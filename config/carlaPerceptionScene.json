@@ -1,4 +1,15 @@
 {
     "hideParkedVehicles": true,
-    "parkedVehicleLabels": ["Car", "Truck", "Bus", "Motorcycle", "Bicycle"]
+    "parkedVehicleLabels": ["Car", "Truck", "Bus", "Motorcycle", "Bicycle"],
+    "targetTrajectory": {
+        "initialGapM": 18.0,
+        "centerGapM": 14.0,
+        "gapAmplitudeM": 1.0,
+        "gapFrequencyRadS": 0.6,
+        "gapGainPerS": 0.8,
+        "maxSpeedMps": 22.0,
+        "lateralOffsetM": 0.0,
+        "coverageCenterGapMinM": 9.0,
+        "coverageCenterGapMaxM": 24.0
+    }
 }

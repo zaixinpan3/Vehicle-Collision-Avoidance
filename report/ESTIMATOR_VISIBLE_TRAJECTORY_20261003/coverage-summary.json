@@ -1,0 +1,210 @@
+{
+  "sceneConfiguration": {
+    "hideParkedVehicles": true,
+    "parkedVehicleLabels": [
+      "Car",
+      "Truck",
+      "Bus",
+      "Motorcycle",
+      "Bicycle"
+    ],
+    "targetTrajectory": {
+      "initialGapM": 18.0,
+      "centerGapM": 14.0,
+      "gapAmplitudeM": 1.0,
+      "gapFrequencyRadS": 0.6,
+      "gapGainPerS": 0.8,
+      "maxSpeedMps": 22.0,
+      "lateralOffsetM": 0.0,
+      "coverageCenterGapMinM": 9.0,
+      "coverageCenterGapMaxM": 24.0
+    }
+  },
+  "definition": {
+    "centerGap": "Target collision-box center minus ego declared center of mass, projected onto current ego forward axis (m).",
+    "initialGap": "18 m spawn spacing along the road between actor origins; first observed center gap is 17.843763 m.",
+    "lowBodyReturns": "Native semantic-LiDAR hits on the target actor with z <= 0.5 m in the ego COM frame; semantics used for coverage scoring only.",
+    "steadyWindow": "Same evaluation time origin as earlier captures: capture frame 200 is t=0; t >= 2 s starts at frame 300. Extended native run continues through t=13.98 s.",
+    "geometricCoverage": "All eight true bounding-box corners inside specified LiDAR range/elevation and projected camera bounds; this does not prove YOLO detection or fully visible surfaces.",
+    "turns": "Legacy same-lane waypoint followers choose the first outgoing branch. Native run includes turns, so ego-frame lateral offset can be nonzero despite zero lane-offset command."
+  },
+  "windows": {
+    "all": {
+      "frames": 900,
+      "firstCaptureFrame": 0,
+      "lastCaptureFrame": 899,
+      "firstEvaluationTimeS": -4.0,
+      "lastEvaluationTimeS": 13.98,
+      "centerLongitudinalRangeM": [
+        9.833793082168313,
+        17.843762938093207
+      ],
+      "maximumAbsoluteLateralM": 7.505798447251067,
+      "maximumAbsoluteRelativeYawDeg": 60.91973114013672,
+      "targetPointCountRange": [
+        47,
+        202
+      ],
+      "lowBodyPointCountRange": [
+        16,
+        113
+      ],
+      "framesWithoutTargetReturns": 0,
+      "framesWithoutLowBodyReturns": 0,
+      "cornerElevationRangeDeg": [
+        -16.288965953124656,
+        -0.9789109559788987
+      ],
+      "minimumLowerElevationMarginDeg": 13.711034046875344,
+      "maximumCornerRangeM": 20.664980573513702,
+      "framesWithAllCornersInsideLidar": 900,
+      "framesWithAllProjectedCornersInsideCamera": 900,
+      "minimumProjectedImageMarginPx": 46.21609630440514,
+      "framesInsideCenterGapEnvelope": 900
+    },
+    "driving": {
+      "frames": 850,
+      "firstCaptureFrame": 50,
+      "lastCaptureFrame": 899,
+      "firstEvaluationTimeS": -3.0,
+      "lastEvaluationTimeS": 13.98,
+      "centerLongitudinalRangeM": [
+        9.833793082168313,
+        17.841833077236046
+      ],
+      "maximumAbsoluteLateralM": 7.505798447251067,
+      "maximumAbsoluteRelativeYawDeg": 60.91973114013672,
+      "targetPointCountRange": [
+        47,
+        202
+      ],
+      "lowBodyPointCountRange": [
+        20,
+        113
+      ],
+      "framesWithoutTargetReturns": 0,
+      "framesWithoutLowBodyReturns": 0,
+      "cornerElevationRangeDeg": [
+        -16.288965953124656,
+        -0.9789109559788987
+      ],
+      "minimumLowerElevationMarginDeg": 13.711034046875344,
+      "maximumCornerRangeM": 20.627637081643677,
+      "framesWithAllCornersInsideLidar": 850,
+      "framesWithAllProjectedCornersInsideCamera": 850,
+      "minimumProjectedImageMarginPx": 46.21609630440514,
+      "framesInsideCenterGapEnvelope": 850
+    },
+    "evaluation": {
+      "frames": 700,
+      "firstCaptureFrame": 200,
+      "lastCaptureFrame": 899,
+      "firstEvaluationTimeS": 0.0,
+      "lastEvaluationTimeS": 13.98,
+      "centerLongitudinalRangeM": [
+        9.833793082168313,
+        14.694906934345944
+      ],
+      "maximumAbsoluteLateralM": 7.505798447251067,
+      "maximumAbsoluteRelativeYawDeg": 60.91973114013672,
+      "targetPointCountRange": [
+        72,
+        202
+      ],
+      "lowBodyPointCountRange": [
+        29,
+        113
+      ],
+      "framesWithoutTargetReturns": 0,
+      "framesWithoutLowBodyReturns": 0,
+      "cornerElevationRangeDeg": [
+        -16.288965953124656,
+        -1.0732212551558609
+      ],
+      "minimumLowerElevationMarginDeg": 13.711034046875344,
+      "maximumCornerRangeM": 17.619272859510684,
+      "framesWithAllCornersInsideLidar": 700,
+      "framesWithAllProjectedCornersInsideCamera": 700,
+      "minimumProjectedImageMarginPx": 46.21609630440514,
+      "framesInsideCenterGapEnvelope": 700
+    },
+    "stable": {
+      "frames": 600,
+      "firstCaptureFrame": 300,
+      "lastCaptureFrame": 899,
+      "firstEvaluationTimeS": 2.0,
+      "lastEvaluationTimeS": 13.98,
+      "centerLongitudinalRangeM": [
+        10.193163494175792,
+        14.694906934345944
+      ],
+      "maximumAbsoluteLateralM": 7.505798447251067,
+      "maximumAbsoluteRelativeYawDeg": 60.91973114013672,
+      "targetPointCountRange": [
+        72,
+        190
+      ],
+      "lowBodyPointCountRange": [
+        29,
+        109
+      ],
+      "framesWithoutTargetReturns": 0,
+      "framesWithoutLowBodyReturns": 0,
+      "cornerElevationRangeDeg": [
+        -15.025472694521012,
+        -1.0732212551558609
+      ],
+      "minimumLowerElevationMarginDeg": 14.974527305478988,
+      "maximumCornerRangeM": 17.619272859510684,
+      "framesWithAllCornersInsideLidar": 600,
+      "framesWithAllProjectedCornersInsideCamera": 600,
+      "minimumProjectedImageMarginPx": 46.21609630440514,
+      "framesInsideCenterGapEnvelope": 600
+    },
+    "matchedOriginalStableWindow": {
+      "frames": 200,
+      "firstCaptureFrame": 300,
+      "lastCaptureFrame": 499,
+      "firstEvaluationTimeS": 2.0,
+      "lastEvaluationTimeS": 5.98,
+      "centerLongitudinalRangeM": [
+        10.193163494175792,
+        13.037018782425045
+      ],
+      "maximumAbsoluteLateralM": 0.01739582350365143,
+      "maximumAbsoluteRelativeYawDeg": 0.0708770751953125,
+      "targetPointCountRange": [
+        104,
+        190
+      ],
+      "lowBodyPointCountRange": [
+        44,
+        90
+      ],
+      "framesWithoutTargetReturns": 0,
+      "framesWithoutLowBodyReturns": 0,
+      "cornerElevationRangeDeg": [
+        -15.025472694521012,
+        -1.3244116438645468
+      ],
+      "minimumLowerElevationMarginDeg": 14.974527305478988,
+      "maximumCornerRangeM": 15.870557633760797,
+      "framesWithAllCornersInsideLidar": 200,
+      "framesWithAllProjectedCornersInsideCamera": 200,
+      "minimumProjectedImageMarginPx": 243.82050276023512,
+      "framesInsideCenterGapEnvelope": 200
+    }
+  },
+  "controlsReproduced": 850,
+  "maximumActuationReproductionError": 2.9800843792671117e-08,
+  "sensorFrameSynchronization": true,
+  "collisionEvents": [],
+  "metadataPath": "simulation_output/estimator_visible_trajectory_20261003/native_validation/metadata.json",
+  "framesPath": "simulation_output/estimator_visible_trajectory_20261003/native_validation/frames.jsonl",
+  "limits": [
+    "Native physics and LiDAR validated on a dedicated port with NullRHI/no rendering. No RGB/YOLO or estimator accuracy rerun.",
+    "Coverage limits are evaluation thresholds, not enforced invariant constraints; other routes, braking events or sensor mounts need revalidation.",
+    "900-frame, 18-second finite validation does not guarantee indefinite visibility. Native sensor parameters and noise remain unchanged.",
+    "Immediate actor-list queries after destroy returned counts 2 vehicles/3 sensors. Settings were restored and all resources were then removed by stopping the verified owned server; final process and port closure independently verified."
+  ]
+}

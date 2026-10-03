@@ -1,0 +1,81 @@
+{
+  "recordedAt": "2026-10-03T18:56:30.171556-05:00",
+  "baseCommit": "504f9f7823ba9cc0b32dc6df51a0e81628c62f7f",
+  "commands": [
+    "python -m unittest discover -s tests -p perceptionTargetTrajectoryTest.py -v",
+    "python -m py_compile scripts/perceptionTargetTrajectory.py tests/perceptionTargetTrajectoryTest.py simulation_output/estimator_visible_trajectory_20261003/captureNative.py simulation_output/estimator_visible_trajectory_20261003/validateNative.py",
+    "systemd-run --user --unit=pdca-visible-trajectory-20261003 --property=MemoryMax=5G --property=MemorySwapMax=0 --property=CPUQuota=250% --property=Nice=10 --property=RuntimeMaxSec=900 --property=KillSignal=SIGINT --property=TimeoutStopSec=20 --working-directory=/home/zai/carla/Build/Package/material_fix_town10_sm6_high_low/Linux /usr/bin/flock -n /tmp/pdca-carla-2011.lock /usr/bin/flock -n /tmp/carla-2011-estimator-smoke.lock /home/zai/carla/Build/Package/material_fix_town10_sm6_high_low/Linux/CarlaUnreal/Binaries/Linux/CarlaUnreal CarlaUnreal -nullrhi -RenderOffScreen -nosound -world-port=2011 -quality-level=Low -stdout -FullStdOutLogOutput",
+    "/home/zai/carla-venv/bin/python simulation_output/estimator_visible_trajectory_20261003/validateNative.py --server-pid 3295680 --frames 900 --output simulation_output/estimator_visible_trajectory_20261003/native_validation",
+    "python simulation_output/estimator_visible_trajectory_20261003/analyzeCoverage.py",
+    "systemctl --user stop pdca-visible-trajectory-20261003.service",
+    "systemctl --user show pdca-visible-trajectory-20261003.service --property=ActiveState --property=Result",
+    "ss -ltnp ( sport = :2000 or sport = :2011 or sport = :2012 or sport = :2013 )",
+    "pdflatex -interaction=nonstopmode -halt-on-error -output-directory=simulation_output/estimator_visible_trajectory_20261003 report/ESTIMATOR_VISIBLE_TRAJECTORY_20261003.tex (two successful passes)"
+  ],
+  "files": [
+    {
+      "path": "config/carlaPerceptionScene.json",
+      "sha256": "e5afabc02a6bf582f57b508d8ffc80bab9e813187613288c32c9dcdbea18211d"
+    },
+    {
+      "path": "scripts/perceptionTargetTrajectory.py",
+      "sha256": "7c30033aa83472883c9673896fa34a08b72c7cf2843fda028d134e7d5057c802"
+    },
+    {
+      "path": "tests/perceptionTargetTrajectoryTest.py",
+      "sha256": "20aa785822cc278d173a4843ffb9c21014ec12c14bb9a219cddfa8060c625dab"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/validateNative.py",
+      "sha256": "0fad2ee1dd184477bb002caaca3ca57a6556ac54b927d116b51293120e406d49"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/captureNative.py",
+      "sha256": "e21fa8d4c150b28d250d5c44dd97b3ac7c9f6ef063c94392c21af5ed6f6b8e20"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/prepareNative.py",
+      "sha256": "8dbc7ae5b159f20931f7511afc7f3a8b5c6286adcf931cf25a23c27702235e57"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/analyzeCoverage.py",
+      "sha256": "08507c040af3ea228ac9139e5b812ea3ab03ed5809dad94e21d77066e81f667a"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/native-input-manifest.json",
+      "sha256": "e30cf3af45e9724f340561a700c5256cb97247f746fea2b704a900fb9b4c8849"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/native_validation/frames.jsonl",
+      "sha256": "7533efba2648496ac04d0d2d5f9df992eda79a4e056f933700f034baa6de6b67"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/native_validation/metadata.json",
+      "sha256": "eb65ea6fa3675fc112dc2276875f226acb3d7d494aab0d90e8d9d5e02955eb43"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/unit-tests.log",
+      "sha256": "dc4d744f07c6d3bc7bedf85e64fb084487b73b928bebd2b702f86d31dc64d718"
+    },
+    {
+      "path": "simulation_output/estimator_visible_trajectory_20261003/server-lifecycle.json",
+      "sha256": "9aaa9c0d5a6e51b003412c031bc4508b102a35283c3d16505a1750e2f987526c"
+    }
+  ],
+  "validation": {
+    "unitTestsPassed": 7,
+    "nativeFrames": 900,
+    "stableFrames": 600,
+    "nativeInputFiles": 911,
+    "actuatorCommandsReproduced": 850,
+    "nativeCoverageAssertionsPassed": true,
+    "sharedPort2000Accessed": false,
+    "ownedServerStoppedAndPortClosed": true,
+    "rgbDetectorOrEstimatorRerun": false,
+    "fullCaptureAdapterSyntaxChecked": true,
+    "reportPages": 4,
+    "reportCompiledTwice": true,
+    "reportPagesAndPlotVisuallyInspected": true
+  },
+  "scope": "Scenario configuration, simulator-independent trajectory/speed-control policy, behavior tests and English report/compact results only. CARLA adapters, recorded data, generated plots/PDF and dependencies remain untracked; concurrent controller/estimator work excluded."
+}

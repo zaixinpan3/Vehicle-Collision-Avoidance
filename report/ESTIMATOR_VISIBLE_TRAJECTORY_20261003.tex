@@ -1,0 +1,140 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,booktabs,graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\graphicspath{{simulation_output/estimator_visible_trajectory_20261003/}}
+\title{A Target Trajectory That Preserves LiDAR Coverage}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+
+\section{Implemented behavior}
+The target now adjusts its speed from relative longitudinal spacing instead
+of receiving an independent fixed 11 m/s reference. The initial road spacing
+is 18 m between actor origins. Its desired center gap oscillates smoothly
+between 13 and 15 m, with zero commanded offset from its lane center.
+The ego speed controller retains its previous 11 m/s setting. Parked vehicle
+map decorations remain disabled.
+
+The previous 15 m label denoted spawn spacing; its stable evaluation actually
+placed the target center only 4.729--4.812 m ahead. The preceding visibility
+study identified missing low vehicle surfaces at those distances. This change
+addresses scenario geometry, without changing the rectangle fitter, observer,
+sensor mounting, LiDAR resolution or noise. It does not claim a new estimator
+RMSE result.
+
+\section{Reference and physical controls}
+Let $s$ be elapsed driving time after the 1 s stationary calibration period,
+$d$ the target collision-box center projected onto the ego forward axis
+relative to the ego center of mass, and $v_e$ the ego forward velocity.
+The scenario policy is
+\[
+ r(s)=14+\sin(0.6s)\quad[\mathrm m],\qquad
+ v_t^{\rm ref}=\operatorname{clip}_{[0,22]}
+ \bigl(v_e+0.6\cos(0.6s)+0.8(r(s)-d)\bigr)\quad[\mathrm{m/s}].
+\]
+For aligned straight motion with exact, unsaturated velocity tracking,
+$\dot e=-0.8e$ for $e=d-r$. Acceleration lag, saturation and turning mean this
+is not a guaranteed visibility invariant. The 9--24 m configuration interval
+is an evaluation envelope, not a hard state constraint.
+
+The target follows map waypoints with the existing physical steering rule.
+Its speed servo retains throttle feedforward 0.25, proportional speed gain
+0.18, brake gain 0.25 and maximum brake 0.8. Maximum target throttle increases
+from 0.65 to 1.0 to give the slower-launching target enough authority to
+recover spacing. Throttle is zero when brake exceeds 0.05; a zero speed
+reference applies full brake. Vehicles are not teleported and their velocity
+is not assigned directly.
+
+Configuration is in \path{config/carlaPerceptionScene.json}; the simulator-independent
+policy and speed servo are in \path{scripts/perceptionTargetTrajectory.py}.
+The local full RGB/LiDAR/GNSS/IMU capture entry point is
+\path{simulation_output/estimator_visible_trajectory_20261003/captureNative.py}.
+It consumes this configuration and the same policy and servo by default.
+The local native coverage driver is \path{validateNative.py} in that directory.
+Simulator adapters and recorded data remain outside tracked project source.
+Actor state is used only for scenario control and separate scoring, never
+as a perception measurement or estimator prior. The prediction-initialized,
+free-pose LiDAR fitting method remains unchanged.
+
+\section{Native validation}
+One 900-frame run at 50 Hz exercised CARLA 0.10.0 on Town10HD\_Opt, spawn 105,
+with a Lincoln MKZ ego and Dodge Charger target. There were 50 stationary,
+150 driving-warmup and 700 evaluation frames. Evaluation $t=0$ is capture
+frame 200, preserving the earlier time convention. Stable evaluation starts
+at $t=2$ s, capture frame 300. The nominal recording duration is 18 s.
+The route includes turns: maximum relative heading was $60.92^\circ$ and
+maximum ego-frame lateral offset was 7.506 m, despite zero lane-offset command.
+
+Native ordinary LiDAR retained 64 channels, 1.28 million points/s, 50 Hz,
+80 m range, $[-30,10]^\circ$ elevation, 0.02 m noise and zero dropoff, with seed
+20261003. A co-located native semantic LiDAR identifies target hits strictly
+for coverage scoring. ``Low body'' here means target returns at ego-COM
+$z\leq0.5$ m; it is a diagnostic count, not a new perception input.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrr@{}}\toprule
+Quantity & All frames & Stable & Matched old window \\
+ & 900 & 600 & 200 \\\midrule
+Evaluation time (s) & $-4$--13.98 & 2--13.98 & 2--5.98 \\
+Center longitudinal gap (m) & 9.834--17.844 & 10.193--14.695 & 10.193--13.037 \\
+Target LiDAR hits/frame & 47--202 & 72--190 & 104--190 \\
+Low-body hits/frame & 16--113 & 29--109 & 44--90 \\
+Frames without target hits & 0 & 0 & 0 \\
+Frames without low-body hits & 0 & 0 & 0 \\
+All box corners inside LiDAR & 900/900 & 600/600 & 200/200 \\
+All corners inside projected image & 900/900 & 600/600 & 200/200 \\
+\bottomrule\end{tabular}
+\end{center}
+The lowest bounding-box corner elevation over the full run was
+$-16.289^\circ$, leaving $13.711^\circ$ above the lower LiDAR boundary.
+All corners remained within 20.665 m range. Their front-camera geometric
+projection retained at least 46.216 pixels to an image boundary. These are
+true-box geometric checks, not observed YOLO detections or proof that every
+vehicle surface is visible. Low-body native hits provide additional evidence
+that the particular near-range truncation has been avoided.
+
+Seven Python behavior tests passed, covering feedback direction, smooth
+reference velocity, speed bounds, acceleration-lag convergence, invalid
+inputs, physical actuation and configuration coverage consistency. All
+850 driving throttle/brake commands from the inline native-test servo were
+reproduced by the extracted default-capture helper within $2.981\times10^{-8}$,
+consistent with the simulator's float precision. Sensor frame IDs matched on
+all 900 ticks and consecutive frames were uninterrupted. No collision events
+were recorded.
+
+\section{Scheduling, scope and limits}
+The shared port 2000 was not used. An exclusively owned server on port 2011
+held both existing local coordination locks. It ran with NullRHI and no image
+rendering under a 5 GiB memory limit, zero swap allowance and 250\% CPU quota.
+This avoided competing for the nearly full GPU memory. The two vehicles and
+three sensors received destruction requests without errors; original world
+settings and 143 hidden decoration components were restored. Immediate
+actor-list queries still returned counts of two vehicles and three
+sensors. The owned server was subsequently stopped successfully and both its
+process exit and closed ports were verified, removing its remaining resources.
+
+Native physics and LiDAR were exercised. RGB rendering, YOLO inference and
+estimator replay were not performed in this run. The full sensor capture
+adapter was prepared and syntax checked; its target actuation was checked
+against every executed native driving command. This finite scenario is not
+a guarantee for other routes, sudden braking, occlusion, weather, sensor
+mounts or arbitrarily long runs. New recordings must retain explicit coverage
+checks. The summary and provenance are in
+\path{report/ESTIMATOR_VISIBLE_TRAJECTORY_20261003/}.
+
+\clearpage
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.86\textheight,keepaspectratio]{trajectory-coverage.pdf}
+\caption{Observed spacing and target returns during the extended native run.
+The green interval is the stable evaluation window. Physical launch lag and
+turning change actual spacing, but low-body hits persist in every frame.}
+\end{figure}
+\end{document}
