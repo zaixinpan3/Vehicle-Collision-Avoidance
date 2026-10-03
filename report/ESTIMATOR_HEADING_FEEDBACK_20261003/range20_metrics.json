@@ -1,0 +1,144 @@
+{
+  "predictionHashesFrozenBeforeTruthRead": {
+    "perception_conf_actual_symmetric/target_measurements.jsonl": "969c560228bc936dc90e5d26846bd440f6d137276b2db1ee706e2441148ac67e",
+    "estimator_conf_actual_symmetric/predictions.csv": "9e9924b676c6e0d80ada36c1d28dca4dd2dbcb4b6b1ec66a4a2310aaed0a7d45",
+    "perception_conf_actual_symmetric_blackout/target_measurements.jsonl": "d72f8e9ba6b7cb980e38c2d6adf163d4a4006f1994e43c7b16522f05b607eeb1",
+    "estimator_conf_actual_symmetric_blackout/predictions.csv": "fc9e29d0f954a5a3f2298b913162b925cf174813a85c83ad68dbcc75e2ccb04d"
+  },
+  "developmentFixtureReused": true,
+  "cases": {
+    "conf_actual_symmetric": {
+      "validFrames": 300,
+      "validFractionOutsideBlackout": 1.0,
+      "rawAllFramesM": {
+        "rmse": 0.08052910727547152,
+        "p95": 0.14744182930022656,
+        "maximum": 0.21848511651427213
+      },
+      "rawAfter2SecondsM": {
+        "rmse": 0.07190638806830837,
+        "p95": 0.12135605843666675,
+        "maximum": 0.21848511651427213
+      },
+      "rawMeanErrorXYAfter2SecondsM": [
+        -0.03150948711079634,
+        0.01685596961582249
+      ],
+      "rawRmseXYAfter2SecondsM": [
+        0.03312886219952989,
+        0.06382011543702128
+      ],
+      "rawWithin0p12MFrames": 262,
+      "missingFrames": [],
+      "fittedHeadingRmseDegAfter2Seconds": 1.6921150840590717,
+      "estimatorPositionAfter2SecondsM": {
+        "rmse": 0.10178314009685176,
+        "p95": 0.18882074993544912,
+        "maximum": 0.2172184180417334
+      },
+      "estimatorVelocityAfter2SecondsMps": {
+        "rmse": 0.3781941780778414,
+        "p95": 0.7183952775216068,
+        "maximum": 0.797196612499313
+      },
+      "allStatesFinite": true,
+      "estimatorPositionAllFramesM": {
+        "rmse": 0.1476358324284395,
+        "p95": 0.2888177316220949,
+        "maximum": 0.31409964754558467
+      },
+      "estimatorVelocityAllFramesMps": {
+        "rmse": 0.8505881646237545,
+        "p95": 1.7943627744764885,
+        "maximum": 3.3015553817727126
+      },
+      "publishedFrames": 300,
+      "initialFrame": 0,
+      "boundsUnavailableFrames": 0,
+      "gates": {
+        "targetPosition": true,
+        "targetVelocity": true,
+        "rawPositionRmse": true,
+        "rawPositionP95": true,
+        "availability": true,
+        "finiteStates": true
+      },
+      "allGatesPass": true
+    },
+    "conf_actual_symmetric_blackout": {
+      "validFrames": 285,
+      "validFractionOutsideBlackout": 1.0,
+      "rawAllFramesM": {
+        "rmse": 0.100121880356993,
+        "p95": 0.16729481633496712,
+        "maximum": 0.23015388075610538
+      },
+      "rawAfter2SecondsM": {
+        "rmse": 0.10255060734605867,
+        "p95": 0.16707509415226318,
+        "maximum": 0.23015388075610538
+      },
+      "rawMeanErrorXYAfter2SecondsM": [
+        -0.033302835735988835,
+        0.02914912839499643
+      ],
+      "rawRmseXYAfter2SecondsM": [
+        0.03492659080604548,
+        0.09641970919740714
+      ],
+      "rawWithin0p12MFrames": 210,
+      "missingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "fittedHeadingRmseDegAfter2Seconds": 2.5508343736171257,
+      "estimatorPositionAfter2SecondsM": {
+        "rmse": 0.1656467334685585,
+        "p95": 0.27258585066316515,
+        "maximum": 0.30258061306484696
+      },
+      "estimatorVelocityAfter2SecondsMps": {
+        "rmse": 0.5802419870970997,
+        "p95": 0.8813313215261275,
+        "maximum": 0.9681179948236789
+      },
+      "allStatesFinite": true,
+      "estimatorPositionAllFramesM": {
+        "rmse": 0.18216026135628616,
+        "p95": 0.2908380082976197,
+        "maximum": 0.31409964754558467
+      },
+      "estimatorVelocityAllFramesMps": {
+        "rmse": 0.923363513088761,
+        "p95": 1.7943627744764885,
+        "maximum": 3.3015553817727126
+      },
+      "publishedFrames": 300,
+      "initialFrame": 0,
+      "boundsUnavailableFrames": 0,
+      "estimatorMaximumPositionErrorDuringBlackoutM": 0.28550052182565133,
+      "gates": {
+        "targetPosition": true,
+        "targetVelocity": true,
+        "rawPositionRmse": true,
+        "rawPositionP95": true,
+        "availability": true,
+        "finiteStates": true
+      },
+      "allGatesPass": true
+    }
+  }
+}

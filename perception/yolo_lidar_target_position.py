@@ -15,9 +15,9 @@ import csv
 import json
 import math
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Protocol
 
 import numpy as np
 
@@ -39,6 +39,34 @@ class CameraEstimate:
     relative_position: np.ndarray
     capsule: dict[str, Any]
     rectangle: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class HeadingPrior:
+    """Predicted body heading in the current perception ego axes.
+
+    The state is predicted to the current frame using earlier measurements.
+    An initialization prior has no measurement history and must be labeled as
+    such. Body heading includes any sideslip correction made by the estimator.
+    The adapter must match the point cloud's axis/angle convention. An NRMM
+    relative heading already uses the current body frame; no estimated world
+    yaw should be introduced when those body axes are otherwise the same.
+    """
+
+    heading_ego_rad: float
+    state_time: float
+    last_measurement_time: float | None
+    source: str
+
+
+class HeadingFeedback(Protocol):
+    """Adapter to an estimator that predicts before consuming each position."""
+
+    def predict(self, frame: int, time: float) -> HeadingPrior | None:
+        ...
+
+    def update(self, frame: int, time: float, position: np.ndarray | None) -> None:
+        ...
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -579,6 +607,8 @@ def estimate_from_cluster(
     cluster: np.ndarray,
     args: argparse.Namespace,
     rectangle_heading_hint: float | None = None,
+    *,
+    fixed_heading: bool = False,
 ) -> CameraEstimate | None:
     """Fit the vehicle body to an associated cluster at a given heading.
 
@@ -591,6 +621,10 @@ def estimate_from_cluster(
 
     rectangle = None
     rectangle_heading = None
+    if fixed_heading and (
+        rectangle_heading_hint is None or not math.isfinite(rectangle_heading_hint)
+    ):
+        raise ValueError("Fixed rectangle orientation requires a finite heading.")
     if args.center_mode == "rectangle":
         center_xy, initial_rectangle = fit_known_size_rectangle(
             cluster,
@@ -600,7 +634,7 @@ def estimate_from_cluster(
             args.rectangle_support_quantile,
             args.rectangle_heading_step,
             args.rectangle_initial_heading_span,
-            args.rectangle_heading_span,
+            0.0 if fixed_heading else args.rectangle_heading_span,
             args.rectangle_heading_smoothness,
             args.rectangle_placement,
             args.rectangle_symmetry_minimum_support,
@@ -617,7 +651,7 @@ def estimate_from_cluster(
                 0.0,
                 min(args.rectangle_heading_step, 0.05),
                 args.rectangle_initial_heading_span,
-                args.rectangle_refine_heading_span,
+                0.0 if fixed_heading else args.rectangle_refine_heading_span,
                 args.rectangle_refine_heading_smoothness,
                 args.rectangle_placement,
                 args.rectangle_symmetry_minimum_support,
@@ -629,6 +663,7 @@ def estimate_from_cluster(
         rectangle.update(
             {
                 "initial_objective": float(initial_rectangle["objective"]),
+                "heading_constraint": "fixed" if fixed_heading else "search",
                 "raw_cluster_point_count": int(cluster.shape[0]),
                 "fit_point_count": int(fit_cluster.shape[0]),
                 "rejected_outlier_count": int(cluster.shape[0] - fit_cluster.shape[0]),
@@ -1324,7 +1359,67 @@ def causal_track_estimates(
     return estimates_by_frame, headings, resolved_count
 
 
-def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
+def estimator_track_estimates(
+    associations: list[dict[str, Any]],
+    args: argparse.Namespace,
+    feedback: HeadingFeedback,
+) -> tuple[list[list[CameraEstimate]], list[float | None], int]:
+    """Fit at the estimator's predicted body heading, then deliver the position.
+
+    The prior state time must match this frame and its latest measurement
+    must precede it. No same-frame refitting or motion-heading iteration is
+    performed. Without a heading prior the existing geometric search is used;
+    without a detection the estimator receives an explicit missing position.
+    """
+    estimates_by_frame = []
+    headings = []
+    resolved = 0
+    previous_time = -float("inf")
+    for record in associations:
+        stamp = float(record["time"])
+        if not math.isfinite(stamp) or stamp <= previous_time:
+            raise ValueError("Estimator feedback requires strictly increasing finite timestamps.")
+        previous_time = stamp
+        prior = feedback.predict(record["frame_number"], stamp)
+        heading = None
+        if prior is not None:
+            if not math.isfinite(prior.heading_ego_rad) or not math.isfinite(prior.state_time):
+                raise ValueError("Estimator heading and state time must be finite.")
+            if abs(prior.state_time - stamp) > 1.0e-9:
+                raise ValueError("Estimator heading must be predicted to the current frame time.")
+            if prior.source not in ("prediction", "initialization"):
+                raise ValueError("Heading prior source must be prediction or initialization.")
+            if prior.last_measurement_time is None:
+                if prior.source != "initialization":
+                    raise ValueError("A predicted heading must identify its latest measurement time.")
+            elif (not math.isfinite(prior.last_measurement_time)
+                  or prior.last_measurement_time >= stamp):
+                raise ValueError("Heading feedback cannot consume the current or a future measurement.")
+            heading = wrap_angle(prior.heading_ego_rad)
+            resolved += 1
+        record["estimator_heading_prior"] = None if prior is None else asdict(prior)
+        estimates = [
+            estimate for detection, cluster in record["clusters"]
+            if (estimate := estimate_from_cluster(
+                detection, cluster, args, heading, fixed_heading=heading is not None
+            )) is not None
+        ]
+        estimates = select_consistent_estimates(estimates, args.max_fusion_spread)
+        fused = fuse_estimates(estimates)
+        # Give the adapter a copy so subsequent updates cannot revise this output.
+        feedback.update(record["frame_number"], stamp, None if fused is None else fused[0].copy())
+        estimates_by_frame.append(estimates)
+        headings.append(heading)
+    return estimates_by_frame, headings, resolved
+
+
+def run_pipeline(
+    args: argparse.Namespace,
+    *,
+    heading_feedback: HeadingFeedback | None = None,
+) -> dict[str, Any]:
+    if heading_feedback is not None and (not args.causal or args.center_mode != "rectangle"):
+        raise ValueError("Estimator heading feedback requires causal rectangle fitting.")
     dataset_root = args.dataset.resolve()
     metadata = load_json(dataset_root / "metadata.json")
     frames = list(iter_jsonl(dataset_root / "frames.jsonl"))
@@ -1436,7 +1531,13 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     estimates_by_frame: list[list[CameraEstimate]] = []
     heading_iterations_run = 0
     heading_change_deg = float("inf")
-    if args.causal:
+    if heading_feedback is not None:
+        estimates_by_frame, headings, resolved = estimator_track_estimates(
+            associations, args, heading_feedback
+        )
+        heading_iterations_run = 1
+        heading_change_deg = None
+    elif args.causal:
         estimates_by_frame, headings, resolved = causal_track_estimates(associations, args)
         heading_iterations_run = 1
         heading_change_deg = None
@@ -1524,6 +1625,9 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             "acceptedDetectionCount": len(all_detections),
             "usedDetectionCount": len(camera_estimates),
         }
+        if heading_feedback is not None:
+            item["estimatorHeadingPrior"] = record["estimator_heading_prior"]
+            item["headingSource"] = "estimator body-heading prior"
         if truth_relative is not None:
             item.update(
                 {
@@ -1606,7 +1710,8 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             "rectangle_initial_heading_span_degrees": args.rectangle_initial_heading_span,
             "rectangle_heading_span_degrees": args.rectangle_heading_span,
             "rectangle_heading_smoothness": args.rectangle_heading_smoothness,
-            "heading_source": "target motion direction",
+            "heading_source": "estimator body-heading prior" if heading_feedback is not None else "target motion direction",
+            "estimator_heading_feedback": heading_feedback is not None,
             "heading_temporal_mode": "causal, frozen past outputs" if args.causal else "offline, centered windows and nearest-frame filling",
             "heading_iterations_run": heading_iterations_run,
             "heading_final_max_change_degrees": heading_change_deg,

@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-10-03T14:58:25.953391-05:00",
+  "prototypeCommands": [
+    "runFeedback.py dev_feedback_edge dev_feedback_symmetric",
+    "runFeedback.py conf_feedback_edge conf_feedback_symmetric conf_feedback_symmetric_blackout conf_constant_symmetric conf_bias20_symmetric conf_bias90_symmetric"
+  ],
+  "actualCommand": "env OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 nice -n 10 /home/zai/.cache/carla-yolo-range-venv/bin/python; set torch.cuda.set_per_process_memory_fraction(0.2,0), then runFeedback.py --actual --device 0 dev_actual_symmetric dev_actual_symmetric_blackout conf_actual_symmetric conf_actual_symmetric_blackout",
+  "gpuAttempt": "Failed before prediction because shared GPU memory was exhausted; no other process was modified.",
+  "pythonTests": "python -m unittest discover -s tests -p 'yoloLidar*Test.py' -v",
+  "matlabTests": [
+    "sharedMeasurementPreservesCurrentPublicationAndEveryNextState",
+    "outputActionLeavesRuntimeStateUntouched",
+    "cascadedObserverConvergesOnAnalyticManeuver",
+    "radarDropoutAdvancesPurePrediction"
+  ],
+  "matlabExecution": "MATLAB MCP unavailable. Actual MATLAB Engine used for per-frame coupling; MATLAB -singleCompThread -batch used for four selected matlab.unittest checks.",
+  "actualDriverHash": "65e4df6a59aec7aa5776811c1cd5646f75ff22206a3844a4c8ed53fb543d7db8",
+  "driverChange": "Added explicit device selection for the CPU retry; estimator/perception algorithms were unchanged.",
+  "frameAdapterCorrection": "Earlier inertial-angle prototypes are retained separately as diagnostics. Final replay directly uses negative targetRelativeHeading in CARLA body coordinates.",
+  "cpuAttemptCommand": "env OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 nice -n 10 taskset -c 12,13,14,15 /home/zai/.cache/carla-yolo-range-venv/bin/python -u simulation_output/estimator_heading_feedback_20261003/runFeedback.py --actual --device cpu dev_actual_symmetric dev_actual_symmetric_blackout conf_actual_symmetric conf_actual_symmetric_blackout",
+  "resourceScheduling": "Initial GPU attempt failed for lack of shared memory. Two owned CPU attempts were interrupted, first for the frame-adapter correction and then after 6115 MiB GPU memory became free. Final GPU inference has a 20 percent PyTorch allocation cap. Other processes and CARLA servers were untouched."
+}

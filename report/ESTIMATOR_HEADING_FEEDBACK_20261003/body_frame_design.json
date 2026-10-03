@@ -1,0 +1,6 @@
+{
+  "recordedAt": "2026-10-03T15:00:14.552445-05:00",
+  "finding": "NRMM q and reconstructed targetRelativeHeading are already in the current ego body axes. Directly negate relative heading for CARLA XY; do not add estimated ego yaw and subtract native ego yaw.",
+  "priorResults": "Earlier inertial-adapter prototypes and the interrupted CPU inference attempt are preserved in inertial_adapter_diagnostic and are diagnostic only.",
+  "productionInterface": "HeadingPrior now explicitly contains current-ego heading, rather than a world angle. State time must match the current perception frame."
+}

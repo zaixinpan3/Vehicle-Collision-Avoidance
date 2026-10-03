@@ -1,0 +1,27 @@
+{
+  "pythonTestsPassed": 32,
+  "matlabTestsPassed": 4,
+  "matlabTestNames": [
+    "sharedMeasurementPreservesCurrentPublicationAndEveryNextState",
+    "outputActionLeavesRuntimeStateUntouched",
+    "cascadedObserverConvergesOnAnalyticManeuver",
+    "radarDropoutAdvancesPurePrediction"
+  ],
+  "actualDetectorCases": 4,
+  "finiteEstimatorPublications": 1200,
+  "bodyFramePrior": true,
+  "fixedBothFitStages": true,
+  "defaultPathPreserved": true,
+  "unmodifiedEstimatorCoreAndGains": true,
+  "noCarlaServerAccess": true,
+  "resourceScheduling": "Initial GPU attempt failed for lack of shared memory. Two owned CPU attempts were interrupted, first for the frame-adapter correction and then after 6115 MiB GPU memory became free. Final GPU inference has a 20 percent PyTorch allocation cap. Other processes and CARLA servers were untouched.",
+  "generalization": "Performance is mixed across the two recordings. Initialization errors and estimator/measurement coupling remain material.",
+  "technicalReportPdf": {
+    "path": "simulation_output/estimator_heading_feedback_20261003/ESTIMATOR_HEADING_FEEDBACK_20261003.pdf",
+    "pages": 5,
+    "twoPassLatexBuildPassed": true,
+    "overfullBoxes": 0,
+    "textExtractionChecked": true,
+    "figureAndLayoutVisuallyInspected": true
+  }
+}

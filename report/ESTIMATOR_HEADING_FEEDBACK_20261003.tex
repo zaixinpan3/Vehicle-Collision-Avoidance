@@ -1,0 +1,167 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,booktabs,graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\title{Causal NRMM Body-Heading Feedback for LiDAR Rectangle Localization}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}\maketitle
+\section{Implemented behavior and measured outcome}
+The perception pipeline can now receive a predicted target body heading from
+an estimator, fit a rectangle with that orientation held fixed, and return the
+new target position to the estimator. The current MATLAB NRMM runtime already
+reconstructs this heading. Its state equations, configuration and gains were
+not modified. Both initial and inlier-refinement rectangle fits preserve the
+supplied orientation, modulo the rectangle's 180-degree symmetry.
+
+Actual YOLO26x inference and native LiDAR association were rerun on two
+previously recorded parked-free CARLA datasets. The following comparison keeps
+symmetric face placement, declared 5.0-by-1.9 m dimensions, confidence selection,
+filters and native ego preprocessing unchanged. The previous method estimates
+a motion direction from the position history; the new method uses the causal
+NRMM body-heading prediction. Each recording contains 300 frames at 0.02 s.
+
+\begin{center}\scriptsize
+\begin{tabular}{@{}llrrrrr@{}}\toprule
+ & & \multicolumn{3}{c}{After 2 seconds} & \multicolumn{2}{c}{All frames} \\
+Data & Heading source & Raw pos. & Est. pos. & Est. vel. & Est. pos. & Est. vel. \\
+ & & m & m & m/s & m & m/s \\\midrule
+15 m & Previous motion heading & 0.0674 & 0.0946 & 0.3049 & 0.1314 & 0.8195 \\
+15 m & NRMM body-heading feedback & 0.0810 & 0.1274 & 0.4471 & 0.1557 & 0.8663 \\
+20 m & Previous motion heading & 0.0661 & 0.1430 & 0.4997 & 0.6948 & 2.6381 \\
+20 m & NRMM body-heading feedback & 0.0719 & 0.1018 & 0.3782 & 0.1476 & 0.8506 \\
+\bottomrule\end{tabular}\end{center}
+
+The 20 m recording's cold-start behavior improves substantially, but the
+15 m recording worsens relative to the preceding symmetric-placement method.
+This is not a uniform accuracy improvement, and the optional feedback path
+has not replaced the default. No new scene or independent capture was used.
+All-frame and post-acquisition metrics are both retained; estimator RMSE
+includes dropout intervals while raw position RMSE uses available detections.
+
+\section{Which heading is used}
+The existing six-state target chain contains relative position $\hat\rho$,
+target absolute velocity $\hat q$ expressed in ego body axes, and target
+acceleration $\hat s$ in those axes. The reconstructed body orientation is
+\[
+ \hat\psi_{C/E}=\operatorname{atan2}(\hat q_y,\hat q_x)-\hat\beta_C.
+\]
+The implementation exposes it as \path{targetRelativeHeading}; it also
+publishes \path{targetHeadingInertial}. The fitted rectangle needs body
+heading, including the estimator's sideslip correction, not just velocity
+course. Since the predicted NRMM state is already in the current ego body
+axes, the native CARLA adapter negates \path{targetRelativeHeading} to match
+CARLA's opposite planar angular convention. No world-yaw estimate is needed.
+Converting through estimated inertial heading and subtracting the native ego
+yaw would introduce an extra ego-heading estimation error. Earlier attempts
+with that adapter are preserved separately as diagnostic artifacts and are
+excluded from the final tables.
+
+The generic Python contract is \path{HeadingPrior}, with fields
+\path{heading_ego_rad}, \path{state_time}, \path{last_measurement_time}, and
+\path{source}. The caller supplies it in the
+same current ego axes as the point cloud. Zero-speed direction is not
+observable from the velocity state; an adapter can return no prior, in which
+case the existing geometric search remains available.
+
+\section{Causal ordering and initialization}
+The implemented ordering at sample $k$ is:
+\begin{enumerate}
+\item The previous \texttt{sample} call has integrated measurements through
+$k-1$ to a state predicted at $t_k$.
+\item Query the current predicted body heading without advancing or modifying
+that state. The prior's state time must equal $t_k$, and its latest measurement
+time must be strictly earlier than $t_k$.
+\item Fit the current detected LiDAR cluster once at the supplied orientation,
+including the inlier refinement. No same-frame target-position update has yet
+been applied, and no motion-heading iteration revises this result.
+\item Supply the fitted position, or an explicit missing measurement, to
+\path{onlineNrmmTrackingRuntime} with the \texttt{sample} action. This advances the observer
+for the next frame. Previously published positions are never revisited.
+\end{enumerate}
+
+The first frame necessarily has no converged target-heading estimate.
+This replay uses the existing co-moving initialization: native GNSS ego
+velocity initializes target velocity, target acceleration is zero, and the
+first fitted position initializes relative position. The first heading is
+explicitly labeled \texttt{initialization}; later ones are \texttt{prediction}.
+That prior is suitable for these following-vehicle scenes but is an assumption,
+not a heading measurement or a solution to arbitrary target acquisition.
+
+The API is invoked through \path{run_pipeline(args,heading_feedback=adapter)}.
+An adapter implements \path{predict(frame,time)}
+and \path{update(frame,time,position)}. This keeps estimator transport outside
+the geometry implementation. The local research adapter uses the actual
+installed MATLAB Engine and production runtime; no Python approximation of
+NRMM or actor-truth input is substituted. Recorded detections can be cached
+because their association is independent of heading; the final runs rerun
+actual detection. This remains an offline replay, not a 50 Hz implementation.
+
+\section{Ablations and failure cases}
+Cached actual detections and native clouds were used for the diagnostic
+ablations. With original edge anchoring, feedback is much worse than with
+symmetric placement: post-2-second position/velocity RMSE is
+0.5927 m / 2.0621 m/s at 15 m and 0.3377 m / 1.1868 m/s at 20 m.
+This shows that supplying heading does not by itself eliminate placement bias.
+
+For the straight 20 m recording, holding the initial world heading constant
+instead of updating it gives 0.0256 m position / 0.1101 m/s velocity RMSE
+after 2 s. This is a revealing control, not a recommendation for turning
+vehicles: a good initial straight-line assumption already supplies much of
+the useful information, while noisy feedback can degrade it.
+
+When the initial target velocity/body-heading prior is rotated by 20 degrees,
+the 20 m feedback case has 0.6761 m position / 2.5280 m/s velocity RMSE after
+2 s. At 90 degrees it has 0.7598 m / 2.6344 m/s. The corresponding full-record
+position RMSE values are 0.9618 and 1.3008 m. All cases remain finite, but
+several accuracy gates fail. Hard orientation locking can preserve a wrong
+initial interpretation rather than reliably recover from it.
+
+The measurement now depends on the observer's prior state: orientation error
+changes the fitted center, which subsequently changes velocity and heading
+estimates. Deterministic ISS analysis does not require statistical independence,
+but the assumed measurement-error and model-domain bounds must still hold for
+this feedback path. These tests do not establish those bounds or a new
+coupled-system stability certificate. A bounded
+heading search, uncertainty-aware acceptance or multi-hypothesis acquisition
+would require separate implementation and validation; none is claimed here.
+
+\section{Validation and reproducibility}
+All 32 Python geometry, association, causality and feedback behavior tests
+pass. They check fixed orientation in both fitting stages, current body-frame
+semantics, strict prior timestamps, predict-before-update order, missing
+measurements, duplicate-time rejection, nonmutation and prefix invariance.
+Four focused MATLAB tests pass: current-publication/next-state equivalence,
+read-only output queries, analytic maneuver convergence including target
+heading, and pure prediction during radar dropout.
+
+The actual-feedback normal/blackout pair in each recording differs only in
+RGB paths at frames 150--164. Audit results record fixed-angle residuals,
+strictly past prior timestamps, finite output counts, matching prefixes,
+reacquisition and unchanged ego states. Original raw files are preserved.
+Scoring hashes are written before the separate scorer reads actor truth.
+The initial GPU attempt failed from insufficient shared memory. Bounded-core
+CPU attempts were interrupted for the frame correction and, later, when GPU
+memory became available. Final inference uses GPU 0 with a 20 percent PyTorch
+allocation cap and lower scheduling priority, without touching other processes
+or any CARLA server. Complete commands, runtime versions, source
+hashes, diagnostics and actual timings accompany the report.
+
+Configured target speeds start at 10 m/s, while these recordings include
+slower targets. Some raw errors exceed the configured 0.12 m measurement
+allowance. Availability of an observer-bound flag does not validate those
+premises. Native compass heading also retains the earlier ideal-heading
+limitation. The generic callback integration and behavior tests are tracked;
+raw recordings, local MATLAB replay transport, caches, model weights and
+figures remain outside Git, with identified external archive exports.
+
+\IfFileExists{feedback_trace.pdf}{\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{feedback_trace.pdf}
+\caption{Actual-feedback errors compared with the previous symmetric geometry.
+The vertical line marks the fixed 2 s acquisition exclusion. The shaded band
+applies only to the blackout feedback case.}\end{figure}}{}
+\end{document}

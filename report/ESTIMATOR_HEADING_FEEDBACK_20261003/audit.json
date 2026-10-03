@@ -1,0 +1,78 @@
+{
+  "captures": {
+    "dev": {
+      "framesPerCase": 300,
+      "finiteEstimatorPublications": 600,
+      "firstPriorIsExplicitInitialization": true,
+      "laterPriorMeasurementTimesStrictlyBeforeFrame": true,
+      "priorStateTimesMatchCurrentFrame": true,
+      "fixedAngleMaximumErrorRad": 0.0,
+      "blackoutMissingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "reacquisitionFrame": 165,
+      "identicalPrefixBeforeBlackout": true,
+      "identicalEgoStates": true,
+      "actualVsCachedPrototypeMaximumPositionDifferenceM": 1.4210854715202004e-14
+    },
+    "conf": {
+      "framesPerCase": 300,
+      "finiteEstimatorPublications": 600,
+      "firstPriorIsExplicitInitialization": true,
+      "laterPriorMeasurementTimesStrictlyBeforeFrame": true,
+      "priorStateTimesMatchCurrentFrame": true,
+      "fixedAngleMaximumErrorRad": 0.0,
+      "blackoutMissingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "reacquisitionFrame": 165,
+      "identicalPrefixBeforeBlackout": true,
+      "identicalEgoStates": true,
+      "actualVsCachedPrototypeMaximumPositionDifferenceM": 0.0
+    }
+  },
+  "unchangedProductionEstimatorAndConfiguration": true,
+  "pythonTests": 32,
+  "matlabTests": 4,
+  "coreSourceSha256": "fa8890c14ce9369fe7592694edddb51f0833d564893f4bfd55444be609af4248",
+  "predictionHashes": {
+    "perception_dev_actual_symmetric/target_measurements.jsonl": "4a909ef9d33ea38b0c571798e89c91201569e13e2db0bccc5f2690edaedd6a61",
+    "estimator_dev_actual_symmetric/predictions.csv": "3b104a519364db6f1f837eefe96d3a9499a295366f37cfd1ad0bc6245cd10877",
+    "perception_dev_actual_symmetric_blackout/target_measurements.jsonl": "39600ed2ceffab7e35c6f8687ec3ced993355f13b8e7239eb44fbc91e51d38a4",
+    "estimator_dev_actual_symmetric_blackout/predictions.csv": "ffbfd86e9d4ceed974e3bb2a04d8b1128a7bc8c861e1dea14e828a36500f5dcd",
+    "perception_conf_actual_symmetric/target_measurements.jsonl": "969c560228bc936dc90e5d26846bd440f6d137276b2db1ee706e2441148ac67e",
+    "estimator_conf_actual_symmetric/predictions.csv": "9e9924b676c6e0d80ada36c1d28dca4dd2dbcb4b6b1ec66a4a2310aaed0a7d45",
+    "perception_conf_actual_symmetric_blackout/target_measurements.jsonl": "d72f8e9ba6b7cb980e38c2d6adf163d4a4006f1994e43c7b16522f05b607eeb1",
+    "estimator_conf_actual_symmetric_blackout/predictions.csv": "fc9e29d0f954a5a3f2298b913162b925cf174813a85c83ad68dbcc75e2ccb04d"
+  },
+  "noCarlaConnection": true,
+  "scope": "Existing data, straight route and same target. Initialization and feedback coupling limit generalization; no new closed-loop stability or deterministic bound claim."
+}
