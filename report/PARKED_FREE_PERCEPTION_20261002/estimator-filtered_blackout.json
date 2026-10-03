@@ -1,0 +1,73 @@
+{
+  "caseName": "filtered_blackout",
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "frames": 300,
+  "initialFrame": 0,
+  "publishedFrames": 300,
+  "finiteStates": true,
+  "targetMissingFrames": 15,
+  "positionBoundUnavailableFrames": 0,
+  "estimatedDomainInvalidFrames": 127,
+  "runtimeMedianSeconds": 0.002102,
+  "runtimeMaximumSeconds": 0.00859,
+  "configuration": {
+    "runtime": {
+      "samplePeriod": 0.02,
+      "integrationStepMaximum": 0.005,
+      "targetHistoryDuration": 2
+    },
+    "target": {
+      "model": {
+        "scalarAccelerationRateMaximum": 0,
+        "curvatureRateMaximum": 0
+      },
+      "domain": {
+        "speedMinimum": 10,
+        "speedMaximum": 20,
+        "scalarAccelerationMaximum": 2,
+        "sideslipMaximum": 0.015,
+        "rearAxleDistance": 1.6,
+        "relativePositionMaximum": 50
+      }
+    },
+    "ego": {
+      "domain": {
+        "speedMinimum": 5,
+        "speedMaximum": 20,
+        "yawRateMaximum": 0.3,
+        "accelerationNormMaximum": null,
+        "bodyAccelerationRateMaximum": null,
+        "yawAccelerationMaximum": null
+      },
+      "yaw": {
+        "rearAxleDistance": 1.714395,
+        "sideslipDomainMaximum": 0.05,
+        "singleTrackYawRateMismatchMaximum": 0.02
+      }
+    },
+    "measurement": {
+      "gps": {
+        "positionNoiseMaximum": 0.12,
+        "velocityNoiseMaximum": 0.02
+      },
+      "imu": {
+        "noiseMaximum": 0.05
+      },
+      "gyroscope": {
+        "noiseMaximum": 0.002
+      },
+      "radar": {
+        "noiseMaximum": 0.12
+      }
+    }
+  },
+  "integration": {
+    "requestedStepMaximum": 0.005,
+    "rateLimitedStepMaximum": 0.053387489499990358,
+    "substepCount": 4,
+    "nominalSampledSpectralRadius": 0.9602748641813873,
+    "scope": "Necessary nominal sampling check and gain-aware RK4 resolution; no nonlinear digital certificate"
+  },
+  "truthReadByEstimator": false,
+  "initialization": "First native GNSS velocity/position, native compass and first YOLO/LiDAR relative-position acquisition; co-moving zero-acceleration target hypothesis."
+}

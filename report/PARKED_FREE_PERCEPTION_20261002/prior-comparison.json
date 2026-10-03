@@ -1,0 +1,45 @@
+{
+  "scoreWindowSeconds": [
+    2.0,
+    5.98
+  ],
+  "cases": {
+    "parked_original_filters_confidence": {
+      "rawPositionRmseM": 1.2456074312924665,
+      "estimatedPositionRmseM": 1.2406291543589725,
+      "targetVelocityRmseMps": 3.6721612731664255
+    },
+    "parked_improved_filters_persistent": {
+      "rawPositionRmseM": 0.25122736625058395,
+      "estimatedPositionRmseM": 0.285140910625767,
+      "targetVelocityRmseMps": 0.7453026410299565
+    },
+    "parked_improved_filters_persistent_blackout": {
+      "rawPositionRmseM": 0.25018625935895566,
+      "estimatedPositionRmseM": 0.33720513293219784,
+      "targetVelocityRmseMps": 0.890589075614799
+    },
+    "hidden_default": {
+      "rawPositionRmseM": 0.3695175249862167,
+      "estimatedPositionRmseM": 0.46414903007034036,
+      "targetVelocityRmseMps": 1.2201249643473846
+    },
+    "hidden_filtered": {
+      "rawPositionRmseM": 0.1628638850825188,
+      "estimatedPositionRmseM": 0.1830569527933214,
+      "targetVelocityRmseMps": 0.41953699414979767
+    },
+    "hidden_filtered_blackout": {
+      "rawPositionRmseM": 0.15549692708641036,
+      "estimatedPositionRmseM": 0.20540279056152957,
+      "targetVelocityRmseMps": 0.4804186924618806
+    }
+  },
+  "originalVersusFreshMaximumAbsoluteTrajectoryDifference": {
+    "ego_centerOfMassPosition": 0.0,
+    "ego_velocity": 0.0,
+    "target_collisionCenterPosition": 7.43865966796875e-05,
+    "target_velocity": 0.0035266876220703125
+  },
+  "interpretation": "Repeated capture on the same route and seeds, not independent scenario coverage. Original-filter confidence comparison keeps processing settings fixed while changing the scene and recapturing; the prior improved-filter comparator also used persistent association."
+}

@@ -1,0 +1,55 @@
+{
+  "scope": "Fresh capture on a previously used route and seed; no gain or threshold retuning.",
+  "nativeSensorGroups": 500,
+  "evaluationFrames": 300,
+  "nativeFramesConsecutive": true,
+  "nativeSensorFramesAligned": true,
+  "preparationMaximumInputTimestampNeverInFuture": true,
+  "hiddenStaticVehicleMeshComponents": 143,
+  "allPredictionHashesUnchangedAfterScoring": true,
+  "perceptionEstimatorSourcesAndModelUnchanged": true,
+  "filteredBlackoutFirst150PerceptionFramesIdentical": true,
+  "filteredBlackoutFirst150EstimatorStatesIdentical": true,
+  "egoStatesIdenticalAcrossCases": true,
+  "blackoutOnlyChangesRgbPathsForFrames150To164": true,
+  "totalFiniteEstimatorPublications": 900,
+  "selectionAuditMethod": "Scoring-only target-center projection; box inclusion is a diagnostic, not a full identity annotation.",
+  "selectionAudit": {
+    "default": {
+      "selectedBoxExcludesTrueTargetCenterFrames": [],
+      "count": 0,
+      "detectorRawCountMean": 1.0366666666666666
+    },
+    "filtered": {
+      "selectedBoxExcludesTrueTargetCenterFrames": [],
+      "count": 0,
+      "detectorRawCountMean": 1.0366666666666666
+    },
+    "filtered_blackout": {
+      "selectedBoxExcludesTrueTargetCenterFrames": [],
+      "count": 0,
+      "detectorRawCountMean": 0.9866666666666667
+    }
+  },
+  "allCasesFunctionalPass": true,
+  "accuracyPassByCase": {
+    "default": true,
+    "filtered": true,
+    "filtered_blackout": true
+  },
+  "existingPythonBehaviorTests": {
+    "passed": 14,
+    "failed": 0,
+    "logSha256": "8bc4516a06aa6eedf8268120e7c68064a4a5fb809721981ead70947f018c946e"
+  },
+  "sourceHashes": {
+    "simulation_output/parked_free_perception_20261002/auditResults.py": "f6185d8e24e75d3330e9fa53820be887f5203f0d00a2c5852cd7abc6511e5b50",
+    "simulation_output/parked_free_perception_20261002/captureNative.py": "d9824c26a8967b6240edf50c04099a5513daa924577d4c6ed1d036a2b8c4591b",
+    "simulation_output/parked_free_perception_20261002/comparePrior.py": "826d29cf89fb2b0e84a94ddc974c99409052886a3cad84812166cc04ce701af3",
+    "simulation_output/parked_free_perception_20261002/plotResults.py": "08f00b8e8846fd6851c3f10c2cbc61dda32bba3010ac1d5b62cce8ad5e7a3350",
+    "simulation_output/parked_free_perception_20261002/prepareNative.py": "8dbc7ae5b159f20931f7511afc7f3a8b5c6286adcf931cf25a23c27702235e57",
+    "simulation_output/parked_free_perception_20261002/runPipeline.py": "e24755b0c2d94d201f844c54dccb924574bab9a5f4e576abdfcb80fb6bc077ec",
+    "simulation_output/parked_free_perception_20261002/scoreNative.py": "9046a7d1f301b428124b6eb4218979fa29a150d8f8653ecb72ba668b624c8d8d",
+    "simulation_output/parked_free_perception_20261002/writeReport.py": "618f0f3384ed9fd3945aa8c0357c3fc09fb8dd5c3b28d3ae8221bee4f8e2d2bf"
+  }
+}

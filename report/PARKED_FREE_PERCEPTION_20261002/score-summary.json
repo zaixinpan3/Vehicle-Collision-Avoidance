@@ -1,0 +1,200 @@
+{
+  "predictionHashesBeforeTruthRead": {
+    "estimator_default/predictions.csv": "85c866e02a852e5ef1b3303af6d2834df4d11453dd4b8bebd8d97e6ad8923e8a",
+    "perception_default/target_measurements.jsonl": "13da6d644ff48db04fcbf617a32c6e27a9ba33946fcfdc30c036abdd3a313314",
+    "estimator_filtered/predictions.csv": "0a047f0d9074985df6a8f380d9842f186c16dcb9a6966f6a6b1eefe423c5282c",
+    "perception_filtered/target_measurements.jsonl": "b5196de074cf1861281e941a3062cfdcf9d034bd322097bc0aa6cd7f245d4c12",
+    "estimator_filtered_blackout/predictions.csv": "87dd9676cf002ba46db4cc7e50c88377d7c8ef4a9b00f686a0a5db9ff69cc815",
+    "perception_filtered_blackout/target_measurements.jsonl": "fa7cc4d322ad90d2544213c52072f1b960517373a287754fd28e54b634b3ef2d"
+  },
+  "truthReadByPredictionStages": false,
+  "scoringTargetReference": "Collision bounding-box center in the physical ego body XY frame, relative to the ego CG.",
+  "nativeEgoSensorErrors": {
+    "gnssPositionM": {
+      "rmse": 0.014355261152212076,
+      "max": 0.033867484851862396
+    },
+    "derivedGnssVelocityMps": {
+      "rmse": 0.22445750097469064,
+      "max": 1.6719871061552847
+    },
+    "gyroYawRateRadps": {
+      "rmse": 0.0004935705911378397,
+      "max": 0.0014041116071465954
+    }
+  },
+  "truthDomain": {
+    "egoSpeedRangeMps": [
+      8.193235956848781,
+      11.187613897729511
+    ],
+    "targetSpeedRangeMps": [
+      4.7573678781819275,
+      11.141045767751033
+    ],
+    "egoMaximumYawRateRadps": 0.05231483684789392,
+    "targetRangeM": [
+      4.7292472413781965,
+      10.781739361004549
+    ]
+  },
+  "default": {
+    "frames": 300,
+    "scoredFrames": 200,
+    "allStatesFinite": true,
+    "rmseAfter2Seconds": {
+      "egoPositionM": 0.013794453218142188,
+      "egoVelocityMps": 0.047729664231294294,
+      "egoBodyVelocityMps": 0.04698579382179173,
+      "egoYawDeg": 0.053238801261970524,
+      "targetRelativePositionM": 0.46414903007034036,
+      "targetVelocityMps": 1.2201249643473846
+    },
+    "maximumErrorsAfter2Seconds": {
+      "egoPositionM": 0.051898838937587385,
+      "egoVelocityMps": 0.19835510074751844,
+      "egoBodyVelocityMps": 0.1989324069969463,
+      "egoYawDeg": 0.13306783756262078,
+      "targetRelativePositionM": 0.6057194503111554,
+      "targetVelocityMps": 2.0193448831237544
+    },
+    "accuracyGates": {
+      "egoPositionM": true,
+      "egoVelocityMps": true,
+      "egoBodyVelocityMps": true,
+      "egoYawDeg": true,
+      "targetRelativePositionM": true,
+      "targetVelocityMps": true
+    },
+    "validPerceptionFrames": 300,
+    "missingPerceptionFrameIds": [],
+    "perceptionValidFractionOutsideBlackout": 1.0,
+    "perceptionRelativePositionRmseAfter2SecondsM": 0.3695175249862167,
+    "perceptionRelativePositionP95After2SecondsM": 0.41556980942294836,
+    "perceptionRelativePositionMaximumM": 0.499420470251821,
+    "perceptionNoiseBound0p12MExceededFrames": 294,
+    "estimatorBoundUnavailableFrames": 0,
+    "runtimeMedianSeconds": 0.0022884999999999997,
+    "runtimeMaximumSeconds": 0.349613,
+    "perceptionGates": {
+      "availability": true,
+      "rmse": true,
+      "p95": true
+    },
+    "functionalPass": true,
+    "accuracyPass": true
+  },
+  "filtered": {
+    "frames": 300,
+    "scoredFrames": 200,
+    "allStatesFinite": true,
+    "rmseAfter2Seconds": {
+      "egoPositionM": 0.013794453218142188,
+      "egoVelocityMps": 0.047729664231294294,
+      "egoBodyVelocityMps": 0.04698579382179173,
+      "egoYawDeg": 0.053238801261970524,
+      "targetRelativePositionM": 0.1830569527933214,
+      "targetVelocityMps": 0.41953699414979767
+    },
+    "maximumErrorsAfter2Seconds": {
+      "egoPositionM": 0.051898838937587385,
+      "egoVelocityMps": 0.19835510074751844,
+      "egoBodyVelocityMps": 0.1989324069969463,
+      "egoYawDeg": 0.13306783756262078,
+      "targetRelativePositionM": 0.3089579180991841,
+      "targetVelocityMps": 1.2436825031614447
+    },
+    "accuracyGates": {
+      "egoPositionM": true,
+      "egoVelocityMps": true,
+      "egoBodyVelocityMps": true,
+      "egoYawDeg": true,
+      "targetRelativePositionM": true,
+      "targetVelocityMps": true
+    },
+    "validPerceptionFrames": 300,
+    "missingPerceptionFrameIds": [],
+    "perceptionValidFractionOutsideBlackout": 1.0,
+    "perceptionRelativePositionRmseAfter2SecondsM": 0.1628638850825188,
+    "perceptionRelativePositionP95After2SecondsM": 0.23345160504428564,
+    "perceptionRelativePositionMaximumM": 0.3514544356723764,
+    "perceptionNoiseBound0p12MExceededFrames": 230,
+    "estimatorBoundUnavailableFrames": 0,
+    "runtimeMedianSeconds": 0.0021955,
+    "runtimeMaximumSeconds": 0.018157,
+    "perceptionGates": {
+      "availability": true,
+      "rmse": true,
+      "p95": true
+    },
+    "functionalPass": true,
+    "accuracyPass": true
+  },
+  "filtered_blackout": {
+    "frames": 300,
+    "scoredFrames": 200,
+    "allStatesFinite": true,
+    "rmseAfter2Seconds": {
+      "egoPositionM": 0.013794453218142188,
+      "egoVelocityMps": 0.047729664231294294,
+      "egoBodyVelocityMps": 0.04698579382179173,
+      "egoYawDeg": 0.053238801261970524,
+      "targetRelativePositionM": 0.20540279056152957,
+      "targetVelocityMps": 0.4804186924618806
+    },
+    "maximumErrorsAfter2Seconds": {
+      "egoPositionM": 0.051898838937587385,
+      "egoVelocityMps": 0.19835510074751844,
+      "egoBodyVelocityMps": 0.1989324069969463,
+      "egoYawDeg": 0.13306783756262078,
+      "targetRelativePositionM": 0.4950326930382152,
+      "targetVelocityMps": 1.2436825031614447
+    },
+    "accuracyGates": {
+      "egoPositionM": true,
+      "egoVelocityMps": true,
+      "egoBodyVelocityMps": true,
+      "egoYawDeg": true,
+      "targetRelativePositionM": true,
+      "targetVelocityMps": true
+    },
+    "validPerceptionFrames": 285,
+    "missingPerceptionFrameIds": [
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160,
+      161,
+      162,
+      163,
+      164
+    ],
+    "perceptionValidFractionOutsideBlackout": 1.0,
+    "perceptionRelativePositionRmseAfter2SecondsM": 0.15549692708641036,
+    "perceptionRelativePositionP95After2SecondsM": 0.20926316861518288,
+    "perceptionRelativePositionMaximumM": 0.3514544356723764,
+    "perceptionNoiseBound0p12MExceededFrames": 215,
+    "estimatorBoundUnavailableFrames": 0,
+    "runtimeMedianSeconds": 0.002102,
+    "runtimeMaximumSeconds": 0.00859,
+    "perceptionGates": {
+      "availability": true,
+      "rmse": true,
+      "p95": true
+    },
+    "functionalPass": true,
+    "accuracyPass": true,
+    "blackoutFramesWithoutDetection": 15,
+    "firstValidFrameAfterBlackout": 165,
+    "maximumTargetPositionErrorDuringBlackoutM": 0.4783242763957675,
+    "maximumTargetPositionErrorAfterBlackoutM": 0.4950326930382152
+  },
+  "unchangedPrefixBeforeBlackoutExactlyEqual": true
+}

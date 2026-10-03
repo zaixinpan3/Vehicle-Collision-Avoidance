@@ -1,0 +1,40 @@
+{
+  "gitCommitBeforeRun": "a55b43ca97175b5a11ea8c0f55f6102dd92d602f",
+  "sourcesSha256": {
+    "perception/yolo_lidar_target_position.py": "7d2e0133c97358970ee38fc95bd6583c59cfd292528107e05f50dace0c2d1a89",
+    "config/nrmmTrackingConfig.m": "50c79c001f29c499023f974f85d1a06103ebbd9e47923ad986b7bf3d63072248",
+    "config/carlaPerceptionScene.json": "80cf738db28c53f11bb4fc193309b8a1e2fcc555fb5935a8eae599df400d6dc3",
+    "estimator/certifiedKinematicCourseCorrespondence.m": "e969fc6c2aee79fd4eb9976d6a7342609499c7a6e40b2ad1f8516fb1a3288e5b",
+    "estimator/certifiedRotationCorrespondence.m": "fe3848a3e72ba4da39b800f2f374e85d37c457aad7df8e24c5f5dc250309b37e",
+    "estimator/nrmmControllerErrorBounds.m": "48bfd1208c4ecc5a1dd20b74364895da9b9d71a9ad66e060fdd35ef80f8280cc",
+    "estimator/nrmmKinematicVelocityMeasurement.m": "0f075c3dafeb4b11a8cda324f39c88e370c29c35ba9755a4412f20a83f5edfae",
+    "estimator/nrmmObserverCertificate.m": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308",
+    "estimator/nrmmObserverRk4Interval.m": "33c395fb3f5905853a19dfd1e6502b80d1a50ffcb281934e98a00b459f6dd795",
+    "estimator/nrmmObserverVectorField.m": "df803b56eb8c3584f9903d271b15f0168d1881ba0bdcf4cba2688c6d48ee5686",
+    "estimator/nrmmPositionErrorBound.m": "5b6fe45f7924c611c6af948038bf16b059fbb76ece1aba571f7d6f420ffbebb5",
+    "estimator/nrmmTargetHistory.m": "7d42d50c49d6217738a9b0247d2ad1faa8563b8066d03e9556e0185e4984522e",
+    "estimator/nrmmTargetLipschitzCertificate.m": "d1f561ad3c3de0868d73b5f45589b30af2b574136316faaca80bfa8100f9c8ba",
+    "estimator/nrmmTargetParameterErrorBounds.m": "6d1104488dc5b9b2d8dda8c3274a6f24294fef0e5d767df6008cb8a473d8d850",
+    "estimator/nrmmTargetTrackerDerivative.m": "6e38b0cbb14d316af51f841d6d0c9a5faf2047a898868d9171df912094a5f088",
+    "estimator/nrmmVelocityDisturbanceBound.m": "84c4c6e9e4c1b47c395df29f5c71043854522d563c7222922aeeb2be9160951a",
+    "estimator/nrmmYawObserverDerivative.m": "732496acba9d6c793d443d53c5fd424912016755cdc3178fe8160e23e46dc70d",
+    "estimator/nrmmYawSet.m": "cc30d09659426872322c8c28d373144680a1dcf23a1ec5354f35f30b1079c295",
+    "estimator/onlineNrmmTrackingRuntime.m": "61a4737a086c076f732ce61705253268f0e66367e30c54647bac7069da91ac05",
+    "estimator/sharmaMultistageObserverDesign.m": "d11057981c43415fa7678513e205cc7d2365c0f237df0c2c07fc116171cb32c5",
+    "estimator/sharmaMultistageObserverRuntime.m": "807a2a0e97d91639f4864791274dcd3c5d70554e996a0e675a408251c4f56fd0",
+    "estimator/sharmaNrmmCompanionDerivative.m": "01ca12dbaa5ea3e8fa335ad139b34de5a6e3ca556a50f884a11cab48ab7e4a41",
+    "estimator/synthesizeNrmmObserverGains.m": "ee4365427a46012eb1eecd19b6b919b2a08b3c13687bb84e6d805dfd028f8a0d",
+    "estimator/synthesizeTargetTrackerCertificate.m": "767da0b6bbcc34f228bc74914d443539a8d94d605ce5121b0221dd6be93d9464",
+    "simulation_output/parked_free_perception_20261002/captureNative.py": "d9824c26a8967b6240edf50c04099a5513daa924577d4c6ed1d036a2b8c4591b",
+    "simulation_output/parked_free_perception_20261002/prepareNative.py": "8dbc7ae5b159f20931f7511afc7f3a8b5c6286adcf931cf25a23c27702235e57",
+    "simulation_output/parked_free_perception_20261002/runNativeEstimator.m": "ca077db3b5a2b264bd3d4271e91c35dd1cc08eab9fe31efd2b9ee63bafa993d8",
+    "simulation/carla_town10_capture.py": "518f6f70e27ed4c6a81527bf2850c3bca7b291216763cfa26023d7cb69718d4b"
+  },
+  "modelPath": "/home/zai/.cache/yolo26/yolo26x.pt",
+  "modelSha256": "9fdd44a31c504547ffb81d2c6d9e6dac3493c8eaa8b0398d3f43bae6c7003e92",
+  "additionalDependenciesSha256": {
+    "config/mncavVehicleConfig.m": "27ddaaf5b081757594d78d8290c76a1513e686e783ede95b6f1fb2689e44a80a",
+    "solver/nrmm/nrmmObserverRk4IntervalMex.mexa64": "d6d520cf4184eff6c8b8e5ce1d8a9b5ec46414fb260ce3e188d6af210107b114"
+  },
+  "matlabExecution": "No MATLAB MCP tool was exposed in ALL_TOOLS; used matlab -singleCompThread -batch under matlab-test-execution skill."
+}
