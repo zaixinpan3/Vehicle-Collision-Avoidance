@@ -7,6 +7,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
 % continuation. A completed duration is distinct from confirmed recovery.
 % TargetEstimateFunction(targetTruth,egoTruth) is an optional synthetic
 % observation hook. It never changes the fixed physical target trajectory.
+% EstimatorConfiguration enables the actual noisy-sensor NRMM adapter. The
+% plant always starts from truth, independently of the published estimate.
+% FailureFile saves experiment inputs for offline reproduction only.
 % Theoretical certificate availability is not an experiment failure criterion.
     arguments
         options.Frames (1,1) double {mustBeInteger,mustBePositive} = 8
@@ -22,18 +25,38 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         options.ContinuationFile (1,1) string = ""
         options.ResumeFrom (1,1) string = ""
         options.TargetEstimateFunction = []
+        options.EstimatorConfiguration (1,1) struct = struct()
+        options.FailureFile (1,1) string = ""
     end
     assert(isempty(options.TargetEstimateFunction) || isa(options.TargetEstimateFunction,'function_handle'), ...
         'TargetEstimateFunction must be empty or a function handle.');
     observationModel="exactTargetState";
     if ~isempty(options.TargetEstimateFunction),observationModel=string(func2str(options.TargetEstimateFunction));end
+    useEstimator=~isempty(fieldnames(options.EstimatorConfiguration));
+    assert(~useEstimator || isempty(options.TargetEstimateFunction), ...
+        'The actual estimator and a synthetic estimate hook cannot be combined.');
+    if useEstimator,observationModel="nrmmSyntheticSensors";end
     assert((strlength(options.ContinuationFile)==0 && strlength(options.ResumeFrom)==0) ...
         || isscalar(options.Scenarios),'Continuation files require exactly one scenario.');
+    assert(strlength(options.FailureFile)==0 || isscalar(options.Scenarios), ...
+        'A failure snapshot requires exactly one scenario.');
     root=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(root,'controller'),fullfile(root,'config'));
     results=cell(1,numel(options.Scenarios));
     for index=1:numel(options.Scenarios)
         name=options.Scenarios(index);
         [ego,target,road,cfg,initialTarget]=localFixture(name,options.ControllerConfiguration);prior=[];
+        estimatorContext=[];estimatorConfiguration=options.EstimatorConfiguration;estimatorInitializationSeconds=0;
+        if useEstimator
+            assert(~isempty(initialTarget),'The NRMM adapter requires a target truth trajectory.');
+            estimatorConfiguration.sensor.radar.rangeMaximum=cfg.collision.encounterRangeMeters;
+            estimatorConfiguration.observer.ego.yaw.rearAxleDistance=cfg.vehicle.lr;
+            if strlength(options.ResumeFrom)==0
+                initializationTimer=tic;
+                estimatorContext=nrmmEstimatorControllerAdapter("initialize",estimatorConfiguration,ego, ...
+                    @(time,unused)localTarget(predictiveSafetyGeometry.predictTarget(initialTarget,time)));
+                estimatorInitializationSeconds=toc(initializationTimer);
+            end
+        end
         baseline=givenPathCollisionBaseline(road,initialTarget,cfg,options.Frames*cfg.controller.sampleTime);
         if options.RequireCollisionThreat && (~baseline.collisionDetected || baseline.initialClearanceMeters<=0)
             error('runNonlinearPredictiveSafetyValidation:notCollisionThreat', ...
@@ -69,6 +92,11 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             assert(strlength(r.failure)==0 && ~r.recovery.recovered && r.executedFrames<options.Frames, ...
                 'Only an unfinished, successful duration can be extended.');
             ego=saved.ego;target=saved.target;prior=saved.prior;frames=r.executedFrames;
+            if useEstimator
+                assert(isequaln(saved.estimatorConfiguration,estimatorConfiguration),'Estimator settings must match.');
+                estimatorContext=saved.estimatorContext;
+                estimatorInitializationSeconds=r.estimatorInitializationSeconds;
+            end
             minimumClearance=r.minimumReplayClearanceMeters;minimumRoadMargin=r.minimumReplayRoadMarginMeters;
             maximumSeconds=r.maximumFrameSeconds;maximumDeviation=r.maximumReplayLateralDeviationMeters;firstClf=r.initialClfValue;lastClf=r.finalClfValue;
             maximumSlack=r.maximumClfSlack;maxHorizon=r.maximumHorizonSteps;finalError=r.finalTransverseError;
@@ -79,19 +107,34 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         for frame=frames+1:options.Frames
             frameTimer=tic;
             phase="controller";
+            egoTruth=ego;targetTruth=target;priorAtFrame=prior;
+            egoInput=ego;estimate=[];sensorFrame=[];observerSeconds=0;
             try
-                estimate=target;
-                if ~isempty(options.TargetEstimateFunction)
-                    estimate=options.TargetEstimateFunction(target,ego);
+                observerTimer=tic;
+                if useEstimator
+                    [estimatorContext,egoInput,estimate,sensorFrame]=nrmmEstimatorControllerAdapter( ...
+                        "sample",estimatorContext,ego.stateTime,ego,target);
+                    egoInput.heldActuatorInput=ego.heldActuatorInput;
+                    observerSeconds=toc(observerTimer);
+                else
+                    egoInput.perception=struct('time',ego.stateTime, ...
+                        'range',cfg.collision.encounterRangeMeters,'completeWithinRange',true);
+                    if ~isempty(target) && norm(target.targetPositionInertial-ego.position)<=cfg.collision.encounterRangeMeters
+                        estimate=target;
+                        if ~isempty(options.TargetEstimateFunction)
+                            estimate=options.TargetEstimateFunction(target,ego);
+                        end
+                    end
                 end
-                [command,~,problem,prior]=collisionAvoidanceController(ego,estimate,road,cfg,prior);
+                controllerTimer=tic;
+                [command,~,problem,prior]=collisionAvoidanceController(egoInput,estimate,road,cfg,prior);
                 assert(problem.metadata.optimizationReturned && numel(command.actuatorInput)==2 ...
                     && all(isfinite(command.actuatorInput),'all'), ...
                     'runNonlinearPredictiveSafetyValidation:noControlOutput','No finite solved control was returned.');
-                frameSeconds=toc(frameTimer);
+                frameSeconds=toc(controllerTimer);pipelineSeconds=toc(frameTimer);
                 phase="replay";
                 maximumSeconds=max(maximumSeconds,frameSeconds);maxHorizon=max(maxHorizon,problem.metadata.horizonSteps);
-                x=problem.model.initialState;input=command.actuatorInput;
+                x=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];input=command.actuatorInput;
                 h=cfg.controller.sampleTime;
                 [times,states]=ode45(@(~,state)nonlinearBicycleModel.derivative(state,input,cfg), ...
                     linspace(0,h,31),x,odeset('RelTol',1e-11,'AbsTol',1e-12));
@@ -123,6 +166,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 warmStartedFrames=warmStartedFrames+(problem.metadata.search.initialization=="shiftedInputRollout");
                 search=problem.metadata.search;
                 entry=struct('time',ego.stateTime-h,'controllerSeconds',frameSeconds, ...
+                    'observerSeconds',observerSeconds,'pipelineSeconds',pipelineSeconds, ...
+                    'observedTarget',~isempty(estimate),'estimatedState',problem.model.initialState, ...
+                    'estimatedTarget',problem.model.target, ...
                     'horizonSteps',problem.metadata.horizonSteps,'source',search.source, ...
                     'solverCalls',search.solverCalls,'initialization',search.initialization, ...
                     'potentialFieldRestarted',search.potentialFieldRestarted,'initializationFailure',search.initializationFailure, ...
@@ -161,7 +207,11 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 frames=frames+1;
                 if collisionDetected
                     failure="runNonlinearPredictiveSafetyValidation:collision: Ground-truth rectangles touched or overlapped.";
-                    failureTime=collisionTime;break;
+                    failureTime=collisionTime;
+                    localSaveFailure(options.FailureFile,name,frame,egoTruth,targetTruth, ...
+                        egoInput,estimate,sensorFrame,priorAtFrame,road,cfg,estimatorConfiguration, ...
+                        failure,struct('command',command,'problem',problem,'times',times,'states',states));
+                    break;
                 end
                 if recovery.enabled
                     inside=all(abs(finalError)<=options.RecoveryTolerances) ...
@@ -183,7 +233,10 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             catch exception
                 failedFrameSeconds=toc(frameTimer);failureTime=(frame-1)*cfg.controller.sampleTime;
                 controlUnavailable=phase=="controller";executionError=~controlUnavailable;
-                failure=string(exception.identifier)+": "+string(exception.message);break;
+                failure=string(exception.identifier)+": "+string(exception.message);
+                localSaveFailure(options.FailureFile,name,frame,egoTruth,targetTruth, ...
+                    egoInput,estimate,sensorFrame,priorAtFrame,road,cfg,estimatorConfiguration,failure,[]);
+                break;
             end
         end
         seconds=[];solverCalls=0;
@@ -216,11 +269,15 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'subsequentP95Seconds',p95Later,'deadlineMisses',nnz(seconds>cfg.controller.sampleTime), ...
             'failedFrameSeconds',failedFrameSeconds,'failureTime',failureTime,'passedTarget',passedTarget, ...
             'totalSolverCalls',solverCalls,'targetInitialState',initialTarget,'configuration',cfg, ...
+            'observationModel',observationModel,'perceptionRadiusMeters',cfg.collision.encounterRangeMeters, ...
+            'estimatorConfiguration',estimatorConfiguration,'estimatorInitializationSeconds',estimatorInitializationSeconds, ...
             'baselineCruise',baseline,'trace',trace);
+        if useEstimator,results{index}.randomSeed=estimatorConfiguration.randomSeed;end
         if strlength(options.ContinuationFile)>0
             continuation=struct('ego',ego,'target',target,'prior',prior,'result',results{index}, ...
                 'stateTransition',options.StateTransition, ...
                 'observationModel',observationModel, ...
+                'estimatorConfiguration',estimatorConfiguration,'estimatorContext',estimatorContext, ...
                 'recoveryOptions',recoveryOptions,'recoveryStart',recoveryStart);
             save(options.ContinuationFile,'continuation','-v7.3');
         end
@@ -269,7 +326,18 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
 end
 function ego=localEgo(x,time,input)
     ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
-        'stateTime',time,'heldActuatorInput',input);
+        'longitudinalVelocity',x(4),'stateTime',time,'heldActuatorInput',input);
+end
+
+function localSaveFailure(file,name,frame,egoTruth,targetTruth,egoInput,targetEstimate, ...
+        sensorFrame,previousState,road,configuration,estimatorConfiguration,failure,replay)
+    if strlength(file)==0,return;end
+    snapshot=struct('scenario',name,'frame',frame,'time',egoTruth.stateTime, ...
+        'egoTruth',egoTruth,'targetTruth',targetTruth,'egoInput',egoInput, ...
+        'targetEstimate',targetEstimate,'sensorFrame',sensorFrame,'previousState',previousState, ...
+        'road',road,'configuration',configuration,'estimatorConfiguration',estimatorConfiguration, ...
+        'failure',failure,'replay',replay);
+    save(file,'snapshot','-v7.3');
 end
 function target=localTarget(q)
     direction=[cos(q(3)+q(6));sin(q(3)+q(6))];velocity=q(4)*direction;

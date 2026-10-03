@@ -14,7 +14,7 @@ function cfg = estimatorControllerIntegrationConfig()
     cfg.sensor.imu.accelerationNoiseMaximum = 0.03;   % m/s^2
     cfg.sensor.gyroscope.yawRateNoiseMaximum = 0.0015; % rad/s
     cfg.sensor.radar.positionNoiseMaximum = 0.04;     % m
-    cfg.sensor.radar.rangeMaximum = 30.0;             % m
+    cfg.sensor.radar.rangeMaximum = 50.0;             % m, reference-position radius
     % The synthetic radar has complete azimuth coverage and no missed
     % detections inside this range. The estimator may coast an acquired
     % target internally for a bounded interval, but it publishes a target

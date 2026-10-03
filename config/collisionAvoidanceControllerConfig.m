@@ -32,12 +32,12 @@ function cfg=localDefaults()
     cfg.initialization=struct('previewSeconds',3,'previewStepSeconds',.1, ...
         'clearancePaddingMeters',.7,'settlingSeconds',1.5,'brakingRatioLimit',.3, ...
         'lateralAccelerationFraction',.98,'frontForceFraction',.98,'speedGain',1);
-    % A target farther than encounterRangeMeters (body to body) carries no
-    % collision risk. Its constant speed-rate and sideslip motion is assumed
-    % only until a prediction first exceeds that range. Inf never ends it.
+    % Outside this ego-to-target reference-position radius there is no
+    % collision risk. Evaluate this at each prediction node, including any
+    % later re-entry. Inf keeps the complete target interaction active.
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
-    cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',30);
+    cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);

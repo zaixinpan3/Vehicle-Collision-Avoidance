@@ -588,7 +588,7 @@ function [problem,model]=localFormulate(anchor,model)
     inputUpper=[Inf;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     [physicalLower,physicalUpper]=localStateLimits(cfg);
-    primaryLowerBound=0;departure=Inf;if isempty(model.target),departure=0;end
+    primaryLowerBound=0;departure=0;
     generator=model.uncertainty.egoGenerator;collisionGenerator=model.uncertainty.collisionGenerator;
     maximumTightening=0;
     times=(0:2*count)*cfg.controller.sampleTime/2;
@@ -611,7 +611,6 @@ function [problem,model]=localFormulate(anchor,model)
         if index>1,r(:,iu(:,index-1))=-eye(2);previous=anchor.inputs(:,index-1);end
         finite=isfinite(rate);difference=input-previous;
         rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
-        if departure==Inf && localBeyondRange(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator),departure=index-1;end
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
         if isfinite(deviationLimit)
             limit=pathLimit;if index==1,limit=deviationLimit;end
@@ -619,7 +618,8 @@ function [problem,model]=localFormulate(anchor,model)
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
             pathCones=[pathCones,cone]; %#ok<AGROW>
         end
-        if index<=departure
+        if ~localBeyondRange(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator)
+            departure=index;
             [g,j,tightening]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator);
             maximumTightening=max(maximumTightening,max(tightening));
             if index==1,primaryLowerBound=max(0,-min(g));end
@@ -632,7 +632,8 @@ function [problem,model]=localFormulate(anchor,model)
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
             pathCones=[pathCones,cone]; %#ok<AGROW>
         end
-        if index<=departure
+        if ~localBeyondRange(middle,(index-.5)*cfg.controller.sampleTime,model,middleCollisionGenerator)
+            departure=index;
             [g,j,tightening]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model,middleCollisionGenerator);
             maximumTightening=max(maximumTightening,max(tightening));
             r=-j*map;if index<=prefix,r(:,is(index))=-1;end
@@ -658,17 +659,15 @@ function [problem,model]=localFormulate(anchor,model)
     model.uncertaintyPrediction.terminalReserve=endpointReserve;
     endpoint=localCone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius+endpointReserve);
     terminalA=zeros(0,nv);terminalB=zeros(0,1);
-    if departure>count
-        if localBeyondRange(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator),departure=count;
-        else
-            [~,terminalB,gradient]=localTerminalClearance(seed,count,model);
-            terminalA=-gradient*poseJacobian*map;
-            rowCount=rowCount+1;rows{rowCount}=terminalA;bounds{rowCount}=terminalB;
-            [g,j,tightening]=localSafetyRows(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator);
-            maximumTightening=max(maximumTightening,max(tightening));
-            r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;
-            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
-        end
+    if ~localBeyondRange(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator)
+        departure=Inf;
+        [~,terminalB,gradient]=localTerminalClearance(seed,count,model);
+        terminalA=-gradient*poseJacobian*map;
+        rowCount=rowCount+1;rows{rowCount}=terminalA;bounds{rowCount}=terminalB;
+        [g,j,tightening]=localSafetyRows(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator);
+        maximumTightening=max(maximumTightening,max(tightening));
+        r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;
+        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
     end
     if isfinite(deviationLimit)
         [r,bound,cone]=localPathRows(y(1:2),map(1:2,:),model.lane,pathLimit,pathBox,generator(1:2,:));
@@ -780,13 +779,11 @@ end
 function beyond=localBeyondRange(x,time,model,generator)
     beyond=isempty(model.target);
     if ~beyond
-        cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+        cfg=model.cfg;
         q=localTargetAt(model,time);
         tube=predictiveSafetyGeometry.targetErrorTube(model.target,model.uncertainty.target,time);
-        reserve=sum(vecnorm(generator(1:2,:))) ...
-            +2*(norm(shape(1:2))+norm(shape(3:4)))*sin(min(pi,sum(abs(generator(3,:))))/2) ...
-            +tube.positionRadius+2*(norm(q(8:9))+norm(q(10:11)))*sin(tube.yawRadius/2);
-        beyond=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3),q(8:11))-reserve>cfg.collision.encounterRangeMeters;
+        reserve=sum(vecnorm(generator(1:2,:)))+tube.positionRadius;
+        beyond=norm(x(1:2)-q(1:2))-reserve>cfg.collision.encounterRangeMeters;
     end
 end
 

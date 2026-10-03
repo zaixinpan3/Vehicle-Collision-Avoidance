@@ -77,9 +77,9 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             end
         end
 
-        function encounterRangeDefaultsToThirtyMetersAndMayBeUnbounded(testCase)
+        function encounterRangeDefaultsToFiftyMetersAndMayBeUnbounded(testCase)
             cfg = collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.collision.encounterRangeMeters, 30);
+            testCase.verifyEqual(cfg.collision.encounterRangeMeters, 50);
             cfg = collisionAvoidanceControllerConfig( ...
                 struct('collision', struct('encounterRangeMeters', Inf)));
             testCase.verifyEqual(cfg.collision.encounterRangeMeters, Inf);

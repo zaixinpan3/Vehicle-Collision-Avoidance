@@ -1,0 +1,68 @@
+{
+  "preparedAt": "2026-10-03T16:45:53.969608-05:00",
+  "baseCommit": "a9b56c61d55e1ad6a513b8623c2139f40637ff82",
+  "files": [
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "33ab006a98ba8dfa0ff20fa19245ef202f1f885729914d4b9078b2734c66b7a3"
+    },
+    {
+      "path": "config/estimatorControllerIntegrationConfig.m",
+      "sha256": "b6c34ded8b0d0b2886b4d738abb333295bbb46a49e5fa02c8032f023ea58565a"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "993dd055654edb9024e19cc335316bf88d5769151baeb6b5d9b0b8ce0139217d"
+    },
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "7b35b6ffdad5801a57819e8f9441a893a20fc2823cac1a7d3fb3ce8b7e1169ec"
+    },
+    {
+      "path": "controller/predictiveSafetyGeometry.m",
+      "sha256": "21ed0bef2e49edfe39e6820c13142d07d160f58f990db45760be142ad461d074"
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "350c98b9cb5475ddc883c6d90b4aab060d742a0c353f64f366b60bf48de8fb7a"
+    },
+    {
+      "path": "estimator/nrmmControllerErrorBounds.m",
+      "sha256": "12c36834aa6bfd05311ac3e8b9e86d25e69d19429891d261e8198b22a4d0016f"
+    },
+    {
+      "path": "estimator/nrmmTargetHistory.m",
+      "sha256": "7d42d50c49d6217738a9b0247d2ad1faa8563b8066d03e9556e0185e4984522e"
+    },
+    {
+      "path": "scripts/nrmmEstimatorControllerAdapter.m",
+      "sha256": "fa1555c793dcab141965f9ad06b0c9a0406b3c310768ba1ccb275ec38ac7ccf9"
+    },
+    {
+      "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "2796152f6eb2da7b9c55f8abc97235a0d98776ef5917a965b12b88255a6d8910"
+    },
+    {
+      "path": "scripts/runPotentialFieldCampaign.m",
+      "sha256": "a0d1529c326a2cfe1805e5de571bf561e6120664e6f5e1b10d148d9509367371"
+    },
+    {
+      "path": "scripts/analyzePerceptionRangeFailures.m",
+      "sha256": "2d19ab7dabaabdb080996fa2620d0ae1c9a176e9619a22053b24aa4f716c2a2e"
+    },
+    {
+      "path": "scripts/collisionThreatScenario.m",
+      "sha256": "a52d64e915e06e80c95ab7db3d00c67b890b2fd0c8edbec824a53fbbf3ec73e3"
+    },
+    {
+      "path": "tests/perceptionRangeTest.m",
+      "sha256": "471fba1f29b89eee6f4ab6a85575dfc5f93ebec9e28d082344153597e542d19b"
+    },
+    {
+      "path": "report/PERCEPTION_50M_CAMPAIGN_20261003.tex",
+      "sha256": "6543240cd05d1b775afa46f59cef6991f0ba5d381735215633df967d97f15ee1"
+    }
+  ],
+  "cache": "/home/zai/.cache/collisionAvoidance/perception50-20261003",
+  "notes": "Source and independent technical artifacts only; no weekly or monthly record hashes."
+}

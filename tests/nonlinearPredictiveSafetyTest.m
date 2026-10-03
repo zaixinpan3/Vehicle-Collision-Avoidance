@@ -177,6 +177,34 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
                 'collisionAvoidanceController:invalidSampleTime');
         end
+        function aCompleteEmptyScanClearsTheForecastButRetainsTheInputWarmStart(testCase)
+            [ego,road,cfg]=localFixture();ego.stateTime=0;
+            q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];
+            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            ego=localSuccessor(ego,prior);ego.stateTime=cfg.controller.sampleTime;
+            ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
+            [command,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyEmpty(problem.model.target);
+            testCase.verifyEmpty(state.targetEpoch);
+            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+        end
+        function encounterRadiusUsesReferencePositionsRatherThanBodyClearance(testCase)
+            [ego,road,cfg]=localFixture();
+            outside=[0;50.1;0;8;0;0;1.6;2.4;.95;0;0];
+            inside=outside;inside(2)=49.9;
+            [~,~,far]=collisionAvoidanceController(ego,localTarget(outside),road,cfg,[]);
+            [~,~,near]=collisionAvoidanceController(ego,localTarget(inside),road,cfg,[]);
+            testCase.verifyEqual(far.metadata.encounterExitStep,0);
+            testCase.verifyGreaterThan(near.metadata.encounterExitStep,0);
+        end
+        function anInitiallyDistantForecastCanEnterTheEncounterRadius(testCase)
+            [ego,road,cfg]=localFixture();
+            q=[52;10;pi;8;0;0;1.6;2.4;.95;0;0];
+            [~,~,prediction]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            testCase.verifyGreaterThan(norm(q(1:2)-ego.position),50);
+            testCase.verifyGreaterThan(prediction.metadata.encounterExitStep,0);
+        end
         function retiredStateCannotRestoreTheOldTargetMotion(testCase)
             [ego,road,cfg]=localFixture();prior=struct('version',56,'target',ones(10,1));
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);

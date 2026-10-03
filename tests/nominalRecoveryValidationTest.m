@@ -90,7 +90,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
         function anActualOptimizationFailureRemainsAnExperimentalFailure(testCase)
             cfg=struct('referenceSpeed',15,'controller',struct('horizonSteps',16));
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=1, ...
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=1, ...
                 ControllerConfiguration=cfg,TargetEstimateFunction=@localImpossibleTarget);
             testCase.verifyTrue(report.results.controlUnavailable);
             testCase.verifyTrue(report.results.experimentFailed);

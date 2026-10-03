@@ -5,8 +5,8 @@ function [command,predictedInput,prediction,controllerState] = ...
 % Every current target estimate updates the prediction; its A and beta are
 % held constant within this frame, independently of proof-metadata availability.
 % Passing [] as previousState starts a new problem and a new target epoch.
-% The target motion is assumed only while a prediction stays within the
-% encounter range; metadata.encounterExitStep is its first node beyond it.
+% Collision interaction is active inside the configured position radius.
+% A complete current sensor scan with no target clears the previous forecast.
     persistent lastState
     if nargin==1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState)~="resetNominalTrajectory"
@@ -39,6 +39,14 @@ function [command,predictedInput,prediction,controllerState] = ...
         expectedTime=epochTime+index*cfg.controller.sampleTime;
         if isfinite(ego.stateTime) && isfinite(epochTime) && abs(ego.stateTime-expectedTime)>1e-9*max(1,abs(expectedTime))
             error('collisionAvoidanceController:invalidSampleTime','Continuation requires consecutive absolute sample times.');
+        end
+    end
+    if isempty(observed) && isfield(egoState,'perception')
+        perception=egoState.perception;
+        if isstruct(perception) && isscalar(perception) ...
+                && all(isfield(perception,{'time','completeWithinRange'})) ...
+                && isequal(perception.completeWithinRange,true) && isequal(perception.time,ego.stateTime)
+            targetEpoch=[];
         end
     end
     q=predictiveSafetyGeometry.predictTarget(targetEpoch,index*cfg.controller.sampleTime);
