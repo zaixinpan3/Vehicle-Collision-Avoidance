@@ -59,7 +59,7 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             [seed,cfg]=localSeed(0);seed.phaseMeters=40;t=[cos(.2);sin(.2)];frame=[0;0;.2;0];
             q=[seed.epochState(1:2)+20*t;.2;4;0;0;1.6;2.4;.95;0;0];
             initial=terminalContinuation.separation(seed,q,frame,cfg);
-            qNext=predictiveSafetyGeometry.targetFlow(q,10*cfg.controller.sampleTime);
+            qNext=predictiveSafetyGeometry.predictTarget(q,10*cfg.controller.sampleTime);
             later=terminalContinuation.separation(seed,qNext,frame,cfg,seed.epochIndex+10);
             before=terminalContinuation.referenceAt(seed,seed.epochIndex);
             after=terminalContinuation.referenceAt(seed,seed.epochIndex+10);
@@ -69,9 +69,9 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
         function departureFollowsTheEndpointPolicyUntilTheTargetIsOutOfRange(testCase)
             [seed,cfg]=localSeed(0);t=[cos(.2);sin(.2)];n=[-t(2);t(1)];
             index=seed.epochIndex;time=index*cfg.controller.sampleTime;origin=seed.epochState(1:2);
-            receding=predictiveSafetyGeometry.targetFlow([origin-15*t;.2+pi;8;0;0;1.6;2.4;.95;0;0],-time);
-            blocking=predictiveSafetyGeometry.targetFlow([origin+20*t;.2;0;0;0;1.6;2.4;.95;0;0],-time);
-            alongside=predictiveSafetyGeometry.targetFlow([origin+5*n;.2;8;0;0;1.6;2.4;.95;0;0],-time);
+            receding=predictiveSafetyGeometry.predictTarget([origin-15*t;.2+pi;8;0;0;1.6;2.4;.95;0;0],-time);
+            blocking=predictiveSafetyGeometry.predictTarget([origin+20*t;.2;0;0;0;1.6;2.4;.95;0;0],-time);
+            alongside=predictiveSafetyGeometry.predictTarget([origin+5*n;.2;8;0;0;1.6;2.4;.95;0;0],-time);
             [margin,value]=terminalContinuation.departure(seed,receding,index,cfg);
             testCase.verifyGreaterThan(margin,10);
             testCase.verifyLessThan(margin,15-4.8);

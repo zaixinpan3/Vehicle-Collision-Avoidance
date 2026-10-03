@@ -78,7 +78,7 @@ classdef controllerInputGeometryTest < matlab.unittest.TestCase
             [~,~,~,obs]=readControllerInputs(ego,target,road,cfg);
             q=predictiveSafetyGeometry.target(obs,target,cfg);
             testCase.verifyEqual(q(4:6),[0;1.2;.08],AbsTol=1e-14);
-            next=predictiveSafetyGeometry.targetFlow(q,1);
+            next=predictiveSafetyGeometry.predictTarget(q,1);
             testCase.verifyEqual(next(4),1.2,AbsTol=1e-14);
         end
         function reverseVelocityKeepsTheSameSideslip(testCase)

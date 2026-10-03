@@ -1,6 +1,6 @@
 function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,controllerConfiguration)
 %collisionThreatScenario Construct conflicts with ideal given-path cruise.
-% Target initial conditions are obtained by reversing its unchanged flow from
+% Target initial conditions are obtained by reversing its prescribed motion from
 % a shared future road position. Controller behavior is not used for selection.
     arguments
         name (1,1) string
@@ -45,5 +45,5 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
     end
     [position,heading] = laneGeometry.referencePose(cfg.referenceSpeed*impactTime,0,curve);
     impactTarget = [position;heading+relativeCourse-beta;targetSpeed;targetAcceleration;beta;lr;2.4;.95;0;0];
-    target = predictiveSafetyGeometry.targetFlow(impactTarget,-impactTime);
+    target = predictiveSafetyGeometry.predictTarget(impactTarget,-impactTime);
 end

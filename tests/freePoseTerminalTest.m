@@ -109,7 +109,7 @@ function [membership,slew,separation]=localContinueCore(seed,y,cfg)
         u=terminalContinuation.control(y,10+j,seed);slew(:,j)=abs(u-y(7:8));
         y=[nonlinearBicycleModel.sample(y(1:6),u,cfg);u];
         membership(j)=terminalContinuation.membership(y,11+j,seed);
-        target=predictiveSafetyGeometry.targetFlow(q,j*cfg.controller.sampleTime);
+        target=predictiveSafetyGeometry.predictTarget(q,j*cfg.controller.sampleTime);
         separation=min(separation,terminalContinuation.separation(seed,target,[0;0;0;0],cfg,11+j));
     end
 end

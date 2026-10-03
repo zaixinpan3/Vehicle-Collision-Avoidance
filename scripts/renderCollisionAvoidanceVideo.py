@@ -1,6 +1,6 @@
 """Render fourteen recorded controller fixtures as a sequential annotated MP4.
 
-Uses the exported ode45 states, actual held controls, and analytic target flow.
+Uses the exported ode45 states, actual held controls, and analytic target prediction.
 The full-scene overview shows recorded paths, not an online prediction. English
 annotations, equal-scale vehicle geometry, and closest-approach pauses preserve
 experiment meaning. Generated media belongs outside the versioned source tree.
@@ -405,7 +405,7 @@ def side_view(scene, time):
 def render_frame(scene, time, rate=1, closest=False, intro=False):
     image = Image.new('RGB', (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
-    label(draw, (32, 18), 'FLOW-INITIALIZED RTI / CLOSED-LOOP REPLAY', 14, MUTED)
+    label(draw, (32, 18), 'POTENTIAL-FIELD INITIALIZATION / RTI REPLAY', 14, MUTED)
     label(draw, (32, 46), TITLES[scene['name']], 33)
     label(draw, (32, 99), f"Cruise {scene['speed']} m/s / {scene['speed'] * 3.6:.1f} km/h   |   Avoidance through nominal recovery", 18, MUTED)
     label(draw, (1566, 44), f"{scene['index']:02d} / 14", 31, TEXT, 'ra')

@@ -114,7 +114,7 @@ a failed inherited budget or enlarging an input correction box reuses the
 already built model. See [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 
 `nominalFeedback` and `nominalGuidanceParameters` supply path guidance and a
-trim steering correction only for constructing the flow seed. They neither
+trim steering correction only for constructing the potential-field seed. They neither
 define another CLF nor provide an issued control. The nominalClf configuration
 group retains their guidance parameters alongside the scalar decreaseFraction;
 retired cost-to-go horizon and tail-level settings are rejected.

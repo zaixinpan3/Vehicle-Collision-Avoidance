@@ -1,5 +1,5 @@
-function rows=extendTimedFlowRecovery(root,directory,frameCount)
-%extendTimedFlowRecovery Extend successful eight-second runs until nominal dwell or cap.
+function rows=extendPotentialFieldRecovery(root,directory,frameCount)
+%extendPotentialFieldRecovery Extend unfinished runs until nominal dwell or observation cap.
     cd(root);addpath('controller','config','scripts');
     rows=jsondecode(fileread(fullfile(directory,'summary.json')));
     for index=1:numel(rows)

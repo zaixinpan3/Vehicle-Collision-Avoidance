@@ -40,7 +40,7 @@ classdef sweptCollisionIntervalTest < matlab.unittest.TestCase
             testCase.verifyTrue(result.certified);
             for fraction=linspace(0,1,101)
                 pose=(1-fraction)*first+fraction*last;
-                q=predictiveSafetyGeometry.targetFlow(target,fraction*duration);
+                q=predictiveSafetyGeometry.predictTarget(target,fraction*duration);
                 gap=predictiveSafetyGeometry.rectangle(pose,shape,q(1:3),q(8:11));
                 testCase.verifyGreaterThanOrEqual(gap,result.lowerBound-1e-12);
             end

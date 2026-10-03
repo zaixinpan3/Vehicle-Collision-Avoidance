@@ -27,7 +27,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         function targetActuallyReachesTheCruisingEgo(testCase,scenario,referenceSpeed)
             [~,target,road,cfg,impactTime] = collisionThreatScenario(scenario,struct('referenceSpeed',referenceSpeed));
             baseline = givenPathCollisionBaseline(road,target,cfg,8);
-            future = predictiveSafetyGeometry.targetFlow(target,impactTime);
+            future = predictiveSafetyGeometry.predictTarget(target,impactTime);
             egoPosition = laneGeometry.referencePose(baseline.initialStationMeters+referenceSpeed*impactTime,0,baseline.referenceCurve);
             testCase.verifyEqual(future(1:2),egoPosition,AbsTol=1e-11);
         end

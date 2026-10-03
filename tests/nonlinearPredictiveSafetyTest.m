@@ -15,41 +15,41 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function targetFlowHasTheSemigroupProperty(testCase,targetSideslip,targetAcceleration)
+        function predictTargetHasTheSemigroupProperty(testCase,targetSideslip,targetAcceleration)
             q=[3;1;.2;7;targetAcceleration;targetSideslip;1.6;2.4;.95;0;0];
-            first=predictiveSafetyGeometry.targetFlow(q,.37);
-            actual=predictiveSafetyGeometry.targetFlow(first,.29);
-            expected=predictiveSafetyGeometry.targetFlow(q,.66);
+            first=predictiveSafetyGeometry.predictTarget(q,.37);
+            actual=predictiveSafetyGeometry.predictTarget(first,.29);
+            expected=predictiveSafetyGeometry.predictTarget(q,.66);
             testCase.verifyEqual(actual,expected,AbsTol=2e-14);
         end
-        function targetFlowMatchesIndependentIntegration(testCase,targetSideslip,targetAcceleration)
+        function predictTargetMatchesIndependentIntegration(testCase,targetSideslip,targetAcceleration)
             q=[3;1;.2;7;targetAcceleration;targetSideslip;1.6;2.4;.95;.2;-.1];
             [~,states]=ode45(@(~,x)[x(4)*cos(x(3)+targetSideslip); ...
                 x(4)*sin(x(3)+targetSideslip);x(4)*sin(targetSideslip)/1.6;targetAcceleration], ...
                 [0,1.3],q(1:4),odeset('RelTol',1e-12,'AbsTol',1e-13));
-            actual=predictiveSafetyGeometry.targetFlow(q,1.3);
+            actual=predictiveSafetyGeometry.predictTarget(q,1.3);
             testCase.verifyEqual(actual(1:4),states(end,:).',AbsTol=2e-10);
             testCase.verifyEqual(actual(5:end),q(5:end));
         end
         function accelerationChangesSpeedAndHeadingRate(testCase)
             q=[0;0;.2;6;1.5;.1;1.6;2.4;.95;0;0];
-            next=predictiveSafetyGeometry.targetFlow(q,2);
+            next=predictiveSafetyGeometry.predictTarget(q,2);
             testCase.verifyEqual(next(4),9);
             testCase.verifyEqual(next(3),q(3)+15*sin(.1)/1.6,AbsTol=1e-14);
             testCase.verifyEqual(next(4)*sin(next(6))/next(7),1.5*q(4)*sin(q(6))/q(7),AbsTol=1e-14);
         end
         function brakingRetainsConstantAccelerationThroughZeroVelocity(testCase)
             q=[0;0;0;2;-2;0;1.6;2.4;.95;0;0];
-            stopped=predictiveSafetyGeometry.targetFlow(q,1);
-            reversed=predictiveSafetyGeometry.targetFlow(stopped,2);
+            stopped=predictiveSafetyGeometry.predictTarget(q,1);
+            reversed=predictiveSafetyGeometry.predictTarget(stopped,2);
             testCase.verifyEqual(stopped(1:4),[1;0;0;0]);
             testCase.verifyEqual(reversed(1:5),[-3;0;0;-4;-2]);
-            testCase.verifyEqual(reversed,predictiveSafetyGeometry.targetFlow(q,3));
+            testCase.verifyEqual(reversed,predictiveSafetyGeometry.predictTarget(q,3));
         end
         function aTurningTargetRetracesItsPathAfterStopping(testCase,targetSideslip)
             q=[3;1;.2;2;-2;targetSideslip;1.6;2.4;.95;0;0];
-            stopped=predictiveSafetyGeometry.targetFlow(q,1);
-            returned=predictiveSafetyGeometry.targetFlow(stopped,1);
+            stopped=predictiveSafetyGeometry.predictTarget(q,1);
+            returned=predictiveSafetyGeometry.predictTarget(stopped,1);
             testCase.verifyEqual(returned(1:3),q(1:3),AbsTol=2e-14);
             testCase.verifyEqual(returned(4:7),[-2;-2;targetSideslip;1.6]);
         end
@@ -82,7 +82,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         function jointTargetCoordinatesAreUnactuated(testCase)
             [~,~,cfg]=localFixture();z=[0;0;0;8;0;0;20;3;.4;6];parameters=[1.2;.08;1.6;2.4;.95;0;0];
             [next,a,b]=nonlinearBicycleModel.jointSample(z,[.01;.02],parameters,cfg);
-            target=predictiveSafetyGeometry.targetFlow([z(7:10);parameters],cfg.controller.sampleTime);
+            target=predictiveSafetyGeometry.predictTarget([z(7:10);parameters],cfg.controller.sampleTime);
             testCase.verifyEqual(next(7:10),target(1:4),AbsTol=1e-14);
             testCase.verifyEqual(a(1:6,7:10),zeros(6,4));
             testCase.verifyEqual(b(7:10,:),zeros(4,2));
@@ -143,7 +143,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         function headingWrapPreservesTheFixedTargetForecast(testCase)
             [ego,road,cfg]=localFixture();q=[100;100;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
-            ego=localSuccessor(ego,prior);next=predictiveSafetyGeometry.targetFlow(prior.targetEpoch,cfg.controller.sampleTime);
+            ego=localSuccessor(ego,prior);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
             [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
             testCase.verifyGreaterThan(next(3),pi);
             testCase.verifyEqual(state.targetEpoch,prior.targetEpoch);
@@ -158,7 +158,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             ego=localSuccessor(ego,prior);ego.stateTime=10+cfg.controller.sampleTime;
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            expected=predictiveSafetyGeometry.targetFlow(q,cfg.controller.sampleTime);
+            expected=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
             testCase.verifyEqual(state.targetEpoch,q,AbsTol=1e-12);
             testCase.verifyEqual(problem.predictedJointState(7:10,1:size(prior.predictedJointState,2)-1), ...
@@ -181,10 +181,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;-1;0;1.6;2.4;.95;0;0];
-            next=predictiveSafetyGeometry.targetFlow(q,1e8);
+            next=predictiveSafetyGeometry.predictTarget(q,1e8);
             testCase.verifyEqual(next(2),q(2));
             q(3)=pi-1e-12;
-            next=predictiveSafetyGeometry.targetFlow(q,1e8);
+            next=predictiveSafetyGeometry.predictTarget(q,1e8);
             testCase.verifyLessThan(next(2),q(2)-1);
         end
         function tinyPhysicalTransverseAccelerationStillAffectsInfiniteSeparation(testCase)
@@ -264,7 +264,7 @@ function finite=localTargetTangent(q,time)
     finite=zeros(4);h=1e-6;
     for j=1:4
         lo=q;hi=q;lo(j)=lo(j)-h;hi(j)=hi(j)+h;
-        a=predictiveSafetyGeometry.targetFlow(hi,time);b=predictiveSafetyGeometry.targetFlow(lo,time);
+        a=predictiveSafetyGeometry.predictTarget(hi,time);b=predictiveSafetyGeometry.predictTarget(lo,time);
         finite(:,j)=(a(1:4)-b(1:4))/(2*h);
     end
 end

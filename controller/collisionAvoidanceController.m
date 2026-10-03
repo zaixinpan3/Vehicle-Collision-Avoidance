@@ -38,7 +38,7 @@ function [command,predictedInput,prediction,controllerState] = ...
             error('collisionAvoidanceController:invalidSampleTime','Continuation requires consecutive absolute sample times.');
         end
     end
-    q=predictiveSafetyGeometry.targetFlow(targetEpoch,index*cfg.controller.sampleTime);
+    q=predictiveSafetyGeometry.predictTarget(targetEpoch,index*cfg.controller.sampleTime);
     difference=Inf;
     if ~isempty(observed) && ~isempty(q)
         difference=observed-q;
@@ -76,7 +76,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     if ~isempty(q)
         targetStates=zeros(4,size(solution.states,2));
         for step=1:size(targetStates,2)
-            future=predictiveSafetyGeometry.targetFlow(targetEpoch,(index+step-1)*cfg.controller.sampleTime);
+            future=predictiveSafetyGeometry.predictTarget(targetEpoch,(index+step-1)*cfg.controller.sampleTime);
             targetStates(:,step)=future(1:4);
         end
         predictedJointState=[predictedJointState;targetStates];

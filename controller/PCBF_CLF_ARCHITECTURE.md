@@ -20,15 +20,15 @@ The prediction length is fixed at
 Previous inputs are shifted and rolled out from the current measurement in
 both encounter and recovery frames. Prior affine states are not reused as the
 linearization trajectory. Without usable previous inputs, one moving-target
-flow rollout is constructed; when no target is present, nominal path guidance
-supplies the initialization. Flow guidance is a search reference, not a safety
+potential-field rollout is constructed; when no target is present, nominal path guidance
+supplies the initialization. Potential guidance is a search reference, not a safety
 certificate. No maneuver bank is used.
 
 The target keeps Sharma et al. (2026), Eq. (17)'s constant tangential
 acceleration `A` and constant sideslip `beta`. The prediction uses inertial
 coordinates, with `V(t)=V0+A*t` and curvature `sin(beta)/lr`; yaw rate therefore
 changes with speed. There is no added sideslip-rate state. The exact arc-length
-flow supplies both initialization and collision constraints at matching
+prediction supplies both initialization and collision constraints at matching
 absolute times. The existing signed-velocity continuation is retained; a stop
 clamp would change the constant-acceleration model.
 
@@ -37,7 +37,7 @@ DOI 10.1109/ACCESS.2024.3355952: direction-dependent obstacle influence,
 motion-dependent repulsion, and joint course/speed guidance. It is an adaptation,
 not a reproduction of their printed potential equations, tracked-vehicle model,
 Bezier path, or eight behavioral priorities. The local-paper assessment in
-[FLOW_INITIALIZATION_ZHAI_20261002.tex](../report/FLOW_INITIALIZATION_ZHAI_20261002.tex)
+[Zhai initialization assessment](../report/FLOW_INITIALIZATION_ZHAI_20261002.tex)
 records the formula issues and the need for longitudinal planning.
 
 At each seed hold, project the actual nonlinear ego state onto the given path.
@@ -63,7 +63,7 @@ Here `c = -side*tangent'*(p_ego-p_target)/max(norm(p_ego-p_target),1)`.
 The star denotes the largest predicted influence. This combines attraction,
 a normalized lateral repulsion and circulation; it is not claimed to be the
 full gradient of one scalar potential. There is no division by closing speed.
-Both acceleration and sideslip affect the target preview through the exact flow.
+Both acceleration and sideslip affect the target preview through the exact prediction.
 The Gaussian now measures predicted interaction; no fitted Gaussian displacement
 or fixed nominal-speed station clock is used.
 
@@ -133,7 +133,7 @@ There is no signed-distance objective, preferred passing direction, normal
 normalization, or replacement of an overlapping distance dual. Zero
 multipliers stay zero: a relaxed row then needs at least the node buffer in
 slack, while a hard positive-buffer row is infeasible. Contact duals may be
-nonunique. Flow initialization does not replace those multipliers or repair
+nonunique. Potential-field initialization does not replace those multipliers or repair
 their zero gradients. The retired signed-direction MEX is neither called nor built.
 The geometric construction retains the nonnegative-multiplier, unit-normal
 and primal-dual identities as numerical assertions. It removes the many
@@ -183,7 +183,7 @@ a tight cap. The implementation attempts the inherited cap in the current
 convex program; `budgetAnchorResidual` records whether the zero-correction
 shift itself satisfies its assembled constraints. It is a diagnostic, not a
 nonlinear safety certificate. A failed capped CLF solve triggers primary
-restoration and the existing bounded flow retry. The restoration creates a
+restoration and the existing bounded potential-field retry. The restoration creates a
 new budget and breaks the previous monotonic-budget chain; this event is
 explicit in the attempt log. No stored plan supplies an issued command.
 
@@ -227,11 +227,11 @@ current-state rows supply the unavoidable lower bound
     J_lower = max(0, -min(g(x_current))).
 
 When a shifted problem has no numerical point, or its primary value exceeds
-this lower bound, one fresh flow model is tried. Primary values are compared only after positive solver termination; a finite
+this lower bound, one fresh potential-field model is tried. Primary values are compared only after positive solver termination; a finite
 array from a failed primary solve is not a valid PCBF optimum. The smaller
 primary value is retained, with ties favoring the shifted model. A fresh problem that reports infeasibility or numerical
 stalling permits one bounded enlargement to twice the nominal input box; its better primary result is retained. State boxes, physical bounds,
-collision rows and terminal conditions remain. The CLF is constructed only once for each model and reused if the inherited budget needs primary restoration. At most one fresh-flow retry is used across
+collision rows and terminal conditions remain. The CLF is constructed only once for each model and reused if the inherited budget needs primary restoration. At most one fresh potential-field retry is used across
 the complete within-frame refinement, rather than resetting that allowance
 each time the dynamics are rebuilt.
 

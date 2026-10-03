@@ -94,7 +94,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             anchor=problem.model.linearization;
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
-            testCase.verifyFalse(problem.metadata.search.flowRestarted);
+            testCase.verifyFalse(problem.metadata.search.potentialFieldRestarted);
             testCase.verifyEqual(problem.metadata.search.linearizationCount,1);
             testCase.verifyEqual(anchor.states(:,1),problem.model.initialState,AbsTol=0);
             testCase.verifyNotEqual(anchor.states(:,1),prior.stateTrajectory(:,2));
@@ -105,17 +105,17 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             localVerifyAffinePrediction(testCase,problem,cfg);
             localVerifyAnchorRollout(testCase,anchor,cfg);
         end
-        function failedShiftReinitializesFlowAndRebuildsBothStages(testCase)
+        function failedShiftReinitializesPotentialFieldAndRebuildsBothStages(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior);prior.inputTrajectory(1,end-9:end)=.15;
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             search=problem.metadata.search;
-            testCase.verifyTrue(search.flowRestarted);
+            testCase.verifyTrue(search.potentialFieldRestarted);
             testCase.verifyEqual([search.attempts.modelBuilt],[true,false,true]);
             testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
             testCase.verifyEqual(search.linearizationCount,2);
-            testCase.verifyEqual([search.attempts.initialization],["shiftedInputRollout","shiftedInputRollout","movingTargetFlow"]);
+            testCase.verifyEqual([search.attempts.initialization],["shiftedInputRollout","shiftedInputRollout","movingTargetPotentialField"]);
             testCase.verifyEqual(search.initializationFailure,"pcbfNoNumericalResult");
             testCase.verifyEqual([search.stages.objective],["inheritedSafetyBudget","clfSlack","pcbfSlack","pcbfSlack","clfSlack"]);
             testCase.verifyGreaterThan([search.attempts(search.selectedAttempt).stages.exitFlag],0);
@@ -129,7 +129,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             model=problem.model;model.initialState(4)=20;
             [solution,search]=solvePredictiveControl(model,prior);
             testCase.verifyEmpty(solution);
-            testCase.verifyTrue(search.flowRestarted);
+            testCase.verifyTrue(search.potentialFieldRestarted);
             testCase.verifyEqual(search.linearizationCount,2);
             testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
             testCase.verifyEqual(search.attempts(end).inputTrustScale,2);
@@ -153,10 +153,10 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior);prior.inputTrajectory(1,end)=pi;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
+            testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetPotentialField");
             testCase.verifyEqual(problem.metadata.search.initializationFailure, ...
                 "collisionAvoidanceController:invalidTireOperatingPoint");
-            testCase.verifyFalse(problem.metadata.search.flowRestarted);
+            testCase.verifyFalse(problem.metadata.search.potentialFieldRestarted);
             testCase.verifyEqual(problem.metadata.search.solverCalls,sum([problem.metadata.search.stages.numericalSolve]));
         end
         function exhaustedBudgetDoesNotExecuteThePreviousTrajectory(testCase)
@@ -187,7 +187,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(problem.solution.safety, ...
                 problem.metadata.search.slackCap+cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            testCase.verifyEqual(problem.metadata.search.attempts(1).initialization,"movingTargetFlow");
+            testCase.verifyEqual(problem.metadata.search.attempts(1).initialization,"movingTargetPotentialField");
             testCase.verifyTrue(problem.metadata.search.modelAgreementSatisfied);
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
@@ -235,7 +235,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             search=problem.metadata.search;
             testCase.verifyEqual(search.linearizationCount,1);
             testCase.verifyEqual(search.refinementCount,1);
-            testCase.verifyFalse(search.flowRestarted);
+            testCase.verifyFalse(search.potentialFieldRestarted);
             testCase.verifyTrue(search.modelAgreementSatisfied);
             testCase.verifyTrue(search.clfStageCompleted);
             testCase.verifyGreaterThan(search.attempts(search.selectedAttempt).stages(1).exitFlag,0);
@@ -251,7 +251,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [solution,search]=solvePredictiveControl(model,[]);
             testCase.verifyEmpty(solution);
             testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyFalse(search.flowRestarted);
+            testCase.verifyFalse(search.potentialFieldRestarted);
             testCase.verifyEqual(search.terminationReason,"linearizationAccuracyNotReached");
         end
         function accurateClfStepEndsTheFrameAtAnArtificialInputBoundary(testCase)
@@ -299,7 +299,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
             prior.stageSlacks=zeros(1,cfg.controller.horizonSteps);prior.safetyBudget=0;
             ego=localSuccessor(ego,prior);
-            q=predictiveSafetyGeometry.targetFlow(prior.targetEpoch,cfg.controller.sampleTime);
+            q=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
             ego.position=q(1:2);
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             search=problem.metadata.search;

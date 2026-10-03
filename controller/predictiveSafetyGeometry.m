@@ -1,5 +1,5 @@
 classdef predictiveSafetyGeometry
-    %predictiveSafetyGeometry Target flow, polygon duals and road coordinates.
+    %predictiveSafetyGeometry Target prediction, potential guidance and polygon geometry.
     methods (Static)
         function [heading,speed,side,risk] = potentialGuidance(x,lane,epoch,time,cfg,side)
             % Zhai-inspired motion-aware repulsion with a passing circulation.
@@ -17,7 +17,7 @@ classdef predictiveSafetyGeometry
                 else
                     positions=projection.point+progress*tangent*times+normal*(lateral*exp(-times/cfg.nominalClf.lookaheadSeconds));angles=projection.heading+zeros(size(times));
                 end
-                target=predictiveSafetyGeometry.targetFlow(epoch,time+times);
+                target=predictiveSafetyGeometry.predictTarget(epoch,time+times);
                 centers=target(1:2,:)+[cos(target(3,:)).*target(10,:)-sin(target(3,:)).*target(11,:); ...
                     sin(target(3,:)).*target(10,:)+cos(target(3,:)).*target(11,:)];
                 differences=positions-centers;
@@ -88,7 +88,7 @@ classdef predictiveSafetyGeometry
                 observation.length/2;observation.width/2;offset];
         end
 
-        function next = targetFlow(q,time)
+        function next = predictTarget(q,time)
             % Sharma NRMM (2026), Eq. (17), in inertial coordinates:
             % Vdot=A, betadot=0, psidot=V*sin(beta)/lr. Constant curvature
             % makes the position integral elementary even when A is nonzero.
@@ -180,13 +180,13 @@ classdef predictiveSafetyGeometry
 
         function check = intervalClearance(first,last,shape,targetEpoch,time,duration,margin)
             % Certify positive distance on a linear ego-pose interpolant.
-            % The target retains its exact prescribed flow. Adaptive midpoint
+            % The target retains its exact prescribed motion. Adaptive midpoint
             % cuts resolve a Lipschitz lower bound down to half the sampled
             % margin. The other half supplies a finite refinement reserve.
             % This concerns the nominal interpolant, not the continuous plant.
-            start=predictiveSafetyGeometry.targetFlow(targetEpoch,time);
-            finish=predictiveSafetyGeometry.targetFlow(targetEpoch,time+duration);
-            middle=predictiveSafetyGeometry.targetFlow(targetEpoch,time+duration/2);
+            start=predictiveSafetyGeometry.predictTarget(targetEpoch,time);
+            finish=predictiveSafetyGeometry.predictTarget(targetEpoch,time+duration);
+            middle=predictiveSafetyGeometry.predictTarget(targetEpoch,time+duration/2);
             speed=max(abs([start(4),finish(4)]));curvature=abs(sin(start(6))/start(7));
             relative=(last(1:2)-first(1:2))/duration ...
                 -middle(4)*predictiveSafetyGeometry.direction(middle(3)+middle(6));
@@ -209,7 +209,7 @@ classdef predictiveSafetyGeometry
                 fraction=(row(1)+row(2))/2;
                 if fraction==row(1) || fraction==row(2),check.lowerBound=0;return;end
                 pose=(1-fraction)*first+fraction*last;
-                target=predictiveSafetyGeometry.targetFlow(targetEpoch,time+fraction*duration);
+                target=predictiveSafetyGeometry.predictTarget(targetEpoch,time+fraction*duration);
                 value=predictiveSafetyGeometry.rectangle(pose,shape,target(1:3),target(8:11));
                 check.fractions(end+1)=fraction; %#ok<AGROW>
                 check.minimumSampledClearance=min(check.minimumSampledClearance,value);

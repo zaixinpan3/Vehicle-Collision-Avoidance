@@ -83,7 +83,7 @@ classdef nonlinearBicycleModel
             if nargout>1,[ego,ae,be]=nonlinearBicycleModel.sample(z(1:6),u,cfg);
             else,ego=nonlinearBicycleModel.sample(z(1:6),u,cfg);end
             target=[z(7:10);targetParameters];
-            future=predictiveSafetyGeometry.targetFlow(target,cfg.controller.sampleTime);
+            future=predictiveSafetyGeometry.predictTarget(target,cfg.controller.sampleTime);
             displacement=future(1:2)-target(1:2);
             at=eye(4);at(1:2,3)=[-displacement(2);displacement(1)];
             at(1:2,4)=cfg.controller.sampleTime*[cos(future(3)+target(6));sin(future(3)+target(6))];
@@ -261,10 +261,10 @@ function y=localIntegrate(x,u,cfg,curvature,duration,variational)
     h=duration/count;
     if variational,y=[x;reshape(eye(6),[],1);zeros(12,1)];else,y=x;end
     for index=1:count
-        k1=localFlow(y,u,cfg,curvature,variational);
-        k2=localFlow(y+h*k1/2,u,cfg,curvature,variational);
-        k3=localFlow(y+h*k2/2,u,cfg,curvature,variational);
-        k4=localFlow(y+h*k3,u,cfg,curvature,variational);
+        k1=localDerivative(y,u,cfg,curvature,variational);
+        k2=localDerivative(y+h*k1/2,u,cfg,curvature,variational);
+        k3=localDerivative(y+h*k2/2,u,cfg,curvature,variational);
+        k4=localDerivative(y+h*k3,u,cfg,curvature,variational);
         y=y+h*(k1+2*k2+2*k3+k4)/6;
     end
 end
@@ -304,7 +304,7 @@ function kernel=localKernel(cfg)
     kernel=handle;
 end
 
-function dy=localFlow(y,u,cfg,curvature,variational)
+function dy=localDerivative(y,u,cfg,curvature,variational)
     dx=nonlinearBicycleModel.derivative(y(1:6),u,cfg,curvature);
     if ~variational,dy=dx;return;end
     [a,b]=nonlinearBicycleModel.jacobian(y(1:6),u,cfg,curvature);

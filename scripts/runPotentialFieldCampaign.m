@@ -1,5 +1,5 @@
-function runTimedFlowCampaign(sourceRoot,outputDirectory,frameCount)
-%runTimedFlowCampaign Follow each prescribed encounter through nominal recovery.
+function runPotentialFieldCampaign(sourceRoot,outputDirectory,frameCount)
+%runPotentialFieldCampaign Follow each prescribed encounter through nominal recovery.
 % frameCount is a diagnostic observation cap, never a success deadline.
     cd(sourceRoot);addpath('controller','config','scripts');
     if ~isfolder(outputDirectory),mkdir(outputDirectory);end

@@ -172,7 +172,7 @@ classdef terminalContinuation
             start=terminalContinuation.referenceAt(seed,index);pose=start;
             margin=-Inf;value=-Inf(4,1);gradient=zeros(4,3);closest=Inf;step=0;last=NaN;
             while step<=cfg.controller.maximumHorizonSteps
-                q=predictiveSafetyGeometry.targetFlow(epoch,(index+step)*h);
+                q=predictiveSafetyGeometry.predictTarget(epoch,(index+step)*h);
                 rows=predictiveSafetyGeometry.dualLinearization(pose(1:3),shape,q(1:3),q(8:11));
                 distance=rows.distance;
                 if distance<closest

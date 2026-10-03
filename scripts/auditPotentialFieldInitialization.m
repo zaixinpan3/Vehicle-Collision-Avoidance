@@ -1,5 +1,5 @@
-function report = auditFlowInitialization(outputDirectory)
-%auditFlowInitialization Measure the current raw seed before any optimization.
+function report = auditPotentialFieldInitialization(outputDirectory)
+%auditPotentialFieldInitialization Measure the current raw seed before any optimization.
 % Extracts the private constructor verbatim. Dense replay and timing are
 % diagnostics only; they do not add controller admission tests. Output files
 % and extracted helpers belong outside the source repository.
@@ -31,9 +31,9 @@ function report = auditFlowInitialization(outputDirectory)
                 'nominalReference',nonlinearBicycleModel.cruise(cfg,frame(4)));
             count=min(cfg.controller.maximumHorizonSteps,cfg.controller.horizonSteps ...
                 +ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime));
-            anchor=auditCurrentFlowSeed(model,count);elapsed=zeros(1,7);
+            anchor=auditCurrentPotentialFieldSeed(model,count);elapsed=zeros(1,7);
             for repeat=1:7
-                timer=tic;auditCurrentFlowSeed(model,count);elapsed(repeat)=toc(timer);
+                timer=tic;auditCurrentPotentialFieldSeed(model,count);elapsed(repeat)=toc(timer);
             end
             [row,traces{caseIndex}]=localMeasure(anchor,model);
             row.scenario=scenario;row.medianWarmSeedMilliseconds=1000*median(elapsed);
@@ -64,7 +64,7 @@ function [row,trace]=localMeasure(anchor,model)
         replay=x(end,:).';difference=replay-anchor.states(:,step+1);
         integrationError=max(integrationError,norm(difference(1:2))+norm(shape(1:2))*abs(difference(3)));
         for point=indices
-            q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,times(point));
+            q=predictiveSafetyGeometry.predictTarget(model.targetEpoch,times(point));
             clearance(point)=predictiveSafetyGeometry.rectangle(states(1:3,point),shape,q(1:3),q(8:11));
         end
     end
@@ -88,13 +88,13 @@ end
 
 function localExtract(source,directory)
     code=fileread(source);result="";starts=regexp(code,'(?m)^function','start');
-    for helper=["localFlowSeed","localGuidanceInput","localClip"]
+    for helper=["localPotentialFieldSeed","localGuidanceInput","localClip"]
         first=regexp(code,"(?m)^function[^\n]*\<"+helper+"\(",'start','once');
         assert(~isempty(first),'The expected initialization helper is missing.');
         next=starts(find(starts>first,1));if isempty(next),next=numel(code)+1;end
         result=result+string(code(first:next-1))+newline;
     end
-    current=replace(result,'function anchor=localFlowSeed(', 'function anchor=auditCurrentFlowSeed(');
-    file=fopen(fullfile(directory,'auditCurrentFlowSeed.m'),'w');assert(file>=0);
+    current=replace(result,'function anchor=localPotentialFieldSeed(', 'function anchor=auditCurrentPotentialFieldSeed(');
+    file=fopen(fullfile(directory,'auditCurrentPotentialFieldSeed.m'),'w');assert(file>=0);
     fprintf(file,'%s',current);fclose(file);
 end

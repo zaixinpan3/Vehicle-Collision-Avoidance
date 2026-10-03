@@ -20,11 +20,11 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     end
     for iteration=1:cfg.nonlinear.maximumLinearizations
         if model.linearizationBuilds>=cfg.nonlinear.maximumLinearizations,break;end
-        model.allowFlowRestart=~restarted;
+        model.allowPotentialFieldRestart=~restarted;
         [candidate,search,trialModel]=localRound(model,previousState,timer);
         offset=numel(allAttempts);allAttempts=[allAttempts,search.attempts]; %#ok<AGROW>
         allStages=[allStages,search.stages]; %#ok<AGROW>
-        restarted=restarted || search.flowRestarted;
+        restarted=restarted || search.potentialFieldRestarted;
         if strlength(search.initializationFailure)>0,initialFailure=search.initializationFailure;end
         if isempty(candidate),break;end
         segment=candidate.searchSegment;candidate=rmfield(candidate,'searchSegment');
@@ -71,7 +71,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     end
     search.attempts=allAttempts;search.stages=allStages;search.selectedAttempt=selected;
     search.linearizationCount=sum([allAttempts.modelBuilt]);search.solverCalls=sum([allStages.numericalSolve]);
-    search.flowRestarted=restarted;search.initializationFailure=initialFailure;
+    search.potentialFieldRestarted=restarted;search.initializationFailure=initialFailure;
     search.refinementCount=numel(history);search.selectedRefinement=selectedRound;search.modelAgreementHistory=history;
     search.modelAgreementSatisfied=~isempty(solution);search.elapsedSeconds=toc(timer);
     search.returned=~isempty(solution);
@@ -234,7 +234,7 @@ function [solution,search,model] = localRound(model,previousState,timer)
         budgetAttempts=localAttempt(search);budgetStages=search.stages;
         if ~isempty(solution)
             search.selectedAttempt=1;search.attempts=budgetAttempts;search.linearizationCount=1;
-            search.flowRestarted=false;search.initializationFailure=failure;search.elapsedSeconds=toc(timer);return;
+            search.potentialFieldRestarted=false;search.initializationFailure=failure;search.elapsedSeconds=toc(timer);return;
         end
         % Restore this optimization after a failed inherited-budget attempt.
         % This branch never issues an input from the previous plan.
@@ -249,12 +249,12 @@ function [solution,search,model] = localRound(model,previousState,timer)
         if expanded,selected=numel(attempts);end
     end
     needsRestoration=isempty(point) || search.primaryOptimum>problem.primaryLowerBound+model.cfg.solver.feasibilityTolerance;
-    if source=="shiftedInputRollout" && needsRestoration && model.allowFlowRestart ...
+    if source=="shiftedInputRollout" && needsRestoration && model.allowPotentialFieldRestart ...
             && model.linearizationBuilds<model.cfg.nonlinear.maximumLinearizations && toc(timer)<model.cfg.solver.timeLimitSeconds
         reason=search.terminationReason;
         if ~isempty(point),reason="positiveRestorablePcbfSlack";end
-        wall=tic;freshAnchor=localFlowSeed(model,size(anchor.inputs,2));initializationSeconds=toc(wall);
-        freshSource="movingTargetFlow";if isempty(model.target),freshSource="laneFeedbackRollout";end
+        wall=tic;freshAnchor=localPotentialFieldSeed(model,size(anchor.inputs,2));initializationSeconds=toc(wall);
+        freshSource="movingTargetPotentialField";if isempty(model.target),freshSource="laneFeedbackRollout";end
         [freshPoint,freshProblem,freshSearch,freshModel]=localPrimary(freshAnchor,model,freshSource,timer);
         freshSearch.initializationSeconds=initializationSeconds;
         attempts(end+1)=localAttempt(freshSearch);stages=[stages,freshSearch.stages];restarted=true;failure=reason;
@@ -274,11 +274,11 @@ function [solution,search,model] = localRound(model,previousState,timer)
     [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
     stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
     % A failed CLF solve can still use the one available fresh initialization.
-    if isempty(solution) && search.initialization=="shiftedInputRollout" && ~restarted && model.allowFlowRestart ...
+    if isempty(solution) && search.initialization=="shiftedInputRollout" && ~restarted && model.allowPotentialFieldRestart ...
             && model.linearizationBuilds<model.cfg.nonlinear.maximumLinearizations ...
             && search.terminationReason=="clfNoNumericalResult" && toc(timer)<model.cfg.solver.timeLimitSeconds
-        failure=search.terminationReason;wall=tic;anchor=localFlowSeed(model,size(anchor.inputs,2));initializationSeconds=toc(wall);
-        source="movingTargetFlow";if isempty(model.target),source="laneFeedbackRollout";end
+        failure=search.terminationReason;wall=tic;anchor=localPotentialFieldSeed(model,size(anchor.inputs,2));initializationSeconds=toc(wall);
+        source="movingTargetPotentialField";if isempty(model.target),source="laneFeedbackRollout";end
         [point,problem,search,model]=localPrimary(anchor,model,source,timer);
         search.initializationSeconds=initializationSeconds;
         attempts(end+1)=localAttempt(search);stages=[stages,search.stages];
@@ -290,7 +290,7 @@ function [solution,search,model] = localRound(model,previousState,timer)
         stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);restarted=true;
     end
     search.selectedAttempt=selected;search.stages=stages;search.attempts=attempts;
-    search.linearizationCount=numel(attempts);search.solverCalls=sum([stages.numericalSolve]);search.flowRestarted=restarted;
+    search.linearizationCount=numel(attempts);search.solverCalls=sum([stages.numericalSolve]);search.potentialFieldRestarted=restarted;
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);
     search.selectedAttempt=search.selectedAttempt+numel(budgetAttempts);
     search.attempts=[budgetAttempts,search.attempts];search.stages=[budgetStages,search.stages];
@@ -299,7 +299,7 @@ end
 
 function [point,problem,search,model,extra,expanded]=localExpandPrimary(point,problem,search,model,anchor,timer)
     % An infeasible affine problem cannot be repaired by shrinking its input
-    % correction box. Reuse the fresh flow and allow one bounded enlargement.
+    % correction box. Reuse the potential-field seed and allow one bounded enlargement.
     % State trust, actuator bounds, safety rows and terminal constraints stay.
     extra=struct([]);expanded=false;
     infeasible=isempty(point) && ~isempty(search.stages) && any(search.stages(end).exitFlag==[-2,-7]);
@@ -480,7 +480,7 @@ function [anchor,source,failure]=localInitialization(model,previous)
     cfg=model.cfg;
     count=min(cfg.controller.maximumHorizonSteps,cfg.controller.horizonSteps ...
         +ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime));
-    source="movingTargetFlow";failure="";
+    source="movingTargetPotentialField";failure="";
     if isempty(model.target),source="laneFeedbackRollout";end
     domainErrors=["collisionAvoidanceController:nonlinearDomain", ...
         "collisionAvoidanceController:invalidTireOperatingPoint", ...
@@ -511,10 +511,10 @@ function [anchor,source,failure]=localInitialization(model,previous)
             failure="unusableShiftedInputs";
         end
     end
-    anchor=localFlowSeed(model,count);
+    anchor=localPotentialFieldSeed(model,count);
 end
 
-function anchor=localFlowSeed(model,count)
+function anchor=localPotentialFieldSeed(model,count)
     % A single potential-guided bicycle rollout, used only without a usable
     % shift or after its optimization fails. No seed supplies an issued input.
     cfg=model.cfg;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
@@ -737,5 +737,5 @@ function [low,high]=localStateLimits(cfg)
 end
 
 function q=localTargetAt(model,time)
-    q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,model.sampleIndex*model.cfg.controller.sampleTime+time);
+    q=predictiveSafetyGeometry.predictTarget(model.targetEpoch,model.sampleIndex*model.cfg.controller.sampleTime+time);
 end

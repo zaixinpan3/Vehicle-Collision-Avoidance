@@ -1,4 +1,4 @@
-classdef movingTargetFlowTest < matlab.unittest.TestCase
+classdef movingTargetPotentialFieldTest < matlab.unittest.TestCase
     % Behavior of the motion-aware potential used only for initialization.
     properties (TestParameter)
         angle = {0,.7,1.9};
@@ -56,7 +56,7 @@ classdef movingTargetFlowTest < matlab.unittest.TestCase
         end
         function accelerationAndSideslipUseTheSameAbsoluteClock(testCase)
             [state,lane,cfg]=localFixture();target=[16;-12;pi/2-.05;9;1;.05;1.6;2.4;.95;.2;-.1];
-            epoch=predictiveSafetyGeometry.targetFlow(target,-.8);
+            epoch=predictiveSafetyGeometry.predictTarget(target,-.8);
             [h1,v1,s1,r1]=predictiveSafetyGeometry.potentialGuidance(state,lane,target,0,cfg,0);
             [h2,v2,s2,r2]=predictiveSafetyGeometry.potentialGuidance(state,lane,epoch,.8,cfg,0);
             testCase.verifyEqual([h2,v2,s2,r2],[h1,v1,s1,r1],AbsTol=1e-11);
@@ -73,11 +73,11 @@ classdef movingTargetFlowTest < matlab.unittest.TestCase
             testCase.verifyEqual([atan2(sin(h2-h1-angle),cos(h2-h1-angle)),v2,s2,r2], ...
                 [0,v1,s1,r1],AbsTol=1e-11);
         end
-        function batchedTargetFlowAgreesWithScalarPrediction(testCase)
+        function batchedTargetPredictionAgreesWithScalarPrediction(testCase)
             q=[16;-12;pi/2-.05;9;1;.05;1.6;2.4;.95;.2;-.1];
-            batch=predictiveSafetyGeometry.targetFlow(q,[-.2,0,.7]);
-            testCase.verifyEqual(batch,[predictiveSafetyGeometry.targetFlow(q,-.2),q, ...
-                predictiveSafetyGeometry.targetFlow(q,.7)],AbsTol=1e-13);
+            batch=predictiveSafetyGeometry.predictTarget(q,[-.2,0,.7]);
+            testCase.verifyEqual(batch,[predictiveSafetyGeometry.predictTarget(q,-.2),q, ...
+                predictiveSafetyGeometry.predictTarget(q,.7)],AbsTol=1e-13);
         end
     end
 end

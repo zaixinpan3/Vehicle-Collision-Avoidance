@@ -52,5 +52,16 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyEqual([resumed.results.trace.input],[uninterrupted.results.trace.input]);
             testCase.verifyEqual([resumed.results.trace.absoluteSampleIndex],[uninterrupted.results.trace.absoluteSampleIndex]);
         end
+        function incompatibleContinuationIsRejectedBeforeAdvancingThePlant(testCase)
+            file=string(tempname)+".mat";
+            testCase.addTeardown(@()delete(file));
+            runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=1,ContinuationFile=file);
+            saved=load(file,'continuation');continuation=saved.continuation;
+            continuation.result.trace=rmfield(continuation.result.trace,'potentialFieldRestarted');
+            save(file,'continuation');
+            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
+                Scenarios="recovery",Frames=2,ResumeFrom=file), ...
+                'runNonlinearPredictiveSafetyValidation:incompatibleTraceSchema');
+        end
     end
 end

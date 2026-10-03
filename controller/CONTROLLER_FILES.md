@@ -8,24 +8,35 @@ and its affine prediction scope.
 | --- | --- |
 | `collisionAvoidanceController.m` | Fixed target epoch, input memory, solver orchestration, affine-result metadata and first input |
 | `readControllerInputs.m` | Ego, one target and given-path normalization |
-| `solvePredictiveControl.m` | Optimize CLF under inherited slack caps, restore PCBF when needed, and relinearize inaccurate predictions |
+| `solvePredictiveControl.m` | Optimize CLF under inherited slack caps, restore PCBF when needed, and build one model per shifted or fresh potential-field seed |
 | `terminalContinuation.m` | Augmented free-pose endpoint core, construction bounds and anchor-based terminal geometry |
-| `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single nominal cost-to-go CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
+| `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target flow, timed Gaussian and transported-flow guidance, exact ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction, Zhai-inspired artificial potential guidance, exact ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
+Normal frames shift the previous inputs and construct one nonlinear anchor.
+Startup, an unusable shift, or a failed shifted solve/accuracy step constructs
+a fresh artificial-potential-field seed. Each anchor is linearized once.
 Each completed CLF result is rolled through the nonlinear model to measure
-prediction agreement. Its full evaluable rollout becomes the next search
-anchor; the entire local model is rebuilt before another accuracy refinement.
-An accurate completed CLF result ends the current frame. The inherited prefix
-slack sum and first-stage cap replace a primary solve when feasible; a failed
-capped solve restores the primary problem. Extra rounds repair model accuracy.
-There is no stored executable witness or alternate controller. Flow is an initializer,
-not a safety certificate. Positive PCBF slack still denotes relaxation.
+prediction agreement; damping reuses the existing convex model. An accurate
+completed CLF result ends the frame. The inherited prefix slack sum and
+first-stage cap replace a primary solve when feasible; a failed capped solve
+restores the primary problem. At most one fresh potential-field retry is used.
+There is no stored executable witness or alternate controller. The potential
+field supplies initialization, not a safety certificate. Positive PCBF slack
+still denotes relaxation.
 Road boundaries remain excluded, and the original given path defines the
 single CLF. Terminal feedback is used only for construction.
+
+Initialization metadata uses `movingTargetPotentialField` and
+`potentialFieldRestarted`; `predictTarget` advances the prescribed target
+motion. The experiment entry points are `runPotentialFieldCampaign`,
+`extendPotentialFieldRecovery`, `auditPotentialFieldInitialization`, and
+`analyzePotentialFieldStudy.py` in `scripts/`. Saved validation continuations
+must use the current trace schema. Historical reports and recorded artifacts
+retain the names used when those experiments were performed.
 
 MATLAB Control System Toolbox and the compiled Clarabel 0.11.1 adapter are required.
 Optimization Toolbox is used by independent comparison tests.
@@ -51,12 +62,14 @@ zero multipliers and translation invariance. Overlap has no imposed direction.
 `twoStagePredictiveControlTest` checks both objectives, the same CLF at all
 target ranges, primary priority, affine dynamics with consistent anchors,
 braking bounds, input increments distinct from physical steering limits,
-positive-slack reporting, same-frame rebuilding of both objectives, nonlinear
-prediction accuracy, first-accurate-iterate stopping, inherited budgets, failed-budget restoration,
+positive-slack reporting, fresh initialization after a failed shift, nonlinear
+prediction accuracy, damping, inherited budgets, failed-budget restoration,
 and rejection when no accurate pair exists within the budget. `clfNominalRecoveryTest` checks target-free
 nonlinear value decrease without requiring the optimizer to issue the nominal
-construction feedback. `nominalClfTest` checks the trim, strict local Lyapunov
-tail, fixed evaluation horizon, input memory, sampled large-state convergence
-and a target-free closed loop. `../scripts/validateNominalClf.m` supplies sampled nominal-feedback diagnostics, not a regional proof. Model, geometry, terminal-core and
+construction feedback. `nominalClfTest` checks the trim, strict local nonlinear
+Lyapunov decrease, path-phase invariance, and rejection of retired cost-to-go
+settings. `movingTargetPotentialFieldTest` checks attraction, motion-aware
+repulsion, passing-side retention, and frame invariance.
+`../scripts/validateNominalClf.m` supplies sampled nominal-feedback diagnostics, not a regional proof. Model, geometry, terminal-core and
 configuration tests retain their mathematical checks. Scenario campaigns and
 independent nonlinear replay belong in `scripts/`, with results in `report/`.
