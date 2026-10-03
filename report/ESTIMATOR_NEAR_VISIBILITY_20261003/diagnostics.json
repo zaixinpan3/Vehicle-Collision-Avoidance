@@ -1,0 +1,690 @@
+{
+  "recordings": {
+    "dev": {
+      "window": "t >= 2.0 s; frames 100 through 299, normal recording",
+      "count": 200,
+      "targetCenterLongitudinalRangeM": [
+        4.729245184568425,
+        4.811788202664986
+      ],
+      "rawPosition": {
+        "rmseM": 0.12457951375724181,
+        "meanXYM": [
+          0.12378059103344824,
+          -0.0012747934598135522
+        ],
+        "centeredRmsM": 0.014028379558447275,
+        "longitudinalStandardDeviationM": 0.0045529685343113375,
+        "meanBiasSquaredFraction": 0.9873199270304578
+      },
+      "estimatedPosition": {
+        "rmseM": 0.15211963640747944,
+        "meanXYM": [
+          0.14843480315335558,
+          -0.0007836879164903346
+        ],
+        "centeredRmsM": 0.03326978849974701,
+        "longitudinalStandardDeviationM": 0.031750476520444014,
+        "meanBiasSquaredFraction": 0.9521667904341776
+      },
+      "minimumObservedHeightQ05RangeM": [
+        0.38252654671669023,
+        0.47296715378761284
+      ],
+      "imageBottomTouchingFrames": 200,
+      "lidarNoiseStddevM": 0.02
+    },
+    "conf": {
+      "window": "t >= 2.0 s; frames 100 through 299, normal recording",
+      "count": 200,
+      "targetCenterLongitudinalRangeM": [
+        4.930286921529592,
+        9.04829217044682
+      ],
+      "rawPosition": {
+        "rmseM": 0.04324199721238807,
+        "meanXYM": [
+          0.03809056625747276,
+          -0.004016629973374328
+        ],
+        "centeredRmsM": 0.020071018129587902,
+        "longitudinalStandardDeviationM": 0.007099327212719566,
+        "meanBiasSquaredFraction": 0.7845595152662868
+      },
+      "estimatedPosition": {
+        "rmseM": 0.05221061110239812,
+        "meanXYM": [
+          0.04991336877168605,
+          -0.004174579650812127
+        ],
+        "centeredRmsM": 0.014736906537213268,
+        "longitudinalStandardDeviationM": 0.011458248698567874,
+        "meanBiasSquaredFraction": 0.9203299471147097
+      },
+      "minimumObservedHeightQ05RangeM": [
+        0.03947636485099776,
+        0.32040198445320134
+      ],
+      "imageBottomTouchingFrames": 32,
+      "lidarNoiseStddevM": 0.02
+    }
+  },
+  "selectedFrames": [
+    {
+      "kind": "dev",
+      "frame": 100,
+      "trueCenterLongitudinalM": 4.811788202664986,
+      "declaredRearLidarHorizontalDistanceM": 2.461835446493243,
+      "lidarLowerRayHeightAtDeclaredRearM": 0.3786587435944597,
+      "cameraLowerImageRayHeightAtDeclaredRearM": 0.49213623925069083,
+      "pointCount": 995,
+      "lowerObservedHeightQ05M": 0.39094703793525715,
+      "lowerBodySelectionLimitM": 0.7349907100200654,
+      "bbox": [
+        98.78938293457031,
+        340.68670654296875,
+        532.3555297851562,
+        639.4673461914062
+      ],
+      "rawErrorXYM": [
+        0.10995265742861093,
+        -0.002086473338511169
+      ]
+    },
+    {
+      "kind": "dev",
+      "frame": 109,
+      "trueCenterLongitudinalM": 4.7988593361772995,
+      "declaredRearLidarHorizontalDistanceM": 2.4489045473698274,
+      "lidarLowerRayHeightAtDeclaredRearM": 0.3861244016842278,
+      "cameraLowerImageRayHeightAtDeclaredRearM": 0.5075442682722289,
+      "pointCount": 999,
+      "lowerObservedHeightQ05M": 0.3989524066448213,
+      "lowerBodySelectionLimitM": 0.7454335361719132,
+      "bbox": [
+        95.96995544433594,
+        339.19268798828125,
+        535.3246459960938,
+        639.364501953125
+      ],
+      "rawErrorXYM": [
+        0.11244722453995415,
+        -0.0011069575548042013
+      ]
+    },
+    {
+      "kind": "dev",
+      "frame": 121,
+      "trueCenterLongitudinalM": 4.736426828583806,
+      "declaredRearLidarHorizontalDistanceM": 2.3864670617966364,
+      "lidarLowerRayHeightAtDeclaredRearM": 0.42217270078743296,
+      "cameraLowerImageRayHeightAtDeclaredRearM": 0.5819484138770592,
+      "pointCount": 980,
+      "lowerObservedHeightQ05M": 0.45478298068046585,
+      "lowerBodySelectionLimitM": 0.7796913728117945,
+      "bbox": [
+        82.06314086914062,
+        338.5331726074219,
+        550.40625,
+        639.1939697265625
+      ],
+      "rawErrorXYM": [
+        0.12549531816685988,
+        0.000817653378435956
+      ]
+    },
+    {
+      "kind": "dev",
+      "frame": 200,
+      "trueCenterLongitudinalM": 4.730588785836943,
+      "declaredRearLidarHorizontalDistanceM": 2.3806505310695387,
+      "lidarLowerRayHeightAtDeclaredRearM": 0.4255308763684724,
+      "cameraLowerImageRayHeightAtDeclaredRearM": 0.5889058650626631,
+      "pointCount": 965,
+      "lowerObservedHeightQ05M": 0.4567283451557158,
+      "lowerBodySelectionLimitM": 0.7721235811710356,
+      "bbox": [
+        80.50590515136719,
+        340.92138671875,
+        550.74462890625,
+        639.368408203125
+      ],
+      "rawErrorXYM": [
+        0.1260918712418233,
+        0.002446386339239168
+      ]
+    },
+    {
+      "kind": "dev",
+      "frame": 275,
+      "trueCenterLongitudinalM": 4.738733219033389,
+      "declaredRearLidarHorizontalDistanceM": 2.3887544229534976,
+      "lidarLowerRayHeightAtDeclaredRearM": 0.4208520922077852,
+      "cameraLowerImageRayHeightAtDeclaredRearM": 0.5791968017634863,
+      "pointCount": 939,
+      "lowerObservedHeightQ05M": 0.43192111849784887,
+      "lowerBodySelectionLimitM": 0.7389934629201891,
+      "bbox": [
+        83.599365234375,
+        344.33197021484375,
+        549.7978515625,
+        639.2694091796875
+      ],
+      "rawErrorXYM": [
+        0.13159924259268685,
+        -0.01455426018485743
+      ]
+    },
+    {
+      "kind": "dev",
+      "frame": 299,
+      "trueCenterLongitudinalM": 4.73384559358688,
+      "declaredRearLidarHorizontalDistanceM": 2.3838489198615576,
+      "lidarLowerRayHeightAtDeclaredRearM": 0.4236842857384273,
+      "cameraLowerImageRayHeightAtDeclaredRearM": 0.5850246298297335,
+      "pointCount": 979,
+      "lowerObservedHeightQ05M": 0.4531439840793609,
+      "lowerBodySelectionLimitM": 0.7761637985706329,
+      "bbox": [
+        83.28034973144531,
+        339.6535949707031,
+        554.1630859375,
+        639.2274169921875
+      ],
+      "rawErrorXYM": [
+        0.11987856366405225,
+        0.0027353132799892454
+      ]
+    },
+    {
+      "kind": "conf",
+      "frame": 100,
+      "trueCenterLongitudinalM": 9.04829217044682,
+      "declaredRearLidarHorizontalDistanceM": 6.6982928841506215,
+      "lidarLowerRayHeightAtDeclaredRearM": -2.06726109844742,
+      "cameraLowerImageRayHeightAtDeclaredRearM": -4.55673264147417,
+      "pointCount": 240,
+      "lowerObservedHeightQ05M": 0.0792892992496491,
+      "lowerBodySelectionLimitM": 0.6064740672707556,
+      "bbox": [
+        275.95013427734375,
+        325.4613037109375,
+        363.8001708984375,
+        395.9183349609375
+      ],
+      "rawErrorXYM": [
+        0.03757748121916471,
+        0.022220585329703002
+      ]
+    },
+    {
+      "kind": "conf",
+      "frame": 109,
+      "trueCenterLongitudinalM": 8.639152742321052,
+      "declaredRearLidarHorizontalDistanceM": 6.289152978703085,
+      "lidarLowerRayHeightAtDeclaredRearM": -1.8310440639010666,
+      "cameraLowerImageRayHeightAtDeclaredRearM": -4.06913920401046,
+      "pointCount": 269,
+      "lowerObservedHeightQ05M": 0.04602184891700739,
+      "lowerBodySelectionLimitM": 0.5868946373462676,
+      "bbox": [
+        272.076171875,
+        325.8476867675781,
+        367.30975341796875,
+        401.7088928222656
+      ],
+      "rawErrorXYM": [
+        0.03767756990479043,
+        -0.012786894330496968
+      ]
+    },
+    {
+      "kind": "conf",
+      "frame": 121,
+      "trueCenterLongitudinalM": 8.154249673836889,
+      "declaredRearLidarHorizontalDistanceM": 5.8042498448747,
+      "lidarLowerRayHeightAtDeclaredRearM": -1.5510851090543554,
+      "cameraLowerImageRayHeightAtDeclaredRearM": -3.4912542238719695,
+      "pointCount": 310,
+      "lowerObservedHeightQ05M": 0.06842830777168289,
+      "lowerBodySelectionLimitM": 0.5981421187520028,
+      "bbox": [
+        267.1246032714844,
+        325.85894775390625,
+        372.7257995605469,
+        410.93310546875
+      ],
+      "rawErrorXYM": [
+        0.03620296003075296,
+        -0.0007091508454739827
+      ]
+    },
+    {
+      "kind": "conf",
+      "frame": 200,
+      "trueCenterLongitudinalM": 6.109561312520853,
+      "declaredRearLidarHorizontalDistanceM": 3.759561895795508,
+      "lidarLowerRayHeightAtDeclaredRearM": -0.3705839712447001,
+      "cameraLowerImageRayHeightAtDeclaredRearM": -1.0544895373377616,
+      "pointCount": 653,
+      "lowerObservedHeightQ05M": 0.08363032937049857,
+      "lowerBodySelectionLimitM": 0.5820124804973601,
+      "bbox": [
+        222.3769989013672,
+        333.101806640625,
+        417.00164794921875,
+        502.0890808105469
+      ],
+      "rawErrorXYM": [
+        0.036237730676429436,
+        0.002548751360940598
+      ]
+    },
+    {
+      "kind": "conf",
+      "frame": 275,
+      "trueCenterLongitudinalM": 5.13439679259225,
+      "declaredRearLidarHorizontalDistanceM": 2.784423397405466,
+      "lidarLowerRayHeightAtDeclaredRearM": 0.192412503297958,
+      "cameraLowerImageRayHeightAtDeclaredRearM": 0.10766536558636242,
+      "pointCount": 1032,
+      "lowerObservedHeightQ05M": 0.1824255883693696,
+      "lowerBodySelectionLimitM": 0.6446540057659149,
+      "bbox": [
+        151.39552307128906,
+        334.7316589355469,
+        484.541748046875,
+        639.90576171875
+      ],
+      "rawErrorXYM": [
+        0.046115173963168665,
+        -0.015476221411266807
+      ]
+    },
+    {
+      "kind": "conf",
+      "frame": 299,
+      "trueCenterLongitudinalM": 4.930286921529592,
+      "declaredRearLidarHorizontalDistanceM": 2.5803288163445934,
+      "lidarLowerRayHeightAtDeclaredRearM": 0.3102465646135968,
+      "cameraLowerImageRayHeightAtDeclaredRearM": 0.35091357153637004,
+      "pointCount": 1022,
+      "lowerObservedHeightQ05M": 0.32040198445320134,
+      "lowerBodySelectionLimitM": 0.6956999868154525,
+      "bbox": [
+        118.74069213867188,
+        340.0848083496094,
+        513.6505126953125,
+        639.0579833984375
+      ],
+      "rawErrorXYM": [
+        0.07256411442439248,
+        -0.00811465249236959
+      ]
+    }
+  ],
+  "translatedCloudControls": [
+    {
+      "sourceKind": "conf",
+      "sourceFrame": 100,
+      "originalCenterXM": 9.04829217044682,
+      "translatedCenterXM": 4.7988593361772995,
+      "sourcePointCount": 240,
+      "masks": {
+        "uncropped": {
+          "pointCount": 240,
+          "fittedPose": [
+            4.836919542594859,
+            0.028300610075090972,
+            0.017228615429834226
+          ],
+          "errorXYM": [
+            0.03806020641755925,
+            0.031812269164166775
+          ],
+          "positionErrorM": 0.04960443308738257,
+          "boundaryHeightLimitM": 0.6064740672707556
+        },
+        "lidar": {
+          "pointCount": 183,
+          "fittedPose": [
+            4.893408352214183,
+            -0.005736791885127517,
+            -0.002240683319204235
+          ],
+          "errorXYM": [
+            0.09454901603688359,
+            -0.0022251327960517145
+          ],
+          "positionErrorM": 0.09457519574128799,
+          "boundaryHeightLimitM": 0.717449042201042
+        },
+        "camera": {
+          "pointCount": 174,
+          "fittedPose": [
+            4.901643525281529,
+            -0.08796948441126566,
+            -0.05215537896824655
+          ],
+          "errorXYM": [
+            0.10278418910422982,
+            -0.08445782532218986
+          ],
+          "positionErrorM": 0.13303275456806724,
+          "boundaryHeightLimitM": 0.7185433834791183
+        },
+        "both": {
+          "pointCount": 174,
+          "fittedPose": [
+            4.901643525281529,
+            -0.08796948441126566,
+            -0.05215537896824655
+          ],
+          "errorXYM": [
+            0.10278418910422982,
+            -0.08445782532218986
+          ],
+          "positionErrorM": 0.13303275456806724,
+          "boundaryHeightLimitM": 0.7185433834791183
+        }
+      }
+    },
+    {
+      "sourceKind": "conf",
+      "sourceFrame": 109,
+      "originalCenterXM": 8.639152742321052,
+      "translatedCenterXM": 4.7988593361772995,
+      "sourcePointCount": 269,
+      "masks": {
+        "uncropped": {
+          "pointCount": 269,
+          "fittedPose": [
+            4.835874720993721,
+            -0.022404261226739577,
+            -0.010743753824174229
+          ],
+          "errorXYM": [
+            0.03701538481642164,
+            -0.02047434576132366
+          ],
+          "positionErrorM": 0.042300562023004015,
+          "boundaryHeightLimitM": 0.5868946373462676
+        },
+        "lidar": {
+          "pointCount": 202,
+          "fittedPose": [
+            4.88883765729383,
+            -1.0994357199395398e-05,
+            0.0027728324524485238
+          ],
+          "errorXYM": [
+            0.08997832111653015,
+            0.001918921108216523
+          ],
+          "positionErrorM": 0.08999878070934614,
+          "boundaryHeightLimitM": 0.7505477070808408
+        },
+        "camera": {
+          "pointCount": 189,
+          "fittedPose": [
+            4.898993921354095,
+            -0.02247274548959592,
+            -0.006101910595731511
+          ],
+          "errorXYM": [
+            0.10013458517679563,
+            -0.020542830024180003
+          ],
+          "positionErrorM": 0.10222007148271464,
+          "boundaryHeightLimitM": 0.7836982667446134
+        },
+        "both": {
+          "pointCount": 188,
+          "fittedPose": [
+            4.898900361823505,
+            -0.019873755574723637,
+            -0.006372073615197886
+          ],
+          "errorXYM": [
+            0.1000410256462052,
+            -0.017943840109307718
+          ],
+          "positionErrorM": 0.10163753347171058,
+          "boundaryHeightLimitM": 0.7867482319474219
+        }
+      }
+    },
+    {
+      "sourceKind": "conf",
+      "sourceFrame": 121,
+      "originalCenterXM": 8.154249673836889,
+      "translatedCenterXM": 4.7988593361772995,
+      "sourcePointCount": 310,
+      "masks": {
+        "uncropped": {
+          "pointCount": 310,
+          "fittedPose": [
+            4.8350622962080365,
+            0.0008472187373871899,
+            -0.0018105501010352953
+          ],
+          "errorXYM": [
+            0.036202960030736975,
+            -0.0007091508371745435
+          ],
+          "positionErrorM": 0.03620990485898857,
+          "boundaryHeightLimitM": 0.5981421187520028
+        },
+        "lidar": {
+          "pointCount": 235,
+          "fittedPose": [
+            4.876258900156334,
+            -0.058190742333696664,
+            -0.03881865342798704
+          ],
+          "errorXYM": [
+            0.0773995639790348,
+            -0.0597471119082584
+          ],
+          "positionErrorM": 0.0977773485298239,
+          "boundaryHeightLimitM": 0.7206218212842943
+        },
+        "camera": {
+          "pointCount": 216,
+          "fittedPose": [
+            4.898199847549048,
+            -0.05963375571187602,
+            -0.03917278367765
+          ],
+          "errorXYM": [
+            0.09934051137174826,
+            -0.06119012528643775
+          ],
+          "positionErrorM": 0.11667377011209673,
+          "boundaryHeightLimitM": 0.7483167499303818
+        },
+        "both": {
+          "pointCount": 216,
+          "fittedPose": [
+            4.898199847549048,
+            -0.05963375571187602,
+            -0.03917278367765
+          ],
+          "errorXYM": [
+            0.09934051137174826,
+            -0.06119012528643775
+          ],
+          "positionErrorM": 0.11667377011209673,
+          "boundaryHeightLimitM": 0.7483167499303818
+        }
+      }
+    },
+    {
+      "sourceKind": "conf",
+      "sourceFrame": 150,
+      "originalCenterXM": 7.212227283973246,
+      "translatedCenterXM": 4.7988593361772995,
+      "sourcePointCount": 405,
+      "masks": {
+        "uncropped": {
+          "pointCount": 405,
+          "fittedPose": [
+            4.830703432922475,
+            0.01932580375153715,
+            0.016329171278248154
+          ],
+          "errorXYM": [
+            0.031844096745175854,
+            0.015960015179628036
+          ],
+          "positionErrorM": 0.03561977796183009,
+          "boundaryHeightLimitM": 0.5675210177898404
+        },
+        "lidar": {
+          "pointCount": 302,
+          "fittedPose": [
+            4.899836358699032,
+            -0.018803040433379874,
+            -0.002216049229196262
+          ],
+          "errorXYM": [
+            0.10097702252173235,
+            -0.02216882900528899
+          ],
+          "positionErrorM": 0.10338189424082045,
+          "boundaryHeightLimitM": 0.7133433759212491
+        },
+        "camera": {
+          "pointCount": 280,
+          "fittedPose": [
+            4.910747384536981,
+            -0.009003171646044753,
+            0.0017335686237283715
+          ],
+          "errorXYM": [
+            0.11188804835968114,
+            -0.012368960217953869
+          ],
+          "positionErrorM": 0.11256965196096001,
+          "boundaryHeightLimitM": 0.7383281871676444
+        },
+        "both": {
+          "pointCount": 280,
+          "fittedPose": [
+            4.910747384536981,
+            -0.009003171646044753,
+            0.0017335686237283715
+          ],
+          "errorXYM": [
+            0.11188804835968114,
+            -0.012368960217953869
+          ],
+          "positionErrorM": 0.11256965196096001,
+          "boundaryHeightLimitM": 0.7383281871676444
+        }
+      }
+    },
+    {
+      "sourceKind": "conf",
+      "sourceFrame": 200,
+      "originalCenterXM": 6.109561312520853,
+      "translatedCenterXM": 4.7988593361772995,
+      "sourcePointCount": 653,
+      "masks": {
+        "uncropped": {
+          "pointCount": 653,
+          "fittedPose": [
+            4.835097066853802,
+            0.0001944398618130018,
+            0.00018931240031161268
+          ],
+          "errorXYM": [
+            0.03623773067650227,
+            0.0025487513859552154
+          ],
+          "positionErrorM": 0.03632725227993609,
+          "boundaryHeightLimitM": 0.5820124804973601
+        },
+        "lidar": {
+          "pointCount": 504,
+          "fittedPose": [
+            4.8962609783300515,
+            0.019407425092773687,
+            0.014024805820357079
+          ],
+          "errorXYM": [
+            0.09740164215275193,
+            0.0217617366169159
+          ],
+          "positionErrorM": 0.09980307146895209,
+          "boundaryHeightLimitM": 0.721057215332985
+        },
+        "camera": {
+          "pointCount": 467,
+          "fittedPose": [
+            4.906015439238424,
+            0.02387105606252336,
+            0.015258473754381732
+          ],
+          "errorXYM": [
+            0.10715610306112477,
+            0.026225367586665573
+          ],
+          "positionErrorM": 0.11031863092108297,
+          "boundaryHeightLimitM": 0.7463918417692185
+        },
+        "both": {
+          "pointCount": 467,
+          "fittedPose": [
+            4.906015439238424,
+            0.02387105606252336,
+            0.015258473754381732
+          ],
+          "errorXYM": [
+            0.10715610306112477,
+            0.026225367586665573
+          ],
+          "positionErrorM": 0.11031863092108297,
+          "boundaryHeightLimitM": 0.7463918417692185
+        }
+      }
+    }
+  ],
+  "sameCloudVisibilityFits": 20,
+  "savedPositionReproductionsWithin1eMinus9M": 5,
+  "maximumReproductionDifferenceM": 8.854977515126983e-12,
+  "geometry": {
+    "lidarOriginEgoM": [
+      -0.14999999105930328,
+      0.0,
+      1.8000001013278961
+    ],
+    "cameraOriginEgoM": [
+      1.5500000566244125,
+      0.0,
+      1.4000000059604645
+    ],
+    "lidarLowerElevationDeg": -30,
+    "cameraWidth": 640,
+    "cameraHeight": 640,
+    "cameraFovDeg": 100
+  },
+  "sourceHashes": {
+    "simulation_output/parked_free_perception_20261002/native_capture/scoring_truth.jsonl": "24474edfab1011af9577109fb2a96575e05e64217b463a4bb05d5f863c841ec7",
+    "simulation_output/estimator_visible_surface_20261003/perception_dev_surface/target_measurements.jsonl": "1c8318de7f7e319b7d4b2de1a8ce3e4a509147b7344aa54bbcc7de076c745473",
+    "simulation_output/estimator_visible_surface_20261003/estimator_dev_surface/predictions.csv": "f4e95611baab6a01dd50dd027e12b6fe4bdcd0f0673b29bca5c35da01758cffb",
+    "simulation_output/parked_free_perception_20261002/perception_inputs/metadata.json": "5af5f243d206eb37d0e6c58678a38d13588db20c5e575a74ef56aa6950e535f2",
+    "simulation_output/perception_geometry_confirmation_20261003/native_capture/scoring_truth.jsonl": "daf8fc4e7faae6dbf1fce2810c85e244ba63d2a837e61c33fad25674df78afbc",
+    "simulation_output/estimator_visible_surface_20261003/perception_conf_surface/target_measurements.jsonl": "b0ce5dfef59a0d4e69221f1a5f58ea0e0770e627899c12ff3451979883b52393",
+    "simulation_output/estimator_visible_surface_20261003/estimator_conf_surface/predictions.csv": "825f54b0977c75a96b25c7fe5a131b93e50bec98390367d4b9a58ebbd13a0095",
+    "simulation_output/perception_geometry_confirmation_20261003/perception_inputs/metadata.json": "e1f3667f864e3efec223153963217729c3bd6cac3fdff069a6a6f47a8911ff2f",
+    "simulation_output/estimator_visible_surface_20261003/clusters_conf/000100.npz": "70a303d1de0e6bd08cd60263d61237a151a59b9e747613ccd03f1fe754947978",
+    "simulation_output/estimator_visible_surface_20261003/clusters_conf/000109.npz": "0040329ae5f5d8d2990b4576ec06bab2b6e94450fac96ce28894ecfe3540c8a2",
+    "simulation_output/estimator_visible_surface_20261003/clusters_conf/000121.npz": "3bd3e6f2611105f584ea07d2a162f35627fbd7afb6799f6ae977aaaab3617f3b",
+    "simulation_output/estimator_visible_surface_20261003/clusters_conf/000150.npz": "43ec34bbc8c25c7a92807358a7a8dddc9d6b91e47a7ed69ae6eba5bcdbde51ad",
+    "simulation_output/estimator_visible_surface_20261003/clusters_conf/000200.npz": "d08834811972b58986d760b3e04976c2e2045470cb3fe5ac7e52396990adbcb3"
+  },
+  "controlScope": "Diagnostic truth-assisted translation of five existing farther clusters along ego x to the same 4.798859 m center distance; the same true-pose numerical seed is used for all four masks. Only geometric LiDAR elevation and full-image bounds are changed. No new ray casting, occlusion, discrete-beam resampling, YOLO inference or MATLAB replay. These controls support a visibility mechanism, not an exact causal percentage of the full scene error.",
+  "productionChanged": false,
+  "carlaAccessed": false
+}

@@ -1,0 +1,33 @@
+{
+  "analyzedPerceptionCommit": "21c7a0c2d4bc95dfe9d43a8ada5f48d69d64a8b4",
+  "sourceHashes": {
+    "perception/rectangle_pose_fit.py": "ee38cadc915ec2cdf5425916e315570065c966dc1cde22e5bbf7fa9cc43d58a0",
+    "perception/yolo_lidar_target_position.py": "6b54cf1db0db16cde629243a443e4432ac26a156cbf3f568ffefb2befca582bb",
+    "simulation_output/estimator_near_visibility_20261003/diagnoseVisibility.py": "8147996e779dc7e6e7729b3d2badfc4a4da0025e386d4a0386d6fccef363a84d"
+  },
+  "commands": [
+    "python3 simulation_output/estimator_near_visibility_20261003/diagnoseVisibility.py",
+    "pdflatex -interaction=nonstopmode -halt-on-error -output-directory simulation_output/estimator_near_visibility_20261003 report/ESTIMATOR_NEAR_VISIBILITY_20261003.tex (two successful passes after adding required amsfonts package)",
+    "pdftoppm -scale-to 850 -png simulation_output/estimator_near_visibility_20261003/ESTIMATOR_NEAR_VISIBILITY_20261003.pdf simulation_output/estimator_near_visibility_20261003/report-page"
+  ],
+  "validation": {
+    "stableFramesInspectedPerRecording": 200,
+    "measuredFramesDetailed": 12,
+    "visibilityControlledFits": 20,
+    "savedPositionFitReproductions": 5,
+    "maximumSavedPositionReproductionDifferenceM": 8.854977515126983e-12,
+    "allFiveCloudsIncreaseLongitudinalBiasUnderVisibilityCropping": true,
+    "productionAlgorithmsUnchanged": true,
+    "noCarlaConnection": true,
+    "noNewDetectorInference": true,
+    "noNewMatlabReplay": true,
+    "unitTestsRerun": false,
+    "reportPdfPages": 4,
+    "twoPassReportCompilationPassed": true,
+    "allReportPagesAndFigureVisuallyInspected": true,
+    "noOverfullReportBoxes": true,
+    "compactJsonFilesParsed": 2
+  },
+  "scope": "Read-only diagnosis of current default fitter and frozen replay outputs. Truth is used only to score and construct explicitly diagnostic translations/seeds, not for deployed perception. No exact causal fraction, new acquisition or full sensor rerender is claimed. The t >= 2 s evaluation window is fixed; initial transients are outside scope.",
+  "exclusions": "Concurrent controller/estimator/adapter/theory/test/report edits, unrelated files, datasets, dependencies and generated figures are not part of this report-only commit."
+}

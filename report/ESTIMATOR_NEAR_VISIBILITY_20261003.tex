@@ -1,0 +1,170 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,amsfonts,booktabs,graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\graphicspath{{simulation_output/estimator_near_visibility_20261003/}}
+\title{Why the Nearer Recording Retains More Position Bias}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+
+\section{Finding: visibility loss and geometric bias}
+The closer recording has more points but loses low vehicle surfaces through
+the LiDAR's downward field-of-view limit and the camera's image boundary.
+The current fitter's ``lower body'' is defined relative to the height interval
+of the \emph{visible} cluster. Once the actual lower body is missing, this
+rule retains a higher, differently shaped band. Its fitted rectangle can
+therefore have a consistent longitudinal offset even with dense returns.
+
+This explanation is supported by a controlled point-cloud experiment:
+five existing farther clusters were translated to the same near distance,
+with their shape, noise and initial fit pose held fixed across four masks.
+Applying only the sensor visibility limits increases longitudinal bias in
+all five. This identifies a concrete visibility--fitting mechanism without
+claiming an exact causal percentage of the recorded error.
+
+All performance statistics here use the previously declared $t\geq2$ s
+window, frames 100--299 of the normal recordings. Startup error is outside
+the question being addressed. Production source, estimator gains and
+initialization were not changed. No live CARLA connection, new capture,
+detector inference or MATLAB replay was required.
+
+\section{Actual distances and bias in the evaluation window}
+The labels 15 m and 20 m describe initial scenario spacing. They do not
+describe the distance during evaluation:
+\begin{center}\small
+\begin{tabular}{@{}lrr@{}}\toprule
+Quantity after 2 s & 15 m recording & 20 m recording \\\midrule
+Target center longitudinal distance (m) & 4.729--4.812 & 4.930--9.048 \\
+Raw position RMSE (m) & 0.12458 & 0.04324 \\
+Mean raw longitudinal error (m) & +0.12378 & +0.03809 \\
+Raw longitudinal standard deviation (m) & 0.00455 & 0.00710 \\
+Mean raw lateral error (m) & -0.00127 & -0.00402 \\
+Centered 2D raw-error RMS (m) & 0.01403 & 0.02007 \\
+Squared mean bias / position MSE & 98.73\% & 78.46\% \\
+Image boxes touching bottom ($y_{\max}\geq639$) & 200/200 & 32/200 \\
+Estimated position RMSE (m) & 0.15212 & 0.05221 \\
+\bottomrule\end{tabular}
+\end{center}
+The nearer recording actually has smaller longitudinal fluctuations, but
+its approximately 12.4 cm mean offset dominates RMSE. The decomposition
+$\mathbb E\|e\|^2=\|\mathbb E e\|^2+
+\mathbb E\|e-\mathbb E e\|^2$ is an error accounting identity, not a causal
+allocation. Centered variation includes scene variation and fitting effects;
+it is not a direct measurement of LiDAR noise alone. Both recordings specify
+\texttt{noise\_stddev}=0.02 m, rather than different noise settings.
+
+\section{Why near range removes low surfaces}
+The recorded LiDAR origin is approximately $(x,z)=(-0.15,1.8)$ m in ego
+coordinates, with lowest elevation $-30^\circ$. The front camera origin is
+$(1.55,1.4)$ m with a 640 by 640 image and $100^\circ$ horizontal field of
+view. Its square image gives the same vertical angular extent. These are
+ego-coordinate heights, not heights above the road.
+
+At frame 109, the target center is $x=4.79886$ m in the 15 m recording.
+The declared 5 m rectangle puts its rear midpoint approximately 2.44890 m
+horizontally from the LiDAR. At this rear location the lower LiDAR ray is
+\[
+ z_{\min,L}=1.8-2.44890\tan30^\circ=0.38612\ \mathrm{m}.
+\]
+At the same declared rear plane the lower image boundary is about
+$z_{\min,C}=0.50754$ m. Thus low returns can be missing either because the
+LiDAR never samples that direction or because their image projections fall
+below the camera. These values describe a particular declared rear plane;
+the cutoffs vary with each point's position, so they are not global constant
+height thresholds for the cloud.
+
+The measured height distribution confirms a different visible band:
+\begin{center}\small
+\begin{tabular}{@{}lrr@{}}\toprule
+Frame 109 & 15 m recording & 20 m recording \\\midrule
+Target center $x$ (m) & 4.79886 & 8.63915 \\
+Associated points & 999 & 269 \\
+5th-percentile point height (m) & 0.39895 & 0.04602 \\
+Current lower-body selection ceiling (m) & 0.74543 & 0.58689 \\
+Raw longitudinal bias (m) & +0.11245 & +0.03768 \\
+\bottomrule\end{tabular}
+\end{center}
+In the nearer cloud, the lower half of the visible height interval is already
+well above the low body visible in the farther cloud. Increasing point count
+within this truncated band does not recreate the missing footprint support.
+Near the end of the 20 m recording, its center distance also decreases to
+4.93029 m: the height 5th percentile rises to 0.32040 m and raw longitudinal
+bias rises to 0.07256 m. This within-record trend is consistent with the
+visibility explanation, but by itself is observational evidence.
+
+\section{Same-cloud visibility controls}
+Five native clusters from 20 m recording frames 100, 109, 121, 150 and 200
+were translated along ego $x$ to a common target-center $x=4.798859$ m.
+The following were held constant within each four-way comparison: all original
+XYZ returns before masking, their noise, declared dimensions, production
+fitting code and a common truth-pose numerical seed. The four masks were
+no crop, LiDAR elevation limits only, full camera-image bounds only, and both.
+Truth is used only for this explicitly diagnostic construction and scoring.
+It is not supplied to deployed perception.
+
+\begin{center}\small
+\begin{tabular}{@{}rrrrr@{}}\toprule
+Source frame & No crop & LiDAR limits & Camera bounds & Both \\
+ & \multicolumn{4}{c}{Fitted longitudinal bias (cm)} \\\midrule
+100 & 3.81 & 9.45 & 10.28 & 10.28 \\
+109 & 3.70 & 9.00 & 10.01 & 10.00 \\
+121 & 3.62 & 7.74 & 9.93 & 9.93 \\
+150 & 3.18 & 10.10 & 11.19 & 11.19 \\
+200 & 3.62 & 9.74 & 10.72 & 10.72 \\
+\bottomrule\end{tabular}
+\end{center}
+For source frame 109, the original 269 points become 202 with the LiDAR mask,
+189 with the camera mask and 188 with both. The masks overlap strongly, so
+their effects cannot be added. The resulting approximately 10 cm error is
+close in scale to the actual near frame's 11.2 cm longitudinal error, but
+this is not a complete simulation of that frame.
+
+The experiment applies geometric visibility to already recorded points.
+It does not rerun ray casting, occlusion, discrete LiDAR beam sampling,
+noise generation, YOLO selection, vehicle pitch/roll or estimator dynamics
+at the translated pose. Twenty controlled fits completed; five saved-input
+fit reproductions agree within $8.9\times10^{-12}$ m. The comparison supports
+the mechanism while leaving shape and dimension contributions unseparated.
+
+\begin{figure}[p]
+\centering\includegraphics[width=\textwidth]{visibility_controls.pdf}
+\caption{Left: a translated actual cluster loses its low returns under the
+recorded sensor visibility constraints. The blue ray is the $y=0$ LiDAR
+section; the actual mask uses every point's horizontal radius. Right: the
+same five clouds acquire larger longitudinal bias when only visibility
+cropping changes. This is an offline diagnostic, not newly captured data.}
+\end{figure}
+
+\section{Implication for the current algorithm}
+The immediate limitation is a visible-surface-to-footprint model mismatch.
+The fitter places an approximate rectangle against the current visible body
+band; an inward-recessed band shifts the inferred rear plane forward and,
+through the half-length offset, shifts the center forward. The observed
+positive longitudinal bias and controlled cropping experiment support this
+mechanism. The current estimator receives that biased position stream and
+does not have an independent measurement that identifies the missing offset.
+
+Further steady-tracking improvement should explicitly handle truncated body
+visibility and use measured support that represents the footprint boundary,
+or model the relation between visible surfaces and that boundary. Changing
+observer initialization is outside this diagnosis. A fixed 12 cm subtraction
+would not address the demonstrated dependence on visibility and range.
+
+The analyzed perception commit is
+\path{21c7a0c2d4bc95dfe9d43a8ada5f48d69d64a8b4}.
+Compact measurements, all 20 controls, source/input hashes and validation
+details accompany this report in
+\path{report/ESTIMATOR_NEAR_VISIBILITY_20261003/}.
+The executable local diagnosis and generated figure remain in
+\path{simulation_output/estimator_near_visibility_20261003/}.
+Production algorithms and all concurrent controller, estimator, adapter,
+theory and test edits are outside this report-only change. Existing frozen
+recordings were inspected; no new unit suite was necessary or executed.
+\end{document}
