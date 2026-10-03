@@ -1,0 +1,280 @@
+{
+  "method": "Scoring-only projection from preceding experiment; center inclusion is diagnostic, not identity ground truth or an oracle selection.",
+  "cases": {
+    "perception_confidence_baseline": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 34,
+      "excludedFrames": [
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        23,
+        30,
+        33,
+        34,
+        35,
+        237,
+        243,
+        244,
+        246,
+        247,
+        248,
+        250,
+        251,
+        252,
+        253,
+        254,
+        256,
+        258,
+        259,
+        260,
+        261,
+        262,
+        263,
+        266,
+        268,
+        270,
+        272
+      ],
+      "missingFrames": [
+        269
+      ]
+    },
+    "perception_largest_baseline": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 31,
+      "excludedFrames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        29,
+        34,
+        36
+      ],
+      "missingFrames": [
+        28,
+        30,
+        31,
+        32,
+        33,
+        35,
+        37,
+        38
+      ]
+    },
+    "perception_persistent_baseline": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": []
+    },
+    "perception_persistent_baseline_depth": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": []
+    },
+    "perception_persistent_baseline_depth_separate": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    "perception_persistent_baseline_locked": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": []
+    },
+    "perception_persistent_baseline_lower": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": []
+    },
+    "perception_persistent_baseline_lower_depth": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": []
+    },
+    "perception_persistent_baseline_lower_locked": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": []
+    },
+    "perception_persistent_baseline_separate": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    "perception_persistent_blackout": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ]
+    },
+    "perception_persistent_blackout_depth": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ]
+    },
+    "perception_persistent_blackout_lower_depth": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ]
+    },
+    "perception_production_baseline": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": []
+    },
+    "perception_production_geometry_baseline": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    "perception_production_geometry_blackout": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ]
+    },
+    "perception_selected_baseline": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": []
+    },
+    "perception_selected_blackout": {
+      "validFramesWhoseSelectedBoxExcludesTruthTargetCenter": 0,
+      "excludedFrames": [],
+      "missingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ]
+    }
+  }
+}

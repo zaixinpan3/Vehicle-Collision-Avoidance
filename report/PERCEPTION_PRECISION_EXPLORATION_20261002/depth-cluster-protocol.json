@@ -1,0 +1,11 @@
+{
+  "recordedAt": "2026-10-02T18:48:34.751615-05:00",
+  "findingsBeforeExperiment": "At close ranges the selected point-cloud minimum ego x stays at2.55 m, exactly camera extrinsic x1.55 m plus min_depth1 m. The optical-depth gate clips visible near-face returns. Near frame270 the cluster also extends laterally2.68 m despite an approximately1.9 m car width: radius1.2 m can join nearby background objects.",
+  "cases": {
+    "depth": "min_depth0.1 m, consistent with the existing projector positive-depth limit",
+    "separate": "cluster_radius0.3 m; at this recording's <=11 m target range and64-channel40deg LiDAR, adjacent vertical rays are approximately0.12 m apart",
+    "depth_separate": "Both changes together"
+  },
+  "allOtherSettings": "Original height0.3 m, original rectangle heading settings, fixed5.0x1.9 m dimensions, persistent association, unchanged estimator gains.",
+  "limits": "Near-range fixture;0.3 m fixed component radius is not justified for sparse distant scans. No truth-derived output offset or vehicle size fitting."
+}

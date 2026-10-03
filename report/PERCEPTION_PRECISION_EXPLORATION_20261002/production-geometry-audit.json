@@ -1,0 +1,9 @@
+{
+  "actualFreshDetectorFrames": 600,
+  "preBlackoutPrefixFrames": 150,
+  "prefixExactlyEqual": true,
+  "blankFramesWithoutPerception": 15,
+  "firstReacquiredFrame": 165,
+  "cachedPrototypeMaximumPositionDifferenceM": 1.9665682260847222e-14,
+  "matchingCacheAvailability": true
+}

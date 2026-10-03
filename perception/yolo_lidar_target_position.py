@@ -871,6 +871,60 @@ def choose_single_detection(detections: list[Detection]) -> list[Detection]:
     return detections[:1]
 
 
+def detection_overlap(first: Detection, second: Detection) -> float:
+    """Return image intersection-over-union for two boxes in one camera."""
+    if first.camera_id != second.camera_id:
+        return 0.0
+    a, b = first.bbox_xyxy, second.bbox_xyxy
+    intersection = max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(
+        0.0, min(a[3], b[3]) - max(a[1], b[1])
+    )
+    union = bbox_area(first) + bbox_area(second) - intersection
+    return intersection / union if union > 0.0 else 0.0
+
+
+class PersistentTargetSelector:
+    """Keep the first acquired car's image track through short detection gaps.
+
+    The first acquisition uses confidence. Later acquisitions require overlap
+    with the last accepted box. A missing/expired match produces no detection;
+    it never silently replaces the target. Create a new selector to acquire a
+    new identity. This is a single-camera association policy, not reidentification
+    across occlusions or a guarantee that the initial car is the desired target.
+    """
+
+    def __init__(self, minimum_iou: float = 0.1, maximum_gap: float = 1.0) -> None:
+        if not math.isfinite(minimum_iou) or not 0.0 < minimum_iou <= 1.0:
+            raise ValueError("Minimum association IoU must be finite and in (0, 1].")
+        if not math.isfinite(maximum_gap) or maximum_gap <= 0.0:
+            raise ValueError("Maximum association gap must be finite and positive.")
+        self.minimum_iou = minimum_iou
+        self.maximum_gap = maximum_gap
+        self.last_detection: Detection | None = None
+        self.last_match_time = -float("inf")
+        self.last_timestamp = -float("inf")
+
+    def select(self, detections: list[Detection], timestamp: float) -> list[Detection]:
+        if not math.isfinite(timestamp) or timestamp <= self.last_timestamp:
+            raise ValueError("Target association requires strictly increasing finite timestamps.")
+        self.last_timestamp = timestamp
+        if not detections:
+            return []
+        if self.last_detection is None:
+            selected = choose_single_detection(detections)[0]
+        else:
+            if timestamp - self.last_match_time > self.maximum_gap:
+                return []
+            selected = max(detections, key=lambda d: (
+                detection_overlap(self.last_detection, d), d.confidence, bbox_area(d)
+            ))
+            if detection_overlap(self.last_detection, selected) < self.minimum_iou:
+                return []
+        self.last_detection = selected
+        self.last_match_time = timestamp
+        return [selected]
+
+
 def fuse_estimates(estimates: list[CameraEstimate]) -> tuple[np.ndarray, dict[str, Any]] | None:
     if not estimates:
         return None
@@ -1249,6 +1303,11 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     if unknown_camera_ids:
         unknown = ", ".join(sorted(unknown_camera_ids))
         raise ValueError(f"Unknown camera id(s): {unknown}.")
+    selector = None
+    if args.target_association == "persistent":
+        if len(selected_camera_ids) != 1:
+            raise ValueError("Persistent target association requires exactly one selected camera.")
+        selector = PersistentTargetSelector(args.association_minimum_iou, args.association_maximum_gap)
     lidar_info = metadata["sensors"]["lidar"]
     lidar_to_world_static = matrix_from_record(lidar_info)
 
@@ -1297,7 +1356,8 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 camera_table[camera_id],
                 args.min_bbox_area_ratio,
             )
-            detections = choose_single_detection(detections)
+            detections = (selector.select(detections, frame_time) if selector is not None
+                          else choose_single_detection(detections))
             all_detections.extend(detections)
             camera_calibration = camera_frame_calibration(
                 camera_table[camera_id],
@@ -1500,6 +1560,9 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             "camera_ids": sorted(selected_camera_ids),
             "image_size": args.image_size,
             "confidence_threshold": args.confidence,
+            "target_association": args.target_association,
+            "association_minimum_iou": args.association_minimum_iou,
+            "association_maximum_gap_s": args.association_maximum_gap,
             "iou_threshold": args.iou,
             "vehicle_length_m": args.vehicle_length,
             "vehicle_width_m": args.vehicle_width,
@@ -1561,6 +1624,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         ),
     )
     parser.add_argument("--min-depth", type=float, default=1.0)
+    parser.add_argument(
+        "--target-association", choices=["confidence", "persistent"], default="confidence",
+        help="Persistent keeps the first acquired car using image overlap; select exactly one camera.",
+    )
+    parser.add_argument("--association-minimum-iou", type=float, default=0.1)
+    parser.add_argument(
+        "--association-maximum-gap", type=float, default=1.0,
+        help="Seconds since the last matched box before the persistent track expires; no automatic replacement.",
+    )
     parser.add_argument("--max-depth", type=float, default=80.0)
     parser.add_argument("--max-depth-span", type=float, default=8.0)
     parser.add_argument("--bbox-margin", type=float, default=0.02)
