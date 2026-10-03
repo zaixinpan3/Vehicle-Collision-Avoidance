@@ -49,8 +49,6 @@ function cfg=localDefaults()
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
         'frontWheelSteeringAngleWeight',1,'brakingRatioWeight',1);
-    % Soft preference for input continuity, within the existing CLF tie budget.
-    cfg.inputPenalty=struct('slewWeight',.5);
     % One analytic quadratic CLF; decreaseFraction multiplies e' Q e.
     % The remaining nominalClf parameters guide initialization only.
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
@@ -137,7 +135,6 @@ function localValidate(cfg)
     for name=string(fieldnames(cfg.clf)).'
         validateattributes(cfg.clf.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    validateattributes(cfg.inputPenalty.slewWeight,{'double'},{'scalar','real','finite','nonnegative'});
     for name=string(fieldnames(cfg.nominalClf)).'
         validateattributes(cfg.nominalClf.(name),{'double'},{'scalar','real','finite','positive'});
     end

@@ -1,0 +1,30 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/return-diagnosis.json",
+    "sha256": "0b168b6ec71428eaaebf7072b10127610656ec5178422805b5d3398251c71ea3"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/return-captures.mat",
+    "sha256": "26b63ffc2d133902c3b7796e24943ef1a6fb27dfcfae49b73c61f16571cf9f24"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/diagnoseReturn.m",
+    "sha256": "a8681beaf1459229a52e5e0b5c2bf0a05c65227a180ecacdbe5054cc7f8d30a1"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/replaySmoothingSolve.m",
+    "sha256": "11df08d4208304964f296df229caf54165111ad7cb95fdbaee531368c8cb0e79"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/diagnosticConicSolve.m",
+    "sha256": "7baec3d4fe0f1e56e3002fa47ba3b806dddc077f9d5b9923a0d1d0151c9e8cf8"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/diagnosticFormulate.m",
+    "sha256": "44250cf24587265aaf426a0b42fcacc53b3e8a68e944b742f3a05e9759113899"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed8-headOn.mat",
+    "sha256": "94cbb2478bddd74eeff6b10c9d4fb48316db1c72a479c10b0dba8608789dd53f"
+  }
+]

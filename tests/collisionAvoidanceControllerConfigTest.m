@@ -11,6 +11,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             "reversed", [4.0, -8.0], "positiveOnly", [1.0, 4.0], ...
             "negativeOnly", [-1.0, -0.2], "outsideRange", [-1.01, 1.0])
         removedOption = { ...
+            struct("inputPenalty", struct("slewWeight", .5)), ...
             struct("model", struct("frontWheelSteeringAngleMaximum", .7)), ...
             struct("model", struct("frontWheelSteeringRateMaximum", 1)), ...
             struct("nonlinear", struct("maximumIterations", 8)), ...
@@ -40,7 +41,6 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             struct("nonlinear", struct("proposalFunction", @sin))}
         invalidCrossingGap = {-0.1, Inf, NaN, [0.1, 0.2]}
         invalidActuation = {[], 1.0, struct([])}
-        invalidSlewWeight = {-1, NaN, Inf, [1,2]}
     end
 
     methods (TestClassSetup)
@@ -54,17 +54,6 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function inputSlewPreferenceCanBeRemovedWithoutAddingAHardRateLimit(testCase)
-            cfg=collisionAvoidanceControllerConfig(struct('inputPenalty',struct('slewWeight',0)));
-            testCase.verifyEqual(cfg.inputPenalty.slewWeight,0);
-            testCase.verifyEqual(cfg.model.brakingRatioRateMaximum,Inf);
-            testCase.verifyEqual(cfg.collision.safetyMarginMeters,.10);
-        end
-        function inputSlewPreferenceRequiresAFiniteNonnegativeWeight(testCase,invalidSlewWeight)
-            testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
-                struct('inputPenalty',struct('slewWeight',invalidSlewWeight))), ...
-                'collisionAvoidanceController:invalidConfiguration');
-        end
         function targetRearAxleDistanceIsPositiveAndIndependentOfEgoGeometry(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('target',struct('rearAxleDistance',1.8)));
             testCase.verifyEqual(cfg.target.rearAxleDistance,1.8);

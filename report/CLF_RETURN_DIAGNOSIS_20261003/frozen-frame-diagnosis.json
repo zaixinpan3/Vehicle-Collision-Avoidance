@@ -1,0 +1,680 @@
+{
+  "maximumReplayInputError": 0,
+  "sourceCommit": "63ccffd5a1cbf21f659c9ec7c6b167a127d44e21",
+  "scope": "Offline frozen-model counterfactuals; no candidate from these diagnostics is executed. Grid is not a global nonlinear optimum or a horizon-safe plan.",
+  "firstStepGrid": "81 steering samples in [-0.65,0.65] rad, 41 signed braking samples in [-0.5,0.5]. All points use the RK4 nonlinear first successor; this is a sampled diagnostic outside the current correction box, without a full-horizon safety guarantee.",
+  "records": [
+    {
+      "timeSeconds": 1.0000000000000002,
+      "state": [
+        5.977684225977771,
+        2.1877490437233744,
+        0.5751173181224813,
+        5.453135570806736,
+        0.679437821787019,
+        0.4803179985372094
+      ],
+      "trustScale": 0.3471514102756337,
+      "anchorFirstInput": [
+        0.2763222600829986,
+        0.024343475371271756
+      ],
+      "issuedInput": [
+        0.25028590431261666,
+        0.06773740165244546
+      ],
+      "clfValue": 1426.5563009776931,
+      "clfSlack": 230.34796504280138,
+      "clfNextValue": 1575.0945416642571,
+      "fullStepFraction": 1,
+      "firstInputCorrection": [
+        -0.026036355770381936,
+        0.04339392628117371
+      ],
+      "variants": [
+        {
+          "variant": "originalSmoothing",
+          "flag": 1,
+          "input": [
+            0.25028590431261666,
+            0.06773740165244546
+          ],
+          "slack": 230.34796504280138,
+          "nonlinearNextValue": 1574.6987871733722
+        },
+        {
+          "variant": "anchorOnly",
+          "flag": 1,
+          "input": [
+            0.2502859043133512,
+            0.06773740164439855
+          ],
+          "slack": 230.3479650433515,
+          "nonlinearNextValue": 1574.6987871738547
+        },
+        {
+          "variant": "pureClf",
+          "flag": 1,
+          "input": [
+            0.2502859043146845,
+            0.06773740165245858
+          ],
+          "slack": 230.34796504301545,
+          "nonlinearNextValue": 1574.6987871740337
+        },
+        {
+          "variant": "noTargetRows",
+          "flag": 1,
+          "input": [
+            0.25028590431660597,
+            0.06773740161281423
+          ],
+          "slack": 230.3479650455116,
+          "nonlinearNextValue": 1574.698787175866
+        }
+      ],
+      "firstStepOnlyInput": [
+        0.2502859043123278,
+        0.0677374016556345
+      ],
+      "firstStepOnlyAffineSlack": 230.3479650425843,
+      "firstStepOnlyTrueValue": 1574.6987871731824,
+      "sampledFirstStepBest": {
+        "value": 1517.5005295144342,
+        "input": [
+          -0.04875,
+          0.5
+        ],
+        "slack": 172.75395289293965
+      }
+    },
+    {
+      "timeSeconds": 1.4000000000000006,
+      "state": [
+        7.6555738977901715,
+        3.7388453926367933,
+        0.716963840496085,
+        6.064650107198147,
+        0.29414599520837936,
+        0.198188496811891
+      ],
+      "trustScale": 0.5065667617310773,
+      "anchorFirstInput": [
+        0.11125090990557251,
+        0.2540118328282259
+      ],
+      "issuedInput": [
+        0.07325840277575257,
+        0.31733267804440635
+      ],
+      "clfValue": 2760.7978584718803,
+      "clfSlack": 269.81709051905915,
+      "clfNextValue": 2946.326500925015,
+      "fullStepFraction": 1,
+      "firstInputCorrection": [
+        -0.03799250712981994,
+        0.06332084521618042
+      ],
+      "variants": [
+        {
+          "variant": "originalSmoothing",
+          "flag": 2,
+          "input": [
+            0.07325840277575257,
+            0.31733267804440635
+          ],
+          "slack": 269.81709051905915,
+          "nonlinearNextValue": 2945.732106080905
+        },
+        {
+          "variant": "anchorOnly",
+          "flag": 2,
+          "input": [
+            0.07325840277575209,
+            0.3173326780444166
+          ],
+          "slack": 269.8170905190625,
+          "nonlinearNextValue": 2945.732106080905
+        },
+        {
+          "variant": "pureClf",
+          "flag": 1,
+          "input": [
+            0.07325840277887602,
+            0.3173326780439707
+          ],
+          "slack": 269.81709051994,
+          "nonlinearNextValue": 2945.7321060820873
+        },
+        {
+          "variant": "noTargetRows",
+          "flag": 1,
+          "input": [
+            0.07325840281239722,
+            0.3173326773525942
+          ],
+          "slack": 269.81709054661184,
+          "nonlinearNextValue": 2945.732106109833
+        }
+      ],
+      "firstStepOnlyInput": [
+        0.0732584027757541,
+        0.317332678044037
+      ],
+      "firstStepOnlyAffineSlack": 269.81709051906626,
+      "firstStepOnlyTrueValue": 2945.732106080914,
+      "sampledFirstStepBest": {
+        "value": 2904.2567284402985,
+        "input": [
+          -0.2275,
+          0.5
+        ],
+        "slack": 227.7473180343421
+      }
+    },
+    {
+      "timeSeconds": 1.4500000000000006,
+      "state": [
+        7.8771526386231345,
+        3.951038349101426,
+        0.7255409832889459,
+        6.19527085973392,
+        0.23537433948013575,
+        0.15760571650648875
+      ],
+      "trustScale": 0.5065667617310773,
+      "anchorFirstInput": [
+        0.09313895830958453,
+        0.2692833950630562
+      ],
+      "issuedInput": [
+        0.055146451179761455,
+        0.3326042402792793
+      ],
+      "clfValue": 2945.807912324594,
+      "clfSlack": 275.5319199108479,
+      "clfNextValue": 3137.3202634010822,
+      "fullStepFraction": 1,
+      "firstInputCorrection": [
+        -0.03799250712982308,
+        0.06332084521622311
+      ],
+      "variants": [
+        {
+          "variant": "originalSmoothing",
+          "flag": 1,
+          "input": [
+            0.055146451179761455,
+            0.3326042402792793
+          ],
+          "slack": 275.5319199108479,
+          "nonlinearNextValue": 3136.563436391954
+        },
+        {
+          "variant": "anchorOnly",
+          "flag": 2,
+          "input": [
+            0.05514645118459436,
+            0.33260424017792717
+          ],
+          "slack": 275.5319199154428,
+          "nonlinearNextValue": 3136.5634363958593
+        },
+        {
+          "variant": "pureClf",
+          "flag": 1,
+          "input": [
+            0.05514645119422821,
+            0.3326042402731792
+          ],
+          "slack": 275.53191991504445,
+          "nonlinearNextValue": 3136.5634363976756
+        },
+        {
+          "variant": "noTargetRows",
+          "flag": 1,
+          "input": [
+            0.05514645120511684,
+            0.3326042397468168
+          ],
+          "slack": 275.531919930165,
+          "nonlinearNextValue": 3136.5634364124558
+        }
+      ],
+      "firstStepOnlyInput": [
+        0.055146451179762315,
+        0.3326042402791132
+      ],
+      "firstStepOnlyAffineSlack": 275.5319199108461,
+      "firstStepOnlyTrueValue": 3136.563436391958,
+      "sampledFirstStepBest": {
+        "value": 3094.74917378529,
+        "input": [
+          -0.26,
+          0.5
+        ],
+        "slack": 232.96083029505087
+      }
+    },
+    {
+      "timeSeconds": 1.5000000000000007,
+      "state": [
+        8.10387981220489,
+        4.167316427427679,
+        0.7322669784075915,
+        6.330995902656004,
+        0.18392668223692,
+        0.12228762526058073
+      ],
+      "trustScale": 0.5065667617310773,
+      "anchorFirstInput": [
+        0.07771738289854727,
+        0.27816023679420143
+      ],
+      "issuedInput": [
+        0.039724875770761676,
+        0.3414810819589129
+      ],
+      "clfValue": 3136.6603464011973,
+      "clfSlack": 282.5912180078019,
+      "clfNextValue": 3335.168581857157,
+      "fullStepFraction": 1,
+      "firstInputCorrection": [
+        -0.03799250712778559,
+        0.06332084516471148
+      ],
+      "variants": [
+        {
+          "variant": "originalSmoothing",
+          "flag": 2,
+          "input": [
+            0.039724875770761676,
+            0.3414810819589129
+          ],
+          "slack": 282.5912180078019,
+          "nonlinearNextValue": 3334.273578501273
+        },
+        {
+          "variant": "anchorOnly",
+          "flag": 1,
+          "input": [
+            0.039724875768716514,
+            0.3414810820105855
+          ],
+          "slack": 282.591218005863,
+          "nonlinearNextValue": 3334.273578499523
+        },
+        {
+          "variant": "pureClf",
+          "flag": 2,
+          "input": [
+            0.03972487586931131,
+            0.3414810819473865
+          ],
+          "slack": 282.59121803579114,
+          "nonlinearNextValue": 3334.2735785408263
+        },
+        {
+          "variant": "noTargetRows",
+          "flag": 1,
+          "input": [
+            0.03972487577212247,
+            0.34148108192958576
+          ],
+          "slack": 282.59121800910737,
+          "nonlinearNextValue": 3334.2735785023456
+        }
+      ],
+      "firstStepOnlyInput": [
+        0.039724875768820694,
+        0.3414810820099349
+      ],
+      "firstStepOnlyAffineSlack": 282.5912180059143,
+      "firstStepOnlyTrueValue": 3334.273578499576,
+      "sampledFirstStepBest": {
+        "value": 3291.8858241237667,
+        "input": [
+          -0.2925,
+          0.5
+        ],
+        "slack": 239.3084602741299
+      }
+    },
+    {
+      "timeSeconds": 2.000000000000001,
+      "state": [
+        10.682617477467227,
+        6.545074339557451,
+        0.7356792256915136,
+        7.605437808443722,
+        -0.07202765590655863,
+        -0.0648913014494559
+      ],
+      "trustScale": 0.5065667617310773,
+      "anchorFirstInput": [
+        0.007539512680985029,
+        0.26444750521600996
+      ],
+      "issuedInput": [
+        -0.030452994448506313,
+        0.20112666004984958
+      ],
+      "clfValue": 5531.534690388876,
+      "clfSlack": 410.2765071716501,
+      "clfNextValue": 5827.765558621061,
+      "fullStepFraction": 1,
+      "firstInputCorrection": [
+        -0.03799250712949134,
+        -0.06332084516616038
+      ],
+      "variants": [
+        {
+          "variant": "originalSmoothing",
+          "flag": 2,
+          "input": [
+            -0.030452994448506313,
+            0.20112666004984958
+          ],
+          "slack": 410.2765071716501,
+          "nonlinearNextValue": 5826.3318985871565
+        },
+        {
+          "variant": "anchorOnly",
+          "flag": 2,
+          "input": [
+            -0.030452994396021102,
+            0.20112666829534728
+          ],
+          "slack": 410.2765072328046,
+          "nonlinearNextValue": 5826.331898628821
+        },
+        {
+          "variant": "pureClf",
+          "flag": 1,
+          "input": [
+            -0.03045299444324518,
+            0.20112666590346523
+          ],
+          "slack": 410.2765071909757,
+          "nonlinearNextValue": 5826.3318986003615
+        },
+        {
+          "variant": "noTargetRows",
+          "flag": 2,
+          "input": [
+            -0.030452994448255666,
+            0.20112666011045793
+          ],
+          "slack": 410.2765071718982,
+          "nonlinearNextValue": 5826.331898587392
+        }
+      ],
+      "firstStepOnlyInput": [
+        -0.030452994448703266,
+        0.20112666000994867
+      ],
+      "firstStepOnlyAffineSlack": 410.27650717135566,
+      "firstStepOnlyTrueValue": 5826.331898586983,
+      "sampledFirstStepBest": {
+        "value": 5774.783090550595,
+        "input": [
+          -0.2925,
+          0.25
+        ],
+        "slack": 357.2940391011134
+      }
+    },
+    {
+      "timeSeconds": 3.999999999999994,
+      "state": [
+        23.269483727756167,
+        15.320774825924696,
+        0.4816566443964536,
+        7.362880710087606,
+        -0.23278893637626358,
+        -0.19732753550890922
+      ],
+      "trustScale": 1,
+      "anchorFirstInput": [
+        -0.00937408136082915,
+        0.03529244422134369
+      ],
+      "issuedInput": [
+        -0.0843740813607615,
+        0.03991753441139847
+      ],
+      "clfValue": 20372.227813091828,
+      "clfSlack": 826.3495162761296,
+      "clfNextValue": 20713.682914432182,
+      "fullStepFraction": 1,
+      "firstInputCorrection": [
+        -0.07499999999993234,
+        0.004625090190054776
+      ],
+      "variants": [
+        {
+          "variant": "originalSmoothing",
+          "flag": 2,
+          "input": [
+            -0.0843740813607615,
+            0.03991753441139847
+          ],
+          "slack": 826.3495162761296,
+          "nonlinearNextValue": 20705.060467721516
+        },
+        {
+          "variant": "anchorOnly",
+          "flag": 2,
+          "input": [
+            -0.08437408135552159,
+            0.03963336833265031
+          ],
+          "slack": 826.3495183566934,
+          "nonlinearNextValue": 20705.062025604333
+        },
+        {
+          "variant": "pureClf",
+          "flag": 2,
+          "input": [
+            -0.08437408119164283,
+            0.040590977307685544
+          ],
+          "slack": 826.3495140319527,
+          "nonlinearNextValue": 20705.05677834033
+        },
+        {
+          "variant": "noTargetRows",
+          "flag": -7,
+          "input": [
+            null,
+            null
+          ],
+          "slack": null,
+          "nonlinearNextValue": null
+        }
+      ],
+      "firstStepOnlyInput": [
+        -0.08437408136082844,
+        0.040800976875071664
+      ],
+      "firstStepOnlyAffineSlack": 826.3495134953469,
+      "firstStepOnlyTrueValue": 20705.055628432943,
+      "sampledFirstStepBest": {
+        "value": 20631.321704512906,
+        "input": [
+          -0.325,
+          0.30000000000000004
+        ],
+        "slack": 743.9883063568182
+      }
+    },
+    {
+      "timeSeconds": 5.999999999999987,
+      "state": [
+        37.9529388051978,
+        18.98715114224346,
+        0.07087658335751261,
+        7.932134033620847,
+        -0.23729055178717212,
+        -0.21215210447720356
+      ],
+      "trustScale": 1,
+      "anchorFirstInput": [
+        -0.00875220914519282,
+        0.0387209926119772
+      ],
+      "issuedInput": [
+        -0.08375220914197778,
+        0.05931209546896367
+      ],
+      "clfValue": 27771.73141642504,
+      "clfSlack": 710.3770311931182,
+      "clfNextValue": 27760.12138973467,
+      "fullStepFraction": 1,
+      "firstInputCorrection": [
+        -0.07499999999678497,
+        0.020591102856986468
+      ],
+      "variants": [
+        {
+          "variant": "originalSmoothing",
+          "flag": 2,
+          "input": [
+            -0.08375220914197778,
+            0.05931209546896367
+          ],
+          "slack": 710.3770311931182,
+          "nonlinearNextValue": 27750.821442701435
+        },
+        {
+          "variant": "anchorOnly",
+          "flag": 2,
+          "input": [
+            -0.08375220913295586,
+            0.05794848187698773
+          ],
+          "slack": 710.3770943454979,
+          "nonlinearNextValue": 27750.829186506067
+        },
+        {
+          "variant": "pureClf",
+          "flag": 2,
+          "input": [
+            -0.08375220868012853,
+            0.065218611570653
+          ],
+          "slack": 710.3769109959177,
+          "nonlinearNextValue": 27750.788074161166
+        },
+        {
+          "variant": "noTargetRows",
+          "flag": 2,
+          "input": [
+            -0.08375220913295586,
+            0.05794848187698773
+          ],
+          "slack": 710.3770943454979,
+          "nonlinearNextValue": 27750.829186506067
+        }
+      ],
+      "firstStepOnlyInput": [
+        -0.08375220914518552,
+        0.06513084727740973
+      ],
+      "firstStepOnlyAffineSlack": 710.3769105947177,
+      "firstStepOnlyTrueValue": 27750.78856755472,
+      "sampledFirstStepBest": {
+        "value": 27675.77324884131,
+        "input": [
+          -0.325,
+          0.30000000000000004
+        ],
+        "slack": 626.0288902864887
+      }
+    },
+    {
+      "timeSeconds": 7.99999999999998,
+      "state": [
+        54.09511925836494,
+        16.068283429320342,
+        -0.3719378573360388,
+        8.535588657567203,
+        -0.2348769695671911,
+        -0.22913081199914165
+      ],
+      "trustScale": 1,
+      "anchorFirstInput": [
+        -0.009632680169123713,
+        -0.00845108467637783
+      ],
+      "issuedInput": [
+        -0.08463268003582342,
+        0.0366050376046667
+      ],
+      "clfValue": 18041.642338326135,
+      "clfSlack": 101.72150867254842,
+      "clfNextValue": 17617.006056065842,
+      "fullStepFraction": 1,
+      "firstInputCorrection": [
+        -0.0749999998666997,
+        0.045056122281044525
+      ],
+      "variants": [
+        {
+          "variant": "originalSmoothing",
+          "flag": 1,
+          "input": [
+            -0.08463268003582342,
+            0.0366050376046667
+          ],
+          "slack": 101.72150867254842,
+          "nonlinearNextValue": 17611.170707669145
+        },
+        {
+          "variant": "anchorOnly",
+          "flag": 1,
+          "input": [
+            -0.08463268012063788,
+            0.034416839645939265
+          ],
+          "slack": 101.72165291954649,
+          "nonlinearNextValue": 17611.179218342924
+        },
+        {
+          "variant": "pureClf",
+          "flag": 2,
+          "input": [
+            -0.08463266885654863,
+            0.04390957634012291
+          ],
+          "slack": 101.72127784709998,
+          "nonlinearNextValue": 17611.142588109447
+        },
+        {
+          "variant": "noTargetRows",
+          "flag": 1,
+          "input": [
+            -0.08463268012063788,
+            0.034416839645939265
+          ],
+          "slack": 101.72165291954649,
+          "nonlinearNextValue": 17611.179218342924
+        }
+      ],
+      "firstStepOnlyInput": [
+        -0.0846326801533808,
+        0.04476661354431742
+      ],
+      "firstStepOnlyAffineSlack": 101.7212712610127,
+      "firstStepOnlyTrueValue": 17611.139311215236,
+      "sampledFirstStepBest": {
+        "value": 17565.39704045295,
+        "input": [
+          -0.30875,
+          0.275
+        ],
+        "slack": 50.1124930179177
+      }
+    }
+  ]
+}

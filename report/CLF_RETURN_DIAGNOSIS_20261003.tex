@@ -1,0 +1,174 @@
+\documentclass[10pt]{article}
+\usepackage[margin=.8in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,hyperref,xurl}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Restore the Proximal CLF Objective and Diagnose Delayed Return}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+\section{Corrected requirement and implementation}
+The user's preference concerns lateral excursion from the given path, not
+smooth actuator changes. The recently added input-continuity objective and
+its configuration field are therefore removed completely. The retained
+controller minimizes PCBF slack during initialization/restoration, or inherits
+the shifted budget, and then minimizes the same first-successor CLF slack with
+its original bounded anchor-relative input correction cost:
+\[
+ \min\;\frac{\rho}{\max(1,V(x))}+\epsilon R_a(\Delta U),\quad
+ R_a=\frac{1}{2M}\sum_{i=0}^{M-1}\sum_{l=1}^{2}
+       \frac{\Delta u_{l,i}^2}{r_l^2},\quad \epsilon=10^{-4}.
+\]
+The input reference is the linearization trajectory, not zero. There is no
+new lateral-deviation objective, road boundary, steering magnitude/rate limit,
+CLF, controller mode, backup or optimization stage. The 0.10-m affine collision
+margin remains. The solver and configuration sources are byte-identical to
+commit \path{b16771139356ec252ed8deb4bb341cc22ffb023a}; continuation version 70
+prevents reuse of the retired objective's continuation state. Existing
+configuration validation rejects the removed option explicitly.
+
+\section{What the CLF does and what the diagnosis tests}
+The unchanged function $V=e^\top P e$ uses transverse position, heading,
+longitudinal/lateral velocity and yaw-rate errors. Its constraint is
+\[
+ V_{\mathrm{aff}}(x_{1|k})-V(x_k)
+ \le-\eta e(x_k)^\top Qe(x_k)+\rho_k,\quad \eta=0.5,\quad\rho_k\ge0.
+\]
+It acts on the first successor. Future controls have no individual CLF
+constraints; horizon feasibility and the tie objective select them. Thus a
+small tie objective can affect future inputs strongly along directions that
+do not change the current minimum slack. A zero-slack decrease condition is
+not a minimum-excursion objective. Positive slack permits $V$ to rise, and the
+local LQR quadratic is not a global nonlinear CLF.
+
+The historical 8-m/s head-on run from smoothing commit
+\path{63ccffd5a1cbf21f659c9ec7c6b167a127d44e21} was replayed from its recorded
+measured states. All 161 issued inputs through 8.0 s were reproduced exactly,
+with maximum input discrepancy zero. An isolated diagnostic copy captured
+the actual conic problem at eight times: 1.0, 1.4, 1.45, 1.5, 2.0, 4.0,
+6.0 and 8.0 s. No diagnostic candidate was executed on the plant or installed
+as another production controller.
+
+For each frozen problem, the analysis (i) restored the anchor-only objective,
+(ii) removed all tie cost and minimized only CLF slack, (iii) removed target
+collision/separation rows while preserving the same dynamics/CLF, and
+(iv) minimized the condensed two-variable first-step CLF quadratic over only
+the existing first-input correction box. The last problem relaxes all future
+constraints and gives a lower bound on the original minimum slack.
+
+\section{Root cause: future-plan selection and shifted correction bounds}
+The immediate steering output is essentially unchanged under the first two
+ablations: its change is below $1.3\times10^{-8}$ rad. Braking changes slightly,
+but the raw CLF slack improvement stays below $3\times10^{-4}$. The relaxed
+first-step minimum also agrees with the full problem within that raw slack
+tolerance at all eight times. The CLF stage was being solved; neither skipping
+it nor a large smoothing weight overriding it explains this regression.
+
+Every examined frame places steering at its lower correction bound:
+\[
+ \delta_{0|k}=\bar\delta_{0|k}-r_{\delta,k}.
+\]
+This is a numerical correction limit about the planned anchor, not an actuator
+or previous-command slew limit. At $t=4.0$ s, the actual stored plan is:
+\begin{center}\begin{tabular}{lr}\toprule
+Quantity & Steering (rad)\\\midrule
+Current first-input anchor $\bar\delta_{0|k}$ & $-0.009374$\\
+Allowed negative correction $-r_{\delta,k}$ & $-0.075000$\\
+Issued first steering $\delta_{0|k}$ & $-0.084374$\\
+Planned next steering $\delta_{1|k}$ & $-0.009398$\\
+\bottomrule\end{tabular}\end{center}
+Thus the current frame commands about $-4.83^\circ$, but its next planned
+command is only $-0.54^\circ$. On the following frame, that small planned
+command becomes the new anchor. A negative correction of at most
+$4.30^\circ$ again yields approximately $-4.83^\circ$. The desired stronger
+return cannot accumulate through the issued input because the update shifts
+the \emph{planned next input}, not the already corrected first input.
+The histories at 6 and 8 s show the same pattern.
+
+At 1.5 s, the anchor is still $+0.077717$ rad and the current radius is
+$0.037993$ rad, so even the most negative allowed correction issues
+$+0.039725$ rad. The vehicle still turns away while the CLF optimizer is already
+using its maximum available correction toward return. The smoothing term's
+important effect is its accumulated change to these future plans and hence
+to subsequent affine problems, not a large instantaneous sacrifice of CLF
+priority inside an unchanged problem.
+
+For additional evidence, an offline grid of 81 steering values in
+$[-0.65,0.65]$ rad and 41 signed braking ratios in $[-0.5,0.5]$ evaluates the
+true RK4 first successor. At 4 s, the best sampled input is approximately
+$[-0.325,0.300]^\top$, outside the current correction box. Its required slack
+is 743.988, versus 817.727 for the actual nonlinear first successor of the
+issued command (826.350 in the affine prediction). Positive slack remains:
+this is not proof of an available zero-slack or horizon-safe maneuver. It
+shows that the existing correction box excludes stronger instantaneous
+CLF improvement. The finite grid is not a global nonlinear optimum.
+
+Removing target rows gives the same optimum at seven examined times. The
+4-s target-removed diagnostic returns numerical flag $-7$ and is recorded
+as unresolved, not feasible or physically impossible. The independent
+first-step lower bound still matches the full problem there. No claim is
+made that terminal or collision constraints never matter in other frames.
+
+\section{Closed-loop rollback results}
+All fourteen scenarios again avoid sampled collision and recover nominal
+cruise. Every recorded state, successor, input, dense ODE45 state/time and
+transverse error is exactly identical to the original pre-smoothing campaign.
+This is a new executed campaign, not a reuse of its timing measurements.
+The comparison below uses the maximum lateral projection over all 31 dense
+samples per 50-ms hold, not only controller nodes.
+
+\begin{center}\small
+\begin{tabular}{rlrrrr}\toprule
+ & & \multicolumn{2}{c}{Maximum offset (m)} & \multicolumn{2}{c}{Recovery (s)}\\
+Speed & Scenario & Smoothing & Restored & Smoothing & Restored\\\midrule
+8 & headOn & 19.019 & 5.957 & 22.40 & 12.60 \\
+8 & acceleratingHeadOn & 6.402 & 5.877 & 12.70 & 12.55 \\
+8 & brakingLead & 5.395 & 5.549 & 14.85 & 13.50 \\
+8 & crossing & 13.176 & 5.722 & 18.40 & 12.60 \\
+8 & turningCrossing & 5.603 & 5.609 & 12.05 & 12.10 \\
+8 & curvedHeadOn & 17.044 & 6.086 & 27.00 & 17.90 \\
+8 & curvedCrossing & 5.775 & 5.751 & 13.30 & 13.05 \\
+15 & headOn & 7.181 & 7.241 & 10.20 & 10.15 \\
+15 & acceleratingHeadOn & 6.869 & 6.872 & 10.30 & 10.30 \\
+15 & brakingLead & 7.740 & 7.872 & 16.35 & 16.10 \\
+15 & crossing & 10.816 & 10.775 & 11.85 & 11.55 \\
+15 & turningCrossing & 10.369 & 10.478 & 11.55 & 11.40 \\
+15 & curvedHeadOn & 11.045 & 11.145 & 65.95 & 66.00 \\
+15 & curvedCrossing & 10.044 & 10.017 & 10.80 & 11.10 \\
+\bottomrule\end{tabular}\end{center}
+The three largest low-speed regressions are removed: head-on 19.019 to
+5.957 m, curved head-on 17.044 to 6.086 m, and crossing 13.176 to 5.722 m.
+The family-wide maximum is now 11.145 m in the 15-m/s curved head-on case,
+at 57.873 s during its later encounter. Seven of fourteen cases have smaller
+maximum excursion than the smoothing variant; other cases have small
+increases. No uniform minimum-detour property is claimed.
+
+There are 4,618 issued holds, no solver interruption, and a minimum dense
+rectangle gap of 49.477 mm. The 0.10-m setting remains an affine-model
+constraint rather than a continuous-plant clearance guarantee. Known target
+acceleration/sideslip, exact state, no road constraints, the 8/16-step prefix
+and 60-step completion are unchanged. ODE45 uses relative/absolute tolerances
+$10^{-11}/10^{-12}$. Recovery requires the existing one-second post-conflict
+nominal dwell; 1,500 holds is an observation cap, not a performance deadline.
+No random seed, sensing error or computation delay is injected into the plant.
+
+The measured full continuation controller call has median 14.401 ms,
+95th percentile 28.553 ms and maximum 76.076 ms. The largest first call is
+924.437 ms. No continuation call exceeds 100 ms; 24 exceed the 50-ms hold.
+This is shared-workstation wall time, not a worst-case deadline guarantee.
+There are 4,545 one-model frames, 73 fresh restarts, 4,510 one-solve frames,
+33 damped frames and at most three numerical solves per frame.
+
+All 390 focused MATLAB tests pass across 18 suites, including rejection of
+the removed option, the original first-step CLF/recovery tests, and the retained
+generic off-diagonal quadratic solver test. Source whitespace checks pass.
+Code Analyzer retains the existing sparse-index/unused-suppression findings
+and the workstation settings-file warning; no new changed-code issue appears.
+
+The correction removes an objective that did not match the user's preference.
+It does not redesign the first-step CLF or prove globally minimal lateral
+excursion. The diagnosed interaction remains a consideration for future
+changes to initialization, regularization or trust-region policy. No additional
+lateral penalty is introduced to conceal it.
+\end{document}

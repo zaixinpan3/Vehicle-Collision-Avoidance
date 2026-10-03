@@ -247,18 +247,14 @@ remain necessary away from cruise even without a target. The secondary minimizes
     rho / max(V(x),1) + epsilon * R(dU),
     sum(xi) <= inheritedBudget or achievedPrimary + lexicographicTieTolerance.
 
-`R = (R_anchor + w R_slew)/(1+w)` combines the normalized squared correction
-about the linearization inputs with actual consecutive input changes,
-including the last issued input. `w = inputPenalty.slewWeight` defaults to 0.5.
-Both terms lie in `[0,1]` on the input correction box; the channelwise bounds
-and formula are given in [NOMINAL_CLF.md](NOMINAL_CLF.md). At an exact optimum
-the effect on minimum scaled CLF slack remains bounded by
-`epsilon = clfTieTolerance = 1e-4`. Absolute zero input is not the reference.
-PCBF priority is retained, and CLF minimization retains this explicit bounded
-tie allowance. A zero primary result still runs the CLF stage. The preference
-adds no actuator or slew limit, cone, solver call, or linearization. Clarabel
-receives the upper triangle of the native sparse quadratic Hessian and its
-linear term, with the endpoint and CLF cones retained;
+`R` is the normalized squared input increment about the linearization inputs.
+At an exact optimum its effect on minimum scaled CLF slack is bounded by
+`epsilon = clfTieTolerance = 1e-4`. It penalizes neither absolute zero input
+nor deviation from the construction feedback. PCBF priority is retained;
+CLF minimization has this explicit bounded tie allowance. A zero primary
+result still runs the CLF stage. The componentwise input boxes imply `R <= 1`,
+so the former epigraph `R <= sigma <= 1` is eliminated exactly. Clarabel solves
+the native sparse quadratic objective with the endpoint and CLF cones retained;
 these are conic QPs rather than linearly constrained QPs. State variables remain
 explicit to preserve dynamic sparsity.
 
@@ -405,7 +401,7 @@ models and timings; `selectedAttempt` identifies the model supplying the
 command. `optimizationConverged` describes the numerical stages of the selected
 problem, not discarded restoration attempts, optimality of an inherited cap,
 or optimality of an issued damped point. `secondaryOptimumApplied` distinguishes
-a full solution from a damped step. Continuation state version 69 stores the per-stage slacks and their total
+a full solution from a damped step. Continuation state version 70 stores the per-stage slacks and their total
 alongside the existing single-CLF trajectory state. The optional stored
 `linearizationTrustScale` carries the learned step size, not an executable
 backup policy.

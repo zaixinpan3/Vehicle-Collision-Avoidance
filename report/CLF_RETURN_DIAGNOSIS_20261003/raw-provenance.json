@@ -1,0 +1,58 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed8-headOn.json",
+    "sha256": "d76d6368c31ffd5be0560d68794fdd0bc1cbbd270a608e3fb18e0ee6d4216a6f"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed8-acceleratingHeadOn.json",
+    "sha256": "50fc49fef8e1bb7a57b85d9b145cb3fb1e69e668d89f5c14fabf27339bc3e1ec"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed8-brakingLead.json",
+    "sha256": "16b1bdefc08b06ae5e88ef47e19a836d6d284ee687c5efcae5eb238ea774dd36"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed8-crossing.json",
+    "sha256": "d03b8b25265af2f9064a359890a76b53dcbb729f34b76e92172591c5ac5ec61c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed8-turningCrossing.json",
+    "sha256": "8a3ddbbdcfdcb7ba4db489d28d93d6b800634e4ba6467fd6d572b7f0781dc2eb"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed8-curvedHeadOn.json",
+    "sha256": "b768f5e1321cca87598bd66d3623180f9a9079c32289dea08797f6de4d111ebf"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed8-curvedCrossing.json",
+    "sha256": "0cd1858080a9f4dbf66f2e047948919fcec5a51142c7fdf23035164dbb309d4c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed15-headOn.json",
+    "sha256": "971cbba882b393ddf1933b4c6003bbafbe0cb4f4a24813976fdeec168511ae6c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed15-acceleratingHeadOn.json",
+    "sha256": "5849296317663405e3bfce7e935510ee53653562042dcbac0eb03d9732ff03cd"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed15-brakingLead.json",
+    "sha256": "6e00af74aac96f4238c0714765d615ba8f61fc909125b1908c78bb941f8ae648"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed15-crossing.json",
+    "sha256": "afe8749bf32a9a0dd5150a7d96dcb8bd61fc86d9ed57b4645e40a19f4a6ef315"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed15-turningCrossing.json",
+    "sha256": "bb167fa85576da1e99af581cd9f74e225af19f2f90081ac609cb21573b11bed4"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed15-curvedHeadOn.json",
+    "sha256": "97d55ed5326beb98835393f213f9c106635d03477410c99c47f7153f5b2a504e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/restore-clf-20261003/validated-campaign/speed15-curvedCrossing.json",
+    "sha256": "448ffb70679517dc05b404d63b4114f770da6d259cb364d8fbe180083241a0a3"
+  }
+]
