@@ -1,0 +1,191 @@
+{
+  "scope": "offline nominal-feedback extrapolation; not a controller validation",
+  "matlabRelease": "2026a",
+  "cases": [
+    {
+      "speedMetersPerSecond": 8,
+      "source": "/home/zai/.cache/collisionAvoidance/perception50-20261003/nrmm/speed8-headOn-formulation.mat",
+      "nominalCoreRadius": 0.000244140625,
+      "nominalSuccessorQuotientNorm": 0,
+      "publishedEgoBoxRadius": [
+        0.04,
+        0.04,
+        0.058497825201591525,
+        0.063776005960834325,
+        0.46834302523985816,
+        0.0015
+      ],
+      "closedLoopSpectralRadius": 0.98756860229010113,
+      "localClosedLoopWeightedNorm": 0.99383227756104031,
+      "existingNonlinearContractionBound": 0.99960289749259834,
+      "outsideCoreCount": 4,
+      "trials": [
+        {
+          "lateralVelocityErrorMetersPerSecond": -0.00046834302523985819,
+          "fractionOfPublishedRadius": 0.001,
+          "input": [
+            -2.0042821883359207E-5,
+            0.013645140013191524
+          ],
+          "nonlinearQuotientNorm": 0.00022086088107122013,
+          "linearQuotientNorm": 0.00022086167563762247,
+          "ratioToNominalCoreRadius": 0.90464616886771765,
+          "outsideEveryRigidlyPlacedNominalCore": false
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": 0.00046834302523985819,
+          "fractionOfPublishedRadius": 0.001,
+          "input": [
+            2.0042821883359207E-5,
+            0.013645140013191524
+          ],
+          "nonlinearQuotientNorm": 0.00022086088107122013,
+          "linearQuotientNorm": 0.00022086167563762247,
+          "ratioToNominalCoreRadius": 0.90464616886771765,
+          "outsideEveryRigidlyPlacedNominalCore": false
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": -0.0046834302523985818,
+          "fractionOfPublishedRadius": 0.01,
+          "input": [
+            -0.00020042821883359206,
+            0.013645140013191524
+          ],
+          "nonlinearQuotientNorm": 0.0022085366541134744,
+          "linearQuotientNorm": 0.0022086167563762247,
+          "ratioToNominalCoreRadius": 9.0461661352487912,
+          "outsideEveryRigidlyPlacedNominalCore": true
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": 0.0046834302523985818,
+          "fractionOfPublishedRadius": 0.01,
+          "input": [
+            0.00020042821883359206,
+            0.013645140013191524
+          ],
+          "nonlinearQuotientNorm": 0.0022085366541134744,
+          "linearQuotientNorm": 0.0022086167563762247,
+          "ratioToNominalCoreRadius": 9.0461661352487912,
+          "outsideEveryRigidlyPlacedNominalCore": true
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": -0.46834302523985816,
+          "fractionOfPublishedRadius": 1,
+          "input": [
+            -0.020042821883359204,
+            0.013645140013191479
+          ],
+          "nonlinearQuotientNorm": 0.21934852498718635,
+          "linearQuotientNorm": 0.22086167563762246,
+          "ratioToNominalCoreRadius": 898.45155834751529,
+          "outsideEveryRigidlyPlacedNominalCore": true
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": 0.46834302523985816,
+          "fractionOfPublishedRadius": 1,
+          "input": [
+            0.020042821883359204,
+            0.013645140013191569
+          ],
+          "nonlinearQuotientNorm": 0.21934852498718635,
+          "linearQuotientNorm": 0.22086167563762246,
+          "ratioToNominalCoreRadius": 898.45155834751529,
+          "outsideEveryRigidlyPlacedNominalCore": true
+        }
+      ]
+    },
+    {
+      "speedMetersPerSecond": 15,
+      "source": "/home/zai/.cache/collisionAvoidance/perception50-20261003/nrmm/speed15-headOn-formulation.mat",
+      "nominalCoreRadius": 0.0009765625,
+      "nominalSuccessorQuotientNorm": 0,
+      "publishedEgoBoxRadius": [
+        0.04,
+        0.04,
+        0.0311017741993016,
+        0.057304610990819072,
+        0.46834302523985816,
+        0.0015
+      ],
+      "closedLoopSpectralRadius": 0.98756860788710288,
+      "localClosedLoopWeightedNorm": 0.99383225217227555,
+      "existingNonlinearContractionBound": 0.9987000374381716,
+      "outsideCoreCount": 4,
+      "trials": [
+        {
+          "lateralVelocityErrorMetersPerSecond": -0.00046834302523985819,
+          "fractionOfPublishedRadius": 0.001,
+          "input": [
+            -1.342517988947689E-5,
+            0.018375607123583382
+          ],
+          "nonlinearQuotientNorm": 0.000197335446436032,
+          "linearQuotientNorm": 0.00019734107017873903,
+          "ratioToNominalCoreRadius": 0.20207149715049677,
+          "outsideEveryRigidlyPlacedNominalCore": false
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": 0.00046834302523985819,
+          "fractionOfPublishedRadius": 0.001,
+          "input": [
+            1.342517988947689E-5,
+            0.018375607123583382
+          ],
+          "nonlinearQuotientNorm": 0.000197335446436032,
+          "linearQuotientNorm": 0.00019734107017873903,
+          "ratioToNominalCoreRadius": 0.20207149715049677,
+          "outsideEveryRigidlyPlacedNominalCore": false
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": -0.0046834302523985818,
+          "fractionOfPublishedRadius": 0.01,
+          "input": [
+            -0.00013425179889476889,
+            0.018375607123583382
+          ],
+          "nonlinearQuotientNorm": 0.0019728482692034414,
+          "linearQuotientNorm": 0.0019734107017873904,
+          "ratioToNominalCoreRadius": 2.020196627664324,
+          "outsideEveryRigidlyPlacedNominalCore": true
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": 0.0046834302523985818,
+          "fractionOfPublishedRadius": 0.01,
+          "input": [
+            0.00013425179889476889,
+            0.018375607123583382
+          ],
+          "nonlinearQuotientNorm": 0.0019728482692034414,
+          "linearQuotientNorm": 0.0019734107017873904,
+          "ratioToNominalCoreRadius": 2.020196627664324,
+          "outsideEveryRigidlyPlacedNominalCore": true
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": -0.46834302523985816,
+          "fractionOfPublishedRadius": 1,
+          "input": [
+            -0.013425179889476889,
+            0.018375607123583361
+          ],
+          "nonlinearQuotientNorm": 0.19165626223887208,
+          "linearQuotientNorm": 0.19734107017873903,
+          "ratioToNominalCoreRadius": 196.256012532605,
+          "outsideEveryRigidlyPlacedNominalCore": true
+        },
+        {
+          "lateralVelocityErrorMetersPerSecond": 0.46834302523985816,
+          "fractionOfPublishedRadius": 1,
+          "input": [
+            0.013425179889476889,
+            0.018375607123583403
+          ],
+          "nonlinearQuotientNorm": 0.19165626223887208,
+          "linearQuotientNorm": 0.19734107017873903,
+          "ratioToNominalCoreRadius": 196.256012532605,
+          "outsideEveryRigidlyPlacedNominalCore": true
+        }
+      ]
+    }
+  ],
+  "checks": "Both exact trims remain inside; twelve admitted-box perturbations are evaluated without assuming their outcome."
+}

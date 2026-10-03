@@ -1,0 +1,78 @@
+{
+  "recordedAt": "2026-10-03T17:25:01.864500-05:00",
+  "scope": "Design analysis and deterministic offline probes, not an implemented robust-controller campaign",
+  "campaignCommit": "aa85322df33f65da055475499fa62b15a9e3a377",
+  "inspectedHead": "21c7a0c2d4bc95dfe9d43a8ada5f48d69d64a8b4",
+  "commands": [
+    "matlab -singleCompThread -batch \"addpath('scripts'); probeObserverTerminalCompatibility('/home/zai/.cache/collisionAvoidance/perception50-20261003/nrmm','report/OBSERVER_CONTROL_COMPATIBILITY_20261003/terminal-probe.json');\"",
+    "matlab -singleCompThread -batch \"addpath('scripts'); verifyObserverRobustConnection('report/OBSERVER_CONTROL_COMPATIBILITY_20261003/algebra-checks.json'); checks=checkcode('scripts/probeObserverTerminalCompatibility.m','-id'); disp(checks);\"",
+    "pdflatex -interaction=nonstopmode -halt-on-error (two passes for standalone technical report)",
+    "git diff --check"
+  ],
+  "checks": {
+    "terminalProbe": "2 exact trim holds remain in core; 8 of 12 perturbed holds leave; 4 remain inside",
+    "finiteDerivationChecks": {
+      "passed": 17,
+      "total": 17
+    },
+    "codeAnalyzer": "No code issues; missing local MLintDefaultSettings.txt triggers default settings",
+    "gitDiffCheck": "passed",
+    "scenarioRerun": false,
+    "runtimeAlgorithmModified": false
+  },
+  "artifacts": [
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "7b35b6ffdad5801a57819e8f9441a893a20fc2823cac1a7d3fb3ce8b7e1169ec"
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "350c98b9cb5475ddc883c6d90b4aab060d742a0c353f64f366b60bf48de8fb7a"
+    },
+    {
+      "path": "controller/OBSERVER_ROBUST_PCBF_THEORY.tex",
+      "sha256": "8fccac4b7455f4149a7460a2857b5cc19a9cf4de652e664be180bf3ab7ff4c1a"
+    },
+    {
+      "path": "estimator/nrmmControllerErrorBounds.m",
+      "sha256": "12c36834aa6bfd05311ac3e8b9e86d25e69d19429891d261e8198b22a4d0016f"
+    },
+    {
+      "path": "scripts/nrmmEstimatorControllerAdapter.m",
+      "sha256": "fa1555c793dcab141965f9ad06b0c9a0406b3c310768ba1ccb275ec38ac7ccf9"
+    },
+    {
+      "path": "scripts/probeObserverTerminalCompatibility.m",
+      "sha256": "5d87510e8bae82c1f958cf96169646e51072b6dcc619d688e4262ac5e347f86e"
+    },
+    {
+      "path": "scripts/verifyObserverRobustConnection.m",
+      "sha256": "863ca2b1a6a7520e3c1fd89cd575ba33be32dc922c852582e4c08091731138a5"
+    },
+    {
+      "path": "report/OBSERVER_CONTROL_COMPATIBILITY_20261003.tex",
+      "sha256": "d8163de5c30a76ecbacec30f7a9ba2e8d19f8c5ab9f5603249a3b966f9dc61c6"
+    },
+    {
+      "path": "report/PERCEPTION_50M_CAMPAIGN_20261003.tex",
+      "sha256": "6543240cd05d1b775afa46f59cef6991f0ba5d381735215633df967d97f15ee1"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/perception50-20261003/nrmm/speed8-headOn-formulation.mat",
+      "sha256": "6e441478ecde7524ed1b102b5dae004106aac8c948ffd452599371f592fd80fe"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/perception50-20261003/nrmm/speed15-headOn-formulation.mat",
+      "sha256": "5bc7b1d3cd79c8e801942296acb85983a10dabe71250ef60eee4a25593cf7787"
+    },
+    {
+      "path": "report/OBSERVER_CONTROL_COMPATIBILITY_20261003/terminal-probe.json",
+      "sha256": "67e73854ef8629fced0ea7ea897a64269a59dac9dd7d3e8cc03f6ed2525d643e"
+    },
+    {
+      "path": "report/OBSERVER_CONTROL_COMPATIBILITY_20261003/algebra-checks.json",
+      "sha256": "b6218e2d83fddc31d77c4587eba551d20e4aba056d3e69958f5d4dac46bdba04"
+    }
+  ],
+  "primarySource": "https://arxiv.org/html/2105.03427v1 (Sections IV-A and IV-C checked on 2026-10-03)"
+}

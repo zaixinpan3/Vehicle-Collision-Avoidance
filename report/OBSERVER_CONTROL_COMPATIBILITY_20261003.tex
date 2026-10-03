@@ -1,0 +1,378 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.82in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,enumitem,xurl,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\newcommand{\R}{\mathbb R}
+\newcommand{\E}{\mathcal E}
+\newcommand{\B}{\mathcal B}
+\newcommand{\support}{\operatorname{supp}}
+\title{Why the Observer-Driven Controller Is Infeasible:\\A Compatible Prediction and Terminal Design}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+
+\textbf{Finding.} The decisive mismatch is between the mathematical objects
+used by the implementation: open-loop uncertainty propagation, a terminal
+core proved for nominal exact-state feedback, and RTI candidates treated as
+though affine feasibility implied a transferable nonlinear witness. These
+objects do not establish the same closed-loop behavior. The target interface
+also discards available information before constructing its prediction set.
+These are formulation problems. A better potential-field seed or faster
+conic solver cannot repair a negative-radius cone or a zero-gradient hard
+collision row.
+
+This report develops a correction to the existing single-controller,
+single-CLF architecture. It does not implement that correction or claim a new
+scenario success rate. The new executable artifact is an offline terminal
+compatibility probe. The fifty-meter campaign and its failure snapshots are
+the evidence base; the fourteen scenarios were not rerun for this design study.
+
+\section{Causal ordering of the failures}
+The completed campaign in
+\path{report/PERCEPTION_50M_CAMPAIGN_20261003.tex} tested seven encounters at
+8 and 15 m/s with the actual noisy NRMM estimator. All fourteen stopped at
+the first control call, with solver primal infeasibility and no executed
+hold. All targets were initially within 50 m. The same estimated ego state
+and its published error box still caused failure after removing the target
+in every case. Independently, setting only ego uncertainty to zero left all
+fourteen target-uncertainty problems infeasible. These are offline
+counterfactual solves, not successful closed-loop controls.
+
+The generated terminal condition is
+\begin{equation}\label{eq:empty}
+ \|L_f(e_M+J_M\Delta U)\|_2\le r_f-R_M.
+\end{equation}
+The weighted uncertainty reserve $R_M$ exceeds $r_f$ by factors 439--3620.
+Its right side is decision independent and negative. No choice of input,
+trust radius, slack objective, or initialization can satisfy this cone.
+The radii are weighted norm units, not meters. In physical terms, the pure
+longitudinal-speed half-width of the nominal core is only
+$3.22\times10^{-5}$ m/s at 8 m/s and $1.29\times10^{-4}$ m/s at 15 m/s.
+
+The target prediction receives an initial course radius of $\pi$ even
+though all snapshots contain 41 position-history samples and an available
+direction interval. Its position enclosure reaches 277.55--305.67 m over
+4.4--4.8 s. The interface tightens its published components using history,
+then builds the prediction set from the earlier coarse components.
+It also replaces the fitted initial velocity magnitude with the same
+15 m/s prior in all cases. These are separate losses of useful information.
+
+The exact-state comparison recovered in eleven cases and stopped without a
+control in three. Two failures involve damping toward a primary point whose
+nonlinear mismatch is already excessive. In the third, an overlapping
+potential-field seed generates the hard row $0\Delta U\le-0.20$.
+Thus fixing the observer interface alone will not resolve all known failures.
+Conversely, those three RTI failures do not explain the common first-frame
+observer failure: the empty cone already proves it independently.
+
+\section{Three different errors must remain distinct}
+Write $x$ for the true ego state, $\hat x$ for its estimate, and $c$ for an
+MPC nominal center. The errors
+\[
+ \epsilon=x-\hat x,\qquad d=x-c
+\]
+have different dynamics. An observer ISS bound constrains $\epsilon$ about
+the future estimate. It does not automatically contract the set of future
+true states about today's open-loop prediction. Future measurements and
+their centers are not yet known. An uncontrolled target's uncertain speed
+can therefore cause a growing position set even while its continuously
+updated observer is stable.
+
+For a causal policy within the same MPC,
+\begin{equation}\label{eq:policy}
+ u_i=v_i+K_i(\hat x_i-c_i),
+\end{equation}
+one linearization at the dynamically consistent anchor gives
+\begin{align}
+ c_{i+1}&=f_h(\bar x_i,\bar u_i)+A_i(c_i-\bar x_i)+B_i(v_i-\bar u_i),\\
+ d_{i+1}&=(A_i+B_iK_i)d_i-B_iK_i\epsilon_i+w_i+r_i.
+ \label{eq:error}
+\end{align}
+Here $r_i$ encloses the nonlinear approximation remainder and $w_i$ the
+declared plant uncertainty. Consequently a sound tube satisfies
+\begin{equation}\label{eq:tube}
+ \E_{i+1}\supseteq(A_i+B_iK_i)\E_i
+ \oplus(-B_iK_i)\E_i^{\mathrm{obs}}\oplus\mathcal W_i\oplus\mathcal R_i.
+\end{equation}
+The minus sign follows from $\hat x-c=d-\epsilon$. The observer term cannot
+be omitted simply because $A+BK$ is stable. The current implementation has
+neither this feedback response nor this observer-input contribution in its
+generator recursion; it uses $G_{i+1}=A_iG_i$.
+
+Equation~\eqref{eq:policy} is a description of one controller's predicted
+response, not a second executable backup. Its initial center and carried
+state must be consistent with the input actually issued. Setting
+$c_0=\hat x_k$ makes the first feedback correction zero, but does not alone
+prove that resetting the center each frame preserves the previous witness.
+There are two rigorous realizations: retain a center and its tube together,
+or establish the recentering and shifted-candidate argument for a simplified
+constraint-tightening MPC. Merely substituting $A+BK$ into existing code
+while leaving the policy and terminal proof unchanged does neither.
+
+The primary literature provides a closely related construction: K\"ohler,
+M\"uller and Allg\"ower derive coupled observer/tracking error bounds and
+information-dependent terminal ingredients. Their Section IV-C also gives a
+simplified tightening formulation that applies the optimized first input
+directly; its recursive proof requires additional terminal robustness and
+incremental-stability assumptions \cite{Kohler}. This supports an efficient
+design direction, not a claim that their theorem already covers the present
+RTI bicycle implementation.
+
+\section{The terminal core must tolerate estimation error}
+The existing construction shrinks a nominal ellipsoid until a local RK4
+contraction enclosure is established. That can be appropriate for the
+nominal model. With nonzero observation error, shrinkage eventually opposes
+invariance: feedback can push an exactly trimmed vehicle outside an
+arbitrarily small core.
+
+\subsection{New numerical counterexample using the actual saved cores}
+\path{scripts/probeObserverTerminalCompatibility.m} loads the saved head-on
+formulations at both speeds. It starts the true vehicle exactly at the
+straight cruise trim, takes previous input equal to trim input, and applies
+the existing terminal gain to a perturbed estimate. Only the lateral-speed
+estimate is perturbed. The successor uses the actual nonlinear RK4 vehicle
+map. A Schur-complement quotient minimizes over rigid endpoint pose, so a
+failure cannot be repaired merely by translating or rotating the core.
+
+\begin{center}
+\begin{tabular}{rrrr}
+\toprule
+Speed & Nominal radius & $|\epsilon_{v_y}|$ (m/s) & Successor norm / radius\\
+\midrule
+8 & 0.00024414 & 0.00046834 & 0.9046\\
+15 & 0.00097656 & 0.00046834 & 0.2021\\
+8 & 0.00024414 & 0.00468343 & 9.0462\\
+15 & 0.00097656 & 0.00468343 & 2.0202\\
+8 & 0.00024414 & 0.46834303 & 898.4516\\
+15 & 0.00097656 & 0.46834303 & 196.2560\\
+\bottomrule
+\end{tabular}
+\end{center}
+Both signs give the same displayed norms. The middle perturbation is only
+one percent of the controller's admitted initial lateral-speed radius, yet
+one hold leaves every rigidly placed copy of the nominal core. The exact
+trim with zero estimation error stays inside. The smallest perturbations
+also remain inside: this is a quantitative incompatibility, not a claim that
+every nonzero error destroys invariance.
+
+The nominal closed-loop spectral radius is approximately 0.98757 at both
+speeds. Thus nominal local stability does not resolve the uncertainty
+incompatibility. This probe extrapolates the nominal feedback to the
+admitted error box; it neither executes that feedback in a campaign nor
+claims that each box point is reachable by the actual observer. A tighter
+correlated observer set could remove some box points, which is another
+reason to improve the set representation.
+
+\subsection{Construct the radius together with the noise floor}
+Use a transverse, possibly input-augmented error measure $q=\|L_fe\|$.
+If the actual estimate-feedback map admits the verified bound
+\begin{equation}
+ q^+\le a q+Cq^2+d_f,\qquad a<1,
+\end{equation}
+then a sublevel radius $r$ is invariant under this certificate if
+\begin{equation}\label{eq:radius}
+ Cr^2-(1-a)r+d_f\le0
+\end{equation}
+and the whole set satisfies the input and model-domain conditions. The term
+$d_f$ includes estimation-error feedback, trim defect and admitted plant
+disturbance. For $C=0$, this certificate requires $r\ge d_f/(1-a)$.
+For $C>0$, the quadratic must have nonnegative discriminant and $r$ must
+lie between its two roots. These are conditions for the chosen bound, not
+a necessary test for every possible invariant-set representation.
+
+The appropriate endpoint is therefore a family over nominal transverse
+state, tube size, observer-error envelope and input memory. Pose/path phase
+remains free. A terminal inequality can still have the form
+$\|L_fe_M\|+R_M\le r$, but now $r$, $R_M$ and the appended policy belong
+to the same robust construction. Enlarging $r$ by hand or discarding $R_M$
+would not establish this. If \eqref{eq:radius} cannot be established inside
+the admissible domain, improve the observer bound, feedback/metric or local
+enclosure; do not report an empty construction as a physical impossibility.
+
+An ego invariant core does not itself establish future target safety.
+Matching-time target interaction must remain in the joint terminal family
+or be closed by an actually justified departure condition. The experimental
+50 m rule activates risk per time/position; a first exit alone does not
+exclude later re-entry by a constant-curvature target.
+
+\section{Use the target information already available}
+The observer interface should maintain a joint current information set:
+\begin{equation}
+ \Theta_k=\Theta_k^{\mathrm{observer}}
+       \cap\Theta_k^{\mathrm{history}}
+       \cap\Theta^{\mathrm{declared\ motion}},
+\end{equation}
+with consistent timestamps and frames. Recenter the resulting set about the
+published estimate without changing its physical contents. In particular,
+a tighter inertial heading interval cannot be copied into a relative-course
+field without accounting for shared ego-yaw error. The intersection must
+reach \path{predictionErrorSet}, not only an unused component publication.
+
+For constant tangential acceleration $A$ and sideslip $\beta$, let
+$\kappa=\sin\beta/l_r$, $s=V_0\tau+A\tau^2/2$, and
+$\gamma_0=\psi_0+\beta$. Before any stop, target position has the compact map
+\begin{equation}
+ p(\tau)=p_0+s\,\operatorname{sinc}(\kappa s/2)
+ \begin{bmatrix}\cos(\gamma_0+\kappa s/2)\\
+                 \sin(\gamma_0+\kappa s/2)\end{bmatrix},
+ \qquad\operatorname{sinc}(z)=\frac{\sin z}{z}.
+\end{equation}
+If the model holds a braking target at rest after zero speed, use its stopped
+arc length beyond that event. Each possible target keeps the same parameters
+throughout a prediction. The next frame may use revised estimates, as the
+user's experimental contract requires.
+
+Propagate the joint parameter set through this map. Collision tightening
+only needs support in a selected separating direction, for example
+\[
+ h_i(n)=\sup_{\theta\in\Theta_k}
+ n^\top\big(p_i(\theta)-\bar p_i\big),
+\]
+with an appropriate joint orientation contribution. A validated enclosure
+of that support can be computed before the convex solve, using sensitivities
+and bounded remainders on a small parameter domain. Sampling alone is not a
+certified supremum. Preserving direction and common parameter dependence
+avoids replacing an informed motion estimate by a huge circular obstacle.
+Uncertainty must still grow when the available information genuinely allows
+diverging target paths; observer convergence cannot remove that fact.
+
+Initialization should retain the fitted velocity magnitude with a justified
+fit-error bound. When history identifies acceleration or curvature, use a
+model-consistent fit and its residual/noise enclosure; when it does not,
+retain uncertainty instead of inventing parameter accuracy. There is no
+need to introduce $\dot\beta$ or an additional target motion mode.
+
+\section{Remove local convexification dead ends}
+\subsection{Overlapping seeds need an informative separating row}
+For fixed unit $n$, let the two centered vehicle footprints be $S_E,S_T$.
+The signed support gap
+\begin{equation}\label{eq:gap}
+ g_n=n^\top(p_T-p_E)-\support(S_E,n)-\support(S_T,-n)
+\end{equation}
+is negative at some overlaps but retains position derivatives $-n,n$.
+The condition $g_n\ge d_0-\xi$ is a sufficient separation row when its
+right side is nonnegative; a positive violation slack is not a safety
+certificate. Choose $n$ consistently with the shifted trajectory or APF
+avoidance side and freeze it within the convex problem. Enclose rotation
+and dynamics linearization errors on the allowed correction domain.
+
+This avoids linearizing the flat zero ordinary-distance value at an
+overlapping seed, which produced $0\Delta U\le-0.20$. The row is informative
+even there. It does not guarantee that every chosen normal, trust domain or
+physical encounter is feasible, and APF initialization remains a search seed.
+
+\subsection{Damping has to approach the claimed reference}
+With $U(\alpha)=U_P+\alpha(U_S-U_P)$, the limit as $\alpha\to0$ is $U_P$.
+If $U_P$ is an affine primary solution with nonzero nonlinear prediction
+defect, shrinking $\alpha$ need not drive that defect to zero. The observed
+17.756 and 32.608 mm primary defects explain the two failed searches.
+Convex feasibility of a segment and nonlinear consistency of its base are
+different properties.
+
+For a genuinely nonlinear-consistent anchor, Taylor error about that anchor
+can be bounded by a quantity quadratic in the total correction. A feasible
+segment also requires its base to satisfy the same convex constraints.
+If no such base exists, damping is not a feasibility argument. Construct an
+informative feasibility-restoration subproblem or carry a properly transferable
+policy; do not assume a saved affine solution is already a nonlinear witness.
+Restoration variables describe the search and are not extra physical safety
+permissions.
+
+The more coherent one-linearization design incorporates a sound model-error
+reserve into the same tube and directional collision constraints before
+solving. This replaces an unrelated fixed global pose-error cutoff with
+the error quantities the constraints actually require. It needs valid local
+remainders, including tire-regime transitions, the complete correction
+domain and any claimed intersample coverage. Increasing the 10 mm cutoff
+alone provides none of these properties.
+
+\section{Implementation order and what would count as resolution}
+\begin{enumerate}[leftmargin=*]
+\item Repair information transfer and initialization in
+\path{nrmmControllerErrorBounds.m} and
+\path{nrmmEstimatorControllerAdapter.m}: preserve the intersected history
+set and fitted velocity, in the correct frame. Re-evaluate prediction support
+with the original sensor data, without using scenario truth to tune estimates.
+\item Jointly redesign the propagation in \path{solvePredictiveControl.m}
+and the core in \path{terminalContinuation.m}. Select the same causal
+estimate-feedback policy, derive observer and tracking/remainder bounds, and
+construct a compatible invariant information family offline. Establish
+target-free noisy cruise before trying to attribute failures to avoidance.
+\item Repair signed collision support rows and the RTI reference/budget
+contract. Preserve a nonlinear-consistent shifted initialization; regenerate
+the existing APF seed only when needed. A changed target estimate is admitted
+in experiments; inherited-budget theorems remain conditional on their
+mathematical update assumptions, without adding an assumption-failure gate.
+\item Keep the one given-path CLF. In the presence of persistent uncertainty,
+the appropriate recovery inequality is
+\[
+ V(x^+)-V(x)\le-\eta\ell(x)+\delta+\sigma(b),
+\]
+where $\delta$ is the optimized CLF slack and $\sigma$ a derived uncertainty
+supply. Zero slack gives disturbance-dependent recovery; vanishing supply
+can recover asymptotic nominal behavior on the established recovery domain.
+Persistent measurement noise does not generally permit an exact true-state
+zero-error guarantee. The path objective remains unchanged.
+\item Reproduce the three exact-state failed frames, then rerun all fourteen
+actual-observer closed loops until recovery or collision/no solved control.
+Report physical clearance, nominal recovery and actual call latency.
+Information-bound premise violations alone remain outside the experimental
+failure definition. Evaluate several sensor seeds before claiming robustness.
+\end{enumerate}
+
+Precomputed gains, set shapes and local bounds can leave the online problem
+as one RTI convex correction with inherited safety budget when applicable,
+and the existing PCBF initialization/restoration solve when necessary. The
+secondary CLF problem remains present at zero PCBF slack. Neither a second
+CLF nor an executable backup is required by this proposal. A one-shot local
+problem cannot be promised feasible for arbitrary initializations; passing
+all fourteen scenarios and a 0.1 s maximum latency remain measurements to
+obtain after implementation.
+
+\section{Evidence and limits}
+The campaign source commit is
+\path{aa85322df33f65da055475499fa62b15a9e3a377}. The new terminal probe is a
+deterministic offline test of saved core/gain data, with no random draws.
+Its twelve perturbed holds and two exact-trim controls are recorded in
+\path{report/OBSERVER_CONTROL_COMPATIBILITY_20261003/terminal-probe.json}.
+The finite mathematical checks in \path{verifyObserverRobustConnection.m}
+were rerun: all seventeen passed. They exercise the existing derivation;
+they do not validate its constants over all nonlinear vehicle trajectories.
+Code Analyzer reported no code issues in the new probe; it fell back to
+default settings because a local preference file was absent. Unit tests from
+the earlier campaign are not reported as newly executed here.
+
+The strongest limitation is that reducing the demonstrated conservatism
+does not establish a nonempty robust safe set for every current sensor
+enclosure. Even a mathematically correct robust controller can have no
+common safe input when admissible target motions demand incompatible
+actions. The current measurements establish explicit implementation-induced
+contradictions; they do not prove global physical avoidability or the
+sufficiency of this proposed redesign. The additional nominal exact-state
+failures must also be addressed.
+
+\textit{Research method and disclosure.} This AI-assisted analysis combines
+source inspection, saved-snapshot counterfactual evidence, a new nonlinear
+terminal probe, explicit algebra and verification against a primary research
+paper. The design was checked against the counterarguments that nominal
+stability might suffice, that all failures came from target uncertainty, and
+that smaller damping must reduce mismatch to zero. Each is contradicted by
+the cited local evidence or the stated limit calculation. No independent
+experimental validation or implemented robust-controller success is claimed.
+
+\begin{thebibliography}{9}
+\bibitem{Kohler} J. K\"ohler, M. A. M\"uller and F. Allg\"ower,
+``Robust output feedback model predictive control using online estimation
+bounds,'' 2021 preprint, Sections III--IV, especially IV-A and IV-C.
+\href{https://arxiv.org/html/2105.03427v1}{arXiv:2105.03427v1}.
+\bibitem{Local} Collision Avoidance Research,
+\path{controller/OBSERVER_ROBUST_PCBF_THEORY.tex}, especially the causal
+error tube, invariant information family and single-CLF uncertainty supply;
+\path{report/PERCEPTION_50M_CAMPAIGN_20261003.tex} and its saved experiment
+data. The present report identifies the implementation consequences of that
+existing derivation, rather than claiming a new general output-feedback theorem.
+\end{thebibliography}
+\end{document}

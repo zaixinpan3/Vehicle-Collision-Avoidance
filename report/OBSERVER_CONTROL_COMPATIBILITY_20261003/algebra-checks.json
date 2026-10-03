@@ -1,0 +1,175 @@
+{
+  "scope": "finite mathematical checks; not a vehicle certificate",
+  "randomSeed": 2.0261003E+7,
+  "matlabRelease": "2026a",
+  "checks": [
+    {
+      "name": "localComparison",
+      "passed": true,
+      "metrics": {
+        "exponentialResidual": 4.5796699765787707E-16,
+        "minimumContainmentGap": 0.0071846146049330609
+      },
+      "failure": ""
+    },
+    {
+      "name": "localEllipsoid",
+      "passed": true,
+      "metrics": {
+        "exactExtremizerResidual": 6.6613381477509392E-16
+      },
+      "failure": ""
+    },
+    {
+      "name": "localCovariantMotion",
+      "passed": true,
+      "metrics": {
+        "transportDerivativeResidual": 2.211806283223961E-11,
+        "reconstructedSideslipRad": 0.030004501823476939
+      },
+      "failure": ""
+    },
+    {
+      "name": "localRelativeYawBound",
+      "passed": true,
+      "metrics": {
+        "samples": 10000,
+        "relativeYawBoundRad": 0.016622292850011249,
+        "largestSampledRelativeYawErrorRad": 0.014668718048355664
+      },
+      "failure": ""
+    },
+    {
+      "name": "localRelativeGeometry",
+      "passed": true,
+      "metrics": {
+        "commonPoseCancellationResidualMeters": 5.9952043329758453E-14
+      },
+      "failure": ""
+    },
+    {
+      "name": "localRobustVertexRows",
+      "passed": true,
+      "metrics": {
+        "samples": 10000,
+        "minimumEnclosureReserveMeters": 0.013056240602046465
+      },
+      "failure": ""
+    },
+    {
+      "name": "localWholeHold",
+      "passed": true,
+      "metrics": {
+        "nodeOnlyMinimumMeters": 0.15000000000000002,
+        "holdReserveMeters": 0.05,
+        "certifiedMinimumMeters": 0.2
+      },
+      "failure": ""
+    },
+    {
+      "name": "localIntersection",
+      "passed": true,
+      "metrics": {
+        "boundingBoxCornerOutsidePriorBy": 0.32287565553229536,
+        "intersectionRetainsTruth": true
+      },
+      "failure": ""
+    },
+    {
+      "name": "localPredictionVersusEstimation",
+      "passed": true,
+      "metrics": {
+        "reachablePositionRadiusMeters": 0.5,
+        "invalidObserverShrinkRadiusMeters": 0.001831563888873418
+      },
+      "failure": ""
+    },
+    {
+      "name": "localOutputFeedbackTube",
+      "passed": true,
+      "metrics": {
+        "exactDynamicsResidual": 2.7755575615628914E-17,
+        "minimumBoxReserve": 0,
+        "wrongSignDiscrepancy": 0.020800000000000013
+      },
+      "failure": ""
+    },
+    {
+      "name": "localRemainderDomain",
+      "passed": true,
+      "metrics": {
+        "maximumSampledRemainder": 0.043539791401705275,
+        "wholeDomainBound": 0.11281000000000001,
+        "uncertaintyOnlyBound": 0.0014100000000000002
+      },
+      "failure": ""
+    },
+    {
+      "name": "localTerminalCore",
+      "passed": true,
+      "metrics": {
+        "admissibleRadiusInterval": [
+          0.082738247007124732,
+          2.417261752992875
+        ],
+        "chosenRadius": 0.2,
+        "worstSuccessorRadius": 0.17400000000000002,
+        "tooSmallRadiusViolation": 0.0098288595620547037
+      },
+      "failure": ""
+    },
+    {
+      "name": "localSlackShift",
+      "passed": true,
+      "metrics": {
+        "inheritedBudget": 0.39999999999999997,
+        "acceptedSuccessorBudget": 0.34,
+        "executedSlackSum": 0.74244999999999994,
+        "positiveNondecayingBudgetCounterexample": 0.1
+      },
+      "failure": ""
+    },
+    {
+      "name": "localClfSupply",
+      "passed": true,
+      "metrics": {
+        "minimumYoungReserve": 0,
+        "issSupply": 0.037161290322580628,
+        "persistentSupplyLimit": 0.18580645161290327
+      },
+      "failure": ""
+    },
+    {
+      "name": "localClfCone",
+      "passed": true,
+      "metrics": {
+        "socLowerCurrentValue": 1.7609246027412147,
+        "socUpperSuccessorValue": 0.55374857057125726,
+        "largestCornerClfResidual": -1.2112799999999997
+      },
+      "failure": ""
+    },
+    {
+      "name": "localVanishingTie",
+      "passed": true,
+      "metrics": {
+        "fixedTieSlackAtNominal": 9.80296049406921E-5,
+        "vanishingTieMaximumSlackExcess": 0,
+        "vanishingTieMaximumDissipationResidual": 0
+      },
+      "failure": ""
+    },
+    {
+      "name": "localCausalAction",
+      "passed": true,
+      "metrics": {
+        "commonActionSetEmpty": true,
+        "individualTrueStateActionsExist": true,
+        "intervalInfeasibilityGap": 1.8
+      },
+      "failure": ""
+    }
+  ],
+  "passed": 17,
+  "total": 17
+}
