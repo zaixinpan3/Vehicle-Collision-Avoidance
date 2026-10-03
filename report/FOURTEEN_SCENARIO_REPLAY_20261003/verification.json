@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "sourceHashesVerified": 14,
+  "completeRecoveryReplays": 14,
+  "independentSampledGeometryMatches": 14,
+  "replaySamples": 138554,
+  "chapters": 14,
+  "frames": 6088,
+  "durationSeconds": 202.93333333333334,
+  "resolution": [
+    1600,
+    900
+  ],
+  "fps": 30,
+  "codec": "h264",
+  "pixelFormat": "yuv420p",
+  "fullDecodeCommand": [
+    "ffmpeg",
+    "-v",
+    "error",
+    "-i",
+    "/tmp/collision-replay-20261003/avoidance.mp4",
+    "-f",
+    "null",
+    "-"
+  ],
+  "fullDecodeExitCode": 0,
+  "fullDecodeErrors": "",
+  "scope": "Visualization of the existing validated campaign; no controller, model, target or simulation change.",
+  "mediaRetention": "Ephemeral MP4 in /tmp; not an archived movie.",
+  "visualInspection": "Closest-approach previews of all 14 chapters reviewed; separate detailed review of the 49.477-mm approach and circular encounter. Encoded recovery frames reviewed before playback."
+}
