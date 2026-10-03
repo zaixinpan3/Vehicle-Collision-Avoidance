@@ -1,0 +1,102 @@
+{
+  "DOI": "10.1109/access.2024.3355952",
+  "title": [
+    "Local Trajectory Planning for Obstacle Avoidance of Unmanned Tracked Vehicles Based on Artificial Potential Field Method"
+  ],
+  "author": [
+    {
+      "ORCID": "https://orcid.org/0000-0002-9844-1554",
+      "authenticated-orcid": false,
+      "given": "Li",
+      "family": "Zhai",
+      "sequence": "first",
+      "affiliation": [
+        {
+          "name": "National Engineering Laboratory for Electric Vehicles, Beijing Institute of Technology, Beijing, China"
+        }
+      ],
+      "role": [
+        {
+          "vocabulary": "crossref",
+          "role": "author"
+        }
+      ]
+    },
+    {
+      "ORCID": "https://orcid.org/0000-0002-2370-3572",
+      "authenticated-orcid": false,
+      "given": "Chang",
+      "family": "Liu",
+      "sequence": "additional",
+      "affiliation": [
+        {
+          "name": "National Engineering Laboratory for Electric Vehicles, Beijing Institute of Technology, Beijing, China"
+        }
+      ],
+      "role": [
+        {
+          "vocabulary": "crossref",
+          "role": "author"
+        }
+      ]
+    },
+    {
+      "ORCID": "https://orcid.org/0000-0003-1364-4385",
+      "authenticated-orcid": false,
+      "given": "Xueying",
+      "family": "Zhang",
+      "sequence": "additional",
+      "affiliation": [
+        {
+          "name": "China North Vehicle Research Institute, Beijing, China"
+        }
+      ],
+      "role": [
+        {
+          "vocabulary": "crossref",
+          "role": "author"
+        }
+      ]
+    },
+    {
+      "ORCID": "https://orcid.org/0000-0002-8498-2069",
+      "authenticated-orcid": false,
+      "given": "Chengping",
+      "family": "Wang",
+      "sequence": "additional",
+      "affiliation": [
+        {
+          "name": "Huawei Technologies Company Ltd., Shanghai, China"
+        }
+      ],
+      "role": [
+        {
+          "vocabulary": "crossref",
+          "role": "author"
+        }
+      ]
+    }
+  ],
+  "publisher": "Institute of Electrical and Electronics Engineers (IEEE)",
+  "published": {
+    "date-parts": [
+      [
+        2024
+      ]
+    ]
+  },
+  "container-title": [
+    "IEEE Access"
+  ],
+  "volume": "12",
+  "page": "19665-19681",
+  "URL": "https://doi.org/10.1109/access.2024.3355952",
+  "link": [
+    {
+      "URL": "http://xplorestaging.ieee.org/ielx7/6287639/10380310/10409169.pdf?arnumber=10409169",
+      "content-type": "unspecified",
+      "content-version": "vor",
+      "intended-application": "similarity-checking"
+    }
+  ]
+}

@@ -1,0 +1,325 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,longtable,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Assessing Zhai et al. (2024) for Flow-Initialized RTI}
+\author{Collision Avoidance Research}
+\date{October 2, 2026}
+\begin{document}
+\maketitle
+
+\section{Decision and scope}
+The useful transfer from Zhai et al.~\cite{zhai} is motion-aware, coupled
+path and speed guidance, rather than replacing the current initialization
+with their complete artificial potential field (APF) controller.
+The current nonlinear bicycle seeds already avoid sampled overlap in all
+fourteen initial threat cases. Their more evident weaknesses are excessive
+displacement, an approximate arrival clock, and an abrupt transition from
+avoidance guidance to a free-pose terminal continuation.
+These are concrete targets for improvement in an initializer used for one
+local convex correction.
+
+This assessment reads the supplied local paper, audits current code, measures
+the unoptimized seeds, and performs one controlled ablation. It does not
+implement the paper's complete algorithm or replace the production controller.
+The proposed predictive-field design below is a research decision, not an
+experimentally established improvement or a safety certificate.
+Only the diagnostic driver and research artifacts are new.
+
+\section{What the paper actually contributes}
+The primary source is the supplied 17-page IEEE Access paper, volume 12,
+pp.\ 19665--19681, DOI 10.1109/ACCESS.2024.3355952. The local PDF was read as text;
+the equations on PDF page 7 were also inspected visually. Crossref's publisher
+metadata confirms title, authors, year, volume and pages. IEEE web access was
+challenge-blocked, so substantive claims come from the local paper.
+
+\begin{itemize}
+\item Section III-B, Eqs.\ (20)--(22), makes repulsion angle dependent through
+  a water-droplet-shaped field. Eqs.\ (25)--(30) add terms involving relative
+  velocity and acceleration for moving obstacles.
+\item Section IV-B/C explicitly reasons about collision-area entry/exit times
+  and chooses speed changes. Table 1 defines eight prioritized driving
+  behaviors; Figs.\ 17--18 contain overtaking/crossing decision logic.
+  These are part of the reported method, not properties of a potential field
+  alone.
+\item Section V-A adds stepwise speed, heading and acceleration restrictions
+  and states that a Bezier curve smooths the planned trajectory. A tracked
+  vehicle model and a separate tracking controller execute it.
+\item In the lateral-meeting experiment, Figs.\ 25--28, APF without the speed
+  planner collides; with speed planning, the vehicle slows and passes safely.
+  This directly supports the relevance of arrival timing, but does not isolate
+  every contribution of the field, behavior rules, smoother and tracker.
+\end{itemize}
+
+The principal integrated simulations use a target cruise speed of 18 km/h
+(5 m/s); the earlier qualitative path comparison in Fig.\ 13 uses a 10 m/s
+ego. Neither is our 15 m/s Fiala-bicycle RTI initialization experiment.
+The real-vehicle demonstration in Section V-D concerns static obstacles.
+No reproducible per-frame computation-time distribution was found in the
+paper. Its HIL and tracking results do not establish a 100 ms bound for our
+controller or prove that one convex correction will succeed.
+
+\paragraph{What should not transfer directly.}
+The eight-behavior arbitration, virtual point destinations, tracked-vehicle
+drive/braking equations, and Eq.\ (41)'s stationary endpoint conditions are not
+needed for our single-controller, given-path cruise task. A smooth geometric
+Bezier curve is not automatically a trajectory of our nonlinear bicycle.
+Any geometric or speed guidance must still be converted to inputs and rolled
+out with the same bicycle model used for linearization.
+
+\section{Current implementation and measured weaknesses}
+The source baseline is commit
+\path{eab55398f9a880666fdb5b078b41a77b291b136e}.
+
+The audit examines the following routines:
+\begin{itemize}
+\item \path{controller/predictiveSafetyGeometry.m}: the Gaussian guide
+and transported flow velocity.
+\item \path{controller/solvePredictiveControl.m}: the nonlinear flow seed,
+input shaping and clipping.
+\end{itemize}
+Normal warm operation shifts previous inputs; flow initialization is used
+when a usable sequence is absent or a fresh seed is requested. It is not
+regenerated on every successful warm frame.
+
+\paragraph{Motion is already included.}
+The target follows the exact constant-tangential-acceleration,
+constant-sideslip model at matching absolute times. A Gaussian envelope is fit
+using the approximate ego station clock
+\[
+ \bar s(t)=s_0+v_{\rm ref}t,\qquad
+ d_g(t)=A_g\exp[-(t-t_c)^2/(2\sigma^2)].
+\]
+That guidance is then modified by a transported cylinder flow, mapped to
+heading/speed requests, shaped using tire capacity, and rolled out with the
+nonlinear bicycle. Thus it would be incorrect to diagnose the current
+initializer as ignoring target motion.
+
+\paragraph{Four specific issues.}
+\begin{enumerate}
+\item The Gaussian has no initial-position or initial-tangent matching.
+  Its requested lateral offset at $t=0$ is 0.184--4.765 m in these cases,
+  although the actual ego starts on its given path. The nonlinear rollout
+  starts at the correct measured state; the discontinuity is in the guidance
+  request, not a fabricated state jump.
+\item The shape is a circular exclusion envelope of radius 5.262 m for these
+  vehicles, independent of their relative orientation. For parallel,
+  side-by-side 4.8 m by 1.9 m rectangles, a 0.1 m clearance requires only
+  2.0 m of lateral center separation. This comparison illustrates the
+  initializer's geometric conservatism; it is not a clearance calculation
+  for the actual turning motion. The optimized collision rows already use
+  rectangle geometry and should retain it.
+\item The clock used to fit the Gaussian is not updated when the generated
+  ego turns or slows. Actual seed station differs from that clock by up to
+  6.789 m. Target prediction remains time aligned; the inaccurate part is
+  the anticipated ego arrival. Also, clipping the norm of the flow velocity
+  to a desired speed is not an explicit longitudinal collision-timing plan.
+\item Flow guidance ends at the last overlap of the nominal station window,
+  not after its Gaussian has decayed. At the twelve actual handoffs,
+  its hypothetical remaining offset is 5.121--7.427 m. The seed then follows
+  a straight terminal family whose pose is freely refitted. This settles
+  intrinsic dynamics but can preserve an outward heading. The original
+  input changes by about 0.175--0.204 rad at that handoff. A free terminal
+  pose is not itself a defect; choosing its approach this abruptly biases
+  the initialization away from nominal recovery.
+\end{enumerate}
+
+\subsection{Focused diagnostic experiment}
+\path{scripts/auditFlowInitialization.m} extracts the current seed,
+shaping and clipping helpers verbatim into the output directory. It evaluates
+seven existing threat scenarios at 8 and 15 m/s, with 50 ms holds, prefixes
+of 8 and 16 holds, and the unchanged three-second completion. The resulting
+3.4/3.8 s lengths are the current initializer lengths, not success deadlines
+for a closed-loop experiment.
+States are exact, road constraints absent, and no random seed is used.
+
+The audit independently integrates the whole prescribed input sequence with
+ODE45, relative tolerance $10^{-10}$, absolute tolerance $10^{-11}$, and
+21 output points per hold. It compares rectangles at matching times.
+The table gives minimum sampled physical clearance and maximum lateral
+displacement along the original RK4 anchor.
+No sampled overlaps occur in these initial seeds; this is not an all-time
+certificate or a test of flow restarts at arbitrary later states.
+
+The ablation changes only post-flow guidance from the free-pose terminal
+feedback to the existing nominal path guidance. Every preceding input is
+asserted identical. It is a diagnostic copy, not a controller option.
+
+\begin{center}
+\small
+\begin{tabular}{rlrrrr}
+\toprule
+$v_{\rm ref}$ & Scenario & Gap (m) & Original $|e_y|_{\max}$ (m)
+ & Ablation $|e_y|_{\max}$ (m) & Original core ratio\\
+\midrule
+8 & Head-on & 2.184 & 14.928 & 9.310 & 0.0100\\
+8 & Accelerating head-on & 1.757 & 15.711 & 9.327 & 0.0029\\
+8 & Braking lead & 1.293 & 6.807 & 6.807 & 4408.6\\
+8 & Crossing & 0.860 & 12.110 & 9.684 & 0.7900\\
+8 & Turning crossing & 1.133 & 12.120 & 10.117 & 1.5432\\
+8 & Curved head-on & 2.678 & 14.055 & 9.292 & 0.0047\\
+8 & Curved crossing & 0.698 & 11.544 & 9.566 & 0.8708\\
+15 & Head-on & 0.288 & 15.950 & 6.782 & 0.000054\\
+15 & Accelerating head-on & 0.172 & 15.345 & 6.260 & 0.000037\\
+15 & Braking lead & 1.284 & 8.504 & 8.504 & 654.0\\
+15 & Crossing & 3.123 & 19.269 & 12.969 & 0.0099\\
+15 & Turning crossing & 3.154 & 19.983 & 13.238 & 0.0172\\
+15 & Curved head-on & 3.327 & 16.907 & 10.792 & 0.0033\\
+15 & Curved crossing & 2.310 & 15.551 & 10.517 & 0.0640\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All ablation minimum gaps equal the corresponding original values to the
+reported precision; the minima precede the changed tail. Maximum displacement
+falls in twelve cases; the two braking cases never enter the changed branch.
+This isolates a contribution of the handoff to the large displacement.
+It does not establish a superior initializer: the terminal-core result worsens.
+
+The core ratio is
+\[
+ \eta_T=\frac{\|R_q([v_x,v_y,r,u_{H-1}^{\top}]^\top
+           -[v_{x,f},v_{y,f},r_f,u_f^\top]^\top)\|_2}{\rho_f}.
+\]
+It minimizes out the free endpoint pose; $\eta_T\leq1$ means intrinsic
+membership only, without asserting terminal target separation. Eleven original
+anchors satisfy this condition, whereas none of the fourteen ablation anchors
+does. For example, 15 m/s head-on improves displacement from 15.950 to
+6.782 m but changes $\eta_T$ from $5.36\,10^{-5}$ to 471.6.
+Forcing an immediate return turn trades settled endpoint dynamics for a
+prettier path. It is not a valid drop-in solution to the RTI problem.
+The two original braking seeds and the 8 m/s turning-crossing seed already
+need endpoint repair; this does not imply the closed-loop controller fails.
+
+Seven alternating warm calls per helper give a median across case medians
+of 3.351 ms for the current seed and 3.250 ms for the ablation. These exclude
+terminal preparation, optimization and the audit. The largest RK4-versus-ODE45
+body-pose discrepancy across an entire seed is 7.07 mm for the current seeds
+and 9.91 mm for the ablation. These are numerical comparisons, not model-error
+bounds. No new closed-loop recovery or controller latency claim is made.
+
+\section{Printed equations require interpretation before implementation}
+The following are checks of the printed paper, not claims about the authors'
+unavailable executable implementation.
+
+\begin{enumerate}
+\item Eq.\ (23) is not a consistent translated rotation as printed:
+  substituting $p=p_{\rm obs}=(3,4)$ and $\theta=\pi/6$ gives $(-4,3)$,
+  rather than zero. A relative frame must use one consistent rotation of
+  $p-p_{\rm obs}$.
+\item Even holding $k_d$ constant, differentiating Eq.\ (20) gives radial
+  force $k_{\rm rep}(1/(k_dd)-1/d_0)/(k_dd^2)$.
+  Eq.\ (22) prints $k_d^2$ in the prefactor denominator. With $k_d=1.2$,
+  $d=4$, $d_0=10$, and $k_{\rm rep}=1$, the negative finite-difference
+  derivative is 0.00564236; the printed force is 0.00470197.
+  Since $k_d$ actually depends on angle, a full spatial gradient also has
+  angular terms.
+\item The printed $d\leq d_0$ cutoff is not consistent with zeroing a potential
+  based on $k_dd$ at the boundary. For example, $k_d=1.6$, $d=8$, $d_0=10$
+  makes the radial expression in Eq.\ (22) negative. The cutoff,
+  effective distance and gradient should be derived together if this
+  field is adapted.
+\end{enumerate}
+
+These issues, the behavior-specific decision logic, and the absence of a
+complete reusable parameter/smoothing specification make literal reproduction
+in our controller inappropriate. They do not invalidate the experimental
+observation that coordinated speed planning helped the paper's crossings.
+
+\section{A compatible design direction}
+Retain one initializer and the same PCBF--CLF controller. Use a predictive
+obstacle field to guide both course and speed, with a circulation component
+to resolve symmetric head-on encounters. Keep the exact target trajectory
+and nonlinear bicycle rollout. The flow remains a search mechanism, not an
+executable fallback or a second CLF.
+
+One suitable design template is a fixed-size, time-synchronized risk function
+\[
+ {\cal R}(p,v,\chi,t)
+   =\sum_{j=1}^{Q}w_j\,
+     \Phi\!\left(D\big(\widehat{\cal E}(p,v,\chi;\tau_j),
+                                {\cal T}(t+\tau_j)\big)\right).
+\]
+Here $Q$ is bounded, $\widehat{\cal E}$ is a cheap local ego-motion predictor,
+and $D$ is an orientation-aware signed separation surrogate used only for
+guidance. It should retain a useful direction in overlap, unlike a
+nonnegative ordinary distance clipped to zero. A smooth repulsion
+$\Phi$ increases as separation decreases. The current circle may be
+replaced by a directional rectangle/ellipse approximation without treating
+that approximation as the controller's safety geometry.
+The course and speed enter the same future collision prediction, instead of
+fitting a lateral curve under a permanently frozen cruise clock.
+
+For a local predictor
+$\hat p_E(\tau)=p+\tau v(\cos\chi,\sin\chi)^\top$, its analytic sensitivities are
+\[
+ \partial_v\hat p_E=\tau(\cos\chi,\sin\chi)^\top,\qquad
+ \partial_\chi\hat p_E=\tau v(-\sin\chi,\cos\chi)^\top.
+\]
+They yield inexpensive joint guidance, for example
+\[
+ \begin{bmatrix}a_g\\\omega_g\end{bmatrix}
+ =
+ \begin{bmatrix}a_{\rm path}\\\omega_{\rm path}\end{bmatrix}
+ -
+ \begin{bmatrix}g_v&0\\0&g_\chi\end{bmatrix}
+ \begin{bmatrix}\partial_v{\cal R}\\\partial_\chi{\cal R}\end{bmatrix}
+ +\begin{bmatrix}0\\\omega_{\rm circulation}\end{bmatrix}.
+\]
+The gains carry the necessary units or act on normalized variables.
+This is an explicit guidance update, not another numerical optimization.
+The baseline path field attracts the vehicle toward the original path and
+speed; risk modulates longitudinal progress and turning together.
+Circulation preserves a consistent passing side when a symmetric gradient
+alone cannot choose one.
+
+At each seed hold, map this guidance to tire-informed inputs, advance
+$\bar x_{i+1}=f_h(\bar x_i,\bar u_i)$ from the measured state, and recompute
+risk at that new state and absolute time. The virtual predictor is only
+guidance; it does not replace the bicycle dynamics in the anchor.
+Smooth start, obstacle-field decay and endpoint settling must be designed
+together. In particular, the terminal pose remains free: there should be no
+requirement to reach a fixed road position at a fixed time, nor to complete
+nominal recovery within the short seed horizon.
+
+This template transfers the paper's most relevant insight while avoiding its
+behavior library and printed-formula ambiguities. Its open questions are
+the surrogate shape, circulation strength, normalized gains and endpoint
+settling. They need a focused implementation comparison before adoption.
+There is no claim that APF eliminates local minima or that a better seed
+alone guarantees one-solve nonlinear feasibility.
+
+\paragraph{Acceptance criteria for that future implementation.}
+Compare raw matching-time clearance, required input correction, endpoint
+repair, and first-convex-correction model agreement, not just path length.
+Then use all fourteen complete closed loops through nominal recovery and
+measure total call latency, including initialization and exceptional rebuilds.
+A desirable initializer should improve these quantities together.
+The present tail ablation fails the endpoint criterion, despite reducing
+displacement, and is therefore not promoted into production.
+
+\section{Reproduction and evidence}
+Run from the repository root:
+\begin{quote}\small
+\texttt{matlab -singleCompThread -batch}\\
+\texttt{"addpath('scripts'); auditFlowInitialization('/tmp/flow-audit');"}
+\end{quote}
+The driver emits the metrics, full traces and identified extracted diagnostic
+helpers. Compact committed evidence is under
+\path{report/FLOW_INITIALIZATION_ZHAI_20261002/}.
+It includes source/artifact provenance, the final 28-row audit and an
+independent numerical check of the printed equations.
+The report uses tool-assisted PDF extraction, code comparison and numerical
+analysis; source claims, measured findings and proposed adaptations are
+separated explicitly.
+
+\begin{thebibliography}{1}
+\bibitem{zhai}
+Zhai, L., Liu, C., Zhang, X., \& Wang, C. (2024).
+Local trajectory planning for obstacle avoidance of unmanned tracked vehicles
+based on artificial potential field method.
+\emph{IEEE Access, 12}, 19665--19681.
+\href{https://doi.org/10.1109/ACCESS.2024.3355952}{doi:10.1109/ACCESS.2024.3355952}.
+\end{thebibliography}
+\end{document}

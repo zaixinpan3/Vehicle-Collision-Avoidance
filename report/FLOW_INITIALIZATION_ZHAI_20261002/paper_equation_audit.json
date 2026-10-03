@@ -1,0 +1,41 @@
+{
+  "scope": "Independent checks of equations as printed, not a reproduction of author software",
+  "equation22": {
+    "kdHeldFixed": 1.2,
+    "kRep": 1.0,
+    "distance": 4.0,
+    "cutoff": 10.0,
+    "negativeFiniteDifference": 0.005642361111234811,
+    "chainRuleDerivative": 0.005642361111111112,
+    "printedForce": 0.004701967592592593
+  },
+  "equation23": {
+    "thetaRadians": 0.5235987755982988,
+    "egoPosition": [
+      3,
+      4
+    ],
+    "obstaclePosition": [
+      3,
+      4
+    ],
+    "printedTransformedPosition": [
+      -4.0,
+      3.0
+    ],
+    "correctRelativePosition": [
+      0.0,
+      0.0
+    ]
+  },
+  "cutoffExample": {
+    "kd": 1.6,
+    "distance": 8.0,
+    "d0": 10.0,
+    "printedRadialForce": -0.00013351440429687503
+  },
+  "circleExample": {
+    "currentExclusionRadiusMeters": 5.262363799656122,
+    "parallelSideBySideRequiredCenterGapMeters": 2.0
+  }
+}

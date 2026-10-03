@@ -1,0 +1,32 @@
+{
+  "recordedAt": "2026-10-02T23:28:00.471171-05:00",
+  "sourceCommit": "ef626d72c8c6166fe8cd835ff0041936314d0b5a",
+  "scope": "Raw initialization and a post-flow-guidance ablation; no optimization or closed-loop run",
+  "productionControllerChanged": false,
+  "paperImplementationReproduced": false,
+  "closedLoopCampaignRerun": false,
+  "controllerSourceVerbatimExtractionVerified": true,
+  "checks": {
+    "rows": 28,
+    "sampledCollisionFreeSeeds": 28,
+    "currentIntrinsicEndpointMembers": 11,
+    "ablationIntrinsicEndpointMembers": 0,
+    "preHandoffInputsIdentical": true,
+    "ablationPreservesEncounterMinimum": true,
+    "twoNoHandoffCasesUnchanged": true
+  },
+  "command": "matlab -singleCompThread -batch \"addpath('scripts'); auditFlowInitialization('/home/zai/.cache/collisionAvoidance/zhai-initialization-20261002/final');\"",
+  "sourceSha256": {
+    "controller/solvePredictiveControl.m": "bfc5c23de5dc7caf8309d1f6a0434c70f72e2c0d8ba8349ebd659e2a896a2c77",
+    "controller/predictiveSafetyGeometry.m": "83be66e5ec0aa5522418de1ca5eb853818110f24df9c8a9c0ff6b3d246184c5a",
+    "controller/nonlinearBicycleModel.m": "c55943a9df940c134c291da86353486a68ebad7d06aa5eefab09dd17a5d6071c",
+    "controller/terminalContinuation.m": "b6011d42c9474787c1062ea2ef32de9913142d2518d024987d6da62548d50e24",
+    "config/collisionAvoidanceControllerConfig.m": "fec71b3649c9bd941df7c374095aa6b13b548a0dfd93039eb76ccba9160bf60f",
+    "scripts/collisionThreatScenario.m": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+    "scripts/auditFlowInitialization.m": "08bd2c37526e7360e45508456ce2c79ada718f33d7dca5769a96e6eee31a030d",
+    "reference/Zhai et al. - 2024 - Local Trajectory Planning for Obstacle Avoidance of Unmanned Tracked Vehicles Based on Artificial Po.pdf": "28bb428f77fce12810a1a6533e3d4e5cdac920acb9a2a0a8295786296be6fad9"
+  },
+  "rawTracePath": "/home/zai/.cache/collisionAvoidance/zhai-initialization-20261002/final/traces.mat",
+  "rawTraceSha256": "af82fd8233ca46f63ca56e8fd5c561446cfc0511b8210210d427a6e56fa29c8a",
+  "claimsScope": "Only raw initial seeds and a diagnostic handoff ablation. Sampled clearance and intrinsic endpoint membership are separate measurements, not continuous-time or full terminal safety certificates."
+}
