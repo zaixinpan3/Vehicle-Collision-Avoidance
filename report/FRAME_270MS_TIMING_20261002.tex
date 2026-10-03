@@ -1,0 +1,169 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,microtype,xurl,hyperref}
+\setlength{\emergencystretch}{3em}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\title{Composition of the Recorded 270.680 ms Controller Call}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 2, 2026}
+\begin{document}\maketitle
+
+\section{Finding and measurement boundary}
+The requested frame is the first call of the 8 m/s head-on scenario,
+at simulation time zero, in the inherited-budget campaign. It uses two
+linearization rounds and three numerical conic solves. Numerical optimization
+accounts for approximately 26.3 ms, or 9.7\% of the full call. The largest
+historical category, 163.545 ms, was not separately instrumented.
+
+New replays locate a large omitted operation: constructing the contracting
+terminal core inside the first controller call. Its median measured cost is
+106.095 ms when its configuration cache misses, versus 0.107 ms when it hits.
+This identifies an important startup bottleneck but does not retroactively
+partition every millisecond of the historical residual. The original call's
+exact terminal-construction duration remains unknown.
+
+The original 270.680 ms timer surrounds the complete
+\path{collisionAvoidanceController} call, including setup and outputs. It
+excludes the scenario's later \texttt{ode45} plant replay, rectangle-distance
+audit, JSON export and plotting. The campaign had already executed MATLAB
+tests, so this was not a fresh MATLAB process; scenario/configuration startup
+and interpreter/cache effects can nevertheless remain.
+
+\section{Original recorded decomposition}
+These categories are disjoint. CLF construction is subtracted from the
+formulation timer before it is reported separately.
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Recorded operation & Time (ms) & Share (\%) \\
+\midrule
+Trajectory initialization, predominantly moving-target flow & 15.172 & 5.61 \\
+Dynamics/constraints formulation, excluding CLF & 32.560 & 12.03 \\
+CLF construction & 28.133 & 10.39 \\
+PCBF stages, including the analytic zero-slack case & 5.916 & 2.19 \\
+CLF numerical solves & 20.404 & 7.54 \\
+Nonlinear prediction-agreement evaluation & 4.950 & 1.83 \\
+Unclassified preparation/orchestration/output time & 163.545 & 60.42 \\
+\midrule
+Full controller call & 270.680 & 100.00 \\
+\bottomrule
+\end{tabular}
+\end{center}
+The numerical solver library's internal timers total 24.060 ms; the broader
+solve-stage timers include matrix/interface overhead and total 26.306 ms.
+The analytic PCBF lower-bound result adds 0.014 ms, bringing the PCBF/CLF
+stage total to 26.320 ms. There is no eight-round search in this frame.
+
+\section{Why two rounds and three solves occurred}
+The horizon contains eight PCBF prefix holds and sixty completion holds,
+at 50 ms per hold: 68 controls and 69 state nodes, spanning 3.4 s.
+There is no previous trajectory at time zero, so no inherited safety budget
+is available.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Operation & Round 1 (ms) & Round 2 (ms) \\
+\midrule
+Initialization & 15.168 & 0.004 \\
+Formulation excluding CLF & 21.554 & 11.006 \\
+CLF construction & 15.234 & 12.899 \\
+PCBF & 0.014 (analytic) & 5.902 \\
+CLF solve & 9.899 & 10.505 \\
+Prediction agreement & 2.877 & 2.073 \\
+\bottomrule
+\end{tabular}
+\end{center}
+The flow anchor in round 1 satisfies every assembled primary constraint at
+zero correction and zero nonnegative slack. Zero is the global lower bound,
+so no numerical primary solve is needed. CLF is then optimized numerically
+in 14 solver iterations. Its rollout disagrees with the affine prediction:
+the body-pose discrepancy measure is 100.463 mm, versus the configured
+10 mm tolerance. This measure includes center displacement plus vehicle
+reach times heading discrepancy; it is not solely center-position error.
+The scaled CLF discrepancy is 0.323042 versus tolerance 0.01, dominating the
+maximum normalized agreement ratio of 32.3042.
+
+The controller rebuilds the model along the nonlinear rollout and reduces
+the input trust scale from 1 to 0.140754. The new anchor does not satisfy the
+complete analytic zero-correction condition, so round 2 solves PCBF
+numerically (9 solver iterations), reaching zero optimal safety slack. It
+then solves CLF (17 solver iterations). The body-pose discrepancy falls to
+2.144 mm, scaled CLF discrepancy to 0.001536, and agreement ratio to
+0.214364. The frame terminates immediately. This second round repairs model
+accuracy; it is not optional CLF polishing or a failed numerical solve.
+
+\section{What the additional replay establishes}
+\path{scripts/runControllerEntryTimingStudy.m} reconstructs the recorded
+configuration and initial ego/target state, then injects entry-phase timers
+into a temporary renamed copy of the controller. Production code remains
+unchanged. Five pairs alternate a terminal cache miss with a hit. Changing
+only the constructor's initial radius in a separate, untimed preparation
+call evicts its one-entry cache without clearing MATLAB/JIT. Each measured
+controller call uses the original configuration and an empty prior state.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+New measurements (five runs each) & Cache miss & Cache hit \\
+\midrule
+Median full call (ms) & 184.680 & 79.269 \\
+Full-call range (ms) & 183.922--236.499 & 77.320--87.928 \\
+Median terminal construction (ms) & 106.095 & 0.107 \\
+Median predictive optimization orchestration (ms) & 78.104 & 78.185 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Every replay produces exactly the recorded first input to stored numerical
+precision, with two rounds and three numerical solves. An unmodified warm
+entry call is also compared. Its measured 109.814 ms precedes the paired
+series; progressive execution warmup remains visible in the first pair.
+The separate instrumented process-warmup call takes 1.462272 s and is not
+included in the paired medians. These replays do not replace the historical
+270.680 ms observation or establish a hard real-time bound.
+
+A further profiled replay identifies the terminal constructor's work:
+one feedback/Lyapunov matrix synthesis, twelve interval RK4 derivative
+enclosures (one zero-radius enclosure and eleven radius trials), and eleven
+matrix-norm bound calculations. Ten halvings reduce the initial radius
+from 0.25 to 0.000244140625, with contraction bound 0.9996028975.
+The profile records 48,633 interval-product helper calls and 88,743 outward
+rounding helper calls. The matrix interval products use nested scalar loops.
+These are terminal-core construction operations, separate from the two
+online MPC linearization rounds.
+
+The profiled full call takes 523.727 ms; profiling overhead makes that number
+unsuitable for a latency comparison. Inclusive function times overlap and
+must not be added together. Call counts and the unprofiled phase timings
+support the attribution.
+
+\section{Implication and validation}
+The largest identified avoidable startup operation depends on configuration,
+not the current encounter: the contracting core can be prepared before
+control starts and retained. Existing continuation frames already carry
+their terminal object. Reusing or precomputing this mathematical construction
+does not require another controller or a changed optimization problem.
+No such production change is made in this diagnostic task.
+
+After startup is removed, repeated dynamics/constraint and CLF construction
+remain substantial; accelerating the numerical solver alone addresses only
+about one tenth of the original call. The full campaign also contains a
+262.069 ms noninitial frame, so fixing startup alone would not establish the
+requested 100 ms maximum for all frames.
+
+Validation asserts identical configuration, initial state, issued input,
+round count and solve count for all measured replays, and unchanged
+production entry source. MATLAB R2026a Update 3 runs with
+\texttt{-singleCompThread} and the existing native solver. The final Code
+Analyzer reports no messages for the new study driver. No controller
+algorithm, test suite, scenario or physical limit was modified; no full
+campaign rerun is claimed.
+
+The adjacent \path{FRAME_270MS_TIMING_20261002/} directory retains the original
+frame, compact summary, replay results, profile function counts/times and
+source/artifact hashes. Full profile data and the temporary timed entry are
+retained in \path{/home/zai/.cache/collisionAvoidance/frame270-study-20261002/}.
+The original controller implementation is commit
+\path{9d9f197f6b3dfa38dc1d9fcb666dd51ae971373b}.
+\end{document}

@@ -1,0 +1,34 @@
+{
+  "controllerCommit": "9d9f197f6b3dfa38dc1d9fcb666dd51ae971373b",
+  "sourceSha256": {
+    "controller/collisionAvoidanceController.m": "3bab76c652060a4c0259e363e0d72bf0360cdf287f884f91b20a020e82405e72",
+    "controller/solvePredictiveControl.m": "9980e76f51f17a2828a4fa483facc0e62590c498d53d7a77d17bcaf77538dcf6",
+    "controller/terminalContinuation.m": "b6011d42c9474787c1062ea2ef32de9913142d2518d024987d6da62548d50e24",
+    "controller/nonlinearBicycleModel.m": "0db77b05b6608fd6703ca8197f406ad48e84b499d2bc679e2560e693936b8608",
+    "config/collisionAvoidanceControllerConfig.m": "9dcebea9f29178545e7bfedd60eb7c3cffa35155d71fb4592d172bcb8670b0eb",
+    "scripts/runControllerEntryTimingStudy.m": "8c171b5e1c67f18aa20a289075fa2141818d4fb3f3b97e8b5919edc6dec562cf",
+    "scripts/collisionThreatScenario.m": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "cbca0307481470353fa481e187d339d28f3590e49cda0557dc129a21c0922c81",
+    "report/FRAME_270MS_TIMING_20261002.tex": "4ad6a58bcd263fae8886f6422220e08b0f3e24068c21187f42c2c05cbcf71102"
+  },
+  "historicalCampaignFile": "/home/zai/.cache/collisionAvoidance/inherited-budget-20261002/campaign/speed8-headOn.json",
+  "historicalCampaignSha256": "dcaeae1c62d3708920517c09ae47e4fa405d8f225d49352e60db91dba6572d3d",
+  "instrumentedEntrySha256": "8b2e5874165416ae5fa38dfdb19e48270ff7ed181dddff21de408a8e29a16bd7",
+  "artifactSha256": {
+    "summary.json": "eaec7758cab7e244e5fa844b1d8314e817b8ca86d3bff01e31bc8d86f332e76b",
+    "historical-frame.json": "672dcc55cf6776301f9199f944698e024f623c1dc5a83fd3a1eb18c58aa7c789",
+    "replays.json": "c649f3ea7f248ab4ff0d63d65a95315fdf791ebf14e083ef02fc0f5a7fc193c6",
+    "code-analysis.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "profile-functions.csv": "29323184cefec89bb81c2245c8a3f1e0fd21841a500ad6a3461bb7ef3507a9c6"
+  },
+  "command": "matlab -singleCompThread -batch \"addpath('scripts'); runControllerEntryTimingStudy('/home/zai/.cache/collisionAvoidance/inherited-budget-20261002/campaign/speed8-headOn.json','/home/zai/.cache/collisionAvoidance/frame270-study-20261002',5);\"",
+  "assertions": "Exact configuration and initial state; every replay input agrees within 1e-10 (observed zero); every replay has two rounds and three numerical solves; production entry source unchanged. Final Code Analyzer has no messages.",
+  "profilingWarning": "Inclusive function times overlap, and profiling adds overhead. They must not be added or substituted into the original 270.680 ms call.",
+  "cacheArtifactSha256": {
+    "/home/zai/.cache/collisionAvoidance/frame270-study-20261002/profile.mat": "cde13da9c604685be6eb8f5b09f0ff28315199168f3a4ce633e569a639cb3b22",
+    "/home/zai/.cache/collisionAvoidance/frame270-study-20261002/profile-functions.json": "695673866169617aa77de9586020808392841b8c3d2ce88b8e5e56ae6e36af5d",
+    "/home/zai/.cache/collisionAvoidance/frame270-study-20261002/timedCollisionAvoidanceController.m": "8b2e5874165416ae5fa38dfdb19e48270ff7ed181dddff21de408a8e29a16bd7",
+    "/home/zai/.cache/collisionAvoidance/frame270-study-20261002/replay.log": "45b8e69e53f5eda4fd76f7eb85507ca08b9aba8058deb66fbf3b7b1ea6858a4a",
+    "/home/zai/.cache/collisionAvoidance/frame270-study-20261002/code-check.log": "d4c36badae2ecb83dd59c9c9b09709169c8c96439db092b30349b64167d24c10"
+  }
+}
