@@ -1,0 +1,42 @@
+{
+  "pythonTestsPassed": 32,
+  "pythonTestsFailed": 0,
+  "matlabUnitTestsRunInThisChange": 0,
+  "cachedFrontendActualMatlabReplays": 4,
+  "finiteEstimatorPublications": 1200,
+  "validFits": 1170,
+  "newDetectorInferenceRuns": 0,
+  "newCarlaConnections": 0,
+  "blackoutMissingFrames": [
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164
+  ],
+  "reacquisitionFrame": 165,
+  "sourceHashesVerified": true,
+  "feedbackOrderAndDropoutAuditPassed": true,
+  "method": "Current-time predicted pose initializes a free three-variable point-cloud fit before one estimator update.",
+  "scope": "Frozen previously measured detections/native clouds and actual MATLAB NRMM, with committed runtime snapshot 26cd6f3998d17fd49f1cd9254245805d17f4d3ae. No new full detector run or MATLAB unit-test run was required for this Python-only change.",
+  "pythonCompilationPassed": true,
+  "cliHelpPassed": true,
+  "technicalReportPdf": {
+    "path": "simulation_output/estimator_pose_default_20261003/ESTIMATOR_POSE_DEFAULT_20261003.pdf",
+    "pages": 3,
+    "twoPassLatexBuildPassed": true,
+    "overfullBoxes": 0,
+    "textExtractionChecked": true,
+    "allPagesVisuallyInspected": true
+  }
+}

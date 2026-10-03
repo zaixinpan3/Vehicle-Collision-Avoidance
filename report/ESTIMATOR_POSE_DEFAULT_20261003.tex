@@ -1,0 +1,143 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\title{One Perception Path with Predicted Pose Used Only for Initialization}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+
+\section{Implemented decision}
+The sole perception path now predicts the target's current relative position
+and body heading, initializes a free three-variable LiDAR rectangle fit, and
+then supplies the fitted center to the estimator. The old motion-heading
+iterations, locked-heading feedback interface, optional pose branch and
+algorithm-selection flags have been removed. This decision supersedes the
+optional-path statement in the preceding pose-initialization report.
+
+The predicted pose is only a numerical starting value. It contributes no
+penalty, fixed orientation, translation bound or frozen choice of a support
+axis. In particular, the preceding implementation selected a support axis
+from the seed and held it fixed during optimization. That implicit influence
+on the objective has been removed. Point-cloud support is now recomputed at
+every candidate pose. Position and heading remain free throughout the fit;
+declared vehicle length and width remain fixed at 5.0 and 1.9 m in this study.
+
+\section{Point-cloud objective and execution order}
+Let $z=(c_x,c_y,\psi)$ and $u_i=R(\psi)^T(p_i-c)$ for observed target points
+$p_i$. Define $h=(L/2,W/2)^T$, $e_i=|u_i|-h$, support quantiles $a_j,b_j$
+of the current $u_{ij}$, midpoint $m_j=(a_j+b_j)/2$, and coverage
+$s_j=(b_j-a_j)/(2h_j)$. With support threshold $\tau=0.8$, the geometry cost is
+\[
+ \begin{aligned}
+ J(z;P)&=\frac1N\sum_i\left[
+ \min\{\min_j |e_{ij}|^2,0.25\}
+ +20\|\max(e_i,0)\|^2\right]
+ +\sum_{j=1}^2 \bigl(w_j(s_j)m_j\bigr)^2,\\
+ w_j(s)&=\operatorname{clip}_{[0,1]}\frac{s-\tau}{1-\tau}.
+ \end{aligned}
+\]
+This objective contains the point cloud and candidate pose, but no predicted
+pose. The coverage ramp avoids a discontinuous on/off support residual at
+the threshold. Its symmetry assumption remains a geometric modeling
+assumption, not an estimator prior or an exact vehicle-surface likelihood.
+
+The first fit uses 2/98 percent support quantiles. Points outside that fitted
+rectangle by more than 0.15 m are rejected before a second fit with 0/100
+percent support quantiles; if too few remain, the first fit is retained.
+The outlier selection uses the first fitted geometry. Both stages precede
+one estimator update. The existing NumPy damped Gauss--Newton solver has
+60 iterations per stage and no bound on total pose correction. A 0.5 m
+scaled per-step limit controls numerical steps only.
+
+\path{run_pipeline(args, pose_feedback=adapter)} now requires an adapter with
+\path{predict(frame, time)} and \path{update(frame, time, position)}.
+The former returns a \path{PosePrior} in current point-cloud ego axes, with
+state time equal to the current frame and latest input strictly earlier.
+The standalone CLI connects that adapter through
+\texttt{--estimator-factory module:callable}; this is dependency wiring,
+not a choice of fitting method. Missing or stale priors are rejected.
+
+At first acquisition, no previous target center exists. A current-cloud
+face-placement bootstrap supplies the center before the same free pose fit.
+The replay retains its existing co-moving initial-heading assumption.
+When detection is missing, the estimator receives a missing observation;
+the predicted position is never recycled as a synthetic measurement.
+Local initialization can choose a solution in an unobserved direction,
+but it cannot make partial point support fully observable or guarantee the
+global minimum. A rectangle also has a 180-degree body-direction ambiguity.
+
+\section{Validation and observed accuracy}
+All 32 current Python behavior tests pass. Coverage includes full default
+pipeline wiring, mandatory estimator integration, correction of all pose
+variables, nearby seed convergence, underobserved tangential ambiguity,
+support recomputation, prefix invariance, stale inputs and missing detections.
+Retired heading-only and motion-iteration tests were replaced by the unified
+path's behavior checks. No MATLAB source changed and no MATLAB unit tests
+were rerun for this change.
+
+Four offline replays reuse frozen actual detector selections and native LiDAR
+clusters from the earlier 15 m and 20 m parked-free recordings. The actual
+MATLAB NRMM runtime processes each frame. This is not a new YOLO inference
+run or a new CARLA capture. The runtime snapshot is commit
+\path{26cd6f3998d17fd49f1cd9254245805d17f4d3ae}, isolating these comparisons
+from concurrent controller and bound edits. Inputs are the previously seen
+Town10HD\_Opt straight following scenario: 300 evaluation frames at 0.02 s,
+native GNSS/IMU ego preprocessing and the earlier ideal-compass limitation.
+LiDAR/ego-sensor seed pairs were 20261002/20261003 for 15 m and
+20261003/20261004 for 20 m. The original hidden parked meshes remain absent.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrr@{}}\toprule
+ & \multicolumn{3}{c}{RMSE after 2 seconds} \\
+Replay & Raw position (m) & Est. position (m) & Est. velocity (m/s) \\\midrule
+15 m & 0.4572 & 0.4682 & 0.3561 \\
+15 m, 0.3 s blackout & 0.4560 & 0.4658 & 0.3751 \\
+20 m & 0.2038 & 0.1394 & 0.3375 \\
+20 m, 0.3 s blackout & 0.2044 & 0.1405 & 0.3357 \\
+\bottomrule\end{tabular}
+\end{center}
+
+The preceding pose fitter gave 0.2648 m and 0.0637 m normal-run position
+RMSE after 2 s. Both position results regress when its seed-dependent
+support selection is removed. The new implementation satisfies the intended
+initialization-only semantics; these measurements do not demonstrate an
+accuracy improvement. The change also alters the support objective, so this
+comparison cannot attribute the regression to initialization alone.
+No parameter was tuned against the truth scores.
+
+All 1200 estimator publications are finite. The interrupted runs preserve
+the first 150 measurements and states exactly, have missing detections at
+frames 150--164, and reacquire at 165. The supplied priors equal the runtime's
+published current pre-update position and heading. Source hashes match the
+snapshot recorded before execution; prediction hashes were written before
+separate scoring read actor truth. Prediction orchestration rejects attempts
+to read the scoring-truth file.
+
+There are 1170 accepted fits. The first stage reports convergence for 1128;
+the refinement reports convergence for 1063. The others still return a
+finite improved fit, without claiming numerical convergence. Refinement
+iteration medians are 9 for 15 m and 7 for 20 m, with maximum 60.
+No comparison of cold-start and predicted-start optimization time was run;
+the intended acceleration is not yet a measured speedup or a 50 Hz guarantee.
+The model and local-solver limitations remain relevant to reducing RMSE.
+
+\section{Artifacts and scope}
+The reusable implementation is in
+\path{perception/yolo_lidar_target_position.py} and
+\path{perception/rectangle_pose_fit.py}. Decision, source provenance,
+commands, execution records, audit and scoring summaries accompany this
+report in \path{report/ESTIMATOR_POSE_DEFAULT_20261003/}.
+Local orchestration, raw predictions and the derived report PDF are in
+\path{simulation_output/estimator_pose_default_20261003/}; recorded inputs,
+dependencies, model weights and generated binaries are excluded from Git.
+The original recordings and prior experiment reports remain preserved.
+This finite, previously seen-data replay establishes the documented behavior
+only; it supplies no new deterministic observer error certificate.
+\end{document}

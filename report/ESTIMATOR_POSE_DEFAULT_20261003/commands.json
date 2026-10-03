@@ -1,0 +1,16 @@
+{
+  "study": "simulation_output/estimator_pose_default_20261003",
+  "commands": [
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python -m unittest discover -s tests -p 'yoloLidar*Test.py' -v",
+    "env OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 nice -n 10 /home/zai/.cache/carla-yolo-range-venv/bin/python -u simulation_output/estimator_pose_default_20261003/runDefault.py dev_default dev_default_blackout conf_default conf_default_blackout",
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python simulation_output/estimator_pose_default_20261003/scoreFeedback.py dev_default dev_default_blackout",
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python simulation_output/estimator_pose_default_20261003/scoreFeedback.py conf_default conf_default_blackout",
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python simulation_output/estimator_pose_default_20261003/auditDefault.py",
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python -m py_compile perception/yolo_lidar_target_position.py perception/rectangle_pose_fit.py tests/yoloLidarPoseInitializationTest.py tests/yoloLidarAssociationTest.py tests/yoloLidarRectangleTest.py",
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python perception/yolo_lidar_target_position.py --help",
+    "pdflatex -interaction=nonstopmode -halt-on-error -output-directory simulation_output/estimator_pose_default_20261003 report/ESTIMATOR_POSE_DEFAULT_20261003.tex (two passes after fixing the equation width)",
+    "pdftotext and pdftoppm on the derived technical PDF; all three page images visually inspected",
+    "git diff --check on the eight modified or deleted perception/test paths"
+  ],
+  "conditions": "No model inference or live simulator; cached actual detector outputs and native cloud associations. Two numerical CPU threads, low scheduling priority, isolated MATLAB engine."
+}

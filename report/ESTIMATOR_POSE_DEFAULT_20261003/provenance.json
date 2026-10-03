@@ -1,0 +1,12 @@
+{
+  "recordedAt": "2026-10-03T16:01:17.250102-05:00",
+  "hashes": {
+    "perception/yolo_lidar_target_position.py": "6b54cf1db0db16cde629243a443e4432ac26a156cbf3f568ffefb2befca582bb",
+    "perception/rectangle_pose_fit.py": "b15c8213bb919a6a1a817393e9013753bc1ed31dcefadb8f95bf3dbe77b52b1f",
+    "tests/yoloLidarPoseInitializationTest.py": "827cfd4caa401731177935081502ad16c6c800c55ed96c8a24f3d43a3d210a68",
+    "simulation_output/estimator_pose_default_20261003/runDefault.py": "fb8561a899fbed1eff9a3f9defc1ce87b39ca18fabc86c606d906bcf2f114fc6",
+    "simulation_output/estimator_pose_default_20261003/nrmmPoseReplayStep.m": "38074a5503dd869d22808e6da445afc06355e4facf78a6e68cf8e317dc9d4c56"
+  },
+  "runtimeSnapshotCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "frozenBeforeScoring": true
+}

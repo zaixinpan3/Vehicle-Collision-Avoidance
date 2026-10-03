@@ -1,0 +1,128 @@
+{
+  "captures": {
+    "dev": {
+      "framesPerCase": 300,
+      "finiteEstimatorPublications": 600,
+      "currentTimePriorEqualsPublishedPredictedState": true,
+      "initialPoseIsUsedByTheOptimizer": true,
+      "noPosePriorPenalty": true,
+      "supportIsRecomputedFromCurrentGeometry": true,
+      "bothPositionAndHeadingAreCorrected": true,
+      "predictionNeverUsedAsMissingMeasurement": true,
+      "identicalPrefixBeforeBlackout": true,
+      "reacquisitionFrame": 165,
+      "blackoutMissingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "identicalEgoStates": true,
+      "fitDiagnostics": {
+        "dev_default": {
+          "validFits": 300,
+          "firstStageConverged": 287,
+          "refinementConverged": 253,
+          "positionCorrectionMaximumM": 0.5129530086340911,
+          "positionCorrectionMedianM": 0.0670647016196137,
+          "headingCorrectionMaximumDegrees": 10.43283714787615,
+          "headingCorrectionMedianDegrees": 7.286356447044146,
+          "refinementIterationsMedian": 9.0,
+          "refinementIterationsMaximum": 60
+        },
+        "dev_default_blackout": {
+          "validFits": 285,
+          "firstStageConverged": 271,
+          "refinementConverged": 237,
+          "positionCorrectionMaximumM": 0.5129530086340911,
+          "positionCorrectionMedianM": 0.07914624226583222,
+          "headingCorrectionMaximumDegrees": 10.43865502996091,
+          "headingCorrectionMedianDegrees": 6.926545076667759,
+          "refinementIterationsMedian": 9.0,
+          "refinementIterationsMaximum": 60
+        }
+      }
+    },
+    "conf": {
+      "framesPerCase": 300,
+      "finiteEstimatorPublications": 600,
+      "currentTimePriorEqualsPublishedPredictedState": true,
+      "initialPoseIsUsedByTheOptimizer": true,
+      "noPosePriorPenalty": true,
+      "supportIsRecomputedFromCurrentGeometry": true,
+      "bothPositionAndHeadingAreCorrected": true,
+      "predictionNeverUsedAsMissingMeasurement": true,
+      "identicalPrefixBeforeBlackout": true,
+      "reacquisitionFrame": 165,
+      "blackoutMissingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "identicalEgoStates": true,
+      "fitDiagnostics": {
+        "conf_default": {
+          "validFits": 300,
+          "firstStageConverged": 292,
+          "refinementConverged": 294,
+          "positionCorrectionMaximumM": 0.6192559838111182,
+          "positionCorrectionMedianM": 0.15743991019233616,
+          "headingCorrectionMaximumDegrees": 9.110993900518157,
+          "headingCorrectionMedianDegrees": 1.7187298851831585,
+          "refinementIterationsMedian": 7.0,
+          "refinementIterationsMaximum": 60
+        },
+        "conf_default_blackout": {
+          "validFits": 285,
+          "firstStageConverged": 278,
+          "refinementConverged": 279,
+          "positionCorrectionMaximumM": 0.6192559838111182,
+          "positionCorrectionMedianM": 0.15849168831705085,
+          "headingCorrectionMaximumDegrees": 9.110993900518157,
+          "headingCorrectionMedianDegrees": 1.7751301803595185,
+          "refinementIterationsMedian": 7.0,
+          "refinementIterationsMaximum": 60
+        }
+      }
+    }
+  },
+  "predictionHashes": {
+    "perception_dev_default/target_measurements.jsonl": "d52a489a45fad23147449d9712572507214064e2423033367318c509dc78147b",
+    "estimator_dev_default/predictions.csv": "b126d8ffc4b237be5c83c6dc026b5d11889a06bce4dc3bb864f7005fad642255",
+    "perception_dev_default_blackout/target_measurements.jsonl": "57df111d6381ccff98f8ffdab8ad1117032a837a4c2d94a15297607ae25aa854",
+    "estimator_dev_default_blackout/predictions.csv": "edb80f0d684becc70cef186ef6b2fe3770a3d1a82a5fc8743765a8e9896a48ff",
+    "perception_conf_default/target_measurements.jsonl": "b033f5d520698638e8af36af9bd8a478e9e640b0659c3e0e5cb6c46b6f690295",
+    "estimator_conf_default/predictions.csv": "5f6cbd5b14b1b52d364d61f264125afa05876296404637d797e39f1900b9a9cc",
+    "perception_conf_default_blackout/target_measurements.jsonl": "c23a1a791150e54aba9f42ad46114c4878a2fd74f686f9ac59354d0cff43afb3",
+    "estimator_conf_default_blackout/predictions.csv": "d69bc2bedb70f9c785cae651a1aa84419bfbf86be5a11fefea764772ac5f5545"
+  },
+  "executionSourceHashesVerified": true,
+  "noCarlaConnection": true,
+  "noNewDetectorInference": true,
+  "frontend": "Frozen actual selected detections and native LiDAR clusters",
+  "runtimeSnapshotCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "scope": "Previously seen straight-route recordings and vehicle. Local optimization does not guarantee a global fit or a new observer error bound."
+}

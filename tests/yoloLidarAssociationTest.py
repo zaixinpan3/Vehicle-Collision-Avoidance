@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'perception'))
 import yolo_lidar_target_position as perception
@@ -74,7 +75,7 @@ class YoloLidarAssociationTest(unittest.TestCase):
         with patch.object(perception, 'load_json', return_value=metadata), \
                 patch.object(perception, 'iter_jsonl', return_value=[]), \
                 self.assertRaisesRegex(ValueError, 'exactly one selected camera'):
-            perception.run_pipeline(args)
+            perception.run_pipeline(args, pose_feedback=SimpleNamespace(predict=lambda *x: None, update=lambda *x: None))
 
 
 if __name__ == '__main__':

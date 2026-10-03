@@ -14,15 +14,15 @@ def fit_rectangle_pose(
     vehicle_length: float,
     vehicle_width: float,
     support_quantile: float = 2.0,
-    placement_mode: str = "edge",
     symmetry_minimum_support: float = 0.8,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Refine x, y and yaw using geometry, with the prior used only as a seed.
 
     The objective retains capped face distance and weight-20 containment.
-    Symmetric placement adds an observed-support midpoint residual along the
-    best-observed axis. It uses the same visibility assumption as the discrete
-    fitter. Neither position nor heading is penalized against the initial pose.
+    Observed-support midpoint residuals are weighted by coverage at the current
+    candidate pose. All residuals depend only on the point cloud and candidate;
+    the initial pose selects neither a fixed face nor an objective term.
+    Neither position nor heading is penalized against the initial pose.
     A partially visible face can leave tangential translation unobservable;
     local initialization chooses a solution but does not resolve that ambiguity.
     """
@@ -35,8 +35,6 @@ def fit_rectangle_pose(
         raise ValueError("Rectangle fitting requires at least three finite points.")
     if not np.all(np.isfinite(half_size)) or np.any(half_size <= 0.0):
         raise ValueError("Rectangle dimensions must be finite and positive.")
-    if placement_mode not in ("edge", "symmetric"):
-        raise ValueError("Rectangle placement must be edge or symmetric.")
     if not 0.0 < symmetry_minimum_support <= 1.0:
         raise ValueError("Rectangle symmetry minimum support must be in (0, 1].")
     quantile = min(max(float(support_quantile), 0.0), 25.0)
@@ -46,12 +44,15 @@ def fit_rectangle_pose(
         c, s = math.cos(heading), math.sin(heading)
         return np.asarray([[c, -s], [s, c]])
 
-    initial_projection = points @ axes(pose[2])
-    low, high = np.percentile(initial_projection, [quantile, 100.0 - quantile], axis=0)
-    coverage = (high - low) / (2.0 * half_size)
-    symmetric_axis = None
-    if placement_mode == "symmetric" and np.max(coverage) >= symmetry_minimum_support:
-        symmetric_axis = int(np.argmax(coverage))
+    def support(local: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        low, high = np.percentile(local, [quantile, 100.0 - quantile], axis=0)
+        coverage = (high - low) / (2.0 * half_size)
+        # A continuous ramp avoids a jump when coverage crosses the threshold.
+        weights = np.clip(
+            (coverage - symmetry_minimum_support) / max(1.0 - symmetry_minimum_support, 1.0e-6),
+            0.0, 1.0,
+        )
+        return 0.5 * (low + high), weights
 
     def residual(candidate: np.ndarray) -> np.ndarray:
         basis = axes(candidate[2])
@@ -59,11 +60,8 @@ def fit_rectangle_pose(
         excess = np.abs(local) - half_size
         boundary = np.minimum(np.min(np.abs(excess), axis=1), 0.5)
         pieces = [boundary, math.sqrt(20.0) * np.maximum(excess, 0.0).ravel()]
-        result = np.concatenate(pieces) / math.sqrt(len(points))
-        if symmetric_axis is not None:
-            support = np.percentile(local[:, symmetric_axis], [quantile, 100.0 - quantile])
-            result = np.append(result, 0.5 * (support[0] + support[1]))
-        return result
+        midpoint, weights = support(local)
+        return np.concatenate([np.concatenate(pieces) / math.sqrt(len(points)), weights * midpoint])
 
     value = residual(pose)
     cost = float(value @ value)
@@ -109,6 +107,7 @@ def fit_rectangle_pose(
     low, high = np.percentile(projections, [quantile, 100.0 - quantile], axis=0)
     local = (points - pose[:2]) @ basis
     excess = np.abs(local) - half_size
+    _, symmetry_weights = support(local)
     center_projection = pose[:2] @ basis
     corners = np.asarray([[-1, -1], [1, -1], [1, 1], [-1, 1]]) * half_size
     correction = pose - initial
@@ -126,9 +125,10 @@ def fit_rectangle_pose(
         "longitudinal_support_m": [float(low[0]), float(high[0])],
         "lateral_support_m": [float(low[1]), float(high[1])],
         "support_quantile_percent": quantile,
-        "placement_mode": placement_mode,
+        "placement_mode": "current point support",
         "symmetry_minimum_support": symmetry_minimum_support,
-        "symmetric_axis": None if symmetric_axis is None else ["longitudinal", "lateral"][symmetric_axis],
+        "symmetry_weights": symmetry_weights.tolist(),
+        "symmetry_selection": "recomputed from current candidate and point cloud",
         "mean_boundary_distance_m": float(np.mean(np.min(np.abs(excess), axis=1))),
         "maximum_containment_violation_m": float(np.max(np.maximum(excess, 0.0))),
         "objective": cost,

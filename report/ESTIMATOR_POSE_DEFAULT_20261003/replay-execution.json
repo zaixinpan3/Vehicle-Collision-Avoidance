@@ -1,0 +1,46 @@
+[
+  {
+    "case": "dev_default",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "current point support",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 300,
+    "wallSeconds": 17.384612405032385
+  },
+  {
+    "case": "dev_default_blackout",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "current point support",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 285,
+    "wallSeconds": 15.97776719101239
+  },
+  {
+    "case": "conf_default",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "current point support",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 300,
+    "wallSeconds": 14.594752595003229
+  },
+  {
+    "case": "conf_default_blackout",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "current point support",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 285,
+    "wallSeconds": 13.244758775981609
+  }
+]

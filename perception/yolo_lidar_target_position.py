@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""Offline YOLO + LiDAR target vehicle position estimation.
+"""Causal YOLO + LiDAR localization initialized by predicted target pose.
 
-The pipeline consumes datasets produced by ``simulation/carla_town10_capture.py``.
-Each frame is processed synchronously: camera images provide car-only 2-D
-detections and the ego LiDAR point cloud provides 3-D geometry.  The resulting
-target measurement is reported in the ego frame as a radar-compatible relative
-position.
+The estimator predicts a current-frame relative center and body heading before
+the point cloud refines all three pose variables. The fitted center is then
+delivered to the estimator as a radar-compatible position measurement.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import importlib
 import json
 import math
 import sys
@@ -44,24 +43,6 @@ class CameraEstimate:
 
 
 @dataclass(frozen=True)
-class HeadingPrior:
-    """Predicted body heading in the current perception ego axes.
-
-    The state is predicted to the current frame using earlier measurements.
-    An initialization prior has no measurement history and must be labeled as
-    such. Body heading includes any sideslip correction made by the estimator.
-    The adapter must match the point cloud's axis/angle convention. An NRMM
-    relative heading already uses the current body frame; no estimated world
-    yaw should be introduced when those body axes are otherwise the same.
-    """
-
-    heading_ego_rad: float
-    state_time: float
-    last_measurement_time: float | None
-    source: str
-
-
-@dataclass(frozen=True)
 class PosePrior:
     """Current-time predicted center and body heading in point-cloud ego axes.
 
@@ -77,10 +58,10 @@ class PosePrior:
     source: str
 
 
-class HeadingFeedback(Protocol):
+class PoseFeedback(Protocol):
     """Adapter to an estimator that predicts before consuming each position."""
 
-    def predict(self, frame: int, time: float) -> HeadingPrior | PosePrior | None:
+    def predict(self, frame: int, time: float) -> PosePrior:
         ...
 
     def update(self, frame: int, time: float, position: np.ndarray | None) -> None:
@@ -529,34 +510,6 @@ def capsule_from_points(
     }
 
 
-def estimate_vehicle_center(
-    points_ego: np.ndarray,
-    vehicle_length: float,
-    vehicle_width: float,
-    center_mode: str,
-    surface_center_offset: float,
-) -> np.ndarray:
-    median_xy = np.median(points_ego[:, :2], axis=0)
-    if center_mode == "surface":
-        return median_xy
-
-    radial_norm = float(np.linalg.norm(median_xy))
-    if radial_norm < 1.0e-6:
-        return median_xy
-    radial = median_xy / radial_norm
-    lateral = np.asarray([-radial[1], radial[0]], dtype=float)
-    radial_coordinates = points_ego[:, :2] @ radial
-    lateral_coordinates = points_ego[:, :2] @ lateral
-    near_surface = float(np.percentile(radial_coordinates, 5.0))
-    lateral_center = float(np.median(lateral_coordinates))
-
-    offset = surface_center_offset
-    if offset < 0.0:
-        offset = 0.45 * vehicle_length
-    offset = min(max(offset, 0.0), 0.55 * vehicle_length)
-    return (near_surface + offset) * radial + lateral_center * lateral
-
-
 def associate_detection_points(
     detection: Detection,
     lidar_points: np.ndarray,
@@ -624,133 +577,69 @@ def estimate_from_cluster(
     detection: Detection,
     cluster: np.ndarray,
     args: argparse.Namespace,
-    rectangle_heading_hint: float | None = None,
-    *,
-    fixed_heading: bool = False,
-    rectangle_pose_hint: PosePrior | None = None,
+    pose_prior: PosePrior,
 ) -> CameraEstimate | None:
-    """Fit the vehicle body to an associated cluster at a given heading.
+    """Refine the predicted center and heading using current point-cloud geometry.
 
-    Returns ``None`` when the cluster does not observe enough of the vehicle to
-    locate it.  A known-size rectangle is anchored by the faces it can see, so
-    a cluster whose extent is small compared with the vehicle in both
-    directions leaves the rectangle free to slide by the unobserved remainder,
-    and the resulting center is not a measurement of anything.
+    First acquisition obtains its missing center from observed face placement.
+    Both fitting stages then optimize position and heading freely. A cluster
+    with insufficient observed support remains a missing measurement.
     """
-
-    rectangle = None
-    rectangle_heading = None
-    if fixed_heading and (
-        rectangle_heading_hint is None or not math.isfinite(rectangle_heading_hint)
-    ):
-        raise ValueError("Fixed rectangle orientation requires a finite heading.")
-    if rectangle_pose_hint is not None and (fixed_heading or args.center_mode != "rectangle"):
-        raise ValueError("Pose initialization requires a rectangle with free orientation.")
-    if args.center_mode == "rectangle":
-        if rectangle_pose_hint is not None:
-            seed_center = rectangle_pose_hint.position_ego_m
-            if seed_center is None:
-                seed_center, _ = fit_known_size_rectangle(
-                    cluster, args.vehicle_length, args.vehicle_width,
-                    rectangle_pose_hint.heading_ego_rad, args.rectangle_support_quantile,
-                    args.rectangle_heading_step, args.rectangle_initial_heading_span,
-                    0.0, 0.0, args.rectangle_placement, args.rectangle_symmetry_minimum_support,
-                )
-            seed = np.asarray([*seed_center, rectangle_pose_hint.heading_ego_rad])
-            center_xy, initial_rectangle = fit_rectangle_pose(
-                cluster, seed, args.vehicle_length, args.vehicle_width,
-                args.rectangle_support_quantile, args.rectangle_placement,
-                args.rectangle_symmetry_minimum_support,
-            )
-        else:
-            center_xy, initial_rectangle = fit_known_size_rectangle(
-                cluster,
-                args.vehicle_length,
-                args.vehicle_width,
-                rectangle_heading_hint,
-                args.rectangle_support_quantile,
-                args.rectangle_heading_step,
-                args.rectangle_initial_heading_span,
-                0.0 if fixed_heading else args.rectangle_heading_span,
-                args.rectangle_heading_smoothness,
-                args.rectangle_placement,
-                args.rectangle_symmetry_minimum_support,
-            )
-        initial_violation = rectangle_containment_violation(cluster, initial_rectangle)
-        rectangle_inliers = initial_violation <= args.rectangle_outlier_tolerance
-        fit_cluster = cluster[rectangle_inliers, :]
-        if fit_cluster.shape[0] >= args.min_lidar_points and rectangle_pose_hint is not None:
-            center_xy, rectangle = fit_rectangle_pose(
-                fit_cluster, np.asarray([*center_xy, initial_rectangle["heading_rad"]]),
-                args.vehicle_length, args.vehicle_width, 0.0,
-                args.rectangle_placement, args.rectangle_symmetry_minimum_support,
-            )
-        elif fit_cluster.shape[0] >= args.min_lidar_points:
-            center_xy, rectangle = fit_known_size_rectangle(
-                fit_cluster,
-                args.vehicle_length,
-                args.vehicle_width,
-                float(initial_rectangle["heading_rad"]),
-                0.0,
-                min(args.rectangle_heading_step, 0.05),
-                args.rectangle_initial_heading_span,
-                0.0 if fixed_heading else args.rectangle_refine_heading_span,
-                args.rectangle_refine_heading_smoothness,
-                args.rectangle_placement,
-                args.rectangle_symmetry_minimum_support,
-            )
-        else:
-            fit_cluster = cluster
-            rectangle = initial_rectangle
-        all_point_violation = rectangle_containment_violation(cluster, rectangle)
-        rectangle.update(
-            {
-                "initial_objective": float(initial_rectangle["objective"]),
-                "heading_constraint": "free" if rectangle_pose_hint is not None else ("fixed" if fixed_heading else "search"),
-                "raw_cluster_point_count": int(cluster.shape[0]),
-                "fit_point_count": int(fit_cluster.shape[0]),
-                "rejected_outlier_count": int(cluster.shape[0] - fit_cluster.shape[0]),
-                "fit_point_fraction": float(fit_cluster.shape[0] / cluster.shape[0]),
-                "outlier_tolerance_m": args.rectangle_outlier_tolerance,
-                "all_point_maximum_containment_violation_m": float(
-                    np.max(all_point_violation)
-                ),
-            }
+    seed_center = pose_prior.position_ego_m
+    if seed_center is None:
+        seed_center, _ = fit_known_size_rectangle(
+            cluster, args.vehicle_length, args.vehicle_width,
+            pose_prior.heading_ego_rad, args.rectangle_support_quantile,
+            1.0, 0.0, 0.0, 0.0, "symmetric", args.rectangle_symmetry_minimum_support,
         )
-        if rectangle_pose_hint is not None:
-            rectangle["prediction_initial_pose"] = initial_rectangle["initial_pose"]
-            rectangle["first_stage_pose"] = [*initial_rectangle["center"], initial_rectangle["heading_rad"]]
-            rectangle["first_stage_converged"] = initial_rectangle["optimizer_converged"]
-        rectangle_heading = float(rectangle["heading_rad"])
-        support_fraction = max(
-            float(rectangle["observed_longitudinal_span_m"]) / args.vehicle_length,
-            float(rectangle["observed_lateral_span_m"]) / args.vehicle_width,
+    seed = np.asarray([*seed_center, pose_prior.heading_ego_rad])
+    center_xy, initial_rectangle = fit_rectangle_pose(
+        cluster, seed, args.vehicle_length, args.vehicle_width,
+        args.rectangle_support_quantile, args.rectangle_symmetry_minimum_support,
+    )
+    initial_violation = rectangle_containment_violation(cluster, initial_rectangle)
+    fit_cluster = cluster[initial_violation <= args.rectangle_outlier_tolerance, :]
+    if fit_cluster.shape[0] >= args.min_lidar_points:
+        center_xy, rectangle = fit_rectangle_pose(
+            fit_cluster, np.asarray([*center_xy, initial_rectangle["heading_rad"]]),
+            args.vehicle_length, args.vehicle_width, 0.0,
+            args.rectangle_symmetry_minimum_support,
         )
-        rectangle["support_fraction"] = support_fraction
-        if support_fraction < args.minimum_support_fraction:
-            return None
     else:
-        center_xy = estimate_vehicle_center(
-            cluster,
-            args.vehicle_length,
-            args.vehicle_width,
-            args.center_mode,
-            args.surface_center_offset,
-        )
+        fit_cluster = cluster
+        rectangle = initial_rectangle
+    rectangle.update(
+        {
+            "initial_objective": float(initial_rectangle["objective"]),
+            "heading_constraint": "free",
+            "raw_cluster_point_count": int(cluster.shape[0]),
+            "fit_point_count": int(fit_cluster.shape[0]),
+            "rejected_outlier_count": int(cluster.shape[0] - fit_cluster.shape[0]),
+            "fit_point_fraction": float(fit_cluster.shape[0] / cluster.shape[0]),
+            "outlier_tolerance_m": args.rectangle_outlier_tolerance,
+            "all_point_maximum_containment_violation_m": float(
+                np.max(rectangle_containment_violation(cluster, rectangle))
+            ),
+            "prediction_initial_pose": initial_rectangle["initial_pose"],
+            "first_stage_pose": [*initial_rectangle["center"], initial_rectangle["heading_rad"]],
+            "first_stage_converged": initial_rectangle["optimizer_converged"],
+        }
+    )
+    support_fraction = max(
+        float(rectangle["observed_longitudinal_span_m"]) / args.vehicle_length,
+        float(rectangle["observed_lateral_span_m"]) / args.vehicle_width,
+    )
+    rectangle["support_fraction"] = support_fraction
+    if support_fraction < args.minimum_support_fraction:
+        return None
     capsule = capsule_from_points(
-        cluster,
-        center_xy,
-        args.vehicle_length,
-        args.vehicle_width,
-        rectangle_heading,
+        cluster, center_xy, args.vehicle_length, args.vehicle_width,
+        float(rectangle["heading_rad"]),
     )
     return CameraEstimate(
-        camera_id=detection.camera_id,
-        detection=detection,
-        point_count=int(cluster.shape[0]),
-        relative_position=center_xy,
-        capsule=capsule,
-        rectangle=rectangle,
+        camera_id=detection.camera_id, detection=detection,
+        point_count=int(cluster.shape[0]), relative_position=center_xy,
+        capsule=capsule, rectangle=rectangle,
     )
 
 
@@ -761,7 +650,7 @@ def estimate_from_detection(
     camera: dict[str, Any],
     ego_to_world: np.ndarray,
     args: argparse.Namespace,
-    rectangle_heading_hint: float | None = None,
+    pose_prior: PosePrior,
 ) -> CameraEstimate | None:
     cluster = associate_detection_points(
         detection,
@@ -773,7 +662,7 @@ def estimate_from_detection(
     )
     if cluster is None:
         return None
-    return estimate_from_cluster(detection, cluster, args, rectangle_heading_hint)
+    return estimate_from_cluster(detection, cluster, args, pose_prior)
 
 
 class UltralyticsCarDetector:
@@ -1217,213 +1106,20 @@ def summarize(measurements: list[dict[str, Any]]) -> dict[str, Any]:
     return summary
 
 
-def motion_headings(
-    times: list[float],
-    world_positions: list[np.ndarray | None],
-    ego_yaws: list[float],
-    window_seconds: float,
-    minimum_displacement: float,
-) -> list[float | None]:
-    """Ego-frame heading of each frame taken from the target's own motion.
-
-    A road vehicle points where it is going, so its track direction is a
-    heading estimate that needs no assumption about which faces the LiDAR can
-    see.  This is what makes it usable in both the following geometry, where
-    the visible face is the target's rear, and the crossing geometry, where it
-    is a flank; the line of sight is a good heading proxy only in the first.
-
-    The direction is the principal axis of the track inside a window centered
-    on each frame, which an offline pass can use symmetrically, and it is
-    reported only where the target actually moved far enough within that window
-    for the direction to be meaningful.  Positions are differenced in world
-    coordinates so a turning ego vehicle does not appear as target motion, then
-    referred back to the ego frame of the sample they belong to.
-    """
-
-    headings: list[float | None] = []
-    for index, time_stamp in enumerate(times):
-        window = [
-            (other_time, world_positions[other])
-            for other, other_time in enumerate(times)
-            if world_positions[other] is not None
-            and abs(other_time - time_stamp) <= 0.5 * window_seconds
-        ]
-        if len(window) < 3:
-            headings.append(None)
-            continue
-        window_times = np.asarray([entry[0] for entry in window], dtype=float)
-        track = np.vstack([entry[1] for entry in window])
-        velocity = fit_track_velocity(window_times, track)
-        if velocity is None:
-            headings.append(None)
-            continue
-        # Judge the window by how far the fitted motion carries the target
-        # across it, not by the gap between its endpoints, so that a single
-        # bad endpoint cannot decide whether the window counts as moving.
-        span_seconds = float(window_times[-1] - window_times[0])
-        if float(np.linalg.norm(velocity)) * span_seconds < minimum_displacement:
-            headings.append(None)
-            continue
-        world_heading = math.atan2(float(velocity[1]), float(velocity[0]))
-        headings.append(wrap_angle(world_heading - ego_yaws[index]))
-    return headings
-
-
-def fill_missing_headings(
-    times: list[float],
-    headings: list[float | None],
-) -> list[float | None]:
-    """Carry the nearest known heading into frames that have none.
-
-    A target that has not yet travelled far enough for its motion to define a
-    direction still has an orientation, and it is the one it is about to drive
-    off in.  Without this, those frames fall back to the point set's principal
-    direction, which for a vehicle seen from behind is ambiguous by 90 degrees
-    and rotates the rectangle onto its side.  An offline pass can reach both
-    backward and forward for the nearest frame that did resolve.
-    """
-
-    known = [index for index, heading in enumerate(headings) if heading is not None]
-    if not known:
-        return headings
-    filled: list[float | None] = []
-    for index, heading in enumerate(headings):
-        if heading is not None:
-            filled.append(heading)
-            continue
-        nearest = min(known, key=lambda other: abs(times[other] - times[index]))
-        filled.append(headings[nearest])
-    return filled
-
-
-def fit_track_velocity(
-    window_times: np.ndarray,
-    track: np.ndarray,
-    residual_tolerance: float = 0.6,
-) -> np.ndarray | None:
-    """Velocity of a short track by regression against time.
-
-    Regressing position on time uses the whole window and yields the direction
-    of travel with its sign, where a principal-axis fit would discard the time
-    ordering and let a single outlying position dominate the direction.  One
-    reweighting pass drops positions that the first fit leaves far off the
-    line, which is what an occasional bad frame looks like.
-    """
-
-    def solve(times_subset: np.ndarray, track_subset: np.ndarray) -> np.ndarray | None:
-        centered_times = times_subset - times_subset.mean()
-        variance = float(centered_times @ centered_times)
-        if variance <= 1.0e-9:
-            return None
-        centered_track = track_subset - track_subset.mean(axis=0)
-        return (centered_times @ centered_track) / variance
-
-    velocity = solve(window_times, track)
-    if velocity is None:
-        return None
-    intercept = track.mean(axis=0) - velocity * window_times.mean()
-    residual = np.linalg.norm(
-        track - (intercept + np.outer(window_times, velocity)),
-        axis=1,
-    )
-    inliers = residual <= residual_tolerance
-    if int(np.count_nonzero(inliers)) < 3 or bool(np.all(inliers)):
-        return velocity
-    refined = solve(window_times[inliers], track[inliers])
-    return velocity if refined is None else refined
-
-
-def ego_yaw_from_transform(ego_to_world: np.ndarray) -> float:
-    return math.atan2(float(ego_to_world[1, 0]), float(ego_to_world[0, 0]))
-
-
-def causal_track_estimates(
-    associations: list[dict[str, Any]],
-    args: argparse.Namespace,
-) -> tuple[list[list[CameraEstimate]], list[float | None], int]:
-    """Fit each arrival using only its current cluster and frozen past outputs.
-
-    Published positions are never refit using a later observation. A carried
-    heading is stored in the inertial frame and rotated into the current ego
-    frame. Unresolved startup headings remain unresolved until enough motion
-    has actually been observed; there is no backward fill from the future.
-    """
-    estimates_by_frame: list[list[CameraEstimate]] = []
-    headings: list[float | None] = []
-    history: list[tuple[float, np.ndarray]] = []
-    last_world_heading: float | None = None
-    resolved_count = 0
-    previous_time = -float("inf")
-    for record in associations:
-        stamp = float(record["time"])
-        if not math.isfinite(stamp) or stamp <= previous_time:
-            raise ValueError("Causal perception requires strictly increasing finite timestamps.")
-        previous_time = stamp
-        history = [(t, p) for t, p in history if stamp - t <= args.motion_heading_window]
-        heading = None if last_world_heading is None else wrap_angle(
-            last_world_heading - record["ego_yaw"]
-        )
-        resolved = False
-
-        def fit(current_heading: float | None) -> tuple[list[CameraEstimate], np.ndarray | None]:
-            estimates = [
-                estimate for detection, cluster in record["clusters"]
-                if (estimate := estimate_from_cluster(detection, cluster, args, current_heading)) is not None
-            ]
-            estimates = select_consistent_estimates(estimates, args.max_fusion_spread)
-            fused = fuse_estimates(estimates)
-            if fused is None:
-                return estimates, None
-            point = np.array([[fused[0][0], fused[0][1], 0.0]])
-            return estimates, transform_points(record["ego_to_world"], point)[0, :2]
-
-        for _ in range(max(1, args.heading_iterations)):
-            estimates, position = fit(heading)
-            track = history + ([] if position is None else [(stamp, position)])
-            if len(track) < 3:
-                break
-            times = np.array([t for t, _ in track])
-            velocity = fit_track_velocity(times, np.vstack([p for _, p in track]))
-            if velocity is None or np.linalg.norm(velocity) * (times[-1] - times[0]) < args.motion_heading_minimum_displacement:
-                break
-            resolved = True
-            measured = wrap_angle(math.atan2(velocity[1], velocity[0]) - record["ego_yaw"])
-            change = float("inf") if heading is None else abs(math.degrees(wrap_angle(measured - heading)))
-            heading = measured if heading is None else wrap_angle(
-                heading + args.heading_damping * wrap_angle(measured - heading)
-            )
-            if change <= args.heading_tolerance:
-                break
-        # Keep the returned fit consistent with its reported final heading.
-        estimates, position = fit(heading)
-        estimates_by_frame.append(estimates)
-        headings.append(heading)
-        resolved_count += int(resolved)
-        if heading is not None:
-            last_world_heading = wrap_angle(heading + record["ego_yaw"])
-        if position is not None:
-            history.append((stamp, position))
-    return estimates_by_frame, headings, resolved_count
-
-
 def estimator_track_estimates(
     associations: list[dict[str, Any]],
     args: argparse.Namespace,
-    feedback: HeadingFeedback,
-    *,
-    pose_initialization: bool = False,
-) -> tuple[list[list[CameraEstimate]], list[float | None], int]:
-    """Fit using a predicted heading or pose, then deliver the measured position.
+    feedback: PoseFeedback,
+) -> tuple[list[list[CameraEstimate]], list[float], int]:
+    """Predict the current pose, fit once, then consume the measured position.
 
-    The prior state time must match this frame and its latest measurement
-    must precede it. No same-frame refitting or motion-heading iteration is
-    performed. Pose mode uses a free local fit initialized at the prediction;
-    heading mode keeps the original fixed-angle behavior. Without a prior the existing geometric search is used;
-    without a detection the estimator receives an explicit missing position.
+    Both geometric fitting stages precede the single estimator update. The
+    prior state time must match this frame; its latest input must precede it.
+    Missing detections deliver an explicit missing position to the estimator.
     """
     estimates_by_frame = []
     headings = []
-    resolved = 0
+    predicted_count = 0
     previous_time = -float("inf")
     for record in associations:
         stamp = float(record["time"])
@@ -1431,61 +1127,49 @@ def estimator_track_estimates(
             raise ValueError("Estimator feedback requires strictly increasing finite timestamps.")
         previous_time = stamp
         prior = feedback.predict(record["frame_number"], stamp)
-        heading = None
-        if prior is not None:
-            expected_type = PosePrior if pose_initialization else HeadingPrior
-            if not isinstance(prior, expected_type):
-                raise ValueError("Estimator prior type must match heading or pose feedback mode.")
-            if not math.isfinite(prior.heading_ego_rad) or not math.isfinite(prior.state_time):
-                raise ValueError("Estimator heading and state time must be finite.")
-            if abs(prior.state_time - stamp) > 1.0e-9:
-                raise ValueError("Estimator heading must be predicted to the current frame time.")
-            if prior.source not in ("prediction", "initialization"):
-                raise ValueError("Heading prior source must be prediction or initialization.")
-            if prior.last_measurement_time is None:
-                if prior.source != "initialization":
-                    raise ValueError("A predicted heading must identify its latest measurement time.")
-            elif (not math.isfinite(prior.last_measurement_time)
-                  or prior.last_measurement_time >= stamp):
-                raise ValueError("Heading feedback cannot consume the current or a future measurement.")
-            if pose_initialization:
-                position = np.asarray(prior.position_ego_m, dtype=float)
-                if prior.position_ego_m is None:
-                    if prior.source != "initialization":
-                        raise ValueError("A predicted pose must include its relative center.")
-                elif position.shape != (2,) or not np.all(np.isfinite(position)):
-                    raise ValueError("Predicted relative position must contain finite x and y.")
-            heading = wrap_angle(prior.heading_ego_rad)
-            resolved += 1
-        record["estimator_heading_prior"] = None if prior is None else asdict(prior)
+        if not isinstance(prior, PosePrior):
+            raise ValueError("The estimator must supply a PosePrior for every frame.")
+        if not math.isfinite(prior.heading_ego_rad) or not math.isfinite(prior.state_time):
+            raise ValueError("Estimator heading and state time must be finite.")
+        if abs(prior.state_time - stamp) > 1.0e-9:
+            raise ValueError("Estimator pose must be predicted to the current frame time.")
+        if prior.source not in ("prediction", "initialization"):
+            raise ValueError("Pose prior source must be prediction or initialization.")
+        if prior.last_measurement_time is None:
+            if prior.source != "initialization":
+                raise ValueError("A predicted pose must identify its latest measurement time.")
+        elif (not math.isfinite(prior.last_measurement_time)
+              or prior.last_measurement_time >= stamp):
+            raise ValueError("Pose feedback cannot consume the current or a future measurement.")
+        if prior.position_ego_m is None:
+            if prior.source != "initialization":
+                raise ValueError("A predicted pose must include its relative center.")
+        else:
+            position = np.asarray(prior.position_ego_m, dtype=float)
+            if position.shape != (2,) or not np.all(np.isfinite(position)):
+                raise ValueError("Predicted relative position must contain finite x and y.")
+        predicted_count += int(prior.source == "prediction")
+        record["estimator_pose_prior"] = asdict(prior)
         estimates = [
             estimate for detection, cluster in record["clusters"]
-            if (estimate := estimate_from_cluster(
-                detection, cluster, args, heading,
-                fixed_heading=heading is not None and not pose_initialization,
-                rectangle_pose_hint=prior if pose_initialization else None,
-            )) is not None
+            if (estimate := estimate_from_cluster(detection, cluster, args, prior)) is not None
         ]
         estimates = select_consistent_estimates(estimates, args.max_fusion_spread)
         fused = fuse_estimates(estimates)
-        # Give the adapter a copy so subsequent updates cannot revise this output.
+        # A transport must not be able to mutate a published measurement.
         feedback.update(record["frame_number"], stamp, None if fused is None else fused[0].copy())
         estimates_by_frame.append(estimates)
-        headings.append(heading)
-    return estimates_by_frame, headings, resolved
+        headings.append(wrap_angle(prior.heading_ego_rad))
+    return estimates_by_frame, headings, predicted_count
 
 
 def run_pipeline(
     args: argparse.Namespace,
     *,
-    heading_feedback: HeadingFeedback | None = None,
-    pose_feedback: HeadingFeedback | None = None,
+    pose_feedback: PoseFeedback,
 ) -> dict[str, Any]:
-    if heading_feedback is not None and pose_feedback is not None:
-        raise ValueError("Choose either heading feedback or pose initialization.")
-    feedback = pose_feedback if pose_feedback is not None else heading_feedback
-    if feedback is not None and (not args.causal or args.center_mode != "rectangle"):
-        raise ValueError("Estimator heading feedback requires causal rectangle fitting.")
+    if not callable(getattr(pose_feedback, "predict", None)) or not callable(getattr(pose_feedback, "update", None)):
+        raise ValueError("Predicted-pose perception requires an estimator with predict and update methods.")
     dataset_root = args.dataset.resolve()
     metadata = load_json(dataset_root / "metadata.json")
     frames = list(iter_jsonl(dataset_root / "frames.jsonl"))
@@ -1518,9 +1202,8 @@ def run_pipeline(
         args.image_size,
     )
 
-    # Association first, for every frame, because it does not depend on the
-    # heading.  The detector then runs once no matter how many times the
-    # heading is revised below.
+    # Detection and association are independent of the predicted pose. The
+    # subsequent estimator updates still consume frames strictly in order.
     associations: list[dict[str, Any]] = []
     for frame_idx, frame in enumerate(frames):
         if args.max_frames is not None and frame_idx >= args.max_frames:
@@ -1575,7 +1258,6 @@ def run_pipeline(
                 "frame_number": frame_number,
                 "time": frame_time,
                 "ego_to_world": ego_to_world,
-                "ego_yaw": ego_yaw_from_transform(ego_to_world),
                 "clusters": clusters,
                 "detections": all_detections,
                 "raw_detection_count": raw_detection_count,
@@ -1587,88 +1269,9 @@ def run_pipeline(
                 f"detections={raw_detection_count} clusters={len(clusters)}"
             )
 
-    # Then alternate between fitting the body at the current heading and
-    # re-reading the heading off the resulting track.  The first pass has no
-    # motion estimate and falls back to the point set's principal direction;
-    # each later pass fits at the heading the previous track implies.
-    times = [record["time"] for record in associations]
-    ego_yaws = [record["ego_yaw"] for record in associations]
-    headings: list[float | None] = [None] * len(associations)
-    estimates_by_frame: list[list[CameraEstimate]] = []
-    heading_iterations_run = 0
-    heading_change_deg = float("inf")
-    if feedback is not None:
-        estimates_by_frame, headings, resolved = estimator_track_estimates(
-            associations, args, feedback, pose_initialization=pose_feedback is not None
-        )
-        heading_iterations_run = 1
-        heading_change_deg = None
-    elif args.causal:
-        estimates_by_frame, headings, resolved = causal_track_estimates(associations, args)
-        heading_iterations_run = 1
-        heading_change_deg = None
-    for iteration in range(0 if args.causal else max(1, args.heading_iterations)):
-        estimates_by_frame = []
-        world_positions: list[np.ndarray | None] = []
-        for record, heading in zip(associations, headings):
-            estimates = [
-                estimate
-                for detection, cluster in record["clusters"]
-                if (
-                    estimate := estimate_from_cluster(
-                        detection, cluster, args, heading
-                    )
-                )
-                is not None
-            ]
-            estimates = select_consistent_estimates(estimates, args.max_fusion_spread)
-            estimates_by_frame.append(estimates)
-            fused = fuse_estimates(estimates)
-            if fused is None:
-                world_positions.append(None)
-                continue
-            position = fused[0]
-            world = transform_points(
-                record["ego_to_world"],
-                np.asarray([[position[0], position[1], 0.0]], dtype=float),
-            )
-            world_positions.append(world[0, :2])
-        heading_iterations_run = iteration + 1
-        resolved_headings = motion_headings(
-            times,
-            world_positions,
-            ego_yaws,
-            args.motion_heading_window,
-            args.motion_heading_minimum_displacement,
-        )
-        resolved = sum(1 for heading in resolved_headings if heading is not None)
-        updated = fill_missing_headings(times, resolved_headings)
-        changes = [
-            abs(math.degrees(wrap_angle(new - old)))
-            for new, old in zip(updated, headings)
-            if new is not None and old is not None
-        ]
-        heading_change_deg = max(changes) if changes else float("inf")
-        # Convergence is judged on the raw step, then the step is under-relaxed
-        # before it is taken.  Heading and position feed each other, and a
-        # frame whose fit can sit at either of two placements will otherwise
-        # alternate between them indefinitely instead of settling.
-        updated = [
-            new
-            if new is None or old is None
-            else wrap_angle(old + args.heading_damping * wrap_angle(new - old))
-            for new, old in zip(updated, headings)
-        ]
-        if args.report_interval > 0:
-            print(
-                f"[heading pass {iteration + 1}] motion resolved on "
-                f"{resolved}/{len(updated)} frames, "
-                f"max change {heading_change_deg:.2f} deg"
-            )
-        if updated == headings or heading_change_deg <= args.heading_tolerance:
-            headings = updated
-            break
-        headings = updated
+    estimates_by_frame, headings, predicted_count = estimator_track_estimates(
+        associations, args, pose_feedback
+    )
 
     measurements: list[dict[str, Any]] = []
     for record, camera_estimates, heading in zip(
@@ -1691,13 +1294,8 @@ def run_pipeline(
             "acceptedDetectionCount": len(all_detections),
             "usedDetectionCount": len(camera_estimates),
         }
-        if feedback is not None:
-            key = "estimatorPosePrior" if pose_feedback is not None else "estimatorHeadingPrior"
-            item[key] = record["estimator_heading_prior"]
-            item["headingSource"] = (
-                "point-cloud fit initialized by predicted pose" if pose_feedback is not None
-                else "estimator body-heading prior"
-            ) if record["estimator_heading_prior"] is not None else "geometric orientation search"
+        item["estimatorPosePrior"] = record["estimator_pose_prior"]
+        item["headingSource"] = "point-cloud fit initialized by predicted pose"
         if truth_relative is not None:
             item.update(
                 {
@@ -1722,7 +1320,7 @@ def run_pipeline(
                     "pointCount": int(sum(est.point_count for est in camera_estimates)),
                     "confidence": float(max(est.detection.confidence for est in camera_estimates)),
                     "fusion": fusion_info,
-                    "motionHeadingRad": heading,
+                    "predictedHeadingRad": heading,
                     "cameraEstimates": [
                         {
                             "cameraId": est.camera_id,
@@ -1771,32 +1369,18 @@ def run_pipeline(
             "iou_threshold": args.iou,
             "vehicle_length_m": args.vehicle_length,
             "vehicle_width_m": args.vehicle_width,
-            "center_mode": args.center_mode,
-            "surface_center_offset_m": args.surface_center_offset,
+            "center_mode": "rectangle",
             "rectangle_support_quantile_percent": args.rectangle_support_quantile,
-            "rectangle_placement": args.rectangle_placement,
+            "rectangle_placement": "current point support",
             "rectangle_symmetry_minimum_support": args.rectangle_symmetry_minimum_support,
-            "rectangle_heading_step_degrees": args.rectangle_heading_step,
-            "rectangle_initial_heading_span_degrees": args.rectangle_initial_heading_span,
-            "rectangle_heading_span_degrees": args.rectangle_heading_span,
-            "rectangle_heading_smoothness": args.rectangle_heading_smoothness,
-            "heading_source": "point-cloud fit initialized by predicted pose" if pose_feedback is not None else ("estimator body-heading prior" if heading_feedback is not None else "target motion direction"),
-            "estimator_heading_feedback": heading_feedback is not None,
-            "estimator_pose_feedback": pose_feedback is not None,
-            "heading_temporal_mode": "causal, frozen past outputs" if args.causal else "offline, centered windows and nearest-frame filling",
-            "heading_iterations_run": heading_iterations_run,
-            "heading_final_max_change_degrees": heading_change_deg,
-            "heading_damping": args.heading_damping,
-            "motion_heading_window_s": args.motion_heading_window,
-            "motion_heading_minimum_displacement_m": args.motion_heading_minimum_displacement,
-            "motion_heading_resolved_frame_count": resolved,
-            "motion_heading_filled_frame_count": sum(h is not None for h in headings) - resolved,
-            "motion_heading_unresolved_frame_count": sum(h is None for h in headings),
+            "tracking_method": "predicted pose initialization",
+            "heading_source": "point-cloud fit initialized by predicted pose",
+            "temporal_mode": "causal, frozen past outputs",
+            "predicted_pose_frame_count": predicted_count,
+            "initialization_frame_count": len(associations) - predicted_count,
             "rectangle_outlier_tolerance_m": args.rectangle_outlier_tolerance,
             "minimum_support_fraction": args.minimum_support_fraction,
             "min_object_height_m": args.min_object_height,
-            "rectangle_refine_heading_span_degrees": args.rectangle_refine_heading_span,
-            "rectangle_refine_heading_smoothness": args.rectangle_refine_heading_smoothness,
             "synchronization": metadata.get("synchronization"),
         }
     )
@@ -1871,100 +1455,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--max-fusion-spread", type=float, default=4.0)
     parser.add_argument("--vehicle-length", type=float, default=-1.0)
     parser.add_argument("--vehicle-width", type=float, default=-1.0)
-    parser.add_argument(
-        "--center-mode",
-        choices=["capsule", "surface", "rectangle"],
-        default="capsule",
-    )
-    parser.add_argument(
-        "--surface-center-offset",
-        type=float,
-        default=-1.0,
-        help="Meters to shift the visible LiDAR surface along line of sight; negative uses 0.45 vehicle length.",
-    )
     parser.add_argument("--use-static-lidar-transform", action="store_true")
     parser.add_argument("--rectangle-support-quantile", type=float, default=2.0)
-    parser.add_argument(
-        "--rectangle-placement", choices=["edge", "symmetric"], default="edge",
-        help=(
-            "Symmetric centers the best-supported visible face tangentially; "
-            "use only when visibility is approximately symmetric. Edge preserves face anchoring."
-        ),
-    )
     parser.add_argument(
         "--rectangle-symmetry-minimum-support", type=float, default=0.8,
         help="Minimum fraction of a known dimension observed before symmetric placement, in (0, 1].",
     )
-    parser.add_argument("--rectangle-heading-step", type=float, default=0.1)
-    parser.add_argument(
-        "--rectangle-initial-heading-span",
-        type=float,
-        default=90.0,
-        help=(
-            "Search half-width in degrees when no motion heading is available. "
-            "The rectangle is symmetric under a half turn, so 90 covers every "
-            "distinct orientation."
-        ),
-    )
-    parser.add_argument(
-        "--rectangle-heading-span",
-        type=float,
-        default=15.0,
-        help=(
-            "Search half-width in degrees around the target's motion heading, "
-            "which bounds how far body slip and track noise may move the fit."
-        ),
-    )
-    parser.add_argument(
-        "--rectangle-heading-smoothness",
-        type=float,
-        default=2.0,
-        help="Quadratic penalty on leaving the motion heading.",
-    )
-    parser.add_argument(
-        "--heading-iterations",
-        type=int,
-        default=8,
-        help="Maximum fit/motion-heading alternations.",
-    )
-    parser.add_argument(
-        "--heading-damping",
-        type=float,
-        default=0.5,
-        help=(
-            "Fraction of each heading update that is applied. Values below 1 "
-            "damp the heading/position feedback loop into a fixed point."
-        ),
-    )
-    parser.add_argument(
-        "--heading-tolerance",
-        type=float,
-        default=0.5,
-        help="Degrees of maximum heading change below which iteration stops.",
-    )
-    parser.add_argument(
-        "--motion-heading-window",
-        type=float,
-        default=1.0,
-        help="Seconds of track, centered on each frame, used for its heading.",
-    )
-    parser.add_argument(
-        "--motion-heading-minimum-displacement",
-        type=float,
-        default=2.0,
-        help=(
-            "Metres the target must travel inside that window before its "
-            "motion defines a heading."
-        ),
-    )
     parser.add_argument("--rectangle-outlier-tolerance", type=float, default=0.15)
-    parser.add_argument("--rectangle-refine-heading-span", type=float, default=0.5)
-    parser.add_argument("--rectangle-refine-heading-smoothness", type=float, default=0.5)
     parser.add_argument("--max-frames", type=int, default=None)
     parser.add_argument("--report-interval", type=int, default=25)
     parser.add_argument(
-        "--causal", action="store_true",
-        help="Use only current/past frames for motion heading; never revise published positions or backfill from future frames.",
+        "--estimator-factory",
+        help="Required by the CLI: module:callable that accepts these arguments and returns a PoseFeedback adapter.",
     )
     args = parser.parse_args(argv)
     if not 0.0 < args.rectangle_symmetry_minimum_support <= 1.0:
@@ -1974,7 +1476,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
-    summary = run_pipeline(args)
+    if not args.estimator_factory or ":" not in args.estimator_factory:
+        raise SystemExit("Supply --estimator-factory module:callable to connect the target estimator.")
+    module_name, factory_name = args.estimator_factory.rsplit(":", 1)
+    factory = getattr(importlib.import_module(module_name), factory_name)
+    feedback = factory(args)
+    try:
+        summary = run_pipeline(args, pose_feedback=feedback)
+    finally:
+        close = getattr(feedback, "close", None)
+        if callable(close):
+            close()
     print(json.dumps(summary, indent=2, ensure_ascii=False))
     return 0
 

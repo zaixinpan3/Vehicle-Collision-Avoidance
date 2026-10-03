@@ -1,4 +1,4 @@
-"""Geometry and causal behavior of optional symmetric visible-face fitting."""
+"""Visible-face bootstrap geometry for predicted-pose rectangle fitting."""
 from pathlib import Path
 import math
 import sys
@@ -62,42 +62,17 @@ class YoloLidarRectangleTest(unittest.TestCase):
         np.testing.assert_allclose(self.fit(points), [12.5, 0.0], atol=1e-12)
         np.testing.assert_array_equal(self.fit(points), self.fit(points, "edge"))
 
-    def testRealSymmetricFitterCannotRevisePublishedPrefix(self):
+    def testFirstAcquisitionBootstrapsTheCenterBeforeFreePoseRefinement(self):
         args = perception.parse_args([
-            "--dataset", ".", "--model", "unused.pt", "--causal",
-            "--center-mode", "rectangle", "--rectangle-placement", "symmetric",
+            "--dataset", ".", "--model", "unused.pt",
             "--vehicle-length", "5", "--vehicle-width", "1.9",
-            "--rectangle-heading-step", "5", "--heading-iterations", "2",
-            "--motion-heading-minimum-displacement", "0.5",
         ])
         detection = perception.Detection("front", (0.0, 0.0, 10.0, 10.0), 0.9, 2, "car")
-        records = []
-        for index in range(10):
-            points = self.rear_face()
-            # Both dimensions are observable without an initial heading hint.
-            side = np.column_stack([np.linspace(10.0, 15.0, 41),
-                                    np.full(41, 0.85), np.ones(41)])
-            points = np.vstack([points, side])
-            points[:, 0] += 0.2 * index
-            if index >= 6:
-                points[:, 1] += 10.0
-            records.append(dict(time=0.1 * index, ego_yaw=0.0, ego_to_world=np.eye(4),
-                                clusters=[(detection, points)]))
-        short = perception.causal_track_estimates(records[:6], args)
-        long = perception.causal_track_estimates(records, args)
-        self.assertEqual(short[1], long[1][:6])
-        for expected, actual in zip(short[0], long[0][:6]):
-            self.assertTrue(expected)
-            np.testing.assert_array_equal(expected[0].relative_position, actual[0].relative_position)
-
-    def testEdgePlacementRemainsTheDefault(self):
-        args = perception.parse_args(["--dataset", ".", "--model", "unused.pt"])
-        self.assertEqual(args.rectangle_placement, "edge")
-        np.testing.assert_array_equal(
-            perception.fit_known_size_rectangle(
-                self.rear_face(), 5.0, 1.9, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0,
-            )[0], self.fit(self.rear_face(), "edge"),
-        )
+        prior = perception.PosePrior(None, 0.0, 0.0, None, "initialization")
+        estimate = perception.estimate_from_cluster(detection, self.rear_face(), args, prior)
+        self.assertIsNotNone(estimate)
+        np.testing.assert_allclose(estimate.relative_position, [12.5, 0.0], atol=1e-12)
+        self.assertEqual(estimate.rectangle["heading_constraint"], "free")
 
     def testInvalidSupportFractionIsRejected(self):
         for support in (0.0, -0.1, 1.1, float("nan")):

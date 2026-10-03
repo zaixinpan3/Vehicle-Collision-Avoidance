@@ -1,0 +1,280 @@
+{
+  "scoring": "Separate actor-truth scoring after predictions and their hashes were written; no truth during prediction or fitting.",
+  "cases": {
+    "conf_default": {
+      "validFrames": 300,
+      "validFractionOutsideBlackout": 1.0,
+      "rawAllFramesM": {
+        "rmse": 0.1868173675525516,
+        "p95": 0.3511005861211324,
+        "maximum": 0.3977766212266095
+      },
+      "rawAfter2SecondsM": {
+        "rmse": 0.20377125805456334,
+        "p95": 0.355199727244089,
+        "maximum": 0.3977766212266095
+      },
+      "rawMeanErrorXYAfter2SecondsM": [
+        0.03450751096554728,
+        -0.08367235561931834
+      ],
+      "rawRmseXYAfter2SecondsM": [
+        0.03587313123346724,
+        0.20058874361400705
+      ],
+      "rawWithin0p12MFrames": 164,
+      "missingFrames": [],
+      "fittedHeadingRmseDegAfter2Seconds": 2.563670317198981,
+      "estimatorPositionAfter2SecondsM": {
+        "rmse": 0.13939770934165616,
+        "p95": 0.23256907012873038,
+        "maximum": 0.3041086965386274
+      },
+      "estimatorVelocityAfter2SecondsMps": {
+        "rmse": 0.3374614929792156,
+        "p95": 0.6635652739722068,
+        "maximum": 1.2097350737110188
+      },
+      "allStatesFinite": true,
+      "estimatorPositionAllFramesM": {
+        "rmse": 0.15782178815030976,
+        "p95": 0.2797077037481527,
+        "maximum": 0.3580076404587692
+      },
+      "estimatorVelocityAllFramesMps": {
+        "rmse": 0.8199925446887797,
+        "p95": 1.7716279752976933,
+        "maximum": 3.3015553817727126
+      },
+      "publishedFrames": 300,
+      "initialFrame": 0,
+      "boundsUnavailableFrames": 0,
+      "gates": {
+        "targetPosition": true,
+        "targetVelocity": true,
+        "rawPositionRmse": true,
+        "rawPositionP95": true,
+        "availability": true,
+        "finiteStates": true
+      },
+      "allGatesPass": true
+    },
+    "conf_default_blackout": {
+      "validFrames": 285,
+      "validFractionOutsideBlackout": 1.0,
+      "rawAllFramesM": {
+        "rmse": 0.18633975131630728,
+        "p95": 0.3519698705175688,
+        "maximum": 0.39777662122692237
+      },
+      "rawAfter2SecondsM": {
+        "rmse": 0.2044139918047337,
+        "p95": 0.3599891001992417,
+        "maximum": 0.39777662122692237
+      },
+      "rawMeanErrorXYAfter2SecondsM": [
+        0.03480872307247837,
+        -0.08185344394468302
+      ],
+      "rawRmseXYAfter2SecondsM": [
+        0.036153094958425024,
+        0.20119153503682216
+      ],
+      "rawWithin0p12MFrames": 155,
+      "missingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "fittedHeadingRmseDegAfter2Seconds": 2.5753903025352756,
+      "estimatorPositionAfter2SecondsM": {
+        "rmse": 0.1404607055473266,
+        "p95": 0.237542603143999,
+        "maximum": 0.3034260823215502
+      },
+      "estimatorVelocityAfter2SecondsMps": {
+        "rmse": 0.33566066408646567,
+        "p95": 0.659329310943666,
+        "maximum": 1.2067880265621427
+      },
+      "allStatesFinite": true,
+      "estimatorPositionAllFramesM": {
+        "rmse": 0.15844886379227383,
+        "p95": 0.2791014038162585,
+        "maximum": 0.3580076404587692
+      },
+      "estimatorVelocityAllFramesMps": {
+        "rmse": 0.8194996368471746,
+        "p95": 1.7716279752976933,
+        "maximum": 3.3015553817727126
+      },
+      "publishedFrames": 300,
+      "initialFrame": 0,
+      "boundsUnavailableFrames": 0,
+      "estimatorMaximumPositionErrorDuringBlackoutM": 0.1553085146049719,
+      "gates": {
+        "targetPosition": true,
+        "targetVelocity": true,
+        "rawPositionRmse": true,
+        "rawPositionP95": true,
+        "availability": true,
+        "finiteStates": true
+      },
+      "allGatesPass": true
+    },
+    "dev_default": {
+      "validFrames": 300,
+      "validFractionOutsideBlackout": 1.0,
+      "rawAllFramesM": {
+        "rmse": 0.3995069485993926,
+        "p95": 0.49273966541916747,
+        "maximum": 0.5115427538862666
+      },
+      "rawAfter2SecondsM": {
+        "rmse": 0.4571754590130919,
+        "p95": 0.4953933227449293,
+        "maximum": 0.5115427538862666
+      },
+      "rawMeanErrorXYAfter2SecondsM": [
+        0.06656103984830772,
+        -0.44898719079374577
+      ],
+      "rawRmseXYAfter2SecondsM": [
+        0.06738526406856266,
+        0.4521820723007949
+      ],
+      "rawWithin0p12MFrames": 45,
+      "missingFrames": [],
+      "fittedHeadingRmseDegAfter2Seconds": 7.749361535747425,
+      "estimatorPositionAfter2SecondsM": {
+        "rmse": 0.4681935249923009,
+        "p95": 0.5417992841109931,
+        "maximum": 0.5578203163507955
+      },
+      "estimatorVelocityAfter2SecondsMps": {
+        "rmse": 0.3561179615506509,
+        "p95": 0.9096158500589558,
+        "maximum": 0.9511266918339384
+      },
+      "allStatesFinite": true,
+      "estimatorPositionAllFramesM": {
+        "rmse": 0.40577254761082265,
+        "p95": 0.5299706569299842,
+        "maximum": 0.5578203163507955
+      },
+      "estimatorVelocityAllFramesMps": {
+        "rmse": 0.8433219683112209,
+        "p95": 1.7530117289974774,
+        "maximum": 3.3849627253219765
+      },
+      "publishedFrames": 300,
+      "initialFrame": 0,
+      "boundsUnavailableFrames": 0,
+      "gates": {
+        "targetPosition": true,
+        "targetVelocity": true,
+        "rawPositionRmse": true,
+        "rawPositionP95": true,
+        "availability": true,
+        "finiteStates": true
+      },
+      "allGatesPass": true
+    },
+    "dev_default_blackout": {
+      "validFrames": 285,
+      "validFractionOutsideBlackout": 1.0,
+      "rawAllFramesM": {
+        "rmse": 0.39538540431341784,
+        "p95": 0.4927622056823044,
+        "maximum": 0.5115427538880531
+      },
+      "rawAfter2SecondsM": {
+        "rmse": 0.4560350898368969,
+        "p95": 0.4958634613905284,
+        "maximum": 0.5115427538880531
+      },
+      "rawMeanErrorXYAfter2SecondsM": [
+        0.06670024008705312,
+        -0.4475768619215899
+      ],
+      "rawRmseXYAfter2SecondsM": [
+        0.0675761245643707,
+        0.4510005216753162
+      ],
+      "rawWithin0p12MFrames": 45,
+      "missingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "fittedHeadingRmseDegAfter2Seconds": 7.720250157337439,
+      "estimatorPositionAfter2SecondsM": {
+        "rmse": 0.46580400159468,
+        "p95": 0.5417992841109931,
+        "maximum": 0.5578203163507955
+      },
+      "estimatorVelocityAfter2SecondsMps": {
+        "rmse": 0.3750651913762267,
+        "p95": 0.9096158500589558,
+        "maximum": 0.9511266918339384
+      },
+      "allStatesFinite": true,
+      "estimatorPositionAllFramesM": {
+        "rmse": 0.4039350043829382,
+        "p95": 0.5299706569299842,
+        "maximum": 0.5578203163507955
+      },
+      "estimatorVelocityAllFramesMps": {
+        "rmse": 0.8487802262060391,
+        "p95": 1.7530117289974774,
+        "maximum": 3.3849627253219765
+      },
+      "publishedFrames": 300,
+      "initialFrame": 0,
+      "boundsUnavailableFrames": 0,
+      "estimatorMaximumPositionErrorDuringBlackoutM": 0.4531261028305324,
+      "gates": {
+        "targetPosition": true,
+        "targetVelocity": true,
+        "rawPositionRmse": true,
+        "rawPositionP95": true,
+        "availability": true,
+        "finiteStates": true
+      },
+      "allGatesPass": true
+    }
+  },
+  "previousPoseVersion": {
+    "commit": "447056c8f2092e0691a27da15525436342e409b2",
+    "source": "report/ESTIMATOR_POSE_INITIALIZATION_20261003",
+    "post2SecondsPositionRmseM": {
+      "dev": 0.26475438513026056,
+      "conf": 0.06367042833454734
+    }
+  },
+  "interpretation": "The support objective was corrected to be seed-independent. Both normal-run position errors regress; uniform accuracy improvement is not demonstrated."
+}

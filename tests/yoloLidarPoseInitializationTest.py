@@ -1,9 +1,13 @@
 """Predicted poses initialize a free geometric fit without becoming observations."""
 from pathlib import Path
-import copy
+import contextlib
+import io
 import math
 import sys
+import tempfile
+import types
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -42,8 +46,8 @@ class PoseFeedback:
 class YoloLidarPoseInitializationTest(unittest.TestCase):
     def setUp(self):
         self.args = perception.parse_args([
-            "--dataset", ".", "--model", "unused.pt", "--causal",
-            "--center-mode", "rectangle", "--vehicle-length", "5", "--vehicle-width", "1.9",
+            "--dataset", ".", "--model", "unused.pt",
+            "--vehicle-length", "5", "--vehicle-width", "1.9",
         ])
         self.det = perception.Detection("front", (0.0, 0.0, 10.0, 10.0), 0.9, 2, "car")
 
@@ -56,7 +60,7 @@ class YoloLidarPoseInitializationTest(unittest.TestCase):
         points = rectangle_points([12.5, 0.2], 0.1)
         initial = np.asarray([12.8, 0.7, 0.25])
         original = initial.copy()
-        center, fit = fit_rectangle_pose(points, initial, 5.0, 1.9)
+        center, fit = fit_rectangle_pose(points, initial, 5.0, 1.9, support_quantile=0.0)
         np.testing.assert_allclose(center, [12.5, 0.2], atol=2e-4)
         self.assertAlmostEqual(fit["heading_rad"], 0.1, delta=2e-4)
         self.assertLess(fit["objective"], fit["seed_objective"] * 1e-4)
@@ -66,7 +70,7 @@ class YoloLidarPoseInitializationTest(unittest.TestCase):
         points = rectangle_points([15.0, -1.0], -0.2)
         for seed in [[15.4, -0.6, -0.05], [14.7, -1.3, -0.35]]:
             with self.subTest(seed=seed):
-                center, fit = fit_rectangle_pose(points, np.asarray(seed), 5.0, 1.9)
+                center, fit = fit_rectangle_pose(points, np.asarray(seed), 5.0, 1.9, support_quantile=0.0)
                 np.testing.assert_allclose(center, [15.0, -1.0], atol=2e-4)
                 self.assertAlmostEqual(fit["heading_rad"], -0.2, delta=2e-4)
 
@@ -80,7 +84,7 @@ class YoloLidarPoseInitializationTest(unittest.TestCase):
     def testCurrentBodyPoseIsUsedWithoutAnExtraEgoRotation(self):
         records = self.records(1)
         result, _, _ = perception.estimator_track_estimates(
-            records, self.args, PoseFeedback(), pose_initialization=True)
+            records, self.args, PoseFeedback())
         fit = result[0][0].rectangle
         np.testing.assert_allclose(fit["prediction_initial_pose"], [12.8, 0.7, 0.25])
         np.testing.assert_allclose(result[0][0].relative_position, [12.5, 0.2], atol=3e-4)
@@ -91,7 +95,7 @@ class YoloLidarPoseInitializationTest(unittest.TestCase):
         records[1]["clusters"] = []
         feedback = PoseFeedback()
         result, _, _ = perception.estimator_track_estimates(
-            records, self.args, feedback, pose_initialization=True)
+            records, self.args, feedback)
         self.assertEqual([(e[0], e[1]) for e in feedback.events],
                          [("predict", 0), ("update", 0), ("predict", 1), ("update", 1),
                           ("predict", 2), ("update", 2)])
@@ -102,9 +106,9 @@ class YoloLidarPoseInitializationTest(unittest.TestCase):
     def testPoseModePreservesThePrefixWithoutLookingAtFutureMeasurements(self):
         short_records = self.records(3)
         records = self.records(6)
-        records[3:][0]["clusters"] = []
-        short = perception.estimator_track_estimates(short_records, self.args, PoseFeedback(), pose_initialization=True)
-        long = perception.estimator_track_estimates(records, self.args, PoseFeedback(), pose_initialization=True)
+        records[3]["clusters"] = []
+        short = perception.estimator_track_estimates(short_records, self.args, PoseFeedback())
+        long = perception.estimator_track_estimates(records, self.args, PoseFeedback())
         for before, after in zip(short[0], long[0]):
             np.testing.assert_array_equal(before[0].relative_position, after[0].relative_position)
 
@@ -112,7 +116,7 @@ class YoloLidarPoseInitializationTest(unittest.TestCase):
         feedback = PoseFeedback()
         feedback.predict = lambda frame, time: perception.PosePrior(None, 0.12, time, None, "initialization")
         result, _, _ = perception.estimator_track_estimates(
-            self.records(1), self.args, feedback, pose_initialization=True)
+            self.records(1), self.args, feedback)
         np.testing.assert_allclose(result[0][0].relative_position, [12.5, 0.2], atol=3e-4)
 
     def testMalformedStaleAndAlreadyUpdatedPriorsAreRejectedBeforeUpdate(self):
@@ -121,17 +125,89 @@ class YoloLidarPoseInitializationTest(unittest.TestCase):
             perception.PosePrior((1.0, 2.0), 0.0, -0.02, -0.04, "prediction"),
             perception.PosePrior((1.0, 2.0), 0.0, 0.0, 0.0, "prediction"),
             perception.PosePrior(None, 0.0, 0.0, -0.02, "prediction"),
+            perception.PosePrior((1.0, 2.0), float("nan"), 0.0, -0.02, "prediction"),
+            perception.PosePrior((1.0, 2.0), 0.0, 0.0, None, "prediction"),
+            None,
         ]
         for prior in priors:
             feedback = PoseFeedback()
             feedback.predict = lambda frame, time: prior
             with self.subTest(prior=prior), self.assertRaises(ValueError):
-                perception.estimator_track_estimates(self.records(1), self.args, feedback, pose_initialization=True)
+                perception.estimator_track_estimates(self.records(1), self.args, feedback)
             self.assertEqual(feedback.events, [])
 
-    def testHeadingLockAndPoseInitializationCannotBeRequestedTogether(self):
-        with self.assertRaisesRegex(ValueError, "either"):
+    def testThePipelineCannotRunWithoutItsEstimator(self):
+        with self.assertRaises(TypeError):
+            perception.run_pipeline(self.args)
+        with self.assertRaisesRegex(ValueError, "requires an estimator"):
+            perception.run_pipeline(self.args, pose_feedback=None)
+
+    def testRemovedHeadingLockAndModeFlagsAreRejected(self):
+        with self.assertRaises(TypeError):
             perception.run_pipeline(self.args, heading_feedback=PoseFeedback(), pose_feedback=PoseFeedback())
+        for flag in ["--causal", "--heading-iterations", "--center-mode", "--rectangle-placement"]:
+            with self.subTest(flag=flag), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                perception.parse_args(["--dataset", ".", "--model", "unused.pt", flag])
+
+    def testRepeatedTimestampsCannotAdvanceTheEstimatorTwice(self):
+        records = self.records(2)
+        records[1]["time"] = records[0]["time"]
+        feedback = PoseFeedback()
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            perception.estimator_track_estimates(records, self.args, feedback)
+        self.assertEqual(len(feedback.events), 2)
+
+    def testPointsCanOverrideBothComponentsOfThePredictedCenter(self):
+        records = self.records(1)
+        records[0]["clusters"] = [(self.det, rectangle_points([13.2, -0.1], 0.3))]
+        result, _, _ = perception.estimator_track_estimates(records, self.args, PoseFeedback())
+        np.testing.assert_allclose(result[0][0].relative_position, [13.2, -0.1], atol=3e-4)
+        self.assertAlmostEqual(result[0][0].rectangle["heading_rad"], 0.3, delta=3e-4)
+
+    def testCurrentGeometryDeterminesSupportWhenSeedAndFitSeeDifferentAxes(self):
+        points = rectangle_points([12.5, 0.2], 0.1)
+        _, fit = fit_rectangle_pose(points, np.asarray([12.7, 0.3, -0.2]), 5.0, 1.9,
+                                    support_quantile=0.0)
+        # At the observed pose both full axes have support, whatever axis the seed suggested.
+        np.testing.assert_allclose(fit["symmetry_weights"], [1.0, 1.0], atol=1e-3)
+        self.assertAlmostEqual(fit["heading_rad"], 0.1, delta=3e-4)
+
+    def testTheCliRequiresEstimatorWiringAndClosesItOnFailure(self):
+        base = ["--dataset", ".", "--model", "unused.pt"]
+        with self.assertRaisesRegex(SystemExit, "estimator-factory"):
+            perception.main(base)
+        backend = PoseFeedback()
+        closed = []
+        backend.close = lambda: closed.append(True)
+        module = types.SimpleNamespace(create=lambda args: backend)
+        with patch.object(perception.importlib, "import_module", return_value=module), \
+                patch.object(perception, "run_pipeline", side_effect=RuntimeError("sensor failed")), \
+                self.assertRaisesRegex(RuntimeError, "sensor failed"):
+            perception.main(base + ["--estimator-factory", "test_adapter:create"])
+        self.assertEqual(closed, [True])
+
+    def testDefaultPipelineRefinesThePredictedPoseWithoutSelectingAMethod(self):
+        transform = {"matrix": np.eye(4).tolist()}
+        metadata = {"sensors": {"cameras": [{"id": "front", "width": 100, "height": 100,
+                    "fov": 90, "transform": transform}], "lidar": {"transform": transform}}}
+        frame = {"frame": 0, "time": 0.0, "ego_transform": transform,
+                 "sensors": {"lidar": {"transform": transform, "path": "unused.npy"},
+                             "cameras": {"front": {"path": "unused.png"}}}}
+        points = rectangle_points([12.5, 0.2], 0.1)
+        detector = types.SimpleNamespace(detect=lambda *args: [self.det])
+        backend = PoseFeedback()
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(perception, "load_json", return_value=metadata), \
+                patch.object(perception, "iter_jsonl", return_value=[frame]), \
+                patch.object(perception, "load_lidar_points", return_value=points), \
+                patch.object(perception, "associate_detection_points", return_value=points), \
+                patch.object(perception, "UltralyticsCarDetector", return_value=detector), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.args.output = Path(folder)
+            summary = perception.run_pipeline(self.args, pose_feedback=backend)
+        self.assertEqual(summary["tracking_method"], "predicted pose initialization")
+        self.assertEqual(summary["valid_count"], 1)
+        np.testing.assert_allclose(backend.events[-1][2], [12.5, 0.2], atol=3e-4)
 
 
 if __name__ == "__main__":

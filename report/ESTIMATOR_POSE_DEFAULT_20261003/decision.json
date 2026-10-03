@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-10-03T15:57:59.791747-05:00",
+  "baselineCommit": "447056c8f2092e0691a27da15525436342e409b2",
+  "decision": "Make predicted-pose rectangle fitting the sole perception/estimator pipeline. Require estimator integration; remove locked-heading and track-motion alternatives. Keep first-acquisition center bootstrap inside the free pose method.",
+  "validation": "32 Python behavior tests, including default full-pipeline wiring and free pose correction; four cached actual detections/native-cloud/actual MATLAB replays, independently scored. No new YOLO inference or CARLA access.",
+  "exclusions": "Preserve concurrent controller, theory, manuscript and report edits; preserve past experiment artifacts as historical observations.",
+  "steeringAt": "2026-10-03T16:01:17.249947-05:00",
+  "additionalUserDecision": "The extrapolated pose is only the numerical starting value; current target LiDAR points decide the best rectangle. Removed seed-fixed support-axis selection. Symmetry support weights now depend on the current candidate and point cloud with a continuous coverage ramp, not the seed."
+}
