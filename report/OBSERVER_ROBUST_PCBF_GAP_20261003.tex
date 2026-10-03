@@ -1,0 +1,180 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,tabularx,hyperref,xurl}
+\usepackage[T1]{fontenc}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\title{Observer-derived uncertainty and robust predictive safety: implementation gap}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+\textbf{Research objective.} Convert multistage observer stability estimates into
+time-varying uncertainty sets, propagate those sets over the planning horizon,
+and use them in one output-feedback robust predictive CBF with one CLF for
+nominal path following. The current implementation does not complete this chain.
+The existing controller is a certainty-equivalent numerical baseline. The
+observer-side enclosure work is substantial, but is disconnected from its safety
+optimization. This audit does not implement the missing controller.
+
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+Link & Evidence and current status \\
+\midrule
+Observer certificate & \texttt{nrmmObserverCertificate} supplies a positive triangular ISS comparison. The production observer is a modified NRMM cascade, not a literal unchanged copy of Sharma. \\
+Current uncertainty & \texttt{nrmmPositionErrorBound} propagates conditional enclosures including held measurements, dropout and numerical trajectory defects. \texttt{nrmmControllerErrorBounds} publishes timestamped ego/target bounds, explicitly with \texttt{futurePredictionIncluded=false}. \\
+Controller admission & \texttt{readControllerInputs} consumes point estimates and geometry, not these bound fields. The entry point fixes a target epoch and rejects subsequent estimated-trajectory corrections. \\
+Horizon propagation & The controller predicts one ego trajectory and one target trajectory. No observer-initialized uncertainty tube is present. \\
+Robust collision rows & \texttt{localSafetyRows} subtracts the fixed 0.20-m buffer from nominal dual rows. There is no support-function tightening over an observer-derived set. \\
+Recursive guarantee & Metadata explicitly says \texttt{notCertifiedForNonlinearPlant}. The terminal core and inherited budgets have no complete uncertainty-set shift proof. \\
+Experiment & The current campaign supplies ego successors and a fixed known target epoch, with no observer, measurement noise or delay. It does not test the proposed contribution. \\
+\bottomrule
+\end{tabularx}
+
+\textbf{Behavioral verification.} For the same 8-m/s head-on initial state,
+adding valid-shaped ego/target certificate fields with all component radii
+0.001 or 1 in their respective SI units changes neither the first command nor
+any predicted input: both differences are exactly zero. Marking the certificate
+unavailable with infinite bounds still returns the identical command. Advancing
+one sample and correcting the target position by only 0.001 m raises
+\texttt{changedTargetTrajectory}. This directly verifies the missing consumer
+and the fixed-trajectory restriction. These metadata probes are not a full
+observer-driven avoidance experiment. All 42 tests across
+\texttt{nrmmCascadeCertificateTest}, \texttt{nrmmControllerErrorBoundsTest} and
+\texttt{nrmmPositionErrorBoundTest} pass; they support the observer components,
+not the absent closed-loop safety theorem.
+
+\textbf{What Sharma supplies.} Sharma, Alai and Rajamani, \emph{Simultaneous
+ego-vehicle state estimation and vehicle trajectory tracking using a multistage
+high gain observer}, Transportation Research Part C 182 (2026), 105411,
+\href{https://doi.org/10.1016/j.trc.2025.105411}{doi:10.1016/j.trc.2025.105411},
+was examined from the local PDF. Assumption 1 on page 6 introduces zero signal
+jerks for the original ego companion model. Theorem 1 on page 7 gives exponential
+estimation stability under its Lipschitz/LMI conditions. Theorem 2 on page 8
+states an $H_\infty$ disturbance-rejection result for the yaw observer and
+$L_2$-bounded disturbances. Neither statement alone specifies an online,
+pointwise, deterministic footprint enclosure under sampled noisy measurements.
+Those conditions must be derived for the actual observer and its disturbance
+model. A Gaussian noise distribution has no finite deterministic amplitude
+bound; a deterministic guarantee needs a declared bounded-error contract, or
+the claim must instead be probabilistic.
+
+\textbf{Required mathematical connection.} The following is a proposed contract,
+not a theorem for the present software. Let $\chi$ collect certified observer
+error measures and suppose an established comparison gives
+\[
+ D^+\chi\le H\chi+d(t),\qquad \chi(t_0)\le b_0,
+ \qquad
+ b(t)=e^{H(t-t_0)}b_0+\int_{t_0}^t e^{H(t-s)}d(s)\,ds,
+\]
+where $H$ is Metzler. Then positivity gives $\chi(t)\le b(t)$. The physical
+coordinate conversion must yield a timestamped joint set
+\[
+ z_k\in\mathcal Z_k=\hat z_k\oplus\mathcal E_k.
+\]
+Its state includes ego pose/velocity, target pose/motion parameters and input
+memory as needed. Common ego yaw and position errors should be retained when
+possible: independent absolute-position boxes lose correlation in relative
+collision geometry. Certificate availability, timing, initial bounds, model
+domain and sampling premises are part of this mathematical input contract.
+The existing output bounds are reusable starting material, not future tubes.
+
+For each proposed input, propagate a true outer reachable set:
+\[
+ \mathcal Z_{i+1|k}\supseteq
+ F_h(\mathcal Z_{i|k},u_{i|k},\Theta_k,\mathcal W_i).
+\]
+The target's constant tangential acceleration and sideslip belong to the
+uncertain but horizon-constant parameter set $\Theta_k$, rather than being
+silently exact. A linearized representation can preserve one model construction:
+\[
+ \mathcal E_{i+1|k}\supseteq
+ A_i\mathcal E_{i|k}\oplus G_i\Delta\Theta_k
+ \oplus\mathcal W_i\oplus\mathcal R_i.
+\]
+For rigor, static parameter correlation can be retained by augmenting the state.
+$\mathcal R_i$ must enclose the nonlinear residual over the entire admitted
+state/input region, including both optimized displacement from the anchor and
+estimation uncertainty. Discretization/hold errors must also be enclosed for a
+continuous-plant claim. The existing 10-mm error comparison between two point
+trajectories does not bound this setwise residual. During open-loop prediction
+there are no future measured innovations; continuing observer contraction as
+though those corrections were already available is not justified.
+
+Let $g_j(z)\ge0$ express a chosen rectangle separation condition including the
+physical clearance $d_0$. For a fixed separating direction and certified lower
+approximation, a sufficient robust row is
+\[
+ \widehat g_{j,i}(\Delta z_i)
+ -\sigma_{\mathcal E_{i|k}}(-a_{j,i}^{\mathsf T})
+ -r_{j,i}^{\rm geom}-r_{j,i}^{\rm hold}\ge0,
+ \qquad \sigma_{\mathcal E}(v)=\sup_{e\in\mathcal E}v^{\mathsf T}e,
+\]
+where $a_{j,i}$ is the state derivative of the separation function and the two
+remainders bound geometric linearization and between-node motion. These terms
+must be certified on the same sets used by prediction. Boxes or ellipsoids give
+inexpensive support evaluations, retaining a convex problem when directions and
+valid remainder bounds are fixed for that local solve. A fixed user clearance
+such as 20 cm remains a physical design buffer; it does not replace these
+state-, time- and direction-dependent uncertainty contributions.
+
+\textbf{Recursive feasibility is a set statement.} When a new observer estimate
+arrives, recenter the uncertainty representation and preserve a valid inclusion,
+for example
+\[
+ \mathcal Z_{k+1}\subseteq
+ \operatorname{Reach}_h(\mathcal Z_k,u_k)\cap
+ \mathcal Z^{\rm obs}_{k+1},
+\]
+while retaining containment of truth. One constructive choice is the exact
+intersection; any computational representation must preserve both necessary
+inclusion and true-state containment. Arbitrarily reboxing after an intersection
+can destroy the inclusion needed by a shift proof. The same requirement applies
+to target-parameter updates. The shifted robust plan and its terminal set must
+remain admissible for every state in the successor set. A nominal endpoint
+ellipsoid or a single predicted target crossing a 30-m threshold cannot close
+this proof for an uncertain target. A robust terminal continuation or a proven
+post-conflict condition is required. This is part of one controller's terminal
+construction, not a separate executable backup controller.
+
+PCBF restoration can still minimize nonnegative safety slack and then optimize
+CLF slack under a safety budget. A zero-slack robust witness can support hard
+safety; positive physical collision slack cannot itself certify avoidance.
+An inherited budget requires a robustly transferable witness and the uncertainty
+update inclusion above. It cannot inherit the nominal proof merely by retaining
+old slack numbers. Solver tolerances and any modeled remainder reserves must be
+accounted for explicitly in the hard-safety statement.
+
+\textbf{One CLF and the performance claim.} Retain a single path/speed reference
+and a single CLF. Robust safety has priority; CLF slack expresses the remaining
+performance freedom. A true-state decrease claim additionally needs a robust
+or disturbance-compensated inequality for that same CLF. With persistent
+nonzero estimation/model error, the natural claim is practical or ISS recovery;
+exact asymptotic nominal recovery needs corresponding vanishing-error and
+zero-slack conditions. Minimizing CLF slack is also not literally the same
+objective as minimizing $\|u-u_{\rm nominal}\|$: the current tie term penalizes
+input changes relative to the linearization anchor. A manuscript should specify
+which intervention measure is minimized rather than conflate these objectives.
+
+\textbf{Implementation and validation order.} First define and consume the
+existing timestamped joint uncertainty contract, permitting corrected target
+estimates. Second implement horizon outer propagation and setwise nonlinear
+remainders. Third insert support-function collision tightening, including hold
+coverage, and a compatible robust terminal/shift construction. Preserve the
+single-controller, single-CLF and local RTI structure where these requirements
+can be met. Finally run sensor-driven observer/controller experiments that
+separately record current-set containment, predicted-tube containment, actual
+clearance, CLF recovery and whole-call runtime. Zero uncertainty should reduce
+to the corresponding nominal formulation; increasing uncertainty must never
+relax the robust rows. No truth state or future realized sensor sample may enter
+the online controller. Passing the existing fourteen exact-state cases remains
+a baseline result, not evidence that this integration is complete.
+
+\textbf{Scope of this work.} Only the architecture description and this audit
+are changed. The production observer/controller algorithms, manuscript and
+pre-existing working-tree theory edits are untouched. Interface probes, 42 test
+results and source/PDF hashes are under
+\path{report/OBSERVER_ROBUST_PCBF_GAP_20261003/}. The comparison, propagation,
+robust-geometry and recursive-feasibility conditions above define the missing
+research work; they do not claim it has been implemented or proved.
+\end{document}

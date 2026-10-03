@@ -1,0 +1,296 @@
+[
+  {
+    "Name": "nrmmCascadeCertificateTest/sensorInputErrorAndYawRateDomainCompose",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 2.871845
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/parallelYawObserverRetainsASeparateOrientationCertificate",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.517821
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/coreHasNoYawInputOrCoupling",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.384698
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/velocityDisturbanceBoundAssembles",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.3041429999999998
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/targetDisturbanceBoundAssembles",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.291034
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/coreComparisonInputAssembles",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.271201
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/copositiveDerivativeIdentityHoldsPointwise",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.260058
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/coreExcludesOutputFilter",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.285574
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/ultimateBoundsIncreaseWithNoiseBounds",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 3.895896
+  },
+  {
+    "Name": "nrmmCascadeCertificateTest/containmentScopeDeclaresEstimatedStatesOnly",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.4147629999999998
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/reconstructedWorldStateIsContainedAcrossRotationsAndPeaking(geometry=rotated)",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.77713
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/reconstructedWorldStateIsContainedAcrossRotationsAndPeaking(geometry=angleBranch)",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.003038
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/reconstructedWorldStateIsContainedAcrossRotationsAndPeaking(geometry=velocityPeaking)",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.00433
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/reconstructedWorldStateIsContainedAcrossRotationsAndPeaking(geometry=nearZeroVelocity)",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.002104
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/freshVelocityBoundsRetainDirectionalInformation",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.048599
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/anExactNrmmTargetPublishesTheNrmmContract",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.022101
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/thePublishedParameterBoundsContainTheTruthAndBeatTheBox(geometry=rotated)",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.005981
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/thePublishedParameterBoundsContainTheTruthAndBeatTheBox(geometry=angleBranch)",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.002132
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/thePublishedParameterBoundsContainTheTruthAndBeatTheBox(geometry=velocityPeaking)",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.00164
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/thePublishedParameterBoundsContainTheTruthAndBeatTheBox(geometry=nearZeroVelocity)",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.001153
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/aModelErrorPublishesNoMotionContract",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.005626
+  },
+  {
+    "Name": "nrmmControllerErrorBoundsTest/staleVelocityRequiresAnAccelerationEnvelope",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.09619399999999999
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/changingForcingAndRadarModeRetainsTheExactComparisonFlow",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 2.386492
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/noisyTrajectoryIsContainedWithOnlyExistingDomainBounds",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.981738
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/declaredIntersampleEnvelopesReduceThePositionRadius",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.728398
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/dropoutPredictionRemainsFiniteAndContainsTruth",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.849975
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/currentBoundUsesThePredictedStateTimestamp",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.158217
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/aHeldGyroWithoutRateInformationUsesTheWholeDomain",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.140857
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/finiteInputRatesGiveAnExplicitHoldErrorEnvelope",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.137237
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/acceptedStepDefectsCoverTheEntireInterpolatingPath",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.017463
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/yawBranchCrossingDoesNotEnterTheNumericalCore",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.004705
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/largeInitialErrorsRemainContainedThroughHighGainPeaking",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.294159
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/oneStepPerSensorIntervalRetainsContainmentThroughPeaking",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.788019
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/inconsistentRadarDisablesTheTargetBound",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.132738
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/anInvalidEgoBoundCannotBeRepairedByResettingTheTarget",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.117756
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/reacquisitionRestartsTheTargetEnclosureAndPreservesEgo",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.121958
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/measurementUpdatesRejectStaleTimestamps",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.157523
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/exactKnownStraightMotionKeepsANumericallySmallEnclosure",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.906642
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/adapterRespectsVectorNoiseRadiiAndPublishesTheOnlineBound",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 1.803389
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/aFreshMeasurementTightensThePublishedEgoBound",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.129039
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/invalidEgoCertificatesAreUnavailableForControl",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.117791
+  },
+  {
+    "Name": "nrmmPositionErrorBoundTest/controllerBoundsRetainTheObserverStateTimestamp",
+    "Passed": true,
+    "Failed": false,
+    "Incomplete": false,
+    "Duration": 0.23344399999999998
+  }
+]

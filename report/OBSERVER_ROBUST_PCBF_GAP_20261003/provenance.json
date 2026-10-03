@@ -1,0 +1,80 @@
+{
+  "recordedAt": "2026-10-03T14:31:29.299281-05:00",
+  "parentHead": "e10f5ba5f80b3d2096ab0e43e8240aa2c589db9e",
+  "sources": [
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "fa27cb862347686aaecf800af51a20930d0ed550cc18d1d851a093b4d35a5242"
+    },
+    {
+      "path": "controller/readControllerInputs.m",
+      "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a"
+    },
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "8344c276c71be91044030e346dea29c98a2dfe2888507bb9cbfc56c31966edc5"
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "350c98b9cb5475ddc883c6d90b4aab060d742a0c353f64f366b60bf48de8fb7a"
+    },
+    {
+      "path": "estimator/nrmmObserverCertificate.m",
+      "sha256": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308"
+    },
+    {
+      "path": "estimator/nrmmPositionErrorBound.m",
+      "sha256": "5b6fe45f7924c611c6af948038bf16b059fbb76ece1aba571f7d6f420ffbebb5"
+    },
+    {
+      "path": "estimator/nrmmControllerErrorBounds.m",
+      "sha256": "48bfd1208c4ecc5a1dd20b74364895da9b9d71a9ad66e060fdd35ef80f8280cc"
+    },
+    {
+      "path": "estimator/onlineNrmmTrackingRuntime.m",
+      "sha256": "61a4737a086c076f732ce61705253268f0e66367e30c54647bac7069da91ac05"
+    },
+    {
+      "path": "estimator/OBSERVER_ISS_THEORY.md",
+      "sha256": "5ba71904b3f5d460ca48dc8afb1e535f1fa08c031ee9bc56f773f7152266aff7"
+    },
+    {
+      "path": "report/NRMM_IMPLEMENTATION_NOTES.md",
+      "sha256": "26c07f285a90263a33277e40d1f0f025c917298ada94bf61f698f9f8615663f3"
+    },
+    {
+      "path": "paper/manuscript.tex",
+      "sha256": "f8180ece4f428cd86b30fe62d9e747dcefc8da1656c28f2425beea4c4bb5e61a"
+    },
+    {
+      "path": "scripts/nrmmEstimatorControllerAdapter.m",
+      "sha256": "fa1555c793dcab141965f9ad06b0c9a0406b3c310768ba1ccb275ec38ac7ccf9"
+    },
+    {
+      "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "6f8b961a2e8eb8fcf81340a4a4c3f99e5e87e57df7853814f4a3266550b879cc"
+    },
+    {
+      "path": "reference/Sharma et al. - 2026 - Simultaneous ego-vehicle state estimation and vehicle trajectory tracking using a multistage high ga.pdf",
+      "sha256": "f8414de25dd6bfa1d65ed4c4681d57b692bf5837622a5e2fbee7bafff4f03621"
+    }
+  ],
+  "methods": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/observer-pcbf-gap-20261003/auditObserverInterface.m",
+      "sha256": "e85515919c78b41732f6136d5a15291cb31d6695bd750584a870b54f49d55f49"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/observer-pcbf-gap-20261003/writeReport.py",
+      "sha256": "58e0a8dfc778c5b22df9a4fd583bcf540ab1e941cfbdccbb2f4f8a55f5e66836"
+    }
+  ],
+  "commands": [
+    "pdftotext -layout on the local Sharma et al. paper; examined Assumption 1 and Theorems 1-2 on PDF pages 6-8.",
+    "matlab -singleCompThread -batch \"run('/home/zai/.cache/collisionAvoidance/observer-pcbf-gap-20261003/auditObserverInterface.m');\"",
+    "python3 /home/zai/.cache/collisionAvoidance/observer-pcbf-gap-20261003/writeReport.py"
+  ],
+  "scope": "Source and behavioral gap analysis plus a proposed integration contract. No robust controller implementation, new fourteen-case campaign, or physical safety theorem is claimed.",
+  "paperVerification": "Local original PDF used. DOI 10.1016/j.trc.2025.105411 could not be opened by the web tool; no external full-text claims used.",
+  "deliberateExclusions": "Pre-existing edits to estimator/OBSERVER_ISS_THEORY.md, report/NRMM_IMPLEMENTATION_NOTES.md and report/README.md remain untouched and uncommitted. Manuscript, PDF and dependencies are read-only evidence, not modified artifacts."
+}

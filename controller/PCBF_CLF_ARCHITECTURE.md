@@ -6,6 +6,14 @@ A continuation frame first attempts CLF optimization under an inherited slack
 budget. A bounded input-increment tie term regularizes the future plan. There is no third optimization stage, target-range
 CLF switch, direct nominal-feedback command, or executable backup.
 
+The current implementation is a certainty-equivalent research baseline. It
+does not consume the NRMM observer's timestamped error enclosures, propagate
+uncertainty over its horizon, or certify an output-feedback robust PCBF.
+Its fixed node margin and model-agreement thresholds do not supply that
+missing guarantee. The source and runtime audit, and the mathematical
+integration requirements, are recorded in
+[the observer-to-PCBF gap analysis](../report/OBSERVER_ROBUST_PCBF_GAP_20261003.tex).
+
 ## Prediction and initialization
 
 The Fiala bicycle state is `x = [px; py; yaw; vx; vy; yawRate]` and its input is
