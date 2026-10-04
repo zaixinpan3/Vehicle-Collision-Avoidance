@@ -3,10 +3,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % Startup uses a potential-field rollout and later samples the shifted plan.
 % The horizon extends until the anchor reaches the terminal set: beyond the
 % perception radius of the target and separating from it, inside the road.
-% The PCBF stage minimizes prefix safety slack, then the CLF stage runs. A
-% shifted problem without a primary point, with restorable positive slack, or
-% without a CLF result is re-solved once from a fresh potential-field rollout.
-% A frame that still has no solution reports it. Solved plans are issued directly.
+% The PCBF stage minimizes prefix safety slack, then the CLF stage runs. When
+% the shifted problem is infeasible inside the linearization trust region, it
+% is solved once more from a fresh potential-field rollout. Any other failure,
+% or a fresh problem without a solution, is reported. Plans are issued directly.
 % The input trust scale is an estimate, not a fixed setting: the next
 % posterior measures how far the previous plan's prediction was from the
 % nonlinear rollout of its own inputs (the plan innovation), and the
@@ -108,35 +108,18 @@ function [solution,search,model] = localRound(model,previousState,timer)
     attempts=localAttempt(search);stages=search.stages;selected=1;restarted=false;
     cfg=model.cfg;freshSource="movingTargetPotentialField";
     if isempty(model.target),freshSource="laneFeedbackRollout";end
-    % The shifted plan is re-solved once from a fresh potential-field rollout
-    % when its primary has no point or more than the unavoidable slack.
-    needsFresh=isempty(point) || (~model.robustnessRelaxation ...
-        && search.primaryOptimum>problem.primaryLowerBound+cfg.solver.feasibilityTolerance);
-    if source=="shiftedInputRollout" && needsFresh && toc(timer)<cfg.solver.timeLimitSeconds
-        failure=search.terminationReason;if ~isempty(point),failure="positiveRestorablePcbfSlack";end
-        wall=tic;freshAnchor=localPotentialFieldSeed(model,cfg.controller.horizonSteps,cfg.controller.maximumHorizonSteps);
-        [freshPoint,freshProblem,freshSearch,freshModel]=localPrimary(freshAnchor,model,freshSource,timer);
-        freshSearch.initializationSeconds=toc(wall);restarted=true;
-        attempts(end+1)=localAttempt(freshSearch);stages=[stages,freshSearch.stages];
-        % Ties retain the shifted plan.
-        if isempty(point) || (~isempty(freshPoint) && freshSearch.primaryOptimum ...
-                <search.primaryOptimum-cfg.solver.lexicographicTieTolerance)
-            point=freshPoint;problem=freshProblem;search=freshSearch;model=freshModel;anchor=freshAnchor;selected=numel(attempts);
-        end
+    % Infeasible inside the linearization trust region: the solver certifies
+    % primal infeasibility of the primary problem around the shifted plan.
+    infeasible=isempty(point) && ~isempty(search.stages) && search.stages(end).exitFlag==-2;
+    if source=="shiftedInputRollout" && infeasible && toc(timer)<cfg.solver.timeLimitSeconds
+        failure="shiftedProblemInfeasible";
+        wall=tic;anchor=localPotentialFieldSeed(model,cfg.controller.horizonSteps,cfg.controller.maximumHorizonSteps);
+        [point,problem,search,model]=localPrimary(anchor,model,freshSource,timer);
+        search.initializationSeconds=toc(wall);restarted=true;
+        attempts(end+1)=localAttempt(search);stages=[stages,search.stages];selected=numel(attempts);
     end
     [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
     stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
-    % A shifted plan whose CLF stage returns no point uses the fresh rollout.
-    if isempty(solution) && ~restarted && source=="shiftedInputRollout" ...
-            && search.terminationReason=="clfNoNumericalResult" && toc(timer)<cfg.solver.timeLimitSeconds
-        failure=search.terminationReason;
-        wall=tic;anchor=localPotentialFieldSeed(model,cfg.controller.horizonSteps,cfg.controller.maximumHorizonSteps);
-        [point,problem,search,model]=localPrimary(anchor,model,freshSource,timer);
-        search.initializationSeconds=toc(wall);attempts(end+1)=localAttempt(search);stages=[stages,search.stages];
-        selected=numel(attempts);restarted=true;
-        [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
-        stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
-    end
     search.attempts=attempts;search.selectedAttempt=selected;search.stages=stages;
     search.solverCalls=sum([stages.numericalSolve]);search.potentialFieldRestarted=restarted;
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);

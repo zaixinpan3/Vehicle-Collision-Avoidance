@@ -117,7 +117,8 @@ CLF optimization.
 The completed CLF optimizer point is issued directly; it is not replayed through
 the nonlinear model or damped.
 A frame uses the shifted previous plan, or a potential-field rollout at
-startup; a failed shift is re-solved once from a fresh potential-field rollout.
+startup; a shifted problem infeasible inside the trust region is re-solved once
+from a fresh potential-field rollout.
 A frame still without a solution reports it; no enlarged box follows. See
 [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 

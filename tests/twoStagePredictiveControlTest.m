@@ -123,7 +123,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             search=problem.metadata.search;
             testCase.verifyTrue(search.potentialFieldRestarted);
-            testCase.verifyEqual(search.initializationFailure,"pcbfNoNumericalResult");
+            testCase.verifyEqual(search.initializationFailure,"shiftedProblemInfeasible");
+            testCase.verifyEqual(search.attempts(1).stages(1).exitFlag,-2);
             % The retained target forecast selects the moving-target field.
             testCase.verifyEqual(search.attempts(end).initialization,"movingTargetPotentialField");
             testCase.verifyEqual(search.linearizationCount,2);
