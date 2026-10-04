@@ -19,11 +19,12 @@ Each sample builds one nonlinear anchor: a potential-field rollout at startup,
 otherwise the shifted previous plan extended by path guidance. The rollout stops
 at the first node of the terminal set, between `horizonSteps` and
 `maximumHorizonSteps`. The anchor is linearized once; the PCBF stage minimizes
-prefix safety slack and the CLF stage follows. The completed CLF result is issued
-directly, without a nonlinear replay or agreement test. If the shifted plan cannot
-be rolled out or either stage returns no numerical result, the controller reports
-`noOptimizationSolution`. There is no fallback seed, retry, enlarged input box,
-inherited slack budget or alternate controller. The input trust scale is estimated
+prefix safety slack and the CLF stage follows. A shifted problem without a
+primary point, with restorable positive slack, or without a CLF result is solved
+once more from a fresh potential-field rollout. The completed CLF result is
+issued directly, without a nonlinear replay or agreement test. An unusable shift,
+or a frame still without a result, reports `noOptimizationSolution`. There is no
+enlarged input box, inherited slack budget or alternate controller. The input trust scale is estimated
 from the next posterior's plan innovation. Positive PCBF slack still denotes
 relaxation.
 
@@ -84,8 +85,8 @@ zero multipliers and translation invariance. Overlap has no imposed direction.
 target ranges, primary priority, affine dynamics with consistent anchors,
 braking bounds, input increments distinct from physical steering limits,
 positive-slack reporting, the terminal set (perception-radius exit, separating
-speed, road rectangle), the shortest target-free horizon, and that an
-infeasible problem or unusable shift is reported without another attempt.
+speed, road rectangle), the shortest target-free horizon, the single fresh
+re-solve of a failed shift, and that an unusable shift is reported.
 `trustInnovationTest` checks the plan-innovation trust law: startup scale,
 bounded growth, square-root shrinkage, attribution of a posterior departure to
 the observer part, and the minimum scale. `clfNominalRecoveryTest` checks target-free

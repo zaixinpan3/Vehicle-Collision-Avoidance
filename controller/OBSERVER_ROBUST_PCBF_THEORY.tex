@@ -872,8 +872,9 @@ Safety and one CLF
 tightenings may use slack throughout the finite horizon. The same quadratic
 CLF has uncertainty padding and a tracking-error-scaled proximal tie. \\
 RTI admission
-& One model is built per frame (startup APF rollout or shifted plan); the
-inherited budget of the theorem is not implemented, the PCBF stage is solved
+& One model is built per shifted or fresh APF anchor (a failed shift is
+re-solved once from a fresh rollout); the inherited budget of the theorem is
+not implemented, the PCBF stage is solved
 in every frame, and a frame without a solution is reported. The completed
 solution is issued without a nonlinear replay. The next plan innovation is split exactly
 into an observation part (posterior minus a nonlinear replay from the plan's own

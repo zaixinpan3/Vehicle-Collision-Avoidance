@@ -116,9 +116,9 @@ CLF optimization.
 
 The completed CLF optimizer point is issued directly; it is not replayed through
 the nonlinear model or damped.
-There is one trajectory model per frame: a potential-field rollout at startup,
-otherwise the shifted previous plan. A frame that cannot be solved reports no
-solution; no other seed, retry or enlarged box follows. See
+A frame uses the shifted previous plan, or a potential-field rollout at
+startup; a failed shift is re-solved once from a fresh potential-field rollout.
+A frame still without a solution reports it; no enlarged box follows. See
 [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 
 `nominalFeedback` and `nominalGuidanceParameters` supply path guidance and a

@@ -12,7 +12,7 @@
 at startup, otherwise the shifted previous plan extended by path guidance. On
 that anchor the controller minimizes PCBF slack, then CLF slack. If any step
 fails, the controller reports \texttt{noOptimizationSolution}. Four mechanisms
-were removed: the fresh-seed retry, the input-box enlargement, the inherited and
+were removed (the fresh-seed re-solve was later restored, see Addendum): the fresh-seed retry, the input-box enlargement, the inherited and
 observer-conditioned slack budgets with their restoration solves, and the
 replacement of an unusable shift. Prefix collision rows remain soft, at the
 user's choice.
@@ -99,4 +99,34 @@ noisy failures, and the replay script. Raw traces are in
 \path{~/.cache/collisionAvoidance/perception-terminal-20261004c/}. Earlier
 iterations are in the \path{-20261004} and \path{-20261004b} directories and
 are superseded.
+
+\section{Addendum: fresh potential-field re-solve restored}
+At the user's direction, the fresh potential-field re-solve was restored as part
+of the original algorithm, not as a fallback. A shifted problem that has no
+primary point, has more than the unavoidable primary slack, or has no CLF
+result is solved once more from a fresh rollout; ties retain the shift. The
+other removed mechanisms stay removed: input-box enlargement, inherited budgets
+and restoration, and replacement of an unusable shift. With the same source
+otherwise, 656 of 656 tests pass (\path{tests-fresh-restart.csv}).
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+ & recovered & no solution & collision\\
+\midrule
+Exact observations, without re-solve & 11 & 3 & 0\\
+Exact observations, with re-solve & 13 & 1 & 0\\
+Noisy estimator, without re-solve & 1 & 13 & 0\\
+Noisy estimator, with re-solve & 3 & 11 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+With exact observations, every case recovers except 15-m/s brakingLead, which
+has no primary point at hold 110. With the noisy estimator, 8-m/s headOn and
+crossing and 15-m/s crossing recover. The other noisy stops follow the
+constraint conflicts diagnosed above: brakingLead at frame~0, and the
+short-horizon road and target rows. Per-case values are in
+\path{campaign-metrics-fresh-restart.csv}; raw traces are in
+\path{~/.cache/collisionAvoidance/fresh-restart-20261004/}.
 \end{document}

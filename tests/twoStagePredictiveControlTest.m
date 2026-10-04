@@ -1,5 +1,5 @@
 classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
-    % One affine model per sample, safety slack then CLF; no fallback algorithm.
+    % Safety slack then CLF; a failed shift is re-solved once from a fresh rollout.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -91,6 +91,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             anchor=problem.model.linearization;
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyFalse(problem.metadata.search.potentialFieldRestarted);
             testCase.verifyEqual(problem.metadata.search.linearizationCount,1);
             testCase.verifyEqual([problem.metadata.search.stages.objective],["pcbfSlack","clfSlack"]);
             testCase.verifyEqual(anchor.states(:,1),problem.model.initialState,AbsTol=0);
@@ -103,16 +104,33 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             localVerifyAffinePrediction(testCase,problem,cfg);
             localVerifyAnchorRollout(testCase,anchor,cfg);
         end
-        function anInfeasibleProblemIsReportedWithoutAnotherAttempt(testCase)
+        function anInfeasibleShiftUsesOneFreshRolloutThenReportsNoSolution(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             model=problem.model;model.initialState(4)=20;
             [solution,search]=solvePredictiveControl(model,prior);
             testCase.verifyEmpty(solution);
-            testCase.verifyNumElements(search.attempts,1);
-            testCase.verifyEqual(search.attempts.initialization,"shiftedInputRollout");
-            testCase.verifyEqual(search.attempts.inputTrustScale,search.trust.scale);
+            testCase.verifyTrue(search.potentialFieldRestarted);
+            testCase.verifyEqual([search.attempts.initialization],["shiftedInputRollout","laneFeedbackRollout"]);
+            testCase.verifyEqual(search.linearizationCount,2);
             testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
+        end
+        function aFailedShiftIsReSolvedFromAFreshPotentialFieldRollout(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            % Near-full braking along the whole shifted plan makes it infeasible.
+            ego=localSuccessor(ego,prior);prior.inputTrajectory(2,:)=.99;
+            [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            search=problem.metadata.search;
+            testCase.verifyTrue(search.potentialFieldRestarted);
+            testCase.verifyEqual(search.initializationFailure,"pcbfNoNumericalResult");
+            % The retained target forecast selects the moving-target field.
+            testCase.verifyEqual(search.attempts(end).initialization,"movingTargetPotentialField");
+            testCase.verifyEqual(search.linearizationCount,2);
+            testCase.verifyTrue(search.clfStageCompleted);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
+            localVerifyAnchorRollout(testCase,problem.model.linearization,cfg);
+            localVerifyAffinePrediction(testCase,problem,cfg);
         end
         function overlappingHardRowsHaveNoInventedRestorationDirection(testCase)
             [ego,road,cfg]=localFixture();

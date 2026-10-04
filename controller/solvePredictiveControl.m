@@ -3,8 +3,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % Startup uses a potential-field rollout and later samples the shifted plan.
 % The horizon extends until the anchor reaches the terminal set: beyond the
 % perception radius of the target and separating from it, inside the road.
-% The PCBF stage minimizes prefix safety slack, then the CLF stage runs; any
-% failure is reported as no solution. Solved plans are issued directly.
+% The PCBF stage minimizes prefix safety slack, then the CLF stage runs. A
+% shifted problem without a primary point, with restorable positive slack, or
+% without a CLF result is re-solved once from a fresh potential-field rollout.
+% A frame that still has no solution reports it. Solved plans are issued directly.
 % The input trust scale is an estimate, not a fixed setting: the next
 % posterior measures how far the previous plan's prediction was from the
 % nonlinear rollout of its own inputs (the plan innovation), and the
@@ -103,9 +105,40 @@ function [solution,search,model] = localRound(model,previousState,timer)
     if source=="shiftedInputRollout",model=localAdaptTrust(model,anchor,previousState);end
     [point,problem,search,model]=localPrimary(anchor,model,source,timer);
     search.initializationSeconds=initializationSeconds;
+    attempts=localAttempt(search);stages=search.stages;selected=1;restarted=false;
+    cfg=model.cfg;freshSource="movingTargetPotentialField";
+    if isempty(model.target),freshSource="laneFeedbackRollout";end
+    % The shifted plan is re-solved once from a fresh potential-field rollout
+    % when its primary has no point or more than the unavoidable slack.
+    needsFresh=isempty(point) || (~model.robustnessRelaxation ...
+        && search.primaryOptimum>problem.primaryLowerBound+cfg.solver.feasibilityTolerance);
+    if source=="shiftedInputRollout" && needsFresh && toc(timer)<cfg.solver.timeLimitSeconds
+        failure=search.terminationReason;if ~isempty(point),failure="positiveRestorablePcbfSlack";end
+        wall=tic;freshAnchor=localPotentialFieldSeed(model,cfg.controller.horizonSteps,cfg.controller.maximumHorizonSteps);
+        [freshPoint,freshProblem,freshSearch,freshModel]=localPrimary(freshAnchor,model,freshSource,timer);
+        freshSearch.initializationSeconds=toc(wall);restarted=true;
+        attempts(end+1)=localAttempt(freshSearch);stages=[stages,freshSearch.stages];
+        % Ties retain the shifted plan.
+        if isempty(point) || (~isempty(freshPoint) && freshSearch.primaryOptimum ...
+                <search.primaryOptimum-cfg.solver.lexicographicTieTolerance)
+            point=freshPoint;problem=freshProblem;search=freshSearch;model=freshModel;anchor=freshAnchor;selected=numel(attempts);
+        end
+    end
     [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
-    search.attempts=localAttempt(search);search.selectedAttempt=1;
-    search.solverCalls=sum([search.stages.numericalSolve]);
+    stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
+    % A shifted plan whose CLF stage returns no point uses the fresh rollout.
+    if isempty(solution) && ~restarted && source=="shiftedInputRollout" ...
+            && search.terminationReason=="clfNoNumericalResult" && toc(timer)<cfg.solver.timeLimitSeconds
+        failure=search.terminationReason;
+        wall=tic;anchor=localPotentialFieldSeed(model,cfg.controller.horizonSteps,cfg.controller.maximumHorizonSteps);
+        [point,problem,search,model]=localPrimary(anchor,model,freshSource,timer);
+        search.initializationSeconds=toc(wall);attempts(end+1)=localAttempt(search);stages=[stages,search.stages];
+        selected=numel(attempts);restarted=true;
+        [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
+        stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
+    end
+    search.attempts=attempts;search.selectedAttempt=selected;search.stages=stages;
+    search.solverCalls=sum([stages.numericalSolve]);search.potentialFieldRestarted=restarted;
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);
 end
 
@@ -116,7 +149,8 @@ function search=localEmptySearch(model,source,failure,seconds)
         'primaryOptimum',NaN,'primaryLowerBound',NaN,'slackCap',NaN,'clfInitialSlack',NaN, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
-        'initializationSeconds',seconds,'initializationFailure',failure,'elapsedSeconds',seconds);
+        'initializationSeconds',seconds,'initializationFailure',failure,'elapsedSeconds',seconds, ...
+        'potentialFieldRestarted',false);
     search.attempts=localAttempt(search);search.selectedAttempt=0;
 end
 

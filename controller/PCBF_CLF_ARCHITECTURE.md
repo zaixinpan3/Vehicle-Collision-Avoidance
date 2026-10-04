@@ -4,8 +4,9 @@ Every frame uses the same target-independent analytic quadratic CLF, defined in
 [NOMINAL_CLF.md](NOMINAL_CLF.md). Every frame minimizes PCBF slack, then CLF
 slack, on one affine model. A bounded input-increment tie term regularizes the
 future plan. There is no third optimization stage, target-range CLF switch,
-direct nominal-feedback command, inherited slack budget, fallback seed, retry or
-executable backup: a frame that cannot be solved reports no solution.
+direct nominal-feedback command, inherited slack budget, enlarged input box or
+executable backup. A shifted plan that fails is re-solved once from a fresh
+potential-field rollout; a frame that still cannot be solved reports no solution.
 
 The implementation now consumes timestamped NRMM observer enclosures. It
 propagates constant target-parameter sets analytically and ego error boxes
@@ -171,8 +172,10 @@ within the useful tire region; they do not add steering magnitude or slew limits
 to the optimization. A seed may still violate collision or terminal constraints
 and is never executable by itself.
 
-**Normal frames shift the previous input plan.** Only startup constructs the
-field rollout. Each trajectory is linearized once. There is no SCP iteration on
+**Normal frames shift the previous input plan.** The field rollout is
+constructed at startup, and once more when the shifted problem has no primary
+point, more than the unavoidable primary slack, or no CLF result. Each
+trajectory is linearized once. There is no SCP iteration on
 an optimized nonlinear rollout within the same hold.
 
 For an anchor `(xbar_i, ubar_i)` the shared model is
@@ -266,9 +269,11 @@ current-state rows supply the unavoidable lower bound
 
     J_lower = max(0, -min(g(x_current))).
 
-A primary value above this lower bound is issued as positive slack; it does
-not trigger another model, seed or enlarged box. A primary problem without a
-numerical point is reported as no solution. A finite array from a failed
+When a shifted problem has no primary point, or its primary value exceeds this
+lower bound, one fresh potential-field model is solved; the smaller primary
+value is retained, with ties favoring the shift. A shifted CLF stage without a
+numerical result also uses the fresh model. There is no enlarged input box and
+no second fresh model. A finite array from a failed
 primary solve is not a valid PCBF optimum.
 
 On the selected model the single CLF requirement is
@@ -318,17 +323,16 @@ through the nonlinear model, and no pose, state, CLF or path-deviation agreement
 test, damped step or line search follows the solve. The path corridor is
 enforced only by the affine rows at the full limit `L`.
 
-Each frame builds exactly **one trajectory model** and makes at most two
-numerical solves (the primary stage is skipped analytically when the zero
-correction is optimal). The input trust scale follows the plan innovation (next
+Each frame builds one trajectory model, or two when the shifted problem is
+re-solved from the fresh rollout, with at most two numerical solves per model. The input trust scale follows the plan innovation (next
 section). This local numerical step bound is not an actuator constraint. No
 global SQP convergence theorem or hard execution deadline follows from this
 finite work budget.
 
-A frame whose anchor is unavailable or whose PCBF or CLF stage returns no
-numerical result reports `collisionAvoidanceController:noOptimizationSolution`.
-No seed, enlarged box, inherited budget, previous-frame plan or incomplete
-numerical point is used instead.
+A frame whose anchor is unavailable, or whose fresh re-solve still returns no
+PCBF or CLF result, reports `collisionAvoidanceController:noOptimizationSolution`.
+No enlarged box, inherited budget, previous-frame plan or incomplete numerical
+point is used instead.
 
 ## Input trust scale from the plan innovation
 
