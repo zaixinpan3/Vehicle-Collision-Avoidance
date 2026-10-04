@@ -1,0 +1,6 @@
+VARIANT adaptive frames=62 recovered=0 collision=1 gap=0.000 failure=runNonlinearPredictiveSafetyValidation:collision: Ground-truth rectangles touched or overlapped.
+VARIANT fixed1 frames=19 recovered=0 collision=0 gap=1.402 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfNoNumericalResult).
+VARIANT min025 frames=35 recovered=0 collision=0 gap=1.358 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfNoNumericalResult).
+VARIANT min05 frames=24 recovered=0 collision=0 gap=1.390 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfNoNumericalResult).
+VARIANT noTerminalFixed1 frames=533 recovered=1 collision=0 gap=0.040 failure=
+VARIANT noTerminal frames=2000 recovered=0 collision=0 gap=0.068 failure=

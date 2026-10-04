@@ -1,0 +1,9 @@
+load(fullfile(fileparts(mfilename('fullpath')),'variant_adaptive.mat'));
+for k=1:numel(PLAN_LOG)
+  L=PLAN_LOG{k}; if L.time<2.2 || L.time>2.6, continue; end
+  fprintf('t=%.2f trust=%.3f slack=%.3g | %s\n',L.time,L.trust,L.safety,strjoin(L.attempts,'  ->  '));
+end
+for tag=["fixed1","min05","min025"]
+  load(fullfile(fileparts(mfilename('fullpath')),"variant_"+tag+".mat"));L=PLAN_LOG{end};
+  fprintf('%s last issued t=%.2f slack=%.3g | %s\n',tag,L.time,L.safety,strjoin(L.attempts,'  ->  '));
+end

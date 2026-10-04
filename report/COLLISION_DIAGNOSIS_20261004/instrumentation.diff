@@ -1,0 +1,37 @@
+diff --git a/controller/collisionAvoidanceController.m b/controller/collisionAvoidanceController.m
+index 73f3282..66f0842 100644
+--- a/controller/collisionAvoidanceController.m
++++ b/controller/collisionAvoidanceController.m
+@@ -8,6 +8,10 @@ function [command,predictedInput,prediction,controllerState] = ...
+ % Collision interaction is active inside the configured position radius.
+ % A complete current sensor scan with no target clears the previous forecast.
+     persistent lastState
++    if isstruct(egoState) && isfield(egoState,'stateTime') && any(abs(egoState.stateTime-[2.25 2.30])<1e-9)
++        snapshot=struct('scenario',"brakingLead",'frame',round(egoState.stateTime/.05)+1,'time',egoState.stateTime,'egoInput',egoState,'targetEstimate',targetEstimate,'road',laneCenterline,'configuration',cfg,'previousState',previousState,'failure',"(saved before solve)");
++        save(sprintf('/tmp/claude-1000/-home-zai-Downloads-ResearchProjects-collisionAvoidance/0a464e23-22e7-4d89-b173-e03d7d2a8c39/scratchpad/snap_%03d.mat',round(egoState.stateTime*100)),'snapshot');
++    end
+     if nargin==1 && (ischar(egoState) || isstring(egoState))
+         if ~isscalar(string(egoState)) || string(egoState)~="resetNominalTrajectory"
+             error('collisionAvoidanceController:invalidAction','Use resetNominalTrajectory.');
+@@ -148,6 +152,7 @@ function [command,predictedInput,prediction,controllerState] = ...
+         'feedbackGains',model.feedbackGains, ...
+         'stageSlacks',solution.stageSlacks,'safetyBudget',solution.safety, ...
+         'target',q,'uncertaintySpecified',uncertainty.specified);
++    global PLAN_LOG; PLAN_LOG{end+1}=struct('time',ego.stateTime,'egoEstimate',ego.modelState,'targetEstimate',q,'states',solution.states,'inputs',solution.inputs,'stageSlacks',solution.stageSlacks,'safety',solution.safety,'robust',model.robustnessRelaxation,'tightening',solution.maximumCollisionTighteningMeters,'egoRadius',model.uncertaintyPrediction.egoStateRadius(:,1:2:end),'source',search.initialization,'restart',search.potentialFieldRestarted,'trust',model.trust.scale,'anchor',model.linearization.inputs,'clfSlack',solution.clfSlack,'targetEpoch',targetEpoch,'sampleIndex',index,'attempts',{arrayfun(@(a)a.initialization+":"+a.terminationReason+"@"+a.inputTrustScale,search.attempts)});
+     prediction=struct('problemClass',"jointPredictiveCbfClf",'model',model, ...
+         'inputTrajectory',predictedInput,'predictedState',solution.states,'predictedJointState',predictedJointState, ...
+         'solution',solution,'metadata',metadata);
+diff --git a/controller/solvePredictiveControl.m b/controller/solvePredictiveControl.m
+index 89be419..e0fc875 100644
+--- a/controller/solvePredictiveControl.m
++++ b/controller/solvePredictiveControl.m
+@@ -647,7 +647,8 @@ function [problem,model]=localFormulate(anchor,model)
+     % The endpoint is a nominal core plus an invariant feedback-error tube.
+     % The uncertainty is retained in that tube and terminal geometry; it is
+     % not required to fit inside the nominal zero-disturbance core.
+-    endpoint=localCone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius);
++    global NO_TERMINAL; endpointRadius=seed.radius; if ~isempty(NO_TERMINAL)&&NO_TERMINAL, endpointRadius=1e6; end
++    endpoint=localCone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-endpointRadius);
+     rowCount=rowCount+1;rows{rowCount}=sparse(numel(terminalDomainMargin),nv);bounds{rowCount}=terminalDomainMargin;
+     terminalA=zeros(0,nv);terminalB=zeros(0,1);
+     if ~localBeyondRange(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator)

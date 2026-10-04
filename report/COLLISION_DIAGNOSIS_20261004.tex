@@ -1,0 +1,86 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Why the noisy 15-m/s braking-lead encounter collides}
+\date{Prepared October 4, 2026}
+\begin{document}
+\maketitle
+
+\textbf{Case.} The case is the controller at abd8740 (direct issue, plan-innovation trust) with
+the noisy estimator (\texttt{estimatorControllerIntegrationConfig}, seed
+20261003), 15~m/s brakingLead. The ego passes a lead that brakes at 0.5~m/s$^2$. The rectangles touch at 3.087~s,
+hold 62. The run reproduces exactly with per-hold plan logging. No production
+source was changed; the instrumentation is in \path{instrumentation.diff}.
+
+\section{What is not the cause}
+\textbf{Estimation.} The ego position error is at most 0.01~m and its yaw error
+at most 0.071~rad. The target position error reaches 0.47~m. Nevertheless, the
+estimated gap tracks the true gap within 0.07~m (0.044 versus 0.050~m at
+3.05~s): the controller knew the gap was closing.
+
+\textbf{Observer tightening.} The ego posterior generator is zero and the
+collision tightening is 0 throughout. The observer's uncertainty did not enter
+this problem.
+
+\textbf{Trust scale as trigger.} At the trigger (2.30~s) the trust scale was 1.
+
+\section{Causal chain}
+\begin{enumerate}
+\item From 1.90 to 2.25~s, the shifted overtaking plan holds a predicted gap of
+  exactly 0.200~m. Its endpoint deviation from the terminal base grows: in
+  scaled units it is 0.88 at 2.25~s and 0.96 at 2.30~s, against a terminal core
+  radius of 0.001.
+\item At 2.30~s the shifted problem fails in both stages (CLF without a
+  numerical result, then PCBF restoration infeasible). A replay of that hold
+  shows the cause. Removing only the terminal cone makes the shifted plan
+  solvable; it issues steering $-0.142$~rad and almost no braking, so it
+  continues the overtake. Removing the collision rows, path rows, terminal
+  target rows or state limits does not help.
+\item The fallback potential-field seed has an exact terminal endpoint. Its
+  plan brakes (ratio 0.149) and later steers back toward the lane. It is
+  feasible only with positive prefix safety slack.
+\item The braking transition produced a 0.22~m model innovation, and the trust
+  scale fell to 0.08--0.15. Every later hold repeated the same chain:
+  terminal-infeasible shift, then a fresh seed with small trust. From 2.70~s
+  each issued plan predicted contact itself (predicted minimum gap 0, slack
+  about 3~m). Contact occurred at 3.09~s.
+\end{enumerate}
+
+\section{Counterfactual closed loops}
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Variant & outcome & minimum gap\\
+\midrule
+adaptive trust (as committed) & collision at hold 62 & 0\\
+trust fixed 1 & no solution at hold 19 & 1.402~m\\
+trust floor 0.5 & no solution at hold 24 & 1.390~m\\
+trust floor 0.25 & no solution at hold 35 & 1.358~m\\
+adaptive trust, terminal cone removed & no collision, unrecovered at 100~s & 0.068~m\\
+trust fixed 1, terminal cone removed & recovered at hold 533 & 0.040~m\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All variants with the terminal cone fail. A trust floor only changes the
+failure from a collision to an earlier stop. Without the terminal cone neither
+run collides, although both pass within 4--7~cm, below the 0.20~m planning
+margin.
+
+\section{Interpretation}
+The primary trigger is the terminal requirement. The endpoint of an ongoing
+overtake must coincide with the cruise equilibrium to within a core radius of
+0.001. Once the shifted plan cannot meet that within its input box, the
+controller abandons the overtake for a potential-field seed that returns to
+the lane. Collision rows on the prefix are soft, so the solver then accepts
+predicted contact instead of reporting failure. The small adaptive trust
+scale keeps later plans close to those seeds; with a larger floor, the same
+chain ends in an infeasible hold instead. The same collision-row/terminal-cone
+conflict stopped the exact-observation 8-m/s brakingLead at hold 108.
+
+No change is proposed or validated here. Removing the terminal cone affects
+the recursive-feasibility argument and was tested only as a counterfactual.
+The files in \path{COLLISION_DIAGNOSIS_20261004/} are the variant outcomes and
+the run, analysis and replay scripts (stored as \path{.m.txt}).
+\end{document}

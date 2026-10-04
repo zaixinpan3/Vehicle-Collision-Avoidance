@@ -1,0 +1,11 @@
+function collisionVariant(tag,minScale,initScale,maxScale)
+global PLAN_LOG NO_TERMINAL; PLAN_LOG={}; NO_TERMINAL=startsWith(tag,'noTerminal');
+here=fileparts(mfilename('fullpath'));cd(fullfile(here,'wt-col'));addpath('controller','config','scripts');
+c=estimatorControllerIntegrationConfig(); c.randomSeed=20261003;
+cfg=struct('referenceSpeed',15,'controller',struct('horizonSteps',16), ...
+  'nonlinear',struct('trustMinimumScale',minScale,'trustInitialScale',initScale,'trustMaximumScale',maxScale));
+r=runNonlinearPredictiveSafetyValidation(Scenarios="brakingLead",Frames=2000,ControllerConfiguration=cfg, ...
+    RequireCollisionThreat=true,RecoveryDwellSeconds=1,EstimatorConfiguration=c).results;
+fprintf('VARIANT %s frames=%d recovered=%d collision=%d gap=%.3f failure=%s\n',tag,r.executedFrames,r.recovery.recovered,r.collisionDetected,r.minimumReplayClearanceMeters,r.failure);
+save(fullfile(here,"variant_"+tag+".mat"),'PLAN_LOG','r');
+end

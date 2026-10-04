@@ -1,0 +1,8 @@
+global PLAN_LOG; PLAN_LOG={};
+cd(fullfile(fileparts(mfilename('fullpath')),'wt-col'));addpath('controller','config','scripts');
+c=estimatorControllerIntegrationConfig(); c.randomSeed=20261003;
+cfg=struct('referenceSpeed',15,'controller',struct('horizonSteps',16));
+r=runNonlinearPredictiveSafetyValidation(Scenarios="brakingLead",Frames=70,ControllerConfiguration=cfg, ...
+    RequireCollisionThreat=true,RecoveryDwellSeconds=1,EstimatorConfiguration=c).results;
+fprintf('frames=%d failure=%s collisionTime=%g\n',r.executedFrames,r.failure,r.collisionTimeSeconds);
+save(fullfile(fileparts(mfilename('fullpath')),'collisionLog.mat'),'PLAN_LOG','r');

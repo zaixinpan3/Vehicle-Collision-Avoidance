@@ -1,0 +1,12 @@
+addpath(fullfile(fileparts(mfilename('fullpath')),'infeas'));cd(fullfile(fileparts(mfilename('fullpath')),'infeas'));
+repo='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+addpath(fullfile(repo,'config'),fullfile(repo,'scripts'),fullfile(repo,'estimator'),fullfile(repo,'solver','controller'));
+addpath(fullfile(pwd,'controller'),'-begin');
+global TERM_LOG DIAG_DROP; DIAG_DROP="";
+for f=["snap_225.mat","snap_230.mat"]
+  s=load(fullfile('..',f)).snapshot; TERM_LOG=zeros(0,8); collisionAvoidanceController("resetNominalTrajectory");
+  try, collisionAvoidanceController(s.egoInput,s.targetEstimate,s.road,s.configuration,s.previousState); catch, end
+  fprintf('%s: per formulation [coreRadius | endpointDeviation | minDomainMargin | endpointReserve | posteriorNorm | speedTubeRadius | endSpeed | seedSpeed]\n',f);
+  disp(TERM_LOG);
+  fprintf('  ego posterior generator present: %d, uncertainty fields: %s\n',isfield(s.egoInput,'stateErrorGenerator')||isfield(s.egoInput,'uncertainty'),strjoin(string(fieldnames(s.egoInput))',','));
+end
