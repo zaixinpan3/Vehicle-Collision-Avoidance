@@ -40,9 +40,8 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
         end
         function displacedAndReversedStatesEventuallyReturnToCruise(testCase,referenceSpeed,curvature)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
-                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2), ...
-                'maximumLateralDeviationMeters',Inf)));
-            % These CLF fixtures start 20 or 40 m away, outside the optional corridor.
+                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2))));
+            % These CLF fixtures start 20 or 40 m away; no road clearance is declared.
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);tolerance=[.1;pi/180;.1;.05;.01];
             for initial=[-20,.2,reference.state(4),0,0;-40,2.5,6,.3,.1].'

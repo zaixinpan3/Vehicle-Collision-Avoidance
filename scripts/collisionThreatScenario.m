@@ -7,7 +7,10 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
         controllerConfiguration (1,1) struct = struct()
     end
     cfg = collisionAvoidanceControllerConfig(controllerConfiguration);
-    road = struct('centerline',[-100,0;1000,0],'lateralClearance',[4;4]);
+    % Four-lane road with 3.75 m lanes; the ego follows the centre of the
+    % second lane from the right, so lateralClearance = [right; left] =
+    % [1.5; 2.5] lanes from the given path.
+    road = struct('centerline',[-100,0;1000,0],'lateralClearance',[5.625;9.375]);
     state = [0;0;0;cfg.referenceSpeed;0;0];
     lr = cfg.target.rearAxleDistance;
     impactTime = 1.6;curvature = 0;
@@ -39,7 +42,7 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
     end
     curve = struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200);
     if curvature~=0
-        road = struct('referenceCurve',curve,'lateralClearance',[4;4]);
+        road = struct('referenceCurve',curve,'lateralClearance',[5.625;9.375]);
         trim = nonlinearBicycleModel.cruise(cfg,curvature);
         state = trim.state;state(1:2) = 0;
     end

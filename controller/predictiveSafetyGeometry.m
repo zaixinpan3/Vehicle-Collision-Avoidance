@@ -117,7 +117,7 @@ classdef predictiveSafetyGeometry
             support=min(support,vecnorm(normal,2,2)*ball.positionRadius);
         end
 
-        function [heading,speed,side,risk] = potentialGuidance(x,lane,epoch,time,cfg,side)
+        function [heading,speed,side,risk] = potentialGuidance(x,lane,epoch,time,cfg,side,clearance)
             % Zhai-inspired motion-aware repulsion with a passing circulation.
             % Matching-time prediction adapts the field to target speed and
             % acceleration; it is guidance, not a safety certificate.
@@ -159,12 +159,14 @@ classdef predictiveSafetyGeometry
                 closing=max(0,futureTangent.'*(progress*futureTangent-targetVelocity))/cfg.referenceSpeed;
             end
             desiredLateral=-lateral/cfg.nominalClf.lookaheadSeconds+obstacleLateral;
-            % Project the guidance velocity into the path-corridor tangent
-            % bounds. This shapes a seed; only the optimizer enforces the
-            % vehicle-position constraint on its prediction.
-            limit=cfg.controller.maximumLateralDeviationMeters;
-            span=cfg.nominalClf.lookaheadSeconds;
-            desiredLateral=min((limit-lateral)/span,max((-limit-lateral)/span,desiredLateral));
+            % Project the guidance velocity into the road, lateralClearance =
+            % [right;left] less half the body width. This shapes a seed; only
+            % the optimizer enforces the road rows on its prediction.
+            if nargin>=7 && ~isempty(clearance)
+                span=cfg.nominalClf.lookaheadSeconds;half=cfg.vehicle.width/2;
+                desiredLateral=min((clearance(2)-half-lateral)/span, ...
+                    max((-clearance(1)+half-lateral)/span,desiredLateral));
+            end
             speed=max(max(1.5,.5*cfg.referenceSpeed),cfg.referenceSpeed*(1-.35*risk*min(2,closing)));
             heading=projection.heading+atan2(desiredLateral,speed);
         end

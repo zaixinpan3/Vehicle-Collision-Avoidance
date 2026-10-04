@@ -57,9 +57,8 @@ successor, use the analytic Frenet error Jacobian J:
 
 The same affine dynamics relate dx_1 to the first input correction. Its Hessian
 is positive semidefinite, so the first-step CLF epigraph is a convex quadratic
-constraint represented by one second-order cone. The path corridor also uses
-cones: the optimization is a sparse conic QP/SOCP, not a QP with exclusively
-affine constraints.
+constraint represented by one second-order cone, so the optimization is a sparse
+conic QP/SOCP rather than a QP with exclusively affine constraints.
 
 The objective is
 

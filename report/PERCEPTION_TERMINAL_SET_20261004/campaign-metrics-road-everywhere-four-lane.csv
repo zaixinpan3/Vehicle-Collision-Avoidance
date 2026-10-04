@@ -1,0 +1,29 @@
+observation,speed,scenario,outcome,holds,minimumSampledGapMeters,minimumRoadMarginMeters,failure
+exact,8,headOn,noSolution,29,1.6509,4.074,two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,8,acceleratingHeadOn,recovered,219,0.847,2.3,
+exact,8,brakingLead,noSolution,5,1.3759,4.606,two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,8,crossing,recovered,170,0.1928,2.391,
+exact,8,turningCrossing,noSolution,230,0.1672,2.235,two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,8,curvedHeadOn,recovered,206,1.3634,2.901,
+exact,8,curvedCrossing,recovered,191,0.1857,2.325,
+exact,15,headOn,recovered,136,0.1831,2.407,
+exact,15,acceleratingHeadOn,recovered,135,0.1933,2.174,
+exact,15,brakingLead,noSolution,16,1.2857,4.625,two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,15,crossing,recovered,150,0.1053,3.642,
+exact,15,turningCrossing,noSolution,6,19.7763,4.62,two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,15,curvedHeadOn,recovered,1208,0.1944,0.704,
+exact,15,curvedCrossing,recovered,151,0.1739,2.628,
+noisy,8,headOn,noSolution,81,1.7016,0.637,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,acceleratingHeadOn,recovered,222,1.2526,0.834,
+noisy,8,brakingLead,noSolution,0,,,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,crossing,recovered,174,0.3792,0.838,
+noisy,8,turningCrossing,noSolution,8,11.6709,4.001,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,curvedHeadOn,noSolution,1543,2.0807,1.771,two-stage affine optimization did not complete (clfNoNumericalResult).
+noisy,8,curvedCrossing,noSolution,0,,,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,headOn,noSolution,16,2.0965,4.605,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,acceleratingHeadOn,noSolution,15,2.6182,4.606,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,brakingLead,noSolution,0,,,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,crossing,noSolution,73,2.0791,0.463,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,turningCrossing,noSolution,10,16.3286,4.051,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedHeadOn,noSolution,73,4.2511,-0.001,wo-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedCrossing,noSolution,72,2.8908,-0.243,wo-stage affine optimization did not complete (pcbfNoNumericalResult).

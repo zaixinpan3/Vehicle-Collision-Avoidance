@@ -179,6 +179,24 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,-1e-3);
             testCase.verifyEqual(problem.metadata.terminalDistanceMeters,Inf);
         end
+        function everyPredictedNodeKeepsTheRectangleOnTheRoad(testCase)
+            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
+            target=struct('targetPositionInertial',q(1:2), ...
+                'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(problem.metadata.roadConstraintScope,"rectangleAtEveryPredictedNode");
+            x=problem.predictedState;
+            corners=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
+            worst=Inf;
+            for k=2:size(x,2)
+                rotation=[cos(x(3,k)),-sin(x(3,k));sin(x(3,k)),cos(x(3,k))];
+                projection=laneGeometry.project(x(1:2,k)+rotation*corners,problem.model.lane);
+                lateral=projection.lateralPosition;
+                worst=min([worst;road.lateralClearance(2)-lateral(:);road.lateralClearance(1)+lateral(:)]);
+            end
+            % Rows are linearized in yaw; allow the second-order corner remainder.
+            testCase.verifyGreaterThanOrEqual(worst,-1e-2);
+        end
         function aRoadTooNarrowForTheVehicleHasNoSolution(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[.5;.5];
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...

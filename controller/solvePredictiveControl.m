@@ -352,7 +352,8 @@ function anchor=localPotentialFieldSeed(model,minimum,maximum)
         if isempty(model.target)
             u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominal);
         else
-            [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.target,time,cfg,side);
+            [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.target,time,cfg,side, ...
+                model.road.lateralClearance);
             course=x(3)+atan2(x(5),x(4));
             yawRate=reference.curvature*hypot(x(4),x(5)) ...
                 -cfg.nominalClf.courseGain*atan2(sin(course-heading),cos(course-heading));
@@ -415,15 +416,9 @@ function [problem,model]=localFormulate(anchor,model)
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
     rhs(1:6)=model.initialState-anchor.states(:,1);
     rows=cell(1,9*count+8);bounds=cell(size(rows));rowCount=0;
-    pathCones=struct('A',{},'b',{},'d',{},'gamma',{});
-    deviationLimit=cfg.controller.maximumLateralDeviationMeters;
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
     lower(iu(:))=-repmat(model.inputTrustScale*radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
-    pathBox=zeros(nv,1);pathBox(ix(:))=upper(ix(:));
-    % Cover the existing maximum fresh-input box expansion as well. Removing
-    % a redundant corridor row remains valid if that box is enlarged later.
-    pathBox(iu(:))=repmat(max(2,model.inputTrustScale)*radius*[.15;.25],count,1);
     % Numerical RTI corrections are local to the new anchor at every sample.
     % Steering still has no actuator magnitude or slew constraint.
     inputLower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
@@ -484,10 +479,10 @@ function [problem,model]=localFormulate(anchor,model)
         finite=isfinite(rate);difference=input-previous;
         rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite)-rateRadius(finite);rate(finite)+difference(finite)-rateRadius(finite)];
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
-        if isfinite(deviationLimit)
-            [r,bound,cone]=localPathRows(x(1:2),map(1:2,:),model.lane,deviationLimit,pathBox,generator(1:2,:));
+        % The current measured node is fixed; every later node stays on the road.
+        if index>1 && ~isempty(model.road.lateralClearance)
+            [r,bound]=localRoadRows(x,model,generator,map);
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
-            pathCones=[pathCones,cone]; %#ok<AGROW>
         end
         if ~localBeyondRange(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator)
             departure=index;
@@ -502,10 +497,9 @@ function [problem,model]=localFormulate(anchor,model)
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
         map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
-        if isfinite(deviationLimit)
-            [r,bound,cone]=localPathRows(middle(1:2),map(1:2,:),model.lane,deviationLimit,pathBox,middleGenerator(1:2,:));
+        if ~isempty(model.road.lateralClearance)
+            [r,bound]=localRoadRows(middle,model,middleGenerator,map);
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
-            pathCones=[pathCones,cone]; %#ok<AGROW>
         end
         if ~localBeyondRange(middle,(index-.5)*cfg.controller.sampleTime,model,middleCollisionGenerator)
             departure=index;
@@ -538,15 +532,10 @@ function [problem,model]=localFormulate(anchor,model)
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
     end
     if ~isempty(model.road.lateralClearance)
-        [r,bound]=localTerminalRoad(y,model,generator,map);
+        [r,bound]=localRoadRows(y,model,generator,map);
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
     end
-    if isfinite(deviationLimit)
-        [r,bound,cone]=localPathRows(y(1:2),map(1:2,:),model.lane,deviationLimit,pathBox,generator(1:2,:));
-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
-        pathCones=[pathCones,cone];
-    end
-    primaryCones=pathCones;
+    primaryCones=struct('A',{},'b',{},'d',{},'gamma',{});
     objective=zeros(nv,1);objective(is)=1;
     problem=struct('a',vertcat(rows{1:rowCount}),'b',vertcat(bounds{1:rowCount}), ...
         'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',primaryCones, ...
@@ -597,16 +586,6 @@ function relative=localRelativeGenerator(x,generator,model)
     relative(1:3,1:3)=relative(1:3,1:3)-rigid*model.uncertainty.egoGenerator(1:3,1:3);
 end
 
-function [rows,bounds,cone]=localPathRows(position,map,lane,limit,box,generator)
-    region=laneGeometry.deviationRegion(position,lane,limit);
-    rows=region.a*map;bounds=region.b-sum(abs(region.a*generator),2);
-    active=abs(rows)*box>bounds;rows=rows(active,:);bounds=bounds(active);
-    cone=struct('A',{},'b',{},'d',{},'gamma',{});
-    radius=region.radius-sum(vecnorm(generator));
-    if isfinite(radius) && norm(abs(region.center)+abs(map)*box)>radius
-        cone=localCone(map,region.center,zeros(size(map,2),1),-radius);
-    end
-end
 
 function problem=localAddClf(problem,anchor,model)
     nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
@@ -717,9 +696,10 @@ function [rows,bounds]=localTerminalSeparation(y,time,model,generator,map)
         normal.'*(localEgoVelocity(y)-localTargetVelocity(q))-speedReserve];
 end
 
-function [rows,bounds]=localTerminalRoad(y,model,generator,map)
-    % Every rectangle corner within lateralClearance=[right;left] of the path,
-    % linearized at the anchor corner on the local path normal.
+function [rows,bounds]=localRoadRows(y,model,generator,map)
+    % The ego drives on the road: every rectangle corner within
+    % lateralClearance=[right;left] of the path, linearized at the anchor
+    % corner on the local path normal. Applied at every predicted node.
     cfg=model.cfg;clearance=model.road.lateralClearance;
     corners=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
     c=cos(y(3));s=sin(y(3));rotation=[c,-s;s,c];derivative=[-s,-c;c,-s];

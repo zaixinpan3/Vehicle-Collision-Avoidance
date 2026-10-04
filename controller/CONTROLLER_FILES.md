@@ -30,11 +30,11 @@ from the next posterior's plan innovation. Positive PCBF slack still denotes
 relaxation.
 
 The terminal set is the perception-radius exit: at the last node the target
-is beyond `encounterRangeMeters` (50 m) and separating, and every ego rectangle
-corner is inside the road `lateralClearance = [right; left]`. Without a target
-only the road rows remain and the horizon is `horizonSteps`. The given path
-defines the single CLF; between the start and the last node the 10-m path
-corridor still applies.
+is beyond `encounterRangeMeters` (50 m) and separating. The road
+`lateralClearance = [right; left]` is the only lateral constraint: every ego
+rectangle corner stays inside it at every predicted node and hold midpoint,
+including the endpoint. Without a target the horizon is `horizonSteps`. The
+given path defines the single CLF; there is no separate path corridor.
 
 Observer inputs tighten affine sampled collision, path, physical-state,
 terminal and CLF constraints. No posterior-inclusion or robust terminal

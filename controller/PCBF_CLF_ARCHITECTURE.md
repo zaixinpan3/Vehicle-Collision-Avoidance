@@ -254,10 +254,10 @@ current geometric implementation.
 One nonnegative collision slack is assigned to each primary-horizon stage;
 it relaxes the start and midpoint separation rows. Completion-tail rows are
 hard. The node buffer is 0.20 m, whereas the experiment's physical pass criterion
-is positive rectangle clearance. No road-boundary constraint is imposed.
-The independent given-path center-deviation bound is described in
-[PATH_DEVIATION_BOUND.md](PATH_DEVIATION_BOUND.md); it defaults to 10 m and is
-hard in both optimization stages, including the finite completion tail.
+is positive rectangle clearance. The road is the only lateral constraint: every
+ego rectangle corner stays within `lateralClearance` at every predicted node,
+hold midpoint and the endpoint, hard in both stages (see Terminal constraints).
+The former 10-m center corridor around the path is removed.
 
 The first problem minimizes the sum of PCBF slacks. The unbounded CLF slack
 and its cone are eliminated from this problem without changing its feasible
@@ -328,8 +328,8 @@ no point. `solverInfo` records native status, iterations and residuals.
 
 The completed PCBF/CLF result is issued directly. Its inputs are not replayed
 through the nonlinear model, and no pose, state, CLF or path-deviation agreement
-test, damped step or line search follows the solve. The path corridor is
-enforced only by the affine rows at the full limit `L`.
+test, damped step or line search follows the solve. The road rows hold for the
+affine prediction only.
 
 Each frame builds one trajectory model, or two when the shifted problem is
 re-solved from the fresh rollout, with at most two numerical solves per model. The input trust scale follows the plan innovation (next
@@ -408,7 +408,8 @@ and velocity `w`:
 
     norm(p - q) >= R,                               (beyond the radius)
     (p - q)' (Rot(psi) v - w) >= 0,                 (separating)
-    every ego rectangle corner within lateralClearance = [right; left] of the path.
+    every ego rectangle corner within lateralClearance = [right; left] of the path
+    (imposed at every predicted node, not only the last one).
 
 The target conditions are linearized on the anchor endpoint with the fixed
 direction `n = (pbar - qbar)/norm(pbar - qbar)`:
@@ -423,10 +424,17 @@ there is no collision risk by definition, and its uncertainty is carried by
 the collision rows inside `R`. At first detection the target tube can exceed
 `R` itself (60.6 m at 5 s in the noisy head-on), which would make any robust
 terminal row unreachable.
-path normal at the anchor corner, with the ego generator support subtracted.
-Without a target only the road rows remain. Without `lateralClearance` only the
-target rows remain. Collision rows apply at nodes inside `R`, including a later
-re-entry, and the 10-m path corridor applies at every node.
+
+The road rows are the same at every node: the ego drives on the road, so every
+predicted node after the measured one and every hold midpoint keeps all four
+rectangle corners within `lateralClearance`, and the endpoint is one of these
+nodes. Each row linearizes one corner's lateral coordinate on the path normal
+at the anchor corner, with the ego generator support subtracted. An earlier
+version imposed the road rows only at the last node with a separate 10-m center
+corridor elsewhere; plans then left the road during avoidance and became
+infeasible when the target exit shortened the horizon to 8--29 nodes. Without a
+target only the road rows remain; without `lateralClearance` there is no road
+constraint. Collision rows apply at nodes inside `R`, including a later re-entry.
 
 The separating condition prevents an endpoint that would re-enter `R` in the
 next instant. It does not prevent a later re-entry by a target whose constant

@@ -24,8 +24,7 @@ function cfg=localDefaults()
     % horizonSteps carries safety slack and is the shortest horizon. The
     % horizon extends until the anchor reaches the terminal set, at most
     % maximumHorizonSteps; a plan that cannot reach it has no solution.
-    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512, ...
-        'maximumLateralDeviationMeters',10);
+    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
     % trustRadius scales RTI state/input corrections about each fresh rollout.
     % The input trust scale adapts to the plan innovation: the scale whose
     % second-order prediction error equals trustInnovationMeters [m], within
@@ -94,7 +93,6 @@ end
 function localValidate(cfg)
     validateattributes(cfg.referenceSpeed,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(cfg.controller.maximumLateralDeviationMeters,{'double'},{'scalar','real','nonnan','positive'});
     for name=["horizonSteps","maximumHorizonSteps"]
         validateattributes(cfg.controller.(name),{'double'},{'scalar','real','finite','integer','positive'});
     end
