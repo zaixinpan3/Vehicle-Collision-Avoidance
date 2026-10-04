@@ -1,0 +1,42 @@
+snapshot crossing frame 43 t=2.10
+  drop []: FAIL pcbfNoNumericalResult status 2 res 3.2e-12
+  drop [path]: FAIL pcbfNoNumericalResult status 2 res 1.5e-12
+  drop [collision]: FAIL pcbfNoNumericalResult status 2 res 2.2e-12
+  drop [terminalTarget]: FAIL pcbfNoNumericalResult status 2 res 7.2e-15
+  drop [terminalRoad]: SOLVED u=[-0.167 0.366] N=46 slack=9.45e-05
+  drop [stateLimits]: FAIL pcbfNoNumericalResult status 2 res 9.1e-14
+snapshot headOn frame 17 t=0.80
+  drop []: FAIL pcbfNoNumericalResult status 2 res 2.7e-12
+  drop [path]: FAIL pcbfNoNumericalResult status 2 res 1.7e-11
+  drop [collision]: FAIL pcbfNoNumericalResult status 2 res 5.2e-12
+  drop [terminalTarget]: FAIL pcbfNoNumericalResult status 2 res 1.5e-11
+  drop [terminalRoad]: FAIL pcbfNoNumericalResult status 2 res 6.4e-12
+  drop [stateLimits]: FAIL pcbfNoNumericalResult status 2 res 1.3e-12
+snapshot acceleratingHeadOn frame 66 t=3.25
+  drop []: FAIL pcbfNoNumericalResult status 2 res 8.8e-14
+  drop [path]: FAIL pcbfNoNumericalResult status 2 res 8.8e-14
+  drop [collision]: FAIL pcbfNoNumericalResult status 2 res 1.9e-12
+  drop [terminalTarget]: FAIL pcbfNoNumericalResult status 2 res 8.8e-14
+  drop [terminalRoad]: SOLVED u=[0.0598 0.315] N=15 slack=8.09e-05
+  drop [stateLimits]: FAIL pcbfNoNumericalResult status 2 res 7.9e-14
+snapshot brakingLead frame 1 t=0.00
+  drop []: FAIL pcbfNoNumericalResult status 2 res 8.2e-09
+  drop [path]: FAIL pcbfNoNumericalResult status 2 res 8.2e-09
+  drop [collision]: FAIL pcbfNoNumericalResult status 2 res 6.3e-07
+  drop [terminalTarget]: SOLVED u=[0.158 0.0262] N=512 slack=1.41e+05
+  drop [terminalRoad]: FAIL pcbfNoNumericalResult status 2 res 5.2e-08
+  drop [stateLimits]: FAIL pcbfNoNumericalResult status 2 res 2.8e-09
+snapshot headOn frame 31 t=1.50
+  drop []: FAIL pcbfNoNumericalResult status 2 res 1.4e-12
+  drop [path]: FAIL pcbfNoNumericalResult status 2 res 1.3e-14
+  drop [collision]: FAIL pcbfNoNumericalResult status 2 res 6.2e-12
+  drop [terminalTarget]: SOLVED u=[0.0127 0.632] N=54 slack=9.84e-05
+  drop [terminalRoad]: SOLVED u=[0.0127 0.632] N=54 slack=9.82e-05
+  drop [stateLimits]: FAIL pcbfNoNumericalResult status 2 res 1.3e-13
+snapshot turningCrossing frame 9 t=0.40
+  drop []: FAIL pcbfNoNumericalResult status 2 res 2.1e-13
+  drop [path]: FAIL pcbfNoNumericalResult status 2 res 2.1e-13
+  drop [collision]: SOLVED u=[-0.271 -0.205] N=89 slack=9.89e-05
+  drop [terminalTarget]: FAIL pcbfNoNumericalResult status 2 res 3.0e-14
+  drop [terminalRoad]: FAIL pcbfNoNumericalResult status 2 res 3.5e-14
+  drop [stateLimits]: FAIL pcbfNoNumericalResult status 2 res 2.0e-13

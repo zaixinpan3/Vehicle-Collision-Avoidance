@@ -1,0 +1,102 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Perception-radius terminal set without fallback algorithms}
+\date{Prepared October 4, 2026}
+\begin{document}
+\maketitle
+
+\section{Changes (user design)}
+\paragraph{No fallback.} Each frame builds one anchor: a potential-field rollout
+at startup, otherwise the shifted previous plan extended by path guidance. On
+that anchor the controller minimizes PCBF slack, then CLF slack. If any step
+fails, the controller reports \texttt{noOptimizationSolution}. Four mechanisms
+were removed: the fresh-seed retry, the input-box enlargement, the inherited and
+observer-conditioned slack budgets with their restoration solves, and the
+replacement of an unusable shift. Prefix collision rows remain soft, at the
+user's choice.
+
+\paragraph{Terminal set.} The free-pose cruise core and its module
+(\path{terminalContinuation.m}, 582 lines) are deleted. At the last node the
+target estimate must be beyond the perception radius $R=50$~m and separating,
+and every ego rectangle corner must lie inside the road,
+$\texttt{lateralClearance}=[4;4]$~m. The target rows are linearized with the
+anchor direction~$n$: $n^\top(p-q)\ge R$ implies $\|p-q\|\ge R$, and
+$n^\top(R(\psi)v-w)\ge 0$ is the separating speed. The ego generator support is
+subtracted from every terminal row. The horizon is variable: the anchor stops at
+the first node, between \texttt{horizonSteps} and 512, that is separating and at
+least $R+1$~m from the target. Without a target, the shortest horizon is used.
+
+\paragraph{Corrections found during validation.}
+\begin{itemize}
+\item \textbf{Target uncertainty in the terminal rows.} With the target tube
+  included, the first noisy frame needed a distance of $50+60.6$~m, because the
+  tube's position radius is 60.6~m at 5~s. Every noisy case therefore failed at
+  frame~0. The target now enters the terminal rows as its estimate; its
+  uncertainty is handled by the collision rows inside~$R$.
+\item \textbf{Slack-cap tolerance.} The CLF stage stalled in Clarabel
+  (InsufficientProgress) with a $10^{-5}$ slack cap. The cap is now
+  $10^{-4}$~m, and four failing holds solve.
+\item \textbf{Horizon end.} With the anchor exactly at $R$, the terminal row was
+  active at zero correction. Ending the horizon 1~m beyond~$R$ solved six
+  stalled exact and noisy holds.
+\end{itemize}
+
+\section{Results (final source)}
+Of 655 tests, 655 pass. The table compares the campaigns with the earlier
+records of this day (plan-innovation trust, cruise terminal core, with fallbacks).
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+ & recovered & no solution & collision\\
+\midrule
+Exact observations, before & 13 & 1 & 0\\
+Exact observations, now & 11 & 3 & 0\\
+Noisy estimator, before & 7 & 6 & 1\\
+Noisy estimator, now & 1 & 13 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+With exact observations, the stops are the CLF-stage numerical failures of
+8 and 15~m/s brakingLead (holds 26 and 110) and a PCBF infeasibility of 15~m/s
+curvedHeadOn at hold 1084, during recovery.
+
+With the noisy estimator, 13 cases stop, mostly in the first 0--65 holds. At
+those holds the conic problem is primal infeasible (status~2), not stalled. A
+replay of six of them that drops one constraint group at a time gives:
+\begin{itemize}
+\item \textbf{Road row only.} 15-m/s crossing (2.10~s) and 8-m/s
+  acceleratingHeadOn (3.25~s) become solvable when only the terminal road rows
+  are removed. The horizons are short (46 and 15 nodes): the target exits~$R$
+  while the ego is still offset from the road centre.
+\item \textbf{Target or road row.} 15-m/s headOn (1.50~s) becomes solvable when
+  either the terminal target rows or the terminal road rows are removed.
+\item \textbf{Target row only.} 8-m/s brakingLead (frame~0) becomes solvable
+  only without the terminal target rows. Its horizon reached 512 nodes
+  (25.6~s) without exiting~$R$: following a lead vehicle never reaches this
+  terminal set.
+\item \textbf{Collision rows only.} 8-m/s turningCrossing (0.40~s) becomes
+  solvable only without the observer-tightened collision rows.
+\item \textbf{No single group.} 8-m/s headOn (0.80~s) is not solvable with any
+  one group removed.
+\end{itemize}
+No collision occurred in any executed hold.
+
+\section{Scope}
+No invariance or recursive-feasibility claim is made for this terminal set. A
+target whose constant sideslip turns it back can re-enter~$R$ after the endpoint.
+The terminal set excludes following a lead vehicle inside~$R$. With a short
+horizon, the road rows require the ego to be inside the road almost
+immediately after the target exits~$R$.
+
+\section{Files}
+\path{PERCEPTION_TERMINAL_SET_20261004/} contains per-case metrics, the test
+table, the source hashes of the final runs, the constraint-drop replays of the
+noisy failures, and the replay script. Raw traces are in
+\path{~/.cache/collisionAvoidance/perception-terminal-20261004c/}. Earlier
+iterations are in the \path{-20261004} and \path{-20261004b} directories and
+are superseded.
+\end{document}

@@ -1,15 +1,16 @@
-# Inherited PCBF slack budgets and one-step CLF optimization
+# PCBF slack and one-step CLF optimization to a perception-radius terminal set
 
 Every frame uses the same target-independent analytic quadratic CLF, defined in
-[NOMINAL_CLF.md](NOMINAL_CLF.md). Initialization and restoration minimize PCBF slack before CLF slack.
-A continuation frame first attempts CLF optimization under an inherited slack
-budget. A bounded input-increment tie term regularizes the future plan. There is no third optimization stage, target-range
-CLF switch, direct nominal-feedback command, or executable backup.
+[NOMINAL_CLF.md](NOMINAL_CLF.md). Every frame minimizes PCBF slack, then CLF
+slack, on one affine model. A bounded input-increment tie term regularizes the
+future plan. There is no third optimization stage, target-range CLF switch,
+direct nominal-feedback command, inherited slack budget, fallback seed, retry or
+executable backup: a frame that cannot be solved reports no solution.
 
 The implementation now consumes timestamped NRMM observer enclosures. It
 propagates constant target-parameter sets analytically and ego error boxes
 through the shared affine variational model. Their supports tighten collision,
-path, physical-state, terminal-entry and first-successor CLF constraints.
+path, physical-state, terminal and first-successor CLF constraints.
 Usable current enclosures remain optimization data. Unavailable, stale,
 incomplete or misaligned proof metadata does not prevent
 optimization around the current point estimates. Its unsupported tightening
@@ -65,19 +66,14 @@ the prediction center and its A and beta. These two parameters remain constant
 within that frame's prediction and may change at the next observation. The
 physical simulated target still obeys one fixed A and beta. Previous inputs
 still initialize the next solve. The primary
-budget is recomputed when observer metadata is present, because no inclusion
-of the new set in the old successor set has been established. The old slack
-sum therefore cannot justify a new hard safety cap. If current enclosures are
-unavailable, the numerical inherited-cap attempt and ordinary primary
-restoration remain available without a nesting claim. Missing current target
+stage is solved in every frame; no slack budget is carried between frames.
+Missing current target
 observations retain the last target forecast. Neither this extrapolation nor a revised point estimate
 is relabeled a certified enclosure.
 
-Terminal entry reserves `sum_j ||L_f*G_intrinsic(:,j)||` inside the existing
-quotient ellipsoid. This can make the current nominal core infeasible even
-for small speed uncertainty. It is intentional that uncertainty is not
-dropped to force a solve. This entry test does not establish robust infinite
-continuation: the existing terminal policy/geometry remains nominal.
+The terminal rows subtract the ego generator support; the target enters
+the terminal rows as its estimate (see Terminal constraints). Uncertainty is not
+dropped to force a solve, and these rows do not establish robust continuation.
 
 ### Experimental outcomes versus theorem premises
 
@@ -107,15 +103,22 @@ The Fiala bicycle state is `x = [px; py; yaw; vx; vy; yawRate]` and its input is
 The default uses one 50-ms RK4 step; its midpoint collision node is an endpoint
 interpolant, not an independently integrated half hold.
 
-The prediction length is fixed at
-
-    M = min(maximumHorizonSteps, N + ceil(completionSeconds / sampleTime)).
+The prediction length is not fixed. The anchor rollout stops at the first node
+`M` with `N <= M <= maximumHorizonSteps` that is separating and at least
+`R + terminalHorizonMarginMeters` (1 m) from the target; without a target
+`M = N`. The terminal row itself uses `R`. With the anchor exactly at `R` the
+terminal row was active at zero correction, and the CLF stage stalled in Clarabel
+(InsufficientProgress or NumericalError) in six exact and noisy holds; a 1-m
+margin solved all six. A rollout that never reaches it uses
+`M = maximumHorizonSteps`, and the optimization then decides feasibility.
 
 Previous inputs are shifted and rolled out from the current measurement in
-both encounter and recovery frames. Prior affine states are not reused as the
-linearization trajectory. Without usable previous inputs, one moving-target
-potential-field rollout is constructed; when no target is present, nominal path guidance
-supplies the initialization. Potential guidance is a search reference, not a safety
+both encounter and recovery frames, then extended by path guidance. Prior
+affine states are not reused as the linearization trajectory. Only at startup
+is one moving-target potential-field rollout constructed; when no target is
+present, nominal path guidance supplies it. A shifted plan that cannot be
+rolled out (non-finite inputs, a braking ratio at the limit, or a tire-domain
+error) is reported as no solution; no other anchor replaces it. Potential guidance is a search reference, not a safety
 certificate. No maneuver bank is used.
 
 The target keeps Sharma et al. (2026), Eq. (17)'s constant tangential
@@ -165,26 +168,22 @@ Course guidance produces a yaw-rate demand. Inverse Fiala force feedback and a
 speed loop produce controls, which are rolled out through the same nonlinear
 bicycle RK4 map. Seed-only friction and braking shaping keep this reference
 within the useful tire region; they do not add steering magnitude or slew limits
-to the optimization. The last `settlingSeconds` settle intrinsic velocities into
-the existing free-pose straight terminal core. The final pose remains free, so
-this construction does not require arrival at a fixed path station. A seed may
-still violate collision or terminal constraints and is never executable by itself.
+to the optimization. A seed may still violate collision or terminal constraints
+and is never executable by itself.
 
-**Normal frames shift the previous input plan.** Only startup, an unevaluable
-shift, or failure of its optimization/accuracy step constructs this new field
-rollout. Each shifted or fresh trajectory is linearized once. There is no SCP
-iteration on an optimized nonlinear rollout within the same hold.
+**Normal frames shift the previous input plan.** Only startup constructs the
+field rollout. Each trajectory is linearized once. There is no SCP iteration on
+an optimized nonlinear rollout within the same hold.
 
 For an anchor `(xbar_i, ubar_i)` the shared model is
 
     x_(i+1) = f_h(xbar_i,ubar_i) + A_i (x_i-xbar_i) + B_i (u_i-ubar_i).
 
 The same anchor supplies dynamics, tire derivatives, collision directions,
-terminal geometry and the analytic first-successor CLF approximation. Input/state correction
+the terminal rows and the analytic first-successor CLF approximation. Input/state correction
 boxes are numerical iteration bounds. At unit trust scale, the steering
 correction is +/-0.075 rad and the braking-ratio correction +/-0.125. The
-trust scale is estimated from the plan innovation (below); only a failed fresh
-solve retries at two.
+trust scale is estimated from the plan innovation (below).
 Steering has no physical
 magnitude or slew bound. Physical braking/model-domain bounds remain. These
 numerical boxes are not certified nonlinear remainder bounds.
@@ -244,61 +243,7 @@ The original conic distance implementation and its historical experiment
 results remain recorded in the dated reports; they do not describe the
 current geometric implementation.
 
-## Inherited safety budget
-
-For an accepted affine prediction with prefix slacks `xi[0:N-1]`, retain
-`S = sum(xi)` and construct `xi_shift = [xi[1:N-1], 0]`. The CLF problem first
-uses the hard constraints
-
-    sum(xi_new) <= sum(xi_shift) = S - xi[0],
-    xi_new[0] <= xi_shift[0].
-
-No lexicographic tie is added to the inherited budget. The first-stage cap
-prevents transferring the available slack into the executed hold. Its rows
-cover the hold's start and midpoint, not continuous-time clearance. The same
-budget remains fixed through any model-accuracy refinement in this frame;
-`xi[0]` is subtracted once per physical sample, never once per iteration.
-The normal objective remains the same CLF slack plus bounded proximal tie.
-There is no additional weighted safety objective.
-
-In an exact common prediction model, if the previous full trajectory is
-feasible and its appended terminal feedback stays admissible, the shifted
-slacks and controls are a feasible candidate. The tail contributes the new
-zero slack. Consequently the budget-constrained problem is feasible without
-recomputing the optimum of the primary problem. The retained quantity is a
-trajectory-dependent upper bound on the optimal safety value, not the optimal
-PCBF value itself. Inherited-budget stages therefore record `primaryOptimum`
-as NaN and `primaryOptimumComputed` as false.
-
-This exact-shift premise does not automatically hold in the implemented
-nonlinear controller: the saved states satisfy the previous affine model;
-the new anchor is integrated from the current measurement; collision tangents
-and terminal placement are rebuilt. Even small discrepancies can invalidate
-a tight cap. The implementation attempts the inherited cap in the current
-convex program; `budgetAnchorResidual` records whether the zero-correction
-shift itself satisfies its assembled constraints. It is a diagnostic, not a
-nonlinear safety certificate. A failed capped CLF solve triggers primary
-restoration and the existing bounded potential-field retry. The restoration creates a
-new budget and breaks the previous monotonic-budget chain; this event is
-explicit in the attempt log. No stored plan supplies an issued command.
-
-Appending the old terminal feedback, rather than merely a trim input, uses
-the old terminal reference and augmented input memory. Outside that core the
-feedback is only an initializer; terminal membership still belongs to the
-new optimization. A target/context reset uses the existing explicit reset
-contract, rather than inheriting a budget for a changed problem.
-
-With exact feasibility and no restoration/tolerance errors,
-`S[k+1] <= S[k] - xi[0|k]` implies summability of the executed-stage slacks and
-`xi[0|k] -> 0`. It does not alone imply `S[k] -> 0`: the sequence `(0,c)` can
-postpone a future slack indefinitely while keeping its sum constant.
-Thus Huang et al.'s optimal-value convergence theorem cannot simply be
-relabelled as a theorem for this suboptimal budget. The reference is
-[Huang et al., 2025, Section III](https://arxiv.org/html/2502.08400v1).
-Finite solver tolerances and budget restorations further limit any exact
-monotonicity claim; closed-loop recovery and collisions are audited separately.
-
-## Primary restoration and secondary dissipation
+## PCBF slack and CLF dissipation
 
 One nonnegative collision slack is assigned to each primary-horizon stage;
 it relaxes the start and midpoint separation rows. Completion-tail rows are
@@ -311,24 +256,20 @@ hard in both optimization stages, including the finite completion tail.
 The first problem minimizes the sum of PCBF slacks. The unbounded CLF slack
 and its cone are eliminated from this problem without changing its feasible
 projection. If the zero correction with zero slacks satisfies every linear
-row, equality, bound and endpoint cone, it attains the global lower bound zero.
+row, equality, bound and path cone, it attains the global lower bound zero.
 The primary stage is then completed analytically; the CLF stage still runs.
 `numericalSolve` distinguishes analytic completion from an actual solver call. The primary therefore contains only the
-shared dynamics, state/input limits, collision rows and endpoint cone.
+shared dynamics, state/input limits, collision, path and terminal rows.
 
 A finite positive primary value need not be a useful safety result. The fixed
 current-state rows supply the unavoidable lower bound
 
     J_lower = max(0, -min(g(x_current))).
 
-When a shifted problem has no numerical point, or its primary value exceeds
-this lower bound, one fresh potential-field model is tried. Primary values are compared only after positive solver termination; a finite
-array from a failed primary solve is not a valid PCBF optimum. The smaller
-primary value is retained, with ties favoring the shifted model. A fresh problem that reports infeasibility or numerical
-stalling permits one bounded enlargement to twice the nominal input box; its better primary result is retained. State boxes, physical bounds,
-collision rows and terminal conditions remain. The CLF is constructed only once for each model and reused if the inherited budget needs primary restoration. At most one fresh potential-field retry is used across
-the complete within-frame refinement, rather than resetting that allowance
-each time the dynamics are rebuilt.
+A primary value above this lower bound is issued as positive slack; it does
+not trigger another model, seed or enlarged box. A primary problem without a
+numerical point is reported as no solution. A finite array from a failed
+primary solve is not a valid PCBF optimum.
 
 On the selected model the single CLF requirement is
 
@@ -343,7 +284,11 @@ quadratic is locally justified, not a global nonlinear CLF; positive slack can
 remain necessary away from cruise even without a target. The secondary minimizes
 
     (rho + epsilon * lossLower * R(dU)) / max(V(x),1),
-    sum(xi) <= inheritedBudget or achievedPrimary + lexicographicTieTolerance.
+    sum(xi) <= achievedPrimary + lexicographicTieTolerance * max(1, achievedPrimary),
+
+with `lexicographicTieTolerance = 1e-4` m. With a 1e-5 cap the CLF stage often
+stalled in Clarabel (InsufficientProgress, primal residual 1e-5 to 6e-5) because
+the zero-slack set is a slab only micrometres thick; 0.1 mm restored progress.
 
 `R` is the normalized squared input increment about the linearization inputs.
 At an exact optimum its effect on minimum physical CLF slack is bounded by
@@ -354,7 +299,7 @@ nor deviation from the construction feedback. PCBF priority is retained;
 CLF minimization has this explicit bounded tie allowance. A zero primary
 result still runs the CLF stage. The componentwise input boxes imply `R <= 1`,
 so the former epigraph `R <= sigma <= 1` is eliminated exactly. Clarabel solves
-the native sparse quadratic objective with the endpoint and CLF cones retained;
+the native sparse quadratic objective with the path and CLF cones retained;
 these are conic QPs rather than linearly constrained QPs. State variables remain
 explicit to preserve dynamic sparsity.
 
@@ -373,28 +318,17 @@ through the nonlinear model, and no pose, state, CLF or path-deviation agreement
 test, damped step or line search follows the solve. The path corridor is
 enforced only by the affine rows at the full limit `L`.
 
-There are at most **two actual trajectory model builds** per frame. A normal
-frame uses one shifted model and one inherited-budget CLF solve. If the shifted
-problem returns no completed CLF result, one fresh potential rollout may replace
-the initialization and receive its own model. A fresh seed that fails reports
-failure; it is not repeatedly optimized and relinearized.
-`maximumLinearizations=1` disables the fresh retry after a built shifted model;
-the default of two allows it. Startup has only the one fresh model regardless.
-The input trust scale follows the plan innovation (next section). This local
-numerical step bound is not an actuator constraint.
+Each frame builds exactly **one trajectory model** and makes at most two
+numerical solves (the primary stage is skipped analytically when the zero
+correction is optimal). The input trust scale follows the plan innovation (next
+section). This local numerical step bound is not an actuator constraint. No
+global SQP convergence theorem or hard execution deadline follows from this
+finite work budget.
 
-A failed inherited-budget attempt restores PCBF on the existing matrices and
-reuses the analytic CLF cone. One bounded input-box enlargement (trust scale two)
-also reuses those matrices, changing only input bounds and the normalized
-proximal objective. Initialization and these restoration solves can require more
-than one numerical solve; one model does not imply one solve in every
-exceptional frame. `linearizationCount` counts actual builds, while attempt logs
-retain reused-model solves with `modelBuilt=false`. No global SQP convergence
-theorem or hard execution deadline follows from this finite work budget.
-
-A frame without a completed CLF result reports
-`collisionAvoidanceController:noOptimizationSolution`; incomplete numerical
-points and previous-frame plans are not issued instead.
+A frame whose anchor is unavailable or whose PCBF or CLF stage returns no
+numerical result reports `collisionAvoidanceController:noOptimizationSolution`.
+No seed, enlarged box, inherited budget, previous-frame plan or incomplete
+numerical point is used instead.
 
 ## Input trust scale from the plan innovation
 
@@ -454,15 +388,41 @@ target, not a certified bound on the nonlinear remainder or on separation.
 
 ## Terminal constraints
 
-The completion tail and augmented input memory remain. The endpoint core has
-free rigid pose; its Schur-reduced ellipsoid restricts velocity and final input,
-not a fixed longitudinal arrival position. It does not redefine the CLF.
+The terminal set is the exit from the perception radius `R`
+(`encounterRangeMeters`, 50 m). The estimator receives the target only inside
+`R`, and outside it there is no collision risk. At the last node `M`, with ego
+position `p`, yaw `psi`, body velocity `v` and predicted target position `q`
+and velocity `w`:
 
-The existing encounter-range contract is unchanged. Its exit index is selected
-on the anchor. At an endpoint still within range, the existing separation or
-departure geometry contributes affine rows. Fitting the stored endpoint pose
-after optimization is not an acceptance test. Neither the core's nominal
-invariance argument nor the affine tail certifies the realized nonlinear plant.
+    norm(p - q) >= R,                               (beyond the radius)
+    (p - q)' (Rot(psi) v - w) >= 0,                 (separating)
+    every ego rectangle corner within lateralClearance = [right; left] of the path.
+
+The target conditions are linearized on the anchor endpoint with the fixed
+direction `n = (pbar - qbar)/norm(pbar - qbar)`:
+
+    n' (p - q) >= R + rho_p,         n' (Rot(psi) v - w) >= rho_v,
+
+The first row is sufficient for the distance condition because
+`n'(p - q) <= norm(p - q)`. The second is the separating speed, linearized in
+`psi` and `v`. `rho_p` and `rho_v` are the ego generator supports along these
+rows (zero without uncertainty). The target enters as its estimate: beyond `R`
+there is no collision risk by definition, and its uncertainty is carried by
+the collision rows inside `R`. At first detection the target tube can exceed
+`R` itself (60.6 m at 5 s in the noisy head-on), which would make any robust
+terminal row unreachable.
+path normal at the anchor corner, with the ego generator support subtracted.
+Without a target only the road rows remain. Without `lateralClearance` only the
+target rows remain. Collision rows apply at nodes inside `R`, including a later
+re-entry, and the 10-m path corridor applies at every node.
+
+The separating condition prevents an endpoint that would re-enter `R` in the
+next instant. It does not prevent a later re-entry by a target whose constant
+sideslip turns it back; the next frame's horizon then extends again. No
+invariance or recursive-feasibility argument for this terminal set is claimed.
+The terminal quantities of the issued affine endpoint are recorded as
+`terminalDistanceMeters`, `terminalSeparatingSpeed` and
+`terminalRoadMarginMeters`.
 
 ## Issued commands, diagnostics and limits
 
@@ -477,8 +437,8 @@ No previous trajectory or primary-only point is issued instead.
 termination it is not a certified optimum. Attempt logs retain all primary
 models and timings; `selectedAttempt` identifies the model supplying the
 command. `optimizationConverged` describes the numerical stages of the selected
-problem, not discarded restoration attempts, optimality of an inherited cap,
-Continuation state version 72 stores the per-stage slacks and their total
+problem, not optimality of the issued point under nonlinear dynamics.
+Continuation state version 73 stores the per-stage slacks and their total
 alongside the existing single-CLF trajectory state, and the trust estimate
 (`scale`, coefficient `curvature`, last `correction`).
 

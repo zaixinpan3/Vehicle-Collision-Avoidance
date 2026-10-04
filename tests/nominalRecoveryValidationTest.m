@@ -59,7 +59,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.addTeardown(@()delete(file));
             runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=1,ContinuationFile=file);
             saved=load(file,'continuation');continuation=saved.continuation;
-            continuation.result.trace=rmfield(continuation.result.trace,'potentialFieldRestarted');
+            continuation.result.trace=rmfield(continuation.result.trace,'terminalDistanceMeters');
             save(file,'continuation');
             testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
                 Scenarios="recovery",Frames=2,ResumeFrom=file), ...

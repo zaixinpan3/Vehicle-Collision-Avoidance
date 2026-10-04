@@ -1,5 +1,5 @@
 classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
-    % Initialization/restoration and inherited-budget CLF on one affine model.
+    % One affine model per sample, safety slack then CLF; no fallback algorithm.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -26,9 +26,13 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 -problem.solution.clfInitialValue+problem.solution.clfRequiredDecrease),AbsTol=cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
-            endpoint=[problem.predictedState(:,end);inputs(:,end)];
-            membership=terminalContinuation.membership(endpoint,problem.metadata.endpointIndex,problem.model.terminal);
-            testCase.verifyLessThanOrEqual(membership,cfg.solver.constraintTolerance);
+            % Terminal set: beyond the perception radius, separating, inside the road.
+            testCase.verifyEqual(problem.metadata.terminalSet,"beyondPerceptionRadiusSeparatingInsideRoad");
+            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalDistanceMeters, ...
+                cfg.collision.encounterRangeMeters-1e-6);
+            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalSeparatingSpeed,0);
+            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,-1e-3);
+            testCase.verifyGreaterThan(size(inputs,2),cfg.controller.horizonSteps);
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
         function targetFreeInitializationRunsBothLexicographicStages(testCase)
@@ -87,53 +91,32 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             anchor=problem.model.linearization;
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
-            testCase.verifyFalse(problem.metadata.search.potentialFieldRestarted);
             testCase.verifyEqual(problem.metadata.search.linearizationCount,1);
+            testCase.verifyEqual([problem.metadata.search.stages.objective],["pcbfSlack","clfSlack"]);
             testCase.verifyEqual(anchor.states(:,1),problem.model.initialState,AbsTol=0);
             testCase.verifyNotEqual(anchor.states(:,1),prior.stateTrajectory(:,2));
-            testCase.verifyEqual(anchor.inputs(:,1:end-1),prior.inputTrajectory(:,2:end),AbsTol=0);
+            count=min(size(anchor.inputs,2),size(prior.inputTrajectory,2)-1);
+            testCase.verifyEqual(anchor.inputs(:,1:count),prior.inputTrajectory(:,2:count+1),AbsTol=0);
             testCase.verifyEqual(problem.predictedState(:,1),problem.model.initialState,AbsTol=1e-7);
             testCase.verifyEqual(problem.metadata.solverCallCount,sum([problem.metadata.search.stages.numericalSolve]));
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyAffinePrediction(testCase,problem,cfg);
             localVerifyAnchorRollout(testCase,anchor,cfg);
         end
-        function failedShiftReinitializesPotentialFieldAndRebuildsBothStages(testCase)
-            [ego,road,cfg]=localFixture();
-            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            ego=localSuccessor(ego,prior);prior.inputTrajectory(1,end-9:end)=.15;
-            [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            search=problem.metadata.search;
-            testCase.verifyTrue(search.potentialFieldRestarted);
-            testCase.verifyEqual([search.attempts.modelBuilt],[true,false,true]);
-            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
-            testCase.verifyEqual(search.linearizationCount,2);
-            testCase.verifyEqual([search.attempts.initialization],["shiftedInputRollout","shiftedInputRollout","movingTargetPotentialField"]);
-            testCase.verifyEqual(search.initializationFailure,"pcbfNoNumericalResult");
-            testCase.verifyEqual([search.stages.objective],["inheritedSafetyBudget","clfSlack","pcbfSlack","pcbfSlack","clfSlack"]);
-            testCase.verifyGreaterThan([search.attempts(search.selectedAttempt).stages.exitFlag],0);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            localVerifyAnchorRollout(testCase,problem.model.linearization,cfg);
-            localVerifyAffinePrediction(testCase,problem,cfg);
-        end
-        function failedFreshInitializationHasOnlyOneBoundedInputExpansion(testCase)
+        function anInfeasibleProblemIsReportedWithoutAnotherAttempt(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             model=problem.model;model.initialState(4)=20;
             [solution,search]=solvePredictiveControl(model,prior);
             testCase.verifyEmpty(solution);
-            testCase.verifyTrue(search.potentialFieldRestarted);
-            testCase.verifyEqual(search.linearizationCount,2);
+            testCase.verifyNumElements(search.attempts,1);
+            testCase.verifyEqual(search.attempts.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(search.attempts.inputTrustScale,search.trust.scale);
             testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
-            testCase.verifyEqual(search.attempts(end).inputTrustScale,2);
-            testCase.verifyEqual(search.attempts(end).modelBuilt,false);
-            testCase.verifyFalse(search.clfStageAttempted);
-            testCase.verifyEqual(search.terminationReason,"pcbfNoNumericalResult");
         end
         function overlappingHardRowsHaveNoInventedRestorationDirection(testCase)
             [ego,road,cfg]=localFixture();
             cfg.controller.horizonSteps=1;
-            cfg.nonlinear.recoveryHorizonSeconds=cfg.controller.sampleTime;
             target=struct('targetPositionInertial',[0;0], ...
                 'targetVelocityInertial',[0;0],'targetYawInertial',0);
             % The start and hard completion anchor both overlap. Ordinary
@@ -141,16 +124,25 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
-        function unevaluableShiftUsesFreshInitializationBeforeOptimization(testCase)
+        function anUnevaluableShiftIsReportedAsNoSolution(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior);prior.inputTrajectory(1,end)=pi;
-            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetPotentialField");
-            testCase.verifyEqual(problem.metadata.search.initializationFailure, ...
-                "collisionAvoidanceController:invalidTireOperatingPoint");
-            testCase.verifyFalse(problem.metadata.search.potentialFieldRestarted);
-            testCase.verifyEqual(problem.metadata.search.solverCalls,sum([problem.metadata.search.stages.numericalSolve]));
+            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
+                'collisionAvoidanceController:noOptimizationSolution');
+        end
+        function aTargetFreeHorizonStopsAtTheShortestLength(testCase)
+            [ego,road,cfg]=localFixture();road.lateralClearance=[4;4];ego.position(2)=.2;
+            [~,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            testCase.verifyEqual(size(inputs,2),cfg.controller.horizonSteps);
+            testCase.verifyTrue(problem.metadata.roadConstraintsEnforced);
+            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,-1e-3);
+            testCase.verifyEqual(problem.metadata.terminalDistanceMeters,Inf);
+        end
+        function aRoadTooNarrowForTheVehicleHasNoSolution(testCase)
+            [ego,road,cfg]=localFixture();road.lateralClearance=[.5;.5];
+            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
+                'collisionAvoidanceController:noOptimizationSolution');
         end
         function exhaustedBudgetDoesNotExecuteThePreviousTrajectory(testCase)
             [ego,road,cfg]=localFixture();
@@ -216,45 +208,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             search=problem.metadata.search;
             testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyFalse(search.potentialFieldRestarted);
             testCase.verifyTrue(search.clfStageCompleted);
             testCase.verifyGreaterThan(search.attempts(search.selectedAttempt).stages(1).exitFlag,0);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-        end
-        function shiftedSlackBudgetSkipsPrimaryAndStillOptimizesClf(testCase)
-            [ego,road,cfg]=localFixture();
-            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            prior.stageSlacks=[.4,.02,.03,zeros(1,5)];prior.safetyBudget=sum(prior.stageSlacks);
-            ego=localSuccessor(ego,prior);
-            [command,inputs,problem,next]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            search=problem.metadata.search;
-            testCase.verifyEqual(search.budgetSource,"shiftedTrajectory");
-            testCase.verifyEqual(search.slackCap,.05,AbsTol=1e-14);
-            testCase.verifyEqual(search.firstSlackCap,.02,AbsTol=1e-14);
-            testCase.verifyEqual(search.solverCalls,1);
-            testCase.verifyTrue(isnan(search.primaryOptimum));
-            testCase.verifyTrue(search.clfStageCompleted);
-            testCase.verifyFalse(problem.metadata.primaryOptimumComputed);
-            testCase.verifyTrue(problem.metadata.optimizationConverged);
-            testCase.verifyLessThanOrEqual(next.safetyBudget,.05+cfg.solver.feasibilityTolerance);
-            testCase.verifyLessThanOrEqual(next.stageSlacks(1),.02+cfg.solver.feasibilityTolerance);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            testCase.verifyEqual(next.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
-        end
-        function brokenBudgetRunsPrimaryRestorationBeforeIssuingANewPlan(testCase)
-            [ego,road,cfg]=localFixture();target=localNearTarget();
-            [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            prior.stageSlacks=zeros(1,cfg.controller.horizonSteps);prior.safetyBudget=0;
-            ego=localSuccessor(ego,prior);
-            q=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
-            ego.position=q(1:2);
-            [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            search=problem.metadata.search;
-            testCase.verifyEqual(search.attempts(1).budgetSource,"shiftedTrajectory");
-            testCase.verifyEqual(search.attempts(1).terminationReason,"clfNoNumericalResult");
-            testCase.verifyEqual(search.budgetSource,"primaryOptimum");
-            testCase.verifyGreaterThan(search.primaryOptimum,0);
-            testCase.verifyTrue(search.clfStageCompleted);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
         end
     end
@@ -279,8 +234,8 @@ function localVerifyAffinePrediction(testCase,problem,cfg)
     end
     testCase.verifyLessThanOrEqual(max(abs(residual),[],'all'),cfg.solver.feasibilityTolerance);
     testCase.verifyFalse(problem.metadata.affineValidationPerformed);
-    testCase.verifyEqual(size(inputs,2),min(cfg.controller.maximumHorizonSteps, ...
-        cfg.controller.horizonSteps+ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime)));
+    testCase.verifyGreaterThanOrEqual(size(inputs,2),cfg.controller.horizonSteps);
+    testCase.verifyLessThanOrEqual(size(inputs,2),cfg.controller.maximumHorizonSteps);
 end
 function [ego,road,cfg]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));

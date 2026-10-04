@@ -1,0 +1,17 @@
+function dropReplay2(file)
+repo='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+addpath(fullfile(repo,'config'),fullfile(repo,'scripts'),fullfile(repo,'estimator'),fullfile(repo,'solver','controller'));
+addpath(fullfile(fileparts(mfilename('fullpath')),'controller'),'-begin');
+global DIAG_DROP DIAG_SEARCH
+s=load(file).snapshot; fprintf('snapshot %s frame %d t=%.2f\n',s.scenario,s.frame,s.time);
+for drop={"","path","collision","terminalTarget","terminalRoad","stateLimits"}
+  DIAG_DROP=drop{1};collisionAvoidanceController("resetNominalTrajectory");
+  try
+    [c,~,p]=collisionAvoidanceController(s.egoInput,s.targetEstimate,s.road,s.configuration,s.previousState);
+    fprintf('  drop [%s]: SOLVED u=%s N=%d slack=%.3g\n',drop{1},mat2str(c.actuatorInput',3),p.metadata.horizonSteps,p.metadata.predictiveBarrierValue);
+  catch e
+    st=DIAG_SEARCH.stages; r=""; if ~isempty(st), r=sprintf('status %d res %.1e',st(end).solverInfo.nativeStatus,st(end).solverInfo.primalResidual); end
+    fprintf('  drop [%s]: FAIL %s %s\n',drop{1},DIAG_SEARCH.terminationReason,r);
+  end
+end
+end

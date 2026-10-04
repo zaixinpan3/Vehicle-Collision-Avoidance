@@ -862,17 +862,20 @@ Ego feedback tube
 & Stagewise Riccati gains propagate correlated generators, input uncertainty
 and input-increment uncertainty. Future posterior errors use the current
 generator as a frozen experimental envelope, not a proved future bound. \\
-Terminal continuation
-& An affine invariant zonotope contains endpoint uncertainty and a nominal
-mean neighborhood. Its disturbance box has a nominal-core floor to avoid
-degenerate scaling. Nonlinear remainder closure remains unproved. \\
+Terminal set
+& The implemented terminal set is the perception-radius exit: target beyond
+$R$ and separating (target estimate), ego rectangle inside the road, with ego
+generator supports subtracted. It is not the invariant terminal
+continuation of the theorem above, and no invariance is claimed. \\
 Safety and one CLF
 & With nonzero uncertainty, mean collision rows are hard and uncertainty
 tightenings may use slack throughout the finite horizon. The same quadratic
 CLF has uncertainty padding and a tracking-error-scaled proximal tie. \\
 RTI admission
-& One model is built per shifted or fresh APF anchor. The completed solution is
-issued without a nonlinear replay. The next plan innovation is split exactly
+& One model is built per frame (startup APF rollout or shifted plan); the
+inherited budget of the theorem is not implemented, the PCBF stage is solved
+in every frame, and a frame without a solution is reported. The completed
+solution is issued without a nonlinear replay. The next plan innovation is split exactly
 into an observation part (posterior minus a nonlinear replay from the plan's own
 prediction) and a model part (replay minus the affine prediction); only the
 model part sets the input trust scale. This

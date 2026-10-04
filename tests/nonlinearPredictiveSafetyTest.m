@@ -166,8 +166,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             expected=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
             testCase.verifyEqual(state.targetEpoch,q,AbsTol=1e-12);
-            testCase.verifyEqual(problem.predictedJointState(7:10,1:size(prior.predictedJointState,2)-1), ...
-                prior.predictedJointState(7:10,2:end),AbsTol=1e-12);
+            % The horizon length follows the terminal set and may differ.
+            count=min(size(problem.predictedJointState,2),size(prior.predictedJointState,2)-1);
+            testCase.verifyEqual(problem.predictedJointState(7:10,1:count), ...
+                prior.predictedJointState(7:10,2:count+1),AbsTol=1e-12);
             testCase.verifyEqual(state.sampleIndex,1);
         end
         function nonconsecutiveSampleTimesCannotReuseTheTrajectory(testCase)
@@ -210,7 +212,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,72);
+            testCase.verifyEqual(state.version,73);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;-1;0;1.6;2.4;.95;0;0];
@@ -219,55 +221,6 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             q(3)=pi-1e-12;
             next=predictiveSafetyGeometry.predictTarget(q,1e8);
             testCase.verifyLessThan(next(2),q(2)-1);
-        end
-        function tinyPhysicalTransverseAccelerationStillAffectsInfiniteSeparation(testCase)
-            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
-            q=[24;6;pi-1e-12;2;-1e-18;0;1.6;2.4;.95;0;0];
-            testCase.verifyLessThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
-            q(3)=pi;
-            testCase.verifyGreaterThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
-        end
-        function straightEndpointSeparationIsIndependentOfWorldHeading(testCase,orientation)
-            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
-            q=[24;6;pi;2;-1;0;1.6;2.4;.95;0;0];
-            expected=terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg);
-            rotation=[cos(orientation),-sin(orientation);sin(orientation),cos(orientation)];
-            q(1:2)=rotation*q(1:2);q(3)=q(3)+orientation;
-            seed.epochState(1:2)=rotation*seed.epochState(1:2);seed.epochState(3)=seed.epochState(3)+orientation;
-            actual=terminalContinuation.separation(seed,q,[0;0;orientation;0;4;4],cfg);
-            testCase.verifyGreaterThan(actual,0);
-            testCase.verifyEqual(actual,expected,AbsTol=1e-12);
-        end
-        function returningTargetOrbitMustBeSeparatedAtTheEndpointSeed(testCase)
-            [~,~,cfg]=localFixture();frame=[0;0;0;0;4;4];seed=localSeedAtOrigin(cfg,0);
-            q=[10;0;0;8;1;asin(.16);1.6;2.4;.95;0;0];
-            margin=terminalContinuation.separation(seed,q,frame,cfg);
-            testCase.verifyLessThan(margin,0);
-        end
-        function acceleratingTargetBehindCannotUseAConstantSpeedSeed(testCase)
-            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
-            q=[-20;0;0;4;1;0;1.6;2.4;.95;0;0];
-            testCase.verifyLessThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
-        end
-        function acceleratingTargetAheadAllowsIndefiniteFollowing(testCase)
-            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
-            q=[20;0;0;10;1;0;1.6;2.4;.95;0;0];
-            testCase.verifyGreaterThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
-        end
-        function deceleratingTargetHasABoundedForwardExcursion(testCase)
-            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
-            q=[-20;0;0;10;-2;0;1.6;2.4;.95;0;0];
-            testCase.verifyGreaterThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
-        end
-        function aBrakingTargetCanReturnFromOutsideACircularLane(testCase)
-            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,.005);
-            q=[250;200;0;5;-1;0;1.6;2.4;.95;0;0];
-            testCase.verifyLessThan(terminalContinuation.separation(seed,q,[0;0;0;.005;4;4],cfg),0);
-        end
-        function aStationaryTargetWithSideslipRemainsAFixedRectangle(testCase)
-            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
-            q=[0;10;0;0;0;-.2;1.6;2.4;.95;0;0];
-            testCase.verifyGreaterThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
         end
         function finiteBrakingSlewUsesAppliedInputMemory(testCase)
             [ego,road,cfg]=localFixture();
@@ -304,10 +257,4 @@ end
 function ego=localSuccessor(ego,prior)
     x=prior.stateTrajectory(:,2);ego.position=x(1:2);ego.yaw=x(3);ego.speed=x(4);
     ego.lateralVelocity=x(5);ego.yawRate=x(6);ego.heldActuatorInput=prior.appliedInput;
-end
-
-function seed=localSeedAtOrigin(cfg,curvature)
-    seed=terminalContinuation.build(cfg,curvature);
-    lane=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
-    seed=terminalContinuation.anchor(seed,seed.reference.state,0,lane);
 end

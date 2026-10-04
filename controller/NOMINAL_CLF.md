@@ -57,9 +57,9 @@ successor, use the analytic Frenet error Jacobian J:
 
 The same affine dynamics relate dx_1 to the first input correction. Its Hessian
 is positive semidefinite, so the first-step CLF epigraph is a convex quadratic
-constraint represented by one second-order cone. The free-pose terminal core
-also retains its cone: the optimization is a sparse conic QP/SOCP, not a QP
-with exclusively affine constraints.
+constraint represented by one second-order cone. The path corridor also uses
+cones: the optimization is a sparse conic QP/SOCP, not a QP with exclusively
+affine constraints.
 
 The objective is
 
@@ -108,19 +108,18 @@ inputs. The frozen-problem replay and fourteen-case rollback results are in
 `report/CLF_RETURN_DIAGNOSIS_20261003.tex`. No extra path-deviation penalty or
 second CLF is introduced to address that regression.
 
-The PCBF budget is a hard constraint of this convex problem. It comes from
-shifted stage slacks when available, or a primary slack minimization during
-initialization/restoration. A zero primary value never skips CLF optimization.
+The PCBF budget is a hard constraint of this convex problem. It comes from the
+primary slack minimization of the same frame. A zero primary value never skips
+CLF optimization.
 
 ## Initialization
 
 The completed CLF optimizer point is issued directly; it is not replayed through
 the nonlinear model or damped.
-There is one trajectory model per initialization. A failed shifted model may
-request one fresh potential-field initialization and its model; a fresh model
-is never repeatedly relinearized in that hold. Restoring
-a failed inherited budget or enlarging an input correction box reuses the
-already built model. See [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
+There is one trajectory model per frame: a potential-field rollout at startup,
+otherwise the shifted previous plan. A frame that cannot be solved reports no
+solution; no other seed, retry or enlarged box follows. See
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 
 `nominalFeedback` and `nominalGuidanceParameters` supply path guidance and a
 trim steering correction only for constructing the potential-field seed. They neither

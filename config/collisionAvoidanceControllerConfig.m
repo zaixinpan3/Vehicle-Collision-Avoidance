@@ -21,6 +21,9 @@ end
 
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
+    % horizonSteps carries safety slack and is the shortest horizon. The
+    % horizon extends until the anchor reaches the terminal set, at most
+    % maximumHorizonSteps; a plan that cannot reach it has no solution.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512, ...
         'maximumLateralDeviationMeters',10);
     % trustRadius scales RTI state/input corrections about each fresh rollout.
@@ -29,20 +32,23 @@ function cfg=localDefaults()
     % [trustMinimumScale,trustMaximumScale]. trustRetention is the per-sample
     % retention of the estimated error coefficient; the scale grows by at most
     % 1/sqrt(trustRetention) per sample and shrinks at once.
-    cfg.nonlinear=struct('integrationStep',.05,'terminalRadius',.25, ...
-        'trustRadius',.5,'maximumLinearizations',2,'recoveryHorizonSeconds',4, ...
+    cfg.nonlinear=struct('integrationStep',.05,'trustRadius',.5, ...
         'trustInnovationMeters',.02,'trustInitialScale',.125, ...
         'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
     % Potential-field seed parameters; these are not optimized actuator limits.
     cfg.initialization=struct('previewSeconds',3,'previewStepSeconds',.1, ...
-        'clearancePaddingMeters',.7,'settlingSeconds',1.5,'brakingRatioLimit',.3, ...
+        'clearancePaddingMeters',.7,'brakingRatioLimit',.3, ...
         'lateralAccelerationFraction',.98,'frontForceFraction',.98,'speedGain',1);
-    % Outside this ego-to-target reference-position radius there is no
-    % collision risk. Evaluate this at each prediction node, including any
-    % later re-entry. Inf keeps the complete target interaction active.
+    % encounterRangeMeters is the perception radius: the estimator receives
+    % the target only inside it, and outside it there is no collision risk.
+    % Collision rows apply at nodes inside it, including a later re-entry.
+    % The terminal set requires the target beyond it and separating.
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
-    cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50);
+    % terminalHorizonMarginMeters only places the horizon end beyond the
+    % radius; a terminal row active at the anchor stalled the conic solver.
+    cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50, ...
+        'terminalHorizonMarginMeters',1);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -64,7 +70,7 @@ function cfg=localDefaults()
     % An in-flight factorization can overrun this soft wall-clock limit.
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
         'feasibilityTolerance',1e-5,'constraintTolerance',1e-8, ...
-        'optimalityTolerance',1e-7,'lexicographicTieTolerance',1e-5, ...
+        'optimalityTolerance',1e-7,'lexicographicTieTolerance',1e-4, ...
         'clfTieTolerance',1e-4);
     cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6);
 end
@@ -93,7 +99,7 @@ function localValidate(cfg)
     if cfg.controller.horizonSteps>cfg.controller.maximumHorizonSteps
         localInvalid('horizonSteps cannot exceed maximumHorizonSteps.');
     end
-    for name=["integrationStep","terminalRadius","trustRadius","recoveryHorizonSeconds", ...
+    for name=["integrationStep","trustRadius", ...
             "trustInnovationMeters","trustInitialScale","trustMinimumScale","trustMaximumScale"]
         validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
     end
@@ -102,7 +108,6 @@ function localValidate(cfg)
             || cfg.nonlinear.trustInitialScale>cfg.nonlinear.trustMaximumScale
         localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
     end
-    validateattributes(cfg.nonlinear.maximumLinearizations,{'double'},{'scalar','real','finite','integer','>=',1,'<=',2});
     for name=string(fieldnames(cfg.initialization)).'
         validateattributes(cfg.initialization.(name),{'double'},{'scalar','real','finite','positive'});
     end
@@ -113,7 +118,8 @@ function localValidate(cfg)
         if cfg.initialization.(name)>=1,localInvalid('initialization.%s must lie in (0,1).',name);end
     end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
-    validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','nonnan','positive'});
+    validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.collision.terminalHorizonMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters
         localInvalid('The encounter range must exceed the collision safety margin.');
     end

@@ -9,9 +9,8 @@ It adds no lateral cost, CLF, controller mode or actuator limit.
 Both the PCBF and CLF problems impose the bound at hold starts, model midpoints
 and the endpoint, over the prefix and completion tail. No safety slack relaxes
 it. Every node uses `L`. A measured state already outside the bound cannot be made
-feasible by changing future controls. Primary zero-correction detection and
-inherited-anchor residuals include every corridor cone, not just the terminal
-membership cone.
+feasible by changing future controls. Primary zero-correction detection
+includes every corridor cone.
 
 For a straight path, the two lateral half-planes are exact. For a circle with
 center `c` and radius `R`, the corridor is the annulus
@@ -46,19 +45,14 @@ The potential-field guidance velocity is projected onto
 
 where `T` is the existing nominal guidance lookahead. This is a seed-generation
 condition for a first-order point guidance law, not a bicycle safety proof.
-The default completion is four seconds, with the last 1.5 seconds devoted to
-intrinsic terminal settling; the remaining guidance interval allows the seed
-to bend back before settling on a freely placed straight continuation. The
-initial input correction scale is 0.125; normal frames still inherit their
-previous accepted scale. These changes keep a single initialization/model per
-attempt. The single CLF and the two-stage/inherited-budget objectives are
-unchanged.
+The seed continues until the terminal set is reached. The input correction
+scale follows the plan-innovation trust estimate. The single CLF and the
+two-stage objectives are unchanged.
 
 The issued plan is not replayed online, so the corridor holds for the affine
 prediction only. Offline ODE45 validation separately reports the maximum across
 31 samples per issued hold; this sampled check is not a continuous-plant
-certificate. The free-pose invariant terminal core retains its original
-intrinsic-dynamics role; it is not proved invariant inside this new path
-corridor. Thus no new infinite-horizon or recursive-feasibility claim for the
-corridor is made. A failed optimization still reports failure rather than
+certificate. The terminal set (perception-radius exit and road rectangle) is
+not proved invariant inside this path corridor. Thus no infinite-horizon or
+recursive-feasibility claim for the corridor is made. A failed optimization still reports failure rather than
 issuing a control from an unaccepted plan.

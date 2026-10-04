@@ -70,7 +70,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             [~,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
             testCase.verifyEqual(second.model.target,q,AbsTol=1e-12);
             testCase.verifyEqual(second.metadata.search.initialization,"shiftedInputRollout");
-            testCase.verifyEqual(second.metadata.safetyBudgetSource,"primaryOptimum");
+            testCase.verifyEqual([second.metadata.search.stages.objective],["pcbfSlack","clfSlack"]);
             testCase.verifyEqual(second.model.linearization.states(:,1),next,AbsTol=1e-12);
         end
         function theSingleClfBoundsAffineInitialAndSuccessorUncertainty(testCase)
@@ -95,14 +95,12 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(prediction.metadata.uncertaintyIncluded);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
         end
-        function feedbackErrorIsCarriedBesideTheNominalTerminalCore(testCase)
+        function feedbackErrorIsCarriedToTheEndpoint(testCase)
             [ego,~,road,cfg]=localFixture(0);
             ego.controllerErrorBound.bounds(4)=.001;
             [command,~,prediction]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
-            testCase.verifyGreaterThan(prediction.model.terminal.feedbackTube.radius(4),.001);
-            testCase.verifyGreaterThan(prediction.model.uncertaintyPrediction.terminalReserve, ...
-                prediction.model.terminal.radius);
+            testCase.verifyGreaterThan(prediction.model.uncertaintyPrediction.egoStateRadius(4,end),0);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
         end
         function directionalTargetSupportContainsTheConstantParameterFamily(testCase)

@@ -1,0 +1,29 @@
+observation,speed,scenario,outcome,holds,minimumSampledGapMeters,failure
+exact,8,headOn,recovered,202,1.3342,
+exact,8,acceleratingHeadOn,recovered,209,1.0774,
+exact,8,brakingLead,noSolution,26,1.3398,affine optimization did not complete (clfNoNumericalResult).
+exact,8,crossing,recovered,162,0.1942,
+exact,8,turningCrossing,recovered,291,0.1546,
+exact,8,curvedHeadOn,recovered,202,1.7172,
+exact,8,curvedCrossing,recovered,359,0.1865,
+exact,15,headOn,recovered,155,0.1797,
+exact,15,acceleratingHeadOn,recovered,146,0.1905,
+exact,15,brakingLead,noSolution,110,0.6552,affine optimization did not complete (clfNoNumericalResult).
+exact,15,crossing,recovered,141,0.1681,
+exact,15,turningCrossing,recovered,232,0.1887,
+exact,15,curvedHeadOn,noSolution,1084,1.2336,ffine optimization did not complete (pcbfNoNumericalResult).
+exact,15,curvedCrossing,recovered,155,0.1999,
+noisy,8,headOn,noSolution,30,1.9555,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,acceleratingHeadOn,noSolution,65,1.1558,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,brakingLead,noSolution,0,,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,crossing,recovered,163,0.6536,
+noisy,8,turningCrossing,noSolution,8,11.8117,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,curvedHeadOn,noSolution,25,3.9237,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,curvedCrossing,noSolution,0,,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,headOn,noSolution,16,2.075,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,acceleratingHeadOn,noSolution,13,4.5934,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,brakingLead,noSolution,0,,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,crossing,noSolution,42,2.7782,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,turningCrossing,noSolution,10,16.5414,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedHeadOn,noSolution,23,7.9438,ffine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedCrossing,noSolution,10,16.4258,ffine optimization did not complete (pcbfNoNumericalResult).

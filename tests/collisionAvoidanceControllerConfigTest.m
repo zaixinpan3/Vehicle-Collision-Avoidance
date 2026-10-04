@@ -80,12 +80,13 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             end
         end
 
-        function encounterRangeDefaultsToFiftyMetersAndMayBeUnbounded(testCase)
+        function encounterRangeDefaultsToFiftyMetersAndMustBeFinite(testCase)
+            % The terminal set requires the target beyond this radius.
             cfg = collisionAvoidanceControllerConfig();
             testCase.verifyEqual(cfg.collision.encounterRangeMeters, 50);
-            cfg = collisionAvoidanceControllerConfig( ...
-                struct('collision', struct('encounterRangeMeters', Inf)));
-            testCase.verifyEqual(cfg.collision.encounterRangeMeters, Inf);
+            testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
+                struct('collision', struct('encounterRangeMeters', Inf))), ...
+                'collisionAvoidanceController:invalidConfiguration');
         end
 
         function encounterRangeMustExceedTheCollisionBuffer(testCase)

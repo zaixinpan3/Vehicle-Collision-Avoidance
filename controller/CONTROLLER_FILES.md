@@ -1,41 +1,43 @@
 # Controller source map
 
-The controller and configuration contain nine MATLAB source files. See
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for budget inheritance and restoration
-and its affine prediction scope.
+The controller and configuration contain eight MATLAB source files. See
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for the two stages, the
+terminal set and the affine prediction scope.
 
 | Source | Responsibility |
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | Optimize CLF under inherited slack caps, restore PCBF when needed, and build one model per shifted or fresh potential-field seed |
-| `terminalContinuation.m` | Augmented free-pose endpoint core, construction bounds and anchor-based terminal geometry |
+| `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout or shifted plan) over a horizon that reaches the terminal set; PCBF slack stage, CLF stage, plan-innovation trust |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
-Normal frames shift the previous inputs and construct one nonlinear anchor.
-Startup, an unusable shift, or a failed shifted solve constructs
-a fresh artificial-potential-field seed. Each anchor is linearized once.
-The first completed CLF result is issued directly, without a nonlinear replay
-or agreement test. The input trust scale is estimated from the next posterior's
-plan innovation. The inherited prefix slack sum and
-first-stage cap replace a primary solve when feasible; a failed capped solve
-restores the primary problem. At most one fresh potential-field retry is used.
-There is no stored executable witness or alternate controller. The potential
-field supplies initialization, not a safety certificate. Positive PCBF slack
-still denotes relaxation.
-Road boundaries remain excluded, and the original given path defines the
-single CLF. Terminal feedback is used only for construction.
+Each sample builds one nonlinear anchor: a potential-field rollout at startup,
+otherwise the shifted previous plan extended by path guidance. The rollout stops
+at the first node of the terminal set, between `horizonSteps` and
+`maximumHorizonSteps`. The anchor is linearized once; the PCBF stage minimizes
+prefix safety slack and the CLF stage follows. The completed CLF result is issued
+directly, without a nonlinear replay or agreement test. If the shifted plan cannot
+be rolled out or either stage returns no numerical result, the controller reports
+`noOptimizationSolution`. There is no fallback seed, retry, enlarged input box,
+inherited slack budget or alternate controller. The input trust scale is estimated
+from the next posterior's plan innovation. Positive PCBF slack still denotes
+relaxation.
 
-Observer inputs now tighten affine sampled collision, path, physical-state,
-terminal-entry and CLF constraints. Updated observer sets preserve the input
-warm start but require a new primary budget. No posterior-inclusion or robust
-terminal invariance proof has been implemented. A finite affine error tube
-larger than the existing nominal terminal core can make the problem infeasible;
-the radii are not discarded to obtain a command. `observerPredictiveControlTest`
+The terminal set is the perception-radius exit: at the last node the target
+is beyond `encounterRangeMeters` (50 m) and separating, and every ego rectangle
+corner is inside the road `lateralClearance = [right; left]`. Without a target
+only the road rows remain and the horizon is `horizonSteps`. The given path
+defines the single CLF; between the start and the last node the 10-m path
+corridor still applies.
+
+Observer inputs tighten affine sampled collision, path, physical-state,
+terminal and CLF constraints. No posterior-inclusion or robust terminal
+invariance proof has been implemented; the radii are not discarded to obtain a
+command. `observerPredictiveControlTest`
 and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
 and expose that limitation. Complete nonlinear robust safety remains conditional
 on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.
@@ -50,11 +52,10 @@ no solved control output. Recovery, margin shortfalls and unverified theory
 premises are separate observations. `nominalRecoveryValidationTest` and
 `../scripts/verifyExperimentalAssumptionPolicy.m` exercise these distinctions.
 
-Initialization metadata uses `movingTargetPotentialField` and
-`potentialFieldRestarted`; `predictTarget` advances the prescribed target
+Initialization metadata uses `movingTargetPotentialField`, `laneFeedbackRollout`
+and `shiftedInputRollout`; `predictTarget` advances the prescribed target
 motion. The experiment entry points are `runPotentialFieldCampaign`,
-`extendPotentialFieldRecovery`, `auditPotentialFieldInitialization`, and
-`analyzePotentialFieldStudy.py` in `scripts/`. Saved validation continuations
+`extendPotentialFieldRecovery` and `analyzePotentialFieldStudy.py` in `scripts/`. Saved validation continuations
 must use the current trace schema. Historical reports and recorded artifacts
 retain the names used when those experiments were performed.
 
@@ -82,8 +83,9 @@ zero multipliers and translation invariance. Overlap has no imposed direction.
 `twoStagePredictiveControlTest` checks both objectives, the same CLF at all
 target ranges, primary priority, affine dynamics with consistent anchors,
 braking bounds, input increments distinct from physical steering limits,
-positive-slack reporting, fresh initialization after a failed shift, direct
-issue of the solved plan, inherited budgets and failed-budget restoration.
+positive-slack reporting, the terminal set (perception-radius exit, separating
+speed, road rectangle), the shortest target-free horizon, and that an
+infeasible problem or unusable shift is reported without another attempt.
 `trustInnovationTest` checks the plan-innovation trust law: startup scale,
 bounded growth, square-root shrinkage, attribution of a posterior departure to
 the observer part, and the minimum scale. `clfNominalRecoveryTest` checks target-free
@@ -92,6 +94,6 @@ construction feedback. `nominalClfTest` checks the trim, strict local nonlinear
 Lyapunov decrease, path-phase invariance, and rejection of retired cost-to-go
 settings. `movingTargetPotentialFieldTest` checks attraction, motion-aware
 repulsion, passing-side retention, and frame invariance.
-`../scripts/validateNominalClf.m` supplies sampled nominal-feedback diagnostics, not a regional proof. Model, geometry, terminal-core and
+`../scripts/validateNominalClf.m` supplies sampled nominal-feedback diagnostics, not a regional proof. Model, geometry and
 configuration tests retain their mathematical checks. Scenario campaigns and
 independent nonlinear replay belong in `scripts/`, with results in `report/`.
