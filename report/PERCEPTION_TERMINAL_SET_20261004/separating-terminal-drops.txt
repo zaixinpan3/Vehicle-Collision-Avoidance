@@ -1,0 +1,16 @@
+Constraint-group drop replays of the noisy failure frames (separating terminal, source of this addendum).
+Groups: terminalTarget = separating row; road = all road rows; collision = all collision rows;
+"tightening" in the script label removes the hard nominal collision rows and keeps the slacked observer-tightened rows.
+Result: OK = primary and CLF stages complete with that group removed; FAIL(pcbfNoNumericalResult st2) = primal infeasible.
+
+case                       frame  none  terminalTarget  road  collision  hardNominalCollision
+15 acceleratingHeadOn      16     FAIL  FAIL            FAIL  OK         OK
+15 brakingLead             64     FAIL  FAIL            OK    FAIL       FAIL
+15 crossing                37     FAIL  FAIL            OK    FAIL       FAIL
+15 curvedCrossing          15     FAIL  FAIL            OK    OK         FAIL
+15 curvedHeadOn            34     FAIL  FAIL            OK    FAIL       FAIL
+15 headOn                  22     FAIL  FAIL            FAIL  OK         OK
+15 turningCrossing         13     FAIL  FAIL            OK    OK         OK
+8 brakingLead              137    FAIL  FAIL            FAIL  OK         FAIL
+8 curvedCrossing           1      FAIL  FAIL            FAIL  OK         FAIL
+8 turningCrossing          14     FAIL  FAIL            OK    OK         FAIL

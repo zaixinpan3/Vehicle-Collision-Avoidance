@@ -17,8 +17,8 @@ function results = verifyObserverRobustConnection(outputPath)
     methods = {@localComparison, @localEllipsoid, @localCovariantMotion, @localRelativeYawBound, ...
         @localRelativeGeometry, @localRobustVertexRows, @localWholeHold, ...
         @localIntersection, @localPredictionVersusEstimation, ...
-        @localOutputFeedbackTube, @localRemainderDomain, @localTerminalCore, ...
-        @localSlackShift, @localClfSupply, @localClfCone, ...
+        @localOutputFeedbackTube, @localRemainderDomain, ...
+        @localClfSupply, @localClfCone, ...
         @localVanishingTie, @localCausalAction};
     checks = repmat(struct("name", "", "passed", false, "metrics", struct, ...
         "failure", ""), numel(methods), 1);
@@ -308,43 +308,6 @@ function metrics = localRemainderDomain()
     assert(maximumError <= correct && maximumError > 10*incorrect);
     metrics = struct("maximumSampledRemainder", maximumError, ...
         "wholeDomainBound", correct, "uncertaintyOnlyBound", incorrect);
-end
-
-function metrics = localTerminalCore()
-    contraction = 0.75;
-    quadratic = 0.1;
-    disturbance = 0.02;
-    discriminant = (1-contraction)^2-4*quadratic*disturbance;
-    radii = [(1-contraction)-sqrt(discriminant), ...
-        (1-contraction)+sqrt(discriminant)]/(2*quadratic);
-    radius = 0.2;
-    successor = contraction*radius+quadratic*radius^2+disturbance;
-    tooSmall = radii(1)/2;
-    tooSmallSuccessor = contraction*tooSmall+quadratic*tooSmall^2+disturbance;
-    assert(radius > radii(1) && radius < radii(2) && successor <= radius);
-    assert(tooSmallSuccessor > tooSmall);
-    assert((1-contraction)^2-4*quadratic*0.2 < 0);
-    metrics = struct("admissibleRadiusInterval", radii, "chosenRadius", radius, ...
-        "worstSuccessorRadius", successor, "tooSmallRadiusViolation", tooSmallSuccessor-tooSmall);
-end
-
-function metrics = localSlackShift()
-    slacks = [0.4, 0.25, 0.1, 0.05];
-    shifted = [slacks(2:end), 0];
-    successor = [0.2, 0.08, 0.04, 0.02];
-    assert(abs(sum(shifted)-(sum(slacks)-slacks(1))) < 1e-12);
-    assert(sum(successor) <= sum(shifted) && successor(1) <= shifted(1));
-    initial = sum(slacks);
-    executed = 0;
-    for index = 1:20
-        executed = executed+slacks(1);
-        slacks = 0.9*[slacks(2:end), 0];
-        assert(executed+sum(slacks) <= initial+1e-12);
-    end
-    postponed = [0, 0.1];
-    assert(sum(postponed) <= sum(postponed)-postponed(1) && sum(postponed) > 0);
-    metrics = struct("inheritedBudget", sum(shifted), "acceptedSuccessorBudget", sum(successor), ...
-        "executedSlackSum", executed, "positiveNondecayingBudgetCounterexample", sum(postponed));
 end
 
 function metrics = localClfSupply()

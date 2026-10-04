@@ -1,4 +1,4 @@
-# PCBF slack and one-step CLF optimization to a perception-radius or shoulder terminal set
+# PCBF slack and one-step CLF optimization to a separating terminal set
 
 Every frame uses the same target-independent analytic quadratic CLF, defined in
 [NOMINAL_CLF.md](NOMINAL_CLF.md). Every frame minimizes PCBF slack, then CLF
@@ -27,13 +27,13 @@ output-feedback PCBF**. The earlier baseline audit is retained in
 The completed mathematical design is in
 [Observer-to-robust-PCBF theory](OBSERVER_ROBUST_PCBF_THEORY.tex). It derives
 current joint uncertainty sets, causal prediction tubes, whole-hold robust
-rectangle constraints, an information-state terminal/shift theorem, and
+rectangle constraints, a per-sample safety statement with a separating terminal set, and
 disturbance-dependent recovery with this same CLF. A vanishing proximal
 weight preserves dissipation in one convex solve. These are conditional
 theoretical results, with finite checks in
 `scripts/verifyObserverRobustConnection.m`. The executable interface realizes
 part of that design; nonlinear remainder bounds, a causal output-feedback
-prediction policy, posterior-set inclusion, robust terminal invariance and
+prediction policy, posterior-set inclusion and
 continuous-hold safety remain unimplemented certification premises.
 
 ## Current observer integration
@@ -108,24 +108,17 @@ The default uses one 50-ms RK4 step; its midpoint collision node is an endpoint
 interpolant, not an independently integrated half hold.
 
 The prediction length is not fixed. The anchor rollout stops at the first node
-`M` with `N <= M <= maximumHorizonSteps` that is separating and at least
-`R + terminalHorizonMarginMeters` (1 m) from the target, or on a shoulder along
-the road; a fresh rollout for one mode stops only at that mode's set. Without a
-target `M = N`. The terminal row itself uses `R`. With the anchor exactly at `R` the
-terminal row was active at zero correction, and the CLF stage stalled in Clarabel
-(InsufficientProgress or NumericalError) in six exact and noisy holds; a 1-m
-margin solved all six. A rollout that never reaches it uses
+`M` with `N <= M <= maximumHorizonSteps` whose separating speed is at least
+`terminalSeparatingMarginMetersPerSecond` (0.5 m/s); without a target `M = N`.
+The terminal row itself requires only zero. A terminal row active at the anchor
+had stalled the CLF stage in Clarabel in an earlier version, hence the margin. A rollout that never reaches it uses
 `M = maximumHorizonSteps`, and the optimization then decides feasibility.
 
 Previous inputs are shifted and rolled out from the current measurement in
-both encounter and recovery frames, then extended by path guidance toward the
-path, or toward the shoulder centre when the plan's terminal mode is a
-shoulder. Prior
-affine states are not reused as the linearization trajectory. Only at startup, or
-after every mode of the shift is infeasible, are fresh rollouts constructed:
-one moving-target potential-field rollout for the separation mode (nominal path
-guidance when no target is present) and, for each shoulder mode, nominal path
-guidance to the centre of that shoulder. A shifted plan that cannot be
+both encounter and recovery frames, then extended by path guidance. Prior
+affine states are not reused as the linearization trajectory. Only at startup
+is one moving-target potential-field rollout constructed; when no target is
+present, nominal path guidance supplies it. A shifted plan that cannot be
 rolled out (non-finite inputs, a braking ratio at the limit, or a tire-domain
 error) is reported as no solution; no other anchor replaces it. Potential guidance is a search reference, not a safety
 certificate. No maneuver bank is used.
@@ -405,30 +398,27 @@ target, not a certified bound on the nonlinear remainder or on separation.
 
 ## Terminal constraints
 
-The terminal set is the exit from the perception radius `R`
-(`encounterRangeMeters`, 50 m). The estimator receives the target only inside
-`R`, and outside it there is no collision risk. At the last node `M`, with ego
-position `p`, yaw `psi`, body velocity `v` and predicted target position `q`
-and velocity `w`:
+The terminal set requires only that the ego separates from the target and stays
+on the road. At the last node `M`, with ego position `p`, yaw `psi`, body
+velocity `v` and predicted target position `q` and velocity `w`:
 
-    norm(p - q) >= R,                               (beyond the radius)
     (p - q)' (Rot(psi) v - w) >= 0,                 (separating)
     every ego rectangle corner within lateralClearance = [right; left] of the path
     (imposed at every predicted node, not only the last one).
 
-The target conditions are linearized on the anchor endpoint with the fixed
-direction `n = (pbar - qbar)/norm(pbar - qbar)`:
+If the relative velocity stays constant after `M`, the squared distance has
+derivative `2 (p - q)' v_rel >= 0` and second derivative `2 norm(v_rel)^2 >= 0`,
+so the distance never decreases again; the clearance at the endpoint then bounds
+the clearance afterwards. Because the endpoint may be close to the target, it
+also carries the collision rows of every other node inside `R`. An earlier
+version also required the target beyond `R` (50 m); following a braking lead
+never reached that set within 512 nodes, and the noisy brakingLead frames were
+infeasible only because of it.
 
-    n' (p - q) >= R + rho_p,         n' (Rot(psi) v - w) >= rho_v,
-
-The first row is sufficient for the distance condition because
-`n'(p - q) <= norm(p - q)`. The second is the separating speed, linearized in
-`psi` and `v`. `rho_p` and `rho_v` are the ego generator supports along these
-rows (zero without uncertainty). The target enters as its estimate: beyond `R`
-there is no collision risk by definition, and its uncertainty is carried by
-the collision rows inside `R`. At first detection the target tube can exceed
-`R` itself (60.6 m at 5 s in the noisy head-on), which would make any robust
-terminal row unreachable.
+The separating row is linearized at the anchor endpoint in position, yaw and
+body velocity and divided by the anchor distance. The target enters as its
+estimate, and its uncertainty is carried by the collision rows inside `R`; the
+ego generator support along the row is subtracted.
 
 The road rows are the same at every node: the ego drives on the road, so every
 predicted node after the measured one and every hold midpoint keeps all four
@@ -441,29 +431,14 @@ infeasible when the target exit shortened the horizon to 8--29 nodes. Without a
 target only the road rows remain; without `lateralClearance` there is no road
 constraint. Collision rows apply at nodes inside `R`, including a later re-entry.
 
-A road shoulder is a second kind of terminal set. `road.shoulderWidth =
-[right; left]` (zero for no shoulder, at most `lateralClearance`) is the outer
-part of the road on each side, and the premise is that no target enters it.
-The right-shoulder mode requires every corner lateral coordinate at most
-`-(right - shoulderWidth(1))` and the left-shoulder mode at least
-`left - shoulderWidth(2)`; the outer side is the road row. The heading error to
-the path must be within `shoulderHeadingToleranceRadians` (0.05 rad). The rows
-are linearized like the road rows, with the ego generator supports subtracted;
-the speed is not constrained. Each mode is a separate primary problem. The
-issued mode has the least primary slack; modes within
-`lexicographicTieTolerance` of it compete on CLF slack. The trust scale is
-expanded only while every mode is infeasible. The scenario road has 10-ft
-(3.048 m) shoulders on both sides. The premise is not checked: a target
-predicted onto the shoulder is not excluded by the shoulder mode, although the
-collision rows inside `R` remain in force.
-
-The separating condition prevents an endpoint that would re-enter `R` in the
-next instant. It does not prevent a later re-entry by a target whose constant
-sideslip turns it back; the next frame's horizon then extends again. No
-invariance or recursive-feasibility argument for this terminal set is claimed.
+The distance argument above holds only for a constant relative velocity. A
+braking lead, a target whose constant sideslip turns it back, or the ego's own
+return to the path can close the distance after `M`; the next frame's horizon
+then extends again. No invariance or recursive-feasibility argument for this
+terminal set is claimed.
 The terminal quantities of the issued affine endpoint are recorded as
 `terminalDistanceMeters`, `terminalSeparatingSpeed` and
-`terminalRoadMarginMeters`; `terminalMode` names the issued mode.
+`terminalRoadMarginMeters`.
 
 ## Issued commands, diagnostics and limits
 

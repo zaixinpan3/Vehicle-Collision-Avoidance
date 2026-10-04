@@ -29,9 +29,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             [~,largeInputs,large]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyGreaterThan(large.metadata.maximumCollisionTighteningMeters, ...
                 small.metadata.maximumCollisionTighteningMeters+.08);
-            % The enclosure may also change the issued terminal mode and horizon.
-            changed=~isequal(size(largeInputs),size(smallInputs)) || norm(largeInputs-smallInputs,'fro')>1e-5;
-            testCase.verifyTrue(changed);
+            testCase.verifyGreaterThan(norm(largeInputs-smallInputs,'fro'),1e-5);
             testCase.verifyTrue(large.metadata.uncertaintyIncluded);
             testCase.verifyFalse(large.metadata.robustNonlinearSafetyCertified);
             testCase.verifyEqual(large.metadata.safetyScope,"hardNominalGeometryWithRelaxedObserverMargins");
@@ -72,13 +70,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             [~,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
             testCase.verifyEqual(second.model.target,q,AbsTol=1e-12);
             testCase.verifyEqual(second.metadata.search.initialization,"shiftedInputRollout");
-            % One PCBF stage per terminal mode on the shifted anchor, then the
-            % CLF stage for the modes tied at the least slack.
-            objectives=[second.metadata.search.stages.objective];
-            modes=unique([second.metadata.search.attempts.terminalMode]);
-            testCase.verifyEqual(objectives(1:numel(modes)),repmat("pcbfSlack",1,numel(modes)));
-            testCase.verifyTrue(all(objectives(numel(modes)+1:end)=="clfSlack"));
-            testCase.verifyNotEmpty(objectives(numel(modes)+1:end));
+            testCase.verifyEqual([second.metadata.search.stages.objective],["pcbfSlack","clfSlack"]);
             testCase.verifyEqual(second.model.linearization.states(:,1),next,AbsTol=1e-12);
         end
         function theSingleClfBoundsAffineInitialAndSuccessorUncertainty(testCase)

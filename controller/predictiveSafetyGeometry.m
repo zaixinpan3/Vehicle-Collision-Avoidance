@@ -362,7 +362,7 @@ classdef predictiveSafetyGeometry
                 curve=lane.referenceCurve;origin=curve.origin;heading=curve.heading;k=curve.curvature;
             else
                 if any(abs(lane.segmentCurvature)>1e-12)
-                    error('collisionAvoidanceController:unsupportedReference','Polyline corners cannot define a smooth terminal lane reference.');
+                    error('collisionAvoidanceController:unsupportedReference','Polyline corners cannot define a smooth lane reference.');
                 end
                 origin=lane.segmentStart(1,:).';heading=atan2(lane.tangent(1,2),lane.tangent(1,1));k=0;
             end

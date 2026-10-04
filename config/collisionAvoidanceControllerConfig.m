@@ -43,15 +43,16 @@ function cfg=localDefaults()
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
     % Collision rows apply at nodes inside it, including a later re-entry.
-    % The terminal set requires the target beyond it and separating.
+    % The terminal set requires only a separating relative velocity (and the
+    % road); with a constant relative velocity the distance then never
+    % decreases again.
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
-    % terminalHorizonMarginMeters only places the horizon end beyond the
-    % radius; a terminal row active at the anchor stalled the conic solver.
-    % A road shoulder is also a terminal set: the ego rectangle on it with
-    % its heading within shoulderHeadingToleranceRadians of the path.
+    % terminalSeparatingMarginMetersPerSecond only places the horizon end
+    % where the anchor separates at that speed; a terminal row active at the
+    % anchor stalled the conic solver.
     cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50, ...
-        'terminalHorizonMarginMeters',1,'shoulderHeadingToleranceRadians',.05);
+        'terminalSeparatingMarginMetersPerSecond',.5);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -121,8 +122,7 @@ function localValidate(cfg)
     end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(cfg.collision.terminalHorizonMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
-    validateattributes(cfg.collision.shoulderHeadingToleranceRadians,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.collision.terminalSeparatingMarginMetersPerSecond,{'double'},{'scalar','real','finite','nonnegative'});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters
         localInvalid('The encounter range must exceed the collision safety margin.');
     end

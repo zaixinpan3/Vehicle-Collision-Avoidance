@@ -26,7 +26,7 @@
 \title{From a Multistage Vehicle Observer to an Output-Feedback\protect\\
 Robust Predictive Barrier and One Nominal CLF}
 \author{Pan Dynamics Collision Avoidance Research}
-\date{October 3, 2026}
+\date{October 3, 2026; terminal set revised October 4, 2026}
 \begin{document}
 \maketitle
 \begin{abstract}
@@ -35,12 +35,13 @@ covariant NRMM observer certificate. Its links are explicit: a positive
 comparison system bounds estimation error; an intersection update defines the
 current possible true states; a causal output-feedback prediction propagates
 these sets; support functions and interval reserves certify rectangle clearance;
-a shift-closed terminal continuation gives recursive feasibility; and the same
-path-following CLF provides disturbance-dependent recovery. An inherited
-zero safety-slack budget eliminates repeated primary minimization. One
-linearization is compatible with the theorem if its remainder bounds hold over
-the entire decision and uncertainty domain and its inner approximation retains
-the shifted certificate. We also derive a vanishing proximal weight that
+a terminal set that only requires the ego to separate from the target and to
+stay on the road bounds the clearance after the horizon when the relative
+velocity stays constant; and the same path-following CLF provides
+disturbance-dependent recovery. Each sample solves its own safety problem; no
+recursive feasibility is claimed. One linearization is compatible with the
+per-sample safety statement if its remainder bounds hold over the entire
+decision and uncertainty domain. We also derive a vanishing proximal weight that
 preserves CLF dissipation in one convex optimization. These are mathematical
 design results, with finite numerical checks, not a claim that the present
 certainty-equivalent controller already implements or certifies them.
@@ -57,8 +58,8 @@ motion. Here $\mathcal V_E,\mathcal V_C$ are the full vehicle rectangles and
 $d_0=0.20\,\mathrm m$ is the present design clearance, not an uncertainty bound.
 The nominal behavior is the given path at its desired cruise speed, with free
 longitudinal phase. There is one controller and one nominal CLF throughout the
-encounter and recovery. A terminal policy is a continuation used in the
-feasibility proof and prediction policy class; it is not a second command mode.
+encounter and recovery. The terminal set is a condition on the last predicted
+node, not a second command mode.
 
 The general use of online observer bounds in robust output-feedback MPC is
 established prior work \cite{Kohler}. The present connection specializes that
@@ -312,8 +313,8 @@ prediction step. A model with bounded nonzero defect must propagate that defect
 instead of claiming exact constant-parameter paths.
 
 \subsection{A causal tube that exposes the observer contribution}
-Use a policy class closed under shifting and terminal append. A useful
-finite-dimensional member is
+Use a causal estimate-feedback policy class. A useful finite-dimensional
+member is
 \begin{equation}\label{eq:policy}
 u_i=v_i+K_i(\hat x_{E,i}-c_{E,i}),
 \end{equation}
@@ -351,13 +352,6 @@ tube, and future worst-case observer bounds enter its disturbance term. For
 $K_i=0$, this reduces to ordinary reachable-set propagation. The closed-loop
 plant tube may contract if its controlled dynamics do; the observer decay
 constant is not substituted for $A_i$.
-
-Pure input vectors with $K_i=0$ at every possible future step are not generally
-closed under appending an output-feedback terminal policy. Either use a
-shift-closed policy class as above, or prove existence of a common open-loop
-terminal action for every terminal information set. The invalid quantifier
-exchange $\forall z\,\exists u(z)$ to $\exists u\,\forall z$ cannot supply
-output-feedback recursive feasibility.
 
 \section{Certified one-linearization collision constraints}
 \subsection{Remainders over the complete decision domain}
@@ -440,89 +434,43 @@ hold. If different slacks meet at a boundary, each adjacent hold must have its
 own valid node inequalities. A positive slack permits clearance below $d_0$;
 it is not a certificate of the requested margin.
 
-\section{The terminal object is an information set, with free path phase}
-Let $T(I,u,y)$ denote the information update, including all admitted plant and
-sensor outcomes represented by $y$. A terminal family $\mathfrak B_f$ has a
-causal policy $\kappa_f$ such that
+\section{The terminal set: separation and the road}
+Let $M$ be the last predicted node, with ego position $p_E$, yaw $\psi_E$,
+body velocity $v_E$, and target position $p_C$ and velocity $w_C$. The terminal
+set is
 \begin{equation}\label{eq:terminal}
-I\in\mathfrak B_f\Longrightarrow
-\begin{cases}
-\kappa_f(I)\text{ is admissible for every state in }\Z,\\
-\text{the entire next hold satisfies \eqref{eq:goal} and all hard constraints},\\
-T(I,\kappa_f(I),y)\in\mathfrak B_f\quad\text{for every admitted }y.
-\end{cases}
+(p_E-p_C)^\top\bigl(R(\psi_E)v_E-w_C\bigr)\ge0,\qquad
+\mathcal V_E\subseteq\text{road},
 \end{equation}
-The state includes time, observer/certificate memory and previous input if
-slew constraints are present. Free path phase is retained. There is no
-requirement to reach a prescribed longitudinal position at a prescribed time.
+together with the collision rows of every predicted node, which the endpoint
+also carries. No distance from the target and no invariant cruise core are
+required. The horizon length $M$ is chosen by the anchor rollout: the first node
+at or after the prefix length at which the anchor separates.
 
-This is a precise construction target rather than a cruise-orbit geometry
-surrogate. Define the robust predecessor of a family $\mathfrak A$ by
-\begin{equation}\label{eq:predecessor}
-\operatorname{Pre}(\mathfrak A)=
-\{I:\exists u\ \text{with safe admissible whole hold, }\
-T(I,u,y)\in\mathfrak A\ \forall y\}.
-\end{equation}
-The greatest controlled-invariant subfamily of the admissible safe information
-states is the union of all families satisfying \eqref{eq:terminal} with a
-suitable selector. This definition does not assume the kernel is nonempty or
-numerically computable. A certified, finitely represented invariant inner family is sufficient. Repeated
-predecessors approximate it, but identifying an infinite intersection of
-predecessors with the kernel additionally needs the usual compactness/closedness
-and action-selection conditions; no such identity is presumed here.
+\begin{proposition}[Clearance after the horizon]\label{prop:separating}
+Suppose that after $t_M$ the relative velocity $v_{\rm rel}=R(\psi_E)v_E-w_C$
+and both body orientations stay constant, and that \eqref{eq:terminal} and the
+endpoint collision row hold at $t_M$. Then the reference-point distance is
+nondecreasing for $t\ge t_M$, and with circumscribing disks of radii $R_E,R_C$
+the rectangle clearance after $t_M$ is at least
+$\norm{p_E-p_C}(t_M)-R_E-R_C$.
+\end{proposition}
+\begin{proof}
+With $\Delta(t)=p_E-p_C$, $\tfrac{d}{dt}\norm\Delta^2=2\Delta^\top v_{\rm rel}$
+and $\tfrac{d^2}{dt^2}\norm\Delta^2=2\norm{v_{\rm rel}}^2\ge0$. The first
+derivative is nonnegative at $t_M$ and nondecreasing, so $\norm\Delta$ never
+decreases. The disk bound follows from the triangle inequality.
+\end{proof}
+The premise is restrictive. A braking or accelerating target, a target whose
+constant sideslip turns it, and the ego's own return to the path all change
+$v_{\rm rel}$ after $t_M$ and can close the distance again. The next sample
+then predicts the encounter again inside its own horizon; that is a per-sample
+statement, not invariance. The set \eqref{eq:terminal} is therefore not
+controlled invariant, and no recursive-feasibility argument rests on it. An
+earlier version of this document built an information-state invariant terminal
+family with a local ego core; that design is not used and has been removed.
 
-\subsection{A constructive local ego core}
-Use transverse ego error $e$ and $q_E=\sqrt{e^\top P e}$. Suppose the same
-nominal feedback applied to estimates admits the verified local bound
-\begin{equation}\label{eq:coreBound}
-q_E^+\le a q_E+Cq_E^2+d_f,\qquad 0\le a<1,\ C\ge0,
-\end{equation}
-for every observer error in an invariant certificate envelope and every plant
-disturbance. Here $d_f$ includes feedback sensitivity to observer error; the
-sampling/trim defect is included too. An envelope $\bar b$ is invariant if
-$M\bar b+d^{\rm obs}\le\bar b$ uniformly for the terminal sensor contract.
-Then the ego sublevel $q_E\le r_f$ is invariant when it lies inside the verified
-model/input domain and
-\begin{equation}\label{eq:coreRadius}
-Cr_f^2-(1-a)r_f+d_f\le0.
-\end{equation}
-For $C>0$ this is possible only if $(1-a)^2\ge4Cd_f$, with
-\begin{equation}
-\frac{(1-a)-\sqrt{(1-a)^2-4Cd_f}}{2C}\le r_f\le
-\frac{(1-a)+\sqrt{(1-a)^2-4Cd_f}}{2C}.
-\end{equation}
-For $C=0$, require $r_f\ge d_f/(1-a)$. This explicitly explains why shrinking
-a nominal ellipsoid indefinitely cannot repair a robust core with nonzero
-disturbance: the lower admissible radius is positive. If required, input
-memory is included in $q_E$ and the same argument applies to the augmented map.
-Input and whole-hold domain constraints need separate uniform verification.
-
-An ego core alone is not a collision-safe joint core. Intersect it with a
-target-relative family whose whole-hold safety and successor inclusion under
-this same policy are verified. For example, a truly departing target can use a
-fixed inertial unit $n$ with
-\begin{equation}\label{eq:departing}
-n^\top(p_C-p_E)\ge R_E+R_C+d_0,\qquad
-n^\top(v_C-v_E)\ge0
-\end{equation}
-throughout its admitted future and the ego core. The first inequality then
-never decreases and circumdisks establish separation. The second must itself
-be invariant under the declared dynamics; checking its current value is not
-enough. A nonzero-curvature target may eventually return, so range exceeding
-30 m, one nominal pass, or a small curvature estimate does not establish
-\eqref{eq:departing}. If this sufficient departure test is unavailable, retain
-target timing in the joint invariant family \eqref{eq:terminal}. A finite
-simulation horizon cannot prove that an uncertain circular target never
-returns. No all-future spatial-sweep separation is imposed as a necessary
-condition.
-
-An $M-N$ step hard continuation into $\mathfrak B_f$ implicitly defines the
-terminal admissible family at the end of the main $N$-step prefix. This is
-finite backward reachability to a robust core, without a fixed terminal pose.
-The continuation length affects feasibility, but does not create a new
-tracking objective or force return to the path within that length.
-
-\section{Robust PCBF, inherited budget, and the safety theorem}
+\section{Robust PCBF and per-sample safety}
 \subsection{The robust finite-horizon problem}
 A prediction policy $\Pi=(\pi_0,\ldots,\pi_{M-1})$ is causal: $\pi_i$ uses
 information available at that future node. Let $\mathfrak I_i^\Pi(I)$ be all
@@ -534,7 +482,7 @@ satisfying, for every information branch and every state/disturbance in it,
 &\text{dynamics, observer/update contract, and hard physical constraints},\nonumber\\
 &\dist(\mathcal V_E(t),\mathcal V_C(t))\ge d_0-\xi_i
 \quad(t\in[t_{k+i},t_{k+i+1}]),\\
-&\mathfrak I_M^\Pi(I)\subseteq\mathfrak B_f.\nonumber
+&\text{the terminal set \eqref{eq:terminal} at node }M.\nonumber
 \end{align}
 Any additional softened constraints use specified scales and the same stage
 slacks; this document uses distance units for collision slack. Softening a
@@ -542,128 +490,31 @@ model-evaluability domain is not allowed.
 Define
 \begin{equation}\label{eq:pcbf}
 V_B^*(I)=\inf_{(\Pi,\Xi)\in\mathcal F_M(I)}\sum_{i=0}^{N-1}\xi_i,
-\quad S(\Xi)=\sum_{i=0}^{N-1}\xi_i,\quad
-\mathfrak K_M=\{I:\exists(\Pi,0)\in\mathcal F_M(I)\}.
+\quad S(\Xi)=\sum_{i=0}^{N-1}\xi_i.
 \end{equation}
-Where an optimum is attained, $V_B^*=0$ exactly on $\mathfrak K_M$.
-Without attainment, a zero infimum need not supply a zero-slack witness; the
-controller retains an actual witness. $V_B^*$ is defined on information,
-not just the estimated vehicle state. The quantity retained online is $S$,
-with $V_B^*(I)\le S$; it need not be the optimal value.
+$V_B^*$ is defined on information, not just the estimated vehicle state.
 
-\begin{assumption}[Shift closure and sound numerical realization]\label{ass:shift}
-The admitted policy/certificate class is closed under conditioning on the
-realized next information, discarding its first hold, and appending
-$\kappa_f$. The uncertainty update is the update represented in prediction,
-or a certified refinement of it. Every numerical constraint certificate is
-sound, with residuals enclosed. If a convex inner approximation is used, it
-retains this shifted witness or independently certifies a replacement under
-the inherited budget. Future domain, noise and target contracts do not expand
-beyond the predicted contract.
-\end{assumption}
-
-\subsection{A constructive way to retain convex feasibility}
-Assumption~\ref{ass:shift} need not be implemented as a search for a second
-control mode. Along with an accepted policy, retain each affine dynamics
-enclosure, its anchor and validity domain, the tube, fixed collision rows,
-absolute times and terminal certificate. At the next sample:
-\begin{enumerate}[nosep]
-\item Shift the first $M-1$ affine enclosure/constraint blocks unchanged.
-The old accepted centers $c^*_{1|k},\ldots,c^*_{M|k}$ and remaining policy
-coefficients still satisfy those same affine equations.
-\item Retain $c_{0|k+1}=c^*_{1|k}$ as the warm candidate center. Require
-$\Z_{k+1}-c^*_{1|k}\subseteq\E^*_{1|k}$, which follows from the certified
-update. Do not add an equality forcing that center to be the new estimate.
-The first input is $v_{0|k+1}+K_{0|k+1}(\hat x_{E,k+1}-c_{E,0|k+1})$.
-\item Append the terminal certificate's affine policy/enclosure block. For
-an affine estimate-feedback local core, its preverified uniform bounds supply
-this block. A general nonlinear terminal selector requires a policy class
-that can represent it and is not automatically a small SOCP.
-\end{enumerate}
-No smaller observer radius or newer derivative is needed to make this warm
-point feasible. The new optimization can improve its centers/inputs inside
-the retained certified domains. An optional fresh linearization or tighter
-set representation is admitted only if it also retains the shifted
-certificate, or has another proved replacement within the inherited budget.
-Otherwise the cached valid blocks remain the model for that solve. This is
-at most one new local approximation per sample, with substantial reuse; it
-does not require within-hold SCP. Certificate reuse is mathematical memory
-inside the single optimization, not permission to issue an unchecked old
-open-loop command. In particular, always forcing both a fresh rollout anchor
-and an estimate-centered initial equality is an additional restriction that
-does not inherit this feasibility proof.
-
-\begin{theorem}[Inherited-budget feasibility and robust safety]\label{thm:safety}
-Under Assumptions~\ref{ass:contract}--\ref{ass:shift}, suppose a feasible
-witness $(\Pi_k,\Xi_k)$ exists and its first input is applied. At the next
-sample a feasible witness exists with slacks
-\begin{equation}\label{eq:shift}
-\widetilde\Xi_{k+1}=(\xi_{1|k},\ldots,\xi_{N-1|k},0),\qquad
-\bar S_{k+1}=S_k-\xi_{0|k}.
-\end{equation}
-Consequently secondary CLF optimization subject to
-\begin{equation}\label{eq:budget}
-S_{k+1}\le\bar S_{k+1},\qquad
-\xi_{0|k+1}\le\widetilde\xi_{0|k+1}
-\end{equation}
-is safety-feasible without resolving the primary minimum. A nonnegative
-unbounded CLF slack makes the CLF row feasible whenever its values are finite.
-If the initial witness has $S_0=0$, every applied hold satisfies
-\eqref{eq:goal}, and $I_k\in\mathfrak K_M$ for all $k$.
-\end{theorem}
+\begin{proposition}[Per-sample robust safety]\label{prop:sampleSafety}
+Under Assumption~\ref{ass:contract}, suppose that at sample $k$ the problem
+\eqref{eq:robustProblem} has a witness with $\xi_{0|k}=0$, every constraint
+certificate is sound with its residuals enclosed, and its first input is
+applied. Then the applied hold satisfies \eqref{eq:goal}. If the witness has
+$S=0$, every predicted hold of every admitted branch satisfies \eqref{eq:goal},
+and Proposition~\ref{prop:separating} applies after $t_{k+M}$ under its premise.
+\end{proposition}
 \begin{proof}
-Truth containment follows first from Proposition~\ref{prop:observer} and
-\eqref{eq:intersection}, then by induction from sound reachable-set propagation.
-The realized successor is an admitted branch of $\mathfrak I_1^{\Pi_k}$.
-Restrict the old policy to this branch and shift its suffix. Its first $N-1$
-slacks are the old last $N-1$ prefix slacks. The newly entering last prefix
-stage is an old hard-tail stage, hence has zero slack (if $M=N$, it is the
-appended safe terminal hold). The remaining tail is hard, and
-\eqref{eq:terminal} supplies an admissible zero-slack appended hold and new
-terminal membership. This constructs \eqref{eq:shift}; it also satisfies the
-first-stage cap in \eqref{eq:budget}. Assumption~\ref{ass:shift} preserves its
-availability in the chosen numerical representation. If $S_k=0$, nonnegative
-slacks and the budget force all new slacks to zero. The whole-hold robust
-constraints then imply \eqref{eq:goal} for the actual state. Induct on $k$.
+Truth containment follows from Proposition~\ref{prop:observer} and
+\eqref{eq:intersection}, then from sound reachable-set propagation. The
+realized first hold is an admitted branch, and its whole-hold robust
+constraints with $\xi_0=0$ imply \eqref{eq:goal}.
 \end{proof}
-
-With an attained optimum, applying its policy gives
-\begin{equation}\label{eq:valueDecrease}
-V_B^*(I_{k+1})\le V_B^*(I_k)-\xi^*_{0|k}.
-\end{equation}
-This is the information-state predictive barrier decrease. Calling it a
-classical smooth CBF would require extra regularity, not supplied here.
-For the inherited feasible upper bound,
-\begin{equation}\label{eq:sum}
-S_{k+1}\le S_k-\xi_{0|k}\quad\Longrightarrow\quad
-\sum_{k=0}^{\infty}\xi_{0|k}\le S_0,\quad\xi_{0|k}\to0.
-\end{equation}
-This alone does not imply $S_k\to0$: $(\xi_0,\xi_1)=(0,c)$ can keep postponing
-the same future violation. Huang's further convergence statements have their
-own optimality, continuity and invariance premises. No such stronger result
-is claimed for the suboptimal budget here. A positive slack witness is a
-restoration object, not a proof of clearance $d_0$; its first hold only has
-the certified lower bound $d_0-\xi_0$.
-
-\begin{remark}[A retained witness is not an executable backup mode]
-The next command can still come from the same CLF optimization on every
-sample. Retaining a feasible policy and certificate is the induction argument
-and a feasible initialization for that optimization. If a numerical solver
-fails to return a command within a deadline and the design refuses any
-previously certified command, mathematical problem feasibility alone cannot
-guarantee closed-loop operation through that computational failure. A runtime
-completion premise must be stated; a new controller mode need not be invented.
-\end{remark}
-
-Recomputing collision normals, shrinking decision domains, resetting a tube
-center to the new estimate, or enlarging a target estimate independently of
-\eqref{eq:intersection} can remove the shifted feasible point from a new inner
-approximation. It is not a proof to say that the old nonlinear witness exists
-while the new convex program excludes it. Retain compatible old certificate
-rows/domains when necessary, or prove a new inner certificate contains that
-witness. This is a constraint on the mathematical one-RTI realization, not a
-request to add repeated SCP rounds. A restoration that increases the inherited
-budget starts a new chain and does not preserve \eqref{eq:sum} across the reset.
+Nothing here guarantees that sample $k+1$ again has a zero-slack witness. A
+shifted witness need not exist, because \eqref{eq:terminal} is not invariant.
+Each sample therefore minimizes prefix slack again; a positive slack witness is
+a restoration object, not a proof of clearance $d_0$, and its first hold only
+has the certified lower bound $d_0-\xi_0$. If a numerical solver fails to return
+a command within a deadline, the controller reports that no solution exists; a
+runtime completion premise must be stated separately.
 
 \section{One CLF: nominal dissipation with an explicit uncertainty supply}
 \subsection{The same function during avoidance and recovery}
@@ -688,7 +539,7 @@ The desired robust first-hold row is
 Here $\sigma_k$ is a \emph{derived} disturbance supply, not an optimized slack,
 and $\delta_k$ is the single CLF slack. The supremum preserves the dependence
 between a true current state and its successor. Safety constraints keep
-priority through \eqref{eq:budget}. No target-range switch changes $V$.
+priority through a cap on the prefix slack sum at its primary optimum. No target-range switch changes $V$.
 
 \subsection{Deriving the supply, rather than choosing a convenient tolerance}
 Suppose a common estimate-feedback action on the recovery domain has
@@ -803,24 +654,21 @@ At each sample perform the following operations, all within the same controller:
 \begin{enumerate}[leftmargin=*,itemsep=3pt]
 \item Obtain timestamped observer sets and intersect them with the certified
 previous successor set using \eqref{eq:intersection}.
-\item Condition and shift the previous causal witness and its certificate;
-inherit \eqref{eq:shift}. Without a witness, generate an APF search seed.
-The seed has no independent safety permission.
+\item Shift the previous plan as the search anchor; without one, generate an
+APF search seed. Neither has independent safety permission.
 \item Construct one affine center model and valid setwise remainders/tube
 supports, preserving an inherited feasible certificate when it exists.
-\item At initialization/restoration minimize prefix safety slack. During
-ordinary zero-budget continuation, impose the inherited budget directly.
-In either case solve the \emph{same} CLF secondary problem; zero PCBF slack
-does not skip CLF optimization.
+\item Minimize prefix safety slack at every sample, then solve the \emph{same}
+CLF secondary problem under a cap at that optimum; zero PCBF slack does not
+skip CLF optimization.
 \item Solve \eqref{eq:objective} subject to affine center dynamics,
-\eqref{eq:tube} or \eqref{eq:boxTube}, \eqref{eq:robustRow}, hard tail and
-robust terminal membership, and \eqref{eq:clfSoc}. Apply its first
-estimate-based input and retain the complete policy/certificate/slacks.
+\eqref{eq:tube} or \eqref{eq:boxTube}, \eqref{eq:robustRow}, hard tail, the
+terminal rows \eqref{eq:terminal}, and \eqref{eq:clfSoc}. Apply its first
+estimate-based input.
 \end{enumerate}
-With fixed gains, directions, remainder radii and an SOC-representable
-terminal inner set, the center problem is a convex conic QP/SOCP. General
-information-state reachability and the maximal invariant kernel are not
-claimed to be SOCPs. Robust overapproximation quality, certificate closure and
+With fixed gains, directions and remainder radii, and the terminal rows
+linearized at the anchor, the center problem is a convex conic QP/SOCP.
+General information-state reachability is not claimed to be an SOCP. Robust overapproximation quality, certificate closure and
 first feasibility remain substantive design requirements. A trusted reference
 seed can improve conditioning and direction choice, but does not replace any
 uncertainty or remainder term.
@@ -831,8 +679,9 @@ uncertainty or remainder term.
 Observer comparison $\Rightarrow$ current truth-containing sets
 $\Rightarrow$ causal reachable tubes and nested information updates
 $\Rightarrow$ whole-hold robust rectangle constraints
-$\Rightarrow$ a shift-closed robust predictive safety witness.
-An initial zero-slack witness gives recursive feasibility and $d_0$ clearance.
+$\Rightarrow$ a per-sample robust predictive safety witness.
+A zero-slack witness gives $d_0$ clearance on the applied hold; no recursive
+feasibility is claimed.
 The one CLF and its disturbance supply give practical recovery under persistent
 uncertainty, and asymptotic nominal recovery when uncertainty/numerical supply
 vanishes and zero CLF slack remains feasible in the recovery domain.
@@ -841,8 +690,8 @@ vanishes and zero CLF slack remains feasible in the recovery domain.
 
 \subsection{Experimental implementation and remaining certification gap}
 The current implementation tests a feedback-aware approximation of the ideal
-construction above. It does not enforce all assumptions of the recursive
-feasibility theorem. In particular, a newly published target acceleration or
+construction above. It does not enforce all assumptions of
+Proposition~\ref{prop:sampleSafety}. In particular, a newly published target acceleration or
 sideslip estimate may change at every sample; each prediction freezes those
 new estimates, without requiring a nested information update.
 
@@ -863,21 +712,16 @@ Ego feedback tube
 and input-increment uncertainty. Future posterior errors use the current
 generator as a frozen experimental envelope, not a proved future bound. \\
 Terminal set
-& The implemented terminal set is the perception-radius exit (target beyond
-$R$ and separating, target estimate) or a road shoulder (ego rectangle on it,
-heading along the path), each with the ego rectangle inside the road and ego
-generator supports subtracted; every mode is solved and the least slack is
-issued. It is not the invariant terminal
-continuation of the theorem above, and no invariance is claimed. \\
+& The implemented terminal set is separation from the target estimate, with
+the endpoint also under the collision rows, and the ego rectangle inside the
+road, with ego generator supports subtracted. No invariance is claimed. \\
 Safety and one CLF
 & With nonzero uncertainty, mean collision rows are hard and uncertainty
 tightenings may use slack throughout the finite horizon. The same quadratic
 CLF has uncertainty padding and a tracking-error-scaled proximal tie. \\
 RTI admission
 & One model is built per shifted or fresh APF anchor (a shifted problem infeasible inside the trust region is re-solved once from a
-fresh rollout); the inherited budget of the theorem is
-not implemented, the PCBF stage is solved
-in every frame, and a frame without a solution is reported. The completed
+fresh rollout); the PCBF stage is solved in every frame, and a frame without a solution is reported. The completed
 solution is issued without a nonlinear replay. The next plan innovation is split exactly
 into an observation part (posterior minus a nonlinear replay from the plan's own
 prediction) and a model part (replay minus the affine prediction); only the
@@ -906,20 +750,17 @@ compatible with that allowance. State uncertainty is propagated again using
 this gain; the error set is never truncated. This avoids a self-contradictory
 input interval but does not prove stability of all such finite-horizon gains.
 
-If the nonlinear anchor is feasible in the current affine problem after its
-uncertainty slacks are assigned, their sum supplies a conditioned safety
-budget and the controller directly optimizes CLF slack. Otherwise it solves
-the primary restoration problem. This budget is an achieved feasible upper
-bound, not $V_B^*$, and changing observer sets do not establish cross-sample
-monotonicity. Positive uncertainty slack explicitly forfeits a hard robust
-collision certificate; even hard mean rows concern the sampled affine model.
+Every sample minimizes the prefix slack and then the CLF slack under a cap at
+that optimum. The achieved value is not $V_B^*$, and changing observer sets do
+not establish cross-sample monotonicity. Positive uncertainty slack explicitly
+forfeits a hard robust collision certificate; even hard mean rows concern the
+sampled affine model.
 
 Thus the implementation is an empirical output-feedback controller with
 uncertainty-aware planning, not an implementation of every premise of the
 theorem. The finite identity checks in
 \texttt{verifyObserverRobustConnection.m} do not establish global
-Fiala remainder bounds, a nonlinear robust terminal invariant set, or a
-runtime deadline. Collision and recovery experiments must retain that scope.
+Fiala remainder bounds or a runtime deadline. Collision and recovery experiments must retain that scope.
 
 \begin{thebibliography}{9}
 \bibitem{Sharma} G. Sharma, H. Alai, and R. Rajamani,

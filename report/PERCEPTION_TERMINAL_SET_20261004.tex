@@ -273,4 +273,56 @@ The shoulder premise is not checked: a target predicted onto a shoulder is not
 excluded by the shoulder mode, although the collision rows inside~$R$ remain.
 Selection by one-step CLF slack among tied modes is a tie rule, not a measure
 of how good a whole plan is.
+
+\section{Addendum 8: shoulder terminal withdrawn, separating terminal set}
+The user reported that a shoulder terminal had conflicted with the CLF in their
+earlier work and never returned to nominal behaviour. The runs of Addendum~7
+showed the same signs: recovery took longer in three exact runs (356 to 481,
+159 to 196 and 154 to 218 holds), and two noisy curved head-on runs chose a
+shoulder within eight holds of a CLF-stage stop. Constraint-drop replays of the
+Addendum~6 failures showed that the perception-radius terminal was the sole
+cause only in the noisy brakingLead cases at frame~0: following a lead never
+leaves~$R$. The shoulder-terminal code is reverted.
+
+At the user's direction the terminal set is relaxed to separation plus the
+road. At the last node $(p-q)^\top(R(\psi)v-w)\ge0$; the distance condition is
+removed. With a constant relative velocity the squared distance then has a
+nonnegative first and second derivative, so the distance never decreases after
+the endpoint. Because the endpoint can now be close to the target, it also
+carries the collision rows. The row is linearized in position, yaw and body
+velocity and divided by the anchor distance. The horizon ends at the first
+anchor node whose separating speed is at least 0.5~m/s
+(\texttt{terminalSeparatingMarginMetersPerSecond}); the row requires zero.
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+ & recovered & no solution & collision\\
+\midrule
+Exact, beyond $R$ and separating (Addendum 6) & 11 & 3 & 0\\
+Exact, separating only & 14 & 0 & 0\\
+Noisy, beyond $R$ and separating (Addendum 6) & 4 & 10 & 0\\
+Noisy, separating only & 4 & 10 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+With exact observations every case recovers, including both brakingLead runs,
+and the subsequent median frame time is 3.5--11~ms. The longest horizon per exact run is
+22--111 nodes. The noisy runs recovering are 8~m/s headOn,
+acceleratingHeadOn, crossing and curvedHeadOn. The noisy brakingLead runs now
+run 136 and 63 holds instead of stopping at frame~0. No \texttt{ode45} replay
+collides or leaves the road; the minimum sampled gap is below the 0.20~m
+planning margin in several runs (minimum 0.110~m).
+
+Each noisy stop is a primal-infeasible primary problem. In the constraint-drop
+replays the separating row is never the cause: removing it alone solves none of
+the ten stops. Removing the collision rows solves seven, of which three also
+solve with only the hard nominal collision rows removed; removing the road rows
+solves six, three of them only that way
+(\path{separating-terminal-drops.txt}, \path{campaign-metrics-separating-terminal.csv}).
+
+The distance argument holds only for a constant relative velocity. A braking
+lead, a turning target or the ego's own return to the path can close the
+distance after the endpoint; no invariance is claimed.
 \end{document}

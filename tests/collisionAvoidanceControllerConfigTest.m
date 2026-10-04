@@ -82,7 +82,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
         end
 
         function encounterRangeDefaultsToFiftyMetersAndMustBeFinite(testCase)
-            % The terminal set requires the target beyond this radius.
+            % Collision rows apply only inside this perception radius.
             cfg = collisionAvoidanceControllerConfig();
             testCase.verifyEqual(cfg.collision.encounterRangeMeters, 50);
             testCase.verifyError(@() collisionAvoidanceControllerConfig( ...

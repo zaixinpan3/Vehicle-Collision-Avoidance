@@ -199,21 +199,18 @@ classdef nonlinearBicycleModel
             error=[projection.lateralPosition;angle;x(4:6)-reference.state(4:6)];
         end
 
-        function u = nominalFeedback(x,previous,lane,reference,cfg,terminal,offset)
+        function u = nominalFeedback(x,previous,lane,reference,cfg,terminal)
             % Path guidance used only to construct an initialization (NOMINAL_CLF.md).
             % Course guidance chi_d=-atan(e_y/D) toward the path, a course loop to a
             % yaw-rate demand within the lateral-friction limit, the front slip angle
             % from the inverse Fiala curve below its force peak, and a speed loop on
             % the braking ratio. terminal.steeringOffset makes the trim an exact
             % equilibrium (the inverse neglects the front longitudinal force).
-            % offset (default 0) tracks a parallel path at that lateral position.
-            if nargin<7,offset=0;end
             p=cfg.nominalClf;projection=laneGeometry.project(x(1:2),lane);
             lateral=projection.lateralPosition;curvature=reference.curvature;
-            deviation=lateral-offset;
             speed=hypot(x(4),x(5));course=localWrap(x(3)+atan2(x(5),x(4))-projection.heading);
             lookahead=max(p.minimumLookaheadMeters,p.lookaheadSeconds*hypot(reference.state(4),reference.state(5)));
-            desired=-atan(deviation/lookahead);desiredRate=-lookahead/(lookahead^2+deviation^2)*speed*sin(course);
+            desired=-atan(lateral/lookahead);desiredRate=-lookahead/(lookahead^2+lateral^2)*speed*sin(course);
             yawRate=curvature*speed*cos(course)/max(1-curvature*lateral,.1)+desiredRate ...
                 -p.courseGain*localWrap(course-desired);
             tire=modifiedFialaTire.parameters(cfg);

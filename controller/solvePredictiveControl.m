@@ -1,18 +1,14 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl One affine model per sample; no fallback algorithm.
 % Startup uses a potential-field rollout and later samples the shifted plan.
-% The horizon extends until the anchor reaches the terminal set. The set is a
-% union of modes: the target beyond the perception radius and separating from
-% it, or the ego rectangle on a road shoulder with its heading along the road
-% (targets are assumed never to enter a shoulder). Every mode is inside the
-% road. Each mode is solved on the same anchor; the PCBF stage minimizes
-% prefix safety slack, then the CLF stage runs, and the mode with the least
-% safety slack, then the least CLF slack, is issued. A primary problem
-% infeasible inside the trust region is re-solved on the same linearization
-% with the trust scale doubled until it is feasible or reaches
-% trustMaximumScale. If every mode of a shifted plan is still infeasible, the
-% modes are solved from a fresh potential-field rollout in the same way. Any
-% other failure is reported.
+% The horizon extends until the anchor reaches the terminal set: separating
+% from the target (relative velocity pointing away), inside the road. With a
+% constant relative velocity the distance then never decreases again.
+% The PCBF stage minimizes prefix safety slack, then the CLF stage runs. A
+% primary problem infeasible inside the trust region is re-solved on the same
+% linearization with the trust scale doubled until it is feasible or reaches
+% trustMaximumScale. A shifted plan still infeasible is then solved from a
+% fresh potential-field rollout in the same way. Any other failure is reported.
 % The input trust scale is an estimate, not a fixed setting: the next
 % posterior measures how far the previous plan's prediction was from the
 % nonlinear rollout of its own inputs (the plan innovation), and the
@@ -32,8 +28,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         solution=localTerminalMetrics(solution,model);
     end
     search.trust=model.trust;
-    % Distinct anchors linearized; modes and expansions on one anchor reuse it.
-    search.linearizationCount=0;if isfield(search,'anchorCount'),search.linearizationCount=search.anchorCount;end
+    search.linearizationCount=sum([search.attempts.modelBuilt]);
     search.elapsedSeconds=toc(timer);search.returned=~isempty(solution);
 end
 
@@ -102,9 +97,7 @@ function trust=localTrustRecord(trust,solution,model)
 end
 
 function [solution,search,model] = localRound(model,previousState,timer)
-%localRound Minimize safety slack per terminal mode, then solve the CLF for
-% the modes tied at the least slack. A shifted plan is one anchor for every
-% mode; a fresh start gives each mode its own rollout.
+%localRound Linearize one anchor, minimize safety slack, then solve the CLF.
     if nargin<3,timer=tic;end
     wall=tic;[anchor,source,failure]=localInitialization(model,previousState);
     initializationSeconds=toc(wall);solution=[];
@@ -112,105 +105,44 @@ function [solution,search,model] = localRound(model,previousState,timer)
         search=localEmptySearch(model,source,failure,initializationSeconds);return;
     end
     if source=="shiftedInputRollout",model=localAdaptTrust(model,anchor,previousState);end
-    cfg=model.cfg;modes=localTerminalModes(model);
-    attempts=struct([]);stages=struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{});
-    if source=="shiftedInputRollout"
-        anchors=repmat({anchor},size(modes));sources=repmat(source,size(modes));
-        seconds=[initializationSeconds,zeros(1,numel(modes)-1)];
-    else
-        [anchors,sources,seconds]=localFreshAnchors(model,modes,anchor,source,initializationSeconds);
+    estimatedScale=model.inputTrustScale;
+    [point,problem,search,model]=localPrimary(anchor,model,source,timer);
+    search.initializationSeconds=initializationSeconds;
+    attempts=localAttempt(search);stages=search.stages;selected=1;restarted=false;
+    cfg=model.cfg;freshSource="movingTargetPotentialField";
+    if isempty(model.target),freshSource="laneFeedbackRollout";end
+    [point,problem,search,model,attempts,stages,selected]=localExpand( ...
+        point,problem,search,model,anchor,source,timer,attempts,stages,selected);
+    % Infeasible even in the largest trust region around the shifted plan.
+    if source=="shiftedInputRollout" && localInfeasible(point,search) && toc(timer)<cfg.solver.timeLimitSeconds
+        failure="shiftedProblemInfeasible";model.inputTrustScale=estimatedScale;
+        wall=tic;anchor=localPotentialFieldSeed(model,cfg.controller.horizonSteps,cfg.controller.maximumHorizonSteps);
+        [point,problem,search,model]=localPrimary(anchor,model,freshSource,timer);
+        search.initializationSeconds=toc(wall);restarted=true;
+        attempts(end+1)=localAttempt(search);stages=[stages,search.stages];selected=numel(attempts);
+        [point,problem,search,model,attempts,stages,selected]=localExpand( ...
+            point,problem,search,model,anchor,freshSource,timer,attempts,stages,selected);
     end
-    [candidates,attempts,stages]=localModes(model,modes,anchors,sources,seconds,timer,attempts,stages);
-    restarted=false;
-    % Infeasible in every mode even in the largest trust region around the shift.
-    if source=="shiftedInputRollout" && all(arrayfun(@(c)localInfeasible(c.point,c.search),candidates)) ...
-            && toc(timer)<cfg.solver.timeLimitSeconds
-        failure="shiftedProblemInfeasible";
-        [anchors,sources,seconds]=localFreshAnchors(model,modes,[],"",0);
-        [candidates,attempts,stages]=localModes(model,modes,anchors,sources,seconds,timer,attempts,stages);
-        restarted=true;
-    end
-    % Least primary slack first; modes within the tie tolerance compete on CLF slack.
-    optimum=arrayfun(@(c)c.search.primaryOptimum,candidates);optimum(arrayfun(@(c)isempty(c.point),candidates))=Inf;
-    best=min(optimum);order=find(optimum<=best+cfg.solver.lexicographicTieTolerance*max(1,best));
-    chosen=order(1);chosenSlack=Inf;
-    for index=order(:).'
-        candidate=candidates(index);
-        [trial,trialSearch,trialModel]=localSecondary(candidate.point,candidate.problem,candidate.anchor,candidate.model,candidate.search,timer);
-        stages=[stages,trialSearch.stages(2:end)]; %#ok<AGROW>
-        attempts(candidate.attempt)=localAttempt(trialSearch);
-        candidates(index).search=trialSearch;candidates(index).model=trialModel;
-        if ~isempty(trial) && trial.clfSlack<chosenSlack
-            chosen=index;chosenSlack=trial.clfSlack;solution=trial;
-        end
-    end
-    search=candidates(chosen).search;model=candidates(chosen).model;
-    search.terminalMode=candidates(chosen).mode;
-    if ~isempty(solution),solution.terminalMode=candidates(chosen).mode;end
-    search.attempts=attempts;search.selectedAttempt=candidates(chosen).attempt;search.stages=stages;
+    [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
+    stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
+    search.attempts=attempts;search.selectedAttempt=selected;search.stages=stages;
     search.solverCalls=sum([stages.numericalSolve]);search.potentialFieldRestarted=restarted;
-    search.anchorCount=(source~="shiftedInputRollout")*(numel(modes)-1)+1+restarted*numel(modes);
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);
 end
 
-function [anchors,sources,seconds]=localFreshAnchors(model,modes,anchor,source,initializationSeconds)
-    % The separation mode starts from the potential-field rollout; a shoulder
-    % mode from path guidance toward the centre of its shoulder.
-    cfg=model.cfg;minimum=cfg.controller.horizonSteps;maximum=cfg.controller.maximumHorizonSteps;
-    anchors=cell(size(modes));sources=strings(size(modes));seconds=zeros(size(modes));
-    for index=1:numel(modes)
-        if modes(index)=="separation" && ~isempty(anchor)
-            anchors{index}=anchor;sources(index)=source;seconds(index)=initializationSeconds;continue;
-        end
-        wall=tic;anchors{index}=localPotentialFieldSeed(model,minimum,maximum,modes(index));
-        seconds(index)=toc(wall);
-        sources(index)="movingTargetPotentialField";
-        if isempty(model.target),sources(index)="laneFeedbackRollout";end
-        if modes(index)~="separation",sources(index)="shoulderGuidanceRollout";end
+function [point,problem,search,model,attempts,stages,selected]=localExpand( ...
+        point,problem,search,model,anchor,source,timer,attempts,stages,selected)
+    % Double the input trust scale on the same anchor while the primary
+    % problem is certified infeasible, never beyond trustMaximumScale: larger
+    % steps leave the region where the linearization is accurate. The trust
+    % estimate itself is unchanged.
+    cfg=model.cfg;
+    while localInfeasible(point,search) && model.inputTrustScale<cfg.nonlinear.trustMaximumScale ...
+            && toc(timer)<cfg.solver.timeLimitSeconds
+        model.inputTrustScale=min(2*model.inputTrustScale,cfg.nonlinear.trustMaximumScale);
+        [point,problem,search,model]=localPrimary(anchor,model,source,timer);
+        attempts(end+1)=localAttempt(search);stages=[stages,search.stages];selected=numel(attempts); %#ok<AGROW>
     end
-end
-
-function [candidates,attempts,stages]=localModes(model,modes,anchors,sources,seconds,timer,attempts,stages)
-    % One primary problem per terminal mode at the estimated trust scale.
-    % While every mode is certified infeasible, the scale is doubled for all
-    % of them, never beyond trustMaximumScale.
-    cfg=model.cfg;scale=model.inputTrustScale;
-    while true
-        candidates=struct('mode',{},'point',{},'problem',{},'search',{},'model',{},'attempt',{},'anchor',{});
-        for index=1:numel(modes)
-            trial=model;trial.terminalMode=modes(index);trial.inputTrustScale=scale;
-            [point,problem,search,trial]=localPrimary(anchors{index},trial,sources(index),timer);
-            search.initializationSeconds=seconds(index);
-            if isempty(attempts),attempts=localAttempt(search);else,attempts(end+1)=localAttempt(search);end %#ok<AGROW>
-            stages=[stages,search.stages]; %#ok<AGROW>
-            candidates(end+1)=struct('mode',modes(index),'point',point,'problem',problem,'search',search, ...
-                'model',trial,'attempt',numel(attempts),'anchor',anchors(index)); %#ok<AGROW>
-        end
-        if ~all(arrayfun(@(c)localInfeasible(c.point,c.search),candidates)) ...
-                || scale>=cfg.nonlinear.trustMaximumScale || toc(timer)>=cfg.solver.timeLimitSeconds
-            return;
-        end
-        scale=min(2*scale,cfg.nonlinear.trustMaximumScale);
-    end
-end
-
-function mode=localMode(model)
-    mode="separation";if isfield(model,'terminalMode'),mode=model.terminalMode;end
-end
-
-function modes=localTerminalModes(model)
-    % Without a target only the road applies. A side with a shoulder adds a mode.
-    modes="separation";
-    if isempty(model.target) || ~isfield(model.road,'shoulderWidth') || isempty(model.road.shoulderWidth),return;end
-    names=["rightShoulder","leftShoulder"];
-    modes=[modes,names(model.road.shoulderWidth(:).'>0)];
-end
-
-function offset=localShoulderOffset(model,mode)
-    % Lateral position of the centre of a shoulder; zero for the path itself.
-    offset=0;clearance=model.road.lateralClearance;
-    if mode=="rightShoulder",offset=-(clearance(1)-model.road.shoulderWidth(1)/2);end
-    if mode=="leftShoulder",offset=clearance(2)-model.road.shoulderWidth(2)/2;end
 end
 
 function infeasible=localInfeasible(point,search)
@@ -225,13 +157,12 @@ function search=localEmptySearch(model,source,failure,seconds)
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
         'initializationSeconds',seconds,'initializationFailure',failure,'elapsedSeconds',seconds, ...
-        'potentialFieldRestarted',false,'terminalMode',"none");
+        'potentialFieldRestarted',false);
     search.attempts=localAttempt(search);search.selectedAttempt=0;
 end
 
 function attempt=localAttempt(search)
-    mode="none";if isfield(search,'terminalMode'),mode=search.terminalMode;end
-    attempt=struct('initialization',search.initialization,'terminalMode',mode,'terminationReason',search.terminationReason, ...
+    attempt=struct('initialization',search.initialization,'terminationReason',search.terminationReason, ...
         'solverCalls',search.solverCalls,'stages',search.stages,'primaryOptimum',search.primaryOptimum, ...
         'primaryLowerBound',search.primaryLowerBound,'inputTrustScale',search.inputTrustScale, ...
         'slackCap',search.slackCap,'initializationSeconds',search.initializationSeconds,'formulationSeconds',search.formulationSeconds, ...
@@ -245,7 +176,7 @@ function search=localSearch(problem,model,initialization,formulationSeconds)
         'initialization',initialization,'returned',false,'converged',false,'terminationReason',"timeLimit", ...
         'formulationSeconds',formulationSeconds,'clfConstructionSeconds',0, ...
         'inputTrustScale',model.inputTrustScale,'primaryOptimum',NaN,'primaryLowerBound',problem.primaryLowerBound,'slackCap',NaN,'clfInitialSlack',NaN, ...
-        'initializationSeconds',0,'terminalMode',localMode(model), ...
+        'initializationSeconds',0, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}));
 end
@@ -387,10 +318,6 @@ function [anchor,source,failure]=localInitialization(model,previous)
         "collisionAvoidanceController:invalidTireOperatingPoint", ...
         "collisionAvoidanceController:singularTireLinearization"];
     inputs=zeros(2,maximum);states=zeros(6,maximum+1);states(:,1)=model.initialState;count=maximum;
-    % The extension continues toward the region of the plan's terminal mode.
-    mode="separation";if isfield(previous,'terminalMode'),mode=previous.terminalMode;end
-    if mode~="separation" && ~any(localTerminalModes(model)==mode),mode="separation";end
-    offset=localShoulderOffset(model,mode);
     try
         for index=1:maximum
             last=model.previousInput;if index>1,last=inputs(:,index-1);end
@@ -402,7 +329,7 @@ function [anchor,source,failure]=localInitialization(model,previous)
                     u=localClip(u+previous.feedbackGains(:,:,index+1)*error,last,cfg);
                 end
             else
-                u=nonlinearBicycleModel.nominalFeedback(states(:,index),last,model.lane,model.nominalReference,cfg,nominal,offset);
+                u=nonlinearBicycleModel.nominalFeedback(states(:,index),last,model.lane,model.nominalReference,cfg,nominal);
             end
             inputs(:,index)=u;states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),u,cfg);
             if index>=minimum && localTerminalReached(states(:,index+1),index,model),count=index;break;end
@@ -414,21 +341,17 @@ function [anchor,source,failure]=localInitialization(model,previous)
     anchor=struct('inputs',inputs(:,1:count),'states',states(:,1:count+1));
 end
 
-function anchor=localPotentialFieldSeed(model,minimum,maximum,mode)
+function anchor=localPotentialFieldSeed(model,minimum,maximum)
     % The startup rollout: potential guidance with a target, path guidance
-    % without one, or path guidance to the centre of a shoulder for a shoulder
-    % mode, stopping when that mode's terminal set is reached. It supplies a
-    % linearization, never an issued input.
-    if nargin<4,mode="separation";end
-    offset=localShoulderOffset(model,mode);
+    % without one. It supplies a linearization, never an issued input.
     cfg=model.cfg;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
     h=cfg.controller.sampleTime;
     inputs=zeros(2,maximum);states=zeros(6,maximum+1);states(:,1)=x;side=0;count=maximum;
     nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
     for index=1:maximum
         time=(index-1)*h;
-        if isempty(model.target) || mode~="separation"
-            u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominal,offset);
+        if isempty(model.target)
+            u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominal);
         else
             [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.target,time,cfg,side, ...
                 model.road.lateralClearance);
@@ -438,46 +361,21 @@ function anchor=localPotentialFieldSeed(model,minimum,maximum,mode)
             u=localGuidanceInput(x,previous,yawRate,speed,cfg,reference);
         end
         inputs(:,index)=u;x=nonlinearBicycleModel.sample(x,u,cfg);states(:,index+1)=x;previous=u;
-        if index>=minimum && localTerminalReached(x,index,model,mode),count=index;break;end
+        if index>=minimum && localTerminalReached(x,index,model),count=index;break;end
     end
     anchor=struct('inputs',inputs(:,1:count),'states',states(:,1:count+1));
 end
 
-function reached=localTerminalReached(x,index,model,mode)
-    % Terminal set on a nonlinear rollout node: the target beyond the
-    % perception radius and separating, or the ego on a shoulder along the
-    % road. Road rows are left to the optimizer. The horizon stops
-    % terminalHorizonMarginMeters beyond the radius so the terminal row is not
-    % active at the anchor; the row itself still uses R.
-    if nargin<4,mode="any";end
+function reached=localTerminalReached(x,index,model)
+    % Target part of the terminal set on a nonlinear rollout node: separating.
+    % Road rows are left to the optimizer. The horizon stops where the
+    % separating speed reaches terminalSeparatingMarginMetersPerSecond, so the
+    % terminal row (which requires only zero) is not active at the anchor.
     reached=true;if isempty(model.target),return;end
-    if mode~="separation" && localOnShoulder(x,model,mode),return;end
-    if mode~="any" && mode~="separation",reached=false;return;end
     cfg=model.cfg;q=localTargetAt(model,index*cfg.controller.sampleTime);
     relative=x(1:2)-q(1:2);
-    if norm(relative)<cfg.collision.encounterRangeMeters+cfg.collision.terminalHorizonMarginMeters
-        reached=false;return;
-    end
-    reached=relative.'*(localEgoVelocity(x)-localTargetVelocity(q))>=0;
-end
-
-function on=localOnShoulder(x,model,mode)
-    on=false;road=model.road;if ~isfield(road,'shoulderWidth') || isempty(road.shoulderWidth),return;end
-    cfg=model.cfg;corners=localCorners(cfg);
-    rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-    projection=laneGeometry.project(x(1:2)+rotation*corners,model.lane);
-    lateral=projection.lateralPosition(:);
-    centre=laneGeometry.project(x(1:2),model.lane);
-    aligned=abs(atan2(sin(x(3)-centre.heading),cos(x(3)-centre.heading)))<=cfg.collision.shoulderHeadingToleranceRadians;
-    width=road.shoulderWidth;clearance=road.lateralClearance;
-    right=width(1)>0 && all(lateral>=-clearance(1) & lateral<=-(clearance(1)-width(1)));
-    left=width(2)>0 && all(lateral<=clearance(2) & lateral>=clearance(2)-width(2));
-    if mode=="rightShoulder",left=false;elseif mode=="leftShoulder",right=false;end
-    on=aligned && (right || left);
-end
-
-function corners=localCorners(cfg)
-    corners=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
+    reached=relative.'*(localEgoVelocity(x)-localTargetVelocity(q)) ...
+        >=cfg.collision.terminalSeparatingMarginMetersPerSecond*norm(relative);
 end
 
 function velocity=localEgoVelocity(x)
@@ -625,16 +523,24 @@ function [problem,model]=localFormulate(anchor,model)
     uncertaintyPrediction.egoStateRadius(:,end)=sum(abs(generator),2);
     uncertaintyPrediction.collisionStateRadius(:,end)=sum(abs(collisionGenerator),2);
     model.uncertaintyPrediction=uncertaintyPrediction;
-    % Terminal set at the last node, by mode: target beyond the perception
-    % radius and separating, or the ego on one shoulder along the road. The
-    % ego rectangle is inside the road in every mode.
+    % Terminal set at the last node: separating from the target, ego
+    % rectangle inside the road. The endpoint can be near the target, so it
+    % also carries the collision rows of every other node inside the range.
     y=anchor.states(:,end);map=sparse(6,nv);map(:,ix(:,end))=eye(6);
-    mode=localMode(model);
-    if mode=="separation" && ~isempty(model.target)
+    time=count*cfg.controller.sampleTime;
+    if ~localBeyondRange(y,time,model,collisionGenerator)
+        departure=count+1;
+        [g,j,tightening]=localSafetyRows(y,time,model,collisionGenerator);
+        maximumTightening=max(maximumTightening,max(tightening));
+        r=-j*map;
+        if robustRelaxation
+            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+        end
+        if count+1<=slackCount,r(:,is(count+1))=-1;end
+        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+    end
+    if ~isempty(model.target)
         [r,bound]=localTerminalSeparation(y,count*cfg.controller.sampleTime,model,generator,map);
-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
-    elseif mode~="separation"
-        [r,bound]=localShoulderRows(y,mode,model,generator,map);
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
     end
     if ~isempty(model.road.lateralClearance)
@@ -786,20 +692,17 @@ function beyond=localBeyondRange(x,time,model,generator)
 end
 
 function [rows,bounds]=localTerminalSeparation(y,time,model,generator,map)
-    % With the fixed anchor direction n, n'(p-q)>=R implies |p-q|>=R, and
-    % n'(v_ego-v_target)>=0 is the separating speed linearized in yaw and v.
-    % The target is its estimate: beyond R there is no collision risk, and
-    % the target uncertainty is carried by the collision rows inside R. The
-    % ego generator support is retained.
-    cfg=model.cfg;q=localTargetAt(model,time);relative=y(1:2)-q(1:2);
-    normal=relative/max(norm(relative),eps);
-    reserve=sum(abs(normal.'*generator(1:2,:)));
+    % Separating: (p-q)'(Rot(psi)v-w)>=0, linearized at the anchor endpoint in
+    % position, yaw and body velocity and scaled by the anchor distance. The
+    % target is its estimate; its uncertainty is carried by the collision rows.
+    % The ego generator support is retained.
+    q=localTargetAt(model,time);relative=y(1:2)-q(1:2);scale=max(norm(relative),eps);
     c=cos(y(3));s=sin(y(3));rotation=[c,-s;s,c];derivative=[-s,-c;c,-s];
-    gradient=[normal.'*derivative*y(4:5),normal.'*rotation];
-    speedReserve=sum(abs(gradient*generator(3:5,:)));
-    rows=[-normal.'*map(1:2,:);-gradient*map(3:5,:)];
-    bounds=[normal.'*relative-cfg.collision.encounterRangeMeters-reserve; ...
-        normal.'*(localEgoVelocity(y)-localTargetVelocity(q))-speedReserve];
+    velocity=localEgoVelocity(y)-localTargetVelocity(q);
+    gradient=[velocity.',relative.'*derivative*y(4:5),relative.'*rotation]/scale;
+    reserve=sum(abs(gradient*generator(1:5,:)));
+    rows=-gradient*map(1:5,:);
+    bounds=relative.'*velocity/scale-reserve;
 end
 
 function [rows,bounds]=localRoadRows(y,model,generator,map)
@@ -819,33 +722,6 @@ function [rows,bounds]=localRoadRows(y,model,generator,map)
         rows(2*k-1,:)=r;bounds(2*k-1)=clearance(2)-projection.lateralPosition-reserve;
         rows(2*k,:)=-r;bounds(2*k)=clearance(1)+projection.lateralPosition-reserve;
     end
-end
-
-function [rows,bounds]=localShoulderRows(y,mode,model,generator,map)
-    % Every rectangle corner on the inner side of the chosen shoulder (its
-    % outer side is the road row) and the heading within
-    % shoulderHeadingToleranceRadians of the path, linearized at the anchor.
-    cfg=model.cfg;clearance=model.road.lateralClearance;width=model.road.shoulderWidth;
-    corners=localCorners(cfg);
-    c=cos(y(3));s=sin(y(3));rotation=[c,-s;s,c];derivative=[-s,-c;c,-s];
-    rows=sparse(6,size(map,2));bounds=zeros(6,1);
-    for k=1:4
-        projection=laneGeometry.project(y(1:2)+rotation*corners(:,k),model.lane);
-        normal=[-sin(projection.heading);cos(projection.heading)];
-        jacobian=normal.'*[eye(2),derivative*corners(:,k)];
-        reserve=sum(abs(jacobian*generator(1:3,:)));
-        r=jacobian*map(1:3,:);
-        if mode=="rightShoulder"
-            rows(k,:)=r;bounds(k)=-(clearance(1)-width(1))-projection.lateralPosition-reserve;
-        else
-            rows(k,:)=-r;bounds(k)=projection.lateralPosition-(clearance(2)-width(2))-reserve;
-        end
-    end
-    centre=laneGeometry.project(y(1:2),model.lane);
-    heading=atan2(sin(y(3)-centre.heading),cos(y(3)-centre.heading));
-    reserve=sum(abs(generator(3,:)));tolerance=cfg.collision.shoulderHeadingToleranceRadians;
-    rows(5,:)=map(3,:);bounds(5)=tolerance-heading-reserve;
-    rows(6,:)=-map(3,:);bounds(6)=tolerance+heading-reserve;
 end
 
 function solution=localTerminalMetrics(solution,model)

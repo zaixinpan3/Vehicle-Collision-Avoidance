@@ -215,7 +215,7 @@ function [lane, road] = localReadLane(rawGeometry, ego)
             && ~isempty(rawGeometry.referenceCurve)
         lane.referenceCurve = laneGeometry.validateReferenceCurve(rawGeometry.referenceCurve);
     end
-    road=struct('lateralClearance',zeros(2,0),'shoulderWidth',zeros(2,0));
+    road=struct('lateralClearance',zeros(2,0));
     if isstruct(rawGeometry)
         if isfield(rawGeometry,'boundaries') && ~isempty(rawGeometry.boundaries)
             error('collisionAvoidanceController:unsupportedRoad','Use a global lateralClearance corridor.');
@@ -224,15 +224,6 @@ function [lane, road] = localReadLane(rawGeometry, ego)
             road.lateralClearance=localFiniteVector(rawGeometry.lateralClearance,2,'lateralClearance');
             if any(road.lateralClearance<=0)
                 error('collisionAvoidanceController:invalidRoadClearance','Lateral clearances must be positive.');
-            end
-        end
-        % shoulderWidth=[right;left] is the outer part of lateralClearance on
-        % each side that no target enters; zero means no shoulder on that side.
-        if isfield(rawGeometry,'shoulderWidth') && ~isempty(rawGeometry.shoulderWidth)
-            road.shoulderWidth=localFiniteVector(rawGeometry.shoulderWidth,2,'shoulderWidth');
-            if isempty(road.lateralClearance) || any(road.shoulderWidth<0) || any(road.shoulderWidth>road.lateralClearance)
-                error('collisionAvoidanceController:invalidRoadShoulder', ...
-                    'Shoulder widths must lie in [0,lateralClearance] of a road with lateralClearance.');
             end
         end
     end
