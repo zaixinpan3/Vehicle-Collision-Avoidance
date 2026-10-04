@@ -1,0 +1,24 @@
+repo='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+addpath(fullfile(repo,'controller'),fullfile(repo,'config'));
+load('speed8-curvedCrossing-diag2.mat','o'); m=o.model; cfg=m.cfg;
+q=m.target; fprintf('target now: pos=(%.1f,%.1f) speed=%.2f accel=%.2f sideslip=%.3f lr=%.2f\n',q(1),q(2),q(4),q(5),q(6),q(7));
+R=q(7)/sin(q(6)); fprintf('target turning radius = lr/sin(beta) = %.1f m (fixed, even while accelerating)\n',R);
+h=cfg.controller.sampleTime; ego=m.initialState;
+fprintf('ego now: pos=(%.1f,%.1f)\n',ego(1),ego(2));
+% target positions over next 60 s
+ts=0:0.5:60; P=zeros(2,numel(ts));
+for k=1:numel(ts), qq=predictiveSafetyGeometry.predictTarget(m.targetEpoch,(m.sampleIndex)*h+ts(k)); P(:,k)=qq(1:2); end
+c=mean(P,2); fprintf('target predicted path: centroid (%.1f,%.1f), spread x[%.1f %.1f] y[%.1f %.1f]\n',c(1),c(2),min(P(1,:)),max(P(1,:)),min(P(2,:)),max(P(2,:)));
+% ego nominal reference future (lane cruise) distance to target at matching times
+idx=m.sampleIndex+cfg.controller.horizonSteps;
+for range=[30 50]
+  c2=cfg; c2.collision.encounterRangeMeters=range;
+  [margin,~,~,last]=terminalContinuation.departure(m.terminal,m.targetEpoch,idx,c2);
+  fprintf('range %d m: departure margin=%.3f (last=%g)  [-Inf means target never leaves range]\n',range,margin,last);
+end
+[sep]=terminalContinuation.separation(m.terminal,predictiveSafetyGeometry.predictTarget(m.targetEpoch,idx*h),m.frame,cfg,idx);
+fprintf('all-future separation margin (used when target never leaves) = %.3f m\n',sep);
+d=zeros(size(ts)); for k=1:numel(ts), r=terminalContinuation.referenceAt(m.terminal,idx+round(ts(k)/h)); d(k)=norm(r(1:2)-P(:,min(k,end))); end
+fprintf('distance ego-reference to target (center) over next 60 s: min %.1f m, max %.1f m\n',min(d),max(d));
+fprintf('times (s) at which center distance < 30 m: %s\n',mat2str(ts(d<30)));
+fprintf('times (s) at which center distance < 50 m: %s\n',mat2str(ts(d<50)));

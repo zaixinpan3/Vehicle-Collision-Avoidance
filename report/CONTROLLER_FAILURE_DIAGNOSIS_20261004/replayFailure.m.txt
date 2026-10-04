@@ -1,0 +1,16 @@
+function out=replayFailure(file)
+    repo='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+    here=fileparts(mfilename('fullpath'));
+    addpath(fullfile(repo,'config'),fullfile(repo,'scripts'),fullfile(repo,'estimator'));
+    addpath(fullfile(repo,'solver','controller'));addpath(fullfile(here,'controller'),'-begin');
+    global DIAG_SEARCH DIAG_MODEL DIAG_AGREE; DIAG_AGREE={};
+    s=load(file).snapshot;
+    collisionAvoidanceController("resetNominalTrajectory");
+    try
+        collisionAvoidanceController(s.egoInput,s.targetEstimate,s.road,s.configuration,s.previousState);
+        disp('REPLAY: controller succeeded (not reproduced)');
+    catch e
+        disp("REPLAY failure: "+e.message);
+    end
+    out=struct('snapshot',s,'search',DIAG_SEARCH,'model',DIAG_MODEL,'agree',{DIAG_AGREE});
+end

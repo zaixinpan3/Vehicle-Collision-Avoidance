@@ -1,0 +1,11 @@
+function bisectCase2(root,tag,names,range)
+    cd(root);addpath('controller','config','scripts');
+    for name=names
+        cfg=struct('referenceSpeed',8,'controller',struct('horizonSteps',8));
+        if range>0, cfg.collision=struct('safetyMarginMeters',0.2,'encounterRangeMeters',range); end
+        r=runNonlinearPredictiveSafetyValidation(Scenarios=name,Frames=1500,ControllerConfiguration=cfg, ...
+            RequireCollisionThreat=true,RecoveryDwellSeconds=1).results;
+        fprintf('EXP %s %s holds=%d gap=%.4f recovered=%d failure=%s\n',tag,name,r.executedFrames, ...
+            r.minimumReplayClearanceMeters,r.recovery.recovered,r.failure);
+    end
+end

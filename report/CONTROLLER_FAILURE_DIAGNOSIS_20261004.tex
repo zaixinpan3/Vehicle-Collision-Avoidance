@@ -1,0 +1,129 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Why two 8-m/s encounters stop at 8584c47}
+\date{Prepared October 4, 2026}
+\begin{document}
+\maketitle
+
+\textbf{Scope.} The rerun in \path{CONTROLLER_CAMPAIGN_20261004.tex} stopped
+in two cases with \texttt{noOptimizationSolution
+(linearizationAccuracyNotReached)}: 8-m/s turningCrossing at hold 20 and
+8-m/s curvedCrossing at hold 219. Both cases recovered at 91a35f6. This
+report identifies the change behind each stop and the mechanism. No
+production source was changed. All interventions were made in temporary
+worktrees or an instrumented scratch copy; the diff is
+\path{CONTROLLER_FAILURE_DIAGNOSIS_20261004/instrumentation.diff}.
+
+\section{What the stop means}
+Each hold, \texttt{solvePredictiveControl} linearizes the bicycle model about
+an anchor trajectory and solves a two-stage SOCP. The first stage minimizes
+PCBF slack and the second minimizes CLF slack. The first hold of the result
+is then replayed through the nonlinear model. The agreement ratio is the
+largest of three scaled errors: pose error over 1 cm, state error over
+$[5,3,1.5]\cdot 1\%$, and CLF prediction error over 0.01 (scaled by
+$\max(1,W_0)$). A ratio above 1 rejects the plan. Two recoveries are then
+tried. First, a damped step is taken, but only if the zero-correction anchor
+is feasible. Second, one fresh potential-field seed is solved. There are at
+most two linearizations per hold. If neither recovery agrees, the hold
+issues no command and the experiment stops.
+
+\section{Isolation}
+Both failing frames replay deterministically from the saved snapshots.
+Bisection over the controller-affecting commits
+(\path{isolation-results.txt}) gives the following:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Source & turningCrossing & curvedCrossing \\
+\midrule
+91a35f6, 838848b, 388dcfc & recovered & recovered \\
+aa85322, 73abcad & recovered & stops (hold 185) \\
+8584c47 (HEAD) & stops (hold 20) & stops (hold 219) \\
+\midrule
+HEAD, agreement over encounter restored & recovered & stops (hold 183) \\
+HEAD, dual instead of support linearization & stops (hold 20) & stops (hold 210) \\
+HEAD, encounter range 30 m & stops (hold 20) & recovered (hold 377) \\
+aa85322, encounter range 30 m & -- & recovered (hold 196) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The two stops have separate causes. turningCrossing follows the 8584c47
+reduction of the agreement check from every in-range node to the first
+hold. curvedCrossing follows the aa85322 increase of the encounter range from
+30 m to a 50 m reference-position radius, which also permits re-entry.
+
+\section{turningCrossing: first-hold agreement lets the plan drift}
+After 8584c47 only the issued hold must agree. In the HEAD trace, the
+first-hold pose error stays at about 2~mm, so the input trust scale grows
+every hold, from 0.125 to 0.751 by 0.55 s. The unchecked remainder of the
+plan grows with it: its pose error relative to the nonlinear model reaches
+5.4~cm, five times the old 1-cm tolerance. Each next hold restarts from that
+shifted plan. Measured against the new linearization, the shifted plan
+violates the constraint set by 0.11. At 1.0~s, 0.26~s before the baseline
+collision, that violation jumps to 0.616. The optimizer then needs a full
+trust-radius steering change (0.224 to 0.149 rad). The resulting yaw-rate
+prediction is off by 0.034 rad/s, so the state ratio is 2.24. Damping is
+impossible because the anchor itself is infeasible. The fresh
+potential-field seed returns no numerical PCBF result at trust scales 0.125
+and 2. The hold therefore stops.
+
+With the encounter-wide check restored (and everything else at HEAD), the
+trust scale stays at or below 0.29. The full-plan error stays at or below
+0.8~cm, the shifted-plan violation stays at or below 0.015, and the case
+recovers.
+
+\section{curvedCrossing: the target returns during recovery}
+The target is an NRMM motion with constant sideslip 0.04~rad and rear-axle
+distance 1.6~m. Its turning radius is therefore
+$1.6/\sin 0.04 = 40.0$~m, regardless of its acceleration. The fixture keeps
+this circling for all time, so after the first crossing the target comes
+back. With range 30 m at HEAD, the ego meets it again at a 5.5~m center
+distance at 12.55~s. The CLF there rises from 0.8 to 371, a second avoidance,
+and the case recovers at 18.85~s.
+
+With the 50 m radius, the returning target stays in the constraint set while
+the ego is still finishing its first recovery. At the failing hold
+($t=10.95$~s) the target is 25~m away. The horizon of about 4.1~s, however,
+predicts rectangle overlap along the anchor 1.6 to 1.8~s ahead (row value
+$-0.98$~m). From 10.45~s the CLF stops decreasing, and the CLF slack grows
+from 0.01 to 1.01. The plans now need large corrections, and the quadratic
+CLF prediction loses accuracy: predicted 2.537 against nonlinear 2.281
+(ratio 15.0), and 7.4 after the fresh seed. The best damped trial reaches
+1.155. Replaying the failing hold without the per-node collision rows lets
+the hold succeed. Removing only the terminal target rows does not.
+
+At 91a35f6 this case was recorded as recovered at 9.75~s, before the target
+returns. The experiment stops at the first confirmed recovery, so the second
+encounter was never exercised in that record.
+
+\section{Interpretation and options}
+Neither stop is a sampled collision. Both are failures to return a
+nonlinearly consistent command. They share the same final step: two
+linearizations per hold and no fallback when both disagree.
+\begin{itemize}
+\item turningCrossing is a regression from the 8584c47 relaxation, which was
+made for the noisy-estimator campaign. Restoring the encounter-wide check
+fixes this case, but its effect on the noisy campaign has not been tested.
+Limiting trust-scale growth by the unchecked plan error is an untested
+alternative.
+\item curvedCrossing is a real second encounter that the 50-m range exposes
+earlier, combined with a CLF agreement test that is strict while CLF slack is
+positive. A shorter range hides the return until the ego has settled. The
+campaign's stop-at-first-recovery criterion also hid it before.
+\end{itemize}
+None of these options was implemented or validated here.
+
+\section{Reproduction}
+Inputs are the saved failure snapshots and traces in
+\path{~/.cache/collisionAvoidance/controller-campaign-20261004/}. The
+scripts in \path{CONTROLLER_FAILURE_DIAGNOSIS_20261004/} are stored as
+\path{.m.txt}: \texttt{bisectCase}, \texttt{bisectCase2} and
+\texttt{traceCase} run cases in a worktree; \texttt{replayFailure} with
+\texttt{runDiag1}--\texttt{6} replays a failing hold in the instrumented
+copy. Every run uses exact target observations, the \texttt{ode45} replay,
+a 1500-hold cap, a 1-s recovery dwell and the 0.20~m margin.
+\end{document}

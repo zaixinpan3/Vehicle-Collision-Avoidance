@@ -1,0 +1,8 @@
+C=fullfile(getenv('HOME'),'.cache/collisionAvoidance/controller-campaign-20261004');
+global DIAG_NO_TERMINAL_TARGET DIAG_NO_COLLISION_ROWS
+cases={[0 0],[1 0],[0 1],[1 1]}; labels=["baseline","no terminal-target row","no collision rows (all nodes beyond range)","neither"];
+for k=1:4
+  DIAG_NO_TERMINAL_TARGET=cases{k}(1); DIAG_NO_COLLISION_ROWS=cases{k}(2);
+  fprintf('--- curvedCrossing failing frame, %s: ',labels(k));
+  o=replayFailure(fullfile(C,"speed8-curvedCrossing-failure.mat"));
+end

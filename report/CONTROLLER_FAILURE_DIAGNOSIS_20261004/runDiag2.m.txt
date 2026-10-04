@@ -1,0 +1,17 @@
+C=fullfile(getenv('HOME'),'.cache/collisionAvoidance/controller-campaign-20261004');
+for n=["speed8-turningCrossing","speed8-curvedCrossing"]
+ o=replayFailure(fullfile(C,n+"-failure.mat")); s=o.search;
+ fprintf('==== %s\n',n);
+ for k=1:numel(s.attempts), a=s.attempts(k); disp(a); end
+ for k=1:numel(o.agree), e=o.agree{k};
+   fprintf('-- agreement check %d (trust %.3f)\n',k,e.trust);
+   fprintf('   first input cand=%s  lin=%s  (steer rad, accel-ish)\n',mat2str(e.candInputs(:,1)',4),mat2str(e.linInputs(:,1)',4));
+   if ~isempty(e.rollout)
+     fprintf('   node2 affine  vx,vy,r=%s\n',mat2str(e.candStates(4:6,2)',5));
+     fprintf('   node2 nonlin  vx,vy,r=%s\n',mat2str(e.rollout(4:6,2)',5));
+     fprintf('   node2 lin-ref vx,vy,r=%s\n',mat2str(e.linStates(4:6,2)',5));
+     fprintf('   clf init=%.5f predNext=%.5f actualNext=%.5f reqDecrease=%.5f\n',e.clfInit,e.clfNext,e.actualClf,e.clfReq);
+   end
+ end
+ save(n+"-diag2.mat",'o');
+end

@@ -1,0 +1,9 @@
+C=fullfile(getenv('HOME'),'.cache/collisionAvoidance/controller-campaign-20261004');
+for n=["speed8-turningCrossing","speed8-curvedCrossing"]
+ o=replayFailure(fullfile(C,n+"-failure.mat")); s=o.search;
+ fprintf('==== %s frame %d t=%.2f\n',n,o.snapshot.frame,o.snapshot.time);
+ disp(s.terminationReason); fprintf('init=%s restarted=%d initFail=%s linearizations=%d solverCalls=%d elapsed=%.3f\n',s.initialization,s.potentialFieldRestarted,s.initializationFailure,s.linearizationCount,s.solverCalls,s.elapsedSeconds);
+ h=s.modelAgreementHistory; for k=1:numel(h), fprintf(' round %d: ratio=%.3f pose=%.4fm scaledState=%.4f scaledClf=%.4f latDevRatio=%.3f trust=%.4f firstTrustAct=%s\n',k,h(k).ratio,h(k).poseErrorMeters,h(k).scaledStateError,h(k).scaledClfError,h(k).lateralDeviationRatio,h(k).inputTrustScale,mat2str(h(k).firstInputTrustActivity',3)); end
+ L=s.lineSearchHistory; for k=1:numel(L), fprintf(' linesearch round %d: reason=%s baseResid=%.3g trials=%d\n',L(k).round,L(k).reason,L(k).baseResidual,numel(L(k).trials)); for t=1:numel(L(k).trials), a=L(k).trials(t).agreement; fprintf('   frac=%.3f ratio=%.3f pose=%.4f state=%.4f clf=%.4f\n',L(k).trials(t).fraction,a.ratio,a.poseErrorMeters,a.scaledStateError,a.scaledClfError); end; end
+ save(n+"-diag.mat",'o');
+end

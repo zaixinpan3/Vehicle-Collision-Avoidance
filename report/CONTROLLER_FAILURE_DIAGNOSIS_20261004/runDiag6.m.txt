@@ -1,0 +1,5 @@
+C=fullfile(getenv('HOME'),'.cache/collisionAvoidance/controller-campaign-20261004');
+global DIAG_NODE_OFF DIAG_TERM_OFF DIAG_ROWS
+DIAG_NODE_OFF=false; DIAG_TERM_OFF=false; DIAG_ROWS=zeros(0,5);
+o=replayFailure(fullfile(C,"speed8-curvedCrossing-failure.mat"));
+fprintf('time  minRowValue  maxTightening  centerDist  rectDist\n'); [~,i]=min(DIAG_ROWS(:,2)); fprintf("rows=%d horizon=%.3f s, min row value %.3f m at t=%.3f (rect dist %.3f)\n",size(DIAG_ROWS,1),max(DIAG_ROWS(:,1)),DIAG_ROWS(i,2),DIAG_ROWS(i,1),DIAG_ROWS(i,5)); disp(DIAG_ROWS(41:4:end,:));

@@ -1,0 +1,18 @@
+BISECT 388dcfc turningCrossing holds=256 gap=0.2002 recovered=1 failure=
+BISECT 388dcfc curvedCrossing holds=199 gap=0.1904 recovered=1 failure=
+BISECT 73abcad turningCrossing holds=265 gap=0.2002 recovered=1 failure=
+BISECT 73abcad curvedCrossing holds=185 gap=0.1722 recovered=0 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).
+BISECT 838848b turningCrossing holds=255 gap=0.1936 recovered=1 failure=
+BISECT 838848b curvedCrossing holds=199 gap=0.1904 recovered=1 failure=
+BISECT 91a35f6 turningCrossing holds=208 gap=0.1927 recovered=1 failure=
+BISECT 91a35f6 curvedCrossing holds=195 gap=0.1864 recovered=1 failure=
+BISECT aa85322 turningCrossing holds=265 gap=0.2002 recovered=1 failure=
+BISECT aa85322 curvedCrossing holds=185 gap=0.1722 recovered=0 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).
+EXP E1_poseCountRevert turningCrossing holds=270 gap=0.1936 recovered=1 failure=
+EXP E1_poseCountRevert curvedCrossing holds=183 gap=0.1722 recovered=0 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).
+EXP E2_dualLinRevert turningCrossing holds=20 gap=2.8882 recovered=0 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).
+EXP E2_dualLinRevert curvedCrossing holds=210 gap=0.1375 recovered=0 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).
+EXP E3_head_range30 turningCrossing holds=20 gap=2.8894 recovered=0 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).
+EXP E3_head_range30 curvedCrossing holds=377 gap=0.1438 recovered=1 failure=
+EXP E4_aa85322_range30 curvedCrossing holds=196 gap=0.1898 recovered=1 failure=
+EXP E5_91a35f6_check curvedCrossing holds=195 gap=0.1864 recovered=1 failure=

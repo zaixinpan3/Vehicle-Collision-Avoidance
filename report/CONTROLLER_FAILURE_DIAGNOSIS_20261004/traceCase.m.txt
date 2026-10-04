@@ -1,0 +1,8 @@
+function traceCase(root,name,frames,range,out)
+    cd(root);addpath('controller','config','scripts');
+    cfg=struct('referenceSpeed',8,'controller',struct('horizonSteps',8));
+    if range>0, cfg.collision=struct('safetyMarginMeters',0.2,'encounterRangeMeters',range); end
+    r=runNonlinearPredictiveSafetyValidation(Scenarios=name,Frames=frames,ControllerConfiguration=cfg, ...
+        RequireCollisionThreat=true,RecoveryDwellSeconds=1,OutputFile=out).results;
+    fprintf('TRACE %s holds=%d recovered=%d failure=%s\n',name,r.executedFrames,r.recovery.recovered,r.failure);
+end

@@ -1,0 +1,8 @@
+C=fullfile(getenv('HOME'),'.cache/collisionAvoidance/controller-campaign-20261004');
+global DIAG_NODE_OFF DIAG_TERM_OFF DIAG_NO_TERMINAL_TARGET DIAG_NO_COLLISION_ROWS
+DIAG_NO_TERMINAL_TARGET=false; DIAG_NO_COLLISION_ROWS=false;
+for k=1:2
+  DIAG_NODE_OFF=(k==1); DIAG_TERM_OFF=(k==2);
+  fprintf('--- nodeRowsOff=%d terminalBlockOff=%d: ',DIAG_NODE_OFF,DIAG_TERM_OFF);
+  o=replayFailure(fullfile(C,"speed8-curvedCrossing-failure.mat"));
+end
