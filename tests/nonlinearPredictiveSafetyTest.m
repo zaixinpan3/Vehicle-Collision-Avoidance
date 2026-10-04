@@ -212,7 +212,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,73);
+            testCase.verifyEqual(state.version,74);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;-1;0;1.6;2.4;.95;0;0];
@@ -238,7 +238,7 @@ end
 function [ego,road,cfg]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
     ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
-    road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
+    road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192],'shoulderWidth',[3.048;3.048]);
 end
 function target=localTarget(q)
     velocity=q(4)*[cos(q(3)+q(6));sin(q(3)+q(6))];

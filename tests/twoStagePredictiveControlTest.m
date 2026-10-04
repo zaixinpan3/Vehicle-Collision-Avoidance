@@ -27,7 +27,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
             % Terminal set: beyond the perception radius, separating, inside the road.
-            testCase.verifyEqual(problem.metadata.terminalSet,"beyondPerceptionRadiusSeparatingInsideRoad");
+            testCase.verifyEqual(problem.metadata.terminalSet,"beyondPerceptionRadiusSeparatingOrOnShoulderInsideRoad");
             testCase.verifyGreaterThanOrEqual(problem.metadata.terminalDistanceMeters, ...
                 cfg.collision.encounterRangeMeters-1e-6);
             testCase.verifyGreaterThanOrEqual(problem.metadata.terminalSeparatingSpeed,0);
@@ -202,6 +202,49 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
+        function eachShoulderIsATerminalModeWithItsOwnRollout(testCase)
+            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("brakingLead",cfg);
+            target=struct('targetPositionInertial',q(1:2), ...
+                'targetVelocityInertial',q(4)*[cos(q(3)+q(6));sin(q(3)+q(6))], ...
+                'targetYawInertial',q(3),'targetSideslip',q(6), ...
+                'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7));
+            [~,inputs,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            search=problem.metadata.search;attempts=search.attempts;
+            testCase.verifyEqual(unique([attempts.terminalMode]),["leftShoulder","rightShoulder","separation"]);
+            testCase.verifyEqual(search.linearizationCount,3);
+            testCase.verifyTrue(any([attempts.initialization]=="shoulderGuidanceRollout"));
+            % The issued mode has the least primary slack among the solved modes.
+            solved=attempts(arrayfun(@(a)isfinite(a.primaryOptimum),attempts));
+            testCase.verifyLessThanOrEqual(attempts(search.selectedAttempt).primaryOptimum, ...
+                min([solved.primaryOptimum])+cfg.solver.lexicographicTieTolerance);
+            testCase.verifyEqual(state.terminalMode,problem.metadata.terminalMode);
+            mode=problem.metadata.terminalMode;
+            if mode~="separation"
+                % The affine endpoint is on the chosen shoulder and along the road.
+                y=state.stateTrajectory(:,end);
+                corners=[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
+                lateral=y(2)+sin(y(3))*corners(1,:)+cos(y(3))*corners(2,:);
+                inner=road.lateralClearance-road.shoulderWidth;tol=1e-3;
+                if mode=="rightShoulder",testCase.verifyLessThanOrEqual(lateral,-inner(1)+tol);
+                else,testCase.verifyGreaterThanOrEqual(lateral,inner(2)-tol);end
+                testCase.verifyLessThanOrEqual(abs(y(3)),cfg.collision.shoulderHeadingToleranceRadians+tol);
+                testCase.verifyEqual(size(inputs,2),size(state.stateTrajectory,2)-1);
+            end
+        end
+        function aRoadWithoutShouldersHasOnlyTheSeparationMode(testCase)
+            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
+            road=rmfield(road,'shoulderWidth');
+            target=struct('targetPositionInertial',q(1:2), ...
+                'targetVelocityInertial',q(4)*[cos(q(3)+q(6));sin(q(3)+q(6))],'targetYawInertial',q(3));
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(unique([problem.metadata.search.attempts.terminalMode]),"separation");
+            testCase.verifyEqual(problem.metadata.terminalMode,"separation");
+        end
+        function shoulderWiderThanTheRoadIsRejected(testCase)
+            [ego,road,cfg]=localFixture();road.lateralClearance=[4;4];road.shoulderWidth=[5;0];
+            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
+                'collisionAvoidanceController:invalidRoadShoulder');
+        end
         function exhaustedBudgetDoesNotExecuteThePreviousTrajectory(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
@@ -265,7 +308,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7));
             [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             search=problem.metadata.search;
-            testCase.verifyEqual(search.linearizationCount,1);
+            % One fresh model per terminal mode: separation and two shoulders.
+            testCase.verifyEqual(search.linearizationCount,numel(unique([search.attempts.terminalMode])));
             testCase.verifyTrue(search.clfStageCompleted);
             testCase.verifyGreaterThan(search.attempts(search.selectedAttempt).stages(1).exitFlag,0);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);

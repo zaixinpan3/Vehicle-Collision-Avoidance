@@ -224,4 +224,53 @@ solver time limit, and 15~m/s curvedCrossing ends with a tire-domain error. Ther
 Three noisy 15-m/s runs (crossing, curvedHeadOn, curvedCrossing) leave even the
 widened road, by 0.14--0.21~m, in the \texttt{ode45} replay
 (\path{campaign-metrics-us-shoulder.csv}).
+
+\section{Addendum 7: a road shoulder as a terminal set}
+At the user's direction, driving onto a shoulder is also a terminal set; targets
+are assumed never to enter a shoulder. The terminal set is now a union of three
+modes: the target beyond~$R$ and separating, the ego rectangle on the right
+shoulder, or on the left shoulder. A shoulder mode requires every corner inside
+that shoulder ($\texttt{road.shoulderWidth}=[3.048; 3.048]$~m, the outer part of
+\texttt{lateralClearance}) and the heading within 0.05~rad of the path; the
+speed is free. Every mode keeps the road rows.
+
+Every mode is solved and the issued mode has the least primary slack; modes
+tied within \texttt{lexicographicTieTolerance} compete on CLF slack. A shifted
+plan is one anchor for all modes; its extension follows path guidance toward
+the region of the mode it ended in. At startup, and after every mode of a shift
+is infeasible, each mode has its own fresh rollout: the potential field for
+separation, and path guidance to the shoulder centre for a shoulder. On a
+single shared anchor the shoulder modes were infeasible in all three startup
+probes, because that anchor never approaches a shoulder. The trust scale is
+expanded only while every mode is infeasible; per-mode expansion had cost eight
+extra solves per frame. All 642 tests pass (\path{tests-shoulder-terminal.csv}).
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+ & recovered & no solution & collision\\
+\midrule
+Exact, shoulders as road only & 11 & 3 & 0\\
+Exact, shoulder terminal & 11 & 3 & 0\\
+Noisy, shoulders as road only & 4 & 10 & 0\\
+Noisy, shoulder terminal & 3 & 11 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+With exact observations the same three cases stop with
+\texttt{clfNoNumericalResult}: 8 and 15~m/s brakingLead (now at holds 29 and
+31) and 15~m/s turningCrossing at hold 5. A shoulder mode was issued in 9 of
+14 exact runs, in six of them from the first frame, where all modes tie at zero slack and the
+one-step CLF slack decides. With the noisy estimator, 8~m/s headOn,
+acceleratingHeadOn and crossing recover. 8~m/s curvedHeadOn, previously
+recovered, now stops at hold 1545 on a CLF numerical failure. 15~m/s brakingLead now runs 90 holds
+instead of stopping at frame~0. No \texttt{ode45} replay leaves the road
+(minimum margin 0.815~m); before, three noisy runs did. No run collides
+(\path{campaign-metrics-shoulder-terminal.csv}, with per-mode hold counts).
+
+The shoulder premise is not checked: a target predicted onto a shoulder is not
+excluded by the shoulder mode, although the collision rows inside~$R$ remain.
+Selection by one-step CLF slack among tied modes is a tie rule, not a measure
+of how good a whole plan is.
 \end{document}

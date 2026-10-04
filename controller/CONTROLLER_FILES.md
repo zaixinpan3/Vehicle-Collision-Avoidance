@@ -8,29 +8,37 @@ terminal set and the affine prediction scope.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout or shifted plan) over a horizon that reaches the terminal set; PCBF slack stage, CLF stage, plan-innovation trust |
+| `solvePredictiveControl.m` | Anchors (shifted plan, or one fresh rollout per terminal mode) over a horizon that reaches the terminal set; per-mode PCBF slack stage, CLF stage and mode selection; plan-innovation trust |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
-Each sample builds one nonlinear anchor: a potential-field rollout at startup,
-otherwise the shifted previous plan extended by path guidance. The rollout stops
-at the first node of the terminal set, between `horizonSteps` and
-`maximumHorizonSteps`. The anchor is linearized once; the PCBF stage minimizes
-prefix safety slack and the CLF stage follows. A primary problem that is primal
-infeasible inside the trust region is re-solved with the trust scale doubled
-until feasible (at most `trustMaximumScale`); a shifted plan still infeasible is solved once more
-from a fresh potential-field rollout in the same way. The completed CLF result is
+The terminal set is a union of modes, and each mode is solved. After startup
+the anchor is the shifted previous plan, extended by path guidance toward the
+region of its terminal mode, and every mode is solved on it. At startup each
+mode has its own rollout: potential-field guidance for the separation mode and
+path guidance to the shoulder centre for a shoulder mode. A rollout stops at
+the first node of the terminal set (of its mode, for a fresh rollout), between
+`horizonSteps` and `maximumHorizonSteps`. The PCBF stage minimizes prefix
+safety slack per mode; the modes within the tie tolerance of the least slack
+run the CLF stage, and the least CLF slack is issued. While every mode is
+primal infeasible inside the trust region, all are re-solved with the trust
+scale doubled (at most `trustMaximumScale`); a shifted plan still infeasible in
+every mode is solved once more from fresh per-mode rollouts in the same way. The completed CLF result is
 issued directly, without a nonlinear replay or agreement test. An unusable shift,
 or a frame still without a result, reports `noOptimizationSolution`. There is no
 inherited slack budget or alternate controller. The input trust scale is estimated
 from the next posterior's plan innovation. Positive PCBF slack still denotes
 relaxation.
 
-The terminal set is the perception-radius exit: at the last node the target
-is beyond `encounterRangeMeters` (50 m) and separating. The road
+The terminal set is the perception-radius exit or a road shoulder: at the last
+node the target is beyond `encounterRangeMeters` (50 m) and separating, or the
+ego rectangle is on a shoulder (`road.shoulderWidth = [right; left]`, the outer
+part of `lateralClearance`) with its heading within
+`shoulderHeadingToleranceRadians` of the path. Targets are assumed never to
+enter a shoulder. The road
 `lateralClearance = [right; left]` is the only lateral constraint: every ego
 rectangle corner stays inside it at every predicted node and hold midpoint,
 including the endpoint. Without a target the horizon is `horizonSteps`. The
@@ -86,7 +94,8 @@ zero multipliers and translation invariance. Overlap has no imposed direction.
 target ranges, primary priority, affine dynamics with consistent anchors,
 braking bounds, input increments distinct from physical steering limits,
 positive-slack reporting, the terminal set (perception-radius exit, separating
-speed, road rectangle), the shortest target-free horizon, the single fresh
+speed, road rectangle, one mode per shoulder with its own rollout, rejected
+shoulder widths), the shortest target-free horizon, the single fresh
 re-solve of a failed shift, and that an unusable shift is reported.
 `trustInnovationTest` checks the plan-innovation trust law: startup scale,
 bounded growth, square-root shrinkage, attribution of a posterior departure to

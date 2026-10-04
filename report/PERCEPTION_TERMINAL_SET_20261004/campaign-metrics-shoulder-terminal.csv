@@ -1,0 +1,29 @@
+observation,speed,scenario,outcome,holds,minimumSampledGapMeters,minimumRoadMarginMeters,collision,roadDeparture,separationHolds,rightShoulderHolds,leftShoulderHolds,failure
+exact,8,headOn,recovered,248,0.6536,3.498,False,False,225,0,23,
+exact,8,acceleratingHeadOn,recovered,224,0.1663,2.394,False,False,197,27,0,
+exact,8,brakingLead,controlUnavailable,29,1.0525,5.727,False,False,0,29,0,The two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,8,crossing,recovered,173,0.1962,5.017,False,False,173,0,0,
+exact,8,turningCrossing,recovered,228,0.1998,4.361,False,False,228,0,0,
+exact,8,curvedHeadOn,recovered,263,0.876,2.526,False,False,232,0,31,
+exact,8,curvedCrossing,recovered,481,0.1719,1.294,False,False,369,0,112,
+exact,15,headOn,recovered,151,0.1756,4.3,False,False,151,0,0,
+exact,15,acceleratingHeadOn,recovered,172,0.1872,4.391,False,False,172,0,0,
+exact,15,brakingLead,controlUnavailable,31,1.0041,7.548,False,False,5,0,26,The two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,15,crossing,recovered,196,0.1055,2.052,False,False,165,31,0,
+exact,15,turningCrossing,controlUnavailable,5,20.7518,7.53,False,False,5,0,0,The two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,15,curvedHeadOn,recovered,1241,0.1974,1.243,False,False,1208,0,33,
+exact,15,curvedCrossing,recovered,218,0.1995,2.487,False,False,175,43,0,
+noisy,8,headOn,recovered,185,1.9485,3.623,False,False,185,0,0,
+noisy,8,acceleratingHeadOn,recovered,208,1.4929,3.632,False,False,208,0,0,
+noisy,8,brakingLead,controlUnavailable,0,,,False,False,0,0,0,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,crossing,recovered,192,1.0519,3.086,False,False,192,0,0,
+noisy,8,turningCrossing,controlUnavailable,20,7.0286,3.914,False,False,15,5,0,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,curvedHeadOn,controlUnavailable,1545,2.5306,4.034,False,False,1541,0,4,The two-stage affine optimization did not complete (clfNoNumericalResult).
+noisy,8,curvedCrossing,controlUnavailable,0,,,False,False,0,0,0,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,headOn,controlUnavailable,16,2.0687,7.512,False,False,15,0,1,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,acceleratingHeadOn,controlUnavailable,13,4.3462,7.513,False,False,12,0,1,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,brakingLead,controlUnavailable,90,0.2104,1.998,False,False,43,47,0,The two-stage affine optimization did not complete (clfNoNumericalResult).
+noisy,15,crossing,controlUnavailable,87,1.2853,0.815,False,False,60,0,27,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,turningCrossing,controlUnavailable,19,8.3438,5.21,False,False,18,1,0,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedHeadOn,controlUnavailable,1094,2.5778,0.982,False,False,1062,0,32,The two-stage affine optimization did not complete (clfNoNumericalResult).
+noisy,15,curvedCrossing,controlUnavailable,82,0.3977,1.268,False,False,81,1,0,The two-stage affine optimization did not complete (pcbfNoNumericalResult).

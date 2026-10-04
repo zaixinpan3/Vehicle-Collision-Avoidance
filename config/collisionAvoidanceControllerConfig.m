@@ -48,8 +48,10 @@ function cfg=localDefaults()
     % rows (hold start and midpoint), not a continuous-time clearance bound.
     % terminalHorizonMarginMeters only places the horizon end beyond the
     % radius; a terminal row active at the anchor stalled the conic solver.
+    % A road shoulder is also a terminal set: the ego rectangle on it with
+    % its heading within shoulderHeadingToleranceRadians of the path.
     cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50, ...
-        'terminalHorizonMarginMeters',1);
+        'terminalHorizonMarginMeters',1,'shoulderHeadingToleranceRadians',.05);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -120,6 +122,7 @@ function localValidate(cfg)
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.collision.terminalHorizonMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.collision.shoulderHeadingToleranceRadians,{'double'},{'scalar','real','finite','positive'});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters
         localInvalid('The encounter range must exceed the collision safety margin.');
     end

@@ -863,9 +863,11 @@ Ego feedback tube
 and input-increment uncertainty. Future posterior errors use the current
 generator as a frozen experimental envelope, not a proved future bound. \\
 Terminal set
-& The implemented terminal set is the perception-radius exit: target beyond
-$R$ and separating (target estimate), ego rectangle inside the road, with ego
-generator supports subtracted. It is not the invariant terminal
+& The implemented terminal set is the perception-radius exit (target beyond
+$R$ and separating, target estimate) or a road shoulder (ego rectangle on it,
+heading along the path), each with the ego rectangle inside the road and ego
+generator supports subtracted; every mode is solved and the least slack is
+issued. It is not the invariant terminal
 continuation of the theorem above, and no invariance is claimed. \\
 Safety and one CLF
 & With nonzero uncertainty, mean collision rows are hard and uncertainty

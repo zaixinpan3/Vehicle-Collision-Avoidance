@@ -90,7 +90,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             assert(isequaln(r.configuration,cfg) && r.scenario==name ...
                 && saved.stateTransition==options.StateTransition ...
                 && isfield(saved,'observationModel') && saved.observationModel==observationModel ...
-                && saved.prior.version==73, ...
+                && saved.prior.version==74, ...
                 'Continuation scenario, configuration and transition must match.');
             assert(isequaln(saved.recoveryOptions,recovery),'Recovery settings must match.');
             assert(isempty(r.trace) || isfield(r.trace,'terminalDistanceMeters'), ...
@@ -302,7 +302,7 @@ end
 
 function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
     cfg=collisionAvoidanceControllerConfig(controllerConfiguration);
-    road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
+    road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192],'shoulderWidth',[3.048;3.048]);
     x=[0;0;0;cfg.referenceSpeed;0;0];target=[];q=[];lr=cfg.target.rearAxleDistance;
     switch name
         case "recovery",x(2)=.01;
@@ -310,7 +310,7 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
             q=[24;0;pi;8;0;0;lr;2.4;.95;0;0];
         case "circular"
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',.005,'length',200), ...
-                'lateralClearance',[8.5344;12.192]);
+                'lateralClearance',[8.5344;12.192],'shoulderWidth',[3.048;3.048]);
             trim=nonlinearBicycleModel.cruise(cfg,.005);x=trim.state;x(1:2)=0;
         case "turningTarget"
             q=[24;0;pi;8;0;atan(-.1*lr);lr;2.4;.95;0;0];

@@ -1,4 +1,4 @@
-# PCBF slack and one-step CLF optimization to a perception-radius terminal set
+# PCBF slack and one-step CLF optimization to a perception-radius or shoulder terminal set
 
 Every frame uses the same target-independent analytic quadratic CLF, defined in
 [NOMINAL_CLF.md](NOMINAL_CLF.md). Every frame minimizes PCBF slack, then CLF
@@ -109,18 +109,23 @@ interpolant, not an independently integrated half hold.
 
 The prediction length is not fixed. The anchor rollout stops at the first node
 `M` with `N <= M <= maximumHorizonSteps` that is separating and at least
-`R + terminalHorizonMarginMeters` (1 m) from the target; without a target
-`M = N`. The terminal row itself uses `R`. With the anchor exactly at `R` the
+`R + terminalHorizonMarginMeters` (1 m) from the target, or on a shoulder along
+the road; a fresh rollout for one mode stops only at that mode's set. Without a
+target `M = N`. The terminal row itself uses `R`. With the anchor exactly at `R` the
 terminal row was active at zero correction, and the CLF stage stalled in Clarabel
 (InsufficientProgress or NumericalError) in six exact and noisy holds; a 1-m
 margin solved all six. A rollout that never reaches it uses
 `M = maximumHorizonSteps`, and the optimization then decides feasibility.
 
 Previous inputs are shifted and rolled out from the current measurement in
-both encounter and recovery frames, then extended by path guidance. Prior
-affine states are not reused as the linearization trajectory. Only at startup
-is one moving-target potential-field rollout constructed; when no target is
-present, nominal path guidance supplies it. A shifted plan that cannot be
+both encounter and recovery frames, then extended by path guidance toward the
+path, or toward the shoulder centre when the plan's terminal mode is a
+shoulder. Prior
+affine states are not reused as the linearization trajectory. Only at startup, or
+after every mode of the shift is infeasible, are fresh rollouts constructed:
+one moving-target potential-field rollout for the separation mode (nominal path
+guidance when no target is present) and, for each shoulder mode, nominal path
+guidance to the centre of that shoulder. A shifted plan that cannot be
 rolled out (non-finite inputs, a braking ratio at the limit, or a tire-domain
 error) is reported as no solution; no other anchor replaces it. Potential guidance is a search reference, not a safety
 certificate. No maneuver bank is used.
@@ -436,13 +441,29 @@ infeasible when the target exit shortened the horizon to 8--29 nodes. Without a
 target only the road rows remain; without `lateralClearance` there is no road
 constraint. Collision rows apply at nodes inside `R`, including a later re-entry.
 
+A road shoulder is a second kind of terminal set. `road.shoulderWidth =
+[right; left]` (zero for no shoulder, at most `lateralClearance`) is the outer
+part of the road on each side, and the premise is that no target enters it.
+The right-shoulder mode requires every corner lateral coordinate at most
+`-(right - shoulderWidth(1))` and the left-shoulder mode at least
+`left - shoulderWidth(2)`; the outer side is the road row. The heading error to
+the path must be within `shoulderHeadingToleranceRadians` (0.05 rad). The rows
+are linearized like the road rows, with the ego generator supports subtracted;
+the speed is not constrained. Each mode is a separate primary problem. The
+issued mode has the least primary slack; modes within
+`lexicographicTieTolerance` of it compete on CLF slack. The trust scale is
+expanded only while every mode is infeasible. The scenario road has 10-ft
+(3.048 m) shoulders on both sides. The premise is not checked: a target
+predicted onto the shoulder is not excluded by the shoulder mode, although the
+collision rows inside `R` remain in force.
+
 The separating condition prevents an endpoint that would re-enter `R` in the
 next instant. It does not prevent a later re-entry by a target whose constant
 sideslip turns it back; the next frame's horizon then extends again. No
 invariance or recursive-feasibility argument for this terminal set is claimed.
 The terminal quantities of the issued affine endpoint are recorded as
 `terminalDistanceMeters`, `terminalSeparatingSpeed` and
-`terminalRoadMarginMeters`.
+`terminalRoadMarginMeters`; `terminalMode` names the issued mode.
 
 ## Issued commands, diagnostics and limits
 
