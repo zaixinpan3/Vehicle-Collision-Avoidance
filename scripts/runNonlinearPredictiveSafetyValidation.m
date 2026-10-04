@@ -302,7 +302,7 @@ end
 
 function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
     cfg=collisionAvoidanceControllerConfig(controllerConfiguration);
-    road=struct('centerline',[-100,0;1000,0],'lateralClearance',[5.625;9.375]);
+    road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
     x=[0;0;0;cfg.referenceSpeed;0;0];target=[];q=[];lr=cfg.target.rearAxleDistance;
     switch name
         case "recovery",x(2)=.01;
@@ -310,7 +310,7 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
             q=[24;0;pi;8;0;0;lr;2.4;.95;0;0];
         case "circular"
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',.005,'length',200), ...
-                'lateralClearance',[5.625;9.375]);
+                'lateralClearance',[8.5344;12.192]);
             trim=nonlinearBicycleModel.cruise(cfg,.005);x=trim.state;x(1:2)=0;
         case "turningTarget"
             q=[24;0;pi;8;0;atan(-.1*lr);lr;2.4;.95;0;0];

@@ -1,0 +1,29 @@
+observation,speed,scenario,outcome,holds,minimumSampledGapMeters,minimumRoadMarginMeters,collision,roadDeparture,failure
+exact,8,headOn,recovered,234,1.5174,4.858,False,False,
+exact,8,acceleratingHeadOn,recovered,226,1.2146,4.777,False,False,
+exact,8,brakingLead,controlUnavailable,38,1.3421,7.418,False,False,The two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,8,crossing,recovered,173,0.1962,5.017,False,False,
+exact,8,turningCrossing,recovered,228,0.1998,4.361,False,False,
+exact,8,curvedHeadOn,recovered,226,1.9412,4.671,False,False,
+exact,8,curvedCrossing,recovered,356,0.1719,4.684,False,False,
+exact,15,headOn,recovered,151,0.1756,4.3,False,False,
+exact,15,acceleratingHeadOn,recovered,172,0.1872,4.391,False,False,
+exact,15,brakingLead,controlUnavailable,3,1.415,7.541,False,False,The two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,15,crossing,recovered,159,0.1576,5.792,False,False,
+exact,15,turningCrossing,controlUnavailable,5,20.7518,7.53,False,False,The two-stage affine optimization did not complete (clfNoNumericalResult).
+exact,15,curvedHeadOn,recovered,1219,0.1993,4.87,False,False,
+exact,15,curvedCrossing,recovered,154,0.1654,5.287,False,False,
+noisy,8,headOn,recovered,185,1.9485,3.623,False,False,
+noisy,8,acceleratingHeadOn,recovered,208,1.4929,3.632,False,False,
+noisy,8,brakingLead,controlUnavailable,0,,,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,crossing,recovered,241,0.9587,1.309,False,False,
+noisy,8,turningCrossing,controlUnavailable,21,6.6283,3.632,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,curvedHeadOn,recovered,1789,1.1597,4.034,False,False,
+noisy,8,curvedCrossing,controlUnavailable,0,,,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,headOn,controlUnavailable,17,1.6696,7.512,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,acceleratingHeadOn,controlUnavailable,15,2.6171,7.513,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,brakingLead,controlUnavailable,0,,,False,False,The two-stage affine optimization did not complete (timeLimit).
+noisy,15,crossing,recovered,255,4.0391,-0.177,False,True,
+noisy,15,turningCrossing,controlUnavailable,23,7.1408,3.471,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedHeadOn,controlUnavailable,86,4.6964,-0.207,False,True,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedCrossing,executionError,84,0.372,-0.139,False,True,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.

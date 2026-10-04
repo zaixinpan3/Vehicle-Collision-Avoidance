@@ -205,4 +205,23 @@ curved road touch or leave the road before they stop: 15~m/s curvedCrossing by
 state with corner coordinates linearized on the curved path; they do not bound
 the realized plant
 (\path{campaign-metrics-road-everywhere-four-lane.csv}).
+
+\section{Addendum 6: US lane width and 10-ft shoulders}
+The experiments are in the US, so the scenario road uses 12-ft (3.6576~m)
+lanes. The ego still follows the centre of the second lane from the right. A
+first run without shoulders (\texttt{lateralClearance} = [5.4864; 9.144]~m)
+recovered 12 of 14 exact and 2 of 14 noisy runs, without collisions; 639 of
+639 tests passed (\path{campaign-metrics-us-four-lane.csv}). Two noisy runs on
+the curved road left the road, 15~m/s curvedHeadOn by 0.072~m and 15~m/s
+curvedCrossing by 0.17~m.
+
+With 10-ft (3.048~m) paved shoulders on both sides counted as road,
+\texttt{lateralClearance} = [8.5344; 12.192]~m. All 639 tests pass. Exact runs
+recover 11 of 14: 8 and 15~m/s brakingLead and 15~m/s turningCrossing stop
+with \texttt{clfNoNumericalResult}. Noisy runs recover 4 of 14. Seven stop with
+\texttt{pcbfNoNumericalResult}, 15~m/s brakingLead stops at frame~0 on the
+solver time limit, and 15~m/s curvedCrossing ends with a tire-domain error. There are no collisions.
+Three noisy 15-m/s runs (crossing, curvedHeadOn, curvedCrossing) leave even the
+widened road, by 0.14--0.21~m, in the \texttt{ode45} replay
+(\path{campaign-metrics-us-shoulder.csv}).
 \end{document}
