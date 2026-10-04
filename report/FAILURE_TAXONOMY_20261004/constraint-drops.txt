@@ -1,0 +1,104 @@
+CASE noisy/speed15-brakingLead t=0.00 frame=1
+   anchors: N=512 dist=10.5 lat=4.59
+   none: FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop collision      FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop terminalTarget OK(N=512,slack=1.7e+05)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=movin)
+CASE noisy/speed15-turningCrossing t=0.50 frame=11
+   anchors: N=68 dist=52.1 lat=0.90 | N=75 dist=51.6 lat=1.29
+   none: FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop collision      OK(N=68,slack=9.9e-05)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+CASE noisy/speed15-curvedHeadOn t=3.35 frame=68
+   anchors: N=17 dist=51.6 lat=-2.90 | N=17 dist=51.6 lat=-2.93
+   none: FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop collision      FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalRoad   OK(N=17,slack=7.3e-05)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+CASE noisy/speed15-curvedCrossing t=0.50 frame=11
+   anchors: N=71 dist=51.8 lat=0.72 | N=76 dist=51.2 lat=1.10
+   none: FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop collision      OK(N=71,slack=9.9e-05)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+CASE campaign/speed8-brakingLead t=1.30 frame=27
+   anchors: N=334 dist=51.2 lat=-1.32
+   none: FAIL(clfNoNumericalResult st10; inits=shift)
+   drop path           OK(N=334,slack=8.2e-05)
+   drop collision      OK(N=334,slack=8.9e-05)
+   drop terminalTarget OK(N=334,slack=8.2e-05)
+   drop terminalRoad   OK(N=334,slack=8.3e-05)
+   drop stateLimits    OK(N=334,slack=8.9e-05)
+CASE campaign/speed15-brakingLead t=5.50 frame=111
+   anchors: N=407 dist=51.2 lat=-2.62
+   none: FAIL(clfNoNumericalResult st10; inits=shift)
+   drop path           FAIL(clfNoNumericalResult st10; inits=shift)
+   drop collision      OK(N=407,slack=9.4e-05)
+   drop terminalTarget OK(N=407,slack=8.6e-05)
+   drop terminalRoad   OK(N=407,slack=8e-05)
+   drop stateLimits    FAIL(clfNoNumericalResult st10; inits=shift)
+CASE noisy/speed8-acceleratingHeadOn t=3.70 frame=75
+   anchors: N=8 dist=52.3 lat=-1.56 | N=8 dist=52.2 lat=-1.60
+   none: FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop collision      FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalRoad   OK(N=8,slack=9.7e-05)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+CASE noisy/speed8-brakingLead t=0.00 frame=1
+   anchors: N=512 dist=9.9 lat=3.03
+   none: FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop collision      FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop terminalTarget OK(N=512,slack=1.4e+05)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=movin)
+CASE noisy/speed8-turningCrossing t=0.40 frame=9
+   anchors: N=89 dist=51.6 lat=2.36 | N=97 dist=51.3 lat=0.16
+   none: FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop collision      OK(N=89,slack=9.9e-05)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+CASE noisy/speed8-curvedHeadOn t=77.50 frame=1551
+   anchors: N=278 dist=51.8 lat=2.32 | N=278 dist=51.2 lat=-0.13
+   none: FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop collision      OK(N=278,slack=8.9e-05)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+CASE noisy/speed8-curvedCrossing t=0.00 frame=1
+   anchors: N=106 dist=51.3 lat=0.32
+   none: FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop collision      OK(N=106,slack=9.9e-05)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=movin)
+CASE noisy/speed15-headOn t=0.80 frame=17
+   anchors: N=52 dist=51.1 lat=1.62 | N=53 dist=51.3 lat=2.40
+   none: FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop collision      OK(N=53,slack=9.8e-05)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+CASE noisy/speed15-acceleratingHeadOn t=0.65 frame=14
+   anchors: N=52 dist=52.1 lat=1.21 | N=53 dist=52.1 lat=2.58
+   none: FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop path           FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop collision      OK(N=52,slack=9.8e-05)
+   drop terminalTarget FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop terminalRoad   FAIL(pcbfNoNumericalResult st2; inits=shift/movin)
+   drop stateLimits    FAIL(pcbfNoNumericalResult st2; inits=shift/movin)

@@ -1,0 +1,80 @@
+--- /home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solvePredictiveControl.m	2026-10-04 16:30:31.205133793 -0500
++++ controller/solvePredictiveControl.m	2026-10-04 16:43:43.923392720 -0500
+@@ -103,6 +103,7 @@
+         search=localEmptySearch(model,source,failure,initializationSeconds);return;
+     end
+     if source=="shiftedInputRollout",model=localAdaptTrust(model,anchor,previousState);end
++    global FORCE_TRUST; if ~isempty(FORCE_TRUST), model.inputTrustScale=FORCE_TRUST; model.trust.scale=FORCE_TRUST; end
+     [point,problem,search,model]=localPrimary(anchor,model,source,timer);
+     search.initializationSeconds=initializationSeconds;
+     attempts=localAttempt(search);stages=search.stages;selected=1;restarted=false;
+@@ -379,6 +380,7 @@
+ end
+ 
+ function [problem,model]=localFormulate(anchor,model)
++    global DIAG_DROP; if isempty(DIAG_DROP),DIAG_DROP="";end
+     model.linearizationBuilds=model.linearizationBuilds+1;
+     cfg=model.cfg;count=size(anchor.inputs,2);prefix=cfg.controller.horizonSteps;
+     robustRelaxation=any(model.uncertainty.egoGenerator(:));
+@@ -393,7 +395,7 @@
+     rhs(1:6)=model.initialState-anchor.states(:,1);
+     rows=cell(1,9*count+8);bounds=cell(size(rows));rowCount=0;
+     pathCones=struct('A',{},'b',{},'d',{},'gamma',{});
+-    deviationLimit=cfg.controller.maximumLateralDeviationMeters;
++    deviationLimit=cfg.controller.maximumLateralDeviationMeters;if any(DIAG_DROP=="path"),deviationLimit=Inf;end
+     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
+     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
+     lower(iu(:))=-repmat(model.inputTrustScale*radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
+@@ -406,7 +408,7 @@
+     inputLower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
+     inputUpper=[Inf;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
+     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
+-    [physicalLower,physicalUpper]=localStateLimits(cfg);
++    [physicalLower,physicalUpper]=localStateLimits(cfg);if any(DIAG_DROP=="stateLimits"),physicalLower(:)=-1e6;physicalUpper(:)=1e6;end
+     primaryLowerBound=0;departure=0;
+     generator=model.uncertainty.egoGenerator;
+     posterior=generator;
+@@ -466,7 +468,7 @@
+             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+             pathCones=[pathCones,cone]; %#ok<AGROW>
+         end
+-        if ~localBeyondRange(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator)
++        if ~any(DIAG_DROP=="collision") && ~localBeyondRange(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator)
+             departure=index;
+             [g,j,tightening]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator);
+             maximumTightening=max(maximumTightening,max(tightening));
+@@ -484,7 +486,7 @@
+             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+             pathCones=[pathCones,cone]; %#ok<AGROW>
+         end
+-        if ~localBeyondRange(middle,(index-.5)*cfg.controller.sampleTime,model,middleCollisionGenerator)
++        if ~any(DIAG_DROP=="collision") && ~localBeyondRange(middle,(index-.5)*cfg.controller.sampleTime,model,middleCollisionGenerator)
+             departure=index;
+             [g,j,tightening]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model,middleCollisionGenerator);
+             maximumTightening=max(maximumTightening,max(tightening));
+@@ -510,11 +512,13 @@
+     % Terminal set at the last node: target beyond the perception radius and
+     % separating, ego rectangle inside the road. No terminal cone remains.
+     y=anchor.states(:,end);map=sparse(6,nv);map(:,ix(:,end))=eye(6);
+-    if ~isempty(model.target)
++    global DIAG_T; DIAG_T=model.inputTrustScale;
++    global DIAG_H; DIAG_H(end+1,:)=[count,NaN,NaN]; if ~isempty(model.target), qq=localTargetAt(model,count*cfg.controller.sampleTime); DIAG_H(end,2)=norm(y(1:2)-qq(1:2)); end; pr=laneGeometry.project(y(1:2),model.lane); DIAG_H(end,3)=pr.lateralPosition;
++    if ~isempty(model.target) && ~any(DIAG_DROP=="terminalTarget")
+         [r,bound]=localTerminalSeparation(y,count*cfg.controller.sampleTime,model,generator,map);
+         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+     end
+-    if ~isempty(model.road.lateralClearance)
++    if ~isempty(model.road.lateralClearance) && ~any(DIAG_DROP=="terminalRoad")
+         [r,bound]=localTerminalRoad(y,model,generator,map);
+         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+     end
+--- /home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m	2026-10-04 15:13:01.094655110 -0500
++++ controller/collisionAvoidanceController.m	2026-10-04 16:42:49.423314991 -0500
+@@ -74,6 +74,7 @@
+         'nominalReference',nominalReference,'stateTime',ego.stateTime, ...
+         'uncertainty',uncertainty);
+     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
++    global DIAG_SEARCH; DIAG_SEARCH=search;
+     if isempty(solution)
+         error('collisionAvoidanceController:noOptimizationSolution', ...
+             'The two-stage affine optimization did not complete (%s).',search.terminationReason);

@@ -1,0 +1,13 @@
+function trustCase(file,label)
+repo='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+addpath(fullfile(repo,'config'),fullfile(repo,'scripts'),fullfile(repo,'estimator'),fullfile(repo,'solver','controller'));
+addpath(fullfile(fileparts(mfilename('fullpath')),'controller'),'-begin');
+global DIAG_DROP DIAG_SEARCH FORCE_TRUST DIAG_T DIAG_H; DIAG_DROP="";
+s=load(file).snapshot; out=sprintf('TRUST %s:',label);
+for f={[],1,2}
+  FORCE_TRUST=f{1}; DIAG_H=zeros(0,3); collisionAvoidanceController("resetNominalTrajectory");
+  try, collisionAvoidanceController(s.egoInput,s.targetEstimate,s.road,s.configuration,s.previousState); r='OK'; catch, r='FAIL'; end
+  if isempty(f{1}), out=sprintf('%s actual trust=%.3f %s;',out,DIAG_T,r); else, out=sprintf('%s trust %g %s;',out,f{1},r); end
+end
+fprintf('%s\n',out);
+end

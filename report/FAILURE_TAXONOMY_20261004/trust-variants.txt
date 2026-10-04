@@ -1,0 +1,7 @@
+TRUST noisy/speed8-turningCrossing: actual trust=0.092 FAIL; trust 1 OK; trust 2 OK;
+TRUST noisy/speed8-curvedHeadOn: actual trust=0.370 FAIL; trust 1 FAIL; trust 2 FAIL;
+TRUST noisy/speed8-curvedCrossing: actual trust=0.125 FAIL; trust 1 FAIL; trust 2 FAIL;
+TRUST noisy/speed15-headOn: actual trust=0.062 FAIL; trust 1 FAIL; trust 2 OK;
+TRUST noisy/speed15-acceleratingHeadOn: actual trust=0.062 FAIL; trust 1 OK; trust 2 OK;
+TRUST noisy/speed15-turningCrossing: actual trust=0.062 FAIL; trust 1 OK; trust 2 OK;
+TRUST noisy/speed15-curvedCrossing: actual trust=0.079 FAIL; trust 1 OK; trust 2 OK;
