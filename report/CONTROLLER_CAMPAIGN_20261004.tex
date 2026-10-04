@@ -1,0 +1,85 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Controller encounter campaign rerun at 8584c47}
+\date{Prepared October 4, 2026}
+\begin{document}
+\maketitle
+
+\textbf{Purpose.} This rerun checks the current controller on the fourteen
+collision-threat encounters after the observer-integration commits
+(838848b, 388dcfc, 8584c47) that followed the 20-cm margin campaign
+(\path{MARGIN_20CM_20261003.tex}). No source or configuration was changed.
+
+\textbf{Setup.} The source is HEAD 8584c47 with no modification to
+\path{controller/}, \path{config/} or \path{scripts/}. The only untracked
+script, \path{scripts/runObserverComparisonCampaign.m}, is not called. The
+command was run from the repository root:
+\begin{verbatim}
+matlab -batch "addpath('scripts'); runPotentialFieldCampaign(pwd,
+  '<repo>/report/CONTROLLER_CAMPAIGN_20261004',1500)"
+\end{verbatim}
+It covers seven encounters (headOn, acceleratingHeadOn, brakingLead, crossing,
+turningCrossing, curvedHeadOn, curvedCrossing) at 8 and 15 m/s, with horizon 8
+or 16 holds and a 1500-hold observation cap. It requires a baseline collision
+threat and a 1-s nominal-recovery dwell. The required clearance is 0.20 m.
+Observations are exact target states, so no random draws occur. The plant is an
+\texttt{ode45} replay, and no computation delay is injected.
+
+\textbf{Outcome.} 12 of 14 encounters avoid and recover. There are 0 sampled
+collisions and 0 path-limit violations over 3934 issued holds. Two 8-m/s
+cases stop with
+\texttt{noOptimizationSolution (linearizationAccuracyNotReached)}:
+turningCrossing at hold 20 (1.0 s, before the encounter, gap 2.89 m) and
+curvedCrossing at hold 219 (10.95 s, during recovery after passing, minimum
+gap 0.138 m). A stopped run is not counted as a success. Both cases recovered
+in the 20-cm margin campaign, where only 15-m/s acceleratingHeadOn was
+unrecovered.
+
+\begin{center}
+\begin{tabular}{llrrrrr}
+\toprule
+Speed & Scenario & Holds & Recovered & Min gap (m) & Max offset (m) & Recovery (s)\\
+\midrule
+8 & headOn & 242 & yes & 1.351 & 5.258 & 12.10\\
+8 & acceleratingHeadOn & 253 & yes & 1.064 & 5.250 & 12.65\\
+8 & brakingLead & 289 & yes & 0.193 & 4.630 & 14.45\\
+8 & crossing & 254 & yes & 0.197 & 5.902 & 12.70\\
+8 & turningCrossing & 20 & \textbf{no} & 2.888 & 1.936 & --\\
+8 & curvedHeadOn & 230 & yes & 1.736 & 5.460 & 11.50\\
+8 & curvedCrossing & 219 & \textbf{no} & 0.138 & 5.582 & --\\
+15 & headOn & 142 & yes & 0.175 & 4.983 & 7.10\\
+15 & acceleratingHeadOn & 160 & yes & 0.179 & 5.003 & 8.00\\
+15 & brakingLead & 290 & yes & 0.315 & 4.661 & 14.50\\
+15 & crossing & 186 & yes & 0.342 & 4.944 & 9.30\\
+15 & turningCrossing & 202 & yes & 0.204 & 4.858 & 10.10\\
+15 & curvedHeadOn & 1258 & yes & 1.972 & 5.781 & 62.90\\
+15 & curvedCrossing & 189 & yes & 0.273 & 5.170 & 9.45\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Recovery is the time at which the nominal-recovery dwell was confirmed. Six
+executed scenes have a sampled gap below the configured 0.20 m: 8-m/s
+brakingLead, crossing and curvedCrossing, and 15-m/s headOn and
+acceleratingHeadOn. The margin is a node-sampled planning buffer, not a
+continuous-time guarantee.
+
+\textbf{Measured runtime.} This is a shared workstation without warm-up
+isolation. Per-case median running frames are 19.5--42.7 ms and per-case p95
+frames are 38.0--94.7 ms. The largest frame is 853 ms, the first call of the
+first case (MATLAB warm-up). Excluding that call, the largest frame is
+200.6 ms (15-m/s headOn first call). No real-time guarantee is asserted.
+
+\textbf{Open items.} The cause of the two linearization-accuracy stops has not
+been diagnosed in this rerun. In particular, it is not established which of
+the three intervening commits changed these outcomes.
+
+\textbf{Files.} \path{CONTROLLER_CAMPAIGN_20261004/} holds \path{metrics.csv},
+\path{metrics.json}, the HEAD record and the worktree
+status. The raw per-case JSON traces, continuation files and the full
+64-MB \path{summary.json} (SHA-256 \texttt{41b911c7\ldots c0a1}) and the console log remain in
+\path{~/.cache/collisionAvoidance/controller-campaign-20261004/} with a
+SHA-256 list of the per-case traces.
+\end{document}

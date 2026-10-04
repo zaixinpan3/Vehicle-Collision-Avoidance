@@ -1,0 +1,15 @@
+speed_mps,scenario,holds,recovered,collision,failure,min_sampled_gap_m,max_lateral_offset_m,path_limit_ok,first_call_s,running_median_ms,running_p95_ms,max_frame_ms,recovery_confirmation_s
+8,headOn,242,True,False,,1.351000,5.258,True,0.853,20.3,42.2,853.4,12.100000000000037
+8,acceleratingHeadOn,253,True,False,,1.064470,5.250,True,0.076,19.5,38.0,78.5,12.650000000000045
+8,brakingLead,289,True,False,,0.193386,4.630,True,0.046,38.3,44.6,118.6,14.45000000000007
+8,crossing,254,True,False,,0.196692,5.902,True,0.048,20.9,40.7,89.9,12.700000000000045
+8,turningCrossing,20,False,False,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).,2.888214,1.936,True,0.051,39.9,80.2,111.2,
+8,curvedHeadOn,230,True,False,,1.736090,5.460,True,0.087,21.9,42.3,87.2,11.500000000000028
+8,curvedCrossing,219,False,False,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).,0.137531,5.582,True,0.050,41.4,94.7,110.6,
+15,headOn,142,True,False,,0.174750,4.983,True,0.201,24.2,43.7,200.6,7.099999999999983
+15,acceleratingHeadOn,160,True,False,,0.179406,5.003,True,0.053,22.7,42.9,101.5,7.99999999999998
+15,brakingLead,290,True,False,,0.314711,4.661,True,0.061,42.7,49.5,115.4,14.500000000000071
+15,crossing,186,True,False,,0.341535,4.944,True,0.047,24.6,43.4,78.8,9.299999999999997
+15,turningCrossing,202,True,False,,0.204149,4.858,True,0.047,41.2,49.3,89.8,10.100000000000009
+15,curvedHeadOn,1258,True,False,,1.972095,5.781,True,0.052,25.3,44.1,113.6,62.89999999999856
+15,curvedCrossing,189,True,False,,0.272826,5.170,True,0.049,27.5,51.1,94.2,9.45
