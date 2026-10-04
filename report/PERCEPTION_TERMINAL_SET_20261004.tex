@@ -196,9 +196,13 @@ noisy runs 0 of 14, without collisions.
 
 The scenario road now follows a four-lane road with 3.75~m lanes. The ego
 follows the centre of the second lane from the right, so
-$\texttt{lateralClearance}=[\text{right};\text{left}]=[5.625;9.375]$~m. With
+\texttt{lateralClearance} = [right; left] = [5.625; 9.375]~m. With
 this road, 638 of 638 tests pass. Exact runs recover 9 of 14; all five stops
 are CLF-stage numerical stalls (\texttt{clfNoNumericalResult}). Noisy runs
-recover 2 of 14. No collision occurs, and every executed hold stays on the road
+recover 2 of 14. No collision occurs. In the \texttt{ode45} replay, two noisy runs on the
+curved road touch or leave the road before they stop: 15~m/s curvedCrossing by
+0.243~m and 15~m/s curvedHeadOn by 0.001~m. The road rows act on the estimated
+state with corner coordinates linearized on the curved path; they do not bound
+the realized plant
 (\path{campaign-metrics-road-everywhere-four-lane.csv}).
 \end{document}
