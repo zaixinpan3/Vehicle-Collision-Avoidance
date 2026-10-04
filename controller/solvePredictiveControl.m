@@ -6,7 +6,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % The PCBF stage minimizes prefix safety slack, then the CLF stage runs. A
 % primary problem infeasible inside the trust region is re-solved on the same
 % linearization with the trust scale doubled until it is feasible or reaches
-% trustExpansionMaximum. A shifted plan still infeasible is then solved from a
+% trustMaximumScale. A shifted plan still infeasible is then solved from a
 % fresh potential-field rollout in the same way. Any other failure is reported.
 % The input trust scale is an estimate, not a fixed setting: the next
 % posterior measures how far the previous plan's prediction was from the
@@ -132,11 +132,13 @@ end
 function [point,problem,search,model,attempts,stages,selected]=localExpand( ...
         point,problem,search,model,anchor,source,timer,attempts,stages,selected)
     % Double the input trust scale on the same anchor while the primary
-    % problem is certified infeasible. The trust estimate itself is unchanged.
+    % problem is certified infeasible, never beyond trustMaximumScale: larger
+    % steps leave the region where the linearization is accurate. The trust
+    % estimate itself is unchanged.
     cfg=model.cfg;
-    while localInfeasible(point,search) && model.inputTrustScale<cfg.nonlinear.trustExpansionMaximum ...
+    while localInfeasible(point,search) && model.inputTrustScale<cfg.nonlinear.trustMaximumScale ...
             && toc(timer)<cfg.solver.timeLimitSeconds
-        model.inputTrustScale=min(2*model.inputTrustScale,cfg.nonlinear.trustExpansionMaximum);
+        model.inputTrustScale=min(2*model.inputTrustScale,cfg.nonlinear.trustMaximumScale);
         [point,problem,search,model]=localPrimary(anchor,model,source,timer);
         attempts(end+1)=localAttempt(search);stages=[stages,search.stages];selected=numel(attempts); %#ok<AGROW>
     end

@@ -7,7 +7,7 @@ future plan. There is no third optimization stage, target-range CLF switch,
 direct nominal-feedback command, inherited slack budget or executable backup.
 A primary problem infeasible inside the trust region is re-solved on the same
 linearization with the trust scale doubled until feasible (at most
-`trustExpansionMaximum = 16`); a shifted plan still infeasible is then solved from
+`trustMaximumScale = 1`); a shifted plan still infeasible is then solved from
 a fresh potential-field rollout in the same way. Any other failure reports no
 solution.
 
@@ -274,9 +274,10 @@ current-state rows supply the unavoidable lower bound
 
 A primary value above this lower bound is issued as positive slack. When the
 solver certifies a primary problem primal infeasible, the input trust scale is
-doubled on the same linearization (the last step clamped to
-`trustExpansionMaximum`, which covers the full braking-ratio range) until the
-problem is feasible. If the shifted plan is still infeasible, one fresh
+doubled on the same linearization, never beyond `trustMaximumScale = 1`, until
+the problem is feasible. An earlier cap of 16 produced feasible problems on an
+inaccurate linearization: model innovation rose to 1.7 m and issued inputs
+reached their physical limits. If the shifted plan is still infeasible, one fresh
 potential-field model is solved with the same expansion, starting again from
 the estimated scale. The expansion does not change the online trust estimate.
 Positive slack, numerical stalls and a CLF stage without a result are reported,

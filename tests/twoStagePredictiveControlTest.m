@@ -116,8 +116,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             inits=[search.attempts.initialization];scales=[search.attempts.inputTrustScale];
             fresh=find(inits=="laneFeedbackRollout",1);
             testCase.verifyEqual(inits(1),"shiftedInputRollout");testCase.verifyNotEmpty(fresh);
-            testCase.verifyEqual(scales(fresh-1),cfg.nonlinear.trustExpansionMaximum);
-            testCase.verifyEqual(scales(end),cfg.nonlinear.trustExpansionMaximum);
+            testCase.verifyEqual(scales(fresh-1),cfg.nonlinear.trustMaximumScale);
+            testCase.verifyEqual(scales(end),cfg.nonlinear.trustMaximumScale);
             growth=scales(2:fresh-1)./scales(1:fresh-2);
             testCase.verifyGreaterThan(growth,1);testCase.verifyLessThanOrEqual(growth,2+1e-12);
             testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
@@ -126,7 +126,6 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior);prior.inputTrajectory(2,:)=.99;
-            cfg.nonlinear.trustExpansionMaximum=16;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             search=problem.metadata.search;scales=[search.attempts.inputTrustScale];
             testCase.verifyTrue(search.clfStageCompleted);
@@ -142,7 +141,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             % Near-full braking along the whole shifted plan makes it infeasible;
             % without expansion beyond the nominal box the fresh rollout is used.
             ego=localSuccessor(ego,prior);prior.inputTrajectory(2,:)=.99;
-            cfg.nonlinear.trustExpansionMaximum=cfg.nonlinear.trustMaximumScale;
+            cfg.nonlinear.trustMaximumScale=cfg.nonlinear.trustInitialScale;cfg.nonlinear.trustMinimumScale=1/16;
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             search=problem.metadata.search;
             testCase.verifyTrue(search.potentialFieldRestarted);

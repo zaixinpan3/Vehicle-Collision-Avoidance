@@ -161,4 +161,21 @@ The plan's model innovation grew from 0.08 to 1.7~m. Issued inputs jumped: the
 braking ratio reached $-1.000$, and steering changed from 0.20 to $-0.82$~rad
 in one hold. The expanded problems are feasible on a linearization that is no
 longer accurate at that step (\path{campaign-metrics-trust-expansion.csv}).
+
+\section{Addendum 4: expansion capped at the trust maximum}
+The cap of 16 contradicted the linearization study: at a trust scale of 1 the
+16-hold error is already 28~cm (p90, 15~m/s), and the tires saturate near 3.
+The expansion is now capped at \texttt{trustMaximumScale} = 1 and the separate
+parameter is removed. All 657 tests pass.
+
+With exact observations, 12 of 14 recover; the result is identical without
+expansion, with cap 16 and with cap 1. With the noisy estimator, 1 of 14
+recovers, against 3 without expansion and 2 with cap 16; there are no
+collisions. Six noisy runs stop between holds 73 and 79 (about 3.7~s). Each of
+these stops becomes solvable only when the terminal road rows are removed.
+When the target leaves $R$ the horizon shrinks to 8--29 nodes, and the ego is
+still 1.8--5.7~m off the path. No trust expansion can satisfy the road rows
+in that time (\path{noisy-drops-cap1.txt}). Expansion therefore does not
+address the dominant noisy failure, and in the noisy runs it changed
+trajectories that had recovered without it.
 \end{document}

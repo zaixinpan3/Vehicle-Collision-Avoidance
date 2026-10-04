@@ -21,7 +21,7 @@ at the first node of the terminal set, between `horizonSteps` and
 `maximumHorizonSteps`. The anchor is linearized once; the PCBF stage minimizes
 prefix safety slack and the CLF stage follows. A primary problem that is primal
 infeasible inside the trust region is re-solved with the trust scale doubled
-until feasible (at most 16); a shifted plan still infeasible is solved once more
+until feasible (at most `trustMaximumScale`); a shifted plan still infeasible is solved once more
 from a fresh potential-field rollout in the same way. The completed CLF result is
 issued directly, without a nonlinear replay or agreement test. An unusable shift,
 or a frame still without a result, reports `noOptimizationSolution`. There is no
