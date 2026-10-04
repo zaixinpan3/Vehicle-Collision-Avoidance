@@ -1,0 +1,73 @@
+function innovationProbe(trust,names,speeds,frames,outFile)
+% Closed loop with exact observations; records the cross-frame plan innovation.
+repo='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+addpath(fullfile(repo,'config'),fullfile(repo,'scripts'),fullfile(repo,'solver','controller'));
+addpath(fullfile(fileparts(mfilename('fullpath')),'controller'),'-begin');
+global PROBE_TRUST; PROBE_TRUST=trust;
+records=struct([]);
+for v=speeds
+ for name=names
+  conf=struct('referenceSpeed',v,'controller',struct('horizonSteps',8+8*(v==15)));
+  [x,q0,road,cfg]=collisionThreatScenario(name,conf);
+  reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
+  unit=cfg.nonlinear.trustRadius*[.15;.25];
+  collisionAvoidanceController("resetNominalTrajectory");
+  prior=[];input=[0;0];h=cfg.controller.sampleTime;
+  rec=struct('speed',v,'scenario',name,'trust',trust,'time',[],'innovation',[],'innovation16',[],'step',[],'curvature',[], ...
+      'anchorResidual',[],'restart',[],'shifted',[],'failure',"",'frames',0,'minGap',Inf);
+  shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+  for k=1:frames
+    t=(k-1)*h; qt=predictiveSafetyGeometry.predictTarget(q0,t);
+    target=localTarget(qt);
+    ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
+        'longitudinalVelocity',x(4),'stateTime',t,'heldActuatorInput',input);
+    % cross-frame innovation of the previous plan, measured before solving
+    e=NaN;e16=NaN;
+    if ~isempty(prior)
+      U=prior.inputTrajectory(:,2:end);Xp=prior.stateTrajectory;xs=x;d=zeros(1,size(U,2)+1);
+      d(1)=norm(xs(1:2)-Xp(1:2,2))+reach*abs(angdiff(xs(3),Xp(3,2)));
+      try
+        for i=1:size(U,2)
+          xs=nonlinearBicycleModel.sample(xs,U(:,i),cfg);
+          d(i+1)=norm(xs(1:2)-Xp(1:2,i+2))+reach*abs(angdiff(xs(3),Xp(3,i+2)));
+        end
+      catch, d(:)=NaN; end
+      e=max(d);e16=max(d(1:min(17,end)));
+    end
+    try
+      [command,~,problem,prior]=collisionAvoidanceController(ego,target,road,cfg,prior);
+    catch err
+      rec.failure=string(err.message);break;
+    end
+    s=problem.metadata.search; anchorU=problem.model.linearization.inputs; planU=problem.inputTrajectory;
+    n=min(size(anchorU,2),size(planU,2));
+    step=max(abs(planU(:,1:n)-anchorU(:,1:n))./unit,[],'all');
+    rec.time(end+1)=t;rec.innovation(end+1)=e;rec.innovation16(end+1)=e16;rec.step(end+1)=step;
+    rec.anchorResidual(end+1)=s.budgetAnchorResidual;rec.restart(end+1)=s.potentialFieldRestarted;
+    rec.shifted(end+1)=s.initialization=="shiftedInputRollout";
+    input=command.actuatorInput;
+    [~,X]=ode45(@(~,z)nonlinearBicycleModel.derivative(z,input,cfg),[0 h/2 h],x,odeset('RelTol',1e-10,'AbsTol',1e-12));
+    for j=1:3, qq=predictiveSafetyGeometry.predictTarget(q0,t+(j-1)*h/2); rec.minGap=min(rec.minGap,predictiveSafetyGeometry.rectangle(X(j,1:3).',shape,qq(1:3),qq(8:11))); end
+    x=X(end,:).';rec.frames=k;
+  end
+  % curvature samples: innovation at frame k+1 divided by the step of frame k
+  rec.curvature=[rec.innovation(2:end)./max(rec.step(1:end-1),1e-6).^2,NaN];
+  fprintf('PROBE trust=%.3f v=%d %-18s frames=%d minGap=%.3f fail=%s | innov p50 %.4f p90 %.4f max %.4f | step p50 %.3f p90 %.3f | L p50 %.4f p90 %.4f | restarts %d\n', ...
+      trust,v,name,rec.frames,rec.minGap,char(rec.failure),median(rec.innovation,'omitnan'),prctile(rec.innovation,90),max(rec.innovation), ...
+      median(rec.step),prctile(rec.step,90),median(rec.curvature(rec.step(1:end)>.05),'omitnan'),prctile(rec.curvature(rec.step>.05),90),sum(rec.restart));
+  if isempty(records),records=rec;else,records(end+1)=rec;end %#ok<AGROW>
+  save(outFile,'records');
+ end
+end
+save(outFile,'records');
+end
+function d=angdiff(a,b),d=atan2(sin(a-b),cos(a-b));end
+function target=localTarget(q)
+    direction=[cos(q(3)+q(6));sin(q(3)+q(6))];velocity=q(4)*direction;
+    yawRate=q(4)*sin(q(6))/q(7);
+    target=struct('targetPositionInertial',q(1:2),'targetVelocityInertial',velocity, ...
+        'targetYawInertial',q(3),'targetYawRate',yawRate,'targetSideslip',q(6), ...
+        'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7), ...
+        'targetAccelerationInertial',q(5)*direction+yawRate*[-velocity(2);velocity(1)], ...
+        'targetLength',2*q(8),'targetWidth',2*q(9),'targetRectangleOffset',q(10:11));
+end

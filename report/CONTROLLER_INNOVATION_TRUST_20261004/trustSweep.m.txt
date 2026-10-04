@@ -1,0 +1,53 @@
+function trustSweep(outFile)
+repo='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+addpath(fullfile(repo,'controller'),fullfile(repo,'config'));
+C=fullfile(getenv('HOME'),'.cache/collisionAvoidance/direct-issue-20261004');
+files=[dir(fullfile(C,'campaign','speed*.json'));dir(fullfile(C,'trust0125','campaign','speed*.json'))];
+scales=[1/16 1/8 1/4 3/8 1/2 3/4 1 1.5 2 3 4];
+horizons=[1 16];
+rows=[];   % [speed scale horizon pattern relErr poseErr velErr maxFrontSlipRatio anchorFrontSlipRatio domainFail]
+radius=0.5*[.15;.25];
+for f=1:numel(files)
+  name=files(f).name; if contains(name,'failure'),continue;end
+  d=jsondecode(fileread(fullfile(files(f).folder,name))); r=d.results; t=r.trace;
+  speed=sscanf(name,'speed%d'); cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',speed,'controller',struct('horizonSteps',8+8*(speed==15))));
+  tire=modifiedFialaTire.parameters(cfg); alphaSat=atan(3*tire.longitudinalForceScale./tire.corneringStiffness);
+  reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
+  n=numel(t); N=max(horizons);
+  for k=1:6:min(n-N,600)
+    X=zeros(6,N+1);X(:,1)=t(k).state(:);U=zeros(2,N);
+    for i=1:N,U(:,i)=t(k+i-1).input(:);end
+    A=zeros(6,6,N);B=zeros(6,2,N);ok=true;
+    try
+      for i=1:N,[X(:,i+1),A(:,:,i),B(:,:,i)]=nonlinearBicycleModel.sample(X(:,i),U(:,i),cfg);end
+    catch, ok=false; end
+    if ~ok,continue;end
+    anchorSlip=max(abs(atan2(X(5,:)+cfg.vehicle.lf*X(6,:),X(4,:))-U(1,[1:N N])))/alphaSat(1);
+    patterns={[1;0],[-1;0],'alt',[0;1],[0;-1],[1;1],[-1;1]};
+    for s=scales
+      for p=1:numel(patterns)
+        if ischar(patterns{p}), sg=repmat([1;0],1,N).*repmat(kron([1 -1 1 -1],ones(1,4)),2,1); else, sg=repmat(patterns{p},1,N); end
+        dU=s*radius.*sg; Up=U+dU; Up(2,:)=min(max(Up(2,:),-0.999),0.999); dU=Up-U;
+        for h=horizons
+          dx=zeros(6,h+1);xn=zeros(6,h+1);xn(:,1)=X(:,1);fail=false;
+          try
+            for i=1:h
+              dx(:,i+1)=A(:,:,i)*dx(:,i)+B(:,:,i)*dU(:,i);
+              xn(:,i+1)=nonlinearBicycleModel.sample(xn(:,i),Up(:,i),cfg);
+            end
+          catch, fail=true; end
+          if fail, rows(end+1,:)=[speed s h p NaN NaN NaN NaN anchorSlip 1]; continue; end %#ok<AGROW>
+          xa=X(:,1:h+1)+dx; e=xn-xa;
+          pose=max(vecnorm(e(1:2,:))+reach*abs(e(3,:)));
+          vel=max(abs(e(4:6,:))./[5;3;1.5],[],'all');
+          eff=xn-X(:,1:h+1); w=[1;1;reach;1;1;1];
+          rel=max(vecnorm(e.*w))/max(max(vecnorm(eff.*w)),1e-12);
+          slip=max(abs(atan2(xn(5,1:h)+cfg.vehicle.lf*xn(6,1:h),xn(4,1:h))-Up(1,1:h)))/alphaSat(1);
+          rows(end+1,:)=[speed s h p rel pose vel slip anchorSlip 0]; %#ok<AGROW>
+        end
+      end
+    end
+  end
+end
+save(outFile,'rows','scales','horizons');
+end

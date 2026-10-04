@@ -1,0 +1,19 @@
+function dropReplay(file)
+% Replay a saved failure hold while dropping one constraint group at a time.
+repo='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+addpath(fullfile(repo,'config'),fullfile(repo,'scripts'),fullfile(repo,'estimator'),fullfile(repo,'solver','controller'));
+addpath(fullfile(fileparts(mfilename('fullpath')),'controller'),'-begin');
+global DIAG_DROP DIAG_SEARCH
+s=load(file).snapshot;
+fprintf('snapshot %s frame %d t=%.2f: %s\n',s.scenario,s.frame,s.time,s.failure);
+for drop={"","path","collision","terminalTarget","terminalCone","stateLimits",["path","terminalCone"]}
+  DIAG_DROP=drop{1};collisionAvoidanceController("resetNominalTrajectory");
+  try
+    [command,~,problem]=collisionAvoidanceController(s.egoInput,s.targetEstimate,s.road,s.configuration,s.previousState);
+    fprintf('  drop [%s]: SOLVED u=%s source=%s\n',strjoin(drop{1},"+"),mat2str(command.actuatorInput',3),problem.metadata.search.initialization);
+  catch e
+    a=DIAG_SEARCH.attempts; reasons=strjoin(arrayfun(@(x)x.initialization+":"+x.terminationReason+"@"+x.inputTrustScale,a),", ");
+    fprintf('  drop [%s]: FAIL %s | %s\n',strjoin(drop{1},"+"),extractAfter(string(e.message),"("),reasons);
+  end
+end
+end

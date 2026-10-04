@@ -1,0 +1,171 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Direct issue of solved plans and a plan-innovation trust estimate}
+\date{Prepared October 4, 2026}
+\begin{document}
+\maketitle
+
+\section{Changes}
+Following the user's direction, the controller now issues every completed
+PCBF/CLF solution directly. The nonlinear replay of each solution, its pose,
+state, CLF and path-deviation agreement test, the damped step, the line search,
+the retry triggered by disagreement and the three prediction tolerances are
+deleted. Fallbacks for a \emph{failed} solve are kept: the bounded input-box
+enlargement and the single fresh potential-field seed.
+
+This removes the information that the old code used to adapt the input trust
+scale $\Delta$. A fixed value was tried first (Section~\ref{sec:fixed}). The
+adopted alternative estimates $\Delta$ from the next posterior.
+
+\paragraph{Plan innovation.}
+For a correction of size $s$ (largest input change from the anchor, in units
+of the box $\pm r[0.15;0.25]$), the affine prediction differs from the nonlinear
+rollout of the same inputs by a second-order remainder $e\approx L s^2$. Let
+$\hat x$ be the previous plan's affine prediction of nodes $2..N{+}1$ and
+$\bar x$ the next anchor, which is the shifted rollout from the new posterior.
+A nonlinear replay $\tilde x$ of the same inputs from the plan's own prediction
+$\tilde x_1=\hat x_1$ splits the innovation exactly:
+\[
+\bar x-\hat x=(\bar x-\tilde x)+(\tilde x-\hat x).
+\]
+The first term propagates the posterior's departure from the prediction and
+belongs to the observer. The second contains no posterior. With the safety
+body-point metric $P(\delta x)=\|\delta p\|+r_E|\delta\psi|$, define
+$e_k=\max_j P(\tilde x_j-\hat x_j)$. Then
+\[
+\hat L_k=\max\!\Big(\frac{e_k}{\max(s_{k-1},\Delta_{k-1}/2)^2},\ \gamma\hat L_{k-1}\Big),\qquad
+\Delta_k=\mathrm{clip}\Big(\sqrt{\tau/\hat L_k},\ \Delta_{\min},\ \Delta_{\max}\Big),
+\]
+with $\tau=0.02$~m, $\Delta_0=0.125$, $\Delta\in[1/16,1]$ and $\gamma=0.5$.
+The estimate grows by at most $1/\sqrt\gamma$ per sample and shrinks at once.
+The cost is one extra nonlinear rollout per hold, about 1~ms warm for 96 holds.
+
+An earlier variant subtracted twice the observer's worst-case tube radius from
+the total innovation. On the noisy campaign that bound explained every
+innovation, including 0.27~m, so $\Delta$ rose to its maximum. That variant was
+replaced before the final runs.
+
+\section{Evidence that $e\approx Ls^2$}
+At each fixed $\Delta$, the 14 encounters were run for 200 holds while the
+innovation and the correction taken were recorded (\path{trust-probe.csv}).
+
+\begin{center}
+\begin{tabular}{rrrrrrr}
+\toprule
+$\Delta$ & speed & $L$ median & $L$ p90 & innov.\ p90 (cm) & fresh restarts & stopped \\
+\midrule
+0.125 & 8 & 0.069 & 0.122 & 0.16 & 1 & 0/7\\
+0.25 & 8 & 0.073 & 0.123 & 0.66 & 2 & 0/7\\
+0.5 & 8 & 0.077 & 0.130 & 2.67 & 1 & 0/7\\
+1 & 8 & 0.082 & 0.128 & 11.40 & 7 & 0/7\\
+0.125 & 15 & 0.270 & 0.540 & 0.76 & 7 & 0/7\\
+0.25 & 15 & 0.279 & 0.551 & 3.06 & 5 & 1/7\\
+0.5 & 15 & 0.281 & 0.514 & 11.17 & 25 & 0/7\\
+1 & 15 & 0.295 & 0.494 & 47.72 & 46 & 4/7\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The estimate of $L$ (in metres per squared box unit) barely changes over an
+eightfold change in $\Delta$, and it is about 3.6 times larger at 15~m/s. Runs
+whose innovation stayed below about 3~cm needed few fresh restarts at both
+speeds. That threshold motivated $\tau=0.02$~m.
+
+\section{Closed-loop results}\label{sec:fixed}
+All runs use the 14 collision-threat encounters (8 and 15~m/s), a 1-s recovery
+dwell, a 0.20~m planning margin and \texttt{ode45} replay.
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Exact observations & recovered & stopped & collisions\\
+\midrule
+8584c47 with the deleted check (this morning) & 12 & 2 & 0\\
+No check, $\Delta=1$ fixed & 12 & 2 & 0\\
+No check, $\Delta=0.125$ fixed & 10 & 0 (4 unrecovered at 75~s) & 0\\
+No check, plan-innovation $\Delta$ & \textbf{13} & 1 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+With the adopted law, exact observations recover 13 of 14. The two 15~m/s
+head-on cases that fail at holds 5--6 with $\Delta=1$ now recover, because the
+law starts small. The median $\Delta$ is 1 in every recovered case; the
+minimum is 0.073--0.125. Seven recovered cases have a sampled gap below 0.20~m
+(minimum 0.089~m). The remaining stop, 8-m/s brakingLead at hold 108, is a
+conflict between the collision rows and the terminal cone: removing either
+group alone makes that hold solvable, while removing the path, terminal-target
+or state limits does not (\path{dropReplay.m.txt}).
+
+With the noisy estimator (\texttt{estimatorControllerIntegrationConfig}, seed
+20261003, 2000-hold cap), the result is 7 recovered, 6 stopped and
+\textbf{1 collision}. The 10-03 record with the check had 6 recovered, 8
+stopped and no collision. Twelve cases end in the same category, several at the same hold.
+15-m/s curvedCrossing now recovers. 15-m/s brakingLead, which stopped at hold
+1 with the check, now collides at 3.09~s. Per-case values are in
+\path{campaign-metrics.csv}.
+
+\section{Diagnoses}
+\paragraph{Tire saturation is the abrupt boundary.}
+In the noisy 8-m/s turningCrossing, $\Delta$ reached 1 while the model
+innovation stayed at 0.1--15~mm. The plan issued at 0.40~s took the full box
+and reached 1.10 times the front saturation slip (0.229~rad), while every earlier plan
+stayed at or below 0.76. Its own model remainder was then 1.90~m, against 0.10~m one hold
+earlier. The estimator shrank $\Delta$ to 0.10 one hold later; the next hold
+was infeasible. A reactive estimate learns $L$ only after the jump.
+
+\paragraph{Collision mechanism (noisy 15-m/s brakingLead).}
+While passing the braking lead (1.85--2.3~s), the observation innovation was
+0.24--0.60~m. From 2.35~s the plans carried positive safety slack (up to 3.7~m);
+in the noisy formulation only the observer tightening may use slack, and the
+nominal rows are hard. One plan had a 9.9~m model remainder at about
+0.3~rad steering. Thereafter every hold restarted from a fresh potential-field
+seed with $\Delta$ between 0.07 and 0.15, so each plan stayed close to its
+seed. The issued plans steered back toward the lane (lateral position 2.6 to
+0.9~m) before the lead was cleared, and the vehicles touched at 3.09~s.
+
+\paragraph{Unrecovered curved test.}
+\texttt{clfNominalRecoveryTest} (15~m/s, curvature 0.005, 40~m and 2.5~rad
+initial offset) fails: 714 of 715 tests pass. The vehicle comes within
+$V\approx0.04$ of cruise at about 7~s and then diverges from about 10~s, well
+inside the 200~m reference. The CLF prediction is accurate (predicted 0.30,
+nonlinear 0.14 at 10.05~s), and the model innovation is 5--14~mm. The cause is
+the anchor. The CLF constrains only the first successor, so each solve moves
+only the first input by the full box. The tail stays at the anchor's steering
+($-0.046$ to $-0.078$~rad, worsening), and the shifted tail becomes the next
+anchor. The required first-step correction outgrows the box, and the CLF slack
+grows from 0.01 to 26. In the deleted design, CLF disagreement triggered fresh
+seeds that replaced this tail. The test also fails with fixed $\Delta=1$ and
+$\Delta=0.125$.
+
+\section{Scope and open items}
+No result here is a certificate. The law sets the next step bound only; every
+completed solve is issued, and $\tau$ is an empirical target. Open items:
+\begin{itemize}
+\item an a-priori term for $\hat L$ from the plan's proximity to tire saturation,
+  so that $\Delta$ shrinks before a step crosses the knee;
+\item tail re-anchoring when the first input is pinned at the box with positive
+  CLF slack;
+\item the noisy collision: soft observer tightening combined with small-$\Delta$
+  fresh seeds;
+\item the brakingLead collision/terminal conflict, which existed before.
+\end{itemize}
+
+\section{Files and reproduction}
+\path{CONTROLLER_INNOVATION_TRUST_20261004/} contains the per-case metrics, the
+probe table, the test table, the source hashes of the final runs, and the
+probe, sweep, plan-log and constraint-drop scripts (stored as \path{.m.txt}).
+Raw traces remain in
+\path{~/.cache/collisionAvoidance/innovation-split-20261004/} (final runs),
+\path{direct-issue-20261004/} (fixed scales and trust sweep) and
+\path{innovation-trust-20261004/} (superseded variant). The commands were
+\begin{verbatim}
+runtests('tests')
+runPotentialFieldCampaign(pwd,'<out>/campaign',1500)
+c=estimatorControllerIntegrationConfig(); c.randomSeed=20261003;
+runPotentialFieldCampaign(pwd,'<out>/noisy',2000,EstimatorConfiguration=c)
+\end{verbatim}
+\end{document}

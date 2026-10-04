@@ -14,7 +14,7 @@ function study = runControllerEntryTimingStudy(campaignFile,outputDirectory,repe
     if ~isfolder(outputDirectory),mkdir(outputDirectory);end
     campaign=jsondecode(fileread(campaignFile));record=campaign.results;
     assert(isscalar(record) && string(record.scenario)=="headOn");
-    frame=record.trace(1);assert(frame.time==0 && frame.solverCalls==3 && frame.refinementCount==2);
+    frame=record.trace(1);assert(frame.time==0 && frame.solverCalls==3);
     configuration=struct('referenceSpeed',8,'controller',struct('horizonSteps',8));
     [x,q,road,cfg]=collisionThreatScenario("headOn",configuration);
     recordedConfiguration=record.configuration;
@@ -98,12 +98,12 @@ function study = runControllerEntryTimingStudy(campaignFile,outputDirectory,repe
         end
         seconds=toc(wall);search=prediction.metadata.search;
         error=norm(command.actuatorInput-frame.input,inf);
-        assert(error<1e-10 && search.refinementCount==2 && search.solverCalls==3, ...
+        assert(error<1e-10 && search.solverCalls==3, ...
             'Replay differs from the recorded control or optimization sequence.');
         row=struct('label',label,'controllerSeconds',seconds,'entryTiming',timing, ...
-            'inputError',error,'search',search,'predictionAgreement',prediction.metadata.predictionAgreement);
-        fprintf('%s: %.3f ms, input error %.3g, %d rounds, %d solves\n', ...
-            label,1000*seconds,error,search.refinementCount,search.solverCalls);
+            'inputError',error,'search',search);
+        fprintf('%s: %.3f ms, input error %.3g, %d solves\n', ...
+            label,1000*seconds,error,search.solverCalls);
     end
 end
 

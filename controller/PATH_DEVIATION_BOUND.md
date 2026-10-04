@@ -8,11 +8,10 @@ It adds no lateral cost, CLF, controller mode or actuator limit.
 
 Both the PCBF and CLF problems impose the bound at hold starts, model midpoints
 and the endpoint, over the prefix and completion tail. No safety slack relaxes
-it. Future nodes use `L - min(predictionToleranceMeters,L/100)`; the fixed initial
-node uses `L`. A measured state already outside the bound cannot be made
+it. Every node uses `L`. A measured state already outside the bound cannot be made
 feasible by changing future controls. Primary zero-correction detection and
 inherited-anchor residuals include every corridor cone, not just the terminal
-membership cone. Damping interpolates feasible points of this same problem.
+membership cone.
 
 For a straight path, the two lateral half-planes are exact. For a circle with
 center `c` and radius `R`, the corridor is the annulus
@@ -55,10 +54,9 @@ previous accepted scale. These changes keep a single initialization/model per
 attempt. The single CLF and the two-stage/inherited-budget objectives are
 unchanged.
 
-The existing nonlinear rollout also checks the maximum nodal center deviation
-against `L`, within the existing agreement/damping mechanism. Offline ODE45
-validation separately reports the maximum across 31 samples per issued hold.
-Neither this sampled check nor the small inward reserve is a continuous-plant
+The issued plan is not replayed online, so the corridor holds for the affine
+prediction only. Offline ODE45 validation separately reports the maximum across
+31 samples per issued hold; this sampled check is not a continuous-plant
 certificate. The free-pose invariant terminal core retains its original
 intrinsic-dynamics role; it is not proved invariant inside this new path
 corridor. Thus no new infinite-horizon or recursive-feasibility claim for the

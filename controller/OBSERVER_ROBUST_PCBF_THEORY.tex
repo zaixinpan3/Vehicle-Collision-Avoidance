@@ -796,9 +796,7 @@ return to path-following cruise, not arrival at a scheduled position. Nothing
 in the proof imposes a fixed recovery duration. Conversely, collision threat
 disappearing alone does not prove membership in a global recovery domain or
 zero slack in a conservative convex inner problem. Those conditions must be
-certified or assessed separately. Feasible damping of a CLF optimizer preserves
-safety only; it preserves \eqref{eq:recovery} only if its \emph{issued} slack
-also satisfies the bound used in that proof.
+certified or assessed separately.
 
 \section{The resulting online problem and the precise implementation boundary}
 At each sample perform the following operations, all within the same controller:
@@ -873,9 +871,12 @@ Safety and one CLF
 tightenings may use slack throughout the finite horizon. The same quadratic
 CLF has uncertainty padding and a tracking-error-scaled proximal tie. \\
 RTI admission
-& One model is built per shifted or fresh APF anchor. Model agreement concerns
-the issued hold; a damped step reuses the model. This does not certify the
-nonlinear suffix or continuous-time robust separation. \\
+& One model is built per shifted or fresh APF anchor. The completed solution is
+issued without a nonlinear replay. The next plan innovation is split exactly
+into an observation part (posterior minus a nonlinear replay from the plan's own
+prediction) and a model part (replay minus the affine prediction); only the
+model part sets the input trust scale. This
+does not certify the nonlinear plan or continuous-time robust separation. \\
 \bottomrule
 \end{longtable}
 

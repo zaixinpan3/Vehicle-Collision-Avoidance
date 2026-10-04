@@ -1,145 +1,38 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl One model per shifted or freshly initialized trajectory.
 % A shifted slack budget can replace the primary optimization, never the CLF.
-% Damping reuses that model; only a failed shift can request a fresh seed.
+% The solved affine plan is issued directly; it is not replayed or checked
+% against the nonlinear model. Only a failed solve can request a fresh seed.
+% The input trust scale is an estimate, not a fixed setting: the next
+% posterior measures how far the previous plan's prediction was from the
+% nonlinear rollout of its own inputs (the plan innovation), and the
+% second-order error coefficient it reveals sets the next step bound.
     if nargin<3,timer=tic;end
     if ~isfield(model,'uncertainty')
         model.uncertainty=struct('specified',false,'egoGenerator',zeros(6), ...
             'collisionGenerator',zeros(6),'target',[],'relativeFrame',false);
     end
-    cfg=model.cfg;solution=[];allAttempts=struct([]);allStages=struct([]);history=struct([]);
-    restarted=false;selected=0;initialFailure="";selectedRound=0;
-    lineSearchHistory=struct([]);
-    model.inputTrustScale=.125;
+    cfg=model.cfg;
+    model.trust=localTrustPrior(previousState,cfg);
+    model.inputTrustScale=model.trust.scale;
     model.inheritedSlacks=[];
     model.linearizationBuilds=0;
-    if isstruct(previousState) && isfield(previousState,'linearizationTrustScale')
-        model.inputTrustScale=previousState.linearizationTrustScale;
-    end
+    model.allowPotentialFieldRestart=true;
     if ~model.uncertainty.specified && isstruct(previousState) && isfield(previousState,'stageSlacks') ...
             && isnumeric(previousState.stageSlacks) && isvector(previousState.stageSlacks) ...
             && numel(previousState.stageSlacks)==cfg.controller.horizonSteps ...
             && all(isfinite(previousState.stageSlacks)) && all(previousState.stageSlacks>=0)
         model.inheritedSlacks=[reshape(previousState.stageSlacks(2:end),1,[]),0];
     end
-    for iteration=1:cfg.nonlinear.maximumLinearizations
-        if model.linearizationBuilds>=cfg.nonlinear.maximumLinearizations,break;end
-        model.allowPotentialFieldRestart=~restarted;
-        [candidate,search,trialModel]=localRound(model,previousState,timer);
-        offset=numel(allAttempts);allAttempts=[allAttempts,search.attempts]; %#ok<AGROW>
-        allStages=[allStages,search.stages]; %#ok<AGROW>
-        restarted=restarted || search.potentialFieldRestarted;
-        if strlength(search.initializationFailure)>0,initialFailure=search.initializationFailure;end
-        if isempty(candidate),model=trialModel;break;end
-        segment=candidate.searchSegment;candidate=rmfield(candidate,'searchSegment');
-        wall=tic;[agreement,~,~]=localPredictionAgreement(candidate,trialModel);
-        agreement.seconds=toc(wall);agreement.stepFraction=1;
-        scale=max(1,candidate.clfInitialValue);
-        agreement.predictedClfReduction=search.clfInitialSlack-candidate.clfSlack;
-        agreement.actualClfReduction=search.clfInitialSlack-agreement.actualClfSlack;
-        agreement.clfReductionResolved=max(abs([agreement.predictedClfReduction, ...
-            agreement.actualClfReduction]))>cfg.solver.clfTieTolerance*scale;
-        agreement.trustBoundaryRefinement=false;
-        history=[history,agreement]; %#ok<AGROW>
-        if agreement.ratio>1 && toc(timer)<cfg.solver.timeLimitSeconds
-            [damped,dampedAgreement,lineSearch]=localDampedStep(candidate,segment,trialModel,agreement,timer);
-            lineSearch.round=iteration;lineSearchHistory=[lineSearchHistory,lineSearch]; %#ok<AGROW>
-            if ~isempty(damped),candidate=damped;agreement=dampedAgreement;end
-        end
-        if agreement.ratio<=1
-            candidate.predictionAgreement=agreement;
-            solution=candidate;acceptedModel=trialModel;acceptedSearch=search;
-            selected=offset+search.selectedAttempt;selectedRound=iteration;
-            acceptedModel.nextTrustScale=min(1,trialModel.inputTrustScale ...
-                *min(1.5,max(1,.8/sqrt(max(agreement.ratio,eps))))*agreement.stepFraction);
-            acceptedModel.nextTrustScale=max(1/1024,acceptedModel.nextTrustScale);
-            acceptedSearch.clfLowerBound=candidate.clfSlack<=cfg.solver.feasibilityTolerance*scale;
-            acceptedModel.terminal=terminalContinuation.fit(acceptedModel.terminal, ...
-                [candidate.states(:,end);candidate.inputs(:,end)],model.sampleIndex+size(candidate.inputs,2));
-            break;
-        end
-        % A failed shifted correction may start one new potential-field seed.
-        % Never linearize the optimized rollout again in this sampling hold.
-        if restarted || search.initialization~="shiftedInputRollout" ...
-                || trialModel.linearizationBuilds>=cfg.nonlinear.maximumLinearizations
-            break;
-        end
-        model=trialModel;model.inheritedSlacks=[];model.inputTrustScale=.125;
-        previousState=[];restarted=true;initialFailure="shiftedModelDisagreement";
-        if toc(timer)>=cfg.solver.timeLimitSeconds,break;end
-    end
+    [solution,search,model]=localRound(model,previousState,timer);
     if ~isempty(solution)
-        model=acceptedModel;search=acceptedSearch;search.terminationReason="twoStagesModelAgreement";
-    elseif ~isempty(history)
-        search.terminationReason="linearizationAccuracyNotReached";
+        model.terminal=terminalContinuation.fit(model.terminal, ...
+            [solution.states(:,end);solution.inputs(:,end)],model.sampleIndex+size(solution.inputs,2));
+        model.trust=localTrustRecord(model.trust,solution,model);
     end
-    search.attempts=allAttempts;search.stages=allStages;search.selectedAttempt=selected;
-    search.linearizationCount=sum([allAttempts.modelBuilt]);search.solverCalls=sum([allStages.numericalSolve]);
-    search.potentialFieldRestarted=restarted;search.initializationFailure=initialFailure;
-    search.refinementCount=numel(history);search.selectedRefinement=selectedRound;search.modelAgreementHistory=history;
-    search.modelAgreementSatisfied=~isempty(solution);search.elapsedSeconds=toc(timer);
-    search.returned=~isempty(solution);
-    search.lineSearchHistory=lineSearchHistory;search.lineSearchSeconds=0;search.lineSearchTrials=0;
-    search.acceptedStepFraction=1;
-    if ~isempty(lineSearchHistory)
-        search.lineSearchSeconds=sum([lineSearchHistory.seconds]);
-        search.lineSearchTrials=sum(arrayfun(@(entry)numel(entry.trials),lineSearchHistory));
-    end
-    if ~isempty(solution),search.acceptedStepFraction=solution.predictionAgreement.stepFraction;end
-end
-
-function [accepted,agreement,info]=localDampedStep(full,segment,model,fullAgreement,timer)
-    wall=tic;accepted=[];agreement=fullAgreement;cfg=model.cfg;
-    problem=segment.problem;base=[segment.primary;0];
-    base(problem.clfIndex)=localClfSlack(base,problem)/problem.clfScale;
-    residual=localConvexResidual(base,problem);
-    baseSlack=problem.clfScale*base(problem.clfIndex);
-    info=struct('reason',"infeasibleBase",'baseResidual',residual,'baseClfSlack',baseSlack, ...
-        'fullClfSlack',full.clfSlack,'accepted',false,'seconds',0,'trials',struct([]));
-    % Inherited slacks alone do not establish feasibility at zero correction.
-    % Use the same numerical feasibility allowance as the accepted solver
-    % point. Convex interpolation preserves that allowance, not exact zeros.
-    if ~isfinite(residual) || residual>cfg.solver.feasibilityTolerance
-        info.seconds=toc(wall);return;
-    end
-    fraction=min(.5,.8/sqrt(fullAgreement.ratio));
-    if ~isfinite(fraction) || fraction<=0,fraction=.1;end
-    direction=segment.secondary-base;
-    zeroClf=full.clfSlack<=cfg.solver.feasibilityTolerance*problem.clfScale;
-    info.reason="modelDisagreement";
-    for attempt=1:3
-        if toc(timer)>=cfg.solver.timeLimitSeconds,info.reason="timeLimit";break;end
-        point=base+fraction*direction;
-        % Tighten rho on the same convex quadratic; linear interpolation of
-        % epigraph heights would report avoidable slack and fake CLF error.
-        point(problem.clfIndex)=localClfSlack(point,problem)/problem.clfScale;
-        trial=localDecode(point,problem,model.linearization);
-        if zeroClf && trial.clfSlack>cfg.solver.feasibilityTolerance*problem.clfScale
-            % The zero-slack sublevel set on this segment is an interval
-            % containing alpha=1. Smaller alpha cannot restore a lost zero.
-            info.reason="zeroClfSlackWouldBeLost";break;
-        end
-        check=tic;[trialAgreement,~,~]=localPredictionAgreement(trial,model);
-        trialAgreement.seconds=toc(check);trialAgreement.stepFraction=fraction;
-        trialAgreement.predictedClfReduction=baseSlack-trial.clfSlack;
-        trialAgreement.actualClfReduction=baseSlack-trialAgreement.actualClfSlack;
-        trialAgreement.clfReductionResolved=max(abs([trialAgreement.predictedClfReduction, ...
-            trialAgreement.actualClfReduction]))>cfg.solver.clfTieTolerance*problem.clfScale;
-        trialAgreement.trustBoundaryRefinement=false;
-        entry=struct('fraction',fraction,'clfSlack',trial.clfSlack,'safety',trial.safety, ...
-            'agreement',trialAgreement);
-        info.trials=[info.trials,entry];
-        if trialAgreement.ratio<=1
-            accepted=trial;agreement=trialAgreement;info.accepted=true;info.reason="accepted";break;
-        end
-        fraction=fraction/2;
-    end
-    info.seconds=toc(wall);
-end
-
-function slack=localClfSlack(point,problem)
-    next=(norm(problem.clfMap*point+problem.clfOffset)^2+problem.clfModelConstant)*problem.clfScale;
-    slack=max(0,next-problem.clfCurrentBudget);
+    search.trust=model.trust;
+    search.linearizationCount=sum([search.attempts.modelBuilt]);
+    search.elapsedSeconds=toc(timer);search.returned=~isempty(solution);
 end
 
 function residual=localConvexResidual(point,problem)
@@ -151,79 +44,77 @@ function residual=localConvexResidual(point,problem)
     end
 end
 
-function [agreement,rollout,valid]=localPredictionAgreement(candidate,model)
-    cfg=model.cfg;[rollout,valid]=localRollout(candidate.inputs,model);
-    if ~valid
-        % Only the first hold is issued. A remote suffix outside the tire
-        % model domain does not invalidate an evaluable first-hold comparison.
-        [rollout,valid]=localRollout(candidate.inputs(:,1),model);
+function trust=localTrustPrior(previous,cfg)
+    % Startup assigns the coefficient that makes the initial scale consistent.
+    scale=cfg.nonlinear.trustInitialScale;
+    trust=struct('scale',scale,'curvature',cfg.nonlinear.trustInnovationMeters/scale^2, ...
+        'correction',NaN,'innovation',NaN,'observationInnovation',NaN,'modelInnovation',NaN, ...
+        'updated',false);
+    if isstruct(previous) && isfield(previous,'trust') && isstruct(previous.trust)
+        trust=previous.trust;trust.updated=false;
+        trust.innovation=NaN;trust.observationInnovation=NaN;trust.modelInnovation=NaN;
     end
-    poseError=Inf;stateError=Inf;clfError=Inf;fullPoseError=Inf;actualSlack=Inf;
-    maximumDeviation=Inf;deviationRatio=0;
-    % RTI executes one hold before receiving another posterior. Agreement
-    % over an unexecuted open-loop suffix is not an admission requirement.
-    % The affine suffix still carries all planning constraints; its nonlinear
-    % feasibility and recursive transfer are explicitly not certified.
-    poseCount=min(size(candidate.states,2),2);
-    if valid
-        nodes=size(rollout.states,2);
-        [poseError,stateError,fullPoseError]=localTrajectoryError(candidate.states(:,1:nodes),rollout.states,cfg,poseCount);
-        if nodes<size(candidate.states,2),fullPoseError=Inf;end
-        actual=nonlinearBicycleModel.nominalValue(rollout.states(:,2),model.lane,model.nominalReference);
-        clfError=abs(actual-candidate.clfNextValue)/max(1,candidate.clfInitialValue);
-        actualSlack=max(0,actual-candidate.clfInitialValue+candidate.clfRequiredDecrease);
-        projection=laneGeometry.project(rollout.states(1:2,1:poseCount),model.lane);
-        maximumDeviation=max(abs(projection.lateralPosition));
-        if isfinite(cfg.controller.maximumLateralDeviationMeters)
-            deviationRatio=max(0,1+(maximumDeviation-cfg.controller.maximumLateralDeviationMeters) ...
-                /cfg.nonlinear.predictionToleranceMeters);
-        end
-    end
-    ratio=max([poseError/cfg.nonlinear.predictionToleranceMeters, ...
-        stateError/cfg.nonlinear.statePredictionTolerance,clfError/cfg.nonlinear.clfPredictionTolerance,deviationRatio]);
-    agreement=struct('poseErrorMeters',poseError,'fullPoseErrorMeters',fullPoseError, ...
-        'poseConstraintNodeCount',poseCount,'scaledStateError',stateError, ...
-        'scaledClfError',clfError,'ratio',ratio,'inputTrustScale',model.inputTrustScale, ...
-        'actualClfSlack',actualSlack,'maximumLateralDeviationMeters',maximumDeviation, ...
-        'lateralDeviationRatio',deviationRatio,'firstInputTrustActivity', ...
-        max(abs(candidate.inputs(:,1)-model.linearization.inputs(:,1)) ...
-        ./(model.inputTrustScale*cfg.nonlinear.trustRadius*[.15;.25])), ...
-        'seconds',0,'stepFraction',1);
 end
 
-function [poseError,stateError,fullPoseError]=localTrajectoryError(affine,nonlinear,cfg,poseCount)
-    reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
-    displacement=vecnorm(affine(1:2,:)-nonlinear(1:2,:));
-    rotation=abs(affine(3,:)-nonlinear(3,:));
-    bodyError=displacement+reach*rotation;fullPoseError=max(bodyError);
-    % Retain the full suffix discrepancy as an offline research measurement.
-    poseError=max(bodyError(1:poseCount));
-    stateError=max(abs(affine(4:6,1:poseCount)-nonlinear(4:6,1:poseCount))./[5;3;1.5],[],'all');
-end
-
-function [rollout,valid]=localRollout(inputs,model)
-    states=zeros(6,size(inputs,2)+1);states(:,1)=model.initialState;valid=true;
+function model=localAdaptTrust(model,anchor,previous)
+    % The previous affine plan predicted xhat at nodes 2..N+1. Replaying its
+    % shifted inputs on the nonlinear model from its own prediction xhat_2
+    % splits the plan innovation exactly at every node:
+    %   anchor - xhat = (anchor - replay) + (replay - xhat).
+    % The first term propagates the posterior's departure from the prediction
+    % and belongs to the observer. The second has no posterior in it: it is
+    % the second-order model remainder L*s^2 of the step that was taken.
+    cfg=model.cfg;trust=model.trust;
+    if ~isfield(previous,'stateTrajectory') || ~isfinite(trust.correction),return;end
+    predicted=previous.stateTrajectory(:,2:end);inputs=previous.inputTrajectory(:,2:end);
+    count=min([size(anchor.states,2),size(predicted,2),size(inputs,2)+1]);
+    replay=zeros(6,count);replay(:,1)=predicted(:,1);
     try
-        for index=1:size(inputs,2)
-            states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),model.cfg);
+        for index=1:count-1
+            replay(:,index+1)=nonlinearBicycleModel.sample(replay(:,index),inputs(:,index),cfg);
         end
     catch exception
         domainErrors=["collisionAvoidanceController:nonlinearDomain", ...
             "collisionAvoidanceController:invalidTireOperatingPoint", ...
             "collisionAvoidanceController:singularTireLinearization"];
         if ~any(string(exception.identifier)==domainErrors),rethrow(exception);end
-        valid=false;
+        return;
     end
-    valid=valid && all(isfinite(states),'all');
-    rollout=struct('inputs',inputs,'states',states);
+    predicted=predicted(:,1:count);realized=anchor.states(:,1:count);
+    trust.innovation=max(localPoseDiscrepancy(realized,predicted,cfg));
+    trust.observationInnovation=max(localPoseDiscrepancy(realized,replay,cfg));
+    trust.modelInnovation=max(localPoseDiscrepancy(replay,predicted,cfg));
+    % A step far inside the box carries little information about its boundary.
+    step=max(trust.correction,trust.scale/2);
+    curvature=max(trust.modelInnovation/step^2,cfg.nonlinear.trustRetention*trust.curvature);
+    curvature=max(curvature,eps);
+    trust.scale=min(cfg.nonlinear.trustMaximumScale,max(cfg.nonlinear.trustMinimumScale, ...
+        sqrt(cfg.nonlinear.trustInnovationMeters/curvature)));
+    trust.curvature=curvature;trust.updated=true;
+    model.trust=trust;model.inputTrustScale=trust.scale;
+end
+
+function discrepancy=localPoseDiscrepancy(first,second,cfg)
+    % Body-point pose metric of the safety rows: translation plus reach*yaw.
+    reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
+    difference=first-second;
+    discrepancy=vecnorm(difference(1:2,:))+reach*abs(atan2(sin(difference(3,:)),cos(difference(3,:))));
+end
+
+function trust=localTrustRecord(trust,solution,model)
+    % Store the correction actually taken, in units of the unit input box.
+    unit=model.cfg.nonlinear.trustRadius*[.15;.25];
+    anchor=model.linearization.inputs;count=min(size(anchor,2),size(solution.inputs,2));
+    trust.correction=max(abs(solution.inputs(:,1:count)-anchor(:,1:count))./unit,[],'all');
 end
 
 function [solution,search,model] = localRound(model,previousState,timer)
 %localRound Restore one affine PCBF problem, then solve its CLF objective.
-% A finite candidate is returned for model agreement and optional damping.
+% A finite candidate is issued without nonlinear checking.
     if nargin<3,timer=tic;end
     wall=tic;[anchor,source,failure]=localInitialization(model,previousState);
     initializationSeconds=toc(wall);
+    if source=="shiftedInputRollout",model=localAdaptTrust(model,anchor,previousState);end
     budgetAttempts=struct([]);budgetStages=struct([]);
     sharedProblem=[];
     if model.uncertainty.specified
@@ -473,7 +364,6 @@ function [solution,search,model,sharedProblem]=localSecondary(point,problem,anch
     search.stages(2)=struct('objective',"clfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN,'numericalSolve',true,'solverInfo',solverInfo);
     if isempty(second) || any(~isfinite(second)) || flag<=0,search.terminationReason="clfNoNumericalResult";return;end
     solution=localDecode(second,problem,anchor);
-    solution.searchSegment=struct('primary',point,'secondary',second,'problem',problem);
     model.terminal=terminalContinuation.fit(model.terminal,[solution.states(:,end);solution.inputs(:,end)],model.sampleIndex+size(solution.inputs,2));
     search.stages(2).value=solution.clfSlack;search.clfStageCompleted=true;search.returned=true;
     search.converged=all([search.stages([search.stages.numericalSolve]).exitFlag]>0);
@@ -631,8 +521,6 @@ function [problem,model]=localFormulate(anchor,model)
     rows=cell(1,9*count+8);bounds=cell(size(rows));rowCount=0;
     pathCones=struct('A',{},'b',{},'d',{},'gamma',{});
     deviationLimit=cfg.controller.maximumLateralDeviationMeters;
-    % Reserve the existing position-accuracy tolerance inside the hard bound.
-    pathLimit=deviationLimit-min(cfg.nonlinear.predictionToleranceMeters,deviationLimit/100);
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
     lower(iu(:))=-repmat(model.inputTrustScale*radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
@@ -701,8 +589,7 @@ function [problem,model]=localFormulate(anchor,model)
         rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite)-rateRadius(finite);rate(finite)+difference(finite)-rateRadius(finite)];
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
         if isfinite(deviationLimit)
-            limit=pathLimit;if index==1,limit=deviationLimit;end
-            [r,bound,cone]=localPathRows(x(1:2),map(1:2,:),model.lane,limit,pathBox,generator(1:2,:));
+            [r,bound,cone]=localPathRows(x(1:2),map(1:2,:),model.lane,deviationLimit,pathBox,generator(1:2,:));
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
             pathCones=[pathCones,cone]; %#ok<AGROW>
         end
@@ -720,7 +607,7 @@ function [problem,model]=localFormulate(anchor,model)
         end
         map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
         if isfinite(deviationLimit)
-            [r,bound,cone]=localPathRows(middle(1:2),map(1:2,:),model.lane,pathLimit,pathBox,middleGenerator(1:2,:));
+            [r,bound,cone]=localPathRows(middle(1:2),map(1:2,:),model.lane,deviationLimit,pathBox,middleGenerator(1:2,:));
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
             pathCones=[pathCones,cone]; %#ok<AGROW>
         end
@@ -778,7 +665,7 @@ function [problem,model]=localFormulate(anchor,model)
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
     end
     if isfinite(deviationLimit)
-        [r,bound,cone]=localPathRows(y(1:2),map(1:2,:),model.lane,pathLimit,pathBox,generator(1:2,:));
+        [r,bound,cone]=localPathRows(y(1:2),map(1:2,:),model.lane,deviationLimit,pathBox,generator(1:2,:));
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
         pathCones=[pathCones,cone];
     end
@@ -859,7 +746,7 @@ function problem=localAddClf(problem,anchor,model)
     currentBudget=max(0,sqrt(value)-initialRadius)^2 ...
         -model.cfg.nominalClf.decreaseFraction*(lossCenter+lossRadius)^2;
     % Young's inequality keeps one SOC and the same CLF. Mean values remain
-    % separate from these bounds for the existing model-agreement diagnostic.
+    % separate from these bounds.
     multiplier=1;bias=0;
     if nextRadius>0
         weight=min(1,nextRadius/max(norm(nominalOffset)*sqrt(scale),eps));

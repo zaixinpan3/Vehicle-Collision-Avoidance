@@ -9,34 +9,27 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function feasibleDampingAvoidsASecondHeadOnOptimization(testCase)
+        function solvedPlanIsIssuedWithoutNonlinearChecking(testCase)
             [ego,~,cfg]=localFixture();
-            % The smaller startup correction now passes the default CLF
-            % agreement threshold; tighten it here to exercise damping.
-            cfg.nonlinear.clfPredictionTolerance=.005;
             [~,q,road]=collisionThreatScenario("headOn",cfg);
             target=struct('targetPositionInertial',q(1:2), ...
                 'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
             [command,inputs,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
             search=problem.metadata.search;
-            testCase.verifyEqual(search.refinementCount,1);
-            testCase.verifyLessThanOrEqual(search.solverCalls,2);
-            testCase.verifyGreaterThan(search.modelAgreementHistory(1).ratio,1);
-            testCase.verifyLessThanOrEqual(problem.metadata.predictionAgreement.ratio,1);
-            testCase.verifyGreaterThan(search.acceptedStepFraction,0);
-            testCase.verifyLessThan(search.acceptedStepFraction,1);
-            testCase.verifyFalse(problem.metadata.secondaryOptimumApplied);
-            testCase.verifyLessThanOrEqual(search.lineSearchTrials,3);
+            testCase.verifyFalse(problem.metadata.nonlinearPredictionEvaluated);
+            testCase.verifyFalse(isfield(problem.metadata,'predictionAgreement'));
+            testCase.verifyFalse(isfield(state,'linearizationTrustScale'));
+            testCase.verifyEqual(search.terminationReason,"twoStagesReturned");
+            testCase.verifyTrue(problem.metadata.secondaryOptimumApplied);
             testCase.verifyLessThanOrEqual(problem.solution.safety,search.slackCap+cfg.solver.constraintTolerance);
             testCase.verifyEqual(problem.solution.clfSlack,max(0,problem.solution.clfNextValue ...
-                -problem.solution.clfInitialValue+problem.solution.clfRequiredDecrease),AbsTol=1e-10);
+                -problem.solution.clfInitialValue+problem.solution.clfRequiredDecrease),AbsTol=cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
             endpoint=[problem.predictedState(:,end);inputs(:,end)];
             membership=terminalContinuation.membership(endpoint,problem.metadata.endpointIndex,problem.model.terminal);
             testCase.verifyLessThanOrEqual(membership,cfg.solver.constraintTolerance);
             localVerifyAffinePrediction(testCase,problem,cfg);
-            localVerifyPredictionAgreement(testCase,problem,cfg);
         end
         function targetFreeInitializationRunsBothLexicographicStages(testCase)
             [ego,road,cfg]=localFixture();
@@ -189,7 +182,6 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 problem.metadata.search.slackCap+cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(problem.metadata.search.attempts(1).initialization,"movingTargetPotentialField");
-            testCase.verifyTrue(problem.metadata.search.modelAgreementSatisfied);
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
         function brakingSlewAndMagnitudeBoundsConstrainTheReturnedPlan(testCase)
@@ -215,17 +207,6 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.solverCallCount,sum([problem.metadata.search.stages.numericalSolve]));
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
-        function oversizedFreshCorrectionReportsFailureWithoutScp(testCase)
-            % This legacy stress fixture expands the default correction box
-            % tenfold. The new seed does not supply an accurate damped point;
-            % the one-model contract reports failure instead of iterating it.
-            [ego,road,cfg]=localFixture();ego.position(2)=1;ego.yaw=.5;
-            cfg.nonlinear.trustRadius=5;
-            target=struct('targetPositionInertial',[-25;-10], ...
-                'targetVelocityInertial',[8;0],'targetYawInertial',0);
-            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:noOptimizationSolution');
-        end
         function brakingEncounterUsesOneFreshModelAndCompletesTheClf(testCase)
             [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("brakingLead",cfg);
             target=struct('targetPositionInertial',q(1:2), ...
@@ -235,45 +216,10 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             search=problem.metadata.search;
             testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyEqual(search.refinementCount,1);
             testCase.verifyFalse(search.potentialFieldRestarted);
-            testCase.verifyTrue(search.modelAgreementSatisfied);
             testCase.verifyTrue(search.clfStageCompleted);
             testCase.verifyGreaterThan(search.attempts(search.selectedAttempt).stages(1).exitFlag,0);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            localVerifyPredictionAgreement(testCase,problem,cfg);
-        end
-        function failedFreshModelDoesNotRelinearizeItsOptimizedRollout(testCase)
-            [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            model=problem.model;model.cfg.nonlinear.predictionToleranceMeters=1e-16;
-            model.cfg.nonlinear.statePredictionTolerance=1e-16;
-            model.cfg.nonlinear.clfPredictionTolerance=1e-16;
-            [solution,search]=solvePredictiveControl(model,[]);
-            testCase.verifyEmpty(solution);
-            testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyFalse(search.potentialFieldRestarted);
-            testCase.verifyEqual(search.terminationReason,"linearizationAccuracyNotReached");
-        end
-        function accurateClfStepEndsTheFrameAtAnArtificialInputBoundary(testCase)
-            [x,q,road,cfg]=collisionThreatScenario("brakingLead",struct('referenceSpeed',15, ...
-                'controller',struct('horizonSteps',16)));
-            ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
-            target=struct('targetPositionInertial',q(1:2), ...
-                'targetVelocityInertial',q(4)*[cos(q(3)+q(6));sin(q(3)+q(6))], ...
-                'targetYawInertial',q(3),'targetSideslip',q(6), ...
-                'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7));
-            limited=cfg;limited.nonlinear.maximumLinearizations=2;
-            [~,~,early]=collisionAvoidanceController(ego,target,road,limited,[]);
-            [~,~,refined]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyTrue(early.metadata.search.modelAgreementSatisfied);
-            testCase.verifyGreaterThan(early.metadata.clfSlack,cfg.solver.feasibilityTolerance);
-            testCase.verifyEqual(refined.metadata.clfFunction,early.metadata.clfFunction);
-            testCase.verifyEqual(refined.metadata.search.refinementCount,early.metadata.search.refinementCount);
-            testCase.verifyEqual(refined.inputTrajectory,early.inputTrajectory,AbsTol=1e-10);
-            testCase.verifyTrue(refined.metadata.search.clfStageCompleted);
-            testCase.verifyFalse(refined.metadata.predictionAgreement.trustBoundaryRefinement);
-            localVerifyPredictionAgreement(testCase,refined,cfg);
         end
         function shiftedSlackBudgetSkipsPrimaryAndStillOptimizesClf(testCase)
             [ego,road,cfg]=localFixture();
@@ -312,19 +258,6 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
         end
     end
-end
-
-function localVerifyPredictionAgreement(testCase,problem,cfg)
-    x=problem.model.initialState;states=zeros(size(problem.predictedState));states(:,1)=x;
-    for index=1:size(problem.inputTrajectory,2)
-        x=nonlinearBicycleModel.sample(x,problem.inputTrajectory(:,index),cfg);states(:,index+1)=x;
-    end
-    reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
-    count=problem.metadata.predictionAgreement.poseConstraintNodeCount;
-    error=max(vecnorm(states(1:2,1:count)-problem.predictedState(1:2,1:count)) ...
-        +reach*abs(states(3,1:count)-problem.predictedState(3,1:count)));
-    testCase.verifyEqual(error,problem.metadata.predictionAgreement.poseErrorMeters,AbsTol=1e-12);
-    testCase.verifyLessThanOrEqual(error,cfg.nonlinear.predictionToleranceMeters);
 end
 
 function localVerifyAnchorRollout(testCase,anchor,cfg)

@@ -51,7 +51,6 @@ classdef pathDeviationConstraintTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             projection=laneGeometry.project(problem.predictedState(1:2,:),problem.model.lane);
             testCase.verifyLessThanOrEqual(max(abs(projection.lateralPosition)),10+cfg.solver.feasibilityTolerance);
-            testCase.verifyLessThanOrEqual(problem.metadata.predictionAgreement.maximumLateralDeviationMeters,10);
             testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
             testCase.verifyEqual(problem.metadata.clfFunction,"quadraticTransverseError");
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);

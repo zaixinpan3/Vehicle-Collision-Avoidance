@@ -2,8 +2,7 @@
 
 The active controller uses one target-independent function throughout avoidance
 and recovery. There is no encounter-dependent CLF, nominal-control substitution,
-or executable backup. Every issued command comes from a completed CLF solve or
-an accepted feasible-segment damping of that solution.
+or executable backup. Every issued command comes from a completed CLF solve.
 
 ## Function and its scope
 
@@ -62,10 +61,6 @@ constraint represented by one second-order cone. The free-pose terminal core
 also retains its cone: the optimization is a sparse conic QP/SOCP, not a QP
 with exclusively affine constraints.
 
-The nonlinear agreement calculation evaluates this same V at the true RK4
-first successor. It requires one trajectory rollout and an analytic value
-calculation, without nominal return simulations or new derivatives.
-
 The objective is
 
     (rho + epsilon * lossLower * R(dU)) / max(1,V(x)),
@@ -93,9 +88,7 @@ The successor upper bound is `(1+w)*V_aff+(1+1/w)*b1^2`, using Young's
 inequality with positive fixed `w` when `b1>0`; zero uncertainty recovers
 `V_aff` exactly. It is constrained by `budget+rho` with the existing single
 SOC. This is a sufficient robust inequality for the affine error model,
-not another CLF. The nonlinear agreement diagnostic still compares mean
-values, rather than mistaking an uncertainty reserve for linearization error.
-`clfWorstNextValue` and `clfCurrentBudget` record the separate bounds.
+not another CLF. `clfWorstNextValue` and `clfCurrentBudget` record the separate bounds.
 
 The remaining nonlinear error-chart and dynamics remainders are not enclosed.
 Persistent observation uncertainty can require positive slack near the path;
@@ -119,19 +112,10 @@ The PCBF budget is a hard constraint of this convex problem. It comes from
 shifted stage slacks when available, or a primary slack minimization during
 initialization/restoration. A zero primary value never skips CLF optimization.
 
-## Damping and initialization
+## Initialization
 
-A full CLF optimizer point may have excessive prediction error. If a primary
-point (or the zero-correction inherited point) is feasible in the exact same
-assembled convex problem, the controller can interpolate all its variables
-with the CLF solution. It tightens rho by evaluating the existing quadratic at
-the interpolated point. It tries at most three nonlinear rollouts without
-another solve. A full zero-slack solution must remain zero-slack within tolerance
-when damped. Positive optimal slack may increase after damping; the metadata
-reports the issued slack and `secondaryOptimumApplied=false`.
-
-An inherited safety budget alone does not prove that the zero-correction point
-satisfies the terminal cone. Damping is unavailable when that point is infeasible.
+The completed CLF optimizer point is issued directly; it is not replayed through
+the nonlinear model or damped.
 There is one trajectory model per initialization. A failed shifted model may
 request one fresh potential-field initialization and its model; a fresh model
 is never repeatedly relinearized in that hold. Restoring
