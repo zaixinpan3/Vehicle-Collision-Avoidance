@@ -32,9 +32,13 @@ function cfg=localDefaults()
     % [trustMinimumScale,trustMaximumScale]. trustRetention is the per-sample
     % retention of the estimated error coefficient; the scale grows by at most
     % 1/sqrt(trustRetention) per sample and shrinks at once.
+    % A primary problem infeasible inside the trust region is re-solved with
+    % the scale doubled up to trustExpansionMaximum (16 covers the full
+    % braking-ratio range); the estimate is not changed by this expansion.
     cfg.nonlinear=struct('integrationStep',.05,'trustRadius',.5, ...
         'trustInnovationMeters',.02,'trustInitialScale',.125, ...
-        'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
+        'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5, ...
+        'trustExpansionMaximum',16);
     % Potential-field seed parameters; these are not optimized actuator limits.
     cfg.initialization=struct('previewSeconds',3,'previewStepSeconds',.1, ...
         'clearancePaddingMeters',.7,'brakingRatioLimit',.3, ...
@@ -100,13 +104,17 @@ function localValidate(cfg)
         localInvalid('horizonSteps cannot exceed maximumHorizonSteps.');
     end
     for name=["integrationStep","trustRadius", ...
-            "trustInnovationMeters","trustInitialScale","trustMinimumScale","trustMaximumScale"]
+            "trustInnovationMeters","trustInitialScale","trustMinimumScale","trustMaximumScale", ...
+            "trustExpansionMaximum"]
         validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.nonlinear.trustRetention,{'double'},{'scalar','real','>',0,'<',1});
     if cfg.nonlinear.trustMinimumScale>cfg.nonlinear.trustInitialScale ...
             || cfg.nonlinear.trustInitialScale>cfg.nonlinear.trustMaximumScale
         localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
+    end
+    if cfg.nonlinear.trustExpansionMaximum<cfg.nonlinear.trustMaximumScale
+        localInvalid('trustExpansionMaximum cannot be below trustMaximumScale.');
     end
     for name=string(fieldnames(cfg.initialization)).'
         validateattributes(cfg.initialization.(name),{'double'},{'scalar','real','finite','positive'});

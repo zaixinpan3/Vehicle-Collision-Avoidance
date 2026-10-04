@@ -3,10 +3,11 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % Startup uses a potential-field rollout and later samples the shifted plan.
 % The horizon extends until the anchor reaches the terminal set: beyond the
 % perception radius of the target and separating from it, inside the road.
-% The PCBF stage minimizes prefix safety slack, then the CLF stage runs. When
-% the shifted problem is infeasible inside the linearization trust region, it
-% is solved once more from a fresh potential-field rollout. Any other failure,
-% or a fresh problem without a solution, is reported. Plans are issued directly.
+% The PCBF stage minimizes prefix safety slack, then the CLF stage runs. A
+% primary problem infeasible inside the trust region is re-solved on the same
+% linearization with the trust scale doubled until it is feasible or reaches
+% trustExpansionMaximum. A shifted plan still infeasible is then solved from a
+% fresh potential-field rollout in the same way. Any other failure is reported.
 % The input trust scale is an estimate, not a fixed setting: the next
 % posterior measures how far the previous plan's prediction was from the
 % nonlinear rollout of its own inputs (the plan innovation), and the
@@ -103,26 +104,46 @@ function [solution,search,model] = localRound(model,previousState,timer)
         search=localEmptySearch(model,source,failure,initializationSeconds);return;
     end
     if source=="shiftedInputRollout",model=localAdaptTrust(model,anchor,previousState);end
+    estimatedScale=model.inputTrustScale;
     [point,problem,search,model]=localPrimary(anchor,model,source,timer);
     search.initializationSeconds=initializationSeconds;
     attempts=localAttempt(search);stages=search.stages;selected=1;restarted=false;
     cfg=model.cfg;freshSource="movingTargetPotentialField";
     if isempty(model.target),freshSource="laneFeedbackRollout";end
-    % Infeasible inside the linearization trust region: the solver certifies
-    % primal infeasibility of the primary problem around the shifted plan.
-    infeasible=isempty(point) && ~isempty(search.stages) && search.stages(end).exitFlag==-2;
-    if source=="shiftedInputRollout" && infeasible && toc(timer)<cfg.solver.timeLimitSeconds
-        failure="shiftedProblemInfeasible";
+    [point,problem,search,model,attempts,stages,selected]=localExpand( ...
+        point,problem,search,model,anchor,source,timer,attempts,stages,selected);
+    % Infeasible even in the largest trust region around the shifted plan.
+    if source=="shiftedInputRollout" && localInfeasible(point,search) && toc(timer)<cfg.solver.timeLimitSeconds
+        failure="shiftedProblemInfeasible";model.inputTrustScale=estimatedScale;
         wall=tic;anchor=localPotentialFieldSeed(model,cfg.controller.horizonSteps,cfg.controller.maximumHorizonSteps);
         [point,problem,search,model]=localPrimary(anchor,model,freshSource,timer);
         search.initializationSeconds=toc(wall);restarted=true;
         attempts(end+1)=localAttempt(search);stages=[stages,search.stages];selected=numel(attempts);
+        [point,problem,search,model,attempts,stages,selected]=localExpand( ...
+            point,problem,search,model,anchor,freshSource,timer,attempts,stages,selected);
     end
     [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
     stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
     search.attempts=attempts;search.selectedAttempt=selected;search.stages=stages;
     search.solverCalls=sum([stages.numericalSolve]);search.potentialFieldRestarted=restarted;
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);
+end
+
+function [point,problem,search,model,attempts,stages,selected]=localExpand( ...
+        point,problem,search,model,anchor,source,timer,attempts,stages,selected)
+    % Double the input trust scale on the same anchor while the primary
+    % problem is certified infeasible. The trust estimate itself is unchanged.
+    cfg=model.cfg;
+    while localInfeasible(point,search) && model.inputTrustScale<cfg.nonlinear.trustExpansionMaximum ...
+            && toc(timer)<cfg.solver.timeLimitSeconds
+        model.inputTrustScale=min(2*model.inputTrustScale,cfg.nonlinear.trustExpansionMaximum);
+        [point,problem,search,model]=localPrimary(anchor,model,source,timer);
+        attempts(end+1)=localAttempt(search);stages=[stages,search.stages];selected=numel(attempts); %#ok<AGROW>
+    end
+end
+
+function infeasible=localInfeasible(point,search)
+    infeasible=isempty(point) && ~isempty(search.stages) && search.stages(end).exitFlag==-2;
 end
 
 function search=localEmptySearch(model,source,failure,seconds)

@@ -111,15 +111,38 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [solution,search]=solvePredictiveControl(model,prior);
             testCase.verifyEmpty(solution);
             testCase.verifyTrue(search.potentialFieldRestarted);
-            testCase.verifyEqual([search.attempts.initialization],["shiftedInputRollout","laneFeedbackRollout"]);
-            testCase.verifyEqual(search.linearizationCount,2);
+            % Each anchor doubles its trust scale up to the maximum before the
+            % fresh rollout or the report.
+            inits=[search.attempts.initialization];scales=[search.attempts.inputTrustScale];
+            fresh=find(inits=="laneFeedbackRollout",1);
+            testCase.verifyEqual(inits(1),"shiftedInputRollout");testCase.verifyNotEmpty(fresh);
+            testCase.verifyEqual(scales(fresh-1),cfg.nonlinear.trustExpansionMaximum);
+            testCase.verifyEqual(scales(end),cfg.nonlinear.trustExpansionMaximum);
+            growth=scales(2:fresh-1)./scales(1:fresh-2);
+            testCase.verifyGreaterThan(growth,1);testCase.verifyLessThanOrEqual(growth,2+1e-12);
             testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
+        end
+        function anInfeasibleTrustRegionIsEnlargedUntilFeasible(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            ego=localSuccessor(ego,prior);prior.inputTrajectory(2,:)=.99;
+            cfg.nonlinear.trustExpansionMaximum=16;
+            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            search=problem.metadata.search;scales=[search.attempts.inputTrustScale];
+            testCase.verifyTrue(search.clfStageCompleted);
+            testCase.verifyEqual(search.attempts(1).stages(1).exitFlag,-2);
+            testCase.verifyGreaterThan(numel(search.attempts),1);
+            testCase.verifyEqual(scales(2),2*scales(1),RelTol=1e-12);
+            % The online trust estimate is not changed by the expansion.
+            testCase.verifyLessThanOrEqual(problem.metadata.trust.scale,cfg.nonlinear.trustMaximumScale);
         end
         function aFailedShiftIsReSolvedFromAFreshPotentialFieldRollout(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            % Near-full braking along the whole shifted plan makes it infeasible.
+            % Near-full braking along the whole shifted plan makes it infeasible;
+            % without expansion beyond the nominal box the fresh rollout is used.
             ego=localSuccessor(ego,prior);prior.inputTrajectory(2,:)=.99;
+            cfg.nonlinear.trustExpansionMaximum=cfg.nonlinear.trustMaximumScale;
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             search=problem.metadata.search;
             testCase.verifyTrue(search.potentialFieldRestarted);
@@ -127,7 +150,6 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.attempts(1).stages(1).exitFlag,-2);
             % The retained target forecast selects the moving-target field.
             testCase.verifyEqual(search.attempts(end).initialization,"movingTargetPotentialField");
-            testCase.verifyEqual(search.linearizationCount,2);
             testCase.verifyTrue(search.clfStageCompleted);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyAnchorRollout(testCase,problem.model.linearization,cfg);

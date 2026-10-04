@@ -4,10 +4,12 @@ Every frame uses the same target-independent analytic quadratic CLF, defined in
 [NOMINAL_CLF.md](NOMINAL_CLF.md). Every frame minimizes PCBF slack, then CLF
 slack, on one affine model. A bounded input-increment tie term regularizes the
 future plan. There is no third optimization stage, target-range CLF switch,
-direct nominal-feedback command, inherited slack budget, enlarged input box or
-executable backup. When the shifted problem is infeasible inside the
-linearization trust region, it is solved once more from a fresh potential-field
-rollout; any other failure reports no solution.
+direct nominal-feedback command, inherited slack budget or executable backup.
+A primary problem infeasible inside the trust region is re-solved on the same
+linearization with the trust scale doubled until feasible (at most
+`trustExpansionMaximum = 16`); a shifted plan still infeasible is then solved from
+a fresh potential-field rollout in the same way. Any other failure reports no
+solution.
 
 The implementation now consumes timestamped NRMM observer enclosures. It
 propagates constant target-parameter sets analytically and ego error boxes
@@ -270,11 +272,15 @@ current-state rows supply the unavoidable lower bound
 
     J_lower = max(0, -min(g(x_current))).
 
-A primary value above this lower bound is issued as positive slack. Only when
-the solver certifies the shifted primary problem primal infeasible is one fresh
-potential-field model solved. Positive slack, numerical stalls and a CLF stage
-without a result are reported, not re-solved. There is no enlarged input box and
-no second fresh model. A finite array from a failed
+A primary value above this lower bound is issued as positive slack. When the
+solver certifies a primary problem primal infeasible, the input trust scale is
+doubled on the same linearization (the last step clamped to
+`trustExpansionMaximum`, which covers the full braking-ratio range) until the
+problem is feasible. If the shifted plan is still infeasible, one fresh
+potential-field model is solved with the same expansion, starting again from
+the estimated scale. The expansion does not change the online trust estimate.
+Positive slack, numerical stalls and a CLF stage without a result are reported,
+not re-solved. There is no second fresh model. A finite array from a failed
 primary solve is not a valid PCBF optimum.
 
 On the selected model the single CLF requirement is

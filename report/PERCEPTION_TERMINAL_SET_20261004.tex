@@ -141,4 +141,24 @@ holds 26 and 110 with \texttt{clfNoNumericalResult}; the broader rule had
 recovered the first and stopped the second. With the noisy estimator 3 of 14
 recover, the same cases as before. No collision occurred
 (\path{campaign-metrics-infeasible-restart.csv}).
+
+\section{Addendum 3: trust-region expansion until feasible}
+At the user's direction, a primary problem certified infeasible inside the
+trust region is now re-solved on the same linearization with the trust scale
+doubled until it becomes feasible, up to 16. If the shifted plan is still
+infeasible at 16, the fresh rollout is expanded in the same way. The online
+trust estimate is unchanged. All 657 tests pass.
+
+With exact observations, 12 of 14 recover, as before. With the noisy estimator,
+2 of 14 recover (previously 3), and there are no collisions. 15-m/s
+turningCrossing now recovers; 8-m/s headOn and 15-m/s crossing no longer do.
+Two new failure types appear. 8-m/s headOn hits an invalid tire operating point
+at 3.95~s. 15-m/s curvedHeadOn has no usable anchor at 3.70~s: the previous
+plan cannot be rolled out on the nonlinear model.
+
+Before these failures the expansion reached 4 to 16 times the estimated scale.
+The plan's model innovation grew from 0.08 to 1.7~m. Issued inputs jumped: the
+braking ratio reached $-1.000$, and steering changed from 0.20 to $-0.82$~rad
+in one hold. The expanded problems are feasible on a linearization that is no
+longer accurate at that step (\path{campaign-metrics-trust-expansion.csv}).
 \end{document}

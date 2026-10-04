@@ -19,12 +19,13 @@ Each sample builds one nonlinear anchor: a potential-field rollout at startup,
 otherwise the shifted previous plan extended by path guidance. The rollout stops
 at the first node of the terminal set, between `horizonSteps` and
 `maximumHorizonSteps`. The anchor is linearized once; the PCBF stage minimizes
-prefix safety slack and the CLF stage follows. A shifted problem that is primal
-infeasible inside the linearization trust region is solved once more from a
-fresh potential-field rollout. The completed CLF result is
+prefix safety slack and the CLF stage follows. A primary problem that is primal
+infeasible inside the trust region is re-solved with the trust scale doubled
+until feasible (at most 16); a shifted plan still infeasible is solved once more
+from a fresh potential-field rollout in the same way. The completed CLF result is
 issued directly, without a nonlinear replay or agreement test. An unusable shift,
 or a frame still without a result, reports `noOptimizationSolution`. There is no
-enlarged input box, inherited slack budget or alternate controller. The input trust scale is estimated
+inherited slack budget or alternate controller. The input trust scale is estimated
 from the next posterior's plan innovation. Positive PCBF slack still denotes
 relaxation.
 
