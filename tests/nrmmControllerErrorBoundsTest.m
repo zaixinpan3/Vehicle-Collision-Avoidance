@@ -48,6 +48,20 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
                 end
             end
         end
+        function yawAndBodyVelocityShareTheSameRotationError(testCase)
+            [output,bound,input]=localVelocityFixture();output.egoYaw=0;
+            published=nrmmControllerErrorBounds(output,bound,input,testCase.Design);
+            generator=published.controllerErrorBound.generator;
+            % The inertial lateral-velocity Jacobian is [V, 1] on (yaw, vy).
+            jointRadius=sum(abs([0,0,10,0,1,0]*generator));
+            separateRadius=[0,0,10,0,1,0]*published.controllerStateErrorBound;
+            testCase.verifyLessThan(jointRadius,separateRadius/5);
+            for angle=linspace(-bound.yaw,bound.yaw,21)
+                truth=localRotation(angle).' * input.gnssVelocity;
+                residual=truth-output.egoBodyVelocity-generator(4:5,3)*angle/bound.yaw;
+                testCase.verifyLessThanOrEqual(abs(residual),sum(abs(generator(4:5,4:end)),2)+1e-12);
+            end
+        end
         function anExactNrmmTargetPublishesTheNrmmContract(testCase)
             published = localReconstruction(testCase.Design, [1.2; 0.03; 0]);
             motion = published.targetEstimate.predictionMotion;
@@ -106,6 +120,25 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             testCase.verifyFalse(any(isfield(estimate, ["targetSpeedErrorBound", "targetCourseErrorBound", ...
                 "targetSpeedRateErrorBound", "targetCurvatureInterval"])));
         end
+        function measurementHistoryAlsoTightensThePredictionParameterSet(testCase)
+            [~,~,~,output,bound,input]=localReconstruction(testCase.Design,[0;0;0]);
+            bound.targetComponents(2:3)=[30;10];
+            withoutHistory=nrmmControllerErrorBounds(output,bound,input,testCase.Design);
+            history=nrmmTargetHistory("initialize",testCase.Design.target.domain,0,1);
+            target=output.targetEstimate;
+            for time=-.5:.025:0
+                position=target.targetPositionInertial+time*target.targetVelocityInertial;
+                history=nrmmTargetHistory("measure",history,time,position,[.04;.04]);
+            end
+            bound.targetHistory=history;
+            withHistory=nrmmControllerErrorBounds(output,bound,input,testCase.Design);
+            first=withoutHistory.targetEstimate.predictionErrorSet;
+            second=withHistory.targetEstimate.predictionErrorSet;
+            testCase.verifyTrue(second.available);
+            testCase.verifyLessThan(second.courseRadius,.15);
+            testCase.verifyLessThan(diff(second.speedInterval),diff(first.speedInterval));
+            testCase.verifyFalse(second.futureMeasurementsAssumed);
+        end
         function staleVelocityRequiresAnAccelerationEnvelope(testCase)
             [output, bound, input] = localVelocityFixture();
             output.stateTime = 0.1;
@@ -129,7 +162,7 @@ function [output, bound, input] = localVelocityFixture()
     input = struct("time",0,"yawRate",0,"gnssPosition",[0;0],"gnssVelocity",[10;0]);
 end
 
-function [published, actualError, truth] = localReconstruction(design, geometry)
+function [published, actualError, truth, output, bound, input] = localReconstruction(design, geometry)
     yaw = geometry(1);
     estimatedYaw = yaw+geometry(2);
     rotation = localRotation(yaw);

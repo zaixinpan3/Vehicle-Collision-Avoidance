@@ -6,7 +6,7 @@ classdef predictiveSafetyGeometry
             % Relative target balls are therefore used in the frame frozen at
             % this sample; path and CLF rows still use the full ego error box.
             uncertainty=struct('specified',ego.uncertaintySpecified, ...
-                'egoGenerator',diag(ego.errorBounds),'collisionGenerator',diag(ego.errorBounds), ...
+                'egoGenerator',ego.errorGenerator,'collisionGenerator',ego.errorGenerator, ...
                 'target',[],'relativeFrame',false);
             if isempty(observation),return;end
             set=observation.predictionErrorSet;
@@ -55,7 +55,7 @@ classdef predictiveSafetyGeometry
                 'accelerationRadius',max(abs(set.accelerationInterval-q(5))), ...
                 'curvatureRadius',max(abs(set.curvatureInterval-curvature)), ...
                 'sideslipRadius',max(abs(asin(set.curvatureInterval*q(7))-q(6))));
-            uncertainty.collisionGenerator=diag([zeros(3,1);ego.errorBounds(4:6)]);
+            uncertainty.collisionGenerator(1:3,:)=0;
             uncertainty.relativeFrame=true;uncertainty.specified=true;
         end
 
@@ -76,6 +76,45 @@ classdef predictiveSafetyGeometry
                 +(curvature+errorSet.curvatureRadius)*arcError);
             tube.yawRadius=min(pi,tube.courseRadius+errorSet.sideslipRadius);
             tube.speedRadius=errorSet.speedRadius+errorSet.accelerationRadius*abs(time);
+        end
+
+        function support = targetPositionSupport(q,errorSet,time,normal)
+            % Directional enclosure of the same constant-parameter family.
+            % A speed error moves principally along the target path; a ball
+            % would incorrectly charge its full size in every normal.
+            support=zeros(size(normal,1),1);
+            if isempty(errorSet),return;end
+            arc=q(4)*time+.5*q(5)*time^2;kappa=sin(q(6))/q(7);
+            ds=errorSet.speedRadius*abs(time)+.5*errorSet.accelerationRadius*time^2;
+            dg=errorSet.courseRadius;dk=errorSet.curvatureRadius;
+            course=q(3)+q(6);theta=course+kappa*arc;
+            point=predictiveSafetyGeometry.predictTarget(q,time);
+            displacement=point(1:2)-q(1:2);
+            courseDerivative=[-displacement(2);displacement(1)];
+            a=kappa*arc;
+            if abs(a)<1e-3
+                % Integrate tau*J*t(course+kappa*tau) without division by a
+                % vanishing curvature. The retained series has O(a^5) error.
+                realPart=-a/3+a^3/30-a^5/840;
+                imaginaryPart=.5-a^2/8+a^4/144-a^6/5760;
+                curvatureDerivative=arc^2*[cos(course),-sin(course);sin(course),cos(course)] ...
+                    *[realPart;imaginaryPart];
+                seriesPadding=abs(arc)^2*abs(a)^7/45360;
+            else
+                curvatureDerivative=(arc*predictiveSafetyGeometry.direction(theta)-displacement)/kappa;
+                seriesPadding=0;
+            end
+            % Taylor remainder in (course, curvature), followed by the arc
+            % endpoint perturbation. Bounds hold also for negative arc length.
+            length=abs(arc);
+            remainder=.5*length*dg^2+.5*length^2*dg*dk+length^3*dk^2/6 ...
+                +ds*(dg+length*dk)+.5*(abs(kappa)+dk)*ds^2+dk*seriesPadding;
+            support=errorSet.positionRadius*vecnorm(normal,2,2) ...
+                +abs(normal*predictiveSafetyGeometry.direction(theta))*ds ...
+                +abs(normal*courseDerivative)*dg+abs(normal*curvatureDerivative)*dk ...
+                +vecnorm(normal,2,2)*remainder;
+            ball=predictiveSafetyGeometry.targetErrorTube(q,errorSet,time);
+            support=min(support,vecnorm(normal,2,2)*ball.positionRadius);
         end
 
         function [heading,speed,side,risk] = potentialGuidance(x,lane,epoch,time,cfg,side)
@@ -238,6 +277,26 @@ classdef predictiveSafetyGeometry
             assert(min(certificate.lambda)>=0 && norm(certificate.normal)<=1+1e-8 && abs(gap)<=1e-6);
             rows=struct('value',values,'jacobian',jacobian,'normal',certificate.normal, ...
                 'lambda',certificate.lambda,'distance',min(values),'exitFlag',1,'dualityGap',gap);
+        end
+
+        function rows = supportLinearization(poseE,shapeE,poseT,shapeT)
+            rows=predictiveSafetyGeometry.dualLinearization(poseE,shapeE,poseT,shapeT);
+            if norm(rows.normal)>0,return;end
+            % Ordinary distance has a zero optimal dual at overlap. Select
+            % another feasible dual on the least-penetrated rectangle axis.
+            % Its negative support gap retains a useful escape derivative;
+            % requiring that gap to be positive is still sufficient separation.
+            re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
+            rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
+            centers=poseE(1:2)+re*shapeE(3:4)-poseT(1:2)-rt*shapeT(3:4);
+            axes=[re,rt];offset=centers.'*axes;
+            gap=abs(offset)-shapeE(1:2).'*abs(re.'*axes)-shapeT(1:2).'*abs(rt.'*axes);
+            [~,index]=max(gap);orientation=1;if offset(index)<0,orientation=-1;end
+            normal=orientation*axes(:,index);body=rt.'*normal;
+            lambda=[max(body,0);max(-body,0)];
+            [values,jacobian]=predictiveSafetyGeometry.fixedDualRows(poseE,shapeE,poseT,shapeT,lambda);
+            rows.value=values;rows.jacobian=jacobian;rows.normal=normal;rows.lambda=lambda;
+            rows.dualityGap=rows.distance-min(values);
         end
 
         function [values,jacobian] = fixedDualRows(poseE,shapeE,poseT,shapeT,lambda)

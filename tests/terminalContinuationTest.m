@@ -90,6 +90,55 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             testCase.verifyError(@()terminalContinuation.control(y,seed.epochIndex,seed), ...
                 'collisionAvoidanceController:outsideContinuation');
         end
+        function feedbackCoreAdmitsTheRequestedMeanAlongsideEndpointError(testCase,curvature)
+            [seed,cfg]=localSeed(curvature);
+            observer=diag([1e-4,1e-4,1e-5,1e-4,1e-4,1e-5]);
+            endpoint=diag([.001,.001,.0001,.002,.001,.0001,.0001,.0001]);
+            deviation=[.01;-.002;.001;.0001;-.0001];
+            requested=norm(seed.quotientFactor*deviation);
+            [expanded,domainMargin]=terminalContinuation.feedbackCore(seed,observer,endpoint,cfg,deviation);
+            reference=terminalContinuation.referenceAt(expanded,expanded.epochIndex);
+            rotation=[cos(reference(3)),-sin(reference(3));sin(reference(3)),cos(reference(3))];
+            member=reference+blkdiag(rotation,eye(6))*[seed.poseGain;eye(5)]*(.99*deviation);
+            testCase.verifyGreaterThan(requested,seed.radius);
+            testCase.verifyGreaterThanOrEqual(expanded.radius,requested-1e-12);
+            testCase.verifyLessThan(terminalContinuation.membership(member,expanded.epochIndex,expanded),0);
+            testCase.verifyGreaterThanOrEqual(expanded.feedbackTube.radius,sum(abs(endpoint),2));
+            testCase.verifyTrue(all(isfinite(domainMargin)));
+        end
+        function rebuildingTheFeedbackCoreDoesNotAccumulateItsRadius(testCase,curvature)
+            [seed,cfg]=localSeed(curvature);
+            observer=diag([1e-4,1e-4,1e-5,1e-4,1e-4,1e-5]);
+            endpoint=zeros(8,1);deviation=[.01;zeros(4,1)];
+            [first,firstMargin]=terminalContinuation.feedbackCore(seed,observer,endpoint,cfg,deviation);
+            [second,secondMargin]=terminalContinuation.feedbackCore(first,observer,endpoint,cfg,deviation);
+            testCase.verifyEqual(second.radius,first.radius,AbsTol=1e-12);
+            testCase.verifyEqual(second.errorBound,first.errorBound,AbsTol=1e-12);
+            testCase.verifyEqual(second.samplePositionBound,first.samplePositionBound,AbsTol=1e-12);
+            testCase.verifyEqual(secondMargin,firstMargin,AbsTol=1e-12);
+        end
+        function aOneDimensionalPosteriorDoesNotInflateUnexcitedDirections(testCase)
+            [seed,cfg]=localSeed(0);
+            cfg.model.brakingRatioRateMaximum=Inf;
+            observer=[0;0;0;.001;0;0];
+            endpoint=[.01;0;0;.001;0;0;0;0];
+            [expanded,domainMargin]=terminalContinuation.feedbackCore(seed,observer,endpoint,cfg);
+            testCase.verifyGreaterThanOrEqual(domainMargin,zeros(size(domainMargin)));
+            testCase.verifyGreaterThanOrEqual(expanded.radius,seed.radius-1e-12);
+            testCase.verifyGreaterThanOrEqual(expanded.feedbackTube.radius(4),.001);
+        end
+        function zeroPosteriorErrorRestoresTheOriginalNominalCore(testCase,curvature)
+            [seed,cfg]=localSeed(curvature);
+            observer=diag([1e-4,1e-4,1e-5,1e-4,1e-4,1e-5]);
+            expanded=terminalContinuation.feedbackCore(seed,observer,zeros(8,1),cfg,[.01;zeros(4,1)]);
+            [restored,domainMargin]=terminalContinuation.feedbackCore(expanded,zeros(6,1),zeros(8,1),cfg);
+            testCase.verifyEqual(restored.radius,seed.radius,AbsTol=0);
+            testCase.verifyEqual(restored.errorBound,seed.errorBound,AbsTol=0);
+            testCase.verifyEqual(restored.samplePositionBound,seed.samplePositionBound,AbsTol=0);
+            testCase.verifyEqual(restored.sampleHeadingBound,seed.sampleHeadingBound,AbsTol=0);
+            testCase.verifyFalse(isfield(restored,'feedbackTube'));
+            testCase.verifyEmpty(domainMargin);
+        end
         function aDeadlineCannotAuthorizeAnUnoptimizedInitialization(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=1e-12;
             target=[];

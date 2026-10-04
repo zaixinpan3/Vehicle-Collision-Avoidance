@@ -50,6 +50,13 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             assert(~isempty(initialTarget),'The NRMM adapter requires a target truth trajectory.');
             estimatorConfiguration.sensor.radar.rangeMaximum=cfg.collision.encounterRangeMeters;
             estimatorConfiguration.observer.ego.yaw.rearAxleDistance=cfg.vehicle.lr;
+            % The known plant bounds yaw acceleration by the axle friction
+            % capacities. This permits gyro-correlated radar transport;
+            % independent yaw errors at every historical sample lose that
+            % information and greatly overstate target velocity uncertainty.
+            tire=modifiedFialaTire.parameters(cfg);
+            estimatorConfiguration.observer.ego.domain.yawAccelerationMaximum= ...
+                [cfg.vehicle.lf,cfg.vehicle.lr]*tire.longitudinalForceScale/cfg.vehicle.Iz;
             if strlength(options.ResumeFrom)==0
                 initializationTimer=tic;
                 estimatorContext=nrmmEstimatorControllerAdapter("initialize",estimatorConfiguration,ego, ...

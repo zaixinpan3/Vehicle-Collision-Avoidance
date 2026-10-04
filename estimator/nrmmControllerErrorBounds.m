@@ -37,6 +37,27 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
     output.controllerErrorBoundSource = "nrmm-state-time-enclosure";
     output.controllerErrorBound = localCertificate( ...
         "ego-state-v1", output.stateTime, egoBounds, egoAvailable, bound.scope);
+    if egoAvailable && isfield(output,'egoYaw') && isfield(output,'egoBodyVelocity') ...
+            && isfield(input,'gnssVelocity')
+        noise=design.sensors.velocityNoiseMaximum;
+        if age>0,noise=noise+bound.holdBounds.acceleration*age;end
+        if isfinite(noise)
+            angle=output.egoYaw;rotation=[cos(angle),sin(angle);-sin(angle),cos(angle)];
+            velocity=rotation*input.gnssVelocity(:);
+            remainder=norm(velocity)*bound.yaw^2/2;
+            offset=abs(velocity-output.egoBodyVelocity(:))+remainder;
+            generator=zeros(6,8);
+            generator(1:3,1:3)=diag(egoBounds(1:3));
+            % The same yaw error rotates the inferred body velocity in the
+            % opposite direction. Boxing these coordinates independently
+            % loses the near cancellation in inertial velocity and course.
+            generator(4:5,3)=[velocity(2);-velocity(1)]*bound.yaw;
+            generator(4:5,4:5)=noise*eye(2);
+            generator(4:5,6:7)=diag(offset);generator(6,8)=egoYawRate;
+            output.controllerErrorBound.generator=generator;
+            output.controllerErrorBound.generatorConvention="commonPoseColumnsFirst";
+        end
+    end
 
     if isempty(output.targetEstimate)
         return;
@@ -125,8 +146,28 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         end
         parameters.speedRateErrorBound = parameters.speedRateErrorBound ...
             + abs(rawAcceleration-target.targetScalarAcceleration);
+        relativeCourseRadius = pi;
+        if components(2)<speed,relativeCourseRadius=asin(components(2)/speed);end
+        if isfield(output.targetEstimate,'measurementHistoryEnclosure') && available
+            % The history and observer enclose the same current state. Use
+            % their intersection for prediction as well as publication.
+            historyParameters = nrmmTargetParameterErrorBounds( ...
+                target.targetVelocityInertial,target.targetAccelerationInertial, ...
+                norm(values(3:4)),norm(values(5:6)),0);
+            historyParameters.speedRateErrorBound = historyParameters.speedRateErrorBound ...
+                +abs(rawAcceleration-target.targetScalarAcceleration);
+            parameters.speedErrorBound = min(parameters.speedErrorBound,historyParameters.speedErrorBound);
+            parameters.speedRateErrorBound = min(parameters.speedRateErrorBound,historyParameters.speedRateErrorBound);
+            parameters.courseErrorBound = min(parameters.courseErrorBound,historyParameters.courseErrorBound);
+            parameters.curvatureInterval = [max(parameters.curvatureInterval(1),historyParameters.curvatureInterval(1)); ...
+                min(parameters.curvatureInterval(2),historyParameters.curvatureInterval(2))];
+            historyCourse = min(historyParameters.courseErrorBound,values(7)+sideslipRadius);
+            % Convert an inertial course enclosure to the uncertain ego
+            % frame. Omitting ego yaw here would understate relative error.
+            relativeCourseRadius = min(relativeCourseRadius,historyCourse+bound.yaw);
+        end
         output.targetEstimate.predictionErrorSet = localPredictionSet( ...
-            output,target,components,parameters,domain,available);
+            output,target,components,parameters,domain,available,relativeCourseRadius);
         if ~available
             parameters = struct("speedErrorBound", Inf, "courseErrorBound", Inf, ...
                 "speedRateErrorBound", Inf, "curvatureInterval", [-Inf; Inf]);
@@ -138,19 +179,17 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
     end
 end
 
-function set = localPredictionSet(output,target,components,parameters,domain,available)
+function set = localPredictionSet(output,target,components,parameters,domain,available,courseRadius)
     curvatureLimit = sin(domain.sideslipMaximum)/domain.rearAxleDistance;
     speed = norm(target.targetVelocity);
-    speedInterval = [max(domain.speedMinimum,speed-components(2)); ...
-        min(domain.speedMaximum,speed+components(2))];
+    speedInterval = [max(domain.speedMinimum,speed-parameters.speedErrorBound); ...
+        min(domain.speedMaximum,speed+parameters.speedErrorBound)];
     accelerationInterval = [max(-domain.scalarAccelerationMaximum, ...
         target.targetScalarAcceleration-parameters.speedRateErrorBound); ...
         min(domain.scalarAccelerationMaximum, ...
         target.targetScalarAcceleration+parameters.speedRateErrorBound)];
     curvatureInterval = [max(-curvatureLimit,parameters.curvatureInterval(1)); ...
         min(curvatureLimit,parameters.curvatureInterval(2))];
-    courseRadius = pi;
-    if components(2) < speed,courseRadius = asin(components(2)/speed);end
     yaw = NaN;
     if isfield(output,'egoYaw'),yaw = output.egoYaw;end
     intervals = [speedInterval,accelerationInterval,curvatureInterval];

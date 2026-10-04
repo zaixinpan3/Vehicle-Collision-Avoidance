@@ -1,0 +1,145 @@
+{
+  "sourceGeneration": "candidate20-20261003",
+  "referenceCampaign": "attempt20",
+  "repository": "/home/zai/Downloads/ResearchProjects/collisionAvoidance",
+  "frozenSourceRoot": "/home/zai/.cache/collisionAvoidance/feedback-20261003/authority-source",
+  "repositoryHeadAtPackaging": "504f9f7823ba9cc0b32dc6df51a0e81628c62f7f",
+  "scope": "The 15 changed MATLAB files analyzed and tested for this task. Theory/report prose is outside the simulation-source hash scope.",
+  "allChangedMatlabFilesMatchFrozenSource": false,
+  "files": [
+    {
+      "file": "config/collisionAvoidanceControllerConfig.m",
+      "frozenSourceSha256": "1a39c2236571f020c042fcd6bb96dd0b597d7a30b48ace69ea7d32f0fd27f911",
+      "repositorySha256": "1a39c2236571f020c042fcd6bb96dd0b597d7a30b48ace69ea7d32f0fd27f911",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "controller/collisionAvoidanceController.m",
+      "frozenSourceSha256": "2f2b0eccd4662d7bc0e2f31574d316465fb8641d38269c40a5b22ed2e151f057",
+      "repositorySha256": "2f2b0eccd4662d7bc0e2f31574d316465fb8641d38269c40a5b22ed2e151f057",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "controller/predictiveSafetyGeometry.m",
+      "frozenSourceSha256": "617059c908e4a155da93d3b97825b7ed036c8eb112005a0e7afe2b1128c55988",
+      "repositorySha256": "617059c908e4a155da93d3b97825b7ed036c8eb112005a0e7afe2b1128c55988",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "controller/readControllerInputs.m",
+      "frozenSourceSha256": "90ed300beba67a0f034aeee21379d480acc7c196da0a098188b6ae7ed9f2ebf6",
+      "repositorySha256": "90ed300beba67a0f034aeee21379d480acc7c196da0a098188b6ae7ed9f2ebf6",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "controller/solvePredictiveControl.m",
+      "frozenSourceSha256": "6332d44900e7cf18856236a570b5586aa44ade1a5c20226953ff64e9efc23c82",
+      "repositorySha256": "aa00af775bee6a83db6778e128ea93c40197f1f949ecb534b40fbf4b201795a1",
+      "matchesFrozenSource": false
+    },
+    {
+      "file": "controller/terminalContinuation.m",
+      "frozenSourceSha256": "534b1c57193811b0c7a7b5296900eda177f22b07b42d4b929eb46d125461beff",
+      "repositorySha256": "534b1c57193811b0c7a7b5296900eda177f22b07b42d4b929eb46d125461beff",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "estimator/nrmmControllerErrorBounds.m",
+      "frozenSourceSha256": "93cf7abeb7f96542a607da16d06479d0518fdd7604c337fbaf1ab7088bd39afc",
+      "repositorySha256": "93cf7abeb7f96542a607da16d06479d0518fdd7604c337fbaf1ab7088bd39afc",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "scripts/analyzePerceptionRangeFailures.m",
+      "frozenSourceSha256": "aaa6da930c4ea8c4ba9a2f43fec6ec8398121dbf889c5a962032d4d86aaa8948",
+      "repositorySha256": "aaa6da930c4ea8c4ba9a2f43fec6ec8398121dbf889c5a962032d4d86aaa8948",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "scripts/nrmmEstimatorControllerAdapter.m",
+      "frozenSourceSha256": "2276a7fb278f1a87579d0c61ea2a841d5400f6c5b773563fd99b66dc1a789b72",
+      "repositorySha256": "2276a7fb278f1a87579d0c61ea2a841d5400f6c5b773563fd99b66dc1a789b72",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "frozenSourceSha256": "a5047c80e64e9e0e593d208bf187ccfa66b7b7f1dfe5d96d467129952c858646",
+      "repositorySha256": "a5047c80e64e9e0e593d208bf187ccfa66b7b7f1dfe5d96d467129952c858646",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "tests/nrmmControllerErrorBoundsTest.m",
+      "frozenSourceSha256": "abe30af27520ff0e4a138f8e3461edbfc95b2184c82eb51c961f5781e0769e60",
+      "repositorySha256": "abe30af27520ff0e4a138f8e3461edbfc95b2184c82eb51c961f5781e0769e60",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "tests/observerPredictiveControlTest.m",
+      "frozenSourceSha256": "d4a38246191bcca0ec81f7e63f7223122034a1dd2d39c080d4d395b5d83ee5d7",
+      "repositorySha256": "d4a38246191bcca0ec81f7e63f7223122034a1dd2d39c080d4d395b5d83ee5d7",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "tests/ordinaryDistanceDualTest.m",
+      "frozenSourceSha256": "fa5bc9c472c2f47d091bace8641c1008c6c837805f504c3028fbdb4860b31213",
+      "repositorySha256": "fa5bc9c472c2f47d091bace8641c1008c6c837805f504c3028fbdb4860b31213",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "tests/terminalContinuationTest.m",
+      "frozenSourceSha256": "d94353977a5abb9fed1fe731331abd977c3591ef7ce68d3805aa25da67a51982",
+      "repositorySha256": "d94353977a5abb9fed1fe731331abd977c3591ef7ce68d3805aa25da67a51982",
+      "matchesFrozenSource": true
+    },
+    {
+      "file": "tests/twoStagePredictiveControlTest.m",
+      "frozenSourceSha256": "a04d775094bf33a662e0faebc1522e9a5b5fff8cf79a02e4b6145809bd98c5f8",
+      "repositorySha256": "a04d775094bf33a662e0faebc1522e9a5b5fff8cf79a02e4b6145809bd98c5f8",
+      "matchesFrozenSource": true
+    }
+  ],
+  "exclusions": [
+    "Unrelated pre-existing edits",
+    "solver nested repository and generated binaries",
+    "literature PDFs",
+    "external archive records"
+  ],
+  "externalSolver": {
+    "repositoryPath": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver",
+    "gitHead": "504f9f7823ba9cc0b32dc6df51a0e81628c62f7f",
+    "binaryPath": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/controller/predictiveConicSolverMex.mexa64",
+    "binarySha256": "4f165b3efc8044d8d0c1610ee25357d5fc976a4b2b39e30bbb95465214bf6756",
+    "scope": "Runtime dependency provenance only; the nested solver repository and binary are excluded from the project commit."
+  },
+  "postCampaignChanges": "Only solvePredictiveControl differs: explanatory comments and explicit rawRadius>0 division guard replace an eps denominator in brake-gain projection. The physical campaign uses the recorded immutable source; regression checks cover the final working implementation. All other algorithm files match.",
+  "artifacts": [
+    {
+      "path": "report/OBSERVER_FEEDBACK_REPAIR_20261003/configuration.json",
+      "sha256": "d3128aa5f400343d9703e3205310891d27b1f2bfe4fc1189d71a9ecd126ff1cf"
+    },
+    {
+      "path": "report/OBSERVER_FEEDBACK_REPAIR_20261003/experiments.json",
+      "sha256": "2ae0859418c79ff03c80ed7659d4bd863113e3a58eca96609bd4408165db776d"
+    },
+    {
+      "path": "report/OBSERVER_FEEDBACK_REPAIR_20261003/failure-probes.json",
+      "sha256": "ba3a9d9cfef0e6a7e8501c6c3fcd4fc3867f55e3d9ae800f93dc33180d630e29"
+    },
+    {
+      "path": "report/OBSERVER_FEEDBACK_REPAIR_20261003/scenario-table.tex",
+      "sha256": "06a947d18c22824fd7649653d20856b183ffe778b5abb95d7251deaa9dd1d590"
+    },
+    {
+      "path": "report/OBSERVER_FEEDBACK_REPAIR_20261003/summary.tex",
+      "sha256": "a5406f2ccb6401bbbf7e45451fc8b9231f07cfdc1689920f1f9c9351bb2cda07"
+    },
+    {
+      "path": "report/OBSERVER_FEEDBACK_REPAIR_20261003/validation.json",
+      "sha256": "6606f15d5922df828742f0825c3b562d3ad1d4628212b721f920228ac82874ff"
+    },
+    {
+      "path": "report/OBSERVER_FEEDBACK_REPAIR_20261003/variant-comparisons.json",
+      "sha256": "dd7b08c325b7e8f10361927c1c42d8b2ed2da4d138810eb9b11e68a1fc75227f"
+    }
+  ]
+}

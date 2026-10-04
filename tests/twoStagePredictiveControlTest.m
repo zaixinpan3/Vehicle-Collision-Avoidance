@@ -177,8 +177,9 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             target=struct('targetPositionInertial',[0;0], ...
                 'targetVelocityInertial',[40;0],'targetYawInertial',0);
             [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            % A nonzero feasible dual retains penetration depth at overlap.
             testCase.verifyEqual(problem.metadata.search.primaryLowerBound, ...
-                cfg.collision.safetyMarginMeters,AbsTol=1e-6);
+                cfg.vehicle.width+cfg.collision.safetyMarginMeters,AbsTol=1e-6);
             testCase.verifyGreaterThan(problem.metadata.search.primaryOptimum,0);
             testCase.verifyTrue(problem.metadata.search.stages(1).numericalSolve);
             testCase.verifyGreaterThan(problem.solution.safety,0);

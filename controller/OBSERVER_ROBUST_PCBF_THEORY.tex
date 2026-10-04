@@ -841,39 +841,78 @@ vanishes and zero CLF slack remains feasible in the recovery domain.
 \end{minipage}}
 \end{center}
 
-\begin{longtable}{p{0.31\linewidth}p{0.62\linewidth}}
+\subsection{Experimental implementation and remaining certification gap}
+The current implementation tests a feedback-aware approximation of the ideal
+construction above. It does not enforce all assumptions of the recursive
+feasibility theorem. In particular, a newly published target acceleration or
+sideslip estimate may change at every sample; each prediction freezes those
+new estimates, without requiring a nested information update.
+
+\begin{longtable}{p{0.27\linewidth}p{0.66\linewidth}}
 \toprule
-Existing artifact & What is and is not supplied today \\\midrule
+Implemented component & Behavior and qualification \\\midrule
 \endhead
-\texttt{nrmmObserverCertificate.m}, \texttt{nrmmPositionErrorBound.m}
-& Comparison/certificate and sampled current enclosures under their declared
-premises. A continuous-core certificate is not automatically a sampled
-exponential certificate or a prediction tube. \\
-\texttt{nrmmControllerErrorBounds.m}
-& Current state/parameter radii. Relative joint sets should be preserved rather
-than unnecessarily converted to two independent inertial boxes. \\
-Current MPC state and target parsing
-& Does not implement \eqref{eq:intersection}; exact-epoch target reset behavior
-must be replaced by a compatible information update for observer integration. \\
-Current RTI and distance rows
-& Nominal affine rows and point-rollout disagreement thresholds. Need validated
-\eqref{eq:tube}, \eqref{eq:taylor}, \eqref{eq:robustRow} and whole-hold coverage. \\
-Current terminal core and inherited slack
-& Nominal numerical continuation, not yet \eqref{eq:terminal} or the inner
-approximation closure in Assumption~\ref{ass:shift}. \\
-Current one quadratic CLF
-& Correct function structure. Need the robust row/supply and a vanishing tie
-or exact slack priority for the recovery result proved here. \\
+Observer publication
+& A joint current ego generator retains yaw/body-velocity correlation from
+GNSS. Measurement-history enclosures tighten target parameter intervals.
+Their validity still depends on the declared observer and sensor premises. \\
+Prediction geometry
+& The common initial rigid pose is retained through propagation and cancelled
+only in relative collision geometry. Directional target supports propagate
+constant-parameter uncertainty without assuming future target measurements. \\
+Ego feedback tube
+& Stagewise Riccati gains propagate correlated generators, input uncertainty
+and input-increment uncertainty. Future posterior errors use the current
+generator as a frozen experimental envelope, not a proved future bound. \\
+Terminal continuation
+& An affine invariant zonotope contains endpoint uncertainty and a nominal
+mean neighborhood. Its disturbance box has a nominal-core floor to avoid
+degenerate scaling. Nonlinear remainder closure remains unproved. \\
+Safety and one CLF
+& With nonzero uncertainty, mean collision rows are hard and uncertainty
+tightenings may use slack throughout the finite horizon. The same quadratic
+CLF has uncertainty padding and a tracking-error-scaled proximal tie. \\
+RTI admission
+& One model is built per shifted or fresh APF anchor. Model agreement concerns
+the issued hold; a damped step reuses the model. This does not certify the
+nonlinear suffix or continuous-time robust separation. \\
 \bottomrule
 \end{longtable}
 
-The accompanying \texttt{scripts/verifyObserverRobustConnection.m} checks
-the derived identities and decisive counterexamples on finite numerical
-instances. It does not certify Lipschitz/remainder constants for every Fiala
-trajectory, a robust terminal set for the fourteen scenarios, deterministic
-sensor amplitude bounds, or a runtime deadline. Those are numerical/model
-certification and controller-integration tasks. No existing collision or
-recovery simulation result is relabelled as an output-feedback robust result.
+Writing $d_i=x_i-\bar x_i$ and $\varepsilon_i=x_i-\hat x_i$, the implemented
+affine feedback propagation is
+\[
+ d_{i+1}=(A_i+B_iK_i)d_i-B_iK_i\varepsilon_i.
+\]
+At the current node $d_0=\varepsilon_0$ and the issued input is known, giving
+$d_1=A_0d_0$. The code preserves this cancellation. Later posterior errors are
+allowed to vary independently inside the frozen envelope. Validated nonlinear
+remainders would still be required to promote this propagation to
+\eqref{eq:tube}.
+
+For a brake-gain row $k_i$, its input radius is
+$r_i=\|[k_iG_i,-k_iE]\|_1$. The available symmetric input allowance at the
+anchor is $a_i=\max\{0,\min(u_{\max}-\bar u_i,\bar u_i-u_{\min})\}$.
+The implementation uses $\alpha_i k_i$ with
+$\alpha_i=\min\{1,a_i/r_i\}$ (one when $r_i=0$), the largest radial gain
+compatible with that allowance. State uncertainty is propagated again using
+this gain; the error set is never truncated. This avoids a self-contradictory
+input interval but does not prove stability of all such finite-horizon gains.
+
+If the nonlinear anchor is feasible in the current affine problem after its
+uncertainty slacks are assigned, their sum supplies a conditioned safety
+budget and the controller directly optimizes CLF slack. Otherwise it solves
+the primary restoration problem. This budget is an achieved feasible upper
+bound, not $V_B^*$, and changing observer sets do not establish cross-sample
+monotonicity. Positive uncertainty slack explicitly forfeits a hard robust
+collision certificate; even hard mean rows concern the sampled affine model.
+
+Thus the implementation is an empirical output-feedback controller with
+uncertainty-aware planning, not an implementation of every premise of the
+theorem. The finite identity checks in
+\texttt{verifyObserverRobustConnection.m} do not establish global
+Fiala remainder bounds, a nonlinear robust terminal invariant set, or a
+runtime deadline. Collision and recovery experiments must retain that scope.
 
 \begin{thebibliography}{9}
 \bibitem{Sharma} G. Sharma, H. Alai, and R. Rajamani,

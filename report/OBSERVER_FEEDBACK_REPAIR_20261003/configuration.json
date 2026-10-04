@@ -1,0 +1,197 @@
+{
+  "sourceGeneration": "candidate20-20261003",
+  "referenceCampaign": "attempt20",
+  "experimentEntryPoint": "runPotentialFieldCampaign",
+  "scenarioDriver": "runNonlinearPredictiveSafetyValidation",
+  "estimatorConfigurationEntryPoint": "estimatorControllerIntegrationConfig",
+  "sourceRoot": "/home/zai/.cache/collisionAvoidance/feedback-20261003/authority-source",
+  "command": "runPotentialFieldCampaign(root, outputDirectory, 2000, EstimatorConfiguration=c), with c=estimatorControllerIntegrationConfig(); c.randomSeed=20261003",
+  "randomSeed": 20261003.0,
+  "referenceSpeedsMetersPerSecond": [
+    8,
+    15
+  ],
+  "scenarioNames": [
+    "headOn",
+    "acceleratingHeadOn",
+    "brakingLead",
+    "crossing",
+    "turningCrossing",
+    "curvedHeadOn",
+    "curvedCrossing"
+  ],
+  "controllerPrefixStepsBySpeed": {
+    "8": 8,
+    "15": 16
+  },
+  "framesObservationCap": 2000,
+  "recoveryDwellSeconds": 1,
+  "sampleTimeSeconds": 0.05,
+  "perceptionRadiusMeters": 50,
+  "requestedSampledCollisionMarginMeters": 0.2,
+  "roadConstraintsEnforced": false,
+  "maximumLateralDeviationMeters": 10,
+  "targetTruthContract": "fixed initial constant-A/constant-beta trajectory, independent of estimated forecasts",
+  "failureCriteria": [
+    "groundTruthCollision",
+    "noSolvedControlOutput"
+  ],
+  "sensorNoise": {
+    "gnss": {
+      "positionNoiseMaximum": 0.04,
+      "velocityNoiseMaximum": 0.05
+    },
+    "imu": {
+      "accelerationNoiseMaximum": 0.03
+    },
+    "gyroscope": {
+      "yawRateNoiseMaximum": 0.0015
+    },
+    "radar": {
+      "positionNoiseMaximum": 0.04,
+      "rangeMaximum": 50,
+      "targetPublicationPolicy": "currentRadarVisibilityRequiredInternalTrackMayCoast",
+      "maximumTrackCoastDuration": 0.5
+    }
+  },
+  "noiseModel": "boundedUniform",
+  "estimatorRuntime": {
+    "samplePeriod": 0.0125,
+    "integrationStepMaximum": 0.0025,
+    "targetHistoryDuration": 2
+  },
+  "estimatorInitialization": {
+    "historyDuration": 0.5,
+    "minimumRadarSamples": 1,
+    "targetSpeedPrior": 15
+  },
+  "targetObserverDomain": {
+    "speedMinimum": 5,
+    "speedMaximum": 20,
+    "scalarAccelerationMaximum": 2,
+    "sideslipMaximum": 0.005,
+    "rearAxleDistance": 1.6,
+    "relativePositionMaximum": 50
+  },
+  "egoYawAccelerationMaximum": 12.259283606557375,
+  "controllerConfigurationSpeed8": {
+    "referenceSpeed": 8,
+    "controller": {
+      "sampleTime": 0.05,
+      "horizonSteps": 8,
+      "maximumHorizonSteps": 512,
+      "maximumLateralDeviationMeters": 10
+    },
+    "nonlinear": {
+      "integrationStep": 0.05,
+      "terminalRadius": 0.25,
+      "trustRadius": 0.5,
+      "maximumLinearizations": 2,
+      "predictionToleranceMeters": 0.01,
+      "statePredictionTolerance": 0.01,
+      "clfPredictionTolerance": 0.01,
+      "recoveryHorizonSeconds": 4
+    },
+    "initialization": {
+      "previewSeconds": 3,
+      "previewStepSeconds": 0.1,
+      "clearancePaddingMeters": 0.7,
+      "settlingSeconds": 1.5,
+      "brakingRatioLimit": 0.3,
+      "lateralAccelerationFraction": 0.98,
+      "frontForceFraction": 0.98,
+      "speedGain": 1
+    },
+    "collision": {
+      "safetyMarginMeters": 0.2,
+      "encounterRangeMeters": 50
+    },
+    "vehicle": {
+      "m": 1650,
+      "Iz": 1700,
+      "lf": 1.4,
+      "lr": 1.65,
+      "wheelbase": 3.05,
+      "length": 4.8,
+      "width": 1.9,
+      "rectangleOffset": [
+        0,
+        0
+      ],
+      "gravity": 9.81
+    },
+    "tire": {
+      "corneringStiffness": [
+        96000,
+        96000
+      ],
+      "frictionCoefficient": [
+        0.85,
+        0.85
+      ]
+    },
+    "actuation": {
+      "brakingRatioMinimum": -1,
+      "brakingRatioMaximum": 1
+    },
+    "roadLoad": {
+      "airDensity": 1.225,
+      "dragCoefficient": 0.3,
+      "frontalArea": 2.2,
+      "rollingCoefficient": 0.01,
+      "rollingSpeedCoefficient": 0,
+      "rollingQuarticCoefficient": 0,
+      "rollingTransitionSpeed": 0.5
+    },
+    "model": {
+      "speedMinimum": 0,
+      "speedMaximum": 18,
+      "scheduleSpeedFloor": 1,
+      "brakingRatioRateMaximum": null,
+      "lateralVelocityMaximum": 12,
+      "yawRateMaximum": 5
+    },
+    "clf": {
+      "lateralPositionErrorScale": 0.5,
+      "headingErrorScale": 0.1,
+      "speedErrorScale": 0.25,
+      "lateralVelocityErrorScale": 0.5,
+      "yawRateErrorScale": 0.2,
+      "frontWheelSteeringAngleWeight": 1,
+      "brakingRatioWeight": 1
+    },
+    "nominalClf": {
+      "lookaheadSeconds": 1.5,
+      "minimumLookaheadMeters": 8,
+      "courseGain": 1.5,
+      "yawRateGain": 10,
+      "lateralAccelerationFraction": 0.75,
+      "frontForceFraction": 0.9,
+      "speedGain": 0.5,
+      "brakingRatioLimit": 0.35,
+      "decreaseFraction": 0.5
+    },
+    "solver": {
+      "maxIterations": 400,
+      "timeLimitSeconds": 5,
+      "feasibilityTolerance": 1e-05,
+      "constraintTolerance": 1e-08,
+      "optimalityTolerance": 1e-07,
+      "lexicographicTieTolerance": 1e-05,
+      "clfTieTolerance": 0.0001
+    },
+    "target": {
+      "defaultLength": 4.8,
+      "defaultWidth": 1.9,
+      "rearAxleDistance": 1.6
+    }
+  },
+  "limitations": [
+    "Each new estimated target acceleration and sideslip is frozen within that frame prediction; posterior changes are allowed across frames.",
+    "Current posterior error is reused as a frozen future feedback-error envelope; no future measurement-contraction certificate or nonlinear RPI certificate is claimed.",
+    "Positive robustness-deficit slack does not certify robust collision avoidance, even when nominal affine collision rows are hard.",
+    "The 2000-hold cap bounds observation only. Reaching it without recovery is reported as recovery not observed, not proof of asymptotic failure.",
+    "Turning scenario truth can exceed the configured 0.005 rad observer sideslip domain; empirical trials continue. Variant17 separately uses 0.06 rad.",
+    "Periodic curved motion can produce another encounter after the first; it is not assumed to depart permanently."
+  ]
+}

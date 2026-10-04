@@ -32,7 +32,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(norm(largeInputs-smallInputs,'fro'),1e-5);
             testCase.verifyTrue(large.metadata.uncertaintyIncluded);
             testCase.verifyFalse(large.metadata.robustNonlinearSafetyCertified);
-            testCase.verifyEqual(large.metadata.safetyScope,"observerTightenedAffineSampledConstraints");
+            testCase.verifyEqual(large.metadata.safetyScope,"hardNominalGeometryWithRelaxedObserverMargins");
         end
         function zeroRadiusEnclosuresRecoverTheExactStateProblem(testCase)
             [ego,target,road,cfg]=localFixture(0);
@@ -95,11 +95,44 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(prediction.metadata.uncertaintyIncluded);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
         end
-        function anUncertaintyTubeWiderThanTheTerminalCoreIsNotSilentlyIgnored(testCase)
+        function feedbackErrorIsCarriedBesideTheNominalTerminalCore(testCase)
             [ego,~,road,cfg]=localFixture(0);
             ego.controllerErrorBound.bounds(4)=.001;
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
-                'collisionAvoidanceController:noOptimizationSolution');
+            [command,~,prediction]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyGreaterThan(prediction.model.terminal.feedbackTube.radius(4),.001);
+            testCase.verifyGreaterThan(prediction.model.uncertaintyPrediction.terminalReserve, ...
+                prediction.model.terminal.radius);
+            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
+        end
+        function directionalTargetSupportContainsTheConstantParameterFamily(testCase)
+            q=[0;0;.2;8;.3;.02;1.6;2.4;.95;0;0];
+            set=struct('positionRadius',.03,'courseRadius',.04,'speedRadius',.4, ...
+                'accelerationRadius',.1,'curvatureRadius',.002,'sideslipRadius',.004);
+            directions=[cos(linspace(0,2*pi,17));sin(linspace(0,2*pi,17))].';
+            for beta=[0,.02]
+                q(6)=beta;
+                for time=[-.5,.2,1,4]
+                    nominal=predictiveSafetyGeometry.predictTarget(q,time);
+                    bound=predictiveSafetyGeometry.targetPositionSupport(q,set,time,directions);
+                    for bits=0:15
+                        signs=2*double(bitget(bits,1:4)).'-1;
+                        member=q;member(4:5)=q(4:5)+signs(1:2).*[set.speedRadius;set.accelerationRadius];
+                        member(6)=asin((sin(beta)/q(7)+signs(3)*set.curvatureRadius)*q(7));
+                        member(3)=q(3)+beta+signs(4)*set.courseRadius-member(6);
+                        actual=predictiveSafetyGeometry.predictTarget(member,time);
+                        testCase.verifyLessThanOrEqual(abs(directions*(actual(1:2)-nominal(1:2))) ...
+                            +set.positionRadius,bound+1e-10);
+                    end
+                end
+            end
+        end
+        function longitudinalTargetSpeedUncertaintyDoesNotBecomeLateralWidth(testCase)
+            q=[0;0;0;8;0;0;1.6;2.4;.95;0;0];
+            set=struct('positionRadius',.03,'courseRadius',0,'speedRadius',2, ...
+                'accelerationRadius',1,'curvatureRadius',0,'sideslipRadius',0);
+            support=predictiveSafetyGeometry.targetPositionSupport(q,set,3,eye(2));
+            testCase.verifyEqual(support,[10.53;.03],AbsTol=1e-12);
         end
         function staleBoundsCannotBeUsedAtTheCurrentStateTime(testCase)
             [ego,target,road,cfg]=localFixture(.01);

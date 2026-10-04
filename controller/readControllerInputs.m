@@ -7,6 +7,16 @@ function [ego,lane,road,target] = readControllerInputs(egoState,targetEstimate,l
     ego.stateTime=localOptionalStateScalar(egoState,"stateTime",NaN);
     [ego.errorBounds,ego.uncertaintySpecified]=localErrorBounds(egoState, ...
         "ego-state-v1",6,ego.stateTime);
+    ego.errorGenerator=diag(ego.errorBounds);
+    if ego.uncertaintySpecified && isfield(egoState.controllerErrorBound,'generator') ...
+            && isfield(egoState.controllerErrorBound,'generatorConvention') ...
+            && string(egoState.controllerErrorBound.generatorConvention)=="commonPoseColumnsFirst"
+        generator=egoState.controllerErrorBound.generator;
+        if isnumeric(generator) && isreal(generator) && size(generator,1)==6 ...
+                && size(generator,2)>=3 && all(isfinite(generator),'all')
+            ego.errorGenerator=generator;
+        end
+    end
     [lane,road]=localReadLane(laneCenterline,ego);
     target=[];
     if isempty(targetEstimate),return;end

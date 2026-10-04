@@ -616,8 +616,9 @@ function [targetState, reconstructedTargetSpeed] = ...
             egoPosition, egoYaw, cfg)
 % The transformed target state is [rho; q; s]: radar relative position,
 % absolute target velocity in the ego frame, and absolute target
-% acceleration in the ego frame. The velocity prior supplies q directly
-% and the acceleration prior is the constant-velocity zero.
+% acceleration in the ego frame. A multi-sample window supplies the fitted
+% velocity; only a single detection uses the provisional velocity prior.
+% The acceleration prior is the constant-velocity zero.
     if any(abs(diff(detectionTime) ...
             - cfg.observer.runtime.samplePeriod) ...
             > 100.0*eps(max(1.0, max(abs(detectionTime)))))
@@ -650,8 +651,7 @@ function [targetState, reconstructedTargetSpeed] = ...
                 "Radar/GNSS samples reconstructed a target below the " ...
                 + "configured NRMM speed domain.");
         end
-        targetVelocity = cfg.initialization.targetSpeedPrior ...
-            * rawTargetVelocity/rawTargetSpeed;
+        targetVelocity = rawTargetVelocity;
     end
     reconstructedTargetSpeed = norm(targetVelocity);
     rotationTranspose = localRotation(egoYaw).';
@@ -666,7 +666,7 @@ function method = localTargetVelocityInitializationMethod(sampleCount)
     if sampleCount == 1
         method = "radialOncomingConfiguredSpeedPrior";
     else
-        method = "radarPositionWindowDirectionConfiguredSpeedMagnitude";
+        method = "radarPositionWindowVelocityLeastSquares";
     end
 end
 

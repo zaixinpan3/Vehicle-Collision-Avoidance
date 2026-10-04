@@ -97,8 +97,9 @@ function [accepted,agreement,info]=localDampedStep(full,segment,model,fullAgreem
     info=struct('reason',"infeasibleBase",'baseResidual',residual,'baseClfSlack',baseSlack, ...
         'fullClfSlack',full.clfSlack,'accepted',false,'seconds',0,'trials',struct([]));
     % Inherited slacks alone do not establish feasibility at zero correction.
-    % Only a point in this exact assembled problem supplies a convex segment.
-    if ~isfinite(residual) || residual>cfg.solver.constraintTolerance
+    % Use the same numerical feasibility allowance as the accepted solver
+    % point. Convex interpolation preserves that allowance, not exact zeros.
+    if ~isfinite(residual) || residual>cfg.solver.feasibilityTolerance
         info.seconds=toc(wall);return;
     end
     fraction=min(.5,.8/sqrt(fullAgreement.ratio));
@@ -152,15 +153,26 @@ end
 
 function [agreement,rollout,valid]=localPredictionAgreement(candidate,model)
     cfg=model.cfg;[rollout,valid]=localRollout(candidate.inputs,model);
+    if ~valid
+        % Only the first hold is issued. A remote suffix outside the tire
+        % model domain does not invalidate an evaluable first-hold comparison.
+        [rollout,valid]=localRollout(candidate.inputs(:,1),model);
+    end
     poseError=Inf;stateError=Inf;clfError=Inf;fullPoseError=Inf;actualSlack=Inf;
     maximumDeviation=Inf;deviationRatio=0;
-    poseCount=min(size(candidate.states,2),candidate.encounterExit+1);
+    % RTI executes one hold before receiving another posterior. Agreement
+    % over an unexecuted open-loop suffix is not an admission requirement.
+    % The affine suffix still carries all planning constraints; its nonlinear
+    % feasibility and recursive transfer are explicitly not certified.
+    poseCount=min(size(candidate.states,2),2);
     if valid
-        [poseError,stateError,fullPoseError]=localTrajectoryError(candidate.states,rollout.states,cfg,poseCount);
+        nodes=size(rollout.states,2);
+        [poseError,stateError,fullPoseError]=localTrajectoryError(candidate.states(:,1:nodes),rollout.states,cfg,poseCount);
+        if nodes<size(candidate.states,2),fullPoseError=Inf;end
         actual=nonlinearBicycleModel.nominalValue(rollout.states(:,2),model.lane,model.nominalReference);
         clfError=abs(actual-candidate.clfNextValue)/max(1,candidate.clfInitialValue);
         actualSlack=max(0,actual-candidate.clfInitialValue+candidate.clfRequiredDecrease);
-        projection=laneGeometry.project(rollout.states(1:2,:),model.lane);
+        projection=laneGeometry.project(rollout.states(1:2,1:poseCount),model.lane);
         maximumDeviation=max(abs(projection.lateralPosition));
         if isfinite(cfg.controller.maximumLateralDeviationMeters)
             deviationRatio=max(0,1+(maximumDeviation-cfg.controller.maximumLateralDeviationMeters) ...
@@ -184,10 +196,9 @@ function [poseError,stateError,fullPoseError]=localTrajectoryError(affine,nonlin
     displacement=vecnorm(affine(1:2,:)-nonlinear(1:2,:));
     rotation=abs(affine(3,:)-nonlinear(3,:));
     bodyError=displacement+reach*rotation;fullPoseError=max(bodyError);
-    % Free endpoint pose and post-encounter positions impose no position
-    % constraint. Preserve accuracy where pose enters the actual problem.
+    % Retain the full suffix discrepancy as an offline research measurement.
     poseError=max(bodyError(1:poseCount));
-    stateError=max(abs(affine(4:6,:)-nonlinear(4:6,:))./[5;3;1.5],[],'all');
+    stateError=max(abs(affine(4:6,1:poseCount)-nonlinear(4:6,1:poseCount))./[5;3;1.5],[],'all');
 end
 
 function [rollout,valid]=localRollout(inputs,model)
@@ -215,6 +226,36 @@ function [solution,search,model] = localRound(model,previousState,timer)
     initializationSeconds=toc(wall);
     budgetAttempts=struct([]);budgetStages=struct([]);
     sharedProblem=[];
+    if model.uncertainty.specified
+        wall=tic;[problem,model]=localFormulate(anchor,model);model.linearization=anchor;
+        search=localSearch(problem,model,source,toc(wall));
+        search.initializationSeconds=initializationSeconds;
+        point=zeros(problem.clfIndex-1,1);
+        for stage=1:numel(problem.slackIndices)
+            rows=problem.a(:,problem.slackIndices(stage))<0;
+            point(problem.slackIndices(stage))=max([0;-problem.b(rows)]);
+        end
+        search.budgetAnchorResidual=localConvexResidual([point;0],problem);
+        search.budgetSource="observerConditionedAnchor";
+        search.slackCap=sum(point(problem.slackIndices));
+        search.slackCap=search.slackCap+model.cfg.solver.lexicographicTieTolerance*max(1,search.slackCap);
+        search.stages(1)=struct('objective',"conditionedSafetyBudget",'exitFlag',NaN, ...
+            'seconds',0,'value',search.slackCap,'numericalSolve',false,'solverInfo',struct());
+        sharedProblem=problem;
+        if search.budgetAnchorResidual<=model.cfg.solver.constraintTolerance
+            [solution,search,model,sharedProblem]=localSecondary(point,problem,anchor,model,search,timer);
+        else
+            solution=[];search.terminationReason="anchorOutsideCurrentAffineSet";
+        end
+        budgetAttempts=localAttempt(search);budgetStages=search.stages;
+        if ~isempty(solution)
+            search.selectedAttempt=1;search.attempts=budgetAttempts;search.linearizationCount=1;
+            search.potentialFieldRestarted=false;search.initializationFailure=failure;search.elapsedSeconds=toc(timer);return;
+        end
+        % A changed posterior can invalidate this particular anchor. Restore
+        % the same assembled problem before requesting a fresh APF rollout.
+        model.inheritedSlacks=[];initializationSeconds=0;
+    end
     if ~isempty(model.inheritedSlacks) && source=="shiftedInputRollout"
         wall=tic;[problem,model]=localFormulate(anchor,model);model.linearization=anchor;
         search=localSearch(problem,model,source,toc(wall));
@@ -252,7 +293,8 @@ function [solution,search,model] = localRound(model,previousState,timer)
         if ~isempty(extra),attempts(end+1)=extra;stages=[stages,extra.stages];end
         if expanded,selected=numel(attempts);end
     end
-    needsRestoration=isempty(point) || search.primaryOptimum>problem.primaryLowerBound+model.cfg.solver.feasibilityTolerance;
+    needsRestoration=isempty(point) || (~model.robustnessRelaxation ...
+        && search.primaryOptimum>problem.primaryLowerBound+model.cfg.solver.feasibilityTolerance);
     if source=="shiftedInputRollout" && needsRestoration && model.allowPotentialFieldRestart ...
             && model.linearizationBuilds<model.cfg.nonlinear.maximumLinearizations && toc(timer)<model.cfg.solver.timeLimitSeconds
         reason=search.terminationReason;
@@ -326,12 +368,13 @@ end
 function problem=localInputBox(problem,anchor,model)
     cfg=model.cfg;iu=problem.inputIndices;count=size(iu,2);
     radius=model.inputTrustScale*cfg.nonlinear.trustRadius*[.15;.25];
-    lower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)]-anchor.inputs;
-    upper=[Inf;min(1-1e-8,cfg.actuation.brakingRatioMaximum)]-anchor.inputs;
+    radius=repmat(radius,1,count);
+    lower=problem.physicalInputLower-anchor.inputs;
+    upper=problem.physicalInputUpper-anchor.inputs;
     problem.lower(iu(:))=reshape(max(-radius,lower),[],1);
     problem.upper(iu(:))=reshape(min(radius,upper),[],1);
     if isfield(problem,'clf')
-        scale=repmat(1./(radius*sqrt(2*count)),count,1);
+        scale=reshape(1./(radius*sqrt(2*count)),[],1);
         increment=sparse(1:numel(iu),iu(:),scale,numel(iu),numel(problem.lower));
         problem.quadratic=2*problem.clfTieBound/problem.clfScale*(increment.'*increment);
     end
@@ -399,7 +442,10 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
     end
     search.primaryOptimum=sum(max(0,point(problem.slackIndices)));
     search.stages(1).value=search.primaryOptimum;
-    search.slackCap=search.primaryOptimum+cfg.solver.lexicographicTieTolerance;
+    % Match the cap's scale to the numerical primary objective. An absolute
+    % micrometer cap on a large restoration sum can exclude the computed
+    % primary point within the solver's relative optimality tolerance.
+    search.slackCap=search.primaryOptimum+cfg.solver.lexicographicTieTolerance*max(1,search.primaryOptimum);
     search.terminationReason="primaryReturned";
 end
 
@@ -504,6 +550,12 @@ function [anchor,source,failure]=localInitialization(model,previous)
                             [states(:,index);inputs(:,end)],model.sampleIndex+index-1,model.terminal);
                         inputs(:,index)=localClip(model.terminal.reference.input ...
                             +model.terminal.gain*deviation,inputs(:,end),cfg);
+                    elseif isfield(previous,'feedbackGains') && index<size(previous.feedbackGains,3)
+                        error=states(:,index)-previous.stateTrajectory(:,index+1);
+                        error(3)=atan2(sin(error(3)),cos(error(3)));
+                        last=model.previousInput;if index>1,last=inputs(:,index-1);end
+                        inputs(:,index)=localClip(inputs(:,index)+previous.feedbackGains(:,:,index+1)*error, ...
+                            last,cfg);
                     end
                     states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),cfg);
                 end
@@ -529,7 +581,7 @@ function anchor=localPotentialFieldSeed(model,count)
     nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
     settle=max(cfg.controller.horizonSteps,count-ceil(cfg.initialization.settlingSeconds/h));
     for index=1:count
-        time=(model.sampleIndex+index-1)*h;
+        time=(index-1)*h;
         if index>settle
             % Settle intrinsic velocities into the existing free-pose
             % straight core; the endpoint position and heading remain free.
@@ -537,7 +589,7 @@ function anchor=localPotentialFieldSeed(model,count)
         elseif isempty(model.targetEpoch)
             u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominal);
         else
-            [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.targetEpoch,time,cfg,side);
+            [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.target,time,cfg,side);
             course=x(3)+atan2(x(5),x(4));
             yawRate=reference.curvature*hypot(x(4),x(5)) ...
                 -cfg.nominalClf.courseGain*atan2(sin(course-heading),cos(course-heading));
@@ -566,11 +618,17 @@ end
 function [problem,model]=localFormulate(anchor,model)
     model.linearizationBuilds=model.linearizationBuilds+1;
     cfg=model.cfg;count=size(anchor.inputs,2);prefix=cfg.controller.horizonSteps;
+    robustRelaxation=any(model.uncertainty.egoGenerator(:));
+    if ~isempty(model.uncertainty.target)
+        robustRelaxation=robustRelaxation || any(structfun(@(value)any(value(:)>0),model.uncertainty.target));
+    end
+    slackCount=prefix;
+    if robustRelaxation,slackCount=count+1;end
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
-    is=iu(end)+(1:prefix);ic=is(end)+1;nv=ic;
+    is=iu(end)+(1:slackCount);ic=is(end)+1;nv=ic;
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
     rhs(1:6)=model.initialState-anchor.states(:,1);
-    rows=cell(1,7*count+4);bounds=cell(size(rows));rowCount=0;
+    rows=cell(1,9*count+8);bounds=cell(size(rows));rowCount=0;
     pathCones=struct('A',{},'b',{},'d',{},'gamma',{});
     deviationLimit=cfg.controller.maximumLateralDeviationMeters;
     % Reserve the existing position-accuracy tolerance inside the hard bound.
@@ -589,7 +647,12 @@ function [problem,model]=localFormulate(anchor,model)
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=0;
-    generator=model.uncertainty.egoGenerator;collisionGenerator=model.uncertainty.collisionGenerator;
+    generator=model.uncertainty.egoGenerator;
+    posterior=generator;
+    stages=localFeedbackLinearization(anchor,model,any(posterior(:)));
+    model.feedbackGains=cat(3,stages.gain);
+    inputGenerator=zeros(2,size(generator,2));
+    physicalInputLower=zeros(2,count);physicalInputUpper=zeros(2,count);
     maximumTightening=0;
     times=(0:2*count)*cfg.controller.sampleTime/2;
     targetTube=predictiveSafetyGeometry.targetErrorTube(model.target,model.uncertainty.target,times);
@@ -597,20 +660,45 @@ function [problem,model]=localFormulate(anchor,model)
         'egoStateRadius',zeros(6,2*count+1),'collisionStateRadius',zeros(6,2*count+1));
     for index=1:count
         x=anchor.states(:,index);input=anchor.inputs(:,index);nextReference=anchor.states(:,index+1);
-        [middle,am,bm,next,a,b]=nonlinearBicycleModel.hold(x,input,cfg);
-        middleGenerator=am*generator;nextGenerator=a*generator;
-        middleCollisionGenerator=am*collisionGenerator;
+        stage=stages(index);middle=stage.middle;am=stage.am;bm=stage.bm;
+        next=stage.next;a=stage.a;b=stage.b;
+        previousInputGenerator=inputGenerator;
+        collisionGenerator=localRelativeGenerator(x,generator,model);
+        if index==1 || ~any(posterior(:))
+            % The current estimate and nominal center coincide. The issued
+            % input is known, so d0=epsilon0 cancels the feedback terms.
+            middleGenerator=am*generator;nextGenerator=a*generator;
+            inputGenerator=zeros(2,size(generator,2));
+        else
+            gain=stage.gain;
+            % Maximize alpha in [0,1] along the Riccati brake-gain direction
+            % subject to its uncertainty image fitting the anchor's remaining
+            % actuator range. Shrink feedback authority, never the error set.
+            allowance=max(0,min(inputUpper(2)-input(2),input(2)-inputLower(2)));
+            rawRadius=sum(abs([gain(2,:)*generator,-gain(2,:)*posterior]));
+            if rawRadius>0,gain(2,:)=gain(2,:)*min(1,allowance/rawRadius);end
+            model.feedbackGains(:,:,index)=gain;
+            inputGenerator=[gain*generator,-gain*posterior];
+            middleGenerator=[(am+bm*gain)*generator,-bm*gain*posterior];
+            nextGenerator=[(a+b*gain)*generator,-b*gain*posterior];
+        end
+        middleCollisionGenerator=localRelativeGenerator(middle,middleGenerator,model);
         if index==1,firstStateGenerator=nextGenerator;end
         uncertaintyPrediction.egoStateRadius(:,2*index-1:2*index)=[sum(abs(generator),2),sum(abs(middleGenerator),2)];
         uncertaintyPrediction.collisionStateRadius(:,2*index-1:2*index)=[sum(abs(collisionGenerator),2),sum(abs(middleCollisionGenerator),2)];
         eq=6*index+(1:6);equal(eq,ix(:,index+1))=eye(6);equal(eq,ix(:,index))=-a;equal(eq,iu(:,index))=-b;
         rhs(eq)=next-nextReference;
-        lower(iu(:,index))=max(lower(iu(:,index)),inputLower-input);
-        upper(iu(:,index))=min(upper(iu(:,index)),inputUpper-input);
+        inputRadius=sum(abs(inputGenerator),2);
+        physicalInputLower(:,index)=inputLower+inputRadius;
+        physicalInputUpper(:,index)=inputUpper-inputRadius;
+        lower(iu(:,index))=max(lower(iu(:,index)),inputLower-input+inputRadius);
+        upper(iu(:,index))=min(upper(iu(:,index)),inputUpper-input-inputRadius);
         r=sparse(2,nv);r(:,iu(:,index))=eye(2);previous=model.previousInput;
         if index>1,r(:,iu(:,index-1))=-eye(2);previous=anchor.inputs(:,index-1);end
+        previousInputGenerator(:,end+1:size(inputGenerator,2))=0;
+        rateRadius=sum(abs(inputGenerator-previousInputGenerator),2);
         finite=isfinite(rate);difference=input-previous;
-        rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
+        rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite)-rateRadius(finite);rate(finite)+difference(finite)-rateRadius(finite)];
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
         if isfinite(deviationLimit)
             limit=pathLimit;if index==1,limit=deviationLimit;end
@@ -623,7 +711,11 @@ function [problem,model]=localFormulate(anchor,model)
             [g,j,tightening]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator);
             maximumTightening=max(maximumTightening,max(tightening));
             if index==1,primaryLowerBound=max(0,-min(g));end
-            r=-j*map;if index<=prefix,r(:,is(index))=-1;end
+            r=-j*map;
+            if robustRelaxation
+                rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+            end
+            if index<=slackCount,r(:,is(index))=-1;end
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
         map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
@@ -636,7 +728,11 @@ function [problem,model]=localFormulate(anchor,model)
             departure=index;
             [g,j,tightening]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model,middleCollisionGenerator);
             maximumTightening=max(maximumTightening,max(tightening));
-            r=-j*map;if index<=prefix,r(:,is(index))=-1;end
+            r=-j*map;
+            if robustRelaxation
+                rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+            end
+            if index<=slackCount,r(:,is(index))=-1;end
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
         rowCount=rowCount+1;rows{rowCount}=[map(4:6,:);-map(4:6,:)];
@@ -645,19 +741,27 @@ function [problem,model]=localFormulate(anchor,model)
         jx=ix(:,index+1);
         lower(jx(4:6))=max(lower(jx(4:6)),physicalLower-nextReference(4:6)+nextRadius);
         upper(jx(4:6))=min(upper(jx(4:6)),physicalUpper-nextReference(4:6)-nextRadius);
-        generator=nextGenerator;collisionGenerator=a*collisionGenerator;
+        generator=nextGenerator;
     end
+    collisionGenerator=localRelativeGenerator(anchor.states(:,end),generator,model);
     uncertaintyPrediction.egoStateRadius(:,end)=sum(abs(generator),2);
     uncertaintyPrediction.collisionStateRadius(:,end)=sum(abs(collisionGenerator),2);
     model.uncertaintyPrediction=uncertaintyPrediction;
     endIndex=model.sampleIndex+count;y=[anchor.states(:,end);anchor.inputs(:,end)];
     [seed,poseJacobian]=terminalContinuation.fit(model.terminal,y,endIndex);model.terminal=seed;
+    [seed,terminalDomainMargin]=terminalContinuation.feedbackCore( ...
+        seed,posterior,[generator;inputGenerator],cfg,y(4:8)-[seed.base(4:6);seed.reference.input]);
+    model.terminal=seed;
     deviation=y(4:8)-[seed.base(4:6);seed.reference.input];
     map=sparse(8,nv);map(1:6,ix(:,end))=eye(6);map(7:8,iu(:,end))=eye(2);
-    endpointReserve=sum(vecnorm(seed.quotientFactor*[generator(4:6,:);zeros(2,6)]));
+    endpointReserve=sum(vecnorm(seed.quotientFactor*[generator(4:6,:);inputGenerator]));
     model.uncertaintyPrediction.terminalCoreRadius=seed.radius;
     model.uncertaintyPrediction.terminalReserve=endpointReserve;
-    endpoint=localCone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius+endpointReserve);
+    % The endpoint is a nominal core plus an invariant feedback-error tube.
+    % The uncertainty is retained in that tube and terminal geometry; it is
+    % not required to fit inside the nominal zero-disturbance core.
+    endpoint=localCone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius);
+    rowCount=rowCount+1;rows{rowCount}=sparse(numel(terminalDomainMargin),nv);bounds{rowCount}=terminalDomainMargin;
     terminalA=zeros(0,nv);terminalB=zeros(0,1);
     if ~localBeyondRange(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator)
         departure=Inf;
@@ -667,6 +771,10 @@ function [problem,model]=localFormulate(anchor,model)
         [g,j,tightening]=localSafetyRows(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator);
         maximumTightening=max(maximumTightening,max(tightening));
         r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;
+        if robustRelaxation
+            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+            r(:,is(end))=-1;
+        end
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
     end
     if isfinite(deviationLimit)
@@ -683,6 +791,45 @@ function [problem,model]=localFormulate(anchor,model)
         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
         'terminalA',terminalA,'terminalB',terminalB,'encounterExit',departure, ...
         'maximumCollisionTighteningMeters',maximumTightening,'firstStateGenerator',firstStateGenerator);
+    model.robustnessRelaxation=robustRelaxation;
+    problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
+end
+
+function stages=localFeedbackLinearization(anchor,model,withFeedback)
+    count=size(anchor.inputs,2);stages=repmat(struct('middle',[],'am',[],'bm',[], ...
+        'next',[],'a',[],'b',[],'gain',zeros(2,6)),1,count);
+    for index=1:count
+        [stages(index).middle,stages(index).am,stages(index).bm, ...
+            stages(index).next,stages(index).a,stages(index).b]= ...
+            nonlinearBicycleModel.hold(anchor.states(:,index),anchor.inputs(:,index),model.cfg);
+    end
+    if ~withFeedback,return;end
+    angle=anchor.states(3,end);rotation=[cos(angle),sin(angle);-sin(angle),cos(angle)];
+    transform=blkdiag(rotation,eye(4));p=transform.'*model.terminal.matrix(1:6,1:6)*transform;
+    cfg=model.cfg;scales=[1,cfg.clf.lateralPositionErrorScale,cfg.clf.headingErrorScale, ...
+        cfg.clf.speedErrorScale,cfg.clf.lateralVelocityErrorScale,cfg.clf.yawRateErrorScale];
+    % Normalize ancillary effort by the same steering/braking scales used
+    % for the RTI correction. An unscaled unit penalty amplifies posterior
+    % noise enough to make the brake tube exceed its physical range.
+    effort=diag(1./[.15;.25].^2);
+    for index=count:-1:1
+        a=stages(index).a;b=stages(index).b;
+        angle=anchor.states(3,index);rotation=[cos(angle),sin(angle);-sin(angle),cos(angle)];
+        transform=blkdiag(rotation,eye(4));q=transform.'*diag(1./scales.^2)*transform;
+        gain=-(effort+b.'*p*b)\(b.'*p*a);stages(index).gain=gain;
+        p=q+a.'*p*a+a.'*p*b*gain;p=(p+p.')/2;
+    end
+end
+
+function relative=localRelativeGenerator(x,generator,model)
+    relative=generator;
+    if ~model.uncertainty.relativeFrame,return;end
+    % Keep the shared initial rigid-pose columns through the feedback map.
+    % Subtract the same rigid motion of the ego/target configuration only
+    % when evaluating pairwise geometry, not before propagating feedback.
+    offset=x(1:2)-model.initialState(1:2);
+    rigid=[eye(2),[-offset(2);offset(1)];0,0,1];
+    relative(1:3,1:3)=relative(1:3,1:3)-rigid*model.uncertainty.egoGenerator(1:3,1:3);
 end
 
 function [rows,bounds,cone]=localPathRows(position,map,lane,limit,box,generator)
@@ -760,7 +907,7 @@ end
 function [values,jacobian,tightening]=localSafetyRows(x,time,model,generator)
     cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     q=localTargetAt(model,time);
-    dual=predictiveSafetyGeometry.dualLinearization(x(1:3),shape,q(1:3),q(8:11));
+    dual=predictiveSafetyGeometry.supportLinearization(x(1:3),shape,q(1:3),q(8:11));
     values=dual.value-cfg.collision.safetyMarginMeters;
     jacobian=[dual.jacobian,zeros(4,3)];
     % Directional position support retains correlation across the affine
@@ -770,9 +917,10 @@ function [values,jacobian,tightening]=localSafetyRows(x,time,model,generator)
     egoReach=norm(shape(1:2))+norm(shape(3:4));
     targetReach=norm(q(8:9))+norm(q(10:11));
     yawRadius=sum(abs(generator(3,:)));
-    reserve=2*egoReach*sin(min(pi,yawRadius)/2)+tube.positionRadius ...
+    targetSupport=predictiveSafetyGeometry.targetPositionSupport(model.target,model.uncertainty.target,time,normal);
+    reserve=2*egoReach*sin(min(pi,yawRadius)/2) ...
         +2*targetReach*sin(tube.yawRadius/2);
-    tightening=sum(abs(normal*generator(1:2,:)),2)+normalNorm*reserve;
+    tightening=sum(abs(normal*generator(1:2,:)),2)+targetSupport+normalNorm*reserve;
     values=values-tightening;
 end
 

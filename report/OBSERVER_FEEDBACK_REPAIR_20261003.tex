@@ -1,0 +1,230 @@
+\documentclass[11pt]{article}
+\usepackage[margin=.8in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,enumitem,xurl,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{.5em}
+\title{Observer-Feedback Prediction Repair:\\Implementation, Experiments, and Remaining Failures}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+\input{report/OBSERVER_FEEDBACK_REPAIR_20261003/summary.tex}
+
+\textbf{Outcome: partial repair.} The previous noisy-estimator campaign could
+not issue its first control in any of fourteen scenarios. The revised
+implementation removes that common observer/terminal incompatibility:
+all fourteen saved initial conditions issue a control in a fresh no-target
+counterfactual. In the complete encounter campaign, however, only
+\recoveredCases{} of fourteen cases demonstrate avoidance and nominal recovery;
+\unavailableCases{} stop because the controller cannot return a solved input.
+There are \collisionCases{} observed collisions in the executed portions.
+A stopped run is not a successful collision-avoidance experiment.
+
+\section{The distinction behind the repair}
+Receiving another measurement can bound estimation error about the next
+estimate. It does not by itself bound prediction error about today's
+open-loop trajectory. With true state $x$, estimate $\hat x$, nominal center
+$c$, and future estimate-feedback input
+$u=\bar u+K(\hat x-c)$, write
+\[
+ \epsilon=x-\hat x,\qquad d=x-c,\qquad
+ d^+=(A+BK)d-BK\epsilon.
+\]
+This affine identity is the relevant correction to propagating only $Ad$.
+The current hold is special: $c_0=\hat x_0$ implies $d_0=\epsilon_0$,
+so its input perturbation cancels and $d_1=A_0d_0$.
+The implementation respects this cancellation, then carries zonotope
+generators through the feedback map without repeatedly boxing the state.
+Input and slew reserves use the same generators. The shifted initialization
+also uses the stored gains to account for a changed measured initial state;
+it remains a search reference, never an independently executable backup.
+
+The finite-horizon brake gain is constrained by available control authority.
+For its nominal Riccati row $k_i$, set
+\[
+ r_i=\|[k_iG_i,-k_iE]\|_1,\quad
+ a_i=\max\{0,\min(u_{\max}-\bar u_i,\bar u_i-u_{\min})\},\quad
+ k_i\leftarrow\min\{1,a_i/r_i\}\,k_i.
+\]
+The zero-radius case leaves the gain unchanged. This solves the scalar
+problem of retaining the largest fraction of that gain while its input
+uncertainty fits the available interval. The state error set is then
+propagated with the resulting gain; it is not shrunk to force feasibility.
+
+The online observer-set/feedback-tube distinction is consistent with
+K\"ohler, M\"uller, and Allg\"ower's output-feedback MPC framework
+\cite{Kohler}. Our local affine implementation does not inherit their
+nonlinear theorem automatically.
+
+\section{Implemented changes}
+\begin{enumerate}[leftmargin=*,itemsep=3pt]
+\item \textbf{Preserve information at the estimator interface.}
+The initial radar/GNSS least-squares fit now retains its fitted velocity
+magnitude instead of replacing it with a 15 m/s prior. Intersected
+position-history information now enters target parameter prediction.
+A joint ego generator preserves the correlation between yaw and inferred
+body velocity: a yaw error rotates the inferred velocity oppositely, so
+inertial-velocity errors nearly cancel. Independent component boxes lost
+this cancellation. The scenario adapter supplies a yaw-acceleration bound
+derived from the known axle friction capacities, permitting correlated
+historical radar transport without supplying the controller any true state.
+
+\item \textbf{Predict directional target uncertainty.}
+The constant-$A$, constant-$\beta$ family is unchanged. Analytic sensitivities
+in traveled arc, course, and curvature, with a Taylor remainder, bound
+support in each collision normal. Longitudinal speed uncertainty therefore
+does not automatically become equally large lateral uncertainty.
+No future target measurement is invented or used to contract this set.
+
+\item \textbf{Separate the nominal terminal neighborhood from noise.}
+The former terminal cone subtracted a large uncertainty reserve from a
+microscopic nominal radius, making its right-hand side negative.
+For the affine terminal feedback matrix $F$, the replacement constructs
+\[
+ Z=\frac{W+FW+\cdots+F^{s-1}W}{1-\alpha},\qquad
+ F^sW\subseteq\alpha W,\quad \alpha<1.
+\]
+Then $FZ+W\subseteq Z$. A scaled member of this family contains the endpoint
+error set and a nominal mean ellipsoid. Physical state/input/slew domains
+are still constrained. A full-dimensional disturbance-box floor uses the
+existing nominal core, avoiding enormous scaling in unexcited directions.
+A one-dimensional velocity-error regression previously produced a scale
+of $4.04\times10^9$; the repaired case is physically admissible and solves.
+
+\item \textbf{Retain feasible current-frame slack budgets.}
+When the shifted nonlinear anchor satisfies the current affine constraints,
+its required robustness slack supplies a feasible cap and the solver
+directly optimizes the same CLF. Otherwise the primary restoration problem
+runs. Updated observer information can change this cap: it is a feasible
+upper bound, not the optimal PCBF value or a proved cross-frame decrease.
+The numerical lexicographic allowance is scaled relative to the primary
+value and aligned with the solver's feasibility tolerance.
+
+\item \textbf{Repair local collision and RTI semantics.}
+At rectangle overlap, the ordinary distance dual can be zero and produce
+a zero-gradient infeasible row. A nonzero feasible dual along a least
+penetrated axis supplies a signed escape row. First-hold model agreement
+is evaluated for the input actually issued; a remote nonlinear suffix
+failure does not masquerade as first-hold disagreement. The remaining
+affine horizon constraints are retained. A fresh APF seed is still used
+only at initialization or after a failed shift; no new control mode is added.
+\end{enumerate}
+
+\section{Explicit experimental limits}
+The future posterior enclosure is frozen at its current value for these
+experiments. Recurring measurements alone do not prove this envelope.
+The terminal invariant family is affine: nonlinear remainders, uniform
+gain compatibility, and information-set nesting remain unverified.
+The finite RTI suffix is not a certified nonlinear continuation.
+
+With nonzero observer uncertainty, the optimizer now imposes hard nominal
+collision geometry and minimizes soft robustness deficits across the full
+finite horizon. This removes a hard uncertain-tail obstruction, but positive
+deficits do not certify collision avoidance for every state in the uncertainty
+set. The configured 0.20 m is a mean-model sampled margin, not an achieved
+physical lower bound. The observed minimum in this campaign is
+\minimumClearance{} m. The controller explicitly retains
+\texttt{robustNonlinearSafetyCertified=false}.
+The ideal recursive-feasibility theorem in
+\path{controller/OBSERVER_ROBUST_PCBF_THEORY.tex} keeps its assumptions;
+the implementation table now identifies these remaining gaps.
+
+\section{Scenario validation}
+Seven prescribed encounters are tested at 8 and 15 m/s. The target follows
+constant tangential acceleration and sideslip. Radar publication is limited
+to 50 m, road constraints are disabled, maximum lateral deviation is 10 m,
+and the controller sample period is 0.05 s. The seed is 20261003.
+Bounded uniform sensor amplitudes are 0.04 m GNSS position,
+0.05 m/s GNSS velocity, 0.03 m/s$^2$ IMU acceleration,
+0.0015 rad/s gyro, and 0.04 m radar position. The actual NRMM runtime uses
+80 Hz samples and a maximum 0.0025 s integration step.
+
+The driver replays each issued hold independently with tight \texttt{ode45}
+integration. Recovery requires one second inside the existing error
+tolerances $[0.1\text{ m},1^\circ,0.1\text{ m/s},0.05\text{ m/s},0.01\text{ rad/s}]$
+after the prescribed interaction. The 2000-hold observation cap is not a
+success deadline. Analytic circular scenarios can meet again; their
+baseline interaction window includes later encounters within that cap.
+Certificate availability is not a failure condition. Actual collision or
+failure to return a solved input is a failure.
+
+\begin{longtable}{lr r r l}
+\toprule
+Scenario & Speed (m/s) & Executed (s) & Minimum (m) & Outcome \\\midrule
+\endhead
+\input{report/OBSERVER_FEEDBACK_REPAIR_20261003/scenario-table.tex}
+\end{longtable}
+
+Maximum successful-call wall time is \maximumCallMs{} ms, including startup;
+the maximum after each scenario's first successful call is
+\maximumWarmCallMs{} ms. The longest failed call is \maximumFailedCallMs{} ms.
+These are runtime measurements under the machine's actual concurrent load,
+not isolated solver benchmarks or a proven 100 ms deadline. Startup
+estimator construction is recorded separately and excluded from controller
+call timing.
+
+\section{Rejected changes and unresolved design issues}
+A fixed small first-input correction cap produced a stable off-path
+trajectory at approximately 7.69 m lateral error. On the saved frame,
+the optimizer exhausted its steering allowance and returned positive CLF
+slack; it could only cancel a shifted countersteer. Removing this cap
+restored a decreasing CLF direction. It was not retained.
+
+An enlarged APF envelope, opposite-side seed screening, and a persistent
+passing normal did not improve the campaign consistently. The persistent
+normal could demand the wrong side after the crossing geometry changed.
+These exploratory changes were removed; the overlap escape dual remains.
+Simply expanding the estimator sideslip domain from 0.005 to 0.06 rad
+changed its gains and exposed substantial curvature oscillation even for
+straight targets: only one of fourteen cases recovered. This variant was
+also rejected.
+
+On the saved 8 m/s turning-crossing failure at 0.55 s, the shifted plan's
+predicted brake-input error radius reached 1.14435, producing the empty
+physical interval $[+0.144349,-0.144349]$. Removing only this input reserve
+made the offline convex problem solvable; removing terminal or collision
+constraints did not. The adopted gain projection repairs this contradiction.
+The same saved frame still fails first-hold agreement: its pose discrepancy
+is only 3.32 mm, but normalized state and CLF discrepancies are approximately
+0.0180 and 0.01255 against their respective 0.01 thresholds. Primary and
+secondary first inputs are nearly identical, so damping between them does
+not reduce this error. The ensuing APF seed has approximately 2.97 m
+rectangle penetration in its predicted suffix and cannot be repaired by
+its local collision constraints. This separates the trigger from the
+unsuccessful reinitialization.
+
+Additional one-frame ablations removed the generic state-error threshold
+and then separately doubled the CLF threshold. They returned more controls
+with positive measured clearance over that one hold, but do not establish
+complete avoidance or recovery. These threshold changes were not adopted.
+
+Remaining failures need improvements to the local planning model and
+target estimates, not another arbitrary uncertainty-radius cap. Some
+single-convexification steps still fail first-hold agreement, and collision
+rows around a poor APF seed can require more motion than the current local
+model permits. Damping toward an inaccurate primary point need not repair
+that disagreement. Curved truth trajectories also exceed the current
+0.005 rad estimator design domain; this is analyzed as a practical model
+mismatch rather than an automatic experimental failure.
+Offline ablations and the final failure snapshots are retained with the
+experimental artifacts. Their conclusions are local evidence, not a proof
+that these scenarios are physically unavoidable.
+
+\section{Verification and reproducibility}
+The companion directory records the final scenario metrics, source hashes,
+configuration, regression outcomes, algebra checks, and offline findings.
+The final-source campaign is isolated from subsequent edits. Rejected
+variants are labeled separately. The unit tests include joint-error
+containment and cancellation, directional target supports, signed overlap
+rows, terminal mean admission, repeated-construction consistency, and
+degenerate posterior directions. Code Analyzer findings are compared with
+the original revision. No nested solver repository, generated native binary,
+or unrelated estimator/theory edit is included in the project change.
+
+\begin{thebibliography}{9}
+\bibitem{Kohler} J. K\"ohler, M. A. M\"uller, and F. Allg\"ower,
+\emph{Robust output feedback model predictive control using online estimation
+bounds}, 2021. \url{https://arxiv.org/abs/2105.03427}.
+\end{thebibliography}
+\end{document}

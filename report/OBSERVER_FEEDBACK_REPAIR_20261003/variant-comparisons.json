@@ -1,0 +1,3629 @@
+{
+  "variants": [
+    {
+      "generation": 14,
+      "completedCases": 14,
+      "recovered": 6,
+      "controlUnavailable": 8,
+      "collisions": 0,
+      "cases": [
+        {
+          "scenario": "headOn",
+          "speed": 8,
+          "executedFrames": 193,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7983333333333333,
+            "entryTimeSeconds": 8.649999999999988,
+            "confirmationTimeSeconds": 9.650000000000002
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.5966558400964361,
+          "maximumReplayLateralDeviationMeters": 5.71559374014917,
+          "firstFrameSeconds": 0.795972,
+          "subsequentMedianSeconds": 0.022294,
+          "subsequentP95Seconds": 0.0660616,
+          "maximumFrameSeconds": 0.795972,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 208,
+          "finalTransverseError": [
+            0.03726167649233174,
+            -0.006418958779112473,
+            0.029536140234107222,
+            0.0036916914157952415,
+            0.0030798681548090015
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 8,
+          "executedFrames": 194,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7083333333333335,
+            "entryTimeSeconds": 8.699999999999989,
+            "confirmationTimeSeconds": 9.700000000000003
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.2359477480768593,
+          "maximumReplayLateralDeviationMeters": 5.8814388644343145,
+          "firstFrameSeconds": 0.13464,
+          "subsequentMedianSeconds": 0.021157,
+          "subsequentP95Seconds": 0.062382049999999994,
+          "maximumFrameSeconds": 0.13464,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 207,
+          "finalTransverseError": [
+            0.01759964434840337,
+            -0.004366683833297501,
+            0.019000264464679617,
+            0.0027274528018606573,
+            0.0020745739387584387
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 8,
+          "executedFrames": 270,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": 12.500000000000043,
+            "confirmationTimeSeconds": 13.500000000000057
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.7423239143100678,
+          "maximumReplayLateralDeviationMeters": 4.4962855531309165,
+          "firstFrameSeconds": 0.103541,
+          "subsequentMedianSeconds": 0.039497,
+          "subsequentP95Seconds": 0.09482249999999987,
+          "maximumFrameSeconds": 0.170009,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 318,
+          "finalTransverseError": [
+            -0.024769133531018225,
+            0.006208894654062313,
+            -0.0275704987694807,
+            -0.007771967421928285,
+            -0.006372821580807166
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 8,
+          "executedFrames": 208,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 2.0183333333333335,
+            "entryTimeSeconds": 9.399999999999999,
+            "confirmationTimeSeconds": 10.400000000000013
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.1527180732013888,
+          "maximumReplayLateralDeviationMeters": 6.573643801065555,
+          "firstFrameSeconds": 0.096832,
+          "subsequentMedianSeconds": 0.027985,
+          "subsequentP95Seconds": 0.06734904999999998,
+          "maximumFrameSeconds": 0.206612,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 217,
+          "finalTransverseError": [
+            0.030154220960437864,
+            -0.006292441532943643,
+            0.028823241057647664,
+            0.008842091474608847,
+            0.008042908518022404
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 8,
+          "executedFrames": 11,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.935,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.55,
+          "minimumReplayClearanceMeters": 10.432387721514642,
+          "maximumReplayLateralDeviationMeters": 0.7545113586820642,
+          "firstFrameSeconds": 0.098344,
+          "subsequentMedianSeconds": 0.0664395,
+          "subsequentP95Seconds": 0.089201,
+          "maximumFrameSeconds": 0.098344,
+          "failedFrameSeconds": 0.144877,
+          "totalSolverCalls": 15,
+          "finalTransverseError": [
+            -0.7545113586820642,
+            -0.2918790408126104,
+            -1.399206357372024,
+            -0.8421170028992424,
+            -0.7245808800896842
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 8,
+          "executedFrames": 1754,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 80.44,
+            "entryTimeSeconds": 86.69999999999722,
+            "confirmationTimeSeconds": 87.69999999999716
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.1677013764173687,
+          "maximumReplayLateralDeviationMeters": 5.776888351541649,
+          "firstFrameSeconds": 0.126585,
+          "subsequentMedianSeconds": 0.021569,
+          "subsequentP95Seconds": 0.04011454999999999,
+          "maximumFrameSeconds": 0.126585,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 1792,
+          "finalTransverseError": [
+            0.006518111184135129,
+            0.0012780799708005436,
+            0.006407838361588425,
+            0.0011614900867056438,
+            0.0014091406390210753
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 8,
+          "executedFrames": 0,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.9366666666666668,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0,
+          "minimumReplayClearanceMeters": null,
+          "maximumReplayLateralDeviationMeters": 0,
+          "firstFrameSeconds": null,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0,
+          "failedFrameSeconds": 0.125273,
+          "totalSolverCalls": 0,
+          "finalTransverseError": [],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "headOn",
+          "speed": 15,
+          "executedFrames": 14,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2516666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.7000000000000001,
+          "minimumReplayClearanceMeters": 3.7677174667391324,
+          "maximumReplayLateralDeviationMeters": 1.2890009529643827,
+          "firstFrameSeconds": 0.290319,
+          "subsequentMedianSeconds": 0.079876,
+          "subsequentP95Seconds": 0.11743024999999999,
+          "maximumFrameSeconds": 0.290319,
+          "failedFrameSeconds": 0.241219,
+          "totalSolverCalls": 15,
+          "finalTransverseError": [
+            1.2890009529643827,
+            0.334567175612458,
+            -2.028055000596538,
+            -0.3663344484224063,
+            0.5546712996411909
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 15,
+          "executedFrames": 12,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2183333333333335,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.6000000000000001,
+          "minimumReplayClearanceMeters": 5.653216875738906,
+          "maximumReplayLateralDeviationMeters": 0.9272369994011551,
+          "firstFrameSeconds": 0.112663,
+          "subsequentMedianSeconds": 0.078575,
+          "subsequentP95Seconds": 0.10271594999999999,
+          "maximumFrameSeconds": 0.112663,
+          "failedFrameSeconds": 0.247823,
+          "totalSolverCalls": 13,
+          "finalTransverseError": [
+            0.9272369994011551,
+            0.2794367203428368,
+            -1.7585899000500724,
+            -0.33903755558366977,
+            0.579531121420246
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 15,
+          "executedFrames": 1,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.05,
+          "minimumReplayClearanceMeters": 1.444528975803836,
+          "maximumReplayLateralDeviationMeters": 0.004956251029971506,
+          "firstFrameSeconds": 0.110286,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0.110286,
+          "failedFrameSeconds": 0.280492,
+          "totalSolverCalls": 1,
+          "finalTransverseError": [
+            0.004956251029971506,
+            0.005651766182551644,
+            -0.018191282683893917,
+            0.11592016687445386,
+            0.2089855819380354
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 15,
+          "executedFrames": 156,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8216666666666668,
+            "entryTimeSeconds": 6.799999999999984,
+            "confirmationTimeSeconds": 7.79999999999998
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.9315202969520897,
+          "maximumReplayLateralDeviationMeters": 6.497028329144681,
+          "firstFrameSeconds": 0.118829,
+          "subsequentMedianSeconds": 0.031011,
+          "subsequentP95Seconds": 0.0832425,
+          "maximumFrameSeconds": 0.177698,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 198,
+          "finalTransverseError": [
+            -0.006095661979970793,
+            0.0016257927245699715,
+            -0.055535760951840984,
+            -0.0001228474148174583,
+            0.00044344909029099934
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 15,
+          "executedFrames": 14,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8266666666666669,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.7000000000000001,
+          "minimumReplayClearanceMeters": 13.517517704584673,
+          "maximumReplayLateralDeviationMeters": 1.2234544051489014,
+          "firstFrameSeconds": 0.104434,
+          "subsequentMedianSeconds": 0.070209,
+          "subsequentP95Seconds": 0.11265730000000002,
+          "maximumFrameSeconds": 0.112765,
+          "failedFrameSeconds": 0.172933,
+          "totalSolverCalls": 18,
+          "finalTransverseError": [
+            -1.2234544051489014,
+            -0.30530252397800406,
+            -1.7803833561179,
+            0.21620936423962872,
+            -0.5577248891869767
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 15,
+          "executedFrames": 1116,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 56.445,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 55.800000000000004,
+          "minimumReplayClearanceMeters": 3.287114432142421,
+          "maximumReplayLateralDeviationMeters": 7.19209515628563,
+          "firstFrameSeconds": 0.11905,
+          "subsequentMedianSeconds": 0.023799,
+          "subsequentP95Seconds": 0.071716,
+          "maximumFrameSeconds": 0.11905,
+          "failedFrameSeconds": 0.102263,
+          "totalSolverCalls": 1198,
+          "finalTransverseError": [
+            2.1871725793061096,
+            0.25763413315522743,
+            -1.2467053327638382,
+            -0.08434411863947175,
+            -0.09801097061495717
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 15,
+          "executedFrames": 10,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8250000000000002,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.5,
+          "minimumReplayClearanceMeters": 16.441984082805998,
+          "maximumReplayLateralDeviationMeters": 0.7008888175376845,
+          "firstFrameSeconds": 0.130383,
+          "subsequentMedianSeconds": 0.115818,
+          "subsequentP95Seconds": 0.130437,
+          "maximumFrameSeconds": 0.130437,
+          "failedFrameSeconds": 0.188953,
+          "totalSolverCalls": 16,
+          "finalTransverseError": [
+            -0.7008888175376845,
+            -0.2249063887328161,
+            -1.1422076390965188,
+            0.25756382755576857,
+            -0.395782759483459
+          ],
+          "pathDeviationLimitSatisfied": true
+        }
+      ]
+    },
+    {
+      "generation": 15,
+      "completedCases": 5,
+      "recovered": 2,
+      "controlUnavailable": 1,
+      "collisions": 0,
+      "cases": [
+        {
+          "scenario": "headOn",
+          "speed": 8,
+          "executedFrames": 2000,
+          "outcome": "observationLimit",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7983333333333333,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.5883494149880542,
+          "maximumReplayLateralDeviationMeters": 7.693533467452873,
+          "firstFrameSeconds": 0.911249,
+          "subsequentMedianSeconds": 0.021834,
+          "subsequentP95Seconds": 0.026236299999999997,
+          "maximumFrameSeconds": 0.911249,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 2003,
+          "finalTransverseError": [
+            -7.686235339548012,
+            -0.00010112021642694274,
+            -0.0174181517104941,
+            0.0003615194462341423,
+            0.00036354483085789517
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 8,
+          "executedFrames": 189,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7083333333333335,
+            "entryTimeSeconds": 8.449999999999985,
+            "confirmationTimeSeconds": 9.45
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.1895062598544406,
+          "maximumReplayLateralDeviationMeters": 6.851346299141172,
+          "firstFrameSeconds": 0.159365,
+          "subsequentMedianSeconds": 0.022014,
+          "subsequentP95Seconds": 0.060356099999999906,
+          "maximumFrameSeconds": 0.159365,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 195,
+          "finalTransverseError": [
+            -0.034064506303081964,
+            0.005987265132638154,
+            0.04906607627171411,
+            -0.005746051039577995,
+            -0.004932698337114375
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 8,
+          "executedFrames": 659,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": 31.95000000000032,
+            "confirmationTimeSeconds": 32.950000000000266
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.0653697007941139,
+          "maximumReplayLateralDeviationMeters": 6.78092647125305,
+          "firstFrameSeconds": 0.12437,
+          "subsequentMedianSeconds": 0.023786,
+          "subsequentP95Seconds": 0.0471586,
+          "maximumFrameSeconds": 0.128151,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 667,
+          "finalTransverseError": [
+            -0.0002939089917267404,
+            0.0001430360524732877,
+            0.07143371578248292,
+            -3.033861192624441e-05,
+            -0.0004205052079985802
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 8,
+          "executedFrames": 2000,
+          "outcome": "observationLimit",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 2.0183333333333335,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.9838128503300672,
+          "maximumReplayLateralDeviationMeters": 8.705477524648485,
+          "firstFrameSeconds": 0.116812,
+          "subsequentMedianSeconds": 0.023133,
+          "subsequentP95Seconds": 0.03187545,
+          "maximumFrameSeconds": 0.16521,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 2009,
+          "finalTransverseError": [
+            -7.689098647563929,
+            -0.00016282533954852798,
+            -0.017329455331791976,
+            0.0006189078987172664,
+            0.0005859446931303356
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 8,
+          "executedFrames": 10,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.935,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.5,
+          "minimumReplayClearanceMeters": 10.888231713345727,
+          "maximumReplayLateralDeviationMeters": 0.6286624911034755,
+          "firstFrameSeconds": 0.114633,
+          "subsequentMedianSeconds": 0.066524,
+          "subsequentP95Seconds": 0.101467,
+          "maximumFrameSeconds": 0.114633,
+          "failedFrameSeconds": 0.175253,
+          "totalSolverCalls": 12,
+          "finalTransverseError": [
+            -0.6286624911034755,
+            -0.25921144289040476,
+            -1.437885851966291,
+            -0.7637876380649872,
+            -0.633625352552216
+          ],
+          "pathDeviationLimitSatisfied": true
+        }
+      ]
+    },
+    {
+      "generation": 16,
+      "completedCases": 14,
+      "recovered": 5,
+      "controlUnavailable": 9,
+      "collisions": 0,
+      "cases": [
+        {
+          "scenario": "headOn",
+          "speed": 8,
+          "executedFrames": 201,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7983333333333333,
+            "entryTimeSeconds": 9.049999999999994,
+            "confirmationTimeSeconds": 10.050000000000008
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.539957399656862,
+          "maximumReplayLateralDeviationMeters": 6.452695115162416,
+          "firstFrameSeconds": 0.897535,
+          "subsequentMedianSeconds": 0.024564,
+          "subsequentP95Seconds": 0.07063649999999999,
+          "maximumFrameSeconds": 0.897535,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 211,
+          "finalTransverseError": [
+            0.0350960978208213,
+            -0.0069352126422268685,
+            0.031001656030507974,
+            0.0049968406261027805,
+            0.004717583471674482
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 8,
+          "executedFrames": 197,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7083333333333335,
+            "entryTimeSeconds": 8.84999999999999,
+            "confirmationTimeSeconds": 9.850000000000005
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.1824804021543711,
+          "maximumReplayLateralDeviationMeters": 6.480214775255782,
+          "firstFrameSeconds": 0.142977,
+          "subsequentMedianSeconds": 0.020761500000000002,
+          "subsequentP95Seconds": 0.06380709999999998,
+          "maximumFrameSeconds": 0.142977,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 209,
+          "finalTransverseError": [
+            0.016205029439599727,
+            -0.004511622510784991,
+            0.017996704459344315,
+            0.002897244848728477,
+            0.0026702164395927606
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 8,
+          "executedFrames": 11,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.55,
+          "minimumReplayClearanceMeters": 1.3317884185737547,
+          "maximumReplayLateralDeviationMeters": 0.8738440086059548,
+          "firstFrameSeconds": 0.117847,
+          "subsequentMedianSeconds": 0.0685215,
+          "subsequentP95Seconds": 0.125493,
+          "maximumFrameSeconds": 0.125493,
+          "failedFrameSeconds": 0.184905,
+          "totalSolverCalls": 13,
+          "finalTransverseError": [
+            0.8738440086059548,
+            0.3164286926687847,
+            -0.10392180198640588,
+            0.6691508813794176,
+            0.6880222303186199
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 8,
+          "executedFrames": 209,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 2.0183333333333335,
+            "entryTimeSeconds": 9.45,
+            "confirmationTimeSeconds": 10.450000000000014
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.14998418527206678,
+          "maximumReplayLateralDeviationMeters": 7.546276620789762,
+          "firstFrameSeconds": 0.107529,
+          "subsequentMedianSeconds": 0.0316135,
+          "subsequentP95Seconds": 0.07295309999999999,
+          "maximumFrameSeconds": 0.113259,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 217,
+          "finalTransverseError": [
+            0.03229029237656065,
+            -0.0064523326552591515,
+            0.029404565740263067,
+            0.007062681887569489,
+            0.005983518181304525
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 8,
+          "executedFrames": 11,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.935,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.55,
+          "minimumReplayClearanceMeters": 10.479590673400574,
+          "maximumReplayLateralDeviationMeters": 0.7708334849081238,
+          "firstFrameSeconds": 0.130939,
+          "subsequentMedianSeconds": 0.0715945,
+          "subsequentP95Seconds": 0.10548,
+          "maximumFrameSeconds": 0.130939,
+          "failedFrameSeconds": 0.144122,
+          "totalSolverCalls": 15,
+          "finalTransverseError": [
+            -0.7708334849081238,
+            -0.3046608210257577,
+            -1.4772869181338253,
+            -0.876614622144421,
+            -0.7425932251154671
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 8,
+          "executedFrames": 1776,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 80.44,
+            "entryTimeSeconds": 87.79999999999715,
+            "confirmationTimeSeconds": 88.7999999999971
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.3426287369767944,
+          "maximumReplayLateralDeviationMeters": 6.409732332244081,
+          "firstFrameSeconds": 0.155721,
+          "subsequentMedianSeconds": 0.023514,
+          "subsequentP95Seconds": 0.04541825,
+          "maximumFrameSeconds": 0.155721,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 1802,
+          "finalTransverseError": [
+            0.0042815693274991205,
+            0.002152310032978782,
+            0.009890853185772208,
+            0.00041653696487270464,
+            0.00041438115492194866
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 8,
+          "executedFrames": 0,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.9366666666666668,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0,
+          "minimumReplayClearanceMeters": null,
+          "maximumReplayLateralDeviationMeters": 0,
+          "firstFrameSeconds": null,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0,
+          "failedFrameSeconds": 0.220929,
+          "totalSolverCalls": 0,
+          "finalTransverseError": [],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "headOn",
+          "speed": 15,
+          "executedFrames": 13,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2516666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.65,
+          "minimumReplayClearanceMeters": 4.787849170037836,
+          "maximumReplayLateralDeviationMeters": 1.0977165580107489,
+          "firstFrameSeconds": 0.328434,
+          "subsequentMedianSeconds": 0.0892385,
+          "subsequentP95Seconds": 0.10456139999999998,
+          "maximumFrameSeconds": 0.328434,
+          "failedFrameSeconds": 0.291211,
+          "totalSolverCalls": 13,
+          "finalTransverseError": [
+            1.0977165580107489,
+            0.30521133230154646,
+            -1.8736300189023627,
+            -0.36279624011263306,
+            0.5416156897427106
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 15,
+          "executedFrames": 11,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2183333333333335,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.55,
+          "minimumReplayClearanceMeters": 6.737300750076647,
+          "maximumReplayLateralDeviationMeters": 0.7654688410429275,
+          "firstFrameSeconds": 0.137605,
+          "subsequentMedianSeconds": 0.088953,
+          "subsequentP95Seconds": 0.099309,
+          "maximumFrameSeconds": 0.137605,
+          "failedFrameSeconds": 0.31103,
+          "totalSolverCalls": 11,
+          "finalTransverseError": [
+            0.7654688410429275,
+            0.24864850603979485,
+            -1.5985925186272087,
+            -0.3119966463371979,
+            0.5580857919232021
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 15,
+          "executedFrames": 1,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.05,
+          "minimumReplayClearanceMeters": 1.4444233243140907,
+          "maximumReplayLateralDeviationMeters": 0.00532410066306062,
+          "firstFrameSeconds": 0.205838,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0.205838,
+          "failedFrameSeconds": 0.324751,
+          "totalSolverCalls": 2,
+          "finalTransverseError": [
+            0.00532410066306062,
+            0.006077433880410502,
+            -0.029807265750473988,
+            0.12562957263540783,
+            0.22625040193221488
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 15,
+          "executedFrames": 13,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8216666666666668,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.65,
+          "minimumReplayClearanceMeters": 12.223757137239936,
+          "maximumReplayLateralDeviationMeters": 1.1062001145336777,
+          "firstFrameSeconds": 0.125761,
+          "subsequentMedianSeconds": 0.07955999999999999,
+          "subsequentP95Seconds": 0.12187309999999997,
+          "maximumFrameSeconds": 0.125761,
+          "failedFrameSeconds": 0.214157,
+          "totalSolverCalls": 17,
+          "finalTransverseError": [
+            1.1062001145336777,
+            0.31598475252070046,
+            -1.9952299030720884,
+            -0.38322757650058803,
+            0.6081402463755229
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 15,
+          "executedFrames": 14,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8266666666666669,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.7000000000000001,
+          "minimumReplayClearanceMeters": 13.533577606922583,
+          "maximumReplayLateralDeviationMeters": 1.2322202595702823,
+          "firstFrameSeconds": 0.124473,
+          "subsequentMedianSeconds": 0.076928,
+          "subsequentP95Seconds": 0.1314237,
+          "maximumFrameSeconds": 0.13188,
+          "failedFrameSeconds": 0.221494,
+          "totalSolverCalls": 18,
+          "finalTransverseError": [
+            -1.2322202595702823,
+            -0.3105269797292506,
+            -1.802420006922306,
+            0.23686413477795226,
+            -0.5700970641499895
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 15,
+          "executedFrames": 1387,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 56.445,
+            "entryTimeSeconds": 68.34999999999826,
+            "confirmationTimeSeconds": 69.3499999999982
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 2.8996533156730293,
+          "maximumReplayLateralDeviationMeters": 7.227688331421753,
+          "firstFrameSeconds": 0.155397,
+          "subsequentMedianSeconds": 0.028784999999999998,
+          "subsequentP95Seconds": 0.08140660000000002,
+          "maximumFrameSeconds": 0.185988,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 1469,
+          "finalTransverseError": [
+            -0.0244171335761576,
+            0.0007694494950445156,
+            -0.054703791492395126,
+            0.0009576469301351281,
+            0.005461304228666128
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 15,
+          "executedFrames": 12,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8250000000000002,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.6000000000000001,
+          "minimumReplayClearanceMeters": 15.026012140008278,
+          "maximumReplayLateralDeviationMeters": 1.0598034280401687,
+          "firstFrameSeconds": 0.153517,
+          "subsequentMedianSeconds": 0.122212,
+          "subsequentP95Seconds": 0.19903844999999995,
+          "maximumFrameSeconds": 0.201924,
+          "failedFrameSeconds": 0.31102,
+          "totalSolverCalls": 18,
+          "finalTransverseError": [
+            -1.0598034280401687,
+            -0.29581888037761817,
+            -1.4475106037726668,
+            0.2640313236909376,
+            -0.5471791391276443
+          ],
+          "pathDeviationLimitSatisfied": true
+        }
+      ]
+    },
+    {
+      "generation": 17,
+      "completedCases": 14,
+      "recovered": 1,
+      "controlUnavailable": 13,
+      "collisions": 0,
+      "cases": [
+        {
+          "scenario": "headOn",
+          "speed": 8,
+          "executedFrames": 7,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7983333333333333,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.35000000000000003,
+          "minimumReplayClearanceMeters": 13.697137051365173,
+          "maximumReplayLateralDeviationMeters": 0.307603528350457,
+          "firstFrameSeconds": 0.890014,
+          "subsequentMedianSeconds": 0.10600699999999999,
+          "subsequentP95Seconds": 0.162457,
+          "maximumFrameSeconds": 0.890014,
+          "failedFrameSeconds": 0.265239,
+          "totalSolverCalls": 8,
+          "finalTransverseError": [
+            0.307603528350457,
+            0.1576395827483956,
+            -1.1024787736955304,
+            0.7441271872976744,
+            0.6922455854597809
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 8,
+          "executedFrames": 6,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7083333333333335,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.30000000000000004,
+          "minimumReplayClearanceMeters": 14.412651735691298,
+          "maximumReplayLateralDeviationMeters": 0.22352789901604986,
+          "firstFrameSeconds": 0.176294,
+          "subsequentMedianSeconds": 0.083381,
+          "subsequentP95Seconds": 0.110104,
+          "maximumFrameSeconds": 0.176294,
+          "failedFrameSeconds": 0.27658,
+          "totalSolverCalls": 6,
+          "finalTransverseError": [
+            0.22352789901604986,
+            0.12410892600639196,
+            -0.9537631035148868,
+            0.6862604665699938,
+            0.6526090198236667
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 8,
+          "executedFrames": 41,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 2.0500000000000003,
+          "minimumReplayClearanceMeters": 1.0264880975519717,
+          "maximumReplayLateralDeviationMeters": 2.3186043242138163,
+          "firstFrameSeconds": 0.125767,
+          "subsequentMedianSeconds": 0.0740275,
+          "subsequentP95Seconds": 0.157694,
+          "maximumFrameSeconds": 0.192561,
+          "failedFrameSeconds": 0.140214,
+          "totalSolverCalls": 81,
+          "finalTransverseError": [
+            2.283353382207928,
+            0.04377658268198951,
+            -0.2080241642908014,
+            0.19762229001013285,
+            0.12202852185351475
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 8,
+          "executedFrames": 7,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 2.0183333333333335,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.35000000000000003,
+          "minimumReplayClearanceMeters": 9.243094362496638,
+          "maximumReplayLateralDeviationMeters": 0.30361773824046323,
+          "firstFrameSeconds": 0.131528,
+          "subsequentMedianSeconds": 0.0752545,
+          "subsequentP95Seconds": 0.082498,
+          "maximumFrameSeconds": 0.131528,
+          "failedFrameSeconds": 0.248502,
+          "totalSolverCalls": 7,
+          "finalTransverseError": [
+            0.30361773824046323,
+            0.1537912866536003,
+            -1.0767445590244433,
+            0.6874711186385615,
+            0.62271911910486
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 8,
+          "executedFrames": 4,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.935,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.2,
+          "minimumReplayClearanceMeters": 13.96863168803998,
+          "maximumReplayLateralDeviationMeters": 0.09543352948939618,
+          "firstFrameSeconds": 0.137988,
+          "subsequentMedianSeconds": 0.077376,
+          "subsequentP95Seconds": 0.113664,
+          "maximumFrameSeconds": 0.137988,
+          "failedFrameSeconds": 0.222973,
+          "totalSolverCalls": 4,
+          "finalTransverseError": [
+            -0.09543352948939618,
+            -0.06409900651868503,
+            -0.6481997390078664,
+            -0.535035671755673,
+            -0.5353394438829224
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 8,
+          "executedFrames": 20,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 80.44,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 1,
+          "minimumReplayClearanceMeters": 6.021137179288388,
+          "maximumReplayLateralDeviationMeters": 0.6185087065865541,
+          "firstFrameSeconds": 0.175413,
+          "subsequentMedianSeconds": 0.084181,
+          "subsequentP95Seconds": 0.267398,
+          "maximumFrameSeconds": 0.274256,
+          "failedFrameSeconds": 0.222957,
+          "totalSolverCalls": 24,
+          "finalTransverseError": [
+            0.6185087065865541,
+            0.10726839855036063,
+            -2.2567552656591277,
+            0.6139340404738203,
+            0.5016609143768285
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 8,
+          "executedFrames": 0,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.9366666666666668,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0,
+          "minimumReplayClearanceMeters": null,
+          "maximumReplayLateralDeviationMeters": 0,
+          "firstFrameSeconds": null,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0,
+          "failedFrameSeconds": 0.232351,
+          "totalSolverCalls": 0,
+          "finalTransverseError": [],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "headOn",
+          "speed": 15,
+          "executedFrames": 6,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2516666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.30000000000000004,
+          "minimumReplayClearanceMeters": 12.351476469483352,
+          "maximumReplayLateralDeviationMeters": 0.1998783623040346,
+          "firstFrameSeconds": 0.43883,
+          "subsequentMedianSeconds": 0.100098,
+          "subsequentP95Seconds": 0.109756,
+          "maximumFrameSeconds": 0.43883,
+          "failedFrameSeconds": 0.207395,
+          "totalSolverCalls": 6,
+          "finalTransverseError": [
+            0.1998783623040346,
+            0.10713189617333545,
+            -0.8700972627569037,
+            -0.08404772267960324,
+            0.4988005105090477
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 15,
+          "executedFrames": 6,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2183333333333335,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.30000000000000004,
+          "minimumReplayClearanceMeters": 12.305941384669282,
+          "maximumReplayLateralDeviationMeters": 0.20272030065010505,
+          "firstFrameSeconds": 0.159641,
+          "subsequentMedianSeconds": 0.093082,
+          "subsequentP95Seconds": 0.122295,
+          "maximumFrameSeconds": 0.159641,
+          "failedFrameSeconds": 0.230045,
+          "totalSolverCalls": 6,
+          "finalTransverseError": [
+            0.20272030065010505,
+            0.10946490232445734,
+            -0.8764596854848214,
+            -0.09350149262018756,
+            0.5090232409275186
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 15,
+          "executedFrames": 12,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.6000000000000001,
+          "minimumReplayClearanceMeters": 1.3582434986380552,
+          "maximumReplayLateralDeviationMeters": 0.6207238366762787,
+          "firstFrameSeconds": 0.181235,
+          "subsequentMedianSeconds": 0.096246,
+          "subsequentP95Seconds": 0.2498615999999999,
+          "maximumFrameSeconds": 0.255571,
+          "failedFrameSeconds": 0.163679,
+          "totalSolverCalls": 19,
+          "finalTransverseError": [
+            0.6207238366762787,
+            0.03600167972927294,
+            -0.14528591627901477,
+            -0.0062289898995816426,
+            -0.6676748091546303
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 15,
+          "executedFrames": 144,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8216666666666668,
+            "entryTimeSeconds": 6.199999999999986,
+            "confirmationTimeSeconds": 7.199999999999982
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.9995704494689258,
+          "maximumReplayLateralDeviationMeters": 6.341298015958036,
+          "firstFrameSeconds": 0.145765,
+          "subsequentMedianSeconds": 0.074079,
+          "subsequentP95Seconds": 0.117639,
+          "maximumFrameSeconds": 0.249396,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 159,
+          "finalTransverseError": [
+            0.013935552732221327,
+            -0.001875682331898199,
+            -0.07282435635357665,
+            -0.00039475939766402834,
+            0.0027007949238829995
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 15,
+          "executedFrames": 12,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8266666666666669,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.6000000000000001,
+          "minimumReplayClearanceMeters": 14.491085343573063,
+          "maximumReplayLateralDeviationMeters": 0.34594634804833546,
+          "firstFrameSeconds": 0.132308,
+          "subsequentMedianSeconds": 0.098493,
+          "subsequentP95Seconds": 0.3062085499999999,
+          "maximumFrameSeconds": 0.312231,
+          "failedFrameSeconds": 0.264023,
+          "totalSolverCalls": 17,
+          "finalTransverseError": [
+            -0.3394233871192702,
+            0.01916688425008313,
+            -1.5413911002433505,
+            -0.005923799255145212,
+            0.5149346186474951
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 15,
+          "executedFrames": 21,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 56.445,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 1.05,
+          "minimumReplayClearanceMeters": 9.227518033776906,
+          "maximumReplayLateralDeviationMeters": 0.7432236216239846,
+          "firstFrameSeconds": 0.147524,
+          "subsequentMedianSeconds": 0.09611600000000001,
+          "subsequentP95Seconds": 0.24768649999999998,
+          "maximumFrameSeconds": 0.310571,
+          "failedFrameSeconds": 0.186935,
+          "totalSolverCalls": 33,
+          "finalTransverseError": [
+            0.7432236216239846,
+            0.08974280466228941,
+            -2.6646123537832427,
+            0.15839603535157473,
+            0.4518678197594878
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 15,
+          "executedFrames": 10,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8250000000000002,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.5,
+          "minimumReplayClearanceMeters": 15.895854397113661,
+          "maximumReplayLateralDeviationMeters": 0.16767795596761786,
+          "firstFrameSeconds": 0.142584,
+          "subsequentMedianSeconds": 0.106855,
+          "subsequentP95Seconds": 0.251345,
+          "maximumFrameSeconds": 0.251345,
+          "failedFrameSeconds": 0.151656,
+          "totalSolverCalls": 15,
+          "finalTransverseError": [
+            -0.1395490763877117,
+            0.04098245433738931,
+            -1.2965123366316362,
+            -0.015144498829100968,
+            0.5176417555669017
+          ],
+          "pathDeviationLimitSatisfied": true
+        }
+      ]
+    },
+    {
+      "generation": 18,
+      "completedCases": 14,
+      "recovered": 6,
+      "controlUnavailable": 8,
+      "collisions": 0,
+      "cases": [
+        {
+          "scenario": "headOn",
+          "speed": 8,
+          "executedFrames": 193,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7983333333333333,
+            "entryTimeSeconds": 8.649999999999988,
+            "confirmationTimeSeconds": 9.650000000000002
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.5966558400964361,
+          "maximumReplayLateralDeviationMeters": 5.71559374014917,
+          "firstFrameSeconds": 0.950924,
+          "subsequentMedianSeconds": 0.027183,
+          "subsequentP95Seconds": 0.0813594999999999,
+          "maximumFrameSeconds": 0.950924,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 208,
+          "finalTransverseError": [
+            0.03726167649233174,
+            -0.006418958779112473,
+            0.029536140234107222,
+            0.0036916914157952415,
+            0.0030798681548090015
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 8,
+          "executedFrames": 194,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7083333333333335,
+            "entryTimeSeconds": 8.699999999999989,
+            "confirmationTimeSeconds": 9.700000000000003
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.2359477480768593,
+          "maximumReplayLateralDeviationMeters": 5.8814388644343145,
+          "firstFrameSeconds": 0.147871,
+          "subsequentMedianSeconds": 0.02673,
+          "subsequentP95Seconds": 0.06965084999999999,
+          "maximumFrameSeconds": 0.147871,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 207,
+          "finalTransverseError": [
+            0.01759964434840337,
+            -0.004366683833297501,
+            0.019000264464679617,
+            0.0027274528018606573,
+            0.0020745739387584387
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 8,
+          "executedFrames": 270,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": 12.500000000000043,
+            "confirmationTimeSeconds": 13.500000000000057
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.7423239143100678,
+          "maximumReplayLateralDeviationMeters": 4.4962855531309165,
+          "firstFrameSeconds": 0.164289,
+          "subsequentMedianSeconds": 0.050212,
+          "subsequentP95Seconds": 0.11696654999999964,
+          "maximumFrameSeconds": 0.182033,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 318,
+          "finalTransverseError": [
+            -0.024769133531018225,
+            0.006208894654062313,
+            -0.0275704987694807,
+            -0.007771967421928285,
+            -0.006372821580807166
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 8,
+          "executedFrames": 208,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 2.0183333333333335,
+            "entryTimeSeconds": 9.399999999999999,
+            "confirmationTimeSeconds": 10.400000000000013
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.1527180732013888,
+          "maximumReplayLateralDeviationMeters": 6.573643801065555,
+          "firstFrameSeconds": 0.102973,
+          "subsequentMedianSeconds": 0.033711,
+          "subsequentP95Seconds": 0.09032024999999992,
+          "maximumFrameSeconds": 0.230929,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 217,
+          "finalTransverseError": [
+            0.030154220960437864,
+            -0.006292441532943643,
+            0.028823241057647664,
+            0.008842091474608847,
+            0.008042908518022404
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 8,
+          "executedFrames": 11,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.935,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.55,
+          "minimumReplayClearanceMeters": 10.432387721514642,
+          "maximumReplayLateralDeviationMeters": 0.7545113586820642,
+          "firstFrameSeconds": 0.107511,
+          "subsequentMedianSeconds": 0.073608,
+          "subsequentP95Seconds": 0.097652,
+          "maximumFrameSeconds": 0.107511,
+          "failedFrameSeconds": 0.15746,
+          "totalSolverCalls": 15,
+          "finalTransverseError": [
+            -0.7545113586820642,
+            -0.2918790408126104,
+            -1.399206357372024,
+            -0.8421170028992424,
+            -0.7245808800896842
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 8,
+          "executedFrames": 1754,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 80.44,
+            "entryTimeSeconds": 86.69999999999722,
+            "confirmationTimeSeconds": 87.69999999999716
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.1677013764173687,
+          "maximumReplayLateralDeviationMeters": 5.776888351541649,
+          "firstFrameSeconds": 0.149266,
+          "subsequentMedianSeconds": 0.023593,
+          "subsequentP95Seconds": 0.0438856,
+          "maximumFrameSeconds": 0.149266,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 1792,
+          "finalTransverseError": [
+            0.006518111184135129,
+            0.0012780799708005436,
+            0.006407838361588425,
+            0.0011614900867056438,
+            0.0014091406390210753
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 8,
+          "executedFrames": 0,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.9366666666666668,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0,
+          "minimumReplayClearanceMeters": null,
+          "maximumReplayLateralDeviationMeters": 0,
+          "firstFrameSeconds": null,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0,
+          "failedFrameSeconds": 0.129584,
+          "totalSolverCalls": 0,
+          "finalTransverseError": [],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "headOn",
+          "speed": 15,
+          "executedFrames": 14,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2516666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.7000000000000001,
+          "minimumReplayClearanceMeters": 3.7677174667391324,
+          "maximumReplayLateralDeviationMeters": 1.2890009529643827,
+          "firstFrameSeconds": 0.287095,
+          "subsequentMedianSeconds": 0.082598,
+          "subsequentP95Seconds": 0.11843979999999998,
+          "maximumFrameSeconds": 0.287095,
+          "failedFrameSeconds": 0.245136,
+          "totalSolverCalls": 15,
+          "finalTransverseError": [
+            1.2890009529643827,
+            0.334567175612458,
+            -2.028055000596538,
+            -0.3663344484224063,
+            0.5546712996411909
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 15,
+          "executedFrames": 12,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2183333333333335,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.6000000000000001,
+          "minimumReplayClearanceMeters": 5.653216875738906,
+          "maximumReplayLateralDeviationMeters": 0.9272369994011551,
+          "firstFrameSeconds": 0.12167,
+          "subsequentMedianSeconds": 0.08515,
+          "subsequentP95Seconds": 0.12862414999999996,
+          "maximumFrameSeconds": 0.130025,
+          "failedFrameSeconds": 0.258024,
+          "totalSolverCalls": 13,
+          "finalTransverseError": [
+            0.9272369994011551,
+            0.2794367203428368,
+            -1.7585899000500724,
+            -0.33903755558366977,
+            0.579531121420246
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 15,
+          "executedFrames": 1,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.05,
+          "minimumReplayClearanceMeters": 1.444528975803836,
+          "maximumReplayLateralDeviationMeters": 0.004956251029971506,
+          "firstFrameSeconds": 0.116767,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0.116767,
+          "failedFrameSeconds": 0.386415,
+          "totalSolverCalls": 1,
+          "finalTransverseError": [
+            0.004956251029971506,
+            0.005651766182551644,
+            -0.018191282683893917,
+            0.11592016687445386,
+            0.2089855819380354
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 15,
+          "executedFrames": 156,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8216666666666668,
+            "entryTimeSeconds": 6.799999999999984,
+            "confirmationTimeSeconds": 7.79999999999998
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.9315202969520897,
+          "maximumReplayLateralDeviationMeters": 6.497028329144681,
+          "firstFrameSeconds": 0.10938,
+          "subsequentMedianSeconds": 0.030947,
+          "subsequentP95Seconds": 0.08385525,
+          "maximumFrameSeconds": 0.174744,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 198,
+          "finalTransverseError": [
+            -0.006095661979970793,
+            0.0016257927245699715,
+            -0.055535760951840984,
+            -0.0001228474148174583,
+            0.00044344909029099934
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 15,
+          "executedFrames": 14,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8266666666666669,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.7000000000000001,
+          "minimumReplayClearanceMeters": 13.517517704584673,
+          "maximumReplayLateralDeviationMeters": 1.2234544051489014,
+          "firstFrameSeconds": 0.106941,
+          "subsequentMedianSeconds": 0.071721,
+          "subsequentP95Seconds": 0.113843,
+          "maximumFrameSeconds": 0.114143,
+          "failedFrameSeconds": 0.174708,
+          "totalSolverCalls": 18,
+          "finalTransverseError": [
+            -1.2234544051489014,
+            -0.30530252397800406,
+            -1.7803833561179,
+            0.21620936423962872,
+            -0.5577248891869767
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 15,
+          "executedFrames": 1116,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 56.445,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 55.800000000000004,
+          "minimumReplayClearanceMeters": 3.287114432142421,
+          "maximumReplayLateralDeviationMeters": 7.19209515628563,
+          "firstFrameSeconds": 0.119452,
+          "subsequentMedianSeconds": 0.024133,
+          "subsequentP95Seconds": 0.07157650000000002,
+          "maximumFrameSeconds": 0.119452,
+          "failedFrameSeconds": 0.110194,
+          "totalSolverCalls": 1198,
+          "finalTransverseError": [
+            2.1871725793061096,
+            0.25763413315522743,
+            -1.2467053327638382,
+            -0.08434411863947175,
+            -0.09801097061495717
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 15,
+          "executedFrames": 10,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8250000000000002,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.5,
+          "minimumReplayClearanceMeters": 16.441984082805998,
+          "maximumReplayLateralDeviationMeters": 0.7008888175376845,
+          "firstFrameSeconds": 0.137025,
+          "subsequentMedianSeconds": 0.122382,
+          "subsequentP95Seconds": 0.134219,
+          "maximumFrameSeconds": 0.137025,
+          "failedFrameSeconds": 0.202731,
+          "totalSolverCalls": 16,
+          "finalTransverseError": [
+            -0.7008888175376845,
+            -0.2249063887328161,
+            -1.1422076390965188,
+            0.25756382755576857,
+            -0.395782759483459
+          ],
+          "pathDeviationLimitSatisfied": true
+        }
+      ]
+    },
+    {
+      "generation": 20,
+      "completedCases": 14,
+      "recovered": 6,
+      "controlUnavailable": 8,
+      "collisions": 0,
+      "cases": [
+        {
+          "scenario": "headOn",
+          "speed": 8,
+          "executedFrames": 193,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7983333333333333,
+            "entryTimeSeconds": 8.649999999999988,
+            "confirmationTimeSeconds": 9.650000000000002
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.5966558400964361,
+          "maximumReplayLateralDeviationMeters": 5.71559374014917,
+          "firstFrameSeconds": 1.21682,
+          "subsequentMedianSeconds": 0.033283,
+          "subsequentP95Seconds": 0.10493509999999995,
+          "maximumFrameSeconds": 1.21682,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 208,
+          "finalTransverseError": [
+            0.03726167649233174,
+            -0.006418958779112473,
+            0.029536140234107222,
+            0.0036916914157952415,
+            0.0030798681548090015
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 8,
+          "executedFrames": 194,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.7083333333333335,
+            "entryTimeSeconds": 8.699999999999989,
+            "confirmationTimeSeconds": 9.700000000000003
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.2359477480768593,
+          "maximumReplayLateralDeviationMeters": 5.8814388644343145,
+          "firstFrameSeconds": 0.307464,
+          "subsequentMedianSeconds": 0.033071,
+          "subsequentP95Seconds": 0.10283105,
+          "maximumFrameSeconds": 0.307464,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 207,
+          "finalTransverseError": [
+            0.01759964434840337,
+            -0.004366683833297501,
+            0.019000264464679617,
+            0.0027274528018606573,
+            0.0020745739387584387
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 8,
+          "executedFrames": 270,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": 12.500000000000043,
+            "confirmationTimeSeconds": 13.500000000000057
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.7423239143100678,
+          "maximumReplayLateralDeviationMeters": 4.4962855531309165,
+          "firstFrameSeconds": 0.11856,
+          "subsequentMedianSeconds": 0.045774,
+          "subsequentP95Seconds": 0.11180154999999994,
+          "maximumFrameSeconds": 0.221367,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 318,
+          "finalTransverseError": [
+            -0.024769133531018225,
+            0.006208894654062313,
+            -0.0275704987694807,
+            -0.007771967421928285,
+            -0.006372821580807166
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 8,
+          "executedFrames": 208,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 2.0183333333333335,
+            "entryTimeSeconds": 9.399999999999999,
+            "confirmationTimeSeconds": 10.400000000000013
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 0.1527180732013888,
+          "maximumReplayLateralDeviationMeters": 6.573643801065555,
+          "firstFrameSeconds": 0.100143,
+          "subsequentMedianSeconds": 0.031601,
+          "subsequentP95Seconds": 0.07753115,
+          "maximumFrameSeconds": 0.224621,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 217,
+          "finalTransverseError": [
+            0.030154220960437864,
+            -0.006292441532943643,
+            0.028823241057647664,
+            0.008842091474608847,
+            0.008042908518022404
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 8,
+          "executedFrames": 11,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.935,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.55,
+          "minimumReplayClearanceMeters": 10.432387860974751,
+          "maximumReplayLateralDeviationMeters": 0.7545113916152536,
+          "firstFrameSeconds": 0.109226,
+          "subsequentMedianSeconds": 0.0775995,
+          "subsequentP95Seconds": 0.106333,
+          "maximumFrameSeconds": 0.109226,
+          "failedFrameSeconds": 0.216182,
+          "totalSolverCalls": 15,
+          "finalTransverseError": [
+            -0.7545113916152536,
+            -0.29187908739340757,
+            -1.3992073970455898,
+            -0.8421184711320723,
+            -0.7245826815099883
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 8,
+          "executedFrames": 1754,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 80.44,
+            "entryTimeSeconds": 86.69999999999722,
+            "confirmationTimeSeconds": 87.69999999999716
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.1677013764173687,
+          "maximumReplayLateralDeviationMeters": 5.776888351541649,
+          "firstFrameSeconds": 0.139312,
+          "subsequentMedianSeconds": 0.022644,
+          "subsequentP95Seconds": 0.041659449999999994,
+          "maximumFrameSeconds": 0.139312,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 1792,
+          "finalTransverseError": [
+            0.006518111184135129,
+            0.0012780799708005436,
+            0.006407838361588425,
+            0.0011614900867056438,
+            0.0014091406390210753
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 8,
+          "executedFrames": 0,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.9366666666666668,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0,
+          "minimumReplayClearanceMeters": null,
+          "maximumReplayLateralDeviationMeters": 0,
+          "firstFrameSeconds": null,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0,
+          "failedFrameSeconds": 0.12824,
+          "totalSolverCalls": 0,
+          "finalTransverseError": [],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "headOn",
+          "speed": 15,
+          "executedFrames": 14,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2516666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.7000000000000001,
+          "minimumReplayClearanceMeters": 3.7677174667391324,
+          "maximumReplayLateralDeviationMeters": 1.2890009529643827,
+          "firstFrameSeconds": 0.284074,
+          "subsequentMedianSeconds": 0.080847,
+          "subsequentP95Seconds": 0.11786804999999999,
+          "maximumFrameSeconds": 0.284074,
+          "failedFrameSeconds": 0.242071,
+          "totalSolverCalls": 15,
+          "finalTransverseError": [
+            1.2890009529643827,
+            0.334567175612458,
+            -2.028055000596538,
+            -0.3663344484224063,
+            0.5546712996411909
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "acceleratingHeadOn",
+          "speed": 15,
+          "executedFrames": 12,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.2183333333333335,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.6000000000000001,
+          "minimumReplayClearanceMeters": 5.653216875738906,
+          "maximumReplayLateralDeviationMeters": 0.9272369994011551,
+          "firstFrameSeconds": 0.112243,
+          "subsequentMedianSeconds": 0.076907,
+          "subsequentP95Seconds": 0.10252859999999998,
+          "maximumFrameSeconds": 0.112243,
+          "failedFrameSeconds": 0.249165,
+          "totalSolverCalls": 13,
+          "finalTransverseError": [
+            0.9272369994011551,
+            0.2794367203428368,
+            -1.7585899000500724,
+            -0.33903755558366977,
+            0.579531121420246
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "brakingLead",
+          "speed": 15,
+          "executedFrames": 1,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 6.646666666666667,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.05,
+          "minimumReplayClearanceMeters": 1.444528975803836,
+          "maximumReplayLateralDeviationMeters": 0.004956251029971506,
+          "firstFrameSeconds": 0.109742,
+          "subsequentMedianSeconds": null,
+          "subsequentP95Seconds": null,
+          "maximumFrameSeconds": 0.109742,
+          "failedFrameSeconds": 0.285463,
+          "totalSolverCalls": 1,
+          "finalTransverseError": [
+            0.004956251029971506,
+            0.005651766182551644,
+            -0.018191282683893917,
+            0.11592016687445386,
+            0.2089855819380354
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "crossing",
+          "speed": 15,
+          "executedFrames": 156,
+          "outcome": "recovered",
+          "recovery": {
+            "enabled": true,
+            "recovered": true,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8216666666666668,
+            "entryTimeSeconds": 6.799999999999984,
+            "confirmationTimeSeconds": 7.79999999999998
+          },
+          "collisionDetected": false,
+          "controlUnavailable": false,
+          "failure": "",
+          "failureTime": null,
+          "minimumReplayClearanceMeters": 1.9315202969520897,
+          "maximumReplayLateralDeviationMeters": 6.497028329144681,
+          "firstFrameSeconds": 0.108079,
+          "subsequentMedianSeconds": 0.030366,
+          "subsequentP95Seconds": 0.08331925000000001,
+          "maximumFrameSeconds": 0.174943,
+          "failedFrameSeconds": null,
+          "totalSolverCalls": 198,
+          "finalTransverseError": [
+            -0.006095661979970793,
+            0.0016257927245699715,
+            -0.055535760951840984,
+            -0.0001228474148174583,
+            0.00044344909029099934
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "turningCrossing",
+          "speed": 15,
+          "executedFrames": 17,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8266666666666669,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+          "failureTime": 0.8500000000000001,
+          "minimumReplayClearanceMeters": 11.46498522931577,
+          "maximumReplayLateralDeviationMeters": 1.8633404906171416,
+          "firstFrameSeconds": 0.101977,
+          "subsequentMedianSeconds": 0.0723075,
+          "subsequentP95Seconds": 0.23362449999999985,
+          "maximumFrameSeconds": 0.284761,
+          "failedFrameSeconds": 0.236012,
+          "totalSolverCalls": 24,
+          "finalTransverseError": [
+            -1.8633404906171416,
+            -0.38927359191795263,
+            -1.7061810465539793,
+            0.3016773805911624,
+            -0.5430309145068906
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedHeadOn",
+          "speed": 15,
+          "executedFrames": 1116,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 56.445,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 55.800000000000004,
+          "minimumReplayClearanceMeters": 3.287114432142421,
+          "maximumReplayLateralDeviationMeters": 7.19209515628563,
+          "firstFrameSeconds": 0.125029,
+          "subsequentMedianSeconds": 0.022957,
+          "subsequentP95Seconds": 0.07267299999999999,
+          "maximumFrameSeconds": 0.125029,
+          "failedFrameSeconds": 0.102063,
+          "totalSolverCalls": 1198,
+          "finalTransverseError": [
+            2.1871725793061096,
+            0.25763413315522743,
+            -1.2467053327638382,
+            -0.08434411863947175,
+            -0.09801097061495717
+          ],
+          "pathDeviationLimitSatisfied": true
+        },
+        {
+          "scenario": "curvedCrossing",
+          "speed": 15,
+          "executedFrames": 13,
+          "outcome": "controlUnavailable",
+          "recovery": {
+            "enabled": true,
+            "recovered": false,
+            "tolerances": [
+              0.1,
+              0.017453292519943295,
+              0.1,
+              0.05,
+              0.01
+            ],
+            "errorOrder": [
+              "lateralMeters",
+              "headingRadians",
+              "speedMetersPerSecond",
+              "lateralVelocityMetersPerSecond",
+              "yawRateRadiansPerSecond"
+            ],
+            "dwellSeconds": 1,
+            "minimumTimeSeconds": 1.8250000000000002,
+            "entryTimeSeconds": null,
+            "confirmationTimeSeconds": null
+          },
+          "collisionDetected": false,
+          "controlUnavailable": true,
+          "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+          "failureTime": 0.65,
+          "minimumReplayClearanceMeters": 14.170125215012593,
+          "maximumReplayLateralDeviationMeters": 1.1928633351164475,
+          "firstFrameSeconds": 0.127869,
+          "subsequentMedianSeconds": 0.114524,
+          "subsequentP95Seconds": 0.1301133,
+          "maximumFrameSeconds": 0.130578,
+          "failedFrameSeconds": 0.219273,
+          "totalSolverCalls": 22,
+          "finalTransverseError": [
+            -1.1928633351164475,
+            -0.28205317157958226,
+            -1.051223974389755,
+            0.19551098823885915,
+            -0.3545709093766459
+          ],
+          "pathDeviationLimitSatisfied": true
+        }
+      ]
+    }
+  ],
+  "limitations": "Attempt15 was interrupted after five cases. Attempt19 and a mixed-source test run were invalidated by concurrent source edits and are excluded. Cases and tests are never reclassified as passing from an incomplete run."
+}

@@ -1,0 +1,718 @@
+{
+  "fullSuiteBeforeFinalGainProjection": {
+    "total": 709,
+    "passed": 708,
+    "failed": 1,
+    "incomplete": 1
+  },
+  "independentTimeoutRerun": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "incomplete": 0,
+    "names": "twoStagePredictiveControlTest/failedFreshInitializationHasOnlyOneBoundedInputExpansion"
+  },
+  "finalProjectionFocusedSuite": {
+    "total": 102,
+    "passed": 102,
+    "failed": 0
+  },
+  "noTargetCounterfactual": [
+    {
+      "scenario": "acceleratingHeadOn",
+      "speed": 15,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0016451785542684213,
+        0.02637138081918408
+      ],
+      "seconds": 1.446696
+    },
+    {
+      "scenario": "brakingLead",
+      "speed": 15,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0016451785542684213,
+        0.02637138081918408
+      ],
+      "seconds": 0.060501
+    },
+    {
+      "scenario": "crossing",
+      "speed": 15,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0016451785542684213,
+        0.02637138081918408
+      ],
+      "seconds": 0.047772
+    },
+    {
+      "scenario": "curvedCrossing",
+      "speed": 15,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.024941688612317697,
+        0.027239223946125234
+      ],
+      "seconds": 0.131604
+    },
+    {
+      "scenario": "curvedHeadOn",
+      "speed": 15,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.024941688612317697,
+        0.027239223946125234
+      ],
+      "seconds": 0.127465
+    },
+    {
+      "scenario": "headOn",
+      "speed": 15,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0016451785542684213,
+        0.02637138081918408
+      ],
+      "seconds": 0.059257
+    },
+    {
+      "scenario": "turningCrossing",
+      "speed": 15,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0016451785542684213,
+        0.02637138081918408
+      ],
+      "seconds": 0.035717
+    },
+    {
+      "scenario": "acceleratingHeadOn",
+      "speed": 8,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0037044883026751477,
+        0.021597249215641306
+      ],
+      "seconds": 0.191902
+    },
+    {
+      "scenario": "brakingLead",
+      "speed": 8,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0037044883026751477,
+        0.021597249215641306
+      ],
+      "seconds": 0.033323
+    },
+    {
+      "scenario": "crossing",
+      "speed": 8,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0037044883026751477,
+        0.021597249215641306
+      ],
+      "seconds": 0.031673
+    },
+    {
+      "scenario": "curvedCrossing",
+      "speed": 8,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.022160302616960836,
+        0.021889877260242843
+      ],
+      "seconds": 0.065638
+    },
+    {
+      "scenario": "curvedHeadOn",
+      "speed": 8,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.022160302616960836,
+        0.021889877260242843
+      ],
+      "seconds": 0.035878
+    },
+    {
+      "scenario": "headOn",
+      "speed": 8,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0037044883026751477,
+        0.021597249215641306
+      ],
+      "seconds": 0.035975
+    },
+    {
+      "scenario": "turningCrossing",
+      "speed": 8,
+      "returned": true,
+      "failure": "",
+      "input": [
+        0.0037044883026751477,
+        0.021597249215641306
+      ],
+      "seconds": 0.033517
+    }
+  ],
+  "algebra": {
+    "scope": "finite mathematical checks; not a vehicle certificate",
+    "randomSeed": 20261003.0,
+    "matlabRelease": "2026a",
+    "checks": [
+      {
+        "name": "localComparison",
+        "passed": true,
+        "metrics": {
+          "exponentialResidual": 4.579669976578771e-16,
+          "minimumContainmentGap": 0.007184614604933061
+        },
+        "failure": ""
+      },
+      {
+        "name": "localEllipsoid",
+        "passed": true,
+        "metrics": {
+          "exactExtremizerResidual": 6.661338147750939e-16
+        },
+        "failure": ""
+      },
+      {
+        "name": "localCovariantMotion",
+        "passed": true,
+        "metrics": {
+          "transportDerivativeResidual": 2.211806283223961e-11,
+          "reconstructedSideslipRad": 0.03000450182347694
+        },
+        "failure": ""
+      },
+      {
+        "name": "localRelativeYawBound",
+        "passed": true,
+        "metrics": {
+          "samples": 10000,
+          "relativeYawBoundRad": 0.01662229285001125,
+          "largestSampledRelativeYawErrorRad": 0.014668718048355664
+        },
+        "failure": ""
+      },
+      {
+        "name": "localRelativeGeometry",
+        "passed": true,
+        "metrics": {
+          "commonPoseCancellationResidualMeters": 5.995204332975845e-14
+        },
+        "failure": ""
+      },
+      {
+        "name": "localRobustVertexRows",
+        "passed": true,
+        "metrics": {
+          "samples": 10000,
+          "minimumEnclosureReserveMeters": 0.013056240602046465
+        },
+        "failure": ""
+      },
+      {
+        "name": "localWholeHold",
+        "passed": true,
+        "metrics": {
+          "nodeOnlyMinimumMeters": 0.15000000000000002,
+          "holdReserveMeters": 0.05,
+          "certifiedMinimumMeters": 0.2
+        },
+        "failure": ""
+      },
+      {
+        "name": "localIntersection",
+        "passed": true,
+        "metrics": {
+          "boundingBoxCornerOutsidePriorBy": 0.32287565553229536,
+          "intersectionRetainsTruth": true
+        },
+        "failure": ""
+      },
+      {
+        "name": "localPredictionVersusEstimation",
+        "passed": true,
+        "metrics": {
+          "reachablePositionRadiusMeters": 0.5,
+          "invalidObserverShrinkRadiusMeters": 0.001831563888873418
+        },
+        "failure": ""
+      },
+      {
+        "name": "localOutputFeedbackTube",
+        "passed": true,
+        "metrics": {
+          "exactDynamicsResidual": 2.7755575615628914e-17,
+          "minimumBoxReserve": 0,
+          "wrongSignDiscrepancy": 0.020800000000000013
+        },
+        "failure": ""
+      },
+      {
+        "name": "localRemainderDomain",
+        "passed": true,
+        "metrics": {
+          "maximumSampledRemainder": 0.043539791401705275,
+          "wholeDomainBound": 0.11281000000000001,
+          "uncertaintyOnlyBound": 0.0014100000000000002
+        },
+        "failure": ""
+      },
+      {
+        "name": "localTerminalCore",
+        "passed": true,
+        "metrics": {
+          "admissibleRadiusInterval": [
+            0.08273824700712473,
+            2.417261752992875
+          ],
+          "chosenRadius": 0.2,
+          "worstSuccessorRadius": 0.17400000000000002,
+          "tooSmallRadiusViolation": 0.009828859562054704
+        },
+        "failure": ""
+      },
+      {
+        "name": "localSlackShift",
+        "passed": true,
+        "metrics": {
+          "inheritedBudget": 0.39999999999999997,
+          "acceptedSuccessorBudget": 0.34,
+          "executedSlackSum": 0.7424499999999999,
+          "positiveNondecayingBudgetCounterexample": 0.1
+        },
+        "failure": ""
+      },
+      {
+        "name": "localClfSupply",
+        "passed": true,
+        "metrics": {
+          "minimumYoungReserve": 0,
+          "issSupply": 0.03716129032258063,
+          "persistentSupplyLimit": 0.18580645161290327
+        },
+        "failure": ""
+      },
+      {
+        "name": "localClfCone",
+        "passed": true,
+        "metrics": {
+          "socLowerCurrentValue": 1.7609246027412147,
+          "socUpperSuccessorValue": 0.5537485705712573,
+          "largestCornerClfResidual": -1.2112799999999997
+        },
+        "failure": ""
+      },
+      {
+        "name": "localVanishingTie",
+        "passed": true,
+        "metrics": {
+          "fixedTieSlackAtNominal": 9.80296049406921e-05,
+          "vanishingTieMaximumSlackExcess": 0,
+          "vanishingTieMaximumDissipationResidual": 0
+        },
+        "failure": ""
+      },
+      {
+        "name": "localCausalAction",
+        "passed": true,
+        "metrics": {
+          "commonActionSetEmpty": true,
+          "individualTrueStateActionsExist": true,
+          "intervalInfeasibilityGap": 1.8
+        },
+        "failure": ""
+      }
+    ],
+    "passed": 17,
+    "total": 17
+  },
+  "codeAnalysis": {
+    "scope": "MATLAB Code Analyzer, factory settings; current task-owned changed MATLAB sources",
+    "release": "2026a",
+    "fileCount": 15,
+    "warningCount": 9,
+    "newWarningCount": 0,
+    "files": [
+      {
+        "file": "config/collisionAvoidanceControllerConfig.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "controller/collisionAvoidanceController.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "controller/predictiveSafetyGeometry.m",
+        "warnings": {
+          "id": "MSNU",
+          "message": "A Code Analyzer message was once suppressed here, but the message is no longer generated.",
+          "fix": 1,
+          "line": 350,
+          "column": [
+            50,
+            60
+          ]
+        },
+        "baselineWarnings": {
+          "id": "MSNU",
+          "message": "A Code Analyzer message was once suppressed here, but the message is no longer generated.",
+          "fix": 1,
+          "line": 291,
+          "column": [
+            50,
+            60
+          ]
+        },
+        "newWarnings": []
+      },
+      {
+        "file": "controller/readControllerInputs.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "controller/solvePredictiveControl.m",
+        "warnings": [
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 681,
+            "column": [
+              26,
+              30
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 681,
+            "column": [
+              57,
+              61
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 681,
+            "column": [
+              82,
+              86
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 688,
+            "column": [
+              24,
+              24
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 689,
+            "column": [
+              20,
+              20
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 694,
+            "column": [
+              26,
+              28
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 713,
+            "column": [
+              9,
+              11
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 713,
+            "column": [
+              31,
+              33
+            ]
+          }
+        ],
+        "baselineWarnings": [
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 606,
+            "column": [
+              26,
+              30
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 606,
+            "column": [
+              57,
+              61
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 606,
+            "column": [
+              82,
+              86
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 610,
+            "column": [
+              24,
+              24
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 611,
+            "column": [
+              20,
+              20
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 614,
+            "column": [
+              26,
+              28
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 629,
+            "column": [
+              9,
+              11
+            ]
+          },
+          {
+            "id": "SPRIX",
+            "message": "This sparse indexing expression is likely to be slow.",
+            "fix": 0,
+            "line": 629,
+            "column": [
+              31,
+              33
+            ]
+          }
+        ],
+        "newWarnings": []
+      },
+      {
+        "file": "controller/terminalContinuation.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "estimator/nrmmControllerErrorBounds.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "scripts/analyzePerceptionRangeFailures.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "scripts/nrmmEstimatorControllerAdapter.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "scripts/runNonlinearPredictiveSafetyValidation.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "tests/nrmmControllerErrorBoundsTest.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "tests/observerPredictiveControlTest.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "tests/ordinaryDistanceDualTest.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "tests/terminalContinuationTest.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      },
+      {
+        "file": "tests/twoStagePredictiveControlTest.m",
+        "warnings": [],
+        "baselineWarnings": [],
+        "newWarnings": []
+      }
+    ]
+  },
+  "finalSolverCodeAnalysis": [
+    {
+      "id": "SPRIX",
+      "message": "This sparse indexing expression is likely to be slow.",
+      "fix": 0,
+      "line": 689,
+      "column": [
+        26,
+        30
+      ]
+    },
+    {
+      "id": "SPRIX",
+      "message": "This sparse indexing expression is likely to be slow.",
+      "fix": 0,
+      "line": 689,
+      "column": [
+        57,
+        61
+      ]
+    },
+    {
+      "id": "SPRIX",
+      "message": "This sparse indexing expression is likely to be slow.",
+      "fix": 0,
+      "line": 689,
+      "column": [
+        82,
+        86
+      ]
+    },
+    {
+      "id": "SPRIX",
+      "message": "This sparse indexing expression is likely to be slow.",
+      "fix": 0,
+      "line": 696,
+      "column": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "SPRIX",
+      "message": "This sparse indexing expression is likely to be slow.",
+      "fix": 0,
+      "line": 697,
+      "column": [
+        20,
+        20
+      ]
+    },
+    {
+      "id": "SPRIX",
+      "message": "This sparse indexing expression is likely to be slow.",
+      "fix": 0,
+      "line": 702,
+      "column": [
+        26,
+        28
+      ]
+    },
+    {
+      "id": "SPRIX",
+      "message": "This sparse indexing expression is likely to be slow.",
+      "fix": 0,
+      "line": 721,
+      "column": [
+        9,
+        11
+      ]
+    },
+    {
+      "id": "SPRIX",
+      "message": "This sparse indexing expression is likely to be slow.",
+      "fix": 0,
+      "line": 721,
+      "column": [
+        31,
+        33
+      ]
+    }
+  ],
+  "scope": "The 709-test run precedes the four-line authority projection. The 102-test controller/terminal/geometry run covers that projection. One timeout in the full run passes unchanged on independent rerun. The zero-radius division guard is an additional exact edge-case correction; its separate smoke validation is recorded below when available.",
+  "zeroRadiusGuardRegression": {
+    "total": 15,
+    "passed": 15,
+    "failed": 0
+  }
+}

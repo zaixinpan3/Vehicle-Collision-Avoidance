@@ -53,6 +53,19 @@ classdef ordinaryDistanceDualTest < matlab.unittest.TestCase
             testCase.verifyEqual(value,zeros(4,1),AbsTol=0);
             testCase.verifyEqual(jacobian,zeros(4,3),AbsTol=0);
         end
+        function overlappingRectanglesHaveAFeasibleDualEscapeDirection(testCase)
+            shape=[2.4;.95;0;0];pose=[0;0;0];target=[.5;.2;.4];
+            rows=predictiveSafetyGeometry.supportLinearization(pose,shape,target,shape);
+            testCase.verifyEqual(norm(rows.normal),1,AbsTol=1e-12);
+            testCase.verifyGreaterThanOrEqual(rows.lambda,zeros(4,1));
+            testCase.verifyLessThan(min(rows.value),0);
+            translation=-min(rows.value)+.2;
+            moved=pose+[translation*rows.normal;0];
+            value=predictiveSafetyGeometry.fixedDualRows(moved,shape,target,shape,rows.lambda);
+            distance=predictiveSafetyGeometry.rectangleNumeric(moved,shape,target,shape);
+            testCase.verifyEqual(min(value),.2,AbsTol=1e-12);
+            testCase.verifyGreaterThanOrEqual(distance,min(value)-1e-12);
+        end
         function optimizedMultipliersAreInvariantToWorldTranslation(testCase)
             pose=[1;.2;.3];target=[10;3;-.2];shape=[2.4;.95;.2;-.1];offset=[100;-70;0];
             first=predictiveSafetyGeometry.dualLinearization(pose,shape,target,shape);

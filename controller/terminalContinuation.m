@@ -95,6 +95,94 @@ classdef terminalContinuation
             seed.phaseMeters=0;
         end
 
+        function [seed,domainMargin] = feedbackCore(seed,observerGenerator,endpointGenerator,cfg,nominalDeviation)
+            % An affine invariant family enclosing terminal mean and error.
+            % Future posterior errors use the current enclosure as a frozen
+            % experimental envelope. This is not a nonlinear tube certificate.
+            if ~isfield(seed,'nominalErrorBound')
+                seed.nominalRadius=seed.radius;
+                seed.nominalErrorBound=seed.errorBound;
+                seed.nominalPositionBound=seed.samplePositionBound;
+                seed.nominalHeadingBound=seed.sampleHeadingBound;
+            end
+            seed.errorBound=seed.nominalErrorBound;
+            if ~isfield(seed,'nominalRadius'),seed.nominalRadius=seed.radius;end
+            seed.radius=seed.nominalRadius;
+            seed.samplePositionBound=seed.nominalPositionBound;
+            seed.sampleHeadingBound=seed.nominalHeadingBound;
+            if isfield(seed,'feedbackTube'),seed=rmfield(seed,'feedbackTube');end
+            domainMargin=zeros(0,1);
+            if ~any(observerGenerator(:)),return;end
+            if nargin<5,nominalDeviation=zeros(5,1);end
+            angle=seed.epochState(3);rotation=localRotation(-angle);
+            transform=blkdiag(rotation,eye(6));endpointGenerator=transform*endpointGenerator;
+            observerGenerator=blkdiag(rotation,eye(4))*observerGenerator;
+            [next,a,b]=nonlinearBicycleModel.sample(seed.base,seed.reference.input,cfg);
+            movingFrame=blkdiag(localRotation(-next(3)),eye(4));
+            aa=[movingFrame*a,zeros(6,2);zeros(2,8)];bb=[movingFrame*b;eye(2)];closed=aa+bb*seed.gain;
+            disturbance=-bb*seed.gain(:,1:6)*observerGenerator;
+            % A full-dimensional enclosing disturbance box also resolves
+            % directions with zero sensor noise. A numerical epsilon there
+            % would require enormous common scaling to admit the mean core.
+            width=max(sum(abs(disturbance),2),seed.nominalErrorBound);
+            block=eye(8);generators=zeros(8,8*1500);
+            for count=1:1500
+                columns=8*(count-1)+(1:8);generators(:,columns)=block.*width.';
+                block=closed*block;alpha=norm((block.*width.')./width,inf);
+                if alpha<.1,break;end
+            end
+            if alpha>=1
+                domainMargin=-1;return;
+            end
+            % A^s W <= alpha W gives Z=(W+...+A^(s-1)W)/(1-alpha),
+            % with A Z + W contained in Z. W is an enclosing disturbance box.
+            generators=generators(:,1:8*count)/(1-alpha);
+            rowScale=sum(abs(generators),2);
+            normalized=generators./rowScale;
+            coefficients=(normalized*normalized.')\(endpointGenerator./rowScale);
+            usage=sum(abs(normalized.'*coefficients),2);
+            poseLift=[seed.poseGain;eye(5)];
+            meanMap=normalized.'*((normalized*normalized.')\(poseLift./rowScale));
+            meanSupport=vecnorm(meanMap/seed.quotientFactor,2,2);
+            requestedRadius=max(seed.nominalRadius,norm(seed.quotientFactor*nominalDeviation));
+            % G*C represents every endpoint uncertainty column. Requiring
+            % ||C_j||_1+||M_j*Q^-1||_2*r <= lambda puts the entire nominal
+            % ellipsoid plus endpoint error in lambda*Z. Every lambda>=1
+            % remains invariant for the same affine map and disturbance.
+            scale=max([1;usage+meanSupport*requestedRadius]);
+            active=meanSupport>0;
+            seed.radius=min((scale-usage(active))./meanSupport(active));
+            generators=scale*generators;
+            radius=sum(abs(generators),2);
+            inputGenerator=[seed.gain*generators,-seed.gain(:,1:6)*observerGenerator];
+            inputRadius=sum(abs(inputGenerator),2);
+            nominalInputRadius=seed.nominalRadius*vecnorm(seed.gain/seed.factor,2,2);
+            difference=seed.gain-[zeros(2,6),eye(2)];
+            slewRadius=sum(abs(difference*generators),2) ...
+                +sum(abs(seed.gain(:,1:6)*observerGenerator),2);
+            [~,am,bm]=nonlinearBicycleModel.hold(seed.base,seed.reference.input,cfg);
+            middle=[am*generators(1:6,:)+bm*seed.gain*generators, ...
+                -bm*seed.gain(:,1:6)*observerGenerator];
+            holdRadius=max(radius(1:6),sum(abs(middle),2));
+            seed.errorBound=seed.nominalErrorBound+radius;
+            seed.samplePositionBound=seed.nominalPositionBound+holdRadius(1:2);
+            seed.sampleHeadingBound=seed.nominalHeadingBound+holdRadius(3);
+            seed.feedbackTube=struct('radius',radius,'inputRadius',inputRadius, ...
+                'blockContraction',alpha,'blockSteps',count,'scale',scale, ...
+                'nominalAdmissionRadius',seed.radius);
+            low=[max(cfg.model.speedMinimum,cfg.model.scheduleSpeedFloor+1e-4); ...
+                -cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
+            high=[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
+            domainMargin=[seed.base(4:6)-low-holdRadius(4:6)-seed.nominalErrorBound(4:6); ...
+                high-seed.base(4:6)-holdRadius(4:6)-seed.nominalErrorBound(4:6); ...
+                seed.reference.input(2)-cfg.actuation.brakingRatioMinimum-inputRadius(2)-nominalInputRadius(2); ...
+                cfg.actuation.brakingRatioMaximum-seed.reference.input(2)-inputRadius(2)-nominalInputRadius(2)];
+            if isfinite(cfg.model.brakingRatioRateMaximum)
+                nominalSlew=seed.nominalRadius*norm(difference(2,:)/seed.factor);
+                domainMargin(end+1)=cfg.controller.sampleTime*cfg.model.brakingRatioRateMaximum-slewRadius(2)-nominalSlew;
+            end
+        end
+
         function [seed,jacobian] = fit(seed,y,sampleIndex)
             % Eliminate free SE(2) pose by the Schur complement of the core.
             % The selected pose is retained as part of the safety witness.
