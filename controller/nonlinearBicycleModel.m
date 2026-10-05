@@ -168,34 +168,48 @@ classdef nonlinearBicycleModel
         end
 
         function reference = cruise(cfg,curvature)
-            % The CLF matrix comes from a semidefinite program, so recent
-            % operating points are cached rather than only the last one.
+            % Trim, sampled local transverse model and the CLF matrix P. P is
+            % never computed here: it is read from config/clfMatrices.json,
+            % which scripts/synthesizeClfMatrices.m writes before experiments.
             persistent savedKeys savedReferences
             if isempty(savedKeys),savedKeys={};savedReferences={};end
-            key={cfg.vehicle,cfg.tire,cfg.roadLoad,cfg.model,cfg.referenceSpeed, ...
-                cfg.controller.sampleTime,cfg.nonlinear.integrationStep,cfg.clf, ...
-                cfg.nominalClf.decreaseFraction,curvature};
-            for index=1:numel(savedKeys)
-                if isequaln(key,savedKeys{index}),reference=savedReferences{index};return;end
-            end
+            key=nonlinearBicycleModel.clfKey(cfg,curvature);
+            index=find(strcmp(savedKeys,key),1);
+            if ~isempty(index),reference=savedReferences{index};return;end
+            point=nonlinearBicycleModel.operatingPoint(cfg,curvature);
+            entry=localClfEntry(key);
+            p=reshape(entry.matrix,5,5);p=(p+p.')/2;
+            reference=struct('state',point.state,'input',point.input,'curvature',curvature, ...
+                'matrix',p,'factor',chol(p),'contraction',exp(-2*cfg.controller.sampleTime/cfg.clf.convergenceTimeConstantSeconds), ...
+                'certifiedContraction',entry.certifiedContraction, ...
+                'continuousA',point.continuousA,'continuousB',point.continuousB);
+            savedKeys=[{key},savedKeys(1:min(end,15))];savedReferences=[{reference},savedReferences(1:min(end,15))];
+        end
+
+        function point = operatingPoint(cfg,curvature)
+            % Constant-speed, constant-curvature trim and its sampled
+            % transverse model e+ = A e + B (u - u_ref).
             speed=cfg.referenceSpeed;
             objective=@(p)localTrimResidual(p,speed,curvature,cfg);
             options=optimoptions('fsolve','Display','off','FunctionTolerance',1e-12, ...
                 'StepTolerance',1e-12,'OptimalityTolerance',1e-12);
-            [point,residual,flag]=fsolve(objective,[0;atan(cfg.vehicle.wheelbase*curvature);.02],options);
+            [solution,residual,flag]=fsolve(objective,[0;atan(cfg.vehicle.wheelbase*curvature);.02],options);
             if flag<=0 || norm(residual,inf)>1e-8
                 error('collisionAvoidanceController:unrealizableReference','No positive-speed constant-curvature trim was found.');
             end
-            [~,x,u]=localTrimResidual(point,speed,curvature,cfg);
+            [~,x,u]=localTrimResidual(solution,speed,curvature,cfg);
             [a,b]=nonlinearBicycleModel.jacobian(x,u,cfg,curvature);
             transition=expm([a(2:6,2:6),b(2:6,:);zeros(2,7)]*cfg.controller.sampleTime);
-            scales=[cfg.clf.lateralPositionErrorScale,cfg.clf.headingErrorScale,cfg.clf.speedErrorScale, ...
-                cfg.clf.lateralVelocityErrorScale,cfg.clf.yawRateErrorScale];
-            q=diag(1./scales.^2);
-            p=localClfMatrix(transition(1:5,1:5),transition(1:5,6:7),q);
-            reference=struct('state',x,'input',u,'curvature',curvature, ...
-                'matrix',p,'factor',chol(p),'continuousA',a(2:6,2:6),'continuousB',b(2:6,:));
-            savedKeys=[{key},savedKeys(1:min(end,15))];savedReferences=[{reference},savedReferences(1:min(end,15))];
+            point=struct('state',x,'input',u,'a',transition(1:5,1:5),'b',transition(1:5,6:7), ...
+                'continuousA',a(2:6,2:6),'continuousB',b(2:6,:));
+        end
+
+        function key = clfKey(cfg,curvature)
+            % Everything the synthesized P depends on, as one canonical text.
+            data=struct('vehicle',cfg.vehicle,'tire',cfg.tire,'roadLoad',cfg.roadLoad,'model',cfg.model, ...
+                'referenceSpeed',cfg.referenceSpeed,'sampleTime',cfg.controller.sampleTime, ...
+                'integrationStep',cfg.nonlinear.integrationStep,'clf',cfg.clf,'curvature',curvature);
+            key=string(jsonencode(data));
         end
 
         function [error,projection] = error(x,lane,reference)
@@ -318,48 +332,24 @@ function dy=localDerivative(y,u,cfg,curvature,variational)
         reshape(a*reshape(y(43:54),6,2)+b,[],1)];
 end
 
-function p=localClfMatrix(a,b,q)
-    % Quadratic CLF of the sampled local transverse model x+ = A x + B u:
-    % find P > 0 such that for every e some input gives the full decrease
-    %   (A e + B u)' P (A e + B u) - e' P e <= -e' Q e.
-    % The controller requests only decreaseFraction (< 1) of it, so the rest
-    % is a reserve for the trust region, actuation and model error. A P
-    % certified only for the requested fraction sits at the edge of
-    % feasibility (P >= eta Q with equality) and needed inputs outside the
-    % trust region near the path.
-    % With S = inv(P) and Y = K S this is the LMI
-    %   [S, (A S + B Y)', S Q^(1/2); A S + B Y, S, 0; Q^(1/2) S, 0, I] >= 0.
-    % Among such P the least steep relative to Q is chosen: maximize gamma
-    % with S >= gamma inv(Q), i.e. P <= Q/gamma. K only certifies that the
-    % decrease is attainable; it is discarded and never applied as a law.
-    % The LMI is solved with a 2% margin and the full decrease is then
-    % checked without it.
-    localPrepareLmiSolver();eta=1;
-    n=size(a,1);m=size(b,2);half=sqrtm(q);design=1.02*eta;
-    s=sdpvar(n,n);y=sdpvar(m,n,'full');gamma=sdpvar(1);
-    closed=a*s+b*y;
-    constraints=[[s,closed.',sqrt(design)*s*half;closed,s,zeros(n);sqrt(design)*half*s,zeros(n),eye(n)]>=0, ...
-        s>=gamma*inv(q),gamma>=0];
-    diagnostics=optimize(constraints,-gamma,sdpsettings('solver','sedumi','verbose',0));
-    if diagnostics.problem~=0
-        error('collisionAvoidanceController:clfSynthesisFailed','The CLF LMI did not solve: %s', ...
-            yalmiperror(diagnostics.problem));
+function entry=localClfEntry(key)
+    % Precomputed CLF matrices, read again only when the file changes.
+    persistent table stamp
+    file=fullfile(fileparts(fileparts(mfilename('fullpath'))),'config','clfMatrices.json');
+    current=-1;if isfile(file),listing=dir(file);current=listing.datenum;end
+    if isempty(table) || ~isequal(stamp,current)
+        table=containers.Map('KeyType','char','ValueType','any');stamp=current;
+        if isfile(file)
+            entries=jsondecode(fileread(file));
+            for index=1:numel(entries),table(char(entries(index).key))=entries(index);end
+        end
     end
-    p=inv(value(s));p=(p+p.')/2;k=value(y)/value(s);
-    residual=max(eig((a+b*k).'*p*(a+b*k)-p+eta*q));
-    if ~(min(eig(p))>0 && residual<=0)
-        error('collisionAvoidanceController:clfSynthesisFailed', ...
-            'The synthesized CLF does not meet the requested decrease (residual %.3g).',residual);
+    if ~isKey(table,char(key))
+        error('collisionAvoidanceController:missingClfMatrix', ...
+            ['No precomputed CLF matrix for this operating point (speed, curvature, vehicle and CLF settings). ' ...
+            'Run scripts/synthesizeClfMatrices before the experiment.']);
     end
-end
-
-function localPrepareLmiSolver()
-    if ~isempty(which('optimize')) && ~isempty(which('sedumi')),return;end
-    root=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver');
-    if ~isfolder(fullfile(root,'YALMIP')) || ~isfolder(fullfile(root,'sedumi'))
-        error('collisionAvoidanceController:missingLmiSolver','CLF synthesis requires YALMIP and SeDuMi in %s.',root);
-    end
-    addpath(genpath(fullfile(root,'YALMIP')));addpath(genpath(fullfile(root,'sedumi')));
+    entry=table(char(key));
 end
 
 function [residual,x,u]=localTrimResidual(point,speed,curvature,cfg)

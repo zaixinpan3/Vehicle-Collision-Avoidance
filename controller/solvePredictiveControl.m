@@ -567,8 +567,9 @@ function problem=localAddClf(problem,anchor,model)
     lossRadius=sum(vecnorm((j0*model.uncertainty.egoGenerator)./scales));
     lossCenter=norm(e0./scales);
     lossLower=max(0,lossCenter-lossRadius)^2;
-    currentBudget=max(0,sqrt(value)-initialRadius)^2 ...
-        -model.cfg.nominalClf.decreaseFraction*(lossCenter+lossRadius)^2;
+    % The successor must stay below rho times the smallest current value
+    % consistent with the observer enclosure.
+    currentBudget=model.nominalReference.contraction*max(0,sqrt(value)-initialRadius)^2;
     % Young's inequality keeps one SOC and the same CLF. Mean values remain
     % separate from these bounds.
     multiplier=1;bias=0;
@@ -594,13 +595,12 @@ end
 
 function [map,offset,constant,value,scale,modelConstant,clf]=localNominalClf(anchor,model,next,nv)
     % One analytic transverse quadratic on the single affine state model.
-    cfg=model.cfg;reference=model.nominalReference;
-    e0=nonlinearBicycleModel.error(model.initialState,model.lane,reference);
+    reference=model.nominalReference;
     [e1,jacobian]=nonlinearBicycleModel.errorLinearization(anchor.states(:,2),model.lane,reference);
     value=nonlinearBicycleModel.nominalValue(model.initialState,model.lane,reference);scale=max(1,value);
-    scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
-        cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
-    required=cfg.nominalClf.decreaseFraction*sum((e0./scales).^2);
+    % V(next) <= rho V(now): the error sqrt(V) shrinks by at least 1/e per
+    % clf.convergenceTimeConstantSeconds.
+    required=(1-reference.contraction)*value;
     map=sparse(5,nv);map(:,next)=reference.factor*jacobian/sqrt(scale);
     offset=reference.factor*e1/sqrt(scale);modelConstant=0;
     constant=(value-required)/scale;

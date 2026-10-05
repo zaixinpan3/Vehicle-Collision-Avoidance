@@ -286,11 +286,13 @@ primary solve is not a valid PCBF optimum.
 
 On the selected model the single CLF requirement is
 
-    V(x_next) - V(x) <= -eta * e(x)' Q e(x) + rho,    rho >= 0,
-    V(x) = e(x)' P e(x).
+    V(x_next) <= exp(-2 h / T) * V(x) + rho,    rho >= 0,
+    V(x) = e(x)' P e(x),
 
-P is the quadratic CLF synthesized by an LMI for the given-path cruise trim
-(see [NOMINAL_CLF.md](NOMINAL_CLF.md)); there is no LQR design. The analytic
+with T = `clf.convergenceTimeConstantSeconds` = 4 s. P is a quadratic CLF
+synthesized offline by an LMI for the given-path cruise trim and read from
+`config/clfMatrices.json` (see [NOMINAL_CLF.md](NOMINAL_CLF.md)); there is no
+LQR design. The analytic
 error Jacobian applied to the affine first successor gives a convex quadratic
 with Hessian J' P J. One second-order cone represents its epigraph. There are
 no cost-to-go rollouts or finite-difference curvature calculations. This

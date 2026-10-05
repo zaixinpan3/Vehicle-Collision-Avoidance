@@ -1,0 +1,93 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\title{A CLF convergence time constant and an offline CLF matrix}
+\date{Prepared October 4, 2026}
+\begin{document}
+\maketitle
+
+\section{Changes (user design)}
+\paragraph{Requested decrease.} The former requirement
+$V^+-V\le-\eta\,e^\top Qe$ with $\eta=0.5$ had no direct physical meaning. For
+the same $\eta$, the guaranteed speed differed by a factor of about 25 between
+error directions: the slowest error time constant was 5--6~s and the fastest
+about 0.15~s. It is replaced by
+\[
+V(x^+)\le\rho\,V(x)+\text{slack},\qquad\rho=e^{-2h/T},
+\]
+with $h=0.05$~s and $T=$ \texttt{clf.convergenceTimeConstantSeconds} $=4$~s,
+chosen with the user. The error size $\sqrt V$ shrinks by at least $1/e$ every
+$T$ in every direction as $V$ measures it. Under an observer enclosure the
+successor bound is $\rho$ times the smallest current value consistent with the
+enclosure. \texttt{nominalClf.decreaseFraction} is deleted.
+
+\paragraph{Offline CLF matrix.} $P$ is no longer computed at run time.
+\path{scripts/synthesizeClfMatrices.m} computes it before experiments and
+writes it, keyed by operating point, to \path{config/clfMatrices.json}. The
+controller only reads the table and rejects an operating point without an
+entry. The run time no longer needs the SDP solver. With $S=P^{-1}$, a
+certificate gain $Y=KS$ and bisection on $\rho$, the script solves
+\[
+\min\rho\quad\text{s.t.}\quad
+\begin{bmatrix}\rho S&(AS+BY)^\top\\AS+BY&S\end{bmatrix}\succeq0,\
+\begin{bmatrix}\bar u_j^2&Y_j\\Y_j^\top&S\end{bmatrix}\succeq0,\
+R^2D\preceq S\preceq R^2\kappa^{-1}D,
+\]
+with $D=\mathrm{diag}(\text{scales}^2)$. In words, the conditions are:
+\begin{itemize}
+\item \emph{Fastest contraction.} $P$ gives the fastest contraction attainable.
+\item \emph{Bounded certificate input.} The certificate input deviation is
+  bounded by $\bar u=(0.075\text{~rad},\,0.125)$ on $V\le1$. These are CLF
+  settings, equal to one maximum trust-region step by default but independent
+  of the trust settings.
+\item \emph{Certification region.} $V\le1$ contains every error within $R=2$
+  error scales.
+\item \emph{Shape bound.} $P$'s weights relative to $Q=D^{-1}$ differ by at most
+  $1/\kappa=10$.
+\end{itemize}
+$K$ is discarded.
+
+Without the input bound the fastest $P$ needs gains of about 30. Without the
+shape bound, it weights some error directions $10^{-9}$ of others. The
+certified error time constants are 2.1~s at 8~m/s and 1.5--1.6~s at 15~m/s, so
+the requested 4~s leaves a factor of 1.9--2.6.
+
+\paragraph{Operating points.} The table holds the four campaign points (8 and
+15~m/s, curvature 0 and 0.005). It also holds three points used only by tests,
+which differ in \texttt{model.brakingRatioRateMaximum} (0.5, 2) or in a drag
+coefficient of 1.2. They were found by a one-off discovery run of the test
+suite: a temporary hook synthesized a missing point instead of failing. The
+hook was then removed, and the final run uses the strict table. The first
+discovery run showed that $P$ had depended on the optimizer's trust maximum: a
+test that reduces it made synthesis infeasible. That is why the certification
+input bound became a CLF setting.
+
+\section{Results}
+All 644 tests pass with the strict table.
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+ & recovered & no solution & collision\\
+\midrule
+Exact, LQR removed (8ae93c3) & 14 & 0 & 0\\
+Exact, time constant & 14 & 0 & 0\\
+Noisy, LQR removed & 4 & 9 & 1\\
+Noisy, time constant & 5 & 9 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+No run leaves the road. The noisy 15-m/s brakingLead run, which collided after
+the LQR removal, now recovers. Recovery is confirmed later at 15~m/s, as the
+4-s time constant is slower near the path than $\eta=0.5$ was: headOn 6.7 to
+9.3~s, crossing 6.6 to 9.6~s and brakingLead 10.9 to 13.3~s. At 8~m/s the
+times change by less than 0.5~s
+(\path{CLF_TIME_CONSTANT_20261004/campaign-metrics.csv}).
+
+The mechanism of the earlier noisy collision is unchanged: an open-loop ego
+tube with soft observer tightening. That run no longer reaches contact because
+its trajectory changed, not because the mechanism was removed. The choice
+recorded in \path{LQR_REMOVAL_20261004.tex} remains open.
+\end{document}

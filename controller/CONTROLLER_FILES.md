@@ -1,6 +1,6 @@
 # Controller source map
 
-The controller and configuration contain eight MATLAB source files. See
+The controller and configuration contain eight MATLAB source files and one data table. See
 [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for the two stages, the
 terminal set and the affine prediction scope.
 
@@ -9,11 +9,12 @@ terminal set and the affine prediction scope.
 | `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
 | `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout or shifted plan) over a horizon that reaches the terminal set; PCBF slack stage, CLF stage, plan-innovation trust |
-| `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
+| `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
+| `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
 Each sample builds one nonlinear anchor: a potential-field rollout at startup,
 otherwise the shifted previous plan extended by path guidance. The rollout stops

@@ -29,7 +29,7 @@ function summary = validateNominalClf(options)
                         input=fminsearch(successor,reference.input,optimset('TolX',1e-12,'TolFun',1e-16,'MaxFunEvals',4000,'MaxIter',2000));
                         value=nonlinearBicycleModel.nominalValue(x,lane,reference);
                         next=successor(input);
-                        required=cfg.nominalClf.decreaseFraction*sum((e./scales).^2);
+                        required=(1-reference.contraction)*value;
                         rows(end+1,:)={speed,curvature,amplitude,coordinate,direction,value,next,required,next-value+required}; %#ok<AGROW>
                     end
                 end

@@ -14,15 +14,28 @@ classdef nominalClfTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function theClfMatrixIsSynthesizedWithoutAFeedbackLaw(testCase,referenceSpeed,curvature)
-            % P comes from the CLF LMI; no gain is stored or applied.
+        function theClfMatrixIsReadFromThePrecomputedTable(testCase,referenceSpeed,curvature)
+            % P was synthesized offline; the controller only reads it.
             [cfg,~,reference]=localSetup(referenceSpeed,curvature);
             testCase.verifyFalse(isfield(reference,'gain'));
+            root=fileparts(fileparts(mfilename('fullpath')));
+            entries=jsondecode(fileread(fullfile(root,'config','clfMatrices.json')));
+            entry=entries(arrayfun(@(e)string(e.key)==nonlinearBicycleModel.clfKey(cfg,curvature),entries));
+            testCase.verifyNumElements(entry,1);
+            testCase.verifyEqual(reference.matrix,(entry.matrix+entry.matrix.')/2,AbsTol=1e-12);
+            % The requested contraction is slower than the certified one.
+            testCase.verifyEqual(reference.contraction,exp(-2*cfg.controller.sampleTime/cfg.clf.convergenceTimeConstantSeconds),AbsTol=1e-15);
+            testCase.verifyLessThan(entry.certifiedContraction,reference.contraction);
+            % Shape: Q/(R^2 shapeRatio) <= P <= Q/R^2.
             scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
                 cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
-            q=diag(1./scales.^2);
-            % P certifies the full decrease e'Qe, so P >= Q is necessary.
-            testCase.verifyGreaterThanOrEqual(min(eig(q\reference.matrix)),1-1e-6);
+            ratio=eig(diag(1./scales.^2)\reference.matrix)*cfg.clf.certificationRegionScale^2;
+            testCase.verifyLessThanOrEqual(max(ratio),1+1e-6);
+            testCase.verifyGreaterThanOrEqual(min(ratio),1/cfg.clf.shapeRatio-1e-6);
+        end
+        function anOperatingPointWithoutAPrecomputedMatrixIsRejected(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',9.375));
+            testCase.verifyError(@()nonlinearBicycleModel.cruise(cfg,0),'collisionAvoidanceController:missingClfMatrix');
         end
         function trimHasZeroValueAndTheInitializationGuidancePreservesIt(testCase,referenceSpeed,curvature)
             [cfg,lane,reference]=localSetup(referenceSpeed,curvature);
@@ -43,7 +56,7 @@ classdef nominalClfTest < matlab.unittest.TestCase
             successor=@(u)nonlinearBicycleModel.nominalValue(nonlinearBicycleModel.sample(x,u,cfg),lane,reference);
             input=fminsearch(successor,reference.input,optimset('TolX',1e-12,'TolFun',1e-16,'MaxFunEvals',4000,'MaxIter',2000));
             value=nonlinearBicycleModel.nominalValue(x,lane,reference);
-            testCase.verifyLessThanOrEqual(successor(input)-value,-cfg.nominalClf.decreaseFraction*sum((e./scales).^2)+1e-12);
+            testCase.verifyLessThanOrEqual(successor(input),reference.contraction*value+1e-12);
         end
         function longitudinalPathPhaseDoesNotChangeTheValue(testCase,referenceSpeed,curvature)
             [~,lane,reference]=localSetup(referenceSpeed,curvature);
@@ -64,12 +77,16 @@ classdef nominalClfTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidConfiguration');
         end
         function nominalFractionsMustLieInsideTheUnitInterval(testCase)
-            for name=["decreaseFraction","lateralAccelerationFraction","frontForceFraction","brakingRatioLimit"]
+            for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit"]
                 testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('nominalClf',struct(name,1))), ...
                     'collisionAvoidanceController:invalidConfiguration');
             end
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('nominalClf',struct('courseGain',0))), ...
                 'collisionAvoidanceController:invalidConfiguration');
+            for setting={struct('convergenceTimeConstantSeconds',0),struct('certificationRegionScale',-1),struct('shapeRatio',.5)}
+                testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('clf',setting{1})), ...
+                    'collisionAvoidanceController:invalidConfiguration');
+            end
         end
     end
 end

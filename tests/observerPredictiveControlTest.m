@@ -83,8 +83,11 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(prediction.metadata.clfCurrentBudget,smallestBudget+1e-9);
             testCase.verifyGreaterThan(prediction.metadata.clfWorstNextValue,prediction.metadata.clfNextValue);
             testCase.verifyEqual(prediction.metadata.clfFunction,"quadraticTransverseError");
-            testCase.verifyLessThanOrEqual(prediction.metadata.clfTieBound, ...
-                cfg.solver.clfTieTolerance*prediction.metadata.clfRequiredDecrease/cfg.nominalClf.decreaseFraction+1e-12);
+            model=prediction.model;
+            scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+                cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+            loss=sum((nonlinearBicycleModel.error(model.initialState,model.lane,model.nominalReference)./scales).^2);
+            testCase.verifyLessThanOrEqual(prediction.metadata.clfTieBound,cfg.solver.clfTieTolerance*loss+1e-12);
         end
         function unavailableBoundsDoNotPreventASolvedControl(testCase)
             [ego,target,road,cfg]=localFixture(.01);
@@ -223,8 +226,6 @@ function [largestNext,smallestBudget]=localClfCorners(prediction)
     [~,a]=nonlinearBicycleModel.sample(model.initialState,model.linearization.inputs(:,1),cfg);
     signs=2*(dec2bin(0:63,6)-'0').'-1;initial=model.uncertainty.egoGenerator*signs;
     initialError=e0+j0*initial;nextError=e1+j1*a*initial;
-    scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
-        cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
     largestNext=max(sum((ref.factor*nextError).^2));
-    smallestBudget=min(sum((ref.factor*initialError).^2)-cfg.nominalClf.decreaseFraction*sum((initialError./scales).^2));
+    smallestBudget=min(ref.contraction*sum((ref.factor*initialError).^2));
 end

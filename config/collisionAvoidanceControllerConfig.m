@@ -62,15 +62,25 @@ function cfg=localDefaults()
         'rollingTransitionSpeed',.5);
     cfg.model=struct('speedMinimum',0,'speedMaximum',18,'scheduleSpeedFloor',1, ...
         'brakingRatioRateMaximum',Inf,'lateralVelocityMaximum',12,'yawRateMaximum',5);
-    % Q = diag(1./scales.^2) sets the requested CLF decrease; the CLF matrix
-    % P is synthesized from it by an LMI (nonlinearBicycleModel.cruise).
+    % One quadratic CLF V = e' P e. Each sample requires
+    %   V(next) <= rho V(now),  rho = exp(-2 sampleTime / convergenceTimeConstantSeconds),
+    % so the error sqrt(V) shrinks by at least 1/e every time constant.
+    % P is synthesized offline (scripts/synthesizeClfMatrices.m) and read
+    % from config/clfMatrices.json: in the sublevel set V <= 1, which contains
+    % every error within certificationRegionScale error scales, some input
+    % deviation within certificationSteeringRadians and
+    % certificationBrakingRatio (one maximum trust-region step by default,
+    % but independent of the trust settings) must give the fastest attainable
+    % contraction, and P's weights relative to Q = diag(1./scales.^2) may
+    % differ by at most shapeRatio.
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
-        'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2);
-    % One analytic quadratic CLF; decreaseFraction multiplies e' Q e.
+        'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
+        'convergenceTimeConstantSeconds',4,'certificationRegionScale',2,'shapeRatio',10, ...
+        'certificationSteeringRadians',.075,'certificationBrakingRatio',.125);
     % The remaining nominalClf parameters guide initialization only.
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
-        'speedGain',.5,'brakingRatioLimit',.35,'decreaseFraction',.5);
+        'speedGain',.5,'brakingRatioLimit',.35);
     % The two convex solves share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
@@ -160,7 +170,8 @@ function localValidate(cfg)
     for name=string(fieldnames(cfg.nominalClf)).'
         validateattributes(cfg.nominalClf.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit","decreaseFraction"]
+    if cfg.clf.shapeRatio<1,localInvalid('clf.shapeRatio must be at least 1.');end
+    for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit"]
         if cfg.nominalClf.(name)>=1,localInvalid('nominalClf.%s must lie in (0,1).',name);end
     end
     validateattributes(cfg.solver.maxIterations,{'double'},{'scalar','real','finite','integer','positive'});

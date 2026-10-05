@@ -12,45 +12,64 @@ For the given path and desired cruise trim, define
     V(x) = e(x)' P e(x),       P > 0.
 
 Longitudinal path phase is free. `nonlinearBicycleModel.cruise` computes the trim
-and synthesizes P by a linear matrix inequality from the sampled transverse
-local dynamics and the error scales in `cfg.clf`. `nominalValue` evaluates this
-quadratic directly. There is no LQR design, and the CLF carries no feedback law. No nominal-policy rollout, finite-difference Hessian,
+and reads P from `config/clfMatrices.json`; it never computes P. `nominalValue`
+evaluates this quadratic directly. There is no LQR design, and the CLF carries
+no feedback law. No nominal-policy rollout, finite-difference Hessian,
 cost-to-go kernel, or additional terminal value is used to construct the CLF.
 
-Let Q be the diagonal inverse squared error scales. The requested decrease is
+## Requested decrease: a convergence time constant
 
-    V(x_next) - V(x) <= -eta * e(x)' Q e(x) + rho,   rho >= 0,
+Each sample requires
 
-where `eta = nominalClf.decreaseFraction = 0.5`. This is deliberately not an
-arbitrary fixed fraction of V. P is a CLF of the sampled local linear system
-x+ = A x + B u that certifies the full decrease: for every e some input u
-satisfies
+    V(x_next) <= rho * V(x) + slack,   rho = exp(-2 h / T),
 
-    (A e + B u)' P (A e + B u) - e' P e <= -e' Q e.
+with h = 0.05 s and T = `clf.convergenceTimeConstantSeconds` = 4 s. The error
+size sqrt(V) then shrinks by at least 1/e every T seconds, in every direction
+of the error as V measures it; one lane width (3.66 m) returns to within
+0.3 m in about 10 s. T replaces the former `nominalClf.decreaseFraction`
+(eta = 0.5 times e'Qe), whose speed differed between error directions by a
+factor of about 25 for the same eta.
 
-The controller requests only eta < 1 of it; the remainder is a reserve for the
-trust region, actuation and model error. With S = inv(P) and Y = K S the
-certificate is the LMI
+## Offline synthesis of P
 
-    [S, (A S + B Y)', S Q^(1/2);
-     A S + B Y, S, 0;
-     Q^(1/2) S, 0, I] >= 0,
+`scripts/synthesizeClfMatrices.m` computes P before experiments, for each
+operating point (vehicle parameters, speed, path curvature, sample time and
+CLF settings), and writes it with its key to `config/clfMatrices.json`. A
+controller call at an operating point without an entry is rejected with
+`collisionAvoidanceController:missingClfMatrix`; nothing is synthesized at run
+time, and the run time does not need the SDP solver.
 
-solved by YALMIP/SeDuMi from `solver/` with a 2% margin and then checked
-without it. Among the feasible P the least steep relative to Q is chosen
-(maximize gamma subject to S >= gamma inv(Q), i.e. P <= Q/gamma). K only
-certifies that the decrease is attainable; it is discarded, and the input
-always comes from the CLF-constrained optimization. Each operating point
-(speed, curvature, CLF scales) is solved once (0.1--1 s) and cached. A first
-version certified only the requested fraction; that P sat at the edge of
-feasibility (`P = eta Q` in one direction), and near the path the decrease
-then needed inputs outside the trust region, so target-free frames 0.1 m off
-the path kept positive CLF slack. Passing from this
-linear certificate to a nonlinear local CLF requires a smooth error chart, an actual
-sampling equilibrium, and admissibility of a neighborhood. The implementation
-uses RK4 and numerical trim calculation; the tests verify nonlinear decrease
-for small signed perturbations, with the input that minimizes the nonlinear
-successor value as the witness, not an interval certificate for an entire set.
+At the trim, the sampled transverse model is e+ = A e + B (u - u_ref). With
+S = inv(P) and a certificate gain Y = K S, the script solves by bisection on rho
+
+    minimize rho
+    subject to  [rho S, (A S + B Y)'; A S + B Y, S] >= 0,
+                [ubar_j^2, Y_j; Y_j', S] >= 0       (j = steering, braking),
+                R^2 D <= S <= R^2 shapeRatio D,    D = diag(scales.^2),
+
+with YALMIP/SeDuMi from `solver/`. The first row is (A+BK)'P(A+BK) <= rho P.
+The second limits the certificate input |K_j e| to
+`clf.certificationSteeringRadians` = 0.075 rad and
+`clf.certificationBrakingRatio` = 0.125 on the sublevel set V <= 1. These
+equal one maximum trust-region step by default but are CLF settings of their
+own, so P does not change with the optimizer's trust settings. The last makes that set contain every error within R =
+`clf.certificationRegionScale` = 2 error scales, and keeps P's weights relative
+to Q = inv(D) within `clf.shapeRatio` = 10 of each other. Without the input
+bound the fastest P needs gains of about 30 (several radians of steering for a
+0.5-m offset); without the shape bound the fastest P nearly ignores some error
+directions (weights 1e-9 to 0.1 relative to Q). K is discarded.
+
+The certified contraction rho* is the fastest attainable under these
+conditions. The requested rho must be slower, otherwise synthesis rejects the
+operating point. For the default vehicle the certified error time constants are
+2.1 s at 8 m/s and 1.5--1.6 s at 15 m/s, against the requested 4 s.
+
+Passing from this linear certificate to a nonlinear local CLF requires a
+smooth error chart, an actual sampling equilibrium, and admissibility of a
+neighborhood. The implementation uses RK4 and numerical trim calculation; the
+tests verify nonlinear contraction for small signed perturbations, with the
+input that minimizes the nonlinear successor value as the witness, not an
+interval certificate for an entire set.
 
 **This quadratic is not a global nonlinear CLF.** Large heading errors, tire
 saturation, state-domain boundaries, braking memory and the MPC trust region
@@ -61,8 +80,8 @@ feedback-reachable region; it cannot be transferred to this simpler function.
 The scenario campaign and displaced-state tests therefore measure eventual
 cruise recovery separately from local zero-slack decrease.
 
-If the exact nonlinear inequality holds with rho=0 on a suitable invariant
-domain, summing it gives dissipation of the transverse error. Zero slack in the
+If the exact nonlinear inequality holds with zero slack on a suitable invariant
+domain, it gives exponential decay of the transverse error with time constant T. Zero slack in the
 **affine approximation**, together with a fixed model-error tolerance, does not
 establish that exact inequality or global asymptotic convergence.
 
@@ -99,7 +118,7 @@ With current and successor generators `G0,G1`, the same CLF uses
     b0 = sum_j ||chol(P)*J0*G0(:,j)||,
     b1 = sum_j ||chol(P)*J1*G1(:,j)||,
     bQ = sum_j ||sqrt(Q)*J0*G0(:,j)||,
-    budget = max(0,sqrt(V0)-b0)^2 - eta*(||sqrt(Q)*e0||+bQ)^2,
+    budget = exp(-2h/T) * max(0,sqrt(V0)-b0)^2,
     lossLower = max(0,||sqrt(Q)*e0||-bQ)^2.
 
 The successor upper bound is `(1+w)*V_aff+(1+1/w)*b1^2`, using Young's
@@ -143,5 +162,5 @@ A frame still without a solution reports it; no enlarged box follows. See
 `nominalFeedback` and `nominalGuidanceParameters` supply path guidance and a
 trim steering correction only for constructing the potential-field seed. They neither
 define another CLF nor provide an issued control. The nominalClf configuration
-group retains their guidance parameters alongside the scalar decreaseFraction;
-retired cost-to-go horizon and tail-level settings are rejected.
+group retains only their guidance parameters; retired cost-to-go horizon and
+tail-level settings are rejected.

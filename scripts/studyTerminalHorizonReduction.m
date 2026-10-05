@@ -143,7 +143,7 @@ function [safe,steps,violations,domain]=localSafe(x,input,time,q0,lane,reference
         value=nonlinearBicycleModel.nominalValue(x,lane,reference);
         successor=nonlinearBicycleModel.nominalValue(next,lane,reference);
         e=nonlinearBicycleModel.error(x,lane,reference);
-        violations=violations+(successor-value>-cfg.nominalClf.decreaseFraction*sum((e./scales).^2)+1e-9);
+        violations=violations+(successor>reference.contraction*value+1e-9);
         x=next;
     end
     safe=curved;
