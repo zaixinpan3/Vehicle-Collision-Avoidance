@@ -28,8 +28,8 @@
 \newcommand{\norminf}[1]{\left\lVert #1\right\rVert_\infty}
 \newcommand{\normone}[1]{\left\lVert #1\right\rVert_1}
 
-\title{Integrated Lane Keeping and Vehicle Collision Avoidance:
-Covariant Ego--Target Estimation and Two-Stage Predictive Control}
+\title{Simultaneous Lane Following and Vehicle Collision Avoidance
+System with Safety Guarantees}
 
 \author{Author Name(s)%
 \thanks{Author names, affiliations, corresponding-author information, and
@@ -37,14 +37,15 @@ funding acknowledgments must be completed before submission. This manuscript
 is a research draft based on the accompanying MATLAB repository.}}
 
 \markboth{Draft Manuscript---October 2026}%
-{Author Name(s): Covariant Ego--Target Estimation}
+{Author Name(s): Simultaneous Lane Following and Collision Avoidance System}
 
 \hypersetup{
-    pdftitle={Integrated Lane Keeping and Vehicle Collision Avoidance:
-Covariant Ego--Target Estimation and Two-Stage Predictive Control},
+    pdftitle={Simultaneous Lane Following and Vehicle Collision Avoidance
+System with Safety Guarantees},
     pdfauthor={Author Name(s)},
-    pdfsubject={Integrated lane keeping and vehicle collision avoidance
-with certified state estimation and two-stage predictive control},
+    pdfsubject={A perception--estimation--control system for simultaneous
+lane following and vehicle collision avoidance, designed so that the
+safety of the whole system can be certified},
     pdfkeywords={autonomous vehicles, cascaded estimator, collision
 avoidance, control Lyapunov function, high-gain observer, input-to-state
 stability, nonlinear relative motion model, predictive control,
@@ -56,35 +57,40 @@ second-order cone programming, vehicle state estimation}
 \maketitle
 
 \begin{abstract}
-This paper develops a measured-input estimator and a predictive controller
-for lane keeping with vehicle collision avoidance, and evaluates them
-together in simulation. The estimator retains the ego-motion-aware
-nonlinear relative motion model of the prior high-gain design but not its
-differentiated ego coordinates: measured acceleration and yaw rate remain
-exogenous inputs, so neither zero ego jerk nor zero yaw acceleration is
-assumed. A direct body-velocity measurement gives a cascade
-input-to-state stability certificate, and the target gains are obtained
-from a semidefinite program that minimizes a bound on the noise-induced
-velocity-error variance among gains satisfying that certificate. In
-closed loop the lateral velocity is measured through the lateral force
-balance of the controller's own tire model, because the kinematic
-relation fails while the rear tire slips. The controller linearizes a
-dynamic bicycle model with modified Fiala tires along one nonlinear
-rollout per sample and solves two second-order cone programs. The first
-minimizes the relaxation of sampled collision constraints written with
-fixed distance-dual multipliers; the second keeps that relaxation and
-minimizes the violation of a decrease condition on one quadratic
-control-Lyapunov function. The horizon extends until the plan separates
-from the obstacle and can remain on the road, and the estimator's current
-error enclosure tightens the constraints of each hold. In fourteen
+This paper develops a system that keeps a vehicle in its lane and avoids
+other vehicles with the same controller, and designs its perception,
+estimation and control so that the safety of the whole system, not of
+the controller alone, can be certified. The three parts share one vehicle
+model and one operating domain, and the uncertainty of each part is
+passed to the next as a set. Perception fits a known-size rectangle to
+LiDAR returns, seeded by the estimator's prediction, and returns the
+obstacle's relative position. The estimator retains the ego-motion-aware
+nonlinear relative motion model of the prior high-gain design but not
+its differentiated ego coordinates, so neither zero ego jerk nor zero
+yaw acceleration is assumed; it carries a cascade input-to-state
+stability certificate, chooses its target gains inside that certificate
+by a semidefinite program, and in closed loop measures the lateral
+velocity through the lateral force balance of the controller's own tire
+model, because the kinematic relation fails while the rear tire slips.
+It publishes an error enclosure with every estimate. The controller
+linearizes a dynamic bicycle model with modified Fiala tires along one
+nonlinear rollout per sample and solves two second-order cone programs:
+the first minimizes the relaxation of sampled collision constraints
+written with fixed distance-dual multipliers, the second minimizes the
+violation of a decrease condition on one quadratic control-Lyapunov
+function. Road edges, a rear-tire adhesion envelope and the estimator's
+sideslip cone are constraints, the horizon ends where the plan separates
+from the obstacle and can remain on the road, and the estimator's
+enclosure tightens the constraints of each hold. In fourteen
 collision-threat encounters with exact states, all runs end
-collision-free on the road with cruise recovered. With the estimator and
+collision-free on the road with cruise recovered; with the estimator and
 bounded sensor noise, 82 of 84 runs do so and two stop without a solved
-command; none collides or leaves the road. The plant of these trials is
-the prediction model itself. The estimation certificate is
-continuous-time, the constraints act on a sampled affine prediction, and
-the controller carries no collision-avoidance or recursive-feasibility
-certificate for the nonlinear vehicle.
+command; none collides or leaves the road. The paper states which links
+of the safety argument are certified, which are measured, and which
+remain open: the estimation certificate is continuous-time, the
+constraints act on a sampled affine prediction, and the closed-loop
+collision-avoidance and recursive-feasibility certificates for the
+nonlinear vehicle are not yet established.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -201,51 +207,60 @@ however, does not guarantee that a collision-free optimization remains feasible
 under repeated receding-horizon updates, particularly when state-estimation
 uncertainty is considered.
 
-This paper does not close that gap. It reports an estimator and a
-controller designed as one system, evaluated together in simulation, and
-separates what is certified from what is only measured. The estimator of
-Section~\ref{sec:estimator} carries a continuous-time input-to-state
-stability (ISS) certificate under declared sensor, model and
-operating-domain bounds, and the shape of its target gains is chosen
-inside that certificate by a semidefinite program that minimizes a bound
-on the velocity-error variance caused by relative-position measurement
-noise. Its operating domain is derived from the controller's state
-limits, and in closed loop its lateral-velocity measurement inverts the
-lateral force balance of the controller's tire model under the input the
-controller holds. The controller of Section~\ref{sec:control} uses no
-maneuver template. At each sample it linearizes the dynamic bicycle model
-with modified Fiala tires along one nonlinear rollout and solves two
-second-order cone programs in strict priority order. The first minimizes
-the relaxation of sampled predictive collision constraints, written with
-distance-dual multipliers that are held fixed during the solve
-\cite{LiZhangGuoLenzoGuo2023}. The second, without increasing that
-relaxation, minimizes the violation of a decrease condition on one
-quadratic control-Lyapunov function, synthesized offline by a linear
-matrix inequality; the same function is used during avoidance and during
-the return to cruise. Road edges, a rear-tire adhesion envelope and the
-estimator's sideslip cone are constraints of both programs, and the
-estimator's current error enclosure tightens the constraints of every
-hold. The horizon is not fixed: it ends at the first node of the
-linearization rollout at which the ego separates from the obstacle and
-can stop its lateral motion before either road edge. A potential-field
-rollout around the moving obstacle initializes the first sample and
-thereby fixes the side on which the obstacle is passed. The ordering of
-the two programs resembles the predictive barrier construction of
-\cite{WabersichZeilinger2023}, and the scheme follows the
-real-time-iteration idea of \cite{DiehlBockSchloder2005}, but its
-constraints are sampled and affine, its terminal condition is not
-invariant, and it carries no certificate of collision avoidance or
-recursive feasibility for the nonlinear vehicle.
-Section~\ref{sec:results} reports fourteen collision-threat encounters
-with exact states and the same encounters with the estimator and bounded
-sensor noise for six noise seeds. All exact-state runs and 82 of the 84
-estimator-in-the-loop runs end collision-free on the road with cruise
-recovered; the other two stop without a solved command, and their cause
-is analyzed. The plant of these trials is the prediction model with
-nominal parameters, and the perception pipeline of
-Section~\ref{sec:perception} is not yet in that loop.
+This paper addresses that gap at the level of the system rather than
+of the controller. A controller certificate that assumes exact states
+does not survive contact with an estimator, and an estimator certificate
+whose premises the controller is free to violate does not survive
+contact with an avoidance maneuver. The system of
+Section~\ref{sec:overview} is therefore designed as one object: its
+perception, estimation and control share one vehicle model and one
+operating domain, each part publishes its uncertainty as a set that the
+next part consumes, and each part keeps the system inside the premises
+of the others. The contributions are the following.
+\begin{enumerate}
+\item A perception--estimation--control architecture for simultaneous
+lane following and collision avoidance in which the uncertainty of every
+stage is passed on as a set, and the controller enforces the premises of
+the estimator (Section~\ref{sec:overview}).
+\item A perception pipeline that fits a known-size rectangle to the
+LiDAR returns of the obstacle vehicle, seeded by the estimator's
+prediction (Section~\ref{sec:perception}).
+\item An estimator with a continuous-time input-to-state stability
+certificate under declared sensor, model and operating-domain bounds,
+whose target gains are chosen inside that certificate by a semidefinite
+program, and whose lateral-velocity measurement inverts the lateral
+force balance of the controller's tire model under the input the
+controller holds (Section~\ref{sec:estimator}).
+\item A controller without maneuver templates that linearizes the
+dynamic bicycle model with modified Fiala tires along one nonlinear
+rollout per sample and solves two second-order cone programs in strict
+priority order: the relaxation of predictive collision constraints with
+fixed distance-dual multipliers \cite{LiZhangGuoLenzoGuo2023} first,
+and the violation of a decrease condition on one quadratic
+control-Lyapunov function second. Road edges, a rear-tire adhesion
+envelope and the estimator's sideslip cone are its constraints, its
+horizon ends where the plan separates from the obstacle and can remain
+on the road, and the estimator's enclosure tightens the constraints of
+every hold (Section~\ref{sec:control}).
+\item A closed-loop evaluation of the system in fourteen
+collision-threat encounters with exact states and with the estimator
+and bounded sensor noise for six noise seeds
+(Section~\ref{sec:results}).
+\end{enumerate}
+The ordering of the two programs resembles the predictive barrier
+construction of \cite{WabersichZeilinger2023}, and the scheme follows
+the real-time-iteration idea of \cite{DiehlBockSchloder2005}. The paper
+separates throughout what is certified from what is measured. The
+estimation certificate and the propagation of its enclosure into the
+constraints of the first hold are proved; the constraints act on a
+sampled affine prediction, the terminal condition is not invariant, and
+the closed-loop collision-avoidance and recursive-feasibility
+certificates for the nonlinear vehicle, which the system is built to
+admit, are not yet established. Section~\ref{sec:overview} states this
+boundary once, and the later sections refer to it.
 
 \section{System Overview}
+\label{sec:overview}
 
 \begin{figure}[!t]
     \centering
@@ -273,8 +288,8 @@ acceleration and yaw-rate measurements, respectively. LiDAR provides
 geometric measurements of road curbs together with
 relative-position measurements of obstacle vehicles, while camera-based
 perception detects obstacle vehicles. The problem addressed
-in this paper is to design an integrated perception--estimation--control
-system such that, in the absence of a predicted collision risk, the ego
+in this paper is to design a perception--estimation--control system
+such that, in the absence of a predicted collision risk, the ego
 vehicle follows the nominal path at a prescribed constant speed.
 When continuing this nominal behavior is predicted to create a collision
 risk, the system coordinates steering and longitudinal actuation to maintain
@@ -452,6 +467,48 @@ perception module is developed and tested separately on simulated camera
 and LiDAR captures; in the closed-loop trials the relative-position
 measurement is synthetic with bounded noise, and the perceived
 road-boundary branch is not used.
+
+\subsection{The Safety Argument and Its Present Status}
+\label{subsec:argument}
+
+The safety of the system rests on a chain of statements, each about one
+interface of Fig.~\ref{fig:architecture}. (i) The perception output lies
+within a declared bound of the true relative position. (ii) Under that
+bound and the sensor bounds, the estimation error lies in the published
+enclosure (Theorem~\ref{thm:cascadeISS}, Corollary~\ref{cor:enclosure},
+and the force-balance interval of Section~\ref{subsec:modelAided}).
+(iii) The true motion stays inside the premises of (ii): the controller
+enforces the sideslip cone and keeps the rear tire below saturation
+(Section~\ref{subsec:envelope}), and the estimator's domain is derived
+from the controller's state limits. (iv) A plan whose constraints are
+tightened by the enclosure keeps the true bodies separated during the
+hold it is issued for (Lemma~\ref{lem:dualRows} and
+Section~\ref{subsec:uncertainty}). (v) A feasible plan exists again at
+the next sample, so that (iv) applies at every sample. (vi) The vehicle
+returns to cruise once the obstacle is passed (the control-Lyapunov
+decrease of Section~\ref{subsec:clf}).
+
+The design of every part is chosen so that these statements can be
+made: the estimator carries no premise that the controller cannot
+enforce, the controller consumes sets rather than point estimates, and
+one model serves both. Their present status differs. Statement (ii) is
+proved for the continuous-time observer under the declared bounds, and
+the truth audit of Section~\ref{subsec:loopEstimation} found no violated
+enclosure. Statement (iii) is enforced on the estimate and the affine
+prediction, not on the true motion; in the audit the sideslip cone held
+in every frame and the adhesion condition was exceeded in three frames
+by at most 0.7\%. Statement (iv) is proved for the affine
+prediction at the constrained instants of the first hold; between those
+instants and for the nonlinear vehicle it is measured, not proved
+(Section~\ref{subsec:scope}). Statement (i) is a declared bound: the
+perception pipeline has been tested on simulated captures but is not yet
+in the closed loop, and its measured errors exceed the bound assumed in
+the estimator trials. Statement (v) is not established: the terminal set
+of Section~\ref{subsec:terminal} is not invariant, and every sample
+re-solves its problem. Statement (vi) is certified for the linearized
+model near cruise and measured for the vehicle. The results of
+Section~\ref{sec:results} are the measured part of this argument; the
+proved part is stated with its premises where it appears.
 
 \section{Perception}
 \label{sec:perception}
@@ -2662,8 +2719,9 @@ the outcomes describe the algorithm with instantaneous computation.
 \section{Discussion}
 \label{sec:discussion}
 
-The two components stand at different levels of assurance.
-Theorem~\ref{thm:cascadeISS} is a continuous-time statement about the
+Of the six statements of Section~\ref{subsec:argument}, the estimation
+links are the strongest and the recursive-feasibility link is the
+weakest. Theorem~\ref{thm:cascadeISS} is a continuous-time statement about the
 velocity--target cascade, and the gain selection of
 Section~\ref{subsec:gainSelection} takes place inside its certificate.
 With a shape chosen outside the certificate, only the scale can be
@@ -2712,7 +2770,9 @@ would state the uncertainty the long horizons actually face. None of
 these was evaluated.
 
 The controller has no certificate for the nonlinear vehicle, and
-success in 96 of 98 runs does not supply one. The trust box and the
+success in 96 of 98 runs does not supply one; statements (iv) and (v)
+of Section~\ref{subsec:argument} are where the system's guarantee is
+still missing. The trust box and the
 node margin are not related by a bound on the linearization remainder;
 the innovation-based trust scale keeps the measured remainder near a
 target and is a heuristic. Separation is imposed at nodes and mid-hold
@@ -2751,41 +2811,48 @@ empirical.
 \section{Conclusion}
 \label{sec:conclusion}
 
-Retaining measured acceleration and yaw rate as exogenous inputs removes
-the zero-jerk and zero-yaw-acceleration assumptions of the differentiated
-ego design. The direct velocity measurement in \eqref{eq:ego_observer}
-yields the cascade comparison of Theorem~\ref{thm:cascadeISS}, and a
-parallel yaw observer with an orientation set supplies inertial
-reconstruction. Shaping the target gains by a semidefinite program that
-contains the Lipschitz certificate reduces the predicted noise and the
-certified radii together. In open-loop synthetic trials with operating
-domains declared per scenario, the estimator has a lower mean error than
-a per-scenario tuned reproduction of the reference observer in five of
-six scenarios for each of position, speed and course after the initial
-transient; the position error over the complete run and most
-acceleration errors favor the reference.
+This paper has treated lane following and collision avoidance as one
+system and has designed its perception, estimation and control so that
+the safety of the whole can be argued link by link. The estimator
+retains measured acceleration and yaw rate as exogenous inputs, which
+removes the zero-jerk and zero-yaw-acceleration assumptions of the
+differentiated ego design; its direct velocity measurement yields the
+cascade comparison of Theorem~\ref{thm:cascadeISS}, a parallel yaw
+observer with an orientation set supplies inertial reconstruction, and
+shaping the target gains inside the Lipschitz certificate reduces the
+predicted noise and the certified radii together. In open-loop synthetic
+trials with operating domains declared per scenario, it has a lower
+mean error than a per-scenario tuned reproduction of the reference
+observer in five of six scenarios for each of position, speed and course
+after the initial transient; the position error over the complete run
+and most acceleration errors favor the reference.
 
 The controller linearizes a dynamic bicycle model with modified Fiala
 tires along one nonlinear rollout per sample and solves two cone
-programs: the relaxation of distance-dual collision rows first, and the
-violation of a decrease condition on one quadratic control-Lyapunov
-function second, over a horizon that ends where the plan separates from
-the obstacle and can remain on the road. Designed together, the
-estimator measures the lateral velocity through the controller's tire
-model, and the controller keeps the vehicle where that measurement is
-informative and tightens each hold by the estimator's current
-enclosure. In fourteen collision-threat encounters with exact states,
-every run ends collision-free on the road with cruise recovered; with
-the estimator and bounded sensor noise, 82 of 84 runs do so, none
-collides, and two stop without a solved command where a long horizon
-meets a noisy estimate of the obstacle's acceleration. These are
-simulations on the prediction model itself. A certified estimate of the
-obstacle's motion parameters and a forecast enclosure along the horizon,
-a bound that links the linearization step to the collision margin,
-whole-hold separation, an invariant terminal condition, actuator
-constraints, real-time computation, plant mismatch and perception in
-the loop remain necessary before physical collision avoidance can be
-claimed.
+programs over a horizon that ends where the plan separates from the
+obstacle and can remain on the road. The two parts are coupled in both
+directions: the estimator measures the lateral velocity through the
+controller's tire model and held input, and the controller keeps the
+vehicle where that measurement is informative and tightens each hold by
+the estimator's current enclosure. In fourteen collision-threat
+encounters with exact states, every run ends collision-free on the road
+with cruise recovered; with the estimator and bounded sensor noise, 82
+of 84 runs do so, none collides, and two stop without a solved command
+where a long horizon meets a noisy estimate of the obstacle's
+acceleration. These are simulations on the prediction model itself.
+
+Of the safety argument of Section~\ref{subsec:argument}, the estimation
+link and the propagation of the enclosure into the first hold are
+proved; the perception bound is declared, the estimator's premises are
+enforced on the prediction and audited on the vehicle, the per-hold
+separation is proved for the affine prediction and measured for the
+vehicle, and recursive feasibility is open. Closing the argument requires a
+certified estimate of the obstacle's motion parameters and a forecast
+enclosure along the horizon, a bound that links the linearization step
+to the collision margin, whole-hold separation, an invariant terminal
+condition, actuator constraints, real-time computation, plant mismatch
+and perception in the loop. The system presented here is built to admit
+each of these additions without changing its structure.
 
 \section*{Data and Code Availability}
 

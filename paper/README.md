@@ -1,7 +1,13 @@
 # Draft manuscript
 
-`manuscript.tex` is the IEEE Transactions-style research draft. The October 5,
-2026 revision synchronizes it with the implementation at commit `d1c31d6`: the
+`manuscript.tex` is the IEEE Transactions-style research draft, titled
+"Simultaneous Lane Following and Vehicle Collision Avoidance System with
+Safety Guarantees". The title names the goal of the work; Section II-A of the
+manuscript states which links of the safety argument are proved at present and
+which are open. The October 5, 2026 revision synchronizes the draft with the
+implementation at commit `d1c31d6` and recasts the narrative around the
+system (contributions list, safety-argument subsection, discussion and
+conclusion): the
 controller section, the closed-loop results, the discussion, the conclusion,
 the abstract and the end of the introduction are rewritten; the estimator
 section gains the model-aided lateral-velocity measurement and the published
