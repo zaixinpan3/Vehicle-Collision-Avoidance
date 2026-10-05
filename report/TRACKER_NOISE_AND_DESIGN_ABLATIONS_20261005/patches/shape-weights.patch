@@ -1,0 +1,55 @@
+--- a/estimator/synthesizeTargetTrackerCertificate.m	2026-10-01 11:37:48.540176769 -0500
++++ b/scratch/synthesizeTargetTrackerCertificateX.m	2026-10-05 12:18:44.118239530 -0500
+@@ -1,5 +1,5 @@
+-function certificate = synthesizeTargetTrackerCertificate( ...
+-        lipschitz, chain, domainTransitTime)
++function certificate = synthesizeTargetTrackerCertificateX( ...
++        lipschitz, chain, domainTransitTime, weights)
+ % synthesizeTargetTrackerCertificate Retain the high-gain chain and certify it.
+ %
+ % One LMI in the gains and a metric selects l: among gains that satisfy the
+@@ -23,6 +23,7 @@
+         lipschitz (1, 1) struct
+         chain (1, 1) struct
+         domainTransitTime (1, 1) double {mustBePositive, mustBeFinite}
++        weights (3, 1) double = [0;1;0]
+     end
+     validateattributes(lipschitz.phiVelocity,{'double'}, ...
+         {'scalar','finite','positive'});
+@@ -38,7 +39,7 @@
+     localPrepareSolver();
+     domainTransitDecayRate = 1.0/domainTransitTime;
+     [injectionVector, shape] = localSolveNoiseShape(chainMatrix, ...
+-        outputVector, unitVector, lipschitz, domainTransitDecayRate);
++        outputVector, unitVector, lipschitz, domainTransitDecayRate, weights);
+     closedLoopMatrix = chainMatrix-injectionVector*outputVector.';
+     [bound, lyapunovMatrix] = localOptimizeBandwidth(closedLoopMatrix, ...
+         injectionVector, lipschitz, chain, unitVector, domainTransitTime);
+@@ -137,7 +138,7 @@
+ end
+ 
+ function [injectionVector, shape] = localSolveNoiseShape( ...
+-        chainMatrix, outputVector, unitVector, lipschitz, decayRate)
++        chainMatrix, outputVector, unitVector, lipschitz, decayRate, weights)
+ % localSolveNoiseShape Minimize output-noise velocity variance among certified gains.
+ %
+ % With Y = P*L the Lipschitz dissipation inequality at the required decay
+@@ -148,7 +149,7 @@
+ % already admit a certificate. They are returned as a shape with unit
+ % slowest rate; shape.bandwidth is that rate and the metric is physical.
+ 
+-    velocitySelector = diag([0.0, 1.0, 0.0]);
++    velocitySelector = diag(weights);
+     sensitivities = [lipschitz.phiVelocity; lipschitz.phiAcceleration];
+     metricVariable = sdpvar(3, 3);
+     gainVariable = sdpvar(3, 1);
+@@ -363,8 +364,7 @@
+     if ~isempty(which("optimize")) && ~isempty(which("sedumi"))
+         return
+     end
+-    estimatorRoot = fileparts(mfilename("fullpath"));
+-    solverRoot = fullfile(fileparts(estimatorRoot), "solver");
++    solverRoot = "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver";
+     yalmipRoot = fullfile(solverRoot, "YALMIP");
+     sedumiRoot = fullfile(solverRoot, "sedumi");
+     if ~isfolder(yalmipRoot) || ~isfolder(sedumiRoot)

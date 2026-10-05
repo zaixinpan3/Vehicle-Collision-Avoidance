@@ -1,0 +1,103 @@
+--- a/estimator/onlineNrmmTrackingRuntime.m	2026-10-05 10:14:48.791928842 -0500
++++ b/estimator/onlineNrmmTrackingRuntime.m	2026-10-05 12:30:45.816051738 -0500
+@@ -71,6 +71,7 @@
+     runtime.targetState = physicalState;
+     runtime.targetOutputPredictor = physicalState(1:2);
+     runtime.lastRadarTime = NaN;
++    runtime.parameterStage = struct("initialized",false,"acceleration",0,"sideslip",0);
+     runtime.positionErrorBound = nrmmPositionErrorBound("reset", ...
+         runtime.positionErrorBound,localBoundState(localPackState(runtime)));
+     audit = localOperatingDomainAudit(localPackState(runtime),runtime,"track-reset");
+@@ -141,7 +142,8 @@
+         "lastRadarTime", NaN, ...
+         "targetCertifiedSpeedDomainValid", true, ...
+         "minimumReconstructedTargetSpeed", Inf, ...
+-        "lastIntervalTargetCertifiedSpeedDomainValid", true);
++        "lastIntervalTargetCertifiedSpeedDomainValid", true, ...
++        "parameterStage", struct("initialized",false,"acceleration",0,"sideslip",0));
+     initialAudit = localOperatingDomainAudit( ...
+         localPackState(runtime), runtime, "initialization");
+     runtime.estimatedDomainAudit = initialAudit;
+@@ -237,12 +239,33 @@
+     runtime.estimatedDomainAudit = localMergeDomainAudits( ...
+         runtime.estimatedDomainAudit, intervalAudit);
+     runtime.lastIntervalDomainAudit = intervalAudit;
++    runtime = localUpdateParameterStage(runtime, observerInput);
+     runtime.currentTime = observerInput.time+runtime.samplePeriod;
+     runtime.positionErrorBound.time = runtime.currentTime;
+     runtime = localRecordMeasurementTimes(runtime, observerInput);
+     if nargout>1 && ~publishCurrent,output = localOutput(runtime, observerInput);end
+ end
+ 
++function runtime = localUpdateParameterStage(runtime, observerInput)
++% Prototype constant-parameter stage: A and beta are constant by the NRMM
++% contract, so their estimates follow the tracker's reconstruction through a
++% first-order stage at the certificate's decay floor (1/domain transit time).
++    design = runtime.observerDesign;
++    ego = struct("bodyVelocity", runtime.bodyVelocityEstimate, "yawRate", observerInput.yawRate);
++    [~, tracker] = nrmmTargetTrackerDerivative(runtime.targetState, ego, design.target.domain);
++    stage = runtime.parameterStage;
++    if ~stage.initialized
++        stage.acceleration = tracker.targetScalarAcceleration;
++        stage.sideslip = tracker.targetSideslip;
++        stage.initialized = true;
++    else
++        gain = 1-exp(-design.target.minimumDecayRate*runtime.samplePeriod);
++        stage.acceleration = stage.acceleration+gain*(tracker.targetScalarAcceleration-stage.acceleration);
++        stage.sideslip = stage.sideslip+gain*(tracker.targetSideslip-stage.sideslip);
++    end
++    runtime.parameterStage = stage;
++end
++
+ function output = localCurrentOutput(runtime, frame)
+     observerInput = localSynchronizedInput(frame, runtime);
+     outputRuntime = localRecordMeasurementTimes(runtime, observerInput);
+@@ -623,6 +646,17 @@
+     [~, estimate] = nrmmTargetTrackerDerivative( ...
+         runtime.targetState, ego, ...
+         design.target.domain);
++    estimate.trackerScalarAcceleration = estimate.targetScalarAcceleration;
++    estimate.trackerSideslip = estimate.targetSideslip;
++    estimate.trackerYawRate = estimate.targetYawRate;
++    if isfield(runtime,"parameterStage") && runtime.parameterStage.initialized
++        domain = design.target.domain;
++        estimate.targetScalarAcceleration = runtime.parameterStage.acceleration;
++        estimate.targetSideslip = runtime.parameterStage.sideslip;
++        estimate.targetYawRate = max(estimate.targetSpeed,domain.speedMinimum) ...
++            *sin(estimate.targetSideslip)/domain.rearAxleDistance;
++        estimate.targetRelativeHeading = estimate.targetCourseAngleEgoFrame-estimate.targetSideslip;
++    end
+     estimate.certifiedSpeedMinimum = ...
+         design.target.domain.speedMinimum;
+     estimate.certifiedSpeedDomainValid = ...
+--- a/estimator/nrmmControllerErrorBounds.m	2026-10-05 10:14:35.410059681 -0500
++++ b/estimator/nrmmControllerErrorBounds.m	2026-10-05 12:30:45.804730983 -0500
+@@ -77,16 +77,25 @@
+     if components(2) < speed
+         courseRadius = asin(min(1.0, components(2)/speed));
+     end
+-    % Global Lipschitz bounds for the saturated inverse reconstruction.
++    % Global Lipschitz bounds for the saturated inverse reconstruction, about
++    % the tracker's reconstructed yaw rate and sideslip. When the published
++    % values come from the window fit, their distance to the tracker's is
++    % added, so the radii hold about the published values.
+     speedFloor = domain.speedMinimum;
+-    yawRateRadius = min(domain.yawRateMaximum+abs(target.targetYawRate), ...
++    trackerYawRate = target.targetYawRate;trackerSideslip = target.targetSideslip;
++    if isfield(target,"trackerYawRate")
++        trackerYawRate = target.trackerYawRate;trackerSideslip = target.trackerSideslip;
++    end
++    yawRateRadius = min(domain.yawRateMaximum+abs(trackerYawRate), ...
+         (domain.accelerationNormBound/speedFloor^2 ...
+         + 2*domain.speedMaximum*domain.accelerationNormBound/speedFloor^3)*components(2) ...
+         + domain.speedMaximum/speedFloor^2*components(3));
+-    sideslipRadius = min(domain.sideslipMaximum+abs(target.targetSideslip), ...
++    sideslipRadius = min(domain.sideslipMaximum+abs(trackerSideslip), ...
+         domain.rearAxleDistance/cos(domain.sideslipMaximum) ...
+         *(yawRateRadius/speedFloor ...
+         + domain.yawRateMaximum/speedFloor^2*components(2)));
++    yawRateRadius = yawRateRadius+abs(trackerYawRate-target.targetYawRate);
++    sideslipRadius = sideslipRadius+abs(trackerSideslip-target.targetSideslip);
+     yawRadius = min(pi, bound.yaw+courseRadius+sideslipRadius);
+     values = [repmat(positionRadius, 2, 1); repmat(velocityRadius, 2, 1); ...
+         repmat(accelerationRadius, 2, 1); yawRadius; yawRateRadius];

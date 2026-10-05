@@ -1,0 +1,3 @@
+domain transit time 1.387347 s, decay floor 0.720800 1/s, phiVelocity 10.362871, phiAcceleration 2.014171
+radar noise per axis uniform +/- 0.028284 m (std 0.016330 m), sample period 0.0125 s
+current shape [3.64381 6.56388 5.38555] bandwidth 4.699405 gains [17.1237 144.959 558.931]

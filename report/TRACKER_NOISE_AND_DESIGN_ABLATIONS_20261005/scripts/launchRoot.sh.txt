@@ -1,0 +1,6 @@
+#!/bin/bash
+# usage: launchRoot.sh jobsfile parallel ; each line: root speed name outdir noisy frames seed
+A=$HOME/.cache/collisionAvoidance/ablation-20261005
+export TMPDIR=$HOME/.cache/collisionAvoidance/mltmp
+mkdir -p $TMPDIR
+cat $1 | xargs -P ${2:-10} -L 1 bash -c 'mkdir -p $3 && cd '$A' && timeout 7200 matlab -singleCompThread -batch "campaignOneRoot(\"$0\",$1,\"$2\",\"$3\",$4,$5,$6)" > $3/log-$1-$2.txt 2>&1'

@@ -1,0 +1,218 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\setlength{\emergencystretch}{2em}
+\title{Tracker parameter noise and ablations of three controller choices}
+\date{Prepared October 5, 2026}
+\begin{document}
+\maketitle
+
+\section{Questions}
+With the tracker's own target acceleration $A$ and sideslip $\beta$
+published (commit \texttt{d1c31d6},
+\path{ESTIMATOR_DIRECT_TARGET_20261005.tex}), two of 84 noisy encounters
+end without a solved command. The user approved one remedy: add a bound on
+the noise of the tracker's acceleration state to the semidefinite program
+that selects its gains. The user also asked whether three controller choices
+of \texttt{06af0a2} are needed and what they do:
+\begin{itemize}
+\item road recovery in the terminal set;
+\item the control Lyapunov function (CLF) row on the estimate;
+\item soft untightened collision rows in the slack prefix.
+\end{itemize}
+This report records the gain study, a prototype of a different estimator
+remedy, and one single-change ablation per controller choice. No project
+source file was changed.
+
+\section{Tracker gains with an acceleration-noise objective}
+\paragraph{Where the noise comes from.} The tracker state is $[\rho;q;s]$, and
+$A=q^\top s/|q|$ and $\beta$ are reconstructed from the acceleration state
+$s$. Radar noise is uniform within $\pm0.0283$~m per axis (standard
+deviation 0.0163~m) at 80~Hz. Through the current gains $(17.12, 144.96,
+558.93)$ its stationary per-axis effect is 0.0068~m in position,
+0.054~m/s in velocity and 0.198~m/s$^2$ in $s$. The measured $A$ error has
+a per-run RMS median of 0.27~m/s$^2$ between 0.5 and 3~s, 0.23 between 3 and
+6~s, and 0.19 between 6 and 10~s. The radar noise therefore accounts for it.
+
+\paragraph{What fixes the gain level.} The certificate requires the
+Lipschitz dissipation inequality at the decay floor $1/T=0.721$~s$^{-1}$.
+Here $T=1.387$~s is the domain transit time, and the Lipschitz constants are
+10.36 and 2.01. For the current shape, the inequality holds at bandwidth
+4.55 but not at 4.50; the design uses 4.70
+(\path{TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005/certified-search.csv}).
+Noise in $s$ grows roughly as the bandwidth to the power 2.5, so this floor
+sets it.
+
+\paragraph{Weighted objective.} The shape program bounds the stationary
+error variance through a Gramian inequality that shares one Lyapunov
+matrix with the dissipation inequality. That variance was weighted on the
+velocity and acceleration errors as listed below. The table gives the
+predicted per-axis noise after the existing bandwidth search
+(\path{TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005/shape-weights.csv}).
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+weights (pos., vel., acc.) & bandwidth & vel.\ (m/s) & acc.\ (m/s$^2$) & certified acc.\ bound\\
+\midrule
+0, 1, 0 (current) & 4.70 & 0.0539 & 0.1981 & 121.4\\
+0, 1, 0.01 & 4.84 & 0.0545 & 0.1982 & 122.5\\
+0, 1, 0.1 & 5.22 & 0.0559 & 0.2014 & 127.5\\
+0, 1, 1 & 5.29 & 0.0561 & 0.2025 & 128.9\\
+0, 0, 1 & 5.30 & 0.0562 & 0.2026 & 129.0\\
+\bottomrule
+\end{tabular}
+\end{center}
+Weighting the acceleration error raised the true acceleration noise by up to
+2\%. The program minimizes an upper bound shared with the certificate, and
+that bound pulled the bandwidth up. A direct search over the three gains was
+run next. Its objective was the exact stationary variance (Lyapunov
+equation). Each candidate was checked with the code's own scaled
+free-metric certificate. The lowest certified acceleration noise it found
+was 0.1675~m/s$^2$, 15\% below the current gains, at gains $(12.69, 105.57,
+389.35)$. The window fit that was removed had an $A$ error of 0.019. The
+approved change was therefore not made: inside the certificate, the gains
+cannot remove the noise that caused the failures.
+
+\section{Prototype: a constant-parameter stage}
+The noise in $s$ is high-frequency, since $s$ is the second derivative of the
+radar position. $A$ and $\beta$ are constant by contract, so a first-order
+stage behind the tracker can average this noise. The stage tracks the
+tracker's reconstruction at the existing decay floor (time constant 1.39~s).
+It is one more feedforward stage of the cascade, and its error is ISS with
+unit gain from the tracker's parameter error. For that rate, the Lyapunov
+equation of the tracker and stage predicts an acceleration noise of
+0.0118~m/s$^2$, against 0.198 unfiltered
+(\path{TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005/parameter-stage-noise.csv}).
+
+Two versions were run on the 84 noisy encounters. v1 starts from the
+tracker's value and filters at the floor rate. v2 starts as the running mean
+of the tracker's values (gain $1/n$) until that gain reaches the floor
+(\path{patches/param.patch}, \path{patches/param2.patch}). The published radii
+are widened by the stage--tracker distance, as they were for the window fit.
+Results are in Section~4. Both recovered 82 of 84, with different failures
+from the tracker output:
+\begin{itemize}
+\item \emph{Seed 1, 15-m/s crossing (v1 and v2), 2.80~s.} The ego was in a
+  sharp recovery (lateral velocity 1.86~m/s, yaw rate $-0.53$~rad/s), with
+  the target 31~m away. The published $A$ was $-0.03$ (truth 0). Clarabel
+  certified the primary problem infeasible, for the shifted plan and the
+  fresh restart alike. There was still no solution with any single
+  constraint group removed. The parameter estimate is not its cause; the
+  trajectory differs.
+\item \emph{v1, seed 5, 15-m/s braking lead, 0.75~s.} The stage lagged: $-0.15$
+  against a true $-0.50$, while the tracker alone had reached $-0.68$ at
+  0.3~s. The horizon grew to 173 holds, and the CLF stage stopped without a
+  numerical result. v2 recovered in this run.
+\item \emph{v2, seed 20261003, 15-m/s braking lead, 0.65~s.} The tracker's
+  initial transient was positive, so the running mean was $+0.18$ at 0.35~s
+  and $-0.17$ at 0.6~s. The horizon grew to 176 holds. Clarabel then stopped the CLF stage
+  with insufficient progress (primal residual $1.2\times10^{-5}$).
+\end{itemize}
+The stage is not adopted. Its start-up needs a design, and tuning it further
+on the same seeds would fit the evaluation set.
+
+\section{Controller ablations}
+Each variant changes one choice of \texttt{d1c31d6} back to its form before
+\texttt{06af0a2} (\path{patches/road.patch}, \path{clf.patch},
+\path{prefix.patch}):
+\begin{itemize}
+\item \emph{road}: no road-recovery rows, and the rollout stops on separation
+  alone;
+\item \emph{clf}: the CLF decrease is required over the whole ego enclosure;
+\item \emph{prefix}: the untightened collision rows are hard at every node,
+  including the prefix.
+\end{itemize}
+The variants ran as exported copies of the commit. They used the same 84 noisy
+runs (seeds 20261003 and 1--5) and, for \emph{road}, the 14 exact runs. Ten
+processes ran in parallel. Four runs that hit the 5-s solver time limit were
+rerun without contention, and their rerun outcomes are counted:
+\begin{itemize}
+\item \emph{clf}: one run recovered and one still had no solution;
+\item \emph{prefix}: the rerun recovered;
+\item \emph{v1}: the rerun recovered.
+\end{itemize}
+\begin{center}
+\begin{tabular}{lrrrrrr}
+\toprule
+noisy, 84 runs & recovered & no solution & not in 100 s & min.\ gap & min.\ road & $A$ RMS\\
+\midrule
+\texttt{d1c31d6} & 82 & 2 & 0 & 0.362 & 0.23 & 0.269\\
+road recovery removed & 72 & 12 & 0 & 0.362 & 0.16 & 0.272\\
+worst-case CLF & 38 & 9 & 37 & 0.356 & 0.11 & 0.276\\
+hard prefix rows & 79 & 5 & 0 & 0.432 & 0.23 & 0.269\\
+parameter stage v1 & 82 & 2 & 0 & 0.412 & 0.96 & 0.065\\
+parameter stage v2 & 82 & 2 & 0 & 0.425 & 0.74 & 0.109\\
+\bottomrule
+\end{tabular}
+\end{center}
+No run collided or left the road. Gaps and road margins are in metres. The
+$A$ RMS is the per-run median over 0.5--3~s, in m/s$^2$; between 3 and 6~s it
+was 0.228 for \texttt{d1c31d6}, 0.032 for v1 and 0.030 for v2. With exact
+states, removing road recovery left all 14 runs recovering. The other variants
+do not act without an enclosure, so they were not run with exact states.
+Per-run data: \path{TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005/ablation-metrics.csv}.
+
+\paragraph{Road recovery.} Ten of the twelve failures are new; the other two
+are the failures of \texttt{d1c31d6}. Nine of the new ones are 8-m/s
+head-on-type encounters (head-on, accelerating head-on, curved head-on) that
+failed between 1.70 and 2.25~s. In the last solved frame of each, the ego
+headed 30--61~degrees into the left edge. It moved toward that edge at
+3.2--7.7~m/s with 0.3--2.1~m left; these values come from the recorded
+path-relative pose. Stopping that motion at full friction would
+have needed more lateral room than remained (for example 2.00 against
+1.31~m), so the road rows had no solution. With road recovery, the same nine
+runs peaked at 53--59~degrees and 6.4--6.8~m/s toward the edge, and all
+recovered with 0.6--1.3~m of margin. The tenth new failure (15-m/s curved
+head-on, 55.05~s) was not near an edge.
+
+\paragraph{CLF on the estimate.} With the worst-case CLF, 37 of the 42
+15-m/s runs did not recover within 100~s, and 9 runs had no solution. The
+braking ratio chattered. The mean absolute change between holds was 0.0353
+(\texttt{d1c31d6}: 0.0106), and its standard deviation after 4~s was 0.119
+(\texttt{d1c31d6}: 0.0011). This is the behaviour described for the original
+design: near the path, the worst case cannot decrease below the enclosure's
+own size, so the CLF stage minimizes it greedily.
+
+\paragraph{Prefix rows.} Hard prefix rows added three failures, all in the
+15-m/s accelerating head-on (seeds 20261003, 3 and 5), at 0.45--0.55~s near
+the closest approach. The 8-m/s braking lead of seed 3, which fails at
+2.65~s in \texttt{d1c31d6}, failed at 1.05~s. Nothing else differs between
+the variants, so these runs fail because of the hard rows. In
+\texttt{d1c31d6} the prefix soft rows carried slack above 1~mm in 1.68\% of
+the noisy holds.
+
+\paragraph{Horizon length.} The failures of \texttt{d1c31d6} and of both
+parameter-stage versions that depend on $A$ occurred once the horizon had
+grown to 84--176 holds. The CLF stage's numerical stalls occurred at
+horizons of 173 and 176 holds.
+
+\section{Scope}
+\begin{itemize}
+\item The closed loop is sensitive to small changes. A single change can move
+  marginal runs either way, which is why the failure cases are listed
+  individually.
+\item The noise predictions are continuous-time stationary values for a
+  white-noise equivalent of the sampled radar noise. They ignore the
+  nonlinear terms and the ego estimation errors.
+\item The direct search is local (fminsearch from five starts), so 0.1675 is
+  the best certified value found, not a proven minimum.
+\item The parameter stage is a prototype; its error bound beyond the
+  unit-gain ISS statement was not developed.
+\end{itemize}
+
+\section{Reproduction}
+The files below are in the folder
+\path{TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005}.
+\begin{itemize}
+\item Study tables: \path{scripts/sdpTables.m.txt}; the weighted shape
+  program is \path{patches/shape-weights.patch}.
+\item Campaigns: \path{scripts/campaignOneRoot.m.txt}, run by
+  \path{scripts/launchRoot.sh.txt}. Each variant root is commit
+  \texttt{d1c31d6} exported with \texttt{git archive}, plus one patch from
+  \path{patches/} and a link to \path{solver/}.
+\item Summaries: \path{scripts/ablation.py.txt}.
+\end{itemize}
+The outputs are under \path{~/.cache/collisionAvoidance/ablation-20261005}.
+\end{document}

@@ -1,0 +1,86 @@
+import json,math,os,glob,sys,csv
+import numpy as np
+names=["headOn","acceleratingHeadOn","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"]
+E=os.path.expanduser('~/.cache/collisionAvoidance/estimator-direct-20261005')
+A=os.path.expanduser('~/.cache/collisionAvoidance/ablation-20261005/out')
+variants={'base':E,'road':A+'/road','clf':A+'/clf','prefix':A+'/prefix','param':A+'/param','param2':A+'/param2','rerun-clf':os.path.dirname(A)+'/rerun/clf','rerun-prefix':os.path.dirname(A)+'/rerun/prefix','rerun-param':os.path.dirname(A)+'/rerun/param'}
+def load(f):
+    try: return json.load(open(f))['results']
+    except Exception: return None
+def fnum(v):
+    return v if isinstance(v,(int,float)) and v is not None and math.isfinite(v) else float('nan')
+rows=[]
+for v,root in variants.items():
+    for d in sorted(glob.glob(os.path.join(root,'*'))):
+        obs=os.path.basename(d)
+        if not os.path.isdir(d): continue
+        for sp in [8,15]:
+            for n in names:
+                f=os.path.join(d,'speed%d-%s.json'%(sp,n))
+                if not os.path.exists(f):
+                    s=os.path.join(d,'speed%d-%s.summary.txt'%(sp,n))
+                    if os.path.exists(s): rows.append(dict(variant=v,observation=obs,speed=sp,scenario=n,outcome='noJson',summary=open(s).read().strip()))
+                    continue
+                r=load(f)
+                if r is None: continue
+                tr=r['trace'];q0=r.get('targetInitialState')
+                brake=np.array([t['input'][1] for t in tr if t.get('input')]) if tr else np.zeros(0)
+                times=np.array([t['time'] for t in tr if t.get('input')]) if tr else np.zeros(0)
+                late=brake[times>=4.0] if len(brake) else brake
+                horizons=[t['horizonSteps'] for t in tr[1:] if isinstance(t.get('horizonSteps'),(int,float))]
+                prefixN=8 if sp==8 else 16
+                def sl(t):
+                    s=t.get('stageSlacks')
+                    if isinstance(s,(int,float)): s=[s]
+                    return [x for x in s if isinstance(x,(int,float))] if isinstance(s,list) else []
+                prefixSlackFrames=sum(1 for t in tr[1:] if any(x>1e-3 for x in sl(t)[:prefixN]))
+                tailSlackFrames=sum(1 for t in tr[1:] if any(x>1e-3 for x in sl(t)[prefixN:]))
+                slackFrames=prefixSlackFrames
+                def perr(a,b,k):
+                    if not q0: return float('nan')
+                    e=[t['estimatedTarget'][k]-q0[k] for t in tr if t.get('estimatedTarget') and a<=t['time']<b]
+                    return math.sqrt(np.mean(np.square(e))) if len(e)>10 else float('nan')
+                rec=r['recovery']
+                rows.append(dict(variant=v,observation=obs,speed=sp,scenario=n,outcome=r['outcome'],holds=r['executedFrames'],
+                    lastTime=tr[-1]['time'] if tr else float('nan'),
+                    recovery=rec['confirmationTimeSeconds'] if rec['recovered'] else float('nan'),
+                    gap=fnum(r['minimumReplayClearanceMeters']),road=fnum(r['minimumReplayRoadMarginMeters']),
+                    collision=bool(r['collisionDetected']),departure=bool(r['roadDepartureDetected']),failure=r['failure'],
+                    brakeStepMean=float(np.mean(np.abs(np.diff(brake)))) if len(brake)>2 else float('nan'),
+                    brakeStdLate=float(np.std(late)) if len(late)>2 else float('nan'),
+                    horizonMax=max(horizons) if horizons else float('nan'),horizonMedian=float(np.median(horizons)) if horizons else float('nan'),
+                    horizons=horizons,slackFrames=slackFrames,tailSlackFrames=tailSlackFrames,frames=len(tr),
+                    aErr=perr(0.5,3,4),bErr=perr(0.5,3,5),aErrLate=perr(3,6,4)))
+def summarize(v,obsFilter):
+    R=[x for x in rows if x['variant']==v and obsFilter(x['observation'])]
+    if not R: return None
+    rec=sum(x['outcome']=='recovered' for x in R);uns=sum(x['outcome']=='controlUnavailable' for x in R)
+    col=sum(x.get('collision',False) for x in R);dep=sum(x.get('departure',False) for x in R)
+    other=[(x['observation'],x['speed'],x['scenario'],x['outcome'],round(x.get('lastTime',float('nan')),2)) for x in R if x['outcome'] not in ('recovered',)]
+    gaps=[x['gap'] for x in R if 'gap' in x];roads=[x['road'] for x in R if 'road' in x]
+    recs=[x['recovery'] for x in R if 'recovery' in x and 'curved' not in x['scenario'] and math.isfinite(x['recovery'])]
+    H=[h for x in R if 'horizons' in x for h in x['horizons']]
+    out=dict(runs=len(R),recovered=rec,noSolution=uns,collision=col,departure=dep,
+        minGap=np.nanmin(gaps) if gaps else float('nan'),medGap=np.nanmedian(gaps) if gaps else float('nan'),
+        minRoad=np.nanmin(roads) if roads else float('nan'),medRoad=np.nanmedian(roads) if roads else float('nan'),
+        recMed=np.median(recs) if recs else float('nan'),recMax=max(recs) if recs else float('nan'),
+        brakeStep=np.nanmedian([x['brakeStepMean'] for x in R if 'brakeStepMean' in x]),
+        brakeStdLate=np.nanmedian([x['brakeStdLate'] for x in R if 'brakeStdLate' in x]),
+        hMed=np.median(H) if H else float('nan'),hP99=np.percentile(H,99) if H else float('nan'),hMax=max(H) if H else float('nan'),
+        slackShare=sum(x.get('slackFrames',0) for x in R)/max(1,sum(x.get('frames',0) for x in R)),
+        tailShare=sum(x.get('tailSlackFrames',0) for x in R)/max(1,sum(x.get('frames',0) for x in R)),
+        aErr=np.nanmedian([x['aErr'] for x in R if 'aErr' in x]),bErr=np.nanmedian([x['bErr'] for x in R if 'bErr' in x]),
+        aErrLate=np.nanmedian([x['aErrLate'] for x in R if 'aErrLate' in x]),others=other)
+    return out
+if __name__=='__main__':
+    for v in variants:
+        for label,flt in [('exact',lambda o:o=='exact'),('noisy',lambda o:o.startswith('noisy'))]:
+            s=summarize(v,flt)
+            if s is None: continue
+            print(f"{v:7s} {label:5s} runs {s['runs']:3d} rec {s['recovered']:3d} noSol {s['noSolution']} coll {s['collision']} dep {s['departure']} | gap min {s['minGap']:.3f} med {s['medGap']:.2f} | road min {s['minRoad']:.2f} med {s['medRoad']:.2f} | recov med {s['recMed']:.2f} max {s['recMax']:.2f} | brake step {s['brakeStep']:.4f} lateStd {s['brakeStdLate']:.4f} | N med {s['hMed']:.0f} p99 {s['hP99']:.0f} max {s['hMax']:.0f} | prefix slack {100*s['slackShare']:.2f}% tail {100*s['tailShare']:.1f}% | A err {s['aErr']:.3f}/{s['aErrLate']:.3f} beta {s['bErr']:.4f}")
+            for o in s['others']: print('        not recovered:',o)
+    if len(sys.argv)>1:
+        keys=['variant','observation','speed','scenario','outcome','holds','lastTime','recovery','gap','road','collision','departure','brakeStepMean','brakeStdLate','horizonMedian','horizonMax','slackFrames','tailSlackFrames','frames','aErr','bErr','aErrLate','failure']
+        with open(sys.argv[1],'w',newline='') as fh:
+            w=csv.DictWriter(fh,fieldnames=keys,extrasaction='ignore',lineterminator='\n');w.writeheader()
+            for x in rows: w.writerow({k:x.get(k,'') for k in keys})

@@ -294,7 +294,10 @@ hard. With an observer enclosure every node also carries a slack on its
 tightened row, and the untightened row stays hard after the prefix only, so the
 formulation reduces to the certainty-equivalent one as the enclosure vanishes.
 (Hard untightened rows in the prefix made the problem stricter for a small
-reported enclosure than for none.) The node buffer is 0.20 m, whereas the experiment's physical pass criterion
+reported enclosure than for none. In a single-change ablation on `d1c31d6`
+they left 79 of 84 noisy encounters recovering instead of 82, with three new
+failures at the closest approach of the 15-m/s accelerating head-on;
+`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`.) The node buffer is 0.20 m, whereas the experiment's physical pass criterion
 is positive rectangle clearance. The road is the only lateral constraint: every
 ego rectangle corner stays within `lateralClearance` at every predicted node,
 hold midpoint and the endpoint, hard in both stages (see Terminal constraints).
@@ -336,7 +339,10 @@ observer enclosure. A worst case over the enclosure (the previous version)
 asks for a decrease below the enclosure's own size, which no input achieves
 near the path. That turned the CLF stage into a greedy one-step minimizer;
 in a noisy 15-m/s head-on the braking ratio then chattered (standard deviation
-0.21) and the run did not recover in 100 s.
+0.21) and the run did not recover in 100 s. In a single-change ablation on
+`d1c31d6`, the worst-case row left 38 of 84 noisy encounters recovering
+instead of 82; 37 of the 42 at 15 m/s did not recover within 100 s
+(`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`).
 
 with T = `clf.convergenceTimeConstantSeconds` = 4 s. P is a quadratic CLF
 synthesized offline by an LMI for the given-path cruise trim and read from
@@ -499,7 +505,10 @@ factors `x = 2 a d/m`, `y = m`, `m = sqrt(2 a max(d_anchor, 1))`. Inside the
 road alone admitted an endpoint heading at 43 degrees toward the edge (noisy
 8-m/s head-on). Turning back needed about 2.2 m of lateral room where 1.3 m
 remained, and the road rows became infeasible once that point entered the
-0.4-s horizon.
+0.4-s horizon. In a single-change ablation on `d1c31d6`, removing road
+recovery left 72 of 84 noisy encounters recovering instead of 82; nine of the
+ten new failures were 8-m/s head-on swerves that could no longer stop their
+motion toward the edge (`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`).
 
 If the relative velocity stays constant after `M`, the squared distance has
 derivative `2 (p - q)' v_rel >= 0` and second derivative `2 norm(v_rel)^2 >= 0`,

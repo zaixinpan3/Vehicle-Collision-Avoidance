@@ -1,0 +1,58 @@
+--- a/controller/solvePredictiveControl.m	2026-10-05 03:10:36.376935198 -0500
++++ b/controller/solvePredictiveControl.m	2026-10-05 12:30:45.813941292 -0500
+@@ -458,6 +458,7 @@
+         % Node index closes hold index-1 (or is the present sample).
+         collisionGenerator=localRelativeGenerator(x,generator,model,holdCenter);
+         middleGenerator=am*initialGenerator;nextGenerator=a*initialGenerator;
++        if index==1,firstStateGenerator=nextGenerator;end
+         middleCenter=model.initialState;if index>1,middleCenter=x;end
+         middleCollisionGenerator=localRelativeGenerator(middle,middleGenerator,model,middleCenter);
+         uncertaintyPrediction.egoStateRadius(:,2*index-1:2*index)=[sum(abs(generator),2),sum(abs(middleGenerator),2)];
+@@ -559,7 +560,7 @@
+         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
+         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
+         'encounterExit',departure, ...
+-        'maximumCollisionTighteningMeters',maximumTightening);
++        'maximumCollisionTighteningMeters',maximumTightening,'firstStateGenerator',firstStateGenerator);
+     model.robustnessRelaxation=robustRelaxation;
+     problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
+ end
+@@ -590,18 +591,28 @@
+ function problem=localAddClf(problem,anchor,model)
+     nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
+     [nominalMap,nominalOffset,~,value,scale,~,clf]=localNominalClf(anchor,model,problem.stateIndices(:,2),nv);
+-    e0=nonlinearBicycleModel.errorLinearization(model.initialState,model.lane,model.nominalReference);
++    [e0,j0]=nonlinearBicycleModel.errorLinearization(model.initialState,model.lane,model.nominalReference);
++    [~,j1]=nonlinearBicycleModel.errorLinearization(anchor.states(:,2),model.lane,model.nominalReference);
++    factor=model.nominalReference.factor;
++    initialRadius=sum(vecnorm(factor*j0*model.uncertainty.egoGenerator));
++    nextRadius=sum(vecnorm(factor*j1*problem.firstStateGenerator));
+     scales=[model.cfg.clf.lateralPositionErrorScale;model.cfg.clf.headingErrorScale; ...
+         model.cfg.clf.speedErrorScale;model.cfg.clf.lateralVelocityErrorScale;model.cfg.clf.yawRateErrorScale];
+-    lossLower=norm(e0./scales)^2;
+-    % The CLF is a soft performance row on the estimate: V(xhat+) <= rho
+-    % V(xhat). Estimation error enters it as an input (ISS); it carries no
+-    % observer enclosure. A worst case over the enclosure would ask for a
+-    % decrease below the enclosure's own size, which no input achieves near
+-    % the path, and would turn this stage into a greedy one-step minimizer.
+-    currentBudget=model.nominalReference.contraction*value;
+-    map=nominalMap;offset=nominalOffset;
+-    modelConstant=0;constant=currentBudget/scale;
++    lossRadius=sum(vecnorm((j0*model.uncertainty.egoGenerator)./scales));
++    lossCenter=norm(e0./scales);
++    lossLower=max(0,lossCenter-lossRadius)^2;
++    % The successor must stay below rho times the smallest current value
++    % consistent with the observer enclosure.
++    currentBudget=model.nominalReference.contraction*max(0,sqrt(value)-initialRadius)^2;
++    % Young's inequality keeps one SOC and the same CLF. Mean values remain
++    % separate from these bounds.
++    multiplier=1;bias=0;
++    if nextRadius>0
++        weight=min(1,nextRadius/max(norm(nominalOffset)*sqrt(scale),eps));
++        multiplier=1+weight;bias=(1+1/weight)*nextRadius^2;
++    end
++    map=sqrt(multiplier)*nominalMap;offset=sqrt(multiplier)*nominalOffset;
++    modelConstant=bias/scale;constant=(currentBudget-bias)/scale;
+     axis=sparse(1,nv);axis(ic)=1;
+     cone=localCone([2*map;axis],[-2*offset;1-constant],axis.',-1-constant);
+     inputScale=repmat(1./(model.inputTrustScale*model.cfg.nonlinear.trustRadius*[.15;.25]*sqrt(2*count)),count,1);

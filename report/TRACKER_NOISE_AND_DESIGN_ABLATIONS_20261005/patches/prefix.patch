@@ -1,0 +1,29 @@
+--- a/controller/solvePredictiveControl.m	2026-10-05 03:10:36.376935198 -0500
++++ b/controller/solvePredictiveControl.m	2026-10-05 12:30:45.814669647 -0500
+@@ -482,7 +482,7 @@
+             maximumTightening=max(maximumTightening,max(tightening));
+             if index==1,primaryLowerBound=max(0,-min(g));end
+             r=-j*map;
+-            if robustRelaxation && index>prefix
++            if robustRelaxation
+                 rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+             end
+             if index<=slackCount,r(:,is(index))=-1;end
+@@ -498,7 +498,7 @@
+             [g,j,tightening]=localSafetyRows(middle,(index-.5)*h,model,middleCollisionGenerator,(index-1)*h);
+             maximumTightening=max(maximumTightening,max(tightening));
+             r=-j*map;
+-            if robustRelaxation && index>prefix
++            if robustRelaxation
+                 rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+             end
+             if index<=slackCount,r(:,is(index))=-1;end
+@@ -536,7 +536,7 @@
+         [g,j,tightening]=localSafetyRows(y,time,model,collisionGenerator,holdStart);
+         maximumTightening=max(maximumTightening,max(tightening));
+         r=-j*map;
+-        if robustRelaxation && count+1>prefix
++        if robustRelaxation
+             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+         end
+         if count+1<=slackCount,r(:,is(count+1))=-1;end

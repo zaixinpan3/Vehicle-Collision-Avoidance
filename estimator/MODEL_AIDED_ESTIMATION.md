@@ -128,6 +128,14 @@ fit. That of `beta` had a median of 0.0078 rad against 0.0005. Both
 failures were forecasts over long horizons (84 and 104 holds). In them, the
 error of `A` moved the target by 3.7 and 5.6 m at the end of the horizon.
 
+That error is the radar noise passed through the tracker's gains, and the
+certificate fixes their level. Weighting the acceleration error in the shape
+program did not lower it, and the best certified gains found lower it by 15%.
+A first-order constant-parameter stage behind the tracker would remove most
+of it, since the noise is high-frequency. Two prototypes recovered 82 of 84
+encounters, with different failures; the stage is not adopted
+(`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`).
+
 ## 6. Target acquisition and initialization in the adapter
 
 `localTargetStateFromInertialWindow` fits position, velocity and a constant

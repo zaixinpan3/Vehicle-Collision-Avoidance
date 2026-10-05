@@ -1,0 +1,27 @@
+--- a/controller/solvePredictiveControl.m	2026-10-05 03:10:36.376935198 -0500
++++ b/controller/solvePredictiveControl.m	2026-10-05 12:30:45.813036808 -0500
+@@ -368,13 +368,8 @@
+     % terminalSeparatingMarginMetersPerSecond and the road-recovery condition
+     % holds with half its deceleration, so neither terminal condition is
+     % active at the anchor.
+-    reached=true;cfg=model.cfg;
+-    if ~isempty(model.road.lateralClearance)
+-        [a,velocity,~,distance]=localRoadRecoveryTerms(x,model);
+-        reached=all(distance>=0 & max(velocity,0).^2<=a*distance);
+-    end
+-    if ~reached || isempty(model.target),return;end
+-    q=localTargetAt(model,index*cfg.controller.sampleTime);
++    reached=true;if isempty(model.target),return;end
++    cfg=model.cfg;q=localTargetAt(model,index*cfg.controller.sampleTime);
+     relative=x(1:2)-q(1:2);
+     reached=relative.'*(localEgoVelocity(x)-localTargetVelocity(q)) ...
+         >=cfg.collision.terminalSeparatingMarginMetersPerSecond*norm(relative);
+@@ -549,8 +544,6 @@
+     if ~isempty(model.road.lateralClearance)
+         [r,bound]=localRoadRows(y,model,generator,map);
+         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+-        [r,bound,cones]=localRoadRecovery(y,model,generator,map,ir);
+-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;primaryCones=[primaryCones,cones];
+     end
+     objective=zeros(nv,1);objective(is)=1;
+     problem=struct('a',vertcat(rows{1:rowCount}),'b',vertcat(bounds{1:rowCount}), ...
