@@ -1,0 +1,76 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Can the estimator's operating domain be computed?}
+\date{Prepared October 5, 2026}
+\begin{document}
+\maketitle
+
+\section{Question}
+The user chose to enlarge the estimator's operating domain rather than limit
+the controller, and asked whether that domain should be computed rather than
+declared. This report classifies every domain premise of the NRMM estimator
+(\path{config/nrmmTrackingConfig.m}, overridden by
+\path{config/estimatorControllerIntegrationConfig.m}). For each premise it
+records where the premise enters the design and the runtime, and whether it can
+be derived from the controller's vehicle, tire and state-limit configuration.
+The estimator is unchanged; the scripts are \path{scripts/studyEstimatorDomain.m}
+and \path{scripts/replayEstimatorValidity.m}.
+
+\section{Classification}
+\begin{center}
+\begin{tabular}{p{0.24\linewidth}p{0.16\linewidth}p{0.5\linewidth}}
+\toprule
+premise (declared) & role & derivation\\
+\midrule
+ego yaw-rate maximum (0.75~rad/s) & runtime check, caps & Not load-bearing: the velocity certificate $A_v^\top+A_v=-2\lambda I$ holds for every yaw rate. The controller's enforced limit $|r|\le5$~rad/s can be used.\\
+ego speed interval (5--25~m/s) & gain, coefficients, kinematic check & From the controller's limits, 1--18~m/s.\\
+single-track mismatch $|r-v_y/l_r|$ (0.25~rad/s) & velocity disturbance (dominant) & Equals $v_x|\tan\alpha_r|/l_r$. It is bounded only while the rear tire is below its Fiala saturation slip $\alpha_{\rm sat}=\arctan(3\mu F_z/C)=0.195$~rad, giving $\le2.15$~rad/s at 18~m/s.\\
+ego sideslip inversion domain (0.12~rad) & kinematic inversion branch & Bounded by rear slip and yaw rate; no premise-free bound.\\
+ego acceleration norm ($\infty$) & between-sample velocity bound & $\mu g$ plus road load: 8.52~m/s$^2$.\\
+ego yaw acceleration (set by the driver) & orientation transport & Axle friction forces over $I_z$: 12.26~rad/s$^2$, already derived this way.\\
+target speed, acceleration, sideslip & target model & A contract about other traffic; it cannot be derived from our vehicle. It can be taken from the scenario set.\\
+relative position maximum (50~m) & gain, ranges & Radar range (sensor specification).\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Cost of the computed values}
+Design ultimate bounds from \texttt{synthesizeNrmmObserverGains}
+(\path{ESTIMATOR_DOMAIN_20261005/ultimate-bounds.csv}):
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+domain & $\|e_v\|$ (m/s) & rel.\ position (m) & target vel.\ (m/s) & target acc.\ (m/s$^2$)\\
+\midrule
+declared & 0.488 & 1.480 & 8.06 & 23.3\\
+yaw rate, speed from controller & 0.488 & 1.480 & 8.06 & 23.3\\
++ mismatch from rear saturation & 3.651 & 6.738 & 37.5 & 112.9\\
++ sideslip = rear saturation slip & 3.695 & 6.810 & 38.0 & 114.1\\
+\bottomrule
+\end{tabular}
+\end{center}
+Enlarging the yaw-rate and speed domains costs nothing. Computing the
+single-track mismatch from the tire makes every guaranteed bound five to seven
+times larger, which makes them useless for a 0.2-m margin.
+
+\section{Validity with the free enlargement}
+The estimator was replayed on the recorded noisy runs (aec20bc) with yaw-rate
+maximum 5~rad/s and speed minimum 1~m/s
+(\path{ESTIMATOR_DOMAIN_20261005/replay-enlarged-yaw-speed.csv}). At 15~m/s
+the ego bound stays valid in all seven runs, against four before. At 8~m/s
+it is still invalidated at 0.40--1.50~s, now by the kinematic feasibility
+check. With the declared sideslip domain and mismatch, the measured lateral
+velocity $l_r r$ must lie within $v\sin(0.12)+l_r(0.25+n_g)$. That is about
+0.76~rad/s at 7~m/s, and the 8-m/s avoidances reach 0.81~rad/s. The vehicle's
+real sideslip and mismatch exceed the declared premises there.
+
+\section{Conclusion}
+The premises that matter, mismatch and sideslip, are statements about how far
+the rear tire slips. The plant alone does not bound them usefully. A useful
+computed value needs a bound on the rear slip angle; the plant cannot provide
+it, but the controller can enforce it. The yaw-rate, speed, acceleration and
+yaw-acceleration premises can be computed from the plant and the controller's
+limits without loss. The target premises are a contract about other vehicles.
+\end{document}

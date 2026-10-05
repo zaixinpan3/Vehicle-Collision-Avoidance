@@ -1,14 +1,17 @@
-function rows = replayEstimatorValidity(campaign,speedList,nameList)
+function rows = replayEstimatorValidity(campaign,speedList,nameList,observerOverride)
 %replayEstimatorValidity Replay the NRMM adapter on recorded truth and report
 % when the estimator's ego error bound becomes invalid, and why.
 % The adapter is deterministic for a given seed and truth trajectory, so this
 % reproduces the estimate published in each recorded noisy campaign run. The
 % controller is not called. Output rows give the first invalid time, the
 % bound's reason, the yaw rate and speed there, and the run's peak yaw rate.
+% observerOverride (optional) is merged into the estimator's observer
+% configuration, e.g. struct('ego',struct('domain',struct('yawRateMaximum',5))).
     arguments
         campaign (1,1) string
         speedList (1,:) double = [8 15]
         nameList (1,:) string = ["headOn","acceleratingHeadOn","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"]
+        observerOverride struct = struct()
     end
 rows=struct('speed',{},'scenario',{},'frames',{},'invalidFrom',{},'reason',{},'yawRateThere',{},'speedThere',{},'maximumYawRate',{},'minimumSpeed',{});
 R=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(R,'scripts'),fullfile(R,'config'),fullfile(R,'controller'),fullfile(R,'estimator'));
@@ -18,7 +21,7 @@ for name=nameList
   if isempty(tr),fprintf('VALID %2d %-19s no frames\n',speed,name);continue;end
   cfgC=collisionAvoidanceControllerConfig(struct('referenceSpeed',speed,'controller',struct('horizonSteps',8+8*(speed==15))));
   [~,q0,~,cfgC]=collisionThreatScenario(name,cfgC);
-  c=estimatorControllerIntegrationConfig(); c.randomSeed=20261003;
+  c=estimatorControllerIntegrationConfig(); c.randomSeed=20261003; c.observer=localMerge(c.observer,observerOverride);
   c.sensor.radar.rangeMaximum=cfgC.collision.encounterRangeMeters; c.observer.ego.yaw.rearAxleDistance=cfgC.vehicle.lr;
   tire=modifiedFialaTire.parameters(cfgC);
   c.observer.ego.domain.yawAccelerationMaximum=[cfgC.vehicle.lf,cfgC.vehicle.lr]*tire.longitudinalForceScale/cfgC.vehicle.Iz;
@@ -53,4 +56,14 @@ function target=localTarget(q)
         'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7), ...
         'targetAccelerationInertial',q(5)*direction+yawRate*[-velocity(2);velocity(1)], ...
         'targetLength',2*q(8),'targetWidth',2*q(9),'targetRectangleOffset',q(10:11));
+end
+
+function base=localMerge(base,override)
+    for field=string(fieldnames(override)).'
+        if isstruct(override.(field)) && isfield(base,field) && isstruct(base.(field))
+            base.(field)=localMerge(base.(field),override.(field));
+        else
+            base.(field)=override.(field);
+        end
+    end
 end
