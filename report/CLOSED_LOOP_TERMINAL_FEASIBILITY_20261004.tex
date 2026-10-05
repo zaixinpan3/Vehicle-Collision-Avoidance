@@ -106,4 +106,61 @@ was not built or timed. Three issues remain.
   Jacobian is piecewise. The peak sensitivity of 9.6 at 15~m/s amplifies
   endpoint linearization error along the tail.
 \end{enumerate}
+
+\section{Addendum: free steps needed with a closed-loop terminal set}
+The user asked whether the terminal-set design can reduce the number of
+prediction steps. If the closed-loop continuation is condensed onto the
+endpoint state, it adds rows but no decision steps. The free horizon then only
+has to reach a state from which the continuation is safe.
+\path{scripts/studyTerminalHorizonReduction.m} measures this along the same
+recorded trajectories, at every frame before recovery. It finds the smallest
+$j\ge k$ such that, from recorded state $j$, a guidance policy keeps at least
+the 0.2-m planning clearance, keeps every rectangle corner on the road, and
+reaches the no-collision certificate. $j-k$ is the free horizon that would have
+sufficed. Two families are compared: return to the path, and return to the
+path or to a parallel lane centre ($+3.66$, $-3.66$ and $+7.32$~m). On the
+curved road, where the infinite-time set is empty, safety is taken over a
+10-s window instead. The recorded states are a proxy for the planned ones.
+
+\begin{center}
+\begin{tabular}{rlrrr}
+\toprule
+speed & scenario & separating (used) & path only & path or lanes\\
+\midrule
+8 & headOn & 35 & 13 & 0\\
+8 & acceleratingHeadOn & 34 & 12 & 0\\
+8 & brakingLead & 98 & 148 & 8\\
+8 & crossing & 29 & 27 & 27\\
+8 & turningCrossing & 80 & 27 & 27\\
+8 & curvedHeadOn & 38 & 14 & 0\\
+8 & curvedCrossing & 111 & 26 & 26\\
+15 & headOn & 23 & 15 & 14\\
+15 & acceleratingHeadOn & 22 & 14 & 14\\
+15 & brakingLead & 101 & 135 & 26\\
+15 & crossing & 31 & 26 & 25\\
+15 & turningCrossing & 61 & 31 & 31\\
+15 & curvedHeadOn & 49 & 205 & 32\\
+15 & curvedCrossing & 31 & 26 & 25\\
+\bottomrule
+\end{tabular}
+\end{center}
+The table gives maxima over the encounter frames. The separating column is the
+horizon the controller actually used, whose median is its minimum (8 or 16).
+The median free horizon is 0 in every run for the path-or-lanes family: most
+recorded states are already in that set. The worst case falls from 111 to 32
+steps. Following a braking lead needs the lane policies: returning to the path
+needs more steps than the present terminal (148 and 135), because the ego is
+returned behind the lead. Crossing targets keep 25--31 steps with either
+family, because a parallel lane does not avoid a target that crosses all
+lanes; policies with other speeds are the untested next lever. The 205-step
+path-only maximum in the 15-m/s curved head-on run was not investigated.
+
+An earlier pass of this study only rejected actual contact and did not check
+the road; it reported zero free steps more often. Its numbers are superseded
+(\path{horizon-reduction.csv}, \path{horizon.log}).
+
+A union of continuation policies is not convex. It would be solved per policy
+(five small conic problems with condensed tails) or by choosing the policy on
+the anchor. Preferring the path policy whenever it qualifies keeps the terminal
+set aligned with the CLF.
 \end{document}

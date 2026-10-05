@@ -1,0 +1,15 @@
+speed,scenario,encounterFrames,separatingHorizonMedian,separatingHorizonMaximum,pathOnlyMedian,pathOnlyMaximum,pathOnlyUnreached,pathAndLanesMedian,pathAndLanesMaximum,pathAndLanesUnreached
+8,headOn,187,8,35,0,13,0,0,0,0
+8,acceleratingHeadOn,187,8,34,0,12,0,0,0,0
+8,brakingLead,225,8,98,36,148,0,0,8,0
+8,crossing,185,8,29,0,27,0,0,27,0
+8,turningCrossing,188,8,80,0,27,0,0,27,0
+8,curvedHeadOn,188,8,38,0,14,0,0,0,0
+8,curvedCrossing,182,8,111,0,26,0,0,26,0
+15,headOn,81,16,23,0,15,0,0,14,0
+15,acceleratingHeadOn,117,16,22,0,14,0,0,14,0
+15,brakingLead,214,16,101,28.5,135,0,0,26,0
+15,crossing,113,16,31,0,26,0,0,25,0
+15,turningCrossing,148,16,61,0,31,0,0,31,0
+15,curvedHeadOn,1197,16,49,0,205,0,0,32,0
+15,curvedCrossing,128,16,31,0,26,0,0,25,0

@@ -1,1 +1,2 @@
 f6c7c692eca9c04206099a31febecc19bd28af34aeab05483755f2825864559d  scripts/studyClosedLoopTerminalFeasibility.m
+198efced243a62add508f6fae0aa962aba931627b58f988f6b7307386e32641a  scripts/studyTerminalHorizonReduction.m
