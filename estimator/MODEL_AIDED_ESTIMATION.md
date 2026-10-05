@@ -134,7 +134,8 @@ program did not lower it, and the best certified gains found lower it by 15%.
 A first-order constant-parameter stage behind the tracker would remove most
 of it, since the noise is high-frequency. Two prototypes recovered 82 of 84
 encounters, with different failures; the stage is not adopted
-(`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`).
+(`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`). The user
+accepted 82 of 84 as the current result (October 5, 2026).
 
 ## 6. Target acquisition and initialization in the adapter
 

@@ -188,6 +188,13 @@ parameter-stage versions that depend on $A$ occurred once the horizon had
 grown to 84--176 holds. The CLF stage's numerical stalls occurred at
 horizons of 173 and 176 holds.
 
+\section{Decision}
+On October 5, 2026 the user accepted 82 of 84 noisy encounters, with the
+tracker's own target parameters (\texttt{d1c31d6}), as the current result.
+The user kept the three controller choices: road recovery in the terminal
+set, the CLF row on the estimate and soft untightened prefix rows. Neither
+the gain-program change nor the parameter stage is pursued.
+
 \section{Scope}
 \begin{itemize}
 \item The closed loop is sensitive to small changes. A single change can move
@@ -214,5 +221,9 @@ The files below are in the folder
   \path{patches/} and a link to \path{solver/}.
 \item Summaries: \path{scripts/ablation.py.txt}.
 \end{itemize}
-The outputs are under \path{~/.cache/collisionAvoidance/ablation-20261005}.
+The raw outputs, about 20~GB of traces and failure snapshots, were kept
+outside the repository in the folder \path{ablation-20261005} under
+\path{~/.cache/collisionAvoidance}. They were deleted at the user's
+direction on October 5, 2026. The per-run metrics, patches and scripts in
+this folder remain.
 \end{document}
