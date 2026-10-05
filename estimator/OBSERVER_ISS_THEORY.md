@@ -22,6 +22,19 @@ Section 8. They are not claims of uniformly better estimation trajectories.
 All continuous-time error bounds apply throughout time. The separate sampled
 realization and its hold-error assumptions are described in
 [NRMM_IMPLEMENTATION_NOTES.md](../report/NRMM_IMPLEMENTATION_NOTES.md).
+With the controller's vehicle model and held input, the lateral component of
+the velocity measurement of Section 3 is replaced by a force-balance inversion
+with its own certified radius; see
+[MODEL_AIDED_ESTIMATION.md](MODEL_AIDED_ESTIMATION.md). Sections 3, 4 and 8
+describe the kinematic branch, which is used without that model.
+A paired synthetic comparison against a reproduction of the Sharma multistage
+observer (`sharmaMultistageObserverDesign.m`, `sharmaMultistageObserverRuntime.m`,
+`sharmaNrmmCompanionDerivative.m`) is recorded in
+[OBSERVER_SHARMA_COMPARISON_20260924.md](../report/OBSERVER_SHARMA_COMPARISON_20260924.md);
+it measures sampled trajectories, not the certificates above, and predates
+the current target gains. The comparison with reference gains tuned per
+scenario is in
+[TARGET_NOISE_SHAPE_GAINS_20261001.tex](../report/TARGET_NOISE_SHAPE_GAINS_20261001.tex).
 
 ## 1. Retained model and covariant chain
 
@@ -561,8 +574,8 @@ current velocity/acceleration enclosures. Gyro transport keeps the common
 absolute-heading error correlated across history samples; it does not assume
 independent deterministic sensor errors. Constant-curvature position chords
 also bound course direction by half the bounded angular sweep. The formulas
-and sampled transport allowance are documented in
-[FINITE_SENSING_CONTROLLER.md](../controller/FINITE_SENSING_CONTROLLER.md).
+and sampled transport allowance are in the help header of
+`nrmmTargetHistory.m`.
 All published bounds remain centered about the original NRMM point estimates.
 Neither the point-observer vector field nor its gain design changes.
 
@@ -570,6 +583,9 @@ This postprocessing cannot repair a violated premise of the ego observer.
 In a dynamic bicycle, rear tire slip permits
 \(r-v_y/l_r\ne0\). A small configured mismatch is a true-motion assumption,
 not a consequence of the gyroscope or of estimated-domain consistency.
+The avoidance maneuvers violate it at 15 m/s
+(`report/ESTIMATOR_DOMAIN_20261005.tex`); the closed-loop runs therefore use
+the force-balance measurement of `MODEL_AIDED_ESTIMATION.md`.
 The simulation-only `auditNrmmTruthEnclosure` checks the true mismatch,
 speed, yaw rate, sideslip and known state-component errors at logged times.
 It never feeds truth to the observer or controller. Passing sampled checks
@@ -583,5 +599,5 @@ predictor in `R^2`, one target comparison enclosure and one sensor-history
 record. Together with ego velocity, position, the GNSS-output predictor and
 yaw, the packed RK4 state is a fixed 15-vector. Time substeps and historical
 samples remain sequences. No target axis, count or radar association step is
-present. The controller receives one optional `targetEstimate`; see
-[the pipeline derivation](../controller/SINGLE_TARGET_PIPELINE.md).
+present. The controller receives one optional `targetEstimate` with its
+state-time enclosures (`nrmmControllerErrorBounds.m`).

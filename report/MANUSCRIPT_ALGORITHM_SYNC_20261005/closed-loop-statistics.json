@@ -1,0 +1,2816 @@
+{
+ "exact": {
+  "runs": {
+   "speed15-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 190,
+    "minimumGap": 0.19949651023059103,
+    "minimumRoadMargin": 5.906432424512009,
+    "maximumLateralDeviation": 5.194481192043032,
+    "recoverySeconds": null,
+    "maximumSteering": 0.21023625350233416,
+    "brakingRatioRange": [
+     -0.2843750000318542,
+     0.34999999796297687
+    ],
+    "maximumYawRate": 0.6041508536452168,
+    "maximumSideslip": 0.03586443068536195,
+    "positivePrimaryFrames": 1,
+    "maximumPrimaryOptimum": 0.0007244894549505456,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 22,
+    "zeroClfSlackFrames": 168,
+    "zeroSlackPairs": 167,
+    "zeroSlackPairsMissingDecrease": 0,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-brakingLead": {
+    "outcome": "recovered",
+    "holds": 265,
+    "minimumGap": 0.18990062018992626,
+    "minimumRoadMargin": 7.532202684249772,
+    "maximumLateralDeviation": 3.20895711022299,
+    "recoverySeconds": null,
+    "maximumSteering": 0.17889601201135313,
+    "brakingRatioRange": [
+     -0.34261480929253574,
+     0.33286499781893053
+    ],
+    "maximumYawRate": 0.6002450156492269,
+    "maximumSideslip": 0.02202209817972493,
+    "positivePrimaryFrames": 17,
+    "maximumPrimaryOptimum": 0.010321822139256847,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 96,
+    "zeroClfSlackFrames": 195,
+    "zeroSlackPairs": 194,
+    "zeroSlackPairsMissingDecrease": 6,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-crossing": {
+    "outcome": "recovered",
+    "holds": 194,
+    "minimumGap": 0.15266054755201086,
+    "minimumRoadMargin": 6.04660388899802,
+    "maximumLateralDeviation": 5.0610175643784325,
+    "recoverySeconds": null,
+    "maximumSteering": 0.29957317274774314,
+    "brakingRatioRange": [
+     -0.2843750000020919,
+     0.39083194717482733
+    ],
+    "maximumYawRate": 0.6528789405656402,
+    "maximumSideslip": 0.03373973836301218,
+    "positivePrimaryFrames": 7,
+    "maximumPrimaryOptimum": 0.0044507488074471725,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 41,
+    "zeroClfSlackFrames": 168,
+    "zeroSlackPairs": 167,
+    "zeroSlackPairsMissingDecrease": 0,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 201,
+    "minimumGap": 0.16851344373799262,
+    "minimumRoadMargin": 5.245136251547911,
+    "maximumLateralDeviation": 5.877157256595538,
+    "recoverySeconds": null,
+    "maximumSteering": 0.14489323927944645,
+    "brakingRatioRange": [
+     -0.2843750000005445,
+     0.3499999557855618
+    ],
+    "maximumYawRate": 0.4598058810037232,
+    "maximumSideslip": 0.026061821665283882,
+    "positivePrimaryFrames": 4,
+    "maximumPrimaryOptimum": 0.012578422404010019,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 40,
+    "zeroClfSlackFrames": 178,
+    "zeroSlackPairs": 177,
+    "zeroSlackPairsMissingDecrease": 7,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1270,
+    "minimumGap": 1.5498187436674227,
+    "minimumRoadMargin": 6.463375921848528,
+    "maximumLateralDeviation": 4.687348593724841,
+    "recoverySeconds": null,
+    "maximumSteering": 0.13297362341553418,
+    "brakingRatioRange": [
+     -0.28437500000052934,
+     0.3499998664068193
+    ],
+    "maximumYawRate": 0.45445910050796795,
+    "maximumSideslip": 0.017334154126367612,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 5.617298827127118e-10,
+    "freshRestarts": 1,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 49,
+    "zeroClfSlackFrames": 1219,
+    "zeroSlackPairs": 1218,
+    "zeroSlackPairsMissingDecrease": 466,
+    "zeroSlackPairsIncreasing": 427,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-headOn": {
+    "outcome": "recovered",
+    "holds": 187,
+    "minimumGap": 0.19363139771571625,
+    "minimumRoadMargin": 6.19180886778363,
+    "maximumLateralDeviation": 4.909603216312623,
+    "recoverySeconds": null,
+    "maximumSteering": 0.23470639406168972,
+    "brakingRatioRange": [
+     -0.2843750000060699,
+     0.3499999935060777
+    ],
+    "maximumYawRate": 0.5983912156921285,
+    "maximumSideslip": 0.03609438374326107,
+    "positivePrimaryFrames": 4,
+    "maximumPrimaryOptimum": 0.005677432969572867,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 164,
+    "zeroSlackPairs": 163,
+    "zeroSlackPairsMissingDecrease": 0,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 205,
+    "minimumGap": 0.19748365851493546,
+    "minimumRoadMargin": 4.705413963121771,
+    "maximumLateralDeviation": 6.371543874080439,
+    "recoverySeconds": null,
+    "maximumSteering": 0.13900122255509725,
+    "brakingRatioRange": [
+     -0.2843750000309572,
+     0.354064541790648
+    ],
+    "maximumYawRate": 0.5677892060645362,
+    "maximumSideslip": 0.04091409801082579,
+    "positivePrimaryFrames": 1,
+    "maximumPrimaryOptimum": 0.0005709660288680453,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 63,
+    "zeroClfSlackFrames": 175,
+    "zeroSlackPairs": 174,
+    "zeroSlackPairsMissingDecrease": 13,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 216,
+    "minimumGap": 1.1673642803737754,
+    "minimumRoadMargin": 3.975154656069476,
+    "maximumLateralDeviation": 6.802745862200128,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3829097660063723,
+    "brakingRatioRange": [
+     -0.2843750000690017,
+     0.4749999868692578
+    ],
+    "maximumYawRate": 0.8160958843407664,
+    "maximumSideslip": 0.1311212524611997,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 8.623575080423302e-10,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 34,
+    "zeroClfSlackFrames": 182,
+    "zeroSlackPairs": 181,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-brakingLead": {
+    "outcome": "recovered",
+    "holds": 229,
+    "minimumGap": 0.1978786433076763,
+    "minimumRoadMargin": 7.51300801294001,
+    "maximumLateralDeviation": 2.277964500852394,
+    "recoverySeconds": null,
+    "maximumSteering": 0.39697316029284024,
+    "brakingRatioRange": [
+     -0.35209144426371913,
+     0.7603478578127137
+    ],
+    "maximumYawRate": 0.6618625001137309,
+    "maximumSideslip": 0.08758931985908436,
+    "positivePrimaryFrames": 2,
+    "maximumPrimaryOptimum": 0.0006117029392057321,
+    "freshRestarts": 1,
+    "horizonMedian": 8,
+    "horizonMaximum": 102,
+    "zeroClfSlackFrames": 165,
+    "zeroSlackPairs": 164,
+    "zeroSlackPairsMissingDecrease": 31,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-crossing": {
+    "outcome": "recovered",
+    "holds": 214,
+    "minimumGap": 0.18443897259661174,
+    "minimumRoadMargin": 4.029264425325479,
+    "maximumLateralDeviation": 6.7681716444341,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3456753319846631,
+    "brakingRatioRange": [
+     -0.2843750000093925,
+     0.4209632079241522
+    ],
+    "maximumYawRate": 0.7787833647950339,
+    "maximumSideslip": 0.09948260643590692,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 8.61478701637383e-10,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 29,
+    "zeroClfSlackFrames": 181,
+    "zeroSlackPairs": 180,
+    "zeroSlackPairsMissingDecrease": 1,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 220,
+    "minimumGap": 0.17906129429373446,
+    "minimumRoadMargin": 4.935813111151413,
+    "maximumLateralDeviation": 5.835810487585128,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3734382623171493,
+    "brakingRatioRange": [
+     -0.2843750000041451,
+     0.34999998851510056
+    ],
+    "maximumYawRate": 0.8193840456470275,
+    "maximumSideslip": 0.11451344665291449,
+    "positivePrimaryFrames": 2,
+    "maximumPrimaryOptimum": 0.026997979219462717,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 111,
+    "zeroClfSlackFrames": 191,
+    "zeroSlackPairs": 190,
+    "zeroSlackPairsMissingDecrease": 0,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1744,
+    "minimumGap": 1.385325297322811,
+    "minimumRoadMargin": 3.8515556521890204,
+    "maximumLateralDeviation": 6.938262882404102,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3688291469915902,
+    "brakingRatioRange": [
+     -0.3499999924010867,
+     0.373046738811914
+    ],
+    "maximumYawRate": 0.7842788619035447,
+    "maximumSideslip": 0.12805147452546797,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 1.6332019253827936e-09,
+    "freshRestarts": 1,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 73,
+    "zeroClfSlackFrames": 1651,
+    "zeroSlackPairs": 1650,
+    "zeroSlackPairsMissingDecrease": 405,
+    "zeroSlackPairsIncreasing": 349,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-headOn": {
+    "outcome": "recovered",
+    "holds": 215,
+    "minimumGap": 1.4850053495989757,
+    "minimumRoadMargin": 4.092885503312328,
+    "maximumLateralDeviation": 6.697414557309024,
+    "recoverySeconds": null,
+    "maximumSteering": 0.36713641391772217,
+    "brakingRatioRange": [
+     -0.2843750000511543,
+     0.4749999643797239
+    ],
+    "maximumYawRate": 0.784700924759309,
+    "maximumSideslip": 0.12466885783616954,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 1.158999942501912e-09,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 36,
+    "zeroClfSlackFrames": 180,
+    "zeroSlackPairs": 179,
+    "zeroSlackPairsMissingDecrease": 1,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 212,
+    "minimumGap": 0.17947200626686488,
+    "minimumRoadMargin": 4.42833370005294,
+    "maximumLateralDeviation": 6.369268036595559,
+    "recoverySeconds": null,
+    "maximumSteering": 0.31406508113250065,
+    "brakingRatioRange": [
+     -0.28437500007570615,
+     0.4749999826834411
+    ],
+    "maximumYawRate": 0.7782977155512325,
+    "maximumSideslip": 0.09305611100419464,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 7.639642088123182e-10,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 80,
+    "zeroClfSlackFrames": 180,
+    "zeroSlackPairs": 179,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   }
+  },
+  "frames": 5562,
+  "controllerMedian": 0.012916,
+  "controllerP95": 0.063164,
+  "controllerMaximum": 1.061954,
+  "shareOver50ms": 0.06778137360661632,
+  "observerMedian": 0.0
+ },
+ "noisy-seed1": {
+  "runs": {
+   "speed15-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 201,
+    "minimumGap": 0.43618601570963117,
+    "minimumRoadMargin": 3.197509873239179,
+    "maximumLateralDeviation": 7.6967365800545435,
+    "recoverySeconds": null,
+    "maximumSteering": 0.4818509635411812,
+    "brakingRatioRange": [
+     -0.3815369561306953,
+     0.9847752428220536
+    ],
+    "maximumYawRate": 0.9328343888062162,
+    "maximumSideslip": 0.13617176578393056,
+    "positivePrimaryFrames": 25,
+    "maximumPrimaryOptimum": 35.06042322893613,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 22,
+    "zeroClfSlackFrames": 167,
+    "zeroSlackPairs": 166,
+    "zeroSlackPairsMissingDecrease": 4,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.1651039051256985,
+     1
+    ]
+   },
+   "speed15-brakingLead": {
+    "outcome": "recovered",
+    "holds": 291,
+    "minimumGap": 1.2381795183547613,
+    "minimumRoadMargin": 3.551613448914914,
+    "maximumLateralDeviation": 4.629141237914873,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3848580891865933,
+    "brakingRatioRange": [
+     -0.3511672379093357,
+     0.40340694387615794
+    ],
+    "maximumYawRate": 0.932442198607269,
+    "maximumSideslip": 0.08388425058442313,
+    "positivePrimaryFrames": 19,
+    "maximumPrimaryOptimum": 13.675340286265959,
+    "freshRestarts": 4,
+    "horizonMedian": 16,
+    "horizonMaximum": 120,
+    "zeroClfSlackFrames": 193,
+    "zeroSlackPairs": 192,
+    "zeroSlackPairsMissingDecrease": 39,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.0625,
+     1
+    ]
+   },
+   "speed15-crossing": {
+    "outcome": "recovered",
+    "holds": 198,
+    "minimumGap": 1.546269052834504,
+    "minimumRoadMargin": 3.144856098723892,
+    "maximumLateralDeviation": 7.730359106135046,
+    "recoverySeconds": null,
+    "maximumSteering": 0.15886210967790448,
+    "brakingRatioRange": [
+     -0.2843750000633274,
+     0.3639389682676966
+    ],
+    "maximumYawRate": 0.7170283259789186,
+    "maximumSideslip": 0.12069427164213022,
+    "positivePrimaryFrames": 1,
+    "maximumPrimaryOptimum": 0.016080992320196368,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 41,
+    "zeroClfSlackFrames": 167,
+    "zeroSlackPairs": 166,
+    "zeroSlackPairsMissingDecrease": 18,
+    "zeroSlackPairsIncreasing": 1,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 238,
+    "minimumGap": 3.489425321613402,
+    "minimumRoadMargin": 0.7515156130765028,
+    "maximumLateralDeviation": 10.340054356751336,
+    "recoverySeconds": null,
+    "maximumSteering": 0.255350884809445,
+    "brakingRatioRange": [
+     -0.422993274168229,
+     0.3499999932960405
+    ],
+    "maximumYawRate": 0.6027520005646638,
+    "maximumSideslip": 0.0313334384461131,
+    "positivePrimaryFrames": 13,
+    "maximumPrimaryOptimum": 6.718750323186988,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 43,
+    "zeroClfSlackFrames": 208,
+    "zeroSlackPairs": 207,
+    "zeroSlackPairsMissingDecrease": 6,
+    "zeroSlackPairsIncreasing": 4,
+    "trustScaleRange": [
+     0.087060898191864,
+     1
+    ]
+   },
+   "speed15-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1303,
+    "minimumGap": 3.8989977985466497,
+    "minimumRoadMargin": 0.4776297361478381,
+    "maximumLateralDeviation": 10.388359902305103,
+    "recoverySeconds": null,
+    "maximumSteering": 0.2645427701213443,
+    "brakingRatioRange": [
+     -0.2843750000037777,
+     0.5565726371954011
+    ],
+    "maximumYawRate": 0.8133432883945367,
+    "maximumSideslip": 0.12719035179965107,
+    "positivePrimaryFrames": 11,
+    "maximumPrimaryOptimum": 6.1561155067200595,
+    "freshRestarts": 1,
+    "horizonMedian": 16,
+    "horizonMaximum": 43,
+    "zeroClfSlackFrames": 1244,
+    "zeroSlackPairs": 1243,
+    "zeroSlackPairsMissingDecrease": 449,
+    "zeroSlackPairsIncreasing": 392,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-headOn": {
+    "outcome": "recovered",
+    "holds": 206,
+    "minimumGap": 0.5239807754838697,
+    "minimumRoadMargin": 3.049347622830126,
+    "maximumLateralDeviation": 7.892735093779717,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3808189699682197,
+    "brakingRatioRange": [
+     -0.38737150336586307,
+     0.9590620446599222
+    ],
+    "maximumYawRate": 0.997061616024181,
+    "maximumSideslip": 0.13270727242735092,
+    "positivePrimaryFrames": 25,
+    "maximumPrimaryOptimum": 33.32414962331301,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 173,
+    "zeroSlackPairs": 172,
+    "zeroSlackPairsMissingDecrease": 4,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 214,
+    "minimumGap": 1.5391318643618743,
+    "minimumRoadMargin": 3.6710217929626943,
+    "maximumLateralDeviation": 7.379487117929743,
+    "recoverySeconds": null,
+    "maximumSteering": 0.16050713093234348,
+    "brakingRatioRange": [
+     -0.31530933864744853,
+     0.3526593961230322
+    ],
+    "maximumYawRate": 0.628822033331304,
+    "maximumSideslip": 0.05061431044441906,
+    "positivePrimaryFrames": 1,
+    "maximumPrimaryOptimum": 0.15611086204021754,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 66,
+    "zeroClfSlackFrames": 184,
+    "zeroSlackPairs": 183,
+    "zeroSlackPairsMissingDecrease": 10,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.0919035583337841,
+     1
+    ]
+   },
+   "speed8-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 235,
+    "minimumGap": 2.3705194329135857,
+    "minimumRoadMargin": 1.0017696989328204,
+    "maximumLateralDeviation": 9.952383897942125,
+    "recoverySeconds": null,
+    "maximumSteering": 0.4773667936394199,
+    "brakingRatioRange": [
+     -0.3221859357196843,
+     0.4866589177003377
+    ],
+    "maximumYawRate": 1.0845765384395911,
+    "maximumSideslip": 0.16399765857818102,
+    "positivePrimaryFrames": 4,
+    "maximumPrimaryOptimum": 6.937641399110355,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 40,
+    "zeroClfSlackFrames": 200,
+    "zeroSlackPairs": 199,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-brakingLead": {
+    "outcome": "recovered",
+    "holds": 288,
+    "minimumGap": 1.3875749759723215,
+    "minimumRoadMargin": 4.526072113400162,
+    "maximumLateralDeviation": 6.411113397844213,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5908253694646999,
+    "brakingRatioRange": [
+     -0.5679721361557395,
+     0.4250001931034663
+    ],
+    "maximumYawRate": 0.7480890934864882,
+    "maximumSideslip": 0.13230376268738006,
+    "positivePrimaryFrames": 27,
+    "maximumPrimaryOptimum": 22.94666857560048,
+    "freshRestarts": 2,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 129,
+    "zeroClfSlackFrames": 219,
+    "zeroSlackPairs": 218,
+    "zeroSlackPairsMissingDecrease": 12,
+    "zeroSlackPairsIncreasing": 1,
+    "trustScaleRange": [
+     0.0674762890688739,
+     1
+    ]
+   },
+   "speed8-crossing": {
+    "outcome": "recovered",
+    "holds": 215,
+    "minimumGap": 1.6534534653705095,
+    "minimumRoadMargin": 4.021039854320987,
+    "maximumLateralDeviation": 6.7693200771870945,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3517673616993799,
+    "brakingRatioRange": [
+     -0.36789110140422787,
+     0.47499996412105655
+    ],
+    "maximumYawRate": 0.8106620663832769,
+    "maximumSideslip": 0.1381009030179931,
+    "positivePrimaryFrames": 3,
+    "maximumPrimaryOptimum": 7.496874239078431,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 29,
+    "zeroClfSlackFrames": 185,
+    "zeroSlackPairs": 184,
+    "zeroSlackPairsMissingDecrease": 4,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 399,
+    "minimumGap": 2.058598741542164,
+    "minimumRoadMargin": 3.985234463435588,
+    "maximumLateralDeviation": 4.874834063510454,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5094617830199117,
+    "brakingRatioRange": [
+     -0.49529004313959446,
+     0.35000021789609076
+    ],
+    "maximumYawRate": 0.9809648862242567,
+    "maximumSideslip": 0.20017813558584563,
+    "positivePrimaryFrames": 9,
+    "maximumPrimaryOptimum": 11.588759714189237,
+    "freshRestarts": 1,
+    "horizonMedian": 8,
+    "horizonMaximum": 119,
+    "zeroClfSlackFrames": 279,
+    "zeroSlackPairs": 278,
+    "zeroSlackPairsMissingDecrease": 15,
+    "zeroSlackPairsIncreasing": 2,
+    "trustScaleRange": [
+     0.0625,
+     1
+    ]
+   },
+   "speed8-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1783,
+    "minimumGap": 3.4671804673353757,
+    "minimumRoadMargin": 1.0988995371778962,
+    "maximumLateralDeviation": 9.75990298550506,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5011927290179099,
+    "brakingRatioRange": [
+     -0.2843750000017279,
+     0.39495970235428784
+    ],
+    "maximumYawRate": 1.0067566588658383,
+    "maximumSideslip": 0.1685349529731932,
+    "positivePrimaryFrames": 7,
+    "maximumPrimaryOptimum": 63.95925986541598,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 59,
+    "zeroClfSlackFrames": 1688,
+    "zeroSlackPairs": 1687,
+    "zeroSlackPairsMissingDecrease": 639,
+    "zeroSlackPairsIncreasing": 608,
+    "trustScaleRange": [
+     0.0893132410922253,
+     1
+    ]
+   },
+   "speed8-headOn": {
+    "outcome": "recovered",
+    "holds": 235,
+    "minimumGap": 2.568176021416419,
+    "minimumRoadMargin": 1.146905325821674,
+    "maximumLateralDeviation": 9.809598272744145,
+    "recoverySeconds": null,
+    "maximumSteering": 0.43872282751577174,
+    "brakingRatioRange": [
+     -0.34999989682907784,
+     0.4810533290197648
+    ],
+    "maximumYawRate": 1.0293007426670338,
+    "maximumSideslip": 0.1548876384264061,
+    "positivePrimaryFrames": 1,
+    "maximumPrimaryOptimum": 4.472197160058091,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 40,
+    "zeroClfSlackFrames": 199,
+    "zeroSlackPairs": 198,
+    "zeroSlackPairsMissingDecrease": 3,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 219,
+    "minimumGap": 1.7658547376189249,
+    "minimumRoadMargin": 3.915269775834627,
+    "maximumLateralDeviation": 6.868387150937401,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3517217958602894,
+    "brakingRatioRange": [
+     -0.36586844094264903,
+     0.4749999827377195
+    ],
+    "maximumYawRate": 0.8328962289381375,
+    "maximumSideslip": 0.12973409508347,
+    "positivePrimaryFrames": 3,
+    "maximumPrimaryOptimum": 11.29028448349325,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 80,
+    "zeroClfSlackFrames": 187,
+    "zeroSlackPairs": 186,
+    "zeroSlackPairsMissingDecrease": 4,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   }
+  },
+  "frames": 6025,
+  "controllerMedian": 0.011718,
+  "controllerP95": 0.076698,
+  "controllerMaximum": 0.743542,
+  "shareOver50ms": 0.07933609958506224,
+  "observerMedian": 0.017257
+ },
+ "noisy-seed2": {
+  "runs": {
+   "speed15-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 207,
+    "minimumGap": 0.42511573058590685,
+    "minimumRoadMargin": 3.2509219876113864,
+    "maximumLateralDeviation": 7.7376066692812895,
+    "recoverySeconds": null,
+    "maximumSteering": 0.48015549989665474,
+    "brakingRatioRange": [
+     -0.39541145469094324,
+     0.944938164421397
+    ],
+    "maximumYawRate": 0.97400944970312,
+    "maximumSideslip": 0.12057379039522184,
+    "positivePrimaryFrames": 26,
+    "maximumPrimaryOptimum": 37.137473531838864,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 22,
+    "zeroClfSlackFrames": 175,
+    "zeroSlackPairs": 174,
+    "zeroSlackPairsMissingDecrease": 5,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-brakingLead": {
+    "outcome": "recovered",
+    "holds": 259,
+    "minimumGap": 1.101580379667998,
+    "minimumRoadMargin": 6.434547331673009,
+    "maximumLateralDeviation": 4.723236423937704,
+    "recoverySeconds": null,
+    "maximumSteering": 0.37724312394215087,
+    "brakingRatioRange": [
+     -0.4946087725850269,
+     0.5177127923470394
+    ],
+    "maximumYawRate": 0.8338468238107317,
+    "maximumSideslip": 0.10452984327180578,
+    "positivePrimaryFrames": 30,
+    "maximumPrimaryOptimum": 6.15441509711497,
+    "freshRestarts": 6,
+    "horizonMedian": 16,
+    "horizonMaximum": 118,
+    "zeroClfSlackFrames": 186,
+    "zeroSlackPairs": 185,
+    "zeroSlackPairsMissingDecrease": 28,
+    "zeroSlackPairsIncreasing": 1,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-crossing": {
+    "outcome": "recovered",
+    "holds": 208,
+    "minimumGap": 1.6461895363280536,
+    "minimumRoadMargin": 2.6195413059427803,
+    "maximumLateralDeviation": 8.223547692961683,
+    "recoverySeconds": null,
+    "maximumSteering": 0.17212821477169749,
+    "brakingRatioRange": [
+     -0.284375000002172,
+     0.3912754944447634
+    ],
+    "maximumYawRate": 0.7338936234418528,
+    "maximumSideslip": 0.13252335594340234,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 1.5526572365584167e-10,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 40,
+    "zeroClfSlackFrames": 167,
+    "zeroSlackPairs": 166,
+    "zeroSlackPairsMissingDecrease": 10,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 234,
+    "minimumGap": 3.6034628001994986,
+    "minimumRoadMargin": 0.6600291397319094,
+    "maximumLateralDeviation": 10.37374935605236,
+    "recoverySeconds": null,
+    "maximumSteering": 0.2763626307117409,
+    "brakingRatioRange": [
+     -0.39179244463693647,
+     0.35455440204639793
+    ],
+    "maximumYawRate": 0.750523950822992,
+    "maximumSideslip": 0.05396377304177547,
+    "positivePrimaryFrames": 19,
+    "maximumPrimaryOptimum": 6.989461895288172,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 42,
+    "zeroClfSlackFrames": 204,
+    "zeroSlackPairs": 203,
+    "zeroSlackPairsMissingDecrease": 4,
+    "zeroSlackPairsIncreasing": 2,
+    "trustScaleRange": [
+     0.08945933565976082,
+     1
+    ]
+   },
+   "speed15-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1310,
+    "minimumGap": 3.8829138498559295,
+    "minimumRoadMargin": 0.5938464818232756,
+    "maximumLateralDeviation": 10.266399414539631,
+    "recoverySeconds": null,
+    "maximumSteering": 0.2772973177403691,
+    "brakingRatioRange": [
+     -0.28437500000257454,
+     0.5711453710367228
+    ],
+    "maximumYawRate": 0.8465649685898774,
+    "maximumSideslip": 0.12828759176246216,
+    "positivePrimaryFrames": 10,
+    "maximumPrimaryOptimum": 4.304279987713865,
+    "freshRestarts": 1,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 45,
+    "zeroClfSlackFrames": 1251,
+    "zeroSlackPairs": 1250,
+    "zeroSlackPairsMissingDecrease": 465,
+    "zeroSlackPairsIncreasing": 407,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-headOn": {
+    "outcome": "recovered",
+    "holds": 207,
+    "minimumGap": 0.5943791234533763,
+    "minimumRoadMargin": 3.1999806321514495,
+    "maximumLateralDeviation": 7.772133426917389,
+    "recoverySeconds": null,
+    "maximumSteering": 0.4474504516791008,
+    "brakingRatioRange": [
+     -0.37499785893993004,
+     0.9339252602027578
+    ],
+    "maximumYawRate": 1.0564669470504593,
+    "maximumSideslip": 0.1331690862502146,
+    "positivePrimaryFrames": 26,
+    "maximumPrimaryOptimum": 34.63190037072149,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 175,
+    "zeroSlackPairs": 174,
+    "zeroSlackPairsMissingDecrease": 4,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 209,
+    "minimumGap": 1.5430619401121162,
+    "minimumRoadMargin": 4.07304976946477,
+    "maximumLateralDeviation": 6.9938069253165205,
+    "recoverySeconds": null,
+    "maximumSteering": 0.15884130201836444,
+    "brakingRatioRange": [
+     -0.2858624011299823,
+     0.349565320374436
+    ],
+    "maximumYawRate": 0.5961273075758328,
+    "maximumSideslip": 0.044599766199089695,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 3.481172878111735e-10,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 64,
+    "zeroClfSlackFrames": 180,
+    "zeroSlackPairs": 179,
+    "zeroSlackPairsMissingDecrease": 10,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 233,
+    "minimumGap": 2.370761085109188,
+    "minimumRoadMargin": 0.875556395082473,
+    "maximumLateralDeviation": 9.93501871316426,
+    "recoverySeconds": null,
+    "maximumSteering": 0.4823646142515104,
+    "brakingRatioRange": [
+     -0.28437500002324717,
+     0.47171998433399304
+    ],
+    "maximumYawRate": 1.0389373448045887,
+    "maximumSideslip": 0.16565892731847257,
+    "positivePrimaryFrames": 7,
+    "maximumPrimaryOptimum": 3.457836204876692,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 38,
+    "zeroClfSlackFrames": 197,
+    "zeroSlackPairs": 196,
+    "zeroSlackPairsMissingDecrease": 1,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-brakingLead": {
+    "outcome": "recovered",
+    "holds": 254,
+    "minimumGap": 1.3925474373919542,
+    "minimumRoadMargin": 5.082804431724046,
+    "maximumLateralDeviation": 6.020970964426404,
+    "recoverySeconds": null,
+    "maximumSteering": 0.571972160779198,
+    "brakingRatioRange": [
+     -0.48765021306907075,
+     0.5208137480914473
+    ],
+    "maximumYawRate": 0.7490231843625814,
+    "maximumSideslip": 0.10689141814461924,
+    "positivePrimaryFrames": 32,
+    "maximumPrimaryOptimum": 20.192813960340807,
+    "freshRestarts": 1,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 138,
+    "zeroClfSlackFrames": 183,
+    "zeroSlackPairs": 182,
+    "zeroSlackPairsMissingDecrease": 5,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.07433026605993465,
+     1
+    ]
+   },
+   "speed8-crossing": {
+    "outcome": "recovered",
+    "holds": 220,
+    "minimumGap": 1.6670964880762997,
+    "minimumRoadMargin": 3.5899886893643664,
+    "maximumLateralDeviation": 7.189169814089731,
+    "recoverySeconds": null,
+    "maximumSteering": 0.41534667672547154,
+    "brakingRatioRange": [
+     -0.3945523196847295,
+     0.4749999850546519
+    ],
+    "maximumYawRate": 0.864430237688802,
+    "maximumSideslip": 0.13866407591687416,
+    "positivePrimaryFrames": 6,
+    "maximumPrimaryOptimum": 5.706377843773266,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 28,
+    "zeroClfSlackFrames": 188,
+    "zeroSlackPairs": 187,
+    "zeroSlackPairsMissingDecrease": 1,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 380,
+    "minimumGap": 1.3758011285221083,
+    "minimumRoadMargin": 5.642686220014216,
+    "maximumLateralDeviation": 4.84437511267656,
+    "recoverySeconds": null,
+    "maximumSteering": 0.511561157662157,
+    "brakingRatioRange": [
+     -0.48248665152506304,
+     0.3526326679497571
+    ],
+    "maximumYawRate": 0.9780326167694905,
+    "maximumSideslip": 0.21360736093975696,
+    "positivePrimaryFrames": 13,
+    "maximumPrimaryOptimum": 10.80114055842608,
+    "freshRestarts": 1,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 124,
+    "zeroClfSlackFrames": 267,
+    "zeroSlackPairs": 266,
+    "zeroSlackPairsMissingDecrease": 21,
+    "zeroSlackPairsIncreasing": 4,
+    "trustScaleRange": [
+     0.0625,
+     1
+    ]
+   },
+   "speed8-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1785,
+    "minimumGap": 3.4232421348000894,
+    "minimumRoadMargin": 1.2040335357634167,
+    "maximumLateralDeviation": 9.658951622088587,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5308717824915542,
+    "brakingRatioRange": [
+     -0.349999997094864,
+     0.4455330396512919
+    ],
+    "maximumYawRate": 0.9856967947755735,
+    "maximumSideslip": 0.17152006828650415,
+    "positivePrimaryFrames": 8,
+    "maximumPrimaryOptimum": 10.35045550878899,
+    "freshRestarts": 1,
+    "horizonMedian": 8,
+    "horizonMaximum": 72,
+    "zeroClfSlackFrames": 1696,
+    "zeroSlackPairs": 1695,
+    "zeroSlackPairsMissingDecrease": 643,
+    "zeroSlackPairsIncreasing": 616,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-headOn": {
+    "outcome": "recovered",
+    "holds": 233,
+    "minimumGap": 2.5200165673211012,
+    "minimumRoadMargin": 1.168652401557292,
+    "maximumLateralDeviation": 9.694119945552298,
+    "recoverySeconds": null,
+    "maximumSteering": 0.46023905894015676,
+    "brakingRatioRange": [
+     -0.2843750000024322,
+     0.3798390913624846
+    ],
+    "maximumYawRate": 0.9948851510114526,
+    "maximumSideslip": 0.1621967661623406,
+    "positivePrimaryFrames": 3,
+    "maximumPrimaryOptimum": 1.47657659501567,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 39,
+    "zeroClfSlackFrames": 196,
+    "zeroSlackPairs": 195,
+    "zeroSlackPairsMissingDecrease": 1,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 220,
+    "minimumGap": 1.6862794508746202,
+    "minimumRoadMargin": 4.323937018807978,
+    "maximumLateralDeviation": 6.4369360338403725,
+    "recoverySeconds": null,
+    "maximumSteering": 0.36912707115630117,
+    "brakingRatioRange": [
+     -0.41786043079448815,
+     0.47499999346264343
+    ],
+    "maximumYawRate": 0.870014552298895,
+    "maximumSideslip": 0.13176013205391313,
+    "positivePrimaryFrames": 5,
+    "maximumPrimaryOptimum": 10.103366862512958,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 83,
+    "zeroClfSlackFrames": 188,
+    "zeroSlackPairs": 187,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   }
+  },
+  "frames": 5959,
+  "controllerMedian": 0.012699,
+  "controllerP95": 0.074455,
+  "controllerMaximum": 1.135856,
+  "shareOver50ms": 0.08021480114113107,
+  "observerMedian": 0.019031
+ },
+ "noisy-seed20261003": {
+  "runs": {
+   "speed15-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 204,
+    "minimumGap": 0.4338727396121805,
+    "minimumRoadMargin": 3.161614450837572,
+    "maximumLateralDeviation": 7.76630539482732,
+    "recoverySeconds": null,
+    "maximumSteering": 0.41780072771858023,
+    "brakingRatioRange": [
+     -0.39416367226251925,
+     0.9447719351104779
+    ],
+    "maximumYawRate": 0.9469108687618429,
+    "maximumSideslip": 0.12996968705526665,
+    "positivePrimaryFrames": 26,
+    "maximumPrimaryOptimum": 36.49051738113912,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 22,
+    "zeroClfSlackFrames": 170,
+    "zeroSlackPairs": 169,
+    "zeroSlackPairsMissingDecrease": 3,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-brakingLead": {
+    "outcome": "recovered",
+    "holds": 310,
+    "minimumGap": 0.8918804903118323,
+    "minimumRoadMargin": 4.3363931592167955,
+    "maximumLateralDeviation": 6.855060276787494,
+    "recoverySeconds": null,
+    "maximumSteering": 0.48543794459159545,
+    "brakingRatioRange": [
+     -0.9653112177007181,
+     0.4471803354987768
+    ],
+    "maximumYawRate": 0.6880679209740398,
+    "maximumSideslip": 0.06609175791882325,
+    "positivePrimaryFrames": 28,
+    "maximumPrimaryOptimum": 11.266518298475527,
+    "freshRestarts": 8,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 108,
+    "zeroClfSlackFrames": 231,
+    "zeroSlackPairs": 230,
+    "zeroSlackPairsMissingDecrease": 28,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.0625,
+     1
+    ]
+   },
+   "speed15-crossing": {
+    "outcome": "recovered",
+    "holds": 206,
+    "minimumGap": 1.5141069651477999,
+    "minimumRoadMargin": 4.27715042813651,
+    "maximumLateralDeviation": 6.801476746098651,
+    "recoverySeconds": null,
+    "maximumSteering": 0.17261647725287277,
+    "brakingRatioRange": [
+     -0.3007581886468625,
+     0.3529468075461408
+    ],
+    "maximumYawRate": 0.5318009826779674,
+    "maximumSideslip": 0.038579821655334176,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 5.842802596043064e-10,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 41,
+    "zeroClfSlackFrames": 177,
+    "zeroSlackPairs": 176,
+    "zeroSlackPairsMissingDecrease": 7,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 238,
+    "minimumGap": 3.5500652835561173,
+    "minimumRoadMargin": 0.6514510194822982,
+    "maximumLateralDeviation": 10.441948557876641,
+    "recoverySeconds": null,
+    "maximumSteering": 0.2571045752107267,
+    "brakingRatioRange": [
+     -0.4515069692995669,
+     0.3500369449779582
+    ],
+    "maximumYawRate": 0.6088185471612504,
+    "maximumSideslip": 0.033560779924665496,
+    "positivePrimaryFrames": 15,
+    "maximumPrimaryOptimum": 7.484402774327151,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 43,
+    "zeroClfSlackFrames": 208,
+    "zeroSlackPairs": 207,
+    "zeroSlackPairsMissingDecrease": 6,
+    "zeroSlackPairsIncreasing": 1,
+    "trustScaleRange": [
+     0.0871651886235696,
+     1
+    ]
+   },
+   "speed15-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1308,
+    "minimumGap": 3.903167198862515,
+    "minimumRoadMargin": 0.3324368384428258,
+    "maximumLateralDeviation": 10.521243466247768,
+    "recoverySeconds": null,
+    "maximumSteering": 0.27034908775701516,
+    "brakingRatioRange": [
+     -0.28437500000255067,
+     0.5733976074762466
+    ],
+    "maximumYawRate": 0.8216679695486071,
+    "maximumSideslip": 0.13170672415154605,
+    "positivePrimaryFrames": 10,
+    "maximumPrimaryOptimum": 10.393637472477215,
+    "freshRestarts": 1,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 45,
+    "zeroClfSlackFrames": 1248,
+    "zeroSlackPairs": 1247,
+    "zeroSlackPairsMissingDecrease": 458,
+    "zeroSlackPairsIncreasing": 398,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-headOn": {
+    "outcome": "recovered",
+    "holds": 205,
+    "minimumGap": 0.58030437492169,
+    "minimumRoadMargin": 2.9889959470453533,
+    "maximumLateralDeviation": 7.95406686744174,
+    "recoverySeconds": null,
+    "maximumSteering": 0.40713072176450205,
+    "brakingRatioRange": [
+     -0.37750482803182234,
+     0.9480431498160967
+    ],
+    "maximumYawRate": 1.0385238540601,
+    "maximumSideslip": 0.13099466027524048,
+    "positivePrimaryFrames": 27,
+    "maximumPrimaryOptimum": 34.64402237643795,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 173,
+    "zeroSlackPairs": 172,
+    "zeroSlackPairsMissingDecrease": 3,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 210,
+    "minimumGap": 1.5313214848675176,
+    "minimumRoadMargin": 4.186124125490204,
+    "maximumLateralDeviation": 6.907334083353812,
+    "recoverySeconds": null,
+    "maximumSteering": 0.17062905222970312,
+    "brakingRatioRange": [
+     -0.3153043244776376,
+     0.35000003812066394
+    ],
+    "maximumYawRate": 0.5434929454121876,
+    "maximumSideslip": 0.03002278420109111,
+    "positivePrimaryFrames": 1,
+    "maximumPrimaryOptimum": 2.382172061036838,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 65,
+    "zeroClfSlackFrames": 180,
+    "zeroSlackPairs": 179,
+    "zeroSlackPairsMissingDecrease": 8,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.0904567546864418,
+     1
+    ]
+   },
+   "speed8-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 231,
+    "minimumGap": 2.420815648051217,
+    "minimumRoadMargin": 0.8385298899205189,
+    "maximumLateralDeviation": 9.981837085832932,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5101809920515384,
+    "brakingRatioRange": [
+     -0.2843750000003246,
+     0.5063416402199683
+    ],
+    "maximumYawRate": 0.9992659780311753,
+    "maximumSideslip": 0.1691664065099551,
+    "positivePrimaryFrames": 6,
+    "maximumPrimaryOptimum": 6.0252180616766875,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 41,
+    "zeroClfSlackFrames": 195,
+    "zeroSlackPairs": 194,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-brakingLead": {
+    "outcome": "recovered",
+    "holds": 241,
+    "minimumGap": 1.3874651931640685,
+    "minimumRoadMargin": 5.0334549166539615,
+    "maximumLateralDeviation": 6.006455785433673,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5715903815653717,
+    "brakingRatioRange": [
+     -0.4988902692051226,
+     0.6098567287407671
+    ],
+    "maximumYawRate": 0.7478540609082305,
+    "maximumSideslip": 0.11346843346058709,
+    "positivePrimaryFrames": 39,
+    "maximumPrimaryOptimum": 44.93876659112462,
+    "freshRestarts": 3,
+    "horizonMedian": 8,
+    "horizonMaximum": 108,
+    "zeroClfSlackFrames": 161,
+    "zeroSlackPairs": 160,
+    "zeroSlackPairsMissingDecrease": 6,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.0625,
+     1
+    ]
+   },
+   "speed8-crossing": {
+    "outcome": "recovered",
+    "holds": 209,
+    "minimumGap": 1.9120457840112703,
+    "minimumRoadMargin": 4.54467191901776,
+    "maximumLateralDeviation": 6.182546096597728,
+    "recoverySeconds": null,
+    "maximumSteering": 0.44921515404669654,
+    "brakingRatioRange": [
+     -0.3377220868926179,
+     0.4749999902538063
+    ],
+    "maximumYawRate": 0.91166899515875,
+    "maximumSideslip": 0.15446423348194938,
+    "positivePrimaryFrames": 5,
+    "maximumPrimaryOptimum": 7.796684790240455,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 29,
+    "zeroClfSlackFrames": 180,
+    "zeroSlackPairs": 179,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 373,
+    "minimumGap": 1.5063034783589078,
+    "minimumRoadMargin": 5.366789996299577,
+    "maximumLateralDeviation": 5.111650642517693,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5282750105070889,
+    "brakingRatioRange": [
+     -0.48207969612322177,
+     0.35285693144708336
+    ],
+    "maximumYawRate": 1.0116878600270052,
+    "maximumSideslip": 0.21537917020411582,
+    "positivePrimaryFrames": 10,
+    "maximumPrimaryOptimum": 12.941109486690449,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 120,
+    "zeroClfSlackFrames": 254,
+    "zeroSlackPairs": 253,
+    "zeroSlackPairsMissingDecrease": 11,
+    "zeroSlackPairsIncreasing": 2,
+    "trustScaleRange": [
+     0.1493757810136662,
+     1
+    ]
+   },
+   "speed8-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1775,
+    "minimumGap": 3.5342199140559964,
+    "minimumRoadMargin": 1.2486211617817826,
+    "maximumLateralDeviation": 9.623260610852824,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5035492819883463,
+    "brakingRatioRange": [
+     -0.34999995431086744,
+     0.41311723445998105
+    ],
+    "maximumYawRate": 1.0024123639382785,
+    "maximumSideslip": 0.1681582181544666,
+    "positivePrimaryFrames": 10,
+    "maximumPrimaryOptimum": 58.883656001272485,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 58,
+    "zeroClfSlackFrames": 1686,
+    "zeroSlackPairs": 1685,
+    "zeroSlackPairsMissingDecrease": 668,
+    "zeroSlackPairsIncreasing": 634,
+    "trustScaleRange": [
+     0.09742562845705309,
+     1
+    ]
+   },
+   "speed8-headOn": {
+    "outcome": "recovered",
+    "holds": 232,
+    "minimumGap": 2.7892341175490087,
+    "minimumRoadMargin": 0.8298169958501145,
+    "maximumLateralDeviation": 10.064242747488134,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5098145605873734,
+    "brakingRatioRange": [
+     -0.28437500010170136,
+     0.4122291656296902
+    ],
+    "maximumYawRate": 1.0975322306220758,
+    "maximumSideslip": 0.16638147916600757,
+    "positivePrimaryFrames": 5,
+    "maximumPrimaryOptimum": 3.0925237187662686,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 40,
+    "zeroClfSlackFrames": 196,
+    "zeroSlackPairs": 195,
+    "zeroSlackPairsMissingDecrease": 1,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 216,
+    "minimumGap": 1.930921779061608,
+    "minimumRoadMargin": 4.144906001616519,
+    "maximumLateralDeviation": 6.623968467001941,
+    "recoverySeconds": null,
+    "maximumSteering": 0.378995022993341,
+    "brakingRatioRange": [
+     -0.3790951849926977,
+     0.4749999932977824
+    ],
+    "maximumYawRate": 0.8632981751578898,
+    "maximumSideslip": 0.14583342976205557,
+    "positivePrimaryFrames": 3,
+    "maximumPrimaryOptimum": 15.768461894717031,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 79,
+    "zeroClfSlackFrames": 184,
+    "zeroSlackPairs": 183,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.1767766952966369,
+     1
+    ]
+   }
+  },
+  "frames": 5958,
+  "controllerMedian": 0.0117225,
+  "controllerP95": 0.075769,
+  "controllerMaximum": 0.80048,
+  "shareOver50ms": 0.08207452165156093,
+  "observerMedian": 0.0164105
+ },
+ "noisy-seed3": {
+  "runs": {
+   "speed15-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 204,
+    "minimumGap": 0.43022628376086863,
+    "minimumRoadMargin": 2.981367053652253,
+    "maximumLateralDeviation": 7.89780814769036,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3975405205497475,
+    "brakingRatioRange": [
+     -0.3774053012583769,
+     0.9436821245412711
+    ],
+    "maximumYawRate": 0.9529760788964838,
+    "maximumSideslip": 0.13754419649536118,
+    "positivePrimaryFrames": 27,
+    "maximumPrimaryOptimum": 37.331954766589945,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 171,
+    "zeroSlackPairs": 170,
+    "zeroSlackPairsMissingDecrease": 5,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-brakingLead": {
+    "outcome": "recovered",
+    "holds": 234,
+    "minimumGap": 1.0800784707915272,
+    "minimumRoadMargin": 6.458149289359762,
+    "maximumLateralDeviation": 4.719603871948439,
+    "recoverySeconds": null,
+    "maximumSteering": 0.24034405229830752,
+    "brakingRatioRange": [
+     -0.35000002495213367,
+     0.4820000832043768
+    ],
+    "maximumYawRate": 0.5656749515553902,
+    "maximumSideslip": 0.03978226797832796,
+    "positivePrimaryFrames": 14,
+    "maximumPrimaryOptimum": 1.376274421662029,
+    "freshRestarts": 2,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 124,
+    "zeroClfSlackFrames": 153,
+    "zeroSlackPairs": 152,
+    "zeroSlackPairsMissingDecrease": 19,
+    "zeroSlackPairsIncreasing": 1,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-crossing": {
+    "outcome": "recovered",
+    "holds": 210,
+    "minimumGap": 1.5758420577996073,
+    "minimumRoadMargin": 3.2024436976615593,
+    "maximumLateralDeviation": 7.769634496579069,
+    "recoverySeconds": null,
+    "maximumSteering": 0.14797362369408368,
+    "brakingRatioRange": [
+     -0.2843750000032185,
+     0.36559628976787706
+    ],
+    "maximumYawRate": 0.6674426288968743,
+    "maximumSideslip": 0.07813694023464116,
+    "positivePrimaryFrames": 1,
+    "maximumPrimaryOptimum": 0.03370042538946381,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 41,
+    "zeroClfSlackFrames": 181,
+    "zeroSlackPairs": 180,
+    "zeroSlackPairsMissingDecrease": 17,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 239,
+    "minimumGap": 3.642413198960952,
+    "minimumRoadMargin": 0.7381264055260992,
+    "maximumLateralDeviation": 10.333523951704187,
+    "recoverySeconds": null,
+    "maximumSteering": 0.28753677042770215,
+    "brakingRatioRange": [
+     -0.36172600888164574,
+     0.34999999007914695
+    ],
+    "maximumYawRate": 0.6954149726397153,
+    "maximumSideslip": 0.0344192043201755,
+    "positivePrimaryFrames": 19,
+    "maximumPrimaryOptimum": 6.166846223854253,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 44,
+    "zeroClfSlackFrames": 209,
+    "zeroSlackPairs": 208,
+    "zeroSlackPairsMissingDecrease": 8,
+    "zeroSlackPairsIncreasing": 3,
+    "trustScaleRange": [
+     0.08518364603091577,
+     1
+    ]
+   },
+   "speed15-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1306,
+    "minimumGap": 3.8843392389184452,
+    "minimumRoadMargin": 0.23287474715523437,
+    "maximumLateralDeviation": 10.636164934919208,
+    "recoverySeconds": null,
+    "maximumSteering": 0.25426581459749636,
+    "brakingRatioRange": [
+     -0.2843750000011935,
+     0.5335971004355052
+    ],
+    "maximumYawRate": 0.7744726497731808,
+    "maximumSideslip": 0.1310380459796517,
+    "positivePrimaryFrames": 11,
+    "maximumPrimaryOptimum": 6.841606852916268,
+    "freshRestarts": 1,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 45,
+    "zeroClfSlackFrames": 1242,
+    "zeroSlackPairs": 1241,
+    "zeroSlackPairsMissingDecrease": 450,
+    "zeroSlackPairsIncreasing": 397,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-headOn": {
+    "outcome": "recovered",
+    "holds": 208,
+    "minimumGap": 0.5894773794735569,
+    "minimumRoadMargin": 2.987473273790533,
+    "maximumLateralDeviation": 7.973718193902374,
+    "recoverySeconds": null,
+    "maximumSteering": 0.4202796946315113,
+    "brakingRatioRange": [
+     -0.37740592233993314,
+     0.9424220820489811
+    ],
+    "maximumYawRate": 1.058544350044958,
+    "maximumSideslip": 0.1368110488533793,
+    "positivePrimaryFrames": 27,
+    "maximumPrimaryOptimum": 35.2806917865974,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 175,
+    "zeroSlackPairs": 174,
+    "zeroSlackPairsMissingDecrease": 3,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 202,
+    "minimumGap": 1.6213354462145475,
+    "minimumRoadMargin": 2.866217263515244,
+    "maximumLateralDeviation": 7.991409512787542,
+    "recoverySeconds": null,
+    "maximumSteering": 0.18402440676543208,
+    "brakingRatioRange": [
+     -0.28437500000560784,
+     0.3514041765640231
+    ],
+    "maximumYawRate": 0.7436309976842828,
+    "maximumSideslip": 0.13134963580217196,
+    "positivePrimaryFrames": 1,
+    "maximumPrimaryOptimum": 0.10085522879839204,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 61,
+    "zeroClfSlackFrames": 171,
+    "zeroSlackPairs": 170,
+    "zeroSlackPairsMissingDecrease": 17,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 235,
+    "minimumGap": 2.3374209233462078,
+    "minimumRoadMargin": 0.7704962453890989,
+    "maximumLateralDeviation": 10.096835958572997,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5323411832055154,
+    "brakingRatioRange": [
+     -0.284375000002013,
+     0.5881180246881725
+    ],
+    "maximumYawRate": 1.0659248355244282,
+    "maximumSideslip": 0.17334967032777981,
+    "positivePrimaryFrames": 8,
+    "maximumPrimaryOptimum": 4.733585661019307,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 39,
+    "zeroClfSlackFrames": 199,
+    "zeroSlackPairs": 198,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-brakingLead": {
+    "outcome": "controlUnavailable",
+    "holds": 53,
+    "minimumGap": 1.3841733183352147,
+    "minimumRoadMargin": 7.507675763299977,
+    "maximumLateralDeviation": 3.164521586587847,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5929263503745552,
+    "brakingRatioRange": [
+     -0.5449198295320967,
+     0.42499998445703185
+    ],
+    "maximumYawRate": 0.7556828720171638,
+    "maximumSideslip": 0.1128538720070153,
+    "positivePrimaryFrames": 18,
+    "maximumPrimaryOptimum": 37.791282610058936,
+    "freshRestarts": 3,
+    "horizonMedian": 40,
+    "horizonMaximum": 105,
+    "zeroClfSlackFrames": 22,
+    "zeroSlackPairs": 22,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 1,
+    "trustScaleRange": [
+     0.0625,
+     1
+    ]
+   },
+   "speed8-crossing": {
+    "outcome": "recovered",
+    "holds": 220,
+    "minimumGap": 1.7964861029977082,
+    "minimumRoadMargin": 3.350628646247765,
+    "maximumLateralDeviation": 7.451592471448202,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3790344048022033,
+    "brakingRatioRange": [
+     -0.3377220868900752,
+     0.4749999604584456
+    ],
+    "maximumYawRate": 0.8732312238976884,
+    "maximumSideslip": 0.13977294984735664,
+    "positivePrimaryFrames": 2,
+    "maximumPrimaryOptimum": 8.171262165554346,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 29,
+    "zeroClfSlackFrames": 189,
+    "zeroSlackPairs": 188,
+    "zeroSlackPairsMissingDecrease": 1,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 391,
+    "minimumGap": 1.5505186421730481,
+    "minimumRoadMargin": 5.094501075494053,
+    "maximumLateralDeviation": 5.445147376436769,
+    "recoverySeconds": null,
+    "maximumSteering": 0.49045886703778685,
+    "brakingRatioRange": [
+     -0.43995417429140166,
+     0.3573466948965899
+    ],
+    "maximumYawRate": 1.019211307682818,
+    "maximumSideslip": 0.18656282443804434,
+    "positivePrimaryFrames": 8,
+    "maximumPrimaryOptimum": 13.600801853706589,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 115,
+    "zeroClfSlackFrames": 285,
+    "zeroSlackPairs": 284,
+    "zeroSlackPairsMissingDecrease": 14,
+    "zeroSlackPairsIncreasing": 3,
+    "trustScaleRange": [
+     0.07400911044931631,
+     1
+    ]
+   },
+   "speed8-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1775,
+    "minimumGap": 3.5573139616610483,
+    "minimumRoadMargin": 1.0915642756039148,
+    "maximumLateralDeviation": 9.777798219260577,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5015381956630514,
+    "brakingRatioRange": [
+     -0.37605390949638506,
+     0.47415158375878447
+    ],
+    "maximumYawRate": 0.9720202923747757,
+    "maximumSideslip": 0.1718515001471007,
+    "positivePrimaryFrames": 8,
+    "maximumPrimaryOptimum": 3.86393182568878,
+    "freshRestarts": 1,
+    "horizonMedian": 8,
+    "horizonMaximum": 66,
+    "zeroClfSlackFrames": 1693,
+    "zeroSlackPairs": 1692,
+    "zeroSlackPairsMissingDecrease": 654,
+    "zeroSlackPairsIncreasing": 620,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-headOn": {
+    "outcome": "recovered",
+    "holds": 233,
+    "minimumGap": 2.776360282708479,
+    "minimumRoadMargin": 1.1515955704205627,
+    "maximumLateralDeviation": 9.678909056894485,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5655565257848404,
+    "brakingRatioRange": [
+     -0.28437500000168264,
+     0.46298119120623615
+    ],
+    "maximumYawRate": 0.984743863942637,
+    "maximumSideslip": 0.16928944264600704,
+    "positivePrimaryFrames": 3,
+    "maximumPrimaryOptimum": 4.748829875684358,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 38,
+    "zeroClfSlackFrames": 197,
+    "zeroSlackPairs": 196,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 221,
+    "minimumGap": 1.7052031702358668,
+    "minimumRoadMargin": 3.803582163851111,
+    "maximumLateralDeviation": 6.981378255504868,
+    "recoverySeconds": null,
+    "maximumSteering": 0.40848312749022186,
+    "brakingRatioRange": [
+     -0.3951077813487356,
+     0.4749999758612893
+    ],
+    "maximumYawRate": 0.826618713574059,
+    "maximumSideslip": 0.131448372976326,
+    "positivePrimaryFrames": 4,
+    "maximumPrimaryOptimum": 9.92272431799498,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 81,
+    "zeroClfSlackFrames": 189,
+    "zeroSlackPairs": 188,
+    "zeroSlackPairsMissingDecrease": 3,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   }
+  },
+  "frames": 5731,
+  "controllerMedian": 0.012107,
+  "controllerP95": 0.076454,
+  "controllerMaximum": 0.789885,
+  "shareOver50ms": 0.08131216192636538,
+  "observerMedian": 0.018141
+ },
+ "noisy-seed4": {
+  "runs": {
+   "speed15-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 210,
+    "minimumGap": 0.4929008506429147,
+    "minimumRoadMargin": 3.2424219054674044,
+    "maximumLateralDeviation": 7.811565128169689,
+    "recoverySeconds": null,
+    "maximumSteering": 0.3614081986019151,
+    "brakingRatioRange": [
+     -0.4038991030954397,
+     0.9275719111034163
+    ],
+    "maximumYawRate": 0.9692069456957834,
+    "maximumSideslip": 0.11557643719208432,
+    "positivePrimaryFrames": 26,
+    "maximumPrimaryOptimum": 33.97613245193916,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 22,
+    "zeroClfSlackFrames": 178,
+    "zeroSlackPairs": 177,
+    "zeroSlackPairsMissingDecrease": 6,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.17103652307918224,
+     1
+    ]
+   },
+   "speed15-brakingLead": {
+    "outcome": "recovered",
+    "holds": 297,
+    "minimumGap": 1.24526368440745,
+    "minimumRoadMargin": 1.0478609492328017,
+    "maximumLateralDeviation": 6.459630064448687,
+    "recoverySeconds": null,
+    "maximumSteering": 0.2691769198354983,
+    "brakingRatioRange": [
+     -0.36958929671837026,
+     0.35029307239918367
+    ],
+    "maximumYawRate": 0.8286083191506084,
+    "maximumSideslip": 0.08326310925695744,
+    "positivePrimaryFrames": 7,
+    "maximumPrimaryOptimum": 3.6173674497341795,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 115,
+    "zeroClfSlackFrames": 221,
+    "zeroSlackPairs": 220,
+    "zeroSlackPairsMissingDecrease": 16,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.0625,
+     1
+    ]
+   },
+   "speed15-crossing": {
+    "outcome": "recovered",
+    "holds": 207,
+    "minimumGap": 1.6225488688187617,
+    "minimumRoadMargin": 2.7638533163516126,
+    "maximumLateralDeviation": 8.135537657982777,
+    "recoverySeconds": null,
+    "maximumSteering": 0.16887023829888068,
+    "brakingRatioRange": [
+     -0.28437500004684174,
+     0.36783822805165745
+    ],
+    "maximumYawRate": 0.6974070491329772,
+    "maximumSideslip": 0.1065436897475742,
+    "positivePrimaryFrames": 2,
+    "maximumPrimaryOptimum": 0.02849303764860291,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 42,
+    "zeroClfSlackFrames": 178,
+    "zeroSlackPairs": 177,
+    "zeroSlackPairsMissingDecrease": 18,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 239,
+    "minimumGap": 3.460491786968852,
+    "minimumRoadMargin": 0.8937986581601933,
+    "maximumLateralDeviation": 10.192763060235784,
+    "recoverySeconds": null,
+    "maximumSteering": 0.23956779714564677,
+    "brakingRatioRange": [
+     -0.4692969391293996,
+     0.3499999939127568
+    ],
+    "maximumYawRate": 0.6361969865889164,
+    "maximumSideslip": 0.0335397743509292,
+    "positivePrimaryFrames": 13,
+    "maximumPrimaryOptimum": 6.4528500070136845,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 43,
+    "zeroClfSlackFrames": 208,
+    "zeroSlackPairs": 207,
+    "zeroSlackPairsMissingDecrease": 9,
+    "zeroSlackPairsIncreasing": 1,
+    "trustScaleRange": [
+     0.08787275574113763,
+     1
+    ]
+   },
+   "speed15-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1307,
+    "minimumGap": 1.59979508466819,
+    "minimumRoadMargin": 1.7364995722397794,
+    "maximumLateralDeviation": 9.148185816392637,
+    "recoverySeconds": null,
+    "maximumSteering": 0.2778058771362926,
+    "brakingRatioRange": [
+     -0.4696539670472005,
+     0.85161539571218
+    ],
+    "maximumYawRate": 0.8631044691638667,
+    "maximumSideslip": 0.12780719842475977,
+    "positivePrimaryFrames": 30,
+    "maximumPrimaryOptimum": 52.73485427555879,
+    "freshRestarts": 2,
+    "horizonMedian": 16,
+    "horizonMaximum": 45,
+    "zeroClfSlackFrames": 1245,
+    "zeroSlackPairs": 1244,
+    "zeroSlackPairsMissingDecrease": 453,
+    "zeroSlackPairsIncreasing": 398,
+    "trustScaleRange": [
+     0.10121305471908992,
+     1
+    ]
+   },
+   "speed15-headOn": {
+    "outcome": "recovered",
+    "holds": 209,
+    "minimumGap": 0.6175528502838412,
+    "minimumRoadMargin": 3.0290101528986337,
+    "maximumLateralDeviation": 7.9566114288098975,
+    "recoverySeconds": null,
+    "maximumSteering": 0.42958955456585995,
+    "brakingRatioRange": [
+     -0.3859871071251406,
+     0.9423003281127009
+    ],
+    "maximumYawRate": 1.032357929399066,
+    "maximumSideslip": 0.12912095819052277,
+    "positivePrimaryFrames": 26,
+    "maximumPrimaryOptimum": 32.4008004609105,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 176,
+    "zeroSlackPairs": 175,
+    "zeroSlackPairsMissingDecrease": 3,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.15658585580914314,
+     1
+    ]
+   },
+   "speed15-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 220,
+    "minimumGap": 1.622302049745553,
+    "minimumRoadMargin": 3.4927397499801174,
+    "maximumLateralDeviation": 7.6064477475300905,
+    "recoverySeconds": null,
+    "maximumSteering": 0.20637289518034968,
+    "brakingRatioRange": [
+     -0.3263236112375271,
+     0.35000000922189434
+    ],
+    "maximumYawRate": 0.5184699261265969,
+    "maximumSideslip": 0.028212337857415483,
+    "positivePrimaryFrames": 5,
+    "maximumPrimaryOptimum": 3.420228737385184,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 65,
+    "zeroClfSlackFrames": 190,
+    "zeroSlackPairs": 189,
+    "zeroSlackPairsMissingDecrease": 7,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.09142066262328943,
+     1
+    ]
+   },
+   "speed8-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 236,
+    "minimumGap": 2.2738340938174364,
+    "minimumRoadMargin": 0.5948877932965324,
+    "maximumLateralDeviation": 10.240610670363523,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5105122602999682,
+    "brakingRatioRange": [
+     -0.28437500006186345,
+     0.5679269199779633
+    ],
+    "maximumYawRate": 1.0052857496045664,
+    "maximumSideslip": 0.1811957196769916,
+    "positivePrimaryFrames": 7,
+    "maximumPrimaryOptimum": 8.527209495416837,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 39,
+    "zeroClfSlackFrames": 199,
+    "zeroSlackPairs": 198,
+    "zeroSlackPairsMissingDecrease": 0,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-brakingLead": {
+    "outcome": "recovered",
+    "holds": 230,
+    "minimumGap": 1.3843470376982827,
+    "minimumRoadMargin": 5.539435034079376,
+    "maximumLateralDeviation": 5.598460593660363,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5931777665813824,
+    "brakingRatioRange": [
+     -0.5655135577458072,
+     0.6763117222922869
+    ],
+    "maximumYawRate": 0.8008841403632567,
+    "maximumSideslip": 0.11167201158140816,
+    "positivePrimaryFrames": 45,
+    "maximumPrimaryOptimum": 32.4882875249979,
+    "freshRestarts": 0,
+    "horizonMedian": 12.0,
+    "horizonMaximum": 115,
+    "zeroClfSlackFrames": 146,
+    "zeroSlackPairs": 145,
+    "zeroSlackPairsMissingDecrease": 18,
+    "zeroSlackPairsIncreasing": 2,
+    "trustScaleRange": [
+     0.0625,
+     1
+    ]
+   },
+   "speed8-crossing": {
+    "outcome": "recovered",
+    "holds": 218,
+    "minimumGap": 1.6860790973094866,
+    "minimumRoadMargin": 3.7856668076018014,
+    "maximumLateralDeviation": 7.002353176457454,
+    "recoverySeconds": null,
+    "maximumSteering": 0.35915322443924297,
+    "brakingRatioRange": [
+     -0.39778031331383135,
+     0.47499997904574154
+    ],
+    "maximumYawRate": 0.8223149191551283,
+    "maximumSideslip": 0.140803326847008,
+    "positivePrimaryFrames": 4,
+    "maximumPrimaryOptimum": 8.225313837884068,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 29,
+    "zeroClfSlackFrames": 186,
+    "zeroSlackPairs": 185,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 381,
+    "minimumGap": 1.410757509866244,
+    "minimumRoadMargin": 5.662201291576211,
+    "maximumLateralDeviation": 4.831720087494594,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5126317365221185,
+    "brakingRatioRange": [
+     -0.5817972088359586,
+     0.350000814412757
+    ],
+    "maximumYawRate": 0.9770940104344389,
+    "maximumSideslip": 0.21094778567420697,
+    "positivePrimaryFrames": 7,
+    "maximumPrimaryOptimum": 11.599379129766554,
+    "freshRestarts": 1,
+    "horizonMedian": 8,
+    "horizonMaximum": 129,
+    "zeroClfSlackFrames": 254,
+    "zeroSlackPairs": 253,
+    "zeroSlackPairsMissingDecrease": 7,
+    "zeroSlackPairsIncreasing": 2,
+    "trustScaleRange": [
+     0.08468696418732084,
+     1
+    ]
+   },
+   "speed8-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1773,
+    "minimumGap": 2.6404960200237437,
+    "minimumRoadMargin": 2.2645827776397898,
+    "maximumLateralDeviation": 8.555093315069385,
+    "recoverySeconds": null,
+    "maximumSteering": 0.47658483827565284,
+    "brakingRatioRange": [
+     -0.36545537599576394,
+     0.3944602771710072
+    ],
+    "maximumYawRate": 0.9904784465670278,
+    "maximumSideslip": 0.15230353379883152,
+    "positivePrimaryFrames": 9,
+    "maximumPrimaryOptimum": 61.587922696396284,
+    "freshRestarts": 1,
+    "horizonMedian": 8,
+    "horizonMaximum": 58,
+    "zeroClfSlackFrames": 1685,
+    "zeroSlackPairs": 1684,
+    "zeroSlackPairsMissingDecrease": 652,
+    "zeroSlackPairsIncreasing": 630,
+    "trustScaleRange": [
+     0.10053046883753342,
+     1
+    ]
+   },
+   "speed8-headOn": {
+    "outcome": "recovered",
+    "holds": 233,
+    "minimumGap": 2.5724643712954443,
+    "minimumRoadMargin": 1.1995133285956978,
+    "maximumLateralDeviation": 9.701020283377252,
+    "recoverySeconds": null,
+    "maximumSteering": 0.500965550114559,
+    "brakingRatioRange": [
+     -0.3321074485385347,
+     0.38733687647447096
+    ],
+    "maximumYawRate": 1.008609856055543,
+    "maximumSideslip": 0.15908177837025675,
+    "positivePrimaryFrames": 3,
+    "maximumPrimaryOptimum": 5.755184670156338,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 37,
+    "zeroClfSlackFrames": 197,
+    "zeroSlackPairs": 196,
+    "zeroSlackPairsMissingDecrease": 0,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 213,
+    "minimumGap": 1.6753250637546175,
+    "minimumRoadMargin": 4.751960848374786,
+    "maximumLateralDeviation": 5.973061648279511,
+    "recoverySeconds": null,
+    "maximumSteering": 0.38966113437744104,
+    "brakingRatioRange": [
+     -0.4407056574994361,
+     0.4749999952534051
+    ],
+    "maximumYawRate": 0.9040961568639589,
+    "maximumSideslip": 0.12719589478844265,
+    "positivePrimaryFrames": 5,
+    "maximumPrimaryOptimum": 13.689347426548405,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 80,
+    "zeroClfSlackFrames": 181,
+    "zeroSlackPairs": 180,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.1767766952966369,
+     1
+    ]
+   }
+  },
+  "frames": 5973,
+  "controllerMedian": 0.012174,
+  "controllerP95": 0.080244,
+  "controllerMaximum": 0.801042,
+  "shareOver50ms": 0.08622132931525196,
+  "observerMedian": 0.017224
+ },
+ "noisy-seed5": {
+  "runs": {
+   "speed15-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 199,
+    "minimumGap": 0.362033099062503,
+    "minimumRoadMargin": 3.3666175643743834,
+    "maximumLateralDeviation": 7.519684736156323,
+    "recoverySeconds": null,
+    "maximumSteering": 0.48658728595282874,
+    "brakingRatioRange": [
+     -0.3741317235796216,
+     0.983376213344987
+    ],
+    "maximumYawRate": 0.956397466293343,
+    "maximumSideslip": 0.12900367468631174,
+    "positivePrimaryFrames": 25,
+    "maximumPrimaryOptimum": 38.808705604163585,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 168,
+    "zeroSlackPairs": 167,
+    "zeroSlackPairsMissingDecrease": 4,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-brakingLead": {
+    "outcome": "recovered",
+    "holds": 288,
+    "minimumGap": 1.1612691576841934,
+    "minimumRoadMargin": 5.339857798287227,
+    "maximumLateralDeviation": 4.754974861193294,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5059964150610692,
+    "brakingRatioRange": [
+     -0.8961612620848759,
+     0.4683231129326109
+    ],
+    "maximumYawRate": 0.6637869708152349,
+    "maximumSideslip": 0.0683171287107068,
+    "positivePrimaryFrames": 30,
+    "maximumPrimaryOptimum": 8.891531094314704,
+    "freshRestarts": 5,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 127,
+    "zeroClfSlackFrames": 200,
+    "zeroSlackPairs": 199,
+    "zeroSlackPairsMissingDecrease": 23,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.09142904938527747,
+     1
+    ]
+   },
+   "speed15-crossing": {
+    "outcome": "recovered",
+    "holds": 200,
+    "minimumGap": 1.58856788461118,
+    "minimumRoadMargin": 3.1024475717106945,
+    "maximumLateralDeviation": 7.745862386916674,
+    "recoverySeconds": null,
+    "maximumSteering": 0.18763965506693153,
+    "brakingRatioRange": [
+     -0.2843750000156158,
+     0.4187661383703857
+    ],
+    "maximumYawRate": 0.7439766472850267,
+    "maximumSideslip": 0.13270506227439116,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 2.85027283021324e-10,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 41,
+    "zeroClfSlackFrames": 165,
+    "zeroSlackPairs": 164,
+    "zeroSlackPairsMissingDecrease": 14,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-curvedCrossing": {
+    "outcome": "recovered",
+    "holds": 237,
+    "minimumGap": 3.6795492962802885,
+    "minimumRoadMargin": 0.8470456004566813,
+    "maximumLateralDeviation": 10.235134188492708,
+    "recoverySeconds": null,
+    "maximumSteering": 0.24202867059278524,
+    "brakingRatioRange": [
+     -0.4104915085664311,
+     0.36431701821332857
+    ],
+    "maximumYawRate": 0.6842641381932807,
+    "maximumSideslip": 0.03440589621105993,
+    "positivePrimaryFrames": 17,
+    "maximumPrimaryOptimum": 9.641198764996094,
+    "freshRestarts": 0,
+    "horizonMedian": 16,
+    "horizonMaximum": 44,
+    "zeroClfSlackFrames": 207,
+    "zeroSlackPairs": 206,
+    "zeroSlackPairsMissingDecrease": 7,
+    "zeroSlackPairsIncreasing": 3,
+    "trustScaleRange": [
+     0.08576725051363676,
+     1
+    ]
+   },
+   "speed15-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1304,
+    "minimumGap": 3.683897496632248,
+    "minimumRoadMargin": 0.4639648410235129,
+    "maximumLateralDeviation": 10.410690793905502,
+    "recoverySeconds": null,
+    "maximumSteering": 0.2812136699353914,
+    "brakingRatioRange": [
+     -0.28437500000142096,
+     0.4702972068426791
+    ],
+    "maximumYawRate": 0.844091069691741,
+    "maximumSideslip": 0.13092873087562096,
+    "positivePrimaryFrames": 9,
+    "maximumPrimaryOptimum": 9.37052392712017,
+    "freshRestarts": 1,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 46,
+    "zeroClfSlackFrames": 1246,
+    "zeroSlackPairs": 1245,
+    "zeroSlackPairsMissingDecrease": 464,
+    "zeroSlackPairsIncreasing": 414,
+    "trustScaleRange": [
+     0.12021797929838281,
+     1
+    ]
+   },
+   "speed15-headOn": {
+    "outcome": "recovered",
+    "holds": 206,
+    "minimumGap": 0.5334828283263182,
+    "minimumRoadMargin": 3.1870392340173,
+    "maximumLateralDeviation": 7.772744985934496,
+    "recoverySeconds": null,
+    "maximumSteering": 0.39878390003992203,
+    "brakingRatioRange": [
+     -0.3706539704635606,
+     0.9471481752323174
+    ],
+    "maximumYawRate": 1.0061538200953597,
+    "maximumSideslip": 0.13619955878558296,
+    "positivePrimaryFrames": 25,
+    "maximumPrimaryOptimum": 36.159857025475404,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 23,
+    "zeroClfSlackFrames": 174,
+    "zeroSlackPairs": 173,
+    "zeroSlackPairsMissingDecrease": 4,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed15-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 212,
+    "minimumGap": 1.6145046548327393,
+    "minimumRoadMargin": 3.4206591811988574,
+    "maximumLateralDeviation": 7.5874437381090365,
+    "recoverySeconds": null,
+    "maximumSteering": 0.15835857654967941,
+    "brakingRatioRange": [
+     -0.29190855664555365,
+     0.35143400709855066
+    ],
+    "maximumYawRate": 0.6556972362829915,
+    "maximumSideslip": 0.06645392396409981,
+    "positivePrimaryFrames": 0,
+    "maximumPrimaryOptimum": 3.7178087585626134e-10,
+    "freshRestarts": 0,
+    "horizonMedian": 16.0,
+    "horizonMaximum": 63,
+    "zeroClfSlackFrames": 183,
+    "zeroSlackPairs": 182,
+    "zeroSlackPairsMissingDecrease": 10,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.11508249901410345,
+     1
+    ]
+   },
+   "speed8-acceleratingHeadOn": {
+    "outcome": "recovered",
+    "holds": 228,
+    "minimumGap": 2.4861328660091413,
+    "minimumRoadMargin": 1.265120627202542,
+    "maximumLateralDeviation": 9.526822141911644,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5099246426562184,
+    "brakingRatioRange": [
+     -0.2843750000457023,
+     0.44912925979609464
+    ],
+    "maximumYawRate": 1.0396593594340617,
+    "maximumSideslip": 0.16953884204422534,
+    "positivePrimaryFrames": 7,
+    "maximumPrimaryOptimum": 3.530669988302084,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 40,
+    "zeroClfSlackFrames": 193,
+    "zeroSlackPairs": 192,
+    "zeroSlackPairsMissingDecrease": 1,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-brakingLead": {
+    "outcome": "recovered",
+    "holds": 333,
+    "minimumGap": 1.3859861513374607,
+    "minimumRoadMargin": 4.859626295993317,
+    "maximumLateralDeviation": 6.176204561770855,
+    "recoverySeconds": null,
+    "maximumSteering": 0.6906444696483292,
+    "brakingRatioRange": [
+     -0.9086763160227929,
+     0.4904971045140001
+    ],
+    "maximumYawRate": 0.862530865062275,
+    "maximumSideslip": 0.23065577146786817,
+    "positivePrimaryFrames": 43,
+    "maximumPrimaryOptimum": 31.679222651762174,
+    "freshRestarts": 9,
+    "horizonMedian": 8,
+    "horizonMaximum": 137,
+    "zeroClfSlackFrames": 243,
+    "zeroSlackPairs": 242,
+    "zeroSlackPairsMissingDecrease": 9,
+    "zeroSlackPairsIncreasing": 1,
+    "trustScaleRange": [
+     0.07045883785643682,
+     1
+    ]
+   },
+   "speed8-crossing": {
+    "outcome": "recovered",
+    "holds": 209,
+    "minimumGap": 1.6720832840742907,
+    "minimumRoadMargin": 4.55847898969853,
+    "maximumLateralDeviation": 6.202797463401943,
+    "recoverySeconds": null,
+    "maximumSteering": 0.42344506894288114,
+    "brakingRatioRange": [
+     -0.4407043604819416,
+     0.47499999515027314
+    ],
+    "maximumYawRate": 0.8717618138719344,
+    "maximumSideslip": 0.13956476486578973,
+    "positivePrimaryFrames": 4,
+    "maximumPrimaryOptimum": 7.23353475162385,
+    "freshRestarts": 0,
+    "horizonMedian": 8,
+    "horizonMaximum": 29,
+    "zeroClfSlackFrames": 180,
+    "zeroSlackPairs": 179,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedCrossing": {
+    "outcome": "controlUnavailable",
+    "holds": 142,
+    "minimumGap": 2.230646571396335,
+    "minimumRoadMargin": 4.997294417485874,
+    "maximumLateralDeviation": 5.529059176455371,
+    "recoverySeconds": null,
+    "maximumSteering": 0.49805679148381,
+    "brakingRatioRange": [
+     -0.43993328727569303,
+     0.3500001848598573
+    ],
+    "maximumYawRate": 1.0309303213236662,
+    "maximumSideslip": 0.19163939110261904,
+    "positivePrimaryFrames": 8,
+    "maximumPrimaryOptimum": 14.275921219427198,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 30,
+    "zeroClfSlackFrames": 116,
+    "zeroSlackPairs": 115,
+    "zeroSlackPairsMissingDecrease": 3,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-curvedHeadOn": {
+    "outcome": "recovered",
+    "holds": 1752,
+    "minimumGap": 2.5883192873778533,
+    "minimumRoadMargin": 1.3530170307231888,
+    "maximumLateralDeviation": 9.503620375629596,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5660731349573129,
+    "brakingRatioRange": [
+     -0.34999999489098965,
+     0.4802610554761832
+    ],
+    "maximumYawRate": 0.9935586420683561,
+    "maximumSideslip": 0.17194558871344903,
+    "positivePrimaryFrames": 14,
+    "maximumPrimaryOptimum": 57.08610257497929,
+    "freshRestarts": 1,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 59,
+    "zeroClfSlackFrames": 1670,
+    "zeroSlackPairs": 1669,
+    "zeroSlackPairsMissingDecrease": 676,
+    "zeroSlackPairsIncreasing": 626,
+    "trustScaleRange": [
+     0.12253499939782546,
+     1
+    ]
+   },
+   "speed8-headOn": {
+    "outcome": "recovered",
+    "holds": 230,
+    "minimumGap": 2.7721371484481203,
+    "minimumRoadMargin": 1.1311264506711307,
+    "maximumLateralDeviation": 9.689599316054467,
+    "recoverySeconds": null,
+    "maximumSteering": 0.5007585323315692,
+    "brakingRatioRange": [
+     -0.2843750000092307,
+     0.3982479434663434
+    ],
+    "maximumYawRate": 0.9877447536529893,
+    "maximumSideslip": 0.16688638227987462,
+    "positivePrimaryFrames": 6,
+    "maximumPrimaryOptimum": 3.449286465998452,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 41,
+    "zeroClfSlackFrames": 194,
+    "zeroSlackPairs": 193,
+    "zeroSlackPairsMissingDecrease": 0,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   },
+   "speed8-turningCrossing": {
+    "outcome": "recovered",
+    "holds": 216,
+    "minimumGap": 1.6975604116846703,
+    "minimumRoadMargin": 4.426129649164485,
+    "maximumLateralDeviation": 6.337156629008756,
+    "recoverySeconds": null,
+    "maximumSteering": 0.39112192901077364,
+    "brakingRatioRange": [
+     -0.4611957710796176,
+     0.4750091238392962
+    ],
+    "maximumYawRate": 0.8618189434183402,
+    "maximumSideslip": 0.13479460129201343,
+    "positivePrimaryFrames": 4,
+    "maximumPrimaryOptimum": 10.195445186218917,
+    "freshRestarts": 0,
+    "horizonMedian": 8.0,
+    "horizonMaximum": 80,
+    "zeroClfSlackFrames": 185,
+    "zeroSlackPairs": 184,
+    "zeroSlackPairsMissingDecrease": 2,
+    "zeroSlackPairsIncreasing": 0,
+    "trustScaleRange": [
+     0.125,
+     1
+    ]
+   }
+  },
+  "frames": 5756,
+  "controllerMedian": 0.012188,
+  "controllerP95": 0.070658,
+  "controllerMaximum": 0.778076,
+  "shareOver50ms": 0.07904794996525365,
+  "observerMedian": 0.017738999999999998
+ }
+}

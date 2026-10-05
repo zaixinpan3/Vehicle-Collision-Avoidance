@@ -246,10 +246,19 @@ normal `n` supplied by the exact rectangle geometry. If `w = R_T' n`, then
 rectangles and provides a supporting hyperplane at a closest feature, so
 these nonnegative multipliers attain the same ordinary-distance optimum.
 Overlap (and the implemented touching convention) gives `n = 0` and
-`lambda = 0`. No signed penetration objective is substituted. The resulting
+`lambda = 0` for the ordinary-distance optimum. The resulting
 `lambda` is fixed when assembling all four trajectory inequalities
 
     lambda' [A (v_j(x)-pT) - b] + s_i >= safetyMarginMeters.
+
+At overlap the trajectory rows do not use the zero multiplier, whose row has
+no gradient in the ego pose. `supportLinearization` selects another feasible
+dual instead: the unit normal of the rectangle axis (of the four axes of both
+bodies) with the least penetration, oriented from the target to the ego. Any
+feasible multiplier gives a lower bound of the distance, so the row remains a
+sufficient separation condition; its value is negative at the anchor and its
+gradient points along that axis. This is not a signed-distance objective: the
+multiplier is fixed, and the row still needs slack until the bodies separate.
 
 The existing affine RTI model retains the first derivative of the rotated
 vertices with respect to ego yaw. Thus the paper's unspecified set notation
@@ -259,19 +268,17 @@ and the yaw tangent are stated here; they are not a claim to reproduce an
 uninspected author implementation. At the anchor, the optimized minimum
 equals the ordinary rectangle distance up to solver tolerance.
 
-There is no signed-distance objective, preferred passing direction, normal
-normalization, or replacement of an overlapping distance dual. Zero
-multipliers stay zero: a relaxed row then needs at least the node buffer in
-slack, while a hard positive-buffer row is infeasible. Contact duals may be
-nonunique. Potential-field initialization does not replace those multipliers or repair
-their zero gradients. The retired signed-direction MEX is neither called nor built.
+There is no signed-distance objective, preferred passing direction or normal
+normalization. Contact duals may be nonunique. Potential-field initialization
+does not replace the multipliers. The retired signed-direction MEX is neither
+called nor built.
 The geometric construction retains the nonnegative-multiplier, unit-normal
 and primal-dual identities as numerical assertions. It removes the many
 five-variable `coneprog` calls and their near-optimal stopping failures;
 it does not relax a trajectory constraint. The distant recovery geometry
 that previously aborted with a 1.68-micrometer gap now has a gap of order
-1e-14 m. Both the overlap plateau and nonunique touching normals remain
-properties of the ordinary-distance formulation.
+1e-14 m. Nonunique touching normals remain a property of the
+ordinary-distance formulation.
 
 The trajectory stages share the remaining soft frame budget. Formulation
 and a currently running factorization are not interrupted by a hard deadline.

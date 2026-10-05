@@ -53,23 +53,25 @@ function cfg = estimatorControllerIntegrationConfig()
     observer.runtime.samplePeriod = 0.0125;           % s
     observer.runtime.integrationStepMaximum = 0.0025; % s
 
-    % Ego operating domain covering the deliberately aggressive straight
-    % and R=60 m avoidance maneuvers, not merely centerline cornering.
+    % Standalone defaults of the ego domain and of the kinematic
+    % single-track branch. The closed-loop drivers replace the ego domain,
+    % the rear-axle distance and the sideslip cone by the controller's values
+    % and add its vehicle model (estimatorConfigurationFromController); the
+    % lateral velocity is then measured by the force balance, and the
+    % mismatch allowance below is used only where no held input exists (the
+    % initialization history). The 0.25 allowance is a declared premise of
+    % the kinematic branch, not a proven vehicle-model bound: avoidance
+    % maneuvers at 15 m/s exceed it (report/ESTIMATOR_DOMAIN_20261005.tex).
     observer.ego.domain.speedMaximum = 25.0;          % m/s
     observer.ego.domain.yawRateMaximum = 0.75;        % rad/s
-    % The rear-axle distance is replaced by the loaded plant value.
-    % Straight avoidance identification reached 0.1768 rad/s in PassVeh14DOF
-    % and 0.1978 rad/s in the nonlinear bicycle. The former 0.10 premise
-    % was violated. The 0.25 allowance is explicit and must be audited in
-    % subsequent runs; it is not a proven global vehicle-model bound.
     observer.ego.yaw.rearAxleDistance = 1.45;         % m
     observer.ego.yaw.sideslipDomainMaximum = 0.12;    % rad
     observer.ego.yaw.singleTrackYawRateMismatchMaximum = 0.25; % rad/s
 
-    % Target operating domain for the avoidance suites: straight-driving
-    % targets between 10 and 15 m/s. The certified speed floor no longer
-    % aborts a run - the Lipschitz extension keeps the observer defined
-    % and the audit merely records transient dips during the ego's dodge.
+    % Standalone target operating domain. The closed-loop drivers replace
+    % it by the hull of the scenario targets (scripts/collisionThreatContract).
+    % The certified speed floor does not abort a run: the Lipschitz
+    % extension keeps the observer defined, and the audit records dips.
     observer.target.domain.speedMinimum = 5.0;        % m/s
     observer.target.domain.speedMaximum = 20.0;       % m/s
     observer.target.domain.scalarAccelerationMaximum = 2.0; % m/s^2
@@ -97,9 +99,9 @@ function cfg = estimatorControllerIntegrationConfig()
     % substitutes for the evolving estimation errors. No fixed state-error
     % override is applied by the adapter.
 
-    % Controller vehicle parameters are copied from the loaded PassVeh14DOF
-    % plant by the scenario drivers; this configuration deliberately holds
-    % no duplicate vehicle geometry. Only the scenario target speed lives
+    % Vehicle parameters come from the controller configuration
+    % (estimatorConfigurationFromController); this configuration holds no
+    % duplicate vehicle geometry. Only the scenario target speed lives
     % here, as the default prior magnitude for the adapter's provisional
     % first-detection target state.
     cfg.vehicle.targetSpeed = 15.0;                  % m/s

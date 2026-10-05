@@ -1,0 +1,121 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Synchronizing the manuscript and the documentation with d1c31d6}
+\date{Prepared October 5, 2026}
+\begin{document}
+\maketitle
+
+\section{Question}
+The manuscript \path{paper/manuscript.tex} described the controller of
+October 2 (\texttt{a29ccb6}): a cost-to-go CLF, a freely placed cruise core,
+exact states, no road constraint, and a fourteen-run campaign with one
+collision. Several documents described still older designs. The user asked for
+the documentation and then the manuscript to be brought in line with the code
+at \texttt{d1c31d6}.
+
+\section{What was read}
+The manuscript, every controller and configuration source, the estimator
+runtime and its theory documents, and the reports
+\path{JOINT_DESIGN_20261005.tex} and
+\path{ESTIMATOR_DIRECT_TARGET_20261005.tex} were read line by line. The
+perception sources, \path{scripts/}, \path{tests/} and the other reports of
+October 1 to 5 were surveyed by three read-only assistants whose summaries
+were used for the documentation changes; statements taken from them were
+checked against the code where they enter the manuscript.
+
+\section{Manuscript changes}
+\begin{itemize}
+\item Abstract, end of the introduction, system overview, architecture
+  caption: the two components are evaluated together; the controller consumes
+  the enclosure and imposes road edges; perception is not in the loop.
+\item Obstacle perception: rectangle pose fit on lower-body points, started
+  from the estimator's predicted pose.
+\item Estimator: new subsection on the force-balance lateral velocity
+  (monotone force balance, certified interval, the changed velocity row) and
+  a description of the published ego zonotope and target parameter set.
+  Lemmas, theorem and gain selection are unchanged.
+\item Control design: rewritten. Variable horizon, shifted-plan and
+  potential-field anchors, distance-dual rows with a least-penetration axis at
+  overlap, road rows, rear-adhesion and sideslip cones, separating and
+  road-recoverable terminal set with one proposition, quadratic CLF with its
+  LMI synthesis, per-hold use of the enclosure, the two programs, the
+  innovation-based trust scale, and the scope of the guarantees.
+\item Results: Sections VI-A and VI-B (estimator alone) are kept and marked
+  as measured before the model-aided measurement, whose kinematic branch they
+  exercise. The closed-loop protocol, outcomes, in-loop estimation, the two
+  runs without a solution, the window-fit ablation and the computation times
+  are new. Discussion and conclusion are rewritten.
+\item Two references were added (Zhai et al.\ 2024; Beal and Gerdes 2013).
+\end{itemize}
+
+\section{Sources of the numbers}
+No simulation, estimator trial or unit test was run for this revision.
+\begin{itemize}
+\item Outcomes, gaps, road margins and recovery times:
+  \path{ESTIMATOR_DIRECT_TARGET_20261005/campaign-metrics.csv}.
+\item Failure table: \path{ESTIMATOR_DIRECT_TARGET_20261005/failures.csv} and
+  the text of that report. Horizon statistics: \path{horizon-steps.csv}.
+  Audit radii: \path{audit.csv}.
+\item Positive primary optima, fresh anchors, input and state extremes,
+  horizon of the exact runs, call-time shares and CLF decrease counts:
+  derived from the recorded traces under
+  \path{~/.cache/collisionAvoidance/estimator-direct-20261005} by
+  \path{MANUSCRIPT_ALGORITHM_SYNC_20261005/deriveClosedLoopStatistics.py}
+  (output \path{closed-loop-statistics.json}). The CLF counts quoted in the
+  manuscript restrict the pairs to $V>10^{-3}$ and were computed with the same
+  trace fields: 3064 pairs, 2520 with zero modeled slack, 73 of those without
+  the requested decrease, none increasing.
+\item Sequential timing (9.2~ms median, 41~ms 95th percentile, 3.4\% over
+  50~ms) and the comparison with the kinematic measurement:
+  \path{JOINT_DESIGN_20261005.tex}.
+\item CLF contraction factors: \path{config/clfMatrices.json}.
+\item Figure \path{closed_loop_results_v02}:
+  \path{MANUSCRIPT_ALGORITHM_SYNC_20261005/figure-sources/closed_loop_results_v02.py}.
+\end{itemize}
+
+\section{Documentation changes}
+\path{README.md} (rewritten; the previous text is kept as
+\path{report/ROOT_README_SUPERSEDED_20261005.md}), \path{CLAUDE.md} and the
+project-structure section of \path{AGENTS.md}, \path{perception/README.md},
+\path{scripts/README.md}, \path{report/README.md} (current-state block and an
+index of October 2 to 5), \path{paper/README.md},
+\path{controller/PCBF_CLF_ARCHITECTURE.md} and
+\path{controller/CONTROLLER_FILES.md} (multipliers at overlap),
+\path{estimator/OBSERVER_ISS_THEORY.md} (links to removed files, pointer to
+the model-aided measurement), and the comments of
+\path{config/estimatorControllerIntegrationConfig.m}. No executable statement
+was changed.
+
+One disagreement between prose and code was found beyond stale names:
+\path{PCBF_CLF_ARCHITECTURE.md} stated that an overlapping anchor keeps a zero
+multiplier, while \texttt{solvePredictiveControl} calls
+\texttt{supportLinearization}, which substitutes the feasible dual of the
+least-penetrated rectangle axis. The document and the manuscript now describe
+the code.
+
+\section{Open items for review}
+\begin{itemize}
+\item The new derivations in the manuscript (force-balance interval and
+  velocity row, collision tightening, CLF synthesis) restate the repository
+  documents and code; they have not been independently reviewed.
+\item The monotonicity of each axle force in yaw rate, speed, stiffness and
+  friction, on which the corner evaluation of the force interval rests, is
+  asserted as in \path{estimator/MODEL_AIDED_ESTIMATION.md}; the manuscript
+  gives no proof.
+\item The bibliographic data of the two added references should be checked
+  against the publishers' records; the first names of the authors of Zhai et
+  al.\ are given as initials.
+\item The estimator-alone comparison was not rerun at \texttt{d1c31d6}.
+\item Computation times were not re-measured at \texttt{d1c31d6}; the
+  campaign timings were recorded with eight runs sharing the machine.
+\item The architecture drawing still labels the road-boundary branch ``not
+  yet used''; this remains true for perceived curbs only, and the caption says
+  so.
+\item \path{scripts/auditJointPredictiveSafety.py} checks a 4-m road
+  half-width that no longer matches the MATLAB road; it was documented, not
+  changed.
+\end{itemize}
+\end{document}

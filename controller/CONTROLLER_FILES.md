@@ -51,7 +51,8 @@ and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
 and expose that limitation. Complete nonlinear robust safety remains conditional
 on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.
 
-The latest point estimate always refreshes target A and beta, held constant
+The estimator shares the controller's vehicle model, input and domain; see
+`../estimator/MODEL_AIDED_ESTIMATION.md`. The latest point estimate always refreshes target A and beta, held constant
 only within the current prediction. Unavailable or stale certificates do not
 block execution; unsupported uncertainty padding is omitted without declaring
 zero estimation error. No assumption-status diagnostics are produced. Usable finite
@@ -87,7 +88,9 @@ nominal-value MEX.
 
 `ordinaryDistanceDualTest` compares the optimized ordinary dual with geometric
 rectangle distance, checks full ego size, fixed-multiplier yaw derivatives,
-zero multipliers and translation invariance. Overlap has no imposed direction.
+zero multipliers and translation invariance. At overlap the trajectory rows
+use the feasible dual of the least-penetrated rectangle axis
+(`supportLinearization`), which the test checks as an escape direction.
 
 `twoStagePredictiveControlTest` checks both objectives, the same CLF at all
 target ranges, primary priority, affine dynamics with consistent anchors,
