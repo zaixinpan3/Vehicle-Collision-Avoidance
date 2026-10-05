@@ -1,0 +1,2 @@
+speed,scenario,frames,invalidFrom,reason,yawRateThere,speedThere,maximumYawRate,minimumSpeed
+15,brakingLead,185,1,ego-measurement-inconsistent-with-declared-bounds,0.779486977639925,14.7804499820396,0.872509649916919,11.6768311793113
