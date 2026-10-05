@@ -1,0 +1,14 @@
+speed,scenario,frames,invalidFrom,reason,yawRateThere,speedThere,maximumYawRate,minimumSpeed,premiseViolationFrames,egoAvailableFrames,egoUncontainedFrames,targetAvailableFrames,targetUncontainedFrames
+8,headOn,241,0.4,ego-measurement-inconsistent-with-declared-bounds,0.811465428544835,6.99291890179474,0.939188575769958,6.87535202929235,45,8,0,8,0
+8,acceleratingHeadOn,240,0.4,ego-measurement-inconsistent-with-declared-bounds,0.811424089022518,7.00756129320853,0.935998652707348,6.87864917440151,44,8,0,8,0
+8,brakingLead,142,1.5,ego-measurement-inconsistent-with-declared-bounds,0.74169894321215,6.45612120130687,0.74169894321215,6.10890826700373,12,30,0,30,0
+8,crossing,216,0.5,ego-measurement-inconsistent-with-declared-bounds,0.72666956897189,6.01441076225686,0.986473728697541,4.78621993373971,30,10,0,10,0
+8,turningCrossing,13,0.4,ego-measurement-inconsistent-with-declared-bounds,0.777679610613174,6.98488364192674,0.791884185898225,6.90731777990056,6,8,0,8,0
+8,curvedHeadOn,1739,0.4,ego-measurement-inconsistent-with-declared-bounds,0.816992374640053,6.98429495082975,0.944346412493133,6.86013892777304,49,8,0,8,0
+15,headOn,82,NaN,,NaN,NaN,0.990344916970088,12.6623715344827,78,19,12,19,11
+15,acceleratingHeadOn,15,NaN,,NaN,NaN,0.689600373837125,12.9445319480072,13,15,8,15,7
+15,brakingLead,233,NaN,,NaN,NaN,0.693670209567148,13.7004744099462,93,8,2,8,0
+15,crossing,38,NaN,,NaN,NaN,0.890322863606432,10.9388903596936,34,31,24,31,23
+15,turningCrossing,17,NaN,,NaN,NaN,0.661233485529394,12.8357641403557,15,17,10,17,9
+15,curvedHeadOn,34,NaN,,NaN,NaN,0.811074275112075,11.9284011024292,31,31,24,31,24
+15,curvedCrossing,20,NaN,,NaN,NaN,0.677340152246683,13.7750554234456,17,20,12,20,10

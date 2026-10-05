@@ -5,6 +5,9 @@ function rows = replayEstimatorValidity(campaign,speedList,nameList,observerOver
 % reproduces the estimate published in each recorded noisy campaign run. The
 % controller is not called. Output rows give the first invalid time, the
 % bound's reason, the yaw rate and speed there, and the run's peak yaw rate.
+% The adapter's truth audit is also counted: frames whose true motion
+% violates a declared ego premise, frames with an available ego or target
+% bound, and available bounds that do not contain the truth.
 % observerOverride (optional) is merged into the estimator's observer
 % configuration, e.g. struct('ego',struct('domain',struct('yawRateMaximum',5))).
     arguments
@@ -13,7 +16,8 @@ function rows = replayEstimatorValidity(campaign,speedList,nameList,observerOver
         nameList (1,:) string = ["headOn","acceleratingHeadOn","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"]
         observerOverride struct = struct()
     end
-rows=struct('speed',{},'scenario',{},'frames',{},'invalidFrom',{},'reason',{},'yawRateThere',{},'speedThere',{},'maximumYawRate',{},'minimumSpeed',{});
+rows=struct('speed',{},'scenario',{},'frames',{},'invalidFrom',{},'reason',{},'yawRateThere',{},'speedThere',{},'maximumYawRate',{},'minimumSpeed',{}, ...
+    'premiseViolationFrames',{},'egoAvailableFrames',{},'egoUncontainedFrames',{},'targetAvailableFrames',{},'targetUncontainedFrames',{});
 R=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(R,'scripts'),fullfile(R,'config'),fullfile(R,'controller'),fullfile(R,'estimator'));
 for speed=speedList
 for name=nameList
@@ -28,17 +32,24 @@ for name=nameList
   mk=@(x,t,u)struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6),'longitudinalVelocity',x(4),'stateTime',t,'heldActuatorInput',u);
   tgt=@(t,~)localTarget(predictiveSafetyGeometry.predictTarget(q0,t));
   ctx=nrmmEstimatorControllerAdapter("initialize",c,mk(tr(1).state(:),0,[0;0]),tgt);
-  first=NaN;reason="";valid=0;maxYawRate=0;minSpeed=Inf;
+  first=NaN;reason="";valid=0;maxYawRate=0;minSpeed=Inf;counts=zeros(1,5);
   for k=1:numel(tr)
     x=tr(k).state(:);u=[0;0];if k>1,u=tr(k-1).input(:);end
-    [ctx,egoOut]=nrmmEstimatorControllerAdapter("sample",ctx,tr(k).time,mk(x,tr(k).time,u),tgt(tr(k).time));
+    [ctx,~,~,~,audit]=nrmmEstimatorControllerAdapter("sample",ctx,tr(k).time,mk(x,tr(k).time,u),tgt(tr(k).time));
+    t=audit.truthEnclosure;targetHere=~isempty(ctx.currentOutput.targetEstimate);
+    counts=counts+[~t.egoPremisesSatisfied,t.egoBoundAvailable,t.egoBoundAvailable && ~t.egoContained, ...
+        targetHere && t.targetBoundAvailable,targetHere && t.targetBoundAvailable && ~t.checkedTargetComponentsContained];
     maxYawRate=max(maxYawRate,abs(x(6)));minSpeed=min(minSpeed,hypot(x(4),x(5)));
     b=ctx.runtime.positionErrorBound;
     if b.egoValid,valid=valid+1;elseif isnan(first),first=tr(k).time;reason=string(b.reason);fr=k;end
   end
   there=[NaN,NaN];if ~isnan(first),xs=tr(fr).state(:);there=[abs(xs(6)),hypot(xs(4),xs(5))];end
   rows(end+1)=struct('speed',speed,'scenario',name,'frames',numel(tr),'invalidFrom',first,'reason',reason, ...
-      'yawRateThere',there(1),'speedThere',there(2),'maximumYawRate',maxYawRate,'minimumSpeed',minSpeed); %#ok<AGROW>
+      'yawRateThere',there(1),'speedThere',there(2),'maximumYawRate',maxYawRate,'minimumSpeed',minSpeed, ...
+      'premiseViolationFrames',counts(1),'egoAvailableFrames',counts(2),'egoUncontainedFrames',counts(3), ...
+      'targetAvailableFrames',counts(4),'targetUncontainedFrames',counts(5)); %#ok<AGROW>
+  fprintf('AUDIT %2d %-19s premise violated in %d/%d frames; ego bound available %d, not containing truth %d; target bound available %d, not containing truth %d\n', ...
+      speed,name,counts(1),numel(tr),counts(2),counts(3),counts(4),counts(5));
   if isnan(first)
     fprintf('VALID %2d %-19s ego bound valid in all %d frames; max |r| %.3f, min speed %.2f\n',speed,name,numel(tr),maxYawRate,minSpeed);
   else

@@ -67,10 +67,50 @@ velocity $l_r r$ must lie within $v\sin(0.12)+l_r(0.25+n_g)$. That is about
 real sideslip and mismatch exceed the declared premises there.
 
 \section{Conclusion}
-The premises that matter, mismatch and sideslip, are statements about how far
-the rear tire slips. The plant alone does not bound them usefully. A useful
-computed value needs a bound on the rear slip angle; the plant cannot provide
-it, but the controller can enforce it. The yaw-rate, speed, acceleration and
+The premises that matter, mismatch and sideslip, bound body-point lateral
+speed and sideslip (see the addendum: the estimator has no wheel model). The
+plant alone does not bound them usefully; the controller can enforce them. The yaw-rate, speed, acceleration and
 yaw-acceleration premises can be computed from the plant and the controller's
 limits without loss. The target premises are a contract about other vehicles.
+
+\section{Addendum: the estimator has no wheel model; premise audit}
+The user asked whether the estimator models front and rear wheels. It does
+not. The ego relation is purely kinematic (\path{estimator/OBSERVER_ISS_THEORY.md},
+Sec.~3):
+\[
+\omega_E=v_y/l_E+d_{\rm st},\quad|d_{\rm st}|\le\delta_{\rm st},\qquad
+v_x\ge\|v\|\cos b .
+\]
+$l_E$ (named \texttt{rearAxleDistance}) is a geometric length of the observer.
+$v_y-l_E\omega_E$ is the lateral velocity of the body point $l_E$ behind the
+centre of mass, so the premises say that this point's lateral speed is at
+most $l_E\delta_{\rm st}$ (0.41~m/s with $l_E=1.65$~m) and that the sideslip is
+at most $b=0.12$~rad. Tires enter only through the true vehicle. With
+$l_E$ equal to the real rear-axle distance, that point is the rear axle, and
+its lateral speed is $v_x\tan\alpha_r$. The earlier statement that the
+estimator's premises concern the rear tire was an interpretation through the
+plant, not a property of the estimator. $l_E$ is a free design length.
+
+Recorded true motion (aec20bc): the point's lateral speed reached 0.42--0.58~m/s
+at 8~m/s and 0.86--4.25~m/s at 15~m/s, and the sideslip reached 0.167~rad and
+0.24~rad. The body point with the least lateral speed lies about 1.0~m behind
+the centre of mass at 8~m/s (at most 0.10--0.24~m/s) and near the centre of
+mass at 15~m/s.
+
+The adapter's truth audit was counted over the replay with the yaw-rate and
+speed domains enlarged (\path{ESTIMATOR_DOMAIN_20261005/audit-enlarged-yaw-speed.csv}).
+The premises were violated in 6--93 frames per run. At 15~m/s, frames with an
+available ego bound that did not contain the truth were: headOn 12 of 19,
+acceleratingHeadOn 8 of 15, brakingLead 2 of 8, crossing 24 of 31,
+turningCrossing 10 of 17, curvedHeadOn 24 of 31, curvedCrossing 12 of 20.
+Target bounds failed in similar numbers. The runtime consistency check tests
+only the measured lateral velocity against the forward cone, so these
+violations pass undetected. At 8~m/s the bounds were available only in the
+first 8--30 frames and always contained the truth.
+
+The published bounds are therefore unsound in the 15-m/s avoidances, which
+also affects every earlier noisy result that used them. Both premises are
+affine or nearly affine in the controller's state [$v_y$, $r$, $v_x$], so the
+controller could enforce them. Alternatively $l_E$ and $\delta_{\rm st}$ could
+be chosen from the motion the controller is allowed to produce.
 \end{document}
