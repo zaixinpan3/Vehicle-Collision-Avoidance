@@ -27,7 +27,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
             % Terminal set: separating, inside the road.
-            testCase.verifyEqual(problem.metadata.terminalSet,"separatingInsideRoad");
+            testCase.verifyEqual(problem.metadata.terminalSet,"separatingRoadRecoverable");
             testCase.verifyGreaterThanOrEqual(problem.metadata.terminalSeparatingSpeed,0);
             testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,-1e-3);
             testCase.verifyGreaterThan(size(inputs,2),cfg.controller.horizonSteps);
@@ -197,6 +197,43 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             end
             % Rows are linearized in yaw; allow the second-order corner remainder.
             testCase.verifyGreaterThanOrEqual(worst,-1e-2);
+        end
+        function everyHoldKeepsTheRearTireBelowSaturationAndInsideTheSideslipCone(testCase)
+            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
+            target=struct('targetPositionInertial',q(1:2), ...
+                'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
+            [~,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            x=problem.predictedState;tire=modifiedFialaTire.parameters(cfg);
+            k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
+            adhesion=@(state,braking)norm([(state(5)-cfg.vehicle.lr*state(6))/(k*state(4));braking]);
+            worstAdhesion=0;worstSideslip=-Inf;
+            for index=1:size(inputs,2)
+                worstAdhesion=max(worstAdhesion,adhesion(x(:,index+1),inputs(2,index)));
+                if index>1,worstAdhesion=max(worstAdhesion,adhesion(x(:,index),inputs(2,index)));end
+                worstSideslip=max(worstSideslip,abs(x(5,index+1))-tan(cfg.model.sideslipMaximum)*x(4,index+1));
+            end
+            % The braking product uses the anchor speed; allow its remainder.
+            testCase.verifyLessThanOrEqual(worstAdhesion,1+1e-2);
+            testCase.verifyLessThanOrEqual(worstSideslip,1e-6);
+        end
+        function theEndpointCanStopItsLateralMotionBeforeTheRoadEdge(testCase)
+            [ego,road,cfg]=localFixture();road.lateralClearance=[4;4];
+            ego.position(2)=1.2;ego.yaw=.3;
+            strict=cfg;strict.collision.roadRecoveryAccelerationFraction=.05;
+            for configuration={cfg,strict}
+                settings=configuration{1};
+                [~,~,problem]=collisionAvoidanceController(ego,[],road,settings,[]);
+                y=problem.predictedState(:,end);
+                corners=settings.vehicle.rectangleOffset+[settings.vehicle.length;settings.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
+                rotation=[cos(y(3)),-sin(y(3));sin(y(3)),cos(y(3))];
+                lateral=laneGeometry.project(y(1:2)+rotation*corners,problem.model.lane).lateralPosition;
+                center=laneGeometry.project(y(1:2),problem.model.lane);
+                leftward=[-sin(center.heading),cos(center.heading)]*rotation*y(4:5);
+                a=settings.collision.roadRecoveryAccelerationFraction*min(settings.tire.frictionCoefficient)*settings.vehicle.gravity;
+                distance=[road.lateralClearance(2)-max(lateral);road.lateralClearance(1)+min(lateral)];
+                % Linearized at the anchor endpoint; allow the second-order remainder.
+                testCase.verifyLessThanOrEqual(max([leftward;-leftward],0).^2-2*a*distance,[2e-2;2e-2]);
+            end
         end
         function aRoadTooNarrowForTheVehicleHasNoSolution(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[.5;.5];

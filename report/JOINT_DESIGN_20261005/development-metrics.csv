@@ -1,0 +1,99 @@
+observation,speed,scenario,outcome,holds,recoveryConfirmedSeconds,minimumSampledGapMeters,minimumRoadMarginMeters,collision,roadDeparture,egoPositionErrorP95,egoYawErrorP95,egoLateralVelocityErrorP95,controllerSecondsMedian,controllerSecondsMax,failure
+baseline,8,headOn,recovered,241,12.050000000000036,2.9736,0.984,False,False,0.0101,0.06772,0.4741,0.0051,0.084,
+baseline,8,acceleratingHeadOn,recovered,240,12.000000000000036,2.4545,1.151,False,False,0.0102,0.06708,0.47,0.0047,0.038,
+baseline,8,brakingLead,controlUnavailable,142,,0.1611,7.508,False,False,0.0117,0.02641,0.1815,0.0218,0.254,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+baseline,8,crossing,recovered,216,10.800000000000018,2.1799,4.853,False,False,0.0094,0.03317,0.3353,0.0061,0.029,
+baseline,8,turningCrossing,controlUnavailable,13,,9.6887,5.628,False,False,0.0219,0.0373,0.3024,0.031,0.039,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+baseline,8,curvedHeadOn,recovered,1739,86.9499999999972,0.2581,1.219,False,False,0.0066,0.01653,0.1186,0.0049,0.146,
+baseline,8,curvedCrossing,controlUnavailable,0,,,,False,False,nan,nan,nan,,,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+baseline,15,headOn,controlUnavailable,82,,0.4943,2.052,False,False,0.0183,0.30812,3.8515,0.0118,0.028,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+baseline,15,acceleratingHeadOn,controlUnavailable,15,,2.7213,7.515,False,False,0.0211,0.07875,0.9789,0.0178,0.026,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+baseline,15,brakingLead,recovered,233,11.65000000000003,0.205,6.044,False,False,0.0106,0.0693,0.9785,0.0109,0.196,
+baseline,15,crossing,controlUnavailable,38,,5.0195,1.258,False,False,0.0181,0.09707,1.0541,0.0156,0.032,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+baseline,15,turningCrossing,controlUnavailable,17,,11.8683,4.528,False,False,0.0215,0.08979,1.1241,0.0295,0.041,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+baseline,15,curvedHeadOn,controlUnavailable,34,,4.6907,2.36,False,False,0.0186,0.13163,1.602,0.0199,0.039,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+baseline,15,curvedCrossing,controlUnavailable,20,,10.3619,3.106,False,False,0.0211,0.09336,1.2291,0.0273,0.069,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,8,headOn,controlUnavailable,31,,3.4101,2.805,False,False,0.0192,0.0077,0.0622,0.0292,0.144,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,8,acceleratingHeadOn,controlUnavailable,31,,2.8279,2.73,False,False,0.0192,0.00765,0.0823,0.0282,0.116,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,8,brakingLead,controlUnavailable,112,,1.3855,6.191,False,False,0.0151,0.00545,0.0745,0.0155,0.627,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfNoNumericalResult).
+A,8,crossing,recovered,209,10.450000000000014,2.786,4.968,False,False,0.0117,0.00543,0.0766,0.0093,0.147,
+A,8,turningCrossing,controlUnavailable,5,,13.3981,7.205,False,False,0.0228,0.00304,0.0396,0.0734,0.14,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,8,curvedHeadOn,controlUnavailable,32,,4.0893,2.706,False,False,0.0196,0.00797,0.0946,0.0194,0.151,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,8,curvedCrossing,controlUnavailable,0,,,,False,False,nan,nan,nan,,,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,15,headOn,observationLimit,2000,,0.5043,0.517,False,False,0.0074,0.00145,0.0152,0.0066,0.116,
+A,15,acceleratingHeadOn,controlUnavailable,11,,6.8354,7.515,False,False,0.0218,0.00468,0.0248,0.0399,0.105,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,15,brakingLead,controlUnavailable,32,,1.3671,2.186,False,False,0.0213,0.01061,0.0982,0.0282,0.087,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,15,crossing,controlUnavailable,36,,5.1625,1.961,False,False,0.0219,0.00519,0.0606,0.0278,0.129,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,15,turningCrossing,recovered,221,11.050000000000022,1.6425,3.518,False,False,0.0212,0.0066,1.6014,0.0139,0.336,
+A,15,curvedHeadOn,controlUnavailable,34,,4.7638,2.537,False,False,0.0212,0.01107,0.1015,0.0225,0.088,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+A,15,curvedCrossing,controlUnavailable,37,,3.5386,2.45,False,False,0.0217,0.00969,0.0943,0.0185,0.221,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+B,8,headOn,recovered,219,10.95000000000002,2.5632,1.942,False,False,0.0151,0.0059,0.047,0.0094,0.124,
+B,8,acceleratingHeadOn,recovered,226,11.300000000000026,2.3237,1.249,False,False,0.0156,0.00599,0.0483,0.0088,0.111,
+B,8,brakingLead,recovered,223,11.150000000000023,1.3859,5.545,False,False,0.0106,0.00489,0.0556,0.0178,0.731,
+B,8,crossing,recovered,205,10.25000000000001,1.7214,4.196,False,False,0.0138,0.00577,0.0436,0.0105,0.128,
+B,8,turningCrossing,controlUnavailable,5,,13.392,7.212,False,False,0.0228,0.00304,0.0396,0.0852,0.158,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+B,8,curvedHeadOn,controlUnavailable,35,,3.6287,1.892,False,False,0.0188,0.00724,0.0808,0.0218,0.155,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+B,8,curvedCrossing,controlUnavailable,0,,,,False,False,nan,nan,nan,,,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+B,15,headOn,controlUnavailable,73,,0.5843,1.99,False,False,0.0229,0.27448,7.1281,0.025,0.119,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+B,15,acceleratingHeadOn,controlUnavailable,79,,0.4374,2.79,False,False,0.0222,0.07098,4.1538,0.0189,0.118,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+B,15,brakingLead,observationLimit,2000,,1.1485,3.618,False,False,0.0074,0.00153,0.0159,0.0078,0.612,
+B,15,crossing,observationLimit,2000,,1.5307,3.571,False,False,0.0066,0.00133,0.0148,0.0077,0.082,
+B,15,turningCrossing,controlUnavailable,1979,,1.8401,4.654,False,False,0.0072,0.00137,0.0147,0.0077,0.278,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfNoNumericalResult).
+B,15,curvedHeadOn,observationLimit,2000,,3.9912,0.303,False,False,0.0115,0.00229,0.0139,0.0084,0.112,
+B,15,curvedCrossing,observationLimit,2000,,1.5587,0.297,False,False,0.0096,0.0018,0.0133,0.0084,0.264,
+F,8,headOn,controlUnavailable,30,,2.4602,1.123,False,False,0.0209,0.00511,0.0831,0.0391,0.136,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+F,8,acceleratingHeadOn,controlUnavailable,28,,2.6275,1.253,False,False,0.0215,0.00625,0.0822,0.0298,0.089,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+F,8,brakingLead,recovered,279,13.950000000000063,1.3879,2.097,False,False,0.0142,0.00439,0.0637,0.0161,0.503,
+F,8,crossing,recovered,207,10.350000000000012,1.6857,4.968,False,False,0.0116,0.00514,0.0449,0.0109,0.108,
+F,8,turningCrossing,recovered,214,10.700000000000017,1.7172,4.52,False,False,0.0114,0.00493,0.0387,0.0171,0.142,
+F,8,curvedHeadOn,recovered,1760,87.99999999999714,2.6737,1.887,False,False,0.0072,0.00212,0.0245,0.007,0.477,
+F,8,curvedCrossing,recovered,380,19.000000000000135,1.6081,4.684,False,False,0.0112,0.0056,0.0465,0.0168,0.248,
+F,15,headOn,controlUnavailable,10,,7.9992,6.398,False,False,0.0223,0.00331,0.0226,0.039,0.114,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+F,15,acceleratingHeadOn,controlUnavailable,9,,8.9751,6.592,False,False,0.0224,0.00319,0.0231,0.0307,0.087,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+F,15,brakingLead,recovered,297,14.850000000000076,1.2449,4.431,False,False,0.0176,0.00381,0.0261,0.0202,0.215,
+F,15,crossing,recovered,206,10.300000000000011,1.4411,4.122,False,False,0.0132,0.00335,0.0134,0.0155,0.133,
+F,15,turningCrossing,recovered,209,10.450000000000014,1.5435,4.164,False,False,0.0126,0.00308,0.01,0.0198,0.105,
+F,15,curvedHeadOn,recovered,1269,63.44999999999853,1.471,2.091,False,False,0.0117,0.00263,0.0092,0.0092,0.303,
+F,15,curvedCrossing,recovered,232,11.60000000000003,3.5033,1.512,False,False,0.0177,0.00683,0.0443,0.0103,0.093,
+I,8,headOn,recovered,230,11.500000000000028,2.473,1.47,False,False,0.014,0.00574,0.0433,0.0112,0.147,
+I,8,acceleratingHeadOn,recovered,230,11.500000000000028,2.1406,1.255,False,False,0.0143,0.00583,0.0432,0.0114,0.147,
+I,8,brakingLead,recovered,262,13.100000000000051,1.3875,5.43,False,False,0.0078,0.00349,0.0458,0.0189,0.93,
+I,8,crossing,recovered,208,10.400000000000013,1.6964,4.825,False,False,0.0118,0.00544,0.046,0.0119,0.152,
+I,8,turningCrossing,controlUnavailable,6,,12.8367,7.07,False,False,0.0227,0.00295,0.0401,0.0925,0.119,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+I,8,curvedHeadOn,controlUnavailable,46,,3.2685,1.204,False,False,0.0171,0.00722,0.0865,0.0469,0.151,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+I,8,curvedCrossing,controlUnavailable,4,,14.0213,7.292,False,False,0.0229,0.00562,0.0634,0.3741,0.396,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+I,15,headOn,recovered,201,10.050000000000008,0.6129,3.578,False,False,0.0164,0.00472,0.0162,0.0188,0.108,
+I,15,acceleratingHeadOn,recovered,204,10.20000000000001,0.4293,3.534,False,False,0.016,0.00469,0.0185,0.0191,0.099,
+I,15,brakingLead,recovered,268,13.400000000000055,1.2494,4.633,False,False,0.0184,0.00391,0.0223,0.0206,0.306,
+I,15,crossing,recovered,205,10.25000000000001,1.5306,3.754,False,False,0.0147,0.00368,0.0138,0.0155,0.148,
+I,15,turningCrossing,recovered,197,9.850000000000005,1.7482,6.783,False,False,0.0209,0.00401,0.0272,0.0229,0.257,
+I,15,curvedHeadOn,recovered,1286,64.29999999999849,3.4413,0.894,False,False,0.012,0.00252,0.0102,0.0109,0.167,
+I,15,curvedCrossing,recovered,236,11.800000000000033,2.6982,1.551,False,False,0.0168,0.00695,0.0441,0.0111,0.289,
+J,8,headOn,recovered,231,11.55000000000003,2.2482,1.546,False,False,0.0137,0.00568,0.0477,0.0114,0.114,
+J,8,acceleratingHeadOn,recovered,234,11.700000000000031,2.2127,0.663,False,False,0.0144,0.00598,0.0518,0.0083,0.147,
+J,8,brakingLead,recovered,231,11.55000000000003,1.3894,6.855,False,False,0.0145,0.00539,0.0575,0.0218,0.573,
+J,8,crossing,recovered,217,10.85000000000002,1.6811,3.638,False,False,0.012,0.00497,0.0431,0.0122,0.172,
+J,8,turningCrossing,recovered,218,10.90000000000002,1.6906,3.877,False,False,0.0117,0.00501,0.0399,0.0192,0.243,
+J,8,curvedHeadOn,recovered,1775,88.7499999999971,3.0959,0.882,False,False,0.0096,0.00277,0.0234,0.0081,0.418,
+J,8,curvedCrossing,recovered,403,20.15000000000015,1.4836,5.066,False,False,0.0097,0.00554,0.0447,0.0169,0.257,
+J,15,headOn,recovered,199,9.950000000000006,0.6766,3.948,False,False,0.0161,0.00479,0.0178,0.0162,0.071,
+J,15,acceleratingHeadOn,recovered,202,10.100000000000009,0.5148,3.679,False,False,0.016,0.00478,0.0184,0.0165,0.07,
+J,15,brakingLead,recovered,246,12.30000000000004,1.0955,7.529,False,False,0.0081,0.00222,0.0214,0.0256,0.306,
+J,15,crossing,recovered,208,10.400000000000013,1.5216,3.674,False,False,0.0143,0.00358,0.0132,0.0178,0.117,
+J,15,turningCrossing,recovered,208,10.400000000000013,1.5197,3.8,False,False,0.0138,0.00357,0.0124,0.0234,0.125,
+J,15,curvedHeadOn,recovered,1259,62.94999999999856,2.5583,1.5,False,False,0.0116,0.00279,0.0101,0.0111,0.108,
+J,15,curvedCrossing,recovered,227,11.350000000000026,2.2584,2.525,False,False,0.0133,0.00672,0.0362,0.0117,0.106,
+L,8,headOn,recovered,231,11.55000000000003,2.2482,1.546,False,False,0.0137,0.00568,0.0477,0.0122,0.15,
+L,8,acceleratingHeadOn,recovered,234,11.700000000000031,2.2059,0.762,False,False,0.0143,0.00598,0.0523,0.0128,0.153,
+L,8,brakingLead,recovered,235,11.750000000000032,1.3894,6.854,False,False,0.0144,0.00534,0.0569,0.0246,0.568,
+L,8,crossing,recovered,217,10.85000000000002,1.6811,3.637,False,False,0.012,0.00497,0.0431,0.018,0.146,
+L,8,turningCrossing,recovered,218,10.90000000000002,1.6906,3.877,False,False,0.0117,0.00501,0.0399,0.0237,0.204,
+L,8,curvedHeadOn,recovered,1765,88.24999999999713,1.9188,0.883,False,False,0.0097,0.0031,0.024,0.0126,0.746,
+L,8,curvedCrossing,recovered,403,20.15000000000015,1.4832,5.066,False,False,0.0097,0.00554,0.0447,0.0184,0.374,
+L,15,headOn,recovered,202,10.100000000000009,0.6766,3.948,False,False,0.016,0.00479,0.0177,0.0216,0.113,
+L,15,acceleratingHeadOn,recovered,204,10.20000000000001,0.5148,3.679,False,False,0.016,0.00478,0.0184,0.0213,0.149,
+L,15,brakingLead,recovered,244,12.200000000000038,1.0792,7.529,False,False,0.0089,0.00234,0.0226,0.032,0.627,
+L,15,crossing,recovered,210,10.500000000000014,1.5197,3.686,False,False,0.0143,0.00358,0.0131,0.0231,0.149,
+L,15,turningCrossing,recovered,210,10.500000000000014,1.5197,3.8,False,False,0.0138,0.00356,0.0123,0.0321,0.185,
+L,15,curvedHeadOn,recovered,1262,63.09999999999855,2.8007,1.5,False,False,0.0119,0.00284,0.0094,0.0202,0.243,
+L,15,curvedCrossing,recovered,225,11.250000000000025,2.2583,2.525,False,False,0.0133,0.00676,0.0364,0.0204,0.204,

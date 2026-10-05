@@ -1,0 +1,86 @@
+function course = nrmmEgoCourseGeometry(observerInput, design)
+% nrmmEgoCourseGeometry Ego lateral-velocity measurement and course-heading correspondence.
+%
+% With a shared vehicle model (design.egoModel) and the held controller
+% input (observerInput.heldInput), the lateral body velocity is certified
+% by the force balance (nrmmModelLateralVelocity). The sideslip interval
+% follows from sin(beta) = v_y/||v|| over the GNSS speed interval, and the
+% heading correspondence is angle(GNSS velocity) - beta. Without them the
+% kinematic single-track relation v_y = l*r with its declared mismatch
+% bound is used, exactly as before (certifiedKinematicCourseCorrespondence).
+%
+% Both branches return the course fields consumed by the runtime and the
+% bound recursion, plus lateralMeasurement = [center, lower, upper, radius,
+% consistent, source] for the body-velocity observer.
+
+    model = design.yaw.courseModel;
+    sensors = design.sensors;
+    useModel = isfield(design,"egoModel") && ~isempty(design.egoModel) ...
+        && isfield(observerInput,"heldInput") && numel(observerInput.heldInput)==2 ...
+        && all(isfinite(observerInput.heldInput));
+    if ~useModel
+        course = certifiedKinematicCourseCorrespondence(observerInput.gnssVelocity, ...
+            observerInput.yawRate,model.rearAxleDistance,sensors.velocityNoiseMaximum, ...
+            sensors.gyroscopeNoiseMaximum,model.singleTrackYawRateMismatchMaximum, ...
+            model.sideslipDomainMaximum);
+        [~,feasible] = nrmmKinematicVelocityMeasurement(observerInput.gnssVelocity, ...
+            observerInput.yawRate,design);
+        lateralError = model.rearAxleDistance*(sensors.gyroscopeNoiseMaximum ...
+            +model.singleTrackYawRateMismatchMaximum);
+        center = model.rearAxleDistance*observerInput.yawRate;
+        course.lateralMeasurement = struct("center",center, ...
+            "lower",center-lateralError,"upper",center+lateralError,"radius",lateralError, ...
+            "consistent",feasible.consistent,"informative",true,"source","kinematic");
+        return;
+    end
+
+    lateral = nrmmModelLateralVelocity(observerInput.gnssVelocity,observerInput.yawRate, ...
+        observerInput.bodyAcceleration,observerInput.heldInput,design.egoModel,sensors, ...
+        model.sideslipDomainMaximum);
+    measuredSpeed = norm(observerInput.gnssVelocity);
+    speedLow = measuredSpeed-sensors.velocityNoiseMaximum;
+    speedHigh = measuredSpeed+sensors.velocityNoiseMaximum;
+    sineDomain = sin(model.sideslipDomainMaximum);
+    estimatedSideslip = NaN;sideslipError = Inf;interval = [NaN;NaN];sineInterval = [NaN;NaN];
+    sineError = Inf;consistent = lateral.consistent && speedLow > 0;
+    if consistent
+        % sin(beta) = v_y/||v|| over v_y in [lower, upper], ||v|| in [speedLow, speedHigh].
+        candidates = [lateral.lower,lateral.upper]./[speedLow;speedHigh];
+        sineInterval = [max(-sineDomain,min(candidates(:)));min(sineDomain,max(candidates(:)))];
+        consistent = sineInterval(1) <= sineInterval(2)+1e-12;
+        if consistent
+            sineInterval = sort(sineInterval);
+            estimatedSine = max(-sineDomain,min(sineDomain,lateral.center/measuredSpeed));
+            estimatedSideslip = asin(estimatedSine);
+            interval = asin(sineInterval);
+            sideslipError = max(abs(interval-estimatedSideslip));
+            sineError = max(abs(sineInterval-estimatedSine));
+        end
+    end
+    if consistent && sideslipError < pi
+        bodyDirection = [cos(estimatedSideslip);sin(estimatedSideslip)];
+        correspondence = certifiedRotationCorrespondence(observerInput.gnssVelocity, ...
+            bodyDirection,sensors.velocityNoiseMaximum,0.0,sideslipError);
+    else
+        correspondence = certifiedRotationCorrespondence(observerInput.gnssVelocity, ...
+            [1;0],sensors.velocityNoiseMaximum,0.0,0.0);
+        correspondence.radius = Inf;correspondence.informative = false;
+        correspondence.rawRadius = Inf;correspondence.modelAngleMaximum = Inf;
+    end
+    course = struct("correspondence",correspondence,"measuredSpeed",measuredSpeed, ...
+        "trueSpeedLowerBound",speedLow,"speedCertificateValid",speedLow > 0, ...
+        "normalizedYawRate",lateral.center/max(measuredSpeed,eps), ...
+        "estimatedSideslip",estimatedSideslip, ...
+        "speedErrorContribution",abs(lateral.center)*sensors.velocityNoiseMaximum/max(measuredSpeed*speedLow,eps), ...
+        "yawRateAndModelContribution",lateral.radius/max(speedLow,eps), ...
+        "sineErrorMaximum",sineError,"trueSideslipSineInterval",sineInterval, ...
+        "trueSideslipInterval",interval,"sideslipErrorMaximum",sideslipError, ...
+        "inversionValid",lateral.consistent,"boundsConsistent",consistent, ...
+        "rearAxleDistance",model.rearAxleDistance, ...
+        "velocityErrorMaximum",sensors.velocityNoiseMaximum, ...
+        "yawRateErrorMaximum",sensors.gyroscopeNoiseMaximum, ...
+        "modelYawRateMismatchMaximum",NaN, ...
+        "sideslipDomainMaximum",model.sideslipDomainMaximum);
+    lateral.consistent = consistent;
+    course.lateralMeasurement = lateral;
+end

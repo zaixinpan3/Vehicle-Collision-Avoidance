@@ -49,14 +49,10 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         if useEstimator
             assert(~isempty(initialTarget),'The NRMM adapter requires a target truth trajectory.');
             estimatorConfiguration.sensor.radar.rangeMaximum=cfg.collision.encounterRangeMeters;
-            estimatorConfiguration.observer.ego.yaw.rearAxleDistance=cfg.vehicle.lr;
-            % The known plant bounds yaw acceleration by the axle friction
-            % capacities. This permits gyro-correlated radar transport;
-            % independent yaw errors at every historical sample lose that
-            % information and greatly overstate target velocity uncertainty.
-            tire=modifiedFialaTire.parameters(cfg);
-            estimatorConfiguration.observer.ego.domain.yawAccelerationMaximum= ...
-                [cfg.vehicle.lf,cfg.vehicle.lr]*tire.longitudinalForceScale/cfg.vehicle.Iz;
+            % The estimator shares the controller's vehicle, limits and
+            % sideslip cone; the target premises are the scenario contract.
+            estimatorConfiguration=estimatorConfigurationFromController(estimatorConfiguration,cfg, ...
+                collisionThreatContract(WindowSeconds=8));
             if strlength(options.ResumeFrom)==0
                 initializationTimer=tic;
                 estimatorContext=nrmmEstimatorControllerAdapter("initialize",estimatorConfiguration,ego, ...
@@ -110,7 +106,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             warmStartedFrames=r.warmStartedFrames;trace=r.trace;passedTarget=r.passedTarget;
             recoveryStart=saved.recoveryStart;
         end
-        recoveryOptions=recovery;
+        recoveryOptions=recovery;truthPath=[];
         for frame=frames+1:options.Frames
             frameTimer=tic;
             phase="controller";
@@ -120,7 +116,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 observerTimer=tic;
                 if useEstimator
                     [estimatorContext,egoInput,estimate,sensorFrame]=nrmmEstimatorControllerAdapter( ...
-                        "sample",estimatorContext,ego.stateTime,ego,target);
+                        "sample",estimatorContext,ego.stateTime,ego,target,truthPath);
                     egoInput.heldActuatorInput=ego.heldActuatorInput;
                     observerSeconds=toc(observerTimer);
                 else
@@ -143,8 +139,24 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 maximumSeconds=max(maximumSeconds,frameSeconds);maxHorizon=max(maxHorizon,problem.metadata.horizonSteps);
                 x=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];input=command.actuatorInput;
                 h=cfg.controller.sampleTime;
-                [times,states]=ode45(@(~,state)nonlinearBicycleModel.derivative(state,input,cfg), ...
-                    linspace(0,h,31),x,odeset('RelTol',1e-11,'AbsTol',1e-12));
+                solution=ode45(@(~,state)nonlinearBicycleModel.derivative(state,input,cfg), ...
+                    [0,h],x,odeset('RelTol',1e-11,'AbsTol',1e-12));
+                times=linspace(0,h,31).';states=deval(solution,times).';
+                if useEstimator
+                    % The estimator's sensors sample this continuous trajectory:
+                    % states and instantaneous body accelerations R(psi)'*pddot
+                    % at its sample times, with the input held over the hold.
+                    sensorPeriod=estimatorConfiguration.observer.runtime.samplePeriod;
+                    pathTimes=(1:round(h/sensorPeriod))*sensorPeriod;
+                    pathStates=deval(solution,pathTimes);
+                    pathAccelerations=zeros(2,numel(pathTimes));
+                    for j=1:numel(pathTimes)
+                        d=nonlinearBicycleModel.derivative(pathStates(:,j),input,cfg);
+                        pathAccelerations(:,j)=[d(4)-pathStates(6,j)*pathStates(5,j);d(5)+pathStates(6,j)*pathStates(4,j)];
+                    end
+                    truthPath=struct('times',ego.stateTime+pathTimes,'states',pathStates, ...
+                        'accelerations',pathAccelerations,'input',input);
+                end
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
                 for j=1:numel(times)
                     q=predictiveSafetyGeometry.predictTarget(initialTarget,ego.stateTime+times(j));

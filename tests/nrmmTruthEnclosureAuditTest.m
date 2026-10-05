@@ -17,6 +17,19 @@ classdef nrmmTruthEnclosureAuditTest < matlab.unittest.TestCase
             testCase.verifyFalse(audit.egoContained);
             testCase.verifyLessThan(audit.egoBoundSlack(5),0);
         end
+        function theSharedVehicleModelRemovesTheKinematicPremise(testCase)
+            [output,state,cfg] = localFixture();
+            cfg.ego.domain.yawRateMaximum = 1;
+            cfg.ego.yaw.singleTrackYawRateMismatchMaximum = 0.1;
+            cfg.ego.model = struct("mass",1650);
+            cfg.ego.yaw.sideslipDomainMaximum = 0.25;
+            state(5:6) = [-0.6;-0.7];
+            output.egoBodyVelocity = state(4:5);
+            output.egoYawRate = state(6);
+            audit = auditNrmmTruthEnclosure(output,state,struct(),cfg);
+            testCase.verifyEqual(audit.egoPremiseNames,["minimumSpeed";"maximumSpeed";"yawRate";"sideslip"]);
+            testCase.verifyTrue(audit.egoPremisesSatisfied);
+        end
         function dynamicRearSlipInvalidatesTheKinematicPremise(testCase)
             [output,state,cfg] = localFixture();
             cfg.ego.domain.yawRateMaximum = 1;

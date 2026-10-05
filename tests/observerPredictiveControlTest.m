@@ -73,15 +73,20 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual([second.metadata.search.stages.objective],["pcbfSlack","clfSlack"]);
             testCase.verifyEqual(second.model.linearization.states(:,1),next,AbsTol=1e-12);
         end
-        function theSingleClfBoundsAffineInitialAndSuccessorUncertainty(testCase)
+        function theSingleClfActsOnTheEstimateWithoutAnEnclosureBudget(testCase)
+            % The CLF row is V(xhat+) <= rho V(xhat) + slack with or without
+            % an observer enclosure: estimation error enters as an input.
             [ego,~,road,cfg]=localFixture(0);
             ego.position(2)=.1;
+            exactEgo=rmfield(ego,'controllerErrorBound');
             ego.controllerErrorBound.bounds=[.001;.001;1e-4;1e-6;1e-6;1e-6];
             [~,~,prediction]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            [largestNext,smallestBudget]=localClfCorners(prediction);
-            testCase.verifyGreaterThanOrEqual(prediction.metadata.clfWorstNextValue,largestNext-1e-9);
-            testCase.verifyLessThanOrEqual(prediction.metadata.clfCurrentBudget,smallestBudget+1e-9);
-            testCase.verifyGreaterThan(prediction.metadata.clfWorstNextValue,prediction.metadata.clfNextValue);
+            [~,~,exact]=collisionAvoidanceController(exactEgo,[],road,cfg,[]);
+            testCase.verifyTrue(prediction.metadata.uncertaintyIncluded);
+            testCase.verifyEqual(prediction.metadata.clfCurrentBudget, ...
+                prediction.metadata.clfContraction*prediction.metadata.clfInitialValue,RelTol=1e-12);
+            testCase.verifyEqual(prediction.metadata.clfCurrentBudget,exact.metadata.clfCurrentBudget,RelTol=1e-12);
+            testCase.verifyEqual(prediction.metadata.clfWorstNextValue,prediction.metadata.clfNextValue,RelTol=1e-12);
             testCase.verifyEqual(prediction.metadata.clfFunction,"quadraticTransverseError");
             model=prediction.model;
             scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
@@ -218,14 +223,3 @@ function [positionExcess,yawExcess]=localTubeSamples()
     end
 end
 
-function [largestNext,smallestBudget]=localClfCorners(prediction)
-    model=prediction.model;cfg=model.cfg;ref=model.nominalReference;
-    [e0,j0]=nonlinearBicycleModel.errorLinearization(model.initialState,model.lane,ref);
-    [e1,j1]=nonlinearBicycleModel.errorLinearization(model.linearization.states(:,2),model.lane,ref);
-    e1=e1+j1*(prediction.predictedState(:,2)-model.linearization.states(:,2));
-    [~,a]=nonlinearBicycleModel.sample(model.initialState,model.linearization.inputs(:,1),cfg);
-    signs=2*(dec2bin(0:63,6)-'0').'-1;initial=model.uncertainty.egoGenerator*signs;
-    initialError=e0+j0*initial;nextError=e1+j1*a*initial;
-    largestNext=max(sum((ref.factor*nextError).^2));
-    smallestBudget=min(ref.contraction*sum((ref.factor*initialError).^2));
-end

@@ -51,7 +51,8 @@ classdef nrmmNativeKernelTest < matlab.unittest.TestCase
             state = [10;0.1;0.01;-0.02;0;0;target;predictor;-pi+0.01];
             measurement = struct("yawRate",0.04,"gnssVelocity",[-10.02;-0.12], ...
                 "bodyAcceleration",[0.2;0.1],"radarDetectionAvailable",true, ...
-                "correspondence",struct("informative",informative,"heading",pi-0.01));
+                "correspondence",struct("informative",informative,"heading",pi-0.01), ...
+                "lateralVelocity",NaN);
             [expected,expectedDerivatives] = nrmmObserverRk4Interval(state,measurement,design,0.0025,5);
             [actual,actualDerivatives] = nrmmObserverRk4IntervalMex(state,measurement,design,0.0025,5);
             testCase.verifyEqual(actual,expected,AbsTol=1e-10);

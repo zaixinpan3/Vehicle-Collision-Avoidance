@@ -51,8 +51,13 @@ function cfg=localDefaults()
     % terminalSeparatingMarginMetersPerSecond only places the horizon end
     % where the anchor separates at that speed; a terminal row active at the
     % anchor stalled the conic solver.
+    % roadRecoveryAccelerationFraction f: at the terminal node the ego must be
+    % able to stop its lateral motion toward either road edge before its
+    % rectangle reaches it, decelerating laterally at f*min(mu)*g:
+    % max(w,0)^2 <= 2 f mu g d. The rollout that places the horizon end
+    % requires it with half that deceleration.
     cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50, ...
-        'terminalSeparatingMarginMetersPerSecond',.5);
+        'terminalSeparatingMarginMetersPerSecond',.5,'roadRecoveryAccelerationFraction',.5);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -60,8 +65,12 @@ function cfg=localDefaults()
     cfg.roadLoad=struct('airDensity',1.225,'dragCoefficient',.30,'frontalArea',2.2, ...
         'rollingCoefficient',.01,'rollingSpeedCoefficient',0,'rollingQuarticCoefficient',0, ...
         'rollingTransitionSpeed',.5);
+    % sideslipMaximum b is the sideslip cone |v_y| <= tan(b) v_x shared with the
+    % estimator (its force-balance and course inversions assume it); the
+    % controller enforces it on every predicted node.
     cfg.model=struct('speedMinimum',0,'speedMaximum',18,'scheduleSpeedFloor',1, ...
-        'brakingRatioRateMaximum',Inf,'lateralVelocityMaximum',12,'yawRateMaximum',5);
+        'brakingRatioRateMaximum',Inf,'lateralVelocityMaximum',12,'yawRateMaximum',5, ...
+        'sideslipMaximum',.25);
     % One quadratic CLF V = e' P e. Each sample requires
     %   V(next) <= rho V(now),  rho = exp(-2 sampleTime / convergenceTimeConstantSeconds),
     % so the error sqrt(V) shrinks by at least 1/e every time constant.
@@ -134,6 +143,7 @@ function localValidate(cfg)
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.collision.terminalSeparatingMarginMetersPerSecond,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.collision.roadRecoveryAccelerationFraction,{'double'},{'scalar','real','positive','<=',1});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters
         localInvalid('The encounter range must exceed the collision safety margin.');
     end
@@ -160,6 +170,7 @@ function localValidate(cfg)
             "lateralVelocityMaximum","yawRateMaximum"]
         validateattributes(cfg.model.(name),{'double'},{'scalar','real','finite','positive'});
     end
+    validateattributes(cfg.model.sideslipMaximum,{'double'},{'scalar','real','positive','<',pi/2});
     if cfg.model.speedMaximum<=max(cfg.model.speedMinimum,cfg.model.scheduleSpeedFloor)
         localInvalid('The positive-speed model domain must have positive width.');
     end

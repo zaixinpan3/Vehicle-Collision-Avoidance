@@ -32,6 +32,10 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % output-predictor resets, dropouts and RK4 are explicitly outside that
 % exponential-stability theorem. A separate comparison recursion in
 % nrmmPositionErrorBound encloses their effects at each accepted state time.
+% The published target forecast parameters A and beta come from the
+% contract-consistent window fit nrmmTargetParameterFit (constant A and
+% curvature over the radar window) once its window is long enough; the
+% tracker's reconstruction is kept for the states and the certified sets.
 % targetEstimate.relativePositionErrorBound is the conditional Euclidean
 % position radius in the ego body frame; invalid bounds publish Inf. The
 % accompanying metadata states its time, assumptions and numerical scope.
@@ -71,6 +75,7 @@ function runtime = localResetTarget(runtime,physicalState)
     runtime.targetState = physicalState;
     runtime.targetOutputPredictor = physicalState(1:2);
     runtime.lastRadarTime = NaN;
+    runtime.targetParameterFit = nrmmTargetParameterFit("reset",runtime.targetParameterFit);
     runtime.positionErrorBound = nrmmPositionErrorBound("reset", ...
         runtime.positionErrorBound,localBoundState(localPackState(runtime)));
     audit = localOperatingDomainAudit(localPackState(runtime),runtime,"track-reset");
@@ -156,6 +161,10 @@ function runtime = localInitialize(cfg, options, observerDesign)
     end
     runtime.positionErrorBound = nrmmPositionErrorBound("initialize", ...
         observerDesign,cfg,localBoundState(localPackState(runtime)),initialTime,prior);
+    minimumFit = 0.5;
+    if isfield(cfg.runtime,"parameterFitMinimumDuration"),minimumFit = cfg.runtime.parameterFitMinimumDuration;end
+    runtime.targetParameterFit = nrmmTargetParameterFit("initialize", ...
+        cfg.runtime.targetHistoryDuration,minimumFit,observerDesign.target.domain);
     if isfield(options,"targetMeasurementHistory")
         for historyInput = options.targetMeasurementHistory(:).'
             if historyInput.time > initialTime
@@ -164,6 +173,10 @@ function runtime = localInitialize(cfg, options, observerDesign)
             if historyInput.radarDetectionAvailable
                 runtime.positionErrorBound.targetHistory = nrmmTargetHistory("sensor", ...
                     runtime.positionErrorBound.targetHistory,historyInput,observerDesign);
+                % The history has no ego estimate; its GNSS position stands in.
+                runtime.targetParameterFit = nrmmTargetParameterFit("append",runtime.targetParameterFit, ...
+                    historyInput.time,historyInput.gnssPosition(:), ...
+                    historyInput.radarRelativePosition(:),historyInput.yawRate);
             end
         end
     end
@@ -207,6 +220,7 @@ end
 function [runtime, output] = localStep(runtime, frame, publishCurrent)
     if nargin<3,publishCurrent = false;end
     observerInput = localSynchronizedInput(frame, runtime);
+    runtime = localAppendDetection(runtime,observerInput);
 
     runtime.gnssPositionPredictor = observerInput.gnssPosition;
     if observerInput.radarDetectionAvailable
@@ -243,8 +257,19 @@ function [runtime, output] = localStep(runtime, frame, publishCurrent)
     if nargout>1 && ~publishCurrent,output = localOutput(runtime, observerInput);end
 end
 
+function runtime = localAppendDetection(runtime,observerInput)
+% Radar detection with the ego position estimated at its time and the gyro
+% rate, for the target parameter window fit.
+    if ~observerInput.radarDetectionAvailable,return;end
+    fit = runtime.targetParameterFit;
+    if ~isempty(fit.time) && observerInput.time <= fit.time(end),return;end
+    runtime.targetParameterFit = nrmmTargetParameterFit("append",fit,observerInput.time, ...
+        runtime.positionEstimate,observerInput.radarRelativePosition(:),observerInput.yawRate);
+end
+
 function output = localCurrentOutput(runtime, frame)
     observerInput = localSynchronizedInput(frame, runtime);
+    runtime = localAppendDetection(runtime,observerInput);
     outputRuntime = localRecordMeasurementTimes(runtime, observerInput);
     % localSynchronizedInput already verifies that these timestamps denote
     % the same sample within floating-point grid tolerance. Publish using
@@ -275,10 +300,15 @@ function [nextState, intervalAudit, positionErrorBound] = localRungeKuttaInterva
         struct("rearAxleDistance",design.yaw.courseModel.rearAxleDistance, ...
         "sideslipDomainMaximum",design.yaw.courseModel.sideslipDomainMaximum)));
     correspondence = observerInput.courseGeometry.correspondence;
+    lateralVelocity = observerInput.courseGeometry.lateralMeasurement.center;
+    if observerInput.courseGeometry.lateralMeasurement.source=="kinematic" || ~isfinite(lateralVelocity)
+        lateralVelocity = NaN;
+    end
     measurement = struct("yawRate",observerInput.yawRate,"gnssVelocity",observerInput.gnssVelocity, ...
         "bodyAcceleration",observerInput.bodyAcceleration, ...
         "radarDetectionAvailable",observerInput.radarDetectionAvailable, ...
-        "correspondence",struct("informative",correspondence.informative,"heading",correspondence.heading));
+        "correspondence",struct("informative",correspondence.informative,"heading",correspondence.heading), ...
+        "lateralVelocity",lateralVelocity);
     if exist("nrmmObserverRk4IntervalMex","file")==3
         [states,firstDerivatives] = nrmmObserverRk4IntervalMex(state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
     else
@@ -618,6 +648,28 @@ function estimate = localTargetEstimate(runtime, observerInput)
     [~, estimate] = nrmmTargetTrackerDerivative( ...
         runtime.targetState, ego, ...
         design.target.domain);
+    % Forecast parameters: the contract-consistent window fit replaces the
+    % tracker's A and beta (its velocity, position and sets are kept); the
+    % tracker values remain available for the enclosure bookkeeping. Until
+    % the window is long enough the contract's simplest member (A = 0,
+    % beta = 0) is published, not the tracker's initial transient.
+    estimate.trackerScalarAcceleration = estimate.targetScalarAcceleration;
+    estimate.trackerSideslip = estimate.targetSideslip;
+    estimate.trackerYawRate = estimate.targetYawRate;
+    estimate.parameterFit = nrmmTargetParameterFit("solve",runtime.targetParameterFit, ...
+        runtime.currentTime,runtime.yawEstimate,observerInput.yawRate);
+    domain = design.target.domain;
+    acceleration = 0;sideslip = 0;estimate.parameterSource = "contractZeroUntilWindow";
+    if estimate.parameterFit.available
+        acceleration = estimate.parameterFit.acceleration;sideslip = estimate.parameterFit.sideslip;
+        estimate.parameterSource = "contractWindowFit";
+    end
+    estimate.targetScalarAcceleration = min(max(acceleration, ...
+        -domain.scalarAccelerationMaximum),domain.scalarAccelerationMaximum);
+    estimate.targetSideslip = min(max(sideslip,-domain.sideslipMaximum),domain.sideslipMaximum);
+    estimate.targetYawRate = max(estimate.targetSpeed,domain.speedMinimum) ...
+        *sin(estimate.targetSideslip)/domain.rearAxleDistance;
+    estimate.targetRelativeHeading = estimate.targetCourseAngleEgoFrame-estimate.targetSideslip;
     estimate.certifiedSpeedMinimum = ...
         design.target.domain.speedMinimum;
     estimate.certifiedSpeedDomainValid = ...
@@ -709,16 +761,16 @@ function observerInput = localSynchronizedInput(frame, runtime)
             "The synchronized frame time must equal the observer time.");
     end
 
+    % The controller's held input, when the frame carries it, makes the
+    % shared-model lateral measurement available (nrmmEgoCourseGeometry).
+    observerInput.heldInput = zeros(0,1);
+    if isfield(frame,"heldSteeringAngle") && isfield(frame,"heldBrakingRatio")
+        observerInput.heldInput = [double(frame.heldSteeringAngle);double(frame.heldBrakingRatio)];
+    end
     % These measurements are held over the interval. Reuse their geometry
     % in every RK4 stage, domain audit, and output reconstruction.
     design = runtime.observerDesign;
-    observerInput.courseGeometry = certifiedKinematicCourseCorrespondence( ...
-        observerInput.gnssVelocity, observerInput.yawRate, ...
-        design.yaw.courseModel.rearAxleDistance, ...
-        design.sensors.velocityNoiseMaximum, ...
-        design.sensors.gyroscopeNoiseMaximum, ...
-        design.yaw.courseModel.singleTrackYawRateMismatchMaximum, ...
-        design.yaw.courseModel.sideslipDomainMaximum);
+    observerInput.courseGeometry = nrmmEgoCourseGeometry(observerInput, design);
 end
 
 function [radar, available] = localRadarPosition(frame, runtime)
@@ -871,6 +923,8 @@ function localAddProjectPaths()
     estimatorRoot = fileparts(mfilename("fullpath"));
     repoRoot = fileparts(estimatorRoot);
     addpath(fullfile(repoRoot, "config"));
+    % The window fit uses the controller's closed-form NRMM target motion.
+    addpath(fullfile(repoRoot, "controller"));
     addpath(estimatorRoot);
     nativePath = fullfile(repoRoot,"solver","nrmm");
     if isfolder(nativePath),addpath(nativePath);end

@@ -173,7 +173,10 @@ classdef nonlinearBicycleModel
             % which scripts/synthesizeClfMatrices.m writes before experiments.
             persistent savedKeys savedReferences
             if isempty(savedKeys),savedKeys={};savedReferences={};end
-            key=nonlinearBicycleModel.clfKey(cfg,curvature);
+            % Character keys: strcmp does not match string objects in a cell,
+            % so a string key never hit this cache and every call re-solved
+            % the trim.
+            key=char(nonlinearBicycleModel.clfKey(cfg,curvature));
             index=find(strcmp(savedKeys,key),1);
             if ~isempty(index),reference=savedReferences{index};return;end
             point=nonlinearBicycleModel.operatingPoint(cfg,curvature);
@@ -206,7 +209,8 @@ classdef nonlinearBicycleModel
 
         function key = clfKey(cfg,curvature)
             % Everything the synthesized P depends on, as one canonical text.
-            data=struct('vehicle',cfg.vehicle,'tire',cfg.tire,'roadLoad',cfg.roadLoad,'model',cfg.model, ...
+            % The controller's state limits (cfg.model) do not enter P.
+            data=struct('vehicle',cfg.vehicle,'tire',cfg.tire,'roadLoad',cfg.roadLoad, ...
                 'referenceSpeed',cfg.referenceSpeed,'sampleTime',cfg.controller.sampleTime, ...
                 'integrationStep',cfg.nonlinear.integrationStep,'clf',cfg.clf,'curvature',curvature);
             key=string(jsonencode(data));

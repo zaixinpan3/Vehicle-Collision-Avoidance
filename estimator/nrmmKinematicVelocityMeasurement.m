@@ -1,15 +1,20 @@
-function [velocity, feasible] = nrmmKinematicVelocityMeasurement(gnssVelocity, yawRate, design)
+function [velocity, feasible] = nrmmKinematicVelocityMeasurement(gnssVelocity, yawRate, design, lateralVelocity)
 % nrmmKinematicVelocityMeasurement Extend the forward kinematic inverse.
 % The lateral measurement is deliberately not clipped: its error is exactly
 % l*(nOmega+dSt). The longitudinal floor keeps the map defined at standstill
 % and outside the raw square-root branch. No orientation estimate is used.
 % The optional feasibility result concerns C_m, before any orientation prior.
+% An optional finite lateralVelocity (the certified force-balance center from
+% nrmmEgoCourseGeometry) replaces the kinematic lateral component l*u.
 
     validateattributes(gnssVelocity, {'double'}, {'real','finite','size',[2,1]});
     validateattributes(yawRate, {'double'}, {'real','finite','scalar'});
     model = design.yaw.courseModel;
     speed = norm(gnssVelocity);
     lateral = model.rearAxleDistance*yawRate;
+    if nargin >= 4 && isfinite(lateralVelocity)
+        lateral = lateralVelocity;
+    end
     cosine = cos(model.sideslipDomainMaximum);
     velocity = [sqrt(max(speed^2-lateral^2, (cosine*speed)^2)); lateral];
     if nargout < 2

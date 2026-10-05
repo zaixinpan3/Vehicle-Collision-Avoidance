@@ -26,7 +26,8 @@
 \title{From a Multistage Vehicle Observer to an Output-Feedback\protect\\
 Robust Predictive Barrier and One Nominal CLF}
 \author{Pan Dynamics Collision Avoidance Research}
-\date{October 3, 2026; terminal set revised October 4, 2026}
+\date{October 3, 2026; terminal set revised October 4, 2026;\protect\\
+implemented tube, handling envelope and CLF row revised October 5, 2026}
 \begin{document}
 \maketitle
 \begin{abstract}
@@ -516,7 +517,46 @@ has the certified lower bound $d_0-\xi_0$. If a numerical solver fails to return
 a command within a deadline, the controller reports that no solution exists; a
 runtime completion premise must be stated separately.
 
+\subsection{What the implementation realizes (October 5, 2026)}
+The executable controller does not enumerate information branches. Every hold
+$i$ of its plan starts from the \emph{current} published enclosure $G_0$ and
+propagates it through that hold only, $G(t_i+\tau)=\Phi_i(\tau)G_0$ for
+$\tau\in[0,h]$, with the common-pose cancellation taken about the ego at $t_i$.
+The target set restarts at $t_i$ from the target's predicted state, for the
+elapsed time $\tau$. For $i=0$ this is the propagation that
+Proposition~\ref{prop:sampleSafety} needs for the applied hold, sampled at the
+hold start, midpoint and end (subject to the remainder and whole-hold premises
+of Section~4). For $i\ge1$ it is an information-state approximation. It
+assumes that the estimator's enclosure at $t_i$ equals the present one, and
+that the estimate at $t_i$ lies on the plan. Neither the family of possible
+future estimates nor the target's forecast error beyond one hold is covered,
+so the $S=0$ statement about every predicted hold is not claimed. The
+open-loop image $G_{i+1}=A_iG_i$ over the variable horizon (up to 512 holds)
+was sound for an open-loop input sequence but made the hard road and state
+rows infeasible in noisy encounters.
+
+The hard physical constraints of \eqref{eq:robustProblem} include, at both
+ends of every hold under that hold's input $b$, the estimator's sideslip cone
+$|v_y|\le\tan(b_\beta)v_x$, robust to the enclosure. The rear-adhesion cone
+$\norm{[(v_y-l_rr)/k;\ \bar v_xb]}\le v_x$, with $k=3\mu_rF_{z,r}/C_r$, keeps
+the rear Fiala tire below saturation with capacity $\sqrt{1-b^2}$. It is
+imposed on the estimate as a handling and observability condition. It is not
+part of the safety certificate. The
+terminal set \eqref{eq:terminal} adds road recovery: with $w_e$ the velocity
+toward road edge $e$ and $d_e$ the outermost corner's distance to it,
+$\max(w_e,0)^2\le2a\,d_e$ for a declared lateral deceleration $a$. Inside the road
+alone admits endpoints that leave it shortly after the horizon. This is still
+not an invariance argument for the road.
+
 \section{One CLF: nominal dissipation with an explicit uncertainty supply}
+\emph{Implementation note (October 5, 2026).} The executable CLF row is
+$V(\hat x^+)\le\rho V(\hat x)+s$ on the estimate. It does not use the supply
+derived below: with the published enclosures, the robust budget is zero near
+the path while the successor's enclosure is not. The worst-case row then
+cannot be met, and its slack minimization made the commands chatter. Recovery
+of the true state is therefore only practical, to a neighborhood set by the
+estimation error.
+
 \subsection{The same function during avoidance and recovery}
 Let
 \begin{equation}\label{eq:clf}

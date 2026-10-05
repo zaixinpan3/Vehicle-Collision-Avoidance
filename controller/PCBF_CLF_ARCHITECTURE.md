@@ -11,10 +11,12 @@ linearization with the trust scale doubled until feasible (at most
 a fresh potential-field rollout in the same way. Any other failure reports no
 solution.
 
-The implementation now consumes timestamped NRMM observer enclosures. It
-propagates constant target-parameter sets analytically and ego error boxes
-through the shared affine variational model. Their supports tighten collision,
-path, physical-state, terminal and first-successor CLF constraints.
+The implementation now consumes timestamped NRMM observer enclosures. Every hold
+of the plan starts from the current enclosure and propagates it through that
+hold only: the target's constant-parameter set analytically, and the ego error
+box through the shared affine variational model (see *Current observer
+integration*). Their supports tighten collision, road, physical-state,
+stable-handling and terminal constraints. The CLF row acts on the estimate.
 Usable current enclosures remain optimization data. Unavailable, stale,
 incomplete or misaligned proof metadata does not prevent
 optimization around the current point estimates. Its unsupported tightening
@@ -62,9 +64,27 @@ at the current sample. Full ego pose uncertainty remains in path and CLF rows.
 For each fixed separating normal, position uncertainty uses directional
 support of the propagated ego generators plus the target position radius.
 Rectangle orientation uncertainty contributes `2*reach*sin(min(pi,b_yaw)/2)`.
-The ego generator propagates as `G_next=A_i*G_i`, for fixed candidate inputs.
-This is an open-loop affine image, not a nonlinear tube with future feedback:
-no ancillary feedback gains are used, and the shifted plan is rolled out with
+
+**Information-consistent holds (2026-10-05).** The estimator publishes a fresh
+enclosure `G0` of its estimate at every sample, and every hold of the plan is
+issued from such an estimate. Hold `i` therefore starts from `G0` and
+propagates it through that hold only:
+
+    G(t_i + tau) = Phi_i(tau) G0,   tau in [0, h],
+
+with `Phi_i` the affine hold map at the midpoint and endpoint. Node `i+1`
+closes hold `i` and uses `A_i G0`. The common-pose cancellation is taken about
+the ego at the start of each hold, where the target is again measured relative
+to it. The target set restarts at each hold from the target's predicted state
+at `t_i`, for the time elapsed in the hold. The first hold is the certified
+one. Later holds assume that the estimator's enclosure at their start equals
+the present one; neither the family of future estimates nor the target's
+forecast error beyond one hold is covered. The earlier open-loop image
+`G_next = A_i G_i` grew with the variable horizon (up to 512 holds). Its
+reserves on the hard road, state-limit and terminal rows made 3 of 4 inspected
+failing noisy frames infeasible. Each of these was solvable without the ego
+enclosure.
+No ancillary feedback gains are used, and the shifted plan is rolled out with
 its own inputs.
 
 Every current target estimate, with or without an error certificate, updates
@@ -111,9 +131,11 @@ interpolant, not an independently integrated half hold.
 
 The prediction length is not fixed. The anchor rollout stops at the first node
 `M` with `N <= M <= maximumHorizonSteps` whose separating speed is at least
-`terminalSeparatingMarginMetersPerSecond` (0.5 m/s); without a target `M = N`.
-The terminal row itself requires only zero. A terminal row active at the anchor
-had stalled the CLF stage in Clarabel in an earlier version, hence the margin. A rollout that never reaches it uses
+`terminalSeparatingMarginMetersPerSecond` (0.5 m/s) and which satisfies the
+road-recovery condition (*Terminal constraints*) with half its deceleration;
+without a target only the road condition applies. The terminal rows themselves
+require zero and the full deceleration. A terminal row active at the anchor
+had stalled the CLF stage in Clarabel in an earlier version, hence the margins. A rollout that never reaches it uses
 `M = maximumHorizonSteps`, and the optimization then decides feasibility.
 
 Previous inputs are shifted and rolled out from the current measurement in
@@ -150,11 +172,19 @@ in the local road axes, define
     r_j^2 = (Delta_s_j/a_j)^2 + (Delta_d_j/b_j)^2,
     w_j = exp(-r_j^2/2 - tau_j/(2*T)),  w = max_j w_j.
 
-The supports include both vehicles' dimensions, the target orientation, body
-center offsets, and the seed padding. They are a directional guidance envelope,
-not an exact collision constraint. A held passing sign is selected once per
-seed from the closest predicted encounter and transverse target velocity. A
-bounded circulation component resolves symmetric head-on geometry. The field is
+The supports include both vehicles' dimensions along the path and its normal,
+including the ego's own heading relative to the path, the target orientation,
+body center offsets, and the seed padding. They are a directional guidance
+envelope, not an exact collision constraint. A held passing sign is selected
+once per seed from the closest predicted encounter and transverse target
+velocity. With a road it also compares the room beside the target: clearing the
+target on the left needs `b - Delta_d` of lateral motion and on the right
+`b + Delta_d`, so half the difference of the room left and right of the target
+is added to the preference, and the side that keeps more road margin after
+clearing wins. Before this term a head-on in the lane was decided by the sign
+of the estimated target sideslip (noise of +/-0.03 rad); in four noisy runs it
+chose the narrower right side and the swerve then ran toward the road edge.
+A bounded circulation component resolves symmetric head-on geometry. The field is
 
     v_d = -d/T + 0.7*v_ref*w*(Delta_d_star/b_star + 2*c),
     v_s = max(1.5, 0.5*v_ref, v_ref*(1-0.35*w*min(2,closing/v_ref))),
@@ -253,7 +283,11 @@ current geometric implementation.
 
 One nonnegative collision slack is assigned to each primary-horizon stage;
 it relaxes the start and midpoint separation rows. Completion-tail rows are
-hard. The node buffer is 0.20 m, whereas the experiment's physical pass criterion
+hard. With an observer enclosure every node also carries a slack on its
+tightened row, and the untightened row stays hard after the prefix only, so the
+formulation reduces to the certainty-equivalent one as the enclosure vanishes.
+(Hard untightened rows in the prefix made the problem stricter for a small
+reported enclosure than for none.) The node buffer is 0.20 m, whereas the experiment's physical pass criterion
 is positive rectangle clearance. The road is the only lateral constraint: every
 ego rectangle corner stays within `lateralClearance` at every predicted node,
 hold midpoint and the endpoint, hard in both stages (see Terminal constraints).
@@ -288,6 +322,14 @@ On the selected model the single CLF requirement is
 
     V(x_next) <= exp(-2 h / T) * V(x) + rho,    rho >= 0,
     V(x) = e(x)' P e(x),
+
+on the estimate: `x` is the current estimate and `x_next` its affine first
+successor. Estimation error enters as an input (ISS); the row carries no
+observer enclosure. A worst case over the enclosure (the previous version)
+asks for a decrease below the enclosure's own size, which no input achieves
+near the path. That turned the CLF stage into a greedy one-step minimizer;
+in a noisy 15-m/s head-on the braking ratio then chattered (standard deviation
+0.21) and the run did not recover in 100 s.
 
 with T = `clf.convergenceTimeConstantSeconds` = 4 s. P is a quadratic CLF
 synthesized offline by an LMI for the given-path cruise trim and read from
@@ -401,15 +443,56 @@ This update is not a solution check: every completed solve is issued, and the
 innovation only sets the next step bound. `tau` is an empirical consistency
 target, not a certified bound on the nonlinear remainder or on separation.
 
+## Stable-handling envelope and the estimator's domain
+
+At both ends of every hold, under that hold's input, except the measured node:
+
+    ||[ (v_y - lr r)/k ; v_x b ]|| <= v_x,   k = 3 mu_r Fz_r / C_r,    (rear adhesion)
+    |v_y| <= tan(model.sideslipMaximum) v_x,                            (sideslip cone)
+
+with `v_x` frozen at the anchor in the product `v_x b`. The first is the
+rear Fiala tire's unsaturated region under the braking ratio's capacity
+`sqrt(1 - b^2)`, a stable-handling envelope in the sense of Beal and Gerdes
+(2013), *IEEE Trans. Control Syst. Technol.* 21(4). A saturated rear axle has
+no restoring yaw moment, and its force no longer determines the slip, so the
+estimator's force-balance measurement would lose its information
+(`estimator/MODEL_AIDED_ESTIMATION.md`). The second is that measurement's cone
+premise; it is robust to the hold's ego enclosure. The adhesion cone is a
+handling and observability row, not part of the safety certificate (the
+estimator's enclosures need only the sideslip cone), and acts on the estimate.
+The certified lateral-velocity radius widens exactly as the rear slip nears
+saturation. In a noisy 15-m/s turning crossing it reached 0.81 m/s, and its
+reserve lowered the admissible normalized rear slip to 0.71 while the current
+state was at 0.75 and decreasing along the plan: the problem was infeasible.
+The cone is divided by the anchor speed so that its entries are of order one;
+unscaled, the CLF stage stalled numerically (Clarabel insufficient progress) in
+a noisy 15-m/s head-on.
+Before this envelope, a noisy 15-m/s head-on combined steering of -0.40 rad with
+a braking ratio of +0.95 (rear lateral capacity 32%); the vehicle spun to a
+0.68-rad sideslip.
+
 ## Terminal constraints
 
-The terminal set requires only that the ego separates from the target and stays
+The terminal set requires that the ego separates from the target and can stay
 on the road. At the last node `M`, with ego position `p`, yaw `psi`, body
 velocity `v` and predicted target position `q` and velocity `w`:
 
     (p - q)' (Rot(psi) v - w) >= 0,                 (separating)
+    max(w_e, 0)^2 <= 2 a d_e,  e = left, right,     (road recovery)
     every ego rectangle corner within lateralClearance = [right; left] of the path
     (imposed at every predicted node, not only the last one).
+
+In the road-recovery condition, `w_e` is the centre's velocity toward edge `e`
+along the path normal and `d_e` the outermost corner's distance to that edge.
+The deceleration is `a = roadRecoveryAccelerationFraction*min(mu)*g` (0.5). The
+ego can then stop its lateral motion toward either edge before reaching it.
+With epigraph variables `t_e >= w_e`, `t_e >= 0`, each edge is one rotated cone
+`t_e^2 <= 2 a d_e`. It is written as `||[2t; x - y]|| <= x + y` with balanced
+factors `x = 2 a d/m`, `y = m`, `m = sqrt(2 a max(d_anchor, 1))`. Inside the
+road alone admitted an endpoint heading at 43 degrees toward the edge (noisy
+8-m/s head-on). Turning back needed about 2.2 m of lateral room where 1.3 m
+remained, and the road rows became infeasible once that point entered the
+0.4-s horizon.
 
 If the relative velocity stays constant after `M`, the squared distance has
 derivative `2 (p - q)' v_rel >= 0` and second derivative `2 norm(v_rel)^2 >= 0`,
@@ -471,6 +554,8 @@ Metadata retains the explicit scope:
 - `nonlinearValidationPerformed = false` (no complete nonlinear-constraint certificate);
 - `nonlinearPredictionEvaluated = false` (the issued plan is not replayed online);
 - `trust` (scale, curvature, correction, innovation, observationInnovation, modelInnovation, updated);
+- `egoUncertaintyModel = currentPosteriorEnclosurePropagatedThroughEachHold`,
+  `targetUncertaintyModel = constantParametersRestartedEachHoldFromCurrentObserverSet`;
 - `recursiveFeasibilityScope = notCertifiedForNonlinearPlant`;
 - unmeasured constraint residuals and margins are NaN;
 - `clfFunction = quadraticTransverseError`, with no tertiary objective;

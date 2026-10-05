@@ -113,24 +113,23 @@ linearization input, not zero. This also prevents arbitrary future inputs
 from becoming poor trust centers after shifting. Solver tolerances add their
 own numerical error.
 
-With current and successor generators `G0,G1`, the same CLF uses
-
-    b0 = sum_j ||chol(P)*J0*G0(:,j)||,
-    b1 = sum_j ||chol(P)*J1*G1(:,j)||,
-    bQ = sum_j ||sqrt(Q)*J0*G0(:,j)||,
-    budget = exp(-2h/T) * max(0,sqrt(V0)-b0)^2,
-    lossLower = max(0,||sqrt(Q)*e0||-bQ)^2.
-
-The successor upper bound is `(1+w)*V_aff+(1+1/w)*b1^2`, using Young's
-inequality with positive fixed `w` when `b1>0`; zero uncertainty recovers
-`V_aff` exactly. It is constrained by `budget+rho` with the existing single
-SOC. This is a sufficient robust inequality for the affine error model,
-not another CLF. `clfWorstNextValue` and `clfCurrentBudget` record the separate bounds.
+With an observer enclosure the row is the same, on the estimate:
+`budget = exp(-2h/T)*V(xhat)` and `lossLower = e0'Qe0` at the estimate.
+Estimation error enters the decrease as an input (input-to-state), not through
+a worst case. The previous worst-case form required the successor's largest
+value over its enclosure to stay below `exp(-2h/T)` times the smallest current
+value consistent with the current enclosure, `max(0, sqrt(V0) - b0)^2`. Near
+the path that budget is zero while the successor's enclosure is not, so no
+input satisfies it. The CLF stage then minimized the next value greedily; in a
+noisy 15-m/s head-on its braking ratio chattered with standard deviation 0.21,
+and the run did not recover within 100 s (2026-10-05).
+`clfWorstNextValue` equals the modeled successor value and `clfCurrentBudget`
+the budget above.
 
 The remaining nonlinear error-chart and dynamics remainders are not enclosed.
-Persistent observation uncertainty can require positive slack near the path;
-neither zero affine slack nor this implementation proves exact asymptotic
-recovery of the nonlinear uncertain plant. See the conditional theorem in
+Neither zero affine slack nor this implementation proves exact asymptotic
+recovery of the nonlinear uncertain plant; with estimation error the closed
+loop can at best approach a neighborhood of the path set by that error. See the conditional theorem in
 `OBSERVER_ROBUST_PCBF_THEORY.tex` for the additional premises.
 
 This constraint controls the first successor only. Future inputs are chosen

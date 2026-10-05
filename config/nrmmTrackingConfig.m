@@ -10,6 +10,9 @@ function cfg = nrmmTrackingConfig()
     cfg.runtime.samplePeriod = 0.02;                 % s
     cfg.runtime.integrationStepMaximum = 0.005;      % s, RK4 step limit
     cfg.runtime.targetHistoryDuration = 2.0;         % s, bounded-noise derivative window
+    % The published target A and beta come from the constant-parameter window
+    % fit over targetHistoryDuration once its window spans this duration.
+    cfg.runtime.parameterFitMinimumDuration = 0.5;   % s
     % Zero retains constant scalar acceleration and constant curvature.
     % Nonzero rates enter the final chain equation as bounded model jerk;
     % the observer model itself remains the nominal Sharma NRMM.

@@ -50,10 +50,19 @@ function value = nrmmTargetHistory(action, varargin)
             value = localEnclose(varargin{:});
         case "sensor"
             value = varargin{1};input = varargin{2};design = varargin{3};
-            course = certifiedKinematicCourseCorrespondence(input.gnssVelocity,input.yawRate, ...
-                design.yaw.courseModel.rearAxleDistance,design.sensors.velocityNoiseMaximum, ...
-                design.sensors.gyroscopeNoiseMaximum,design.yaw.courseModel.singleTrackYawRateMismatchMaximum, ...
-                design.yaw.courseModel.sideslipDomainMaximum);
+            % The runtime supplies the course geometry it integrates with; a
+            % caller without it and without the shared vehicle model gets
+            % the kinematic correspondence, as before.
+            if isfield(input,"courseGeometry")
+                course = input.courseGeometry;
+            elseif isfield(design,"egoModel") && ~isempty(design.egoModel)
+                course = nrmmEgoCourseGeometry(input,design);
+            else
+                course = certifiedKinematicCourseCorrespondence(input.gnssVelocity,input.yawRate, ...
+                    design.yaw.courseModel.rearAxleDistance,design.sensors.velocityNoiseMaximum, ...
+                    design.sensors.gyroscopeNoiseMaximum,design.yaw.courseModel.singleTrackYawRateMismatchMaximum, ...
+                    design.yaw.courseModel.sideslipDomainMaximum);
+            end
             heading = course.correspondence.heading;
             angle = min(pi,course.correspondence.radius);
             position = input.radarRelativePosition(:);

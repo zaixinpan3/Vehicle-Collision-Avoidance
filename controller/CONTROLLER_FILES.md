@@ -30,17 +30,23 @@ inherited slack budget or alternate controller. The input trust scale is estimat
 from the next posterior's plan innovation. Positive PCBF slack still denotes
 relaxation.
 
-The terminal set is separation: at the last node the relative velocity points
-away from the target, and the endpoint also carries the collision rows. The road
+The terminal set is separation and road recovery: at the last node the
+relative velocity points away from the target, and the ego can stop its lateral
+motion toward either road edge before reaching it (one rotated cone per edge).
+The endpoint also carries the collision rows. The road
 `lateralClearance = [right; left]` is the only lateral constraint: every ego
 rectangle corner stays inside it at every predicted node and hold midpoint,
-including the endpoint. Without a target the horizon is `horizonSteps`. The
-given path defines the single CLF; there is no separate path corridor.
+including the endpoint. Both ends of every hold also keep the rear tire below
+Fiala saturation under the hold's braking ratio (one second-order cone) and the
+sideslip inside the estimator's cone `model.sideslipMaximum`. Without a target
+the horizon is `horizonSteps`. The given path defines the single CLF; there is
+no separate path corridor.
 
-Observer inputs tighten affine sampled collision, path, physical-state,
-terminal and CLF constraints. No posterior-inclusion proof has been
-implemented, and the terminal set is not invariant; the radii are not discarded to obtain a
-command. `observerPredictiveControlTest`
+Observer inputs tighten affine sampled collision, road, physical-state,
+handling and terminal constraints. Each hold starts from the current enclosure
+and propagates it through that hold only; the CLF row acts on the estimate. No
+posterior-inclusion proof has been implemented, and the terminal set is not
+invariant; the radii are not discarded to obtain a command. `observerPredictiveControlTest`
 and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
 and expose that limitation. Complete nonlinear robust safety remains conditional
 on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.

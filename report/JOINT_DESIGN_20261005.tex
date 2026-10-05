@@ -1,0 +1,258 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Joint estimator--controller design for the noisy-sensor encounters}
+\date{Prepared October 5, 2026}
+\begin{document}
+\maketitle
+
+\section{Question}
+The user asked for the estimator and the controller to be treated as one
+design, and for the encounters with the noisy synthetic sensors to work.
+Working here means no collision, a solved command in every frame, and
+recovery to the given path. The user left the design open. This report
+records the coupled design, the measured results and the development steps
+that led to it.
+
+\section{Starting point (aec20bc)}
+With exact target and ego states, all 14 encounters recovered. With the NRMM
+estimator and noisy sensors (seed 20261003), 5 of 14 recovered and none
+collided; the other 9 ended without a solved command
+(\texttt{pcbfNoNumericalResult}). The estimator's ego bound was invalid in 9
+of 13 runs, because the maneuvers left its declared domain
+(\path{ESTIMATOR_VALIDITY_20261004.tex}). Where the bound was published, it
+failed to contain the truth in most 15-m/s frames: the kinematic premise
+$v_y=l_Er$ of the velocity measurement does not hold while the rear tire
+slips (\path{ESTIMATOR_DOMAIN_20261005.tex}). The ego heading error reached
+0.07--0.31~rad (95th percentile) and the lateral velocity error 1--3.9~m/s at
+15~m/s.
+
+\section{Design}
+The changes come in pairs: what the controller provides to the estimator,
+and what the estimator provides to the controller.
+
+\paragraph{E1. Shared model and input.} The estimator receives the input the
+controller held and the controller's vehicle and Fiala tire model. The
+lateral force balance $m a_y=F_{x,f}\sin\delta+F_{y,f}\cos\delta+F_{y,r}$
+replaces $v_y=l_Er$. Each axle force is monotone in $v_y$, so the
+accelerometer determines $v_y$, and a certified interval follows from the
+sensor bounds, a 5\% box on stiffness and friction, and the sideslip cone.
+The published value is the nominal solution, not the interval midpoint. The
+domain (speed, yaw rate, acceleration, yaw acceleration, sideslip cone) is
+computed from the controller's limits and tire friction.
+The velocity bound now includes the drift of the held measurement between
+samples (\path{estimator/MODEL_AIDED_ESTIMATION.md}).
+
+\paragraph{E2. Contract-consistent target parameters.} The target contract
+keeps $A$ and $\beta$ constant. A Gauss--Newton fit of the closed-form NRMM
+trajectory to the last 2~s of radar detections replaces the tracker's $A$ and
+$\beta$ in the published estimate. The detections are converted to the
+inertial frame with headings obtained by integrating the gyro back from the
+current yaw estimate. $A$ and the curvature are kept only where they exceed
+three standard errors. Until the window spans 0.5~s, $A=\beta=0$ is published
+instead of the tracker's initial transient. The tracker's velocity, position
+and certified sets are kept, and the published radii are widened by the
+distance between the two values.
+
+\paragraph{E3. Acquisition and initialization.} The 0.5-s radar window before
+$t=0$ also initializes the tracker's acceleration: the window is fitted with a
+constant acceleration, and only components above three standard errors are
+kept. The window is converted with the GNSS course fitted linearly over it;
+one noisy course sample rotates a 20-m detection by about 0.12~m. A target
+that enters the radar range during a run is acquired after
+0.25~s of detections, whose least-squares line initializes its velocity. A
+single detection with the 15-m/s line-of-sight prior had started a re-acquired
+8-m/s target 7~m/s off.
+
+\paragraph{C1. Information-consistent holds.} Every hold of the plan starts
+from the estimator's current enclosure and propagates it through that hold
+only. The target set restarts from its predicted state at the hold start.
+The open-loop image over the variable horizon (up to 512 holds) had made the
+hard road and state rows infeasible.
+
+\paragraph{C2. Stable-handling envelope.} At both ends of every hold the plan
+keeps the rear tire below Fiala saturation under the hold's braking ratio,
+$\|[(v_y-l_rr)/k;\ \bar v_xb]\|\le v_x$, on the estimate. It also keeps the
+sideslip inside the estimator's cone, robust to the enclosure. This removes
+the spin observed at 15~m/s and keeps the force-balance measurement
+informative. The adhesion cone is scaled to unit entries.
+
+\paragraph{C3. CLF on the estimate.} The CLF row $V(\hat x^+)\le\rho
+V(\hat x)$ uses the estimate. The worst case over the enclosure cannot be met
+near the path, and minimizing its slack made the braking ratio chatter.
+
+\paragraph{C4. Slack structure with an enclosure.} The untightened collision
+rows are hard only after the slack prefix, as without an enclosure. The
+tightened rows carry slack at every node.
+
+\paragraph{C5. Road recovery in the terminal set.} The endpoint must be able
+to stop its lateral motion toward either road edge before reaching it:
+$\max(w_e,0)^2\le2a\,d_e$ with $a=0.5\mu g$, as one rotated cone per edge.
+The horizon rollout stops only where this holds with half the deceleration.
+
+\paragraph{C6. Startup seed.} The potential-field seed counts the ego's own
+heading in its clearance envelope. It chooses the passing side by the road
+room that remains after clearing the target, rather than by the sign of a
+noisy sideslip estimate.
+
+\section{Results}
+\paragraph{Encounters.} Each encounter ran for up to 2000 holds (100~s), with
+recovery confirmed after the last given-path collision time and a 1-s dwell
+inside the tolerances. On the circular road the given path meets the target
+again near 80~s, so curved runs confirm recovery after that second encounter.
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+ & runs & recovered & no solution & collision & min.\ gap (m)\\
+\midrule
+exact states, aec20bc & 14 & 14 & 0 & 0 & 0.124\\
+exact states, this design & 14 & 14 & 0 & 0 & 0.153\\
+noisy, seed 20261003, aec20bc & 14 & 5 & 9 & 0 & 0.161\\
+noisy, six seeds, this design & 84 & 84 & 0 & 0 & 0.416\\
+\bottomrule
+\end{tabular}
+\end{center}
+The noisy seeds are 20261003 and 1--5. No run left the road. The smallest road
+margin was 1.00~m (noisy) and 3.85~m (exact). The median of the noisy minimum
+gaps was 1.64~m, against 0.20~m with exact states. The controller plans
+against a forecast it knows to be uncertain, and its tightened rows keep more
+clearance. Recovery on the straight road was confirmed after a median of
+10.9~s (noisy) and 10.7~s (exact), at most 13.5~s
+(\path{JOINT_DESIGN_20261005/campaign-metrics.csv}).
+
+\paragraph{Estimation.} The 95th percentile of the ego estimation error per
+run, over the 84 noisy runs, was as follows:
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+ & aec20bc (seed 20261003) & this design (six seeds)\\
+\midrule
+heading, 8~m/s & 0.017--0.068 rad & 0.0015--0.0061 rad\\
+heading, 15~m/s & 0.069--0.31 rad & 0.0023--0.0065 rad\\
+lateral velocity, 8~m/s & 0.12--0.47 m/s & 0.019--0.059 m/s\\
+lateral velocity, 15~m/s & 0.98--3.85 m/s & 0.009--0.106 m/s\\
+position & & 0.007--0.022 m\\
+\bottomrule
+\end{tabular}
+\end{center}
+The published target parameters were compared with the truth on the
+seed-20261003 runs (root mean square per run, median over 14 runs). From
+0.5~s to 3~s, the error of $A$ fell from 0.27~m/s$^2$ (tracker, stage F) to
+0.021~m/s$^2$, and that of $\beta$ from 0.0066 to 0.0006~rad. In the first
+0.5~s the largest $\beta$ error fell from 0.044 to 0.0077~rad. The $A$ error
+there stays about 0.3~m/s$^2$: model selection holds $A$ at zero until it is
+significant.
+
+\paragraph{Truth audit.} \path{scripts/replayEstimatorValidity.m} replayed the
+estimator on every frame of the 14 seed-20261003 runs and reproduced the
+published estimates to $5\times10^{-15}$. The ego bound was valid in every
+frame. Neither the published ego bounds nor the target bounds failed to
+contain the truth in any frame where they were available (5,896 ego and 2,247
+target frames).
+The true state left the shared domain in one frame: in the 15-m/s
+head-on the rear-adhesion ratio was 1.008 at 1.25~s, because the adhesion
+row acts on the estimate and on the affine prediction
+(\path{JOINT_DESIGN_20261005/audit.csv}). For comparison, at aec20bc the ego
+bound was lost in 9 of 13 runs, and at 15~m/s the available bounds failed to
+contain the truth in 2--24 frames per run.
+
+\paragraph{Computation.} The four exact encounters 8-m/s turning crossing,
+8-m/s head-on, 15-m/s crossing and 15-m/s head-on were run one at a time on the
+same machine, about 800 holds each way. The controller took a median of
+9.2~ms per hold (aec20bc: 6.7~ms) and a 95th percentile of 41~ms (30~ms). It
+exceeded the 50-ms hold in 3.4\% of holds (1.4\%). At equal horizon length the
+cost rose by about 1.4--1.5 times, because of the adhesion and road-recovery
+cones (\path{JOINT_DESIGN_20261005/timing-exact-sequential.csv}). With the
+estimator, the observer took a median of 11--15~ms per hold depending on
+machine load (aec20bc: 8.6~ms, run alone). In the final campaign, run as eight
+parallel processes, the controller exceeded 50~ms in 7.1\% of the noisy
+holds. Deadline misses are recorded but are not a failure criterion of these
+experiments.
+
+Two changes are neutral for the trajectories, which were verified
+bit-identical on two noisy runs. A cache of the cruise trim never hit,
+because \texttt{strcmp} does not match MATLAB string objects inside a cell
+array, so every hold re-solved the trim. The per-hold target tube is now
+evaluated in one vectorized call. Splitting the adhesion cones to hold ends
+only saved about 5\% and was not adopted.
+
+\paragraph{Development record.} The full noisy campaign (seed 20261003) after
+each stage:
+\begin{center}
+\begin{tabular}{llr}
+\toprule
+stage & added & recovered\\
+\midrule
+aec20bc & --- & 5/14\\
+A & E1 (force balance, shared domain) & 2/14\\
+B & C1 (per-hold enclosure) & 4/14\\
+F & C3, C2 (adhesion robust), E3 (acceleration fit) & 10/14\\
+I & C4, C5, C6, E3 significance test, velocity-bound drift & 11/14\\
+J & E2 (window fit, per-detection headings) & 14/14\\
+L & cone scaling & 14/14\\
+final & adhesion on estimate, model selection, gyro headings, & 14/14\\
+ & $A=\beta=0$ until 0.5~s, 0.25-s acquisition & \\
+\bottomrule
+\end{tabular}
+\end{center}
+Stage A lost three runs: the bounds became valid, the open-loop tube entered
+the hard rows, and the target tube drove large swerves toward the road
+edge. In stage B, four runs did not recover within 100~s because the robust
+CLF chattered. At stage L, seeds 1--3 gave 14, 13 and 14; the failure was the
+robust adhesion reserve. Two later stages were stopped early. With the adhesion
+row on the estimate, two 15-m/s head-on runs of seed 4 had no solution in
+their first frame: a noisy curvature of the straight target caused it. With
+model selection added, the 8-m/s curved head-on of seed 5 had no solution
+when the target was re-acquired for its second encounter. These led to the
+final changes (\path{JOINT_DESIGN_20261005/development-metrics.csv}).
+
+\section{Scope and limits}
+\begin{itemize}
+\item The plant in these simulations is the controller's model with nominal
+  parameters, so the force-balance certificate's structural premise holds by
+  construction; the 5\% parameter box is a design margin, not a measured
+  mismatch.
+\item Only the first hold of each plan uses a certified enclosure. Later holds
+  assume that the estimator's enclosure at their start equals the present one.
+  The target's forecast error beyond one hold is not in the constraints; the
+  plan relies on the window fit and on replanning.
+\item The window fit is an estimate, not an enclosure; the certified target
+  parameter set remains wide (course about $\pm0.4$~rad, the full contract
+  range for $A$ and curvature).
+\item The rear-adhesion row acts on the estimate and is not part of the safety
+  certificate. The road-recovery deceleration fraction (0.5) is a declared
+  setting.
+\item Recursive feasibility is not claimed; every frame either returns a
+  solved command or reports that there is none.
+\item During this work MATLAB sessions began to end with a heap-corruption
+  message at exit, after all outputs had been written. A session running only
+  \texttt{disp(1+1)} showed it too, so the message does not come from the
+  project code. It appeared in the run during which the user quota of the
+  RAM-backed \path{/tmp} filled, and it disappeared once \texttt{TMPDIR}
+  pointed to disk. Orphaned MATLAB service processes from those sessions
+  then made new sessions fail to start (error 5001). The final campaign ran
+  with \texttt{TMPDIR} on disk, after those processes were stopped.
+\end{itemize}
+
+\section{Reproduction}
+Each encounter was run in its own MATLAB process with the arguments that
+\texttt{runPotentialFieldCampaign} passes
+(\path{JOINT_DESIGN_20261005/campaignOne.m.txt}):
+\begin{verbatim}
+c = estimatorControllerIntegrationConfig(); c.randomSeed = seed;  % noisy
+runNonlinearPredictiveSafetyValidation(Scenarios=name, Frames=2000, ...
+  ControllerConfiguration=struct('referenceSpeed',speed, ...
+    'controller',struct('horizonSteps',8+8*(speed==15))), ...
+  RequireCollisionThreat=true, RecoveryDwellSeconds=1, ...
+  EstimatorConfiguration=c)          % struct() for exact states
+\end{verbatim}
+For one seed this is \texttt{runPotentialFieldCampaign(root, out, 2000,
+EstimatorConfiguration=c)}. The truth audit is
+\texttt{replayEstimatorValidity(out)} on the seed-20261003 outputs. The
+estimator's ego kernel must be rebuilt after this change
+(\path{scripts/buildNrmmObserverKernel.m}); generated binaries under
+\path{solver/} are not part of the change. Outputs are under
+\path{~/.cache/collisionAvoidance/joint-design-20261005}.
+\end{document}

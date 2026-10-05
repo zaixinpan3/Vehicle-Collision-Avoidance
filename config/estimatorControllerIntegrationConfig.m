@@ -28,11 +28,18 @@ function cfg = estimatorControllerIntegrationConfig()
     % center of mass, gravity-compensated.
 
     cfg.initialization.historyDuration = 0.50;        % s
-    % One radar position cannot observe target velocity. On the first
-    % detection, publish a clearly identified provisional state using an
-    % oncoming line-of-sight direction and the declared speed prior; the
-    % continuous-gain output-predictor observer then corrects that prior.
-    cfg.initialization.minimumRadarSamples = 1;
+    % One radar position cannot observe target velocity. A target is
+    % acquired after this many consecutive detections (0.25 s at 80 Hz),
+    % whose least-squares line initializes its velocity. A single detection
+    % with the oncoming line-of-sight speed prior (15 m/s) started a
+    % re-acquired 8-m/s target 7 m/s off; the tracker's transient then moved
+    % the published forecast across the whole target contract and left the
+    % controller without a solution.
+    cfg.initialization.minimumRadarSamples = 20;
+    % A detection window spanning at least this duration also initializes
+    % the target acceleration (constant-acceleration least squares); a
+    % shorter window initializes it to zero.
+    cfg.initialization.accelerationFitMinimumDuration = 0.50; % s
     % This default supplies only the provisional speed magnitude; scenario
     % drivers replace it with their declared target speed. It is not
     % presented as a radar velocity measurement.

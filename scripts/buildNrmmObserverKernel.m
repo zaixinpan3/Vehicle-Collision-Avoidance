@@ -16,7 +16,7 @@ function information = buildNrmmObserverKernel()
         struct("rearAxleDistance",1.5,"sideslipDomainMaximum",0.12)));
     measurement = struct("yawRate",0,"gnssVelocity",zeros(2,1),"bodyAcceleration",zeros(2,1), ...
         "radarDetectionAvailable",false, ...
-        "correspondence",struct("informative",false,"heading",0));
+        "correspondence",struct("informative",false,"heading",0),"lateralVelocity",0);
     types = {zeros(15,1),measurement,design,0,0};
     settings = coder.config("mex");settings.GenerateReport = false;settings.EnableOpenMP = false;
     clear nrmmObserverRk4IntervalMex;

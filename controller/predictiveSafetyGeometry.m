@@ -63,17 +63,18 @@ classdef predictiveSafetyGeometry
             % Exact analytic enclosure of constant-A, constant-beta paths.
             % Split the arc-length endpoint error from the course/curvature
             % error on the nominal arc. No future observer decay is assumed.
+            % q may hold one column per time (each time from its own start).
             time=reshape(time,1,[]);
             tube=struct('positionRadius',zeros(size(time)),'yawRadius',zeros(size(time)), ...
                 'courseRadius',zeros(size(time)),'speedRadius',zeros(size(time)));
             if isempty(errorSet),return;end
-            arc=q(4)*time+.5*q(5)*time.^2;
+            arc=q(4,:).*time+.5*q(5,:).*time.^2;
             arcError=errorSet.speedRadius*abs(time)+.5*errorSet.accelerationRadius*time.^2;
-            curvature=abs(sin(q(6))/q(7));
+            curvature=abs(sin(q(6,:))./q(7,:));
             tube.positionRadius=errorSet.positionRadius+arcError+abs(arc)*errorSet.courseRadius ...
                 +.5*arc.^2*errorSet.curvatureRadius;
             tube.courseRadius=min(pi,errorSet.courseRadius+abs(arc)*errorSet.curvatureRadius ...
-                +(curvature+errorSet.curvatureRadius)*arcError);
+                +(curvature+errorSet.curvatureRadius).*arcError);
             tube.yawRadius=min(pi,tube.courseRadius+errorSet.sideslipRadius);
             tube.speedRadius=errorSet.speedRadius+errorSet.accelerationRadius*abs(time);
         end
@@ -140,8 +141,13 @@ classdef predictiveSafetyGeometry
                 longitudinal=sum([cos(angles);sin(angles)].*differences,1);
                 transverse=sum([-sin(angles);cos(angles)].*differences,1);
                 yaw=target(3,:)-angles;
-                a=cfg.vehicle.length/2+abs(cos(yaw)).*target(8,:)+abs(sin(yaw)).*target(9,:)+cfg.initialization.clearancePaddingMeters+norm(cfg.vehicle.rectangleOffset);
-                b=cfg.vehicle.width/2+abs(sin(yaw)).*target(8,:)+abs(cos(yaw)).*target(9,:)+cfg.initialization.clearancePaddingMeters+norm(cfg.vehicle.rectangleOffset);
+                % Both rectangles' extents along the path and its normal: the
+                % ego's own heading relative to the path widens it as well.
+                egoYaw=x(3)-projection.heading;
+                egoAlong=abs(cos(egoYaw))*cfg.vehicle.length/2+abs(sin(egoYaw))*cfg.vehicle.width/2;
+                egoAcross=abs(sin(egoYaw))*cfg.vehicle.length/2+abs(cos(egoYaw))*cfg.vehicle.width/2;
+                a=egoAlong+abs(cos(yaw)).*target(8,:)+abs(sin(yaw)).*target(9,:)+cfg.initialization.clearancePaddingMeters+norm(cfg.vehicle.rectangleOffset);
+                b=egoAcross+abs(sin(yaw)).*target(8,:)+abs(cos(yaw)).*target(9,:)+cfg.initialization.clearancePaddingMeters+norm(cfg.vehicle.rectangleOffset);
                 rho=(longitudinal./a).^2+(transverse./b).^2;
                 potential=exp(-.5*rho-times/(2*cfg.nominalClf.lookaheadSeconds));
                 [risk,k]=max(potential);
@@ -151,6 +157,16 @@ classdef predictiveSafetyGeometry
                     [~,closest]=min(rho);
                     otherVelocity=target(4,closest)*[cos(target(3,closest)+target(6,closest));sin(target(3,closest)+target(6,closest))];
                     preference=transverse(closest)-.3*[-sin(angles(closest)),cos(angles(closest))]*otherVelocity;
+                    if nargin>=7 && ~isempty(clearance)
+                        % Clearing the target on the left needs b-transverse
+                        % of lateral motion, on the right b+transverse. Half
+                        % the difference of the road room beside the target
+                        % is added, so the side that keeps more road margin
+                        % after clearing wins; a head-on in the lane is then
+                        % no longer decided by estimation noise.
+                        targetLateral=lateral*exp(-times(closest)/cfg.nominalClf.lookaheadSeconds)-transverse(closest);
+                        preference=preference+((clearance(2)-targetLateral)-(clearance(1)+targetLateral))/2;
+                    end
                     side=1;if preference < -1e-8,side=-1;end
                 end
                 radial=x(1:2)-centers(:,1);

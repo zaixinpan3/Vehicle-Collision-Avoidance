@@ -48,6 +48,25 @@ classdef movingTargetPotentialFieldTest < matlab.unittest.TestCase
             testCase.verifyTrue(all(isfinite([heading,speed,side,risk])));
             testCase.verifyGreaterThan(speed,cfg.model.scheduleSpeedFloor);
         end
+        function aHeadOnInTheLanePassesOnTheSideWithMoreRoadRoom(testCase)
+            % A small transverse offset no longer decides the side once the
+            % road room beside the target differs by more than twice it.
+            [state,lane,cfg]=localFixture();target=[24;.2;pi;8;0;0;1.6;2.4;.95;0;0];
+            [~,~,noRoad]=predictiveSafetyGeometry.potentialGuidance(state,lane,target,0,cfg,0);
+            [~,~,wideLeft]=predictiveSafetyGeometry.potentialGuidance(state,lane,target,0,cfg,0,[8.5;12.2]);
+            mirrored=target;mirrored(2)=-.2;
+            [~,~,mirroredNoRoad]=predictiveSafetyGeometry.potentialGuidance(state,lane,mirrored,0,cfg,0);
+            [~,~,wideRight]=predictiveSafetyGeometry.potentialGuidance(state,lane,mirrored,0,cfg,0,[12.2;8.5]);
+            testCase.verifyEqual([noRoad,wideLeft],[-1,1]);
+            testCase.verifyEqual([mirroredNoRoad,wideRight],[1,-1]);
+        end
+        function aYawedEgoWidensTheGuidanceEnvelope(testCase)
+            [state,lane,cfg]=localFixture();target=[6;3.2;0;0;0;0;1.6;2.4;.95;0;0];
+            [~,~,~,straight]=predictiveSafetyGeometry.potentialGuidance(state,lane,target,0,cfg,0);
+            yawed=state;yawed(3)=.5;
+            [~,~,~,turned]=predictiveSafetyGeometry.potentialGuidance(yawed,lane,target,0,cfg,0);
+            testCase.verifyGreaterThan(turned,straight);
+        end
         function chosenPassingSideIsRetainedWithinASeed(testCase)
             [state,lane,cfg]=localFixture();target=[24;0;pi;8;0;0;1.6;2.4;.95;0;0];
             [heading,~,side]=predictiveSafetyGeometry.potentialGuidance(state,lane,target,0,cfg,-1);

@@ -22,8 +22,14 @@ function [derivative, model] = nrmmObserverVectorField( ...
     radarAvailable = localAvailability(measurement);
 
     planarCross = [0.0, -1.0; 1.0, 0.0];
+    % The lateral component is the certified force-balance center when the
+    % shared ego model and held input are available, else l*u (NaN).
+    lateralVelocity = NaN;
+    if isfield(measurement, "lateralVelocity")
+        lateralVelocity = double(measurement.lateralVelocity);
+    end
     velocityMeasurement = nrmmKinematicVelocityMeasurement( ...
-        gnssVelocity, yawRate, design);
+        gnssVelocity, yawRate, design, lateralVelocity);
     velocityInnovation = velocityMeasurement-bodyVelocity;
     bodyVelocityDerivative = bodyAcceleration ...
         - yawRate*planarCross*bodyVelocity ...

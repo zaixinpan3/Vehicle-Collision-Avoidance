@@ -106,14 +106,19 @@ function bound = localMeasure(bound,input,state)
     design = bound.design;
     sensors = design.sensors;
     domain = design.operatingDomain;
-    course = certifiedKinematicCourseCorrespondence(input.gnssVelocity,input.yawRate, ...
-        design.yaw.courseModel.rearAxleDistance,sensors.velocityNoiseMaximum, ...
-        sensors.gyroscopeNoiseMaximum, ...
-        design.yaw.courseModel.singleTrackYawRateMismatchMaximum, ...
-        design.yaw.courseModel.sideslipDomainMaximum);
-    [velocityMeasurement,feasible] = nrmmKinematicVelocityMeasurement( ...
-        input.gnssVelocity,input.yawRate,design);
-    sensorConsistent = feasible.consistent ...
+    % The runtime supplies the course geometry it integrates with; it holds
+    % the certified lateral measurement (force balance or kinematic).
+    if isfield(input,"courseGeometry")
+        course = input.courseGeometry;
+    else
+        course = nrmmEgoCourseGeometry(input,design);
+    end
+    lateral = course.lateralMeasurement;
+    center = NaN;
+    if lateral.source=="force-balance",center = lateral.center;end
+    velocityMeasurement = nrmmKinematicVelocityMeasurement( ...
+        input.gnssVelocity,input.yawRate,design,center);
+    sensorConsistent = lateral.consistent ...
         && abs(input.yawRate) <= localGuard(domain.egoYawRateMaximum+sensors.gyroscopeNoiseMaximum) ...
         && norm(input.bodyAcceleration) <= localGuard(bound.holdBounds.acceleration+sensors.accelerometerNoiseMaximum);
     if ~sensorConsistent
@@ -131,11 +136,15 @@ function bound = localMeasure(bound,input,state)
     bound.orientationSet = nrmmYawSet("intersect",bound.orientationSet,measurementSet);
     bound.yaw = nrmmYawSet("radiusAbout",bound.orientationSet,state.yaw);
     model = design.yaw.courseModel;
-    % This scalar reconstruction error is used only for initial/measurement
-    % containment; propagation below combines the common gyro column first.
-    velocityNoise = (sensors.velocityNoiseMaximum+model.rearAxleDistance ...
-        *(sensors.gyroscopeNoiseMaximum+model.singleTrackYawRateMismatchMaximum)) ...
+    % ||y_v - v|| <= (epsG + rho)/cos(b), with rho the certified lateral
+    % radius: l*(epsW + dSt) for the kinematic relation, the force-balance
+    % interval half-width otherwise. Used for initial/measurement containment;
+    % propagation below combines the common gyro column first.
+    velocityNoise = (sensors.velocityNoiseMaximum+lateral.radius) ...
         /cos(model.sideslipDomainMaximum);
+    bound.velocityMeasurementNoise = velocityNoise;
+    bound.lateralMeasurementRadius = lateral.radius;
+    bound.velocityMeasurementSource = string(lateral.source);
     residual = norm(velocityMeasurement-state.bodyVelocity);
     if residual > localGuard(bound.bodyVelocity+velocityNoise)
         bound.egoValid = false;
@@ -202,11 +211,27 @@ function bound = localAdvance(bound,input,before,after,first,step)
         effectiveSensors.velocityNoiseMaximum = velocityError;
         effectiveSensors.gyroscopeNoiseMaximum = gyroError;
         effectiveSensors.accelerometerNoiseMaximum = accelerationError;
-        velocityCertificate = nrmmVelocityDisturbanceBound(design.velocity.gain, ...
-            [domain.egoSpeedMinimum,domain.egoSpeedMaximum], ...
-            design.yaw.courseModel,effectiveSensors);
         egoMatrix = -design.velocity.gain;
-        egoInput = velocityCertificate.disturbanceBound+defect.bodyVelocity;
+        if isfield(bound,"velocityMeasurementSource") && bound.velocityMeasurementSource=="force-balance"
+            % e' = -k e - u J e + (a_m - a) - (u - r) J v + k (y - v(t)), with
+            % the measurement y held from the sample. ||y - v(t)|| <= (dS + dW)
+            % / cos(b): the speed error dS = velocityError (GNSS noise plus the
+            % speed change over the age) and the lateral error dW = the
+            % certified radius at the sample plus the change of v_y since
+            % then, |v_y'| = |a_y - r v_x| <= ||a|| + |r| ||v||.
+            rateBound = abs(input.yawRate)+gyroError;
+            speedBound = min(domain.egoSpeedMaximum,norm(input.gnssVelocity)+velocityError);
+            lateralDrift = (accelerationEnvelope+rateBound*speedBound)*age;
+            measurementNoise = (velocityError+bound.lateralMeasurementRadius+lateralDrift) ...
+                /cos(design.yaw.courseModel.sideslipDomainMaximum);
+            egoInput = accelerationError+gyroError*domain.egoSpeedMaximum ...
+                +design.velocity.gain*measurementNoise+defect.bodyVelocity;
+        else
+            velocityCertificate = nrmmVelocityDisturbanceBound(design.velocity.gain, ...
+                [domain.egoSpeedMinimum,domain.egoSpeedMaximum], ...
+                design.yaw.courseModel,effectiveSensors);
+            egoInput = velocityCertificate.disturbanceBound+defect.bodyVelocity;
+        end
     else
         % A sample acceleration does not bound intersample acceleration.
         % The true speed domain still gives a finite uniform velocity error.
