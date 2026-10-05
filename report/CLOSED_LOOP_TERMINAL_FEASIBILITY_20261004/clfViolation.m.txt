@@ -1,0 +1,24 @@
+R='/home/zai/Downloads/ResearchProjects/collisionAvoidance';addpath(fullfile(R,'scripts'),fullfile(R,'config'),fullfile(R,'controller'));
+for speed=[8 15]
+cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',speed,'controller',struct('horizonSteps',8+8*(speed==15))));
+[~,~,road,cfg]=collisionThreatScenario("headOn",cfg);
+collisionAvoidanceController("resetNominalTrajectory");
+[~,~,p]=collisionAvoidanceController(struct('position',[0;0],'yaw',0,'speed',speed),[],road,cfg,[]);
+lane=p.model.lane;ref=p.model.nominalReference;
+t=jsondecode(fileread(sprintf('%s/.cache/collisionAvoidance/separating-terminal-20261004/campaign/speed%d-headOn.json',getenv('HOME'),speed))).results.trace;
+scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale;cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+bins=[0 1e-4 1e-2 1 100 Inf];cnt=zeros(1,5);viol=zeros(1,5);worst=0;
+for k=1:5:numel(t)
+  x=t(k).state(:);
+  for s=1:300
+    e=nonlinearBicycleModel.error(x,lane,ref);u=ref.input+ref.gain*e;u(2)=min(1-1e-8,max(-1+1e-8,u(2)));
+    try, n=nonlinearBicycleModel.sample(x,u,cfg); catch, break; end
+    V=nonlinearBicycleModel.nominalValue(x,lane,ref);V1=nonlinearBicycleModel.nominalValue(n,lane,ref);
+    req=cfg.nominalClf.decreaseFraction*sum((e./scales).^2);
+    b=find(V>=bins,1,'last');cnt(b)=cnt(b)+1;
+    if V1-V>-req+1e-9, viol(b)=viol(b)+1; worst=max(worst,(V1-V+req)); end
+    x=n;
+  end
+end
+fprintf('speed %d: V bins [0,1e-4) [1e-4,1e-2) [1e-2,1) [1,100) [100,inf): steps %s violations %s, max excess %.3g\n',speed,mat2str(cnt),mat2str(viol),worst);
+end

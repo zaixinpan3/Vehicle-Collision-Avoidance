@@ -163,4 +163,70 @@ A union of continuation policies is not convex. It would be solved per policy
 (five small conic problems with condensed tails) or by choosing the policy on
 the anchor. Preferring the path policy whenever it qualifies keeps the terminal
 set aligned with the CLF.
+
+\section{Addendum 2: the CLF's own law as the continuation}
+The user clarified the proposal. Once the ego is in the terminal set, the CLF
+alone must avoid the target, whose motion is known. The fixed guidance is then
+the law that defines the CLF: the discrete LQR feedback
+$u=u_{\rm ref}+Ke(x)$, whose Riccati matrix is $P$ in $V=e^\top Pe$
+(\texttt{nominalReference.gain}). Braking is clipped to its bounds. The study
+was repeated with this law (\texttt{Policy="clfLqr"}). It also counted
+continuation steps that violate the requested decrease
+$V^+-V\le-\eta\,e^\top Qe$ ($\eta=0.5$), and continuations that leave the model
+domain. A continuation that leaves the model domain does not qualify.
+
+\begin{center}
+\begin{tabular}{rlrrrrr}
+\toprule
+ & & separating & \multicolumn{2}{c}{CLF law} & decrease & CLF law, $V\le1$\\
+speed & scenario & max & med & max & violated & med / max\\
+\midrule
+8 & headOn & 35 & 0 & 15 & 6.3\% & 85 / 178\\
+8 & acceleratingHeadOn & 34 & 0 & 14 & 7.7\% & 86 / 179\\
+8 & brakingLead & 98 & 36 & 148 & 3.4\% & 105 / 217\\
+8 & crossing & 29 & 0 & 30 & 3.6\% & 85 / 177\\
+8 & turningCrossing & 80 & 0 & 33 & 1.4\% & 68 / 161\\
+8 & curvedHeadOn & 38 & 0 & 16 & 1.4\% & 86 / 179\\
+8 & curvedCrossing & 111 & 0 & 33 & 1.0\% & 88 / 178\\
+15 & headOn & 23 & 0 & 17 & 35.5\% & 32 / 72\\
+15 & acceleratingHeadOn & 22 & 0 & 17 & 32.8\% & 46 / 104\\
+15 & brakingLead & 101 & 23 & 129 & 6.1\% & 96 / 202\\
+15 & crossing & 31 & 0 & 30 & 13.0\% & 44 / 100\\
+15 & turningCrossing & 61 & 0 & 31 & 16.2\% & 63 / 136\\
+15 & curvedHeadOn & 49 & 0 & 202 & 0.2\% & 0 / 261\\
+15 & curvedCrossing & 31 & 0 & 26 & 2.4\% & 52 / 115\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Where the law violates the CLF decrease.} Head-on rollouts of the law
+were started from every fifth recorded state and run for 300 steps. Grouped by $V$ at the start
+of each step, no violation occurs for $V<1$ (11{,}126 steps at 8~m/s, 5{,}417 at
+15~m/s). Violations occur for $1\le V<100$ (3 of 936; 22 of 284) and
+$V\ge100$ (104 of 538; 203 of 299), that is, in the displaced states of an
+avoidance (\path{clfViolation.m.txt}). The LQR law is a CLF law near the path,
+not globally.
+
+\paragraph{Assessment.}
+\begin{enumerate}
+\item \emph{Computable.} Under the target contract, membership of an endpoint
+  is one deterministic rollout of the law and the target. Its linearization
+  is analytic, $K\,\partial e/\partial x$, so the condensed tail rows are
+  cheap.
+\item \emph{Reachable without a level condition.} Requiring only that the law's
+  rollout avoids the target, keeps 0.2~m and stays on the road, the median free
+  horizon is 0. The maximum is 14--33 steps, except brakingLead (148, 129) and
+  the 15-m/s curved head-on run (202). Under the exact models, shifting the plan
+  and appending one law step keeps the endpoint in the set. That gives
+  recursive feasibility of the terminal condition, and it does not depend on
+  the law decreasing $V$. The CLF decrease of the law is a convergence-rate
+  property, not part of the safety argument.
+\item \emph{With $V\le1$ the horizon grows.} Adding the sublevel set in which
+  the law met the decrease requires the ego to be back near the path at the
+  endpoint. The free horizon then rises to a median of up to 105 (0 to 105) and a maximum of 72--261, longer
+  than the present terminal (22--111).
+\end{enumerate}
+The remaining long cases are brakingLead (the law returns the ego behind the
+lead) and the curved road, where the infinite-time set is empty and a 10-s
+window was used. The recorded trajectories are a proxy for planned ones.
 \end{document}

@@ -8,7 +8,13 @@ function study = studyTerminalHorizonReduction(campaignDirectory,options)
 %
 % Policies: nominal path guidance (nonlinearBicycleModel.nominalFeedback)
 % toward the path (offset 0) or toward a parallel lane centre at the given
-% lateral offsets. For every recorded ego state k of a campaign run, the study
+% lateral offsets. With Policy="clfLqr" the continuation is instead the CLF's
+% own law, the discrete LQR feedback u = u_ref + gain*e(x) whose Riccati
+% matrix defines V, with braking clipped to its bounds; the study then also
+% counts the continuation steps that violate the requested decrease. With a
+% finite TerminalValueLimit the state must also satisfy V <= limit, the CLF
+% sublevel set in which the law was found to meet the decrease; it also
+% V+ - V <= -eta e'Qe, and continuations that leave the model domain. For every recorded ego state k of a campaign run, the study
 % finds the smallest j>=k such that, from the recorded state j, some policy
 % reaches a model-based no-collision certificate without touching the target.
 % j-k is the free horizon that would have sufficed along the recorded
@@ -28,6 +34,8 @@ function study = studyTerminalHorizonReduction(campaignDirectory,options)
         options.Offsets (1,:) double = [0 3.6576 -3.6576 7.3152]
         options.MaximumTailSteps (1,1) double {mustBePositive,mustBeInteger} = 2000
         options.WindowSeconds (1,1) double {mustBePositive} = 10
+        options.Policy (1,1) string {mustBeMember(options.Policy,["guidance","clfLqr"])} = "guidance"
+        options.TerminalValueLimit (1,1) double {mustBePositive} = Inf
         options.OutputFile (1,1) string = ""
     end
     root=fileparts(fileparts(mfilename('fullpath')));
@@ -54,16 +62,22 @@ function study = studyTerminalHorizonReduction(campaignDirectory,options)
             half=hypot(cfg.vehicle.length,cfg.vehicle.width)/2;
             offsets=options.Offsets(options.Offsets+half<=road.lateralClearance(2) ...
                 & -options.Offsets+half<=road.lateralClearance(1));
-            safe=false(numel(offsets),last);
+            safe=false(numel(offsets),last);clfSteps=0;clfViolations=0;domainExits=0;
+            if options.Policy=="clfLqr",offsets=0;end
             for k=1:last
                 input=reference.input;if k>1,input=trace(k-1).input(:);end
                 for m=1:numel(offsets)
-                    safe(m,k)=localSafe(trace(k).state(:),input,trace(k).time,q0,lane,reference,cfg, ...
-                        offsets(m),options.MaximumTailSteps,curved,options.WindowSeconds,road);
+                    [safe(m,k),steps,violations,domain]=localSafe(trace(k).state(:),input,trace(k).time,q0,lane,reference,cfg, ...
+                        offsets(m),options.MaximumTailSteps,curved,options.WindowSeconds,road,options.Policy);
+                    clfSteps=clfSteps+steps;clfViolations=clfViolations+violations;domainExits=domainExits+domain;
+                    % Optionally the endpoint must also lie in the CLF sublevel set.
+                    safe(m,k)=safe(m,k) && nonlinearBicycleModel.nominalValue(trace(k).state(:),lane,reference)<=options.TerminalValueLimit;
                 end
             end
             row=struct('speed',speed,'scenario',name,'encounterFrames',last, ...
-                'separatingHorizonMedian',median(used),'separatingHorizonMaximum',max(used));
+                'separatingHorizonMedian',median(used),'separatingHorizonMaximum',max(used), ...
+                'policy',options.Policy,'clfViolationFraction',clfViolations/max(clfSteps,1), ...
+                'domainExits',domainExits);
             for f=1:numel(families)
                 member=any(safe(ismember(offsets,families(f).offsets),:),1);
                 free=NaN(1,last);
@@ -81,6 +95,8 @@ function study = studyTerminalHorizonReduction(campaignDirectory,options)
                 row.separatingHorizonMaximum,row.pathOnlyMedian,row.pathOnlyMaximum,row.pathOnlyUnreached, ...
                 row.pathAndLanesMedian,row.pathAndLanesMaximum,row.pathAndLanesUnreached, ...
                 string(repmat(sprintf(' [curved: %g-s window]',options.WindowSeconds),1,curved)));
+            fprintf('POLICY %s CLF-decrease violations %.4f of continuation steps, domain exits %d\n', ...
+                options.Policy,row.clfViolationFraction,domainExits);
         end
     end
     study=struct('scope',"Offline study on recorded exact-observation trajectories; recorded states proxy the plans", ...
@@ -99,13 +115,15 @@ function [lane,reference]=localGeometry(road,cfg)
     lane=problem.model.lane;reference=problem.model.nominalReference;
 end
 
-function safe=localSafe(x,input,time,q0,lane,reference,cfg,offset,maximum,curved,window,road)
+function [safe,steps,violations,domain]=localSafe(x,input,time,q0,lane,reference,cfg,offset,maximum,curved,window,road,policy)
     % Guidance toward a parallel path: evaluate the path guidance on the
     % state shifted by -offset along the local path normal (exact on a
     % straight road, a first-order approximation on the curved one).
     h=cfg.controller.sampleTime;nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    safe=false;
+    safe=false;steps=0;violations=0;domain=0;
+    scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+        cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
     if curved,maximum=round(window/h);end
     for step=0:maximum
         q=predictiveSafetyGeometry.predictTarget(q0,time+step*h);
@@ -118,8 +136,26 @@ function safe=localSafe(x,input,time,q0,lane,reference,cfg,offset,maximum,curved
         if step==maximum,break;end
         projection=laneGeometry.project(x(1:2),lane);
         shifted=x;shifted(1:2)=x(1:2)-offset*[-sin(projection.heading);cos(projection.heading)];
-        input=nonlinearBicycleModel.nominalFeedback(shifted,input,lane,reference,cfg,nominal);
-        x=nonlinearBicycleModel.sample(x,input,cfg);
+        if policy=="clfLqr"
+            e=nonlinearBicycleModel.error(x,lane,reference);
+            input=reference.input+reference.gain*e;
+            input(2)=min(min(1-1e-8,cfg.actuation.brakingRatioMaximum),max(max(-1+1e-8,cfg.actuation.brakingRatioMinimum),input(2)));
+        else
+            input=nonlinearBicycleModel.nominalFeedback(shifted,input,lane,reference,cfg,nominal);
+        end
+        try
+            next=nonlinearBicycleModel.sample(x,input,cfg);
+        catch
+            domain=1;return;
+        end
+        if policy=="clfLqr"
+            value=nonlinearBicycleModel.nominalValue(x,lane,reference);
+            successor=nonlinearBicycleModel.nominalValue(next,lane,reference);
+            e=nonlinearBicycleModel.error(x,lane,reference);
+            steps=steps+1;
+            violations=violations+(successor-value>-cfg.nominalClf.decreaseFraction*sum((e./scales).^2)+1e-9);
+        end
+        x=next;
     end
     safe=curved;
 end
