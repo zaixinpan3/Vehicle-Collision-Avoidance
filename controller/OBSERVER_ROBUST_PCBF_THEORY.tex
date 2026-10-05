@@ -526,7 +526,7 @@ V=e^\top P e,\quad\ell=e^\top Qe,\quad P,Q\succ0.
 \end{equation}
 This is the existing transverse function, independent of the target. A smooth
 path chart and a verified recovery domain are required. Positive definiteness
-of an LQR matrix at one trim does not prove a global nonlinear CLF. If $P$
+of a matrix synthesized at one trim does not prove a global nonlinear CLF. If $P$
 depends on path phase, all successor expressions include the successor $P$;
 freezing it without a bound is invalid. Below $P$ is fixed on the verified domain.
 
@@ -689,7 +689,7 @@ vanishes and zero CLF slack remains feasible in the recovery domain.
 \end{center}
 
 \subsection{Experimental implementation and remaining certification gap}
-The current implementation tests a feedback-aware approximation of the ideal
+The current implementation tests an open-loop approximation of the ideal
 construction above. It does not enforce all assumptions of
 Proposition~\ref{prop:sampleSafety}. In particular, a newly published target acceleration or
 sideslip estimate may change at every sample; each prediction freezes those
@@ -707,10 +707,11 @@ Prediction geometry
 & The common initial rigid pose is retained through propagation and cancelled
 only in relative collision geometry. Directional target supports propagate
 constant-parameter uncertainty without assuming future target measurements. \\
-Ego feedback tube
-& Stagewise Riccati gains propagate correlated generators, input uncertainty
-and input-increment uncertainty. Future posterior errors use the current
-generator as a frozen experimental envelope, not a proved future bound. \\
+Ego uncertainty tube
+& The current correlated generator is propagated open loop through the affine
+hold maps, $G_{i+1}=A_iG_i$. No ancillary feedback is assumed, so the issued
+inputs carry no uncertainty of their own. This is an experimental envelope,
+not a proved future bound. \\
 Terminal set
 & The implemented terminal set is separation from the target estimate, with
 the endpoint also under the collision rows, and the ego rectangle inside the
@@ -730,25 +731,12 @@ does not certify the nonlinear plan or continuous-time robust separation. \\
 \bottomrule
 \end{longtable}
 
-Writing $d_i=x_i-\bar x_i$ and $\varepsilon_i=x_i-\hat x_i$, the implemented
-affine feedback propagation is
-\[
- d_{i+1}=(A_i+B_iK_i)d_i-B_iK_i\varepsilon_i.
-\]
-At the current node $d_0=\varepsilon_0$ and the issued input is known, giving
-$d_1=A_0d_0$. The code preserves this cancellation. Later posterior errors are
-allowed to vary independently inside the frozen envelope. Validated nonlinear
-remainders would still be required to promote this propagation to
-\eqref{eq:tube}.
-
-For a brake-gain row $k_i$, its input radius is
-$r_i=\|[k_iG_i,-k_iE]\|_1$. The available symmetric input allowance at the
-anchor is $a_i=\max\{0,\min(u_{\max}-\bar u_i,\bar u_i-u_{\min})\}$.
-The implementation uses $\alpha_i k_i$ with
-$\alpha_i=\min\{1,a_i/r_i\}$ (one when $r_i=0$), the largest radial gain
-compatible with that allowance. State uncertainty is propagated again using
-this gain; the error set is never truncated. This avoids a self-contradictory
-input interval but does not prove stability of all such finite-horizon gains.
+Writing $d_i=x_i-\bar x_i$, the implemented propagation is the open-loop
+image $d_{i+1}=A_id_i$ from the current enclosure $d_0=\varepsilon_0$. The causal
+policy class of \eqref{eq:policy} is not used: with $K_i=0$ the tube reduces to
+reachable-set propagation, which is sound but more conservative than a
+feedback-aware tube. Validated nonlinear remainders would still be required to
+promote this propagation to \eqref{eq:tube}.
 
 Every sample minimizes the prefix slack and then the CLF slack under a cap at
 that optimum. The achieved value is not $V_B^*$, and changing observer sets do

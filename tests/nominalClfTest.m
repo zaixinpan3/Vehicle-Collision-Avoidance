@@ -14,6 +14,16 @@ classdef nominalClfTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function theClfMatrixIsSynthesizedWithoutAFeedbackLaw(testCase,referenceSpeed,curvature)
+            % P comes from the CLF LMI; no gain is stored or applied.
+            [cfg,~,reference]=localSetup(referenceSpeed,curvature);
+            testCase.verifyFalse(isfield(reference,'gain'));
+            scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+                cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+            q=diag(1./scales.^2);
+            % P certifies the full decrease e'Qe, so P >= Q is necessary.
+            testCase.verifyGreaterThanOrEqual(min(eig(q\reference.matrix)),1-1e-6);
+        end
         function trimHasZeroValueAndTheInitializationGuidancePreservesIt(testCase,referenceSpeed,curvature)
             [cfg,lane,reference]=localSetup(referenceSpeed,curvature);
             parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,curvature);
@@ -29,10 +39,11 @@ classdef nominalClfTest < matlab.unittest.TestCase
                 cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
             e=zeros(5,1);e(coordinate)=direction*1e-3*scales(coordinate);
             x=[0;e(1);reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
-            input=reference.input+reference.gain*e;
+            % Witness: the input that minimizes the nonlinear successor value.
+            successor=@(u)nonlinearBicycleModel.nominalValue(nonlinearBicycleModel.sample(x,u,cfg),lane,reference);
+            input=fminsearch(successor,reference.input,optimset('TolX',1e-12,'TolFun',1e-16,'MaxFunEvals',4000,'MaxIter',2000));
             value=nonlinearBicycleModel.nominalValue(x,lane,reference);
-            next=nonlinearBicycleModel.nominalValue(nonlinearBicycleModel.sample(x,input,cfg),lane,reference);
-            testCase.verifyLessThanOrEqual(next-value,-cfg.nominalClf.decreaseFraction*sum((e./scales).^2)+1e-12);
+            testCase.verifyLessThanOrEqual(successor(input)-value,-cfg.nominalClf.decreaseFraction*sum((e./scales).^2)+1e-12);
         end
         function longitudinalPathPhaseDoesNotChangeTheValue(testCase,referenceSpeed,curvature)
             [~,lane,reference]=localSetup(referenceSpeed,curvature);

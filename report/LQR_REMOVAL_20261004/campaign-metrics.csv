@@ -1,0 +1,29 @@
+observation,speed,scenario,outcome,holds,minimumSampledGapMeters,minimumRoadMarginMeters,collision,roadDeparture,failure
+exact,8,headOn,recovered,206,1.5248,4.796,False,False,
+exact,8,acceleratingHeadOn,recovered,206,1.2155,4.704,False,False,
+exact,8,brakingLead,recovered,243,0.1954,7.515,False,False,
+exact,8,crossing,recovered,205,0.1784,4.868,False,False,
+exact,8,turningCrossing,recovered,206,0.1849,4.356,False,False,
+exact,8,curvedHeadOn,recovered,207,1.9443,4.707,False,False,
+exact,8,curvedCrossing,recovered,201,0.198,4.886,False,False,
+exact,15,headOn,recovered,134,0.2083,6.321,False,False,
+exact,15,acceleratingHeadOn,recovered,136,0.2109,6.113,False,False,
+exact,15,brakingLead,recovered,218,0.1946,7.532,False,False,
+exact,15,crossing,recovered,132,0.1104,6.099,False,False,
+exact,15,turningCrossing,recovered,163,0.1774,4.738,False,False,
+exact,15,curvedHeadOn,recovered,1216,0.1999,4.681,False,False,
+exact,15,curvedCrossing,recovered,146,0.1718,5.831,False,False,
+noisy,8,headOn,recovered,235,2.8498,1.787,False,False,
+noisy,8,acceleratingHeadOn,recovered,234,2.3415,1.911,False,False,
+noisy,8,brakingLead,controlUnavailable,135,0.1805,7.508,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,crossing,recovered,213,2.18,4.998,False,False,
+noisy,8,turningCrossing,controlUnavailable,13,9.6886,5.628,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,8,curvedHeadOn,recovered,1736,0.2714,2.263,False,False,
+noisy,8,curvedCrossing,controlUnavailable,0,,,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,headOn,controlUnavailable,81,0.4892,2.111,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,acceleratingHeadOn,controlUnavailable,15,2.7221,7.515,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,brakingLead,collision,185,0,2.147,True,False,Ground-truth rectangles touched or overlapped.
+noisy,15,crossing,controlUnavailable,37,5.0235,1.573,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,turningCrossing,controlUnavailable,17,11.8684,4.534,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedHeadOn,controlUnavailable,34,4.6983,2.388,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+noisy,15,curvedCrossing,controlUnavailable,20,10.3622,3.106,False,False,The two-stage affine optimization did not complete (pcbfNoNumericalResult).

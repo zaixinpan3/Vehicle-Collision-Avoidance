@@ -168,10 +168,16 @@ classdef nonlinearBicycleModel
         end
 
         function reference = cruise(cfg,curvature)
-            persistent savedKey saved
+            % The CLF matrix comes from a semidefinite program, so recent
+            % operating points are cached rather than only the last one.
+            persistent savedKeys savedReferences
+            if isempty(savedKeys),savedKeys={};savedReferences={};end
             key={cfg.vehicle,cfg.tire,cfg.roadLoad,cfg.model,cfg.referenceSpeed, ...
-                cfg.controller.sampleTime,cfg.nonlinear.integrationStep,cfg.clf,curvature};
-            if isequaln(key,savedKey),reference=saved;return;end
+                cfg.controller.sampleTime,cfg.nonlinear.integrationStep,cfg.clf, ...
+                cfg.nominalClf.decreaseFraction,curvature};
+            for index=1:numel(savedKeys)
+                if isequaln(key,savedKeys{index}),reference=savedReferences{index};return;end
+            end
             speed=cfg.referenceSpeed;
             objective=@(p)localTrimResidual(p,speed,curvature,cfg);
             options=optimoptions('fsolve','Display','off','FunctionTolerance',1e-12, ...
@@ -185,11 +191,11 @@ classdef nonlinearBicycleModel
             transition=expm([a(2:6,2:6),b(2:6,:);zeros(2,7)]*cfg.controller.sampleTime);
             scales=[cfg.clf.lateralPositionErrorScale,cfg.clf.headingErrorScale,cfg.clf.speedErrorScale, ...
                 cfg.clf.lateralVelocityErrorScale,cfg.clf.yawRateErrorScale];
-            q=diag(1./scales.^2);r=diag([cfg.clf.frontWheelSteeringAngleWeight,cfg.clf.brakingRatioWeight]);
-            [gain,p]=dlqr(transition(1:5,1:5),transition(1:5,6:7),q,r);
-            reference=struct('state',x,'input',u,'curvature',curvature,'gain',-gain, ...
+            q=diag(1./scales.^2);
+            p=localClfMatrix(transition(1:5,1:5),transition(1:5,6:7),q);
+            reference=struct('state',x,'input',u,'curvature',curvature, ...
                 'matrix',p,'factor',chol(p),'continuousA',a(2:6,2:6),'continuousB',b(2:6,:));
-            savedKey=key;saved=reference;
+            savedKeys=[{key},savedKeys(1:min(end,15))];savedReferences=[{reference},savedReferences(1:min(end,15))];
         end
 
         function [error,projection] = error(x,lane,reference)
@@ -310,6 +316,50 @@ function dy=localDerivative(y,u,cfg,curvature,variational)
     [a,b]=nonlinearBicycleModel.jacobian(y(1:6),u,cfg,curvature);
     dy=[dx;reshape(a*reshape(y(7:42),6,6),[],1); ...
         reshape(a*reshape(y(43:54),6,2)+b,[],1)];
+end
+
+function p=localClfMatrix(a,b,q)
+    % Quadratic CLF of the sampled local transverse model x+ = A x + B u:
+    % find P > 0 such that for every e some input gives the full decrease
+    %   (A e + B u)' P (A e + B u) - e' P e <= -e' Q e.
+    % The controller requests only decreaseFraction (< 1) of it, so the rest
+    % is a reserve for the trust region, actuation and model error. A P
+    % certified only for the requested fraction sits at the edge of
+    % feasibility (P >= eta Q with equality) and needed inputs outside the
+    % trust region near the path.
+    % With S = inv(P) and Y = K S this is the LMI
+    %   [S, (A S + B Y)', S Q^(1/2); A S + B Y, S, 0; Q^(1/2) S, 0, I] >= 0.
+    % Among such P the least steep relative to Q is chosen: maximize gamma
+    % with S >= gamma inv(Q), i.e. P <= Q/gamma. K only certifies that the
+    % decrease is attainable; it is discarded and never applied as a law.
+    % The LMI is solved with a 2% margin and the full decrease is then
+    % checked without it.
+    localPrepareLmiSolver();eta=1;
+    n=size(a,1);m=size(b,2);half=sqrtm(q);design=1.02*eta;
+    s=sdpvar(n,n);y=sdpvar(m,n,'full');gamma=sdpvar(1);
+    closed=a*s+b*y;
+    constraints=[[s,closed.',sqrt(design)*s*half;closed,s,zeros(n);sqrt(design)*half*s,zeros(n),eye(n)]>=0, ...
+        s>=gamma*inv(q),gamma>=0];
+    diagnostics=optimize(constraints,-gamma,sdpsettings('solver','sedumi','verbose',0));
+    if diagnostics.problem~=0
+        error('collisionAvoidanceController:clfSynthesisFailed','The CLF LMI did not solve: %s', ...
+            yalmiperror(diagnostics.problem));
+    end
+    p=inv(value(s));p=(p+p.')/2;k=value(y)/value(s);
+    residual=max(eig((a+b*k).'*p*(a+b*k)-p+eta*q));
+    if ~(min(eig(p))>0 && residual<=0)
+        error('collisionAvoidanceController:clfSynthesisFailed', ...
+            'The synthesized CLF does not meet the requested decrease (residual %.3g).',residual);
+    end
+end
+
+function localPrepareLmiSolver()
+    if ~isempty(which('optimize')) && ~isempty(which('sedumi')),return;end
+    root=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver');
+    if ~isfolder(fullfile(root,'YALMIP')) || ~isfolder(fullfile(root,'sedumi'))
+        error('collisionAvoidanceController:missingLmiSolver','CLF synthesis requires YALMIP and SeDuMi in %s.',root);
+    end
+    addpath(genpath(fullfile(root,'YALMIP')));addpath(genpath(fullfile(root,'sedumi')));
 end
 
 function [residual,x,u]=localTrimResidual(point,speed,curvature,cfg)

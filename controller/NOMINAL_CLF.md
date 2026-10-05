@@ -12,9 +12,9 @@ For the given path and desired cruise trim, define
     V(x) = e(x)' P e(x),       P > 0.
 
 Longitudinal path phase is free. `nonlinearBicycleModel.cruise` computes the trim
-and the discrete LQR matrix P from the transverse local dynamics, the error
-scales in `cfg.clf`, and the two input weights. `nominalValue` evaluates this
-quadratic directly. No nominal-policy rollout, finite-difference Hessian,
+and synthesizes P by a linear matrix inequality from the sampled transverse
+local dynamics and the error scales in `cfg.clf`. `nominalValue` evaluates this
+quadratic directly. There is no LQR design, and the CLF carries no feedback law. No nominal-policy rollout, finite-difference Hessian,
 cost-to-go kernel, or additional terminal value is used to construct the CLF.
 
 Let Q be the diagonal inverse squared error scales. The requested decrease is
@@ -22,16 +22,35 @@ Let Q be the diagonal inverse squared error scales. The requested decrease is
     V(x_next) - V(x) <= -eta * e(x)' Q e(x) + rho,   rho >= 0,
 
 where `eta = nominalClf.decreaseFraction = 0.5`. This is deliberately not an
-arbitrary fixed fraction of V. For the exact sampled local linear system and
-its LQR feedback K, the Riccati identity gives
+arbitrary fixed fraction of V. P is a CLF of the sampled local linear system
+x+ = A x + B u that certifies the full decrease: for every e some input u
+satisfies
 
-    (A+B K)' P (A+B K) - P = -(Q + K' R K).
+    (A e + B u)' P (A e + B u) - e' P e <= -e' Q e.
 
-Thus eta below one leaves a strict local decrease reserve. Passing from this
-identity to a nonlinear local CLF requires a smooth error chart, an actual
+The controller requests only eta < 1 of it; the remainder is a reserve for the
+trust region, actuation and model error. With S = inv(P) and Y = K S the
+certificate is the LMI
+
+    [S, (A S + B Y)', S Q^(1/2);
+     A S + B Y, S, 0;
+     Q^(1/2) S, 0, I] >= 0,
+
+solved by YALMIP/SeDuMi from `solver/` with a 2% margin and then checked
+without it. Among the feasible P the least steep relative to Q is chosen
+(maximize gamma subject to S >= gamma inv(Q), i.e. P <= Q/gamma). K only
+certifies that the decrease is attainable; it is discarded, and the input
+always comes from the CLF-constrained optimization. Each operating point
+(speed, curvature, CLF scales) is solved once (0.1--1 s) and cached. A first
+version certified only the requested fraction; that P sat at the edge of
+feasibility (`P = eta Q` in one direction), and near the path the decrease
+then needed inputs outside the trust region, so target-free frames 0.1 m off
+the path kept positive CLF slack. Passing from this
+linear certificate to a nonlinear local CLF requires a smooth error chart, an actual
 sampling equilibrium, and admissibility of a neighborhood. The implementation
 uses RK4 and numerical trim calculation; the tests verify nonlinear decrease
-for small signed perturbations, not an interval certificate for an entire set.
+for small signed perturbations, with the input that minimizes the nonlinear
+successor value as the witness, not an interval certificate for an entire set.
 
 **This quadratic is not a global nonlinear CLF.** Large heading errors, tire
 saturation, state-domain boundaries, braking memory and the MPC trust region

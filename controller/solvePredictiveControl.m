@@ -323,11 +323,6 @@ function [anchor,source,failure]=localInitialization(model,previous)
             last=model.previousInput;if index>1,last=inputs(:,index-1);end
             if index<=size(shifted,2)
                 u=shifted(:,index);
-                if isfield(previous,'feedbackGains') && index<size(previous.feedbackGains,3)
-                    error=states(:,index)-previous.stateTrajectory(:,index+1);
-                    error(3)=atan2(sin(error(3)),cos(error(3)));
-                    u=localClip(u+previous.feedbackGains(:,:,index+1)*error,last,cfg);
-                end
             else
                 u=nonlinearBicycleModel.nominalFeedback(states(:,index),last,model.lane,model.nominalReference,cfg,nominal);
             end
@@ -425,12 +420,12 @@ function [problem,model]=localFormulate(anchor,model)
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=0;
+    % The ego uncertainty is propagated open loop: G_next = A_i G_i. No
+    % future feedback correction is assumed, so issued inputs carry no
+    % uncertainty of their own.
     generator=model.uncertainty.egoGenerator;
-    posterior=generator;
-    stages=localFeedbackLinearization(anchor,model,any(posterior(:)));
-    model.feedbackGains=cat(3,stages.gain);
-    inputGenerator=zeros(2,size(generator,2));
-    physicalInputLower=zeros(2,count);physicalInputUpper=zeros(2,count);
+    stages=localLinearization(anchor,model);
+    physicalInputLower=repmat(inputLower,1,count);physicalInputUpper=repmat(inputUpper,1,count);
     maximumTightening=0;
     times=(0:2*count)*cfg.controller.sampleTime/2;
     targetTube=predictiveSafetyGeometry.targetErrorTube(model.target,model.uncertainty.target,times);
@@ -440,43 +435,20 @@ function [problem,model]=localFormulate(anchor,model)
         x=anchor.states(:,index);input=anchor.inputs(:,index);nextReference=anchor.states(:,index+1);
         stage=stages(index);middle=stage.middle;am=stage.am;bm=stage.bm;
         next=stage.next;a=stage.a;b=stage.b;
-        previousInputGenerator=inputGenerator;
         collisionGenerator=localRelativeGenerator(x,generator,model);
-        if index==1 || ~any(posterior(:))
-            % The current estimate and nominal center coincide. The issued
-            % input is known, so d0=epsilon0 cancels the feedback terms.
-            middleGenerator=am*generator;nextGenerator=a*generator;
-            inputGenerator=zeros(2,size(generator,2));
-        else
-            gain=stage.gain;
-            % Maximize alpha in [0,1] along the Riccati brake-gain direction
-            % subject to its uncertainty image fitting the anchor's remaining
-            % actuator range. Shrink feedback authority, never the error set.
-            allowance=max(0,min(inputUpper(2)-input(2),input(2)-inputLower(2)));
-            rawRadius=sum(abs([gain(2,:)*generator,-gain(2,:)*posterior]));
-            if rawRadius>0,gain(2,:)=gain(2,:)*min(1,allowance/rawRadius);end
-            model.feedbackGains(:,:,index)=gain;
-            inputGenerator=[gain*generator,-gain*posterior];
-            middleGenerator=[(am+bm*gain)*generator,-bm*gain*posterior];
-            nextGenerator=[(a+b*gain)*generator,-b*gain*posterior];
-        end
+        middleGenerator=am*generator;nextGenerator=a*generator;
         middleCollisionGenerator=localRelativeGenerator(middle,middleGenerator,model);
         if index==1,firstStateGenerator=nextGenerator;end
         uncertaintyPrediction.egoStateRadius(:,2*index-1:2*index)=[sum(abs(generator),2),sum(abs(middleGenerator),2)];
         uncertaintyPrediction.collisionStateRadius(:,2*index-1:2*index)=[sum(abs(collisionGenerator),2),sum(abs(middleCollisionGenerator),2)];
         eq=6*index+(1:6);equal(eq,ix(:,index+1))=eye(6);equal(eq,ix(:,index))=-a;equal(eq,iu(:,index))=-b;
         rhs(eq)=next-nextReference;
-        inputRadius=sum(abs(inputGenerator),2);
-        physicalInputLower(:,index)=inputLower+inputRadius;
-        physicalInputUpper(:,index)=inputUpper-inputRadius;
-        lower(iu(:,index))=max(lower(iu(:,index)),inputLower-input+inputRadius);
-        upper(iu(:,index))=min(upper(iu(:,index)),inputUpper-input-inputRadius);
+        lower(iu(:,index))=max(lower(iu(:,index)),inputLower-input);
+        upper(iu(:,index))=min(upper(iu(:,index)),inputUpper-input);
         r=sparse(2,nv);r(:,iu(:,index))=eye(2);previous=model.previousInput;
         if index>1,r(:,iu(:,index-1))=-eye(2);previous=anchor.inputs(:,index-1);end
-        previousInputGenerator(:,end+1:size(inputGenerator,2))=0;
-        rateRadius=sum(abs(inputGenerator-previousInputGenerator),2);
         finite=isfinite(rate);difference=input-previous;
-        rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite)-rateRadius(finite);rate(finite)+difference(finite)-rateRadius(finite)];
+        rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
         % The current measured node is fixed; every later node stays on the road.
         if index>1 && ~isempty(model.road.lateralClearance)
@@ -560,30 +532,13 @@ function [problem,model]=localFormulate(anchor,model)
     problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
 end
 
-function stages=localFeedbackLinearization(anchor,model,withFeedback)
+function stages=localLinearization(anchor,model)
     count=size(anchor.inputs,2);stages=repmat(struct('middle',[],'am',[],'bm',[], ...
-        'next',[],'a',[],'b',[],'gain',zeros(2,6)),1,count);
+        'next',[],'a',[],'b',[]),1,count);
     for index=1:count
         [stages(index).middle,stages(index).am,stages(index).bm, ...
             stages(index).next,stages(index).a,stages(index).b]= ...
             nonlinearBicycleModel.hold(anchor.states(:,index),anchor.inputs(:,index),model.cfg);
-    end
-    if ~withFeedback,return;end
-    cfg=model.cfg;scales=[1,cfg.clf.lateralPositionErrorScale,cfg.clf.headingErrorScale, ...
-        cfg.clf.speedErrorScale,cfg.clf.lateralVelocityErrorScale,cfg.clf.yawRateErrorScale];
-    % The recursion starts from the stage weight at the endpoint.
-    angle=anchor.states(3,end);rotation=[cos(angle),sin(angle);-sin(angle),cos(angle)];
-    transform=blkdiag(rotation,eye(4));p=transform.'*diag(1./scales.^2)*transform;
-    % Normalize ancillary effort by the same steering/braking scales used
-    % for the RTI correction. An unscaled unit penalty amplifies posterior
-    % noise enough to make the brake tube exceed its physical range.
-    effort=diag(1./[.15;.25].^2);
-    for index=count:-1:1
-        a=stages(index).a;b=stages(index).b;
-        angle=anchor.states(3,index);rotation=[cos(angle),sin(angle);-sin(angle),cos(angle)];
-        transform=blkdiag(rotation,eye(4));q=transform.'*diag(1./scales.^2)*transform;
-        gain=-(effort+b.'*p*b)\(b.'*p*a);stages(index).gain=gain;
-        p=q+a.'*p*a+a.'*p*b*gain;p=(p+p.')/2;
     end
 end
 

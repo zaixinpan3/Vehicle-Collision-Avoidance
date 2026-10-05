@@ -63,7 +63,9 @@ For each fixed separating normal, position uncertainty uses directional
 support of the propagated ego generators plus the target position radius.
 Rectangle orientation uncertainty contributes `2*reach*sin(min(pi,b_yaw)/2)`.
 The ego generator propagates as `G_next=A_i*G_i`, for fixed candidate inputs.
-This is an open-loop affine image, not a nonlinear tube with future feedback.
+This is an open-loop affine image, not a nonlinear tube with future feedback:
+no ancillary feedback gains are used, and the shifted plan is rolled out with
+its own inputs.
 
 Every current target estimate, with or without an error certificate, updates
 the prediction center and its A and beta. These two parameters remain constant
@@ -287,7 +289,8 @@ On the selected model the single CLF requirement is
     V(x_next) - V(x) <= -eta * e(x)' Q e(x) + rho,    rho >= 0,
     V(x) = e(x)' P e(x).
 
-P is the local discrete LQR matrix for the given-path cruise trim. The analytic
+P is the quadratic CLF synthesized by an LMI for the given-path cruise trim
+(see [NOMINAL_CLF.md](NOMINAL_CLF.md)); there is no LQR design. The analytic
 error Jacobian applied to the affine first successor gives a convex quadratic
 with Hessian J' P J. One second-order cone represents its epigraph. There are
 no cost-to-go rollouts or finite-difference curvature calculations. This
