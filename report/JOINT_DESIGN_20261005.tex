@@ -236,6 +236,16 @@ final changes (\path{JOINT_DESIGN_20261005/development-metrics.csv}).
   with \texttt{TMPDIR} on disk, after those processes were stopped.
 \end{itemize}
 
+\section{Addendum: E2 removed (October 5, 2026)}
+At the user's direction the window fit (E2) was removed and the tracker's own
+$A$ and $\beta$ are published again; everything else above is unchanged.
+With the tracker's output the six-seed noisy campaign recovered 82 of 84
+encounters, with no collision or road departure. In the other two, the
+controller had no solution where a long horizon (84 and 104 holds) met a
+forecast moved by the tracker's error in $A$. The smallest road margin
+fell to 0.23~m. The truth audit again found no bound that failed to contain
+the truth (\path{ESTIMATOR_DIRECT_TARGET_20261005.tex}).
+
 \section{Reproduction}
 Each encounter was run in its own MATLAB process with the arguments that
 \texttt{runPotentialFieldCampaign} passes

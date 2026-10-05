@@ -1,10 +1,11 @@
-# Model-aided ego estimation and contract-consistent target parameters
+# Model-aided ego estimation
 
 This note describes how the estimator shares the controller's vehicle model,
 input and operating domain (October 5, 2026). It complements
 [OBSERVER_ISS_THEORY.md](OBSERVER_ISS_THEORY.md), whose continuous-time
 cascade and certificates are unchanged. The experiments and audits are in
-`report/JOINT_DESIGN_20261005.tex`.
+`report/JOINT_DESIGN_20261005.tex` and
+`report/ESTIMATOR_DIRECT_TARGET_20261005.tex`.
 
 ## Why the kinematic relation was replaced
 
@@ -112,76 +113,22 @@ centre plus the GNSS direction error (`certifiedRotationCorrespondence`). An
 uninformative interval contributes the whole circle; the orientation set
 then propagates with the gyro.
 
-## 5. Contract-consistent target parameters
+## 5. Target parameters come from the tracker
 
-The target contract (NRMM) keeps the tangential acceleration `A` and the
-sideslip `beta` constant, so the path has constant curvature
-`kappa = sin(beta)/lr`. The high-gain tracker does not use this constancy. It
-reconstructs `A` and `beta` from its acceleration state, which differentiates
-radar noise twice and has a transient after initialization. On the noisy
-campaign, its `A` error had RMS 0.2-0.4 m/s^2 throughout. Its `beta` error had
-RMS 0.03-0.04 rad in the first 0.5 s, the size of the whole contract range
-(+/-0.055 rad), and reached that bound within 0.05 s of initialization. The
-controller plans with these values. The forecast then moved by about 0.6 m at
-1 s ahead from one sample to the next, and the encounter plans became
-infeasible.
+The published target acceleration `A` and sideslip `beta` are the tracker's
+own reconstruction from its state `[rho; q; s]` (`nrmmTargetTrackerDerivative`).
+Commit `06af0a2` had replaced them with a Gauss-Newton window fit of the
+constant-parameter trajectory to the radar detections. At the user's
+direction (October 5, 2026) the estimator's direct output is published
+again, and the window fit is removed. With it, the six-seed noisy campaign
+recovered 82 of 84 encounters instead of 84, with no collision
+(`report/ESTIMATOR_DIRECT_TARGET_20261005.tex`). Between 0.5 and 3 s, the
+per-run RMS error of `A` had a median of 0.27 m/s^2 against 0.019 for the
+fit. That of `beta` had a median of 0.0078 rad against 0.0005. Both
+failures were forecasts over long horizons (84 and 104 holds). In them, the
+error of `A` moved the target by 3.7 and 5.6 m at the end of the horizon.
 
-`nrmmTargetParameterFit` keeps the radar detections of the last
-`targetHistoryDuration` (2 s), each with the ego position estimated at its
-time and the gyro rate. At a solve the ego heading at each detection is the
-current yaw estimate minus the integrated gyro back to that detection, and
-the detections are converted to the inertial frame with these headings.
-Within the window the relative headings are accurate to the gyro noise. A
-constant yaw error `e` rotates the target path and adds `e` times the ego
-displacement, so `A` and `kappa` move only by `e` times the ego's
-acceleration. The first version converted each detection with the yaw
-estimated at its own time. The yaw observer's corrections, times a range of
-45 m during an avoidance, then bent a re-acquired straight target's track
-into `beta = -0.055` (the contract bound; truth -0.008).
-Gauss-Newton fits `theta = [X; Y; course; V; A; kappa]` at the solve time
-to the closed-form trajectory `predictiveSafetyGeometry.predictTarget`, the
-one the controller predicts with. It starts from a quadratic polynomial fit
-of the same window, and clips `V`, `A` and `beta` to the target domain.
-
-**Model selection inside the contract.** `A` and `kappa` stay free only where
-they exceed three standard errors of the fit, computed from its residual
-variance. Otherwise the contract member with that parameter at zero
-(constant speed, straight path) is refitted. With the 0.5-s initialization
-window the curvature's standard error is about 0.006 1/m at 8 m/s. The
-unrestricted fit once gave a straight head-on target `beta = -0.016`. Its
-forecast then drifted 0.6 m into the ego's escape side within 1.1 s, and the
-startup plan overlapped that forecast after the slack prefix, where the
-fixed-multiplier collision rows are hard and have zero gradient at overlap,
-so the first frame had no solution (2 of 12 noisy 15-m/s head-on runs). A
-turning target's curvature (0.03 1/m) is significant from the first frame.
-The test passes any parameter once the window has made it significant.
-
-Once the window spans `parameterFitMinimumDuration` (0.5 s), the runtime
-publishes the fitted `A` and `beta`. Before that, after a mid-run
-acquisition, it publishes the contract's simplest member `A = 0`, `beta = 0`,
-not the tracker's initial transient. It keeps the tracker's position,
-velocity (speed and course) and certified sets. The heading is the tracker
-course minus the published `beta`, so the published course is unchanged.
-
-Bookkeeping keeps the certified sets valid about the published values. The
-acceleration interval is already recentred at the published `A`. The
-published yaw-rate and sideslip radii add their distance to the tracker's
-values. The controller computes curvature and sideslip radii as distances from
-its published centre to the interval ends.
-
-The fit is an estimate, not an enclosure. An offline prototype without model
-selection used synthetic radar noise and the recorded ego estimation errors,
-over five encounters and their first 2 s. The fit's `beta` error was at most
-0.017 rad and its `A` error at most 0.38 m/s^2 (turning targets, first 0.2 s).
-The tracker's were at most 0.063 rad and 1.7 m/s^2.
-
-**Initialization history.** The runtime receives the radar detections of the
-initialization window (0.5 s), with the GNSS position standing in for the
-ego estimate and the gyro rates for the headings. The fit is therefore
-available from the first frame of an encounter that starts inside the radar
-range.
-
-## 6. Target initialization in the adapter
+## 6. Target acquisition and initialization in the adapter
 
 `localTargetStateFromInertialWindow` fits position, velocity and a constant
 acceleration to a window of at least `accelerationFitMinimumDuration` (0.5 s),
@@ -208,9 +155,6 @@ the circular road).
 - the force-balance interval contains the true lateral velocity;
 - the nominal point is exact without noise even where the interval is wide;
 - contradictory measurements give an empty interval;
-- the window fit recovers constant contract parameters and averages bounded noise;
-- model selection keeps a straight forecast until curvature is significant;
-- gyro-integrated headings keep the fit accurate for a turning ego with a yaw error;
 - the estimator domain is computed from the controller.
 
 `tests/nrmmTruthEnclosureAuditTest.m` checks that the shared vehicle model
@@ -222,12 +166,14 @@ The ego and target enclosures are conditional on the stated sensor bounds, the
 shared model structure with its parameter box, the sideslip cone, and the
 target contract. The plant used in the simulations has exactly this structure,
 with the nominal parameters. The replay audit (`scripts/replayEstimatorValidity.m`)
-covers every frame of the fourteen noisy encounters (seed 20261003). In it the
-published ego and target bounds contained the truth in every frame, and the ego
-bound stayed valid throughout. The true motion stayed inside the sideslip cone.
-In one frame (15-m/s head-on, 1.25 s) it reached a rear-adhesion ratio of
-1.008, since the controller's adhesion row acts on the estimate. The
-force-balance certificate needs only the cone. The target prediction-parameter set
-is still wide: course about +/-0.4 rad, speed +/-1.7 to 3.7 m/s, and the
-whole contract range for `A` and curvature. The controller therefore uses the
-current enclosure only for each hold (see `controller/PCBF_CLF_ARCHITECTURE.md`).
+covers every frame of the fourteen noisy encounters (seed 20261003, tracker
+output). The published ego bounds (5,958 frames) and target bounds (2,291
+frames) contained the truth in every frame. The ego bound stayed valid
+throughout. The true motion stayed inside the sideslip cone. In three frames
+(15-m/s runs) it reached a rear-adhesion ratio of 1.0004-1.0072, since the
+controller's adhesion row acts on the estimate. The force-balance certificate
+needs only the cone. The target prediction-parameter set is still wide. Its
+per-run medians were a course of +/-0.24 to 0.53 rad and a speed of +/-1.9 to
+4.0 m/s, with the whole contract range for `A` and curvature. The controller
+therefore uses the current enclosure only for each hold (see
+`controller/PCBF_CLF_ARCHITECTURE.md`).

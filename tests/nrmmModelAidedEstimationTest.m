@@ -1,5 +1,5 @@
 classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
-    %nrmmModelAidedEstimationTest Shared-model ego measurement and contract-consistent target fit.
+    %nrmmModelAidedEstimationTest Shared-model ego measurement and the controller-derived domain.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -49,88 +49,6 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
             testCase.verifyFalse(lateral.consistent);
             testCase.verifyTrue(isinf(lateral.radius));
         end
-        function windowFitRecoversConstantParametersOfTheNrmmContract(testCase)
-            q=[3;-2;.4;9;.8;.045;1.6;2.4;.95;0;0];
-            domain=localTargetDomain();
-            fit=nrmmTargetParameterFit("initialize",2,.5,domain);
-            times=-2.5:1/80:0;
-            path=predictiveSafetyGeometry.predictTarget(q,times);
-            for index=1:numel(times)
-                fit=nrmmTargetParameterFit("append",fit,times(index),[0;0],path(1:2,index),0);
-            end
-            testCase.verifyLessThanOrEqual(fit.time(end)-fit.time(1),2+1e-9);
-            solution=nrmmTargetParameterFit("solve",fit,0,0,0);
-            testCase.verifyTrue(solution.available);
-            testCase.verifyEqual(solution.acceleration,q(5),AbsTol=1e-5);
-            testCase.verifyEqual(solution.sideslip,q(6),AbsTol=1e-6);
-            testCase.verifyEqual(solution.speed,q(4),AbsTol=1e-5);
-            testCase.verifyEqual(solution.position,q(1:2),AbsTol=1e-5);
-            testCase.verifyEqual(solution.course,q(3)+q(6),AbsTol=1e-6);
-        end
-        function windowFitAveragesBoundedNoiseAndNeedsItsMinimumSpan(testCase)
-            q=[0;0;pi;8;0;0;1.6;2.4;.95;0;0];
-            domain=localTargetDomain();
-            fit=nrmmTargetParameterFit("initialize",2,.5,domain);
-            stream=RandStream("mt19937ar",Seed=5);
-            times=-1.5:1/80:0;path=predictiveSafetyGeometry.predictTarget(q,times);
-            for index=1:numel(times)
-                if index==20
-                    testCase.verifyFalse(nrmmTargetParameterFit("solve",fit,times(index-1),0,0).available);
-                end
-                noisy=path(1:2,index)+0.04*(2*rand(stream,2,1)-1)/sqrt(2);
-                fit=nrmmTargetParameterFit("append",fit,times(index),[0;0],noisy,0);
-            end
-            solution=nrmmTargetParameterFit("solve",fit,0,0,0);
-            testCase.verifyTrue(solution.available);
-            testCase.verifyLessThan(abs(solution.acceleration),0.1);
-            testCase.verifyLessThan(abs(solution.sideslip),0.005);
-            testCase.verifyLessThan(solution.residualRms,0.04);
-            testCase.verifyError(@()nrmmTargetParameterFit("append",fit,0,[0;0],[1;0],0), ...
-                "nrmmTargetParameterFit:timeOrder");
-        end
-        function modelSelectionKeepsAStraightForecastUntilCurvatureIsSignificant(testCase)
-            domain=localTargetDomain();stream=RandStream("mt19937ar",Seed=9);
-            straight=[0;0;pi;8;0;0;1.6;2.4;.95;0;0];turning=straight;turning(5)=1;turning(6)=.05;
-            for q={straight,turning}
-                fit=nrmmTargetParameterFit("initialize",2,.5,domain);
-                times=-.5:1/80:0;path=predictiveSafetyGeometry.predictTarget(q{1},times);
-                for index=1:numel(times)
-                    fit=nrmmTargetParameterFit("append",fit,times(index),[0;0], ...
-                        path(1:2,index)+0.04*(2*rand(stream,2,1)-1)/sqrt(2),0);
-                end
-                solution=nrmmTargetParameterFit("solve",fit,0,0,0);
-                if q{1}(6)==0
-                    testCase.verifyEqual(solution.selected(6),false);
-                    testCase.verifyEqual(solution.sideslip,0);
-                else
-                    testCase.verifyEqual(solution.selected(6),true);
-                    testCase.verifyEqual(solution.sideslip,q{1}(6),AbsTol=0.02);
-                end
-            end
-        end
-        function gyroHeadingsKeepTheFitAccurateForATurningEgoWithAYawError(testCase)
-            % Body-frame detections from a turning, accelerating ego. A
-            % constant yaw-estimate error rotates the target path and adds that
-            % angle times the ego displacement: A and kappa move only by the
-            % error times the ego acceleration, not by the error times range.
-            q=[30;5;-2.6;9;.6;.04;1.6;2.4;.95;0;0];domain=localTargetDomain();
-            times=-1.5:1/80:0;path=predictiveSafetyGeometry.predictTarget(q,times);
-            rate=.5;yaw0=.3;egoPath=[8*times;0.5*times.^2];
-            fit=nrmmTargetParameterFit("initialize",2,.5,domain);
-            for index=1:numel(times)
-                heading=yaw0+rate*times(index);
-                rotation=[cos(heading),-sin(heading);sin(heading),cos(heading)];
-                radar=rotation.'*(path(1:2,index)-egoPath(:,index));
-                fit=nrmmTargetParameterFit("append",fit,times(index),egoPath(:,index),radar,rate);
-            end
-            exact=nrmmTargetParameterFit("solve",fit,0,yaw0,rate);
-            rotated=nrmmTargetParameterFit("solve",fit,0,yaw0+.01,rate);
-            testCase.verifyEqual(exact.acceleration,q(5),AbsTol=1e-5);
-            testCase.verifyEqual(exact.sideslip,q(6),AbsTol=1e-6);
-            testCase.verifyEqual(rotated.acceleration,q(5),AbsTol=.01);
-            testCase.verifyEqual(rotated.sideslip,q(6),AbsTol=1e-3);
-            testCase.verifyEqual(rotated.course-exact.course,.01,AbsTol=.01);
-        end
         function estimatorDomainIsComputedFromTheController(testCase)
             controller=collisionAvoidanceControllerConfig();
             estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),controller);
@@ -169,9 +87,4 @@ function [x,input,acceleration]=localState(stream,cfg)
         acceleration=[d(4)-x(6)*x(5);d(5)+x(6)*x(4)];
         return
     end
-end
-
-function domain=localTargetDomain()
-    domain=struct('rearAxleDistance',1.6,'sideslipMaximum',.055,'speedMinimum',1, ...
-        'speedMaximum',20,'scalarAccelerationMaximum',1.1);
 end

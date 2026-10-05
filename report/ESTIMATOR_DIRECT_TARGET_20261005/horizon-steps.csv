@@ -1,0 +1,3 @@
+publication,noisyFrames,median,p90,p99,maximum,shareAtMost16,shareAbove32,shareAbove64,shareAbove128
+windowFit06af0a2,35334,16,23,89,135,0.879974,0.0704138,0.024226,0.000198109
+trackerDirect,35318,16,22,79,138,0.878447,0.0701059,0.0197916,0.000169885

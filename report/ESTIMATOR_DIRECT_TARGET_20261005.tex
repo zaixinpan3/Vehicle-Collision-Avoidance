@@ -1,0 +1,180 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Target parameters from the estimator's direct output}
+\date{Prepared October 5, 2026}
+\begin{document}
+\maketitle
+
+\section{Question}
+In the joint estimator--controller design (commit \texttt{06af0a2},
+\path{JOINT_DESIGN_20261005.tex}), a window fit replaced the tracker's target
+scalar acceleration $A$ and sideslip $\beta$ (item E2). The fit used the last
+2~s of radar detections. The user asked for the estimator's direct output
+instead. This report records the change and what it does to the noisy-sensor
+encounters.
+
+\section{Change}
+The runtime again publishes the tracker's own reconstruction of $A$ and
+$\beta$. The tracker state is $[\rho;q;s]$: relative position, target velocity
+and target acceleration in the ego frame. From it,
+$A=q^\top s/|q|$ and $\Omega=(Jq)^\top s/|q|^2$
+(\path{estimator/nrmmTargetTrackerDerivative.m}). The following were removed:
+\begin{itemize}
+\item \path{estimator/nrmmTargetParameterFit.m};
+\item its calls in \path{estimator/onlineNrmmTrackingRuntime.m}: reset,
+  initialization, per-detection history, the override of the published $A$ and
+  $\beta$, and the widening of the published radii by the tracker--fit distance;
+\item the configuration field \texttt{parameterFitMinimumDuration};
+\item the corresponding shift terms in \path{estimator/nrmmControllerErrorBounds.m}.
+  This file and \path{config/nrmmTrackingConfig.m} are again identical to
+  \texttt{300b70b}.
+\end{itemize}
+Four unit tests of the fit were removed with it. Everything else in
+\texttt{06af0a2} is unchanged: the force-balance ego measurement and the
+computed domain (E1), and acquisition and initialization in the adapter (E3).
+The controller changes C1--C6 are unchanged too.
+
+\section{Results}
+\paragraph{Encounters.} The 98 runs used the same configuration as in
+\path{JOINT_DESIGN_20261005.tex}: 14 encounters with exact states, and the
+same 14 with noisy sensors for seeds 20261003 and 1--5. Each ran up to 2000
+holds (100~s).
+\begin{center}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & & & no & & min.\ & min.\ road\\
+ & runs & recovered & solution & collision & gap (m) & margin (m)\\
+\midrule
+exact states & 14 & 14 & 0 & 0 & 0.153 & 3.85\\
+noisy, window fit & 84 & 84 & 0 & 0 & 0.416 & 1.00\\
+noisy, tracker output & 84 & 82 & 2 & 0 & 0.362 & 0.23\\
+\bottomrule
+\end{tabular}
+\end{center}
+The exact-state runs do not use the estimator. Their results are identical to
+\texttt{06af0a2}. Seeds 20261003, 1, 2 and 4 recovered 14 of 14; seeds 3 and 5
+recovered 13 of 14. No run collided or left the road.
+
+The other noisy runs changed systematically. In the 15-m/s curved runs the
+smallest road margin fell to 0.23--0.89~m, from 1.89--3.30~m with the fit. The
+minimum gap to the target grew to 3.5--3.9~m, from 1.8--3.2~m. Faced with the
+noisier forecast, the controller passed the target more widely and came closer
+to the road edge. The median minimum gap over all noisy runs was 1.66~m
+(fit: 1.64~m). On the straight road, recovery was confirmed after a median of
+10.9~s (fit: 10.9~s). The maximum was 16.7~s, in an 8-m/s braking lead (fit:
+13.5~s). The ego estimation errors were unchanged within run-to-run variation:
+95th-percentile heading 0.0019--0.0068~rad, lateral velocity
+0.010--0.114~m/s, position 0.007--0.022~m
+(\path{ESTIMATOR_DIRECT_TARGET_20261005/campaign-metrics.csv}).
+
+\paragraph{Target parameters.} The table gives the root-mean-square error of
+the published parameter in each of the 84 noisy runs, as the median (maximum)
+over runs
+(\path{ESTIMATOR_DIRECT_TARGET_20261005/parameter-errors.csv}).
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+ & window fit & tracker output\\
+\midrule
+$A$, 0.5--3~s (m/s$^2$) & 0.019 (0.048) & 0.269 (0.461)\\
+$\beta$, 0.5--3~s (rad) & 0.0005 (0.0013) & 0.0078 (0.0269)\\
+$A$, first 0.5~s (m/s$^2$) & 0.228 (0.550) & 0.543 (1.163)\\
+$\beta$, first 0.5~s (rad) & 0.0000 (0.0077) & 0.0208 (0.0498)\\
+\bottomrule
+\end{tabular}
+\end{center}
+The tracker's $A$ also changes strongly from one 50-ms frame to the next. It
+can sit at the contract limit $\pm1.1$~m/s$^2$ for several frames (below).
+
+\paragraph{The two runs without a solution.} Both stopped in a frame whose plan
+needed a long horizon, while the tracker's $A$ was far from the truth
+(\path{ESTIMATOR_DIRECT_TARGET_20261005/failures.csv}).
+\begin{itemize}
+\item \emph{Seed 3, 8-m/s braking lead, $t=2.65$~s.} The lead brakes at
+  $A=-0.5$~m/s$^2$. In the eight preceding frames the published $A$ was
+  $-0.717$, $-0.898$, $-1.100$, $-1.100$, $-1.100$, $-1.100$, $-0.585$ and
+  $-0.594$~m/s$^2$; in the failing frame it was $-0.078$, with
+  $\beta=0.008$ instead of 0. The horizon was 84 holds (4.2~s). At its end the
+  forecast lead was 3.7~m further ahead and 1.6~m further left than the
+  true one.
+\item \emph{Seed 5, 8-m/s curved crossing, $t=7.10$~s.} The target turns with
+  $A=0.5$~m/s$^2$ and $\beta=0.040$. In the eight preceding frames the
+  published $A$ ranged from 0.16 to 0.73~m/s$^2$; in the failing frame it was
+  0.78. Until then the horizon had been 8 holds, and the separating speed of
+  the plan's endpoint had fallen from 1.83 to 0.56~m/s, close to the
+  rollout's 0.5-m/s margin. In the failing frame the rollout ran on to 104
+  holds (5.2~s). At the end of that horizon the forecast target was 5.6~m from
+  the true one.
+\end{itemize}
+The failing frames were re-solved with groups of rows removed. Without the
+collision rows, or without the terminal separation rows, both problems were
+solved. Removing the road, handling or road-recovery rows did not help. With
+the collision rows made soft, the slack was nonzero only at the end of the
+horizon: nodes 58--85 of 84 holds, and 102--105 of 104. The conflict lies
+between the forecast target near the end of a long horizon and the terminal
+separation requirement. Beyond the first hold the forecast uses the published
+$A$ and $\beta$ without an enclosure (see the scope in
+\path{JOINT_DESIGN_20261005.tex}), so the error of $A$ enters it
+quadratically in time.
+
+\paragraph{Horizon length.} The horizon is variable and is unchanged by this
+change. The shifted plan is rolled out until its first node in the terminal
+set, at most 512 holds (25.6~s). Over all noisy frames the median was 16 holds
+(0.8~s). The 90th percentile was 22, the 99th 79 and the maximum 138 holds.
+87.8\% of frames used at most 16 holds, 2.0\% more than 64 and 0.017\% more
+than 128. With the fit the figures were 16, 23, 89 and 135
+(\path{ESTIMATOR_DIRECT_TARGET_20261005/horizon-steps.csv}). The longest
+horizons occur in the 8-m/s braking lead (138), the 8-m/s curved crossing
+(129) and the 15-m/s braking lead (127). The two failures fall in the first
+two of these.
+
+\paragraph{Truth audit.} \path{scripts/replayEstimatorValidity.m} replayed
+the 14 seed-20261003 runs and reproduced the published estimates to
+$5.3\times10^{-15}$. The ego bound was valid in all 5,958 frames, and neither
+the ego bound nor the target bound (2,291 frames) failed to contain the truth.
+The true state left the shared domain in three frames, through the
+rear-adhesion ratio: 1.0072 and 1.0053 at 1.25~s in the 15-m/s head-on and
+accelerating head-on, and 1.0004 at 3.75~s in the 15-m/s braking lead. The
+sideslip cone held. The target prediction-parameter set is as wide as before.
+Per-run medians were a course radius of 0.24--0.53~rad and a speed half-width
+of 1.9--4.0~m/s, with the whole contract range for $A$ and curvature
+(\path{ESTIMATOR_DIRECT_TARGET_20261005/audit.csv}).
+
+\paragraph{Tests.} 653 of 653 tests pass: the 657 of \texttt{06af0a2} less
+the four fit tests (\path{ESTIMATOR_DIRECT_TARGET_20261005/tests.csv}).
+
+\section{Scope}
+\begin{itemize}
+\item The certified bounds are unaffected: the fit had only replaced the point
+  values of $A$ and $\beta$ and widened the radii by its distance to the
+  tracker. The failures are not bound violations. They come from the forecast
+  beyond the first hold, which no certificate covers.
+\item The tracker's gains minimize a bound on its output-noise velocity
+  variance subject to the Lipschitz dissipation inequality. The noise of the
+  acceleration state $s$, from which $A$ and $\beta$ are reconstructed, is not
+  part of that design. Ways to keep the direct output and reduce this noise
+  include a bound on the variance of $s$ in the gain program, or a
+  constant-parameter stage inside the estimator cascade. On the controller
+  side, the long horizons could trust the forecast less. None of these was
+  tried here.
+\item The campaign ran as eight parallel processes; the computation time was
+  not re-measured.
+\end{itemize}
+
+\section{Reproduction}
+The runner is the one of \path{JOINT_DESIGN_20261005.tex}; a copy is in
+\path{ESTIMATOR_DIRECT_TARGET_20261005/campaignOne.m.txt}. For one seed:
+\begin{verbatim}
+c = estimatorControllerIntegrationConfig(); c.randomSeed = seed;
+runPotentialFieldCampaign(root, out, 2000, EstimatorConfiguration=c)
+\end{verbatim}
+The truth audit is \texttt{replayEstimatorValidity(out)} on the
+seed-20261003 outputs, and the tests are \texttt{runtests('tests')}. The
+source hashes of the files that produced these results are listed in
+\path{ESTIMATOR_DIRECT_TARGET_20261005/source-sha256.txt}. The outputs are
+under\\
+\path{~/.cache/collisionAvoidance/estimator-direct-20261005}.
+\end{document}
