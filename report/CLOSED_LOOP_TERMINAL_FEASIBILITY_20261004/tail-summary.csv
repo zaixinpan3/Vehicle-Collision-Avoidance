@@ -1,0 +1,15 @@
+speed,scenario,frames,certifiedFrames,collidingFrames,uncertifiedFrames,tailMedian,tailP95,tailMaximum,requiredTotalMaximum,rolloutMillisecondsP95
+8,headOn,42,39,3,0,54,132,136,136,7.5040000000000004
+8,acceleratingHeadOn,42,39,3,0,55,133,138,138,6.099
+8,brakingLead,49,22,27,0,13,83,89,224,3.235
+8,crossing,41,36,5,0,48,134,138,159,5.6129999999999995
+8,turningCrossing,42,37,5,0,99,185,187,212,8.254
+8,curvedHeadOn,42,0,42,0,,,,,76.11500000000001
+8,curvedCrossing,41,0,41,0,,,,,163.293
+15,headOn,20,17,3,0,24,132,132,139,5.361000000000001
+15,acceleratingHeadOn,28,25,3,0,25,127,128,142,5.515
+15,brakingLead,47,22,25,0,16,77,87,212,2.6940000000000004
+15,crossing,27,22,5,0,14,125,131,156,5.303000000000001
+15,turningCrossing,34,28,6,0,30,133,146,176,5.745
+15,curvedHeadOn,244,0,244,0,,,,,50.268
+15,curvedCrossing,30,0,30,0,,,,,170.208

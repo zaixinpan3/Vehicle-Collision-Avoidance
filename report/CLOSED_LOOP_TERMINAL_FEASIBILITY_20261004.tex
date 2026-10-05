@@ -1,0 +1,109 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Can a closed-loop terminal set be computed in real time?}
+\date{Prepared October 4, 2026}
+\begin{document}
+\maketitle
+
+\section{Question}
+The user proposed a terminal set built from the target contract (constant
+tangential acceleration $A$ and sideslip $\beta$): the states from which the
+nominal path guidance alone never collides with the target. This study asks
+whether such a set can be imposed at every 50-ms sample. The controller is
+unchanged. The study script is \path{scripts/studyClosedLoopTerminalFeasibility.m}.
+
+\paragraph{Setup.} The nominal guidance is \texttt{nonlinearBicycleModel.nominalFeedback}, the
+law that already extends every anchor. For every fifth recorded ego state of the
+14 exact-observation runs of the separating-terminal campaign (commit 4b63978),
+the ego is rolled out under that guidance and the target under its model until
+one of two things happens. Either the rectangles touch, or a model-based
+certificate shows that no later collision occurs. The certificate requires the
+ego to have converged to the path. With $d_s=R_E+R_C+0.2$~m
+(circumscribed radii), it then requires one of the following:
+\begin{itemize}
+\item straight road, $\beta\neq0$: the target stays on a fixed circle (centre
+  $c$, radius $l_r/|\sin\beta|$); the ego is past $c$ along the road and at
+  least $d_s$ outside the circle;
+\item straight road, $\beta=0$: the vehicles separate, are at least $d_s$
+  apart, and the sign of $\Delta^\top Ae$ keeps the separating rate
+  nondecreasing until the target stops;
+\item curved road: the ego's path circle and the target's whole future path
+  are at least $d_s$ apart, or the target is outside the road circle by $d_s$
+  and moving outward.
+\end{itemize}
+The rollout limit is 4000 steps (200~s).
+
+\section{Results}
+\paragraph{Tail length (straight road).} Every non-colliding sampled state
+reached a certificate. The tail needed 13--99 steps (median per run) and at
+most 187 steps (9.4~s). If the free part must first reach the next state whose
+rollout is certified, the total horizon is at most 224 nodes. In the
+brakingLead runs about half of the states collide under the nominal guidance:
+cruising behind a slower lead is not in the set until the ego has overtaken
+(\path{CLOSED_LOOP_TERMINAL_FEASIBILITY_20261004/tail-summary.csv}).
+
+\paragraph{Curved road: the set is empty.} In curvedHeadOn and curvedCrossing,
+every sampled state, including those long after the encounter, collides under
+the model. The re-collision comes 1000--3460 steps (50--173~s) later. The ego
+circles the 200-m-radius road, and the target either circles its own
+constant-curvature path or crosses the road circle again. Taken over infinite
+time, the contract therefore predicts a later encounter, and no state is safe
+forever. Any usable terminal set on a curved road needs a finite validity time
+for the target model, or the perception premise that a target beyond the 50-m
+radius poses no risk.
+
+\paragraph{Cost per tail node.} The guidance costs 17~$\mu$s, one RK4 step
+9~$\mu$s and the hold linearization 12~$\mu$s. The guidance Jacobian by
+central differences costs 269~$\mu$s, so a 190-node tail costs about 58~ms. The
+Jacobian dominates; an analytic or complex-step Jacobian would remove most of
+it. The nonlinear rollouts alone took at most 8.3~ms (p95) on the straight road.
+
+\paragraph{Solve time versus horizon (present formulation).}
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+$N$ & startup (ms) & conic (ms) & shifted (ms) & conic (ms)\\
+\midrule
+64 & 86 & 9 & 46 & 12\\
+128 & 74 & 18 & 73 & 21\\
+256 & 178 & 35 & 171 & 43\\
+512 & 513 & 69 & 504 & 86\\
+1024 & 1715 & 138 & 1640 & 168\\
+\bottomrule
+\end{tabular}
+\end{center}
+The conic time grows linearly, at about 0.17~ms per node. The total grows
+faster than linearly, because the MATLAB formulation assigns sparse entries
+inside node loops. If the tail nodes were carried as variables, 224 nodes would
+cost about 40~ms of conic time alone.
+
+\paragraph{Condensing the tail.} Along the tail the inputs are a fixed
+feedback, so every tail state is an affine function of the endpoint state:
+$\delta x_i=\Phi_i\,\delta x_M$. Each tail collision or road row then becomes a
+row on the six endpoint variables. The set is a polyhedron in $\delta x_M$, and
+the conic problem keeps the size of the free horizon. The closed-loop
+sensitivities stay bounded. Starting 2--3~m off the path, the transverse part
+of $\|\Phi_i\|$ peaks at 2.8--3.6 at 8~m/s and 5.8--9.6 at 15~m/s, then decays
+to 0.01--0.04 after 200 steps (\path{phiStudy.m.txt}). Longitudinal position
+sensitivity to speed grows linearly, because path phase is free.
+
+\section{Assessment}
+Real-time use appears possible on the straight road if the tail is condensed
+into rows on the endpoint state and the guidance Jacobian is computed
+analytically. The free horizon then stays at its present size. The added work
+is a closed-loop rollout (below 10~ms) and about 12 rows per tail node on six
+variables. This is an estimate from the measured parts; the condensed problem
+was not built or timed. Three issues remain.
+\begin{enumerate}
+\item On the curved road the infinite-time set is empty under the contract. A
+  finite model-validity time, or the perception-radius premise, must be chosen.
+\item The terminal set excludes following a slower lead; the controller must
+  overtake within the horizon, or the nominal behaviour must include speed
+  adaptation.
+\item \texttt{nominalFeedback} contains clips and a sign switch, so its
+  Jacobian is piecewise. The peak sensitivity of 9.6 at 15~m/s amplifies
+  endpoint linearization error along the tail.
+\end{enumerate}
+\end{document}

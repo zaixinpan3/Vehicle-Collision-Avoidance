@@ -1,0 +1,17 @@
+R='/home/zai/Downloads/ResearchProjects/collisionAvoidance';addpath(fullfile(R,'scripts'),fullfile(R,'config'),fullfile(R,'controller'));
+for speed=[8 15]
+cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',speed));
+reference=nonlinearBicycleModel.cruise(cfg,0);
+lane=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',0,'length',2000));
+nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,0);
+for start=[[0;3;.15;reference.state(4:6)],[0;-2;-.1;reference.state(4)-1;reference.state(5:6)]]
+x=start;u=reference.input;Phi=eye(6);n=[];
+for i=1:200
+  f=@(z)nonlinearBicycleModel.sample(z,nonlinearBicycleModel.nominalFeedback(z,u,lane,reference,cfg,nominal),cfg);
+  J=zeros(6);for j=1:6,d=zeros(6,1);d(j)=1e-6;J(:,j)=(f(x+d)-f(x-d))/2e-6;end
+  Phi=J*Phi;n(end+1)=norm(Phi(2:6,:));
+  u=nonlinearBicycleModel.nominalFeedback(x,u,lane,reference,cfg,nominal);x=nonlinearBicycleModel.sample(x,u,cfg);
+end
+fprintf('speed %d start y=%.1f: max ||Phi(2:6,:)|| = %.2f, at 50/100/200 steps = %.3f / %.3f / %.3f, final lateral %.3f\n',speed,start(2),max(n),n(50),n(100),n(200),x(2));
+end
+end
