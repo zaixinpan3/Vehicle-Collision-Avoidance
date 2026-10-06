@@ -1,7 +1,0 @@
-{
-  "recordedAt": "2026-10-02T18:52:21.188962-05:00",
-  "reason": "Lowering height alone reduces estimator velocity RMSE from1.307 to0.728 m/s despite little raw-position improvement. Optical-depth0.1 m removes longitudinal clipping. Test their combination with original1.2 m clustering, since0.3 m clustering loses frames3--8 and increases all-frame startup error.",
-  "case": "lower_depth: min_object_height0 m, min_depth0.1 m, original cluster_radius1.2 m, original rectangle and observer settings.",
-  "selection": "Identical frozen persistent image selections; only selected target clusters need recaching. No truth reads.",
-  "assessment": "Report both all-frame and post2-second results, baseline and black-camera fault. Keep startup losses and poor ablations visible."
-}

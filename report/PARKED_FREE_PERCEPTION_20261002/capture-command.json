@@ -1,9 +1,0 @@
-[
-  "/home/zai/carla-venv/bin/python",
-  "-u",
-  "simulation_output/parked_free_perception_20261002/captureNative.py",
-  "--port",
-  "2011",
-  "--server-pid",
-  "2690788"
-]

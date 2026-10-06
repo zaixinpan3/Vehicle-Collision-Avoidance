@@ -1,8 +1,0 @@
-{
-  "estimator_default/predictions.csv": "85c866e02a852e5ef1b3303af6d2834df4d11453dd4b8bebd8d97e6ad8923e8a",
-  "perception_default/target_measurements.jsonl": "13da6d644ff48db04fcbf617a32c6e27a9ba33946fcfdc30c036abdd3a313314",
-  "estimator_filtered/predictions.csv": "0a047f0d9074985df6a8f380d9842f186c16dcb9a6966f6a6b1eefe423c5282c",
-  "perception_filtered/target_measurements.jsonl": "b5196de074cf1861281e941a3062cfdcf9d034bd322097bc0aa6cd7f245d4c12",
-  "estimator_filtered_blackout/predictions.csv": "87dd9676cf002ba46db4cc7e50c88377d7c8ef4a9b00f686a0a5db9ff69cc815",
-  "perception_filtered_blackout/target_measurements.jsonl": "fa7cc4d322ad90d2544213c52072f1b960517373a287754fd28e54b634b3ef2d"
-}

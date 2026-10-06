@@ -1,8 +1,0 @@
-{
-  "comparedFrames": 300,
-  "sameAvailabilityAndDetections": true,
-  "maximumPositionDifferenceM": 8.848414820926143e-15,
-  "maximumMotionHeadingDifferenceRad": 4.440892098500626e-15,
-  "geometryRecordsWithAnyFloatDifference": 271,
-  "initialBitwiseEqualityCheck": "Failed for floating-point differences; bounded numerical comparison used below."
-}
