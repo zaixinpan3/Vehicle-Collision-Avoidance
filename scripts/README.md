@@ -58,26 +58,23 @@ are affine states; independent replay determines measured physical clearance. Se
 [the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
 
 `prepareCollisionAvoidanceController` warms MATLAB and the optimizer using a
-discarded call. `prepareCollisionAvoidancePipeline` additionally probes the
-estimator adapter. Neither helper builds native controller libraries:
+discarded call. It does not build native controller libraries:
 `buildPredictiveConicSolver` links the required Clarabel adapter, and
 `buildControllerKernels` builds the optional MATLAB Coder kernels.
 
 ## Estimator and perception research
 
-- `nrmmEstimatorControllerAdapter`, `nrmmTargetMeasurement` and
-  `nrmmTargetTruth` provide the estimator scenario interface. The adapter
-  drives `onlineNrmmTrackingRuntime` at 80 Hz on bounded-noise sensors
+- `nrmmEstimatorControllerAdapter` provides the estimator scenario
+  interface. It drives `onlineNrmmTrackingRuntime` at 80 Hz on bounded-noise sensors
   synthesized from the true path, acquires a target after 20 consecutive
   detections, publishes it only while detected, and passes the controller's
   held input to the estimator.
-- `runObserverComparisonScenario`, `runObserverComparisonCampaign`,
-  `runSharmaFairnessAudit`, `runSharmaScenarioTunedAudit` and
-  `runNrmmOracleTargetComparison` compare the estimator with the reproduced
+- `runObserverComparisonScenario` and `runObserverComparisonCampaign`
+  compare the estimator with the reproduced
   Sharma et al. (2026) observer on prescribed kinematic motions (no vehicle
   dynamics, no controller).
-- `runOnlineNrmmComplexManeuverScenario`, `runOnlineNrmmTrackingErrorBenchmark`
-  and `runNrmmPositionBoundBenchmark` are estimator research drivers.
+- `runOnlineNrmmComplexManeuverScenario` and `runOnlineNrmmTrackingErrorBenchmark`
+  are estimator research drivers.
 - `buildNrmmObserverKernel` and `auditNrmmTruthEnclosure` support the estimator's
   independent native kernel and bound audits.
 - `fitPerceivedRoadBoundaries`, `evaluatePerceivedRoadBoundarySafety` and
@@ -87,6 +84,8 @@ estimator adapter. Neither helper builds native controller libraries:
   used by the current controller.
 
 Retired controller modes, formal controller admission and native benchmark
-scripts have been removed. Their dated reports remain historical results;
+scripts have been removed. On October 6, 2026 the research, audit and
+validation scripts that no weekly record cites were removed as well (last
+present at commit `1fca601`). Their dated reports remain historical results;
 use Git history for the source associated with those reports. New reports
 and numerical results belong in `report/`.

@@ -64,8 +64,8 @@ premises are separate observations. `nominalRecoveryValidationTest` and
 
 Initialization metadata uses `movingTargetPotentialField`, `laneFeedbackRollout`
 and `shiftedInputRollout`; `predictTarget` advances the prescribed target
-motion. The experiment entry points are `runPotentialFieldCampaign`,
-`extendPotentialFieldRecovery` and `analyzePotentialFieldStudy.py` in `scripts/`. Saved validation continuations
+motion. The experiment entry points are `runPotentialFieldCampaign` and
+`extendPotentialFieldRecovery` in `scripts/`. Saved validation continuations
 must use the current trace schema. Historical reports and recorded artifacts
 retain the names used when those experiments were performed.
 
