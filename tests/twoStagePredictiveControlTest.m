@@ -1,5 +1,6 @@
 classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
-    % Safety slack then CLF; a failed shift is re-solved once from a fresh rollout.
+    % Safety slack then CLF on an affine model; the issued plan is the
+    % nonlinear rollout of an accepted step and ends in the terminal set.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -9,14 +10,14 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function solvedPlanIsIssuedWithoutNonlinearChecking(testCase)
+        function issuedPlanIsTheNonlinearRolloutOfAnAcceptedStep(testCase)
             [ego,~,cfg]=localFixture();
             [~,q,road]=collisionThreatScenario("headOn",cfg);
             target=struct('targetPositionInertial',q(1:2), ...
                 'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
             [command,inputs,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
             search=problem.metadata.search;
-            testCase.verifyFalse(problem.metadata.nonlinearPredictionEvaluated);
+            testCase.verifyTrue(problem.metadata.nonlinearPredictionEvaluated);
             testCase.verifyFalse(isfield(problem.metadata,'predictionAgreement'));
             testCase.verifyFalse(isfield(state,'linearizationTrustScale'));
             testCase.verifyEqual(search.terminationReason,"twoStagesReturned");
@@ -26,12 +27,15 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 -problem.solution.clfInitialValue+problem.solution.clfRequiredDecrease),AbsTol=cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
-            % Terminal set: separating, inside the road.
-            testCase.verifyEqual(problem.metadata.terminalSet,"separatingRoadRecoverable");
-            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalSeparatingSpeed,0);
-            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,-1e-3);
+            % Terminal set: the endpoint's CLF tube misses the target until it
+            % leaves the perception range.
+            testCase.verifyEqual(problem.metadata.terminalSet,"clfTubeEncounterSafe");
+            testCase.verifyTrue(ismember(problem.metadata.acceptedStep,cfg.terminal.acceptanceSteps));
+            context=terminalSafeSet.context(problem.model);
+            testCase.verifyTrue(terminalSafeSet.member(context,problem.predictedState(:,end),size(inputs,2)));
+            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,0);
             testCase.verifyGreaterThan(size(inputs,2),cfg.controller.horizonSteps);
-            localVerifyAffinePrediction(testCase,problem,cfg);
+            localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function targetFreeInitializationRunsBothLexicographicStages(testCase)
             [ego,road,cfg]=localFixture();
@@ -51,10 +55,10 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.appliedInput,inputs(:,1),AbsTol=0);
             testCase.verifyFalse(isfield(state,'witness'));
-            testCase.verifyFalse(problem.metadata.nonlinearValidationPerformed);
-            testCase.verifyEqual(problem.metadata.safetyScope,"affineSampledConstraints");
-            testCase.verifyEqual(problem.metadata.recursiveFeasibilityScope,"notCertifiedForNonlinearPlant");
-            localVerifyAffinePrediction(testCase,problem,cfg);
+            testCase.verifyTrue(problem.metadata.nonlinearValidationPerformed);
+            testCase.verifyEqual(problem.metadata.safetyScope,"nonlinearRolloutSampledConstraints");
+            testCase.verifyEqual(problem.metadata.recursiveFeasibilityScope,"shiftedPlanOnDeclaredModelWithConsistentForecast");
+            localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function encounterUsesTheSameNominalClf(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
@@ -66,7 +70,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.clfFunction,"quadraticTransverseError");
             testCase.verifyEqual(problem.metadata.tertiaryObjective,"none");
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            localVerifyAffinePrediction(testCase,problem,cfg);
+            localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function targetRangeCannotSelectADifferentClf(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
@@ -99,7 +103,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.predictedState(:,1),problem.model.initialState,AbsTol=1e-7);
             testCase.verifyEqual(problem.metadata.solverCallCount,sum([problem.metadata.search.stages.numericalSolve]));
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            localVerifyAffinePrediction(testCase,problem,cfg);
+            localVerifyNonlinearRollout(testCase,problem,cfg);
             localVerifyAnchorRollout(testCase,anchor,cfg);
         end
         function anInfeasibleShiftUsesOneFreshRolloutThenReportsNoSolution(testCase)
@@ -153,7 +157,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(search.clfStageCompleted);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyAnchorRollout(testCase,problem.model.linearization,cfg);
-            localVerifyAffinePrediction(testCase,problem,cfg);
+            localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function overlappingHardRowsHaveNoInventedRestorationDirection(testCase)
             [ego,road,cfg]=localFixture();
@@ -216,23 +220,34 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(worstAdhesion,1+1e-2);
             testCase.verifyLessThanOrEqual(worstSideslip,1e-6);
         end
-        function theEndpointCanStopItsLateralMotionBeforeTheRoadEdge(testCase)
+        function theEndpointLiesInTheTerminalSet(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[4;4];
             ego.position(2)=1.2;ego.yaw=.3;
-            strict=cfg;strict.collision.roadRecoveryAccelerationFraction=.05;
-            for configuration={cfg,strict}
-                settings=configuration{1};
-                [~,~,problem]=collisionAvoidanceController(ego,[],road,settings,[]);
-                y=problem.predictedState(:,end);
-                corners=settings.vehicle.rectangleOffset+[settings.vehicle.length;settings.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
-                rotation=[cos(y(3)),-sin(y(3));sin(y(3)),cos(y(3))];
-                lateral=laneGeometry.project(y(1:2)+rotation*corners,problem.model.lane).lateralPosition;
-                center=laneGeometry.project(y(1:2),problem.model.lane);
-                leftward=[-sin(center.heading),cos(center.heading)]*rotation*y(4:5);
-                a=settings.collision.roadRecoveryAccelerationFraction*min(settings.tire.frictionCoefficient)*settings.vehicle.gravity;
-                distance=[road.lateralClearance(2)-max(lateral);road.lateralClearance(1)+min(lateral)];
-                % Linearized at the anchor endpoint; allow the second-order remainder.
-                testCase.verifyLessThanOrEqual(max([leftward;-leftward],0).^2-2*a*distance,[2e-2;2e-2]);
+            [~,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            y=problem.predictedState(:,end);context=terminalSafeSet.context(problem.model);
+            [member,~,info]=terminalSafeSet.member(context,y,size(inputs,2));
+            testCase.verifyTrue(member);
+            testCase.verifyLessThanOrEqual(info.value,context.levelMaximum);
+            testCase.verifyEqual(problem.metadata.terminalValue,info.value,AbsTol=1e-12);
+            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,0);
+        end
+        function shiftedPlanIsAFeasibleCandidateAtTheNextSample(testCase)
+            % Recursive feasibility on the declared model: when the state is
+            % the plan's own successor and the forecast is unchanged, the
+            % shifted plan meets every hard row and ends in the terminal set.
+            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
+            target=struct('targetPositionInertial',q(1:2), ...
+                'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
+            [~,~,~,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            for frame=1:3
+                ego=localSuccessor(ego,state);
+                future=predictiveSafetyGeometry.predictTarget(q,frame*cfg.controller.sampleTime);
+                target=struct('targetPositionInertial',future(1:2), ...
+                    'targetVelocityInertial',future(4)*[cos(future(3));sin(future(3))],'targetYawInertial',future(3));
+                [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,state);
+                testCase.verifyTrue(problem.metadata.anchorCertified);
+                testCase.verifyTrue(problem.metadata.candidateFeasible);
+                localVerifyNonlinearRollout(testCase,problem,cfg);
             end
         end
         function aRoadTooNarrowForTheVehicleHasNoSolution(testCase)
@@ -270,7 +285,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 problem.metadata.search.slackCap+cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(problem.metadata.search.attempts(1).initialization,"movingTargetPotentialField");
-            localVerifyAffinePrediction(testCase,problem,cfg);
+            localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function brakingSlewAndMagnitudeBoundsConstrainTheReturnedPlan(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.05;
@@ -281,7 +296,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(abs(diff([ego.heldActuatorInput(2),inputs(2,:)]))),limit+tol);
             testCase.verifyLessThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMaximum+tol);
             testCase.verifyGreaterThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMinimum-tol);
-            localVerifyAffinePrediction(testCase,problem,cfg);
+            localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function numericalSteeringCorrectionDoesNotImposeActuatorSlew(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;ego.yaw=.5;
@@ -293,7 +308,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 cfg.nonlinear.trustRadius*.15+cfg.solver.feasibilityTolerance);
             testCase.verifyGreaterThan(abs(steering-ego.heldActuatorInput(1)),.5);
             testCase.verifyEqual(problem.metadata.solverCallCount,sum([problem.metadata.search.stages.numericalSolve]));
-            localVerifyAffinePrediction(testCase,problem,cfg);
+            localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function brakingEncounterUsesOneFreshModelAndCompletesTheClf(testCase)
             [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("brakingLead",cfg);
@@ -314,22 +329,22 @@ end
 function localVerifyAnchorRollout(testCase,anchor,cfg)
     residual=zeros(6,size(anchor.inputs,2));
     for index=1:size(anchor.inputs,2)
-        next=nonlinearBicycleModel.sample(anchor.states(:,index),anchor.inputs(:,index),cfg);
+        [~,next]=terminalSafeSet.holdStates(anchor.states(:,index),anchor.inputs(:,index),cfg);
         residual(:,index)=next-anchor.states(:,index+1);
     end
     testCase.verifyLessThanOrEqual(max(abs(residual),[],'all'),1e-12);
 end
 
-function localVerifyAffinePrediction(testCase,problem,cfg)
-    anchor=problem.model.linearization;states=problem.predictedState;inputs=problem.inputTrajectory;
+function localVerifyNonlinearRollout(testCase,problem,cfg)
+    % The issued plan is the nonlinear rollout of its inputs from the estimate.
+    states=problem.predictedState;inputs=problem.inputTrajectory;
     residual=zeros(6,size(inputs,2));
+    testCase.verifyEqual(states(:,1),problem.model.initialState,AbsTol=0);
     for index=1:size(inputs,2)
-        [next,a,b]=nonlinearBicycleModel.sample(anchor.states(:,index),anchor.inputs(:,index),cfg);
-        affine=next+a*(states(:,index)-anchor.states(:,index))+b*(inputs(:,index)-anchor.inputs(:,index));
-        residual(:,index)=states(:,index+1)-affine;
+        [~,next]=terminalSafeSet.holdStates(states(:,index),inputs(:,index),cfg);
+        residual(:,index)=states(:,index+1)-next;
     end
-    testCase.verifyLessThanOrEqual(max(abs(residual),[],'all'),cfg.solver.feasibilityTolerance);
-    testCase.verifyFalse(problem.metadata.affineValidationPerformed);
+    testCase.verifyLessThanOrEqual(max(abs(residual),[],'all'),1e-12);
     testCase.verifyGreaterThanOrEqual(size(inputs,2),cfg.controller.horizonSteps);
     testCase.verifyLessThanOrEqual(size(inputs,2),cfg.controller.maximumHorizonSteps);
 end

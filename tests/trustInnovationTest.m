@@ -1,5 +1,5 @@
 classdef trustInnovationTest < matlab.unittest.TestCase
-    % Input trust scale estimated from the plan innovation e = L*s^2.
+    % Input trust scale estimated from the full-step remainder e = L*s^2.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -13,43 +13,38 @@ classdef trustInnovationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function startupUsesTheInitialScaleAndRecordsTheCorrection(testCase)
+        function theFullStepRemainderSetsTheNextScale(testCase)
+            % The frame solves with the initial scale; the nonlinear rollout of
+            % its full affine step measures the remainder L*s^2 that sets the
+            % scale of the next frame.
             [ego,road,cfg]=localFixture();
             [~,inputs,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            testCase.verifyEqual(state.trust.scale,cfg.nonlinear.trustInitialScale);
-            testCase.verifyFalse(state.trust.updated);
+            search=problem.metadata.search;acceptance=search.acceptance;
+            testCase.verifyEqual(search.inputTrustScale,cfg.nonlinear.trustInitialScale);
+            testCase.verifyTrue(state.trust.updated);
+            testCase.verifyEqual(state.trust.modelInnovation,acceptance.fullGap,AbsTol=0);
+            prior=struct('scale',cfg.nonlinear.trustInitialScale,'correction',acceptance.fullCorrection, ...
+                'curvature',cfg.nonlinear.trustInnovationMeters/cfg.nonlinear.trustInitialScale^2);
+            testCase.verifyEqual(state.trust.scale,localExpectedScale(prior,acceptance.fullGap,cfg),RelTol=1e-12);
             unit=cfg.nonlinear.trustRadius*[.15;.25];
             anchor=problem.model.linearization.inputs;
             testCase.verifyEqual(state.trust.correction,max(abs(inputs-anchor)./unit,[],'all'),AbsTol=1e-12);
-            testCase.verifyLessThanOrEqual(state.trust.correction, ...
-                state.trust.scale+cfg.solver.feasibilityTolerance);
-            testCase.verifyTrue(isnan(state.trust.modelInnovation));
+            testCase.verifyLessThanOrEqual(acceptance.fullCorrection, ...
+                search.inputTrustScale+cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(problem.metadata.trust.scale,state.trust.scale);
         end
         function anAccuratePlanGrowsTheScaleByAtMostTheRetentionBound(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,~,problem,state]=collisionAvoidanceController(localSuccessor(ego,prior),[],road,cfg,prior);
-            trust=problem.metadata.trust;
-            testCase.verifyTrue(trust.updated);
+            trust=problem.metadata.trust;acceptance=problem.metadata.search.acceptance;
+            testCase.verifyEqual(problem.metadata.search.inputTrustScale,prior.trust.scale);
             testCase.verifyLessThan(trust.modelInnovation,cfg.nonlinear.trustInnovationMeters);
-            testCase.verifyEqual(trust.scale,localExpectedScale(prior.trust,trust.modelInnovation,cfg),RelTol=1e-12);
-            testCase.verifyGreaterThan(trust.scale,prior.trust.scale);
+            previous=prior.trust;previous.correction=acceptance.fullCorrection;
+            testCase.verifyEqual(trust.scale,localExpectedScale(previous,trust.modelInnovation,cfg),RelTol=1e-12);
             testCase.verifyLessThanOrEqual(trust.scale, ...
                 prior.trust.scale/sqrt(cfg.nonlinear.trustRetention)*(1+1e-12));
             testCase.verifyEqual(state.trust.scale,trust.scale);
-        end
-        function aContradictedPredictionShrinksTheScaleBySquareRootLaw(testCase)
-            [ego,road,cfg]=localFixture();
-            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            offset=8*cfg.nonlinear.trustInnovationMeters;
-            next=localSuccessor(ego,prior);
-            prior.stateTrajectory(2,5)=prior.stateTrajectory(2,5)+offset;
-            [~,~,problem]=collisionAvoidanceController(next,[],road,cfg,prior);
-            trust=problem.metadata.trust;
-            testCase.verifyGreaterThanOrEqual(trust.modelInnovation,offset*(1-1e-3));
-            testCase.verifyEqual(trust.scale,localExpectedScale(prior.trust,trust.modelInnovation,cfg),RelTol=1e-12);
-            testCase.verifyLessThan(trust.scale,prior.trust.scale);
         end
         function aPosteriorDepartureIsAttributedToTheObserverNotTheModel(testCase)
             [ego,road,cfg]=localFixture();
@@ -58,22 +53,23 @@ classdef trustInnovationTest < matlab.unittest.TestCase
             [~,~,reference]=collisionAvoidanceController(exact,[],road,cfg,prior);
             offset=.3;displaced=exact;displaced.position(2)=displaced.position(2)+offset;
             [~,~,problem]=collisionAvoidanceController(displaced,[],road,cfg,prior);
-            trust=problem.metadata.trust;
-            % The model part replays the plan from its own prediction, so the
-            % posterior cannot change it; the departure enters the observer part.
-            testCase.verifyEqual(trust.modelInnovation,reference.metadata.trust.modelInnovation,AbsTol=0);
-            testCase.verifyEqual(trust.scale,reference.metadata.trust.scale,AbsTol=0);
-            testCase.verifyGreaterThanOrEqual(trust.observationInnovation,offset*(1-1e-3));
-            testCase.verifyLessThanOrEqual(trust.innovation, ...
-                trust.observationInnovation+trust.modelInnovation+1e-12);
+            % The plan is a nonlinear rollout, so a posterior equal to its second
+            % node has no innovation; a displaced one enters the observer part.
+            testCase.verifyEqual(reference.metadata.trust.observationInnovation,0,AbsTol=1e-12);
+            testCase.verifyGreaterThanOrEqual(problem.metadata.trust.observationInnovation,offset*(1-1e-9));
+            testCase.verifyEqual(problem.metadata.search.inputTrustScale,prior.trust.scale);
         end
-        function aGrossContradictionStopsAtTheMinimumScale(testCase)
-            [ego,road,cfg]=localFixture();
-            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            next=localSuccessor(ego,prior);
-            prior.stateTrajectory(2,5)=prior.stateTrajectory(2,5)+10;
-            [~,~,problem]=collisionAvoidanceController(next,[],road,cfg,prior);
-            testCase.verifyEqual(problem.metadata.trust.scale,cfg.nonlinear.trustMinimumScale);
+        function theScaleFollowsTheClampedLawWithinItsBounds(testCase)
+            for target=[1e-12,10]
+                [ego,road,cfg]=localFixture();cfg.nonlinear.trustInnovationMeters=target;
+                [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
+                acceptance=problem.metadata.search.acceptance;
+                prior=struct('scale',cfg.nonlinear.trustInitialScale,'correction',acceptance.fullCorrection, ...
+                    'curvature',target/cfg.nonlinear.trustInitialScale^2);
+                testCase.verifyEqual(state.trust.scale,localExpectedScale(prior,acceptance.fullGap,cfg),RelTol=1e-12);
+                testCase.verifyGreaterThanOrEqual(state.trust.scale,cfg.nonlinear.trustMinimumScale);
+                testCase.verifyLessThanOrEqual(state.trust.scale,cfg.nonlinear.trustMaximumScale);
+            end
         end
         function invalidTrustSettingsAreRejected(testCase)
             for override={struct('trustRetention',1),struct('trustRetention',0), ...

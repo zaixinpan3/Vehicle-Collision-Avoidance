@@ -1,4 +1,4 @@
-# PCBF slack and one-step CLF optimization to a separating terminal set
+# PCBF slack and one-step CLF optimization to a CLF-tube terminal set
 
 Every frame uses the same target-independent analytic quadratic CLF, defined in
 [NOMINAL_CLF.md](NOMINAL_CLF.md). Every frame minimizes PCBF slack, then CLF
@@ -10,6 +10,16 @@ linearization with the trust scale doubled until feasible (at most
 `trustMaximumScale = 1`); a shifted plan still infeasible is then solved from
 a fresh potential-field rollout in the same way. Any other failure reports no
 solution.
+
+The horizon ends in the terminal set of
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md): the CLF tube of the endpoint, the
+region every trajectory of the terminal controller (this problem without PCBF
+rows) stays in, misses the target until the target leaves the perception
+range. The issued plan is the nonlinear rollout of an accepted step of the
+affine solution (*Issuing the solved plan*). On the declared sampled model with
+exact information the previous plan, shifted by one hold, is always an
+acceptable step, which makes the problem recursively feasible within an
+encounter.
 
 The implementation now consumes timestamped NRMM observer enclosures. Every hold
 of the plan starts from the current enclosure and propagates it through that
@@ -129,23 +139,23 @@ The Fiala bicycle state is `x = [px; py; yaw; vx; vy; yawRate]` and its input is
 The default uses one 50-ms RK4 step; its midpoint collision node is an endpoint
 interpolant, not an independently integrated half hold.
 
-The prediction length is not fixed. The anchor rollout stops at the first node
-`M` with `N <= M <= maximumHorizonSteps` whose separating speed is at least
-`terminalSeparatingMarginMetersPerSecond` (0.5 m/s) and which satisfies the
-road-recovery condition (*Terminal constraints*) with half its deceleration;
-without a target only the road condition applies. The terminal rows themselves
-require zero and the full deceleration. A terminal row active at the anchor
-had stalled the CLF stage in Clarabel in an earlier version, hence the margins. A rollout that never reaches it uses
+The prediction length is not fixed. At startup the potential-field rollout
+stops at the first node `M` with `N <= M <= maximumHorizonSteps` that lies in
+the terminal set; a rollout that never reaches it uses
 `M = maximumHorizonSteps`, and the optimization then decides feasibility.
 
-Previous inputs are shifted and rolled out from the current measurement in
-both encounter and recovery frames, then extended by path guidance. Prior
-affine states are not reused as the linearization trajectory. Only at startup
-is one moving-target potential-field rollout constructed; when no target is
-present, nominal path guidance supplies it. A shifted plan that cannot be
-rolled out (non-finite inputs, a braking ratio at the limit, or a tire-domain
-error) is reported as no solution; no other anchor replaces it. Potential guidance is a search reference, not a safety
-certificate. No maneuver bank is used.
+Later frames shift the previous accepted plan by one hold and roll its inputs
+out from the current estimate. The plan keeps its endpoint at the same
+absolute time, so the horizon shrinks by one hold per frame. Only when the
+shifted plan is shorter than `N`, or its endpoint is no longer in the terminal
+set (a changed forecast or state), is it extended by holds of the terminal
+controller (`terminalSafeSet.terminalInput`). Each such hold is an admissible
+input whose successor meets the CLF without slack. Prior affine states are
+not reused. When no target is present, nominal path guidance supplies the
+startup rollout. A shifted plan that cannot be rolled out (non-finite inputs,
+a braking ratio at the limit, or a tire-domain error) is reported as no
+solution; no other anchor replaces it. Potential guidance is a search
+reference, not a safety certificate. No maneuver bank is used.
 
 The target keeps Sharma et al. (2026), Eq. (17)'s constant tangential
 acceleration `A` and constant sideslip `beta`. The prediction uses inertial
@@ -208,8 +218,8 @@ and is never executable by itself.
 **Normal frames shift the previous input plan.** The field rollout is
 constructed at startup, and once more when the primary problem around the
 shifted plan is primal infeasible inside the trust region. Each trajectory is
-linearized once. There is no SCP iteration on
-an optimized nonlinear rollout within the same hold.
+linearized once; a second linearization happens only when no step of the
+solution is acceptable on the nonlinear model (*Issuing the solved plan*).
 
 For an anchor `(xbar_i, ubar_i)` the shared model is
 
@@ -384,21 +394,42 @@ no point. `solverInfo` records native status, iterations and residuals.
 
 ## Issuing the solved plan
 
-The completed PCBF/CLF result is issued directly. Its inputs are not replayed
-through the nonlinear model, and no pose, state, CLF or path-deviation agreement
-test, damped step or line search follows the solve. The road rows hold for the
-affine prediction only.
+The affine solution is a search direction about the anchor. The issued plan
+is the rollout, on the sampled nonlinear model, of `anchor + alpha*correction`
+for the largest `alpha` in `terminal.acceptanceSteps = [1, 1/2, ..., 1/32, 0]`
+that satisfies all of:
 
-Each frame builds one trajectory model, or two when the shifted problem is
-re-solved from the fresh rollout, with at most two numerical solves per model. The input trust scale follows the plan innovation (next
-section). This local numerical step bound is not an actuator constraint. No
-global SQP convergence theorem or hard execution deadline follows from this
-finite work budget.
+- the rollout meets every hard row (road, state limits, handling envelope,
+  and collision clearance after the prefix, at nodes and hold midpoints);
+- it ends in the terminal set;
+- its prefix collision deficit does not exceed the anchor's.
 
-A frame whose anchor is unavailable, whose CLF stage returns no result, or
-whose fresh re-solve still has no result, reports `collisionAvoidanceController:noOptimizationSolution`.
-No enlarged box, inherited budget, previous-frame plan or incomplete numerical
-point is used instead.
+`alpha = 0` is the anchor itself. When the anchor is the previous plan
+shifted (and extended by the terminal controller), it is feasible by
+construction under the hypotheses of
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md), Section 6.
+
+Without an acceptable step (possible only when the anchor is not a feasible
+plan, e.g. a startup rollout), the problem is linearized again at the full
+step's rollout and solved again. This happens at most
+`terminal.sqpIterations = 2` times, and then the controller reports no
+solution (`nonlinearAcceptanceFailed`).
+
+This is a step-size rule of one sequential convex method. It is not a second
+controller, and a previous plan is issued only when it satisfies the current
+problem. The issued plan is a nonlinear rollout, so the next frame's shift
+reproduces it.
+
+A frame fails, with `collisionAvoidanceController:noOptimizationSolution`, in
+any of these cases:
+
+- its anchor is unavailable;
+- its CLF stage returns no result;
+- its fresh re-solve still has no result;
+- no step is acceptable.
+
+No enlarged box, inherited budget or incomplete numerical point is used
+instead.
 
 ## Input trust scale from the plan innovation
 
@@ -410,39 +441,35 @@ units), the affine prediction differs from the nonlinear rollout of the same
 inputs by a second-order remainder, `e ~ L*s^2`. The coefficient `L` depends
 on the operating point (speed, tire slip) and is not known in advance.
 
-Every new posterior measures it. Let `xhat_1..N` be the previous plan's affine
-prediction of nodes 2..N+1 and `xbar_1..N` the shifted rollout of the same inputs
-from the new posterior (the next anchor). A second nonlinear replay `xtil` of
-the same inputs, started at the plan's own prediction `xtil_1 = xhat_1`, splits
-the plan innovation exactly at every node:
-
-    xbar - xhat = (xbar - xtil) + (xtil - xhat).
-
-The first term propagates the posterior's departure from the prediction
-(estimation error, plant mismatch and the first hold's remainder); it belongs to
-the observer. The second contains no posterior: it is the model remainder of the
-step that was taken. With the safety body-point metric
+The nonlinear rollout of the full affine step measures it in the frame that
+takes the step. With the safety body-point metric
 `P(dx) = norm(dp) + r_E * abs(dpsi)`, the model innovation is
 
-    e_k = max_j P(xtil_j - xhat_j).
+    e_k = max_j P(x_nl,j - x_aff,j),
 
-Only `e_k` sets the trust scale; the total and observation parts are recorded.
-An earlier variant subtracted twice the observer's worst-case tube radius from
-the total innovation instead. On the noisy-estimator campaign that bound
-explained every innovation (0.27 m included), so the scale rose to its maximum
-and the encounters became infeasible within 10 to 70 holds; the exact split
-replaced it.
+the largest departure of the full step's nonlinear rollout from its affine
+prediction. The departure of the next posterior from the plan's second node is
+recorded separately as the observation innovation: it belongs to the
+estimator and the plant, and it does not set the scale.
+
+Before the issued plan was a nonlinear rollout, the model share was obtained
+at the next frame by replaying the shifted inputs from the plan's own
+prediction. An earlier variant subtracted twice the observer's worst-case
+tube radius from the total innovation instead. On the noisy-estimator
+campaign that bound explained every innovation (0.27 m included), so the
+scale rose to its maximum and the encounters became infeasible within 10 to
+70 holds.
 
 The coefficient estimate uses fast attack and slow release, and the scale is
 the step whose predicted remainder equals the target innovation `tau`:
 
-    Lhat_k  = max( e_k / max(s_(k-1), Delta_(k-1)/2)^2 , gamma * Lhat_(k-1) ),
-    Delta_k = clip( sqrt(tau / Lhat_k), Delta_min, Delta_max ).
+    Lhat_k  = max( e_k / max(s_k, Delta_k/2)^2 , gamma * Lhat_(k-1) ),
+    Delta_(k+1) = clip( sqrt(tau / Lhat_k), Delta_min, Delta_max ),
 
-`Delta` grows by at most `1/sqrt(gamma)` per sample and shrinks at once. A step
-far inside the box (`s < Delta/2`) is not taken as evidence about the box
-boundary. Startup uses `Delta_0` with `Lhat_0 = tau/Delta_0^2`. A frame without
-a shifted rollout keeps the previous estimate. The defaults are `tau = 0.02 m`,
+with `s_k` the full step's size in box units. `Delta` grows by at most
+`1/sqrt(gamma)` per sample and shrinks at once. A step far inside the box
+(`s < Delta/2`) is not taken as evidence about the box boundary. Startup uses
+`Delta_0` with `Lhat_0 = tau/Delta_0^2`. The defaults are `tau = 0.02 m`,
 `Delta_0 = 0.125`, `Delta` in `[1/16, 1]` and `gamma = 0.5`.
 
 On the fourteen exact-observation encounters (2026-10-04), the measured
@@ -452,9 +479,9 @@ stayed below about 3 cm needed few fresh restarts at both speeds. One `tau`
 therefore yields about 0.4-0.5 at 8 m/s and 0.2-0.27 at 15 m/s, without a
 speed schedule.
 
-This update is not a solution check: every completed solve is issued, and the
-innovation only sets the next step bound. `tau` is an empirical consistency
-target, not a certified bound on the nonlinear remainder or on separation.
+The step-size rule, not the trust scale, decides what is issued; the scale
+only bounds the next correction. `tau` is an empirical consistency target,
+not a certified bound on the nonlinear remainder or on separation.
 
 ## Stable-handling envelope and the estimator's domain
 
@@ -486,63 +513,44 @@ a braking ratio of +0.95 (rear lateral capacity 32%); the vehicle spun to a
 
 ## Terminal constraints
 
-The terminal set requires that the ego separates from the target and can stay
-on the road. At the last node `M`, with ego position `p`, yaw `psi`, body
-velocity `v` and predicted target position `q` and velocity `w`:
+The terminal set and its proofs are in
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md). In short, with the CLF
+`V = e'Pe`, an endpoint `y` is in the set when it meets all of:
 
-    (p - q)' (Rot(psi) v - w) >= 0,                 (separating)
-    max(w_e, 0)^2 <= 2 a d_e,  e = left, right,     (road recovery)
-    every ego rectangle corner within lateralClearance = [right; left] of the path
-    (imposed at every predicted node, not only the last one).
+- `V(y) <= cbar`, the smaller of the CLF's certified region (1) and the
+  largest level whose ellipsoid lies inside the state rows (0.403 at 8 m/s on
+  the straight road, where rear adhesion binds);
+- the tube of every terminal-controller trajectory from `y` (lateral and
+  heading errors shrinking as `exp(-t/T)`, station within a bounded drift of
+  the trim's) stays on the road;
+- that tube does not meet the target's forecast rectangle until the target
+  leaves the perception range, within a 60-s encounter window.
 
-In the road-recovery condition, `w_e` is the centre's velocity toward edge `e`
-along the path normal and `d_e` the outermost corner's distance to that edge.
-The deceleration is `a = roadRecoveryAccelerationFraction*min(mu)*g` (0.5). The
-ego can then stop its lateral motion toward either edge before reaching it.
-With epigraph variables `t_e >= w_e`, `t_e >= 0`, each edge is one rotated cone
-`t_e^2 <= 2 a d_e`. It is written as `||[2t; x - y]|| <= x + y` with balanced
-factors `x = 2 a d/m`, `y = m`, `m = sqrt(2 a max(d_anchor, 1))`. Inside the
-road alone admitted an endpoint heading at 43 degrees toward the edge (noisy
-8-m/s head-on). Turning back needed about 2.2 m of lateral room where 1.3 m
-remained, and the road rows became infeasible once that point entered the
-0.4-s horizon. In a single-change ablation on `d1c31d6`, removing road
-recovery left 72 of 84 noisy encounters recovering instead of 82; nine of the
-ten new failures were 8-m/s head-on swerves that could no longer stop their
-motion toward the edge (`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`).
+In the convex problem this is one cone at the last node,
+`||F (e(y) + J dx_N)|| <= sqrt(c*)`, with `c*` the largest level whose tube at
+the anchor endpoint's station is clear. The endpoint also carries the
+collision rows of every other node inside `R` and the road rows. Membership
+of the issued plan's endpoint is checked on its nonlinear rollout.
 
-If the relative velocity stays constant after `M`, the squared distance has
-derivative `2 (p - q)' v_rel >= 0` and second derivative `2 norm(v_rel)^2 >= 0`,
-so the distance never decreases again; the clearance at the endpoint then bounds
-the clearance afterwards. Because the endpoint may be close to the target, it
-also carries the collision rows of every other node inside `R`. An earlier
-version also required the target beyond `R` (50 m); following a braking lead
-never reached that set within 512 nodes, and the noisy brakingLead frames were
-infeasible only because of it.
+This replaces the earlier separating, road-recoverable terminal set
+(separating relative velocity, lateral road recovery
+`max(w,0)^2 <= 2 a d`). That set was not invariant: a braking lead, a target
+whose sideslip turns it back, or the ego's own return to the path could close
+the distance again. No recursive-feasibility argument held for it.
 
-The separating row is linearized at the anchor endpoint in position, yaw and
-body velocity and divided by the anchor distance. The target enters as its
-estimate, and its uncertainty is carried by the collision rows inside `R`; the
-ego generator support along the row is subtracted.
+The road rows are the same at every node: every predicted node after the
+measured one and every hold midpoint keeps all four rectangle corners within
+`lateralClearance`. Each row linearizes one corner's lateral coordinate on the
+path normal at the anchor corner, with the ego generator support subtracted.
+Collision rows apply at nodes inside `R`, including a later re-entry.
 
-The road rows are the same at every node: the ego drives on the road, so every
-predicted node after the measured one and every hold midpoint keeps all four
-rectangle corners within `lateralClearance`, and the endpoint is one of these
-nodes. Each row linearizes one corner's lateral coordinate on the path normal
-at the anchor corner, with the ego generator support subtracted. An earlier
-version imposed the road rows only at the last node with a separate 10-m center
-corridor elsewhere; plans then left the road during avoidance and became
-infeasible when the target exit shortened the horizon to 8--29 nodes. Without a
-target only the road rows remain; without `lateralClearance` there is no road
-constraint. Collision rows apply at nodes inside `R`, including a later re-entry.
+The terminal records are:
 
-The distance argument above holds only for a constant relative velocity. A
-braking lead, a target whose constant sideslip turns it back, or the ego's own
-return to the path can close the distance after `M`; the next frame's horizon
-then extends again. No invariance or recursive-feasibility argument for this
-terminal set is claimed.
-The terminal quantities of the issued affine endpoint are recorded as
-`terminalDistanceMeters`, `terminalSeparatingSpeed` and
-`terminalRoadMarginMeters`.
+- `terminalValue` and `terminalLevel` (the endpoint's `V` and `c*`);
+- `terminalExitSeconds`;
+- `terminalDistanceMeters` and `terminalRoadMarginMeters`;
+- `acceptedStep`, `candidateFeasible`, `anchorCertified`,
+  `appendedTerminalSteps` and `linearizationGapMeters`.
 
 ## Issued commands, diagnostics and limits
 
@@ -558,21 +566,23 @@ termination it is not a certified optimum. Attempt logs retain all primary
 models and timings; `selectedAttempt` identifies the model supplying the
 command. `optimizationConverged` describes the numerical stages of the selected
 problem, not optimality of the issued point under nonlinear dynamics.
-Continuation state version 73 stores the per-stage slacks and their total
-alongside the existing single-CLF trajectory state, and the trust estimate
+Continuation state version 77 stores the per-stage slacks and their total,
+the issued nonlinear plan (inputs and states) and the trust estimate
 (`scale`, coefficient `curvature`, last `correction`).
 
 Metadata retains the explicit scope:
 
-- `predictionModel = affineFialaRk4Linearization`;
-- `safetyScope = affineSampledConstraints`;
+- `predictionModel = nonlinearFialaRk4RolloutOfAffineStep`;
+- `safetyScope = nonlinearRolloutSampledConstraints`;
 - `affineValidationPerformed = false`;
-- `nonlinearValidationPerformed = false` (no complete nonlinear-constraint certificate);
-- `nonlinearPredictionEvaluated = false` (the issued plan is not replayed online);
+- `nonlinearValidationPerformed = true` and `nonlinearPredictionEvaluated = true`
+  (the issued plan is the RK4 rollout that met the rows; this is the sampled
+  model, not the physical vehicle);
 - `trust` (scale, curvature, correction, innovation, observationInnovation, modelInnovation, updated);
 - `egoUncertaintyModel = currentPosteriorEnclosurePropagatedThroughEachHold`,
   `targetUncertaintyModel = constantParametersRestartedEachHoldFromCurrentObserverSet`;
-- `recursiveFeasibilityScope = notCertifiedForNonlinearPlant`;
+- `recursiveFeasibilityScope = shiftedPlanOnDeclaredModelWithConsistentForecast`;
+- `terminalSet = clfTubeEncounterSafe`;
 - unmeasured constraint residuals and margins are NaN;
 - `clfFunction = quadraticTransverseError`, with no tertiary objective;
 - required decrease, modeled successor value and bounded CLF tie allowance are recorded.
@@ -585,8 +595,10 @@ these dense ODE45 safety/recovery measurements remain offline. Online
 nonlinear RK4 expansion evaluates approximation accuracy, not a full
 physical-vehicle safety certificate.
 
-This is a bounded-work RTI implementation. It does not automatically inherit
-nonlinear stability or recursive-feasibility guarantees. For the general RTI
+This is a bounded-work RTI implementation with a step-size rule. Its
+recursive feasibility is the conditional statement of
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md), Section 6; it does not cover
+estimation error, model mismatch or forecast changes (Section 9 there). For the general RTI
 method see Diehl, Bock and Schloder,
 [Real-Time Iterations for Nonlinear Optimal Feedback Control](https://cdn.syscop.de/publications/Diehl2005c.pdf).
 Vehicle-specific results and full controller-call timing belong in the dated

@@ -1,14 +1,16 @@
 # Controller source map
 
-The controller and configuration contain eight MATLAB source files and one data table. See
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for the two stages, the
-terminal set and the affine prediction scope.
+The controller and configuration contain nine MATLAB source files and one data table. See
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for the two stages and the
+prediction scope, and [TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md) for the
+terminal set and recursive feasibility.
 
 | Source | Responsibility |
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout or shifted plan) over a horizon that reaches the terminal set; PCBF slack stage, CLF stage, plan-innovation trust |
+| `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout, or the shifted accepted plan extended by the terminal controller) over a horizon that reaches the terminal set; PCBF slack stage, CLF stage with the terminal CLF-level cone, step-size rule on the nonlinear rollout, full-step remainder trust |
+| `terminalSafeSet.m` | CLF-tube terminal set: tube of the terminal controller, encounter exit, level bisection, state-row level, terminal controller hold, nonlinear hard-row checks |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
@@ -17,36 +19,39 @@ terminal set and the affine prediction scope.
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
 Each sample builds one nonlinear anchor: a potential-field rollout at startup,
-otherwise the shifted previous plan extended by path guidance. The rollout stops
-at the first node of the terminal set, between `horizonSteps` and
-`maximumHorizonSteps`. The anchor is linearized once; the PCBF stage minimizes
-prefix safety slack and the CLF stage follows. A primary problem that is primal
-infeasible inside the trust region is re-solved with the trust scale doubled
-until feasible (at most `trustMaximumScale`); a shifted plan still infeasible is solved once more
-from a fresh potential-field rollout in the same way. The completed CLF result is
-issued directly, without a nonlinear replay or agreement test. An unusable shift,
-or a frame still without a result, reports `noOptimizationSolution`. There is no
-inherited slack budget or alternate controller. The input trust scale is estimated
-from the next posterior's plan innovation. Positive PCBF slack still denotes
-relaxation.
+stopped at its first node in the terminal set; otherwise the shifted previous
+plan, extended by terminal-controller holds when it is shorter than
+`horizonSteps` or its endpoint has left the set. The anchor is linearized once;
+the PCBF stage minimizes prefix safety slack and the CLF stage follows. A
+primary problem that is primal infeasible inside the trust region is re-solved
+with the trust scale doubled until feasible (at most `trustMaximumScale`); a
+shifted plan still infeasible is solved once more from a fresh potential-field
+rollout in the same way. The issued plan is the nonlinear rollout of the
+largest acceptable step of the solution, where `alpha = 0`, the shifted plan,
+is acceptable by construction on the declared model. Without an acceptable
+step the problem is linearized again at most twice. An unusable shift, or a
+frame still without an accepted plan, reports `noOptimizationSolution`. There
+is no inherited slack budget or alternate controller. The input trust scale is
+estimated from the full step's second-order remainder. Positive PCBF slack
+still denotes relaxation.
 
-The terminal set is separation and road recovery: at the last node the
-relative velocity points away from the target, and the ego can stop its lateral
-motion toward either road edge before reaching it (one rotated cone per edge).
-The endpoint also carries the collision rows. The road
-`lateralClearance = [right; left]` is the only lateral constraint: every ego
-rectangle corner stays inside it at every predicted node and hold midpoint,
-including the endpoint. Both ends of every hold also keep the rear tire below
-Fiala saturation under the hold's braking ratio (one second-order cone) and the
-sideslip inside the estimator's cone `model.sideslipMaximum`. Without a target
-the horizon is `horizonSteps`. The given path defines the single CLF; there is
-no separate path corridor.
+The terminal set is the set of states whose CLF tube misses the target until
+the target leaves the perception range (`terminalSafeSet`). In the convex
+problem it is one cone on the endpoint's CLF level. The endpoint also carries
+the collision and road rows. The road `lateralClearance = [right; left]` is the
+only lateral constraint: every ego rectangle corner stays inside it at every
+predicted node and hold midpoint, including the endpoint. Both ends of every
+hold also keep the rear tire below Fiala saturation under the hold's braking
+ratio (one second-order cone) and the sideslip inside the estimator's cone
+`model.sideslipMaximum`. Without a target the horizon is `horizonSteps`. The
+given path defines the single CLF; there is no separate path corridor.
 
 Observer inputs tighten affine sampled collision, road, physical-state,
 handling and terminal constraints. Each hold starts from the current enclosure
 and propagates it through that hold only; the CLF row acts on the estimate. No
-posterior-inclusion proof has been implemented, and the terminal set is not
-invariant; the radii are not discarded to obtain a command. `observerPredictiveControlTest`
+posterior-inclusion proof has been implemented, and the terminal set is
+invariant only under exact information (TERMINAL_SAFE_SET.md, Section 9); the
+radii are not discarded to obtain a command. `observerPredictiveControlTest`
 and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
 and expose that limitation. Complete nonlinear robust safety remains conditional
 on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.
@@ -95,12 +100,15 @@ use the feasible dual of the least-penetrated rectangle axis
 `twoStagePredictiveControlTest` checks both objectives, the same CLF at all
 target ranges, primary priority, affine dynamics with consistent anchors,
 braking bounds, input increments distinct from physical steering limits,
-positive-slack reporting, the terminal set (separating speed, road
-rectangle), the shortest target-free horizon, the single fresh
-re-solve of a failed shift, and that an unusable shift is reported.
-`trustInnovationTest` checks the plan-innovation trust law: startup scale,
-bounded growth, square-root shrinkage, attribution of a posterior departure to
-the observer part, and the minimum scale. `clfNominalRecoveryTest` checks target-free
+positive-slack reporting, terminal-set membership of the endpoint, that the
+issued plan is the nonlinear rollout of its inputs, that the shifted plan is a
+feasible candidate at the next samples, the shortest target-free horizon, the
+single fresh re-solve of a failed shift, and that an unusable shift is
+reported. `terminalSafeSetTest` checks invariance under the terminal
+controller, nesting of levels, the state-row level, the encounter window and
+the grid. `trustInnovationTest` checks the full-step remainder trust law:
+the next scale, bounded growth, the clamped law, and attribution of a
+posterior departure to the observer part. `clfNominalRecoveryTest` checks target-free
 nonlinear value decrease without requiring the optimizer to issue the nominal
 construction feedback. `nominalClfTest` checks the trim, strict local nonlinear
 Lyapunov decrease, path-phase invariance, and rejection of retired cost-to-go

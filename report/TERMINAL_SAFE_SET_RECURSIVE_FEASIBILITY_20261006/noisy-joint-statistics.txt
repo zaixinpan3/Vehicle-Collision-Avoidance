@@ -1,0 +1,20 @@
+run                                      holds outcome           col    gap shift  cert  cand  rst   a0    in50    in95   inMax    fc50    fc95   fcMax failure
+speed8-acceleratingHeadOn-seed20261003      11 controlUnavailable    0 10.640    10    10    10    0    0  0.0026  0.0051  0.0051   8.044  24.848  24.848 collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did
+speed8-brakingLead-seed20261003              0 controlUnavailable    0    nan     0     0     0    0    0     nan     nan     nan     nan     nan     nan collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did
+speed8-crossing-seed20261003               177 recovered           0  1.884   176   176   176    0    0  0.0019  0.0039  0.0064   0.566   7.737  14.182 
+speed8-curvedHeadOn-seed20261003             8 controlUnavailable    0 14.538     7     7     7    0    0  0.0026  0.0048  0.0048  10.134  39.127  39.127 collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did
+speed8-headOn-seed20261003                 175 recovered           0  1.990   174   174   174    0    0  0.0020  0.0043  0.0058   0.997   5.560  14.777 
+
+RUNS 5 recovered 2 collisions 0 outcomes {'recovered': 2, 'controlUnavailable': 3}
+shifted frames 367 certified 367 candidate feasible 367 restarts 0 alpha0 0
+candidate failure reasons {}
+observation innovation [m, pose metric] median 0.0019 p95 0.0043 max 0.0064 (n=367)
+forecast change at endpoint [m] median 0.880 p95 10.196 max 39.127 (n=245)
+  endpoint  0.0- 1.0 s ahead: n=   48 median 0.071 p95 0.178 max 0.351
+  endpoint  1.0- 2.0 s ahead: n=   40 median 0.404 p95 0.793 max 0.967
+  endpoint  2.0- 4.0 s ahead: n=   86 median 0.997 p95 2.523 max 5.244
+  endpoint  4.0- 8.0 s ahead: n=   71 median 4.765 p95 17.494 max 39.127
+  endpoint  8.0-30.0 s ahead: n=    0 median nan p95 nan max nan
+time from now to target exit [s] median 2.05 p95 6.41 max 16.07
+eta 8-curve        n=     8 median 0.0689 p95 0.0728 p99 0.0728 max 0.0728
+eta 8-straight     n=   363 median 0.0111 p95 0.0418 p99 0.0448 max 0.0473

@@ -1,0 +1,26 @@
+function campaignOne(speed,name,outputDirectory,noisy,frames,seed,transition)
+%campaignOne One campaign case, as runPotentialFieldCampaign runs it.
+    root='/home/zai/Downloads/ResearchProjects/collisionAvoidance';
+    cd(root);addpath('controller','config','scripts');
+    if ~isfolder(outputDirectory),mkdir(outputDirectory);end
+    if nargin<5,frames=2000;end
+    if nargin<6,seed=20261003;end
+    if nargin<7,transition="ode45";end
+    estimator=struct();
+    if noisy
+        estimator=estimatorControllerIntegrationConfig();estimator.randomSeed=seed;
+    end
+    configuration=struct('referenceSpeed',speed,'controller',struct('horizonSteps',8+8*(speed==15)));
+    stem=fullfile(outputDirectory,sprintf('speed%g-%s',speed,name));
+    if noisy,stem=stem+sprintf('-seed%d',seed);end
+    t=tic;
+    result=runNonlinearPredictiveSafetyValidation(Scenarios=string(name),Frames=frames, ...
+        ControllerConfiguration=configuration,RequireCollisionThreat=true,RecoveryDwellSeconds=1,StateTransition=string(transition), ...
+        EstimatorConfiguration=estimator,FailureFile=stem+"-failure.mat", ...
+        OutputFile=stem+".json",ContinuationFile=stem+".mat");
+    r=result.results;
+    fid=fopen(stem+".summary.txt",'w');
+    fprintf(fid,'RESULT %g %s holds=%d gap=%.6g recovery=%d collision=%d max=%.6g failure=%s outcome=%s wall=%.1f\n', ...
+        speed,name,r.executedFrames,r.minimumReplayClearanceMeters,r.recovery.recovered,r.collisionDetected,r.maximumFrameSeconds,r.failure,r.outcome,toc(t));
+    fclose(fid);
+end

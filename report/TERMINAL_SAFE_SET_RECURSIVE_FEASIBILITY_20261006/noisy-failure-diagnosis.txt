@@ -1,0 +1,54 @@
+/home/zai/.cache/collisionAvoidance/terminal-20261006/noisy/speed8-acceleratingHeadOn-seed20261003-failure.mat frame 12 returned 0 reason nonlinearAcceptanceFailed
+                   step: NaN
+      candidateFeasible: 0
+        candidateReason: "collision"
+             iterations: 2
+       linearizationGap: NaN
+                fullGap: 0.4734
+         fullCorrection: 0.1756
+          terminalLevel: 0.4025
+          terminalValue: NaN
+    terminalExitSeconds: NaN
+                 reason: "terminal:levelAboveCertifiedRegion"
+
+anchorCertified 1 appended 0
+ attempt 1 shiftedInputRollout pcbfNoNumericalResult scale 0.088 flags -2
+ attempt 2 shiftedInputRollout twoStagesReturned scale 0.176 flags [1 1]
+shifted endpoint: member 1 V 0.4017 reason  level 0.4025 exit 0.00 margin Inf
+/home/zai/.cache/collisionAvoidance/terminal-20261006/noisy/speed8-curvedHeadOn-seed20261003-failure.mat frame 9 returned 0 reason nonlinearAcceptanceFailed
+                   step: NaN
+      candidateFeasible: 0
+        candidateReason: "collision"
+             iterations: 0
+       linearizationGap: NaN
+                fullGap: 7.2402
+         fullCorrection: 0.6634
+          terminalLevel: 0.9066
+          terminalValue: NaN
+    terminalExitSeconds: NaN
+                 reason: "collision"
+
+anchorCertified 1 appended 0
+ attempt 1 shiftedInputRollout pcbfNoNumericalResult scale 0.083 flags -2
+ attempt 2 shiftedInputRollout pcbfNoNumericalResult scale 0.166 flags -2
+ attempt 3 shiftedInputRollout pcbfNoNumericalResult scale 0.332 flags -2
+ attempt 4 shiftedInputRollout twoStagesReturned scale 0.663 flags [1 1]
+shifted endpoint: member 1 V 0.9007 reason  level 0.9066 exit 5.15 margin 28.680
+/home/zai/.cache/collisionAvoidance/terminal-20261006/noisy/speed8-brakingLead-seed20261003-failure.mat frame 1 returned 0 reason pcbfNoNumericalResult
+                   step: NaN
+      candidateFeasible: 0
+        candidateReason: ""
+             iterations: 0
+       linearizationGap: NaN
+                fullGap: NaN
+         fullCorrection: NaN
+          terminalLevel: NaN
+          terminalValue: NaN
+    terminalExitSeconds: NaN
+                 reason: ""
+
+anchorCertified 0 appended 0
+ attempt 1 movingTargetPotentialField pcbfNoNumericalResult scale 0.125 flags -2
+ attempt 2 movingTargetPotentialField pcbfNoNumericalResult scale 0.250 flags -2
+ attempt 3 movingTargetPotentialField pcbfNoNumericalResult scale 0.500 flags -2
+ attempt 4 movingTargetPotentialField pcbfNoNumericalResult scale 1.000 flags -2

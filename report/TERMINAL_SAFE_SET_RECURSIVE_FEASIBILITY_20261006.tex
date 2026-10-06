@@ -1,0 +1,306 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\setlength{\emergencystretch}{2em}
+\title{A CLF-tube terminal set and recursive feasibility of the collision-avoidance controller}
+\date{Prepared October 6, 2026}
+\begin{document}
+\maketitle
+
+\section{Request}
+The user asked for a terminal set that follows from the controller itself.
+After the horizon, the controller is the same optimization without its PCBF
+(collision) rows, so the vehicle dissipates to the nominal behavior under the
+CLF. The terminal safe set is the set of states from which that controller
+does not collide with a target obeying the motion contract (constant
+tangential acceleration $A$ and sideslip $\beta$). The requirements were:
+\begin{itemize}
+\item no safety distance of its own;
+\item no predesigned maneuver or mode;
+\item continuous-time theory;
+\item a target that leaves the 50-m perception range no longer exists;
+\item ``no solution'' when the set cannot be reached.
+\end{itemize}
+Recursive feasibility was required without compromise. The user also asked
+what the terminal set should be when the estimator and the controller are
+designed together. The theory is in \path{controller/TERMINAL_SAFE_SET.md};
+this report records the implementation and the measurements.
+
+\section{Design}
+\paragraph{CLF tube.} A terminal controller is any input law with
+$\dot V\le-(2/T)V$ for the CLF $V=e^\top Pe$, $T=4$~s. Every error component
+then obeys
+$|e_i(t)|\le a_i\sqrt{V_0}\,e^{-t/T}$, $a_i=\sqrt{(P^{-1})_{ii}}$. The path
+station stays within $s_0+v_{\mathrm{path}}t\pm G(t)$, where $G$ integrates a
+bound on the path-speed error. The ego rectangle thus lies in a box family in
+path coordinates (the tube) that depends only on $V_0$ and $s_0$.
+
+\paragraph{Terminal set.} A state is terminal if all of the following hold:
+\begin{itemize}
+\item $V\le\bar c$;
+\item its tube stays on the road;
+\item its tube does not meet the target's forecast rectangle before the
+  target leaves the range, within a 60-s encounter window.
+\end{itemize}
+$\bar c$ is the smaller of the CLF's certified region (1) and the largest
+level whose ellipsoid lies inside the state rows. At 8~m/s it is 0.403 on
+the straight road and 0.907 on the curve, set by rear adhesion; at 15~m/s it
+is 1. The tube of a successor under the terminal controller lies inside the
+tube of its predecessor shifted by the elapsed time. The set is therefore
+forward invariant.
+
+\paragraph{Recursive feasibility.} The issued plan is the nonlinear rollout of
+$\text{anchor}+\alpha\cdot\text{correction}$ for the largest
+$\alpha\in\{1,\tfrac12,\dots,\tfrac1{32},0\}$ that meets every hard row, ends
+in the terminal set, and does not increase the prefix collision deficit. The
+anchor is the previous accepted plan shifted by one hold. If that plan is
+shorter than the prefix or its endpoint has left the set, it is extended by
+terminal-controller holds. On the declared sampled model, with exact
+information and the forecast unchanged, this anchor reproduces the previous
+plan and is acceptable ($\alpha=0$). Hence no sample after the first accepted
+one in an encounter reports no solution. The proposition has four
+hypotheses: H1 (declared plant, exact state), H2 (forecast unchanged), H3
+(the terminal controller has an admissible input, checked online) and H4
+(the encounter ends within 60~s).
+
+\paragraph{What changed.}
+\begin{itemize}
+\item \path{controller/terminalSafeSet.m} (new) implements the tube, the
+  encounter exit, the bisected level, the state-row level, the terminal
+  controller hold and the nonlinear row checks.
+\item \path{solvePredictiveControl.m}:
+  \begin{itemize}
+  \item the anchor is the shifted accepted plan, extended by
+    terminal-controller holds where needed;
+  \item the startup rollout stops at its first node in the set;
+  \item the separating and road-recovery rows are replaced by one cone,
+    $\|F(e(y)+J\,\delta x_N)\|\le\sqrt{c^*}$;
+  \item a step-size rule on the nonlinear rollout decides the issued plan,
+    with at most two re-linearizations;
+  \item the trust coefficient comes from the full step's nonlinear
+    remainder.
+  \end{itemize}
+\item \path{collisionAvoidanceController.m}: state version 77 and new
+  metadata.
+\item \path{collisionAvoidanceControllerConfig.m}: \texttt{cfg.terminal}
+  replaces \texttt{terminalSeparatingMarginMetersPerSecond} and
+  \texttt{roadRecoveryAccelerationFraction}.
+\end{itemize}
+This reverses one earlier decision: the issued plan is now evaluated on the
+nonlinear model before it is issued. Recursive feasibility needs the issued
+plan to be a plan of the nonlinear sampled model, since only then does the
+next frame's shift reproduce it. The step-size rule is part of the
+optimization method; it never issues an input that violates the current
+problem.
+
+\section{Exact information}
+\paragraph{Setup.} The 14 collision-threat encounters (7 scenarios at 8 and
+15~m/s, \texttt{collisionThreatScenario}) were run with exact ego state and
+exact target state inside the 50-m range. The runs used
+\texttt{runNonlinearPredictiveSafetyValidation}, at most 2000 holds, with a
+1-s recovery dwell after the last collision time. Two plants were used:
+\begin{itemize}
+\item ode45 (relative tolerance $10^{-11}$), the campaign default; it differs
+  from the controller's one-step RK4 model by the integration error;
+\item the declared RK4 model itself, on which hypothesis H1 holds exactly.
+\end{itemize}
+The per-run table is \path{TERMINAL_SAFE_SET_RECURSIVE_FEASIBILITY_20261006/runs.csv}.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+ & ode45 plant & RK4 plant\\
+\midrule
+encounters recovered & 14 of 14 & 14 of 14\\
+collisions; frames without a solution & 0; 0 & 0; 0\\
+holds & 5630 & 5552\\
+shifted frames & 5614 & 5536\\
+shifted plan in the terminal set (certified anchor) & 5614 & 5536\\
+shifted plan a feasible candidate ($\alpha=0$ acceptable) & 5607 & 5536\\
+fresh restarts & 2 & 2\\
+accepted full steps ($\alpha=1$) & 5188 & 5106\\
+issued shifted plan ($\alpha=0$) & 28 & 41\\
+largest horizon (holds) & 280 & 280\\
+smallest continuous-time clearance (ode45 replay) & 0.155~m & 0.155~m\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Reading.} On the RK4 plant every one of the 5536 shifted plans was
+a feasible candidate, as the proposition states. On the ode45 plant 7 of
+5614 were not, all in the 8-m/s braking lead (frames 55, 63, 84--86, 101,
+102), and all because of a collision row after the prefix.
+\begin{itemize}
+\item The accepted plan had that row active at the 0.2-m clearance.
+\item The integration difference between ode45 and one-step RK4 then moved
+  the row below the $10^{-6}$-m tolerance.
+\item In these frames the optimizer's own step was accepted (6 full steps,
+  1 half step). The candidate is a guarantee, not the only plan available.
+\end{itemize}
+The two fresh restarts are the second encounters on the circular road: the
+oncoming target on the same circle re-enters the range after one synodic
+period, at 77.4~s (8~m/s) and 54.4~s (15~m/s). A target that has left the
+range does not exist for the controller, so its return is new information
+and a new encounter, outside the proposition.
+
+The smallest continuous-time clearance, 0.155~m (15-m/s accelerating
+head-on), is below the 0.2-m clearance of the sampled rows. The rows hold at
+nodes and hold midpoints only; between them the replayed clearance stayed
+positive.
+
+Controller time per frame had a 95th percentile of at most 0.37~s (ode45)
+and 0.43~s (RK4), and a maximum of 1.05 and 1.14~s. These were measured with
+up to 13 runs in parallel and memory swapping, and are not timing
+measurements; the sample time is 0.05~s, so the controller is not real-time
+in MATLAB either way.
+
+The terminal level $\bar c$ binds in the plans: the optimizer has no reason
+to keep the endpoint's $V$ low, so it rises to $\bar c$. A full step then often
+lands just above it because of linearization error, which is why 13--15\% of
+the steps were halved.
+
+\section{Estimator in the loop}
+\paragraph{What was run.} The noisy-sensor campaign had to stop early. It
+uses the synthetic 0.1-s sensor contract and the NRMM adapter,
+\texttt{estimatorControllerIntegrationConfig}, seeds 20261003 and 1--5. 84
+runs were planned; only 5 ran on the final code, all at 8~m/s with seed
+20261003.
+
+Running 13 MATLAB sessions in parallel exhausted the 29~GB of memory, and the
+kernel killed seven of them. After that, MathWorks online licensing refused
+nearly every new session (``Unable to communicate with required MathWorks
+services (error 5001)''). Network access to MathWorks was available, and a
+lone \texttt{matlab -batch} start failed as well. The remaining 79 runs are
+not reported here. The comparison with the previous design (82 of 84
+recovered at \texttt{d1c31d6}) is therefore open.
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+encounter (8~m/s, seed 20261003) & outcome & end\\
+\midrule
+head-on & recovered & 175 holds\\
+crossing & recovered & 177 holds\\
+accelerating head-on & no solution & hold 12 (\texttt{nonlinearAcceptanceFailed})\\
+curved head-on & no solution & hold 9 (\texttt{nonlinearAcceptanceFailed})\\
+braking lead & no solution & first frame (\texttt{pcbfNoNumericalResult})\\
+\bottomrule
+\end{tabular}
+\end{center}
+No run collided. In the 367 shifted frames before the failures, every anchor
+was certified and every candidate feasible.
+
+\paragraph{Diagnosis} (\path{noisy-failure-diagnosis.txt}, replayed from the
+saved failure frames).
+\begin{itemize}
+\item \emph{Accelerating and curved head-on.} The shifted plan's endpoint is
+  still in the terminal set under the new forecast, but a collision row after
+  the prefix is violated: the forecast moved the target into the plan's tail.
+  \begin{itemize}
+  \item The convex problem became feasible only at larger trust scales (0.18
+    and 0.66 of the box).
+  \item Over the 85--95-hold horizon, the nonlinear rollout of the full step
+    departed from its affine prediction by 0.47~m and 7.2~m.
+  \item No step was acceptable, and the re-linearization did not recover.
+  \end{itemize}
+\item \emph{Braking lead, first frame.} The potential-field rollout ran
+  512 holds without entering the terminal set and ended at $V=6.4$. At that
+  station even the $V=0$ tube meets the target, so the terminal level is
+  $-\infty$ and the startup problem is infeasible at every trust scale. With
+  the first estimate $A=-1.1$~m/s$^2$, the lead's forecast stops and reverses
+  down the lane, and the rollout never passes it.
+\end{itemize}
+The cause in both cases is the forecast, not the ego estimate. In the first
+second of tracking, the estimated $A$ and $\beta$ swing between their
+contract limits: from $+1.1$ to $-1.09$~m/s$^2$ and from $+0.055$ to
+$-0.055$ within 0.3~s. The terminal set uses the forecast up to the target's
+exit, several seconds ahead. The previous design issued the affine solution
+without checking it on the nonlinear model, and its terminal condition was
+local (separating at the endpoint), so these jumps did not make it fail at
+these frames.
+
+\paragraph{Size of the information change} (\path{noisy-joint-statistics.txt}).
+The change of the forecast target position at the previous plan's endpoint
+time, from one frame to the next, was:
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+endpoint ahead of the frame & median & 95\% & max\\
+\midrule
+0--1~s & 0.07~m & 0.18~m & 0.35~m\\
+1--2~s & 0.40~m & 0.79~m & 0.97~m\\
+2--4~s & 1.00~m & 2.52~m & 5.24~m\\
+4--8~s & 4.77~m & 17.5~m & 39.1~m\\
+\bottomrule
+\end{tabular}
+\end{center}
+The ego estimate departed from the plan's prediction by 0.0019~m (median),
+0.0043~m (95\%) and 0.0064~m (max) in the body-point pose metric. In CLF
+units ($\eta=\|F J(\hat x-x)\|$, truth known), the ego estimation error had a
+95th percentile of 0.042 and a maximum of 0.047 on the straight road.
+
+\section{Joint estimator--controller terminal set}
+Section~9 of \path{controller/TERMINAL_SAFE_SET.md} derives three
+requirements; the measurements above size them.
+\begin{enumerate}
+\item \emph{Ego: an ISS tube.}
+  \begin{itemize}
+  \item The tube radius becomes
+    $r(t)=e^{-t/T}r_0+r_\infty(1-e^{-t/T})$, with
+    $r_\infty\le\sqrt2\|F b\,\mathrm{diag}(\bar u)\|\,\eta/(1-\sqrt\rho)$.
+  \item The constants are 16.4 and 16.5 at 8~m/s (straight, curve) and 23.4
+    and 24.2 at 15~m/s (\path{iss-constants.txt}).
+  \item The tube fits inside $\bar c$ only for $\eta\le0.039$ at 8~m/s on the
+    straight road. The measured maximum, 0.047, is the actual error, not a
+    certified bound, and already exceeds it.
+  \item The levers are a faster CLF time constant (the factor scales with
+    $T/h$; at the certified 2.1~s it halves) and terminal gains that are low
+    in the poorly estimated directions.
+  \end{itemize}
+\item \emph{Plan: feedback instead of open loop.} The 7.2-m linearization gap
+  of an 85-hold open-loop step is the open-loop propagation that Section~9.2
+  describes. A plan executed as $u=v+K(x-z)$ about its affine prediction:
+  \begin{itemize}
+  \item keeps the convex problem unchanged;
+  \item reproduces the old plan exactly under exact information;
+  \item contracts both innovations and linearization error in the rollout.
+  \end{itemize}
+\item \emph{Target: nested information sets.} The forecast change grows
+  from decimeters at 1~s to tens of meters at 4--8~s. A terminal set robust
+  to it needs information sets that only shrink, as in a set-membership
+  estimate of the constant $A$ and $\beta$ intersected over time. The
+  published intervals stay at the contract width, so a terminal set robust
+  to them is empty for exits more than a few seconds ahead. A
+  constant-parameter set from the radar positions narrows roughly as
+  $1/W^2$ for $A$ over an observation window $W$.
+\end{enumerate}
+Under the joint design, the terminal set is therefore (4.1) with the ISS
+radius and the target's information set in place of its estimate. It is
+nonempty when:
+\begin{itemize}
+\item the ego error satisfies $r_\infty^2<\bar c$;
+\item the target set at the exit time is narrower than the lateral room the
+  tube leaves.
+\end{itemize}
+Its recursive feasibility then needs nested target sets and a feedback-form
+plan. None of the three is implemented; the present terminal set is
+certainty-equivalent in the target and inflates the tube only by the ego
+enclosure's position and yaw.
+
+\section{Tests}
+\texttt{runtests('tests')}: 590 of 590 passed on the final code, including
+the new \texttt{terminalSafeSetTest} (invariance under the terminal
+controller over 60 holds, nested levels, the state-row level against 2000
+boundary points, the encounter window, the grid) and the shifted-plan
+candidate test in \texttt{twoStagePredictiveControlTest}.
+
+\section{Raw data}
+The raw outputs under \path{~/.cache/collisionAvoidance/terminal-20261006}
+are deleted after this report (standing instruction). The folder
+\path{TERMINAL_SAFE_SET_RECURSIVE_FEASIBILITY_20261006} keeps the per-run
+table, the statistics, the diagnosis log and the scripts.
+
+
+\end{document}

@@ -1,0 +1,34 @@
+campaign,case,seed,holds,outcome,collision,failure,minimumReplayClearanceMeters,shiftedFrames,anchorCertified,candidateFeasible,candidateCollisionReasons,potentialFieldRestarts,alphaFull,alphaZero,appendedTerminalSteps,maximumHorizonSteps,p95ControllerSeconds,maximumControllerSeconds
+exact,speed15-acceleratingHeadOn,,117,recovered,0,,0.15450281478124597,116,116,116,0,0,105,0,65,67,0.106321,0.957462
+exact,speed15-brakingLead,,325,recovered,0,,0.20135469987392562,324,324,324,0,0,257,9,114,226,0.231844,1.049941
+exact,speed15-crossing,,199,recovered,0,,1.573070720856011,198,198,198,0,0,185,0,129,85,0.075638,0.829404
+exact,speed15-curvedCrossing,,184,recovered,0,,1.3886588555483708,183,183,183,0,0,164,0,115,84,0.08276,0.438024
+exact,speed15-curvedHeadOn,,1288,recovered,0,,3.078624849136941,1286,1286,1286,0,1,1266,0,1141,93,0.046292,0.416103
+exact,speed15-headOn,,155,recovered,0,,0.1640725957776333,154,154,154,0,0,149,0,102,68,0.075706,0.864718
+exact,speed15-turningCrossing,,199,recovered,0,,1.5542985982812452,198,198,198,0,0,181,0,129,85,0.078028,0.729436
+exact,speed8-acceleratingHeadOn,,186,recovered,0,,1.119331703408684,185,185,185,0,0,171,0,91,102,0.083066,0.757519
+exact,speed8-brakingLead,,305,recovered,0,,0.2182687725485625,304,304,297,7,0,223,1,67,245,0.289502,1.000793
+exact,speed8-crossing,,188,recovered,0,,0.30727595154164405,187,187,187,0,0,166,0,92,103,0.117255,0.761203
+exact,speed8-curvedCrossing,,339,recovered,0,,0.19935647701891004,338,338,338,0,0,280,0,66,280,0.370942,0.90086
+exact,speed8-curvedHeadOn,,1768,recovered,0,,1.9194357033974585,1766,1766,1766,0,1,1709,0,1564,124,0.063315,0.458306
+exact,speed8-headOn,,186,recovered,0,,1.502450998223217,185,185,185,0,0,169,0,89,104,0.09006,0.696249
+exact,speed8-turningCrossing,,191,recovered,0,,0.48088033789590195,190,190,190,0,0,163,18,79,119,0.139235,0.865484
+rk4,speed15-acceleratingHeadOn,,117,recovered,0,,0.15455095944719768,116,116,116,0,0,105,0,65,67,0.062367,0.822424
+rk4,speed15-brakingLead,,325,recovered,0,,0.1989588438526688,324,324,324,0,0,255,12,114,226,0.237228,1.061543
+rk4,speed15-crossing,,199,recovered,0,,1.5724374034090598,198,198,198,0,0,185,0,129,85,0.072259,0.687828
+rk4,speed15-curvedCrossing,,184,recovered,0,,1.3932478164172952,183,183,183,0,0,164,0,115,84,0.083344,0.418032
+rk4,speed15-curvedHeadOn,,1290,recovered,0,,3.082350744040278,1288,1288,1288,0,1,1266,0,1143,93,0.045676,0.410936
+rk4,speed15-headOn,,155,recovered,0,,0.16414224473248124,154,154,154,0,0,149,0,102,68,0.080421,0.891434
+rk4,speed15-turningCrossing,,199,recovered,0,,1.563497397032627,198,198,198,0,0,181,0,129,85,0.081632,0.721279
+rk4,speed8-acceleratingHeadOn,,159,recovered,0,,1.118624130468955,158,158,158,0,0,143,0,64,102,0.084301,0.732215
+rk4,speed8-brakingLead,,304,recovered,0,,0.22171739657740727,303,303,303,0,0,219,0,66,245,0.291025,0.98032
+rk4,speed8-crossing,,178,recovered,0,,0.32172407546472676,177,177,177,0,0,156,0,82,103,0.119304,0.801353
+rk4,speed8-curvedCrossing,,332,recovered,0,,0.19990058471924163,331,331,331,0,0,272,6,59,280,0.434996,1.138525
+rk4,speed8-curvedHeadOn,,1764,recovered,0,,1.9208196405917364,1762,1762,1762,0,1,1708,0,1560,124,0.065015,0.437184
+rk4,speed8-headOn,,159,recovered,0,,1.4993347733313631,158,158,158,0,0,143,0,62,104,0.098718,0.751603
+rk4,speed8-turningCrossing,,187,recovered,0,,0.48770296199764074,186,186,186,0,0,160,23,75,119,0.137347,0.867876
+noisy,speed8-acceleratingHeadOn,20261003,11,controlUnavailable,0,The two-stage affine optimization did not complete (nonlinearAcceptanceFailed).,10.639868958696525,10,10,10,0,0,6,0,1,102,0.176965,0.829123
+noisy,speed8-brakingLead,20261003,0,controlUnavailable,0,The two-stage affine optimization did not complete (pcbfNoNumericalResult).,,0,0,0,0,0,0,0,0,0,,
+noisy,speed8-crossing,20261003,177,recovered,0,,1.8839172212878852,176,176,176,0,0,169,0,81,103,0.135582,0.520394
+noisy,speed8-curvedHeadOn,20261003,8,controlUnavailable,0,The two-stage affine optimization did not complete (nonlinearAcceptanceFailed).,14.537665053090649,7,7,7,0,0,4,0,0,92,0.183584,0.483731
+noisy,speed8-headOn,20261003,175,recovered,0,,1.9897385257197016,174,174,174,0,0,162,0,79,103,0.14633,0.5529

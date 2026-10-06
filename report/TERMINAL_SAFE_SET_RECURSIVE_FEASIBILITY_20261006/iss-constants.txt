@@ -1,0 +1,4 @@
+v= 8 kappa=0.000 |F b U|sqrt2=0.2032  1/(1-sqrt(rho))=80.5  => r_inf/eta=16.36  sqrt(cbar)=0.634  eta_max=0.0388
+v= 8 kappa=0.005 |F b U|sqrt2=0.2055  1/(1-sqrt(rho))=80.5  => r_inf/eta=16.54  sqrt(cbar)=0.952  eta_max=0.0576
+v=15 kappa=0.000 |F b U|sqrt2=0.2902  1/(1-sqrt(rho))=80.5  => r_inf/eta=23.36  sqrt(cbar)=1.000  eta_max=0.0428
+v=15 kappa=0.005 |F b U|sqrt2=0.3008  1/(1-sqrt(rho))=80.5  => r_inf/eta=24.22  sqrt(cbar)=1.000  eta_max=0.0413
