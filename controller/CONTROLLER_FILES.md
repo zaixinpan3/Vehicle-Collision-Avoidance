@@ -10,7 +10,7 @@ terminal set and recursive feasibility.
 | `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
 | `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout, or the shifted accepted plan extended by the terminal controller) over a horizon that reaches the terminal set; PCBF slack stage, CLF stage with the terminal CLF-level cone, step-size rule on the nonlinear rollout, full-step remainder trust |
-| `terminalSafeSet.m` | Safe-exit terminal set: lane-hold CLF backups (nominal path first), tube about a lane centre, encounter end (exit or fixed window), level bisection, state-row level, backup hold, nonlinear hard-row checks |
+| `terminalSafeSet.m` | Safe-exit terminal set: lane-hold CLF backups (nominal path first), tube about a lane centre, encounter end (exit or proven separation), level bisection, state-row level, backup hold, nonlinear hard-row checks |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
@@ -37,7 +37,7 @@ still denotes relaxation.
 
 The terminal set is the set of states whose CLF tube under a backup (the
 given path or another lane centre) misses the target until the encounter ends:
-the target leaves the perception range or a fixed window ends
+the target leaves the perception range or separation is proven
 (`terminalSafeSet`). In the convex
 problem it is one cone on the endpoint's CLF level. The endpoint also carries
 the collision and road rows. The road `lateralClearance = [right; left]` is the
@@ -108,7 +108,8 @@ feasible candidate at the next samples, the shortest target-free horizon, the
 single fresh re-solve of a failed shift, and that an unusable shift is
 reported. `terminalSafeSetTest` checks invariance under the terminal
 controller and under a lane-hold backup, nesting of levels, the state-row
-level, the fixed encounter window, the offset CLF error and the grid. `trustInnovationTest` checks the full-step remainder trust law:
+level, the end of an encounter (exit or proven separation), the offset CLF
+error and the grid. `trustInnovationTest` checks the full-step remainder trust law:
 the next scale, bounded growth, the clamped law, and attribution of a
 posterior departure to the observer part. `clfNominalRecoveryTest` checks target-free
 nonlinear value decrease without requiring the optimizer to issue the nominal

@@ -15,14 +15,19 @@ classdef terminalSafeSet
 %           and the tube does not meet the target's forecast rectangle until
 %           the encounter ends },
 % and the terminal set is the union of the S_d. The encounter ends at the
-% earlier of the target leaving encounterRangeMeters of every point of the
-% tube and the end of the encounter window, which is fixed in time:
-% terminal.horizonSeconds after the encounter's start (model.encounterWindow
-% Seconds remain from the present sample). The end is an absorbing mode: no
-% property of the target after it is used, and a target still present at the
-% window end starts a new encounter. The tube shrinks along any
+% first of two events, both of which can be computed, so no encounter
+% duration is preset:
+%   exit        the target leaves encounterRangeMeters of every point of the
+%               tube;
+%   separation  from that time on the tube and the target provably never come
+%               within the collision buffer again (straight road: a gap
+%               along or across the road that the forecast and the tube's
+%               remaining drift can only widen; see permanent).
+% The end is an absorbing mode: no property of the target after it is used.
+% terminal.horizonSeconds only limits how far the check computes: a tube that
+% reaches it with neither event is not terminal. The tube shrinks along any
 % CLF-satisfying trajectory (V1 <= rho V0 nests the tube of x1 in the tube of
-% x0 shifted by one hold) and the window end does not move, so S_d is
+% x0 shifted by one hold), so both events only come earlier and S_d is
 % invariant under its backup until the encounter ends. See
 % TERMINAL_SAFE_SET.md.
 % The nominal backup is tried first; the others only matter where it fails.
@@ -113,11 +118,13 @@ classdef terminalSafeSet
                 'reach',norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset), ...
                 'buffer',cfg.collision.safetyMarginMeters,'range',cfg.collision.encounterRangeMeters, ...
                 'clearance',clearance,'levelMaximum',modes(1).levelMaximum, ...
-                'dt',dt,'ratio',ratio,'windowSteps',localWindowSteps(model,terminal,dt), ...
+                'dt',dt,'ratio',ratio,'horizonSteps',ceil(terminal.horizonSeconds/dt), ...
+                'pathHeading',here.heading,'targetMotion',localTargetMotion(model), ...
                 'positionRadius',positionRadius,'yawRadius',yawRadius, ...
                 'hasTarget',~isempty(model.target),'stationNow',here.station, ...
                 'covered',-1,'targetStation',zeros(2,0),'targetLateral',zeros(2,0), ...
-                'targetSpeed',zeros(1,0),'pointStation',zeros(1,0),'pointLateral',zeros(1,0));
+                'targetSpeed',zeros(1,0),'pointStation',zeros(1,0),'pointLateral',zeros(1,0), ...
+                'targetCourse',zeros(1,0),'targetVelocity',zeros(1,0));
             context.model=struct('targetEpoch',model.targetEpoch,'sampleIndex',model.sampleIndex, ...
                 'sampleTime',h,'lane',model.lane,'reference',references(1));
         end
@@ -197,41 +204,84 @@ classdef terminalSafeSet
             if ego.lateral(2)>context.clearance(2) || -ego.lateral(1)>context.clearance(1)
                 info.reason="tubeLeavesRoad";return;
             end
-            if ~context.hasTarget,ok=true;info.exitSeconds=0;return;end
+            if ~context.hasTarget,ok=true;info.exitSeconds=0;info.reason="noTarget";return;end
             start=node*context.ratio;chunk=round(2/context.dt);
-            if start>=context.windowSteps
-                % The encounter window has ended by this node (absorbing).
-                ok=true;info.exitSeconds=0;info.reason="encounterWindowEnded";return;
-            end
             steps=0;shift=0;
             while true
-                last=min(start+steps+chunk,context.windowSteps);
+                last=min(start+steps+chunk,start+context.horizonSteps);
                 context=terminalSafeSet.extend(context,last);
                 tau=(steps:last-start)*context.dt;
-                [ego,box,guard]=terminalSafeSet.tube(context,value,station,tau,shift,mode);
+                [ego,box,guard,rate]=terminalSafeSet.tube(context,value,station,tau,shift,mode);
                 index=start+(steps:last-start)+1;
                 pointGap=terminalSafeSet.separation(context,box.station,box.lateral, ...
                     context.pointStation(:,index),context.pointLateral(:,index));
                 exitAt=find(pointGap>context.range,1);
+                apart=terminalSafeSet.permanent(context,ego,rate,index,mode);
                 bodyGap=terminalSafeSet.separation(context,ego.station,ego.lateral, ...
                     context.targetStation(:,index),context.targetLateral(:,index));
                 required=max(context.buffer,guard+context.dt/2*context.targetSpeed(index));
-                limit=numel(tau);if ~isempty(exitAt),limit=exitAt-1;end
+                % Grid points before an exit must be clear; a separation
+                % certificate covers the time from its own grid point on, so
+                % that grid point is checked as well.
+                limit=numel(tau);reason="exit";stop=exitAt;
+                if ~isempty(apart) && (isempty(exitAt) || apart<exitAt),stop=apart;reason="permanentSeparation";end
+                if ~isempty(stop),limit=stop-(reason=="exit");end
                 if limit>0
                     margin=bodyGap(1:limit)-required(1:limit);info.margin=min(info.margin,min(margin));
                     if any(margin<0),info.reason="tubeMeetsTarget";return;end
                 end
-                if ~isempty(exitAt),ok=true;info.exitSeconds=tau(exitAt);return;end
-                % Clear until the encounter window ends: the encounter ends
-                % there (absorbing); the window end is fixed in time.
-                if last>=context.windowSteps
-                    ok=true;info.exitSeconds=tau(end);info.reason="clearToWindowEnd";return;
+                if ~isempty(stop),ok=true;info.exitSeconds=tau(stop);info.reason=reason;return;end
+                % Neither event within the computed horizon: not terminal.
+                if last>=start+context.horizonSteps
+                    info.reason="noExitOrSeparation";return;
                 end
                 shift=box.shift;steps=last-start+1;
             end
         end
 
-        function [ego,box,guard] = tube(context,value,station,tau,shift,mode)
+        function first = permanent(context,ego,rate,index,mode)
+            % First grid point from which the backup's rectangle box and the
+            % target provably never come within the buffer again, or []. Only
+            % on a straight road, where the gap between path boxes is at least
+            % their gap along the road and their gap across it:
+            %   a straight-line target (beta = 0) moves its box by c s(t) along
+            %   and s s(t) across the road, s(t) = V u + A u^2/2, c and s the
+            %   cosine and sine of its course to the road; a gap across the road
+            %   that its lateral velocity never closes (s V >= 0 and s A >= 0 on
+            %   the side away from the ego, opposite signs on the other), or a
+            %   gap along it that its station rate never closes (c V >= v and
+            %   c A >= 0 ahead, c V <= v and c A <= 0 behind), stays open;
+            %   a circling target (beta ~= 0) stays in the disk of its circle
+            %   widened by its body reach: a disk beside the ego band, or behind
+            %   it while the ego moves forward, stays apart.
+            % The ego band across the road only shrinks; along the road its
+            % centre moves at the trim's station rate v, and its further drift is
+            % at most T*sigma(r) (sigma(lambda r) <= lambda sigma(r), r decays as
+            % exp(-t/T)). These hold for all later times, also through a stop.
+            first=[];
+            if context.curvature~=0,return;end
+            motion=context.targetMotion;
+            if ~motion.available,return;end
+            v=context.modes(mode).pathSpeed;b=context.buffer;
+            remaining=context.timeConstant*rate;
+            lateral=ego.lateral;along=ego.station;
+            if motion.straight
+                angle=context.targetCourse(index)-context.pathHeading;
+                c=cos(angle);s=sin(angle);speed=context.targetVelocity(index);A=motion.acceleration;
+                target=context.targetLateral(:,index);station=context.targetStation(:,index);
+                apart=(target(1,:)-lateral(2,:)>=b & s.*speed>=0 & s*A>=0) ...
+                    | (lateral(1,:)-target(2,:)>=b & s.*speed<=0 & s*A<=0) ...
+                    | (station(1,:)-along(2,:)-remaining>=b & c.*speed-v>=0 & c*A>=0) ...
+                    | (along(1,:)-remaining-station(2,:)>=b & v-c.*speed>=0 & c*A<=0);
+            else
+                radius=motion.diskRadius;centre=motion.centre;
+                apart=(centre(2)-radius-lateral(2,:)>=b) | (lateral(1,:)-centre(2)-radius>=b) ...
+                    | (along(1,:)-remaining-centre(1)-radius>=b & v>=0);
+            end
+            first=find(apart,1);
+        end
+
+        function [ego,box,guard,rate] = tube(context,value,station,tau,shift,mode)
             % Path-coordinate boxes of the ego rectangle (ego) and of its
             % reference point (box) at times tau after the node under backup
             % 'mode' (default nominal), and the distance (guard) an ego body
@@ -260,7 +310,7 @@ classdef terminalSafeSet
             ego.station=[centre-drift-stretch-context.positionRadius;centre+drift+stretch+context.positionRadius];
             ego.lateral=[d-outer;d+outer];
             box.station=[centre-drift;centre+drift];box.lateral=[d-lateral;d+lateral];
-            box.shift=drift(end)+speedError(end)*context.dt;
+            box.shift=drift(end)+speedError(end)*context.dt;rate=speedError;
             % Body-point speed over [tau-dt/2,tau+dt/2]: |v| + |r| reach.
             early=radius*exp(context.dt/(2*context.timeConstant));
             speed=hypot(abs(p.velocity(1))+a(3)*early,abs(p.velocity(2))+a(4)*early) ...
@@ -311,6 +361,8 @@ classdef terminalSafeSet
             context.targetSpeed=[context.targetSpeed,speed];
             context.pointStation=[context.pointStation,[reference.station;reference.station]];
             context.pointLateral=[context.pointLateral,[reference.lateralPosition;reference.lateralPosition]];
+            context.targetCourse=[context.targetCourse,q(3,:)+q(6,:)];
+            context.targetVelocity=[context.targetVelocity,q(4,:)];
             context.covered=last;
         end
 
@@ -428,11 +480,20 @@ classdef terminalSafeSet
     end
 end
 
-function steps = localWindowSteps(model,terminal,dt)
-    % Grid index (from the present sample) at which the encounter window ends.
-    seconds=terminal.horizonSeconds;
-    if isfield(model,'encounterWindowSeconds') && isfinite(model.encounterWindowSeconds)
-        seconds=max(0,model.encounterWindowSeconds);
-    end
-    steps=floor(seconds/dt+1e-9);
+function motion = localTargetMotion(model)
+    % Constants of the target's forecast used by the separation certificate:
+    % its tangential acceleration, and for beta ~= 0 the centre of its circle
+    % in path coordinates and the circle's radius widened by the body reach.
+    motion=struct('available',false,'straight',true,'acceleration',0,'diskRadius',Inf,'centre',[NaN;NaN]);
+    q=model.targetEpoch;
+    if isempty(q),return;end
+    motion.available=true;motion.acceleration=q(5);
+    curvature=sin(q(6))/q(7);
+    if curvature==0,return;end
+    motion.straight=false;
+    course=q(3)+q(6);
+    centre=q(1:2)+[-sin(course);cos(course)]/curvature;
+    projection=laneGeometry.project(centre,model.lane);
+    motion.centre=[projection.station;projection.lateralPosition];
+    motion.diskRadius=1/abs(curvature)+norm(q(8:9))+norm(q(10:11));
 end

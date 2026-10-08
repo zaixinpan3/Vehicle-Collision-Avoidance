@@ -21,14 +21,17 @@ backup does not collide with the target, for the target's forecast motion
 under the motion contract (constant tangential acceleration `A` and constant
 sideslip `beta`), until the encounter ends (Section 4).
 
-The encounter ends at the earlier of two events, and the end is an absorbing
-mode: no property of the target after it is used.
+The encounter ends at the first of two events, both computed rather than
+preset, and the end is an absorbing mode: no property of the target after it
+is used.
 
 - The target leaves the perception range (it no longer exists for the
   controller).
-- The encounter window ends: `H_enc = terminal.horizonSeconds` (60 s) after
-  the encounter's start, a fixed time. A target still inside the range then
-  starts a new encounter.
+- Separation is proven: from that time on the tube and the target can never
+  come within the collision buffer again (Section 4.1).
+
+`terminal.horizonSeconds` (60 s) only limits how far ahead the check computes;
+a state whose tube reaches it with neither event is not terminal.
 
 Only the lanes of the road are modes; no avoidance maneuver or side is
 designed in advance, and without `road.laneOffsets` the nominal backup is the
@@ -115,18 +118,15 @@ two boxes; on a straight path it is `hypot(Delta_s, Delta_d)`.
 ## 4. The terminal set
 
 Let `B(t)` be the target's forecast rectangle and `q(t)` its reference point,
-both in path coordinates, `T_d(x)` the tube of backup `d` from `x`, and
-`t_end` the end of the present encounter window, a fixed time. For a state
-`x` at time `t_x` define the end of the encounter
+both in path coordinates, and `T_d(x)` the tube of backup `d` from `x`. For a
+state `x` at time `t_x` define the end of the encounter
 
     t_e(x) = min( first t >= 0 at which q(t_x + t) is farther than R from
                   every point of the reference-point box of T_d(x)(t),
-                  t_end - t_x ).
+                  first t >= 0 from which separation is proven (Section 4.1) ),
 
-The window end is fixed: it does not move when the plan is extended. A
-target that drives beside the ego at the same speed, inside the range but
-never in its way, ends its encounter at the window end, and a new encounter
-starts there.
+and require `t_e(x) <= H = terminal.horizonSeconds`. `H` bounds the
+computation only; it is not an encounter duration.
 
 The set of backup `d` is
 
@@ -153,15 +153,37 @@ there.
 The target's existence ends at its first exit: a target that has left the
 range is not followed back in, even if its forecast returns.
 
-The previous version of this set capped the exit at 60 s after each state
-and accepted a tube clear for that sliding window (hypothesis H4 of an
-earlier Section 6). Extending a plan by one hold then checked a new end
-interval that the old endpoint had not verified. Requiring the target to
-leave the range instead (no window) removes H4 but makes every state
-non-terminal for a target that stays in range: a parallel target at 49.9 m
-and the braking lead's first frames, whose first estimate is a lead at the ego's
-speed (measured in `report/TERMINAL_BACKUP_SET_20261008.tex`). The fixed
-window keeps both properties.
+**4.1 Proven separation.** On a straight road the distance between two path
+boxes is at least their gap along the road and at least their gap across it.
+After a grid time `t_s` the ego rectangle's band across the road only shrinks,
+and its station interval moves at the trim's station rate `v` and widens by at
+most `T sigma(r(t_s))` more, because `sigma(lambda r) <= lambda sigma(r)` and
+`r` decays as `exp(-t/T)`. The target obeys its contract for all later times,
+also through a stop (signed speed `V(t) = V_s + A (t - t_s)`):
+
+- a straight-line target (`beta = 0`) moves its box by `c s(t)` along and
+  `s s(t)` across the road, `s(t) = V_s u + A u^2/2`, `c, s` the cosine and sine
+  of its course to the road. A gap across the road of at least the buffer stays
+  open if the target's lateral velocity never closes it (`s V_s >= 0` and
+  `s A >= 0` with the target on the left, opposite signs on the right); a gap
+  along the road, reduced by the ego's further drift, stays open if
+  `c V_s >= v` and `c A >= 0` (target ahead) or `c V_s <= v` and `c A <= 0`
+  (target behind);
+- a circling target (`beta ~= 0`) stays in the disk of its circle widened by
+  its body reach. A disk beside the ego band, or behind it while the ego moves
+  forward, stays apart.
+
+On a curved road no separation is claimed; only the exit ends the encounter.
+
+**History.** The CLF-tube set of October 6 capped the exit at 60 s after each
+state and accepted a tube clear for that sliding window (hypothesis H4).
+Extending a plan by one hold then checked a new end interval that the old
+endpoint had not verified. Requiring the exit alone removes H4 but makes
+every state non-terminal for a target that stays in range (a parallel target
+at 49.9 m, the braking lead's first frames). A window fixed 60 s after the
+encounter's start kept invariance (commit `b836fba`); proven separation
+replaces it without any preset time
+(`report/TERMINAL_BACKUP_SET_20261008.tex`).
 
 ## 5. Forward invariance
 
@@ -179,8 +201,10 @@ of `x(tau)` lies in the box of the tube of `x(0)` at the same absolute time:
     T(x(tau))(t) is contained in T(x(0))(t + tau).
 
 The same holds for the reference-point boxes, so the exit of `x(tau)` is no
-later than the exit of `x(0)`. The window end `t_end` is fixed, so the end of
-the encounter seen from `x(tau)` is no later than that seen from `x(0)`.
+later than the exit of `x(0)`. A separation proven for `x(0)` at a time `t_s`
+holds for `x(tau)` at the same absolute time: its boxes are subsets and its
+station-rate bound is smaller. So the end of the encounter seen from
+`x(tau)` is no later than that seen from `x(0)`.
 Before it the boxes of `x(tau)` are clear of `B` because the larger ones are.
 The road condition is inherited the same way. The actual rectangle lies in
 `T_d(x(0))(t)` for all `t` (Section 3), so it does not meet `B` before the
@@ -215,8 +239,9 @@ A plan meeting these rows is *accepted*.
   has an input with `V_d(x+) <= rho V_d(x)` that meets the road, state and
   handling rows (checked online).
 
-The earlier hypothesis H4 (no conflict after a sliding 60-s window) is no
-longer needed: the window end is fixed (Section 4).
+The earlier hypothesis H4 (no conflict after a sliding 60-s window) is not
+needed: the encounter ends by an exit or a proven separation, both of which
+only come earlier along the backup (Section 5).
 
 **Proposition.** Under H1–H3, within one encounter, if the plan of sample `k`
 is accepted, the shifted plan at `k+1` is accepted:
@@ -232,8 +257,9 @@ reproduce the old nodes 2..N+1 exactly. Every hard row of the old plan holds
 there. The old node `prefix+1` was hard (deficit 0) and is now the last
 prefix node, so the prefix deficit sum loses the old first node's deficit and
 gains zero. The endpoint is the old endpoint at the same absolute time. By H2
-the forecast is unchanged and the window end is fixed, so the endpoint is
-still in `S_d`. An appended hold of backup `d` satisfies
+the forecast is unchanged, so the endpoint is still in `S_d`: its exit or
+separation is at the same absolute time, within `H` of the same node. An
+appended hold of backup `d` satisfies
 `V_d(x+) <= rho V_d(x)` and its own rows (H3). By Section 5 its endpoint is in
 `S_d` (or the encounter has ended), and its nodes and midpoints are inside the
 tube of the old endpoint. That tube clears the target by the hard-row
@@ -246,8 +272,8 @@ encounter has been accepted, H1–H3 guarantee that no later sample of that
 encounter reports no solution.
 
 The start of an encounter is outside this statement. When the target first
-enters the range, re-enters it after leaving, or is still present when a
-window ends, the new encounter is an initial-feasibility question.
+enters the range or re-enters it after leaving, the new encounter is an
+initial-feasibility question.
 
 **Return to the nominal path.** A plan whose endpoint is terminal only for
 another lane is extended by path guidance toward the given path until a node
@@ -282,13 +308,13 @@ controller meet the same hard rows as every other node. The set is otherwise
 
 `G` uses a left Riemann sum, an upper bound because `sigma(r(t))` decreases.
 The target table is filled in 2-s chunks and reused within a sample.
-`terminal.horizonSeconds` (60 s) is the encounter window `H_enc`. The
-controller stores the sample at which the present encounter started
-(`encounterStart` in its state) and passes the window's remaining seconds
-(`encounterWindowSeconds`); a target that appears, or is still present when
-the window ends, starts a new encounter. A tube clear until the window end is
-in `S` (`clearToWindowEnd`), and so is any node after it
-(`encounterWindowEnded`).
+`terminal.horizonSeconds` (60 s) bounds how far the check computes from a
+node. `terminalSafeSet.permanent` tests the separation of Section 4.1 at every
+grid point of a chunk; the check ends at the first exit or proven separation,
+after confirming the grid points before it (and the separation's own point).
+A tube that reaches the bound with neither is not terminal
+(`noExitOrSeparation`). The issued plan records how its encounter ends
+(`terminalEnd`: `exit` or `permanentSeparation`).
 
 **Backups.** `terminalSafeSet.modeReferences` builds one reference per lane
 centre of `road.laneOffsets` (the nominal path first, then by distance), each
@@ -350,10 +376,12 @@ input trust scale (`localTrustRecord`).
 
 ## 8. Measured behavior
 
-The lane-hold backups and the fixed window are measured in
-`report/TERMINAL_BACKUP_SET_20261008.tex`: exact states 14 of 14 as before;
-noisy 57 of 84 against 55, with 9 of 12 noisy braking-lead runs now running
-beyond 1 hold (at most 1 before); the fixed window alone changes no outcome. The CLF-tube set of
+The lane-hold backups with proven separation are measured in
+`report/TERMINAL_BACKUP_SET_20261008.tex` (variant F): exact states 14 of 14
+as before; noisy 58 of 84 against 55 (2 of 12 braking leads recover, none
+before), no collision. Encounters ended by exit at 8144 accepted endpoints and
+by proven separation at 2689, at most 26 s after the endpoint, so the 60-s
+computation bound never applied. The CLF-tube set of
 October 6 is measured in
 `report/TERMINAL_SAFE_SET_RECURSIVE_FEASIBILITY_20261006.tex`, for the
 exact-state campaigns:
@@ -464,8 +492,13 @@ Section 8.
 
 - Recursive feasibility is proven within one encounter, on the declared
   sampled model with exact information (H1, H2), and conditionally on H3,
-  which is checked online, not proven. Each new encounter (a target appearing,
-  or still present at a window end) is an initial-feasibility question.
+  which is checked online, not proven. Each new encounter (a target appearing
+  or re-entering) is an initial-feasibility question.
+- Separation is proven only on a straight road. On a curve only the exit
+  ends an encounter, and a target that stays in range without either event
+  within `terminal.horizonSeconds` makes the state non-terminal, also when
+  it would in fact never be met: the bound decides completeness, not
+  soundness.
 - On a curve, a lane backup pairs the offset path's trim with the given
   path's CLF matrix; its decrease is checked per appended hold, not certified
   offline.

@@ -154,7 +154,7 @@ function [solution,search,model,stages]=localAcceptance(solution,problem,anchor,
     cfg=model.cfg;
     search.acceptance=struct('step',NaN,'candidateFeasible',false,'candidateReason',"",'iterations',0, ...
         'linearizationGap',NaN,'fullGap',NaN,'fullCorrection',NaN,'terminalLevel',NaN, ...
-        'terminalValue',NaN,'terminalExitSeconds',NaN,'terminalLaneOffset',NaN,'reason',"");
+        'terminalValue',NaN,'terminalExitSeconds',NaN,'terminalLaneOffset',NaN,'terminalEnd',"",'reason',"");
     if isempty(solution),return;end
     for iteration=0:cfg.terminal.sqpIterations
         [accepted,info]=localLineSearch(solution,anchor,model);
@@ -171,6 +171,7 @@ function [solution,search,model,stages]=localAcceptance(solution,problem,anchor,
             search.acceptance.terminalValue=accepted.terminalValue;
             search.acceptance.terminalExitSeconds=accepted.terminalExitSeconds;
             search.acceptance.terminalLaneOffset=accepted.terminalLaneOffset;
+            search.acceptance.terminalEnd=accepted.terminalEnd;
             return;
         end
         if iteration==cfg.terminal.sqpIterations || toc(timer)>=cfg.solver.timeLimitSeconds,break;end
@@ -235,7 +236,7 @@ function [plan,context]=localEvaluatePlan(inputs,model,context)
     % it), and the terminal set at the endpoint.
     cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;h=cfg.controller.sampleTime;
     plan=struct('inputs',inputs,'states',[],'feasible',false,'softSum',Inf,'softDeficits',zeros(1,0), ...
-        'reason',"",'terminalValue',NaN,'terminalExitSeconds',NaN,'terminalLaneOffset',NaN);
+        'reason',"",'terminalValue',NaN,'terminalExitSeconds',NaN,'terminalLaneOffset',NaN,'terminalEnd',"");
     states=zeros(6,count+1);middles=zeros(6,count);states(:,1)=model.initialState;
     try
         for index=1:count
@@ -281,7 +282,7 @@ function [plan,context]=localEvaluatePlan(inputs,model,context)
     end
     [member,context,terminal]=terminalSafeSet.member(context,states(:,end),count);
     plan.terminalValue=terminal.value;plan.terminalExitSeconds=terminal.exitSeconds;
-    if member,plan.terminalLaneOffset=terminal.lateralOffset;end
+    if member,plan.terminalLaneOffset=terminal.lateralOffset;plan.terminalEnd=terminal.reason;end
     if ~member,plan.reason="terminal:"+terminal.reason;return;end
     plan.softDeficits=deficits;plan.softSum=sum(deficits);plan.feasible=true;
 end
@@ -950,7 +951,7 @@ function solution=localTerminalMetrics(solution,model,acceptance)
     cfg=model.cfg;y=solution.states(:,end);count=size(solution.inputs,2);
     solution.terminalValue=acceptance.terminalValue;solution.terminalLevel=acceptance.terminalLevel;
     solution.terminalExitSeconds=acceptance.terminalExitSeconds;
-    solution.terminalLaneOffset=acceptance.terminalLaneOffset;
+    solution.terminalLaneOffset=acceptance.terminalLaneOffset;solution.terminalEnd=acceptance.terminalEnd;
     solution.acceptedStep=acceptance.step;solution.candidateFeasible=acceptance.candidateFeasible;
     solution.linearizationGap=acceptance.linearizationGap;
     solution.terminalDistanceMeters=Inf;solution.terminalRoadMarginMeters=Inf;

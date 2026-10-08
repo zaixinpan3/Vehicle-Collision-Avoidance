@@ -1,2 +1,2 @@
 TOTAL 592 PASSED 592 FAILED 0 INCOMPLETE 0
-runtests('tests') on the committed source; changed classes: terminalSafeSetTest (fixed window, lane-hold backup, offset CLF error), twoStagePredictiveControlTest (terminal set name)
+runtests('tests') on the committed source (proven separation); terminalSafeSetTest covers exit, proven separation (parallel, faster lead, circling target), a slower lead beyond the computed horizon, lane-hold backups and their invariance

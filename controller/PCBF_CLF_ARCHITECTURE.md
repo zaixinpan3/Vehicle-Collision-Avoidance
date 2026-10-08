@@ -15,8 +15,9 @@ The horizon ends in the terminal set of
 [TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md): the CLF tube of the endpoint
 under a backup controller (this problem without PCBF rows, about the given
 path or another lane centre of `road.laneOffsets`) misses the target until the
-encounter ends, at the target's exit from the perception range or at a fixed
-window end, whichever comes first. The issued plan is the nonlinear rollout of an accepted step of the
+encounter ends: the target leaves the perception range, or the two are proven
+never to come within the collision buffer again. No encounter duration is
+preset. The issued plan is the nonlinear rollout of an accepted step of the
 affine solution (*Issuing the solved plan*). On the declared sampled model with
 exact information the previous plan, shifted by one hold, is always an
 acceptable step, which makes the problem recursively feasible within an
@@ -535,8 +536,9 @@ centre `d`, it meets all of:
   errors shrinking as `exp(-t/T)`, station within a bounded drift of the
   trim's) stays on the road;
 - that tube does not meet the target's forecast rectangle until the
-  encounter ends: the target leaves the perception range, or the encounter
-  window ends 60 s after the encounter's start (a fixed time).
+  encounter ends: the target leaves the perception range, or separation is
+  proven (straight road: a gap along or across the road that the forecast
+  and the tube can only widen), within the 60 s that the check computes.
 
 In the convex problem this is one cone at the last node,
 `||F (e_d(y) + J dx_N)|| <= sqrt(c*)`, for the backup `d` selected at the

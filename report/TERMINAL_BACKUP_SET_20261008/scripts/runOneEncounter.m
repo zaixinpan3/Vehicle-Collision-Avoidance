@@ -22,13 +22,14 @@ function runOneEncounter(sourceRoot,outputDirectory,speed,name,seed,frameCount,v
             EstimatorConfiguration=c,FailureFile=stem+"-failure.mat",OutputFile=stem+".json");
         r=result.results;trace=r.trace;r=rmfield(r,{'trace','configuration'});
         r.seed=seed;r.speed=speed;r.wallSeconds=toc(timer);
-        frames=struct('time',{},'primaryOptimum',{},'horizonSteps',{},'controllerSeconds',{},'terminalLaneOffset',{});
+        frames=struct('time',{},'primaryOptimum',{},'horizonSteps',{},'controllerSeconds',{},'terminalLaneOffset',{},'terminalEnd',{},'terminalExitSeconds',{});
         if ~isempty(trace) && isfield(trace,'time')
-            lane=num2cell(nan(1,numel(trace)));
+            lane=num2cell(nan(1,numel(trace)));endKind=repmat({""},1,numel(trace));
             if isfield(trace,'terminalLaneOffset'),lane={trace.terminalLaneOffset};end
+            if isfield(trace,'terminalEnd'),endKind={trace.terminalEnd};end
             frames=struct('time',{trace.time},'primaryOptimum',{trace.primaryOptimum}, ...
                 'horizonSteps',{trace.horizonSteps},'controllerSeconds',{trace.controllerSeconds}, ...
-                'terminalLaneOffset',lane);
+                'terminalLaneOffset',lane,'terminalEnd',endKind,'terminalExitSeconds',{trace.terminalExitSeconds});
         end
         r.frames=frames;
     catch exception

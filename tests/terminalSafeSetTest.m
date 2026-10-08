@@ -1,7 +1,7 @@
 classdef terminalSafeSetTest < matlab.unittest.TestCase
     % Safe-exit terminal set of lane-hold CLF backups: invariance under a
-    % backup, nested levels, state-row containment, the fixed encounter window
-    % and the lane-hold backups.
+    % backup, nested levels, state-row containment, the end of an encounter
+    % (exit or proven separation) and the lane-hold backups.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -77,35 +77,35 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyFalse(member);
             testCase.verifyEqual(info.reason,"tubeLeavesRoad");
         end
-        function theEncounterEndsAtItsExitOrAtTheFixedWindowEnd(testCase)
-            % A parallel target at the same speed never leaves the range: it is
-            % cleared until the encounter window ends (absorbing); the same
-            % target in the ego lane ahead meets the tube; a receding target
-            % ends the encounter by leaving the range.
+        function theEncounterEndsAtItsExitOrAtAProvenSeparation(testCase)
+            % A parallel target at the same speed never leaves the range, but
+            % the gap across the road can never close: the encounter ends there.
             parallel=localModel([0;0;0;8;0;0],[0;49.9;0;8;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(parallel),parallel.initialState,0);
             testCase.verifyTrue(member);
-            testCase.verifyEqual(info.reason,"clearToWindowEnd");
-            testCase.verifyEqual(info.exitSeconds,60,AbsTol=1e-9);
+            testCase.verifyEqual(info.reason,"permanentSeparation");
+            % A slower lead in the ego lane meets the tube.
             ahead=localModel([0;0;0;8;0;0],[20;0;0;6;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(ahead),ahead.initialState,0);
             testCase.verifyFalse(member);
             testCase.verifyEqual(info.reason,"tubeMeetsTarget");
+            % A faster lead never comes closer.
             receding=localModel([0;0;0;8;0;0],[20;0;0;10;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(receding),receding.initialState,0);
             testCase.verifyTrue(member);
-            testCase.verifyLessThan(info.exitSeconds,60);
-            % The window end is fixed in time: with 1 s left the slower lead
-            % ahead cannot be reached before the encounter ends, and a node
-            % after the end is past the encounter.
-            ahead.encounterWindowSeconds=1;
-            context=terminalSafeSet.context(ahead);
-            [member,context,info]=terminalSafeSet.member(context,ahead.initialState,0);
+            testCase.verifyEqual(info.reason,"permanentSeparation");
+            % A slightly slower lead far ahead closes only after the computed
+            % horizon; with neither event within it the state is not terminal.
+            slow=localModel([0;0;0;8;0;0],[40;0;0;7.5;0;0;1.6;2.4;.95;0;0]);
+            [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(slow),slow.initialState,0);
+            testCase.verifyFalse(member);
+            testCase.verifyEqual(info.reason,"noExitOrSeparation");
+            % A target circling beside the road stays in its disk, clear of the
+            % ego band.
+            circling=localModel([0;0;0;8;0;0],[0;40;0;5;0;.05;1.6;2.4;.95;0;0]);
+            [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(circling),circling.initialState,0);
             testCase.verifyTrue(member);
-            testCase.verifyEqual(info.reason,"clearToWindowEnd");
-            [member,~,info]=terminalSafeSet.member(context,ahead.initialState,21);
-            testCase.verifyTrue(member);
-            testCase.verifyEqual(info.reason,"encounterWindowEnded");
+            testCase.verifyEqual(info.reason,"permanentSeparation");
         end
         function aLaneHoldBackupCompletesAnEncounterTheNominalOneCannot(testCase)
             % Settled in the left lane beside a slower lead in the nominal

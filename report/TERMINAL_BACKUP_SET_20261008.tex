@@ -77,9 +77,9 @@ October 6 requirement that the terminal set use no mode.
   terminal lane.
 \item \path{controller/collisionAvoidanceController.m}: the encounter start
   in the controller state and the remaining window in the model.
-\item \path{controller/readControllerInputs.m}: optional
-  \texttt{road.laneOffsets}; \path{scripts/collisionThreatScenario.m}: the
-  four lane centres of the campaign road.
+\item \path{controller/readControllerInputs.m} reads an optional
+  \texttt{road.laneOffsets}, and the campaign road of
+  \path{scripts/collisionThreatScenario.m} has four lane centres.
 \item Theory: \path{controller/TERMINAL_SAFE_SET.md} (Sections 1--7 and 10).
 \end{itemize}
 
@@ -149,10 +149,10 @@ numerical stalls of the conic solver.
 
 \section{Decision needed}
 \begin{itemize}
-\item Keep the lane backups (D), or keep only the fixed window (E), which
-  changes no outcome but removes H4. The lane backups are modes, against the
-  October 6 requirement; the return to the nominal path is a guidance
-  extension, not a certificate.
+\item Keep the lane backups, or the nominal backup alone. The lane backups
+  are modes, against the October 6 requirement; the return to the nominal
+  path is a guidance extension, not a certificate. (The window question is
+  settled by the addendum: no preset time is needed.)
 \item The remaining failures point to the plan's length and the conic
   solver's numerical stalls, not to the terminal set.
 \end{itemize}
@@ -165,9 +165,78 @@ states), \texttt{compare.py}, and \texttt{diagnoseFrame*.m} with
 \texttt{debugControllerModel.m} (the controller's model construction) for
 failing frames. Each variant ran on a snapshot of the source: A is the
 implementation before the fixed window (the target had to leave the range
-within 60~s of each node), D the committed source, and E the committed
-source without \texttt{laneOffsets} in the scenario road. Their hashes are in
+within 60~s of each node), D the source of commit \texttt{b836fba}, E that
+source without \texttt{laneOffsets} in the scenario road, and F the source
+with proven separation (the addendum). F ran as D in \texttt{run-DE.sh}
+(\texttt{D} the study folder, \texttt{VARIANT='struct()'}, \texttt{SEEDS}
+unset, i.e.\ seeds 0, 20261003 and 1--5) with the F snapshot as source; the
+summary is \texttt{compare.py} over \texttt{out-base out-A out-D out-E out-F}. Their hashes are in
 \path{variant*-sha256.txt}. Raw outputs were in
 \path{~/.cache/collisionAvoidance/terminal_backup_20261008/} and are
 disposable.
+
+\section{Addendum: proven separation instead of a preset window}
+The user asked why the window is 60~s and whether a preset time is needed.
+It is not: 60~s was the engineering cap of October 6, with no derivation, and
+the safety task itself has no duration. The encounter now ends at the first of
+two computed events, the target's exit or a proven separation, and
+\texttt{terminal.horizonSeconds} only bounds how far the check computes; a
+state that reaches it with neither event is not terminal (variant F, which
+replaces D in the source).
+
+\paragraph{Proven separation.} On a straight road the distance between two
+path boxes is at least their gap along the road and their gap across it.
+After a grid time the ego band across the road only shrinks, and along the
+road it moves at the trim's station rate and widens by at most
+$T\sigma(r)$ more. A straight-line target ($\beta=0$) keeps a gap across the
+road open if its lateral velocity never closes it ($sV\ge0$ and $sA\ge0$ on
+the side away from the ego, and opposite signs on the other) and a gap along it
+open if its station rate never closes it ($cV\ge v$ and $cA\ge0$ ahead,
+$cV\le v$ and $cA\le0$ behind). A circling target stays in the disk of its
+circle widened by its body reach. These hold for all later times, also
+through a stop. A separation proven for a state holds for its successors
+under the backup at the same absolute time, so invariance and the shift
+argument hold within an encounter without any window. On a curve only the
+exit ends an encounter.
+
+\paragraph{Implementation.} \path{controller/terminalSafeSet.m}:
+\texttt{permanent} (the certificate above, tested at every grid point of a
+chunk), \texttt{localTargetMotion} (the forecast's tangential acceleration and,
+for $\beta\ne0$, the circle's centre and widened radius), the target's course
+and speed on the grid, and the computation bound \texttt{horizonSteps}; the
+check ends at the first exit or proven separation after confirming the grid
+points before it and the separation's own point, and returns
+\texttt{noExitOrSeparation} when it reaches the bound with neither. The fixed
+window (\texttt{windowSteps}, \texttt{clearToWindowEnd},
+\texttt{encounterWindowEnded}) and the encounter start in the controller state
+are removed. The issued plan and the trace record how the encounter ends
+(\texttt{terminalEnd}). \texttt{terminalSafeSetTest} now checks that a
+parallel target, a faster lead and a target circling beside the road end the
+encounter by proven separation, that a slower lead in the ego lane meets the
+tube, and that a lead closing only after the 60-s bound is not terminal. The
+full suite (592 tests) passes on F (\path{tests.txt}).
+
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+ & baseline & A & D & E & F\\
+\midrule
+exact, recovered of 14 & 14 & 14 & 14 & 14 & 14\\
+noisy, recovered of 84 & 55 & 56 & 57 & 55 & 58\\
+noisy, new recoveries / new failures & -- & 2 / 1 & 3 / 1 & 0 / 0 & 4 / 1\\
+noisy braking leads recovered of 12 & 0 & 0 & 1 & 0 & 2\\
+collisions & 0 & 0 & 0 & 0 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+F's new recoveries are the braking leads of seeds 3 and 5 at 8~m/s, the
+15~m/s head-on of seed 4 and the 8~m/s curved crossing of seed 4; its new
+failure is the same late stop as in A and D (8~m/s curved head-on of seed 1,
+at hold 1571). Over all 98 runs, of F's accepted endpoints with a target
+8144 end the encounter by the target's exit and 2689 by proven separation; the
+end lies at most 26.2~s after the endpoint (median 0, 99th percentile 8.7~s;
+exact runs at most 7.5~s), so the 60-s computation bound was never reached. Five of the 12 noisy braking leads run beyond 1 hold with
+F (9 with D). Per run: \path{campaign-runs.csv} (all five variants); summary
+\path{comparison-all.txt}.
+
 \end{document}
