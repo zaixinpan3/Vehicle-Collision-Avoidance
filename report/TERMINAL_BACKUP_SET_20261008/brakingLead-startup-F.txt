@@ -1,0 +1,56 @@
+/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F/seed1-speed15-brakingLead-failure.mat
+ ego v 15.003 m/s; target x 6.25 y 0.010 yaw 0.00063 V 14.972 A 0.000 beta 0.00000
+ lane d=+0.00:  node 0 false(tubeMeetsTarget NaNs)  node 40 false(tubeMeetsTarget NaNs)  node 100 false(tubeMeetsTarget NaNs)  node 200 false(tubeMeetsTarget NaNs)
+ lane d=-3.66:  node 0 true(permanentSeparation 0.0s)  node 40 true(permanentSeparation 0.0s)  node 100 true(permanentSeparation 0.0s)  node 200 true(permanentSeparation 0.0s)
+ lane d=+3.66:  node 0 false(noExitOrSeparation NaNs)  node 40 false(noExitOrSeparation NaNs)  node 100 false(noExitOrSeparation NaNs)  node 200 false(noExitOrSeparation NaNs)
+ lane d=+7.32:  node 0 false(noExitOrSeparation NaNs)  node 40 false(noExitOrSeparation NaNs)  node 100 false(noExitOrSeparation NaNs)  node 200 false(noExitOrSeparation NaNs)
+ solve: returned 0, nonlinearAcceptanceFailed; candidateReason terminal:levelAboveCertifiedRegion; reason terminal:levelAboveCertifiedRegion
+/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F/seed1-speed8-brakingLead-failure.mat
+ ego v 8.003 m/s; target x 6.25 y 0.012 yaw 0.00243 V 7.972 A 0.000 beta 0.00000
+ lane d=+0.00:  node 0 false(tubeMeetsTarget NaNs)  node 40 false(tubeMeetsTarget NaNs)  node 100 false(tubeMeetsTarget NaNs)  node 200 false(tubeMeetsTarget NaNs)
+ lane d=-3.66:  node 0 true(permanentSeparation 0.0s)  node 40 true(permanentSeparation 0.0s)  node 100 true(permanentSeparation 0.0s)  node 200 true(permanentSeparation 0.0s)
+ lane d=+3.66:  node 0 false(noExitOrSeparation NaNs)  node 40 false(noExitOrSeparation NaNs)  node 100 false(noExitOrSeparation NaNs)  node 200 false(tubeMeetsTarget NaNs)
+ lane d=+7.32:  node 0 false(noExitOrSeparation NaNs)  node 40 false(noExitOrSeparation NaNs)  node 100 false(noExitOrSeparation NaNs)  node 200 false(noExitOrSeparation NaNs)
+ solve: returned 0, nonlinearAcceptanceFailed; candidateReason terminal:levelAboveCertifiedRegion; reason terminal:levelAboveCertifiedRegion
+/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F/seed20261003-speed15-brakingLead-failure.mat
+ ego v 14.997 m/s; target x 6.22 y -0.013 yaw 0.00289 V 14.900 A 0.000 beta 0.00000
+ lane d=+0.00:  node 0 false(tubeMeetsTarget NaNs)  node 40 false(tubeMeetsTarget NaNs)  node 100 false(tubeMeetsTarget NaNs)  node 200 false(tubeMeetsTarget NaNs)
+ lane d=-3.66:  node 0 true(permanentSeparation 0.0s)  node 40 true(permanentSeparation 0.0s)  node 100 true(permanentSeparation 0.0s)  node 200 true(permanentSeparation 0.0s)
+ lane d=+3.66:  node 0 false(tubeMeetsTarget NaNs)  node 40 false(tubeMeetsTarget NaNs)  node 100 false(tubeMeetsTarget NaNs)  node 200 false(tubeMeetsTarget NaNs)
+ lane d=+7.32:  node 0 false(noExitOrSeparation NaNs)  node 40 false(noExitOrSeparation NaNs)  node 100 false(noExitOrSeparation NaNs)  node 200 false(noExitOrSeparation NaNs)
+ solve: returned 0, nonlinearAcceptanceFailed; candidateReason terminal:levelAboveCertifiedRegion; reason terminal:levelAboveCertifiedRegion
+/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F/seed20261003-speed8-brakingLead-failure.mat
+ ego v 7.997 m/s; target x 6.22 y -0.016 yaw 0.00377 V 7.900 A 0.000 beta 0.00000
+ lane d=+0.00:  node 0 false(tubeMeetsTarget NaNs)  node 40 false(tubeMeetsTarget NaNs)  node 100 false(tubeMeetsTarget NaNs)  node 200 false(tubeMeetsTarget NaNs)
+ lane d=-3.66:  node 0 true(permanentSeparation 0.0s)  node 40 true(permanentSeparation 0.0s)  node 100 true(permanentSeparation 0.0s)  node 200 true(permanentSeparation 0.0s)
+ lane d=+3.66:  node 0 false(tubeMeetsTarget NaNs)  node 40 false(tubeMeetsTarget NaNs)  node 100 false(tubeMeetsTarget NaNs)  node 200 false(tubeMeetsTarget NaNs)
+ lane d=+7.32:  node 0 false(noExitOrSeparation NaNs)  node 40 false(noExitOrSeparation NaNs)  node 100 false(noExitOrSeparation NaNs)  node 200 false(noExitOrSeparation NaNs)
+ solve: returned 0, nonlinearAcceptanceFailed; candidateReason terminal:levelAboveCertifiedRegion; reason terminal:levelAboveCertifiedRegion
+/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F/seed1-speed15-brakingLead-failure.mat
+ seed holds 512 reached 0; endpoint x 382.7 y 6.75 yaw -0.001 v 15.00; terminated nonlinearAcceptanceFailed
+ seed lateral position: min -0.02 max 7.94
+ lane d=+0.00: ratio 7.31 member 0 (levelAboveCertifiedRegion)
+ lane d=-3.66: ratio 17.4 member 0 (levelAboveCertifiedRegion)
+ lane d=+3.66: ratio 1.53 member 0 (levelAboveCertifiedRegion)
+ lane d=+7.32: ratio 0.0524 member 0 (noExitOrSeparation)
+/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F/seed1-speed8-brakingLead-failure.mat
+ seed holds 512 reached 0; endpoint x 203.6 y 4.93 yaw 0.003 v 8.00; terminated nonlinearAcceptanceFailed
+ seed lateral position: min -0.02 max 5.60
+ lane d=+0.00: ratio 11.4 member 0 (levelAboveCertifiedRegion)
+ lane d=-3.66: ratio 34.5 member 0 (levelAboveCertifiedRegion)
+ lane d=+3.66: ratio 0.784 member 0 (tubeMeetsTarget)
+ lane d=+7.32: ratio 2.6 member 0 (levelAboveCertifiedRegion)
+/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F/seed20261003-speed15-brakingLead-failure.mat
+ seed holds 512 reached 0; endpoint x 382.5 y 8.35 yaw 0.004 v 14.99; terminated nonlinearAcceptanceFailed
+ seed lateral position: min 0.01 max 8.35
+ lane d=+0.00: ratio 11.3 member 0 (levelAboveCertifiedRegion)
+ lane d=-3.66: ratio 23.3 member 0 (levelAboveCertifiedRegion)
+ lane d=+3.66: ratio 3.58 member 0 (levelAboveCertifiedRegion)
+ lane d=+7.32: ratio 0.182 member 0 (noExitOrSeparation)
+/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F/seed20261003-speed8-brakingLead-failure.mat
+ seed holds 512 reached 0; endpoint x 203.4 y 5.85 yaw -0.002 v 7.99; terminated nonlinearAcceptanceFailed
+ seed lateral position: min 0.01 max 5.85
+ lane d=+0.00: ratio 15.8 member 0 (levelAboveCertifiedRegion)
+ lane d=-3.66: ratio 42 member 0 (levelAboveCertifiedRegion)
+ lane d=+3.66: ratio 2.21 member 0 (levelAboveCertifiedRegion)
+ lane d=+7.32: ratio 1.02 member 0 (levelAboveCertifiedRegion)

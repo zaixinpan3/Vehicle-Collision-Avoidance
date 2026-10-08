@@ -155,6 +155,8 @@ numerical stalls of the conic solver.
   settled by the addendum: no preset time is needed.)
 \item The remaining failures point to the plan's length and the conic
   solver's numerical stalls, not to the terminal set.
+\item Whether to add a startup rollout toward the other side (braking lead at
+  startup, addendum).
 \end{itemize}
 
 \section{Reproduction}
@@ -238,5 +240,24 @@ end lies at most 26.2~s after the endpoint (median 0, 99th percentile 8.7~s;
 exact runs at most 7.5~s), so the 60-s computation bound was never reached. Five of the 12 noisy braking leads run beyond 1 hold with
 F (9 with D). Per run: \path{campaign-runs.csv} (all five variants); summary
 \path{comparison-all.txt}.
+
+\paragraph{Braking lead at startup.} F stops 6 of the 12 noisy braking leads
+at the first frame, D 2. The four that D started (seeds 1 and 20261003 at
+both speeds; D failed them later, after 1 to 924 holds) have one cause. The
+first estimate is a lead 6.2~m ahead, 0.03 to 0.10~m/s slower than the ego,
+with a heading of 0.6 to 3.8~mrad toward the left. A settled ego in the given
+lane meets it. In the right lane separation is proven at once: the lead's
+lateral velocity points away. In the two left lanes the forecast lead creeps
+toward the tube: it meets the first one's tube in two runs, and otherwise no
+separation can be proven, while at that speed difference the lead does not
+leave the range within the 60~s computed. The startup potential-field rollout
+passes on the left (to 5.6--8.4~m), reaches no terminal state in its 512 holds,
+and no plan is accepted; D, which accepted a tube clear until the window end,
+started all four. The cause is the side of the startup rollout, not an empty
+terminal set. A second startup rollout toward the other side, when the first
+reaches no terminal state, is the obvious remedy; it is not implemented
+(\path{brakingLead-startup-F.txt}; \path{scripts/whyNotTerminal.m},
+\path{scripts/whySeedFails.m} with the copy written by
+\path{scripts/makeSolveDiag.py}).
 
 \end{document}

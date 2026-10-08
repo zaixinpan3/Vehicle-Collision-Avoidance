@@ -381,7 +381,11 @@ The lane-hold backups with proven separation are measured in
 as before; noisy 58 of 84 against 55 (2 of 12 braking leads recover, none
 before), no collision. Encounters ended by exit at 8144 accepted endpoints and
 by proven separation at 2689, at most 26 s after the endpoint, so the 60-s
-computation bound never applied. The CLF-tube set of
+computation bound never applied. Six of the 12 noisy braking leads stop at
+the first frame (2 with the fixed window): the startup rollout passes on the
+left, where the lead's estimated heading toward the left (a few mrad) at
+nearly the ego's speed admits neither an exit nor a separation proof, while
+the right lane, provably separate, is not tried. The CLF-tube set of
 October 6 is measured in
 `report/TERMINAL_SAFE_SET_RECURSIVE_FEASIBILITY_20261006.tex`, for the
 exact-state campaigns:
