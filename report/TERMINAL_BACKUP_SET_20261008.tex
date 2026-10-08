@@ -1,0 +1,173 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\setlength{\emergencystretch}{2em}
+\title{A finite-encounter terminal set with lane-hold backup controllers}
+\date{Prepared October 8, 2026}
+\begin{document}
+\maketitle
+
+\section{Request}
+The user asked to explore a terminal set for a finite encounter: the safety
+task ends when the target leaves the perception range, modelled as an
+absorbing mode of a hybrid system, and the terminal set is the set of states
+from which a backup controller completes the encounter safely, so that the
+prediction horizon need not cover the whole avoidance. The proposal also
+suggested a persistent-separation set from a collision-cone condition, and
+asked whether the backup should only accept already separating states or
+also continue avoiding. The user asked for an implementation and a
+simulation test if the design is reasonable.
+
+\section{Assessment}
+\begin{itemize}
+\item The CLF-tube terminal set of October 6 already is a safe-exit set: its
+  backup is the CLF terminal controller (return to the given path at the
+  reference speed), and the tube must miss the target until it leaves the
+  range. What the proposal adds is the finite-encounter formulation without
+  the 60-s sliding window (hypothesis H4), and a backup that may keep
+  avoiding.
+\item \emph{Finite encounter.} Requiring the target to leave the range
+  removes H4, and $S\cup\{\dagger\}$ is invariant with an absorbing end state.
+  It also makes every state non-terminal for a target that stays in range: a
+  parallel target at 49.9~m (two unit tests) and the first frames of the
+  braking lead, whose first estimate is a lead at the ego's speed ($A=0$ until
+  0.5~s). A fixed encounter window keeps both properties: the encounter ends at
+  the earlier of the target's exit and a fixed time 60~s after the encounter's
+  start. Because that end does not move, the shift argument holds within the
+  encounter without H4; a target still present then starts a new encounter.
+\item \emph{Backup controller.} The return-to-path backup makes no state
+  terminal while a slower vehicle stays in the given lane; this is the
+  braking lead's startup failure in all 12 noisy runs. A family of lane-hold
+  backups (the same CLF and tube about each lane centre of the road) lets the
+  terminal set include overtaking states. The tube certificate selects a backup
+  whose tube stays clear, which is the role the proposal gave the collision
+  cone.
+\item \emph{Persistent separation.} $\mathcal S_{\mathrm{sep}}$ is the
+  separating terminal set of October 4--6, withdrawn because it is not
+  invariant under the ego's return to the path. It was not implemented; the
+  tube check covers both cases the proposal distinguished.
+\item \emph{Return to nominal.} A lane backup kept alone would never be left:
+  the shifted endpoint keeps its lane and appended holds keep it there (the
+  conflict that withdrew the shoulder terminal on October 4). A plan ending
+  in another lane is therefore extended by path guidance to the nominal set
+  whenever that extension meets every hard row.
+\end{itemize}
+The lanes are modes taken from the road description; this relaxes the
+October 6 requirement that the terminal set use no mode.
+
+\section{Implementation}
+\begin{itemize}
+\item \path{controller/terminalSafeSet.m}: backups (\texttt{modeReferences},
+  one reference per lane centre of \texttt{road.laneOffsets}, nominal first;
+  on a curve the offset path's trim with the given path's CLF matrix), the
+  tube about a lane centre (station rate (3.2')), membership in the union
+  (\texttt{member}, nominal first, cheap skip of backups whose level is above
+  their region), \texttt{select}, the fixed window (\texttt{windowSteps};
+  \texttt{clearToWindowEnd}, \texttt{encounterWindowEnded}), and the backup's
+  holds.
+\item \path{controller/nonlinearBicycleModel.m}: the CLF error and the path
+  guidance subtract the reference's \texttt{lateralOffset}.
+\item \path{controller/solvePredictiveControl.m}: the terminal cone uses the
+  selected backup, a shifted plan is extended by holds of its endpoint's
+  backup, and \texttt{localReturnToNominal} extends a plan that ends in
+  another lane back to the nominal set when every appended hold meets the
+  hard rows; the search records the anchor length, the return and the
+  terminal lane.
+\item \path{controller/collisionAvoidanceController.m}: the encounter start
+  in the controller state and the remaining window in the model.
+\item \path{controller/readControllerInputs.m}: optional
+  \texttt{road.laneOffsets}; \path{scripts/collisionThreatScenario.m}: the
+  four lane centres of the campaign road.
+\item Theory: \path{controller/TERMINAL_SAFE_SET.md} (Sections 1--7 and 10).
+\end{itemize}
+
+\section{Tests}
+\texttt{terminalSafeSetTest} now checks the fixed window (a parallel target is
+cleared to the window end, a node after it is past the encounter, a short
+remaining window ends the encounter before a slower lead is reached), that a
+lane-hold backup makes terminal an overtaking state the nominal backup cannot
+complete, the invariance of that backup over 40 holds, and the offset CLF
+error. Before the fixed window, two tests (a parallel target at 49.9~m in
+\texttt{nonlinearPredictiveSafetyTest} and the window test) failed with the
+exit-only set. The full suite result is in \path{tests.txt}.
+
+\section{Campaigns}
+The 14 encounters with exact states and the 84 noisy ones (seeds 20261003 and
+1--5), 2000-hold cap, 1-s recovery dwell, each in its own MATLAB process:
+\begin{itemize}
+\item \emph{baseline}: \texttt{5b4379a} controller (identical to
+  \texttt{68883d2});
+\item \emph{A}: exit required within 60~s of each node, with lane backups;
+\item \emph{D}: fixed window with lane backups (the committed design);
+\item \emph{E}: fixed window without lane backups.
+\end{itemize}
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+ & baseline & A & D & E\\
+\midrule
+exact, recovered of 14 & 14 & 14 & 14 & 14\\
+noisy, recovered of 84 & 55 & 56 & 57 & 55\\
+noisy, new recoveries / new failures & -- & 2 / 1 & 3 / 1 & 0 / 0\\
+collisions & 0 & 0 & 0 & 0\\
+noisy smallest clearance (m) & 0.272 & 0.289 & 0.289 & 0.272\\
+noisy runs using a lane backup & -- & 4 & 13 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+Per run: \path{TERMINAL_BACKUP_SET_20261008/campaign-runs.csv}; summary
+\path{comparison.txt}.
+
+\paragraph{Fixed window.} E reproduces the baseline run for run: the window
+end is never reached within these encounters, so the window removes H4
+without changing behaviour.
+
+\paragraph{Lane backups.} With exact states the braking lead uses a lane
+backup in about 80 of its 250 frames (the overtaking) and recovers, as
+before. With noise, the braking lead failed at its first frame in all 12
+baseline runs or at the next (solver time limit: no endpoint in the terminal
+set; at most 1 hold). With D, 9 of 12 run beyond 1 hold (9 to 1865 holds) and
+one recovers. The
+other stops are numerical (\texttt{pcbfNoNumericalResult},
+\texttt{clfNoNumericalResult}) or \texttt{nonlinearAcceptanceFailed} later in
+the run. Two inspected frames show the causes: a 479-hold startup plan whose
+endpoint drifts by about 2~m when rolled out from the next estimate, followed
+by a stalled CLF stage (Clarabel status 9, residual $3\times10^{-5}$); and a
+plan that swerves to 9.7~m left, whose primal problems are then infeasible at
+every trust scale. With A (exit required) the braking lead cannot start at
+all. The new failure (8~m/s curved head-on, seed 1, in A and D) occurs at hold
+1571, long after the encounter; E recovers it at hold 1764.
+
+\paragraph{Conclusion.} The finite-encounter terminal set with lane-hold
+backups is sound and implemented, and the fixed window removes H4 at no cost.
+The lane backups make the braking lead's startup feasible, but the noisy
+campaign gains only two recoveries (55 to 57): its dominant failures are not
+an empty terminal set but forecast changes on long open-loop plans and
+numerical stalls of the conic solver.
+
+\section{Decision needed}
+\begin{itemize}
+\item Keep the lane backups (D), or keep only the fixed window (E), which
+  changes no outcome but removes H4. The lane backups are modes, against the
+  October 6 requirement; the return to the nominal path is a guidance
+  extension, not a certificate.
+\item The remaining failures point to the plan's length and the conic
+  solver's numerical stalls, not to the terminal set.
+\end{itemize}
+
+\section{Reproduction}
+Scripts in \path{TERMINAL_BACKUP_SET_20261008/scripts}: \texttt{campaign.sh}
+(with \texttt{SEEDS}, \texttt{D}, \texttt{VARIANT}), \texttt{run-A.sh},
+\texttt{run-DE.sh}, \texttt{runOneEncounter.m} (seed 0 runs with exact
+states), \texttt{compare.py}, and \texttt{diagnoseFrame*.m} with
+\texttt{debugControllerModel.m} (the controller's model construction) for
+failing frames. Each variant ran on a snapshot of the source: A is the
+implementation before the fixed window (the target had to leave the range
+within 60~s of each node), D the committed source, and E the committed
+source without \texttt{laneOffsets} in the scenario road. Their hashes are in
+\path{variant*-sha256.txt}. Raw outputs were in
+\path{~/.cache/collisionAvoidance/terminal_backup_20261008/} and are
+disposable.
+\end{document}

@@ -10,8 +10,9 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
     % US four-lane road with 12 ft (3.6576 m) lanes and 10 ft (3.048 m) paved
     % shoulders. The ego follows the centre of the second lane from the right,
     % so lateralClearance = [right; left] = [1.5 lanes + shoulder; 2.5 lanes +
-    % shoulder] from the given path.
-    road = struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
+    % shoulder] from the given path. laneOffsets are the four lane centres.
+    lanes = 3.6576*[-1,0,1,2];
+    road = struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192],'laneOffsets',lanes);
     state = [0;0;0;cfg.referenceSpeed;0;0];
     lr = cfg.target.rearAxleDistance;
     impactTime = 1.6;curvature = 0;
@@ -43,7 +44,7 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
     end
     curve = struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200);
     if curvature~=0
-        road = struct('referenceCurve',curve,'lateralClearance',[8.5344;12.192]);
+        road = struct('referenceCurve',curve,'lateralClearance',[8.5344;12.192],'laneOffsets',lanes);
         trim = nonlinearBicycleModel.cruise(cfg,curvature);
         state = trim.state;state(1:2) = 0;
     end

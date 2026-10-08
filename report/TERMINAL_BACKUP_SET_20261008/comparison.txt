@@ -1,0 +1,45 @@
+===== exact =====
+[out-base] runs 14 recovered 14  {'recovered': 14}
+   min clearance 0.155 m; median per-run minimum 0.800 m
+   controller s median 0.011 p95 0.206 max 1.41
+[out-A] runs 14 recovered 14  {'recovered': 14}
+   min clearance 0.154 m; median per-run minimum 0.800 m
+   terminal lane != 0 in 162/5405 frames, 3 runs; lanes used [(-3.66, 2), (0, 5243), (7.32, 160)]
+   controller s median 0.018 p95 0.151 max 0.99
+[out-D] runs 14 recovered 14  {'recovered': 14}
+   min clearance 0.154 m; median per-run minimum 0.800 m
+   terminal lane != 0 in 162/5405 frames, 3 runs; lanes used [(-3.66, 2), (0, 5243), (7.32, 160)]
+   controller s median 0.016 p95 0.151 max 1.11
+[out-E] runs 14 recovered 14  {'recovered': 14}
+   min clearance 0.155 m; median per-run minimum 0.800 m
+   terminal lane != 0 in 0/5630 frames, 0 runs; lanes used [(0, 5630)]
+   controller s median 0.014 p95 0.244 max 1.37
+  out-A vs out-base: newly recovered 0 []
+  out-A vs out-base: newly failed 0 []
+  out-D vs out-base: newly recovered 0 []
+  out-D vs out-base: newly failed 0 []
+  out-E vs out-base: newly recovered 0 []
+  out-E vs out-base: newly failed 0 []
+===== noisy =====
+[out-base] runs 84 recovered 55  {'noSolution:nonlinearAcceptanceFailed': 11, 'noSolution:timeLimit': 12, 'recovered': 55, 'noSolution:pcbfNoNumericalResult': 6}
+   min clearance 0.272 m; median per-run minimum 2.029 m
+   controller s median 0.016 p95 0.218 max 3.76
+[out-A] runs 84 recovered 56  {'noSolution:nonlinearAcceptanceFailed': 23, 'recovered': 56, 'noSolution:pcbfNoNumericalResult': 5}
+   min clearance 0.289 m; median per-run minimum 2.049 m
+   terminal lane != 0 in 24/19870 frames, 4 runs; lanes used [(-3.66, 13), (0, 19846), (3.66, 8), (7.32, 3)]
+   controller s median 0.018 p95 0.251 max 4.14
+[out-D] runs 84 recovered 57  {'noSolution:nonlinearAcceptanceFailed': 15, 'noSolution:clfNoNumericalResult': 3, 'recovered': 57, 'noSolution:pcbfNoNumericalResult': 9}
+   min clearance 0.289 m; median per-run minimum 1.981 m
+   terminal lane != 0 in 329/23077 frames, 13 runs; lanes used [(-3.66, 156), (0, 22748), (3.66, 161), (7.32, 12)]
+   controller s median 0.019 p95 0.291 max 4.59
+[out-E] runs 84 recovered 55  {'noSolution:nonlinearAcceptanceFailed': 11, 'recovered': 55, 'noSolution:timeLimit': 11, 'noSolution:pcbfNoNumericalResult': 7}
+   min clearance 0.272 m; median per-run minimum 2.029 m
+   terminal lane != 0 in 0/17901 frames, 0 runs; lanes used [(0, 17901)]
+   controller s median 0.018 p95 0.241 max 4.03
+  out-A vs out-base: newly recovered 2 ['seed4-speed15-headOn', 'seed4-speed8-curvedCrossing']
+  out-A vs out-base: newly failed 1 [('seed1-speed8-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed')]
+  out-D vs out-base: newly recovered 3 ['seed4-speed15-headOn', 'seed4-speed8-curvedCrossing', 'seed5-speed8-brakingLead']
+  out-D vs out-base: newly failed 1 [('seed1-speed8-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed')]
+  out-E vs out-base: newly recovered 0 []
+  out-E vs out-base: newly failed 0 []
+per-run table: /home/zai/.cache/collisionAvoidance/terminal_backup_20261008/campaign-runs.csv

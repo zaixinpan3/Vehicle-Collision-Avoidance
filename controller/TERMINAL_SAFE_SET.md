@@ -1,7 +1,7 @@
 # Terminal safe set and recursive feasibility
 
 This note defines the terminal set used by `solvePredictiveControl`, proves
-its forward invariance under the terminal controller, and states the
+its forward invariance under the backup controllers, and states the
 recursive-feasibility property of the resulting optimization together with
 its hypotheses. The theory is in continuous time; Section 7 describes how the
 implementation samples it. Section 9 derives what the set has to become when
@@ -9,29 +9,45 @@ the estimator and the controller are designed together.
 
 ## 1. Purpose
 
-After the prediction horizon the controller is the same optimization problem
-without its PCBF (collision) rows. What remains is the CLF row, now without
-slack, so the vehicle dissipates to the nominal behavior (cruise on the given
-path at the reference speed). The terminal set is the set of states from which
-that controller never collides with the target, for the target's forecast
-motion under the motion contract (constant tangential acceleration `A` and
-constant sideslip `beta`), until the target leaves the perception range
-`R = encounterRangeMeters`. A target outside the perception range no longer
-exists for the controller.
+The safety task is a finite encounter: no collision with the target while it
+is inside the perception range `R = encounterRangeMeters`. After the
+prediction horizon a backup controller completes the encounter. A backup is
+the same optimization problem without its PCBF (collision) rows, with the CLF
+row without slack, about the trim of the given path held at a lane centre
+`d` of the road: the nominal path (`d = 0`, dissipation to cruise on the given
+path) or another lane centre of `road.laneOffsets` (holding that lane at the
+reference speed). The terminal set is the set of states from which some
+backup does not collide with the target, for the target's forecast motion
+under the motion contract (constant tangential acceleration `A` and constant
+sideslip `beta`), until the encounter ends (Section 4).
 
-No avoidance maneuver, lane, side or mode is designed in advance. The set
-contains no safety distance of its own; Section 7 lists the two sampling
-allowances of the implementation.
+The encounter ends at the earlier of two events, and the end is an absorbing
+mode: no property of the target after it is used.
+
+- The target leaves the perception range (it no longer exists for the
+  controller).
+- The encounter window ends: `H_enc = terminal.horizonSeconds` (60 s) after
+  the encounter's start, a fixed time. A target still inside the range then
+  starts a new encounter.
+
+Only the lanes of the road are modes; no avoidance maneuver or side is
+designed in advance, and without `road.laneOffsets` the nominal backup is the
+only one. This relaxes the requirement of October 6 that the terminal set use
+no mode. The set contains no safety distance of its own; Section 7 lists the
+two sampling allowances of the implementation.
 
 If the set cannot be reached, the problem has no solution and the controller
 reports `collisionAvoidanceController:noOptimizationSolution`.
 
-## 2. The terminal controller
+## 2. The backup controllers
 
-Let `e(x) = [e_y; e_psi; vx - vx*; vy - vy*; r - r*]` be the transverse error
-to the path trim and `V(x) = e(x)' P e(x)` the CLF of
-[NOMINAL_CLF.md](NOMINAL_CLF.md). A terminal controller is any input law whose
-closed loop satisfies
+Let `e_d(x) = [e_y - d; e_psi; vx - vx*; vy - vy*; r - r*]` be the transverse
+error to the trim of the path offset by `d` and `V_d(x) = e_d(x)' P e_d(x)`,
+with `P` the CLF of [NOMINAL_CLF.md](NOMINAL_CLF.md). On a straight road the
+trim is the same for every `d`. On a curve of curvature `kappa` the offset
+path has curvature `kappa/(1 - kappa d)`, and the backup uses that path's trim
+with the given path's `P`. That pairing is not certified offline. A backup
+(terminal controller) is any input law whose closed loop satisfies
 
     dV/dt <= -(2/T) V,                    T = clf.convergenceTimeConstantSeconds,
 
@@ -44,7 +60,7 @@ linearized model with bounded input, `|K_j e| <= ubar_j`, and a contraction
 `rho* < rho` (time constant 2.1 s at 8 m/s and 1.5 s at 15 m/s against the
 required 4 s). On the nonlinear model the existence of an admissible input
 with `V(x+) <= rho V(x)` is not proven; it is checked at every hold the
-controller appends (Section 6, hypothesis H3).
+controller appends (Section 6, hypothesis H3). The same holds for each `V_d`.
 
 ## 3. The CLF tube
 
@@ -52,11 +68,19 @@ For the ellipsoid `{e : e'Pe <= V}` the largest value of `|e_i|` is
 `a_i sqrt(V)`, `a_i = sqrt((inv P)_ii)`. With `r(t) = sqrt(V0) exp(-t/T)`,
 (2.1) gives at every time
 
-    |e_y(t)| <= a_1 r(t),  |e_psi(t)| <= a_2 r(t),  |v_x - v_x*| <= a_3 r(t),
+    |e_y(t) - d| <= a_1 r(t),  |e_psi(t)| <= a_2 r(t),  |v_x - v_x*| <= a_3 r(t),
     |v_y - v_y*| <= a_4 r(t),  |yawRate - r*| <= a_5 r(t).                (3.1)
 
 The path station `s` obeys `ds/dt = v_t / (1 - kappa e_y)`, where `v_t` is the
-velocity component along the path tangent. The trim has `ds/dt = v_path`.
+velocity component along the path tangent. The trim has
+`ds/dt = v_path = v_t* / (1 - kappa d)` (signed `kappa d`). The formulas
+below are written for `d = 0`; for a lane centre `d`, with `|e_y - d| <= a_1 r`,
+
+    |ds/dt - v_path| <= |v_t - v_t*| / q + |v_t*| |kappa| a_1 r / (q (1 - kappa d)),
+    q = 1 - kappa d - |kappa| a_1 r,                                      (3.2')
+
+the lateral boxes below are centred on `d`, and the station stretch uses the
+outer radius `|d| + outer`.
 Writing `theta = yaw - pathHeading = psi* + e_psi`,
 
     |v_t - v_path| <= |dvx| + |dvy| + (|vx*| + |vy*|) |e_psi|,
@@ -91,22 +115,28 @@ two boxes; on a straight path it is `hypot(Delta_s, Delta_d)`.
 ## 4. The terminal set
 
 Let `B(t)` be the target's forecast rectangle and `q(t)` its reference point,
-both in path coordinates. For a state `x` define the encounter exit
+both in path coordinates, `T_d(x)` the tube of backup `d` from `x`, and
+`t_end` the end of the present encounter window, a fixed time. For a state
+`x` at time `t_x` define the end of the encounter
 
-    t_exit(x) = first t >= 0 at which q(t) is farther than R from every
-                point of the reference-point box of T(x)(t),
+    t_e(x) = min( first t >= 0 at which q(t_x + t) is farther than R from
+                  every point of the reference-point box of T_d(x)(t),
+                  t_end - t_x ).
 
-capped at `H_enc = terminal.horizonSeconds` (60 s). The cap is the encounter
-window. A target that stays inside the range for longer is taken to have
-ended its encounter there (hypothesis H4 below). Without the cap, a target
-driving beside the ego at the same speed, inside the range but never in its
-way, would make every state non-terminal.
+The window end is fixed: it does not move when the plan is extended. A
+target that drives beside the ego at the same speed, inside the range but
+never in its way, ends its encounter at the window end, and a new encounter
+starts there.
 
-The terminal set is
+The set of backup `d` is
 
-    S = { x :  V(x) <= cbar,
-               T(x)(t) lies inside the road for all t >= 0,
-               dist(T(x)(t), B(t)) > 0 for all t in [0, t_exit(x)) }.      (4.1)
+    S_d = { x :  V_d(x) <= cbar_d,
+                 T_d(x)(t) lies inside the road for all t >= 0,
+                 dist(T_d(x)(t), B(t_x + t)) > 0 for all t in [0, t_e(x)) },   (4.1)
+
+and the terminal set is `S = S_0 U S_d1 U ...` over the lane centres of the
+road, the nominal backup first. In the hybrid model with an absorbing end
+state `+` (the encounter is over), the terminal set is `S U {+}`.
 
 `cbar` is the smaller of `terminal.levelMaximum` (1, the region in which the
 CLF was synthesized) and the largest level whose ellipsoid lies inside the
@@ -123,11 +153,22 @@ there.
 The target's existence ends at its first exit: a target that has left the
 range is not followed back in, even if its forecast returns.
 
+The previous version of this set capped the exit at 60 s after each state
+and accepted a tube clear for that sliding window (hypothesis H4 of an
+earlier Section 6). Extending a plan by one hold then checked a new end
+interval that the old endpoint had not verified. Requiring the target to
+leave the range instead (no window) removes H4 but makes every state
+non-terminal for a target that stays in range: a parallel target at 49.9 m
+and the braking lead's first frames, whose first estimate is a lead at the ego's
+speed (measured in `report/TERMINAL_BACKUP_SET_20261008.tex`). The fixed
+window keeps both properties.
+
 ## 5. Forward invariance
 
-**Proposition.** If `x(0)` is in `S` and a terminal controller acts, then
-`x(tau)` is in `S` for every `tau >= 0`, and the ego never meets the target
-before the target leaves the perception range.
+**Proposition.** If `x(0)` is in `S_d` and backup `d` acts, then `x(tau)` is
+in `S_d` until the encounter ends, and the ego never meets the target before
+the encounter ends. In the hybrid model, `S U {+}` is forward invariant: the
+end state `+` is absorbing.
 
 *Proof.* `V(x(tau)) <= exp(-2 tau/T) V(x(0)) <= cbar`. The tube of `x(tau)` has
 radius `r_tau(t) = sqrt(V(x(tau))) exp(-t/T) <= r_0(t + tau)`. Since `sigma` is
@@ -138,10 +179,13 @@ of `x(tau)` lies in the box of the tube of `x(0)` at the same absolute time:
     T(x(tau))(t) is contained in T(x(0))(t + tau).
 
 The same holds for the reference-point boxes, so the exit of `x(tau)` is no
-later than the exit of `x(0)`, and before it the boxes of `x(tau)` are clear of
-`B` because the larger ones are. The road condition is inherited the same way.
-The actual rectangle lies in `T(x(0))(t)` for all `t` (Section 3), so it does
-not meet `B(t)` before the exit. QED
+later than the exit of `x(0)`. The window end `t_end` is fixed, so the end of
+the encounter seen from `x(tau)` is no later than that seen from `x(0)`.
+Before it the boxes of `x(tau)` are clear of `B` because the larger ones are.
+The road condition is inherited the same way. The actual rectangle lies in
+`T_d(x(0))(t)` for all `t` (Section 3), so it does not meet `B` before the
+encounter ends. The tube is the same for every lane centre up to the offset
+`d` and (3.2'), so the argument holds for each backup. QED
 
 The sampled terminal controller satisfies `V(x_(k+1)) <= rho V(x_k)` at the
 sample instants. Nesting then holds exactly from sample to sample. Inside a
@@ -167,19 +211,19 @@ A plan meeting these rows is *accepted*.
 - H1: the plant is the declared sampled model, and the state is known
   exactly.
 - H2: the target follows its forecast (the same constant `A` and `beta`).
-- H3: at every endpoint the closed loop reaches, the terminal controller has
-  an input with `V(x+) <= rho V(x)` that meets the road, state and handling
-  rows (checked online).
-- H4: an encounter that has not ended `H_enc` after a plan's endpoint brings no
-  conflict with that endpoint's tube after that time. Each appended hold moves
-  the window end by `h`; without H4 the new end interval would be unverified.
+- H3: at every endpoint the closed loop reaches, the backup that certifies it
+  has an input with `V_d(x+) <= rho V_d(x)` that meets the road, state and
+  handling rows (checked online).
 
-**Proposition.** Under H1–H4, if the plan of sample `k` is accepted, the
-shifted plan at `k+1` is accepted:
+The earlier hypothesis H4 (no conflict after a sliding 60-s window) is no
+longer needed: the window end is fixed (Section 4).
+
+**Proposition.** Under H1–H3, within one encounter, if the plan of sample `k`
+is accepted, the shifted plan at `k+1` is accepted:
 
 - drop the first hold;
 - if it is shorter than the prefix or its endpoint is no longer in `S`,
-  append holds of the terminal controller.
+  append holds of the backup `d` whose set contains the old endpoint.
 
 The sum of the prefix collision deficits does not increase.
 
@@ -188,20 +232,33 @@ reproduce the old nodes 2..N+1 exactly. Every hard row of the old plan holds
 there. The old node `prefix+1` was hard (deficit 0) and is now the last
 prefix node, so the prefix deficit sum loses the old first node's deficit and
 gains zero. The endpoint is the old endpoint at the same absolute time. By H2
-the forecast is unchanged, so the endpoint is still in `S`. An appended hold
-satisfies `V(x+) <= rho V(x)` and its own rows (H3). By Section 5 its endpoint
-is in `S`, and its nodes and midpoints are inside the tube of the old endpoint.
-That tube clears the target by the hard-row clearance at the check instants,
-which lie on the tube's grid (Section 7). QED
+the forecast is unchanged and the window end is fixed, so the endpoint is
+still in `S_d`. An appended hold of backup `d` satisfies
+`V_d(x+) <= rho V_d(x)` and its own rows (H3). By Section 5 its endpoint is in
+`S_d` (or the encounter has ended), and its nodes and midpoints are inside the
+tube of the old endpoint. That tube clears the target by the hard-row
+clearance at the check instants, which lie on the tube's grid (Section 7).
+QED
 
 The optimizer never has to find this candidate: it is the step `alpha = 0`
 of the step-size rule (Section 7). Consequently, once one plan of an
-encounter has been accepted, H1–H4 guarantee that no later sample of that
+encounter has been accepted, H1–H3 guarantee that no later sample of that
 encounter reports no solution.
 
 The start of an encounter is outside this statement. When the target first
-enters the range, or re-enters it after leaving, the new information is an
-initial-feasibility question.
+enters the range, re-enters it after leaving, or is still present when a
+window ends, the new encounter is an initial-feasibility question.
+
+**Return to the nominal path.** A plan whose endpoint is terminal only for
+another lane is extended by path guidance toward the given path until a node
+in `S_0`, and the extension replaces the plan's end only if every appended
+hold meets the hard rows (state limits, handling envelope, road, collision
+clearance at nodes and midpoints). The plan before its old endpoint is
+unchanged, so the proposition is unaffected. This is a search, not a
+certificate: the return happens as soon as it is safe, and a plan that cannot
+yet return keeps its lane. Without it a lane backup would never be left,
+because the shifted endpoint keeps its lane and appended holds keep it there
+(the conflict that withdrew the shoulder terminal on October 4).
 
 ## 7. Implementation
 
@@ -225,8 +282,22 @@ controller meet the same hard rows as every other node. The set is otherwise
 
 `G` uses a left Riemann sum, an upper bound because `sigma(r(t))` decreases.
 The target table is filled in 2-s chunks and reused within a sample.
-`terminal.horizonSeconds` (60 s) is the encounter window `H_enc`. A tube clear
-for the whole window is in `S` (`clearThroughHorizon`, exit `Inf`).
+`terminal.horizonSeconds` (60 s) is the encounter window `H_enc`. The
+controller stores the sample at which the present encounter started
+(`encounterStart` in its state) and passes the window's remaining seconds
+(`encounterWindowSeconds`); a target that appears, or is still present when
+the window ends, starts a new encounter. A tube clear until the window end is
+in `S` (`clearToWindowEnd`), and so is any node after it
+(`encounterWindowEnded`).
+
+**Backups.** `terminalSafeSet.modeReferences` builds one reference per lane
+centre of `road.laneOffsets` (the nominal path first, then by distance), each
+carrying its `lateralOffset`; `nonlinearBicycleModel.error` and the path
+guidance subtract it. `member` returns the first backup (nominal first) whose
+set contains the state; a backup whose CLF level at the state exceeds its
+`cbar_d` is skipped without a tube check. `select` gives the backup of an
+endpoint (the containing one, else the one whose region is closest), which
+sets the terminal cone and the holds appended to a shifted plan.
 
 **Level.** `terminalSafeSet.level` bisects the largest `c` in `[0, cbar]` whose
 tube at a given station is clear (clearance is monotone in `c` because tubes
@@ -242,8 +313,9 @@ linearized at the anchor endpoint `y`, with `c*` the level at `y`'s station.
 When `y` is in `S` the zero correction satisfies it.
 
 **Anchor.** Later samples start from the previous accepted plan, shifted by
-one hold, with the terminal controller appended if needed
-(`terminalSafeSet.terminalInput`). The terminal controller tries:
+one hold, with holds of the endpoint's backup appended if needed
+(`terminalSafeSet.terminalInput` with that backup's reference). The backup
+tries:
 
 - the path guidance;
 - the input that minimizes the successor `V` on the trim's linear sampled
@@ -278,7 +350,12 @@ input trust scale (`localTrustRecord`).
 
 ## 8. Measured behavior
 
-See `report/TERMINAL_SAFE_SET_RECURSIVE_FEASIBILITY_20261006.tex` for the
+The lane-hold backups and the fixed window are measured in
+`report/TERMINAL_BACKUP_SET_20261008.tex`: exact states 14 of 14 as before;
+noisy 57 of 84 against 55, with 9 of 12 noisy braking-lead runs now running
+beyond 1 hold (at most 1 before); the fixed window alone changes no outcome. The CLF-tube set of
+October 6 is measured in
+`report/TERMINAL_SAFE_SET_RECURSIVE_FEASIBILITY_20261006.tex`, for the
 exact-state campaigns:
 
 - the ode45 plant;
@@ -385,10 +462,15 @@ Section 8.
 
 ## 10. Limitations
 
-- Recursive feasibility is proven on the declared sampled model with exact
-  information (H1, H2) and conditionally on two further hypotheses:
-  - H3, which is checked online, not proven;
-  - H4, the finite encounter window.
+- Recursive feasibility is proven within one encounter, on the declared
+  sampled model with exact information (H1, H2), and conditionally on H3,
+  which is checked online, not proven. Each new encounter (a target appearing,
+  or still present at a window end) is an initial-feasibility question.
+- On a curve, a lane backup pairs the offset path's trim with the given
+  path's CLF matrix; its decrease is checked per appended hold, not certified
+  offline.
+- The return to the nominal path is a guidance extension accepted only when
+  it meets the hard rows; it is not a certificate that the return happens.
 - The tube assumes the continuous-time decrease (2.1) inside each hold.
 - `cbar` binds the rear-adhesion row at the certification braking ratio.
   Other input-dependent rows (the actual braking of the terminal controller)

@@ -215,7 +215,7 @@ function [lane, road] = localReadLane(rawGeometry, ego)
             && ~isempty(rawGeometry.referenceCurve)
         lane.referenceCurve = laneGeometry.validateReferenceCurve(rawGeometry.referenceCurve);
     end
-    road=struct('lateralClearance',zeros(2,0));
+    road=struct('lateralClearance',zeros(2,0),'laneOffsets',zeros(1,0));
     if isstruct(rawGeometry)
         if isfield(rawGeometry,'boundaries') && ~isempty(rawGeometry.boundaries)
             error('collisionAvoidanceController:unsupportedRoad','Use a global lateralClearance corridor.');
@@ -225,6 +225,16 @@ function [lane, road] = localReadLane(rawGeometry, ego)
             if any(road.lateralClearance<=0)
                 error('collisionAvoidanceController:invalidRoadClearance','Lateral clearances must be positive.');
             end
+        end
+        % Lane centres relative to the path (left positive): the lanes a
+        % terminal backup may hold until the target leaves (terminalSafeSet).
+        if isfield(rawGeometry,'laneOffsets') && ~isempty(rawGeometry.laneOffsets)
+            offsets=rawGeometry.laneOffsets;
+            if ~isnumeric(offsets) || ~isreal(offsets) || ~isvector(offsets) || any(~isfinite(offsets))
+                error('collisionAvoidanceController:invalidLaneOffsets', ...
+                    'laneOffsets must be finite lateral offsets of lane centres from the path.');
+            end
+            road.laneOffsets=reshape(double(offsets),1,[]);
         end
     end
 end

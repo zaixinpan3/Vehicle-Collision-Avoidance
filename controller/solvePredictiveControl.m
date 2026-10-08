@@ -2,11 +2,14 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 %solvePredictiveControl One affine model per sample; no fallback algorithm.
 % Startup uses a potential-field rollout; later samples start from the
 % previous accepted plan shifted by one hold. The horizon ends where the
-% anchor enters the terminal set (terminalSafeSet): the CLF tube of the
-% endpoint misses the target until the target leaves the perception range.
-% A shifted plan shorter than horizonSteps, or whose endpoint is no longer in
-% the set, is extended by holds of the terminal controller (the same problem
-% without PCBF rows, CLF without slack).
+% anchor enters the terminal set (terminalSafeSet): the CLF tube of a backup
+% (the nominal path or another lane centre) from the endpoint misses the
+% target until the target leaves the perception range, within the encounter
+% window. A shifted plan shorter than horizonSteps, or whose endpoint is no
+% longer in the set, is extended by holds of the endpoint's backup (the same
+% problem without PCBF rows, CLF without slack). A plan whose endpoint holds
+% another lane is extended back to the nominal set by path guidance whenever
+% that extension meets every hard row.
 % The PCBF stage minimizes prefix safety slack, then the CLF stage runs; the
 % terminal row is the CLF level of the endpoint, V(x_N) <= c*, c* the
 % largest level whose tube at the anchor endpoint is clear. A primary
@@ -129,6 +132,10 @@ function [solution,search,model] = localRound(model,previousState,timer)
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);
     search.anchorCertified=isfield(anchor,'certified') && anchor.certified;
     search.appendedTerminalSteps=0;if isfield(anchor,'appended'),search.appendedTerminalSteps=anchor.appended;end
+    search.anchorHolds=size(anchor.inputs,2);
+    search.returnedHolds=0;if isfield(anchor,'returnedHolds'),search.returnedHolds=anchor.returnedHolds;end
+    search.seedReachedTerminalSet=NaN;
+    if isfield(anchor,'seedReachedTerminalSet'),search.seedReachedTerminalSet=anchor.seedReachedTerminalSet;end
 end
 
 function [solution,search,model,stages]=localAcceptance(solution,problem,anchor,model,search,timer,stages)
@@ -147,7 +154,7 @@ function [solution,search,model,stages]=localAcceptance(solution,problem,anchor,
     cfg=model.cfg;
     search.acceptance=struct('step',NaN,'candidateFeasible',false,'candidateReason',"",'iterations',0, ...
         'linearizationGap',NaN,'fullGap',NaN,'fullCorrection',NaN,'terminalLevel',NaN, ...
-        'terminalValue',NaN,'terminalExitSeconds',NaN,'reason',"");
+        'terminalValue',NaN,'terminalExitSeconds',NaN,'terminalLaneOffset',NaN,'reason',"");
     if isempty(solution),return;end
     for iteration=0:cfg.terminal.sqpIterations
         [accepted,info]=localLineSearch(solution,anchor,model);
@@ -163,6 +170,7 @@ function [solution,search,model,stages]=localAcceptance(solution,problem,anchor,
             search.acceptance.step=accepted.step;search.acceptance.linearizationGap=accepted.linearizationGap;
             search.acceptance.terminalValue=accepted.terminalValue;
             search.acceptance.terminalExitSeconds=accepted.terminalExitSeconds;
+            search.acceptance.terminalLaneOffset=accepted.terminalLaneOffset;
             return;
         end
         if iteration==cfg.terminal.sqpIterations || toc(timer)>=cfg.solver.timeLimitSeconds,break;end
@@ -227,7 +235,7 @@ function [plan,context]=localEvaluatePlan(inputs,model,context)
     % it), and the terminal set at the endpoint.
     cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;h=cfg.controller.sampleTime;
     plan=struct('inputs',inputs,'states',[],'feasible',false,'softSum',Inf,'softDeficits',zeros(1,0), ...
-        'reason',"",'terminalValue',NaN,'terminalExitSeconds',NaN);
+        'reason',"",'terminalValue',NaN,'terminalExitSeconds',NaN,'terminalLaneOffset',NaN);
     states=zeros(6,count+1);middles=zeros(6,count);states(:,1)=model.initialState;
     try
         for index=1:count
@@ -273,6 +281,7 @@ function [plan,context]=localEvaluatePlan(inputs,model,context)
     end
     [member,context,terminal]=terminalSafeSet.member(context,states(:,end),count);
     plan.terminalValue=terminal.value;plan.terminalExitSeconds=terminal.exitSeconds;
+    if member,plan.terminalLaneOffset=terminal.lateralOffset;end
     if ~member,plan.reason="terminal:"+terminal.reason;return;end
     plan.softDeficits=deficits;plan.softSum=sum(deficits);plan.feasible=true;
 end
@@ -472,7 +481,8 @@ function [anchor,source,failure]=localInitialization(model,previous)
     % The previous accepted plan, shifted by one hold. Its endpoint lies in
     % the terminal set at the same absolute time; only when the plan is
     % shorter than the prefix, or its endpoint is not in the set (a changed
-    % forecast), is it extended by holds of the terminal controller.
+    % forecast), is it extended by holds of the endpoint's backup: the one
+    % whose set contains it, else the one whose CLF region it is closest to.
     domainErrors=["collisionAvoidanceController:nonlinearDomain", ...
         "collisionAvoidanceController:invalidTireOperatingPoint", ...
         "collisionAvoidanceController:singularTireLinearization"];
@@ -483,8 +493,12 @@ function [anchor,source,failure]=localInitialization(model,previous)
             [~,states(:,index+1)]=terminalSafeSet.holdStates(states(:,index),inputs(:,index),cfg);
         end
         [member,context]=terminalSafeSet.member(context,states(:,end),count);
+        if count<minimum || ~member
+            [mode,context]=terminalSafeSet.select(context,states(:,end),count);
+            reference=context.modes(mode).reference;
+        end
         while (count<minimum || ~member) && count<maximum
-            [u,next,ok]=terminalSafeSet.terminalInput(states(:,end),inputs(:,end),model);
+            [u,next,ok]=terminalSafeSet.terminalInput(states(:,end),inputs(:,end),model,reference);
             if ~ok,break;end
             inputs(:,end+1)=u;states(:,end+1)=next;count=count+1;appended=appended+1; %#ok<AGROW>
             [member,context]=terminalSafeSet.member(context,next,count);
@@ -494,7 +508,51 @@ function [anchor,source,failure]=localInitialization(model,previous)
         failure=string(exception.identifier);return;
     end
     anchor=struct('inputs',inputs,'states',states,'terminalContext',context, ...
-        'certified',member && count>=minimum,'appended',appended);
+        'certified',member && count>=minimum,'appended',appended,'returnedHolds',0);
+    anchor=localReturnToNominal(anchor,model);
+end
+
+function anchor=localReturnToNominal(anchor,model)
+    % A plan whose endpoint is terminal only for another lane's backup is
+    % extended by path guidance until a node in the nominal backup's set, and
+    % the extension is kept only if every appended hold meets the hard rows
+    % (state limits, handling envelope, road, collision clearance). The plan
+    % before the endpoint is unchanged, so its prefix deficits are too. The
+    % return is thus taken as soon as it is safe, and a plan that cannot yet
+    % return keeps holding its lane.
+    cfg=model.cfg;count=size(anchor.inputs,2);maximum=cfg.controller.maximumHorizonSteps;
+    context=anchor.terminalContext;
+    if count>=maximum || numel(context.modes)<2,return;end
+    [nominal,context]=terminalSafeSet.member(context,anchor.states(:,end),count,1);
+    anchor.terminalContext=context;
+    if nominal,return;end
+    reference=model.nominalReference;
+    guidance=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    margin=cfg.collision.safetyMarginMeters;h=cfg.controller.sampleTime;
+    inputs=anchor.inputs;states=anchor.states;x=states(:,end);previous=inputs(:,end);found=false;
+    try
+        for index=count+1:maximum
+            u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,guidance);
+            [middle,next]=terminalSafeSet.holdStates(x,u,cfg);
+            if ~terminalSafeSet.admissible(x,middle,next,u,model) ...
+                    || localClearance(middle,(index-.5)*h,model,shape)<margin ...
+                    || localClearance(next,index*h,model,shape)<margin
+                break;
+            end
+            inputs(:,index)=u;states(:,index+1)=next;x=next;previous=u;
+            if mod(index-count,10)==0 || index==maximum
+                [found,context]=terminalSafeSet.member(context,next,index,1);
+                if found,break;end
+            end
+        end
+    catch exception
+        if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
+        return;
+    end
+    if ~found,anchor.terminalContext=context;return;end
+    anchor.inputs=inputs(:,1:index);anchor.states=states(:,1:index+1);anchor.terminalContext=context;
+    anchor.returnedHolds=index-count;
 end
 
 function anchor=localPotentialFieldSeed(model,minimum,maximum)
@@ -525,7 +583,8 @@ function anchor=localPotentialFieldSeed(model,minimum,maximum)
         end
     end
     anchor=struct('inputs',inputs(:,1:count),'states',states(:,1:count+1),'terminalContext',context, ...
-        'certified',false,'appended',0,'seedReachedTerminalSet',member);
+        'certified',false,'appended',0,'seedReachedTerminalSet',member,'returnedHolds',0);
+    if member,anchor=localReturnToNominal(anchor,model);end
 end
 
 function u=localGuidanceInput(x,previous,yawRate,speed,cfg,reference)
@@ -689,12 +748,15 @@ function [problem,model]=localFormulate(anchor,model)
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
     end
     context=localTerminalContext(anchor,model);
-    [terminalLevel,context,terminalInfo]=terminalSafeSet.level(context,y,count);
+    % The endpoint's backup: the one whose set contains the anchor endpoint
+    % (nominal first), else the one whose CLF region it is closest to.
+    [mode,context]=terminalSafeSet.select(context,y,count);
+    [terminalLevel,context,terminalInfo]=terminalSafeSet.level(context,y,count,mode);
     % The bisection returns a verified level within its tolerance below the
     % exact one; an endpoint verified in the set keeps its own level.
-    [member,~,memberInfo]=terminalSafeSet.member(context,y,count);
+    [member,~,memberInfo]=terminalSafeSet.member(context,y,count,mode);
     if member,terminalLevel=max(terminalLevel,memberInfo.value);end
-    reference=model.nominalReference;
+    reference=context.modes(mode).reference;
     [e,jacobian]=nonlinearBicycleModel.errorLinearization(y,model.lane,reference);
     primaryCones(end+1)=localCone(reference.factor*jacobian*map,-reference.factor*e, ...
         sparse(nv,1),-sqrt(max(terminalLevel,0)));
@@ -707,6 +769,7 @@ function [problem,model]=localFormulate(anchor,model)
         'encounterExit',departure, ...
         'maximumCollisionTighteningMeters',maximumTightening, ...
         'terminalLevel',terminalLevel,'terminalAnchorValue',terminalInfo.value, ...
+        'terminalLaneOffset',context.modes(mode).lateralOffset, ...
         'terminalAnchorExitSeconds',terminalInfo.exitSeconds,'terminalAnchorReason',terminalInfo.reason);
     model.robustnessRelaxation=robustRelaxation;
     problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
@@ -887,6 +950,7 @@ function solution=localTerminalMetrics(solution,model,acceptance)
     cfg=model.cfg;y=solution.states(:,end);count=size(solution.inputs,2);
     solution.terminalValue=acceptance.terminalValue;solution.terminalLevel=acceptance.terminalLevel;
     solution.terminalExitSeconds=acceptance.terminalExitSeconds;
+    solution.terminalLaneOffset=acceptance.terminalLaneOffset;
     solution.acceptedStep=acceptance.step;solution.candidateFeasible=acceptance.candidateFeasible;
     solution.linearizationGap=acceptance.linearizationGap;
     solution.terminalDistanceMeters=Inf;solution.terminalRoadMarginMeters=Inf;

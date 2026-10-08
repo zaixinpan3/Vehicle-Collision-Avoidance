@@ -1,26 +1,39 @@
 classdef terminalSafeSet
-%terminalSafeSet Encounter-safe terminal set of the CLF terminal controller.
-% After the horizon the controller is the same problem without PCBF rows: a
-% controller whose CLF row holds without slack, V(t) <= exp(-2t/T) V(0), on
-% the given path's trim. Any such controller keeps the transverse error in
+%terminalSafeSet Safe-exit terminal set of a family of lane-hold CLF backups.
+% After the horizon a backup controller completes the encounter. A backup is
+% the CLF of the given path's trim held at a lane centre d: the nominal path
+% (d = 0) or another lane centre of model.road.laneOffsets. It is any
+% controller whose CLF row holds without slack, V_d(t) <= exp(-2t/T) V_d(0),
+% about the trim of the path offset by d. Such a controller keeps the
+% transverse error in
 %   |e_i(t)| <= a_i sqrt(V0) exp(-t/T),    a_i = sqrt((inv(P))_ii),
-% and the path station within s0 + vPath t +/- G(V0,t), G the integral of a
-% bound on the path-speed error. The ego rectangle therefore stays in a box
-% in path coordinates (the CLF tube). The terminal set is
-%   S = { x : V(x) <= levelMaximum, the tube of x stays on the road, and it
-%         does not meet the target's forecast rectangle until the target
-%         leaves encounterRangeMeters of every point of the tube }.
-% A target outside the perception range no longer exists for the
-% controller, so the encounter ends there; a target that stays inside it is
-% checked for terminal.horizonSeconds, within which the encounter is taken
-% to end. levelMaximum is the smaller of
-% terminal.levelMaximum (the CLF's certified region) and the largest level
-% whose ellipsoid lies inside the state rows of the problem (speed, lateral
-% velocity and yaw-rate limits, sideslip cone, rear adhesion at the
-% certification braking ratio).
-% The tube shrinks along any CLF-satisfying trajectory (V1 <= rho V0 nests
-% the tube of x1 in the tube of x0 shifted by one hold), so S is forward
-% invariant under the terminal controller; see TERMINAL_SAFE_SET.md.
+% about the offset path, and the path station within s0 + vPath_d t +/- G(V0,t),
+% G the integral of a bound on the station-rate error. The ego rectangle
+% therefore stays in a box in path coordinates (the CLF tube of the backup).
+% For one backup the terminal set is
+%   S_d = { x : V_d(x) <= levelMaximum_d, the tube of x stays on the road,
+%           and the tube does not meet the target's forecast rectangle until
+%           the encounter ends },
+% and the terminal set is the union of the S_d. The encounter ends at the
+% earlier of the target leaving encounterRangeMeters of every point of the
+% tube and the end of the encounter window, which is fixed in time:
+% terminal.horizonSeconds after the encounter's start (model.encounterWindow
+% Seconds remain from the present sample). The end is an absorbing mode: no
+% property of the target after it is used, and a target still present at the
+% window end starts a new encounter. The tube shrinks along any
+% CLF-satisfying trajectory (V1 <= rho V0 nests the tube of x1 in the tube of
+% x0 shifted by one hold) and the window end does not move, so S_d is
+% invariant under its backup until the encounter ends. See
+% TERMINAL_SAFE_SET.md.
+% The nominal backup is tried first; the others only matter where it fails.
+% levelMaximum_d is the smaller of terminal.levelMaximum (the CLF's
+% certified region) and the largest level whose ellipsoid lies inside the
+% state rows of the problem (speed, lateral velocity and yaw-rate limits,
+% sideslip cone, rear adhesion at the certification braking ratio).
+% On a curve the backup of lane d uses the trim of the offset path
+% (curvature kappa/(1-kappa d)) with the CLF matrix of the given path; that
+% pairing is not certified offline, and every hold the terminal controller
+% appends is checked for V(x+) <= rho V(x).
 % "Does not meet" is checked on a time grid of step dt: at each grid point
 % the two boxes must be farther apart than the distance their bodies can
 % move in dt/2 (a continuous-time no-collision bound), and at least
@@ -29,13 +42,43 @@ classdef terminalSafeSet
 % which lie on the grid. The ego estimation enclosure, when present,
 % inflates the tube.
     methods (Static)
+        function references = modeReferences(model)
+            % The backups' references: the nominal path first, then the other
+            % lane centres by distance from it.
+            base=model.nominalReference;base.lateralOffset=0;
+            offsets=0;
+            if isfield(model,'road') && isfield(model.road,'laneOffsets') && ~isempty(model.road.laneOffsets)
+                offsets=unique([0,reshape(model.road.laneOffsets,1,[])]);
+            end
+            [~,order]=sort(abs(offsets));offsets=offsets(order);
+            references=repmat(base,1,numel(offsets));
+            for index=2:numel(offsets)
+                references(index).lateralOffset=offsets(index);
+                if base.curvature~=0
+                    point=terminalSafeSet.offsetTrim(model.cfg,base.curvature,offsets(index));
+                    references(index).state=point.state;references(index).input=point.input;
+                    references(index).continuousA=point.continuousA;references(index).continuousB=point.continuousB;
+                end
+            end
+        end
+
+        function point = offsetTrim(cfg,curvature,offset)
+            % Trim of the path offset by 'offset' (curvature kappa/(1-kappa d)).
+            persistent keys points
+            if isempty(keys),keys={};points={};end
+            key=[char(nonlinearBicycleModel.clfKey(cfg,curvature)),sprintf('|%.17g',offset)];
+            index=find(strcmp(keys,key),1);
+            if ~isempty(index),point=points{index};return;end
+            point=nonlinearBicycleModel.operatingPoint(cfg,curvature/(1-curvature*offset));
+            keys=[{key},keys(1:min(end,31))];points=[{point},points(1:min(end,31))];
+        end
+
         function context = context(model)
-            % Constants of one frame and a lazily extended target table on
-            % the absolute grid of this frame (step dt, index 0 = now).
-            cfg=model.cfg;reference=model.nominalReference;terminal=cfg.terminal;
-            scale=sqrt(diag(inv(reference.matrix)));
-            offset=reference.state(3);velocity=reference.state(4:5);
-            pathSpeed=velocity(1)*cos(offset)-velocity(2)*sin(offset);
+            % Constants of one frame, one entry of 'modes' per backup, and a
+            % lazily extended target table on the absolute grid of this frame
+            % (step dt, index 0 = now) shared by all backups.
+            cfg=model.cfg;terminal=cfg.terminal;
+            references=terminalSafeSet.modeReferences(model);
             positionRadius=0;yawRadius=0;
             if isfield(model,'uncertainty') && isfield(model.uncertainty,'egoGenerator')
                 generator=model.uncertainty.egoGenerator;
@@ -50,74 +93,122 @@ classdef terminalSafeSet
             here=laneGeometry.project(model.initialState(1:2),model.lane);
             clearance=[Inf;Inf];
             if ~isempty(model.road.lateralClearance),clearance=model.road.lateralClearance;end
-            context=struct('scale',scale,'timeConstant',cfg.clf.convergenceTimeConstantSeconds, ...
-                'contraction',reference.contraction,'yawOffset',offset,'velocity',velocity, ...
-                'yawRate',reference.state(6),'pathSpeed',pathSpeed,'curvature',reference.curvature, ...
+            modes=struct('reference',cell(1,numel(references)),'scale',[],'yawOffset',[], ...
+                'velocity',[],'yawRate',[],'tangentSpeed',[],'pathSpeed',[],'lateralOffset',[],'levelMaximum',[]);
+            for index=1:numel(references)
+                reference=references(index);offset=reference.state(3);velocity=reference.state(4:5);
+                tangentSpeed=velocity(1)*cos(offset)-velocity(2)*sin(offset);
+                modes(index).reference=reference;modes(index).scale=sqrt(diag(inv(reference.matrix)));
+                modes(index).yawOffset=offset;modes(index).velocity=velocity;
+                modes(index).yawRate=reference.state(6);modes(index).tangentSpeed=tangentSpeed;
+                % Station rate of the offset path, on the given path's stations.
+                modes(index).pathSpeed=tangentSpeed/(1-reference.curvature*reference.lateralOffset);
+                modes(index).lateralOffset=reference.lateralOffset;
+                modes(index).levelMaximum=min(terminal.levelMaximum,terminalSafeSet.stateLevel(reference,cfg));
+            end
+            context=struct('modes',modes,'timeConstant',cfg.clf.convergenceTimeConstantSeconds, ...
+                'curvature',references(1).curvature,'pathSpeed',modes(1).pathSpeed, ...
                 'halfLength',cfg.vehicle.length/2,'halfWidth',cfg.vehicle.width/2, ...
                 'offset',norm(cfg.vehicle.rectangleOffset), ...
                 'reach',norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset), ...
                 'buffer',cfg.collision.safetyMarginMeters,'range',cfg.collision.encounterRangeMeters, ...
-                'clearance',clearance, ...
-                'levelMaximum',min(terminal.levelMaximum,terminalSafeSet.stateLevel(reference,cfg)), ...
-                'dt',dt,'ratio',ratio,'horizonSteps',ceil(terminal.horizonSeconds/dt), ...
+                'clearance',clearance,'levelMaximum',modes(1).levelMaximum, ...
+                'dt',dt,'ratio',ratio,'windowSteps',localWindowSteps(model,terminal,dt), ...
                 'positionRadius',positionRadius,'yawRadius',yawRadius, ...
                 'hasTarget',~isempty(model.target),'stationNow',here.station, ...
                 'covered',-1,'targetStation',zeros(2,0),'targetLateral',zeros(2,0), ...
                 'targetSpeed',zeros(1,0),'pointStation',zeros(1,0),'pointLateral',zeros(1,0));
             context.model=struct('targetEpoch',model.targetEpoch,'sampleIndex',model.sampleIndex, ...
-                'sampleTime',h,'lane',model.lane,'reference',reference);
+                'sampleTime',h,'lane',model.lane,'reference',references(1));
         end
 
-        function [member,context,info] = member(context,x,node)
-            % x at plan node 'node' (0 = now). V(x) is the tube level.
-            [value,station]=terminalSafeSet.coordinates(context,x);
-            [member,context,info]=terminalSafeSet.clear(context,value,station,node);
-            info.value=value;
+        function [member,context,info] = member(context,x,node,mode)
+            % x at plan node 'node' (0 = now). Membership in the terminal set:
+            % the first backup (nominal first) whose set contains x, or only
+            % backup 'mode' when given. info.mode is its index (NaN if none);
+            % the other fields are those of the nominal (or given) backup when
+            % x is not a member.
+            if nargin>3,candidates=mode;else,candidates=1:numel(context.modes);end
+            member=false;info=[];
+            for m=candidates
+                [value,station]=terminalSafeSet.coordinates(context,x,m);
+                % A backup whose region does not contain x is skipped cheaply.
+                if m~=candidates(1) && ~(value<=context.modes(m).levelMaximum*(1+1e-12)),continue;end
+                [ok,context,attempt]=terminalSafeSet.clear(context,value,station,node,m);
+                attempt.value=value;attempt.mode=m;attempt.lateralOffset=context.modes(m).lateralOffset;
+                if ok,member=true;info=attempt;return;end
+                if isempty(info),info=attempt;end
+            end
+            info.mode=NaN;
         end
 
-        function [level,context,info] = level(context,x,node)
-            % Largest CLF level whose tube at x's station is clear (-Inf if
-            % none). Clearance is monotone in the level: tubes are nested.
-            [value,station]=terminalSafeSet.coordinates(context,x);
-            [top,context,info]=terminalSafeSet.clear(context,context.levelMaximum,station,node);
-            if top,level=context.levelMaximum;info.value=value;return;end
-            [bottom,context]=terminalSafeSet.clear(context,0,station,node);
-            if ~bottom,level=-Inf;info.value=value;return;end
-            low=0;high=context.levelMaximum;
+        function [mode,context] = select(context,x,node)
+            % The backup of a plan endpoint: the one whose set contains it, or
+            % else the one whose CLF region it is closest to.
+            [member,context,info]=terminalSafeSet.member(context,x,node);
+            if member,mode=info.mode;return;end
+            ratios=inf(1,numel(context.modes));
+            for m=1:numel(context.modes)
+                ratios(m)=terminalSafeSet.coordinates(context,x,m)/context.modes(m).levelMaximum;
+            end
+            [~,mode]=min(ratios);
+        end
+
+        function [level,context,info] = level(context,x,node,mode)
+            % Largest CLF level of backup 'mode' whose tube at x's station is
+            % clear (-Inf if none). Clearance is monotone in the level: tubes
+            % are nested. Without 'mode' the backup is selected (select).
+            if nargin<4,[mode,context]=terminalSafeSet.select(context,x,node);end
+            maximum=context.modes(mode).levelMaximum;
+            [value,station]=terminalSafeSet.coordinates(context,x,mode);
+            [top,context,info]=terminalSafeSet.clear(context,maximum,station,node,mode);
+            info.value=value;info.mode=mode;
+            if top,level=maximum;return;end
+            [bottom,context]=terminalSafeSet.clear(context,0,station,node,mode);
+            if ~bottom,level=-Inf;return;end
+            low=0;high=maximum;
             for iteration=1:30
                 middle=(low+high)/2;
-                [ok,context]=terminalSafeSet.clear(context,middle,station,node);
+                [ok,context]=terminalSafeSet.clear(context,middle,station,node,mode);
                 if ok,low=middle;else,high=middle;end
-                if high-low<=1e-4*context.levelMaximum,break;end
+                if high-low<=1e-4*maximum,break;end
             end
-            level=low;[~,context,info]=terminalSafeSet.clear(context,level,station,node);info.value=value;
+            level=low;[~,context,info]=terminalSafeSet.clear(context,level,station,node,mode);
+            info.value=value;info.mode=mode;
         end
 
-        function [value,station] = coordinates(context,x)
-            lane=context.model.lane;reference=context.model.reference;
+        function [value,station] = coordinates(context,x,mode)
+            if nargin<3,mode=1;end
+            lane=context.model.lane;reference=context.modes(mode).reference;
             projection=laneGeometry.project(x(1:2),lane,context.stationNow);
             value=nonlinearBicycleModel.nominalValue(x,lane,reference);station=projection.station;
         end
 
-        function [ok,context,info] = clear(context,value,station,node)
-            % Tube of level 'value' starting at 'station' at plan node 'node'.
+        function [ok,context,info] = clear(context,value,station,node,mode)
+            % Tube of backup 'mode' (default nominal) of level 'value' starting
+            % at 'station' at plan node 'node'.
+            if nargin<5,mode=1;end
             info=struct('exitSeconds',NaN,'margin',Inf,'reason',"");ok=false;
-            if ~(value<=context.levelMaximum*(1+1e-12))
+            if ~(value<=context.modes(mode).levelMaximum*(1+1e-12))
                 info.reason="levelAboveCertifiedRegion";return;
             end
             % The lateral extent is largest at the start and only shrinks.
-            ego=terminalSafeSet.tube(context,value,station,0,0);
+            ego=terminalSafeSet.tube(context,value,station,0,0,mode);
             if ego.lateral(2)>context.clearance(2) || -ego.lateral(1)>context.clearance(1)
                 info.reason="tubeLeavesRoad";return;
             end
             if ~context.hasTarget,ok=true;info.exitSeconds=0;return;end
             start=node*context.ratio;chunk=round(2/context.dt);
+            if start>=context.windowSteps
+                % The encounter window has ended by this node (absorbing).
+                ok=true;info.exitSeconds=0;info.reason="encounterWindowEnded";return;
+            end
             steps=0;shift=0;
             while true
-                last=min(start+steps+chunk,start+context.horizonSteps);
+                last=min(start+steps+chunk,context.windowSteps);
                 context=terminalSafeSet.extend(context,last);
                 tau=(steps:last-start)*context.dt;
-                [ego,box,guard]=terminalSafeSet.tube(context,value,station,tau,shift);
+                [ego,box,guard]=terminalSafeSet.tube(context,value,station,tau,shift,mode);
                 index=start+(steps:last-start)+1;
                 pointGap=terminalSafeSet.separation(context,box.station,box.lateral, ...
                     context.pointStation(:,index),context.pointLateral(:,index));
@@ -131,41 +222,49 @@ classdef terminalSafeSet
                     if any(margin<0),info.reason="tubeMeetsTarget";return;end
                 end
                 if ~isempty(exitAt),ok=true;info.exitSeconds=tau(exitAt);return;end
-                % Clear for the whole window: the encounter is taken to end
-                % within terminal.horizonSeconds (TERMINAL_SAFE_SET.md, H4).
-                if last>=start+context.horizonSteps
-                    ok=true;info.exitSeconds=Inf;info.reason="clearThroughHorizon";return;
+                % Clear until the encounter window ends: the encounter ends
+                % there (absorbing); the window end is fixed in time.
+                if last>=context.windowSteps
+                    ok=true;info.exitSeconds=tau(end);info.reason="clearToWindowEnd";return;
                 end
                 shift=box.shift;steps=last-start+1;
             end
         end
 
-        function [ego,box,guard] = tube(context,value,station,tau,shift)
+        function [ego,box,guard] = tube(context,value,station,tau,shift,mode)
             % Path-coordinate boxes of the ego rectangle (ego) and of its
-            % reference point (box) at times tau after the node, and the
-            % distance (guard) an ego body point can move in dt/2 there.
+            % reference point (box) at times tau after the node under backup
+            % 'mode' (default nominal), and the distance (guard) an ego body
+            % point can move in dt/2 there.
+            if nargin<6,mode=1;end
+            p=context.modes(mode);
             radius=sqrt(max(value,0))*exp(-tau/context.timeConstant);
-            a=context.scale;kappa=abs(context.curvature);
+            a=p.scale;kappa=abs(context.curvature);d=p.lateralOffset;
             lateral=a(1)*radius+context.positionRadius;
-            heading=min(pi/2,abs(context.yawOffset)+a(2)*radius+context.yawRadius);
-            speedError=((abs(context.velocity(1))+abs(context.velocity(2)))*a(2)*radius ...
-                +(a(3)+a(4))*radius+context.pathSpeed*kappa*a(1)*radius)./max(1-kappa*a(1)*radius,.5);
+            heading=min(pi/2,abs(p.yawOffset)+a(2)*radius+context.yawRadius);
+            % Station rate about the offset path (TERMINAL_SAFE_SET.md, (3.2)):
+            % |ds/dt - v_t*/(1-kappa d)| <= dv/q + |v_t*| |kappa| a1 r/(q (1-kappa d)),
+            % q = 1 - kappa d - |kappa| a1 r, with the signed product kappa d.
+            base=max(1-context.curvature*d,.5);
+            q=max(base-kappa*a(1)*radius,.5);
+            dv=(abs(p.velocity(1))+abs(p.velocity(2)))*a(2)*radius+(a(3)+a(4))*radius;
+            speedError=dv./q+abs(p.tangentSpeed)*kappa*a(1)*radius./(q*base);
             % Left Riemann sum of a nonincreasing integrand bounds its integral.
             drift=shift+[0,cumsum(speedError(1:end-1))]*context.dt;
-            centre=station+context.pathSpeed*tau;
+            centre=station+p.pathSpeed*tau;
             along=context.halfLength*cos(heading)+context.halfWidth*sin(heading)+context.offset;
             across=context.halfLength*sin(heading)+context.halfWidth*cos(heading)+context.offset;
             bulge=kappa*(2*context.halfLength)^2/8;
             outer=lateral+across+bulge;
-            stretch=along./max(1-kappa*outer,.5);
+            stretch=along./max(1-kappa*(abs(d)+outer),.5);
             ego.station=[centre-drift-stretch-context.positionRadius;centre+drift+stretch+context.positionRadius];
-            ego.lateral=[-outer;outer];
-            box.station=[centre-drift;centre+drift];box.lateral=[-lateral;lateral];
+            ego.lateral=[d-outer;d+outer];
+            box.station=[centre-drift;centre+drift];box.lateral=[d-lateral;d+lateral];
             box.shift=drift(end)+speedError(end)*context.dt;
             % Body-point speed over [tau-dt/2,tau+dt/2]: |v| + |r| reach.
             early=radius*exp(context.dt/(2*context.timeConstant));
-            speed=hypot(abs(context.velocity(1))+a(3)*early,abs(context.velocity(2))+a(4)*early) ...
-                +(abs(context.yawRate)+a(5)*early)*context.reach;
+            speed=hypot(abs(p.velocity(1))+a(3)*early,abs(p.velocity(2))+a(4)*early) ...
+                +(abs(p.yawRate)+a(5)*early)*context.reach;
             guard=context.dt/2*speed;
         end
 
@@ -247,14 +346,15 @@ classdef terminalSafeSet
             end
         end
 
-        function [input,next,ok,value] = terminalInput(x,previous,model)
-            % One hold of the terminal controller: an admissible input whose
-            % successor meets the CLF without slack, V(next) <= rho V(x), the
+        function [input,next,ok,value] = terminalInput(x,previous,model,reference)
+            % One hold of a backup (default nominal): an admissible input whose
+            % successor meets its CLF without slack, V(next) <= rho V(x), the
             % road, the stable-handling envelope and the state limits.
-            cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
+            if nargin<4,reference=model.nominalReference;end
+            cfg=model.cfg;lane=model.lane;
             current=nonlinearBicycleModel.nominalValue(x,lane,reference);
             bound=reference.contraction*current*(1+1e-9)+1e-12;
-            candidates=terminalSafeSet.candidateInputs(x,previous,model);
+            candidates=terminalSafeSet.candidateInputs(x,previous,model,reference);
             input=[];next=[];ok=false;value=Inf;
             for k=1:size(candidates,2)
                 u=candidates(:,k);
@@ -273,10 +373,11 @@ classdef terminalSafeSet
             ok=value<=bound;
         end
 
-        function candidates = candidateInputs(x,previous,model)
+        function candidates = candidateInputs(x,previous,model,reference)
             % The path guidance, the input minimizing the linear sampled CLF
-            % successor, and a grid about the latter.
-            cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
+            % successor, and a grid about the latter, for a backup's reference.
+            if nargin<4,reference=model.nominalReference;end
+            cfg=model.cfg;lane=model.lane;
             guidance=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
             nominal=nonlinearBicycleModel.nominalFeedback(x,previous,lane,reference,cfg,guidance);
             h=cfg.controller.sampleTime;
@@ -325,4 +426,13 @@ classdef terminalSafeSet
             margin=min([clearance(2)-lateral(:);clearance(1)+lateral(:)]);
         end
     end
+end
+
+function steps = localWindowSteps(model,terminal,dt)
+    % Grid index (from the present sample) at which the encounter window ends.
+    seconds=terminal.horizonSeconds;
+    if isfield(model,'encounterWindowSeconds') && isfinite(model.encounterWindowSeconds)
+        seconds=max(0,model.encounterWindowSeconds);
+    end
+    steps=floor(seconds/dt+1e-9);
 end
