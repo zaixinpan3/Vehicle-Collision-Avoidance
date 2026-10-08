@@ -249,9 +249,12 @@ published target set again comes from the observer alone, and
 \path{estimator/nrmmTargetParameterSet.m}, its test and its wiring in
 \path{nrmmControllerErrorBounds}, \path{nrmmPositionErrorBound},
 \path{onlineNrmmTrackingRuntime} and \path{nrmmTrackingConfig} are gone; these
-files are again identical to \texttt{68883d2}. The controller option
-\texttt{collision.targetTubeOrigin} (default \texttt{"holdStart"}) and the
-per-frame record of the published set's half-widths in the validation trace
-remain. The measurements above are kept as the record of the experiment.
+files are again identical to \texttt{68883d2}. The user then had the
+controller option \texttt{collision.targetTubeOrigin} removed as well
+(\texttt{"currentSample"} is not wanted); \path{solvePredictiveControl},
+the controller configuration and its test are again identical to
+\texttt{68883d2}. Only the per-frame record of the published set's
+half-widths in the validation trace remains. The measurements above are kept
+as the record of the experiment.
 
 \end{document}

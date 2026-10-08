@@ -45,13 +45,7 @@ function cfg=localDefaults()
     % Collision rows apply at nodes inside it, including a later re-entry.
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
-    % targetTubeOrigin is where the target's error tube starts for the
-    % tightened collision row of a hold: "holdStart" restarts the published set
-    % at each hold from the predicted target state there (the first hold is
-    % the certified one); "currentSample" propagates the published set from
-    % the present sample over the whole prediction (every hold certified for
-    % the present information, wider later).
-    cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50,'targetTubeOrigin',"holdStart");
+    cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50);
     % Terminal set (controller/terminalSafeSet.m, TERMINAL_SAFE_SET.md): the
     % CLF level of the endpoint is at most levelMaximum (the CLF's certified
     % region; it is further capped where the state rows bind) and the CLF tube
@@ -149,10 +143,6 @@ function localValidate(cfg)
     end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
-    if ~(isstring(cfg.collision.targetTubeOrigin) || ischar(cfg.collision.targetTubeOrigin)) ...
-            || ~any(string(cfg.collision.targetTubeOrigin)==["holdStart","currentSample"])
-        localInvalid('collision.targetTubeOrigin must be "holdStart" or "currentSample".');
-    end
     for name=["levelMaximum","timeStepSeconds","horizonSeconds"]
         validateattributes(cfg.terminal.(name),{'double'},{'scalar','real','finite','positive'});
     end

@@ -97,18 +97,11 @@ enclosure.
 No ancillary feedback gains are used, and the shifted plan is rolled out with
 its own inputs.
 
-`collision.targetTubeOrigin` selects where the target's tube starts. The
-default `"holdStart"` is the restart described above. `"currentSample"`
-propagates the published set from the present sample over the whole
-prediction (`localTargetTube` with every hold start at zero), so every
-tightened collision row encloses the target for the present information;
-the tube then widens with the prediction time. The tightened rows carry
-slack either way, so the option changes the slack, not feasibility. The ego
-enclosure still restarts at each hold. On the 84 noisy encounters it recovered
-31 against 55 and one encounter collided: in the prefix the tightened and the
-nominal row of a node share one slack, so a wide tube also relaxes the nominal
-row (`report/TARGET_PARAMETER_SET_20261008.tex`). It is not usable with the
-present slack structure.
+Propagating the target set from the present sample over the whole prediction
+instead was measured on October 8, 2026 and not adopted: 31 of 84 noisy
+encounters recovered against 55, and one collided, because in the prefix the
+tightened and the nominal row of a node share one slack
+(`report/TARGET_PARAMETER_SET_20261008.tex`).
 
 Every current target estimate, with or without an error certificate, updates
 the prediction center and its A and beta. These two parameters remain constant

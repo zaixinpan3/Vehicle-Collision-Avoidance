@@ -90,21 +90,6 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidConfiguration');
         end
 
-        function targetTubeOriginDefaultsToHoldStartAndIsValidated(testCase)
-            % "currentSample" propagates the published target set over the
-            % whole prediction; "holdStart" restarts it at each hold.
-            cfg = collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(string(cfg.collision.targetTubeOrigin), "holdStart");
-            cfg = collisionAvoidanceControllerConfig(struct('collision', ...
-                struct('targetTubeOrigin', 'currentSample')));
-            testCase.verifyEqual(string(cfg.collision.targetTubeOrigin), "currentSample");
-            for origin = {"perHold", 3}
-                testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
-                    struct('collision', struct('targetTubeOrigin', origin{1}))), ...
-                    'collisionAvoidanceController:invalidConfiguration');
-            end
-        end
-
         function encounterRangeMustExceedTheCollisionBuffer(testCase)
             for range = [-1, 0, NaN, 0.05]
                 testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
