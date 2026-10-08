@@ -375,8 +375,7 @@ end
 function summary=localTargetSetSummary(estimate)
     % Half-widths of the published constant-parameter set, for audit only.
     summary=struct('available',false,'positionRadius',NaN,'courseRadius',NaN, ...
-        'speedHalfWidth',NaN,'accelerationHalfWidth',NaN,'curvatureHalfWidth',NaN, ...
-        'membershipAvailable',false,'intersected',false,'projected',false,'slices',0);
+        'speedHalfWidth',NaN,'accelerationHalfWidth',NaN,'curvatureHalfWidth',NaN);
     if isempty(estimate) || ~isstruct(estimate) || ~isfield(estimate,'predictionErrorSet') ...
             || isempty(estimate.predictionErrorSet),return;end
     set=estimate.predictionErrorSet;
@@ -385,11 +384,4 @@ function summary=localTargetSetSummary(estimate)
     summary.speedHalfWidth=diff(set.speedInterval)/2;
     summary.accelerationHalfWidth=diff(set.accelerationInterval)/2;
     summary.curvatureHalfWidth=diff(set.curvatureInterval)/2;
-    if isfield(estimate,'parameterMembershipSet')
-        membership=estimate.parameterMembershipSet;
-        summary.membershipAvailable=isequal(membership.available,true);
-        summary.intersected=isequal(membership.intersected,true);
-        summary.projected=isequal(membership.projected,true);
-        summary.slices=membership.slices;
-    end
 end

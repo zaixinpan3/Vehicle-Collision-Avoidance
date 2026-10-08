@@ -137,6 +137,13 @@ encounters, with different failures; the stage is not adopted
 (`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`). The user
 accepted 82 of 84 as the current result (October 5, 2026).
 
+On October 8, 2026 a set-membership enclosure of the six constants over the
+radar history, parallel to the observer, was implemented (commit `956b1b1`)
+and measured: it halved the published course and speed widths, left `A` and
+curvature unresolved in time, and changed 6 of 84 noisy outcomes (net +2).
+It was removed at the user's direction: the published target set comes from
+the NRMM observer alone (`report/TARGET_PARAMETER_SET_20261008.tex`).
+
 ## 6. Target acquisition and initialization in the adapter
 
 `localTargetStateFromInertialWindow` fits position, velocity and a constant
@@ -157,61 +164,7 @@ and its `A` and `beta` across the whole contract within 0.5 s, and the
 controller had no solution (noisy 8-m/s curved head-on, second encounter on
 the circular road).
 
-## 7. Certified constant-parameter set (optional)
-
-Under the target contract the whole target path is fixed by six constants at
-the present sample, `theta = [x; y; chi; V; A; kappa]` in the true ego body
-frame (`kappa = sin(beta)/lr`). `nrmmTargetParameterSet` encloses them by set
-membership over the history window (2 s): every radar detection is a
-constraint `|p(t_j; theta) - z_j| <= r_j`, where `z_j` is the detection carried
-into the present body frame and `p` is the controller's `predictTarget`
-family. Two certified carriers exist and each detection uses the one with the
-smaller radius:
-
-- gyro: relative heading by trapezoidal gyro integration, radius growing with
-  the detection's age (`gyroNoise*dt + yawAccelerationMaximum*dt^2/4` per
-  step, about 0.024 rad per second of age with the friction bound);
-- heading: the detection's own certified ego heading, radius
-  `headingRadius*range` (about 0.0075 rad times the range).
-
-The present heading error and the present GNSS error are shared by all past
-detections and are nuisance variables of the linear program. The family is
-linearized; its remainder is bounded with the Taylor bound of
-`targetPositionSupport`. Because the course and curvature nonlinearities
-dominate that remainder over the observer's prior (course about +/-0.4 rad,
-curvature the full contract), their ranges are split into slices, each
-linearized about its own values; slices whose linear program is empty are
-discarded and the union of the others is kept. A slice whose solver fails
-numerically is kept whole. `A` and `kappa` are carried to the next published
-sample and intersected (they are constant), `V` widened by the `A` interval
-times the elapsed time, so these intervals are nested from sample to sample.
-
-`nrmmControllerErrorBounds` intersects the result with the published
-`predictionErrorSet` (position and course radii, speed, `A` and curvature
-intervals). An empty intersection contradicts a premise; the observer set is
-then kept and `parameterMembershipSet.reason` records it. With
-`projectForecast` the published `A` and `beta` are clipped into the
-intersected intervals, with the course unchanged. The options are
-`cfg.runtime.targetParameterSet` in `nrmmTrackingConfig`; both switches are
-off by default, which leaves the published estimate unchanged.
-
-Measured behaviour (`report/TARGET_PARAMETER_SET_20261008.tex`, 84 noisy
-encounters): the published course and speed half-widths halve (median 0.34 to
-0.16 rad and 2.75 to 1.05 m/s at 1--2 s after the first published set); `A`
-stays at the contract width and curvature until about 2 s. The detection
-radius is dominated by the ego's certified motion error carried into the
-present frame (0.2--0.4 m at 30--45 m), not by the 0.04-m radar noise. With
-the set, 57 of 84 encounters recovered against 55 without it, with 4 new
-recoveries and 2 new failures. The linear programs (MATLAB `linprog`) take
-0.9 s per published sample (median, up to 8 s), far beyond the 50-ms
-controller period; this is a research implementation.
-
 ## Tests
-
-`tests/nrmmTargetParameterSetTest.m` checks containment of the truth over a
-synthetic encounter with bounded sensor errors, the nesting of `A` and
-curvature across samples, the unavailable cases, and that contradictory
-detections are reported as inconsistent.
 
 `tests/nrmmModelAidedEstimationTest.m` checks the following:
 

@@ -104,10 +104,11 @@ prediction (`localTargetTube` with every hold start at zero), so every
 tightened collision row encloses the target for the present information;
 the tube then widens with the prediction time. The tightened rows carry
 slack either way, so the option changes the slack, not feasibility. The ego
-enclosure still restarts at each hold. The estimator can narrow the published
-set with its certified constant-parameter set
-(`estimator/MODEL_AIDED_ESTIMATION.md`, Section 7); the measured effect of both
-options is in `report/TARGET_PARAMETER_SET_20261008.tex`.
+enclosure still restarts at each hold. On the 84 noisy encounters it recovered
+31 against 55 and one encounter collided: in the prefix the tightened and the
+nominal row of a node share one slack, so a wide tube also relaxes the nominal
+row (`report/TARGET_PARAMETER_SET_20261008.tex`). It is not usable with the
+present slack structure.
 
 Every current target estimate, with or without an error certificate, updates
 the prediction center and its A and beta. These two parameters remain constant

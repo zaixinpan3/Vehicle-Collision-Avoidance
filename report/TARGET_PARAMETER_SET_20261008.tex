@@ -241,4 +241,17 @@ outputs were written to
 disposable; the committed folder keeps the per-run table and the summary. The
 source hashes of the variant snapshot are in \path{variant-source-sha256.txt}.
 
+\section{Addendum: the estimator stage removed (October 8, 2026)}
+At the user's direction the set-membership stage was removed: it is an
+estimation mechanism outside the NRMM observer, which the user does not want
+(the same reason as the window fit and the parameter stage of October 5). The
+published target set again comes from the observer alone, and
+\path{estimator/nrmmTargetParameterSet.m}, its test and its wiring in
+\path{nrmmControllerErrorBounds}, \path{nrmmPositionErrorBound},
+\path{onlineNrmmTrackingRuntime} and \path{nrmmTrackingConfig} are gone; these
+files are again identical to \texttt{68883d2}. The controller option
+\texttt{collision.targetTubeOrigin} (default \texttt{"holdStart"}) and the
+per-frame record of the published set's half-widths in the validation trace
+remain. The measurements above are kept as the record of the experiment.
+
 \end{document}

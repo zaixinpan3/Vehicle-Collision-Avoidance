@@ -10,14 +10,6 @@ function cfg = nrmmTrackingConfig()
     cfg.runtime.samplePeriod = 0.02;                 % s
     cfg.runtime.integrationStepMaximum = 0.005;      % s, RK4 step limit
     cfg.runtime.targetHistoryDuration = 2.0;         % s, bounded-noise derivative window
-    % Certified constant-parameter set of the target from the history window
-    % (estimator/nrmmTargetParameterSet.m), computed at each published sample.
-    % enabled intersects it with the published prediction set; projectForecast
-    % also clips the published A and sideslip into it. The remaining fields
-    % trade linear-program work against tightness.
-    cfg.runtime.targetParameterSet = struct('enabled',false,'projectForecast',false, ...
-        'maximumMeasurements',32,'iterations',3,'courseSliceWidth',0.1, ...
-        'curvatureSliceWidth',0.008,'maximumSlices',64);
     % Zero retains constant scalar acceleration and constant curvature.
     % Nonzero rates enter the final chain equation as bounded model jerk;
     % the observer model itself remains the nominal Sharma NRMM.
