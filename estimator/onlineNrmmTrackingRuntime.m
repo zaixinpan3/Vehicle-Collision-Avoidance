@@ -240,6 +240,12 @@ function [runtime, output] = localStep(runtime, frame, publishCurrent)
     runtime.currentTime = observerInput.time+runtime.samplePeriod;
     runtime.positionErrorBound.time = runtime.currentTime;
     runtime = localRecordMeasurementTimes(runtime, observerInput);
+    if publishCurrent && isfield(output,"targetEstimate") && isstruct(output.targetEstimate) ...
+            && isfield(output.targetEstimate,"parameterMembershipSet") ...
+            && isequal(output.targetEstimate.parameterMembershipSet.available,true)
+        % The next published sample carries its constant parameters forward.
+        runtime.positionErrorBound.targetParameterSet = output.targetEstimate.parameterMembershipSet;
+    end
     if nargout>1 && ~publishCurrent,output = localOutput(runtime, observerInput);end
 end
 

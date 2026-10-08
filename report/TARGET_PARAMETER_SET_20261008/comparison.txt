@@ -1,0 +1,46 @@
+runs per variant: {'out-baseline': 84, 'out-v0-off': 84, 'out-v1-set': 84, 'out-v2-fullfan': 84}
+
+[out-baseline] outcomes {'noSolution:nonlinearAcceptanceFailed': 11, 'noSolution:timeLimit': 12, 'recovered': 55, 'noSolution:pcbfNoNumericalResult': 6}
+  min clearance 0.272 m; median per-run minimum 2.029 m
+  recovery confirmation time median 9.7 s
+  observer s/frame median 0.014 p95 0.024 max 0.17; controller median 0.016
+
+[out-v0-off] outcomes {'noSolution:nonlinearAcceptanceFailed': 11, 'noSolution:timeLimit': 10, 'recovered': 55, 'noSolution:pcbfNoNumericalResult': 8}
+  min clearance 0.272 m; median per-run minimum 2.029 m
+  recovery confirmation time median 9.7 s
+  observer s/frame median 0.017 p95 0.026 max 0.16; controller median 0.018
+  published set median half-widths by time since first set [course rad | speed m/s | A m/s2 | curvature 1/m | primary slack m]:
+    0.0-0.5s  0.489 | 3.81 | 1.10 | 0.0344 | 0.000  (n=757)
+    0.5-1.0s  0.412 | 3.23 | 1.10 | 0.0344 | 0.859  (n=538)
+    1.0-2.0s  0.341 | 2.75 | 1.10 | 0.0344 | 0.000  (n=1110)
+    2.0-4.0s  0.403 | 3.48 | 1.10 | 0.0344 | 0.000  (n=2130)
+
+[out-v1-set] outcomes {'noSolution:timeLimit': 10, 'noSolution:nonlinearAcceptanceFailed': 9, 'noSolution:pcbfNoNumericalResult': 8, 'recovered': 57}
+  min clearance 0.306 m; median per-run minimum 1.637 m
+  recovery confirmation time median 9.7 s
+  observer s/frame median 0.020 p95 1.853 max 7.96; controller median 0.017
+  published set median half-widths by time since first set [course rad | speed m/s | A m/s2 | curvature 1/m | primary slack m]:
+    0.0-0.5s  0.326 | 1.91 | 1.10 | 0.0344 | 0.000  (n=756)
+    0.5-1.0s  0.228 | 1.35 | 1.10 | 0.0344 | 0.000  (n=531)
+    1.0-2.0s  0.161 | 1.05 | 1.10 | 0.0344 | 0.000  (n=1170)
+    2.0-4.0s  0.174 | 1.15 | 1.10 | 0.0240 | 0.000  (n=2219)
+
+[out-v2-fullfan] outcomes {'noSolution:nonlinearAcceptanceFailed': 32, 'noSolution:timeLimit': 7, 'noSolution:pcbfNoNumericalResult': 13, 'recovered': 31, 'collision': 1}
+  min clearance 0.000 m; median per-run minimum 2.605 m
+  recovery confirmation time median 8.3 s
+  observer s/frame median 0.021 p95 2.164 max 9.19; controller median 0.016
+  published set median half-widths by time since first set [course rad | speed m/s | A m/s2 | curvature 1/m | primary slack m]:
+    0.0-0.5s  0.320 | 1.90 | 1.10 | 0.0344 | 1440.075  (n=736)
+    0.5-1.0s  0.224 | 1.32 | 1.10 | 0.0344 | 332.057  (n=498)
+    1.0-2.0s  0.158 | 0.98 | 1.10 | 0.0325 | 0.000  (n=850)
+    2.0-4.0s  0.219 | 1.36 | 1.10 | 0.0245 | 0.000  (n=1354)
+
+paired transitions against out-baseline
+  out-v0-off: newly recovered 0 []
+  out-v0-off: newly failed 0 []
+  out-v1-set: newly recovered 4 ['seed20261003-speed8-acceleratingHeadOn', 'seed4-speed15-acceleratingHeadOn', 'seed4-speed15-curvedHeadOn', 'seed4-speed15-headOn']
+  out-v1-set: newly failed 2 [('seed1-speed8-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed1-speed8-turningCrossing', 'noSolution:pcbfNoNumericalResult')]
+  out-v2-fullfan: newly recovered 5 ['seed3-speed8-acceleratingHeadOn', 'seed3-speed8-curvedCrossing', 'seed4-speed15-acceleratingHeadOn', 'seed4-speed15-headOn', 'seed5-speed8-acceleratingHeadOn']
+  out-v2-fullfan: newly failed 29 [('seed1-speed15-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed1-speed15-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed1-speed8-acceleratingHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed1-speed8-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed1-speed8-headOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed2-speed15-crossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed2-speed15-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed2-speed8-acceleratingHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed2-speed8-headOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed20261003-speed15-crossing', 'noSolution:pcbfNoNumericalResult'), ('seed20261003-speed15-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed20261003-speed15-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed20261003-speed8-headOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed20261003-speed8-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed3-speed15-acceleratingHeadOn', 'collision'), ('seed3-speed15-crossing', 'noSolution:pcbfNoNumericalResult'), ('seed3-speed15-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed3-speed15-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed3-speed8-headOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed3-speed8-turningCrossing', 'noSolution:pcbfNoNumericalResult'), ('seed4-speed15-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed4-speed8-acceleratingHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed4-speed8-headOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed4-speed8-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed5-speed15-crossing', 'noSolution:pcbfNoNumericalResult'), ('seed5-speed15-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed5-speed15-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed5-speed8-headOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed5-speed8-turningCrossing', 'noSolution:nonlinearAcceptanceFailed')]
+
+per-run table: /home/zai/.cache/collisionAvoidance/contract_set_impl_20261008/campaign-runs.csv

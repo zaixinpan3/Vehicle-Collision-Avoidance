@@ -168,6 +168,11 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         end
         output.targetEstimate.predictionErrorSet = localPredictionSet( ...
             output,target,components,parameters,domain,available,relativeCourseRadius);
+        if available && isfield(bound,"targetParameterSetOptions") ...
+                && isequal(bound.targetParameterSetOptions.enabled,true)
+            [output.targetEstimate,parameters] = localParameterMembership( ...
+                output.targetEstimate,bound,design,domain,parameters);
+        end
         if ~available
             parameters = struct("speedErrorBound", Inf, "courseErrorBound", Inf, ...
                 "speedRateErrorBound", Inf, "curvatureInterval", [-Inf; Inf]);
@@ -204,6 +209,74 @@ function set = localPredictionSet(output,target,components,parameters,domain,ava
         'rearAxleDistance',domain.rearAxleDistance, ...
         'scope',"currentObserverEnclosureWithConstantParameters", ...
         'futureMeasurementsAssumed',false);
+end
+
+function [estimate,parameters] = localParameterMembership(estimate,bound,design,domain,parameters)
+% Intersect the published constant-parameter set with the certified
+% set-membership set of the history window (nrmmTargetParameterSet). Both
+% contain the truth under their premises, so their intersection does. An
+% empty intersection contradicts a premise; the observer set is then kept
+% unchanged and the conflict is recorded. With projectForecast the published
+% A and sideslip are clipped into the intersected intervals; the projection
+% onto a convex set that contains the truth cannot move them away from it.
+    set = estimate.predictionErrorSet;
+    if ~set.available,return;end
+    options = bound.targetParameterSetOptions;
+    options.radarNoise = design.sensors.radarNoiseMaximum;
+    options.gnssNoise = design.sensors.positionNoiseMaximum;
+    previous = [];
+    if isfield(bound,"targetParameterSet"),previous = bound.targetParameterSet;end
+    lr = domain.rearAxleDistance;
+    center = struct('relativePosition',set.relativePosition(:),'course',set.courseCenter, ...
+        'speed',norm(estimate.targetVelocity),'acceleration',estimate.targetScalarAcceleration, ...
+        'curvature',sin(estimate.targetSideslip)/lr);
+    prior = struct('positionRadius',set.positionRadius,'courseRadius',set.courseRadius, ...
+        'speedInterval',set.speedInterval,'accelerationInterval',set.accelerationInterval, ...
+        'curvatureInterval',set.curvatureInterval);
+    membership = nrmmTargetParameterSet(bound.targetHistory,set.time,center,domain,prior,previous,options);
+    membership.intersected = false;membership.projected = false;
+    if membership.available
+        low = membership.center+membership.lower;high = membership.center+membership.upper;
+        speedInterval = [max(set.speedInterval(1),low(4));min(set.speedInterval(2),high(4))];
+        accelerationInterval = [max(set.accelerationInterval(1),low(5));min(set.accelerationInterval(2),high(5))];
+        curvatureInterval = [max(set.curvatureInterval(1),low(6));min(set.curvatureInterval(2),high(6))];
+        if all([speedInterval(1),accelerationInterval(1),curvatureInterval(1)] ...
+                <= [speedInterval(2),accelerationInterval(2),curvatureInterval(2)])
+            set.positionRadius = min(set.positionRadius, ...
+                norm(max(abs([membership.lower(1:2),membership.upper(1:2)]),[],2)));
+            set.courseRadius = min(set.courseRadius,max(abs([membership.lower(3),membership.upper(3)])));
+            set.speedInterval = speedInterval;set.accelerationInterval = accelerationInterval;
+            set.curvatureInterval = curvatureInterval;
+            set.scope = set.scope+"; intersected with nrmm-constant-parameter-membership-v1";
+            membership.intersected = true;
+            speed = center.speed;
+            parameters.speedErrorBound = min(parameters.speedErrorBound,max(abs(speedInterval-speed)));
+            parameters.speedRateErrorBound = min(parameters.speedRateErrorBound, ...
+                max(abs(accelerationInterval-center.acceleration)));
+            parameters.curvatureInterval = [max(parameters.curvatureInterval(1),curvatureInterval(1)); ...
+                min(parameters.curvatureInterval(2),curvatureInterval(2))];
+            % The membership course is relative to the true ego frame; the
+            % published inertial course bound adds the ego yaw bound.
+            parameters.courseErrorBound = min(parameters.courseErrorBound,set.courseRadius+bound.yaw);
+            if isequal(options.projectForecast,true)
+                acceleration = min(max(center.acceleration,accelerationInterval(1)),accelerationInterval(2));
+                curvature = min(max(center.curvature,curvatureInterval(1)),curvatureInterval(2));
+                sideslip = asin(min(1,max(-1,curvature*lr)));
+                course = estimate.targetCourseAngleInertial;
+                estimate.targetScalarAcceleration = acceleration;
+                if isfield(estimate,'targetTangentialAcceleration')
+                    estimate.targetTangentialAcceleration = acceleration;
+                end
+                estimate.targetSideslip = sideslip;
+                estimate.targetHeadingInertial = atan2(sin(course-sideslip),cos(course-sideslip));
+                membership.projected = acceleration~=center.acceleration || curvature~=center.curvature;
+            end
+        else
+            membership.reason = "emptyIntersectionWithObserverSet";
+        end
+    end
+    estimate.predictionErrorSet = set;
+    estimate.parameterMembershipSet = membership;
 end
 
 function radius = localVelocityBounds(output, bound, input, design, age)

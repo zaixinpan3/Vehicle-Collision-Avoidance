@@ -54,6 +54,12 @@ function bound = localInitialize(design,cfg,state,time,prior)
     validateattributes(duration,{'double'},{'scalar','finite','positive'});
     bound.targetHistory = nrmmTargetHistory("initialize", ...
         design.target.domain,design.target.modelJerkMaximum,duration,holdBounds.yawAcceleration);
+    % Options of the published constant-parameter set (nrmmControllerErrorBounds).
+    bound.targetParameterSetOptions = struct('enabled',false);
+    if isfield(cfg.runtime,"targetParameterSet")
+        bound.targetParameterSetOptions = cfg.runtime.targetParameterSet;
+    end
+    bound.targetParameterSet = [];
     bound = localReset(bound,state);
     if ~isempty(fieldnames(prior))
         validateattributes(prior.yaw,{'double'},{'real','scalar','finite','>=',0,'<=',pi});
@@ -96,6 +102,8 @@ function bound = localReset(bound,state)
         bound.targetHistory = nrmmTargetHistory("initialize",domain, ...
             bound.design.target.modelJerkMaximum,history.duration,history.yawAccelerationMaximum);
     end
+    % A new track carries no parameter information from the previous one.
+    bound.targetParameterSet = [];
 end
 
 function bound = localMeasure(bound,input,state)

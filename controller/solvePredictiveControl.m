@@ -815,6 +815,9 @@ function [tube,support]=localTargetTube(model,time,holdStart,normal)
         if nargin>3,support=zeros(size(normal,1),1);end
         return;
     end
+    % With targetTubeOrigin "currentSample" every hold starts from the present
+    % published set: the tube covers the whole elapsed prediction time.
+    if model.cfg.collision.targetTubeOrigin=="currentSample",holdStart=zeros(size(holdStart));end
     % One predicted start state per entry; the tube formulas are elementwise.
     starts=localTargetAt(model,holdStart);
     tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,time-holdStart);

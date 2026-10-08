@@ -1,0 +1,244 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\setlength{\emergencystretch}{2em}
+\title{A certified constant-parameter set of the target and a full-horizon target tube}
+\date{Prepared October 8, 2026}
+\begin{document}
+\maketitle
+
+\section{Request}
+The user asked how to use the target motion contract (constant tangential
+acceleration $A$ and constant sideslip $\beta$) so that the target's error
+tube stops growing from frame to frame, and then asked for an implementation
+and a test of its effect. Under the contract the whole target path is fixed by
+six constants, so the uncertainty is only in what is not yet known about them.
+Set membership over the radar history encloses them; the enclosure only
+shrinks, so the target set for any fixed future time is nested from sample to
+sample. This report records the implementation, its tests and the closed-loop
+measurements. It also records what limits the gain.
+
+\section{Design}
+\paragraph{Parameters.} At the published sample the six constants are
+$\theta=[x;y;\chi;V;A;\kappa]$ in the true ego body frame (the tracker's
+frame), $\kappa=\sin\beta/l_r$. The family is the controller's
+\texttt{predictTarget}: $p(\tau)=[x;y]+s\,\mathrm{sinc}(\kappa s/2)
+[\cos;\sin](\chi+\kappa s/2)$, $s=V\tau+A\tau^2/2$.
+
+\paragraph{Detections.} Each radar detection $j$ of the 2-s history window is
+carried into the present body frame by one of two certified transports, the
+one with the smaller radius:
+\begin{itemize}
+\item gyro: the relative heading by trapezoidal gyro integration, radius
+  $\mathrm{radar}+\mathrm{gnss}+2\sin(a_j/2)|\rho_j|$, where $a_j$ grows by
+  $n_g\,dt+M\,dt^2/4$ per 12.5-ms step ($M$ the friction bound on yaw
+  acceleration); this is about 0.024~rad per second of age;
+\item heading: the detection's own certified ego heading, radius
+  $\mathrm{radar}+\mathrm{gnss}+2\sin(b_j/2)|\rho_j|$, $b_j\approx0.0075$~rad.
+\end{itemize}
+The present heading error $\varphi$ and the present GNSS error $c$ are shared
+by all past detections and are variables of the linear program; their
+second-order effect is added to each radius. Each detection gives the
+constraint $|p(t_j;\theta)-z_j-\varphi w_j-c|\le r_j+R_j$, with the Euclidean
+ball replaced by its circumscribed octagon.
+
+\paragraph{Linearization and slices.} $p$ is linearized; $R_j$ is the Taylor
+remainder of \texttt{targetPositionSupport} with the arc length inflated by
+its own error, valid over the current domain box. Over the observer's prior
+(course about $\pm0.4$~rad, curvature the whole contract) the remainder
+swamps every detection: a first version shrank nothing. The course and
+curvature ranges are therefore split into slices (0.1~rad by
+0.008~m$^{-1}$, at most 64), each linearized about its own values. A slice
+whose program is empty cannot explain the detections and is discarded; the
+union of the others is kept. A slice whose solver fails numerically (after a
+second algorithm) is kept whole. The computation repeats on the shrunken box
+while some component shrinks by more than 10\% (at most three passes).
+
+\paragraph{Domain and nesting.} The domain is the observer's published set,
+intersected with the contract and with the previous sample's $A$ and $\kappa$
+intervals ($V$ widened by the $A$ interval times the elapsed time). The
+published \texttt{predictionErrorSet} is intersected with the result. With
+\texttt{projectForecast} the published $A$ and $\beta$ are clipped into the
+intersected intervals (course unchanged): the projection onto a convex set
+that contains the truth cannot move them away from it.
+
+\paragraph{Controller option.} \texttt{collision.targetTubeOrigin} selects
+where the target tube of a tightened collision row starts:
+\texttt{"holdStart"} (default) restarts the published set at each hold, as
+before; \texttt{"currentSample"} propagates it from the present sample over the
+whole prediction, so every tightened row encloses the target for the present
+information. The tightened rows carry slack in both cases.
+
+\section{Implementation}
+\begin{itemize}
+\item \path{estimator/nrmmTargetParameterSet.m} (new): the set.
+\item \path{estimator/nrmmControllerErrorBounds.m}: intersection, optional
+  projection, \texttt{parameterMembershipSet} on the published estimate.
+\item \path{estimator/nrmmPositionErrorBound.m},
+  \path{estimator/onlineNrmmTrackingRuntime.m}: options, reset on a new track,
+  the previous set carried between published samples.
+\item \path{config/nrmmTrackingConfig.m}:
+  \texttt{runtime.targetParameterSet} (both switches off by default).
+\item \path{config/collisionAvoidanceControllerConfig.m},
+  \path{controller/solvePredictiveControl.m}: \texttt{targetTubeOrigin}.
+\item \path{scripts/runNonlinearPredictiveSafetyValidation.m}: the trace
+  records the published set's half-widths.
+\end{itemize}
+
+\section{Tests}
+\texttt{runtests('tests')}: 595 of 595 passed on the final code. The new class
+\texttt{nrmmTargetParameterSetTest} checks, on a synthetic encounter with
+bounded radar, GNSS and gyro errors and a slowly varying heading error inside
+its radius: containment of the true constants at three samples and a set
+narrower than the observer's prior; nesting of $A$ and curvature across
+samples; the unavailable cases (no current detection, no transport bound);
+and that detections off the constant-parameter family are reported as
+inconsistent. A configuration test covers \texttt{targetTubeOrigin}.
+
+\paragraph{First version.} With one linearization over the observer's prior
+the remainder reached 1.4--43~m and no component shrank. Course slices alone
+gave course $\pm0.16$~rad and speed $\pm1.4$~m/s after 2~s; adding curvature
+slices gave course $\pm0.08$~rad, speed $\pm0.7$~m/s and curvature
+$\pm0.01$~m$^{-1}$ after 2~s in the same synthetic probe
+(\path{scripts/probeParameterSet.m}), with the truth inside at every sample.
+
+\section{Closed-loop campaigns}
+The 84 noisy encounters (seven scenarios at 8 and 15~m/s, seeds 20261003 and
+1--5, 2000-hold cap, 1-s recovery dwell) ran in four variants, each encounter
+in its own MATLAB process, eight in parallel:
+\begin{itemize}
+\item \emph{baseline}: \texttt{68883d2} (HEAD) unchanged;
+\item \emph{V0}: the new code with both options off;
+\item \emph{V1}: the set with forecast projection, \texttt{"holdStart"} tube;
+\item \emph{V2}: V1 with the \texttt{"currentSample"} tube.
+\end{itemize}
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+ & baseline & V0 & V1 & V2\\
+\midrule
+recovered & 55 & 55 & 57 & 31\\
+no solved command & 29 & 29 & 27 & 52\\
+collision & 0 & 0 & 0 & 1\\
+smallest clearance (m) & 0.272 & 0.272 & 0.306 & 0\\
+newly recovered / newly failed vs baseline & -- & 0 / 0 & 4 / 2 & 5 / 29\\
+\bottomrule
+\end{tabular}
+\end{center}
+Per run: \path{TARGET_PARAMETER_SET_20261008/campaign-runs.csv}; summary:
+\path{comparison.txt}.
+
+\paragraph{Baseline.} This is the first complete noisy campaign on
+\texttt{68883d2} (the October 6 run stopped after 5 of 84). All 12 braking-lead
+runs have no solution at their first frame (solver time limit), as diagnosed
+on October 6: the startup rollout never enters the terminal set. The other 17
+failures are \texttt{nonlinearAcceptanceFailed} (11) and
+\texttt{pcbfNoNumericalResult} (6). The comparison with 82 of 84 on
+\texttt{d1c31d6} is now 55 of 84.
+
+\paragraph{V0} reproduces the baseline run for run (outcome, number of holds and
+smallest clearance identical in all 84; two failures report the solver time
+limit instead of no numerical result, a load-dependent difference). The
+differences below are therefore caused by the options.
+
+\paragraph{Width of the published set} (median half-widths over frames, by
+time since the first published set):
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+ & 0--0.5~s & 0.5--1~s & 1--2~s & 2--4~s\\
+\midrule
+course (rad), V0 / V1 & 0.49 / 0.33 & 0.41 / 0.23 & 0.34 / 0.16 & 0.40 / 0.17\\
+speed (m/s), V0 / V1 & 3.81 / 1.91 & 3.23 / 1.35 & 2.75 / 1.05 & 3.48 / 1.15\\
+$A$ (m/s$^2$), V0 / V1 & 1.10 / 1.10 & 1.10 / 1.10 & 1.10 / 1.10 & 1.10 / 1.10\\
+curvature (m$^{-1}$), V0 / V1 & 0.034 / 0.034 & 0.034 / 0.034 & 0.034 / 0.034 & 0.034 / 0.024\\
+\bottomrule
+\end{tabular}
+\end{center}
+The set halves the course and speed widths. It leaves $A$ at the contract
+width throughout and curvature until about 2~s, when most encounters are
+decided. The set was available in 7317 of 7380 published frames and the
+intersection was never empty. The forecast projection changed the published
+$A$ or $\beta$ in 78 of 7380 frames.
+
+\paragraph{V1.} Two more encounters recovered, with 4 new recoveries and 2 new
+failures; none of the six involved the projection. With the per-hold tube the
+target set enters a row only through one hold of growth, so the intersection
+mainly lowers the position radius (about 6.5 to 4~cm). The changes are of the
+size the October 5 ablations attributed to the closed loop's sensitivity to
+small changes, and they are not evidence of a systematic gain.
+
+\paragraph{V2.} Propagating the set over the whole prediction makes the
+tightened rows violated by hundreds of metres early in an encounter: the
+primary slack sum exceeded 751~m in the top decile of frames, with medians of
+1440~m (first 0.5~s) and 332~m (0.5--1~s). Two consequences:
+\begin{itemize}
+\item In the prefix the tightened row and the nominal collision row of a node
+  share one slack. A large robust slack therefore also relaxes the nominal row,
+  and the slack sum is dominated by distant nodes that the ego cannot
+  influence. In the 15-m/s accelerating head-on of seed 3 (recovered in the
+  baseline and in V1) the vehicles touched at 1.07~s.
+\item 29 runs that recovered in the baseline failed: 28 without a solved
+  command, mostly \texttt{nonlinearAcceptanceFailed}, and the collision.
+\end{itemize}
+The full-horizon tube is not usable with the present slack structure; it would
+need separate, prioritized slacks for robust and nominal rows.
+
+\paragraph{Cost.} On frames where it ran, the set took 0.92~s (median), 2.29~s
+(95th percentile) and 7.96~s (maximum) of MATLAB \texttt{linprog} time per
+published sample, against the 50-ms controller period. The controller itself
+was unchanged (median 0.017~s).
+
+\section{Why the gain is small}
+The offline study of the same day assumed radar-only noise (0.04~m) and a
+linearization at the truth; it predicted a guaranteed position half-width of
+0.2--0.6~m at the impact time with about 0.5~s left. The certified pipeline
+cannot reach that:
+\begin{itemize}
+\item every detection carried into the present frame carries the ego's own
+  certified motion error: about 0.0075~rad times the range with the heading
+  transport, or 0.024~rad per second of age times the range with the gyro
+  transport (the friction bound on yaw acceleration enters the trapezoid
+  error). At 30--45~m this is 0.2--0.4~m per detection, five to ten times the
+  radar noise;
+\item the observer's prior (course $\pm0.4$~rad, speed $\pm3.3$~m/s, $A$ and
+  curvature at the contract) makes the linearization remainder large, and
+  slicing removes only part of it;
+\item the encounters are decided within about 1.5~s of detection, before $A$
+  and curvature can be resolved from 2~s of data.
+\end{itemize}
+
+\section{Decision needed}
+Both options stay off by default; the published estimate and the controller
+are unchanged unless they are enabled. The user should decide whether to keep
+the implementation in this form. If the target tube is to be made
+non-divergent in practice, the measurements point to:
+\begin{itemize}
+\item a certified relative-motion bound for the ego over short windows (the
+  heading and gyro transports dominate the detection radius);
+\item separate, prioritized slacks for robust and nominal collision rows
+  before any full-horizon tube;
+\item a dedicated linear-program solver or fewer slices for real time.
+\end{itemize}
+The forecast projection touches the published $A$ and $\beta$, which the user
+decided on October 5 to take from the tracker; it is off by default and had no
+measurable effect here.
+
+\section{Reproduction}
+The scripts are in \path{TARGET_PARAMETER_SET_20261008/scripts}. Each campaign
+variant runs on a snapshot of the source with \path{solver/} linked:
+\begin{verbatim}
+campaign.sh <sourceCopy> <outDir>   # with D=<scripts dir>, VARIANT=<MATLAB struct>
+run-variants.sh                      # V1 and V2
+python3 compare.py out-baseline out-v0-off out-v1-set out-v2-fullfan
+\end{verbatim}
+\texttt{runOneEncounter} mirrors \path{scripts/runPotentialFieldCampaign.m} for
+one encounter and records per-frame published set widths and slack. The raw
+outputs were written to
+\path{~/.cache/collisionAvoidance/contract_set_impl_20261008/} and are
+disposable; the committed folder keeps the per-run table and the summary. The
+source hashes of the variant snapshot are in \path{variant-source-sha256.txt}.
+
+\end{document}
