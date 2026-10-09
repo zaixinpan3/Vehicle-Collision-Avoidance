@@ -19,10 +19,10 @@ classdef terminalSafeSet
 % duration is preset:
 %   exit        the target leaves encounterRangeMeters of every point of the
 %               tube;
-%   separation  from that time on the tube and the target provably never come
-%               within the collision buffer again (straight road: a gap
-%               along or across the road that the forecast and the tube's
-%               remaining drift can only widen; see permanent).
+%   separation  from that time on the target's forecast motion relative to
+%               the backup's box lies outside their collision cone, so the
+%               two provably never come within the collision buffer again
+%               (straight road; see collisionCone).
 % The end is an absorbing mode: no property of the target after it is used.
 % terminal.horizonSeconds only limits how far the check computes: a tube that
 % reaches it with neither event is not terminal. The tube shrinks along any
@@ -216,15 +216,15 @@ classdef terminalSafeSet
                 pointGap=terminalSafeSet.separation(context,box.station,box.lateral, ...
                     context.pointStation(:,index),context.pointLateral(:,index));
                 exitAt=find(pointGap>context.range,1);
-                apart=terminalSafeSet.permanent(context,ego,rate,index,mode);
+                apart=terminalSafeSet.collisionCone(context,ego,rate,index,mode);
                 bodyGap=terminalSafeSet.separation(context,ego.station,ego.lateral, ...
                     context.targetStation(:,index),context.targetLateral(:,index));
                 required=max(context.buffer,guard+context.dt/2*context.targetSpeed(index));
-                % Grid points before an exit must be clear; a separation
+                % Grid points before an exit must be clear; the collision-cone
                 % certificate covers the time from its own grid point on, so
                 % that grid point is checked as well.
                 limit=numel(tau);reason="exit";stop=exitAt;
-                if ~isempty(apart) && (isempty(exitAt) || apart<exitAt),stop=apart;reason="permanentSeparation";end
+                if ~isempty(apart) && (isempty(exitAt) || apart<exitAt),stop=apart;reason="outsideCollisionCone";end
                 if ~isempty(stop),limit=stop-(reason=="exit");end
                 if limit>0
                     margin=bodyGap(1:limit)-required(1:limit);info.margin=min(info.margin,min(margin));
@@ -239,25 +239,31 @@ classdef terminalSafeSet
             end
         end
 
-        function first = permanent(context,ego,rate,index,mode)
-            % First grid point from which the backup's rectangle box and the
-            % target provably never come within the buffer again, or []. Only
-            % on a straight road, where the gap between path boxes is at least
-            % their gap along the road and their gap across it:
-            %   a straight-line target (beta = 0) moves its box by c s(t) along
-            %   and s s(t) across the road, s(t) = V u + A u^2/2, c and s the
-            %   cosine and sine of its course to the road; a gap across the road
-            %   that its lateral velocity never closes (s V >= 0 and s A >= 0 on
-            %   the side away from the ego, opposite signs on the other), or a
-            %   gap along it that its station rate never closes (c V >= v and
-            %   c A >= 0 ahead, c V <= v and c A <= 0 behind), stays open;
-            %   a circling target (beta ~= 0) stays in the disk of its circle
+        function first = collisionCone(context,ego,rate,index,mode)
+            % First grid point from which the target provably never meets the
+            % backup's rectangle box again, or []: the target's forecast motion
+            % relative to the box is outside the collision cone of the two
+            % boxes. Only on a straight road.
+            %   From a grid time the ego band across the road only shrinks; along
+            %   the road the box moves at the trim's station rate v and drifts
+            %   by at most T*sigma(r) more (sigma(lambda r) <= lambda sigma(r),
+            %   r decays as exp(-t/T)). Widened by that drift, the ego box is
+            %   fixed in a frame moving at v.
+            %   A straight-line target (beta = 0) moves its box by c s(u) along
+            %   and s s(u) across the road, s(u) = V u + A u^2/2, c and s the
+            %   cosine and sine of its course to the road, also through a stop.
+            %   In the moving frame the difference of the box centres is a
+            %   parabola in u, and the boxes meet at some u >= 0 iff the
+            %   parabola enters the sum box (half-widths H_s, H_d, with the
+            %   buffer): the relative motion lies inside the collision cone.
+            %   Equivalently, the least normalized box distance
+            %   max(|q_s|/H_s, |q_d|/H_d) over u >= 0 is at most 1; it is
+            %   attained at u = 0, at a vertex or zero of q_s or q_d, or where
+            %   |q_s|/H_s = |q_d|/H_d, and is evaluated at all of these, so the
+            %   test is exact for the forecast (localParabolaMeetsBox).
+            %   A circling target (beta ~= 0) stays in the disk of its circle
             %   widened by its body reach: a disk beside the ego band, or behind
             %   it while the ego moves forward, stays apart.
-            % The ego band across the road only shrinks; along the road its
-            % centre moves at the trim's station rate v, and its further drift is
-            % at most T*sigma(r) (sigma(lambda r) <= lambda sigma(r), r decays as
-            % exp(-t/T)). These hold for all later times, also through a stop.
             first=[];
             if context.curvature~=0,return;end
             motion=context.targetMotion;
@@ -269,16 +275,39 @@ classdef terminalSafeSet
                 angle=context.targetCourse(index)-context.pathHeading;
                 c=cos(angle);s=sin(angle);speed=context.targetVelocity(index);A=motion.acceleration;
                 target=context.targetLateral(:,index);station=context.targetStation(:,index);
-                apart=(target(1,:)-lateral(2,:)>=b & s.*speed>=0 & s*A>=0) ...
-                    | (lateral(1,:)-target(2,:)>=b & s.*speed<=0 & s*A<=0) ...
-                    | (station(1,:)-along(2,:)-remaining>=b & c.*speed-v>=0 & c*A>=0) ...
-                    | (along(1,:)-remaining-station(2,:)>=b & v-c.*speed>=0 & c*A<=0);
+                gapS=mean(station,1)-mean(along,1);halfS=diff(along,1,1)/2+remaining+diff(station,1,1)/2+b;
+                gapD=mean(target,1)-mean(lateral,1);halfD=diff(lateral,1,1)/2+diff(target,1,1)/2+b;
+                apart=~localParabolaMeetsBox(c*A/2,c.*speed-v,gapS,halfS,s*A/2,s.*speed,gapD,halfD);
             else
                 radius=motion.diskRadius;centre=motion.centre;
                 apart=(centre(2)-radius-lateral(2,:)>=b) | (lateral(1,:)-centre(2)-radius>=b) ...
                     | (along(1,:)-remaining-centre(1)-radius>=b & v>=0);
             end
             first=find(apart,1);
+        end
+
+        function [mode,context] = coneLane(context,x)
+            % Index of the nearest lane backup whose settled state at x's
+            % station is already in its set (its box, settled about the lane
+            % centre, is outside the collision cone of the target, or the
+            % target exits); 0 when the nominal backup qualifies, when none
+            % does, or when the nearest ones lie on both sides. Guidance for
+            % the startup rollout, not a certificate.
+            mode=0;best=Inf;tie=false;
+            if ~context.hasTarget,return;end
+            here=laneGeometry.project(x(1:2),context.model.lane,context.stationNow);
+            for m=1:numel(context.modes)
+                [ok,context]=terminalSafeSet.clear(context,0,here.station,0,m);
+                if ~ok,continue;end
+                if m==1,mode=0;return;end
+                offset=context.modes(m).lateralOffset-here.lateralPosition;
+                if abs(offset)<best-1e-9
+                    best=abs(offset);mode=m;tie=false;
+                elseif abs(abs(offset)-best)<=1e-9 && sign(offset)~=sign(context.modes(mode).lateralOffset-here.lateralPosition)
+                    tie=true;
+                end
+            end
+            if tie,mode=0;end
         end
 
         function [ego,box,guard,rate] = tube(context,value,station,tau,shift,mode)
@@ -478,6 +507,37 @@ classdef terminalSafeSet
             margin=min([clearance(2)-lateral(:);clearance(1)+lateral(:)]);
         end
     end
+end
+
+function hit = localParabolaMeetsBox(aS,bS,gS,hS,aD,bD,gD,hD)
+    % Per column: does the parabola (aS u^2 + bS u + gS, aD u^2 + bD u + gD),
+    % u >= 0, enter the box |q_s| <= hS, |q_d| <= hD? Exact: the least
+    % normalized box distance over u >= 0 is attained at u = 0, at a vertex or
+    % zero of either coordinate, or where the two normalized distances are
+    % equal, and it is evaluated at all of them.
+    n=numel(gS);aS=aS+zeros(1,n);aD=aD+zeros(1,n);
+    u=[zeros(1,n);localVertex(aS,bS);localVertex(aD,bD);localRoots(aS,bS,gS);localRoots(aD,bD,gD); ...
+        localRoots(aS./hS-aD./hD,bS./hS-bD./hD,gS./hS-gD./hD); ...
+        localRoots(aS./hS+aD./hD,bS./hS+bD./hD,gS./hS+gD./hD)];
+    u(u<0)=NaN;
+    qS=aS.*u.^2+bS.*u+gS;qD=aD.*u.^2+bD.*u+gD;
+    distance=max(abs(qS)./hS,abs(qD)./hD);
+    hit=min(distance,[],1,'omitnan')<=1+1e-9;
+end
+
+function u = localVertex(a,b)
+    u=nan(size(b));at=a~=0;u(at)=-b(at)./(2*a(at));
+end
+
+function r = localRoots(a,b,c)
+    % Real roots of a u^2 + b u + c = 0 per column, two rows, NaN where absent.
+    % Stable for small a: q = -(b + sign(b) sqrt(disc))/2, roots q/a and c/q.
+    n=numel(c);r=nan(2,n);
+    linear=a==0;at=linear & b~=0;r(1,at)=-c(at)./b(at);
+    disc=b.^2-4*a.*c;ok=~linear & disc>=0;
+    sgn=sign(b);sgn(sgn==0)=1;q=-(b+sgn.*sqrt(max(disc,0)))/2;
+    r(1,ok)=q(ok)./a(ok);
+    at=ok & q~=0;r(2,at)=c(at)./q(at);
 end
 
 function motion = localTargetMotion(model)

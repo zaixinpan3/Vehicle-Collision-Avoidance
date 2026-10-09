@@ -155,8 +155,9 @@ numerical stalls of the conic solver.
   settled by the addendum: no preset time is needed.)
 \item The remaining failures point to the plan's length and the conic
   solver's numerical stalls, not to the terminal set.
-\item Whether to add a startup rollout toward the other side (braking lead at
-  startup, addendum).
+\item Whether to try the cone's lane before the potential field at startup
+  (second addendum: two 15~m/s braking leads now stop on the solver time
+  limit because the retry follows a 512-hold first rollout).
 \end{itemize}
 
 \section{Reproduction}
@@ -259,5 +260,105 @@ reaches no terminal state, is the obvious remedy; it is not implemented
 (\path{brakingLead-startup-F.txt}; \path{scripts/whyNotTerminal.m},
 \path{scripts/whySeedFails.m} with the copy written by
 \path{scripts/makeSolveDiag.py}).
+
+\section{Second addendum: the collision cone and the startup side}
+The user asked whether the same-direction, same-speed case could be judged
+from the relative velocity's position with respect to the collision cone, and
+then asked for a terminal set designed on the collision cone, with a
+simulation test (variant G, the committed design).
+
+\paragraph{Design.} The cone is not a test of the next instant but of the
+whole future under constant relative motion, so it is the right form for the
+separation certificate, with three changes that keep the certificate
+invariant: it is taken with respect to the backup's converged motion (the
+lane trim at the station rate $v$), not the ego's present velocity; the
+transient is absorbed by widening the ego box by the tube's remaining drift
+$T\sigma(r)$; and the target's constant acceleration $A$ makes the relative
+motion a parabola. On a straight road, in the frame moving at $v$, the
+difference of the box centres is
+$q(u)=q(0)+(cV_s-v,\,sV_s)\,u+(cA,\,sA)\,u^2/2$, and the boxes meet at some
+$u\ge0$ iff $q(u)$ enters the sum box $|q_s|\le H_s$, $|q_d|\le H_d$
+(half-widths added, with the buffer). The relative motions for which this
+happens form the collision cone of the two boxes; separation is proven iff the
+relative motion is outside it. The test is exact for the forecast: the least
+normalized box distance $\max(|q_s|/H_s,|q_d|/H_d)$ over $u\ge0$ is attained
+at $u=0$, at a vertex or zero of $q_s$ or $q_d$, or where the two normalized
+distances are equal, and it is evaluated at all of these (at most 11
+candidates, \texttt{localParabolaMeetsBox}, vectorized over the grid). The
+sign conditions of the first addendum are the one-coordinate special case; a
+slow diagonal crosser whose crossing ends after the 60-s bound is now
+terminal. A condition on the present relative velocity alone (``the distance
+grows now'') is neither necessary nor sufficient: a target drifting away
+across the road while the along-road gap closes is safe although the distance
+shrinks, and a faster lead that brakes is safe now and met later. The circling
+target keeps its disk test; on a curve only the exit ends an encounter.
+
+For the same-direction, same-speed case the cone gives the verdict of the
+first addendum (seed 20261003, 15~m/s: relative velocity $(-0.10,+0.043)$~m/s,
+left lane inside the cone, right lane outside), so the braking leads' startup
+is decided by the side of the startup rollout, and the cone is used there as
+well: a potential-field rollout that reaches no terminal state is run once
+more toward the lane the cone prefers (\texttt{terminalSafeSet.coneLane}: the
+nearest lane whose settled backup at the present station is already in its
+set, not the nominal lane, none when the nearest such lanes lie on both
+sides), driven by the backup's path guidance; without such a lane the
+potential field runs again toward the other side. A retry under the
+potential field alone was tried first and parked the ego at $-6.6$~m at
+15~m/s, 3~m past the right lane centre and outside that backup's certified
+region (\path{scripts/whyRetryFails.m}). The choice is guidance; the
+endpoint is certified like any other. The four first frames of the first
+addendum now solve standalone in 0.4 to 3.3~s with 44- to 48-hold plans
+ending in the right lane (\path{scripts/smokeStartup.m}).
+
+\paragraph{Tests.} \texttt{terminalSafeSetTest} adds the braking lead's
+first estimate per lane (left lane inside the cone, right lane outside at
+once, the cone's lane from the given lane), the slow diagonal crosser, a
+crosser that meets the box, and a lead that prefers no side. The full suite
+on an isolated copy of \texttt{f9e82a4} with this change: 590 of 592
+(\path{tests.txt}); the two errors are the native-kernel test of the
+estimator, whose MEX no longer exists in the shared \path{solver/} folder
+after a concurrent kernel rebuild by another session, unrelated to the
+controller.
+
+\begin{center}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & baseline & A & D & E & F & G\\
+\midrule
+exact, recovered of 14 & 14 & 14 & 14 & 14 & 14 & 14\\
+noisy, recovered of 84 & 55 & 56 & 57 & 55 & 58 & 59\\
+noisy, new recoveries / new failures & -- & 2 / 1 & 3 / 1 & 0 / 0 & 4 / 1 & 5 / 1\\
+noisy braking leads recovered of 12 & 0 & 0 & 1 & 0 & 2 & 3\\
+noisy braking leads stopped at the first frame & 10 & 12 & 2 & 10 & 6 & 2\\
+collisions & 0 & 0 & 0 & 0 & 0 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+G's exact runs reproduce F run for run. Against F, G recovers the 8~m/s
+braking leads of seeds 1 and 4 (290 and 301 holds) and loses that of seed 3
+(F 308 holds; G \texttt{nonlinearAcceptanceFailed} at hold 48); the other 95
+outcomes are unchanged in kind, although several braking leads now run
+further before their numerical stop. The two first-frame stops are the 15~m/s
+leads of seeds 1 and 20261003, on the 5-s solver time limit: standalone they
+solve in 2.6 and 3.3~s, of which the first (failing) 512-hold rollout takes
+most, and under the campaign's eight parallel processes they exceed the
+limit. Of G's accepted endpoints with a target, 8664 end the encounter by
+exit and 2747 by the cone (F: 8144 and 2689); the end lies at most 50.9~s
+after the endpoint (median 0, 99th percentile 10.6~s; F 26.2 and 8.7~s), so
+the 60-s computation bound was never reached. A lane backup is terminal in
+56 noisy frames of 11 runs (F 208 of 8). Per run: \path{campaign-runs.csv}
+(six variants); summary \path{comparison-all.txt}; encounter ends and
+braking leads \path{encounter-ends-FG.txt} (\path{scripts/encounterEnds.py}).
+
+\paragraph{Reproduction.} G ran as F (\texttt{campaign.sh} with the G
+snapshot, \path{variantG-sha256.txt}); the first frames were examined with
+\path{scripts/smokeStartup.m} and \path{scripts/whyRetryFails.m} on the F
+failure snapshots, with \path{scripts/makeSolveDiag.py} writing the
+instrumented copy of the solver.
+
+\paragraph{Next.} The cone's lane could be tried before the potential field
+when the nominal backup's settled state is not already clear, which would
+spare the failing 512-hold first rollout at startup; not done, because it
+changes the startup seed of every encounter in which a lane qualifies.
 
 \end{document}

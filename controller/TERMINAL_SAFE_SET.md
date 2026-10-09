@@ -27,8 +27,9 @@ is used.
 
 - The target leaves the perception range (it no longer exists for the
   controller).
-- Separation is proven: from that time on the tube and the target can never
-  come within the collision buffer again (Section 4.1).
+- The target's forecast motion relative to the backup's box is outside their
+  collision cone: from that time on the two can never come within the
+  collision buffer again (Section 4.1).
 
 `terminal.horizonSeconds` (60 s) only limits how far ahead the check computes;
 a state whose tube reaches it with neither event is not terminal.
@@ -123,7 +124,8 @@ state `x` at time `t_x` define the end of the encounter
 
     t_e(x) = min( first t >= 0 at which q(t_x + t) is farther than R from
                   every point of the reference-point box of T_d(x)(t),
-                  first t >= 0 from which separation is proven (Section 4.1) ),
+                  first t >= 0 from which the relative motion is outside the
+                  collision cone (Section 4.1) ),
 
 and require `t_e(x) <= H = terminal.horizonSeconds`. `H` bounds the
 computation only; it is not an encounter duration.
@@ -153,27 +155,49 @@ there.
 The target's existence ends at its first exit: a target that has left the
 range is not followed back in, even if its forecast returns.
 
-**4.1 Proven separation.** On a straight road the distance between two path
-boxes is at least their gap along the road and at least their gap across it.
-After a grid time `t_s` the ego rectangle's band across the road only shrinks,
-and its station interval moves at the trim's station rate `v` and widens by at
-most `T sigma(r(t_s))` more, because `sigma(lambda r) <= lambda sigma(r)` and
-`r` decays as `exp(-t/T)`. The target obeys its contract for all later times,
-also through a stop (signed speed `V(t) = V_s + A (t - t_s)`):
+**4.1 Proven separation: the collision cone.** On a straight road, after a
+grid time `t_s` the ego rectangle's band across the road only shrinks, and its
+station interval moves at the trim's station rate `v` and widens by at most
+`T sigma(r(t_s))` more, because `sigma(lambda r) <= lambda sigma(r)` and `r`
+decays as `exp(-t/T)`. Widened by that drift, the ego box `E` is fixed in a
+frame moving at `v` along the road. The target obeys its contract for all
+later times, also through a stop (signed speed `V(u) = V_s + A u`,
+`u = t - t_s`):
 
-- a straight-line target (`beta = 0`) moves its box by `c s(t)` along and
-  `s s(t)` across the road, `s(t) = V_s u + A u^2/2`, `c, s` the cosine and sine
-  of its course to the road. A gap across the road of at least the buffer stays
-  open if the target's lateral velocity never closes it (`s V_s >= 0` and
-  `s A >= 0` with the target on the left, opposite signs on the right); a gap
-  along the road, reduced by the ego's further drift, stays open if
-  `c V_s >= v` and `c A >= 0` (target ahead) or `c V_s <= v` and `c A <= 0`
-  (target behind);
+- a straight-line target (`beta = 0`) moves its box `B` by `c s(u)` along and
+  `s s(u)` across the road, `s(u) = V_s u + A u^2/2`, `c, s` the cosine and
+  sine of its course to the road. In the moving frame the difference of the
+  box centres is the parabola
+  `q(u) = q(0) + (c V_s - v, s V_s) u + (c A, s A) u^2/2`, and `E` and `B`
+  meet at some `u >= 0` iff `q(u)` enters the sum box `|q_s| <= H_s`,
+  `|q_d| <= H_d` (the half-widths of `E` and `B` added, with the buffer). The
+  relative motions (velocity and acceleration) for which this happens form
+  the collision cone of the two boxes, the cone of Chakravarthy and Ghose for
+  rectangles and constant acceleration; separation is proven at `t_s` iff the
+  relative motion lies outside it. The test is exact for the forecast: the
+  least normalized box distance `max(|q_s|/H_s, |q_d|/H_d)` over `u >= 0` is
+  attained at `u = 0`, at a vertex or a zero of `q_s` or `q_d`, or where
+  `|q_s|/H_s = |q_d|/H_d`; it is evaluated at all of these (at most 11
+  candidates), and the boxes meet iff it is at most 1;
 - a circling target (`beta ~= 0`) stays in the disk of its circle widened by
   its body reach. A disk beside the ego band, or behind it while the ego moves
   forward, stays apart.
 
-On a curved road no separation is claimed; only the exit ends the encounter.
+The cone is taken with respect to the backup's converged motion (the lane
+trim at `v`), not the ego's present velocity, and the transient is absorbed
+by the widened box; this is what makes the certificate invariant (Section 5).
+A condition on the present relative velocity alone ("the distance is growing
+now") would be neither necessary (a target drifting away across the road
+while the along-road gap closes is safe although the distance shrinks) nor
+sufficient (a faster lead that brakes is safe now and met later); the cone
+states that the boxes never meet. The sign conditions of the previous version
+(a gap along or across the road that never closes) are the special case in
+which one coordinate of `q` alone keeps the boxes apart. On a curved road no
+separation is claimed; only the exit ends the encounter.
+
+The cone also chooses the side of the startup rollout when the potential
+field's rollout reaches no terminal state (Section 7,
+`terminalSafeSet.coneLane`); that choice is guidance, not a certificate.
 
 **History.** The CLF-tube set of October 6 capped the exit at 60 s after each
 state and accepted a tube clear for that sliding window (hypothesis H4).
@@ -182,7 +206,10 @@ endpoint had not verified. Requiring the exit alone removes H4 but makes
 every state non-terminal for a target that stays in range (a parallel target
 at 49.9 m, the braking lead's first frames). A window fixed 60 s after the
 encounter's start kept invariance (commit `b836fba`); proven separation
-replaces it without any preset time
+replaces it without any preset time (commit `f5e1ab7`), first as sign
+conditions on the gap along or across the road and then as the exact
+collision-cone test, which certifies everything the sign conditions did and
+also a slow diagonal crosser whose crossing ends after the bound
 (`report/TERMINAL_BACKUP_SET_20261008.tex`).
 
 ## 5. Forward invariance
@@ -201,10 +228,12 @@ of `x(tau)` lies in the box of the tube of `x(0)` at the same absolute time:
     T(x(tau))(t) is contained in T(x(0))(t + tau).
 
 The same holds for the reference-point boxes, so the exit of `x(tau)` is no
-later than the exit of `x(0)`. A separation proven for `x(0)` at a time `t_s`
-holds for `x(tau)` at the same absolute time: its boxes are subsets and its
-station-rate bound is smaller. So the end of the encounter seen from
-`x(tau)` is no later than that seen from `x(0)`.
+later than the exit of `x(0)`. A relative motion outside the cone for `x(0)`
+at a time `t_s` is outside it for `x(tau)` at the same absolute time: the
+widened box of `x(tau)` is a subset (smaller tube, smaller remaining drift),
+and the target's motion in the same moving frame is the same parabola. So
+the end of the encounter seen from `x(tau)` is no later than that seen from
+`x(0)`.
 Before it the boxes of `x(tau)` are clear of `B` because the larger ones are.
 The road condition is inherited the same way. The actual rectangle lies in
 `T_d(x(0))(t)` for all `t` (Section 3), so it does not meet `B` before the
@@ -240,8 +269,9 @@ A plan meeting these rows is *accepted*.
   handling rows (checked online).
 
 The earlier hypothesis H4 (no conflict after a sliding 60-s window) is not
-needed: the encounter ends by an exit or a proven separation, both of which
-only come earlier along the backup (Section 5).
+needed: the encounter ends by an exit or by a relative motion outside the
+collision cone, both of which only come earlier along the backup
+(Section 5).
 
 **Proposition.** Under H1–H3, within one encounter, if the plan of sample `k`
 is accepted, the shifted plan at `k+1` is accepted:
@@ -309,12 +339,13 @@ controller meet the same hard rows as every other node. The set is otherwise
 `G` uses a left Riemann sum, an upper bound because `sigma(r(t))` decreases.
 The target table is filled in 2-s chunks and reused within a sample.
 `terminal.horizonSeconds` (60 s) bounds how far the check computes from a
-node. `terminalSafeSet.permanent` tests the separation of Section 4.1 at every
-grid point of a chunk; the check ends at the first exit or proven separation,
-after confirming the grid points before it (and the separation's own point).
-A tube that reaches the bound with neither is not terminal
-(`noExitOrSeparation`). The issued plan records how its encounter ends
-(`terminalEnd`: `exit` or `permanentSeparation`).
+node. `terminalSafeSet.collisionCone` applies the cone test of Section 4.1 at
+every grid point of a chunk (`localParabolaMeetsBox`, vectorized over the
+grid); the check ends at the first exit or cone certificate, after confirming
+the grid points before it (and the certificate's own point). A tube that
+reaches the bound with neither is not terminal (`noExitOrSeparation`). The
+issued plan records how its encounter ends (`terminalEnd`: `exit` or
+`outsideCollisionCone`).
 
 **Backups.** `terminalSafeSet.modeReferences` builds one reference per lane
 centre of `road.laneOffsets` (the nominal path first, then by distance), each
@@ -350,7 +381,16 @@ tries:
 
 It keeps the admissible input with the smallest successor `V`. At startup,
 the potential-field rollout runs until its first node in `S` from `prefix` on,
-at most `maximumHorizonSteps`.
+at most `maximumHorizonSteps`. A rollout that reaches no such node is run
+once more: `terminalSafeSet.coneLane` names the nearest lane whose settled
+backup at the present station is already in its set (its box outside the
+target's cone, or the target exits; not the nominal lane, and not when the
+nearest such lanes lie on both sides), and the second rollout drives to that
+lane centre with the backup's path guidance, ignoring the target; without
+such a lane the potential field runs again toward the other side. The first
+rollout is kept when the second fails too. The choice is guidance: the
+rollout's endpoint is certified like any other, and the optimization decides
+feasibility.
 
 **Step-size rule.** The affine solution is a search direction. The issued
 plan is the rollout, on the sampled nonlinear model, of
@@ -376,16 +416,17 @@ input trust scale (`localTrustRecord`).
 
 ## 8. Measured behavior
 
-The lane-hold backups with proven separation are measured in
-`report/TERMINAL_BACKUP_SET_20261008.tex` (variant F): exact states 14 of 14
-as before; noisy 58 of 84 against 55 (2 of 12 braking leads recover, none
-before), no collision. Encounters ended by exit at 8144 accepted endpoints and
-by proven separation at 2689, at most 26 s after the endpoint, so the 60-s
-computation bound never applied. Six of the 12 noisy braking leads stop at
-the first frame (2 with the fixed window): the startup rollout passes on the
-left, where the lead's estimated heading toward the left (a few mrad) at
-nearly the ego's speed admits neither an exit nor a separation proof, while
-the right lane, provably separate, is not tried. The CLF-tube set of
+The lane-hold backups with the collision cone and the cone-guided startup
+retry are measured in `report/TERMINAL_BACKUP_SET_20261008.tex` (variant G):
+exact states 14 of 14, run for run as with the sign conditions (variant F);
+noisy 59 of 84 against 55 for the baseline and 58 for F, no collision.
+Encounters ended by exit at 8664 accepted endpoints and by the cone at 2747,
+median 0 s and at most 51 s after the endpoint (99th percentile 10.6 s), so
+the 60-s computation bound was never reached. Of the 12 noisy braking leads,
+3 recover (F 2), 2 stop at the first frame (F 6), both at 15 m/s on the 5-s
+solver time limit: the first rollout and the retry together take 2.6 to
+3.3 s on an idle machine and longer under the campaign's parallel load. The
+CLF-tube set of
 October 6 is measured in
 `report/TERMINAL_SAFE_SET_RECURSIVE_FEASIBILITY_20261006.tex`, for the
 exact-state campaigns:
@@ -498,8 +539,8 @@ Section 8.
   sampled model with exact information (H1, H2), and conditionally on H3,
   which is checked online, not proven. Each new encounter (a target appearing
   or re-entering) is an initial-feasibility question.
-- Separation is proven only on a straight road. On a curve only the exit
-  ends an encounter, and a target that stays in range without either event
+- The collision cone is applied only on a straight road. On a curve only
+  the exit ends an encounter, and a target that stays in range without either event
   within `terminal.horizonSeconds` makes the state non-terminal, also when
   it would in fact never be met: the bound decides completeness, not
   soundness.

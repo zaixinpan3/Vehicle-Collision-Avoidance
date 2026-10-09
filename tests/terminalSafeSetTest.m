@@ -1,7 +1,8 @@
 classdef terminalSafeSetTest < matlab.unittest.TestCase
     % Safe-exit terminal set of lane-hold CLF backups: invariance under a
     % backup, nested levels, state-row containment, the end of an encounter
-    % (exit or proven separation) and the lane-hold backups.
+    % (exit or a relative motion outside the collision cone), the lane-hold
+    % backups and the cone's side for the startup rollout.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -77,13 +78,14 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyFalse(member);
             testCase.verifyEqual(info.reason,"tubeLeavesRoad");
         end
-        function theEncounterEndsAtItsExitOrAtAProvenSeparation(testCase)
+        function theEncounterEndsAtItsExitOrOutsideTheCollisionCone(testCase)
             % A parallel target at the same speed never leaves the range, but
-            % the gap across the road can never close: the encounter ends there.
+            % its relative motion is outside the collision cone: the encounter
+            % ends at once.
             parallel=localModel([0;0;0;8;0;0],[0;49.9;0;8;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(parallel),parallel.initialState,0);
             testCase.verifyTrue(member);
-            testCase.verifyEqual(info.reason,"permanentSeparation");
+            testCase.verifyEqual(info.reason,"outsideCollisionCone");
             % A slower lead in the ego lane meets the tube.
             ahead=localModel([0;0;0;8;0;0],[20;0;0;6;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(ahead),ahead.initialState,0);
@@ -93,19 +95,55 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             receding=localModel([0;0;0;8;0;0],[20;0;0;10;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(receding),receding.initialState,0);
             testCase.verifyTrue(member);
-            testCase.verifyEqual(info.reason,"permanentSeparation");
+            testCase.verifyEqual(info.reason,"outsideCollisionCone");
             % A slightly slower lead far ahead closes only after the computed
             % horizon; with neither event within it the state is not terminal.
             slow=localModel([0;0;0;8;0;0],[40;0;0;7.5;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(slow),slow.initialState,0);
             testCase.verifyFalse(member);
             testCase.verifyEqual(info.reason,"noExitOrSeparation");
+            % A braking lead's first estimate: 6.2 m ahead, 0.1 m/s slower and
+            % heading 3.8 mrad toward the left (as measured). A settled ego in
+            % the left lane is in its cone (it closes along the road while the
+            % lead drifts toward that lane); in the right lane the lead drifts
+            % away, outside the cone, at once.
+            lead=[6.2;0;.0038;7.9;0;0;1.6;2.4;.95;0;0];lane=3.6576;
+            left=localModel([0;lane;0;8;0;0],lead,lane*[-1,0,1,2]);
+            testCase.verifyFalse(terminalSafeSet.member(terminalSafeSet.context(left),left.initialState,0));
+            % From the given lane the cone prefers the right side: the nearest
+            % lane whose settled backup is already outside the cone.
+            given=localModel([0;0;0;8;0;0],lead,lane*[-1,0,1,2]);
+            [member,context]=terminalSafeSet.member(terminalSafeSet.context(given),given.initialState,0);
+            testCase.verifyFalse(member);
+            [mode,context]=terminalSafeSet.coneLane(context,given.initialState);
+            testCase.verifyEqual(context.modes(mode).lateralOffset,-lane,AbsTol=1e-12);
+            % A lead drifting straight ahead at the ego's speed prefers neither.
+            even=localModel([0;0;0;8;0;0],[6.2;0;0;8;0;0;1.6;2.4;.95;0;0],lane*[-1,0,1,2]);
+            testCase.verifyEqual(terminalSafeSet.coneLane(terminalSafeSet.context(even),even.initialState),0);
+            right=localModel([0;-lane;0;8;0;0],lead,lane*[-1,0,1,2]);
+            [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(right),right.initialState,0);
+            testCase.verifyTrue(member);
+            testCase.verifyEqual(info.reason,"outsideCollisionCone");
+            testCase.verifyEqual(info.exitSeconds,0);
+            % A slow diagonal crosser: 20 m ahead on the right, closing at
+            % 0.1 m/s along the road and 0.12 m/s across it. Its box crosses
+            % the ego band between 32 s and 68 s and reaches the ego box's
+            % station only after 150 s: outside the cone now, although no
+            % single gap is monotone and the crossing ends after the bound.
+            crosser=localModel([0;0;0;8;0;0],[20;-6;atan2(.12,7.9);hypot(7.9,.12);0;0;1.6;2.4;.95;0;0]);
+            [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(crosser),crosser.initialState,0);
+            testCase.verifyTrue(member);
+            testCase.verifyEqual(info.reason,"outsideCollisionCone");
+            testCase.verifyEqual(info.exitSeconds,0);
+            % Closing across the road a little faster meets the box: inside.
+            hitter=localModel([0;0;0;8;0;0],[20;-6;atan2(.05,7.9);hypot(7.9,.05);0;0;1.6;2.4;.95;0;0]);
+            testCase.verifyFalse(terminalSafeSet.member(terminalSafeSet.context(hitter),hitter.initialState,0));
             % A target circling beside the road stays in its disk, clear of the
             % ego band.
             circling=localModel([0;0;0;8;0;0],[0;40;0;5;0;.05;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(circling),circling.initialState,0);
             testCase.verifyTrue(member);
-            testCase.verifyEqual(info.reason,"permanentSeparation");
+            testCase.verifyEqual(info.reason,"outsideCollisionCone");
         end
         function aLaneHoldBackupCompletesAnEncounterTheNominalOneCannot(testCase)
             % Settled in the left lane beside a slower lead in the nominal

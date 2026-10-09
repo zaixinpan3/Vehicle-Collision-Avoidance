@@ -134,8 +134,11 @@ function [solution,search,model] = localRound(model,previousState,timer)
     search.appendedTerminalSteps=0;if isfield(anchor,'appended'),search.appendedTerminalSteps=anchor.appended;end
     search.anchorHolds=size(anchor.inputs,2);
     search.returnedHolds=0;if isfield(anchor,'returnedHolds'),search.returnedHolds=anchor.returnedHolds;end
-    search.seedReachedTerminalSet=NaN;
-    if isfield(anchor,'seedReachedTerminalSet'),search.seedReachedTerminalSet=anchor.seedReachedTerminalSet;end
+    search.seedReachedTerminalSet=NaN;search.seedSide=NaN;search.seedRetried=false;
+    if isfield(anchor,'seedReachedTerminalSet')
+        search.seedReachedTerminalSet=anchor.seedReachedTerminalSet;
+        search.seedSide=anchor.seedSide;search.seedRetried=anchor.seedRetried;
+    end
 end
 
 function [solution,search,model,stages]=localAcceptance(solution,problem,anchor,model,search,timer,stages)
@@ -560,14 +563,43 @@ function anchor=localPotentialFieldSeed(model,minimum,maximum)
     % The startup rollout: potential guidance with a target, path guidance
     % without one. It supplies a linearization, never an issued input, and
     % stops at the first node from horizonSteps on that is in the terminal set.
+    % A rollout that reaches no terminal state is run once more: toward the
+    % lane the collision cone prefers (terminalSafeSet.coneLane, the nearest
+    % lane whose settled backup is already clear of the target) with the
+    % backup's path guidance, else with the potential field toward the other
+    % side; the first rollout is kept when the second fails too.
+    context=terminalSafeSet.context(model);
+    [anchor,context]=localSeedRollout(model,minimum,maximum,context,0,[]);
+    if ~anchor.seedReachedTerminalSet && ~isempty(model.target)
+        [mode,context]=terminalSafeSet.coneLane(context,model.initialState);
+        if mode>0
+            retry=localSeedRollout(model,minimum,maximum,context,0,context.modes(mode).reference);
+        else
+            retry=localSeedRollout(model,minimum,maximum,context,-anchor.seedSide,[]);
+        end
+        retry.seedRetried=true;
+        if retry.seedReachedTerminalSet,anchor=retry;else,anchor.seedRetried=true;end
+    end
+    if anchor.seedReachedTerminalSet,anchor=localReturnToNominal(anchor,model);end
+end
+
+function [anchor,context]=localSeedRollout(model,minimum,maximum,context,side,laneReference)
+    % One startup rollout. With a target and no laneReference the potential
+    % field guides it (side 0 lets the field choose its passing side, +1
+    % passes on the left, -1 on the right); with laneReference the path
+    % guidance drives to that lane centre, ignoring the target.
     cfg=model.cfg;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
     h=cfg.controller.sampleTime;
-    inputs=zeros(2,maximum);states=zeros(6,maximum+1);states(:,1)=x;side=0;count=maximum;
+    inputs=zeros(2,maximum);states=zeros(6,maximum+1);states(:,1)=x;count=maximum;
     nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
-    context=terminalSafeSet.context(model);member=false;
+    if ~isempty(laneReference)
+        reference=laneReference;side=sign(laneReference.lateralOffset);
+        nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
+    end
+    member=false;
     for index=1:maximum
         time=(index-1)*h;
-        if isempty(model.target)
+        if isempty(model.target) || ~isempty(laneReference)
             u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominal);
         else
             [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.target,time,cfg,side, ...
@@ -584,8 +616,8 @@ function anchor=localPotentialFieldSeed(model,minimum,maximum)
         end
     end
     anchor=struct('inputs',inputs(:,1:count),'states',states(:,1:count+1),'terminalContext',context, ...
-        'certified',false,'appended',0,'seedReachedTerminalSet',member,'returnedHolds',0);
-    if member,anchor=localReturnToNominal(anchor,model);end
+        'certified',false,'appended',0,'seedReachedTerminalSet',member,'seedSide',side, ...
+        'seedRetried',false,'returnedHolds',0);
 end
 
 function u=localGuidanceInput(x,previous,yawRate,speed,cfg,reference)

@@ -18,6 +18,10 @@
    min clearance 0.154 m; median per-run minimum 0.800 m
    terminal lane != 0 in 162/5405 frames, 3 runs; lanes used [(-3.66, 2), (0, 5243), (7.32, 160)]
    controller s median 0.018 p95 0.166 max 1.31
+[out-G] runs 14 recovered 14  {'recovered': 14}
+   min clearance 0.154 m; median per-run minimum 0.800 m
+   terminal lane != 0 in 162/5405 frames, 3 runs; lanes used [(-3.66, 2), (0, 5243), (7.32, 160)]
+   controller s median 0.018 p95 0.158 max 1.17
   out-A vs out-base: newly recovered 0 []
   out-A vs out-base: newly failed 0 []
   out-D vs out-base: newly recovered 0 []
@@ -26,6 +30,8 @@
   out-E vs out-base: newly failed 0 []
   out-F vs out-base: newly recovered 0 []
   out-F vs out-base: newly failed 0 []
+  out-G vs out-base: newly recovered 0 []
+  out-G vs out-base: newly failed 0 []
 ===== noisy =====
 [out-base] runs 84 recovered 55  {'noSolution:nonlinearAcceptanceFailed': 11, 'noSolution:timeLimit': 12, 'recovered': 55, 'noSolution:pcbfNoNumericalResult': 6}
    min clearance 0.272 m; median per-run minimum 2.029 m
@@ -46,6 +52,10 @@
    min clearance 0.289 m; median per-run minimum 1.990 m
    terminal lane != 0 in 208/22369 frames, 8 runs; lanes used [(-3.66, 99), (0, 22161), (3.66, 100), (7.32, 9)]
    controller s median 0.020 p95 0.345 max 4.41
+[out-G] runs 84 recovered 59  {'noSolution:nonlinearAcceptanceFailed': 13, 'recovered': 59, 'noSolution:timeLimit': 3, 'noSolution:pcbfNoNumericalResult': 7, 'noSolution:clfNoNumericalResult': 2}
+   min clearance 0.289 m; median per-run minimum 1.981 m
+   terminal lane != 0 in 228/22947 frames, 12 runs; lanes used [(-3.66, 107), (0, 22719), (3.66, 113), (7.32, 8)]
+   controller s median 0.020 p95 0.352 max 4.62
   out-A vs out-base: newly recovered 2 ['seed4-speed15-headOn', 'seed4-speed8-curvedCrossing']
   out-A vs out-base: newly failed 1 [('seed1-speed8-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed')]
   out-D vs out-base: newly recovered 3 ['seed4-speed15-headOn', 'seed4-speed8-curvedCrossing', 'seed5-speed8-brakingLead']
@@ -54,4 +64,6 @@
   out-E vs out-base: newly failed 0 []
   out-F vs out-base: newly recovered 4 ['seed3-speed8-brakingLead', 'seed4-speed15-headOn', 'seed4-speed8-curvedCrossing', 'seed5-speed8-brakingLead']
   out-F vs out-base: newly failed 1 [('seed1-speed8-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed')]
+  out-G vs out-base: newly recovered 5 ['seed1-speed8-brakingLead', 'seed4-speed8-brakingLead', 'seed4-speed15-headOn', 'seed4-speed8-curvedCrossing', 'seed5-speed8-brakingLead']
+  out-G vs out-base: newly failed 1 [('seed1-speed8-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed')]
 per-run table: /home/zai/.cache/collisionAvoidance/terminal_backup_20261008/campaign-runs.csv

@@ -1,0 +1,36 @@
+[/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-F]
+  exact: {'exit': 1081, 'noTarget': 3230, 'permanentSeparation': 1094}
+  exact end after endpoint (s): n 2175 median 0.025 p99 7.430 max 7.460
+  noisy: {'exit': 7063, 'noTarget': 13711, 'permanentSeparation': 1595}
+  noisy end after endpoint (s): n 8658 median 0.000 p99 9.486 max 26.165
+  all end after endpoint (s): n 10833 median 0.000 p99 8.658 max 26.165
+  seed1-speed15-brakingLead          noSolution:nonlinearAcceptanceFailed          holds 0
+  seed1-speed8-brakingLead           noSolution:nonlinearAcceptanceFailed          holds 0
+  seed2-speed15-brakingLead          noSolution:pcbfNoNumericalResult              holds 22
+  seed2-speed8-brakingLead           noSolution:nonlinearAcceptanceFailed          holds 1
+  seed20261003-speed15-brakingLead   noSolution:nonlinearAcceptanceFailed          holds 0
+  seed20261003-speed8-brakingLead    noSolution:nonlinearAcceptanceFailed          holds 0
+  seed3-speed15-brakingLead          noSolution:pcbfNoNumericalResult              holds 28
+  seed3-speed8-brakingLead           recovered                                     holds 308
+  seed4-speed15-brakingLead          noSolution:nonlinearAcceptanceFailed          holds 0
+  seed4-speed8-brakingLead           noSolution:nonlinearAcceptanceFailed          holds 0
+  seed5-speed15-brakingLead          noSolution:clfNoNumericalResult               holds 1865
+  seed5-speed8-brakingLead           recovered                                     holds 275
+[/home/zai/.cache/collisionAvoidance/terminal_backup_20261008/out-G]
+  exact: {'exit': 1081, 'noTarget': 3230, 'outsideCollisionCone': 1094}
+  exact end after endpoint (s): n 2175 median 0.025 p99 7.430 max 7.460
+  noisy: {'exit': 7583, 'noTarget': 13711, 'outsideCollisionCone': 1653}
+  noisy end after endpoint (s): n 9236 median 0.000 p99 11.141 max 50.855
+  all end after endpoint (s): n 11411 median 0.000 p99 10.621 max 50.855
+  seed1-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed1-speed8-brakingLead           recovered                                     holds 290
+  seed2-speed15-brakingLead          noSolution:pcbfNoNumericalResult              holds 22
+  seed2-speed8-brakingLead           noSolution:timeLimit                          holds 9
+  seed20261003-speed15-brakingLead   noSolution:timeLimit                          holds 0
+  seed20261003-speed8-brakingLead    noSolution:nonlinearAcceptanceFailed          holds 18
+  seed3-speed15-brakingLead          noSolution:pcbfNoNumericalResult              holds 28
+  seed3-speed8-brakingLead           noSolution:nonlinearAcceptanceFailed          holds 48
+  seed4-speed15-brakingLead          noSolution:clfNoNumericalResult               holds 221
+  seed4-speed8-brakingLead           recovered                                     holds 301
+  seed5-speed15-brakingLead          noSolution:clfNoNumericalResult               holds 1865
+  seed5-speed8-brakingLead           recovered                                     holds 275
