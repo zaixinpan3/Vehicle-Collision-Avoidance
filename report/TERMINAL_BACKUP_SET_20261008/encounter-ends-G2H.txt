@@ -1,0 +1,36 @@
+[out-G2]
+  exact: {'exit': 1081, 'noTarget': 3230, 'outsideCollisionCone': 1094}
+  exact end after endpoint (s): n 2175 median 0.025 p99 7.430 max 7.460
+  noisy: {'exit': 7590, 'noTarget': 13711, 'outsideCollisionCone': 1654}
+  noisy end after endpoint (s): n 9244 median 0.000 p99 11.301 max 50.855
+  all end after endpoint (s): n 11419 median 0.000 p99 10.790 max 50.855
+  seed1-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed1-speed8-brakingLead           recovered                                     holds 290
+  seed2-speed15-brakingLead          noSolution:pcbfNoNumericalResult              holds 22
+  seed2-speed8-brakingLead           noSolution:timeLimit                          holds 9
+  seed20261003-speed15-brakingLead   noSolution:nonlinearAcceptanceFailed          holds 8
+  seed20261003-speed8-brakingLead    noSolution:nonlinearAcceptanceFailed          holds 18
+  seed3-speed15-brakingLead          noSolution:pcbfNoNumericalResult              holds 28
+  seed3-speed8-brakingLead           noSolution:nonlinearAcceptanceFailed          holds 48
+  seed4-speed15-brakingLead          noSolution:clfNoNumericalResult               holds 221
+  seed4-speed8-brakingLead           recovered                                     holds 301
+  seed5-speed15-brakingLead          noSolution:clfNoNumericalResult               holds 1865
+  seed5-speed8-brakingLead           recovered                                     holds 275
+[out-H]
+  exact: {'exit': 1175, 'noTarget': 3273, 'outsideCollisionCone': 1182}
+  exact end after endpoint (s): n 2357 median 0.035 p99 7.425 max 7.460
+  noisy: {'exit': 5733, 'noTarget': 10483, 'outsideCollisionCone': 1685}
+  noisy end after endpoint (s): n 7418 median 0.000 p99 7.494 max 15.255
+  all end after endpoint (s): n 9775 median 0.000 p99 7.455 max 15.255
+  seed1-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed1-speed8-brakingLead           noSolution:timeLimit                          holds 0
+  seed2-speed15-brakingLead          noSolution:timeLimit                          holds 1
+  seed2-speed8-brakingLead           noSolution:timeLimit                          holds 1
+  seed20261003-speed15-brakingLead   noSolution:timeLimit                          holds 0
+  seed20261003-speed8-brakingLead    noSolution:pcbfNoNumericalResult              holds 0
+  seed3-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed3-speed8-brakingLead           noSolution:timeLimit                          holds 0
+  seed4-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed4-speed8-brakingLead           noSolution:pcbfNoNumericalResult              holds 0
+  seed5-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed5-speed8-brakingLead           noSolution:timeLimit                          holds 0

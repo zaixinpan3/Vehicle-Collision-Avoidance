@@ -1,8 +1,7 @@
 classdef terminalSafeSetTest < matlab.unittest.TestCase
-    % Safe-exit terminal set of lane-hold CLF backups: invariance under a
-    % backup, nested levels, state-row containment, the end of an encounter
-    % (exit or a relative motion outside the collision cone), the lane-hold
-    % backups and the cone's side for the startup rollout.
+    % CLF-tube terminal set: invariance under the terminal controller, nested
+    % levels, state-row containment and the end of an encounter (exit or a
+    % relative motion outside the collision cone).
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -102,29 +101,21 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(slow),slow.initialState,0);
             testCase.verifyFalse(member);
             testCase.verifyEqual(info.reason,"noExitOrSeparation");
-            % A braking lead's first estimate: 6.2 m ahead, 0.1 m/s slower and
-            % heading 3.8 mrad toward the left (as measured). A settled ego in
-            % the left lane is in its cone (it closes along the road while the
-            % lead drifts toward that lane); in the right lane the lead drifts
-            % away, outside the cone, at once.
-            lead=[6.2;0;.0038;7.9;0;0;1.6;2.4;.95;0;0];lane=3.6576;
-            left=localModel([0;lane;0;8;0;0],lead,lane*[-1,0,1,2]);
-            testCase.verifyFalse(terminalSafeSet.member(terminalSafeSet.context(left),left.initialState,0));
-            % From the given lane the cone prefers the right side: the nearest
-            % lane whose settled backup is already outside the cone.
-            given=localModel([0;0;0;8;0;0],lead,lane*[-1,0,1,2]);
-            [member,context]=terminalSafeSet.member(terminalSafeSet.context(given),given.initialState,0);
-            testCase.verifyFalse(member);
-            [mode,context]=terminalSafeSet.coneLane(context,given.initialState);
-            testCase.verifyEqual(context.modes(mode).lateralOffset,-lane,AbsTol=1e-12);
-            % A lead drifting straight ahead at the ego's speed prefers neither.
-            even=localModel([0;0;0;8;0;0],[6.2;0;0;8;0;0;1.6;2.4;.95;0;0],lane*[-1,0,1,2]);
-            testCase.verifyEqual(terminalSafeSet.coneLane(terminalSafeSet.context(even),even.initialState),0);
-            right=localModel([0;-lane;0;8;0;0],lead,lane*[-1,0,1,2]);
-            [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(right),right.initialState,0);
+            % A braking lead's first estimate (6.2 m ahead, 0.1 m/s slower,
+            % heading 3.8 mrad, as measured): in the ego lane it meets the
+            % tube. In the lane to the right, drifting further right, it is
+            % outside the cone at once; drifting left, toward the ego, it
+            % closes along and across the road and is inside it.
+            lane=3.6576;
+            inLane=localModel([0;0;0;8;0;0],[6.2;0;.0038;7.9;0;0;1.6;2.4;.95;0;0]);
+            testCase.verifyFalse(terminalSafeSet.member(terminalSafeSet.context(inLane),inLane.initialState,0));
+            away=localModel([0;0;0;8;0;0],[6.2;-lane;-.0038;7.9;0;0;1.6;2.4;.95;0;0]);
+            [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(away),away.initialState,0);
             testCase.verifyTrue(member);
             testCase.verifyEqual(info.reason,"outsideCollisionCone");
             testCase.verifyEqual(info.exitSeconds,0);
+            toward=localModel([0;0;0;8;0;0],[6.2;-lane;.0038;7.9;0;0;1.6;2.4;.95;0;0]);
+            testCase.verifyFalse(terminalSafeSet.member(terminalSafeSet.context(toward),toward.initialState,0));
             % A slow diagonal crosser: 20 m ahead on the right, closing at
             % 0.1 m/s along the road and 0.12 m/s across it. Its box crosses
             % the ego band between 32 s and 68 s and reaches the ego box's
@@ -145,38 +136,6 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyTrue(member);
             testCase.verifyEqual(info.reason,"outsideCollisionCone");
         end
-        function aLaneHoldBackupCompletesAnEncounterTheNominalOneCannot(testCase)
-            % Settled in the left lane beside a slower lead in the nominal
-            % lane: returning to the nominal lane meets the lead, holding the
-            % left lane passes it until it leaves the range.
-            lane=3.6576;x=[0;lane;0;8;0;0];lead=[15;0;0;6;0;0;1.6;2.4;.95;0;0];
-            without=localModel(x,lead);
-            testCase.verifyFalse(terminalSafeSet.member(terminalSafeSet.context(without),x,0));
-            with=localModel(x,lead,lane*[-1,0,1,2]);
-            context=terminalSafeSet.context(with);
-            testCase.verifyEqual([context.modes.lateralOffset],[0,-lane,lane,2*lane],AbsTol=1e-12);
-            [member,context,info]=terminalSafeSet.member(context,x,0);
-            testCase.verifyTrue(member);
-            testCase.verifyEqual(info.lateralOffset,lane,AbsTol=1e-12);
-            testCase.verifyLessThan(info.exitSeconds,60);
-            % Its backup keeps the state in its set until the lead leaves.
-            reference=context.modes(info.mode).reference;previous=[0;0];
-            for node=1:40
-                [u,x,ok]=terminalSafeSet.terminalInput(x,previous,with,reference);
-                testCase.assertTrue(ok);previous=u;
-                [member,context]=terminalSafeSet.member(context,x,node,info.mode);
-                testCase.verifyTrue(member);
-            end
-        end
-        function theBackupErrorIsMeasuredFromItsLaneCentre(testCase)
-            model=localModel([0;3.6576;.01;8;.1;.02],[]);
-            reference=model.nominalReference;
-            nominal=nonlinearBicycleModel.error(model.initialState,model.lane,reference);
-            reference.lateralOffset=3.6576;
-            held=nonlinearBicycleModel.error(model.initialState,model.lane,reference);
-            testCase.verifyEqual(held(1),nominal(1)-3.6576,AbsTol=1e-12);
-            testCase.verifyEqual(held(2:5),nominal(2:5),AbsTol=0);
-        end
         function theGridMustContainTheHoldMidpoints(testCase)
             model=localModel([0;0;0;8;0;0],[]);
             model.cfg.terminal.timeStepSeconds=.01;
@@ -193,10 +152,9 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
     end
 end
 
-function model=localModel(x,q,laneOffsets)
+function model=localModel(x,q)
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
-    if nargin>2,road.laneOffsets=laneOffsets;end
     ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
         'longitudinalVelocity',x(4),'stateTime',0,'heldActuatorInput',[0;0]);
     [~,lane,roadOut]=readControllerInputs(ego,[],road,cfg);

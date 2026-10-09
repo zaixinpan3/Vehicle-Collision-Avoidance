@@ -29,7 +29,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(state.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
             % Terminal set: the endpoint's CLF tube misses the target until it
             % leaves the perception range.
-            testCase.verifyEqual(problem.metadata.terminalSet,"laneHoldBackupSafeExit");
+            testCase.verifyEqual(problem.metadata.terminalSet,"clfTubeEncounterSafe");
             testCase.verifyTrue(ismember(problem.metadata.acceptedStep,cfg.terminal.acceptanceSteps));
             context=terminalSafeSet.context(problem.model);
             testCase.verifyTrue(terminalSafeSet.member(context,problem.predictedState(:,end),size(inputs,2)));

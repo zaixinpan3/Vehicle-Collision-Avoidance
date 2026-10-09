@@ -12,13 +12,13 @@ a fresh potential-field rollout in the same way. Any other failure reports no
 solution.
 
 The horizon ends in the terminal set of
-[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md): the CLF tube of the endpoint
-under a backup controller (this problem without PCBF rows, about the given
-path or another lane centre of `road.laneOffsets`) misses the target until the
-encounter ends: the target leaves the perception range, or the target's
-forecast motion relative to the backup's box is outside their collision cone
-(the two never come within the collision buffer again). No encounter
-duration is preset. The issued plan is the nonlinear rollout of an accepted step of the
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md): the CLF tube of the endpoint, the
+region every trajectory of the terminal controller (this problem without PCBF
+rows) stays in, misses the target until the encounter ends: the target leaves
+the perception range, or the target's forecast motion relative to the tube's
+box is outside their collision cone (the two never come within the collision
+buffer again). No encounter duration is preset, and no lane or other mode is
+used. The issued plan is the nonlinear rollout of an accepted step of the
 affine solution (*Issuing the solved plan*). On the declared sampled model with
 exact information the previous plan, shifted by one hold, is always an
 acceptable step, which makes the problem recursively feasible within an
@@ -150,21 +150,16 @@ interpolant, not an independently integrated half hold.
 
 The prediction length is not fixed. At startup the potential-field rollout
 stops at the first node `M` with `N <= M <= maximumHorizonSteps` that lies in
-the terminal set. A rollout that never reaches it is run once more, toward
-the lane the collision cone prefers (`terminalSafeSet.coneLane`) with the
-backup's path guidance, else with the potential field toward the other side;
-a rollout that still never reaches it uses `M = maximumHorizonSteps`, and
-the optimization then decides feasibility.
+the terminal set; a rollout that never reaches it uses
+`M = maximumHorizonSteps`, and the optimization then decides feasibility.
 
 Later frames shift the previous accepted plan by one hold and roll its inputs
 out from the current estimate. The plan keeps its endpoint at the same
 absolute time, so the horizon shrinks by one hold per frame. Only when the
 shifted plan is shorter than `N`, or its endpoint is no longer in the terminal
-set (a changed forecast or state), is it extended by holds of the endpoint's
-backup (`terminalSafeSet.terminalInput`). Each such hold is an admissible
-input whose successor meets that backup's CLF without slack. A plan ending in
-another lane is extended back to the nominal set by path guidance whenever
-every appended hold meets the hard rows. Prior affine states are
+set (a changed forecast or state), is it extended by holds of the terminal
+controller (`terminalSafeSet.terminalInput`). Each such hold is an admissible
+input whose successor meets the CLF without slack. Prior affine states are
 not reused. When no target is present, nominal path guidance supplies the
 startup rollout. A shifted plan that cannot be rolled out (non-finite inputs,
 a braking ratio at the limit, or a tire-domain error) is reported as no
@@ -528,17 +523,15 @@ a braking ratio of +0.95 (rear lateral capacity 32%); the vehicle spun to a
 ## Terminal constraints
 
 The terminal set and its proofs are in
-[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md). In short, an endpoint `y` is in
-the set when, for some backup `d` (the nominal path first, then the other lane
-centres of `road.laneOffsets`), with the CLF `V_d = e_d'Pe_d` about lane
-centre `d`, it meets all of:
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md). In short, with the CLF
+`V = e'Pe`, an endpoint `y` is in the set when it meets all of:
 
-- `V_d(y) <= cbar_d`, the smaller of the CLF's certified region (1) and the
+- `V(y) <= cbar`, the smaller of the CLF's certified region (1) and the
   largest level whose ellipsoid lies inside the state rows (0.403 at 8 m/s on
   the straight road, where rear adhesion binds);
-- the tube of every trajectory of backup `d` from `y` (lateral and heading
-  errors shrinking as `exp(-t/T)`, station within a bounded drift of the
-  trim's) stays on the road;
+- the tube of every terminal-controller trajectory from `y` (lateral and
+  heading errors shrinking as `exp(-t/T)`, station within a bounded drift of
+  the trim's) stays on the road;
 - that tube does not meet the target's forecast rectangle until the
   encounter ends: the target leaves the perception range, or the target's
   forecast motion relative to that box, widened by the tube's remaining
@@ -547,9 +540,8 @@ centre `d`, it meets all of:
   that the check computes.
 
 In the convex problem this is one cone at the last node,
-`||F (e_d(y) + J dx_N)|| <= sqrt(c*)`, for the backup `d` selected at the
-anchor endpoint, with `c*` the largest level whose tube at the anchor
-endpoint's station is clear. The endpoint also carries the
+`||F (e(y) + J dx_N)|| <= sqrt(c*)`, with `c*` the largest level whose tube at
+the anchor endpoint's station is clear. The endpoint also carries the
 collision rows of every other node inside `R` and the road rows. Membership
 of the issued plan's endpoint is checked on its nonlinear rollout.
 

@@ -4,7 +4,7 @@
 \usepackage{booktabs}
 \usepackage{url}
 \setlength{\emergencystretch}{2em}
-\title{A finite-encounter terminal set with lane-hold backup controllers}
+\title{A finite-encounter terminal set; lane-hold backups tried and removed}
 \date{Prepared October 8, 2026}
 \begin{document}
 \maketitle
@@ -149,15 +149,13 @@ numerical stalls of the conic solver.
 
 \section{Decision needed}
 \begin{itemize}
-\item Keep the lane backups, or the nominal backup alone. The lane backups
-  are modes, against the October 6 requirement; the return to the nominal
-  path is a guidance extension, not a certificate. (The window question is
-  settled by the addendum: no preset time is needed.)
+\item Keep the lane backups, or the nominal backup alone. Decided: the
+  nominal backup alone (third addendum). (The window question is settled by
+  the first addendum: no preset time is needed.)
 \item The remaining failures point to the plan's length and the conic
   solver's numerical stalls, not to the terminal set.
 \item Whether to try the cone's lane before the potential field at startup
-  (second addendum: two 15~m/s braking leads now stop on the solver time
-  limit because the retry follows a 512-hold first rollout).
+  (second addendum). Lapsed: the lanes were removed (third addendum).
 \end{itemize}
 
 \section{Reproduction}
@@ -360,5 +358,68 @@ instrumented copy of the solver.
 when the nominal backup's settled state is not already clear, which would
 spare the failing 512-hold first rollout at startup; not done, because it
 changes the startup seed of every encounter in which a lane qualifies.
+
+\section{Third addendum: lane-hold backups removed}
+\paragraph{Decision.} The user decided not to keep the lane-hold backups: they
+are modes, against the October 6 requirement that the terminal set use none.
+They were removed together with what existed only for them: the return to the
+given path (\texttt{localReturnToNominal}), the offset trims and the
+\texttt{lateralOffset} of the CLF error and the path guidance,
+\texttt{road.laneOffsets}, the lanes of the campaign road, and the startup
+rollout retried toward the cone's lane (\texttt{coneLane}). The design is the
+single-backup CLF-tube set of October 6 with the encounter end of the
+addenda: the target's exit or a relative motion outside the collision cone,
+no preset encounter time (variant H, the committed design). The question of
+trying the cone's lane first at startup lapses with the lanes.
+
+\paragraph{Tests.} \texttt{terminalSafeSetTest} drops the two lane tests and
+places the braking lead's first estimate in the ego lane (meets the tube) and
+in the lane to the right drifting away (outside the cone at once) or toward
+the ego (inside it). The full suite: 590 of 590 (\path{tests.txt}).
+
+\paragraph{Provenance.} Between the variant-G campaign and this one another
+session consolidated the estimator into eleven files (\texttt{dee75fb}, ``no
+algorithm changes'') and rebuilt the shared native kernels in
+\path{solver/nrmm} at 19:23:44--19:24:07, during the G campaign
+(19:14:34--19:29:17); one G run spanned the rebuild (seed 5, 15~m/s braking
+lead, with F's outcome and hold count) and none started after it. The
+committed G (\texttt{3d80afb}, consolidated estimator) was therefore rerun as
+G2, interleaved encounter by encounter with H in one pool of eight processes
+(\path{scripts/campaign-pair.sh}), so that both see the same machine load. A
+first attempt at 23:39 failed: every MATLAB start but one returned licensing
+error 5001, because the MathWorks service host had stalled (48 instances, its
+log looping); it was restarted and the campaign rerun at 00:15.
+
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+ & baseline & E & G & G2 & H\\
+\midrule
+exact, recovered of 14 & 14 & 14 & 14 & 14 & 14\\
+noisy, recovered of 84 & 55 & 55 & 59 & 59 & 55\\
+noisy braking leads recovered of 12 & 0 & 0 & 3 & 3 & 0\\
+noisy braking leads stopped at the first frame & 12 & 12 & 2 & 1 & 12\\
+collisions & 0 & 0 & 0 & 0 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+G2 reproduces G in 97 of 98 runs (outcome and hold count); the exception is
+the 15~m/s braking lead of seed 20261003 (G: time limit at the first frame;
+G2: \texttt{nonlinearAcceptanceFailed} at hold 8). The estimator consolidation
+does not change the closed loop. H reproduces the baseline in 96 of 98 runs;
+the two others are noisy braking leads that stop at the first frame with
+\texttt{pcbfNoNumericalResult} instead of the time limit. The exit-or-cone end
+thus changes no outcome against the sliding window, as the fixed window did
+not (E), and the lane backups were the source of every gain of G: without
+them all 12 noisy braking leads stop at the first frame again (the first
+estimate is a lead at nearly the ego's speed in the ego lane; the terminal
+controller's tube meets it, and the startup rollout cannot pass it and return
+within 512 holds), and the 8~m/s curved head-on of seed 1 recovers again (as
+in the baseline and E). Of H's accepted endpoints with a target, 6908 end the
+encounter by exit and 2867 by the cone; the end lies at most 15.3~s after the
+endpoint (median 0, 99th percentile 7.5~s). Per run:
+\path{campaign-runs.csv} (eight variants); summary \path{comparison-all.txt};
+encounter ends \path{encounter-ends-G2H.txt}; hashes
+\path{variantH-sha256.txt}.
 
 \end{document}

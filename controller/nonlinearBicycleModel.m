@@ -217,13 +217,10 @@ classdef nonlinearBicycleModel
         end
 
         function [error,projection] = error(x,lane,reference)
-            % A backup reference held at another lane centre carries its
-            % lateral offset from the path (terminalSafeSet.modeReferences).
             projection=laneGeometry.project(x(1:2),lane);
             angle=atan2(sin(x(3)-projection.heading-reference.state(3)), ...
                 cos(x(3)-projection.heading-reference.state(3)));
-            offset=0;if isfield(reference,'lateralOffset'),offset=reference.lateralOffset;end
-            error=[projection.lateralPosition-offset;angle;x(4:6)-reference.state(4:6)];
+            error=[projection.lateralPosition;angle;x(4:6)-reference.state(4:6)];
         end
 
         function u = nominalFeedback(x,previous,lane,reference,cfg,terminal)
@@ -235,13 +232,9 @@ classdef nonlinearBicycleModel
             % equilibrium (the inverse neglects the front longitudinal force).
             p=cfg.nominalClf;projection=laneGeometry.project(x(1:2),lane);
             lateral=projection.lateralPosition;curvature=reference.curvature;
-            % Guidance toward the reference's lane centre; the path-curvature
-            % term below uses the actual lateral position.
-            offset=0;if isfield(reference,'lateralOffset'),offset=reference.lateralOffset;end
-            relative=lateral-offset;
             speed=hypot(x(4),x(5));course=localWrap(x(3)+atan2(x(5),x(4))-projection.heading);
             lookahead=max(p.minimumLookaheadMeters,p.lookaheadSeconds*hypot(reference.state(4),reference.state(5)));
-            desired=-atan(relative/lookahead);desiredRate=-lookahead/(lookahead^2+relative^2)*speed*sin(course);
+            desired=-atan(lateral/lookahead);desiredRate=-lookahead/(lookahead^2+lateral^2)*speed*sin(course);
             yawRate=curvature*speed*cos(course)/max(1-curvature*lateral,.1)+desiredRate ...
                 -p.courseGain*localWrap(course-desired);
             tire=modifiedFialaTire.parameters(cfg);
