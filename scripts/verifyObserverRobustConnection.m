@@ -65,7 +65,7 @@ function metrics = localComparison()
         stage = struct("velocityDecayRate", rates(1), ...
             "targetDecayRate", rates(2), "targetVelocityCoupling", 0.6, ...
             "input", [0.03; 0.05]);
-        certificate = nrmmObserverCertificate(stage);
+        certificate = nrmmObserverCertificate("core",stage);
         matrix = certificate.matrix;
         initial = [0.4; 0.7];
         for time = linspace(0, 4, 81)

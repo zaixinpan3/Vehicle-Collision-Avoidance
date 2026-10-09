@@ -25,8 +25,8 @@ classdef sharmaBaselineObserverTest < matlab.unittest.TestCase
             % omitted term psiEdot*J*vDot is nonzero. The target is an exact
             % Sharma-model target (constant A, constant sideslip).
             [state, input, thirdDerivative] = localAssumptionOneTruth(1.7);
-            corrected = sharmaNrmmCompanionDerivative(state, input, "corrected", 1.0);
-            published = sharmaNrmmCompanionDerivative(state, input, "published", 1.0);
+            corrected = sharmaMultistageObserver("companionDerivative",state, input, "corrected", 1.0);
+            published = sharmaMultistageObserver("companionDerivative",state, input, "published", 1.0);
             testCase.verifyEqual(corrected([3, 6]), thirdDerivative, ...
                 "The corrected companion map must reproduce the exact third derivative.", AbsTol=2.0e-4);
             vDot = input.bodyAcceleration - input.yawRate*[0.0, -1.0; 1.0, 0.0]*input.bodyVelocity;
@@ -42,13 +42,13 @@ classdef sharmaBaselineObserverTest < matlab.unittest.TestCase
             % Constant-speed circular ego motion has vDot = 0, so the printed
             % equations are exact there; both variants must agree with the truth.
             [state, input, thirdDerivative] = localAssumptionOneTruth(0.0);
-            published = sharmaNrmmCompanionDerivative(state, input, "published", 1.0);
+            published = sharmaMultistageObserver("companionDerivative",state, input, "published", 1.0);
             testCase.verifyEqual(published([3, 6]), thirdDerivative, AbsTol=2.0e-4);
         end
 
         function designSatisfiesTheoremOne(testCase)
             cfg = nrmmTrackingConfig();
-            design = sharmaMultistageObserverDesign(cfg);
+            design = sharmaMultistageObserver("design",cfg);
             lmi = design.lmi;
             closedLoop = lmi.systemMatrix - lmi.gainSeed*lmi.outputMatrix;
             residual = closedLoop.'*lmi.lyapunovMatrix + lmi.lyapunovMatrix*closedLoop ...
@@ -66,7 +66,7 @@ classdef sharmaBaselineObserverTest < matlab.unittest.TestCase
             testCase.verifyTrue(design.yaw.hInfinity.feasible);
 
             reference = synthesizeNrmmObserverGains(cfg);
-            matched = sharmaMultistageObserverDesign(cfg, Theta="matched", ReferenceDesign=reference);
+            matched = sharmaMultistageObserver("design",cfg, Theta="matched", ReferenceDesign=reference);
             expectedRate = reference.target.bandwidth*min(abs(real(reference.target.closedLoopPoles)));
             testCase.verifyEqual(matched.target.slowestPhysicalRate, expectedRate, RelTol=1.0e-9);
             testCase.verifyEqual(matched.ego.slowestPhysicalRate, reference.velocity.gain, RelTol=1.0e-9);
@@ -74,7 +74,7 @@ classdef sharmaBaselineObserverTest < matlab.unittest.TestCase
 
         function targetLipschitzMaximizesEquation73OverSigns(testCase)
             cfg = nrmmTrackingConfig();
-            design = sharmaMultistageObserverDesign(cfg);
+            design = sharmaMultistageObserver("design",cfg);
             c1 = design.target.domain.yawRateMaximum;
             c2 = cfg.ego.domain.yawRateMaximum;
             expected = 0.0;
@@ -104,19 +104,19 @@ classdef sharmaBaselineObserverTest < matlab.unittest.TestCase
 
         function runtimeOutputCarriesTheComparisonContract(testCase)
             cfg = nrmmTrackingConfig();
-            design = sharmaMultistageObserverDesign(cfg);
+            design = sharmaMultistageObserver("design",cfg);
             options = struct("initialTime", 0.0, "egoInitialPosition", [0.0; 0.0], ...
                 "egoInitialYaw", 0.0, "egoInitialBodyVelocity", [15.0; 0.0], ...
                 "targetInitialState", [30.0; 0.0; 15.3; 0.0; 0.0; 0.0]);
-            runtime = sharmaMultistageObserverRuntime("initialize", cfg, options, design);
+            runtime = sharmaMultistageObserver("initialize", cfg, options, design);
             frame = struct("time", 0.0, "xGps", 0.0, "yGps", 0.0, "vxGps", 15.0, "vyGps", 0.0, ...
                 "longitudinalAcceleration", 0.0, "lateralAcceleration", 0.0, "yawRateMeasured", 0.0, ...
                 "radarRelativePosition", [30.0, 0.0], "radarDetectionAvailable", true);
-            initialOutput = sharmaMultistageObserverRuntime("output", runtime, frame);
+            initialOutput = sharmaMultistageObserver("output", runtime, frame);
             testCase.verifyEqual(initialOutput.targetState, options.targetInitialState, ...
                 "The companion mapping must invert exactly at the initial state.", AbsTol=1.0e-9);
             testCase.verifyEqual(initialOutput.targetEstimate.targetSpeed, 15.3, AbsTol=1.0e-9);
-            [runtime, output] = sharmaMultistageObserverRuntime("step", runtime, frame);
+            [runtime, output] = sharmaMultistageObserver("step", runtime, frame);
             testCase.verifyEqual(runtime.currentTime, cfg.runtime.samplePeriod, AbsTol=1.0e-12);
             for field = ["egoState", "egoYaw", "egoYawRate", "egoBodyVelocity", "targetState", ...
                     "targetEstimate", "integrationStep", "diverged"]
@@ -133,7 +133,7 @@ classdef sharmaBaselineObserverTest < matlab.unittest.TestCase
             frame.time = cfg.runtime.samplePeriod;
             frame.radarRelativePosition(:) = NaN;
             frame.radarDetectionAvailable = false;
-            [~, coasting] = sharmaMultistageObserverRuntime("step", runtime, frame);
+            [~, coasting] = sharmaMultistageObserver("step", runtime, frame);
             testCase.verifyFalse(coasting.radarDetectionAvailable);
             testCase.verifyTrue(all(isfinite(coasting.targetState)));
         end

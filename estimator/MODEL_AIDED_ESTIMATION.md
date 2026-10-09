@@ -41,7 +41,7 @@ unchanged.
 
 ## 2. Force-balance lateral velocity
 
-`nrmmModelLateralVelocity` uses the lateral force balance at the centre of mass
+`nrmmEgoCourseGeometry("lateralVelocity", ...)` uses the lateral force balance at the centre of mass
 
     m*a_y = Fx_f(b)*sin(d) + Fy_f(alpha_f)*cos(d) + Fy_r(alpha_r),
     alpha_f = atan2(v_y + lf*r, v_x) - d,   alpha_r = atan2(v_y - lr*r, v_x),
@@ -77,7 +77,7 @@ The controller's rear-adhesion cone keeps the rear tire below saturation (see
 `controller/PCBF_CLF_ARCHITECTURE.md`, *Stable-handling envelope*), so the
 inversion stays informative. Without the shared model or a held input (for
 example over the initialization history), the kinematic relation and its
-declared mismatch are used unchanged (`nrmmEgoCourseGeometry`).
+declared mismatch are used unchanged (`nrmmEgoCourseGeometry("kinematicCourse", ...)`).
 
 ## 3. Body-velocity observer and its bound
 
@@ -109,7 +109,7 @@ since the speed changes by at most `||a||` per second and
 The sideslip sine interval is `[lower, upper]` divided by the speed interval and
 clipped to the cone. The heading measurement is the GNSS course minus
 `asin(c/M)`. Its certified radius is the sideslip interval's distance to that
-centre plus the GNSS direction error (`certifiedRotationCorrespondence`). An
+centre plus the GNSS direction error (`nrmmEgoCourseGeometry("rotation", ...)`). An
 uninformative interval contributes the whole circle; the orientation set
 then propagates with the gyro.
 

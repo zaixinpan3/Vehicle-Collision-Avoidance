@@ -1,8 +1,43 @@
-function output = nrmmControllerErrorBounds(output, bound, input, design)
+function value = nrmmControllerErrorBounds(action, varargin)
 %nrmmControllerErrorBounds Publish state-time enclosures for control.
-% The comparison state bounds yaw, body velocity and [rho; q; s]. Absolute
-% position also uses the timestamped GNSS ball and the true speed domain.
-% These are current estimation bounds, not a prediction-horizon certificate.
+%
+%   output = nrmmControllerErrorBounds("publish", output, bound, input, design)
+%       The comparison state bounds yaw, body velocity and [rho; q; s]. Absolute
+%       position also uses the timestamped GNSS ball and the true speed domain.
+%       These are current estimation bounds, not a prediction-horizon certificate.
+%   bounds = nrmmControllerErrorBounds("targetParameters", velocity, acceleration, ...
+%       velocityRadius, accelerationRadius, frameRotationRadius)
+%       The true target velocity and acceleration lie within velocityRadius and
+%       accelerationRadius (norms) of the estimates velocity and acceleration, given
+%       in one frame whose orientation errs by at most frameRotationRadius (rad).
+%       Speed, speed-rate and normal acceleration do not depend on the frame. The
+%       NRMM parameters of the true state, relative to the estimate's own
+%       (speed |v|, course atan2(v), speed-rate v'a/|v|), satisfy
+%       speedErrorBound      |V - |v|| <= velocityRadius;
+%       courseErrorBound     frameRotationRadius + asin(velocityRadius/|v|), or
+%       pi when the velocity ball contains rest;
+%       speedRateErrorBound  |A - v'a/|v|| <= accelerationRadius + 2|a| sin(theta/2),
+%       theta the course bound of the frame itself;
+%       curvatureInterval    [lo; hi] of the normal acceleration over the speed
+%       squared, a_N/V^2, over both balls, or [-Inf; Inf] when
+%       the velocity ball contains rest.
+%       For vector error boxes, supply the Euclidean norms of their half-widths as
+%       velocityRadius and accelerationRadius; a component radius alone is insufficient.
+
+    switch string(action)
+        case "publish"
+            value = localPublish(varargin{1}, varargin{2}, varargin{3}, varargin{4});
+        case "targetParameters"
+            value = localTargetParameterBounds(varargin{:});
+        otherwise
+            error("nrmmControllerErrorBounds:invalidAction", ...
+                "action must be 'publish' or 'targetParameters'.");
+    end
+end
+
+%% State-time enclosures published to the controller
+
+function output = localPublish(output, bound, input, design)
 
     age = max(0.0, output.stateTime-input.time);
     egoPosition = norm(output.egoPositionInertial-input.gnssPosition) ...
@@ -136,7 +171,7 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
             "curvatureMaximum",sin(domain.sideslipMaximum)/domain.rearAxleDistance, ...
             "speedRateMaximum",domain.scalarAccelerationMaximum, ...
             "scalarAccelerationMaximum",domain.accelerationNormBound);
-        parameters = nrmmTargetParameterErrorBounds(target.targetVelocity, ...
+        parameters = localTargetParameterBounds(target.targetVelocity, ...
             target.targetAcceleration, components(2), components(3), bound.yaw);
         % The inverse reconstruction clips A. Recenter its enclosure at the
         % value actually published to the controller, not the raw projection.
@@ -151,7 +186,7 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         if isfield(output.targetEstimate,'measurementHistoryEnclosure') && available
             % The history and observer enclose the same current state. Use
             % their intersection for prediction as well as publication.
-            historyParameters = nrmmTargetParameterErrorBounds( ...
+            historyParameters = localTargetParameterBounds( ...
                 target.targetVelocityInertial,target.targetAccelerationInertial, ...
                 norm(values(3:4)),norm(values(5:6)),0);
             historyParameters.speedRateErrorBound = historyParameters.speedRateErrorBound ...
@@ -248,4 +283,35 @@ function certificate = localCertificate(kind, time, values, available, scope)
         "available", available, "source", "nrmm-state-time-enclosure", ...
         "scope", scope, "futurePredictionIncluded", false, ...
         "floatingPointVerified", false);
+end
+
+%% NRMM parameter error bounds of a target estimate
+
+function bounds = localTargetParameterBounds(velocity, acceleration, ...
+        velocityRadius, accelerationRadius, frameRotationRadius)
+    arguments
+        velocity (2,1) double {mustBeReal,mustBeFinite}
+        acceleration (2,1) double {mustBeReal,mustBeFinite}
+        velocityRadius (1,1) double {mustBeReal,mustBeNonnegative}
+        accelerationRadius (1,1) double {mustBeReal,mustBeNonnegative}
+        frameRotationRadius (1,1) double {mustBeReal,mustBeNonnegative}
+    end
+    speed = norm(velocity);
+    theta = pi;
+    if velocityRadius < speed
+        theta = asin(velocityRadius/speed);
+    end
+    componentRadius = accelerationRadius+2*norm(acceleration)*sin(theta/2);
+    curvatureInterval = [-Inf; Inf];
+    if velocityRadius < speed
+        normalAcceleration = (velocity(1)*acceleration(2)-velocity(2)*acceleration(1))/speed;
+        numerator = normalAcceleration+[-componentRadius; componentRadius];
+        denominator = [(speed-velocityRadius)^2, (speed+velocityRadius)^2];
+        quotients = numerator./denominator;
+        curvatureInterval = [min(quotients, [], "all"); max(quotients, [], "all")];
+    end
+    bounds = struct("speedErrorBound", velocityRadius, ...
+        "courseErrorBound", min(pi, frameRotationRadius+theta), ...
+        "speedRateErrorBound", componentRadius, ...
+        "curvatureInterval", curvatureInterval);
 end

@@ -17,7 +17,7 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
                 measured=[x(4);x(5)]+sensors.velocityNoiseMaximum*(2*rand(stream,2,1)-1)/sqrt(2);
                 rate=x(6)+sensors.gyroscopeNoiseMaximum*(2*rand(stream)-1);
                 accel=acceleration+sensors.accelerometerNoiseMaximum*(2*rand(stream,2,1)-1)/sqrt(2);
-                lateral=nrmmModelLateralVelocity(measured,rate,accel,input,model,sensors,0.3);
+                lateral=nrmmEgoCourseGeometry("lateralVelocity",measured,rate,accel,input,model,sensors,0.3);
                 testCase.verifyTrue(lateral.consistent);
                 testCase.verifyGreaterThanOrEqual(x(5),lateral.lower-1e-6);
                 testCase.verifyLessThanOrEqual(x(5),lateral.upper+1e-6);
@@ -33,19 +33,19 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
             exact=struct('velocityNoiseMaximum',0,'gyroscopeNoiseMaximum',0,'accelerometerNoiseMaximum',0);
             x=[0;0;0;14.5;-0.3084;0.602];input=[0.2172;-0.345];
             d=nonlinearBicycleModel.derivative(x,input,cfg);acceleration=[d(4)-x(6)*x(5);d(5)+x(6)*x(4)];
-            lateral=nrmmModelLateralVelocity(x(4:5),x(6),acceleration,input,model,exact,0.3);
+            lateral=nrmmEgoCourseGeometry("lateralVelocity",x(4:5),x(6),acceleration,input,model,exact,0.3);
             testCase.verifyEqual(lateral.center,x(5),AbsTol=2e-5);
             testCase.verifyLessThanOrEqual(lateral.lower,x(5)+1e-6);
             testCase.verifyGreaterThanOrEqual(lateral.upper,x(5)-1e-6);
             testCase.verifyGreaterThan(lateral.radius,0.05);
             model.parameterUncertainty=0;
-            narrow=nrmmModelLateralVelocity(x(4:5),x(6),acceleration,input,model,exact,0.3);
+            narrow=nrmmEgoCourseGeometry("lateralVelocity",x(4:5),x(6),acceleration,input,model,exact,0.3);
             testCase.verifyLessThan(narrow.radius,1e-4);
         end
         function contradictoryMeasurementsGiveAnEmptyInterval(testCase)
             [model,sensors]=localModel(0.05);
             % Straight driving with zero steering cannot produce 8 m/s^2.
-            lateral=nrmmModelLateralVelocity([15;0],0,[0;8],[0;0],model,sensors,0.05);
+            lateral=nrmmEgoCourseGeometry("lateralVelocity",[15;0],0,[0;8],[0;0],model,sensors,0.05);
             testCase.verifyFalse(lateral.consistent);
             testCase.verifyTrue(isinf(lateral.radius));
         end

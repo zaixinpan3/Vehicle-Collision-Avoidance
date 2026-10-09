@@ -28,7 +28,7 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
         end
         function freshVelocityBoundsRetainDirectionalInformation(testCase)
             [output, bound, input] = localVelocityFixture();
-            published = nrmmControllerErrorBounds(output, bound, input, testCase.Design);
+            published = nrmmControllerErrorBounds("publish",output, bound, input, testCase.Design);
             testCase.verifyLessThan(published.controllerStateErrorBound(4), 0.08);
             testCase.verifyGreaterThan(published.controllerStateErrorBound(5), 0.49);
             testCase.verifyEqual(published.egoBodyVelocity, output.egoBodyVelocity);
@@ -36,7 +36,7 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             for center = [0, 3.13, -1.2]
                 bound.orientationSet = nrmmYawSet("initialize", center, 0.05);
                 input.gnssVelocity = localRotation(center)*[10;0];
-                published = nrmmControllerErrorBounds(output, bound, input, testCase.Design);
+                published = nrmmControllerErrorBounds("publish",output, bound, input, testCase.Design);
                 for heading = center+linspace(-0.05, 0.05, 21)
                     for direction = linspace(-pi, pi, 21)
                         noise = testCase.Design.sensors.velocityNoiseMaximum ...
@@ -50,7 +50,7 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
         end
         function yawAndBodyVelocityShareTheSameRotationError(testCase)
             [output,bound,input]=localVelocityFixture();output.egoYaw=0;
-            published=nrmmControllerErrorBounds(output,bound,input,testCase.Design);
+            published=nrmmControllerErrorBounds("publish",output,bound,input,testCase.Design);
             generator=published.controllerErrorBound.generator;
             % The inertial lateral-velocity Jacobian is [V, 1] on (yaw, vy).
             jointRadius=sum(abs([0,0,10,0,1,0]*generator));
@@ -123,7 +123,7 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
         function measurementHistoryAlsoTightensThePredictionParameterSet(testCase)
             [~,~,~,output,bound,input]=localReconstruction(testCase.Design,[0;0;0]);
             bound.targetComponents(2:3)=[30;10];
-            withoutHistory=nrmmControllerErrorBounds(output,bound,input,testCase.Design);
+            withoutHistory=nrmmControllerErrorBounds("publish",output,bound,input,testCase.Design);
             history=nrmmTargetHistory("initialize",testCase.Design.target.domain,0,1);
             target=output.targetEstimate;
             for time=-.5:.025:0
@@ -131,7 +131,7 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
                 history=nrmmTargetHistory("measure",history,time,position,[.04;.04]);
             end
             bound.targetHistory=history;
-            withHistory=nrmmControllerErrorBounds(output,bound,input,testCase.Design);
+            withHistory=nrmmControllerErrorBounds("publish",output,bound,input,testCase.Design);
             first=withoutHistory.targetEstimate.predictionErrorSet;
             second=withHistory.targetEstimate.predictionErrorSet;
             testCase.verifyTrue(second.available);
@@ -143,10 +143,10 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             [output, bound, input] = localVelocityFixture();
             output.stateTime = 0.1;
             bound.holdBounds.acceleration = Inf;
-            published = nrmmControllerErrorBounds(output, bound, input, testCase.Design);
+            published = nrmmControllerErrorBounds("publish",output, bound, input, testCase.Design);
             testCase.verifyEqual(published.controllerStateErrorBound(4:5), [0.8;0.8]);
             bound.holdBounds.acceleration = 2;
-            published = nrmmControllerErrorBounds(output, bound, input, testCase.Design);
+            published = nrmmControllerErrorBounds("publish",output, bound, input, testCase.Design);
             testCase.verifyGreaterThan(published.controllerStateErrorBound(4), 0.2);
             testCase.verifyLessThan(published.controllerStateErrorBound(4), 0.28);
         end
@@ -208,7 +208,7 @@ function [published, actualError, truth, output, bound, input] = localReconstruc
         "orientationSet",nrmmYawSet("initialize",estimatedYaw,abs(geometry(2))));
     input = struct("time", 0, "yawRate", 0, "gnssPosition", ...
         position+design.sensors.positionNoiseMaximum*[1; 1]/sqrt(2));
-    published = nrmmControllerErrorBounds(output, bound, input, design);
+    published = nrmmControllerErrorBounds("publish",output, bound, input, design);
     truth = struct("speed", speed, "course", course, "scalarAcceleration", scalarAcceleration, ...
         "yawRate", yawRate, "yaw", targetYaw);
     actualError = [abs(position-estimatedPosition); abs(geometry(2)); ...

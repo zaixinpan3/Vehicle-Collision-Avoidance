@@ -284,10 +284,10 @@ function [nextState, intervalAudit, positionErrorBound] = localRungeKuttaInterva
         "radarDetectionAvailable",observerInput.radarDetectionAvailable, ...
         "correspondence",struct("informative",correspondence.informative,"heading",correspondence.heading), ...
         "lateralVelocity",lateralVelocity);
-    if exist("nrmmObserverRk4IntervalMex","file")==3
-        [states,firstDerivatives] = nrmmObserverRk4IntervalMex(state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
+    if exist("nrmmObserverIntegrationKernelMex","file")==3
+        [states,firstDerivatives] = nrmmObserverIntegrationKernelMex(state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
     else
-        [states,firstDerivatives] = nrmmObserverRk4Interval(state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
+        [states,firstDerivatives] = nrmmObserverVectorField("integrate",state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
     end
     for substepIdx = 1:runtime.integrationSubstepCount
         previousState = states(:,substepIdx);
@@ -608,7 +608,7 @@ function output = localOutput(runtime, observerInput)
     if ~output.egoInertialVelocitySet.available
         output.egoInertialVelocityErrorBound = Inf;
     end
-    output = nrmmControllerErrorBounds(output, runtime.positionErrorBound, ...
+    output = nrmmControllerErrorBounds("publish",output, runtime.positionErrorBound, ...
         observerInput, design);
 end
 
@@ -723,7 +723,7 @@ function observerInput = localSynchronizedInput(frame, runtime)
     % These measurements are held over the interval. Reuse their geometry
     % in every RK4 stage, domain audit, and output reconstruction.
     design = runtime.observerDesign;
-    observerInput.courseGeometry = nrmmEgoCourseGeometry(observerInput, design);
+    observerInput.courseGeometry = nrmmEgoCourseGeometry("course",observerInput, design);
 end
 
 function [radar, available] = localRadarPosition(frame, runtime)

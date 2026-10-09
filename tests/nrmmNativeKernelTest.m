@@ -53,8 +53,8 @@ classdef nrmmNativeKernelTest < matlab.unittest.TestCase
                 "bodyAcceleration",[0.2;0.1],"radarDetectionAvailable",true, ...
                 "correspondence",struct("informative",informative,"heading",pi-0.01), ...
                 "lateralVelocity",NaN);
-            [expected,expectedDerivatives] = nrmmObserverRk4Interval(state,measurement,design,0.0025,5);
-            [actual,actualDerivatives] = nrmmObserverRk4IntervalMex(state,measurement,design,0.0025,5);
+            [expected,expectedDerivatives] = nrmmObserverVectorField("integrate",state,measurement,design,0.0025,5);
+            [actual,actualDerivatives] = nrmmObserverIntegrationKernelMex(state,measurement,design,0.0025,5);
             testCase.verifyEqual(actual,expected,AbsTol=1e-10);
             testCase.verifyEqual(actualDerivatives,expectedDerivatives,AbsTol=1e-10);
             testCase.verifySize(actual,[15,6]);

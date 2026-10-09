@@ -17,7 +17,7 @@ classdef nrmmDirectVelocityTest < matlab.unittest.TestCase
         function exactKinematicsRecoverTheForwardVelocity(testCase)
             design = testCase.Design;
             truth = 12*[cos(0.03);sin(0.03)];
-            measured = nrmmKinematicVelocityMeasurement([0;12], ...
+            measured = nrmmObserverVectorField("velocityMeasurement",[0;12], ...
                 truth(2)/design.yaw.courseModel.rearAxleDistance,design);
             testCase.verifyEqual(measured,truth,AbsTol=1e-13);
         end
@@ -25,7 +25,7 @@ classdef nrmmDirectVelocityTest < matlab.unittest.TestCase
         function longitudinalFloorDoesNotClipTheLateralMeasurement(testCase)
             design = testCase.Design;
             rate = 10;
-            measured = nrmmKinematicVelocityMeasurement([1;0],rate,design);
+            measured = nrmmObserverVectorField("velocityMeasurement",[1;0],rate,design);
             testCase.verifyEqual(measured, ...
                 [cos(design.yaw.courseModel.sideslipDomainMaximum); ...
                 design.yaw.courseModel.rearAxleDistance*rate],AbsTol=1e-13);
@@ -35,7 +35,7 @@ classdef nrmmDirectVelocityTest < matlab.unittest.TestCase
             cfg = testCase.Config;
             cfg.ego.domain.speedMinimum = 0;
             design = synthesizeNrmmObserverGains(cfg);
-            [measurement,feasible] = nrmmKinematicVelocityMeasurement([0;0],0,design);
+            [measurement,feasible] = nrmmObserverVectorField("velocityMeasurement",[0;0],0,design);
             testCase.verifyEqual(measurement,[0;0],AbsTol=0);
             testCase.verifyTrue(feasible.consistent);
             testCase.verifyTrue(isfinite(design.ultimateBounds.bodyVelocity));
@@ -43,7 +43,7 @@ classdef nrmmDirectVelocityTest < matlab.unittest.TestCase
         end
 
         function impossibleKinematicsAreReportedWithoutAnUndefinedInput(testCase)
-            [measurement,feasible] = nrmmKinematicVelocityMeasurement([10;0],20,testCase.Design);
+            [measurement,feasible] = nrmmObserverVectorField("velocityMeasurement",[10;0],20,testCase.Design);
             testCase.verifyTrue(all(isfinite(measurement)));
             testCase.verifyFalse(feasible.consistent);
         end
@@ -75,7 +75,7 @@ classdef nrmmDirectVelocityTest < matlab.unittest.TestCase
             input = struct("yawRate",0.1,"gnssVelocity",[speed;0], ...
                 "bodyAcceleration",[0;0],"positionReference",[0;0], ...
                 "radarReference",[20;2],"radarAvailable",false);
-            derivative = nrmmObserverVectorField(estimate,input,design);
+            derivative = nrmmObserverVectorField("derivative",estimate,input,design);
             testCase.verifyEqual(derivative.bodyVelocity,[0;0],AbsTol=1e-13);
         end
 
@@ -94,7 +94,7 @@ classdef nrmmDirectVelocityTest < matlab.unittest.TestCase
             model = testCase.Design.yaw.courseModel;
             model.sideslipDomainMaximum = 0;
             gain = 7/model.rearAxleDistance;
-            bound = nrmmVelocityDisturbanceBound(gain,[0,20],model,testCase.Design.sensors);
+            bound = nrmmObserverCertificate("velocity",gain,[0,20],model,testCase.Design.sensors);
             testCase.verifyEqual(bound.gyroCoefficient,13,AbsTol=1e-12);
         end
 
@@ -130,7 +130,7 @@ function [maximumExcess,floorCount] = localFiniteErrorSweep(design)
     design.sensors.velocityNoiseMaximum = 1.5;
     design.sensors.gyroscopeNoiseMaximum = 0.3;
     design.sensors.accelerometerNoiseMaximum = 0.2;
-    certificate = nrmmVelocityDisturbanceBound(design.velocity.gain,[0,20], ...
+    certificate = nrmmObserverCertificate("velocity",design.velocity.gain,[0,20], ...
         design.yaw.courseModel,design.sensors);
     maximumExcess = -Inf;
     floorCount = 0;
@@ -143,7 +143,7 @@ function [maximumExcess,floorCount] = localFiniteErrorSweep(design)
         gyro = 0.3*(2*rand(stream)-1);
         mismatch = 0.4*(2*rand(stream)-1);
         rate = truth(2)/design.yaw.courseModel.rearAxleDistance+mismatch+gyro;
-        [measurement,feasible] = nrmmKinematicVelocityMeasurement(truth+gnssNoise,rate,design);
+        [measurement,feasible] = nrmmObserverVectorField("velocityMeasurement",truth+gnssNoise,rate,design);
         accelerationNoise = 0.2*[cos(noiseAngle);sin(noiseAngle)];
         forcing = accelerationNoise+design.velocity.gain*(measurement-truth) ...
             -gyro*[-truth(2);truth(1)];
@@ -159,7 +159,7 @@ function improvement = localGyroComparison(design)
         model.sideslipDomainMaximum = (coneIndex-1)/20*1.55;
         for gainIndex = 1:11
             gain = 10^((gainIndex-1)/2-2);
-            bound = nrmmVelocityDisturbanceBound(gain,[0,20],model,design.sensors);
+            bound = nrmmObserverCertificate("velocity",gain,[0,20],model,design.sensors);
             improvement(coneIndex,gainIndex) = bound.separatedGyroCoefficient-bound.gyroCoefficient;
         end
     end

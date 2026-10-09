@@ -18,7 +18,7 @@ classdef nrmmTargetParameterErrorBoundsTest < matlab.unittest.TestCase
                 acceleration = 2*(2*rand(stream, 2, 1)-1);
                 velocityRadius = 1.5*rand(stream);accelerationRadius = 0.5*rand(stream);
                 rotationRadius = 0.2*rand(stream);
-                bounds = nrmmTargetParameterErrorBounds(velocity, acceleration, ...
+                bounds = nrmmControllerErrorBounds("targetParameters",velocity, acceleration, ...
                     velocityRadius, accelerationRadius, rotationRadius);
                 for sample = 1:50
                     rotation = rotationRadius*(2*rand(stream)-1);
@@ -46,7 +46,7 @@ classdef nrmmTargetParameterErrorBoundsTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(excess, 1e-9);
         end
         function aBallContainingRestLeavesCourseAndCurvatureOpen(testCase)
-            bounds = nrmmTargetParameterErrorBounds([0.2; 0.1], [0.5; -0.2], 0.3, 0.1, 0.05);
+            bounds = nrmmControllerErrorBounds("targetParameters",[0.2; 0.1], [0.5; -0.2], 0.3, 0.1, 0.05);
             testCase.verifyEqual(bounds.speedErrorBound, 0.3);
             testCase.verifyEqual(bounds.courseErrorBound, pi);
             testCase.verifyEqual(bounds.speedRateErrorBound, 0.1+2*norm([0.5; -0.2]));

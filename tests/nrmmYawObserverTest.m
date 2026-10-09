@@ -16,21 +16,21 @@ classdef nrmmYawObserverTest < matlab.unittest.TestCase
     methods (Test)
         function informativeHeadingCorrectsTheGyroPropagation(testCase)
             measurement = struct("heading",0.3,"informative",true);
-            derivative = nrmmYawObserverDerivative(0.2,0.12,measurement,testCase.Design);
+            derivative = nrmmObserverVectorField("yawDerivative",0.2,0.12,measurement,testCase.Design);
             testCase.verifyEqual(derivative, ...
                 0.12+0.1*testCase.Design.yaw.correctionBandwidth,AbsTol=1e-14);
         end
 
         function headingCorrectionTakesTheShortDirectionAcrossPi(testCase)
             measurement = struct("heading",-pi+0.02,"informative",true);
-            derivative = nrmmYawObserverDerivative(pi-0.03,0,measurement,testCase.Design);
+            derivative = nrmmObserverVectorField("yawDerivative",pi-0.03,0,measurement,testCase.Design);
             testCase.verifyEqual(derivative, ...
                 0.05*testCase.Design.yaw.correctionBandwidth,AbsTol=1e-14);
         end
 
         function uninformativeHeadingLeavesOnlyGyroPropagation(testCase)
             measurement = struct("heading",NaN,"informative",false);
-            derivative = nrmmYawObserverDerivative(0.8,0.17,measurement,testCase.Design);
+            derivative = nrmmObserverVectorField("yawDerivative",0.8,0.17,measurement,testCase.Design);
             testCase.verifyEqual(derivative,0.17,AbsTol=0);
         end
 

@@ -28,8 +28,8 @@ with its own certified radius; see
 [MODEL_AIDED_ESTIMATION.md](MODEL_AIDED_ESTIMATION.md). Sections 3, 4 and 8
 describe the kinematic branch, which is used without that model.
 A paired synthetic comparison against a reproduction of the Sharma multistage
-observer (`sharmaMultistageObserverDesign.m`, `sharmaMultistageObserverRuntime.m`,
-`sharmaNrmmCompanionDerivative.m`) is recorded in
+observer (`sharmaMultistageObserver.m`: design, sampled runtime and companion-form
+map) is recorded in
 [OBSERVER_SHARMA_COMPARISON_20260924.md](../report/OBSERVER_SHARMA_COMPARISON_20260924.md);
 it measures sampled trajectories, not the certificates above, and predates
 the current target gains. The comparison with reference gains tuned per
@@ -133,7 +133,7 @@ At `q=0` the same bound follows by continuity. Thus, globally,
  \le L_q\|q-\hat q\|+L_s\|s-\hat s\|.}
 \]
 
-`nrmmTargetLipschitzCertificate.m` evaluates these analytic expressions.
+`nrmmObserverCertificate("targetLipschitz", ...)` evaluates these analytic expressions.
 A maximum over finitely many Jacobian evaluations is not used as the proof. The reconstructed
 `Omega(q,s)` is differentiated, rather than frozen as a constant in this bound.
 The legacy scalar `phi = hypot(Lq,Ls)` is only a diagnostic in numerical SI
@@ -180,11 +180,11 @@ in the true domain. In particular the lateral component is never clipped:
 \[
 y_y-v_y=l_E(n_\omega+d_{\rm st}).
 \]
-The observer implemented by `nrmmObserverVectorField.m` is
+The observer implemented by `nrmmObserverVectorField("derivative", ...)` is
 \[
 \boxed{\dot{\hat v}=a_m-uJ\hat v+k_v(y_v-\hat v),\qquad k_v>0.}
 \]
-`nrmmKinematicVelocityMeasurement.m` implements the algebraic map.
+`nrmmObserverVectorField("velocityMeasurement", ...)` implements the algebraic map.
 
 ## 4. Exact common-error dynamics and explicit velocity certificate
 
@@ -258,7 +258,7 @@ D^+\|e_v\|\le-k_v\|e_v\|+\bar d_v,\quad
  \frac{\varepsilon_a+C_\omega(k_v)\varepsilon_\omega}{k_v}
  +l_E\sec b\,\delta_{\rm st}.}
 \]
-`nrmmVelocityDisturbanceBound.m` evaluates these expressions. The transient
+`nrmmObserverCertificate("velocity", ...)` evaluates these expressions. The transient
 radius solves \(\dot B_v=-k_vB_v+d_v\), with a valid initial error bound,
 and either the explicit forcing or a certified upper bound on \(d_v^\star\).
 
@@ -309,7 +309,7 @@ of \(\Delta\Phi_e/\omega_T^2\) yields the sufficient condition
 -\omega_T(A_\ell^TP+PA_\ell)-\tau_q(L_q/\omega_T)^2e_2e_2^T-\tau_sL_s^2e_3e_3^T
  -(\tau_q^{-1}+\tau_s^{-1})(Pe_3)(Pe_3)^T\succeq2\lambda_TP.
 \]
-`synthesizeTargetTrackerCertificate.m` selects \(\ell\) with the noise-shape
+`synthesizeNrmmObserverGains.m` (its local target-tracker certificate) selects \(\ell\) with the noise-shape
 program of Section 7. For each candidate bandwidth it then solves for \(P\)
 and positive multipliers together, without fixing \(A_\ell^TP+PA_\ell=-I\).
 With \(a_q=L_q/\omega_T\), \(a_s=L_s\), the equivalent Schur condition is
@@ -362,7 +362,7 @@ H=\begin{bmatrix}-k_v&0\\c_{Tv}&-\lambda_T\end{bmatrix},\quad
 The Hurwitz Metzler matrix admits positive backward weights
 \(w=-H^{-T}\mathbf1\), so \(w^TH=-\mathbf1^T\). Consequently
 \(D^+(w^T\chi)\le-(w^T\chi)/\max(w)+w^Td\).
-`nrmmObserverCertificate.m` constructs this two-state comparison.
+`nrmmObserverCertificate("core", ...)` constructs this two-state comparison.
 Given \(B_0\ge\chi(t_0)\), its nonnegative transition matrix gives
 \[
 \chi(t)\le e^{H(t-t_0)}B_0+\int_{t_0}^t e^{H(t-\tau)}d(\tau)\,d\tau,
@@ -496,7 +496,7 @@ Here \(h_m\) is the certified kinematic course correspondence heading and
 \(\chi_m=1\) only when that correspondence is informative; otherwise
 \(\chi_m=0\) and the observer propagates the measured gyro alone. The estimate
 is never reset to a measurement center or the center of an orientation set.
-`nrmmYawObserverDerivative.m` implements this equation. The original bandwidth
+`nrmmObserverVectorField("yawDerivative", ...)` implements this equation. The original bandwidth
 preference is retained: \(k_\psi=\log(20)/T_{\rm domain}\). It does not depend
 on runtime timing or impose a uniform low-speed inversion precondition.
 
