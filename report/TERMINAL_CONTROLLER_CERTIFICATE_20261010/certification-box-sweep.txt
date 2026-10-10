@@ -1,0 +1,277 @@
+# certification-box sweep, October 10, 2026: synthesizeClfMatrices with clf.certification* overrides, RefreshExisting=false, Iterations=4, 6 components, margin 1.25, 1200+600 samples, seed 20261010
+# process A (boxes 1-3)
+
+##### box [1 0.15 0.75 0.15 0.08] speed 8 curvature 0
+  plain LMI: fill 0.159, extents [1 0.0805 0.644 0.104 0.08]
+  iteration 1: coefficient bounds [0.162 0.0954 0.0539 0.0179 0.022 0.00988], residual 0.0124; LMI ok 1, fill 0.010, extents [0.286 0.0323 0.225 0.15 0.08]
+  iteration 2: coefficient bounds [0.138 0.0595 0.043 0.0317 0.0222 0.00628], residual 0.0070; LMI ok 1, fill 0.051, extents [0.741 0.0641 0.495 0.15 0.08]
+  iteration 3: coefficient bounds [0.142 0.0953 0.0645 0.031 0.0255 0.00987], residual 0.0073; LMI ok 1, fill 0.040, extents [0.626 0.058 0.292 0.15 0.08]
+  iteration 4: coefficient bounds [0.122 0.0623 0.0543 0.0321 0.0252 0.00638], residual 0.0069; LMI ok 1, fill 0.050, extents [0.732 0.0638 0.548 0.15 0.08]
+  final attempt 1 (K fixed, contained in extents [0.741 0.0641 0.495 0.15 0.08]): bounds [0.141 0.0962 0.0638 0.0317 0.0272 0.00957], residual 0.0077, margin of (S,K) -0.00056; LMI ok 1, fill 0.000, extents [8.33e-05 7.65e-06 0.000102 6.17e-05 2.39e-05]
+  final attempt 2 (K fixed, contained in extents [0.62 0.0537 0.414 0.125 0.0669]): bounds [0.113 0.0823 0.0528 0.0258 0.0224 0.00675], residual 0.0059, margin of (S,K) 2.4e-05; LMI ok 1, fill 0.036, extents [0.615 0.0534 0.367 0.107 0.0669]
+CLF speed  8.00 curvature 0.0000: extents [0.62 m 0.053 rad 0.37 m/s 0.11 m/s 0.067 rad/s], fill 0.036; certified time constant 3.83 s (required 4.00 s), hold factor 1.0259; sampled worst contraction 0.9447
+elapsed 10 s
+
+##### box [1 0.15 0.75 0.15 0.08] speed 8 curvature 0.005
+  plain LMI: fill 0.168, extents [1 0.0822 0.75 0.106 0.08]
+  iteration 1: coefficient bounds [0.196 0.0735 0.0249 0.0223 0.0189 0.00923], residual 0.0055; LMI ok 1, fill 0.051, extents [0.701 0.0618 0.39 0.15 0.08]
+  iteration 2: coefficient bounds [0.136 0.0673 0.06 0.0327 0.0295 0.00692], residual 0.0069; LMI ok 1, fill 0.045, extents [0.662 0.0601 0.266 0.15 0.08]
+  iteration 3: coefficient bounds [0.179 0.064 0.0544 0.0344 0.0273 0.00832], residual 0.0070; LMI ok 1, fill 0.046, extents [0.706 0.0621 0.381 0.15 0.08]
+  iteration 4: coefficient bounds [0.143 0.0684 0.061 0.0338 0.0302 0.00657], residual 0.0063; LMI ok 1, fill 0.050, extents [0.705 0.0627 0.6 0.15 0.08]
+  final attempt 1 (K fixed, contained in extents [0.701 0.0618 0.39 0.15 0.08]): bounds [0.137 0.0661 0.0589 0.0323 0.0324 0.00712], residual 0.0064, margin of (S,K) -0.000117; LMI ok 1, fill 0.000, extents [0.000272 2.42e-05 0.000332 0.000168 7.98e-05]
+  final attempt 2 (K fixed, contained in extents [0.586 0.0517 0.326 0.125 0.0669]): bounds [0.108 0.0561 0.0481 0.0266 0.0264 0.00555], residual 0.0045, margin of (S,K) 0.000179; LMI ok 1, fill 0.035, extents [0.569 0.05 0.312 0.098 0.0656]
+CLF speed  8.00 curvature 0.0050: extents [0.57 m 0.050 rad 0.31 m/s 0.10 m/s 0.066 rad/s], fill 0.035; certified time constant 3.47 s (required 4.00 s), hold factor 1.0204; sampled worst contraction 0.9460
+elapsed 11 s
+
+##### box [1 0.15 0.75 0.15 0.08] speed 15 curvature 0
+  plain LMI: fill 0.103, extents [1 0.0602 0.627 0.0496 0.08]
+  iteration 1: coefficient bounds [0.24 0.0646 0.039 0.0208 0.00762 0.00337], residual 0.0029; LMI ok 1, fill 0.067, extents [1 0.0564 0.385 0.15 0.08]
+  iteration 2: coefficient bounds [0.346 0.0654 0.0397 0.014 0.00935 0.00846], residual 0.0028; LMI ok 1, fill 0.067, extents [1 0.056 0.406 0.15 0.08]
+  iteration 3: coefficient bounds [0.361 0.0678 0.0403 0.0156 0.0101 0.00826], residual 0.0030; LMI ok 1, fill 0.065, extents [1 0.0557 0.414 0.15 0.08]
+  iteration 4: coefficient bounds [0.4 0.0709 0.0434 0.0147 0.0117 0.00831], residual 0.0031; LMI ok 1, fill 0.064, extents [1 0.0553 0.476 0.15 0.08]
+  final attempt 1 (K fixed, contained in extents [1 0.056 0.406 0.15 0.08]): bounds [0.359 0.0682 0.0409 0.0151 0.0105 0.0084], residual 0.0029, margin of (S,K) -5.14e-05; LMI ok 1, fill 0.064, extents [0.99 0.0547 0.406 0.149 0.079]
+CLF speed 15.00 curvature 0.0000: extents [0.99 m 0.055 rad 0.41 m/s 0.15 m/s 0.079 rad/s], fill 0.064; certified time constant 3.93 s (required 4.00 s), hold factor 1.0090; sampled worst contraction 0.9574
+elapsed 6 s
+
+##### box [1 0.15 0.75 0.15 0.08] speed 15 curvature 0.005
+  plain LMI: fill 0.109, extents [1 0.0616 0.75 0.0509 0.08]
+  iteration 1: coefficient bounds [0.266 0.0412 0.0232 0.00452 0.0012 0.00215], residual 0.0018; LMI ok 1, fill 0.075, extents [1 0.0574 0.456 0.15 0.08]
+  iteration 2: coefficient bounds [0.382 0.0765 0.0201 0.0141 0.00971 0.00241], residual 0.0068; LMI ok 1, fill 0.035, extents [0.919 0.0497 0.581 0.15 0.08]
+  iteration 3: coefficient bounds [0.37 0.0782 0.028 0.0146 0.0085 0.00188], residual 0.0070; LMI ok 1, fill 0.034, extents [0.907 0.0492 0.593 0.15 0.08]
+  iteration 4: coefficient bounds [0.356 0.0775 0.0278 0.0147 0.0086 0.00788], residual 0.0029; LMI ok 1, fill 0.060, extents [1 0.0537 0.628 0.15 0.08]
+  final attempt 1 (K fixed, contained in extents [1 0.0574 0.456 0.15 0.08]): bounds [0.385 0.0758 0.0199 0.014 0.00973 0.00238], residual 0.0059, margin of (S,K) -0.0017; LMI ok 1, fill 0.000, extents [3.3e-06 1.96e-07 4.49e-06 1.9e-06 1.16e-06]
+  final attempt 2 (K fixed, contained in extents [0.837 0.048 0.381 0.125 0.0669]): bounds [0.323 0.062 0.0169 0.0119 0.00725 0.00194], residual 0.0019, margin of (S,K) -0.000168; LMI ok 1, fill 0.000, extents [0.000219 1.22e-05 0.000322 0.000116 5.23e-05]
+  final attempt 3 (K fixed, contained in extents [0.7 0.0401 0.319 0.105 0.056]): bounds [0.275 0.0515 0.0139 0.0101 0.00168 0.00444], residual 0.0009, margin of (S,K) 5.17e-05; LMI ok 1, fill 0.037, extents [0.695 0.0399 0.299 0.089 0.0559]
+CLF speed 15.00 curvature 0.0050: extents [0.69 m 0.040 rad 0.30 m/s 0.09 m/s 0.056 rad/s], fill 0.037; certified time constant 3.67 s (required 4.00 s), hold factor 1.0023; sampled worst contraction 0.9616
+elapsed 8 s
+
+##### box [1.5 0.15 0.75 0.15 0.08] speed 8 curvature 0
+  plain LMI: fill 0.171, extents [1.5 0.0964 0.652 0.105 0.08]
+  iteration 1: coefficient bounds [0.164 0.0958 0.0523 0.0187 0.0229 0.0099], residual 0.0128; LMI ok 1, fill 0.001, extents [0.181 0.0221 0.111 0.131 0.08]
+  iteration 2: coefficient bounds [0.125 0.0653 0.035 0.0307 0.015 0.00527], residual 0.0054; LMI ok 1, fill 0.062, extents [1.09 0.0795 0.58 0.15 0.08]
+  iteration 3: coefficient bounds [0.165 0.11 0.0631 0.0316 0.0274 0.0119], residual 0.0088; LMI ok 1, fill 0.016, extents [0.492 0.048 0.236 0.15 0.08]
+  iteration 4: coefficient bounds [0.118 0.0621 0.0443 0.034 0.0224 0.00605], residual 0.0066; LMI ok 1, fill 0.045, extents [0.887 0.0706 0.454 0.15 0.08]
+  final attempt 1 (K fixed, contained in extents [1.09 0.0795 0.58 0.15 0.08]): bounds [0.164 0.113 0.0631 0.032 0.0263 0.0112], residual 0.0100, margin of (S,K) -0.00194; LMI ok 0, fill 0.000, extents [2.6e-06 2.13e-07 2.84e-06 1.86e-06 8.29e-07]
+  final attempt 2 (K fixed, contained in extents [0.912 0.0665 0.485 0.125 0.0669]): bounds [0.132 0.0919 0.0535 0.0269 0.0238 0.00906], residual 0.0068, margin of (S,K) -0.000871; LMI ok 1, fill 0.000, extents [1.35e-05 1.08e-06 1.47e-05 9.1e-06 3.63e-06]
+  final attempt 3 (K fixed, contained in extents [0.763 0.0556 0.406 0.105 0.056]): bounds [0.105 0.0807 0.0434 0.0225 0.0189 0.00549], residual 0.0053, margin of (S,K) -0.000309; LMI ok 1, fill 0.000, extents [0.000364 2.8e-05 0.000323 0.000212 7.7e-05]
+  final attempt 4 (K fixed, contained in extents [0.639 0.0465 0.34 0.0877 0.0469]): bounds [0.084 0.0685 0.0378 0.0193 0.0169 0.00337], residual 0.0044, margin of (S,K) 6.46e-06; LMI ok 1, fill 0.021, extents [0.638 0.0465 0.272 0.0741 0.0468]
+CLF speed  8.00 curvature 0.0000: extents [0.64 m 0.047 rad 0.27 m/s 0.07 m/s 0.047 rad/s], fill 0.021; certified time constant 3.83 s (required 4.00 s), hold factor 1.0165; sampled worst contraction 0.9524
+elapsed 9 s
+
+##### box [1.5 0.15 0.75 0.15 0.08] speed 8 curvature 0.005
+  plain LMI: fill 0.182, extents [1.5 0.0983 0.75 0.107 0.08]
+  iteration 1: coefficient bounds [0.2 0.0779 0.0264 0.0258 0.0195 0.00953], residual 0.0056; LMI ok 1, fill 0.038, extents [0.747 0.0632 0.359 0.15 0.08]
+  iteration 2: coefficient bounds [0.132 0.0643 0.0567 0.0329 0.0291 0.00657], residual 0.0068; LMI ok 1, fill 0.035, extents [0.744 0.0639 0.75 0.15 0.08]
+  iteration 3: coefficient bounds [0.173 0.129 0.0635 0.0313 0.0314 0.0137], residual 0.0138; LMI ok 0, fill 0.000, extents [6.12e-06 7.73e-07 8.52e-06 6.19e-06 3.8e-06]
+  final attempt 1 (K fixed, contained in extents [0.747 0.0632 0.359 0.15 0.08]): bounds [0.13 0.0624 0.0608 0.034 0.0322 0.00637], residual 0.0063, margin of (S,K) -3.77e-05; LMI ok 1, fill 0.000, extents [0.000288 2.45e-05 0.000304 0.00017 7.28e-05]
+  final attempt 2 (K fixed, contained in extents [0.625 0.0529 0.3 0.125 0.0669]): bounds [0.107 0.0559 0.0487 0.0271 0.0256 0.00593], residual 0.0049, margin of (S,K) 0.000116; LMI ok 1, fill 0.026, extents [0.61 0.0508 0.285 0.0945 0.0644]
+CLF speed  8.00 curvature 0.0050: extents [0.61 m 0.051 rad 0.28 m/s 0.09 m/s 0.064 rad/s], fill 0.026; certified time constant 3.51 s (required 4.00 s), hold factor 1.0221; sampled worst contraction 0.9452
+elapsed 6 s
+
+##### box [1.5 0.15 0.75 0.15 0.08] speed 15 curvature 0
+  plain LMI: fill 0.126, extents [1.5 0.0714 0.635 0.0539 0.08]
+  iteration 1: coefficient bounds [0.256 0.0664 0.0382 0.021 0.00817 0.00335], residual 0.0030; LMI ok 1, fill 0.078, extents [1.5 0.0675 0.439 0.15 0.08]
+  iteration 2: coefficient bounds [0.346 0.0683 0.039 0.0158 0.00971 0.00848], residual 0.0029; LMI ok 1, fill 0.078, extents [1.5 0.0669 0.411 0.15 0.08]
+  iteration 3: coefficient bounds [0.381 0.071 0.0413 0.0156 0.0109 0.00823], residual 0.0031; LMI ok 1, fill 0.076, extents [1.5 0.0666 0.407 0.15 0.08]
+  iteration 4: coefficient bounds [0.364 0.0689 0.0414 0.0141 0.0106 0.00861], residual 0.0030; LMI ok 1, fill 0.077, extents [1.5 0.0669 0.421 0.15 0.08]
+  final attempt 1 (K fixed, contained in extents [1.5 0.0675 0.439 0.15 0.08]): bounds [0.348 0.0688 0.0402 0.0157 0.01 0.00855], residual 0.0028, margin of (S,K) -3.95e-05; LMI ok 1, fill 0.078, extents [1.5 0.0668 0.415 0.149 0.0796]
+CLF speed 15.00 curvature 0.0000: extents [1.50 m 0.067 rad 0.41 m/s 0.15 m/s 0.080 rad/s], fill 0.078; certified time constant 3.91 s (required 4.00 s), hold factor 1.0073; sampled worst contraction 0.9558
+elapsed 5 s
+
+##### box [1.5 0.15 0.75 0.15 0.08] speed 15 curvature 0.005
+  plain LMI: fill 0.133, extents [1.5 0.073 0.75 0.0553 0.08]
+  iteration 1: coefficient bounds [0.266 0.0433 0.0255 0.00394 0.00219 0.00133], residual 0.0018; LMI ok 1, fill 0.090, extents [1.5 0.0685 0.338 0.15 0.08]
+  iteration 2: coefficient bounds [0.381 0.0758 0.0147 0.014 0.00901 0.00759], residual 0.0018; LMI ok 1, fill 0.085, extents [1.5 0.0652 0.75 0.15 0.08]
+  iteration 3: coefficient bounds [0.381 0.0709 0.0335 0.0141 0.0095 0.00177], residual 0.0057; LMI ok 1, fill 0.044, extents [1.23 0.0566 0.66 0.15 0.08]
+  iteration 4: coefficient bounds [0.343 0.0834 0.0291 0.0144 0.00837 0.0074], residual 0.0017; LMI ok 1, fill 0.082, extents [1.5 0.0646 0.75 0.15 0.08]
+  final attempt 1 (K fixed, contained in extents [1.5 0.0685 0.338 0.15 0.08]): bounds [0.386 0.0732 0.0146 0.014 0.00918 0.00182], residual 0.0052, margin of (S,K) -0.00128; LMI ok 1, fill 0.000, extents [7.48e-06 3.52e-07 7.19e-06 2.92e-06 1.92e-06]
+  final attempt 2 (K fixed, contained in extents [1.25 0.0573 0.283 0.125 0.0669]): bounds [0.319 0.0629 0.0121 0.0116 0.00684 0.0015], residual 0.0022, margin of (S,K) -0.00019; LMI ok 1, fill 0.000, extents [0.00027 1.2e-05 0.000281 9.49e-05 5.4e-05]
+  final attempt 3 (K fixed, contained in extents [1.05 0.048 0.237 0.105 0.056]): bounds [0.269 0.0514 0.0103 0.00973 0.00228 0.00359], residual 0.0009, margin of (S,K) 8.31e-05; LMI ok 1, fill 0.044, extents [1.04 0.0474 0.219 0.0855 0.0558]
+CLF speed 15.00 curvature 0.0050: extents [1.04 m 0.047 rad 0.22 m/s 0.09 m/s 0.056 rad/s], fill 0.044; certified time constant 3.62 s (required 4.00 s), hold factor 1.0017; sampled worst contraction 0.9622
+elapsed 8 s
+
+##### box [1.5 0.2 1 0.1 0.05] speed 8 curvature 0
+  plain LMI: fill 0.054, extents [1.5 0.0806 0.86 0.0603 0.05]
+  iteration 1: coefficient bounds [0.378 0.0883 0.0773 0.0141 0.0153 0.0151], residual 0.0053; LMI ok 1, fill 0.005, extents [0.324 0.0269 0.164 0.1 0.05]
+  iteration 2: coefficient bounds [0.112 0.075 0.0437 0.034 0.0194 0.00456], residual 0.0030; LMI ok 1, fill 0.020, extents [0.851 0.0549 0.304 0.1 0.05]
+  iteration 3: coefficient bounds [0.125 0.0978 0.0751 0.0383 0.0198 0.00445], residual 0.0042; LMI ok 1, fill 0.012, extents [0.63 0.0439 0.257 0.1 0.05]
+  iteration 4: coefficient bounds [0.105 0.0931 0.0551 0.0373 0.0206 0.00434], residual 0.0035; LMI ok 1, fill 0.016, extents [0.733 0.0491 0.242 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [0.851 0.0549 0.304 0.1 0.05]): bounds [0.124 0.0936 0.0765 0.0404 0.02 0.00422], residual 0.0041, margin of (S,K) -0.000241; LMI ok 1, fill 0.000, extents [1.76e-05 1.18e-06 1.92e-05 9.55e-06 3.85e-06]
+  final attempt 2 (K fixed, contained in extents [0.712 0.0459 0.254 0.0837 0.0418]): bounds [0.104 0.0808 0.0654 0.0333 0.0174 0.0043], residual 0.0031, margin of (S,K) -4.76e-05; LMI ok 1, fill 0.000, extents [0.000379 2.48e-05 0.000417 0.00018 6.25e-05]
+  final attempt 3 (K fixed, contained in extents [0.596 0.0384 0.213 0.07 0.035]): bounds [0.082 0.0655 0.0544 0.0281 0.0144 0.00361], residual 0.0028, margin of (S,K) -1.03e-06; LMI ok 1, fill 0.010, extents [0.595 0.0384 0.21 0.0555 0.035]
+CLF speed  8.00 curvature 0.0000: extents [0.59 m 0.038 rad 0.21 m/s 0.06 m/s 0.035 rad/s], fill 0.010; certified time constant 3.85 s (required 4.00 s), hold factor 1.0256; sampled worst contraction 0.9555
+elapsed 8 s
+
+##### box [1.5 0.2 1 0.1 0.05] speed 8 curvature 0.005
+  plain LMI: fill 0.064, extents [1.5 0.0844 1 0.0647 0.05]
+  iteration 1: coefficient bounds [0.446 0.0468 0.0248 0.0229 0.00711 0.00435], residual 0.0044; LMI ok 1, fill 0.007, extents [0.384 0.0311 0.0905 0.1 0.05]
+  iteration 2: coefficient bounds [0.0733 0.0938 0.0632 0.0284 0.0236 0.00391], residual 0.0029; LMI ok 1, fill 0.021, extents [0.873 0.0559 0.718 0.1 0.05]
+  iteration 3: coefficient bounds [0.29 0.0814 0.0792 0.0422 0.0196 0.0139], residual 0.0068; LMI ok 1, fill 0.002, extents [0.223 0.0192 0.161 0.1 0.05]
+  iteration 4: coefficient bounds [0.116 0.0771 0.0316 0.0331 0.0212 0.00366], residual 0.0027; LMI ok 1, fill 0.023, extents [0.9 0.058 0.581 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [0.9 0.058 0.581 0.1 0.05]): bounds [0.204 0.103 0.0639 0.0386 0.0227 0.0101], residual 0.0048, margin of (S,K) -0.000495; LMI ok 0, fill 0.000, extents [4.89e-06 3.41e-07 6.71e-06 2.7e-06 1.42e-06]
+  final attempt 2 (K fixed, contained in extents [0.753 0.0485 0.486 0.0837 0.0418]): bounds [0.17 0.0849 0.0512 0.0284 0.0177 0.00693], residual 0.0033, margin of (S,K) -0.000207; LMI ok 1, fill 0.000, extents [0.000132 8.94e-06 0.000179 7.1e-05 3.54e-05]
+  final attempt 3 (K fixed, contained in extents [0.63 0.0406 0.406 0.07 0.035]): bounds [0.142 0.0717 0.0428 0.0217 0.0141 0.00494], residual 0.0026, margin of (S,K) -6.25e-05; LMI ok 1, fill 0.004, extents [0.331 0.0218 0.334 0.0618 0.0282]
+CLF speed  8.00 curvature 0.0050: extents [0.33 m 0.022 rad 0.33 m/s 0.06 m/s 0.028 rad/s], fill 0.004; certified time constant 3.89 s (required 4.00 s), hold factor 1.0288; sampled worst contraction 0.9564
+elapsed 14 s
+
+##### box [1.5 0.2 1 0.1 0.05] speed 15 curvature 0
+  plain LMI: fill 0.041, extents [1.5 0.0581 0.844 0.0207 0.05]
+  iteration 1: coefficient bounds [0.218 0.0866 0.0521 0.0152 0.00443 0.00251], residual 0.0020; LMI ok 1, fill 0.021, extents [1.5 0.0548 0.213 0.1 0.05]
+  iteration 2: coefficient bounds [0.308 0.0516 0.0556 0.0171 0.0104 0.00667], residual 0.0016; LMI ok 1, fill 0.025, extents [1.5 0.0552 0.533 0.1 0.05]
+  iteration 3: coefficient bounds [0.332 0.0799 0.0549 0.0193 0.0143 0.00669], residual 0.0022; LMI ok 1, fill 0.020, extents [1.44 0.053 0.533 0.1 0.05]
+  iteration 4: coefficient bounds [0.329 0.0769 0.06 0.0194 0.0141 0.0068], residual 0.0023; LMI ok 1, fill 0.019, extents [1.35 0.0509 0.538 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [1.5 0.0552 0.533 0.1 0.05]): bounds [0.33 0.0814 0.055 0.0191 0.0144 0.0067], residual 0.0021, margin of (S,K) -0.000151; LMI ok 1, fill 0.000, extents [0.000376 1.43e-05 0.000389 0.000129 6.51e-05]
+  final attempt 2 (K fixed, contained in extents [1.25 0.0462 0.446 0.0837 0.0418]): bounds [0.267 0.0668 0.0472 0.0167 0.0119 0.00557], residual 0.0018, margin of (S,K) -8.49e-05; LMI ok 1, fill 0.000, extents [0.000739 2.79e-05 0.000742 0.000255 0.000126]
+  final attempt 3 (K fixed, contained in extents [1.05 0.0386 0.373 0.07 0.035]): bounds [0.226 0.0531 0.0394 0.0133 0.0104 0.00461], residual 0.0016, margin of (S,K) -1.09e-05; LMI ok 1, fill 0.012, extents [1.04 0.0385 0.227 0.0691 0.035]
+CLF speed 15.00 curvature 0.0000: extents [1.04 m 0.039 rad 0.23 m/s 0.07 m/s 0.035 rad/s], fill 0.012; certified time constant 3.94 s (required 4.00 s), hold factor 1.0087; sampled worst contraction 0.9586
+elapsed 18 s
+
+##### box [1.5 0.2 1 0.1 0.05] speed 15 curvature 0.005
+  plain LMI: fill 0.048, extents [1.5 0.0613 1 0.0228 0.05]
+  iteration 1: coefficient bounds [0.303 0.0429 0.0168 0.00416 0.00227 0.00121], residual 0.0006; LMI ok 1, fill 0.030, extents [1.5 0.0557 0.802 0.1 0.05]
+  iteration 2: coefficient bounds [0.322 0.0897 0.0445 0.0156 0.00193 0.00158], residual 0.0009; LMI ok 1, fill 0.026, extents [1.5 0.0534 1 0.1 0.05]
+  iteration 3: coefficient bounds [0.343 0.0981 0.0491 0.0156 0.00183 0.00191], residual 0.0013; LMI ok 1, fill 0.023, extents [1.5 0.0532 0.888 0.1 0.05]
+  iteration 4: coefficient bounds [0.334 0.0899 0.0485 0.0169 0.00167 0.00178], residual 0.0011; LMI ok 1, fill 0.026, extents [1.5 0.0539 1 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [1.5 0.0557 0.802 0.1 0.05]): bounds [0.333 0.0906 0.0444 0.0154 0.00194 0.00174], residual 0.0009, margin of (S,K) -0.000212; LMI ok 1, fill 0.000, extents [0.000366 1.43e-05 0.000501 0.000191 9.72e-05]
+  final attempt 2 (K fixed, contained in extents [1.25 0.0466 0.671 0.0837 0.0418]): bounds [0.276 0.0755 0.0379 0.0135 0.00159 0.00119], residual 0.0006, margin of (S,K) -9.88e-05; LMI ok 1, fill 0.017, extents [1.16 0.0422 0.603 0.076 0.0391]
+CLF speed 15.00 curvature 0.0050: extents [1.16 m 0.042 rad 0.60 m/s 0.08 m/s 0.039 rad/s], fill 0.017; certified time constant 3.85 s (required 4.00 s), hold factor 1.0036; sampled worst contraction 0.9621
+elapsed 19 s
+EXIT
+# process B (boxes 4-6)
+
+##### box [2 0.2 1 0.1 0.05] speed 8 curvature 0
+  plain LMI: fill 0.053, extents [2 0.0942 0.866 0.0603 0.05]
+  iteration 1: coefficient bounds [0.382 0.0819 0.0796 0.0138 0.0143 0.0151], residual 0.0051; LMI ok 1, fill 0.004, extents [0.337 0.0273 0.126 0.1 0.05]
+  iteration 2: coefficient bounds [0.104 0.0744 0.0434 0.0262 0.011 0.00454], residual 0.0023; LMI ok 1, fill 0.024, extents [1.08 0.0634 0.292 0.1 0.05]
+  iteration 3: coefficient bounds [0.0969 0.0943 0.0738 0.0369 0.0197 0.00433], residual 0.0036; LMI ok 1, fill 0.014, extents [0.793 0.0508 0.451 0.1 0.05]
+  iteration 4: coefficient bounds [0.145 0.0981 0.0839 0.0403 0.0194 0.00482], residual 0.0040; LMI ok 1, fill 0.011, extents [0.65 0.0442 0.213 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [1.08 0.0634 0.292 0.1 0.05]): bounds [0.0966 0.0913 0.0739 0.0378 0.0196 0.00466], residual 0.0037, margin of (S,K) -0.000252; LMI ok 1, fill 0.000, extents [1.52e-05 9.29e-07 1.48e-05 7.11e-06 3.42e-06]
+  final attempt 2 (K fixed, contained in extents [0.906 0.053 0.244 0.0837 0.0418]): bounds [0.0816 0.0764 0.0621 0.0324 0.0166 0.0036], residual 0.0032, margin of (S,K) -0.00016; LMI ok 1, fill 0.000, extents [0.000159 9.62e-06 0.000159 7.56e-05 3.43e-05]
+  final attempt 3 (K fixed, contained in extents [0.758 0.0444 0.204 0.07 0.035]): bounds [0.0642 0.063 0.0545 0.0263 0.0139 0.00321], residual 0.0027, margin of (S,K) -7.45e-05; LMI ok 1, fill 0.000, extents [0.000286 1.72e-05 0.000285 0.000137 5.72e-05]
+  final attempt 4 (K fixed, contained in extents [0.634 0.0371 0.171 0.0586 0.0293]): bounds [0.055 0.057 0.0446 0.0225 0.0124 0.0026], residual 0.0023, margin of (S,K) -1.49e-05; LMI ok 1, fill 0.008, extents [0.629 0.0371 0.0897 0.0504 0.0292]
+CLF speed  8.00 curvature 0.0000: extents [0.63 m 0.037 rad 0.09 m/s 0.05 m/s 0.029 rad/s], fill 0.008; certified time constant 3.86 s (required 4.00 s), hold factor 1.0164; sampled worst contraction 0.9593
+elapsed 13 s
+
+##### box [2 0.2 1 0.1 0.05] speed 8 curvature 0.005
+  plain LMI: fill 0.064, extents [2 0.0981 1 0.0648 0.05]
+  iteration 1: coefficient bounds [0.442 0.0464 0.0247 0.0219 0.0076 0.00471], residual 0.0041; LMI ok 1, fill 0.006, extents [0.414 0.0324 0.0812 0.1 0.05]
+  iteration 2: coefficient bounds [0.0727 0.0924 0.0637 0.0251 0.0241 0.00388], residual 0.0029; LMI ok 1, fill 0.020, extents [0.978 0.0588 0.556 0.1 0.05]
+  iteration 3: coefficient bounds [0.201 0.111 0.0648 0.0437 0.02 0.00833], residual 0.0052; LMI ok 1, fill 0.005, extents [0.411 0.0313 0.337 0.1 0.05]
+  iteration 4: coefficient bounds [0.115 0.105 0.0554 0.0359 0.0238 0.00448], residual 0.0032; LMI ok 1, fill 0.015, extents [0.794 0.0523 0.579 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [0.978 0.0588 0.556 0.1 0.05]): bounds [0.191 0.11 0.067 0.0433 0.0218 0.00951], residual 0.0054, margin of (S,K) -0.000487; LMI ok 0, fill 0.000, extents [4.34e-06 2.9e-07 5.14e-06 2.16e-06 1.11e-06]
+  final attempt 2 (K fixed, contained in extents [0.818 0.0492 0.465 0.0837 0.0418]): bounds [0.157 0.0901 0.0536 0.0356 0.0176 0.0057], residual 0.0035, margin of (S,K) -0.000223; LMI ok 1, fill 0.000, extents [0.00015 9.71e-06 0.000176 6.81e-05 3.34e-05]
+  final attempt 3 (K fixed, contained in extents [0.684 0.0412 0.389 0.07 0.035]): bounds [0.132 0.075 0.0446 0.0255 0.0135 0.00423], residual 0.0026, margin of (S,K) -8.39e-05; LMI ok 1, fill 0.009, extents [0.652 0.0407 0.348 0.0673 0.0345]
+CLF speed  8.00 curvature 0.0050: extents [0.65 m 0.041 rad 0.35 m/s 0.07 m/s 0.035 rad/s], fill 0.009; certified time constant 3.88 s (required 4.00 s), hold factor 1.0224; sampled worst contraction 0.9577
+elapsed 10 s
+
+##### box [2 0.2 1 0.1 0.05] speed 15 curvature 0
+  plain LMI: fill 0.045, extents [2 0.0665 0.851 0.0217 0.05]
+  iteration 1: coefficient bounds [0.225 0.0872 0.051 0.016 0.00483 0.00243], residual 0.0021; LMI ok 1, fill 0.022, extents [1.63 0.0566 0.172 0.1 0.05]
+  iteration 2: coefficient bounds [0.31 0.0498 0.0535 0.0167 0.00875 0.00666], residual 0.0013; LMI ok 1, fill 0.030, extents [2 0.0638 0.449 0.1 0.05]
+  iteration 3: coefficient bounds [0.326 0.0721 0.0582 0.0172 0.0141 0.00671], residual 0.0021; LMI ok 1, fill 0.022, extents [1.64 0.0559 0.396 0.1 0.05]
+  iteration 4: coefficient bounds [0.34 0.0731 0.0622 0.0168 0.0138 0.0071], residual 0.0022; LMI ok 1, fill 0.020, extents [1.57 0.0543 0.653 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [2 0.0638 0.449 0.1 0.05]): bounds [0.327 0.0742 0.0594 0.0171 0.0146 0.00663], residual 0.0020, margin of (S,K) -0.000294; LMI ok 1, fill 0.000, extents [0.00029 9.72e-06 0.00026 9.15e-05 4.51e-05]
+  final attempt 2 (K fixed, contained in extents [1.67 0.0534 0.376 0.0837 0.0418]): bounds [0.262 0.0607 0.0504 0.0152 0.012 0.00556], residual 0.0017, margin of (S,K) -0.000139; LMI ok 1, fill 0.000, extents [0.000641 2.12e-05 0.000579 0.000199 9.54e-05]
+  final attempt 3 (K fixed, contained in extents [1.4 0.0447 0.315 0.07 0.035]): bounds [0.223 0.0495 0.0416 0.0115 0.0096 0.00458], residual 0.0015, margin of (S,K) -7.52e-05; LMI ok 1, fill 0.000, extents [0.000701 2.29e-05 0.000643 0.000217 0.000106]
+  final attempt 4 (K fixed, contained in extents [1.17 0.0374 0.263 0.0586 0.0293]): bounds [0.187 0.0413 0.0361 0.0105 0.0092 0.00409], residual 0.0011, margin of (S,K) 1.62e-05; LMI ok 1, fill 0.010, extents [1.15 0.037 0.258 0.0482 0.0293]
+CLF speed 15.00 curvature 0.0000: extents [1.15 m 0.037 rad 0.26 m/s 0.05 m/s 0.029 rad/s], fill 0.010; certified time constant 3.82 s (required 4.00 s), hold factor 1.0049; sampled worst contraction 0.9629
+elapsed 9 s
+
+##### box [2 0.2 1 0.1 0.05] speed 15 curvature 0.005
+  plain LMI: fill 0.053, extents [2 0.07 1 0.0238 0.05]
+  iteration 1: coefficient bounds [0.303 0.0444 0.0178 0.004 0.00205 0.0013], residual 0.0006; LMI ok 1, fill 0.032, extents [2 0.0645 0.269 0.1 0.05]
+  iteration 2: coefficient bounds [0.34 0.0726 0.0283 0.00878 0.00147 0.00132], residual 0.0011; LMI ok 1, fill 0.030, extents [2 0.062 1 0.1 0.05]
+  iteration 3: coefficient bounds [0.355 0.0872 0.0503 0.0147 0.00203 0.00177], residual 0.0009; LMI ok 1, fill 0.027, extents [1.93 0.0615 0.757 0.1 0.05]
+  iteration 4: coefficient bounds [0.331 0.0826 0.0438 0.0171 0.00136 0.00158], residual 0.0011; LMI ok 1, fill 0.028, extents [1.97 0.0626 1 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [2 0.0645 0.269 0.1 0.05]): bounds [0.337 0.0724 0.0285 0.0089 0.00148 0.00132], residual 0.0010, margin of (S,K) -0.000152; LMI ok 1, fill 0.000, extents [0.000987 3.15e-05 0.000759 0.000348 0.000175]
+  final attempt 2 (K fixed, contained in extents [1.67 0.0539 0.225 0.0837 0.0418]): bounds [0.283 0.0583 0.0228 0.00741 0.00122 0.000885], residual 0.0007, margin of (S,K) -7.88e-05; LMI ok 1, fill 0.022, extents [1.65 0.0516 0.212 0.0763 0.0408]
+CLF speed 15.00 curvature 0.0050: extents [1.65 m 0.052 rad 0.21 m/s 0.08 m/s 0.041 rad/s], fill 0.022; certified time constant 3.85 s (required 4.00 s), hold factor 1.0033; sampled worst contraction 0.9659
+elapsed 8 s
+
+##### box [0.75 0.1 0.5 0.1 0.05] speed 8 curvature 0
+  plain LMI: fill 0.150, extents [0.75 0.0549 0.432 0.0658 0.05]
+  iteration 1: coefficient bounds [0.16 0.09 0.0385 0.012 0.0151 0.00476], residual 0.0054; LMI ok 1, fill 0.056, extents [0.562 0.0451 0.267 0.1 0.05]
+  iteration 2: coefficient bounds [0.101 0.0658 0.0421 0.0208 0.0193 0.00456], residual 0.0041; LMI ok 1, fill 0.078, extents [0.717 0.0528 0.327 0.1 0.05]
+  iteration 3: coefficient bounds [0.115 0.0854 0.0433 0.0216 0.0195 0.00471], residual 0.0048; LMI ok 1, fill 0.067, extents [0.648 0.0496 0.239 0.1 0.05]
+  iteration 4: coefficient bounds [0.109 0.0581 0.0426 0.0214 0.0206 0.00463], residual 0.0043; LMI ok 1, fill 0.075, extents [0.698 0.052 0.363 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [0.717 0.0528 0.327 0.1 0.05]): bounds [0.113 0.089 0.0431 0.0222 0.0204 0.00453], residual 0.0049, margin of (S,K) -0.000334; LMI ok 1, fill 0.000, extents [0.000125 9.58e-06 0.000179 8.63e-05 3.5e-05]
+  final attempt 2 (K fixed, contained in extents [0.6 0.0442 0.273 0.0837 0.0418]): bounds [0.0934 0.0734 0.0351 0.0179 0.0167 0.00376], residual 0.0038, margin of (S,K) 1.73e-05; LMI ok 1, fill 0.054, extents [0.596 0.0439 0.255 0.0712 0.0418]
+CLF speed  8.00 curvature 0.0000: extents [0.60 m 0.044 rad 0.25 m/s 0.07 m/s 0.042 rad/s], fill 0.054; certified time constant 3.84 s (required 4.00 s), hold factor 1.0127; sampled worst contraction 0.9546
+elapsed 6 s
+
+##### box [0.75 0.1 0.5 0.1 0.05] speed 8 curvature 0.005
+  plain LMI: fill 0.161, extents [0.75 0.0561 0.5 0.0677 0.05]
+  iteration 1: coefficient bounds [0.19 0.0647 0.0176 0.0168 0.00956 0.00323], residual 0.0045; LMI ok 1, fill 0.063, extents [0.604 0.0473 0.203 0.1 0.05]
+  iteration 2: coefficient bounds [0.123 0.0457 0.0375 0.0237 0.0201 0.00603], residual 0.0033; LMI ok 1, fill 0.090, extents [0.75 0.0544 0.304 0.1 0.05]
+  iteration 3: coefficient bounds [0.121 0.0703 0.038 0.0238 0.0204 0.00628], residual 0.0039; LMI ok 1, fill 0.078, extents [0.712 0.0526 0.252 0.1 0.05]
+  iteration 4: coefficient bounds [0.148 0.0612 0.041 0.0188 0.0213 0.00625], residual 0.0044; LMI ok 1, fill 0.072, extents [0.684 0.0515 0.44 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [0.75 0.0544 0.304 0.1 0.05]): bounds [0.125 0.0751 0.0401 0.0241 0.0202 0.00585], residual 0.0039, margin of (S,K) -0.000325; LMI ok 1, fill 0.000, extents [0.000132 9.91e-06 0.000199 8.79e-05 3.65e-05]
+  final attempt 2 (K fixed, contained in extents [0.627 0.0455 0.254 0.0837 0.0418]): bounds [0.1 0.0618 0.0323 0.0185 0.0168 0.0044], residual 0.0028, margin of (S,K) 5.68e-05; LMI ok 1, fill 0.063, extents [0.617 0.0449 0.249 0.0696 0.0418]
+CLF speed  8.00 curvature 0.0050: extents [0.62 m 0.045 rad 0.25 m/s 0.07 m/s 0.042 rad/s], fill 0.063; certified time constant 3.75 s (required 4.00 s), hold factor 1.0080; sampled worst contraction 0.9572
+elapsed 7 s
+
+##### box [0.75 0.1 0.5 0.1 0.05] speed 15 curvature 0
+  plain LMI: fill 0.102, extents [0.75 0.0409 0.421 0.0325 0.05]
+  iteration 1: coefficient bounds [0.241 0.0516 0.0255 0.0148 0.00736 0.00227], residual 0.0020; LMI ok 1, fill 0.076, extents [0.75 0.0394 0.379 0.1 0.05]
+  iteration 2: coefficient bounds [0.367 0.0552 0.0281 0.0149 0.00963 0.00593], residual 0.0020; LMI ok 1, fill 0.075, extents [0.75 0.0392 0.35 0.1 0.05]
+  iteration 3: coefficient bounds [0.397 0.0534 0.0271 0.015 0.0105 0.00592], residual 0.0020; LMI ok 1, fill 0.076, extents [0.75 0.0391 0.37 0.1 0.05]
+  iteration 4: coefficient bounds [0.364 0.0636 0.0296 0.0151 0.00981 0.00688], residual 0.0020; LMI ok 1, fill 0.075, extents [0.75 0.0391 0.332 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [0.75 0.0394 0.379 0.1 0.05]): bounds [0.359 0.0533 0.0271 0.0151 0.0099 0.00608], residual 0.0019, margin of (S,K) -2.75e-05; LMI ok 1, fill 0.075, extents [0.749 0.0391 0.334 0.0988 0.0497]
+CLF speed 15.00 curvature 0.0000: extents [0.75 m 0.039 rad 0.33 m/s 0.10 m/s 0.050 rad/s], fill 0.075; certified time constant 3.87 s (required 4.00 s), hold factor 1.0054; sampled worst contraction 0.9596
+elapsed 6 s
+
+##### box [0.75 0.1 0.5 0.1 0.05] speed 15 curvature 0.005
+  plain LMI: fill 0.108, extents [0.75 0.0419 0.5 0.0335 0.05]
+  iteration 1: coefficient bounds [0.27 0.0276 0.0191 0.00326 0.00093 0.000564], residual 0.0004; LMI ok 1, fill 0.089, extents [0.75 0.0401 0.5 0.0862 0.05]
+  iteration 2: coefficient bounds [0.337 0.061 0.0252 0.0083 0.00195 0.000954], residual 0.0008; LMI ok 1, fill 0.083, extents [0.75 0.0391 0.5 0.1 0.05]
+  iteration 3: coefficient bounds [0.372 0.0566 0.0265 0.0102 0.0019 0.0022], residual 0.0013; LMI ok 1, fill 0.079, extents [0.75 0.0389 0.5 0.1 0.05]
+  iteration 4: coefficient bounds [0.363 0.058 0.0269 0.0101 0.00191 0.0022], residual 0.0013; LMI ok 1, fill 0.079, extents [0.75 0.039 0.5 0.1 0.05]
+  final attempt 1 (K fixed, contained in extents [0.75 0.0401 0.5 0.0862 0.05]): bounds [0.329 0.063 0.0251 0.00849 0.00194 0.000933], residual 0.0008, margin of (S,K) -0.000282; LMI ok 1, fill 0.000, extents [0.000228 1.31e-05 0.000553 0.000168 7.78e-05]
+  final attempt 2 (K fixed, contained in extents [0.627 0.0336 0.418 0.0721 0.0418]): bounds [0.275 0.0528 0.0209 0.007 0.00164 0.00066], residual 0.0004, margin of (S,K) -9.86e-05; LMI ok 1, fill 0.061, extents [0.627 0.0332 0.392 0.0717 0.0416]
+CLF speed 15.00 curvature 0.0050: extents [0.63 m 0.033 rad 0.39 m/s 0.07 m/s 0.042 rad/s], fill 0.061; certified time constant 3.84 s (required 4.00 s), hold factor 1.0010; sampled worst contraction 0.9600
+elapsed 7 s
+
+##### box [1.25 0.15 0.75 0.12 0.06] speed 8 curvature 0
+  plain LMI: fill 0.113, extents [1.25 0.0784 0.648 0.0765 0.06]
+  iteration 1: coefficient bounds [0.222 0.092 0.055 0.0151 0.0159 0.00876], residual 0.0096; LMI ok 1, fill 0.006, extents [0.276 0.0264 0.17 0.12 0.06]
+  iteration 2: coefficient bounds [0.114 0.0598 0.0322 0.0313 0.0172 0.00438], residual 0.0054; LMI ok 1, fill 0.034, extents [0.74 0.0553 0.46 0.12 0.06]
+  iteration 3: coefficient bounds [0.178 0.109 0.0693 0.0323 0.0211 0.00941], residual 0.0063; LMI ok 1, fill 0.021, extents [0.553 0.0458 0.329 0.12 0.06]
+  iteration 4: coefficient bounds [0.108 0.0787 0.0613 0.0306 0.0226 0.0055], residual 0.0047; LMI ok 1, fill 0.036, extents [0.774 0.0574 0.323 0.12 0.06]
+  final attempt 1 (K fixed, contained in extents [0.774 0.0574 0.323 0.12 0.06]): bounds [0.125 0.0831 0.0632 0.0338 0.0217 0.00416], residual 0.0055, margin of (S,K) -0.000134; LMI ok 1, fill 0.000, extents [0.00013 9.84e-06 0.000154 6.79e-05 3.02e-05]
+  final attempt 2 (K fixed, contained in extents [0.648 0.0481 0.27 0.1 0.0502]): bounds [0.102 0.069 0.0522 0.0264 0.0198 0.0034], residual 0.0043, margin of (S,K) 3.67e-05; LMI ok 1, fill 0.025, extents [0.639 0.0473 0.262 0.0781 0.0499]
+CLF speed  8.00 curvature 0.0000: extents [0.64 m 0.047 rad 0.26 m/s 0.08 m/s 0.050 rad/s], fill 0.025; certified time constant 3.75 s (required 4.00 s), hold factor 1.0240; sampled worst contraction 0.9510
+elapsed 7 s
+
+##### box [1.25 0.15 0.75 0.12 0.06] speed 8 curvature 0.005
+  plain LMI: fill 0.124, extents [1.25 0.0807 0.75 0.0795 0.06]
+  iteration 1: coefficient bounds [0.26 0.0628 0.0225 0.0232 0.0114 0.00737], residual 0.0043; LMI ok 1, fill 0.030, extents [0.646 0.0509 0.155 0.12 0.06]
+  iteration 2: coefficient bounds [0.122 0.0597 0.0361 0.0337 0.018 0.00527], residual 0.0043; LMI ok 1, fill 0.043, extents [0.875 0.0619 0.341 0.12 0.06]
+  iteration 3: coefficient bounds [0.0923 0.103 0.0622 0.0226 0.0252 0.00745], residual 0.0054; LMI ok 1, fill 0.029, extents [0.661 0.0518 0.449 0.12 0.06]
+  iteration 4: coefficient bounds [0.114 0.0975 0.0617 0.0334 0.0264 0.00628], residual 0.0051; LMI ok 1, fill 0.029, extents [0.66 0.0518 0.396 0.12 0.06]
+  final attempt 1 (K fixed, contained in extents [0.875 0.0619 0.341 0.12 0.06]): bounds [0.095 0.101 0.0644 0.0252 0.0269 0.00763], residual 0.0054, margin of (S,K) -0.000508; LMI ok 0, fill 0.000, extents [1.56e-05 1.18e-06 1.79e-05 7.95e-06 4.75e-06]
+  final attempt 2 (K fixed, contained in extents [0.732 0.0518 0.285 0.1 0.0502]): bounds [0.0811 0.0929 0.052 0.0222 0.0218 0.00537], residual 0.0037, margin of (S,K) -1.98e-05; LMI ok 1, fill 0.030, extents [0.729 0.0517 0.256 0.0792 0.05]
+CLF speed  8.00 curvature 0.0050: extents [0.73 m 0.052 rad 0.26 m/s 0.08 m/s 0.050 rad/s], fill 0.030; certified time constant 3.87 s (required 4.00 s), hold factor 1.0174; sampled worst contraction 0.9539
+elapsed 12 s
+
+##### box [1.25 0.15 0.75 0.12 0.06] speed 15 curvature 0
+  plain LMI: fill 0.081, extents [1.25 0.0577 0.633 0.0347 0.06]
+  iteration 1: coefficient bounds [0.239 0.0636 0.0379 0.0186 0.00633 0.00274], residual 0.0023; LMI ok 1, fill 0.052, extents [1.25 0.0548 0.374 0.12 0.06]
+  iteration 2: coefficient bounds [0.337 0.0607 0.0387 0.015 0.00945 0.00835], residual 0.0022; LMI ok 1, fill 0.053, extents [1.25 0.0546 0.358 0.12 0.06]
+  iteration 3: coefficient bounds [0.363 0.0581 0.0376 0.0151 0.00869 0.00897], residual 0.0023; LMI ok 1, fill 0.053, extents [1.25 0.0545 0.337 0.12 0.06]
+  iteration 4: coefficient bounds [0.355 0.0633 0.0441 0.014 0.00946 0.00809], residual 0.0023; LMI ok 1, fill 0.052, extents [1.25 0.0543 0.35 0.12 0.06]
+  final attempt 1 (K fixed, contained in extents [1.25 0.0546 0.358 0.12 0.06]): bounds [0.363 0.0574 0.0373 0.0138 0.00942 0.00885], residual 0.0021, margin of (S,K) 2.85e-06; LMI ok 1, fill 0.053, extents [1.24 0.0544 0.351 0.115 0.0599]
+CLF speed 15.00 curvature 0.0000: extents [1.24 m 0.054 rad 0.35 m/s 0.12 m/s 0.060 rad/s], fill 0.053; certified time constant 3.84 s (required 4.00 s), hold factor 1.0067; sampled worst contraction 0.9578
+elapsed 13 s
+
+##### box [1.25 0.15 0.75 0.12 0.06] speed 15 curvature 0.005
+  plain LMI: fill 0.089, extents [1.25 0.0595 0.75 0.0361 0.06]
+  iteration 1: coefficient bounds [0.279 0.0347 0.0214 0.00383 0.000972 0.00113], residual 0.0006; LMI ok 1, fill 0.065, extents [1.25 0.0558 0.75 0.12 0.06]
+  iteration 2: coefficient bounds [0.351 0.0866 0.0342 0.0124 0.00192 0.00391], residual 0.0020; LMI ok 1, fill 0.049, extents [1.25 0.0526 0.75 0.12 0.06]
+  iteration 3: coefficient bounds [0.373 0.0712 0.0376 0.0137 0.00295 0.00397], residual 0.0018; LMI ok 1, fill 0.051, extents [1.25 0.0531 0.75 0.12 0.06]
+  iteration 4: coefficient bounds [0.349 0.0779 0.0368 0.0134 0.00249 0.00376], residual 0.0021; LMI ok 1, fill 0.049, extents [1.25 0.0529 0.75 0.12 0.06]
+  final attempt 1 (K fixed, contained in extents [1.25 0.0558 0.75 0.12 0.06]): bounds [0.351 0.0872 0.0346 0.0123 0.00188 0.00412], residual 0.0021, margin of (S,K) -0.00101; LMI ok 1, fill 0.000, extents [0.000134 6.23e-06 0.000205 8.35e-05 4.1e-05]
+  final attempt 2 (K fixed, contained in extents [1.05 0.0466 0.627 0.1 0.0502]): bounds [0.284 0.0724 0.0284 0.0105 0.00161 0.00149], residual 0.0012, margin of (S,K) -0.00037; LMI ok 1, fill 0.000, extents [0.000297 1.36e-05 0.000482 0.000187 8.32e-05]
+  final attempt 3 (K fixed, contained in extents [0.875 0.039 0.525 0.084 0.042]): bounds [0.242 0.0613 0.0243 0.00879 0.00131 0.00101], residual 0.0004, margin of (S,K) -4.84e-05; LMI ok 1, fill 0.032, extents [0.874 0.0385 0.393 0.0754 0.0414]
+CLF speed 15.00 curvature 0.0050: extents [0.87 m 0.038 rad 0.39 m/s 0.08 m/s 0.041 rad/s], fill 0.032; certified time constant 3.84 s (required 4.00 s), hold factor 1.0010; sampled worst contraction 0.9643
+elapsed 21 s
+EXIT

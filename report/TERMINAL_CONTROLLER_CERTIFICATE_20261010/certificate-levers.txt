@@ -1,0 +1,48 @@
+
+##### T 4 s, steering box 0.075 rad, speed 8, straight
+CLF speed  8.00 curvature 0.0000: extents [0.62 m 0.053 rad 0.37 m/s 0.11 m/s 0.067 rad/s], fill 0.036; certified time constant 3.83 s (required 4.00 s), hold factor 1.0259; sampled worst contraction 0.9447
+elapsed 55 s
+
+##### T 4 s, steering box 0.075 rad, speed 15, straight
+CLF speed 15.00 curvature 0.0000: extents [0.99 m 0.055 rad 0.41 m/s 0.15 m/s 0.079 rad/s], fill 0.064; certified time constant 3.93 s (required 4.00 s), hold factor 1.0090; sampled worst contraction 0.9574
+elapsed 31 s
+
+##### T 4 s, steering box 0.1 rad, speed 8, straight
+CLF speed  8.00 curvature 0.0000: extents [0.54 m 0.049 rad 0.36 m/s 0.11 m/s 0.067 rad/s], fill 0.029; certified time constant 3.79 s (required 4.00 s), hold factor 1.0350; sampled worst contraction 0.9420
+elapsed 49 s
+
+##### T 4 s, steering box 0.1 rad, speed 15, straight
+CLF speed 15.00 curvature 0.0000: extents [1.00 m 0.056 rad 0.39 m/s 0.15 m/s 0.080 rad/s], fill 0.064; certified time constant 3.91 s (required 4.00 s), hold factor 1.0092; sampled worst contraction 0.9569
+elapsed 47 s
+
+##### T 6 s, steering box 0.075 rad, speed 8, straight
+CLF speed  8.00 curvature 0.0000: extents [0.65 m 0.051 rad 0.34 m/s 0.09 m/s 0.056 rad/s], fill 0.040; certified time constant 4.74 s (required 6.00 s), hold factor 1.0133; sampled worst contraction 0.9549
+elapsed 63 s
+
+##### T 6 s, steering box 0.075 rad, speed 15, straight
+CLF speed 15.00 curvature 0.0000: extents [0.82 m 0.047 rad 0.35 m/s 0.11 m/s 0.067 rad/s], fill 0.058; certified time constant 5.44 s (required 6.00 s), hold factor 1.0052; sampled worst contraction 0.9616
+elapsed 44 s
+
+##### T 6 s, steering box 0.1 rad, speed 8, straight
+CLF speed  8.00 curvature 0.0000: extents [0.78 m 0.061 rad 0.35 m/s 0.11 m/s 0.067 rad/s], fill 0.051; certified time constant 5.87 s (required 6.00 s), hold factor 1.0234; sampled worst contraction 0.9517
+elapsed 7 s
+
+##### T 6 s, steering box 0.1 rad, speed 15, straight
+CLF speed 15.00 curvature 0.0000: extents [0.83 m 0.047 rad 0.36 m/s 0.11 m/s 0.067 rad/s], fill 0.056; certified time constant 5.62 s (required 6.00 s), hold factor 1.0066; sampled worst contraction 0.9616
+elapsed 7 s
+
+##### T 8 s, steering box 0.075 rad, speed 8, straight
+CLF speed  8.00 curvature 0.0000: extents [0.65 m 0.051 rad 0.34 m/s 0.09 m/s 0.056 rad/s], fill 0.048; certified time constant 6.03 s (required 8.00 s), hold factor 1.0121; sampled worst contraction 0.9601
+elapsed 8 s
+
+##### T 8 s, steering box 0.075 rad, speed 15, straight
+CLF speed 15.00 curvature 0.0000: extents [0.96 m 0.054 rad 0.32 m/s 0.15 m/s 0.077 rad/s], fill 0.083; certified time constant 7.59 s (required 8.00 s), hold factor 1.0078; sampled worst contraction 0.9610
+elapsed 5 s
+
+##### T 8 s, steering box 0.1 rad, speed 8, straight
+FAILED: The final certificate fails its own vertex check (relative margin -1.05e-05).
+
+##### T 8 s, steering box 0.1 rad, speed 15, straight
+CLF speed 15.00 curvature 0.0000: extents [0.87 m 0.050 rad 0.33 m/s 0.15 m/s 0.075 rad/s], fill 0.071; certified time constant 7.83 s (required 8.00 s), hold factor 1.0086; sampled worst contraction 0.9616
+elapsed 5 s
+EXIT

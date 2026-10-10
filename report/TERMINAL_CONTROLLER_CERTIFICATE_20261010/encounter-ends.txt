@@ -1,0 +1,36 @@
+[/home/zai/.cache/collisionAvoidance/terminal_certificate_20261010/out-I2]
+  exact: {'outsideCollisionCone': 1531, 'noTarget': 3234, 'exit': 757}
+  exact end after endpoint (s): n 2288 median 0.000 p99 8.105 max 8.105
+  noisy: {'exit': 4847, 'noTarget': 10324, 'outsideCollisionCone': 2414}
+  noisy end after endpoint (s): n 7261 median 0.000 p99 6.485 max 14.165
+  all end after endpoint (s): n 9549 median 0.000 p99 8.105 max 14.165
+  seed1-speed15-brakingLead          noSolution:pcbfNoNumericalResult              holds 0
+  seed1-speed8-brakingLead           noSolution:timeLimit                          holds 0
+  seed2-speed15-brakingLead          noSolution:timeLimit                          holds 1
+  seed2-speed8-brakingLead           noSolution:timeLimit                          holds 1
+  seed20261003-speed15-brakingLead   noSolution:pcbfNoNumericalResult              holds 0
+  seed20261003-speed8-brakingLead    noSolution:pcbfNoNumericalResult              holds 0
+  seed3-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed3-speed8-brakingLead           noSolution:pcbfNoNumericalResult              holds 0
+  seed4-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed4-speed8-brakingLead           noSolution:timeLimit                          holds 0
+  seed5-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed5-speed8-brakingLead           noSolution:clfNoNumericalResult               holds 14
+[/home/zai/.cache/collisionAvoidance/terminal_certificate_20261010/out-J]
+  exact: {'outsideCollisionCone': 1579, 'noTarget': 2138, 'exit': 556}
+  exact end after endpoint (s): n 2135 median 0.000 p99 4.375 max 4.380
+  noisy: {'outsideCollisionCone': 1897, 'exit': 3539, 'noTarget': 12563}
+  noisy end after endpoint (s): n 5436 median 0.000 p99 4.606 max 12.070
+  all end after endpoint (s): n 7571 median 0.000 p99 4.425 max 12.070
+  seed1-speed15-brakingLead          noSolution:pcbfNoNumericalResult              holds 0
+  seed1-speed8-brakingLead           noSolution:timeLimit                          holds 0
+  seed2-speed15-brakingLead          noSolution:clfNoNumericalResult               holds 0
+  seed2-speed8-brakingLead           noSolution:timeLimit                          holds 1
+  seed20261003-speed15-brakingLead   noSolution:timeLimit                          holds 0
+  seed20261003-speed8-brakingLead    noSolution:pcbfNoNumericalResult              holds 0
+  seed3-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed3-speed8-brakingLead           noSolution:timeLimit                          holds 0
+  seed4-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed4-speed8-brakingLead           noSolution:timeLimit                          holds 0
+  seed5-speed15-brakingLead          noSolution:timeLimit                          holds 0
+  seed5-speed8-brakingLead           noSolution:timeLimit                          holds 0

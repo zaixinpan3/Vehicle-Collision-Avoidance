@@ -10,7 +10,7 @@ terminal set and recursive feasibility.
 | `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
 | `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout, or the shifted accepted plan extended by the terminal controller) over a horizon that reaches the terminal set; PCBF slack stage, CLF stage with the terminal CLF-level cone, step-size rule on the nonlinear rollout, full-step remainder trust |
-| `terminalSafeSet.m` | CLF-tube terminal set: tube of the terminal controller, encounter end (exit or a relative motion outside the collision cone), level bisection, state-row level, terminal controller hold, nonlinear hard-row checks |
+| `terminalSafeSet.m` | CLF-tube terminal set: tube of the terminal controller, encounter end (exit or a relative motion outside the collision cone), level bisection, state-row level, the terminal controller's hold (`u = u* + K e`), nonlinear hard-row checks, the Jacobians of the sampled error map and the sampled check of the offline certificate |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
@@ -108,7 +108,9 @@ feasible candidate at the next samples, the shortest target-free horizon, the
 single fresh re-solve of a failed shift, and that an unusable shift is
 reported. `terminalSafeSetTest` checks invariance under the terminal
 controller, nesting of levels, the state-row level, the end of an encounter
-(exit or outside the collision cone) and the grid. `trustInnovationTest` checks the full-step remainder trust law:
+(exit or outside the collision cone) and the grid; `nominalClfTest` checks
+the stored certificate of P and K (input bound, box, fill, contraction,
+hold factor) and repeats its sampled check with another seed. `trustInnovationTest` checks the full-step remainder trust law:
 the next scale, bounded growth, the clamped law, and attribution of a
 posterior departure to the observer part. `clfNominalRecoveryTest` checks target-free
 nonlinear value decrease without requiring the optimizer to issue the nominal

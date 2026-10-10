@@ -1,9 +1,14 @@
 classdef terminalSafeSet
 %terminalSafeSet Encounter-safe terminal set of the CLF terminal controller.
-% After the horizon the controller is the same problem without PCBF rows: a
-% controller whose CLF row holds without slack, V(t) <= exp(-2t/T) V(0), on
-% the given path's trim. Any such controller keeps the transverse error in
-%   |e_i(t)| <= a_i sqrt(V0) exp(-t/T),    a_i = sqrt((inv(P))_ii),
+% After the horizon the controller is the linear feedback u = u* + K e(x) on
+% the transverse error to the given path's trim, with the gain K certified
+% offline together with the CLF matrix P (NOMINAL_CLF.md): on the certified
+% level set {V <= certifiedLevel} every hold satisfies V(x+) <= rho V(x),
+% rho = exp(-2h/T), with an input inside the certification bound. The CLF
+% therefore decays as V(t) <= exp(-2t/T) V(0) at the samples, and inside a
+% hold up to the certified hold factor. Any such motion keeps the transverse
+% error in
+%   |e_i(t)| <= a_i sqrt(V0) exp(-t/T),    a_i = holdFactor sqrt((inv(P))_ii),
 % and the path station within s0 + vPath t +/- G(V0,t), G the integral of a
 % bound on the path-speed error. The ego rectangle therefore stays in a box
 % in path coordinates (the CLF tube). The terminal set is
@@ -22,11 +27,13 @@ classdef terminalSafeSet
 % The check reads the forecast at the node's own time first (closed-form
 % tests) and follows the grid only when needed, for a span the forecast's own
 % geometry bounds (clear, scanBound); a tube that reaches the end of that span
-% with neither event is not terminal. levelMaximum is the smaller
-% of terminal.levelMaximum (the CLF's certified region) and the largest level
-% whose ellipsoid lies inside the state rows of the problem (speed, lateral
-% velocity and yaw-rate limits, sideslip cone, rear adhesion at the
-% certification braking ratio).
+% with neither event is not terminal. levelMaximum is the smallest of
+% terminal.levelMaximum, the certified level of the gain, and the largest
+% level whose ellipsoid, inflated by the squared hold factor, lies inside the
+% state rows of the problem (speed, lateral velocity and yaw-rate limits,
+% sideslip cone, rear adhesion at the certification braking ratio), so that
+% every hold of the terminal controller from S meets the problem's rows at
+% its nodes and midpoints.
 % The tube shrinks along any CLF-satisfying trajectory (V1 <= rho V0 nests
 % the tube of x1 in the tube of x0 shifted by one hold), so both events only
 % come earlier and S is forward invariant under the terminal controller
@@ -43,7 +50,9 @@ classdef terminalSafeSet
             % Constants of one frame and a lazily extended target table on
             % the absolute grid of this frame (step dt, index 0 = now).
             cfg=model.cfg;reference=model.nominalReference;terminal=cfg.terminal;
-            scale=sqrt(diag(inv(reference.matrix)));
+            % Tube half-axes a_i, inflated by the certified hold factor so that
+            % the tube also bounds the state inside each hold (Section 3).
+            scale=reference.holdFactor*sqrt(diag(inv(reference.matrix)));
             offset=reference.state(3);velocity=reference.state(4:5);
             pathSpeed=velocity(1)*cos(offset)-velocity(2)*sin(offset);
             positionRadius=0;yawRadius=0;
@@ -68,7 +77,8 @@ classdef terminalSafeSet
                 'reach',norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset), ...
                 'buffer',cfg.collision.safetyMarginMeters,'range',cfg.collision.encounterRangeMeters, ...
                 'clearance',clearance, ...
-                'levelMaximum',min(terminal.levelMaximum,terminalSafeSet.stateLevel(reference,cfg)), ...
+                'levelMaximum',min([terminal.levelMaximum,reference.certifiedLevel, ...
+                    terminalSafeSet.stateLevel(reference,cfg)/reference.holdFactor^2]), ...
                 'dt',dt,'ratio',ratio, ...
                 'pathHeading',here.heading,'targetMotion',localTargetMotion(model), ...
                 'positionRadius',positionRadius,'yawRadius',yawRadius, ...
@@ -385,48 +395,106 @@ classdef terminalSafeSet
             end
         end
 
-        function [input,next,ok,value] = terminalInput(x,previous,model)
-            % One hold of the terminal controller: an admissible input whose
-            % successor meets the CLF without slack, V(next) <= rho V(x), the
-            % road, the stable-handling envelope and the state limits.
+        function [input,next,ok,value] = terminalInput(x,model)
+            % One hold of the terminal controller u = u* + K e(x): the gain
+            % certified offline together with P (NOMINAL_CLF.md). On the
+            % certified level set the hold satisfies V(next) <= rho V(x), the
+            % input bound and, below the state-row level, the state and
+            % handling rows (TERMINAL_SAFE_SET.md, Section 2). ok evaluates
+            % the same conditions on this hold: a guard on the certificate,
+            % and the decision for states outside the set.
             cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
-            current=nonlinearBicycleModel.nominalValue(x,lane,reference);
-            bound=reference.contraction*current*(1+1e-9)+1e-12;
-            candidates=terminalSafeSet.candidateInputs(x,previous,model);
-            input=[];next=[];ok=false;value=Inf;
-            for k=1:size(candidates,2)
-                u=candidates(:,k);
+            e=nonlinearBicycleModel.error(x,lane,reference);
+            input=reference.input+reference.gain*e;
+            low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);high=min(1-1e-8,cfg.actuation.brakingRatioMaximum);
+            input(2)=min(high,max(low,input(2)));
+            bound=reference.contraction*sum((reference.factor*e).^2)*(1+1e-9)+1e-12;
+            next=[];ok=false;value=Inf;
+            try
+                [middle,next]=terminalSafeSet.holdStates(x,input,cfg);
+            catch exception
+                if startsWith(string(exception.identifier),"collisionAvoidanceController:"),return;end
+                rethrow(exception);
+            end
+            value=nonlinearBicycleModel.nominalValue(next,lane,reference);
+            ok=value<=bound && terminalSafeSet.admissible(x,middle,next,input,model);
+        end
+
+        function [a,b] = jacobians(reference,cfg,errors,inputs,duration)
+            % Jacobians of the sampled error map at the states x(e) on the
+            % trim's own lane: for the columns e of errors and du of inputs,
+            % e(s) = g(e, du) over the first 'duration' seconds of a hold with
+            % the input u* + du, a = dg/de (5x5xn) and b = dg/ddu (5x2xn), from
+            % the RK4 variational equations and the error chart; NaN where the
+            % model's domain is left. scripts/synthesizeClfMatrices encloses
+            % them over the certification box (NOMINAL_CLF.md).
+            if nargin<5,duration=cfg.controller.sampleTime;end
+            curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);
+            lane=struct('referenceCurve',curve);
+            [~,heading]=laneGeometry.referencePose(50,0,curve);
+            chart=[[-sin(heading);cos(heading)],zeros(2,4);zeros(4,1),eye(4)];
+            n=size(errors,2);a=nan(5,5,n);b=nan(5,2,n);
+            for j=1:n
+                e=errors(:,j);
+                [position,yaw]=laneGeometry.referencePose(50,e(1),curve);
+                x=[position;yaw+reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
                 try
-                    [middle,successor]=terminalSafeSet.holdStates(x,u,cfg);
+                    [next,ax,bx]=nonlinearBicycleModel.sample(x,reference.input+inputs(:,j),cfg,[],duration);
                 catch exception
                     if startsWith(string(exception.identifier),"collisionAvoidanceController:"),continue;end
                     rethrow(exception);
                 end
-                v=nonlinearBicycleModel.nominalValue(successor,lane,reference);
-                if v<value && terminalSafeSet.admissible(x,middle,successor,u,model)
-                    input=u;next=successor;value=v;
-                end
-                if k<=2 && value<=bound,break;end
+                [~,jacobian]=nonlinearBicycleModel.errorLinearization(next,lane,reference);
+                a(:,:,j)=jacobian*ax*chart;b(:,:,j)=jacobian*bx;
             end
-            ok=value<=bound;
         end
 
-        function candidates = candidateInputs(x,previous,model)
-            % The path guidance, the input minimizing the linear sampled CLF
-            % successor, and a grid about the latter.
-            cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
-            guidance=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
-            nominal=nonlinearBicycleModel.nominalFeedback(x,previous,lane,reference,cfg,guidance);
-            h=cfg.controller.sampleTime;
-            transition=expm([reference.continuousA,reference.continuousB;zeros(2,7)]*h);
-            a=transition(1:5,1:5);b=transition(1:5,6:7);
-            e=nonlinearBicycleModel.error(x,lane,reference);
-            least=reference.input-(reference.factor*b)\(reference.factor*a*e);
-            [steer,brake]=ndgrid(-.15:.03:.15,-.3:.075:.3);
-            grid=least+[steer(:).';brake(:).'];
-            candidates=[nominal,least,grid];
-            low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);high=min(1-1e-8,cfg.actuation.brakingRatioMaximum);
-            candidates(2,:)=min(high,max(low,candidates(2,:)));
+        function result = certificate(reference,cfg,errors,subdivisions)
+            % Sampled check of the terminal controller on the trim's own
+            % lane. For each column e of errors (transverse errors), one hold
+            % from x(e) under u = u* + K e gives
+            %   contraction  V(x+) / V(x);
+            %   remainder    ||F (e(x+) - (A0 + B0 K) e)|| / ||F e||, F = chol(P),
+            %                the departure from the trim's Jacobian in CLF units;
+            %   holdFactor   max over s in (0, h] of exp(s/T) sqrt(V(x(s)) / V(x)),
+            %                the excess of the tube radius inside the hold;
+            %   rows         state and handling rows at the hold's midpoint and
+            %                endpoint;
+            % NaN where the model's domain is left. The certificate itself is
+            % the robust LMI of scripts/synthesizeClfMatrices over the enclosure
+            % of the Jacobians (TERMINAL_SAFE_SET.md, Section 2); these samples
+            % test it independently.
+            if nargin<4,subdivisions=10;end
+            curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);
+            lane=struct('referenceCurve',curve);
+            f=reference.factor;closed=reference.nominalA+reference.nominalB*reference.gain;
+            h=cfg.controller.sampleTime;T=cfg.clf.convergenceTimeConstantSeconds;
+            n=size(errors,2);
+            result=struct('contraction',nan(1,n),'remainder',nan(1,n),'holdFactor',nan(1,n), ...
+                'rows',false(1,n),'input',nan(2,n));
+            for j=1:n
+                e=errors(:,j);value=sum((f*e).^2);
+                [position,heading]=laneGeometry.referencePose(50,e(1),curve);
+                x=[position;heading+reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
+                u=reference.input+reference.gain*e;result.input(:,j)=u;
+                try
+                    [middle,next]=terminalSafeSet.holdStates(x,u,cfg);
+                    factor=0;
+                    for s=h*(1:subdivisions)/subdivisions
+                        y=nonlinearBicycleModel.sample(x,u,cfg,[],s);
+                        factor=max(factor,exp(s/T)*sqrt(nonlinearBicycleModel.nominalValue(y,lane,reference)/value));
+                    end
+                catch exception
+                    if startsWith(string(exception.identifier),"collisionAvoidanceController:"),continue;end
+                    rethrow(exception);
+                end
+                plus=nonlinearBicycleModel.error(next,lane,reference);
+                result.contraction(j)=sum((f*plus).^2)/value;
+                result.remainder(j)=norm(f*(plus-closed*e))/sqrt(value);
+                result.holdFactor(j)=factor;
+                result.rows(j)=terminalSafeSet.stateRows(next,cfg) && terminalSafeSet.stateRows(middle,cfg) ...
+                    && terminalSafeSet.handlingRows(x,u,cfg) && terminalSafeSet.handlingRows(next,u,cfg);
+            end
         end
 
         function ok = admissible(x,middle,next,u,model)

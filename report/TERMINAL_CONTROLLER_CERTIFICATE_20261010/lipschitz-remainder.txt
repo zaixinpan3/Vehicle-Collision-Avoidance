@@ -1,0 +1,45 @@
+LMI status 4
+   -0.0130   -0.1023    0.0000   -0.0168   -0.0258
+    0.0000   -0.0000   -0.1480    0.0000    0.0000
+
+speed 8 curv 0 c=1.000: L=0.55521 (budget 0.01104) worstContr=1.01589 (rho 0.97531, rho* 0.95363) holdFactor=1.02059 rows 1665/2000 nan 0 time 0.8s
+speed 8 curv 0 c=0.400: L=0.41343 (budget 0.01104) worstContr=1.01640 (rho 0.97531, rho* 0.95363) holdFactor=1.02085 rows 2000/2000 nan 0 time 0.4s
+speed 8 curv 0 c=0.100: L=0.19636 (budget 0.01104) worstContr=1.01683 (rho 0.97531, rho* 0.95363) holdFactor=1.02106 rows 2000/2000 nan 0 time 0.4s
+speed 8 curv 0 c=0.025: L=0.09975 (budget 0.01104) worstContr=1.01703 (rho 0.97531, rho* 0.95363) holdFactor=1.02117 rows 2000/2000 nan 0 time 0.4s
+  n=200: L(1)=0.52187
+  n=2000: L(1)=0.54890
+  n=20000: L(1)=0.56170
+LMI status 4
+   -0.0094   -0.0179    0.0107   -0.0842   -0.0285
+    0.0049    0.0012   -0.2962   -0.0002   -0.0030
+
+speed 8 curv 0.005 c=1.000: L=0.70392 (budget 0.01100) worstContr=1.05303 (rho 0.97531, rho* 0.95371) holdFactor=1.03908 rows 2000/2000 nan 0 time 0.4s
+speed 8 curv 0.005 c=0.400: L=0.56627 (budget 0.01100) worstContr=1.05609 (rho 0.97531, rho* 0.95371) holdFactor=1.04059 rows 2000/2000 nan 0 time 0.4s
+speed 8 curv 0.005 c=0.100: L=0.28796 (budget 0.01100) worstContr=1.06320 (rho 0.97531, rho* 0.95371) holdFactor=1.04409 rows 2000/2000 nan 0 time 0.4s
+speed 8 curv 0.005 c=0.025: L=0.14448 (budget 0.01100) worstContr=1.06860 (rho 0.97531, rho* 0.95371) holdFactor=1.04673 rows 2000/2000 nan 0 time 0.4s
+  n=200: L(1)=0.67158
+  n=2000: L(1)=0.73244
+  n=20000: L(1)=0.75197
+LMI status 4
+   -0.0078   -0.0147    0.0000   -0.0797   -0.0502
+   -0.0000   -0.0000   -0.2843    0.0000   -0.0000
+
+speed 15 curv 0 c=1.000: L=0.54809 (budget 0.01956) worstContr=1.14371 (rho 0.97531, rho* 0.93706) holdFactor=1.08290 rows 2000/2000 nan 0 time 0.4s
+speed 15 curv 0 c=0.400: L=0.40002 (budget 0.01956) worstContr=1.09793 (rho 0.97531, rho* 0.93706) holdFactor=1.06100 rows 2000/2000 nan 0 time 0.4s
+speed 15 curv 0 c=0.100: L=0.20588 (budget 0.01956) worstContr=1.10977 (rho 0.97531, rho* 0.93706) holdFactor=1.06670 rows 2000/2000 nan 0 time 0.4s
+speed 15 curv 0 c=0.025: L=0.10264 (budget 0.01956) worstContr=1.11566 (rho 0.97531, rho* 0.93706) holdFactor=1.06953 rows 2000/2000 nan 0 time 0.4s
+  n=200: L(1)=0.48305
+  n=2000: L(1)=0.54603
+  n=20000: L(1)=0.55377
+LMI status 4
+   -0.0072   -0.0361   -0.0231   -0.1040   -0.0493
+   -0.0073   -0.0013   -0.3008   -0.0015   -0.0043
+
+speed 15 curv 0.005 c=1.000: L=0.36718 (budget 0.01827) worstContr=1.36247 (rho 0.97531, rho* 0.93956) holdFactor=1.18193 rows 2000/2000 nan 0 time 0.4s
+speed 15 curv 0.005 c=0.400: L=0.25596 (budget 0.01827) worstContr=1.13965 (rho 0.97531, rho* 0.93956) holdFactor=1.08097 rows 2000/2000 nan 0 time 0.4s
+speed 15 curv 0.005 c=0.100: L=0.13367 (budget 0.01827) worstContr=1.08901 (rho 0.97531, rho* 0.93956) holdFactor=1.05668 rows 2000/2000 nan 0 time 0.4s
+speed 15 curv 0.005 c=0.025: L=0.06833 (budget 0.01827) worstContr=1.08968 (rho 0.97531, rho* 0.93956) holdFactor=1.05701 rows 2000/2000 nan 0 time 0.4s
+  n=200: L(1)=0.32533
+  n=2000: L(1)=0.37773
+  n=20000: L(1)=0.38206
+EXIT 0

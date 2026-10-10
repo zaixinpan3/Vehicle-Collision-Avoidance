@@ -491,7 +491,7 @@ function [anchor,source,failure]=localInitialization(model,previous)
         end
         [member,context]=terminalSafeSet.member(context,states(:,end),count);
         while (count<minimum || ~member) && count<maximum
-            [u,next,ok]=terminalSafeSet.terminalInput(states(:,end),inputs(:,end),model);
+            [u,next,ok]=terminalSafeSet.terminalInput(states(:,end),model);
             if ~ok,break;end
             inputs(:,end+1)=u;states(:,end+1)=next;count=count+1;appended=appended+1; %#ok<AGROW>
             [member,context]=terminalSafeSet.member(context,next,count);

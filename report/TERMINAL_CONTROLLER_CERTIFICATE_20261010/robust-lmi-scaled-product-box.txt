@@ -1,0 +1,37 @@
+
+=== speed 8 curv 0 box [1.5 0.2 1 0.3 0.15]
+iter 0: coef bounds [0.78 0.255 0.157 0.151 0.0741] eps 0.0900 | LMI 0 fill 0.000 extents [1.28e-06 1.5e-07 7.94e-07 4.49e-07 4.04e-07]
+
+=== speed 8 curv 0 box [1 0.15 0.75 0.15 0.08]
+iter 0: coef bounds [0.944 0.189 0.195 0.0643 0.0615] eps 0.0782 | LMI 0 fill 0.000 extents [1.52e-06 1.85e-07 1.3e-06 7.04e-07 5.02e-07]
+
+=== speed 8 curv 0 box [0.75 0.1 0.5 0.1 0.05]
+iter 0: coef bounds [1.25 0.178 0.187 0.0507 0.0641] eps 0.0575 | LMI 0 fill 0.000 extents [5.9e-07 6.16e-08 6.21e-07 3.11e-07 1.82e-07]
+
+=== speed 8 curv 0.005 box [1.5 0.2 1 0.3 0.15]
+iter 0: coef bounds [0.808 0.251 0.156 0.155 0.101] eps 0.0805 | LMI 4 fill 0.000 extents [1.47e-06 1.71e-07 8.76e-07 5.22e-07 4.79e-07]
+
+=== speed 8 curv 0.005 box [1 0.15 0.75 0.15 0.08]
+iter 0: coef bounds [1 0.192 0.19 0.0901 0.0851] eps 0.0597 | LMI 0 fill 0.000 extents [8.57e-07 9.8e-08 7.8e-07 4.11e-07 2.88e-07]
+
+=== speed 8 curv 0.005 box [0.75 0.1 0.5 0.1 0.05]
+iter 0: coef bounds [1.33 0.188 0.177 0.0786 0.0571] eps 0.0577 | LMI 0 fill 0.000 extents [6.71e-07 7.04e-08 6.99e-07 3.48e-07 2.1e-07]
+
+=== speed 15 curv 0 box [1.5 0.2 1 0.3 0.15]
+iter 0: coef bounds [1.03 0.179 0.0868 0.0562 0.0412] eps 0.0209 | LMI 0 fill 0.000 extents [4.94e-06 3.2e-07 3.46e-06 3.27e-06 1.77e-06]
+
+=== speed 15 curv 0 box [1 0.15 0.75 0.15 0.08]
+iter 0: coef bounds [1.62 0.106 0.124 0.0445 0.0433] eps 0.0180 | LMI 4 fill 0.000 extents [5.63e-06 3.44e-07 5.56e-06 3.36e-06 2.1e-06]
+
+=== speed 15 curv 0 box [0.75 0.1 0.5 0.1 0.05]
+iter 0: coef bounds [2.41 0.11 0.0967 0.0358 0.0322] eps 0.0158 | LMI 0 fill 0.000 extents [4.24e-06 2.4e-07 4.88e-06 2.51e-06 1.56e-06]
+
+=== speed 15 curv 0.005 box [1.5 0.2 1 0.3 0.15]
+iter 0: coef bounds [1.04 0.206 0.116 0.0649 0.0419] eps 0.0250 | LMI 0 fill 0.000 extents [3.13e-06 2.1e-07 2.22e-06 1.9e-06 1.01e-06]
+
+=== speed 15 curv 0.005 box [1 0.15 0.75 0.15 0.08]
+iter 0: coef bounds [1.65 0.148 0.109 0.0605 0.0319] eps 0.0287 | LMI 0 fill 0.000 extents [2.8e-06 1.9e-07 2.52e-06 1.39e-06 8.62e-07]
+
+=== speed 15 curv 0.005 box [0.75 0.1 0.5 0.1 0.05]
+iter 0: coef bounds [2.46 0.142 0.0852 0.0451 0.0295] eps 0.0225 | LMI 4 fill 0.000 extents [2.16e-06 1.29e-07 2.38e-06 1.11e-06 7.01e-07]
+EXIT 0

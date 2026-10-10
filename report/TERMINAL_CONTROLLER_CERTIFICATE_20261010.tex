@@ -1,0 +1,322 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\setlength{\emergencystretch}{2em}
+\title{Certifying the terminal controller on the nonlinear model}
+\date{Prepared October 10, 2026}
+\begin{document}
+\maketitle
+
+\section{Request}
+The user objected to the terminal controller as it stood (the same
+optimization problem without collision rows, with the CLF row without
+slack): with such a controller it is hard to prove that the vehicle does not
+leave the terminal set. The user then set the terminal set's requirements
+(the set only has to be safe so that recursive feasibility holds; no heavy
+real-time computation; no excess conservatism; a provable invariance under
+the terminal controller, with assumptions allowed) and asked for an
+implementation whose main work is to try to close the mathematical gap.
+
+\section{The gap}
+The terminal set $S$ of \path{controller/TERMINAL_SAFE_SET.md} is invariant
+under any controller whose closed loop satisfies $V(x^+)\le\rho V(x)$,
+$\rho=e^{-2h/T}$, because the CLF tube is nested along such a motion and the
+encounter's end events only come earlier. Which input the terminal
+controller chooses is irrelevant; what matters is that an input satisfying
+the constraint exists at every state of $S$. That existence was hypothesis
+H3, checked online by a candidate search (path guidance, the linear
+minimizer, a 45-point grid) and never proven: the offline LMI certified a
+linear gain $K$ on the \emph{linearized} sampled model only (fastest
+contraction $\rho^*$, time constant 2.1~s at 8~m/s and 1.5~s at 15~m/s
+against the required 4~s), and discarded $K$.
+
+\section{First route: a Lipschitz budget for the nonlinear remainder}
+The natural way to lift the linear certificate is the triangle inequality
+in the $P$-norm, $F=\mathrm{chol}(P)$: with $\phi(e)=e(x^+)-(A+BK)e$ the
+one-hold remainder and $L(c)=\sup\{\|F\phi(e)\|/\|Fe\| : e'Pe\le c\}$,
+\[
+\|Fe^+\|\le(\sqrt{\rho^*}+L(c))\,\|Fe\|,\qquad
+\sqrt{\rho^*}+L(c)\le\sqrt{\rho}\ \Rightarrow\ V(x^+)\le\rho V(x)\ \text{on}\ \{V\le c\}.
+\]
+This was implemented (certificate sampling in \texttt{terminalSafeSet},
+a level bisection in the synthesis script) and measured
+(\path{lipschitz-remainder.txt}, 2000 directions on the boundary of each
+level, the gain recovered from the stored $P$). It fails by two orders of
+magnitude. The budget $\sqrt{\rho}-\sqrt{\rho^*}$ is 0.011 at 8~m/s and
+0.020 at 15~m/s per 50-ms hold, while
+\[
+L(1)=0.70,\quad L(0.4)=0.57,\quad L(0.1)=0.29,\quad L(0.025)=0.14
+\qquad(8~\text{m/s, curvature }0.005),
+\]
+that is $L\approx0.9\sqrt{c}$: a second-order remainder with a large
+constant. Under $u^*+Ke$ the sampled $V(x^+)/V(x)$ exceeds 1 at every level
+down to $c=0.025$ (1.05--1.07 at 8~m/s, up to 1.36 at 15~m/s on the curve).
+Two causes, both measured in \path{jacobian-variation.txt}:
+\begin{itemize}
+\item The modified Fiala tire leaves its linear range at slips of a few
+  hundredths of a radian ($F_y=C\alpha-\tfrac{C^2}{3\mu F_z}|\alpha|\alpha+\dots$,
+  relative deviation $4.7|\alpha|$ for the default tire), and the former $P$
+  let the lateral velocity reach $a_4\sqrt{\bar c}=1.4$~m/s and the yaw rate
+  0.76~rad/s at the certified level: slips far beyond the linear range.
+  Over that set the Jacobian entries of the lateral-velocity and yaw-rate
+  rows vary by $\pm50$--$180\%$ of their trim values, and the steering column
+  by $\pm50$--$65\%$.
+\item The RK4 hold of 50~ms is not the exponential of the continuous
+  Jacobian in the fast yaw mode at 8~m/s (entry (5,5): 0.264 against 0.188),
+  so the former $A$ was not even the declared model's linearization.
+\end{itemize}
+Fitting the budget would need $c\approx1.5\cdot10^{-4}$, a lateral extent of
+about a centimetre. The route was abandoned.
+
+\section{Second route: a robust LMI over an enclosure of the Jacobians}
+Let $g(e,\delta u)$ be the transverse error after one hold from $x(e)$ with
+input $u^*+\delta u$ and $G=[\partial g/\partial e,\ \partial g/\partial\delta u]$
+its Jacobian, available exactly from the RK4 variational equations and the
+error chart (\texttt{terminalSafeSet.jacobians}). On a convex set $\Omega$
+containing the trim,
+\[
+g(e,Ke)=\bar G\begin{bmatrix}e\\Ke\end{bmatrix},\qquad
+\bar G=\int_0^1 G(te,tKe)\,dt\in\mathrm{conv}\{G(e',Ke'):e'\in\Omega\}.
+\]
+If the hull lies in a zonotope $Z=\{G_0+\sum_k\delta_kD_k+R:|\delta_k|\le1,\|R\|\le\varepsilon\}$,
+the discrete Lyapunov inequality at the vertices of $Z$ (residual by
+Petersen's lemma) proves $V(g(e,Ke))\le\rho V(e)$ on $\Omega$. With
+$S=P^{-1}$, $Y=KS$ this is an LMI; the set is $\Omega=\{V\le1\}$, kept inside
+a certification box $|e_i|\le\beta_i$ (rows $S_{ii}\le\beta_i^2$) and under
+the input box ($|K_je|\le\bar u_j$ on $\Omega$), and the fill
+$t$ in $S\succeq t\,\mathrm{diag}(\beta)^2$ is maximized. The enclosure is
+the trim's Jacobian, the leading six principal directions of the sampled
+deviations with their coefficient bounds, and the residual norm, in
+box-scaled coordinates, each widened by 1.25.
+
+Three versions were needed (\path{robust-lmi-product-box.txt},
+\path{robust-lmi-scaled-product-box.txt}, \path{robust-lmi-along-controller.txt}):
+\begin{itemize}
+\item Enclosing over the product of the state box and the input box returns
+  only the trivial solution ($S\approx10^{-6}$), at every box tried. The
+  product contains states with the largest lateral velocity and yaw rate
+  steered the wrong way, where the front slip reaches 0.15~rad and the tire's
+  stiffness derivative is nearly zero: the LMI then has to contract the
+  lateral position without a working front tire.
+\item In unscaled coordinates the residual term of Petersen's lemma couples
+  to the condition number of $S$ (metres against radians per second), which
+  alone forces $S\to0$. Scaling by the box removes this; the product
+  enclosure still fails because the steering box ($\pm0.075$~rad) saturates
+  the front tire at every state.
+\item Enclosing along the controller's own inputs, $u=u^*+Ke$ over
+  $\Omega$, is feasible with non-trivial sets. The enclosure then depends on
+  $(P,K)$, so the design iterates: plain LMI, then enclosures along the
+  current controller over the current set, four rounds; the fill oscillates
+  (0.01--0.09) rather than converging.
+\end{itemize}
+A certificate that refers to its own set needs a last step: $K$ is fixed
+(the robust iteration with the largest fill), the Jacobians are enclosed
+along $K$ over that iteration's set $\Omega_0$, and $P$ is solved for with
+$K$ fixed and $\Omega\subseteq\Omega_0$ ($S'\preceq S_0$); if the LMI has no
+solution the sampling set is shrunk by 0.7 and the step repeated (its
+Jacobians approach the trim's, where $K$ contracts). Picking the plain LMI's
+gain as the starting point fails at every shrink (it has no robustness
+margin at all); the robust iterations' gains succeed at the first or second
+attempt. The LMIs are solved with a contraction $0.1\%$ stricter than
+$\rho$, and the vertex inequalities are re-verified by eigenvalues at $\rho$
+with the solved multipliers; the smallest contraction they certify is
+recorded. The partial-hold maps are enclosed over the same samples to give
+the hold factor $\mu$, the largest $e^{s/T}\sqrt{V(x(s))/V(x)}$ inside a
+hold, by which the tube's half-axes are inflated.
+
+\section{Certified sets}
+Each synthesis takes 6--26~s (YALMIP/SeDuMi, 64 vertices). The sweep over
+certification boxes (\path{certification-box-sweep.txt}) gives the extents
+$\sqrt{(P^{-1})_{ii}}$ of the certified set, the certified time constant
+($-2h/\ln$ of the recorded contraction) and the hold factor:
+
+\begin{center}\small
+\begin{tabular}{llrrrrrrrr}
+\toprule
+box $\beta$ & $v$, $\kappa$ & $e_y$ (m) & $e_\psi$ (rad) & $\delta v_x$ (m/s) & $\delta v_y$ (m/s) & $\delta r$ (rad/s) & $T$ cert. (s) & $\mu$ & worst sampled $V^+/V$ \\
+\midrule
+{[1, .15, .75, .15, .08]} (default) & 8, 0 & 0.62 & 0.053 & 0.37 & 0.11 & 0.067 & 3.83 & 1.026 & 0.945 \\
+ & 8, 0.005 & 0.57 & 0.050 & 0.31 & 0.10 & 0.066 & 3.47 & 1.020 & 0.946 \\
+ & 15, 0 & 0.99 & 0.055 & 0.41 & 0.15 & 0.079 & 3.93 & 1.009 & 0.957 \\
+ & 15, 0.005 & 0.69 & 0.040 & 0.30 & 0.09 & 0.056 & 3.67 & 1.002 & 0.962 \\
+\midrule
+{[1.5, .15, .75, .15, .08]} & 8, 0 & 0.64 & 0.047 & 0.27 & 0.07 & 0.047 & 3.83 & 1.017 & 0.952 \\
+ & 8, 0.005 & 0.61 & 0.051 & 0.28 & 0.09 & 0.064 & 3.51 & 1.022 & 0.945 \\
+ & 15, 0 & 1.50 & 0.067 & 0.41 & 0.15 & 0.080 & 3.91 & 1.007 & 0.956 \\
+ & 15, 0.005 & 1.04 & 0.047 & 0.22 & 0.09 & 0.056 & 3.62 & 1.002 & 0.962 \\
+\midrule
+{[1.5, .2, 1, .1, .05]} & 8, 0 & 0.59 & 0.038 & 0.21 & 0.06 & 0.035 & 3.85 & 1.026 & 0.956 \\
+ & 8, 0.005 & 0.33 & 0.022 & 0.33 & 0.06 & 0.028 & 3.89 & 1.029 & 0.956 \\
+ & 15, 0 & 1.04 & 0.039 & 0.23 & 0.07 & 0.035 & 3.94 & 1.009 & 0.959 \\
+ & 15, 0.005 & 1.16 & 0.042 & 0.60 & 0.08 & 0.039 & 3.85 & 1.004 & 0.962 \\
+\midrule
+{[2, .2, 1, .1, .05]} & 8, 0 & 0.63 & 0.037 & 0.09 & 0.05 & 0.029 & 3.86 & 1.016 & 0.959 \\
+ & 8, 0.005 & 0.65 & 0.041 & 0.35 & 0.07 & 0.035 & 3.88 & 1.022 & 0.958 \\
+ & 15, 0 & 1.15 & 0.037 & 0.26 & 0.05 & 0.029 & 3.82 & 1.005 & 0.963 \\
+ & 15, 0.005 & 1.65 & 0.052 & 0.21 & 0.08 & 0.041 & 3.85 & 1.003 & 0.966 \\
+\midrule
+{[.75, .1, .5, .1, .05]} & 8, 0 & 0.60 & 0.044 & 0.25 & 0.07 & 0.042 & 3.84 & 1.013 & 0.955 \\
+ & 8, 0.005 & 0.62 & 0.045 & 0.25 & 0.07 & 0.042 & 3.75 & 1.008 & 0.957 \\
+ & 15, 0 & 0.75 & 0.039 & 0.33 & 0.10 & 0.050 & 3.87 & 1.005 & 0.960 \\
+ & 15, 0.005 & 0.63 & 0.033 & 0.39 & 0.07 & 0.042 & 3.84 & 1.001 & 0.960 \\
+\midrule
+{[1.25, .15, .75, .12, .06]} & 8, 0 & 0.64 & 0.047 & 0.26 & 0.08 & 0.050 & 3.75 & 1.024 & 0.951 \\
+ & 8, 0.005 & 0.73 & 0.052 & 0.26 & 0.08 & 0.050 & 3.87 & 1.017 & 0.954 \\
+ & 15, 0 & 1.24 & 0.054 & 0.35 & 0.12 & 0.060 & 3.84 & 1.007 & 0.958 \\
+ & 15, 0.005 & 0.87 & 0.038 & 0.39 & 0.08 & 0.041 & 3.84 & 1.001 & 0.964 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Box entries are lateral (m), heading (rad), speed (m/s), lateral velocity (m/s), yaw rate (rad/s); the required contraction is 0.975 per hold ($T=4$~s).
+
+The lateral extent saturates near 0.6~m at 8~m/s and 1.0--1.65~m at 15~m/s
+whatever the box: with the input box of 0.075~rad the robust LMI cannot
+contract a larger lateral error at $T=4$~s against the enclosed variation of
+the steering effectiveness (the first principal direction, coefficient
+bound 0.12--0.38 in scaled units) and of the tire rows. The default box
+$[1~\text{m},\,0.15~\text{rad},\,0.75~\text{m/s},\,0.15~\text{m/s},\,0.08~\text{rad/s}]$
+is kept; it gives the largest heading and speed extents. Two levers were
+measured on the straight road (\path{certificate-levers.txt}): a slower
+required decay ($T=6$ or 8~s instead of 4~s, which the optimizer would share)
+and a wider steering box (0.1~rad instead of 0.075). Neither moves the set
+materially: lateral 0.54--0.78~m at 8~m/s and 0.82--1.00~m at 15~m/s, heading
+0.047--0.061~rad. The size is set by the tire, not by the decay rate: the
+modified Fiala tire's stiffness derivative falls to 70\% at a slip of
+0.033~rad, and a heading error of 0.05~rad steered at 0.075~rad already puts
+the front tire there, so the enclosure's first principal direction (the
+steering effectiveness and the tire rows) is what the robust LMI pays for.
+A less conservative enclosure (correlated structure instead of a zonotope,
+or an interval enclosure of the tire characteristic) is the way to a larger
+certified set, not a different $T$. Against the former
+linear certificate the set is about three times smaller laterally (0.62
+against 1.9~m at 8~m/s) and in heading (0.053 against 0.18~rad), and far
+smaller in lateral velocity and yaw rate (0.11~m/s and 0.067~rad/s against
+1.4~m/s and 0.76~rad/s), which is where the tire's nonlinearity lives. The
+state-row level of the new $P$ is 16--209, so $\bar c=1$ everywhere. On an
+independent sample (another seed, 800 points) the worst contraction under
+$u^*+Ke$ is 0.945--0.962 against the required 0.975, and the sampled hold
+factor is below the certified one.
+
+\section{Implementation}
+\begin{itemize}
+\item \path{scripts/synthesizeClfMatrices.m}: the robust design above;
+  entries now carry $K$, the trim's RK4 Jacobians, the certified level (1),
+  the hold factor, the fill, the extents and the certificate's record
+  (box, input box, components, coefficient bounds, residual, margin, sample
+  counts and seed, iterations, LMI eigenvalue margin, largest inputs and
+  slips, sampled worst contraction and hold factor). Existing entries are
+  re-synthesized from their keys; entries whose key no longer reproduces
+  (the retired settings) are replaced.
+\item \path{config/collisionAvoidanceControllerConfig.m}:
+  \texttt{clf.certificationRegionScale} and \texttt{clf.shapeRatio} are
+  replaced by the five certification-box settings; rejected as unknown.
+\item \path{controller/terminalSafeSet.m}: \texttt{terminalInput} is
+  $u=u^*+Ke(x)$, one nonlinear hold, with the decrease, input box and rows
+  evaluated as a guard; the candidate search is removed. New
+  \texttt{jacobians} (the sampled error map's Jacobians) and
+  \texttt{certificate} (the sampled check). The tube's half-axes carry
+  $\mu$, and \texttt{levelMaximum} is the least of \texttt{terminal.levelMaximum},
+  the certified level and the state-row level divided by $\mu^2$ (so hold
+  midpoints meet the rows).
+\item \path{controller/nonlinearBicycleModel.m}: \texttt{cruise} reads
+  $K$, the Jacobians, the level and the hold factor; an entry without them
+  is rejected (\texttt{collisionAvoidanceController:staleClfMatrix}).
+\item Tests: \texttt{nominalClfTest} verifies the stored certificate
+  (input bound, box, fill, contraction, LMI margin, hold factor) and repeats
+  the sampled check with another seed on the certified set;
+  \texttt{terminalSafeSetTest} uses the new \texttt{terminalInput};
+  \texttt{collisionAvoidanceControllerConfigTest} rejects the retired
+  settings.
+\item Documents: \path{controller/TERMINAL_SAFE_SET.md} (Section 2 rewritten,
+  H3 restated as the enclosure hypothesis, hold factor, limitations),
+  \path{controller/NOMINAL_CLF.md}, \path{controller/PCBF_CLF_ARCHITECTURE.md},
+  \path{controller/CONTROLLER_FILES.md}, \path{README.md}, \path{CLAUDE.md}.
+\end{itemize}
+The run-time cost of the terminal controller is one matrix product and one
+RK4 hold; the membership test is unchanged.
+
+\section{What is proven and what is assumed}
+Under H1 (declared sampled model, exact state) and H2 (the target follows
+its forecast), the appended holds of the terminal controller satisfy
+$V(x^+)\le\rho V(x)$, the input box and the problem's rows on $S$, by the
+certificate; invariance of $S$ and recursive feasibility within an encounter
+follow as before. The certificate's one numerical hypothesis is H3: the
+Jacobians along the controller over $\Omega$ lie in the recorded zonotope.
+It rests on 1200 boundary and 600 interior samples (recorded seed), a margin
+of 1.25 on every coefficient bound and residual, and the independent sampled
+check; it is not an interval enclosure. The former H3 (existence of an
+admissible decreasing input, checked online) is gone, and so is the
+assumption that the continuous decrease holds inside a hold (now the hold
+factor). The ode45 plant of the experiments differs from the declared RK4
+model (H1), as before.
+
+\section{Campaign}
+The paired campaign (14 exact and 84 noisy encounters; seeds 0, 20261003 and
+1--5; 8 and 15~m/s; seven geometries; both variants interleaved in one pool
+of eight processes) compares the baseline, commit \texttt{deb4dac} with its
+linear certificate, against the working tree with the certified terminal
+controller (\path{comparison.txt}, \path{campaign-runs.csv},
+\path{encounter-ends.txt}). No collision in either variant (least replay
+clearance 0.155~m exact and 0.240~m noisy against the 0.2-m buffer at the
+sampled rows).
+
+\begin{center}\small
+\begin{tabular}{lrrrr}
+\toprule
+ & exact recovered & noisy recovered & horizon with a target (median / p95) & controller s with a target (median / p95) \\
+\midrule
+baseline (deb4dac) & 14 of 14 & 54 of 84 & 47 / 187 holds & 0.065 / 0.391 \\
+certified terminal controller & 12 of 14 & 39 of 84 & 81 / 201 holds & 0.110 / 0.406 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The certified variant recovers 15 noisy runs fewer and no run more; 14 of
+the 15 new failures and both exact failures stop on
+\texttt{clfNoNumericalResult}, the CLF stage's conic solve returning no
+numerical result (once in 84 for the baseline). Twelve of the fifteen stop at
+the first frame; the exact curved head-ons and three noisy ones stop at
+their second encounter on the circle (frames 1096--1596), where the
+baseline had completed. The mechanism is the size of the certified set: a
+plan must end inside it, so plans are longer (first-frame horizon median
+124 against 90 holds; 81 against 47 holds whenever a target is present,
+the first curved head-on starts with 135 holds against 94), and the CLF
+stage's conic program on those plans fails numerically more often, the
+weakness the previous report already recorded on 222-hold plans. The
+terminal controller itself costs nothing measurable: the median controller
+time without a target is unchanged (0.015 against 0.018~s). All twelve noisy
+braking leads stop at the first frame in both variants, as before. The
+encounters that both variants complete end the same way (exit or the cone);
+with longer plans the end is reached sooner after the endpoint (99th
+percentile 4.4 against 8.1~s).
+
+The result is the trade this certificate makes: the former set was not a
+proof, and the proven set is small enough to lengthen plans beyond what the
+conic solver handles reliably. The remedies are on the optimizer's side
+(the numerical robustness of long CLF-stage solves, or a horizon that need
+not grow until the endpoint reaches the set) or in a tighter enclosure
+(Section 5); none was attempted here.
+
+\section{Reproduction}
+\begin{itemize}
+\item Exploration scripts in \path{scripts/} of this folder (they address the
+  repository by absolute path and ran against the intermediate code of
+  October 10; \texttt{lipschitzRemainder.m} used the reference fields
+  \texttt{sampledA/B}, since renamed \texttt{nominalA/B}):
+  \texttt{lipschitzRemainder.m}, \texttt{jacobianVariation.m},
+  \texttt{robustLmiProductBox.m}, \texttt{robustLmiScaledProductBox.m},
+  \texttt{robustLmiAlongController.m}, \texttt{certificationBoxSweep.m},
+  \texttt{certificateLevers.m}; their
+  outputs are the \texttt{.txt} files named in the text.
+\item \texttt{matlab -batch "addpath('scripts'); synthesizeClfMatrices"}
+  regenerates \path{config/clfMatrices.json} (\path{synthesis.txt}).
+\item Campaign: \path{report/TERMINAL_BACKUP_SET_20261008/scripts/campaign-pair.sh}
+  with the baseline copy of commit \texttt{deb4dac} and a tar copy of the
+  working tree (\texttt{run-campaign.sh} in \path{scripts/} of this folder),
+  \texttt{compare.py} and \texttt{encounterEnds.py} from the same folder;
+  raw outputs under \path{~/.cache/collisionAvoidance/terminal_certificate_20261010/}
+  (disposable).
+\end{itemize}
+\end{document}

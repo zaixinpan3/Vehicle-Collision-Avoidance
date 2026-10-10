@@ -1,0 +1,45 @@
+# Full MATLAB test suite on the working tree of October 10, 2026 (runtests('tests')), concurrent with the paired campaign
+826:TOTAL 602 PASSED 602 FAILED 0 INCOMPLETE 0
+
+# Focused runs before the fixture updates: nominalClfTest+terminalSafeSetTest+configTest+twoStage: 160 tests, 152 passed (8 failed on the obsolete Lipschitz-budget assertion and on fixtures outside the smaller certified set); after the updates: 71/71 and 8/8
+
+# Test classes and counts (from the final full run)
+     71 {'collisionAvoidanceControllerConfigTest/
+     63 {'nominalClfTest/
+     55 {'nonlinearPredictiveSafetyTest/
+     31 {'onlineNrmmTrackingRuntimeTest/
+     31 {'collisionThreatScenarioTest/
+     23 {'modifiedFialaTireTest/
+     22 {'twoStagePredictiveControlTest/
+     20 {'nrmmPositionErrorBoundTest/
+     20 {'longitudinalRoadLoadTest/
+     19 {'observerGainSynthesisTest/
+     18 {'ordinaryDistanceDualTest/
+     18 {'nrmmControllerErrorBoundsTest/
+     15 {'observerPredictiveControlTest/
+     15 {'controllerInputGeometryTest/
+     13 {'movingTargetPotentialFieldTest/
+     12 {'nrmmModelFormulationTest/
+     12 {'nrmmDirectVelocityTest/
+     12 {'clfNominalRecoveryTest/
+     11 {'nrmmYawSetTest/
+     10 {'nrmmStructuredHighGainTest/
+     10 {'nrmmCascadeCertificateTest/
+      9 {'perceptionRangeTest/
+      9 {'nrmmYawObserverTest/
+      9 {'nominalRecoveryValidationTest/
+      8 {'terminalSafeSetTest/
+      8 {'controllerKernelTest/
+      7 {'predictiveConicSolverTest/
+      7 {'nrmmTargetHistoryTest/
+      6 {'sharmaBaselineObserverTest/
+      6 {'certifiedKinematicCourseCorrespondenceTest/
+      5 {'trustInnovationTest/
+      5 {'sweptCollisionIntervalTest/
+      5 {'nrmmTruthEnclosureAuditTest/
+      4 {'nrmmObserverVectorFieldTest/
+      4 {'nrmmModelAidedEstimationTest/
+      3 {'nrmmNativeKernelTest/
+      3 {'fitPerceivedRoadBoundariesTest/
+      2 {'nrmmTargetParameterErrorBoundsTest/
+      1 {'controllerSourceBudgetTest/

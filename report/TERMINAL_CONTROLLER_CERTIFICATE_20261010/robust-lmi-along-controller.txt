@@ -1,0 +1,189 @@
+
+=== speed 8 curv 0 box [1.5 0.2 1 0.3 0.15]
+nominal LMI 0 fill 0.249 extents [1.5 0.129 0.864 0.214 0.15]
+ iter 1: max|Ke| [0.0363 0.0843], max front slip 0.051 rad (stiffness factor >= 0.61), coef bounds [0.158 0.116 0.0642 0.0289 0.0351], eps 0.0246
+   current (P,K): vertex 0.9979 + residual 0.0651 = 1.0630 vs sqrt(rho) 0.9876
+   robust LMI 4 fill 0.000 extents [2.71e-06 3.52e-07 2.83e-06 3.65e-06 2e-06]
+   P-only LMI (K fixed) 0 fill 0.000 extents [3.15e-06 3.29e-07 3.25e-06 3.63e-06 1.91e-06]
+ final extents [1.5 0.129 0.864 0.214 0.15], K=[-0.0276 -0.236 -1.36e-08 -0.0268 -0.0735;-3.76e-08 6.61e-08 -0.0987 -2.34e-08 -2.54e-08]
+ sampled worst V+/V = 0.97032 (rho 0.97531), hold factor 0.9994, domain failures 0; stateLevel 34.956
+
+=== speed 8 curv 0 box [1 0.15 0.75 0.15 0.08]
+nominal LMI 0 fill 0.164 extents [1 0.0804 0.645 0.104 0.08]
+ iter 1: max|Ke| [0.0217 0.081], max front slip 0.029 rad (stiffness factor >= 0.77), coef bounds [0.156 0.0941 0.055 0.0178 0.0224], eps 0.0120
+   current (P,K): vertex 0.9953 + residual 0.0391 = 1.0344 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.013 extents [0.336 0.0358 0.282 0.15 0.08]
+ iter 2: max|Ke| [0.0223 0.12], max front slip 0.030 rad (stiffness factor >= 0.76), coef bounds [0.132 0.0586 0.0528 0.0314 0.0245], eps 0.0067
+   current (P,K): vertex 0.9730 + residual 0.0729 = 1.0459 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.056 extents [0.784 0.0664 0.369 0.15 0.08]
+ iter 3: max|Ke| [0.0237 0.124], max front slip 0.029 rad (stiffness factor >= 0.76), coef bounds [0.13 0.0712 0.0606 0.0319 0.0267], eps 0.0074
+   current (P,K): vertex 0.9811 + residual 0.0396 = 1.0207 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.046 extents [0.688 0.0608 0.371 0.15 0.08]
+ iter 4: max|Ke| [0.0227 0.124], max front slip 0.028 rad (stiffness factor >= 0.77), coef bounds [0.125 0.0748 0.0584 0.0312 0.0268], eps 0.0075
+   current (P,K): vertex 0.9800 + residual 0.0443 = 1.0244 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.044 extents [0.675 0.0601 0.582 0.15 0.08]
+ final extents [0.675 0.0601 0.582 0.15 0.08], K=[-0.041 -0.612 0.00241 0.0245 -0.169;-0.0113 -0.369 -0.214 -0.0438 -0.0113]
+ sampled worst V+/V = 0.94239 (rho 0.97531), hold factor 0.9975, domain failures 0; stateLevel 72.483
+
+=== speed 8 curv 0 box [0.75 0.1 0.5 0.1 0.05]
+nominal LMI 0 fill 0.156 extents [0.75 0.0548 0.432 0.0661 0.05]
+ iter 1: max|Ke| [0.0136 0.0786], max front slip 0.019 rad (stiffness factor >= 0.85), coef bounds [0.158 0.0885 0.0386 0.0119 0.0148], eps 0.0052
+   current (P,K): vertex 0.9912 + residual 0.0169 = 1.0081 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.061 extents [0.599 0.0467 0.275 0.1 0.05]
+ iter 2: max|Ke| [0.0135 0.121], max front slip 0.018 rad (stiffness factor >= 0.85), coef bounds [0.102 0.0708 0.0408 0.0216 0.02], eps 0.0044
+   current (P,K): vertex 0.9813 + residual 0.0221 = 1.0034 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.077 extents [0.714 0.0524 0.234 0.1 0.05]
+ iter 3: max|Ke| [0.0145 0.123], max front slip 0.019 rad (stiffness factor >= 0.85), coef bounds [0.113 0.0523 0.0433 0.0214 0.0201], eps 0.0049
+   current (P,K): vertex 0.9826 + residual 0.0221 = 1.0048 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.071 extents [0.673 0.0506 0.211 0.1 0.05]
+ iter 4: max|Ke| [0.0147 0.124], max front slip 0.019 rad (stiffness factor >= 0.85), coef bounds [0.114 0.0601 0.0381 0.0233 0.0208], eps 0.0047
+   current (P,K): vertex 0.9824 + residual 0.0220 = 1.0044 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.072 extents [0.682 0.051 0.256 0.1 0.05]
+ final extents [0.682 0.051 0.256 0.1 0.05], K=[-0.026 -0.462 -0.000189 0.0189 -0.179;-0.0373 -0.332 -0.47 -0.505 0.366]
+ sampled worst V+/V = 0.95007 (rho 0.97531), hold factor 0.9982, domain failures 0; stateLevel 208.973
+
+=== speed 8 curv 0.005 box [1.5 0.2 1 0.3 0.15]
+nominal LMI 0 fill 0.258 extents [1.5 0.131 1 0.217 0.15]
+ iter 1: max|Ke| [0.046 0.115], max front slip 0.044 rad (stiffness factor >= 0.66), coef bounds [0.166 0.12 0.0465 0.0363 0.0271], eps 0.0247
+   current (P,K): vertex 1.0646 + residual 0.0811 = 1.1457 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.000 extents [3.65e-06 4.81e-07 3.95e-06 4.86e-06 2.77e-06]
+   P-only LMI (K fixed) 0 fill 0.000 extents [1.59e-06 1.39e-07 1.07e-06 1.65e-06 9.3e-07]
+ final extents [1.5 0.131 1 0.217 0.15], K=[-0.0113 -0.126 -0.0456 -0.034 -0.0772;0.0283 0.922 -0.0851 0.00892 0.0113]
+ sampled worst V+/V = 0.97848 (rho 0.97531), hold factor 1.0016, domain failures 0; stateLevel 22.139
+
+=== speed 8 curv 0.005 box [1 0.15 0.75 0.15 0.08]
+nominal LMI 0 fill 0.174 extents [1 0.0822 0.75 0.107 0.08]
+ iter 1: max|Ke| [0.027 0.0978], max front slip 0.024 rad (stiffness factor >= 0.81), coef bounds [0.2 0.074 0.0249 0.0238 0.0183], eps 0.0094
+   current (P,K): vertex 1.0340 + residual 0.0374 = 1.0713 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.024 extents [0.451 0.0453 0.31 0.15 0.08]
+ iter 2: max|Ke| [0.0205 0.122], max front slip 0.029 rad (stiffness factor >= 0.76), coef bounds [0.128 0.0629 0.0509 0.033 0.0266], eps 0.0062
+   current (P,K): vertex 0.9766 + residual 0.0503 = 1.0269 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.060 extents [0.83 0.0696 0.664 0.15 0.08]
+ iter 3: max|Ke| [0.0239 0.123], max front slip 0.033 rad (stiffness factor >= 0.74), coef bounds [0.155 0.117 0.0619 0.0311 0.0313], eps 0.0145
+   current (P,K): vertex 0.9827 + residual 0.0845 = 1.0673 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.004 extents [0.184 0.0225 0.171 0.14 0.08]
+ iter 4: max|Ke| [0.023 0.125], max front slip 0.028 rad (stiffness factor >= 0.78), coef bounds [0.121 0.0613 0.0373 0.0338 0.0169], eps 0.0053
+   current (P,K): vertex 0.9678 + residual 0.1065 = 1.0743 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.074 extents [0.95 0.0757 0.545 0.15 0.08]
+ final extents [0.95 0.0757 0.545 0.15 0.08], K=[-0.0275 -0.462 -0.00354 0.0434 -0.17;0.02 0.509 -0.246 -0.186 0.135]
+ sampled worst V+/V = 0.95117 (rho 0.97531), hold factor 0.9986, domain failures 0; stateLevel 67.025
+
+=== speed 8 curv 0.005 box [0.75 0.1 0.5 0.1 0.05]
+nominal LMI 0 fill 0.166 extents [0.75 0.0561 0.5 0.068 0.05]
+ iter 1: max|Ke| [0.0168 0.0874], max front slip 0.016 rad (stiffness factor >= 0.87), coef bounds [0.195 0.0644 0.0183 0.0165 0.00934], eps 0.0044
+   current (P,K): vertex 1.0034 + residual 0.0177 = 1.0211 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.067 extents [0.637 0.0485 0.148 0.1 0.05]
+ iter 2: max|Ke| [0.0134 0.12], max front slip 0.021 rad (stiffness factor >= 0.83), coef bounds [0.115 0.0402 0.0337 0.0225 0.018], eps 0.0049
+   current (P,K): vertex 0.9816 + residual 0.0242 = 1.0058 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.072 extents [0.681 0.0508 0.318 0.1 0.05]
+ iter 3: max|Ke| [0.0149 0.123], max front slip 0.021 rad (stiffness factor >= 0.83), coef bounds [0.0944 0.0912 0.0367 0.0205 0.02], eps 0.0051
+   current (P,K): vertex 0.9831 + residual 0.0282 = 1.0113 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.065 extents [0.623 0.0482 0.307 0.1 0.05]
+ iter 4: max|Ke| [0.014 0.12], max front slip 0.021 rad (stiffness factor >= 0.83), coef bounds [0.123 0.0785 0.0409 0.0223 0.0189], eps 0.0049
+   current (P,K): vertex 0.9820 + residual 0.0241 = 1.0061 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.069 extents [0.645 0.0493 0.333 0.1 0.05]
+ final extents [0.645 0.0493 0.333 0.1 0.05], K=[-0.0285 -0.497 0.000429 0.00109 -0.191;0.00236 0.203 -0.377 -0.159 0.136]
+ sampled worst V+/V = 0.95240 (rho 0.97531), hold factor 0.9981, domain failures 0; stateLevel 163.281
+
+=== speed 15 curv 0 box [1.5 0.2 1 0.3 0.15]
+nominal LMI 0 fill 0.164 extents [1.5 0.0987 0.836 0.124 0.15]
+ iter 1: max|Ke| [0.0245 0.084], max front slip 0.029 rad (stiffness factor >= 0.77), coef bounds [0.258 0.0962 0.047 0.0272 0.0106], eps 0.0059
+   current (P,K): vertex 1.0609 + residual 0.0185 = 1.0794 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.078 extents [1.5 0.0871 0.59 0.3 0.15]
+ iter 2: max|Ke| [0.0279 0.121], max front slip 0.040 rad (stiffness factor >= 0.68), coef bounds [0.36 0.122 0.0508 0.0182 0.0129], eps 0.0122
+   current (P,K): vertex 0.9801 + residual 0.0511 = 1.0311 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.029 extents [1.04 0.0635 0.481 0.3 0.15]
+ iter 3: max|Ke| [0.0299 0.122], max front slip 0.041 rad (stiffness factor >= 0.68), coef bounds [0.363 0.132 0.0527 0.0139 0.0138], eps 0.0122
+   current (P,K): vertex 0.9713 + residual 0.0812 = 1.0524 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.028 extents [1.02 0.062 0.458 0.3 0.15]
+ iter 4: max|Ke| [0.0291 0.125], max front slip 0.041 rad (stiffness factor >= 0.68), coef bounds [0.369 0.127 0.0484 0.0133 0.0136], eps 0.0119
+   current (P,K): vertex 0.9708 + residual 0.0804 = 1.0512 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.030 extents [1.05 0.0641 0.497 0.3 0.15]
+ final extents [1.05 0.0641 0.497 0.3 0.15], K=[-0.0337 -0.77 -0.0006 -0.0404 -0.15;0.000166 0.0149 -0.252 0.00343 -0.000293]
+ sampled worst V+/V = 0.93402 (rho 0.97531), hold factor 0.9977, domain failures 0; stateLevel 36.473
+
+=== speed 15 curv 0 box [1 0.15 0.75 0.15 0.08]
+nominal LMI 0 fill 0.106 extents [1 0.0604 0.628 0.0502 0.08]
+ iter 1: max|Ke| [0.0142 0.0808], max front slip 0.015 rad (stiffness factor >= 0.87), coef bounds [0.245 0.0635 0.0382 0.0207 0.00807], eps 0.0033
+   current (P,K): vertex 1.0306 + residual 0.0129 = 1.0435 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.066 extents [1 0.0563 0.489 0.15 0.08]
+ iter 2: max|Ke| [0.0152 0.123], max front slip 0.022 rad (stiffness factor >= 0.82), coef bounds [0.351 0.07 0.0394 0.018 0.00997], eps 0.0089
+   current (P,K): vertex 0.9826 + residual 0.0426 = 1.0252 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.028 extents [0.808 0.0467 0.382 0.15 0.08]
+ iter 3: max|Ke| [0.0165 0.122], max front slip 0.022 rad (stiffness factor >= 0.82), coef bounds [0.356 0.0713 0.0472 0.0144 0.0103], eps 0.0093
+   current (P,K): vertex 0.9742 + residual 0.0621 = 1.0363 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.027 extents [0.768 0.045 0.389 0.15 0.08]
+ iter 4: max|Ke| [0.0163 0.124], max front slip 0.022 rad (stiffness factor >= 0.82), coef bounds [0.356 0.0699 0.043 0.0141 0.0102], eps 0.0091
+   current (P,K): vertex 0.9739 + residual 0.0630 = 1.0370 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.028 extents [0.782 0.0457 0.391 0.15 0.08]
+ final extents [0.782 0.0457 0.391 0.15 0.08], K=[-0.0253 -0.58 -2.1e-05 -0.0415 -0.144;-0.00508 -0.0742 -0.32 0.0571 -0.095]
+ sampled worst V+/V = 0.93898 (rho 0.97531), hold factor 0.9980, domain failures 0; stateLevel 58.812
+
+=== speed 15 curv 0 box [0.75 0.1 0.5 0.1 0.05]
+nominal LMI 0 fill 0.105 extents [0.75 0.041 0.421 0.033 0.05]
+ iter 1: max|Ke| [0.00893 0.078], max front slip 0.010 rad (stiffness factor >= 0.92), coef bounds [0.246 0.0502 0.0254 0.0146 0.00773], eps 0.0022
+   current (P,K): vertex 0.9996 + residual 0.0086 = 1.0082 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.077 extents [0.75 0.0394 0.393 0.1 0.05]
+ iter 2: max|Ke| [0.00993 0.122], max front slip 0.015 rad (stiffness factor >= 0.88), coef bounds [0.378 0.0574 0.0276 0.0151 0.00974], eps 0.0061
+   current (P,K): vertex 0.9845 + residual 0.0282 = 1.0128 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.045 extents [0.75 0.0382 0.315 0.1 0.05]
+ iter 3: max|Ke| [0.0101 0.125], max front slip 0.014 rad (stiffness factor >= 0.88), coef bounds [0.352 0.0573 0.0305 0.0132 0.00995], eps 0.0067
+   current (P,K): vertex 0.9781 + residual 0.0381 = 1.0162 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.041 extents [0.71 0.0369 0.31 0.1 0.05]
+ iter 4: max|Ke| [0.0102 0.125], max front slip 0.014 rad (stiffness factor >= 0.89), coef bounds [0.348 0.0524 0.0274 0.0129 0.00944], eps 0.0069
+   current (P,K): vertex 0.9773 + residual 0.0404 = 1.0177 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.039 extents [0.691 0.0363 0.299 0.1 0.05]
+ final extents [0.691 0.0363 0.299 0.1 0.05], K=[-0.0184 -0.454 -0.000261 -0.0269 -0.148;0.0192 0.394 -0.413 -0.162 0.341]
+ sampled worst V+/V = 0.94776 (rho 0.97531), hold factor 0.9985, domain failures 0; stateLevel 100.766
+
+=== speed 15 curv 0.005 box [1.5 0.2 1 0.3 0.15]
+nominal LMI 0 fill 0.168 extents [1.5 0.0999 0.872 0.148 0.15]
+ iter 1: max|Ke| [0.0296 0.123], max front slip 0.042 rad (stiffness factor >= 0.67), coef bounds [0.292 0.0923 0.0479 0.015 0.00985], eps 0.0080
+   current (P,K): vertex 1.0299 + residual 0.0296 = 1.0596 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.056 extents [1.48 0.083 0.597 0.3 0.15]
+ iter 2: max|Ke| [0.0328 0.124], max front slip 0.054 rad (stiffness factor >= 0.59), coef bounds [0.399 0.136 0.0408 0.0171 0.0192], eps 0.0137
+   current (P,K): vertex 0.9807 + residual 0.0747 = 1.0554 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.017 extents [0.796 0.0486 0.499 0.3 0.15]
+ iter 3: max|Ke| [0.0318 0.124], max front slip 0.055 rad (stiffness factor >= 0.59), coef bounds [0.402 0.141 0.0489 0.0163 0.0193], eps 0.0143
+   current (P,K): vertex 0.9713 + residual 0.1218 = 1.0931 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.016 extents [0.763 0.0467 0.419 0.3 0.15]
+ iter 4: max|Ke| [0.0317 0.123], max front slip 0.055 rad (stiffness factor >= 0.58), coef bounds [0.402 0.136 0.0461 0.0151 0.0177], eps 0.0157
+   current (P,K): vertex 0.9708 + residual 0.1392 = 1.1100 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.012 extents [0.692 0.0429 0.31 0.3 0.15]
+ final extents [0.692 0.0429 0.31 0.3 0.15], K=[-0.0592 -1.33 0.00132 -0.0534 -0.169;-0.0225 -0.194 -0.42 0.116 -0.134]
+ sampled worst V+/V = 0.92225 (rho 0.97531), hold factor 0.9970, domain failures 0; stateLevel 40.656
+
+=== speed 15 curv 0.005 box [1 0.15 0.75 0.15 0.08]
+nominal LMI 0 fill 0.112 extents [1 0.0618 0.75 0.0516 0.08]
+ iter 1: max|Ke| [0.0171 0.118], max front slip 0.025 rad (stiffness factor >= 0.80), coef bounds [0.275 0.0414 0.0229 0.00453 0.00119], eps 0.0029
+   current (P,K): vertex 1.0470 + residual 0.0140 = 1.0609 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.069 extents [1 0.0567 0.503 0.15 0.08]
+ iter 2: max|Ke| [0.0165 0.121], max front slip 0.034 rad (stiffness factor >= 0.73), coef bounds [0.388 0.0776 0.0229 0.014 0.0093], eps 0.0071
+   current (P,K): vertex 0.9848 + residual 0.0332 = 1.0180 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.035 extents [0.917 0.0495 0.738 0.15 0.08]
+ iter 3: max|Ke| [0.0167 0.123], max front slip 0.033 rad (stiffness factor >= 0.74), coef bounds [0.365 0.0806 0.0348 0.0142 0.00842], eps 0.0064
+   current (P,K): vertex 0.9777 + residual 0.0475 = 1.0253 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.038 extents [0.991 0.0521 0.75 0.15 0.08]
+ iter 4: max|Ke| [0.0162 0.124], max front slip 0.033 rad (stiffness factor >= 0.74), coef bounds [0.369 0.0819 0.0345 0.0145 0.00888], eps 0.0062
+   current (P,K): vertex 0.9779 + residual 0.0441 = 1.0219 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.039 extents [1 0.0523 0.75 0.15 0.08]
+ final extents [1 0.0523 0.75 0.15 0.08], K=[-0.0203 -0.52 -0.00255 -0.0286 -0.186;-0.0323 -0.219 -0.133 0.48 -0.531]
+ sampled worst V+/V = 0.94710 (rho 0.97531), hold factor 0.9984, domain failures 0; stateLevel 16.000
+
+=== speed 15 curv 0.005 box [0.75 0.1 0.5 0.1 0.05]
+nominal LMI 0 fill 0.111 extents [0.75 0.042 0.5 0.0339 0.05]
+ iter 1: max|Ke| [0.0105 0.0941], max front slip 0.020 rad (stiffness factor >= 0.84), coef bounds [0.272 0.0281 0.019 0.00333 0.000901], eps 0.0005
+   current (P,K): vertex 1.0078 + residual 0.0025 = 1.0104 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.091 extents [0.75 0.0401 0.5 0.0923 0.05]
+ iter 2: max|Ke| [0.0101 0.121], max front slip 0.024 rad (stiffness factor >= 0.80), coef bounds [0.345 0.0649 0.0242 0.00905 0.00181], eps 0.0015
+   current (P,K): vertex 0.9886 + residual 0.0074 = 0.9960 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.079 extents [0.75 0.0388 0.5 0.1 0.05]
+ iter 3: max|Ke| [0.0102 0.122], max front slip 0.024 rad (stiffness factor >= 0.80), coef bounds [0.365 0.0555 0.0271 0.0105 0.00191], eps 0.0022
+   current (P,K): vertex 0.9855 + residual 0.0104 = 0.9959 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.074 extents [0.75 0.0387 0.5 0.1 0.05]
+ iter 4: max|Ke| [0.0101 0.123], max front slip 0.025 rad (stiffness factor >= 0.80), coef bounds [0.376 0.0574 0.0267 0.0106 0.00184], eps 0.0022
+   current (P,K): vertex 0.9845 + residual 0.0107 = 0.9953 vs sqrt(rho) 0.9876
+   robust LMI 0 fill 0.074 extents [0.75 0.0387 0.5 0.1 0.05]
+ final extents [0.75 0.0387 0.5 0.1 0.05], K=[-0.0167 -0.302 -0.00565 -0.0226 -0.184;-0.056 -0.0436 -0.192 0.924 -0.943]
+ sampled worst V+/V = 0.95986 (rho 0.97531), hold factor 0.9991, domain failures 0; stateLevel 36.000
+EXIT 0

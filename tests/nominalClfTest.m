@@ -17,25 +17,76 @@ classdef nominalClfTest < matlab.unittest.TestCase
         function theClfMatrixIsReadFromThePrecomputedTable(testCase,referenceSpeed,curvature)
             % P was synthesized offline; the controller only reads it.
             [cfg,~,reference]=localSetup(referenceSpeed,curvature);
-            testCase.verifyFalse(isfield(reference,'gain'));
             root=fileparts(fileparts(mfilename('fullpath')));
             entries=jsondecode(fileread(fullfile(root,'config','clfMatrices.json')));
             entry=entries(arrayfun(@(e)string(e.key)==nonlinearBicycleModel.clfKey(cfg,curvature),entries));
             testCase.verifyNumElements(entry,1);
             testCase.verifyEqual(reference.matrix,(entry.matrix+entry.matrix.')/2,AbsTol=1e-12);
-            % The requested contraction is slower than the certified one.
+            % The terminal controller's gain and its certificate: the input bound
+            % on V <= 1, the set inside the certification box with the recorded
+            % fill, a certified contraction no slower than the requested one, a
+            % hold factor of at least one, and the vertex inequalities verified.
             testCase.verifyEqual(reference.contraction,exp(-2*cfg.controller.sampleTime/cfg.clf.convergenceTimeConstantSeconds),AbsTol=1e-15);
-            testCase.verifyLessThan(entry.certifiedContraction,reference.contraction);
-            % Shape: Q/(R^2 shapeRatio) <= P <= Q/R^2.
-            scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
-                cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
-            ratio=eig(diag(1./scales.^2)\reference.matrix)*cfg.clf.certificationRegionScale^2;
-            testCase.verifyLessThanOrEqual(max(ratio),1+1e-6);
-            testCase.verifyGreaterThanOrEqual(min(ratio),1/cfg.clf.shapeRatio-1e-6);
+            testCase.verifyEqual(reference.gain,reshape(entry.gain,2,5),AbsTol=1e-12);
+            testCase.verifyEqual(reference.nominalA,reshape(entry.nominalA,5,5),AbsTol=1e-12);
+            inputBound=sqrt(diag(reference.gain*(reference.matrix\reference.gain.')));
+            testCase.verifyLessThanOrEqual(inputBound,[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio]*(1+1e-6));
+            box=[cfg.clf.certificationLateralMeters;cfg.clf.certificationHeadingRadians;cfg.clf.certificationSpeedMetersPerSecond; ...
+                cfg.clf.certificationLateralVelocityMetersPerSecond;cfg.clf.certificationYawRateRadiansPerSecond];
+            s=inv(reference.matrix);
+            testCase.verifyLessThanOrEqual(sqrt(diag(s)),box*(1+1e-6));
+            testCase.verifyGreaterThan(entry.regionFill,0);
+            testCase.verifyGreaterThanOrEqual(min(eig(diag(1./box)*s*diag(1./box))),entry.regionFill-1e-6);
+            testCase.verifyEqual(reference.certifiedLevel,1);
+            testCase.verifyLessThanOrEqual(entry.certifiedContraction,reference.contraction*(1+1e-9));
+            testCase.verifyGreaterThanOrEqual(entry.certificate.lmiMinimumEigenvalue,-1e-6);
+            testCase.verifyGreaterThanOrEqual(reference.holdFactor,1);
         end
         function anOperatingPointWithoutAPrecomputedMatrixIsRejected(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',9.375));
             testCase.verifyError(@()nonlinearBicycleModel.cruise(cfg,0),'collisionAvoidanceController:missingClfMatrix');
+        end
+        function theCertifiedGainContractsOnTheCertifiedLevelSet(testCase,referenceSpeed,curvature)
+            % An independent sample of the boundary of the certified level set:
+            % under u = u* + K e the nonlinear hold contracts by rho, the
+            % remainder fits the budget without its margin, the hold factor
+            % is not exceeded, and below the state-row level the hold meets the
+            % problem's rows at its midpoint and endpoint.
+            [cfg,~,reference]=localSetup(referenceSpeed,curvature);
+            stream=RandStream('mt19937ar','Seed',7+referenceSpeed+1000*curvature);
+            directions=randn(stream,5,400);unit=reference.factor\(directions./vecnorm(directions));
+            result=terminalSafeSet.certificate(reference,cfg,sqrt(reference.certifiedLevel)*unit,10);
+            testCase.verifyTrue(all(isfinite(result.contraction)));
+            testCase.verifyLessThanOrEqual(max(result.contraction),reference.contraction);
+            testCase.verifyLessThanOrEqual(max(result.holdFactor),reference.holdFactor);
+            level=min(reference.certifiedLevel,terminalSafeSet.stateLevel(reference,cfg)/reference.holdFactor^2);
+            rows=terminalSafeSet.certificate(reference,cfg,sqrt(level)*unit,0);
+            testCase.verifyTrue(all(rows.rows));
+        end
+        function freshJacobiansLieInTheRecordedEnclosure(testCase,referenceSpeed,curvature)
+            % Hypothesis H3 on new samples: the Jacobians of the sampled error
+            % map along u = u* + K e on the certified set lie in the recorded
+            % zonotope (coefficients within their bounds, residual within its
+            % norm), in box-scaled coordinates.
+            [cfg,~,reference]=localSetup(referenceSpeed,curvature);
+            root=fileparts(fileparts(mfilename('fullpath')));
+            entries=jsondecode(fileread(fullfile(root,'config','clfMatrices.json')));
+            entry=entries(arrayfun(@(e)string(e.key)==nonlinearBicycleModel.clfKey(cfg,curvature),entries));
+            certificate=entry.certificate;
+            box=[cfg.clf.certificationLateralMeters;cfg.clf.certificationHeadingRadians;cfg.clf.certificationSpeedMetersPerSecond; ...
+                cfg.clf.certificationLateralVelocityMetersPerSecond;cfg.clf.certificationYawRateRadiansPerSecond];
+            inputBox=[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio];
+            stream=RandStream('mt19937ar','Seed',11+referenceSpeed+1000*curvature);
+            directions=randn(stream,5,200);unit=reference.factor\(directions./vecnorm(directions));
+            errors=unit.*sqrt([ones(1,120),rand(stream,1,80)]);
+            [a,b]=terminalSafeSet.jacobians(reference,cfg,errors,reference.gain*errors,cfg.controller.sampleTime);
+            u=reshape(certificate.directions,35,[]);
+            for j=1:size(errors,2)
+                deviation=[diag(box)\(a(:,:,j)-reference.nominalA)*diag(box),diag(box)\(b(:,:,j)-reference.nominalB)*diag(inputBox)];
+                x=reshape(deviation,[],1);coefficients=u.'*x;
+                testCase.verifyLessThanOrEqual(abs(coefficients),certificate.coefficientBounds(:)*(1+1e-9));
+                testCase.verifyLessThanOrEqual(norm(reshape(x-u*coefficients,5,7)),certificate.residualNorm*(1+1e-9));
+            end
         end
         function trimHasZeroValueAndTheInitializationGuidancePreservesIt(testCase,referenceSpeed,curvature)
             [cfg,lane,reference]=localSetup(referenceSpeed,curvature);
@@ -83,7 +134,7 @@ classdef nominalClfTest < matlab.unittest.TestCase
             end
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('nominalClf',struct('courseGain',0))), ...
                 'collisionAvoidanceController:invalidConfiguration');
-            for setting={struct('convergenceTimeConstantSeconds',0),struct('certificationRegionScale',-1),struct('shapeRatio',.5)}
+            for setting={struct('convergenceTimeConstantSeconds',0),struct('certificationLateralMeters',-1),struct('certificationYawRateRadiansPerSecond',0)}
                 testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('clf',setting{1})), ...
                     'collisionAvoidanceController:invalidConfiguration');
             end

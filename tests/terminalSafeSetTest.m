@@ -15,25 +15,25 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % A receding target behind the ego: an offset start is in the set,
             % and every hold of the terminal controller stays in it.
             q=[-12;3.66;0;6;0;0;1.6;2.4;.95;0;0];
-            model=localModel([0;1;.05;8;0;0],q);
+            model=localModel([0;.25;.01;8;0;0],q);
             context=terminalSafeSet.context(model);
-            x=model.initialState;previous=[0;0];
+            x=model.initialState;
             [member,context]=terminalSafeSet.member(context,x,0);
             testCase.verifyTrue(member);
             for node=1:60
-                [u,next,ok,value]=terminalSafeSet.terminalInput(x,previous,model);
+                [~,next,ok,value]=terminalSafeSet.terminalInput(x,model);
                 testCase.verifyTrue(ok);
                 testCase.verifyLessThanOrEqual(value, ...
                     model.nominalReference.contraction*nonlinearBicycleModel.nominalValue(x,model.lane,model.nominalReference)*(1+1e-9)+1e-12);
                 [member,context]=terminalSafeSet.member(context,next,node);
                 testCase.verifyTrue(member);
-                x=next;previous=u;
+                x=next;
             end
         end
         function clearanceIsMonotoneInTheLevel(testCase)
             % Tubes are nested in the level, so the bisected level separates
             % clear levels from blocked ones.
-            q=[30;3.2;pi;8;0;0;1.6;2.4;.95;0;0];
+            q=[30;2.4;pi;8;0;0;1.6;2.4;.95;0;0];
             model=localModel([0;0;0;8;0;0],q);
             context=terminalSafeSet.context(model);
             [level,context]=terminalSafeSet.level(context,model.initialState,0);
@@ -65,7 +65,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             end
         end
         function withoutATargetOnlyTheLevelAndTheRoadCount(testCase)
-            model=localModel([0;.5;0;8;0;0],[]);
+            model=localModel([0;.3;0;8;0;0],[]);
             context=terminalSafeSet.context(model);
             testCase.verifyTrue(terminalSafeSet.member(context,model.initialState,0));
             far=model.initialState;far(2)=6;
@@ -99,11 +99,11 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyFalse(ok);
             testCase.verifyEqual(info.reason,"insideCollisionCone");
             testCase.verifyEqual(context.covered,0);
-            % A slow crosser 10 m ahead, 4.5 m to the right, drifting right at
-            % 2 m/s: inside the certified tube's whole box for the first 0.7 s
+            % A slow crosser 10 m ahead, 3 m to the right, drifting right at
+            % 2 m/s: inside the certified tube's whole box for the first 0.6 s
             % but never inside the settled one, so the check follows the grid
             % only until the parabola has left that box, and certifies there.
-            crosser=localModel([0;0;0;8;0;0],[10;-4.5;-pi/2;2;0;0;1.6;2.4;.95;0;0]);
+            crosser=localModel([0;0;0;8;0;0],[10;-3;-pi/2;2;0;0;1.6;2.4;.95;0;0]);
             context=terminalSafeSet.context(crosser);
             [ok,context,info]=terminalSafeSet.clear(context,context.levelMaximum,station,0);
             testCase.verifyTrue(ok);

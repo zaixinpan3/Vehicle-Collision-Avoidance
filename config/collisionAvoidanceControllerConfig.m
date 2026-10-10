@@ -77,17 +77,25 @@ function cfg=localDefaults()
     % One quadratic CLF V = e' P e. Each sample requires
     %   V(next) <= rho V(now),  rho = exp(-2 sampleTime / convergenceTimeConstantSeconds),
     % so the error sqrt(V) shrinks by at least 1/e every time constant.
-    % P is synthesized offline (scripts/synthesizeClfMatrices.m) and read
-    % from config/clfMatrices.json: in the sublevel set V <= 1, which contains
-    % every error within certificationRegionScale error scales, some input
-    % deviation within certificationSteeringRadians and
-    % certificationBrakingRatio (one maximum trust-region step by default,
-    % but independent of the trust settings) must give the fastest attainable
-    % contraction, and P's weights relative to Q = diag(1./scales.^2) may
-    % differ by at most shapeRatio.
+    % P and the terminal controller's gain K are synthesized offline
+    % (scripts/synthesizeClfMatrices.m) and read from config/clfMatrices.json:
+    % on the certification box of transverse errors (|lateral| <=
+    % certificationLateralMeters, |heading| <= certificationHeadingRadians,
+    % |speed| <= certificationSpeedMetersPerSecond, |lateral velocity| <=
+    % certificationLateralVelocityMetersPerSecond, |yaw rate| <=
+    % certificationYawRateRadiansPerSecond) with inputs within
+    % certificationSteeringRadians and certificationBrakingRatio of the trim
+    % (one maximum trust-region step by default, but independent of the trust
+    % settings), the sampled nonlinear model's one-hold Jacobians are enclosed
+    % and the largest sublevel set V <= 1 inside the box on which u = u* + K e
+    % contracts by rho against every Jacobian of the enclosure is certified
+    % (NOMINAL_CLF.md). The terminal set lives inside that set.
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
-        'convergenceTimeConstantSeconds',4,'certificationRegionScale',2,'shapeRatio',10, ...
+        'convergenceTimeConstantSeconds',4, ...
+        'certificationLateralMeters',1,'certificationHeadingRadians',.15, ...
+        'certificationSpeedMetersPerSecond',.75,'certificationLateralVelocityMetersPerSecond',.15, ...
+        'certificationYawRateRadiansPerSecond',.08, ...
         'certificationSteeringRadians',.075,'certificationBrakingRatio',.125);
     % The remaining nominalClf parameters guide initialization only.
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
@@ -190,7 +198,6 @@ function localValidate(cfg)
     for name=string(fieldnames(cfg.nominalClf)).'
         validateattributes(cfg.nominalClf.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    if cfg.clf.shapeRatio<1,localInvalid('clf.shapeRatio must be at least 1.');end
     for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit"]
         if cfg.nominalClf.(name)>=1,localInvalid('nominalClf.%s must lie in (0,1).',name);end
     end

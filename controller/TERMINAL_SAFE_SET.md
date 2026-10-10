@@ -11,10 +11,11 @@ the estimator and the controller are designed together.
 
 The safety task is a finite encounter: no collision with the target while it
 is inside the perception range `R = encounterRangeMeters`. After the
-prediction horizon the terminal controller completes the encounter: the same
-optimization problem without its PCBF (collision) rows, with the CLF row
-without slack, so the vehicle dissipates to the nominal behavior (cruise on
-the given path at the reference speed). The terminal set is the set of states
+prediction horizon the terminal controller completes the encounter: the
+linear feedback `u = u* + K e(x)` on the transverse error, certified together
+with the CLF on the nonlinear model (Section 2), so the vehicle dissipates to
+the nominal behavior (cruise on the given path at the reference speed). The
+terminal set is the set of states
 from which that controller does not collide with the target, for the target's
 forecast motion under the motion contract (constant tangential acceleration
 `A` and constant sideslip `beta`), until the encounter ends (Section 4).
@@ -47,27 +48,93 @@ reports `collisionAvoidanceController:noOptimizationSolution`.
 
 Let `e(x) = [e_y; e_psi; vx - vx*; vy - vy*; r - r*]` be the transverse error
 to the path trim and `V(x) = e(x)' P e(x)` the CLF of
-[NOMINAL_CLF.md](NOMINAL_CLF.md). A terminal controller is any input law whose
-closed loop satisfies
+[NOMINAL_CLF.md](NOMINAL_CLF.md). The terminal controller is the linear
+feedback
 
-    dV/dt <= -(2/T) V,                    T = clf.convergenceTimeConstantSeconds,
+    u = u* + K e(x),
 
-or, sampled with hold `h`, `V(x+) <= rho V(x)`, `rho = exp(-2h/T)`. Both give
+whose gain `K` is synthesized together with `P`
+(`scripts/synthesizeClfMatrices.m`). The pair is certified on the sampled
+nonlinear model itself (RK4 holds of `h`), on the sublevel set
+`Omega = {x : V(x) <= 1}`:
 
-    V(x(t)) <= exp(-2t/T) V(x(0)).                                        (2.1)
+    V(x+) <= rho V(x),   rho = exp(-2h/T),   T = clf.convergenceTimeConstantSeconds,   (2.1)
+    |K_j e| <= ubar_j   (the certification input box, 0.075 rad and 0.125),
+    Omega lies inside the certification box of errors (clf.certification*).
 
-The offline synthesis certifies on `V <= 1` a linear feedback of the sampled
-linearized model with bounded input, `|K_j e| <= ubar_j`, and a contraction
-`rho* < rho` (time constant 2.1 s at 8 m/s and 1.5 s at 15 m/s against the
-required 4 s). On the nonlinear model the existence of an admissible input
-with `V(x+) <= rho V(x)` is not proven; it is checked at every hold the
-controller appends (Section 6, hypothesis H3).
+Hence along the terminal controller `V(x_k) <= rho^k V(x_0)`, and with the
+hold factor `mu >= 1` below, `sqrt V(x(t)) <= mu exp(-t/T) sqrt V(x_0)` at
+every time, which is (2.1) in continuous form up to `mu`.
+
+**How (2.1) is established.** Write `g(e, du)` for the error after one hold
+from `x(e)` with the input `u* + du`; `g(0, 0) = 0`. `Omega` is convex and
+contains `0`, so along the ray from `0` to `e`
+
+    g(e, K e) = Gbar [e; K e],   Gbar = integral_0^1 G(t e, t K e) dt,
+
+with `G = [dg/de, dg/d(du)]` the Jacobian of the sampled map
+(`terminalSafeSet.jacobians`: the RK4 variational equations composed with
+the error chart). `Gbar` lies in the convex hull of the Jacobians along the
+controller over `Omega`. Let that hull be contained in the zonotope
+
+    Z = { G0 + sum_k delta_k D_k + R : |delta_k| <= 1, ||R|| <= eps },
+
+`G0` the Jacobian at the trim, `D_k` the leading principal directions of the
+sampled deviations with their coefficient bounds, `R` the residual (all in
+box-scaled coordinates). The discrete Lyapunov inequality imposed at every
+vertex of `Z`, with the residual absorbed by Petersen's lemma, gives
+`V(g(e, K e)) <= rho V(e)` for every `e` in `Omega`. The design is the LMI in
+`S = inv(P)`, `Y = K S` over those vertices, with the input rows
+`[ubar_j^2, Y_j; Y_j', S] >= 0` and the box rows `S_ii <= box_i^2`,
+maximizing the fill `t` in `S >= t diag(box)^2`. Because `Z` depends on
+`Omega` and `K`, the design iterates (plain LMI, then enclosures along the
+current controller over the current set) and ends with a step at fixed `K`
+whose set lies inside the set the enclosure was built on, so the final
+certificate is self-consistent. The vertex inequalities are then re-verified
+by eigenvalues and the smallest contraction they certify is recorded
+(`certifiedContraction <= rho`).
+
+**Hypothesis H3 (the only numerical step).** The Jacobians `G(e, K e)`,
+`e` in `Omega`, lie in the recorded zonotope. The zonotope is built from
+boundary-heavy samples of `Omega` (1200 on the boundary, 600 inside, recorded
+seed) and every coefficient bound and the residual are widened by the margin
+factor 1.25. The rest is algebra. An independent sample with another seed
+checks (2.1), the hold factor and the problem's rows directly
+(`terminalSafeSet.certificate`; a unit test repeats it).
+
+**Hold factor.** The partial-hold maps `e -> e(s)`, `0 < s < h`, are enclosed
+over the same samples, and
+
+    mu = max( 1, max_s exp(s/T) max_{Z_s} || F (A_s + B_s K) inv(F) || ),   F = chol(P),
+
+(a convex maximum, attained at a vertex, plus the residual's share) bounds
+`sqrt V(x(s)) <= mu exp(-s/T) sqrt V(x_k)` inside every hold. The certificate
+is for the declared sampled model, so there is no zero-order-hold gap between
+the certificate and the controller.
+
+**Why not the linear certificate.** The previous terminal controller (the
+same problem without collision rows, with the CLF row without slack) was
+certified on the linearized sampled model only: the fastest contraction `rho*`
+with the input bound (time constant 2.1 s at 8 m/s, 1.5 s at 15 m/s against
+the required 4 s), and the existence of an admissible input with
+`V(x+) <= rho V(x)` on the nonlinear model was an online check (the former
+H3). Closing that gap by a Lipschitz bound `L` on the nonlinear remainder,
+`sqrt(rho*) + L <= sqrt(rho)`, was tried on October 10 and fails by two
+orders of magnitude: the budget is 0.011 at 8 m/s while the remainder ratio
+is about `0.9 sqrt(c)` on the level `c` (the modified Fiala tire leaves its
+linear range at slips of a few hundredths of a radian, and the former `P`
+let the lateral velocity reach 1.4 m/s at `cbar`). The Jacobian enclosure
+replaces the single linear model by every Jacobian the controller meets; its
+price is a smaller certified set (Section 4), because the tire's variation
+over the set must be absorbed with a decay of `1/T`. The study is in
+`report/TERMINAL_CONTROLLER_CERTIFICATE_20261010.tex`.
 
 ## 3. The CLF tube
 
 For the ellipsoid `{e : e'Pe <= V}` the largest value of `|e_i|` is
-`a_i sqrt(V)`, `a_i = sqrt((inv P)_ii)`. With `r(t) = sqrt(V0) exp(-t/T)`,
-(2.1) gives at every time
+`sqrt((inv P)_ii) sqrt(V)`. With the hold factor `mu` of Section 2,
+`a_i = mu sqrt((inv P)_ii)` and `r(t) = sqrt(V0) exp(-t/T)`, (2.1) and the
+hold factor give at every time, inside the holds included,
 
     |e_y(t)| <= a_1 r(t),  |e_psi(t)| <= a_2 r(t),  |v_x - v_x*| <= a_3 r(t),
     |v_y - v_y*| <= a_4 r(t),  |yawRate - r*| <= a_5 r(t).                (3.1)
@@ -136,16 +203,19 @@ The terminal set is
 In the hybrid model with an absorbing end state `+` (the encounter is over),
 the terminal set is `S U {+}`.
 
-`cbar` is the smaller of `terminal.levelMaximum` (1, the region in which the
-CLF was synthesized) and the largest level whose ellipsoid lies inside the
-problem's linear state rows (speed, lateral velocity, yaw rate, sideslip cone,
-rear adhesion at the certification braking ratio),
+`cbar` is the smallest of `terminal.levelMaximum` (1), the certified level
+of Section 2 (1: the whole certified set) and `cbar_state / mu^2`, where
+`cbar_state` is the largest level whose ellipsoid lies inside the problem's
+linear state rows (speed, lateral velocity, yaw rate, sideslip cone, rear
+adhesion at the certification braking ratio),
 
-    cbar_state = min_j b_j^2 / (g_j' inv(P) g_j)   for the rows g_j' e <= b_j.
+    cbar_state = min_j b_j^2 / (g_j' inv(P) g_j)   for the rows g_j' e <= b_j;
 
-At 8 m/s it is 0.403 on the straight road and 0.907 on the curve (rear
-adhesion binds); at 15 m/s it is 1.146 and 1.541, so `cbar = 1`. Because the
-lateral extent of the tube is largest at `t = 0`, the road condition is checked
+the division by `mu^2` puts the hold midpoints, which lie in the `mu`-inflated
+ellipsoid, inside the rows as well. With the certified `P` the state-row
+level is far above 1 at every operating point (the certified set keeps the
+lateral velocity and yaw rate small), so `cbar = 1`. Because the lateral
+extent of the tube is largest at `t = 0`, the road condition is checked
 there.
 
 The target's existence ends at its first exit: a target that has left the
@@ -234,10 +304,10 @@ The road condition is inherited the same way. The actual rectangle lies in
 `T(x(0))(t)` for all `t` (Section 3), so it does not meet `B` before the
 encounter ends. QED
 
-The sampled terminal controller satisfies `V(x_(k+1)) <= rho V(x_k)` at the
-sample instants. Nesting then holds exactly from sample to sample. Inside a
-hold, (2.1) is assumed as in the continuous-time theory; it is not checked
-between samples.
+The certificate of Section 2 is for the sampled model: `V(x_(k+1)) <= rho
+V(x_k)` at the sample instants, so nesting holds exactly from sample to
+sample, and inside a hold the hold factor `mu` bounds the radius, so the tube
+(whose half-axes carry `mu`) contains the state between samples as well.
 
 ## 6. Recursive feasibility
 
@@ -258,9 +328,11 @@ A plan meeting these rows is *accepted*.
 - H1: the plant is the declared sampled model, and the state is known
   exactly.
 - H2: the target follows its forecast (the same constant `A` and `beta`).
-- H3: at every endpoint the closed loop reaches, the terminal controller has
-  an input with `V(x+) <= rho V(x)` that meets the road, state and handling
-  rows (checked online).
+- H3: the Jacobians of the sampled error map along the terminal controller
+  over `Omega` lie in the recorded enclosure (Section 2). This is the
+  certificate's one numerical hypothesis; it is checked offline, and
+  `terminalInput` evaluates each appended hold as a guard. (Until October 10,
+  H3 was the online existence of such an input, which was not proven.)
 
 The earlier hypothesis H4 (no conflict after a sliding 60-s window) is not
 needed: the encounter ends by an exit or by a relative motion outside the
@@ -283,8 +355,10 @@ prefix node, so the prefix deficit sum loses the old first node's deficit and
 gains zero. The endpoint is the old endpoint at the same absolute time. By H2
 the forecast is unchanged, so the endpoint is still in `S`: its exit or
 separation is at the same absolute time, within `H` of the same node. An
-appended hold satisfies `V(x+) <= rho V(x)` and its own rows (H3). By
-Section 5 its endpoint is in `S` (or the encounter has ended), and its nodes
+appended hold satisfies `V(x+) <= rho V(x)` by the certificate of Section 2
+(under H3), the input bound by the same certificate, and the state and
+handling rows at its nodes and midpoint because `cbar <= cbar_state / mu^2`.
+By Section 5 its endpoint is in `S` (or the encounter has ended), and its nodes
 and midpoints are inside the
 tube of the old endpoint. That tube clears the target by the hard-row
 clearance at the check instants, which lie on the tube's grid (Section 7).
@@ -372,14 +446,10 @@ When `y` is in `S` the zero correction satisfies it.
 
 **Anchor.** Later samples start from the previous accepted plan, shifted by
 one hold, with terminal-controller holds appended if needed
-(`terminalSafeSet.terminalInput`). The terminal controller tries:
-
-- the path guidance;
-- the input that minimizes the successor `V` on the trim's linear sampled
-  model;
-- a grid around that input.
-
-It keeps the admissible input with the smallest successor `V`. At startup,
+(`terminalSafeSet.terminalInput`): `u = u* + K e(x)` with the certified gain,
+one nonlinear hold. The function also evaluates the hold's decrease, input
+box and rows, as a guard on the certificate and as the decision for a state
+outside the certified set. At startup,
 the potential-field rollout runs until its first node in `S` from `prefix` on,
 at most `maximumHorizonSteps`. The rollout supplies a linearization, never
 an issued input: its endpoint is certified like any other, and the
@@ -409,12 +479,26 @@ input trust scale (`localTrustRecord`).
 
 ## 8. Measured behavior
 
-The single-backup set with the collision cone is measured in
-`report/TERMINAL_BACKUP_SET_20261008.tex` (third and fourth addenda). With
+The certified terminal controller (Section 2, the present code) is measured
+in `report/TERMINAL_CONTROLLER_CERTIFICATE_20261010.tex` against the linear
+certificate of commit `deb4dac` on the same 98 encounters, interleaved under
+the same load: exact 12 of 14 against 14 of 14, noisy 39 of 84 against 54 of
+84, no collision in either. Fourteen of the fifteen new noisy failures and
+both exact ones are `clfNoNumericalResult`, the CLF stage's conic solve
+failing numerically on longer plans: a plan must end inside the smaller
+certified set, so the horizon with a target present is 81 holds at the
+median against 47 (first frame 124 against 90). The terminal controller
+costs nothing measurable per sample. The remedies are the numerical
+robustness of long CLF-stage solves or a tighter enclosure (Section 2), not
+the certificate's structure.
+
+The single-backup set with the collision cone and the linear certificate is
+measured in `report/TERMINAL_BACKUP_SET_20261008.tex` (third and fourth
+addenda). With
 the grid check of October 9 (variant H): exact states 14 of 14; noisy 55 of
 84, the same runs as the CLF-tube set of October 6 with its sliding window
 (96 of 98 runs identical in outcome and length), no collision. With the
-closed-form check of October 10 (variant I2, the present code): exact 14 of
+closed-form check of October 10 (variant I2, commit `deb4dac`): exact 14 of
 14, noisy 54 of 84 (one turning crossing stops on a 4.7-s conic solve of a
 222-hold plan), no collision; the membership test costs 0.2 to 0.9 ms per
 call where it is closed-form (against 0.6 to 12.9 ms before) and 1.3 to
@@ -537,18 +621,23 @@ Section 8.
 ## 10. Limitations
 
 - Recursive feasibility is proven within one encounter, on the declared
-  sampled model with exact information (H1, H2), and conditionally on H3,
-  which is checked online, not proven. Each new encounter (a target appearing
-  or re-entering) is an initial-feasibility question.
+  sampled model with exact information (H1, H2), and on the enclosure
+  hypothesis H3 of the terminal controller's certificate, which is numerical
+  (sampled with a margin), not an interval proof. Each new encounter (a
+  target appearing or re-entering) is an initial-feasibility question.
 - The collision cone is applied only on a straight road. On a curve only
   the exit ends an encounter, and a target that stays in range without either
   event within the span of Section 7 makes the state non-terminal, also when
   it would in fact never be met: the span decides completeness, not
   soundness.
-- The tube assumes the continuous-time decrease (2.1) inside each hold.
-- `cbar` binds the rear-adhesion row at the certification braking ratio.
-  Other input-dependent rows (the actual braking of the terminal controller)
-  are checked online.
+- The hold factor is itself certified from the enclosures of the
+  partial-hold maps (Section 2); the ode45 plant of the experiments is not
+  the declared RK4 model (H1).
+- The certified set is smaller than the linear certificate's (Section 2):
+  the plan must end nearer the path, so horizons are longer. The box and the
+  input box are configuration settings (`clf.certification*`); a larger box
+  needs a slower `T` or more input authority, and the synthesis reports when
+  the robust LMI has no solution.
 - The terminal set is certainty-equivalent in the target. Section 9 is a
   derivation; only the ego enclosure's position and yaw parts are
   implemented.

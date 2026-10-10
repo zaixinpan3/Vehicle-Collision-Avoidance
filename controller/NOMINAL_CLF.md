@@ -12,10 +12,13 @@ For the given path and desired cruise trim, define
     V(x) = e(x)' P e(x),       P > 0.
 
 Longitudinal path phase is free. `nonlinearBicycleModel.cruise` computes the trim
-and reads P from `config/clfMatrices.json`; it never computes P. `nominalValue`
-evaluates this quadratic directly. There is no LQR design, and the CLF carries
-no feedback law. No nominal-policy rollout, finite-difference Hessian,
-cost-to-go kernel, or additional terminal value is used to construct the CLF.
+and reads P, the terminal controller's gain K and their certificate from
+`config/clfMatrices.json`; it never computes them. `nominalValue` evaluates
+this quadratic directly. There is no LQR design; the gain K is used only by
+the terminal controller `u = u* + K e` of the terminal set
+([TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md), Section 2), never by the
+optimizer. No nominal-policy rollout, finite-difference Hessian, cost-to-go
+kernel, or additional terminal value is used to construct the CLF.
 
 ## Requested decrease: a convergence time constant
 
@@ -30,46 +33,73 @@ of the error as V measures it; one lane width (3.66 m) returns to within
 (eta = 0.5 times e'Qe), whose speed differed between error directions by a
 factor of about 25 for the same eta.
 
-## Offline synthesis of P
+## Offline certificate of P and the terminal controller
 
-`scripts/synthesizeClfMatrices.m` computes P before experiments, for each
-operating point (vehicle parameters, speed, path curvature, sample time and
-CLF settings), and writes it with its key to `config/clfMatrices.json`. A
-controller call at an operating point without an entry is rejected with
-`collisionAvoidanceController:missingClfMatrix`; nothing is synthesized at run
-time, and the run time does not need the SDP solver.
+`scripts/synthesizeClfMatrices.m` computes P and K before experiments, for
+each operating point (vehicle parameters, speed, path curvature, sample time
+and CLF settings), and writes them with their key and certificate to
+`config/clfMatrices.json`. A controller call at an operating point without an
+entry is rejected with `collisionAvoidanceController:missingClfMatrix`, an
+entry without the certificate with `collisionAvoidanceController:staleClfMatrix`;
+nothing is synthesized at run time, and the run time does not need the SDP
+solver.
 
-At the trim, the sampled transverse model is e+ = A e + B (u - u_ref). With
-S = inv(P) and a certificate gain Y = K S, the script solves by bisection on rho
+The certificate is on the sampled nonlinear model itself, not on its
+linearization. Let `g(e, du)` be the transverse error after one hold from the
+state with error `e` under the input `u_ref + du`, and `G = [dg/de, dg/d(du)]`
+its Jacobian from the RK4 variational equations and the error chart
+(`terminalSafeSet.jacobians`). On the sublevel set `Omega = {V <= 1}`, which
+is convex, `g(e, K e)` equals the mean of `G` along the ray to `e` applied to
+`[e; K e]`, so a discrete Lyapunov inequality that holds for every Jacobian in
+a convex enclosure of `{G(e, K e) : e in Omega}` holds for the nonlinear map.
+The enclosure is a zonotope in box-scaled coordinates (the trim's Jacobian,
+the leading principal directions of the sampled deviations with their
+coefficient bounds, and a residual norm, all widened by a margin factor of
+1.25), and the inequality is imposed at its vertices with the residual
+absorbed by Petersen's lemma. With `S = inv(P)` and `Y = K S` the LMI is
 
-    minimize rho
-    subject to  [rho S, (A S + B Y)'; A S + B Y, S] >= 0,
+    maximize t
+    subject to  [rho S, N_v', Z'; N_v, S - lambda_v I, 0; Z, 0, lambda_v I] >= 0   (every vertex v),
+                N_v = A_v S + B_v Y,   Z = eps [S; Y],
                 [ubar_j^2, Y_j; Y_j', S] >= 0       (j = steering, braking),
-                R^2 D <= S <= R^2 shapeRatio D,    D = diag(scales.^2),
+                S_ii <= box_i^2,   S >= t diag(box)^2,
 
-with YALMIP/SeDuMi from `solver/`. The first row is (A+BK)'P(A+BK) <= rho P.
-The second limits the certificate input |K_j e| to
-`clf.certificationSteeringRadians` = 0.075 rad and
-`clf.certificationBrakingRatio` = 0.125 on the sublevel set V <= 1. These
-equal one maximum trust-region step by default but are CLF settings of their
-own, so P does not change with the optimizer's trust settings. The last makes that set contain every error within R =
-`clf.certificationRegionScale` = 2 error scales, and keeps P's weights relative
-to Q = inv(D) within `clf.shapeRatio` = 10 of each other. Without the input
-bound the fastest P needs gains of about 30 (several radians of steering for a
-0.5-m offset); without the shape bound the fastest P nearly ignores some error
-directions (weights 1e-9 to 0.1 relative to Q). K is discarded.
+with `rho = exp(-2h/T)` the requested contraction, `ubar =
+[clf.certificationSteeringRadians; clf.certificationBrakingRatio]` (0.075 rad
+and 0.125 on `V <= 1`) and `box` the certification box of
+`clf.certificationLateralMeters`, `...HeadingRadians`,
+`...SpeedMetersPerSecond`, `...LateralVelocityMetersPerSecond` and
+`...YawRateRadiansPerSecond`, inside which `Omega` must lie. Because the
+enclosure depends on `Omega` and `K`, the script iterates: the plain LMI gives
+a first pair; each round encloses the Jacobians along the current controller
+over the current set and solves again; the last round fixes `K`, encloses over
+the current set and solves for a `P` whose set lies inside it, shrinking the
+sampling set if necessary, so the final certificate refers to an enclosure
+taken on a superset of its own level set. The vertex inequalities are then
+re-verified by eigenvalues and the smallest contraction they certify is
+recorded (`certifiedContraction`, at most `rho`). The partial-hold maps are
+enclosed the same way to give the hold factor by which the CLF tube is
+inflated between samples. YALMIP/SeDuMi from `solver/`.
 
-The certified contraction rho* is the fastest attainable under these
-conditions. The requested rho must be slower, otherwise synthesis rejects the
-operating point. For the default vehicle the certified error time constants are
-2.1 s at 8 m/s and 1.5--1.6 s at 15 m/s, against the requested 4 s.
+The only non-algebraic step is the enclosure (hypothesis H3 of
+TERMINAL_SAFE_SET.md): it is built from 1200 boundary and 600 interior
+samples of `Omega` with a recorded seed. The entry records the samples' seed,
+the coefficient bounds, the residual, the largest slip angles reached, the
+inputs' maxima, and an independent sampled check with another seed
+(`terminalSafeSet.certificate`: worst contraction, hold factor, the
+problem's rows); `nominalClfTest` repeats that check.
 
-Passing from this linear certificate to a nonlinear local CLF requires a
-smooth error chart, an actual sampling equilibrium, and admissibility of a
-neighborhood. The implementation uses RK4 and numerical trim calculation; the
-tests verify nonlinear contraction for small signed perturbations, with the
-input that minimizes the nonlinear successor value as the witness, not an
-interval certificate for an entire set.
+The former certificate (until October 10, 2026) was the fastest contraction
+of the linearized sampled model with the input bound and a shape constraint
+(time constants 2.1 s at 8 m/s and 1.5 s at 15 m/s against the required 4 s);
+its gain was discarded and the nonlinear decrease was checked online by the
+terminal controller. Closing that gap with a Lipschitz bound on the nonlinear
+remainder fails by two orders of magnitude (the modified Fiala tire is
+nonlinear at slips of a few hundredths of a radian), which is why the
+certificate now encloses the Jacobians over the set instead of trusting one
+linearization. The certified set is smaller in the lateral velocity and yaw
+rate (where the tire varies) than the former `V <= 1`, and the lateral extent
+is set by the box and the robust LMI's feasibility at `T`.
 
 **This quadratic is not a global nonlinear CLF.** Large heading errors, tire
 saturation, state-domain boundaries, braking memory and the MPC trust region

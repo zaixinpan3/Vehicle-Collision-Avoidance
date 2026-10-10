@@ -182,9 +182,13 @@ classdef nonlinearBicycleModel
             point=nonlinearBicycleModel.operatingPoint(cfg,curvature);
             entry=localClfEntry(key);
             p=reshape(entry.matrix,5,5);p=(p+p.')/2;
+            % The terminal controller's gain and its nonlinear certificate
+            % (certified level, hold factor) are synthesized with P.
             reference=struct('state',point.state,'input',point.input,'curvature',curvature, ...
                 'matrix',p,'factor',chol(p),'contraction',exp(-2*cfg.controller.sampleTime/cfg.clf.convergenceTimeConstantSeconds), ...
                 'certifiedContraction',entry.certifiedContraction, ...
+                'gain',reshape(entry.gain,2,5),'certifiedLevel',entry.certifiedLevel,'holdFactor',entry.holdFactor, ...
+                'nominalA',reshape(entry.nominalA,5,5),'nominalB',reshape(entry.nominalB,5,2), ...
                 'continuousA',point.continuousA,'continuousB',point.continuousB);
             savedKeys=[{key},savedKeys(1:min(end,15))];savedReferences=[{reference},savedReferences(1:min(end,15))];
         end
@@ -345,7 +349,8 @@ function entry=localClfEntry(key)
         table=containers.Map('KeyType','char','ValueType','any');stamp=current;
         if isfile(file)
             entries=jsondecode(fileread(file));
-            for index=1:numel(entries),table(char(entries(index).key))=entries(index);end
+            if ~iscell(entries),entries=num2cell(entries);end
+            for index=1:numel(entries),table(char(entries{index}.key))=entries{index};end
         end
     end
     if ~isKey(table,char(key))
@@ -354,6 +359,13 @@ function entry=localClfEntry(key)
             'Run scripts/synthesizeClfMatrices before the experiment.']);
     end
     entry=table(char(key));
+    for name=["gain","certifiedLevel","holdFactor","nominalA","nominalB"]
+        if ~isfield(entry,name)
+            error('collisionAvoidanceController:staleClfMatrix', ...
+                ['The CLF entry for this operating point predates the terminal controller''s certificate (no %s). ' ...
+                'Run scripts/synthesizeClfMatrices before the experiment.'],name);
+        end
+    end
 end
 
 function [residual,x,u]=localTrimResidual(point,speed,curvature,cfg)

@@ -13,8 +13,9 @@ solution.
 
 The horizon ends in the terminal set of
 [TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md): the CLF tube of the endpoint, the
-region every trajectory of the terminal controller (this problem without PCBF
-rows) stays in, misses the target until the encounter ends: the target leaves
+region every trajectory of the terminal controller (the linear feedback
+`u = u* + K e` certified with the CLF on the nonlinear model) stays in, misses
+the target until the encounter ends: the target leaves
 the perception range, or the target's forecast motion relative to the tube's
 box is outside their collision cone (the two never come within the collision
 buffer again). No encounter duration is preset, and no lane or other mode is
@@ -158,8 +159,9 @@ out from the current estimate. The plan keeps its endpoint at the same
 absolute time, so the horizon shrinks by one hold per frame. Only when the
 shifted plan is shorter than `N`, or its endpoint is no longer in the terminal
 set (a changed forecast or state), is it extended by holds of the terminal
-controller (`terminalSafeSet.terminalInput`). Each such hold is an admissible
-input whose successor meets the CLF without slack. Prior affine states are
+controller (`terminalSafeSet.terminalInput`): `u = u* + K e` with the
+certified gain, whose successor meets the CLF without slack on the certified
+set. Prior affine states are
 not reused. When no target is present, nominal path guidance supplies the
 startup rollout. A shifted plan that cannot be rolled out (non-finite inputs,
 a braking ratio at the limit, or a tire-domain error) is reported as no
