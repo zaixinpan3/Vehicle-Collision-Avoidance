@@ -11,8 +11,9 @@ the estimator and the controller are designed together.
 
 The safety task is a finite encounter: no collision with the target while it
 is inside the perception range `R = encounterRangeMeters`. After the
-prediction horizon the terminal controller completes the encounter: the
-linear feedback `u = u* + K e(x)` on the transverse error, certified together
+prediction horizon the terminal controller completes the encounter: a static
+feedback on the transverse error, commanding the front lateral force and the
+braking ratio and steering through the inverse Fiala curve, certified together
 with the CLF on the nonlinear model (Section 2), so the vehicle dissipates to
 the nominal behavior (cruise on the given path at the reference speed). The
 terminal set is the set of states
@@ -48,34 +49,53 @@ reports `collisionAvoidanceController:noOptimizationSolution`.
 
 Let `e(x) = [e_y; e_psi; vx - vx*; vy - vy*; r - r*]` be the transverse error
 to the path trim and `V(x) = e(x)' P e(x)` the CLF of
-[NOMINAL_CLF.md](NOMINAL_CLF.md). The terminal controller is the linear
+[NOMINAL_CLF.md](NOMINAL_CLF.md). The terminal controller is the static
 feedback
 
-    u = u* + K e(x),
+    w = K e(x),   u = inputOf(x, w),
 
-whose gain `K` is synthesized together with `P`
-(`scripts/synthesizeClfMatrices.m`). The pair is certified on the sampled
-nonlinear model itself (RK4 holds of `h`), on the sublevel set
+where the virtual input `w` is the deviation of the front lateral force and
+of the braking ratio from the trim's, and `inputOf`
+(`terminalSafeSet.inputOf`) turns it into the physical input: the braking
+ratio `b* + w_2`, and the steering angle whose front slip gives the force
+`F* + w_1` on the Fiala curve below its peak at that braking ratio (the
+inverse of `F = -C tan(a) (1 - q + q^2/3)`, closed form). This is a feedback
+linearization of the front tire: the controller is linear in the force the
+tire delivers, so the front tire's saturation no longer enters the Jacobians
+the certificate must cover (the steering-level map `u = u* + K e` remains
+available to the synthesis and gives sets about half as large, see
+`report/TERMINAL_SET_ALTERNATIVES_20261010.tex`). The gain `K` is synthesized
+together with `P` (`scripts/synthesizeClfMatrices.m`). The pair is certified
+on the sampled nonlinear model itself (RK4 holds of `h`), on the sublevel set
 `Omega = {x : V(x) <= 1}`:
 
     V(x+) <= rho V(x),   rho = exp(-2h/T),   T = clf.convergenceTimeConstantSeconds,   (2.1)
-    |K_j e| <= ubar_j   (the certification input box, 0.075 rad and 0.125),
+    |K_j e| <= ubar_j   (the certification input box: 0.4 of the front lateral
+                         capacity, and 0.125 of braking ratio),
     Omega lies inside the certification box of errors (clf.certification*).
 
 Hence along the terminal controller `V(x_k) <= rho^k V(x_0)`, and with the
 hold factor `mu >= 1` below, `sqrt V(x(t)) <= mu exp(-t/T) sqrt V(x_0)` at
 every time, which is (2.1) in continuous form up to `mu`.
 
-**How (2.1) is established.** Write `g(e, du)` for the error after one hold
-from `x(e)` with the input `u* + du`; `g(0, 0) = 0`. `Omega` is convex and
-contains `0`, so along the ray from `0` to `e`
+**How (2.1) is established.** Write `g(e, w)` for the error after one hold
+from `x(e)` with the input `inputOf(x(e), w)`; the trim is a fixed point,
+`g(0, 0) = 0`, so along the ray from `0` to `(e, w)`
 
-    g(e, K e) = Gbar [e; K e],   Gbar = integral_0^1 G(t e, t K e) dt,
+    g(e, w) = Gbar(e, w) [e; w],   Gbar(e, w) = integral_0^1 G(t e, t w) dt,     (2.2)
 
-with `G = [dg/de, dg/d(du)]` the Jacobian of the sampled map
-(`terminalSafeSet.jacobians`: the RK4 variational equations composed with
-the error chart). `Gbar` lies in the convex hull of the Jacobians along the
-controller over `Omega`. Let that hull be contained in the zonotope
+exactly, with `G = [dg/de, dg/dw]` the Jacobian of the sampled map
+(`terminalSafeSet.jacobians`: the RK4 variational equations, the input map's
+derivatives and the error chart). The certificate encloses the ray averages `Gbar(e, K e)`
+themselves over `Omega` (`terminalSafeSet.rayJacobians`: Gauss-Legendre
+quadrature with 8 nodes; the quadrature's residual in (2.2) is carried as a
+rank-one term of the residual below). Enclosing the averages and not the
+pointwise Jacobians is what makes the set large: for the saturating tire the
+averages spread like the secants of the force curve and the pointwise
+Jacobians like its tangents, and at the slips the set reaches the tangent
+spread is two to three times the secant spread (normalized Fiala curve
+`1 - (1 - s)^3`: tangent `(1 - s)^2`, secant `(1 - (1 - s)^3) / (3 s)`). Let
+the averages lie in the zonotope
 
     Z = { G0 + sum_k delta_k D_k + R : |delta_k| <= 1, ||R|| <= eps },
 
@@ -87,20 +107,23 @@ vertex of `Z`, with the residual absorbed by Petersen's lemma, gives
 `S = inv(P)`, `Y = K S` over those vertices, with the input rows
 `[ubar_j^2, Y_j; Y_j', S] >= 0` and the box rows `S_ii <= box_i^2`,
 maximizing the fill `t` in `S >= t diag(box)^2`. Because `Z` depends on
-`Omega` and `K`, the design iterates (plain LMI, then enclosures along the
-current controller over the current set) and ends with a step at fixed `K`
-whose set lies inside the set the enclosure was built on, so the final
-certificate is self-consistent. The vertex inequalities are then re-verified
-by eigenvalues and the smallest contraction they certify is recorded
+`Omega` and `K`, the design grows the set self-consistently: each round
+encloses the averages over `1.5 Omega` and over inputs within `ubar/4` of the
+current controller, and solves the LMI with the new set inside `1.5 Omega`
+and the new gain within that band of the old one on it, so that every round's
+pair is certified by the enclosure it was designed with; the round with the
+largest fill is kept. Its vertex inequalities are re-verified by eigenvalues
+and the smallest contraction they certify is recorded
 (`certifiedContraction <= rho`).
 
-**Hypothesis H3 (the only numerical step).** The Jacobians `G(e, K e)`,
+**Hypothesis H3 (the only numerical step).** The ray averages `Gbar(e, K e)`,
 `e` in `Omega`, lie in the recorded zonotope. The zonotope is built from
-boundary-heavy samples of `Omega` (1200 on the boundary, 600 inside, recorded
-seed) and every coefficient bound and the residual are widened by the margin
-factor 1.25. The rest is algebra. An independent sample with another seed
-checks (2.1), the hold factor and the problem's rows directly
-(`terminalSafeSet.certificate`; a unit test repeats it).
+boundary-heavy samples of the inflated set (1200 on the boundary, 600 inside,
+recorded seed) and every coefficient bound and the residual are widened by
+the margin factor 1.25. The rest is algebra. An independent sample with
+another seed checks (2.1), the hold factor and the problem's rows directly
+(`terminalSafeSet.certificate`), and a unit test checks fresh ray averages
+against the recorded zonotope.
 
 **Hold factor.** The partial-hold maps `e -> e(s)`, `0 < s < h`, are enclosed
 over the same samples, and
@@ -479,18 +502,30 @@ input trust scale (`localTrustRecord`).
 
 ## 8. Measured behavior
 
-The certified terminal controller (Section 2, the present code) is measured
-in `report/TERMINAL_CONTROLLER_CERTIFICATE_20261010.tex` against the linear
-certificate of commit `deb4dac` on the same 98 encounters, interleaved under
-the same load: exact 12 of 14 against 14 of 14, noisy 39 of 84 against 54 of
-84, no collision in either. Fourteen of the fifteen new noisy failures and
-both exact ones are `clfNoNumericalResult`, the CLF stage's conic solve
-failing numerically on longer plans: a plan must end inside the smaller
-certified set, so the horizon with a target present is 81 holds at the
-median against 47 (first frame 124 against 90). The terminal controller
-costs nothing measurable per sample. The remedies are the numerical
-robustness of long CLF-stage solves or a tighter enclosure (Section 2), not
-the certificate's structure.
+The present certificate (Section 2: the force-level terminal controller, the
+ray-averaged enclosure and the self-consistent growth) is measured in
+`report/TERMINAL_SET_ALTERNATIVES_20261010.tex` against the first certified
+version, commit `8faf395`, on the same 98 encounters interleaved under the
+same load: exact 13 of 14 against 12 of 14, noisy 53 of 84 against 39 of 84,
+no collision in either (least clearance 0.146 m exact, 0.245 m noisy). The
+certified set reaches 2 m of lateral error at every operating point (0.6 to
+1.0 m before), so the plans no longer have to end near the path: the
+first-frame horizon falls from 120 to 105 holds at the median and the
+95th-percentile horizon from 217 to 104 holds (exact), and the CLF stage's
+numerical failures on long plans fall from 18 to 3 encounters. Against the
+last uncertified design (commit `deb4dac`: 14 of 14 and 54 of 84) the
+certified controller is within one encounter in each group. The twelve noisy
+braking leads still stop at their first frames (the startup problem of the
+first estimate, unchanged since October 8).
+
+The first certified version (commit `8faf395`, pointwise Jacobians, fixed-gain
+final step) was measured in `report/TERMINAL_CONTROLLER_CERTIFICATE_20261010.tex`
+against the linear certificate of commit `deb4dac`: exact 12 of 14 against 14
+of 14, noisy 39 of 84 against 54 of 84, no collision in either. Fourteen of
+the fifteen new noisy failures and both exact ones were `clfNoNumericalResult`,
+the CLF stage's conic solve failing numerically on the longer plans that the
+0.6-m set required (horizon with a target present 81 holds at the median
+against 47; first frame 124 against 90).
 
 The single-backup set with the collision cone and the linear certificate is
 measured in `report/TERMINAL_BACKUP_SET_20261008.tex` (third and fourth
@@ -633,11 +668,13 @@ Section 8.
 - The hold factor is itself certified from the enclosures of the
   partial-hold maps (Section 2); the ode45 plant of the experiments is not
   the declared RK4 model (H1).
-- The certified set is smaller than the linear certificate's (Section 2):
-  the plan must end nearer the path, so horizons are longer. The box and the
-  input box are configuration settings (`clf.certification*`); a larger box
-  needs a slower `T` or more input authority, and the synthesis reports when
-  the robust LMI has no solution.
+- The certified set reaches the certification box in the lateral error
+  (2 m) at every operating point and is bounded by the enclosure's growth in
+  the other coordinates (Section 2); the box and the input box are
+  configuration settings (`clf.certification*`), and the synthesis reports
+  when the robust LMI has no solution. A common certificate over a range of
+  cruise speeds was not found with one quadratic function
+  (`report/TERMINAL_SET_ALTERNATIVES_20261010.tex`).
 - The terminal set is certainty-equivalent in the target. Section 9 is a
   derivation; only the ego enclosure's position and yaw parts are
   implemented.

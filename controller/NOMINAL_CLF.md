@@ -48,15 +48,26 @@ The certificate is on the sampled nonlinear model itself, not on its
 linearization. Let `g(e, du)` be the transverse error after one hold from the
 state with error `e` under the input `u_ref + du`, and `G = [dg/de, dg/d(du)]`
 its Jacobian from the RK4 variational equations and the error chart
-(`terminalSafeSet.jacobians`). On the sublevel set `Omega = {V <= 1}`, which
-is convex, `g(e, K e)` equals the mean of `G` along the ray to `e` applied to
-`[e; K e]`, so a discrete Lyapunov inequality that holds for every Jacobian in
-a convex enclosure of `{G(e, K e) : e in Omega}` holds for the nonlinear map.
-The enclosure is a zonotope in box-scaled coordinates (the trim's Jacobian,
-the leading principal directions of the sampled deviations with their
-coefficient bounds, and a residual norm, all widened by a margin factor of
-1.25), and the inequality is imposed at its vertices with the residual
-absorbed by Petersen's lemma. With `S = inv(P)` and `Y = K S` the LMI is
+(`terminalSafeSet.jacobians`). The trim is a fixed point, so along the ray
+from `0` to `(e, du)`
+
+    g(e, du) = Gbar(e, du) [e; du],   Gbar(e, du) = integral_0^1 G(t e, t du) dt,
+
+exactly. The certificate encloses the ray averages `Gbar` along the controller
+over the set (`terminalSafeSet.rayJacobians`, Gauss-Legendre quadrature with
+8 nodes; the quadrature's residual in the identity is added to the enclosure's
+residual as a rank-one term), so a discrete Lyapunov inequality that holds for
+every matrix of the enclosure holds for the nonlinear map. Enclosing the ray
+averages rather than the pointwise Jacobians matters for a saturating tire:
+the averages spread like the secants of the force curve, the pointwise
+Jacobians like its tangents, and at the slips the set reaches the tangent
+spread is two to three times the secant spread (the first coefficient bound
+drops from about 0.13 to 0.06 at 8 m/s). The enclosure is a zonotope in
+box-scaled coordinates (the trim's Jacobian, the leading principal directions
+of the sampled deviations with their coefficient bounds, and a residual norm,
+all widened by a margin factor of 1.25), and the inequality is imposed at its
+vertices with the residual absorbed by Petersen's lemma. With `S = inv(P)` and
+`Y = K S` the LMI is
 
     maximize t
     subject to  [rho S, N_v', Z'; N_v, S - lambda_v I, 0; Z, 0, lambda_v I] >= 0   (every vertex v),
@@ -70,24 +81,29 @@ and 0.125 on `V <= 1`) and `box` the certification box of
 `clf.certificationLateralMeters`, `...HeadingRadians`,
 `...SpeedMetersPerSecond`, `...LateralVelocityMetersPerSecond` and
 `...YawRateRadiansPerSecond`, inside which `Omega` must lie. Because the
-enclosure depends on `Omega` and `K`, the script iterates: the plain LMI gives
-a first pair; each round encloses the Jacobians along the current controller
-over the current set and solves again; the last round fixes `K`, encloses over
-the current set and solves for a `P` whose set lies inside it, shrinking the
-sampling set if necessary, so the final certificate refers to an enclosure
-taken on a superset of its own level set. The vertex inequalities are then
-re-verified by eigenvalues and the smallest contraction they certify is
-recorded (`certifiedContraction`, at most `rho`). The partial-hold maps are
-enclosed the same way to give the hold factor by which the CLF tube is
-inflated between samples. YALMIP/SeDuMi from `solver/`.
+enclosure depends on `Omega` and `K`, the script grows the set
+self-consistently: the plain LMI inside half the box gives a first pair; each
+round encloses the ray averages over 1.5 times the current set and over
+inputs within a quarter of `ubar` of the current controller, and solves the
+LMI with the new set inside that inflated set (`S' <= 1.5 S`) and the new
+gain within that band of the old one on it (`|(K' - K)_j e| <= ubar_j / 4`
+on the new set). Every round's pair is therefore certified by the enclosure
+it was designed with, and the set may grow by 1.5 in `V` per round until the
+enclosure's growth stops it; the pair with the largest fill is kept. Its
+vertex inequalities are re-verified by eigenvalues and the smallest
+contraction they certify is recorded (`certifiedContraction`, at most `rho`).
+The partial-hold maps are enclosed the same way, on the same samples, to give
+the hold factor by which the CLF tube is inflated between samples.
+YALMIP/SeDuMi from `solver/`.
 
 The only non-algebraic step is the enclosure (hypothesis H3 of
 TERMINAL_SAFE_SET.md): it is built from 1200 boundary and 600 interior
-samples of `Omega` with a recorded seed. The entry records the samples' seed,
-the coefficient bounds, the residual, the largest slip angles reached, the
-inputs' maxima, and an independent sampled check with another seed
-(`terminalSafeSet.certificate`: worst contraction, hold factor, the
-problem's rows); `nominalClfTest` repeats that check.
+samples of the inflated set with a recorded seed. The entry records the
+samples' seed, the coefficient bounds, the residual (with the quadrature's
+share), the largest slip angles reached, the inputs' maxima, and an
+independent sampled check with another seed (`terminalSafeSet.certificate`:
+worst contraction, hold factor, the problem's rows); `nominalClfTest` repeats
+that check and tests fresh ray averages against the recorded zonotope.
 
 The former certificate (until October 10, 2026) was the fastest contraction
 of the linearized sampled model with the input bound and a shape constraint
@@ -97,9 +113,12 @@ terminal controller. Closing that gap with a Lipschitz bound on the nonlinear
 remainder fails by two orders of magnitude (the modified Fiala tire is
 nonlinear at slips of a few hundredths of a radian), which is why the
 certificate now encloses the Jacobians over the set instead of trusting one
-linearization. The certified set is smaller in the lateral velocity and yaw
-rate (where the tire varies) than the former `V <= 1`, and the lateral extent
-is set by the box and the robust LMI's feasibility at `T`.
+linearization. With the pointwise Jacobians (October 10, first version) the
+certified lateral extent was 0.6 m at 8 m/s; the ray averages and the
+self-consistent growth (October 11) are what recover the former size
+(`report/TERMINAL_SET_ALTERNATIVES_20261010.tex` compares the constructions
+tried: secant enclosure, force-level input map, saturation hull,
+poly-quadratic function, slower decay, polytope, interval certificate).
 
 **This quadratic is not a global nonlinear CLF.** Large heading errors, tire
 saturation, state-domain boundaries, braking memory and the MPC trust region

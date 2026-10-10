@@ -1,0 +1,26 @@
+secant+wide+iter8          8/0            lat 1.145 m  head 0.1037 rad  speed 0.483  vy 0.195  r 0.1349  fill 0.063  T 3.89/4 s  mu 1.0232  slips 0.066/0.023  worst 0.9449  rows 1  23 s
+force+secant+wide+iter8    8/0            lat 1.728 m  head 0.1383 rad  speed 0.467  vy 0.227  r 0.1500  fill 0.131  T 3.87/4 s  mu 1.0132  slips 0.056/0.028  worst 0.9563  rows 1  169 s
+secant+T20+wide+iter8      8/0            lat 1.451 m  head 0.1130 rad  speed 0.595  vy 0.229  r 0.1464  fill 0.134  T 17.37/20 s  mu 1.0191  slips 0.074/0.030  worst 0.9565  rows 1  201 s
+secant+wide+iter10+gs0.1   8/0            lat 1.302 m  head 0.1157 rad  speed 0.381  vy 0.300  r 0.1500  fill 0.070  T 3.89/4 s  mu 1.0288  slips 0.071/0.035  worst 0.9427  rows 1  229 s
+secant+wide+iter10+gs0.05+grow1.3 8/0            lat 0.685 m  head 0.0646 rad  speed 0.337  vy 0.164  r 0.1500  fill 0.043  T 3.86/4 s  mu 1.0264  slips 0.067/0.019  worst 0.9484  rows 1  288 s
+secant+T1000+wide+iter8    8/0            lat 1.372 m  head 0.1020 rad  speed 0.585  vy 0.241  r 0.1500  fill 0.125  T 98.37/1000 s  mu 1.0239  slips 0.092/0.034  worst 0.9655  rows 1  247 s
+secant+wide+iter10+gs0.1+grow1.3 8/0            lat 1.529 m  head 0.1272 rad  speed 0.358  vy 0.211  r 0.1500  fill 0.094  T 3.90/4 s  mu 1.0190  slips 0.063/0.030  worst 0.9481  rows 1  363 s
+secant+wide+iter10+gs0.25+grow1.3 8/0            lat 1.087 m  head 0.0975 rad  speed 0.422  vy 0.179  r 0.1236  fill 0.059  T 3.87/4 s  mu 1.0220  slips 0.063/0.021  worst 0.9460  rows 1  336 s
+force+secant+wide+iter10+gs0.1 8/0            lat 1.668 m  head 0.1348 rad  speed 0.422  vy 0.226  r 0.1500  fill 0.134  T 3.88/4 s  mu 1.0122  slips 0.045/0.028  worst 0.9571  rows 1  364 s
+secant+comp4+wide+iter8    8/0            lat 0.730 m  head 0.0750 rad  speed 0.459  vy 0.234  r 0.1500  fill 0.018  T 3.97/4 s  mu 1.1123  slips 0.081/0.025  worst 0.9291  rows 1  84 s
+force+secant+wide+iter10+gs0.1+grow1.3 8/0            lat 2.000 m  head 0.1494 rad  speed 0.418  vy 0.231  r 0.1500  fill 0.160  T 3.88/4 s  mu 1.0103  slips 0.045/0.027  worst 0.9611  rows 1  328 s
+secant+comp8+wide+iter8    8/0            lat 1.812 m  head 0.1410 rad  speed 0.712  vy 0.227  r 0.1500  fill 0.156  T 3.87/4 s  mu 1.0044  slips 0.075/0.029  worst 0.9608  rows 1  1050 s
+poly+secant+wide+iter8     8/0            lat 0.599 m  head 0.0629 rad  speed 0.440  vy 0.174  r 0.1497  fill 0.031  T 3.85/4 s  mu 1.0512  slips 0.074/0.020  worst 0.9464  rows 1  678 s (union 0.60 m, 0.063 rad)
+sat+secant+wide+iter8      8/0            lat 1.003 m  head 0.0961 rad  speed 0.442  vy 0.194  r 0.1348  fill 0.047  T 3.30/4 s  mu 1.0683  slips 0.067/0.023  worst 0.9369  rows 1  1052 s
+baseline+wide+iter8        8/0            lat 0.234 m  head 0.0292 rad  speed 0.146  vy 0.141  r 0.1499  fill 0.005  T 3.78/4 s  mu 1.1267  slips 0.066/0.018  worst 0.9164  rows 1  173 s
+force+wide+iter8           8/0            lat 0.797 m  head 0.0777 rad  speed 0.364  vy 0.192  r 0.1329  fill 0.037  T 3.86/4 s  mu 1.0446  slips 0.049/0.024  worst 0.9462  rows 1  20 s
+poly+secant+sched6         8/0            lat 0.900 m  head 0.0709 rad  speed 0.410  vy 0.109  r 0.0720  fill 0.095  T 3.88/4 s  mu 1.0048  slips 0.026/0.015  worst 0.9646  rows 1  1782 s (union 0.90 m, 0.071 rad)
+secant+wide+iter8          8/0.005        lat 1.191 m  head 0.1075 rad  speed 0.433  vy 0.235  r 0.1500  fill 0.059  T 3.94/4 s  mu 1.0341  slips 0.063/0.036  worst 0.9441  rows 1  294 s
+force+secant+wide+iter8    8/0.005        lat 1.811 m  head 0.1404 rad  speed 0.447  vy 0.210  r 0.1500  fill 0.121  T 3.91/4 s  mu 1.0130  slips 0.060/0.032  worst 0.9537  rows 1  312 s
+secant+wide+iter8          15/0           lat 2.000 m  head 0.1019 rad  speed 0.595  vy 0.221  r 0.1500  fill 0.122  T 3.94/4 s  mu 1.0054  slips 0.065/0.025  worst 0.9617  rows 1  206 s
+force+secant+wide+iter8    15/0           lat 2.000 m  head 0.1045 rad  speed 0.603  vy 0.256  r 0.1500  fill 0.129  T 3.87/4 s  mu 1.0061  slips 0.055/0.027  worst 0.9622  rows 1  256 s
+secant+wide+iter8          15/0.005       lat 2.000 m  head 0.0980 rad  speed 0.575  vy 0.247  r 0.1500  fill 0.106  T 3.86/4 s  mu 1.0086  slips 0.072/0.037  worst 0.9589  rows 1  250 s
+force+secant+wide+iter8    15/0.005       lat 2.000 m  head 0.1028 rad  speed 0.520  vy 0.220  r 0.1500  fill 0.124  T 3.86/4 s  mu 1.0059  slips 0.075/0.038  worst 0.9623  rows 1  236 s
+baseline+wide+iter8        15/0           lat 1.709 m  head 0.0751 rad  speed 0.482  vy 0.269  r 0.1500  fill 0.048  T 3.93/4 s  mu 1.0204  slips 0.068/0.027  worst 0.9398  rows 1  119 s
+baseline+wide+iter8        15/0.005       lat 1.422 m  head 0.0661 rad  speed 0.511  vy 0.217  r 0.1500  fill 0.036  T 3.94/4 s  mu 1.0330  slips 0.068/0.032  worst 0.9421  rows 1  65 s
+secant+wide+iter8          11.5-15/0-0.005 lat 0.107 m  head 0.0168 rad  speed 0.171  vy 0.141  r 0.1178  fill 0.001  T 3.91/4 s  mu 1.2823  slips 0.061/0.024  worst 0.8798  rows 1  715 s

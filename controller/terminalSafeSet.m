@@ -1,10 +1,14 @@
 classdef terminalSafeSet
 %terminalSafeSet Encounter-safe terminal set of the CLF terminal controller.
-% After the horizon the controller is the linear feedback u = u* + K e(x) on
-% the transverse error to the given path's trim, with the gain K certified
-% offline together with the CLF matrix P (NOMINAL_CLF.md): on the certified
-% level set {V <= certifiedLevel} every hold satisfies V(x+) <= rho V(x),
-% rho = exp(-2h/T), with an input inside the certification bound. The CLF
+% After the horizon the controller is the static feedback u = inputOf(x, K e(x))
+% on the transverse error to the given path's trim: the virtual input K e is
+% the deviation of the front lateral force and of the braking ratio from the
+% trim's, and the steering angle follows from the inverse Fiala curve
+% (feedback linearization of the front tire; the alternative steering-level
+% map is u = u* + K e). The gain K is certified offline together with the CLF
+% matrix P (NOMINAL_CLF.md): on the certified level set
+% {V <= certifiedLevel} every hold satisfies V(x+) <= rho V(x),
+% rho = exp(-2h/T), with the virtual input inside the certification bound. The CLF
 % therefore decays as V(t) <= exp(-2t/T) V(0) at the samples, and inside a
 % hold up to the certified hold factor. Any such motion keeps the transverse
 % error in
@@ -396,8 +400,8 @@ classdef terminalSafeSet
         end
 
         function [input,next,ok,value] = terminalInput(x,model)
-            % One hold of the terminal controller u = u* + K e(x): the gain
-            % certified offline together with P (NOMINAL_CLF.md). On the
+            % One hold of the terminal controller u = inputOf(x, K e(x)): the
+            % gain certified offline together with P (NOMINAL_CLF.md). On the
             % certified level set the hold satisfies V(next) <= rho V(x), the
             % input bound and, below the state-row level, the state and
             % handling rows (TERMINAL_SAFE_SET.md, Section 2). ok evaluates
@@ -405,11 +409,12 @@ classdef terminalSafeSet
             % and the decision for states outside the set.
             cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
             e=nonlinearBicycleModel.error(x,lane,reference);
-            input=reference.input+reference.gain*e;
+            input=terminalSafeSet.inputOf(reference,cfg,x,reference.gain*e);
             low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);high=min(1-1e-8,cfg.actuation.brakingRatioMaximum);
             input(2)=min(high,max(low,input(2)));
             bound=reference.contraction*sum((reference.factor*e).^2)*(1+1e-9)+1e-12;
             next=[];ok=false;value=Inf;
+            if any(~isfinite(input)),return;end
             try
                 [middle,next]=terminalSafeSet.holdStates(x,input,cfg);
             catch exception
@@ -420,39 +425,70 @@ classdef terminalSafeSet
             ok=value<=bound && terminalSafeSet.admissible(x,middle,next,input,model);
         end
 
-        function [a,b] = jacobians(reference,cfg,errors,inputs,duration)
+        function [a,b,plus] = jacobians(reference,cfg,errors,inputs,duration)
             % Jacobians of the sampled error map at the states x(e) on the
-            % trim's own lane: for the columns e of errors and du of inputs,
-            % e(s) = g(e, du) over the first 'duration' seconds of a hold with
-            % the input u* + du, a = dg/de (5x5xn) and b = dg/ddu (5x2xn), from
-            % the RK4 variational equations and the error chart; NaN where the
-            % model's domain is left. scripts/synthesizeClfMatrices encloses
-            % them over the certification box (NOMINAL_CLF.md).
+            % trim's own lane: for the columns e of errors and w of inputs
+            % (deviations of the controller's input, see inputOf),
+            % e(s) = g(e, w) over the first 'duration' seconds of a hold with
+            % the input inputOf(x(e), w), a = dg/de (5x5xn) and b = dg/dw
+            % (5x2xn), from the RK4 variational equations, the input map's
+            % derivatives and the error chart, and plus = g(e, w) itself (5xn);
+            % NaN where the model's domain is left.
+            % scripts/synthesizeClfMatrices encloses their ray averages
+            % (rayJacobians) over the certified set (NOMINAL_CLF.md).
             if nargin<5,duration=cfg.controller.sampleTime;end
             curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);
             lane=struct('referenceCurve',curve);
             [~,heading]=laneGeometry.referencePose(50,0,curve);
             chart=[[-sin(heading);cos(heading)],zeros(2,4);zeros(4,1),eye(4)];
-            n=size(errors,2);a=nan(5,5,n);b=nan(5,2,n);
+            n=size(errors,2);a=nan(5,5,n);b=nan(5,2,n);plus=nan(5,n);
             for j=1:n
                 e=errors(:,j);
                 [position,yaw]=laneGeometry.referencePose(50,e(1),curve);
                 x=[position;yaw+reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
+                [u,due,duw]=terminalSafeSet.inputOf(reference,cfg,x,inputs(:,j));
+                if any(~isfinite(u)),continue;end
                 try
-                    [next,ax,bx]=nonlinearBicycleModel.sample(x,reference.input+inputs(:,j),cfg,[],duration);
+                    [next,ax,bx]=nonlinearBicycleModel.sample(x,u,cfg,[],duration);
                 catch exception
                     if startsWith(string(exception.identifier),"collisionAvoidanceController:"),continue;end
                     rethrow(exception);
                 end
-                [~,jacobian]=nonlinearBicycleModel.errorLinearization(next,lane,reference);
-                a(:,:,j)=jacobian*ax*chart;b(:,:,j)=jacobian*bx;
+                [plus(:,j),jacobian]=nonlinearBicycleModel.errorLinearization(next,lane,reference);
+                a(:,:,j)=jacobian*(ax*chart+bx*due);b(:,:,j)=jacobian*bx*duw;
             end
+        end
+
+        function [a,b,gap] = rayJacobians(reference,cfg,errors,inputs,duration,nodes)
+            % Ray-averaged Jacobians of the sampled error map,
+            %   Gbar(e, du) = integral_0^1 G(t e, t du) dt,
+            % by Gauss-Legendre quadrature with 'nodes' nodes (a = 5x5xn,
+            % b = 5x2xn), and gap = g(e, du) - Gbar [e; du] (5xn), the
+            % residual of the exact identity g(e, du) = Gbar [e; du] (the trim
+            % is a fixed point of the map) that the quadrature leaves. For
+            % the saturating tire the ray averages spread like the secants of
+            % its curve, not like its tangents, which is why the certificate
+            % encloses them (TERMINAL_SAFE_SET.md, Section 2). NaN where the
+            % model's domain is left.
+            if nargin<5 || isempty(duration),duration=cfg.controller.sampleTime;end
+            if nargin<6,nodes=8;end
+            beta=.5./sqrt(1-(2*(1:nodes-1)).^(-2));tridiagonal=diag(beta,1)+diag(beta,-1);
+            [vectors,values]=eig(tridiagonal);[points,order]=sort(diag(values));
+            weights=vectors(1,order).^2;points=(points.'+1)/2;
+            n=size(errors,2);a=zeros(5,5,n);b=zeros(5,2,n);
+            for q=1:nodes
+                [aq,bq]=terminalSafeSet.jacobians(reference,cfg,points(q)*errors,points(q)*inputs,duration);
+                a=a+weights(q)*aq;b=b+weights(q)*bq;
+            end
+            [~,~,plus]=terminalSafeSet.jacobians(reference,cfg,errors,inputs,duration);
+            gap=nan(5,n);
+            for j=1:n,gap(:,j)=plus(:,j)-a(:,:,j)*errors(:,j)-b(:,:,j)*inputs(:,j);end
         end
 
         function result = certificate(reference,cfg,errors,subdivisions)
             % Sampled check of the terminal controller on the trim's own
             % lane. For each column e of errors (transverse errors), one hold
-            % from x(e) under u = u* + K e gives
+            % from x(e) under u = inputOf(x(e), K e) gives
             %   contraction  V(x+) / V(x);
             %   remainder    ||F (e(x+) - (A0 + B0 K) e)|| / ||F e||, F = chol(P),
             %                the departure from the trim's Jacobian in CLF units;
@@ -476,7 +512,8 @@ classdef terminalSafeSet
                 e=errors(:,j);value=sum((f*e).^2);
                 [position,heading]=laneGeometry.referencePose(50,e(1),curve);
                 x=[position;heading+reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
-                u=reference.input+reference.gain*e;result.input(:,j)=u;
+                u=terminalSafeSet.inputOf(reference,cfg,x,reference.gain*e);result.input(:,j)=u;
+                if any(~isfinite(u)),continue;end
                 try
                     [middle,next]=terminalSafeSet.holdStates(x,u,cfg);
                     factor=0;
@@ -495,6 +532,60 @@ classdef terminalSafeSet
                 result.rows(j)=terminalSafeSet.stateRows(next,cfg) && terminalSafeSet.stateRows(middle,cfg) ...
                     && terminalSafeSet.handlingRows(x,u,cfg) && terminalSafeSet.handlingRows(next,u,cfg);
             end
+        end
+
+        function [u,due,duw] = inputOf(reference,cfg,x,w)
+            % Physical input of the terminal controller's virtual input
+            % deviation w at state x, with du/de (2x5, e the transverse error)
+            % and du/dw (2x2). reference.inputMap selects the map:
+            %   "steering"  u = u* + w (w = [steering; braking] deviations);
+            %   "force"     w = [front lateral force; braking] deviations: the
+            %               braking ratio is b* + w(2) and the steering angle
+            %               is the one whose front slip gives the lateral force
+            %               F* + w(1) on the Fiala curve below its peak at that
+            %               braking ratio (feedback linearization of the front
+            %               tire; F* = reference.trimForce). NaN when the force
+            %               exceeds the available lateral capacity.
+            % The derivatives of the steering inverse are central differences
+            % (the inverse is smooth below the peak).
+            if ~isfield(reference,'inputMap') || string(reference.inputMap)=="steering"
+                u=reference.input+w;due=zeros(2,5);duw=eye(2);return;
+            end
+            u=[terminalSafeSet.inverseSteering(reference,cfg,x,w);reference.input(2)+w(2)];
+            due=nan(2,5);duw=nan(2);
+            if ~isfinite(u(1)),return;end
+            if nargout<2,return;end
+            due=zeros(2,5);duw=[0,0;0,1];
+            for index=3:5
+                step=1e-6*max(1,abs(x(index+1)));xp=x;xm=x;xp(index+1)=xp(index+1)+step;xm(index+1)=xm(index+1)-step;
+                due(1,index)=(terminalSafeSet.inverseSteering(reference,cfg,xp,w)-terminalSafeSet.inverseSteering(reference,cfg,xm,w))/(2*step);
+            end
+            steps=[1e-3*max(1,abs(w(1)));1e-7];
+            for index=1:2
+                wp=w;wm=w;wp(index)=wp(index)+steps(index);wm(index)=wm(index)-steps(index);
+                duw(1,index)=(terminalSafeSet.inverseSteering(reference,cfg,x,wp)-terminalSafeSet.inverseSteering(reference,cfg,x,wm))/(2*steps(index));
+            end
+        end
+
+        function delta = inverseSteering(reference,cfg,x,w)
+            % Steering angle whose front lateral force is trimForce + w(1) at
+            % the braking ratio b* + w(2): Fiala's curve
+            % F = -C tan(a) (1 - q + q^2/3), q = C |tan a| / (3 mu Fz eta),
+            % inverted below its peak (|F| < mu Fz eta, eta = sqrt(1 - b^2)).
+            tire=modifiedFialaTire.parameters(cfg);
+            b=reference.input(2)+w(2);eta=sqrt(max(0,1-b^2));capacity=tire.longitudinalForceScale(1)*eta;
+            force=reference.trimForce+w(1);
+            if abs(force)>=capacity,delta=NaN;return;end
+            q=1-(1-abs(force)/capacity)^(1/3);
+            alpha=-sign(force)*atan(3*capacity*q/tire.corneringStiffness(1));
+            delta=atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-alpha;
+        end
+
+        function force = trimForce(reference,cfg)
+            % Front lateral force at the trim (the force map's F*).
+            x=reference.state;u=reference.input;
+            slip=atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-u(1);
+            forces=modifiedFialaTire.evaluate([slip;0],u(2),cfg);force=forces(1);
         end
 
         function ok = admissible(x,middle,next,u,model)

@@ -1,0 +1,29 @@
+##### secant+comp4+wide+iter8 speeds 8 curvatures 0
+  plain LMI: fill 0.070, extents [1 0.0754 0.663 0.114 0.08]
+  iteration 1: growth 1.500, bounds [0.0634 0.0559 0.034 0.0145], residual 0.0131, mean-value residual 8.76e-06; fill 0.004, margin -1.22e-05, extents [0.273 0.0302 0.176 0.125 0.0861]
+  iteration 2: growth 1.500, bounds [0.0734 0.0357 0.0264 0.0106], residual 0.0084, mean-value residual 3.19e-05; fill 0.006, margin 2.21e-04, extents [0.332 0.036 0.204 0.129 0.0961]
+  iteration 3: growth 1.500, bounds [0.09 0.0371 0.0287 0.0111], residual 0.0114, mean-value residual 4.61e-05; fill 0.009, margin 3.26e-05, extents [0.4 0.0436 0.235 0.152 0.117]
+  iteration 4: growth 1.500, bounds [0.101 0.0419 0.0346 0.0127], residual 0.0117, mean-value residual 3.98e-05; fill 0.013, margin 1.43e-05, extents [0.479 0.0521 0.273 0.182 0.143]
+  iteration 5: growth 1.500, bounds [0.128 0.0455 0.0388 0.0146], residual 0.0134, mean-value residual 4.64e-05; fill 0.016, margin -2.07e-05, extents [0.578 0.0595 0.329 0.197 0.15]
+  iteration 6: growth 1.500, bounds [0.188 0.0526 0.0435 0.0123], residual 0.0139, mean-value residual 3.99e-05; fill 0.013, margin -1.98e-05, extents [0.636 0.0659 0.4 0.207 0.15]
+  iteration 7: growth 1.500, bounds [0.125 0.0594 0.0375 0.0154], residual 0.0133, mean-value residual 3.68e-05; fill 0.018, margin 7.12e-07, extents [0.73 0.075 0.459 0.234 0.15]
+  iteration 8: growth 1.500, bounds [0.0999 0.062 0.0394 0.017], residual 0.0140, mean-value residual 5.90e-05; fill 0.014, margin -1.93e-05, extents [0.653 0.0692 0.428 0.266 0.15]
+secant+comp4+wide+iter8 speeds 8 curvatures 0: extents [0.730 m 0.0750 rad 0.459 m/s 0.234 m/s 0.1500 rad/s], fill 0.018; certified T 3.97 s (required 4.00), hold factor 1.1123, slips [0.081 0.025] rad; sampled worst 0.9291, rows 1; 84 s
+secant+comp4+wide+iter8: ellipsoid ceiling (K fixed, no residual): ok 1, extents [0.879 0.0703 0.459 0.3 0.15]
+  iteration 1: 238 candidate rows, 56 kept, extents [2 0.2 0.496 0.3 0.15]
+  iteration 2: 912 candidate rows, 92 kept, extents [2 0.2 0.496 0.3 0.15]
+  iteration 3: 1484 candidate rows, 172 kept, extents [2 0.2 0.496 0.3 0.15]
+  iteration 4: 2772 candidate rows, 182 kept, extents [2 0.2 0.496 0.3 0.15]
+  iteration 5: 2930 candidate rows, 200 kept, extents [2 0.2 0.496 0.3 0.15]
+  iteration 6: 3212 candidate rows, 244 kept, extents [2 0.2 0.496 0.3 0.15]
+  iteration 7: 3916 candidate rows, 264 kept, extents [2 0.2 0.496 0.3 0.15]
+  iteration 8: 4236 candidate rows, 264 kept, extents [2 0.2 0.496 0.3 0.15]
+secant+comp4+wide+iter8: polytope ceiling: converged 1, 264 facets, extents [2 0.2 0.496 0.3 0.15]
+               label: "secant+comp4+wide+iter8"
+    ellipsoidExtents: [5×1 double]
+     polytopeExtents: [5×1 double]
+              facets: 264
+           converged: 1
+          iterations: 8
+              lambda: 0.9871
+            vertices: 16

@@ -99,11 +99,14 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyFalse(ok);
             testCase.verifyEqual(info.reason,"insideCollisionCone");
             testCase.verifyEqual(context.covered,0);
-            % A slow crosser 10 m ahead, 3 m to the right, drifting right at
-            % 2 m/s: inside the certified tube's whole box for the first 0.6 s
-            % but never inside the settled one, so the check follows the grid
-            % only until the parabola has left that box, and certifies there.
-            crosser=localModel([0;0;0;8;0;0],[10;-3;-pi/2;2;0;0;1.6;2.4;.95;0;0]);
+            % A slow crosser 10 m ahead, 4.6 m to the right, drifting right at
+            % 2 m/s: its relative motion enters the certified tube's whole box
+            % (lateral half-width 6 m at the certified level: the 2-m tube
+            % with its heading band, the target's 2.4-m half-length and the
+            % buffer) for a few tenths of a second but never the settled one,
+            % so the check follows the grid only until the parabola has left
+            % that box, and certifies there.
+            crosser=localModel([0;0;0;8;0;0],[10;-4.6;-pi/2;2;0;0;1.6;2.4;.95;0;0]);
             context=terminalSafeSet.context(crosser);
             [ok,context,info]=terminalSafeSet.clear(context,context.levelMaximum,station,0);
             testCase.verifyTrue(ok);

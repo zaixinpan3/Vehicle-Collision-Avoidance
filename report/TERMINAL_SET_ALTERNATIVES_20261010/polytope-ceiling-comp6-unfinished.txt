@@ -1,0 +1,4 @@
+secant+wide+iter8: ellipsoid ceiling (K fixed, no residual): ok 1, extents [1.54 0.113 0.482 0.268 0.15]
+  iteration 1: 910 candidate rows, 136 kept, extents [2 0.2 0.538 0.3 0.15]
+  iteration 2: 8716 candidate rows, 392 kept, extents [2 0.2 0.535 0.3 0.15]
+  iteration 3: 25160 candidate rows, 772 kept, extents [2 0.2 0.535 0.3 0.15]

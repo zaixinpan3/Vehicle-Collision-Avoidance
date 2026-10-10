@@ -1,0 +1,426 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\setlength{\emergencystretch}{2em}
+\title{Alternative constructions of the terminal set:\\ what enlarges the certified set and what does not}
+\date{Prepared October 10--11, 2026}
+\begin{document}
+\maketitle
+
+\section{Request}
+After the terminal controller had been certified on the nonlinear model
+(\path{report/TERMINAL_CONTROLLER_CERTIFICATE_20261010.tex}, commit
+\texttt{8faf395}), the certified set was three times smaller than the former
+unproven one (0.6~m of lateral error at 8~m/s against 1.9~m), the plans
+became longer and the conic solver failed more often. The user asked for a
+brainstorm of mathematically elegant ways to construct the terminal set and
+then asked to try the elegant ones. This report records what was tried, what
+each construction certifies, and which ones went into the code.
+
+\section{Starting point}
+The certificate of commit \texttt{8faf395} encloses, in box-scaled
+coordinates, the pointwise one-hold Jacobians $G(e,Ke)$ of the sampled error
+map along the controller over the certified set, by a zonotope (six principal
+directions with coefficient bounds, a residual, all widened by 1.25), and
+solves the robust discrete Lyapunov LMI at its vertices. Two things limited
+it. First, the pointwise Jacobians of a saturating tire spread like the
+tangents of its force curve; at the slips the set reaches the first
+coefficient bound was 0.11--0.16. Second, the design iterated the enclosure
+and the LMI and ended with a step at fixed gain whose set had to lie inside
+the set the enclosure was built on; that step was fragile (it returned the
+trivial set and shrank the set by 0.7 until it passed), so the final set was
+roughly the size of the second-to-last iteration's.
+
+\section{Constructions tried}
+All experiments use the study synthesizer
+\path{scripts/alternativeCertificate.m} of this folder, which repeats the
+production pipeline with options, and its driver \texttt{runAlternatives.m}
+(variants are named by tokens: \texttt{secant}, \texttt{force},
+\texttt{sat}, \texttt{poly}, \texttt{T$n$} for the time constant,
+\texttt{wide} for the box $[2~\text{m},0.2~\text{rad},1~\text{m/s},0.3~\text{m/s},0.15~\text{rad/s}]$
+(the default box is $[1,0.15,0.75,0.15,0.08]$), \texttt{comp$n$} for the
+number of principal directions, \texttt{iter$n$}, \texttt{gs$\delta$} for the
+gain band and \texttt{grow$\gamma$} for the growth factor). Every row of the
+tables is a verified certificate: the vertex inequalities hold at the
+required contraction with the recorded enclosure (relative margin
+$\ge -10^{-6}$), and an independent sample with another seed confirms the
+contraction and the problem's rows. Results are in \path{variants.txt}
+(self-consistent scheme) and \path{variants-first-scheme.txt} (the
+first scheme with the fixed-gain final step); the JSON lines beside them
+hold every number, the gains and the enclosures.
+
+\subsection{Secant enclosure: ray-averaged Jacobians}
+The mean-value identity the certificate rests on is exact for the ray
+average, not for the pointwise Jacobians: with $g(0,0)=0$,
+\[
+g(e,w)=\bar G(e,w)\,[e;w],\qquad \bar G(e,w)=\int_0^1 G(te,tw)\,dt .
+\]
+The certificate needs the Lyapunov inequality only for the matrices
+$\bar G(e,Ke)$, $e\in\Omega$, whose convex hull is in general much smaller
+than the hull of the pointwise Jacobians. For the modified Fiala curve,
+normalized as $F=1-(1-s)^3$, the tangent slope is $(1-s)^2$ and the secant
+slope $(1-(1-s)^3)/(3s)$: at the force peak the tangent is 0 and the secant
+still $1/3$; at $s=0.5$ they are 0.25 and 0.58. The study computes $\bar G$ by
+Gauss--Legendre quadrature along the ray (8 nodes; the integrand has a kink
+where a slip angle crosses zero, so the convergence is algebraic,
+\path{scripts/quadratureCheck.m}: relative residual of the identity
+$3.6\cdot10^{-4}$ with 4 nodes, $1.2\cdot10^{-4}$ with 8, $1.9\cdot10^{-5}$
+with 24) and carries the quadrature's residual exactly: the rank-one matrix
+that makes the identity hold for a sample has norm
+$\|\text{gap}\|/\|[e;w]\|$, and its maximum over the samples is added to the
+enclosure's residual before the margin. The trim is a fixed point of the
+sampled map to $10^{-14}$ (\path{scripts/trimOffset.m}).
+
+Effect at 8~m/s on a straight road, default box, first scheme: the first
+coefficient bound drops from 0.11--0.16 to 0.05--0.08 and the certified set
+grows from 0.63~m, 0.054~rad to 0.99~m, 0.078~rad, where the box binds. With
+the wide box the set reaches 1.1--1.5~m (Table~\ref{tab:eight}).
+
+\subsection{Force-level input map (feedback linearization of the front tire)}
+The virtual input becomes $w=[\Delta F_{yf};\Delta b]$, the deviation of the
+front lateral force and of the braking ratio from the trim's; the steering
+angle is the one whose front slip gives that force on the Fiala curve below
+its peak, $\delta=\operatorname{atan2}(v_y+l_f r,v_x)-\alpha(F,b)$ with
+$\alpha$ the closed-form inverse of $F=-C\tan\alpha\,(1-q+q^2/3)$,
+$q=C|\tan\alpha|/(3\mu F_z\eta)$, $\eta=\sqrt{1-b^2}$. The controller is
+$w=Ke$, still a static gain, plus one closed-form inversion per hold. The
+Jacobians of the sampled map through the inversion are computed by the chain
+rule (the inversion's derivatives by central differences). The input box is
+0.4 of the front lateral capacity (about 3~kN) and 0.125 of braking ratio.
+
+Alone (pointwise Jacobians) the map gives little (0.68~m against 0.63~m):
+within a 50-ms hold the steering is held while the slip moves, so the force
+is not held and the front tire still enters the Jacobians. Combined with the
+secant enclosure and the self-consistent growth it gives the largest sets of
+the study at the required decay: 1.73~m and 0.138~rad at 8~m/s straight,
+1.81~m and 0.140~rad on the curve, and the box (2~m) at 15~m/s
+(Table~\ref{tab:eight}, Table~\ref{tab:points}).
+
+\subsection{Self-consistent growth instead of a final fixed-gain step}
+Each round of the first scheme designed $(P,K)$ against the enclosure of the
+previous set along the previous gain, so the pair was never certified by the
+enclosure it was designed with, and the final fixed-gain step had to repair
+that. The study replaces it: round $i$ encloses the ray averages over
+$\gamma\,\Omega_i$ and over inputs within $\delta\,\bar u$ of $K_i e$ (a
+random band), and solves the LMI with the new set inside $\gamma\,\Omega_i$
+($S_{i+1}\preceq\gamma S_i$) and the new gain within the band on it
+($|(K_{i+1}-K_i)_j e|\le\delta\bar u_j$ on $\Omega_{i+1}$, a linear row in
+$(S,Y)$). Every round's pair is then certified by its own enclosure; the
+round with the largest fill is kept. The iteration starts from the plain LMI
+inside half the box, because a wide box otherwise gives a first enclosure
+over the whole box and a trivial LMI. The parameters matter
+(Table~\ref{tab:eight}): $\gamma=1.3$, $\delta=0.1$ is the best of the
+settings tried for both maps ($\delta=0.05$ stalls the gain and the growth;
+$\delta=0.25$ widens the enclosure). The production script uses
+$\gamma=1.3$, $\delta=0.1$, ten rounds.
+
+\subsection{Saturation hull (Hu--Lin)}
+The controller $\operatorname{sat}(Ke)$ at the input box, with the convex
+hull $\operatorname{co}\{(D_iK+(I-D_i)H)e\}$ over the four saturation
+patterns and an auxiliary gain $H$ bounded on the set ($|Ke|$ allowed up to
+four times the box). No gain: 0.84~m against 0.99~m (first scheme) and
+1.00~m against 1.14~m (self-consistent, same $\gamma,\delta$). The four
+patterns quadruple the vertex blocks, and the certified contraction drops
+(3.30~s). The steering box was not the binding limit, as the lever study of
+October 10 had already found.
+
+\subsection{Poly-quadratic Lyapunov function}
+$V=e'P(\theta)e$ with $P$ bilinear in the two normalized axle slips
+$\theta$ (ray-averaged in secant mode, computable online in closed form),
+common slack $G$ and a constant gain (the de Oliveira--Bernussou--Geromel
+form), all pairs (current vertex, next vertex), and the Jacobian deviations
+regressed on $\theta$ before the principal directions of the remainder. The
+regression leaves more residual than the principal directions alone (0.0096
+against 0.0035 with three remainder directions), so the sets are smaller:
+0.51--0.60~m; with six remainder directions (1024 vertex blocks, 30 minutes
+per synthesis) 0.90~m, still below the common quadratic's 0.99~m with the
+same enclosure budget. The scheduling that would help (heading and speed
+errors as well as the slips) multiplies the vertex pairs beyond what SeDuMi
+handles here.
+
+\subsection{Slower decay}
+With the secant enclosure and the wide box, $T=20$~s gives 1.45~m (first
+scheme 1.79~m) and $T=1000$~s 1.37~m, against 1.14~m at $T=4$~s with the
+same $\gamma,\delta$ and 1.73~m with the force map at $T=4$~s. The decay
+rate is not what limits the set; the growth of the enclosure with the set
+is.
+
+\subsection{Interval certificate (one $P$, $K$ over a speed range)}
+One certificate for the trims at 8, 9.5 and 11.5~m/s (curvatures 0 and
+0.005) is infeasible at the first round (the trim-to-trim variation puts the
+first coefficient bound at 0.4), and one over 11.5--15~m/s returns only a
+0.11-m set. The error dynamics change too much with the cruise speed for one
+quadratic; the former linear study's interval CLF did not carry the tire
+variation. A gain-scheduled $(P(v_0),K(v_0))$ would be the next step; it was
+not built.
+
+\subsection{Polytope against ellipsoid on the same vertex set}
+\path{scripts/polytopeCeiling.m} takes the final enclosure and gain of a
+secant certificate, drops the residual, and compares the largest-fill
+ellipsoid of the LMI at fixed $K$ with the maximal $\lambda$-contractive
+polytope inside the box and the input rows under the same $K$ and the same
+vertex matrices (Blanchini's set recursion, $\lambda=\sqrt{\rho}$, until it
+stops changing). With four principal directions (16 vertices) the recursion
+converges in 8 rounds to a 264-facet polytope with extents
+$[2~\text{m},0.2~\text{rad},0.50,0.3,0.15]$, the box in four of five
+coordinates, while the ellipsoid gives $[0.88,0.070,0.46,0.3,0.15]$
+(\path{polytope-ceiling-comp4.txt}). Neither is a certificate (the residual
+is dropped, and the polytope extends beyond the set the enclosure was sampled
+on), but on the same linear-parameter-varying vertex set the polyhedral class
+is 2.3 times larger in lateral error and 2.9 times in heading, which is the
+universality of polyhedral Lyapunov functions for such systems. Making it a
+certificate needs the residual's cone rows (each facet's condition becomes
+$h'M_vx+\varepsilon\|h\|\,\|[I;K]x\|\le\lambda$, convex but not linear) and a
+vertex representation of the polytope at each round; that is the most
+promising construction not implemented here. With six directions the
+recursion's redundancy removal did not finish
+(\path{polytope-ceiling-comp6-unfinished.txt}).
+
+\subsection{Not tried, and why}
+Sum-of-squares certificates (the atan, $1/v_x$ and $\sqrt{1-b^2}$ terms need
+rational recasting and the RK4 map is of high degree); the Lur'e function with
+sector conditions (its benefit, secants in place of tangents, is what the
+ray-averaged enclosure obtains exactly on the sampled map); funnel libraries,
+the rollout-defined set and the safe-stop set (constructions of the planner's
+terminal test, not of the certificate, and the campaign below shows that the
+certified set is no longer the planner's limitation); the translation-symmetry
+slab (a terminal set about any parallel line, one certificate by symmetry;
+its membership and invariance were derived in the brainstorm and it remains a
+design option); Hamilton--Jacobi reachability of the five-dimensional error
+space as a ceiling; interval arithmetic for a rigorous enclosure (H3 stays a
+sampled hypothesis with a margin).
+
+\begin{table}
+\centering\footnotesize
+\caption{8~m/s, straight road. Extents of the certified set
+(lateral~m, heading~rad, speed~m/s, lateral velocity~m/s, yaw rate~rad/s),
+certified time constant (required 4~s unless the token says otherwise),
+hold factor, worst sampled contraction. Upper block: first scheme
+(fixed-gain final step; \texttt{wide} is the $[2,0.2,1,0.3,0.15]$ box, the
+others use the default box); lower block: self-consistent growth, all with
+the wide box ($\gamma=1.5$, $\delta=0.25$ unless the tokens say otherwise).}
+\label{tab:eight}
+\begin{tabular}{lrrrrrrrr}
+\toprule
+variant & lat & head & speed & $v_y$ & $r$ & $T_c$ & $\mu$ & worst \\
+\midrule
+\texttt{baseline} (as \texttt{8faf395}) & 0.63 & 0.054 & 0.35 & 0.123 & 0.067 & 3.91 & 1.029 & 0.946 \\
+\texttt{force} & 0.68 & 0.056 & 0.28 & 0.104 & 0.067 & 3.49 & 1.018 & 0.953 \\
+\texttt{secant} & 0.99 & 0.078 & 0.41 & 0.148 & 0.080 & 3.93 & 1.010 & 0.954 \\
+\texttt{secant{+}comp8} & 1.00 & 0.079 & 0.27 & 0.114 & 0.080 & 3.86 & 1.003 & 0.959 \\
+\texttt{force{+}secant} & 0.82 & 0.065 & 0.38 & 0.107 & 0.067 & 3.67 & 1.007 & 0.954 \\
+\texttt{sat{+}secant} & 0.84 & 0.065 & 0.20 & 0.108 & 0.067 & 3.93 & 1.031 & 0.954 \\
+\texttt{poly{+}secant} & 0.51 & 0.047 & 0.29 & 0.101 & 0.072 & 3.90 & 1.085 & 0.941 \\
+\texttt{poly{+}secant{+}sched6} & 0.90 & 0.071 & 0.41 & 0.109 & 0.072 & 3.88 & 1.005 & 0.965 \\
+\texttt{secant{+}wide} & 1.48 & 0.117 & 0.50 & 0.216 & 0.121 & 3.91 & 1.014 & 0.950 \\
+\texttt{force{+}secant{+}wide{+}iter6} & 1.43 & 0.106 & 0.33 & 0.194 & 0.109 & 3.86 & 1.007 & 0.957 \\
+\texttt{secant{+}T20{+}wide} & 1.79 & 0.123 & 0.58 & 0.222 & 0.135 & 16.18 & 1.008 & 0.964 \\
+\midrule
+\texttt{baseline{+}iter8} & 0.23 & 0.029 & 0.15 & 0.141 & 0.150 & 3.78 & 1.127 & 0.916 \\
+\texttt{force{+}iter8} & 0.80 & 0.078 & 0.36 & 0.192 & 0.133 & 3.86 & 1.045 & 0.946 \\
+\texttt{secant{+}iter8} & 1.14 & 0.104 & 0.48 & 0.195 & 0.135 & 3.89 & 1.023 & 0.945 \\
+\texttt{secant{+}iter10{+}gs0.1} & 1.30 & 0.116 & 0.38 & 0.300 & 0.150 & 3.89 & 1.029 & 0.943 \\
+\texttt{secant{+}iter10{+}gs0.25{+}grow1.3} & 1.09 & 0.097 & 0.42 & 0.179 & 0.124 & 3.87 & 1.022 & 0.946 \\
+\texttt{secant{+}iter10{+}gs0.1{+}grow1.3} & 1.53 & 0.127 & 0.36 & 0.211 & 0.150 & 3.90 & 1.019 & 0.948 \\
+\texttt{secant{+}iter10{+}gs0.05{+}grow1.3} & 0.69 & 0.065 & 0.34 & 0.164 & 0.150 & 3.86 & 1.026 & 0.948 \\
+\texttt{secant{+}comp4{+}iter8} & 0.73 & 0.075 & 0.46 & 0.234 & 0.150 & 3.97 & 1.112 & 0.929 \\
+\texttt{secant{+}comp8{+}iter8} & 1.81 & 0.141 & 0.71 & 0.227 & 0.150 & 3.87 & 1.004 & 0.961 \\
+\texttt{sat{+}secant{+}iter8} & 1.00 & 0.096 & 0.44 & 0.194 & 0.135 & 3.30 & 1.068 & 0.937 \\
+\texttt{poly{+}secant{+}iter8} & 0.60 & 0.063 & 0.44 & 0.174 & 0.150 & 3.85 & 1.051 & 0.946 \\
+\texttt{secant{+}T20{+}iter8} & 1.45 & 0.113 & 0.59 & 0.229 & 0.146 & 17.37 & 1.019 & 0.957 \\
+\texttt{secant{+}T1000{+}iter8} & 1.37 & 0.102 & 0.59 & 0.241 & 0.150 & 98.37 & 1.024 & 0.965 \\
+\texttt{force{+}secant{+}iter8} & 1.73 & 0.138 & 0.47 & 0.227 & 0.150 & 3.87 & 1.013 & 0.956 \\
+\texttt{force{+}secant{+}iter10{+}gs0.1} & 1.67 & 0.135 & 0.42 & 0.226 & 0.150 & 3.88 & 1.012 & 0.957 \\
+\texttt{force{+}secant{+}iter10{+}gs0.1{+}grow1.3} & 2.00 & 0.149 & 0.42 & 0.231 & 0.150 & 3.88 & 1.010 & 0.961 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}
+\centering\small
+\caption{Other operating points, self-consistent scheme, \texttt{wide} box,
+$\gamma=1.5$, $\delta=0.25$, eight rounds (columns as in Table~\ref{tab:eight}).}
+\label{tab:points}
+\begin{tabular}{llrrrrrrrr}
+\toprule
+variant & point & lat & head & speed & $v_y$ & $r$ & $T_c$ & $\mu$ & worst \\
+\midrule
+\texttt{baseline} & 15 / 0 & 1.71 & 0.075 & 0.48 & 0.269 & 0.150 & 3.93 & 1.020 & 0.940 \\
+\texttt{baseline} & 15 / 0.005 & 1.42 & 0.066 & 0.51 & 0.217 & 0.150 & 3.94 & 1.033 & 0.942 \\
+\texttt{secant} & 8 / 0.005 & 1.19 & 0.107 & 0.43 & 0.235 & 0.150 & 3.94 & 1.034 & 0.944 \\
+\texttt{secant} & 15 / 0 & 2.00 & 0.102 & 0.60 & 0.221 & 0.150 & 3.94 & 1.005 & 0.962 \\
+\texttt{secant} & 15 / 0.005 & 2.00 & 0.098 & 0.58 & 0.247 & 0.150 & 3.86 & 1.009 & 0.959 \\
+\texttt{force{+}secant} & 8 / 0.005 & 1.81 & 0.140 & 0.45 & 0.210 & 0.150 & 3.91 & 1.013 & 0.954 \\
+\texttt{force{+}secant} & 15 / 0 & 2.00 & 0.105 & 0.60 & 0.256 & 0.150 & 3.87 & 1.006 & 0.962 \\
+\texttt{force{+}secant} & 15 / 0.005 & 2.00 & 0.103 & 0.52 & 0.220 & 0.150 & 3.86 & 1.006 & 0.962 \\
+\texttt{secant}, one certificate & 11.5--15 / 0--0.005 & 0.11 & 0.017 & 0.17 & 0.141 & 0.118 & 3.91 & 1.282 & 0.880 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{The production certificate}
+The production synthesis (\path{scripts/synthesizeClfMatrices.m}) now uses
+the force-level input map, the ray-averaged enclosure (8 nodes, quadrature
+residual carried) and the self-consistent growth ($\gamma=1.3$,
+$\delta=0.1$, ten rounds, start inside half the box), with the certification
+box widened to $[2~\text{m},0.2~\text{rad},1~\text{m/s},0.3~\text{m/s},0.2~\text{rad/s}]$
+and the force box at 0.4 of the front lateral capacity. The certified sets
+(\path{synthesis.txt}; \path{config/clfMatrices.json}) are in
+Table~\ref{tab:production}. Every set reaches the 2-m lateral box; the
+heading extent is 0.167~rad at 8~m/s and 0.118~rad at 15~m/s. Against the
+certificate of \texttt{8faf395} the lateral extent is 3.2 times larger at
+8~m/s and 2 to 2.9 times at 15~m/s, and against the former unproven linear
+certificate (1.9~m, 0.18~rad at 8~m/s) it is the same size or larger. The
+hold factors are 1.004--1.012 (the former 1.009--1.026), the independent
+sampled check finds worst contractions of 0.957--0.966 against the required
+0.975, and the enclosure samples (over the 1.3-times inflated set and the
+input band) reach front slips of 0.042--0.060~rad against the former
+0.027~rad: the front tire's saturation is the controller's to handle through
+the inverse curve, not the certificate's to absorb.
+
+\begin{table}
+\centering\small
+\caption{Production certificate (\texttt{synthesizeClfMatrices}, this
+commit) against commit \texttt{8faf395}. Extents in m, rad, m/s, m/s, rad/s;
+certified time constant in s; hold factor; worst sampled contraction.}
+\label{tab:production}
+\begin{tabular}{llrrrrrrrr}
+\toprule
+point & certificate & lat & head & speed & $v_y$ & $r$ & $T_c$ & $\mu$ & worst \\
+\midrule
+8 / 0 & \texttt{8faf395} & 0.62 & 0.053 & 0.37 & 0.107 & 0.067 & 3.83 & 1.026 & 0.945 \\
+8 / 0 & this & 2.00 & 0.167 & 0.52 & 0.272 & 0.200 & 3.85 & 1.010 & 0.961 \\
+8 / 0.005 & \texttt{8faf395} & 0.57 & 0.050 & 0.31 & 0.098 & 0.066 & 3.47 & 1.020 & 0.946 \\
+8 / 0.005 & this & 2.00 & 0.167 & 0.63 & 0.277 & 0.200 & 3.86 & 1.012 & 0.957 \\
+15 / 0 & \texttt{8faf395} & 0.99 & 0.055 & 0.41 & 0.149 & 0.079 & 3.93 & 1.009 & 0.957 \\
+15 / 0 & this & 2.00 & 0.118 & 0.48 & 0.233 & 0.200 & 3.87 & 1.005 & 0.966 \\
+15 / 0.005 & \texttt{8faf395} & 0.70 & 0.040 & 0.30 & 0.089 & 0.056 & 3.67 & 1.002 & 0.962 \\
+15 / 0.005 & this & 2.00 & 0.118 & 0.61 & 0.261 & 0.200 & 3.85 & 1.004 & 0.963 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Implementation}
+\begin{itemize}
+\item \path{controller/terminalSafeSet.m}: \texttt{inputOf} (the input map:
+  steering or force, with its derivatives), \texttt{inverseSteering},
+  \texttt{trimForce}; \texttt{jacobians} composes the map's derivatives into
+  the chain rule and returns the error after the hold; \texttt{rayJacobians}
+  (Gauss--Legendre ray average and the identity's gap);
+  \texttt{terminalInput} and \texttt{certificate} command through
+  \texttt{inputOf}.
+\item \path{scripts/synthesizeClfMatrices.m}: the ray-averaged enclosure with
+  the quadrature residual, the self-consistent growth (options
+  \texttt{Growth}, \texttt{GainStep}, \texttt{StartFraction},
+  \texttt{QuadratureNodes}, \texttt{InputMap}), no final fixed-gain step; the
+  entry records \texttt{inputMap}, \texttt{trimForce} and the new
+  certificate fields (\texttt{quadratureNodes}, \texttt{quadratureResidual},
+  \texttt{meanValueResidual}, \texttt{growth}, \texttt{inputBand},
+  \texttt{iterationsUsed}).
+\item \path{config/collisionAvoidanceControllerConfig.m}: the wider
+  certification box and \texttt{clf.certificationFrontForceFraction} (0.4);
+  \texttt{certificationSteeringRadians} remains the box of the steering map.
+\item \path{controller/nonlinearBicycleModel.m}: the reference carries
+  \texttt{inputMap} and \texttt{trimForce}; entries without them are stale.
+\item \path{config/clfMatrices.json}: regenerated (five entries).
+\item Tests: \texttt{nominalClfTest} checks the input box against the entry's
+  recorded box and the map, and tests fresh ray averages (with their
+  quadrature correction) against the recorded zonotope.
+\item Documents: \path{controller/TERMINAL_SAFE_SET.md} (Sections 1, 2, 10),
+  \path{controller/NOMINAL_CLF.md}, \path{controller/PCBF_CLF_ARCHITECTURE.md},
+  \path{controller/CONTROLLER_FILES.md}.
+\end{itemize}
+
+\section{What is proven and what is assumed}
+Unchanged in structure from \path{TERMINAL_CONTROLLER_CERTIFICATE_20261010.tex}:
+the terminal controller is an explicit static feedback, its contraction on
+the certified set follows from the vertex LMIs by the mean-value identity,
+and the hold factor from the partial-hold enclosures. The hypotheses are H1
+(the declared RK4 sampled model with exact state), H2 (the target follows its
+forecast) and H3, now: the ray-averaged Jacobians $\bar G(e,Ke)$ along the
+controller over the certified set lie in the recorded zonotope. H3 is
+sampled (1200 boundary and 600 interior samples of the 1.3-times inflated set
+and of the input band, margin 1.25, the quadrature's gap carried as a
+rank-one residual) and re-checked on fresh samples by a unit test. The input
+band is part of the certificate: the gain the LMI returns lies within it by
+a constraint, so the enclosure covers the controller actually used. The
+inversion's derivatives are central differences of a smooth closed form;
+their error ($10^{-8}$ relative) is far below the margin.
+
+\section{Campaign}
+The same 98 encounters as before (seven geometries at 8 and 15~m/s; seed 0
+with exact states, six noisy seeds with the estimator in the loop) were run
+for the baseline, commit \texttt{8faf395} (a \texttt{git archive} copy), and
+for the working tree of this commit (a tar copy), interleaved in one pool of
+eight processes so that both see the same load
+(\path{scripts/run-campaign.sh}; \path{comparison.txt},
+\path{campaign-runs.csv}, \path{encounter-ends.txt}, \path{horizons.txt}).
+The baseline reproduces its October 10 result (12 of 14, 39 of 84).
+
+\begin{table}
+\centering\small
+\caption{Paired campaign under the same load. Recovered encounters; no
+collision in either variant (least replay clearance 0.157 and 0.146~m exact,
+0.240 and 0.245~m noisy).}
+\label{tab:campaign}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (14)} & \multicolumn{2}{c}{noisy (84)} \\
+ & \texttt{8faf395} & this & \texttt{8faf395} & this \\
+\midrule
+recovered & 12 & 13 & 39 & 53 \\
+no solution: \texttt{clfNoNumericalResult} & 2 & 1 & 16 & 2 \\
+no solution: \texttt{timeLimit} & 0 & 0 & 11 & 9 \\
+no solution: \texttt{nonlinearAcceptanceFailed} & 0 & 0 & 12 & 11 \\
+no solution: \texttt{pcbfNoNumericalResult} & 0 & 0 & 6 & 9 \\
+first-frame horizon, median holds & 130 & 105 & 120 & 105 \\
+horizon, 95th percentile holds & 217 & 104 & 116 & 103 \\
+controller time per frame, 95th percentile (s) & 0.371 & 0.172 & 0.225 & 0.230 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The larger certified set does what the October 10 report expected: the plans
+need not reach a 0.6-m set any more, the horizons shorten (first frame 130 to
+105 holds exact, 120 to 105 noisy; 95th percentile 217 to 104 exact), and the
+CLF-stage conic failures on long plans, which caused the October 10 losses,
+fall from 18 to 3. Fifteen noisy encounters and two exact ones are newly
+recovered (head-ons, accelerating head-ons, crossings, turning crossings and
+curved head-ons at both speeds); one exact run (15~m/s braking lead) and one
+noisy run (seed 1, 15~m/s crossing) are newly lost, both to
+\texttt{clfNoNumericalResult}. Against commit \texttt{deb4dac}, the last
+uncertified design (14 of 14, 54 of 84), the certified controller is now
+within one encounter in each group. The twelve noisy braking leads still
+stop at their first frames (nine on the solver's time limit, two on a
+numerical failure, one on the acceptance search), as in every variant since
+October 8; that is the startup problem of the first estimate, not the
+terminal set. The encounter ends later after the endpoint at the 99th
+percentile (7.4 against 4.4~s exact, 5.7 against 4.6~s noisy): the wider
+tube takes longer to clear a target.
+
+\section{Reproduction}
+\begin{itemize}
+\item \texttt{matlab -batch "addpath('scripts'); synthesizeClfMatrices"}
+  regenerates \path{config/clfMatrices.json} (\path{synthesis.txt}; about
+  four minutes per operating point on a loaded machine). The first run of the
+  script stored a wrong enclosure basis (a reused variable); the
+  regeneration after the fix reproduced every matrix, gain and hold factor
+  bit for bit.
+\item Study: \texttt{runAlternatives('<tokens>', '<out.jsonl>', 'eight' |
+  'rest' | 'intervalLow' | 'intervalHigh')} in \path{scripts/} of this folder
+  (it addresses the repository by its own location), \texttt{summarize.py}
+  for the tables, \texttt{polytopeCeiling.m} for Section 3.8,
+  \texttt{quadratureCheck.m}, \texttt{trimOffset.m} and
+  \texttt{polyLmiDebug.m} for the checks quoted in the text. The first-scheme
+  rows were produced by the script before its final step was replaced; the
+  JSON lines record the options of every row.
+\item Tests: \path{tests.txt} (602 of 602 after the change).
+\item Campaign: \texttt{run-campaign.sh} with
+  \path{report/TERMINAL_BACKUP_SET_20261008/scripts/campaign-pair.sh},
+  \texttt{compare.py} and \texttt{encounterEnds.py}; raw outputs under
+  \path{~/.cache/collisionAvoidance/terminal_alternatives_20261010/}
+  (disposable).
+\end{itemize}
+\end{document}

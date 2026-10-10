@@ -79,24 +79,28 @@ function cfg=localDefaults()
     % so the error sqrt(V) shrinks by at least 1/e every time constant.
     % P and the terminal controller's gain K are synthesized offline
     % (scripts/synthesizeClfMatrices.m) and read from config/clfMatrices.json:
-    % on the certification box of transverse errors (|lateral| <=
+    % inside the certification box of transverse errors (|lateral| <=
     % certificationLateralMeters, |heading| <= certificationHeadingRadians,
     % |speed| <= certificationSpeedMetersPerSecond, |lateral velocity| <=
     % certificationLateralVelocityMetersPerSecond, |yaw rate| <=
-    % certificationYawRateRadiansPerSecond) with inputs within
-    % certificationSteeringRadians and certificationBrakingRatio of the trim
-    % (one maximum trust-region step by default, but independent of the trust
-    % settings), the sampled nonlinear model's one-hold Jacobians are enclosed
-    % and the largest sublevel set V <= 1 inside the box on which u = u* + K e
-    % contracts by rho against every Jacobian of the enclosure is certified
-    % (NOMINAL_CLF.md). The terminal set lives inside that set.
+    % certificationYawRateRadiansPerSecond), the largest sublevel set V <= 1 on
+    % which the terminal controller contracts by rho against every ray-averaged
+    % Jacobian of the sampled nonlinear model over the set is certified
+    % (NOMINAL_CLF.md); the terminal set lives inside that set. The terminal
+    % controller commands the front lateral force and the braking ratio
+    % linearly in the error, within certificationFrontForceFraction of the
+    % front axle's lateral capacity and certificationBrakingRatio of the trim,
+    % and steers through the inverse Fiala curve (terminalSafeSet.inputOf);
+    % certificationSteeringRadians is the steering box of the alternative
+    % steering-level map that the synthesis can be asked for. The box only
+    % bounds the set; its size is set by the certificate.
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
         'convergenceTimeConstantSeconds',4, ...
-        'certificationLateralMeters',1,'certificationHeadingRadians',.15, ...
-        'certificationSpeedMetersPerSecond',.75,'certificationLateralVelocityMetersPerSecond',.15, ...
-        'certificationYawRateRadiansPerSecond',.08, ...
-        'certificationSteeringRadians',.075,'certificationBrakingRatio',.125);
+        'certificationLateralMeters',2,'certificationHeadingRadians',.2, ...
+        'certificationSpeedMetersPerSecond',1,'certificationLateralVelocityMetersPerSecond',.3, ...
+        'certificationYawRateRadiansPerSecond',.2, ...
+        'certificationFrontForceFraction',.4,'certificationSteeringRadians',.075,'certificationBrakingRatio',.125);
     % The remaining nominalClf parameters guide initialization only.
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
@@ -195,6 +199,7 @@ function localValidate(cfg)
     for name=string(fieldnames(cfg.clf)).'
         validateattributes(cfg.clf.(name),{'double'},{'scalar','real','finite','positive'});
     end
+    if cfg.clf.certificationFrontForceFraction>=1,localInvalid('clf.certificationFrontForceFraction must lie in (0,1).');end
     for name=string(fieldnames(cfg.nominalClf)).'
         validateattributes(cfg.nominalClf.(name),{'double'},{'scalar','real','finite','positive'});
     end

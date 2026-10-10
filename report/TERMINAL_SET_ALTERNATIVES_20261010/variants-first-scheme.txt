@@ -1,0 +1,11 @@
+force                      8/0            lat 0.675 m  head 0.0563 rad  speed 0.283  vy 0.104  r 0.0667  fill 0.043  T 3.49/4 s  mu 1.0181  slips 0.027/0.014  worst 0.9532  rows 1  28 s
+secant                     8/0            lat 0.987 m  head 0.0778 rad  speed 0.409  vy 0.148  r 0.0797  fill 0.095  T 3.93/4 s  mu 1.0101  slips 0.027/0.017  worst 0.9536  rows 1  30 s
+force+secant               8/0            lat 0.821 m  head 0.0649 rad  speed 0.384  vy 0.107  r 0.0668  fill 0.073  T 3.67/4 s  mu 1.0070  slips 0.027/0.014  worst 0.9537  rows 1  47 s
+sat+secant                 8/0            lat 0.836 m  head 0.0649 rad  speed 0.204  vy 0.108  r 0.0669  fill 0.072  T 3.93/4 s  mu 1.0305  slips 0.024/0.014  worst 0.9536  rows 1  84 s
+secant+comp8               8/0            lat 0.999 m  head 0.0790 rad  speed 0.275  vy 0.114  r 0.0800  fill 0.124  T 3.86/4 s  mu 1.0033  slips 0.029/0.013  worst 0.9593  rows 1  31 s
+secant+T20+wide            8/0            lat 1.789 m  head 0.1231 rad  speed 0.577  vy 0.222  r 0.1347  fill 0.203  T 16.18/20 s  mu 1.0079  slips 0.053/0.034  worst 0.9639  rows 1  115 s
+secant+wide                8/0            lat 1.482 m  head 0.1165 rad  speed 0.496  vy 0.216  r 0.1214  fill 0.073  T 3.91/4 s  mu 1.0144  slips 0.052/0.028  worst 0.9502  rows 1  141 s
+poly+secant                8/0            lat 0.506 m  head 0.0471 rad  speed 0.290  vy 0.101  r 0.0718  fill 0.026  T 3.90/4 s  mu 1.0849  slips 0.027/0.015  worst 0.9414  rows 1  365 s (union 0.51 m, 0.047 rad)
+secant+wide+iter6          8/0            lat 1.442 m  head 0.1083 rad  speed 0.492  vy 0.191  r 0.1090  fill 0.077  T 3.84/4 s  mu 1.0088  slips 0.039/0.026  worst 0.9588  rows 1  266 s
+force+secant+wide+iter6    8/0            lat 1.430 m  head 0.1061 rad  speed 0.332  vy 0.194  r 0.1086  fill 0.091  T 3.86/4 s  mu 1.0073  slips 0.024/0.027  worst 0.9570  rows 1  303 s
+baseline                   8/0            lat 0.627 m  head 0.0545 rad  speed 0.346  vy 0.123  r 0.0665  fill 0.036  T 3.91/4 s  mu 1.0288  slips 0.025/0.014  worst 0.9456  rows 1  8 s

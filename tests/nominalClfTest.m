@@ -30,7 +30,14 @@ classdef nominalClfTest < matlab.unittest.TestCase
             testCase.verifyEqual(reference.gain,reshape(entry.gain,2,5),AbsTol=1e-12);
             testCase.verifyEqual(reference.nominalA,reshape(entry.nominalA,5,5),AbsTol=1e-12);
             inputBound=sqrt(diag(reference.gain*(reference.matrix\reference.gain.')));
-            testCase.verifyLessThanOrEqual(inputBound,[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio]*(1+1e-6));
+            testCase.verifyLessThanOrEqual(inputBound,entry.certificate.inputBox(:)*(1+1e-6));
+            tire=modifiedFialaTire.parameters(cfg);
+            if reference.inputMap=="force"
+                testCase.verifyEqual(entry.certificate.inputBox(:),[cfg.clf.certificationFrontForceFraction*tire.longitudinalForceScale(1);cfg.clf.certificationBrakingRatio],RelTol=1e-12);
+                testCase.verifyEqual(reference.trimForce,terminalSafeSet.trimForce(reference,cfg),AbsTol=1e-9);
+            else
+                testCase.verifyEqual(entry.certificate.inputBox(:),[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio],RelTol=1e-12);
+            end
             box=[cfg.clf.certificationLateralMeters;cfg.clf.certificationHeadingRadians;cfg.clf.certificationSpeedMetersPerSecond; ...
                 cfg.clf.certificationLateralVelocityMetersPerSecond;cfg.clf.certificationYawRateRadiansPerSecond];
             s=inv(reference.matrix);
@@ -64,10 +71,12 @@ classdef nominalClfTest < matlab.unittest.TestCase
             testCase.verifyTrue(all(rows.rows));
         end
         function freshJacobiansLieInTheRecordedEnclosure(testCase,referenceSpeed,curvature)
-            % Hypothesis H3 on new samples: the Jacobians of the sampled error
-            % map along u = u* + K e on the certified set lie in the recorded
-            % zonotope (coefficients within their bounds, residual within its
-            % norm), in box-scaled coordinates.
+            % Hypothesis H3 on new samples: the ray-averaged Jacobians of the
+            % sampled error map along u = u* + K e on the certified set lie in
+            % the recorded zonotope (coefficients within their bounds; the
+            % principal residual plus the rank-one quadrature correction of
+            % the mean-value identity within the residual norm), in box-scaled
+            % coordinates.
             [cfg,~,reference]=localSetup(referenceSpeed,curvature);
             root=fileparts(fileparts(mfilename('fullpath')));
             entries=jsondecode(fileread(fullfile(root,'config','clfMatrices.json')));
@@ -75,17 +84,19 @@ classdef nominalClfTest < matlab.unittest.TestCase
             certificate=entry.certificate;
             box=[cfg.clf.certificationLateralMeters;cfg.clf.certificationHeadingRadians;cfg.clf.certificationSpeedMetersPerSecond; ...
                 cfg.clf.certificationLateralVelocityMetersPerSecond;cfg.clf.certificationYawRateRadiansPerSecond];
-            inputBox=[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio];
+            inputBox=certificate.inputBox(:);
             stream=RandStream('mt19937ar','Seed',11+referenceSpeed+1000*curvature);
             directions=randn(stream,5,200);unit=reference.factor\(directions./vecnorm(directions));
             errors=unit.*sqrt([ones(1,120),rand(stream,1,80)]);
-            [a,b]=terminalSafeSet.jacobians(reference,cfg,errors,reference.gain*errors,cfg.controller.sampleTime);
+            inputs=reference.gain*errors;
+            [a,b,gap]=terminalSafeSet.rayJacobians(reference,cfg,errors,inputs,cfg.controller.sampleTime,certificate.quadratureNodes);
             u=reshape(certificate.directions,35,[]);
             for j=1:size(errors,2)
                 deviation=[diag(box)\(a(:,:,j)-reference.nominalA)*diag(box),diag(box)\(b(:,:,j)-reference.nominalB)*diag(inputBox)];
                 x=reshape(deviation,[],1);coefficients=u.'*x;
+                quadrature=norm(diag(box)\gap(:,j))/norm([diag(box)\errors(:,j);diag(inputBox)\inputs(:,j)]);
                 testCase.verifyLessThanOrEqual(abs(coefficients),certificate.coefficientBounds(:)*(1+1e-9));
-                testCase.verifyLessThanOrEqual(norm(reshape(x-u*coefficients,5,7)),certificate.residualNorm*(1+1e-9));
+                testCase.verifyLessThanOrEqual(norm(reshape(x-u*coefficients,5,7))+quadrature,certificate.residualNorm*(1+1e-9));
             end
         end
         function trimHasZeroValueAndTheInitializationGuidancePreservesIt(testCase,referenceSpeed,curvature)
