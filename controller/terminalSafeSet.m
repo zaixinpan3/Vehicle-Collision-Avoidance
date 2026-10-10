@@ -19,8 +19,10 @@ classdef terminalSafeSet
 %               provably never come within the collision buffer again
 %               (straight road; see collisionCone).
 % The end is an absorbing state: no property of the target after it is used.
-% terminal.horizonSeconds only limits how far the check computes: a tube that
-% reaches it with neither event is not terminal. levelMaximum is the smaller
+% The check reads the forecast at the node's own time first (closed-form
+% tests) and follows the grid only when needed, for a span the forecast's own
+% geometry bounds (clear, scanBound); a tube that reaches the end of that span
+% with neither event is not terminal. levelMaximum is the smaller
 % of terminal.levelMaximum (the CLF's certified region) and the largest level
 % whose ellipsoid lies inside the state rows of the problem (speed, lateral
 % velocity and yaw-rate limits, sideslip cone, rear adhesion at the
@@ -67,7 +69,7 @@ classdef terminalSafeSet
                 'buffer',cfg.collision.safetyMarginMeters,'range',cfg.collision.encounterRangeMeters, ...
                 'clearance',clearance, ...
                 'levelMaximum',min(terminal.levelMaximum,terminalSafeSet.stateLevel(reference,cfg)), ...
-                'dt',dt,'ratio',ratio,'horizonSteps',ceil(terminal.horizonSeconds/dt), ...
+                'dt',dt,'ratio',ratio, ...
                 'pathHeading',here.heading,'targetMotion',localTargetMotion(model), ...
                 'positionRadius',positionRadius,'yawRadius',yawRadius, ...
                 'hasTarget',~isempty(model.target),'stationNow',here.station, ...
@@ -111,20 +113,30 @@ classdef terminalSafeSet
 
         function [ok,context,info] = clear(context,value,station,node)
             % Tube of level 'value' starting at 'station' at plan node 'node'.
+            % The node's own grid point is checked first: the tube and the
+            % forecast at one time, so a relative motion outside the cone (or
+            % a target already out of range) is certified in closed form. Only
+            % otherwise does the check follow the grid, in 2-s chunks, until
+            % the first exit or cone certificate, over a span that scanBound
+            % derives from the forecast itself (on a straight road in closed
+            % form: a forecast that meets the settled tube before the target
+            % can leave the range is rejected at once). A tube that reaches
+            % the end of the span with neither event is not terminal. Nothing
+            % about the encounter is preset.
             info=struct('exitSeconds',NaN,'margin',Inf,'reason',"");ok=false;
             if ~(value<=context.levelMaximum*(1+1e-12))
                 info.reason="levelAboveCertifiedRegion";return;
             end
             % The lateral extent is largest at the start and only shrinks.
-            ego=terminalSafeSet.tube(context,value,station,0,0);
+            [ego,~,~,rate]=terminalSafeSet.tube(context,value,station,0,0);
             if ego.lateral(2)>context.clearance(2) || -ego.lateral(1)>context.clearance(1)
                 info.reason="tubeLeavesRoad";return;
             end
             if ~context.hasTarget,ok=true;info.exitSeconds=0;info.reason="noTarget";return;end
             start=node*context.ratio;chunk=round(2/context.dt);
-            steps=0;shift=0;
+            steps=0;shift=0;cap=0;ending="";
             while true
-                last=min(start+steps+chunk,start+context.horizonSteps);
+                if steps==0,last=start;else,last=min(start+steps+chunk,start+cap);end
                 context=terminalSafeSet.extend(context,last);
                 tau=(steps:last-start)*context.dt;
                 [ego,box,guard,rate]=terminalSafeSet.tube(context,value,station,tau,shift);
@@ -140,19 +152,75 @@ classdef terminalSafeSet
                 % certificate covers the time from its own grid point on, so
                 % that grid point is checked as well.
                 limit=numel(tau);reason="exit";stop=exitAt;
-                if ~isempty(apart) && (isempty(exitAt) || apart<exitAt),stop=apart;reason="outsideCollisionCone";end
+                if ~isempty(apart) && (isempty(exitAt) || apart<=exitAt),stop=apart;reason="outsideCollisionCone";end
                 if ~isempty(stop),limit=stop-(reason=="exit");end
                 if limit>0
                     margin=bodyGap(1:limit)-required(1:limit);info.margin=min(info.margin,min(margin));
                     if any(margin<0),info.reason="tubeMeetsTarget";return;end
                 end
                 if ~isempty(stop),ok=true;info.exitSeconds=tau(stop);info.reason=reason;return;end
-                % Neither event within the computed horizon: not terminal.
-                if last>=start+context.horizonSteps
-                    info.reason="noExitOrSeparation";return;
+                if steps==0
+                    % Neither event at the node itself: the span to follow.
+                    [cap,ending]=terminalSafeSet.scanBound(context,value,station,ego,box,rate,index);
                 end
+                % Neither event within the span: not terminal.
+                if last>=start+cap,info.reason=ending;return;end
                 shift=box.shift;steps=last-start+1;
             end
+        end
+
+        function [cap,ending] = scanBound(context,value,station,ego,box,rate,index)
+            % Grid steps the time-resolved check may follow after a node whose
+            % own point certified nothing, and the reason reported when the
+            % span ends with neither event. cap = 0 rejects the node at once.
+            %   Straight road, straight-line target: the relative motion is a
+            %   parabola (collisionCone). If it enters the settled tube's box
+            %   (level 0) at u_hit, the tube meets the target then unless the
+            %   target has left the range before: the span is the first time
+            %   the reference point is surely out of range, or none when that
+            %   time is not before u_hit. Otherwise the parabola leaves the
+            %   whole tube's box (widened by the total drift) for good at
+            %   u_out, where the cone certifies at the latest: the span is
+            %   u_out, or the tube's settling time when the parabola never
+            %   leaves (a co-moving target).
+            %   Circling target: the span is the time the tube's box has passed
+            %   the target's disk, where the disk test certifies.
+            %   Curved road: no cone; the span is the settling time plus the
+            %   time the ego needs for the range diameter, 2R/v. A target still
+            %   in range then has neither passed nor been passed.
+            T=context.timeConstant;dt=context.dt;b=context.buffer;R=context.range;v=context.pathSpeed;
+            r0=sqrt(max(value,0));remaining=T*rate;
+            settle=max(remaining,context.scale(1)*r0);tolerance=max(b,1e-2);
+            tSettle=0;if settle>tolerance,tSettle=T*log(settle/tolerance);end
+            motion=context.targetMotion;ending="noExitWithinSpan";
+            if context.curvature~=0 || ~motion.available
+                cap=max(1,ceil((tSettle+2*R/max(v,.5))/dt));return;
+            end
+            if ~motion.straight
+                behind=motion.centre(1)+motion.diskRadius+b-(ego.station(1)-remaining);
+                cap=max(1,ceil(behind/max(v,.5)/dt));return;
+            end
+            ending="insideCollisionCone";
+            angle=context.targetCourse(index)-context.pathHeading;c=cos(angle);s=sin(angle);
+            V=context.targetVelocity(index);A=motion.acceleration;
+            aS=c*A/2;bS=c*V-v;aD=s*A/2;bD=s*V;
+            targetS=context.targetStation(:,index);targetD=context.targetLateral(:,index);
+            gS=mean(targetS)-mean(ego.station);gD=mean(targetD)-mean(ego.lateral);
+            settled=terminalSafeSet.tube(context,0,station,0,0);
+            halfS0=diff(settled.station)/2+diff(targetS)/2+b;halfD0=diff(settled.lateral)/2+diff(targetD)/2+b;
+            excess=rate*dt;
+            halfS=diff(ego.station)/2+remaining+excess+diff(targetS)/2+b;halfD=diff(ego.lateral)/2+diff(targetD)/2+b;
+            [entry,~]=localParabolaBoxSpan(aS,bS,gS,halfS0,aD,bD,gD,halfD0);
+            if isfinite(entry)
+                % The forecast meets the settled tube at 'entry'.
+                radius=hypot(diff(box.station)/2+remaining+excess,diff(box.lateral)/2);
+                gRefS=context.pointStation(1,index)-mean(box.station);gRefD=context.pointLateral(1,index)-mean(box.lateral);
+                leave=localParabolaDiskExit(aS,bS,gRefS,aD,bD,gRefD,R+radius);
+                if ~(leave<entry),cap=0;return;end
+                cap=max(1,ceil(leave/dt)+1);return;
+            end
+            [~,out]=localParabolaBoxSpan(aS,bS,gS,halfS,aD,bD,gD,halfD);
+            cap=max(1,ceil(min(out,tSettle)/dt)+1);
         end
 
         function first = collisionCone(context,ego,rate,index)
@@ -211,8 +279,13 @@ classdef terminalSafeSet
             a=context.scale;kappa=abs(context.curvature);
             lateral=a(1)*radius+context.positionRadius;
             heading=min(pi/2,abs(context.yawOffset)+a(2)*radius+context.yawRadius);
-            speedError=((abs(context.velocity(1))+abs(context.velocity(2)))*a(2)*radius ...
-                +(a(3)+a(4))*radius+context.pathSpeed*kappa*a(1)*radius)./max(1-kappa*a(1)*radius,.5);
+            % |v_t - v_t*| for theta = psi* + e_psi, |e_psi| <= a2 r (TERMINAL_SAFE_SET.md, (3.2)):
+            % |dvx| + |dvy| (|sin psi*| + a2 r) + |vx*| (|sin psi*| a2 r + (a2 r)^2/2) + |vy*| a2 r;
+            % the heading enters a straight road's station rate only at second order.
+            yaw=a(2)*radius;tilt=abs(sin(context.yawOffset));
+            tangentError=a(3)*radius+a(4)*radius.*(tilt+yaw)+abs(context.velocity(1))*(tilt*yaw+yaw.^2/2) ...
+                +abs(context.velocity(2))*yaw;
+            speedError=(tangentError+context.pathSpeed*kappa*a(1)*radius)./max(1-kappa*a(1)*radius,.5);
             % Left Riemann sum of a nonincreasing integrand bounds its integral.
             drift=shift+[0,cumsum(speedError(1:end-1))]*context.dt;
             centre=station+context.pathSpeed*tau;
@@ -406,6 +479,63 @@ function hit = localParabolaMeetsBox(aS,bS,gS,hS,aD,bD,gD,hD)
     qS=aS.*u.^2+bS.*u+gS;qD=aD.*u.^2+bD.*u+gD;
     distance=max(abs(qS)./hS,abs(qD)./hD);
     hit=min(distance,[],1,'omitnan')<=1+1e-9;
+end
+
+function [entry,leave] = localParabolaBoxSpan(aS,bS,gS,hS,aD,bD,gD,hD)
+    % First and last time u >= 0 at which the parabola (aS u^2 + bS u + gS,
+    % aD u^2 + bD u + gD) is inside the box |q_s| <= hS, |q_d| <= hD; Inf and
+    % Inf when never, entry and Inf when it stays inside.
+    bandS=localBand(aS,bS,gS,hS);bandD=localBand(aD,bD,gD,hD);
+    entry=Inf;leave=Inf;hit=false;
+    for i=1:size(bandS,1)
+        for j=1:size(bandD,1)
+            lo=max(bandS(i,1),bandD(j,1));hi=min(bandS(i,2),bandD(j,2));
+            if lo<=hi
+                if ~hit,leave=-Inf;hit=true;end
+                entry=min(entry,lo);leave=max(leave,hi);
+            end
+        end
+    end
+end
+
+function band = localBand(a,b,g,h)
+    % {u >= 0 : |a u^2 + b u + g| <= h} as rows [lo, hi] (hi may be Inf).
+    f=@(u)a*u.^2+b*u+g;
+    points=[localScalarRoots(a,b,g-h),localScalarRoots(a,b,g+h)];points=sort(points(points>0));
+    edges=[0,points,Inf];band=zeros(0,2);
+    for k=1:numel(edges)-1
+        lo=edges(k);hi=edges(k+1);
+        if isinf(hi),probe=lo+1;else,probe=(lo+hi)/2;end
+        if abs(f(probe))<=h*(1+1e-9)+1e-12
+            if ~isempty(band) && band(end,2)==lo,band(end,2)=hi;else,band(end+1,:)=[lo,hi];end %#ok<AGROW>
+        end
+    end
+end
+
+function r = localScalarRoots(a,b,c)
+    % Real roots of a u^2 + b u + c = 0 (scalar coefficients).
+    if a==0
+        if b==0,r=zeros(1,0);else,r=-c/b;end
+        return;
+    end
+    disc=b^2-4*a*c;
+    if disc<0,r=zeros(1,0);return;end
+    sgn=sign(b);if sgn==0,sgn=1;end
+    q=-(b+sgn*sqrt(disc))/2;
+    if q==0,r=0;else,r=[q/a,c/q];end
+end
+
+function first = localParabolaDiskExit(aS,bS,gS,aD,bD,gD,rho)
+    % First time u >= 0 at which the parabola is farther than rho from the
+    % origin, Inf when never.
+    p=conv([aS,bS,gS],[aS,bS,gS])+conv([aD,bD,gD],[aD,bD,gD]);p(end)=p(end)-rho^2;
+    if polyval(p,0)>0,first=0;return;end
+    r=roots(p);r=sort(real(r(abs(imag(r))<1e-9*max(1,abs(r)) & real(r)>0))).';
+    first=Inf;
+    for k=1:numel(r)
+        if k<numel(r),probe=(r(k)+r(k+1))/2;else,probe=r(k)+1;end
+        if polyval(p,probe)>0,first=r(k);return;end
+    end
 end
 
 function u = localVertex(a,b)

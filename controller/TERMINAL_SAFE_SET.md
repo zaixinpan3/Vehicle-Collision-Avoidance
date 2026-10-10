@@ -29,8 +29,10 @@ is used.
   collision cone: from that time on the two can never come within the
   collision buffer again (Section 4.1).
 
-`terminal.horizonSeconds` (60 s) only limits how far ahead the check computes;
-a state whose tube reaches it with neither event is not terminal.
+Nothing about the encounter is preset. The check reads the forecast at the
+state's own time first, in closed form, and follows the grid only when
+needed, over a span the forecast's own geometry bounds (Section 7); a state
+whose tube reaches the end of that span with neither event is not terminal.
 
 No avoidance maneuver, lane, side or mode is designed in advance: the
 terminal controller is the only backup. (Lane-hold backups at the other lane
@@ -72,18 +74,25 @@ For the ellipsoid `{e : e'Pe <= V}` the largest value of `|e_i|` is
 
 The path station `s` obeys `ds/dt = v_t / (1 - kappa e_y)`, where `v_t` is the
 velocity component along the path tangent. The trim has `ds/dt = v_path`.
-Writing `theta = yaw - pathHeading = psi* + e_psi`,
+Writing `theta = yaw - pathHeading = psi* + e_psi` and expanding
+`v_t = vx cos theta - vy sin theta` about the trim,
 
-    |v_t - v_path| <= |dvx| + |dvy| + (|vx*| + |vy*|) |e_psi|,
+    |v_t - v_t*| <= |dvx| + |dvy| (|sin psi*| + |e_psi|)
+                    + |vx*| (|sin psi*| |e_psi| + e_psi^2 / 2) + |vy*| |e_psi|,
 
 so with (3.1)
 
     |ds/dt - v_path| <= sigma(r) =
-        [ (|vx*| + |vy*|) a_2 r + (a_3 + a_4) r + v_path |kappa| a_1 r ]
-        / (1 - |kappa| a_1 r),                                             (3.2)
+        [ a_3 r + a_4 r (|sin psi*| + a_2 r) + |vx*| (|sin psi*| a_2 r + (a_2 r)^2 / 2)
+          + |vy*| a_2 r + v_path |kappa| a_1 r ] / (1 - |kappa| a_1 r),          (3.2)
 
 and `|s(t) - s0 - v_path t| <= G(t) = integral_0^t sigma(r(tau)) dtau`.
-`sigma` is increasing in `r` and `r` decreases, so `G` is concave.
+`sigma` is increasing in `r`, `sigma(lambda r) <= lambda sigma(r)` for
+`lambda <= 1`, and `r` decreases, so `G` is concave and the drift remaining
+after time `t` is at most `T sigma(r(t))`. On a straight road the heading
+enters the station rate only at second order: at 8 m/s and `V = cbar` the
+total drift `T sigma` is 4.6 m, against 14.5 m for the first-order bound
+`(|vx*| + |vy*|) a_2 r + (a_3 + a_4) r` used until October 9.
 
 The ego rectangle at time `t` therefore lies in a box in path coordinates:
 
@@ -114,8 +123,9 @@ both in path coordinates, and `T(x)` the tube of `x`. For a state `x` at time
                   first t >= 0 from which the relative motion is outside the
                   collision cone (Section 4.1) ),
 
-and require `t_e(x) <= H = terminal.horizonSeconds`. `H` bounds the
-computation only; it is not an encounter duration.
+and require `t_e(x)` to lie within the span the check follows (Section 7),
+which the forecast's geometry bounds; it limits the computation only and is
+not an encounter duration.
 
 The terminal set is
 
@@ -310,15 +320,42 @@ controller meet the same hard rows as every other node. The set is otherwise
 `dist > 0`.
 
 `G` uses a left Riemann sum, an upper bound because `sigma(r(t))` decreases.
-The target table is filled in 2-s chunks and reused within a sample.
-`terminal.horizonSeconds` (60 s) bounds how far the check computes from a
-node. `terminalSafeSet.collisionCone` applies the cone test of Section 4.1 at
-every grid point of a chunk (`localParabolaMeetsBox`, vectorized over the
-grid); the check ends at the first exit or cone certificate, after confirming
-the grid points before it (and the certificate's own point). A tube that
-reaches the bound with neither is not terminal (`noExitOrSeparation`). The
-issued plan records how its encounter ends (`terminalEnd`: `exit` or
-`outsideCollisionCone`).
+The target table is shared by the checks of one sample and extended lazily.
+
+**Order of the check.** `terminalSafeSet.clear` first evaluates the node's
+own grid point alone: the tube and the forecast at that one time, the exit
+test and the cone test of Section 4.1 (`localParabolaMeetsBox`). A relative
+motion outside the cone, or a target already out of range, is thus certified
+in closed form, without a grid. Only otherwise does the check follow the
+grid in 2-s chunks (the cone test at every grid point, vectorized), ending at
+the first exit or cone certificate after confirming the grid points before it
+(and the certificate's own point), over a span that `terminalSafeSet.scanBound`
+derives from the forecast:
+
+- straight road, straight-line target: the relative motion is the parabola
+  of Section 4.1. If it enters the box of the *settled* tube (level 0) at
+  `u_hit`, the tube meets the target then unless the target has left the
+  range before; the first time at which the reference point is surely out of
+  range (farther than `R` plus the reference box's largest half-diagonal) is
+  computed from the same parabola, and if it is not before `u_hit` the node
+  is rejected at once (`insideCollisionCone`), otherwise the span ends at
+  that time. If the parabola never enters the settled box, it leaves the box
+  of the *whole* tube (widened by the total drift `T sigma(r0)`) for good at
+  some `u_out`, where the cone certifies at the latest; the span is `u_out`,
+  or the settling time `T log(max(T sigma(r0), a_1 r0) / safetyMarginMeters)`
+  when the parabola never leaves (a co-moving target inside the widened box,
+  which the shrinking box releases as it settles);
+- circling target: the span ends when the tube's box has passed the target's
+  disk, where the disk test certifies;
+- curved road: there is no cone; the span is the settling time plus the time
+  the ego needs for the range diameter, `2R/v`. A target still in range then
+  has neither passed nor been passed, and the node is rejected
+  (`noExitWithinSpan`).
+
+The span is a bound on the computation, not an encounter duration; at
+`V = 0` the settled and whole boxes coincide and the check is the single
+closed-form evaluation. The issued plan records how its encounter ends
+(`terminalEnd`: `exit` or `outsideCollisionCone`).
 
 **Level.** `terminalSafeSet.level` bisects the largest `c` in `[0, cbar]` whose
 tube at a given station is clear (clearance is monotone in `c` because tubes
@@ -373,15 +410,24 @@ input trust scale (`localTrustRecord`).
 ## 8. Measured behavior
 
 The single-backup set with the collision cone is measured in
-`report/TERMINAL_BACKUP_SET_20261008.tex` (third addendum, variant H): exact
-states 14 of 14; noisy 55 of 84, the same runs as the CLF-tube set of
-October 6 with its sliding window (96 of 98 runs identical in outcome and
-length), no collision. All 12 noisy braking leads stop at the first frame:
-the first estimate is a lead at nearly the ego's speed in the ego lane, the
-terminal controller's tube meets it, and the startup rollout cannot pass it
-and return within `maximumHorizonSteps`. With lane-hold backups (removed)
-the result was 59 of 84. Encounters ended by exit at 6908 accepted endpoints
-and by the cone at 2867, at most 15.3 s after the endpoint. The CLF-tube set of
+`report/TERMINAL_BACKUP_SET_20261008.tex` (third and fourth addenda). With
+the grid check of October 9 (variant H): exact states 14 of 14; noisy 55 of
+84, the same runs as the CLF-tube set of October 6 with its sliding window
+(96 of 98 runs identical in outcome and length), no collision. With the
+closed-form check of October 10 (variant I2, the present code): exact 14 of
+14, noisy 54 of 84 (one turning crossing stops on a 4.7-s conic solve of a
+222-hold plan), no collision; the membership test costs 0.2 to 0.9 ms per
+call where it is closed-form (against 0.6 to 12.9 ms before) and 1.3 to
+1.7 ms where it still follows the grid (circling targets, curves), while the
+end-to-end controller time, dominated by the conic solver on long plans, is
+unchanged at the median and slightly worse in the tail. All 12 noisy braking
+leads stop at the first frame in every variant: the first estimate is a lead
+at nearly the ego's speed in the ego lane, the terminal controller's tube
+meets it, and the startup rollout cannot pass it and return within
+`maximumHorizonSteps`; one CLF certified over 4-8 m/s and over 7.5-15 m/s
+exists (same report), so a cruise speed chosen in such an interval could
+make that state terminal. With lane-hold backups (removed) the result was 59
+of 84. The CLF-tube set of
 October 6 is measured in
 `report/TERMINAL_SAFE_SET_RECURSIVE_FEASIBILITY_20261006.tex`, for the
 exact-state campaigns:
@@ -495,9 +541,9 @@ Section 8.
   which is checked online, not proven. Each new encounter (a target appearing
   or re-entering) is an initial-feasibility question.
 - The collision cone is applied only on a straight road. On a curve only
-  the exit ends an encounter, and a target that stays in range without either event
-  within `terminal.horizonSeconds` makes the state non-terminal, also when
-  it would in fact never be met: the bound decides completeness, not
+  the exit ends an encounter, and a target that stays in range without either
+  event within the span of Section 7 makes the state non-terminal, also when
+  it would in fact never be met: the span decides completeness, not
   soundness.
 - The tube assumes the continuous-time decrease (2.1) inside each hold.
 - `cbar` binds the rear-adhesion row at the certification braking ratio.

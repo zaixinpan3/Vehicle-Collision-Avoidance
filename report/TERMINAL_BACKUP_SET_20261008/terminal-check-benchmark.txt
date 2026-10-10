@@ -1,0 +1,16 @@
+working tree (I2, commit pending)
+  receding lead, settled           member 1 outsideCollisionCone   end   0.00     0.52 ms/call
+  braking-lead estimate, settled   member 0 insideCollisionCone    end    NaN     0.41 ms/call
+  slow lead 40 m, settled          member 0 insideCollisionCone    end    NaN     0.32 ms/call
+  crosser, offset 1 m ego          member 1 outsideCollisionCone   end   0.00     0.24 ms/call
+  head-on ahead 40 m, offset 1 m   member 1 outsideCollisionCone   end   0.09     0.88 ms/call
+  circling target ahead            member 1 exit                   end   8.34     1.72 ms/call
+  curve head-on, offset 1 m        member 0 tubeMeetsTarget        end    NaN     1.31 ms/call
+commit 6b72fcb (H)
+  receding lead, settled           member 1 outsideCollisionCone   end   0.00     0.86 ms/call
+  braking-lead estimate, settled   member 0 tubeMeetsTarget        end    NaN     2.58 ms/call
+  slow lead 40 m, settled          member 0 noExitOrSeparation     end    NaN    12.91 ms/call
+  crosser, offset 1 m ego          member 1 outsideCollisionCone   end   0.00     0.59 ms/call
+  head-on ahead 40 m, offset 1 m   member 1 outsideCollisionCone   end   0.09     0.61 ms/call
+  circling target ahead            member 1 exit                   end   8.40     1.63 ms/call
+  curve head-on, offset 1 m        member 0 tubeMeetsTarget        end    NaN     0.65 ms/call

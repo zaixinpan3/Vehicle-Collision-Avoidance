@@ -154,6 +154,9 @@ numerical stalls of the conic solver.
   the first addendum: no preset time is needed.)
 \item The remaining failures point to the plan's length and the conic
   solver's numerical stalls, not to the terminal set.
+\item Whether the terminal controller's cruise speed may be a continuous
+  parameter of one interval-certified CLF (fourth addendum); the user has
+  not decided.
 \item Whether to try the cone's lane before the potential field at startup
   (second addendum). Lapsed: the lanes were removed (third addendum).
 \end{itemize}
@@ -421,5 +424,137 @@ endpoint (median 0, 99th percentile 7.5~s). Per run:
 \path{campaign-runs.csv} (eight variants); summary \path{comparison-all.txt};
 encounter ends \path{encounter-ends-G2H.txt}; hashes
 \path{variantH-sha256.txt}.
+
+\section{Fourth addendum: a closed-form terminal check}
+\paragraph{Request.} The user set three requirements for the terminal set: it
+exists only to make the shifted plan feasible (the closed loop does not
+normally execute the terminal controller), so it must need no heavy real-time
+computation, must not be so conservative that the problem loses its solution,
+and should be mathematically clean. Measured against the design of the third
+addendum (variant H): the membership test followed a 5-ms grid for up to 60~s
+whenever the node itself certified nothing (12.9~ms per call for a slower
+lead far ahead, 2.6~ms for the braking lead's first estimate, repeated at
+every node of a 512-hold startup rollout); the station drift bound used a
+first-order heading term that widened the cone test's box by 14.5~m along the
+road at the certified level; and 60~s was a preset constant.
+
+\paragraph{Design (variant I2, the committed design).} Three changes, none of
+which alters the set's definition (Section 4 of the theory note), only how
+membership is decided and how tightly the tube is bounded.
+\begin{enumerate}
+\item \emph{Closed form first.} The node's own grid point is evaluated alone:
+  the tube and the forecast at that one time, the exit test and the cone test.
+  A relative motion outside the cone, or a target already out of range, is
+  certified without a grid.
+\item \emph{A span bounded by the forecast's geometry.} Only when the node
+  itself certifies nothing does the check follow the grid, and
+  \texttt{terminalSafeSet.scanBound} limits the span from the forecast rather
+  than by a constant. On a straight road with a straight-line target the
+  relative motion is the parabola of the cone test: if it enters the box of
+  the settled tube (level 0) at $u_{\mathrm{hit}}$, the tube meets the target
+  then unless the target has left the range before, and the first time at
+  which the reference point is surely out of range is computed from the same
+  parabola (a quartic); a node whose forecast meets the settled tube before
+  any exit is rejected at once. If the parabola never enters the settled box,
+  it leaves the whole tube's box (widened by the total drift) for good at
+  $u_{\mathrm{out}}$, where the cone certifies at the latest; the span is
+  $u_{\mathrm{out}}$, or the tube's settling time
+  \[ T\log\bigl(\max(T\sigma(r_0),\,a_1 r_0)/\text{buffer}\bigr) \]
+  for a co-moving target inside the widened box. A circling target's span ends when the tube's box
+  has passed its disk; on a curve, where there is no cone, the span is the
+  settling time plus the range transit time $2R/v$. The constant
+  \texttt{terminal.horizonSeconds} is removed from the configuration.
+\item \emph{A tighter drift bound.} Expanding the tangential speed about the
+  trim, the heading error enters a straight road's station rate only at
+  second order:
+  \[ |v_t-v_t^*|\le|\delta v_x|+|\delta v_y|\,(|\sin\psi^*|+|e_\psi|)
+     +|v_x^*|\,(|\sin\psi^*|\,|e_\psi|+e_\psi^2/2)+|v_y^*|\,|e_\psi| \]
+  replaces $|\delta v_x|+|\delta v_y|+(|v_x^*|+|v_y^*|)|e_\psi|$. At 8~m/s and
+  $V=\bar c$ the total drift $T\sigma$ falls from 14.5~m to 4.6~m; the bound
+  keeps $\sigma(\lambda r)\le\lambda\sigma(r)$, so the remaining-drift
+  argument of Section 4.1 is unchanged.
+\end{enumerate}
+A first attempt (variant I) bounded the span by the settling time alone. That
+is wrong where no cone exists: on curves and for circling targets the exit is
+the only end, and the settling time of a nearly settled tube is a few seconds,
+so exits at 5--15~s were cut off; noisy 54 of 84 with a new failure
+(8~m/s turning crossing of seed 2) and no gain in compute. The
+geometry-bounded span replaces it.
+
+\paragraph{Tests.} \texttt{terminalSafeSetTest} adds the node-only certificate
+(the target table is not extended past the node), the closed-form rejection of
+a slower lead at the certified level, and a slow crosser inside the whole box
+but outside the settled one, certified on a grid shorter than one chunk;
+\texttt{collisionAvoidanceControllerConfigTest} rejects
+\texttt{terminal.horizonSeconds}. Full suite 592 of 592 (\path{tests.txt}).
+
+\paragraph{Cost of the check.} Measured per \texttt{member} call on seven
+cases, H against I2, by \path{scripts/benchTerminal.m} into
+\path{terminal-check-benchmark.txt}: receding lead 0.86 to 0.52~ms; the braking
+lead's first estimate 2.58 to 0.41~ms; a slower lead 40~m ahead 12.9 to
+0.32~ms; a crosser 0.59 to 0.24~ms; a head-on target 40~m ahead with the ego
+offset 0.61 to 0.88~ms; a circling target 1.63 to 1.72~ms; a head-on target
+on a curve 0.65 to 1.31~ms. The common certificates and every rejection are
+now closed-form evaluations; the cases that still follow the grid (circling
+targets, curves) cost what they did.
+
+\paragraph{Campaign.} H and I2 ran interleaved, encounter by encounter, in
+one pool of eight processes (\texttt{campaign-pair.sh}; no licensing error in
+this pair, one transient one in the earlier H2/I pair on a run that
+completed).
+\begin{center}
+\footnotesize
+\begin{tabular}{lrrrr}
+\toprule
+ & H & H3 (rerun) & I (settling cap) & I2\\
+\midrule
+exact, recovered of 14 & 14 & 14 & 14 & 14\\
+noisy, recovered of 84 & 55 & 55 & 54 & 54\\
+collisions & 0 & 0 & 0 & 0\\
+controller s: median & .017 & .018 & .016 & .018\\
+\phantom{controller s:} p95 / p99 & .24 / .53 & .26 / .59 & .24 / .63 & .24 / .64\\
+\phantom{controller s:} max & 3.6 & 4.2 & 4.7 & 4.2\\
+frames above 1 s & 48 & 44 & 68 & 71\\
+\bottomrule
+\end{tabular}
+\end{center}
+H3 reproduces H in 97 of 98 runs. I2 differs from H3 in 21 runs (outcome or
+length), 20 of them in length only or in the kind of first-frame failure of
+a braking lead; the one changed outcome is the 8~m/s turning crossing of seed
+5, stopped at hold 23 on the solver time limit. Replayed standalone, that
+frame's PCBF stage takes 4.7~s on a 222-hold plan and ends without a
+numerical result: a solver stall on a long plan, not the terminal check
+(\path{scripts/diagTime.m}). End-to-end controller time is unchanged at the
+median and 95th percentile and slightly worse in the tail (71 against 44
+frames above 1~s), all in the 8~m/s braking-lead, curved-crossing and
+turning-crossing runs whose horizons reach 200 to 512 holds: the tail is the
+conic solver on long plans, and the terminal check no longer contributes to
+it. Of I2's accepted endpoints with a target, 3945 end by the cone and 5604
+by exit (H3: 2867 and 6908; ties now count as cone); the end lies at most
+14.2~s after the endpoint (99th percentile 8.1~s). Per run:
+\path{campaign-runs.csv} (twelve variants); summary \path{comparison-all.txt};
+ends \path{encounter-ends-H3I2.txt}; hashes \path{variantI2-sha256.txt}.
+
+\paragraph{One CLF for a speed interval.} The braking lead's first estimate
+(a lead at nearly the ego's speed in the ego lane) is rejected by every
+variant because the terminal controller returns to the reference speed; at
+the lead's speed the same state is certified at once (probe of October 9).
+A terminal controller whose cruise speed is a continuous parameter in an
+interval needs one CLF certified over that interval. The LMIs of
+\texttt{synthesizeClfMatrices} with a common $S$ and one certificate gain per
+grid speed (\path{scripts/clfSpeedIntervalStudy.m},
+\path{clf-speed-interval.txt}) are feasible for 4--8~m/s (certified time
+constant 3.94~s against the required 4.00) and 7.5--15~m/s (2.26~s), with
+tube scales within a few percent of the per-speed ones ($a_1\approx3.0$~m),
+and infeasible for 4--15~m/s (4.31~s). Curvature 0.005 gives the same
+picture. This is a feasibility study, not a certificate check, and nothing
+of it is in the controller.
+
+\paragraph{Conclusion.} The committed check decides membership in closed
+form wherever the forecast allows, bounds the remaining cases by their own
+geometry, carries no preset time, and bounds the tube three times more
+tightly along the road. It changes no outcome for the better: the remaining
+failures are solver stalls on long plans and the braking lead's startup,
+which only a terminal controller with an adjustable cruise speed can reach.
 
 \end{document}

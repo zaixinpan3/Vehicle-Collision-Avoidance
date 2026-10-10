@@ -1,2 +1,2 @@
-TOTAL 590 PASSED 590 FAILED 0 INCOMPLETE 0
-runtests('tests') on the working tree of the single-backup design (lane-hold backups and the startup retry removed; HEAD 3d80afb with the consolidated estimator of dee75fb); 590 = 592 - the two lane-backup tests; terminalSafeSetTest covers exit, the collision cone (parallel, faster lead, braking-lead first estimate in the ego lane and in the lane to the right drifting away or toward, slow diagonal crosser, a crosser that meets the box, circling target) and a slower lead beyond the computed horizon
+TOTAL 592 PASSED 592 FAILED 0 INCOMPLETE 0
+runtests('tests') on the working tree of the closed-form terminal check (settling and geometry-bounded span, tighter drift bound, terminal.horizonSeconds removed); terminalSafeSetTest adds the node-only certificate (no grid extension), the closed-form rejection at the certified level and the grid-bounded crosser; collisionAvoidanceControllerConfigTest rejects terminal.horizonSeconds

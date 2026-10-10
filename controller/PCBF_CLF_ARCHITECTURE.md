@@ -536,8 +536,9 @@ The terminal set and its proofs are in
   encounter ends: the target leaves the perception range, or the target's
   forecast motion relative to that box, widened by the tube's remaining
   drift, is outside their collision cone (straight road: the relative
-  parabola under constant `A` never enters the summed box), within the 60 s
-  that the check computes.
+  parabola under constant `A` never enters the summed box), checked at the
+  endpoint's own time in closed form and, when needed, along the grid over a
+  span the forecast's geometry bounds.
 
 In the convex problem this is one cone at the last node,
 `||F (e(y) + J dx_N)|| <= sqrt(c*)`, with `c*` the largest level whose tube at

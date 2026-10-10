@@ -49,15 +49,17 @@ function cfg=localDefaults()
     % Terminal set (controller/terminalSafeSet.m, TERMINAL_SAFE_SET.md): the
     % CLF level of the endpoint is at most levelMaximum (the CLF's certified
     % region; it is further capped where the state rows bind) and the CLF tube
-    % of the endpoint misses the target's forecast until the target leaves
-    % encounterRangeMeters, checked on a grid of timeStepSeconds [s] (it must
-    % divide half the sample time). A target still inside the range after
-    % horizonSeconds [s] is taken to have ended its encounter there.
+    % of the endpoint misses the target's forecast until the encounter ends
+    % (the target leaves encounterRangeMeters, or its relative motion is
+    % outside the tube's collision cone), checked at the endpoint's own time
+    % and, when needed, on a grid of timeStepSeconds [s] (it must divide half
+    % the sample time) until the tube has settled; no encounter duration is
+    % preset.
     % acceptanceSteps are the step sizes tried on the nonlinear rollout of the
     % affine correction, largest first; 0 is the shifted plan itself. Without
     % an acceptable step the problem is linearized again at the full step, at
     % most sqpIterations times.
-    cfg.terminal=struct('levelMaximum',1,'timeStepSeconds',.005,'horizonSeconds',60, ...
+    cfg.terminal=struct('levelMaximum',1,'timeStepSeconds',.005, ...
         'acceptanceSteps',[1,.5,.25,.125,.0625,.03125,0],'sqpIterations',2);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
@@ -143,7 +145,7 @@ function localValidate(cfg)
     end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
-    for name=["levelMaximum","timeStepSeconds","horizonSeconds"]
+    for name=["levelMaximum","timeStepSeconds"]
         validateattributes(cfg.terminal.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.terminal.acceptanceSteps,{'double'},{'row','real','finite','>=',0,'<=',1});

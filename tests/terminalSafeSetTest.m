@@ -85,22 +85,43 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(parallel),parallel.initialState,0);
             testCase.verifyTrue(member);
             testCase.verifyEqual(info.reason,"outsideCollisionCone");
-            % A slower lead in the ego lane meets the tube.
+            % A slower lead in the ego lane is met by the forecast: inside the
+            % cone of the settled tube.
             ahead=localModel([0;0;0;8;0;0],[20;0;0;6;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(ahead),ahead.initialState,0);
             testCase.verifyFalse(member);
-            testCase.verifyEqual(info.reason,"tubeMeetsTarget");
+            testCase.verifyEqual(info.reason,"insideCollisionCone");
+            % At the certified level the same lead is rejected in closed form
+            % as well: the forecast meets the settled tube before any exit.
+            context=terminalSafeSet.context(ahead);
+            [~,station]=terminalSafeSet.coordinates(context,ahead.initialState);
+            [ok,context,info]=terminalSafeSet.clear(context,context.levelMaximum,station,0);
+            testCase.verifyFalse(ok);
+            testCase.verifyEqual(info.reason,"insideCollisionCone");
+            testCase.verifyEqual(context.covered,0);
+            % A slow crosser 10 m ahead, 4.5 m to the right, drifting right at
+            % 2 m/s: inside the certified tube's whole box for the first 0.7 s
+            % but never inside the settled one, so the check follows the grid
+            % only until the parabola has left that box, and certifies there.
+            crosser=localModel([0;0;0;8;0;0],[10;-4.5;-pi/2;2;0;0;1.6;2.4;.95;0;0]);
+            context=terminalSafeSet.context(crosser);
+            [ok,context,info]=terminalSafeSet.clear(context,context.levelMaximum,station,0);
+            testCase.verifyTrue(ok);
+            testCase.verifyEqual(info.reason,"outsideCollisionCone");
+            testCase.verifyGreaterThan(info.exitSeconds,0);testCase.verifyLessThan(info.exitSeconds,1);
+            testCase.verifyLessThan(context.covered,round(2/context.dt));
             % A faster lead never comes closer.
             receding=localModel([0;0;0;8;0;0],[20;0;0;10;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(receding),receding.initialState,0);
             testCase.verifyTrue(member);
             testCase.verifyEqual(info.reason,"outsideCollisionCone");
-            % A slightly slower lead far ahead closes only after the computed
-            % horizon; with neither event within it the state is not terminal.
+            % A slightly slower lead far ahead is met by the forecast (after
+            % 70 s): inside the cone, no exit before the tube has settled, so
+            % the state is not terminal.
             slow=localModel([0;0;0;8;0;0],[40;0;0;7.5;0;0;1.6;2.4;.95;0;0]);
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(slow),slow.initialState,0);
             testCase.verifyFalse(member);
-            testCase.verifyEqual(info.reason,"noExitOrSeparation");
+            testCase.verifyEqual(info.reason,"insideCollisionCone");
             % A braking lead's first estimate (6.2 m ahead, 0.1 m/s slower,
             % heading 3.8 mrad, as measured): in the ego lane it meets the
             % tube. In the lane to the right, drifting further right, it is
@@ -135,6 +156,24 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [member,~,info]=terminalSafeSet.member(terminalSafeSet.context(circling),circling.initialState,0);
             testCase.verifyTrue(member);
             testCase.verifyEqual(info.reason,"outsideCollisionCone");
+        end
+        function aCertificateAtTheNodeNeedsNoGrid(testCase)
+            % Outside the cone at the node's own grid point, the check reads
+            % the forecast at that point only: the target table ends there.
+            receding=localModel([0;0;0;8;0;0],[20;0;0;10;0;0;1.6;2.4;.95;0;0]);
+            context=terminalSafeSet.context(receding);
+            [member,context,info]=terminalSafeSet.member(context,receding.initialState,0);
+            testCase.verifyTrue(member);testCase.verifyEqual(info.exitSeconds,0);
+            testCase.verifyEqual(context.covered,0);
+            [member,context]=terminalSafeSet.member(context,receding.initialState,8);
+            testCase.verifyTrue(member);testCase.verifyEqual(context.covered,8*context.ratio);
+            % A settled tube is decided at its node alone: a lead the forecast
+            % meets later is rejected there without a grid.
+            slow=localModel([0;0;0;8;0;0],[40;0;0;7.5;0;0;1.6;2.4;.95;0;0]);
+            context=terminalSafeSet.context(slow);
+            [member,context,info]=terminalSafeSet.member(context,slow.initialState,0);
+            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"insideCollisionCone");
+            testCase.verifyEqual(context.covered,0);
         end
         function theGridMustContainTheHoldMidpoints(testCase)
             model=localModel([0;0;0;8;0;0],[]);
