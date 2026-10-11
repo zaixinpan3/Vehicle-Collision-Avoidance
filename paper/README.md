@@ -8,7 +8,12 @@ which are open. The October 11, 2026 revision synchronizes the draft with the
 implementation at commit `ea88059` (the controller of that date: the
 braking-continuation terminal set, the step-size rule, the low-speed regime of
 the vehicle model, the cruise law certified on the sampled nonlinear model,
-and the faster assembly). The control-design section, the closed-loop
+and the faster assembly). The revision that followed on the same day, commit
+`e207dde`, floors the weight of the CLF stage's tie term on the shifted plan
+(cruise exact at 8 and 15 m/s on both paths; 14 of 14 and 73 of 84
+encounters recovered, `report/SOLVER_TOLERANCE_20261011.tex`); the
+manuscript's discussion mentions it, and its results predate it. The
+control-design section, the closed-loop
 protocol, outcomes, in-loop estimation, failure analysis, computation,
 discussion, conclusion, abstract and the end of the introduction are
 rewritten; the system overview, the safety-argument subsection and the

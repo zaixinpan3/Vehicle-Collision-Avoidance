@@ -3228,8 +3228,12 @@ and the plant misses it in 7\% of the zero-slack samples with exact
 states. The one run in which $V$ increases, at 15\,m/s on the curve,
 points at the tie term: near the path its weight vanishes, the later
 inputs of the plan are then fixed by nothing but the solver's choice,
-and the next anchor inherits them. A floor on that weight is the
-obvious remedy and was not evaluated here.
+and the next anchor inherits them. A floor of one unit of the error
+scales on that weight, applied to the shifted plan, removed the
+oscillation in the revision of the controller that followed the
+campaign of this section (cruise exact at both speeds on both paths,
+14 of 14 and 73 of 84 encounters recovered); the results reported here
+predate it.
 
 Several premises of the closed-loop trials are favorable. The plant is
 the prediction model with nominal parameters, so the structural premise
