@@ -1,0 +1,28 @@
+AUDIT  8 headOn              replay difference 1.8e-15; outside shared domain 0/203; ego bound available 203, not containing truth 0; target bound available 97, not containing truth 0 (position 0)
+VALID  8 headOn              ego bound valid in all 203 frames
+AUDIT  8 acceleratingHeadOn  replay difference 1.8e-15; outside shared domain 0/182; ego bound available 182, not containing truth 0; target bound available 85, not containing truth 0 (position 0)
+VALID  8 acceleratingHeadOn  ego bound valid in all 182 frames
+AUDIT  8 brakingLead         replay difference 3.6e-15; outside shared domain 0/367; ego bound available 367, not containing truth 0; target bound available 312, not containing truth 0 (position 0)
+VALID  8 brakingLead         ego bound valid in all 367 frames
+AUDIT  8 crossing            replay difference 1.8e-15; outside shared domain 0/188; ego bound available 188, not containing truth 0; target bound available 130, not containing truth 0 (position 0)
+VALID  8 crossing            ego bound valid in all 188 frames
+AUDIT  8 turningCrossing     replay difference 3.6e-15; outside shared domain 0/192; ego bound available 192, not containing truth 0; target bound available 192, not containing truth 0 (position 0)
+VALID  8 turningCrossing     ego bound valid in all 192 frames
+AUDIT  8 curvedHeadOn        replay difference 8.9e-16; outside shared domain 0/15; ego bound available 15, not containing truth 0; target bound available 15, not containing truth 0 (position 0)
+VALID  8 curvedHeadOn        ego bound valid in all 15 frames
+AUDIT  8 curvedCrossing      replay difference 1.8e-15; outside shared domain 0/188; ego bound available 188, not containing truth 0; target bound available 188, not containing truth 0 (position 0)
+VALID  8 curvedCrossing      ego bound valid in all 188 frames
+AUDIT 15 headOn              replay difference 3.6e-15; outside shared domain 0/217; ego bound available 217, not containing truth 0; target bound available 69, not containing truth 0 (position 0)
+VALID 15 headOn              ego bound valid in all 217 frames
+AUDIT 15 acceleratingHeadOn  replay difference 3.6e-15; outside shared domain 0/179; ego bound available 179, not containing truth 0; target bound available 64, not containing truth 0 (position 0)
+VALID 15 acceleratingHeadOn  ego bound valid in all 179 frames
+AUDIT 15 brakingLead         replay difference 3.6e-15; outside shared domain 0/320; ego bound available 320, not containing truth 0; target bound available 304, not containing truth 0 (position 0)
+VALID 15 brakingLead         ego bound valid in all 320 frames
+AUDIT 15 crossing            replay difference 3.6e-15; outside shared domain 0/203; ego bound available 203, not containing truth 0; target bound available 96, not containing truth 0 (position 0)
+VALID 15 crossing            ego bound valid in all 203 frames
+AUDIT 15 turningCrossing     replay difference 3.6e-15; outside shared domain 0/219; ego bound available 219, not containing truth 0; target bound available 190, not containing truth 0 (position 0)
+VALID 15 turningCrossing     ego bound valid in all 219 frames
+AUDIT 15 curvedHeadOn        replay difference 5.3e-15; outside shared domain 0/1298; ego bound available 1298, not containing truth 0; target bound available 170, not containing truth 0 (position 0)
+VALID 15 curvedHeadOn        ego bound valid in all 1298 frames
+AUDIT 15 curvedCrossing      replay difference 3.6e-15; outside shared domain 0/230; ego bound available 230, not containing truth 0; target bound available 106, not containing truth 0 (position 0)
+VALID 15 curvedCrossing      ego bound valid in all 230 frames

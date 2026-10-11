@@ -445,7 +445,7 @@ no cost-to-go rollouts or finite-difference curvature calculations. This
 quadratic is locally justified, not a global nonlinear CLF; positive slack can
 remain necessary away from cruise even without a target. The secondary minimizes
 
-    (rho + epsilon * lossLower * R(dU)) / max(V(x),1),
+    (rho + epsilon * max(lossLower,f) * R(dU)) / max(V(x),1),
     sum(xi) <= achievedPrimary + lexicographicTieTolerance * max(1, achievedPrimary),
 
 with `lexicographicTieTolerance = 1e-4` m. With a 1e-5 cap the CLF stage often
@@ -454,9 +454,20 @@ the zero-slack set is a slab only micrometres thick; 0.1 mm restored progress.
 
 `R` is the normalized squared input increment about the linearization inputs.
 At an exact optimum its effect on minimum physical CLF slack is bounded by
-`epsilon * lossLower`, where `epsilon = clfTieTolerance = 1e-4` and
-`lossLower` bounds `e'Qe` from below over the current affine error set.
-The tie vanishes at nominal behavior. It penalizes neither absolute zero input
+`epsilon * max(lossLower,f)`, where `epsilon = clfTieTolerance = 1e-4` and
+`lossLower` bounds `e'Qe` from below over the current affine error set
+(`Q` built from the CLF error scales). The floor `f` is one error-scale unit
+when the anchor is the previous accepted plan, and 0 on a fresh rollout. Only
+the first successor enters the CLF row, so near the path the tie is what keeps
+the plan's later inputs, which the next sample inherits. While it vanished
+there, the solver returned them anywhere in the trust box; the plan, and with
+it the next sample's anchor, wandered between samples, and the 15 m/s cruise
+oscillated (speed error down to -0.14 m/s, with recurring CLF slack). Which
+point the solver returned had depended on rows that never bind, and leaving
+those rows out exposed it. A fresh rollout is only a search seed: a floored tie
+on it held the 15 m/s accelerating head-on's first solution so close to the
+seed that no step was accepted (`report/SOLVER_TOLERANCE_20261011.tex`). It
+penalizes neither absolute zero input
 nor deviation from the construction feedback. PCBF priority is retained;
 CLF minimization has this explicit bounded tie allowance. A zero primary
 result still runs the CLF stage. The componentwise input boxes imply `R <= 1`,
@@ -466,8 +477,8 @@ these are conic QPs rather than linearly constrained QPs. State variables remain
 explicit to preserve dynamic sparsity.
 
 The compiled adapter seeks the configured constraint/optimality precision.
-Its reduced-accuracy termination uses the existing `feasibilityTolerance`
-(default 1e-5) for primal/dual residuals and absolute/relative objective gap.
+Its reduced-accuracy termination uses `solver.reducedTolerance` (default 1e-4)
+for primal/dual residuals and absolute/relative objective gap.
 Flags 1 and 2 distinguish full and reduced-accuracy convergence. Numerical
 acceptance error is additional to the analytic lexicographic tie bounds.
 Infeasibility rays, time-limit iterates and unresolved numerical failures return

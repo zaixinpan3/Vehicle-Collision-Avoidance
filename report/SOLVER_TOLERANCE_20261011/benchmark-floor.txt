@@ -1,0 +1,15 @@
+headOn              8 m/s: recovered    onset   40.1 ms, after: median   5.9 p95   14.6 max   27.3 ms, >50ms   0 frames, horizon median   8 max  25
+acceleratingHeadOn  8 m/s: recovered    onset   21.8 ms, after: median   5.8 p95   13.5 max   33.9 ms, >50ms   0 frames, horizon median   8 max  28
+brakingLead         8 m/s: recovered    onset   21.1 ms, after: median  12.8 p95   22.8 max   33.3 ms, >50ms   0 frames, horizon median   8 max  27
+crossing            8 m/s: recovered    onset   18.7 ms, after: median   4.8 p95   15.9 max   32.2 ms, >50ms   0 frames, horizon median   8 max  33
+turningCrossing     8 m/s: noSolution   onset   39.9 ms, after: median  12.9 p95   21.3 max   53.8 ms, >50ms   1 frames, horizon median  12 max  24
+curvedHeadOn        8 m/s: recovered    onset   30.8 ms, after: median   5.8 p95   13.4 max   21.0 ms, >50ms   0 frames, horizon median   8 max  32
+curvedCrossing      8 m/s: recovered    onset   19.4 ms, after: median   5.8 p95   12.9 max   18.9 ms, >50ms   0 frames, horizon median   8 max  32
+headOn             15 m/s: recovered    onset   18.6 ms, after: median   6.5 p95   14.8 max   23.1 ms, >50ms   0 frames, horizon median  16 max  38
+acceleratingHeadOn 15 m/s: recovered    onset   21.2 ms, after: median   6.5 p95   15.0 max   23.2 ms, >50ms   0 frames, horizon median  16 max  42
+brakingLead        15 m/s: notRecovered onset   33.6 ms, after: median  19.2 p95   22.8 max   25.3 ms, >50ms   0 frames, horizon median  16 max  55
+crossing           15 m/s: recovered    onset   28.3 ms, after: median   7.0 p95   18.5 max   19.9 ms, >50ms   0 frames, horizon median  18 max  65
+turningCrossing    15 m/s: recovered    onset   26.6 ms, after: median   9.4 p95   18.4 max   23.8 ms, >50ms   0 frames, horizon median  24 max  64
+curvedHeadOn       15 m/s: recovered    onset   22.1 ms, after: median   6.9 p95   14.8 max   21.4 ms, >50ms   0 frames, horizon median  16 max  48
+curvedCrossing     15 m/s: recovered    onset   26.6 ms, after: median   7.1 p95   18.3 max   22.8 ms, >50ms   0 frames, horizon median  16 max  61
+cold start 925 ms (warm-up 1487 ms); recovered 12 of 14; onset median 24.3 max 40.1 ms; all frames median 6.5 p95 20.8 p99 23.7 max 53.8 ms; 1 of 3249 frames over 50 ms

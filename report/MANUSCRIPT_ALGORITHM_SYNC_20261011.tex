@@ -1,0 +1,162 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Synchronizing the manuscript with ea88059}
+\date{Prepared October 11, 2026}
+\begin{document}
+\maketitle
+
+\section{Question}
+The manuscript \path{paper/manuscript.tex} described the controller of
+October 5 (\texttt{d1c31d6}): a separating, road-recoverable terminal set
+that was not invariant, a CLF certified only for the linearized model with
+its gain discarded, a solution issued directly, and 82 of 84 noisy
+encounters recovered. Since then the controller changed in eleven commits
+(\texttt{68883d2} to \texttt{ea88059}): the issued plan is the nonlinear
+rollout of an accepted step; the terminal set is the braking continuation of
+both vehicles, holding only mild endpoints, with the obstacle's braking
+ending at rest; the vehicle model has a kinematic regime below 4~m/s so that
+it can stop; the cruise law $u=u^*+Ke$ is certified with the CLF on the
+sampled nonlinear model; and the problem is assembled about twice as fast
+with looser solver tolerances. The user asked for the paper to be brought in
+line with the algorithm.
+
+\section{What was read}
+The manuscript line by line; the commit history since \texttt{4ccf41f};
+\path{controller/PCBF_CLF_ARCHITECTURE.md}, \path{controller/TERMINAL_SAFE_SET.md},
+\path{controller/NOMINAL_CLF.md}, \path{controller/CONTROLLER_FILES.md};
+\path{controller/solvePredictiveControl.m}, \path{controller/terminalSafeSet.m},
+\path{controller/nonlinearBicycleModel.m}, \path{controller/collisionAvoidanceController.m},
+the target forecast of \path{controller/predictiveSafetyGeometry.m},
+\path{config/collisionAvoidanceControllerConfig.m}, \path{config/clfMatrices.json}
+and the header of \path{scripts/synthesizeClfMatrices.m}; the reports of
+October 11 (\path{BRAKING_TERMINAL_SET_20261011.tex},
+\path{TARGET_STOP_AT_REST_20261011.tex}, \path{MILD_TERMINAL_SET_20261011.tex},
+\path{LOW_SPEED_MODEL_20261011.tex}, \path{CONTROLLER_SPEED_20261011.tex}) and the
+index; and the estimator document changes since \texttt{d1c31d6}, which are
+consolidations and notes without algorithm changes. Statements taken from
+the documents were checked against the code where they enter the manuscript.
+
+\section{Manuscript changes}
+\begin{itemize}
+\item Abstract, contributions and the boundary paragraph of the
+  introduction, the architecture paragraph of Section II and the
+  safety-argument subsection: the terminal set from the obstacle's model,
+  the issued plan as a rollout, recursive feasibility proved on the declared
+  model and measured with the estimator, the cruise law certified on the
+  sampled nonlinear model, 74 of 84.
+\item Section II: the tire model is used above 4~m/s; braking of the
+  obstacle ends at rest. Section IV-C: the force-balance premise is the Fiala
+  model, which the plant follows exactly above 4~m/s only.
+\item Section V, rewritten: the low-speed regime of the prediction model
+  (kinematic bicycle, blend, exact rest) and the obstacle forecast with rest;
+  the anchor (startup and onset rollouts, the shifted issued plan and its
+  extension by cruise, guidance and braking holds); collision rows
+  unchanged; the handling rows' speed limits; the terminal set with the
+  terminal law, mildness, Assumption~3, the closed-form continuation, the
+  parked check and Proposition~1 (invariance); the CLF with the ray-average
+  identity, the zonotope enclosure, the LMI with Petersen's lemma, the
+  self-consistent growth and the enclosure hypothesis; the enclosure use with
+  the terminal widening; the two programs with the tolerances, the trust
+  expansion, the fresh rollout and the step-size rule; Proposition~2
+  (recursive feasibility under H1--H3); the trust scale from the full step's
+  remainder; the scope; and the computation measures that leave the problem
+  unchanged. The separating proposition, the road-recovery cone and the
+  innovation split are removed.
+\item Section VI: the parameter table (kinematic regime, $a_b$, $a_m$,
+  certification box and input bound, solver tolerances; the retired
+  $v_{\rm sep}$, $c_{\rm rec}$, $R_V$, $c_V$, $v_f$ removed); the certified sets
+  and contractions; the plant's low-speed regime; the outcomes table and the
+  figure for the new campaign; a new subsection on the shifted plan and the
+  terminal set in the loop; the estimation audit of the new campaign; the ten
+  failures with a table of the published obstacle parameters; computation.
+\item Discussion and conclusion rewritten; the AI-assistance disclosure
+  extended.
+\item Four references added: Chen et al.\ (2021, backup CBFs), Petersen
+  (1987), Chisci et al.\ (2001), Mayne et al.\ (2005).
+\end{itemize}
+
+\section{Sources of the numbers}
+No controller simulation and no unit test was run for this revision.
+\begin{itemize}
+\item The campaign is the reference arm of a solver-tolerance study that the
+  user was running in another session on October 11 (raw outputs under
+  \path{~/.cache/collisionAvoidance/solver_tolerance_20261011/out-ref}, a
+  \texttt{git archive} of \texttt{ea88059} with a solver link, verified
+  identical to the commit's \path{config}, \path{controller}, \path{estimator}
+  and \path{scripts}). Its 98 runs reproduce the committed campaign of
+  \path{CONTROLLER_SPEED_20261011/campaign-runs.csv} in outcome, frame count,
+  least clearance, largest lateral deviation and recovery time, run for run.
+  Six MATLAB sessions shared the machine; the timings quoted are those of
+  this rerun, so that the figure and the statistics come from one record.
+\item Outcomes, gaps, road margins, recovery times, extremes, horizon
+  statistics, accepted steps, shifted-candidate feasibility, extension
+  counts, continuation ends, primary optima, CLF decrease counts, estimation
+  errors and target-parameter errors: derived from the traces by
+  \path{MANUSCRIPT_ALGORITHM_SYNC_20261011/deriveClosedLoopStatistics.py}
+  (output \path{closed-loop-statistics.json}). The CLF counts restrict the
+  pairs to $V>10^{-3}$ and to samples whose full step was accepted. The
+  cruise statistics of the exact 15~m/s curved head-on (speed error, lateral
+  offset, slack frames between 20 and 50~s) and the forecast displacements of
+  the failure table were computed from the same traces with session scripts
+  that reproduce the target forecast of \texttt{predictTarget}.
+\item Estimator audit: \path{scripts/replayEstimatorValidity.m} of
+  \texttt{ea88059} on the seed-20261003 runs, through
+  \path{MANUSCRIPT_ALGORITHM_SYNC_20261011/auditEstimatorInLoop.m}; output
+  \path{estimator-audit-seed20261003.json} and \path{.txt}. 4001 frames, ego
+  bound valid and containing the truth in all, target bound available in
+  2018 and containing the truth in all, no frame outside the sideslip cone or
+  the adhesion condition, replay difference at most $5\cdot10^{-15}$.
+\item Certified sets, contractions, hold factors and the sampled check:
+  \path{config/clfMatrices.json} (entries of October 10, certificate seed
+  20261010).
+\item The benchmark with a target that appears, the previous
+  implementation's timings, the tolerance study and the offline re-solves of
+  four failing samples: \path{CONTROLLER_SPEED_20261011.tex}.
+\item The kinematic comparison of the October 5 estimator (heading errors
+  0.07--0.31~rad, five of fourteen recovered): \path{JOINT_DESIGN_20261005.tex},
+  quoted as a result on the controller of that date.
+\item The full-horizon target tube measurement (31 of 84, one collision):
+  \path{TARGET_PARAMETER_SET_20261008.tex}; the set-membership enclosure of
+  the obstacle's constants mentioned in the discussion: the same report.
+\item Figure \path{closed_loop_results_v03}:
+  \path{MANUSCRIPT_ALGORITHM_SYNC_20261011/figure-sources/closed_loop_results_v03.py}.
+\end{itemize}
+
+\section{Documentation changes}
+\path{paper/README.md} and \path{report/README.md} (this entry). No
+executable statement and no controller document was changed.
+
+\section{Open items for review}
+\begin{itemize}
+\item Section III-B (road-curb extraction) describes the offline
+  curb-detection experiment that was removed from the repository on
+  October 6, 2026 at the user's direction; its figure cannot be regenerated
+  from the repository. Whether the subsection stays is the user's decision;
+  it was left unchanged here.
+\item The working tree held uncommitted changes of a concurrent session
+  (a floor on the tie term's weight in \path{solvePredictiveControl.m}, the
+  solver-tolerance study \path{SOLVER_TOLERANCE_20261011}, and edits to the
+  controller documents and configuration). The manuscript describes
+  \texttt{ea88059}; the explanation offered in Sections VI-D and VII for the
+  CLF increases at 15~m/s on the curve (the tie term's weight vanishes at
+  the path) follows from the design as written and agrees with that
+  session's finding, but the remedy it mentions was not evaluated for the
+  manuscript.
+\item The derivations of Section V restate the repository documents and
+  code; the proofs of the two propositions and the Petersen form of the LMI
+  have not been independently reviewed. Assumption~3 is the user's modeling
+  assumption and carries no mismatch bound.
+\item The bibliographic data of the four added references should be checked
+  against the publishers' records.
+\item The estimator-alone comparison (Sections VI-A and VI-B) was not rerun.
+\item The timings are those of six runs sharing the machine; the
+  lighter-load benchmark quoted alongside is from the speed report.
+\item The architecture drawing still labels the road-boundary branch ``not
+  yet used''; the caption says so.
+\item Section VI-F quotes the offline re-solves of four failing samples from
+  the speed report; the remaining six failing samples were not re-solved.
+\end{itemize}
+\end{document}

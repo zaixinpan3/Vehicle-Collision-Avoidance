@@ -369,6 +369,9 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
     if nargin<5 || isempty(problem)
         wall=tic;[problem,model]=localFormulate(anchor,model);formulationSeconds=toc(wall);
         model.linearization=anchor;
+        % The next sample inherits this plan's later inputs only when the
+        % anchor is the previous accepted plan (localAddClf).
+        problem.inheritedAnchor=initialization=="shiftedInputRollout";
     else
         problem=localInputBounds(problem,model);
     end
@@ -1034,7 +1037,15 @@ function problem=localAddClf(problem,anchor,model)
     e0=nonlinearBicycleModel.errorLinearization(model.initialState,model.lane,model.nominalReference);
     scales=[model.cfg.clf.lateralPositionErrorScale;model.cfg.clf.headingErrorScale; ...
         model.cfg.clf.speedErrorScale;model.cfg.clf.lateralVelocityErrorScale;model.cfg.clf.yawRateErrorScale];
-    lossLower=norm(e0./scales)^2;
+    % On the previous accepted plan the tie's loss is at least one unit of
+    % the CLF error scales. Only the first successor enters the CLF row, so
+    % near the path the row and the constraints leave the later inputs free,
+    % and the tie is what keeps them. A tie that vanished there left them
+    % anywhere in the trust box: the plan, and the next sample's anchor,
+    % wandered between samples, and at 15 m/s the cruise oscillated. A fresh
+    % rollout is only a search seed, and the tie is not floored on it
+    % (report/SOLVER_TOLERANCE_20261011.tex).
+    lossLower=max(double(problem.inheritedAnchor),norm(e0./scales)^2);
     % The CLF is a soft performance row on the estimate: V(xhat+) <= rho
     % V(xhat). Estimation error enters it as an input (ISS); it carries no
     % observer enclosure. A worst case over the enclosure would ask for a

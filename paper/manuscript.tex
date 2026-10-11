@@ -78,19 +78,30 @@ nonlinear rollout per sample and solves two second-order cone programs:
 the first minimizes the relaxation of sampled collision constraints
 written with fixed distance-dual multipliers, the second minimizes the
 violation of a decrease condition on one quadratic control-Lyapunov
-function. Road edges, a rear-tire adhesion envelope and the estimator's
-sideslip cone are constraints, the horizon ends where the plan separates
-from the obstacle and can remain on the road, and the estimator's
-enclosure tightens the constraints of each hold. In fourteen
-collision-threat encounters with exact states, all runs end
+function, certified for a cruise law on the sampled nonlinear model.
+The horizon ends in a terminal set built from the obstacle's own motion
+model: past the endpoint the obstacle keeps its forecast and the ego
+brakes to rest with its steering held, and the endpoint is terminal
+when that joint continuation, exact in closed form, stays on the road
+and clears the obstacle until it leaves the perception range. The set
+is forward invariant under the braking law, the issued plan is the
+nonlinear rollout of an accepted step of the convex solution, and on
+the declared model with exact information the plan of one sample
+shifted by one hold is feasible at the next. Road edges, a rear-tire
+adhesion envelope and the estimator's sideslip cone are constraints,
+and the estimator's enclosure tightens the constraints of each hold. In
+fourteen collision-threat encounters with exact states, all runs end
 collision-free on the road with cruise recovered; with the estimator and
-bounded sensor noise, 82 of 84 runs do so and two stop without a solved
-command; none collides or leaves the road. The paper states which links
-of the safety argument are certified, which are measured, and which
-remain open: the estimation certificate is continuous-time, the
-constraints act on a sampled affine prediction, and the closed-loop
-collision-avoidance and recursive-feasibility certificates for the
-nonlinear vehicle are not yet established.
+bounded sensor noise, 74 of 84 runs do so and ten stop without a solved
+command, mostly within two seconds of the start, where the published
+course and curvature of the obstacle still place its forecast meters
+from its motion; none collides or leaves the road. The paper states
+which links of the safety argument are certified, which are measured,
+and which remain open: the estimation certificate is continuous-time,
+recursive feasibility is proved without estimation error and measured
+with it, the control-Lyapunov certificate rests on a sampled enclosure
+of the model's Jacobians, and separation between the constrained
+instants is measured, not proved.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -237,27 +248,35 @@ rollout per sample and solves two second-order cone programs in strict
 priority order: the relaxation of predictive collision constraints with
 fixed distance-dual multipliers \cite{LiZhangGuoLenzoGuo2023} first,
 and the violation of a decrease condition on one quadratic
-control-Lyapunov function second. Road edges, a rear-tire adhesion
-envelope and the estimator's sideslip cone are its constraints, its
-horizon ends where the plan separates from the obstacle and can remain
-on the road, and the estimator's enclosure tightens the constraints of
-every hold (Section~\ref{sec:control}).
+control-Lyapunov function second, whose cruise law is certified on the
+sampled nonlinear model. Its horizon ends in a terminal set built from
+the obstacle's own motion model and one braking law of the ego, which
+is forward invariant and makes the problem recursively feasible on the
+declared model; the issued plan is the nonlinear rollout of an accepted
+step of the convex solution. Road edges, a rear-tire adhesion envelope
+and the estimator's sideslip cone are its constraints, and the
+estimator's enclosure tightens the constraints of every hold
+(Section~\ref{sec:control}).
 \item A closed-loop evaluation of the system in fourteen
 collision-threat encounters with exact states and with the estimator
 and bounded sensor noise for six noise seeds
 (Section~\ref{sec:results}).
 \end{enumerate}
 The ordering of the two programs resembles the predictive barrier
-construction of \cite{WabersichZeilinger2023}, and the scheme follows
-the real-time-iteration idea of \cite{DiehlBockSchloder2005}. The paper
-separates throughout what is certified from what is measured. The
-estimation certificate and the propagation of its enclosure into the
-constraints of the first hold are proved; the constraints act on a
-sampled affine prediction, the terminal condition is not invariant, and
-the closed-loop collision-avoidance and recursive-feasibility
-certificates for the nonlinear vehicle, which the system is built to
-admit, are not yet established. Section~\ref{sec:overview} states this
-boundary once, and the later sections refer to it.
+construction of \cite{WabersichZeilinger2023}, the terminal set is a
+backup set in the sense of \cite{ChenJankovicSantilloAmes2021}, and the
+scheme follows the real-time-iteration idea of
+\cite{DiehlBockSchloder2005}. The paper separates throughout what is
+certified from what is measured. The estimation certificate, the
+propagation of its enclosure into the constraints of the first hold,
+the invariance of the terminal set and the recursive feasibility of the
+problem on the declared sampled model with exact information are
+proved; the cruise law's decrease is certified conditional on a sampled
+enclosure of the model's Jacobians; the same chain under estimation
+error, model mismatch and changing forecasts, and the separation of the
+vehicles between the sampled instants, are measured, not proved.
+Section~\ref{sec:overview} states this boundary once, and the later
+sections refer to it.
 
 \section{System Overview}
 \label{sec:overview}
@@ -371,8 +390,10 @@ forces are
     \end{gathered}
     \label{eq:tire_forces}
 \end{equation}
-The model is used on the forward-speed domain
-$v_{x,E}>v_{\rm f}>0$. For axle \(i\in\{f,r\}\), let \(t=\tan\alpha\), \(C_i>0\) be its
+The tire model is used above a speed of 4\,m/s; below it the
+controller's prediction model blends into a kinematic bicycle, so that
+the vehicle can come to rest (Section~\ref{subsec:predictionModel}).
+For axle \(i\in\{f,r\}\), let \(t=\tan\alpha\), \(C_i>0\) be its
 nominal cornering stiffness, and \(Q_i=\eta_i\mu_iF_{zi}\). Following
 \cite[Sec.~II-A, eqs.~(7), (11) and (13)]{FahmyGhanyBaumann2018},
 \begin{equation}
@@ -417,7 +438,8 @@ Fig.~\ref{fig:ego_obstacle_frames} are
 The obstacle vehicle has its own unobserved inputs. The tracker of
 Section~\ref{subsec:targetTracker} and the obstacle prediction of
 Section~\ref{subsec:predictionModel} both use the constant-acceleration,
-constant-sideslip motion model of \cite{SharmaAlaiRajamani2026}.
+constant-sideslip motion model of \cite{SharmaAlaiRajamani2026}; in the
+prediction, braking ends at rest.
 
 \begin{figure*}[!t]
     \centering
@@ -461,8 +483,9 @@ lateral clearances, the road edges. At each sampling instant, the
 controller linearizes the vehicle model along a nonlinear rollout. It
 builds the collision constraints from the obstacle estimate and the
 control-Lyapunov function from the reference path and the prescribed
-speed, solves two convex programs in strict priority order, and issues
-the steering and longitudinal actuation commands of the second. The
+speed, solves two convex programs in strict priority order, rolls their
+solution out through the nonlinear model, and issues the first steering
+and longitudinal actuation commands of that rollout. The
 perception module is developed and tested separately on simulated camera
 and LiDAR captures; in the closed-loop trials the relative-position
 measurement is synthetic with bounded noise, and the perceived
@@ -495,18 +518,27 @@ one model serves both. Their present status differs. Statement (ii) is
 proved for the continuous-time observer under the declared bounds, and
 the truth audit of Section~\ref{subsec:loopEstimation} found no violated
 enclosure. Statement (iii) is enforced on the estimate and the affine
-prediction, not on the true motion; in the audit the sideslip cone held
-in every frame and the adhesion condition was exceeded in three frames
-by at most 0.7\%. Statement (iv) is proved for the affine
-prediction at the constrained instants of the first hold; between those
-instants and for the nonlinear vehicle it is measured, not proved
+prediction and checked on the issued plan; in the audit the true motion
+stayed inside the sideslip cone and below the adhesion condition in
+every sample. Statement (iv) holds on the declared sampled model at the
+constrained instants: the issued plan is a rollout of that model which
+clears the obstacle at every node and mid-hold point beyond the primary
+holds, by a margin tightened with the enclosure where one is supplied
+(Lemma~\ref{lem:dualRows}, Section~\ref{subsec:program}); between those
+instants and for the vehicle it is measured, not proved
 (Section~\ref{subsec:scope}). Statement (i) is a declared bound: the
 perception pipeline has been tested on simulated captures but is not yet
 in the closed loop, and its measured errors exceed the bound assumed in
-the estimator trials. Statement (v) is not established: the terminal set
-of Section~\ref{subsec:terminal} is not invariant, and every sample
-re-solves its problem. Statement (vi) is certified for the linearized
-model near cruise and measured for the vehicle. The results of
+the estimator trials. Statement (v) is proved on the declared model
+with exact information for the duration of an encounter
+(Proposition~\ref{prop:recursive}): the terminal set of
+Section~\ref{subsec:terminal} is forward invariant under its braking
+law, and the shifted plan is a feasible candidate at the next sample.
+With the estimator in the loop it is measured: the shifted plan was
+feasible at 99.8\% of the samples. Statement (vi) is certified for the
+cruise law on the sampled nonlinear model within its certified set,
+conditional on a sampled enclosure of the model's Jacobians, and
+measured for the inputs the programs issue. The results of
 Section~\ref{sec:results} are the measured part of this argument; the
 proved part is stated with its premises where it appears.
 
@@ -1012,7 +1044,12 @@ keeps the rear tire below saturation and the motion inside the cone
 The same interval, divided by the speed interval, replaces
 $\hat\beta\pm\bar e_\beta$ in the course correspondence of
 Lemma~\ref{lem:course}. Without the model or a held input, the kinematic
-measurement of Section~\ref{subsec:egoObserver} is used unchanged.
+measurement of Section~\ref{subsec:egoObserver} is used unchanged. The
+premise is the Fiala model: the plant of Section~\ref{sec:results}
+follows it exactly above 4\,m/s and blends toward a kinematic bicycle
+below (Section~\ref{subsec:predictionModel}), where the inversion is a
+model of the vehicle only approximately; ten of the 84 estimated-state
+runs slow into that range, to 3.2\,m/s at the least.
 
 \subsection{Covariant Target Tracker}
 \label{subsec:targetTracker}
@@ -1448,12 +1485,18 @@ Every sample builds one nonlinear rollout, linearizes the vehicle model
 along it, and solves two convex programs on that affine model. The first
 minimizes the relaxation of the sampled collision constraints. The
 second keeps that relaxation and minimizes the violation of a
-control-Lyapunov decrease condition, and its first input is applied. No
-maneuver template is prescribed and no backup command exists; the same
-programs are solved during avoidance and during the return to cruise.
-The controller acts on the estimates of Section~\ref{sec:estimator} and
-tightens its constraints by their current enclosures. The obstacle
-vehicle of this section is the target of that section.
+control-Lyapunov decrease condition. The affine solution is a search
+direction: the issued plan is the nonlinear rollout of the largest
+acceptable step along it, and the first input of that plan is applied.
+The horizon ends in a terminal set that is forward invariant under one
+braking law, so that on the declared model with exact information the
+plan of one sample, shifted by one hold, is an acceptable plan at the
+next. No maneuver template is prescribed and no backup command exists;
+the same programs are solved during avoidance and during the return to
+cruise. The controller acts on the estimates of
+Section~\ref{sec:estimator} and tightens its constraints by their
+current enclosures. The obstacle vehicle of this section is the target
+of that section.
 
 \subsection{Prediction Model}
 \label{subsec:predictionModel}
@@ -1468,8 +1511,39 @@ section. The controller state and input are
 the inertial pose, the body velocities and the yaw rate $r=\dot\psi$,
 and the front steering angle and signed longitudinal force ratio.
 Equations \eqref{eq:position_kinematics}--\eqref{eq:fiala_force} define
-$\dot{\bm x}=f(\bm x,\bm u)$ for $v_x>v_{\rm f}$ and $|\beta|\leq1$.
-Passive flat-road load in still air is
+$\dot{\bm x}=f(\bm x,\bm u)$ above the speed $v_2=4$\,m/s. Below
+$v_1=2.5$\,m/s the body accelerations are those of a kinematic bicycle,
+\begin{equation}
+    \begin{gathered}
+    m_E\dot v_x=\bigl[\beta_++\beta_-\tanh(v_x/v_{\rm h})\bigr]
+        \bigl(\mu_fF_{zf}\cos\delta_F+\mu_rF_{zr}\bigr)\\
+        \qquad{}-F_R(v_x)+m_Ev_yr,\\
+    \dot v_y=\frac{l_{r,E}r_{\rm k}-v_y}{T_{\rm k}},\qquad
+    \dot r=\frac{r_{\rm k}-r}{T_{\rm k}},\qquad
+    r_{\rm k}=\frac{v_x\tan\delta_F}{L},
+    \end{gathered}
+    \label{eq:kinematic_model}
+\end{equation}
+with $\beta_+=\max(\beta,0)$, $\beta_-=\min(\beta,0)$, a brake-hold speed
+$v_{\rm h}$ and a lag $T_{\rm k}$: the yaw rate and the lateral velocity
+relax to their kinematic values, which is a rear axle without slip; the
+longitudinal force is the force ratio times the axle capacities; and
+braking fades below $v_{\rm h}$, so that it ends at rest and never
+reverses the vehicle, while driving moves it off from rest. Between
+$v_1$ and $v_2$ the body accelerations of the two models are blended
+with the weight $\lambda=s^2(3-2s)$, $s=(v_x-v_1)/(v_2-v_1)$; position
+and heading follow the body velocities in all three regimes. A braked
+vehicle slower than $v_{\rm h}/5$ at the end of a hold is taken to be at
+rest exactly, with zero body velocities and zero sensitivities: the
+vanishing tail of the fading brake, with coefficients of $10^{-4}$ to
+$10^{-7}$, had left the second program without a numerical result while
+the vehicle crept to a stop. Above $v_2$ the model is the Fiala bicycle
+exactly, so the certificates of Section~\ref{subsec:clf}, computed at 8
+and 15\,m/s, do not see the low-speed regime. The low-speed regime
+exists so that the vehicle can stop: the terminal set of
+Section~\ref{subsec:terminal} contains stops, and a model that ended at
+the tire's 1\,m/s floor could not reach them. Passive flat-road load in
+still air is
 \begin{equation}
     \begin{split}
     F_R(v)={}&\tfrac12\rho_{\rm air}C_dA_fv|v|\\
@@ -1514,28 +1588,33 @@ $c_{\rm R},c_{\rm L}>0$ to the right and left of the path.
 
 The obstacle keeps the constant scalar acceleration $A_C$ and constant
 sideslip $\beta_C$ of the tracker model of
-Section~\ref{subsec:targetTracker}, written in inertial coordinates.
-With the curvature $\kappa_C=\sin\beta_C/l_{r,C}$ of that model, arc
-length $s(t)=V_{C,0}t+\tfrac12A_Ct^2$ and
+Section~\ref{subsec:targetTracker}, written in inertial coordinates,
+with braking that ends at rest. With the curvature
+$\kappa_C=\sin\beta_C/l_{r,C}$ of that model, the speed
+$V_C(t)=\max(0,V_{C,0}+A_Ct)$, the arc length $s(t)$ its integral, and
 $\vartheta(t)=\tfrac12\kappa_Cs(t)$,
 \begin{equation}
     \begin{aligned}
     \bm p_C(t)&=\bm p_{C,0}+s\,\frac{\sin\vartheta}{\vartheta}
         \begin{bmatrix}\cos(\psi_{C,0}+\beta_C+\vartheta)\\
         \sin(\psi_{C,0}+\beta_C+\vartheta)\end{bmatrix},\\
-    \psi_C(t)&=\psi_{C,0}+\kappa_Cs,\qquad V_C(t)=V_{C,0}+A_Ct,
+    \psi_C(t)&=\psi_{C,0}+\kappa_Cs,
     \end{aligned}
     \label{eq:target_flow}
 \end{equation}
 with $\sin\vartheta/\vartheta=1$ at $\vartheta=0$. No quadrature is
-needed, and the yaw rate $\kappa_CV_C(t)$ varies with speed. The flow is
-not clipped at zero speed. Every new estimate replaces the obstacle
-state and the parameters $A_C$ and $\beta_C$; they are constant within
-one prediction and may change at the next sample. When no estimate
-arrives, the last prediction is continued. The obstacle is perceived
-only within the range $R_{\rm enc}$, and collision constraints are
-imposed at the prediction nodes at which the two reference points are
-closer than $R_{\rm enc}$, including after a later re-entry.
+needed, and the yaw rate $\kappa_CV_C(t)$ varies with speed. A braking
+obstacle stops at the arc length $-V_{C,0}^2/(2A_C)$ and stays there,
+with $A_C$ then zero; an obstacle at rest moves off only forward. Every
+new estimate replaces the obstacle state and the parameters $A_C$ and
+$\beta_C$; the forecast runs forward from the latest estimate and the
+sample at which it was taken, because a stop cannot be run backward,
+and the parameters are constant within one prediction and may change at
+the next sample. When no estimate arrives, the last forecast is
+continued. The obstacle is perceived only within the range $R_{\rm enc}$,
+and collision constraints are imposed at the prediction nodes at which
+the two reference points are closer than $R_{\rm enc}$, including after
+a later re-entry.
 
 An anchor trajectory $(\bar{\bm x}_i,\bar{\bm u}_i)$, $i=0,\ldots,M$,
 with $\bar{\bm x}_0$ the supplied estimate and
@@ -1557,29 +1636,47 @@ $B_i=D_uF(\bar{\bm x}_i,\bar{\bm u}_i)$, the shared model is
 The trust boxes limit the correction of one solve; they are not
 certified bounds on the linearization remainder. The scale
 $\sigma\in[\sigma_{\min},1]$ of the input box is estimated online
-(Section~\ref{subsec:trust}) and starts at $\sigma_0$. The force ratio obeys its actuator
-interval, and the body velocities $v_x$, $v_y$ and $r$ obey box bounds
-at the nodes and mid-hold points. The steering angle has neither a
-magnitude nor a rate bound.
+(Section~\ref{subsec:trust}) and starts at $\sigma_0$. The force ratio
+obeys its actuator interval, and the body velocities $v_x$, $v_y$ and $r$
+obey box bounds at the nodes and mid-hold points, with $v_x\geq0$. The
+steering angle has neither a magnitude nor a rate bound.
 
 The horizon length $M$ is not fixed. It has $N$ primary holds, on which
-collision constraints may be relaxed, and the anchor rollout is continued
-until its first node $M\geq N$ that lies in the terminal set of
-Section~\ref{subsec:terminal} with a margin, or to a largest length
-$M_{\max}$.
+collision constraints may be relaxed, and it ends at the first node
+$M\geq N$ of the anchor that lies in the terminal set $\mathcal X_f$ of
+Section~\ref{subsec:terminal}, or at a largest length $M_{\max}$ when
+the anchor never reaches it.
 
-\subsection{Initialization}
+\subsection{The Anchor}
 \label{subsec:initialization}
 
-When the previous sample returned a plan, its inputs are shifted by one
-hold and rolled out through $F$ from the new estimate; beyond the end of
-the shifted plan the rollout continues under the path-guidance law
-$\bm\pi$ below until the horizon ends. Predicted states of the previous
-affine solution are never reused as the anchor. At the first sample, and
-once more in a sample whose shifted problem is infeasible
-(Section~\ref{subsec:program}), a fresh anchor is rolled out under a
-guidance feedback: $\bm\pi$ without an obstacle, and a potential-field
-guidance with one.
+The anchor of the first sample, and of a sample at which an obstacle
+appears that the previous plan did not know of, is a rollout under a
+guidance feedback: the path-guidance law $\bm\pi$ below without an
+obstacle, and a potential-field guidance with one. It is stopped at its
+first node $M\geq N$ in $\mathcal X_f$, or at $M_{\max}$. Every later
+sample starts from the previous issued plan, which is itself a nonlinear
+rollout (Section~\ref{subsec:program}), shifted by one hold and rolled
+out again through $F$ from the new estimate; its endpoint keeps its
+absolute time, so the plan is one hold shorter. While the shifted plan is
+shorter than $N$, or its endpoint is no longer in $\mathcal X_f$ because
+the forecast or the state has changed, holds of the declared model are
+appended, each kept only when the hard rows of
+Sections~\ref{subsec:geometry}--\ref{subsec:envelope} hold on it and its
+endpoint lies in $\mathcal X_f$: first the hold of the cruise law
+$\bm u=\bm u_*+K\bm e$ of Section~\ref{subsec:clf}; if that hold takes an
+endpoint out of $\mathcal X_f$, holds of the guidance feedback through
+states outside $\mathcal X_f$ until a node in $\mathcal X_f$ is reached
+again, which lengthens the plan to complete a maneuver instead of braking
+to keep its endpoint mild; and otherwise the hold nearest to the cruise
+hold on a segment toward holding the previous steering angle, at the
+cruise force ratio first, then at the ratio whose deceleration is the
+terminal law's $a_{\rm b}$, then braking as hard as the rear adhesion
+admits, each found by bisection. When no hold keeps the endpoint in
+$\mathcal X_f$, the plan stays one hold shorter. Predicted states of the
+previous affine solution are never reused as the anchor. A fresh rollout
+is also used once in a sample whose shifted problem is infeasible
+(Section~\ref{subsec:program}).
 
 The path-guidance law steers the course toward the path through a
 lookahead law and regulates the speed through the force ratio. With
@@ -1748,14 +1845,18 @@ mid-hold rows, and the rows of later holds have none. With an enclosure,
 every hold has a slack on its tightened rows, and beyond the primary
 holds the untightened rows ($\theta_i=0$) are imposed in addition
 without slack, so that the formulation reduces to the former as the
-enclosure vanishes. The vertex rotation is retained to first order, with
-remainder at most $\tfrac12\normtwo{\bm o_j}\Delta\psi^2$. By
-Lemma~\ref{lem:dualRows}(i), rows \eqref{eq:collision_rows} with
+enclosure vanishes. Rows that no correction inside the trust boxes can
+violate are not formed, which leaves the feasible set unchanged
+(Section~\ref{subsec:computation}). The vertex rotation is retained to
+first order, with remainder at most $\tfrac12\normtwo{\bm o_j}\Delta\psi^2$.
+By Lemma~\ref{lem:dualRows}(i), rows \eqref{eq:collision_rows} with
 $\xi_i=\theta_i=0$ therefore imply
 $d\geq d_{\rm m}-\tfrac12r_E\Delta\psi_i^2$ for the affine-predicted
 pose, where $r_E=\max_j\normtwo{\bm o_j}$. With the values of
 Section~\ref{sec:results} ($r_E=2.58$\,m, $|\Delta\psi|\leq0.25$\,rad,
-$d_{\rm m}=0.20$\,m) the right side is at least $0.119$\,m.
+$d_{\rm m}=0.20$\,m) the right side is at least $0.119$\,m. The issued
+plan is checked against the exact rectangle distance at the same
+instants (Section~\ref{subsec:program}).
 
 \subsection{Road, Handling Envelope and Estimator Domain}
 \label{subsec:envelope}
@@ -1796,75 +1897,170 @@ restoring yaw moment. It is also an observability condition, because a
 saturated force no longer determines the slip and the inversion of
 \eqref{eq:force_balance} loses its information. Condition
 \eqref{eq:sideslip_cone} is the cone premise of that inversion, with
-the same $\beta_{\rm dom}$. Before these rows were added, a run with
+the same $\beta_{\rm dom}$. The adhesion cone applies at nodes whose
+anchor speed is above $v_1$, where the rear tire has a lateral force to
+saturate, and the sideslip cone above $v_{\rm h}$, where the sideslip is
+defined. Before these rows were added, a run with
 estimated states at 15\,m/s combined a steering angle of $-0.40$\,rad
 with a force ratio of $0.95$ and spun to a sideslip of 0.68\,rad.
 
 \subsection{Terminal Set}
 \label{subsec:terminal}
 
-The horizon ends where the ego separates from the obstacle and can
-remain on the road. At the last node $M$, with ego velocity
-$\bm v=R(\psi)\bm v^E$ and obstacle velocity $\dot{\bm p}_C$,
+The horizon ends where a simple continuation of both vehicles is known
+to be safe for the rest of the encounter. Past the endpoint
+$\bm z=\bm x_M$ at time $t_M$ the obstacle keeps its forecast
+\eqref{eq:target_flow}, and the ego follows one terminal law
+$\kappa_{\rm f}$: a kinematic vehicle with its steering held, braking at
+the constant rate $a_{\rm b}$ until it stops. With the steering held, a
+kinematic bicycle keeps its sideslip and its course curvature, so the
+law keeps the ego in the same constant-acceleration, constant-curvature
+family as the obstacle. With $V=\normtwo{\bm v^E}$,
+$\beta_E=\operatorname{atan2}(v_y,v_x)$ and $\kappa_E=r/V$ at $\bm z$,
+the speed is $V_j=\max(V-ja_{\rm b}T_s,0)$ at the $j$th node of the
+continuation and linear in between, so the ego stops exactly at the end
+of hold $J=\lceil V/(a_{\rm b}T_s)\rceil$; with $s(\tau)$ the arc length
+of that schedule and $\vartheta=\tfrac12\kappa_Es$,
 \begin{equation}
-    (\bm p-\bm p_C)^{\trans}(\bm v-\dot{\bm p}_C)\geq0,
-    \label{eq:terminal_separation}
+    \begin{aligned}
+    \bm p(\tau)&=\bm p+s\,\frac{\sin\vartheta}{\vartheta}
+        \begin{bmatrix}\cos(\psi+\beta_E+\vartheta)\\
+        \sin(\psi+\beta_E+\vartheta)\end{bmatrix},\\
+    \psi(\tau)&=\psi+\kappa_Es,\qquad \tau\in[0,JT_s].
+    \end{aligned}
+    \label{eq:continuation}
 \end{equation}
+The joint continuation is exact and in closed form; it agrees with an
+RK4 integration of the same kinematics to $10^{-9}$\,m. It is sampled at
+its nodes and mid-hold points, the instants at which the plan's own
+collision rows are sampled. The measured course curvature $r/V$ is held
+rather than the kinematic $\sin\beta_E/l_{r,E}$ of the obstacle model:
+that relation presumes a rear axle without slip, and for the Fiala state
+in the trim of a 4\,m/s$^2$ left turn at 15\,m/s, whose sideslip at the
+center of mass is $-0.0093$\,rad, it would continue the turn as a right
+turn.
+
+A state is \emph{mild} when its sideslip lies in the cone
+\eqref{eq:sideslip_cone} and the lateral acceleration of the held arc is
+small, $|rV|\leq a_{\rm m}$. With $a_{\rm b}=4$\,m/s$^2$ and
+$a_{\rm m}=2$\,m/s$^2$ the continuation uses 54\% of the friction
+budget $\mu g=8.3$\,m/s$^2$, and the configuration requires
+$\sqrt{a_{\rm b}^2+a_{\rm m}^2}<\mu g$. Along the continuation
+$\beta_E$ is constant and $|rV|=|\kappa_E|V^2$ only falls, so a mild
+state stays mild. An endpoint in the middle of a swerve is not mild: the
+plan has to settle before it is terminal.
+
+\begin{assumption}
+\label{asm:mild}
+In a mild state the prediction model of Section~\ref{subsec:predictionModel}
+follows the kinematic vehicle under the terminal law. No bound on the
+mismatch is computed.
+\end{assumption}
+
+This is a modeling assumption of the design, not a derived bound. It
+enters only the recursive-feasibility statement of
+Section~\ref{subsec:recursive}: every hold the controller appends to a
+plan is a hold of the prediction model whose endpoint is checked in the
+terminal set, so the implementation does not rely on it.
+
+Let $\phi^j(\bm z)$, $j\geq0$, be the joint continuation at the nodes
+and mid-hold points after $t_M$, $t_e(\bm z)$ the first of these
+instants at which the obstacle's reference point is farther than
+$R_{\rm enc}$ from the ego's ($+\infty$ if none), and $t_s(\bm z)=JT_s$
+the stop. The terminal set is
 \begin{equation}
-    \max(w_e,0)^2\leq2a_{\rm rec}d_e,\qquad e\in\{{\rm L},{\rm R}\},
-    \label{eq:road_recovery}
+    \mathcal X_f=\bigl\{\bm z\ \text{mild}:\ \text{(a), (b) and (c) hold}\bigr\},
+    \label{eq:terminal_set}
 \end{equation}
-where $w_e$ is the velocity of the center of mass toward road edge $e$
-along the path normal, $d_e$ the distance of the outermost rectangle
-vertex to that edge, and $a_{\rm rec}=c_{\rm rec}\mu g$ a declared
-lateral deceleration. Condition \eqref{eq:road_recovery} states that the
-ego can stop its lateral motion toward either edge before reaching it;
-with an epigraph variable $t_e\geq\max(w_e,0)$ it is one rotated
-second-order cone per edge. Membership in the road alone admitted
-endpoints heading toward an edge at $43^\circ$ that left the road shortly
-after the horizon. The endpoint also carries the rows
-\eqref{eq:collision_rows} and \eqref{eq:road_rows}. Row
-\eqref{eq:terminal_separation} is linearized at the anchor endpoint in
-position, heading and body velocity and divided by the anchor distance.
+where (a) every node, mid-hold pose and the parked pose of the
+continuation keeps the ego rectangle on the road; (b) every node and
+mid-hold pose before $t_e(\bm z)$ clears the forecast obstacle rectangle
+by $d_{\rm m}$; and (c) if $t_e(\bm z)>t_s(\bm z)$, the obstacle's
+remaining track until it leaves the range about the parked reference
+point, or comes to rest, clears the parked rectangle by $d_{\rm m}$.
+The first exit ends the encounter, and no property of the obstacle after
+it is used. Condition (b) at $j=0$ includes the endpoint itself, so
+$\mathcal X_f$ lies in the safe set. An enclosure, when published, widens
+$d_{\rm m}$ in (b) and (c) and the road margin in (a) by the ego position
+radius and the chord of its heading radius
+(Section~\ref{subsec:uncertainty}).
+
+Condition (c) is decided in closed form. After the stop the ego is a
+fixed rectangle and the obstacle moves along its line or circle. The arc
+lengths at which its reference point stays within $R_{\rm enc}$ of the
+parked point form one interval (a quadratic inequality on a line, an arc
+of angles on a circle, the whole circle when it lies inside the range),
+and from its position the obstacle sweeps that stretch until it leaves,
+or until it comes to rest and stays. The distance between two
+rectangles is continuous along the track and, while they are apart, is
+attained between a vertex of one and an edge of the other; since the two
+are apart at the stop, a node of (b), the least distance over the
+stretch is the least distance between a vertex path---a segment on a
+line, an arc on a circle---and an edge, over the 32 vertex--edge pairs.
+The arc-to-segment distance has three kinds of candidates: the ends of
+the arc against the segment, the ends of the segment against the arc,
+and the point of the circle nearest to the segment's line when it lies
+on both. The check also returns the obstacle pose attaining the least
+distance, the witness, which the convex program linearizes. In 2895
+random cases it was never above the least distance of a dense sampling
+of the forecast in time (spacing at most 2.4\,mm; above by at most
+$5\cdot10^{-13}$\,m from rounding) and within $3\cdot10^{-7}$\,m of it.
 
 \begin{proposition}
-\label{prop:separating}
-Suppose that for $t\geq t_M$ the relative velocity
-$\bm v_{\rm rel}=\bm v-\dot{\bm p}_C$ is constant and
-\eqref{eq:terminal_separation} holds at $t_M$. Then
-$\normtwo{\bm p(t)-\bm p_C(t)}$ is nondecreasing for $t\geq t_M$.
+\label{prop:invariance}
+Let $\bm z\in\mathcal X_f$ and let $\bm z'$ be the ego state one hold
+later under $\kappa_{\rm f}$, with the obstacle on its forecast. Then
+$\bm z'\in\mathcal X_f$, or the obstacle has left the range. No sampled
+pose of the continuation from $\bm z$ meets the obstacle before the
+exit, nor does the parked ego at any time after the stop while the
+obstacle is in range. $\mathcal X_f$ is the largest set with these
+properties for the law $\kappa_{\rm f}$.
 \end{proposition}
 
 \begin{IEEEproof}
-With $\bm\Delta=\bm p-\bm p_C$,
-$\tfrac{d}{dt}\normtwo{\bm\Delta}^2=2\bm\Delta^{\trans}\bm v_{\rm rel}$
-and
-$\tfrac{d^2}{dt^2}\normtwo{\bm\Delta}^2=2\normtwo{\bm v_{\rm rel}}^2
-\geq0$. The first derivative is nonnegative at $t_M$ and nondecreasing.
+The continuation of $\bm z'$ is the continuation of $\bm z$ shifted by
+one hold: the speed schedule from $V-a_{\rm b}T_s$ is the remainder of
+the schedule from $V$, the arc continues on the same circle with the
+same sideslip and curvature, and the forecast is evaluated at the same
+absolute times. $\bm z'$ is mild because $\beta_E$ is held and $|rV|$
+falls. Every sampled pose of the new continuation is a pose of the old
+one, so (a) holds and (b) holds up to the same exit instant; the parked
+pose and the obstacle's remaining track are the same, so (c) holds. The
+safety statements are (b) and (c) themselves. A state outside
+$\mathcal X_f$ has a continuation under $\kappa_{\rm f}$ that leaves the
+road or meets the obstacle at a sampled instant before the exit or after
+the stop, so no set that the law keeps safe contains it.
 \end{IEEEproof}
 
-The anchor rollout places the end of the horizon at its first node
-$M\geq N$ at which \eqref{eq:terminal_separation} holds with a
-separating speed of at least $v_{\rm sep}$, that is, with right side
-$v_{\rm sep}\normtwo{\bm p-\bm p_C}$, and \eqref{eq:road_recovery} holds
-with $a_{\rm rec}/2$; without an obstacle only the road condition applies.
-Neither terminal condition is then active at the anchor, which matters
-numerically: a terminal row active at the anchor stalled the cone
-solver. A rollout that never reaches such a node uses $M=M_{\max}$.
+The construction is the backup-set principle of
+\cite{ChenJankovicSantilloAmes2021}, used only to define the terminal
+set; the free holds of the plan enlarge the set of states from which the
+problem is feasible, and the ego never has to brake: the law only
+certifies that a safe continuation exists.
 
-The premise of Proposition~\ref{prop:separating} is restrictive. A
-braking lead, an obstacle whose constant sideslip turns it back, or the
-ego's own return to the path changes the relative velocity after $t_M$
-and can close the distance again; the next sample then predicts that
-encounter inside its own, longer horizon. The terminal set is therefore
-not controlled invariant, and no recursive-feasibility argument rests on
-it. Two alternatives were tried and withdrawn. An invariant cruise core
-around a freely placed straight cruise line had a radius so small that
-it acted as a terminal equality, and a requirement that the obstacle be
-beyond $R_{\rm enc}$ at the endpoint could not be met behind a braking
-lead within $M_{\max}$ holds.
+In the convex program, membership of the endpoint is imposed through the
+conditions of \eqref{eq:terminal_set} linearized at the anchor endpoint
+$\bar{\bm x}_M$ on the correction $\Delta\bm x_M$: the mildness bound
+$|rV|\leq a_{\rm m}$, linearized in speed and yaw rate where the anchor
+is within 1\,m/s$^2$ of it and keeping up to $0.1$\,m/s$^2$ of the
+margin the anchor has; fixed-multiplier rows
+\eqref{eq:collision_rows} at the nodes and mid-hold poses of the
+continuation before the exit and at the parked pose against the
+witness; and road rows \eqref{eq:road_rows} at every pose of the
+continuation; each composed with the derivative of the closed-form pose
+\eqref{eq:continuation} with respect to the endpoint state, with the
+braking schedule held. Each row keeps up to 5\,cm of the margin the
+anchor has, so that an endpoint inside $\mathcal X_f$ stays inside by that
+much and the next sample's shift survives a small departure of the plant
+or of an appended hold from the law; a row is never tighter than the
+anchor itself, so when $\bar{\bm x}_M\in\mathcal X_f$ the zero correction
+satisfies every row. Conditions with more than 5\,m to spare, or whose
+margin exceeds the most their pose can move over the trust boxes, are
+left out. Membership of the issued plan's endpoint is decided exactly
+on its nonlinear rollout (Section~\ref{subsec:program}), never by these
+rows.
 
-\subsection{Quadratic Control-Lyapunov Function}
+\subsection{Quadratic Control-Lyapunov Function and Cruise Law}
 \label{subsec:clf}
 
 One obstacle-independent function measures the distance from cruise at
@@ -1873,35 +2069,74 @@ every sample, during avoidance and after it:
     V(\bm x)=\bm e(\bm x)^{\trans}P\,\bm e(\bm x),\qquad P\succ0 .
     \label{eq:clf}
 \end{equation}
-The matrix $P$ is synthesized offline for each operating point (vehicle,
-speed, path curvature, sample period) and only read at run time. Let
-$\bm e^+=A_e\bm e+B_e(\bm u-\bm u_*)$ be the sampled transverse model at
-the trim, $Q_e=\diag(\varsigma_1^{-2},\ldots,\varsigma_5^{-2})$ with
-error scales $\varsigma_i>0$, $S=P^{-1}$ and $Y=KS$ for a certificate
-gain $K$. The synthesis minimizes $\rho$ by bisection subject to
+The matrix $P$ and a gain $K$ are synthesized offline for each operating
+point (vehicle, speed, path curvature, sample period) and only read at
+run time. They certify the cruise law $\bm u=\bm u_*+K\bm e$ on the
+sampled nonlinear model: on the sublevel set $\Omega=\{V\leq1\}$, one
+hold under that law gives
+$V(F(\bm x,\bm u_*+K\bm e))\leq\rho^\star V(\bm x)$ with
+$\rho^\star<\rho_V=e^{-2T_s/T_V}$ for a convergence time constant
+$T_V$, the inputs satisfy $|K_j\bm e|\leq\bar u_j$, and $\Omega$ lies
+inside a certification box $|e_i|\leq b_i$.
+
+Let $g(\bm e,\Delta\bm u)$ be the transverse error after one hold from
+the state with error $\bm e$ under the input $\bm u_*+\Delta\bm u$, and
+$G=[\partial g/\partial\bm e,\ \partial g/\partial\Delta\bm u]$ its
+Jacobian from the RK4 variational equations and the path chart. The trim
+is a fixed point, $g(0,0)=0$, so along the ray from the origin
+\begin{equation}
+    g(\bm e,\Delta\bm u)=\bar G(\bm e,\Delta\bm u)
+        \begin{bmatrix}\bm e\\\Delta\bm u\end{bmatrix},\qquad
+    \bar G=\int_0^1G(t\bm e,t\Delta\bm u)\,dt,
+    \label{eq:ray_average}
+\end{equation}
+exactly. A discrete Lyapunov inequality that holds for every matrix of
+an enclosure of the ray averages $\bar G$ over $\Omega$ along the
+cruise law therefore holds for the nonlinear map on $\Omega$. The
+enclosure is a zonotope in box-scaled coordinates,
+$G_0+\sum_k\delta_kD_k+R$ with $|\delta_k|\leq1$ and
+$\normtwo{R}\leq\epsilon_G$: the Jacobian $G_0$ at the trim, the six
+leading principal directions $D_k$ of the sampled deviations with their
+coefficient bounds, and a residual, all widened by a factor of 1.25. The
+ray averages are computed by eight-node Gauss--Legendre quadrature, whose
+residual in \eqref{eq:ray_average} is added to $\epsilon_G$. Enclosing the
+ray averages rather than the pointwise Jacobians matters for a saturating
+tire: the averages spread like the secants of the force curve and the
+pointwise Jacobians like its tangents, and at the slips that $\Omega$
+reaches the tangent spread is two to three times the secant spread. With
+$S=P^{-1}$, $Y=KS$ and $[A_v\ B_v]$ the vertices of the zonotope, the
+synthesis maximizes the fill $t$ subject to
 \begin{equation}
     \begin{gathered}
-    \begin{bmatrix}\rho S&(A_eS+B_eY)^{\trans}\\
-        A_eS+B_eY&S\end{bmatrix}\succeq0,\qquad
-    \begin{bmatrix}\bar u_j^2&Y_j\\Y_j^{\trans}&S\end{bmatrix}\succeq0,\\
-    R_V^2Q_e^{-1}\preceq S\preceq c_V R_V^2Q_e^{-1},
+    \begin{bmatrix}\rho_VS&N_v^{\trans}&Z^{\trans}\\
+        N_v&S-\lambda_vI&0\\Z&0&\lambda_vI\end{bmatrix}\succeq0,\\
+    N_v=A_vS+B_vY,\qquad Z=\epsilon_G\begin{bmatrix}S\\Y\end{bmatrix},\\
+    \begin{bmatrix}\bar u_j^2&Y_j\\Y_j^{\trans}&S\end{bmatrix}\succeq0,\qquad
+    S_{ii}\leq b_i^2,\qquad S\succeq t\,\diag(\bm b)^2,
     \end{gathered}
     \label{eq:clf_lmi}
 \end{equation}
-for $j=1,2$, where $Y_j$ is the $j$th row of $Y$. The first inequality is
-$(A_e+B_eK)^{\trans}P(A_e+B_eK)\preceq\rho P$. The second bounds the
-certificate input by $|K_j\bm e|\leq\bar u_j$ on the sublevel set
-$V\leq1$, and the third makes that set contain every error within $R_V$
-error scales and keeps the weights of $P$ relative to $Q_e$ within a
-ratio $c_V$ of one another. Without the input bound the fastest
-contraction needs gains of several radians of steering per meter;
-without the shape bound it nearly ignores some error directions. The
-gain $K$ is discarded: it certifies that a decrease is attainable with
-small inputs near cruise and is never applied. The result is the
-smallest contraction factor $\rho^\star$ attainable under these
-conditions for the linearized model. It certifies nothing for the
-nonlinear vehicle away from the trim, where tire saturation and large
-heading errors can make a decrease unavailable.
+for every vertex $v$ and $j=1,2$, where $Y_j$ is the $j$th row of $Y$.
+The first family is the vertex inequalities
+$(A_v+B_vK)^{\trans}P(A_v+B_vK)\preceq\rho_VP$ with the residual
+absorbed by Petersen's lemma \cite{Petersen1987}, the second bounds the
+inputs on $\Omega$, and the last two place $\Omega$ in the box and
+maximize its fill. Because the enclosure depends on $\Omega$ and $K$,
+the design iterates to self-consistency: each round encloses the ray
+averages over an inflation of the current set and over inputs within a
+band of the current gain, and solves \eqref{eq:clf_lmi} with the new set
+inside that inflated set and the new gain within the band. Every round's
+pair is therefore certified by the enclosure it was designed with; the
+pair with the largest fill is kept, re-verified by eigenvalues, and the
+smallest contraction it certifies is recorded as $\rho^\star$. The one
+non-algebraic step is the enclosure hypothesis, that the ray averages over
+$\Omega$ along the law lie in the recorded zonotope. It is built from 1200
+boundary and 600 interior samples with a recorded seed and checked again
+on fresh samples with another seed. The certificate is conditional on
+that hypothesis; it is not a proof for the nonlinear map. A Lipschitz
+bound on the remainder of the trim's linearization would make it one but
+fails by two orders of magnitude on this tire, which saturates at slips
+of a few hundredths of a radian.
 
 Every sample requests
 \begin{equation}
@@ -1909,13 +2144,11 @@ Every sample requests
     \qquad\rho_V=e^{-2T_s/T_V},\qquad\delta\geq0,
     \label{eq:clf_row}
 \end{equation}
-with $\bm x$ the supplied estimate and a convergence time constant
-$T_V$: without slack the error measure $\sqrt V$ shrinks by a factor
-$1/e$ every $T_V$. The request must be slower than the certificate,
-$\rho_V>\rho^\star$; otherwise the operating point is rejected. Only the
-first input enters. In the program the successor is the affine first
-node, and the error is linearized there with the analytic Jacobian
-$D\bm e$ of the path chart,
+with $\bm x$ the supplied estimate: without slack the error measure
+$\sqrt V$ shrinks by a factor $1/e$ every $T_V$. Only the first input
+enters. In the program the successor is the affine first node, and the
+error is linearized there with the analytic Jacobian $D\bm e$ of the
+path chart,
 \begin{equation}
     \normtwo{P^{1/2}\bigl[\bm e(\bar{\bm x}_1)
         +D\bm e(\bar{\bm x}_1)\Delta\bm x_1\bigr]}^2
@@ -1925,7 +2158,12 @@ $D\bm e$ of the path chart,
 which is one second-order cone. The left side is a local model, so
 $\delta=0$ in the program does not prove \eqref{eq:clf_row} for the
 nonlinear map. The row acts on the estimate and carries no enclosure
-(Section~\ref{subsec:uncertainty}).
+(Section~\ref{subsec:uncertainty}). The gain $K$ is never used by the
+programs: it defines the cruise hold that extends the anchor
+(Section~\ref{subsec:initialization}). On $\Omega$ that hold decreases
+$V$ by at least the requested factor within the input bound, and the
+extension checks the decrease and the hard rows on every hold it appends
+rather than relying on the certificate.
 
 \subsection{Use of the Estimation Enclosure}
 \label{subsec:uncertainty}
@@ -1944,8 +2182,11 @@ end, $\tfrac12(I+A_i)$ and $A_i$; the node that closes hold $i$ is
 constrained with $A_iG_0$, and the present node with $G_0$. A row
 $\bm a^{\trans}\Delta\bm x\leq b$ on the ego state is tightened by the
 support $\normone{\bm a^{\trans}G_i}$ of the zonotope; this applies to
-the road rows \eqref{eq:road_rows}, the body-velocity bounds, the
-sideslip cone \eqref{eq:sideslip_cone} and the terminal rows. The
+the road rows \eqref{eq:road_rows}, the body-velocity bounds and the
+sideslip cone \eqref{eq:sideslip_cone}. The terminal rows widen the
+clearances and road margins of \eqref{eq:terminal_set} by the position
+radius of $G_0$ and the chord of its heading radius, as a static
+offset; the continuation is not propagated from the enclosure. The
 adhesion cone \eqref{eq:adhesion_cone} acts on the estimate, because the
 certified lateral-velocity radius widens exactly as the rear slip nears
 saturation, and its reserve excluded states well inside the envelope.
@@ -1969,9 +2210,11 @@ constant-parameter family \eqref{eq:target_flow} is enclosed by
     \label{eq:target_tube}
 \end{equation}
 and the heading radius $b_{\psi_C}$ adds the sideslip radius to
-$b_\gamma(\tau)$. A directional version of the position bound, which
-charges a speed error along the path of the target only, is used when it
-is smaller. The tightening of \eqref{eq:collision_rows} is
+$b_\gamma(\tau)$; braking that ends at rest keeps $b_s$ valid, because
+the speed $\max(0,V_{C,0}+A_C\tau)$ is 1-Lipschitz in $(V_{C,0},A_C\tau)$
+for forward obstacles. A directional version of the position bound,
+which charges a speed error along the path of the target only, is used
+when it is smaller. The tightening of \eqref{eq:collision_rows} is
 \begin{equation}
     \begin{split}
     \theta_i={}&\normone{\bm n^{\trans}G_{i,p}^{\rm rel}}
@@ -1996,7 +2239,11 @@ plan. Neither the family of possible future estimates nor the forecast
 error of the target beyond one hold is covered. The alternative that is
 sound for an open-loop input sequence, $G_{i+1}=A_iG_i$ from $G_0$ over
 the whole horizon, grew with the variable horizon until the road and
-state rows were infeasible. The row \eqref{eq:clf_model} uses the
+state rows were infeasible; propagating the target set from the present
+sample over the whole horizon recovered 31 of 84 noisy encounters
+against 55 for the per-hold form and produced one collision, because the
+tightened and the nominal row of a node share one slack within the
+primary holds. The row \eqref{eq:clf_model} uses the
 estimate for the same kind of reason. A worst case over the enclosure
 asks that the largest successor value over the successor's enclosure
 stay below $\rho_V$ times the smallest current value. Near the path
@@ -2007,7 +2254,7 @@ force ratio chattered, and a 15\,m/s head-on run did not recover in
 and recovery of the true state can at best reach a neighborhood of the
 path set by that error.
 
-\subsection{The Two Programs}
+\subsection{The Two Programs and the Issued Plan}
 \label{subsec:program}
 
 Let $\mathcal A$ denote the constraints shared by both programs on
@@ -2015,9 +2262,9 @@ $(\Delta\bm x_{0:M},\Delta\bm u_{0:M-1},\bm\xi)$: the model
 \eqref{eq:affine_model}, the force-ratio and body-velocity bounds, the
 collision rows \eqref{eq:collision_rows} with $\bm\xi\geq0$, the road
 rows \eqref{eq:road_rows}, the cones \eqref{eq:adhesion_cone} and rows
-\eqref{eq:sideslip_cone}, and the terminal conditions
-\eqref{eq:terminal_separation} and \eqref{eq:road_recovery}, each with
-its tightening. The primary program is
+\eqref{eq:sideslip_cone}, and the terminal rows of
+Section~\ref{subsec:terminal} on $\Delta\bm x_M$, each with its
+tightening. The primary program is
 \begin{equation}
     J_1^\star=\min\ \sum_i\xi_i
     \quad\text{subject to }\mathcal A,
@@ -2035,7 +2282,9 @@ and the secondary program is
     \end{aligned}
     \label{eq:secondary_program}
 \end{equation}
-with $\ell(\bm x)=\bm e(\bm x)^{\trans}Q_e\bm e(\bm x)$ and
+with $\ell(\bm x)=\bm e(\bm x)^{\trans}Q_e\bm e(\bm x)$,
+$Q_e=\diag(\varsigma_1^{-2},\ldots,\varsigma_5^{-2})$ for error scales
+$\varsigma_i>0$, and
 \begin{equation}
     \mathcal R(\Delta\bm u)=\frac1{2M}\sum_{i=0}^{M-1}
         \normtwo{(\sigma W_u)^{-1}\Delta\bm u_i}^2,\qquad
@@ -2049,8 +2298,8 @@ solved. The ordering resembles the predictive barrier construction of
 \cite{WabersichZeilinger2023}, in which the minimal relaxation of a
 predictive safety problem is computed before the performance problem.
 The conditions under which that construction yields a control barrier
-function, in particular an exact prediction model and a terminal safe
-set for the complete problem, are not established here.
+function, in particular an exact prediction model, are not established
+here.
 
 Minimizing a first-step slack alone leaves the later inputs
 undetermined, and the next anchor inherits them. The term
@@ -2061,109 +2310,205 @@ which vanishes at cruise. The penalty acts on increments from the
 anchor; it pulls the inputs neither toward zero nor toward $\bm\pi$. The
 tolerance $\epsilon_{\rm lex}$ is $10^{-4}$\,m: with a cap of
 $10^{-5}$\,m the zero-slack set is a slab a few micrometers thick, and
-the cone solver repeatedly stalled on the secondary program.
+the cone solver repeatedly stalled on the secondary program. Both
+programs are solved by an interior-point cone solver to feasibility and
+gap tolerances of $10^{-6}$, and a solve that stalls is accepted at
+$10^{-4}$: the solution is a search direction that the step-size rule
+below checks on the nonlinear model before anything is issued.
 
 When the solver certifies the primary program primal infeasible, the
 input trust scale $\sigma$ is doubled on the same linearization, up to
-$\sigma=1$, until the program is feasible. If the program around a
-shifted anchor is still infeasible, one fresh anchor is rolled out and
-treated in the same way. The secondary program is then solved on the
-selected model. A sample therefore builds one linearization, or two when
-the shifted problem is re-solved from the fresh rollout.
+$\sigma=1$, until the program is feasible; the formulated problem is
+reused and only the input bounds change. If the program around a shifted
+anchor is still infeasible, one fresh anchor is rolled out under the
+guidance feedback and treated in the same way. The secondary program is
+then solved on the selected model.
 
-The applied command is the first input of the secondary solution,
-unclipped. The solution is issued directly: its inputs are not replayed
-through the nonlinear model, and no agreement test, damping or line
-search follows the solve. A positive $J_1^\star$ is executed and
-recorded; it is a relaxation, not a statement of safety. If the anchor
-cannot be rolled out, if the primary program has no solution after the
-steps above, or if the secondary program returns no converged point, no
-command is issued and the run stops. Neither the previous plan nor a
-primary-only point is substituted.
+The affine solution $(\Delta\bm u^\star,\Delta\bm x^\star)$ is a search
+direction about the anchor. For $\alpha\in\{1,\tfrac12,\ldots,\tfrac1{32},0\}$,
+in that order, the inputs $\bar{\bm u}+\alpha\Delta\bm u^\star$ are
+rolled out through $F$ from the estimate, and the first $\alpha$ is
+accepted whose rollout meets every hard row (road, state limits and
+handling envelope at every node and mid-hold point, and the exact
+rectangle clearance $d_{\rm m}$ at every node and mid-hold point beyond
+the primary holds), whose endpoint lies in $\mathcal X_f$ by the exact
+evaluation of \eqref{eq:terminal_set}, and whose summed clearance deficit
+over the primary holds does not exceed the anchor's. The step
+$\alpha=0$ is the anchor itself. The issued plan is that rollout, and the
+applied command is its first input, unclipped. If no step is acceptable,
+which is possible only when the anchor is not itself an acceptable plan,
+as at the first sample of an encounter, the problem is linearized again
+at the rollout of the full step and solved again, at most twice, after
+which no command is issued and the run stops. The run also stops when
+the shifted plan cannot be rolled out, when the primary program has no
+solution after the steps above, or when the secondary program returns
+no converged point. Neither the previous plan nor a primary-only point
+is substituted. A positive $J_1^\star$ is executed and recorded: without
+an enclosure it is a relaxation of the margin within the primary holds;
+with an enclosure it is the summed relaxation of the tightened rows over
+the horizon, while the untightened rows beyond the primary holds remain
+hard and hold on the issued rollout. In neither case is it a statement
+of safety.
 
-\subsection{Trust Scale from the Plan Innovation}
+\subsection{Recursive Feasibility on the Declared Model}
+\label{subsec:recursive}
+
+Call a plan \emph{accepted} when it is the rollout of its inputs through
+$F$ from the current state, meets the road, state and handling rows at
+every node and mid-hold point, clears the obstacle by $d_{\rm m}$ at
+every node and mid-hold point after the $N$ primary holds, and ends in
+$\mathcal X_f$; the issued plan of Section~\ref{subsec:program} is
+accepted by construction. Consider the hypotheses: (H1) the plant is $F$
+and the state is known exactly; (H2) the obstacle follows the forecast
+used at sample $k$, with the same $A_C$ and $\beta_C$; (H3) from the
+endpoint of the plan, some hold of $F$ keeps the endpoint in
+$\mathcal X_f$ with the hard rows met and its mid-hold point clear.
+
+\begin{proposition}
+\label{prop:recursive}
+Under (H1) and (H2), if the plan of sample $k$ is accepted and has at
+least two holds, its inputs shifted by one hold form an accepted plan at
+sample $k+1$, one hold shorter, whose summed clearance deficit over the
+primary holds does not exceed that of sample $k$. Under (H3) as well,
+the shifted plan extended by that hold is accepted.
+\end{proposition}
+
+\begin{IEEEproof}
+By (H1) the new state is the plan's second node, so the shifted inputs
+reproduce the old nodes $2,\ldots,M+1$ exactly, and every hard row of
+the old plan holds at them. The old node $N+1$ was hard, with zero
+deficit, and is now the last primary node, so the deficit sum loses the
+old first node's deficit and gains zero. The endpoint is the old
+endpoint at the same absolute time, and by (H2) the forecast is
+unchanged, so its membership \eqref{eq:terminal_set} is the same
+evaluation as before. An appended hold under (H3) meets the hard rows,
+its mid-hold point clears the obstacle, and its endpoint lies in
+$\mathcal X_f$, whose condition (b) at $j=0$ includes the node's own
+clearance.
+\end{IEEEproof}
+
+The optimizer never has to find this candidate: it is the step
+$\alpha=0$ of the rule in Section~\ref{subsec:program}. Under (H1) and
+(H2), once a plan of an encounter has been accepted, no later sample
+reports no solution while the plan has holds left, and (H3) is what
+keeps the plan from running out. Under Assumption~\ref{asm:mild} the
+terminal law's own hold satisfies (H3), since it keeps the endpoint in
+$\mathcal X_f$ by Proposition~\ref{prop:invariance}; the implementation
+does not use the assumption but tries holds of $F$ and keeps one only
+when its endpoint is checked in $\mathcal X_f$
+(Section~\ref{subsec:initialization}). When (H3) fails at consecutive
+samples the plan shrinks by one hold per sample until it is empty. The
+start of an encounter, when an obstacle enters or re-enters the range,
+is an initial-feasibility question outside the statement, and so is a
+re-entry of the obstacle after the exit that ends the continuation:
+the plan's own collision rows apply there, the terminal set does not
+check it.
+
+\subsection{Trust Scale from the Model Remainder}
 \label{subsec:trust}
 
-The scale $\sigma$ of the input trust box is estimated from how well the
-previous affine prediction agreed with the nonlinear model. For a
+The scale $\sigma$ of the input trust box is estimated from the
+remainder of the linearization, measured in the same sample. For a
 correction of size $s$, the largest input change from the anchor in
 units of $\bm\tau_u$, the affine prediction differs from the nonlinear
 rollout of the same inputs by a second-order remainder of the form
-$Ls^2$, with a coefficient $L$ that depends on the operating point. Let
-$\hat{\bm x}_j$ be the previous plan's affine prediction,
-$\bar{\bm x}_j$ the new anchor, which is the nonlinear rollout of the
-same inputs from the new estimate, and $\tilde{\bm x}_j$ a second
-nonlinear rollout of the same inputs started at the plan's own
-prediction of the present state. Then
-\begin{equation}
-    \bar{\bm x}_j-\hat{\bm x}_j
-    =(\bar{\bm x}_j-\tilde{\bm x}_j)+(\tilde{\bm x}_j-\hat{\bm x}_j)
-    \label{eq:innovation_split}
-\end{equation}
-splits the plan innovation exactly. The first term propagates the
-departure of the new estimate from the prediction: estimation error,
-plant mismatch and the remainder of the first hold. The second contains
-no measurement; it is the model remainder of the step that was taken.
-With $\varpi(\Delta\bm x)=\normtwo{\Delta\bm p}+r_E|\Delta\psi|$, which
-bounds the displacement of any body point, and
+$Ls^2$, with a coefficient $L$ that depends on the operating point. The
+step-size rule rolls out the full step. With
+$\varpi(\Delta\bm x)=\normtwo{\Delta\bm p}+r_E|\Delta\psi|$, which bounds
+the displacement of any body point, $\tilde{\bm x}_j$ that rollout,
+$\hat{\bm x}_j$ the affine prediction of the same inputs and
 $e_k=\max_j\varpi(\tilde{\bm x}_j-\hat{\bm x}_j)$,
 \begin{equation}
     \begin{gathered}
     \hat L_k=\max\Bigl(
-        \frac{e_k}{\max(s_{k-1},\sigma_{k-1}/2)^2},\
+        \frac{e_k}{\max(s_k,\sigma_k/2)^2},\
         \gamma_L\hat L_{k-1}\Bigr),\\
-    \sigma_k=\min\Bigl(1,\ \max\Bigl(\sigma_{\min},\
+    \sigma_{k+1}=\min\Bigl(1,\ \max\Bigl(\sigma_{\min},\
         \sqrt{\tau_e/\hat L_k}\Bigr)\Bigr).
     \end{gathered}
     \label{eq:trust_update}
 \end{equation}
 The scale is the step whose predicted remainder equals a target
-innovation $\tau_e$. It shrinks at once and grows by at most
+remainder $\tau_e$. It shrinks at once and grows by at most
 $\gamma_L^{-1/2}$ per sample, and a step far inside the box is not taken
-as evidence about its boundary. Only the model part $e_k$ enters. An
-earlier rule that subtracted the estimator's worst-case radius from the
-total innovation explained every innovation by that radius, so the scale
-rose to its maximum and the encounters became infeasible. The update is
-not a check of the issued solution, and $\tau_e$ is an empirical
-consistency target, not a bound on the remainder or on the separation.
+as evidence about its boundary. The departure of the next estimate from
+the plan's second node is recorded separately as the observation
+innovation; it belongs to the estimator and the plant and does not set
+the scale. An earlier rule that subtracted the estimator's worst-case
+radius from the total innovation explained every innovation by that
+radius, so the scale rose to its maximum and the encounters became
+infeasible. The update is not a check of the issued solution, and
+$\tau_e$ is an empirical consistency target, not a bound on the
+remainder or on the separation.
 
 \subsection{Scope of the Guarantees}
 \label{subsec:scope}
 
-Three statements hold in exact arithmetic. For an executed plan whose
-programs converged with $J_1^\star=0$, the affine prediction satisfies
-the rows \eqref{eq:collision_rows} with
-$\sum_i\xi_i\leq\epsilon_{\rm lex}$, so the predicted rectangles are
-separated by at least
-$d_{\rm m}-\epsilon_{\rm lex}-\tfrac12r_E\Delta\psi_i^2$ at the
-constrained instants within $R_{\rm enc}$, and by the additional
-tightening \eqref{eq:collision_tightening} where an enclosure is
-supplied. The predicted endpoint of such a plan satisfies the linearized
-terminal rows, and under the premise of
-Proposition~\ref{prop:separating} the reference-point distance does not
-decrease after it. Near the trim, the linear model admits an input
-within $\bar{\bm u}$ that contracts $V$ by $\rho^\star<\rho_V$.
+Four statements hold in exact arithmetic. First, the issued plan is a
+rollout of the declared model $F$ that satisfies every hard row and
+clears the obstacle, by the exact rectangle distance, by at least
+$d_{\rm m}$ at every node and mid-hold point beyond the primary holds,
+by $d_{\rm m}$ plus the tightening \eqref{eq:collision_tightening}
+where an enclosure is supplied; within the primary holds its clearance
+deficit is minimized and recorded. Second, its endpoint lies in
+$\mathcal X_f$, which is forward invariant under the braking law with
+the obstacle on its forecast (Proposition~\ref{prop:invariance}).
+Third, on the declared model with exact information, the shifted plan is
+accepted at the next sample for as long as the encounter lasts and
+holds of $F$ keep extending it (Proposition~\ref{prop:recursive}).
+Fourth, on $\Omega$ the cruise law contracts $V$ by $\rho^\star<\rho_V$
+per hold within the input bound, conditional on the enclosure
+hypothesis of Section~\ref{subsec:clf}.
 
-None of these is a statement about the vehicle. The constraints act on
-the affine model \eqref{eq:affine_model} at nodes and mid-hold points.
-The nonlinear rollout of the same inputs can violate them, and two
-rectangles that are separated at consecutive constrained instants can
-intersect in between. The trust boxes and the node margin $d_{\rm m}$
-are not linked by a bound on the accumulated linearization remainder;
-the trust update \eqref{eq:trust_update} keeps a measured remainder near
-$\tau_e$ but bounds nothing. Feasibility is not recursive: the shifted
-plan is an initialization, the next anchor is a new nonlinear rollout
-with new multipliers and a new horizon length, and the terminal set is
-not invariant, so the solution of one sample need not be feasible at the
-next. A positive $J_1^\star$ is executed and may describe an overlapping
-plan. Only the first hold uses a certified enclosure, and that
-certificate is itself conditional on the premises of
-Section~\ref{sec:estimator}. Zero slack in \eqref{eq:secondary_program}
-is a statement about the local model \eqref{eq:clf_model}. The scheme
-follows the real-time-iteration idea of \cite{DiehlBockSchloder2005}: it
-solves convex programs on one linearization per sample instead of
-iterating to convergence, and it inherits neither nominal stability nor
-safety from the nonlinear problem that it approximates.
+The statements are about the sampled model at its sampled instants.
+Two rectangles separated at consecutive constrained instants can
+intersect in between, and the braking phase of the continuation is
+sampled in the same way; only the parked phase is checked in continuous
+time. The plant of Section~\ref{sec:results} integrates the same
+differential equations with a different scheme, and the mismatch is
+measured, not bounded. With the estimator in the loop (H1) and (H2)
+fail: the shifted plan reproduces the old one only up to the innovation
+propagated through the linearized model, and a changed forecast changes
+the membership of the endpoint. The enclosure enters as a static
+tightening of each hold and of the terminal clearances, not as a
+propagated set, and the row \eqref{eq:clf_model} acts on the estimate.
+Whether some hold of $F$ keeps the endpoint in $\mathcal X_f$, (H3),
+is checked online; Assumption~\ref{asm:mild}, under which it always
+does, carries no mismatch bound. The first exit of the obstacle ends the
+continuation, and a re-entry is handled by the plan's rows alone. The
+trust boxes and $d_{\rm m}$ are not linked by a bound on the
+linearization remainder; the trust update keeps a measured remainder
+near $\tau_e$ but bounds nothing. A positive $J_1^\star$ is executed.
+Zero slack in \eqref{eq:secondary_program} is a statement about the
+local model \eqref{eq:clf_model}, and the certificate of $K$ says
+nothing about the input the programs issue. The scheme follows the
+real-time-iteration idea of \cite{DiehlBockSchloder2005}: it solves
+convex programs on one linearization per sample instead of iterating to
+convergence, and what it inherits from the nonlinear problem is the
+acceptance of the issued plan on $F$, not optimality.
+
+\subsection{Computation}
+\label{subsec:computation}
+
+Every inequality row is a small dense block on the few variables it
+involves, and the sparse matrices are assembled in one call; building
+them row by row had cost time quadratic in the plan length. A row whose
+largest value over the variables' boxes---the state box of
+\eqref{eq:affine_model} and the input box at $\sigma=1$---is below its
+bound cannot bind and is left out, which leaves the feasible set and the
+optimum unchanged; most road rows, state-limit rows and collision rows
+far from the obstacle go this way, and a collision multiplier is not
+computed where the reference distance less both reaches, the margin and
+the largest tightening exceeds the most the pose can move over the
+boxes. A larger trust scale reuses the formulated problem. The step-size
+rule checks every hold of a candidate at once, and exact rectangle
+distances are computed only where a lower bound from the reference
+distance is below the margin. The cruise trim is solved by Newton's
+method with the analytic tangent. On 120 captured problems the block
+assembly reproduced the previous matrices to $4.4\cdot10^{-16}$, and on
+2880 candidate plans the batched rule gave the same decision as a
+hold-by-hold scan. A warm-up action runs one synthetic encounter at
+start-up, so that every code path is compiled before the first sample.
 
 \section{Results}
 \label{sec:results}
@@ -2382,15 +2727,16 @@ $m_E$, $I_{z,E}$ & 1650\,kg, 1700\,kg\,m$^2$\\
 $l_{f,E}$, $l_{r,E}$ & 1.40\,m, 1.65\,m\\
 $C_f=C_r$, $\mu_f=\mu_r$ & 96\,kN/rad, 0.85\\
 $\rho_{\rm air}$, $C_d$, $A_f$ & 1.225\,kg/m$^3$, 0.30, 2.2\,m$^2$\\
-$q_0$, $q_1$, $q_4$, $v_{\rm tr}$, $v_{\rm f}$ & 0.01, 0, 0,
-    0.5\,m/s, 1\,m/s\\
+$q_0$, $q_1$, $q_4$, $v_{\rm tr}$ & 0.01, 0, 0, 0.5\,m/s\\
+$v_1$, $v_2$, $T_{\rm k}$, $v_{\rm h}$ & 2.5\,m/s, 4\,m/s, 0.1\,s,
+    0.25\,m/s\\
 Ego and obstacle bodies & 4.8\,m $\times$ 1.9\,m\\
 $l_{r,C}$, $r_E$ & 1.6\,m, 2.58\,m\\
 $c_{\rm R}$, $c_{\rm L}$ & 8.53\,m, 12.19\,m\\
 $T_s$, $M_{\max}$ & 50\,ms, 512\\
 $N$ at 8\,m/s; at 15\,m/s & 8; 16\\
 $d_{\rm m}$, $R_{\rm enc}$ & 0.20\,m, 50\,m\\
-$v_{\rm sep}$, $c_{\rm rec}$ & 0.5\,m/s, 0.5\\
+$a_{\rm b}$, $a_{\rm m}$ & 4\,m/s$^2$, 2\,m/s$^2$\\
 $\bm\tau_x$ & (2.5\,m, 2.5\,m, 0.25\,rad,\\
  & \ 2.5\,m/s, 1.5\,m/s, 0.75\,rad/s)\\
 $\bm\tau_u$ & (0.075\,rad, 0.125)\\
@@ -2398,15 +2744,18 @@ $\sigma_0$, $\sigma_{\min}$, $\tau_e$, $\gamma_L$ & 0.125, 1/16,
     0.02\,m, 0.5\\
 $\varsigma_1,\ldots,\varsigma_5$ & 0.5\,m, 0.1\,rad, 0.25\,m/s,\\
  & \ 0.5\,m/s, 0.2\,rad/s\\
-$T_V$, $R_V$, $c_V$, $\bar{\bm u}$ & 4\,s, 2, 10,
-    (0.075\,rad, 0.125)\\
+$T_V$, $\bar{\bm u}$ & 4\,s, (0.075\,rad, 0.125)\\
+$\bm b$ & (2\,m, 0.2\,rad, 1\,m/s, 0.3\,m/s,\\
+ & \ 0.2\,rad/s)\\
 $\epsilon$, $\epsilon_{\rm lex}$ & $10^{-4}$, $10^{-4}$\,m\\
+Solver & $10^{-6}$ feasibility and gap, $10^{-4}$ if\\
+ & \ stalled; 400 iterations; 5\,s per call\\
 $d_{\rm la}$, $k_\chi$, $k_r$ & $\max(8\,\mathrm{m},\,1.5\,\mathrm{s}\cdot v_*)$,
     1.5\,s$^{-1}$, 10\,s$^{-1}$\\
 $c_a$, $c_\phi$, $k_\beta$, $\bar\beta$ & 0.75, 0.9, 0.5\,s/m, 0.35\\
 $T_{\rm p}$, $T_{\rm la}$, padding & 3\,s, 1.5\,s, 0.7\,m\\
 Bounds & $|\beta|\leq1$ (no rate limit),\\
- & \ $1\leq v_x\leq18$\,m/s, $|v_y|\leq12$\,m/s,\\
+ & \ $0\leq v_x\leq18$\,m/s, $|v_y|\leq12$\,m/s,\\
  & \ $|r|\leq5$\,rad/s, $\beta_{\rm dom}=0.25$\,rad\\
 Sensor noise maxima & GNSS 0.04\,m and 0.05\,m/s,\\
  & \ accelerometer 0.03\,m/s$^2$,\\
@@ -2421,21 +2770,27 @@ Table~\ref{tab:controllerParameters} lists the parameters. The vehicle
 is a generic passenger car. In the closed-loop trials the estimator uses
 the same vehicle parameters as the controller, not the rear-axle
 distance of Section~\ref{subsec:designResults}. With these values the
-synthesis \eqref{eq:clf_lmi} certifies contraction factors
-$\rho^\star$ of 0.954 at 8\,m/s and 0.937 to 0.940 at 15\,m/s per
-sample, on the straight and the curved path, against the requested
-$\rho_V=0.975$; the corresponding time constants of $\sqrt V$ are
-2.1\,s and 1.5 to 1.6\,s against $T_V=4$\,s.
+synthesis \eqref{eq:clf_lmi} certifies, for the cruise law, contraction
+factors $\rho^\star$ of 0.9744 to 0.9748 per sample against the
+requested $\rho_V=0.9753$, that is, time constants of $\sqrt V$ of 3.85
+to 3.92\,s against $T_V=4$\,s, on sets $\Omega$ whose half-extents are
+1.49\,m (8\,m/s, straight), 1.59\,m (8\,m/s, curved) and 2.0\,m
+(15\,m/s) of lateral offset, 0.114 to 0.144\,rad of heading, 0.49 to
+0.74\,m/s of speed, 0.19 to 0.27\,m/s of lateral velocity and
+0.20\,rad/s of yaw rate; the samples that built the enclosures reach
+front slip angles of 0.080\,rad. The independent check on fresh samples
+found worst contractions of 0.941 to 0.963 and no violated input bound or
+state row.
 
 Seven encounter geometries are run at reference speeds of 8 and
 15\,m/s. In the head-on case the obstacle starts 24\,m ahead on the path
 and approaches at 8\,m/s; in the accelerating head-on case it also
 accelerates at 1\,m/s$^2$. The braking lead starts 1.45\,m ahead of the
-ego body at the ego speed and brakes at 0.5\,m/s$^2$. The crossing
-obstacle moves at 8\,m/s perpendicular to the path and reaches the path
-when the cruising ego does. The turning crossing obstacle reaches the
-same point at 10\,m/s and perpendicular to the path at that instant,
-while accelerating at $A_C=1$\,m/s$^2$ and turning with
+ego body at the ego speed and brakes at 0.5\,m/s$^2$ until it stops. The
+crossing obstacle moves at 8\,m/s perpendicular to the path and reaches
+the path when the cruising ego does. The turning crossing obstacle
+reaches the same point at 10\,m/s and perpendicular to the path at that
+instant, while accelerating at $A_C=1$\,m/s$^2$ and turning with
 $\beta_C=0.05$\,rad, a turning radius of about 32\,m. The curved head-on
 and curved crossing cases use a path of curvature $0.005$\,m$^{-1}$,
 with an opposing obstacle on the same circle at 8\,m/s and an obstacle
@@ -2446,14 +2801,15 @@ lanes of 3.66\,m and paved shoulders of 3.05\,m, and the path is the
 center of the second lane from the right, which gives the clearances
 $c_{\rm R}$ and $c_{\rm L}$ of Table~\ref{tab:controllerParameters}.
 
-Each issued input is held for $T_s$ on the model $f$ itself, integrated
-by an adaptive Runge--Kutta method with relative and absolute tolerances
-$10^{-11}$ and $10^{-12}$. The plant therefore differs from the
-prediction only through the integration scheme and the linearization.
-There is no parameter mismatch or actuator dynamics, the obstacle
-follows \eqref{eq:target_flow} exactly with fixed $A_C$ and $\beta_C$,
-and the measured computation time is not applied as a delay. The body
-distance is evaluated at 31 instants per hold.
+Each issued input is held for $T_s$ on the model $f$ itself, including
+its low-speed regime, integrated by an adaptive Runge--Kutta method with
+relative and absolute tolerances $10^{-11}$ and $10^{-12}$. The plant
+therefore differs from the prediction only through the integration
+scheme and the linearization, and it is not snapped to rest below
+$v_{\rm h}/5$. There is no parameter mismatch or actuator dynamics, the
+obstacle follows \eqref{eq:target_flow} exactly with fixed $A_C$ and
+$\beta_C$, and the measured computation time is not applied as a delay.
+The body distance is evaluated at 31 instants per hold.
 
 Two observation modes are used. With \emph{exact states}, the
 controller receives the true ego and obstacle states and no enclosure.
@@ -2485,11 +2841,12 @@ holds (100\,s). On the circular path the opposing obstacle of the curved
 head-on case meets the ego a second time within that period, so those
 runs contain two encounters and confirm recovery after the second. The
 campaign uses MATLAB R2026a on an AMD Ryzen 7 7800X3D and the
-interior-point cone solver Clarabel through a compiled interface, with
-an iteration limit of 400 per program and a time limit of 5\,s per
-call. Below, a primary optimum is called zero when it does not exceed
-$\epsilon_{\rm lex}$ plus the feasibility tolerance $10^{-5}$, and a
-control-Lyapunov slack when it does not exceed $10^{-5}\max(V,1)$.
+interior-point cone solver Clarabel through a compiled interface; before
+each run the controller's warm-up action compiles every code path. Six
+runs shared the machine. Below, a primary optimum is called zero when
+it does not exceed $\epsilon_{\rm lex}$ plus the feasibility tolerance
+$10^{-5}$, and a control-Lyapunov slack when it does not exceed
+$10^{-5}\max(V,1)$.
 
 \subsection{Closed-Loop Outcomes}
 \label{subsec:controlResults}
@@ -2517,20 +2874,20 @@ lateral deviation from the path.}
 Scenario & (m) & (s) & (m) & runs & (m) & (m) & (s)
  & (m) & (s) & (m) & runs & (m) & (m) & (s)\\
 \midrule
-Head-on              & 1.485 & 10.75 & 6.70 & 6/6 & 2.52 & 0.83 & 11.65
-                     & 0.194 &  9.35 & 4.91 & 6/6 & 0.52 & 2.99 & 10.33\\
-Accelerating head-on & 1.167 & 10.80 & 6.80 & 6/6 & 2.27 & 0.59 & 11.70
-                     & 0.200 &  9.50 & 5.19 & 6/6 & 0.36 & 2.98 & 10.20\\
-Braking lead         & 0.198 & 11.45 & 2.28 & 5/6 & 1.38 & 4.53 & 12.70
-                     & 0.190 & 13.25 & 3.21 & 6/6 & 0.89 & 1.05 & 14.48\\
-Crossing             & 0.184 & 10.70 & 6.77 & 6/6 & 1.65 & 3.35 & 10.83
-                     & 0.153 &  9.70 & 5.06 & 6/6 & 1.51 & 2.62 & 10.33\\
-Turning crossing     & 0.180 & 10.60 & 6.37 & 6/6 & 1.68 & 3.80 & 10.88
-                     & 0.198 & 10.25 & 6.37 & 6/6 & 1.53 & 2.87 & 10.55\\
-Curved head-on$^{\rm a}$ & 1.385 & 87.20 & 6.94 & 6/6 & 2.59 & 1.09 & 88.75
-                     & 1.550 & 63.50 & 4.69 & 6/6 & 1.60 & 0.23 & 65.32\\
-Curved crossing      & 0.179 & 11.00 & 5.84 & 5/6 & 1.38 & 3.98 & 19.05
-                     & 0.169 & 10.05 & 5.88 & 6/6 & 3.46 & 0.65 & 11.90\\
+Head-on              & 0.877 &  8.80 & 4.09 & 5/6 & 1.82 & 4.57 &  9.60
+                     & 0.155 & 10.85 & 5.38 & 6/6 & 0.54 & 2.70 & 11.03\\
+Accelerating head-on & 0.664 &  8.45 & 4.08 & 6/6 & 1.36 & 4.26 &  9.47
+                     & 0.163 & 10.70 & 5.52 & 6/6 & 0.39 & 3.24 & 10.33\\
+Braking lead         & 0.198 & 14.70 & 3.77 & 5/6 & 0.21 & 4.55 & 18.35
+                     & 0.299 & 14.45 & 6.32 & 5/6 & 0.59 & 1.02 & 17.90\\
+Crossing             & 0.187 &  9.55 & 5.18 & 6/6 & 1.50 & 5.28 &  9.50
+                     & 1.378 &  9.85 & 6.46 & 6/6 & 1.78 & 3.20 & 10.30\\
+Turning crossing     & 0.181 &  9.35 & 5.15 & 6/6 & 1.57 & 5.21 &  9.47
+                     & 1.269 &  9.75 & 6.35 & 6/6 & 1.87 & 2.96 & 11.05\\
+Curved head-on$^{\rm a}$ & 0.266 & 86.30 & 5.65 & 1/6 & 2.82 & 1.56 & 88.00
+                     & 2.681 & 65.05 & 8.41 & 4/6 & 3.80 & 0.21 & 65.50\\
+Curved crossing      & 0.136 &  9.00 & 5.45 & 6/6 & 1.98 & 5.05 &  9.20
+                     & 1.119 & 10.10 & 6.87 & 6/6 & 2.91 & 0.18 & 11.68\\
 \bottomrule
 \multicolumn{15}{l}{$^{\rm a}$Two encounters on the circular path;
 recovery is confirmed after the second.}
@@ -2539,7 +2896,7 @@ recovery is confirmed after the second.}
 
 \begin{figure*}[!t]
     \centering
-    \includegraphics[width=\textwidth]{closed_loop_results_v02.pdf}
+    \includegraphics[width=\textwidth]{closed_loop_results_v03.pdf}
     \caption{Recorded closed-loop motion. (a)--(c) Ego (blue) and
     obstacle (orange) footprints at 0.5\,s intervals in path
     coordinates for three runs at 15\,m/s; darker footprints are later,
@@ -2547,7 +2904,7 @@ recovery is confirmed after the second.}
     road edges. (d) Sampled body distance of all 98 runs during the
     first 6\,s. (e) Lateral deviation from the path during the first
     20\,s. (f) Empirical distribution of the wall time of all controller
-    calls, recorded while eight runs shared the machine. In (d)--(f),
+    calls, recorded while six runs shared the machine. In (d)--(f),
     blue lines are the exact-state runs and gray lines the
     estimated-state runs.}
     \label{fig:closedLoop}
@@ -2555,187 +2912,292 @@ recovery is confirmed after the second.}
 
 Table~\ref{tab:closedLoop} and Fig.~\ref{fig:closedLoop} summarize the
 98 runs. With exact states all fourteen runs succeed: no contact, no
-departure from the road, and cruise recovered between 9.35 and
-13.25\,s in the single-encounter cases. With estimated states 82 of the
-84 runs succeed. The other two stop without a solved command, an
-8\,m/s braking lead at 2.65\,s and an 8\,m/s curved crossing at
-7.10\,s, each for one seed; no run collides or leaves the road. Four
-seeds succeed in all fourteen encounters and two in thirteen.
+departure from the road, and cruise recovered between 8.45 and
+14.70\,s in the single-encounter cases. With estimated states 74 of the
+84 runs succeed. The other ten stop without a solved command, between
+0.25 and 5.95\,s into the run (Section~\ref{subsec:failureResults}); no
+run collides or leaves the road. Two seeds succeed in thirteen
+encounters and four in twelve; seven of the ten failures are curved
+head-ons.
 
 With exact states the controller uses the node margin almost completely.
-In ten of the fourteen runs the smallest sampled distance is below
-$d_{\rm m}=0.20$\,m, down to 0.153\,m
+In six of the fourteen runs the smallest sampled distance is below
+$d_{\rm m}=0.20$\,m, down to 0.136\,m
 (Fig.~\ref{fig:closedLoop}(d)): the margin is consumed between the
-constrained instants and by the linearization. A positive primary
-optimum occurs at 38 samples of eight runs, at most 0.027\,m, and is
-executed each time. A fresh anchor is rolled out at three samples of
-the campaign. The steering angle reaches 0.40\,rad, the yaw rate
-0.82\,rad/s, and the force ratio ranges from $-0.35$ to $0.76$. The
-largest lateral deviation is 2.3 to 6.9\,m
+constrained instants and by the plant's departure from the sampled
+model. The primary optimum is positive at one sample of one run, by
+$1.2\cdot10^{-4}$\,m. The steering angle reaches 0.52\,rad, the yaw
+rate 0.99\,rad/s and the sideslip 0.19\,rad, inside the cone of
+0.25\,rad; the force ratio ranges from $-1.00$ to $0.97$, and the speed
+stays above 4.9\,m/s, so the low-speed regime of the model is not
+entered. The largest lateral deviation is 3.8 to 8.4\,m
 (Fig.~\ref{fig:closedLoop}(e)): the maneuvers leave the lane and use the
-adjacent lanes, and the body stays at least 3.85\,m from a road edge.
-The horizon is $N$ holds in the median and at most 111 holds.
+adjacent lanes, and the body stays at least 2.67\,m from a road edge.
+The horizon is $N$ holds in the median, 40 holds at the 95th percentile
+and at most 117 holds; the first sample of a run plans 24 to 25 holds.
 
 With estimated states the passes are wider. The median over the 84 runs
-of the smallest distance is 1.66\,m, against 0.20\,m with exact states,
-because the tightened rows \eqref{eq:collision_tightening} reserve the
-current enclosure and the forecast of the obstacle changes from sample
-to sample. The wider passes use the road: the lateral deviation reaches
-10.6\,m, and the smallest distance to a road edge falls to 0.23\,m in a
-15\,m/s curved head-on. The steering angle reaches 0.69\,rad, the yaw
-rate 1.10\,rad/s and the force ratio $-0.97$ and $0.98$. Recovery on the
-straight road is confirmed after a median of 10.9\,s and at most
-16.7\,s. Over all estimated-state samples the horizon has a median of 16
-holds, a 99th percentile of 79 and a maximum of 138.
+of the smallest distance is 1.80\,m, against 0.28\,m with exact states,
+and no run comes within $d_{\rm m}$ (least 0.21\,m), because the
+tightened rows \eqref{eq:collision_tightening} reserve the current
+enclosure and the forecast of the obstacle changes from sample to
+sample. The wider passes use the road: the lateral deviation reaches
+11.0\,m, and the smallest distance to a road edge falls to 0.18\,m in a
+15\,m/s curved crossing. The steering angle reaches 1.04\,rad, at
+4.1\,m/s in an 8\,m/s turning crossing, the yaw rate 1.19\,rad/s and
+the sideslip 0.21\,rad; the force ratio ranges from $-0.85$ to $1.00$.
+Ten runs slow into the blended regime between $v_1$ and $v_2$, to
+3.2\,m/s at the least, and none into the kinematic regime. Recovery is
+confirmed after a median of 10.3\,s and at most 22.8\,s in the
+single-encounter cases. Over all estimated-state samples the horizon
+has a median of 16 holds, a 95th percentile of 74 and a maximum of 184.
+
+The primary optimum is positive at 1109 of the 23083 estimated-state
+samples, in 75 runs, and exceeds 1\,m at 665 of them. With an
+enclosure it is the summed relaxation of the tightened rows over the
+whole horizon, and the target tube \eqref{eq:target_tube} over a long
+horizon can exceed the available room; the untightened rows beyond the
+primary holds are hard. The issued plans themselves clear the obstacle
+by $d_{\rm m}$ at every constrained instant beyond the primary holds, by
+construction, and within the primary holds they fall short of $d_{\rm m}$
+at 13 samples of six runs, by at most 0.22\,m; with exact states at 16
+samples of five runs, by at most 0.5\,mm.
 
 The control-Lyapunov condition is met in the model more often than on
-the plant. In the exact-state runs, 3064 consecutive state pairs have
-$V>10^{-3}$, and 2520 of them have zero slack in
-\eqref{eq:secondary_program}. In 73 of those the requested decrease
-\eqref{eq:clf_row} is not achieved by the plant; in none does $V$
-increase. Recovery in Table~\ref{tab:closedLoop} is an observed dwell,
-not a certified decrease.
+the plant. In the exact-state runs, 3702 consecutive state pairs have
+$V>10^{-3}$, and 3078 of them have zero slack in
+\eqref{eq:secondary_program} and the full step accepted. In 217 of
+those the requested decrease \eqref{eq:clf_row} is not achieved by the
+plant, and in 60 $V$ increases; all 60 are in the 15\,m/s curved
+head-on run at $V<0.04$, where the ego cruises on the curve between its
+two encounters with a speed error within $\pm0.15$\,m/s, a lateral
+offset within 0.11\,m, and zero modeled slack unattained at 58 of 601
+samples. The tie term of \eqref{eq:secondary_program} fixes the later
+inputs of the plan with a weight that vanishes on the path, and the
+next anchor inherits those inputs; the run at 8\,m/s on the same curve
+cruises without a visible error, and the four estimated-state runs on
+the curve that recover hold their speed within $\pm0.05$\,m/s. In the
+estimated-state runs, 15955 pairs have zero slack and the full step;
+1965 miss the requested decrease and 792 increase. Recovery in
+Table~\ref{tab:closedLoop} is an observed dwell, not a certified
+decrease.
+
+\subsection{The Shifted Plan and the Terminal Set in the Loop}
+\label{subsec:feasibilityResults}
+
+Proposition~\ref{prop:recursive} says that the shifted plan is accepted
+whenever the plant is the sampled model and the forecast does not
+change. With exact states the plant is the same differential equation
+under another integrator and the forecast is the truth: the shifted
+plan was accepted at all 5522 samples that had one, the remaining 16
+samples being the first sample of each run and the two second encounters
+on the circle, at which the obstacle re-enters the range and a fresh
+rollout is used. The full step was
+accepted at 5477 samples and a shorter one at 61; the zero step was
+never needed, no sample was linearized twice, and no fresh rollout was
+needed for an infeasible shifted problem. With estimated states the
+shifted plan was accepted at 22919 of 22966 samples (99.8\%). At the
+other 47 it failed a collision row (32), the handling envelope (7), or
+the terminal set (8, one endpoint no longer mild and seven whose
+continuation met the moved forecast); the zero step was taken at 66
+samples, a second linearization at 6, and a fresh rollout after an
+infeasible shifted problem at 28, all in 15\,m/s braking leads; five
+further samples started from a fresh rollout because the obstacle
+re-entered the range.
+
+The extension of the shifted plan appended guidance holds through
+states outside $\mathcal X_f$ at 275 exact-state and 521
+estimated-state samples, braking holds at 20 and 26, and found no hold
+that keeps the endpoint in $\mathcal X_f$ at 18 and 14, after which the
+plan stayed one hold shorter; no run ran out of plan. The continuation
+of the issued plan's endpoint ended with the obstacle's exit at 678
+exact-state and 4697 estimated-state samples and with the parked check
+at 1517 and 6889; the rest had no obstacle in range. So in most samples
+with an obstacle the certificate behind the horizon is a stop: the ego
+could brake to rest at any time and the obstacle's forecast would pass
+the parked car.
 
 \subsection{Estimation in the Loop}
 \label{subsec:loopEstimation}
 
 Over the 84 estimated-state runs, the 95th percentile of the ego
-estimation error within a run is 0.002 to 0.007\,rad in heading, 0.01 to
-0.11\,m/s in lateral velocity and 0.007 to 0.022\,m in position. With
+estimation error within a run is 0.002 to 0.010\,rad in heading, 0.009
+to 0.16\,m/s in lateral velocity and 0.007 to 0.023\,m in position. With
 the kinematic measurement of Section~\ref{subsec:egoObserver} and a
 fixed declared domain, the same encounters gave heading errors of 0.07
 to 0.31\,rad and lateral-velocity errors of 1.0 to 3.9\,m/s at
-15\,m/s (one seed), the ego enclosure was lost in nine of thirteen
-runs, and only five of fourteen runs recovered. The force-balance
-measurement of Section~\ref{subsec:modelAided} and the handling
-envelope of Section~\ref{subsec:envelope} were introduced together for
-this reason.
+15\,m/s (one seed, on the controller of October 5), the ego enclosure
+was lost in nine of thirteen runs, and only five of fourteen runs
+recovered. The force-balance measurement of Section~\ref{subsec:modelAided}
+and the handling envelope of Section~\ref{subsec:envelope} were
+introduced together for this reason.
 
 The published enclosures were audited against the recorded truth in
-every frame of the fourteen runs of one seed. The ego enclosure was
-valid in all 5958 frames and the target enclosure was available in
-2291; neither failed to contain the truth in any frame. The medians of
-the ego radii within a run were 0.06\,m in position, 0.005 to
-0.008\,rad in heading and 0.08 to 0.09\,m/s in lateral velocity. The
-true motion stayed inside the sideslip cone \eqref{eq:sideslip_cone}.
-It exceeded the adhesion condition \eqref{eq:adhesion_cone} in three
-frames of three 15\,m/s runs, by at most 0.7\%, which is possible
-because that condition acts on the estimate and on the affine
-prediction. The audit covers the sampled instants of one seed and is
-not a proof of the premises.
+every sample of the fourteen runs of one seed, by replaying the
+estimator on the recorded plant trajectory; the replay reproduced the
+recorded estimates to $5\cdot10^{-15}$. The ego enclosure was valid and
+available in all 4001 samples and the target enclosure in 2018 of them,
+and neither failed to contain the truth. The medians of the ego radii
+within a run were 0.062 to 0.064\,m in position, 0.005 to 0.018\,rad in
+heading and 0.08 to 0.15\,m/s in lateral velocity. The true motion
+stayed inside the sideslip cone \eqref{eq:sideslip_cone} and below the
+adhesion condition \eqref{eq:adhesion_cone} in every sample, including
+the two runs of the seed that slow into the blended regime, where the
+plant's lateral forces are no longer those of the Fiala model that the
+force-balance measurement inverts. The audit covers the sampled
+instants of one seed and is not a proof of the premises.
 
 The target enclosure remains wide where the controller needs it most.
-The relative-position radius has a median of about 0.065\,m, but the
-set of motion parameters used for prediction has median radii of 0.24
-to 0.53\,rad in course and 1.9 to 4.0\,m/s in speed, and the whole
+The relative-position radius has a median of about 0.064\,m, but the
+set of motion parameters used for prediction has median radii of 0.20
+to 0.59\,rad in course and 1.4 to 4.3\,m/s in speed, and the whole
 declared range for $A_C$ and $\kappa_C$. The point estimates of the
 parameters are also noisy: between 0.5 and 3\,s, the root-mean-square
-error within a run has a median of 0.27\,m/s$^2$ for $A_C$ (largest
-0.46\,m/s$^2$) and 0.008\,rad for $\beta_C$ (largest 0.027\,rad), and
-the estimate of $A_C$ can sit at the limit of its declared range for
-several consecutive samples. The gain program
-\eqref{eq:noise_shape_lmi} bounds the variance of the velocity error;
-the noise of the acceleration state, from which $A_C$ and $\beta_C$ are
-reconstructed, is not part of its objective.
+error within a run has a median of 0.26\,m/s$^2$ for $A_C$ (largest
+0.61\,m/s$^2$) and 0.008\,rad for $\beta_C$ (largest 0.042\,rad). The
+gain program \eqref{eq:noise_shape_lmi} bounds the variance of the
+velocity error; the noise of the acceleration state, from which $A_C$
+and $\beta_C$ are reconstructed, is not part of its objective.
 
 \subsection{Runs Without a Solution}
 \label{subsec:failureResults}
 
-\begin{table}[!t]
-\caption{The two estimated-state runs that stop without a solved
-command: obstacle parameters published in the failing sample and their
-true values.}
+\begin{table*}[!t]
+\caption{The ten estimated-state runs that stop without a solved
+command: the sample that fails, the program without a result (primary:
+the solver finds no point of \eqref{eq:primary_program}; step: no step
+of the rule in Section~\ref{subsec:program} is acceptable), the horizon
+of the last solved sample, and the obstacle parameters published at
+that sample against their true values: course error, curvature and
+acceleration (published; true), and the distance between the published
+and the true forecast of the obstacle 3\,s later.}
 \label{tab:failures}
 \centering
 \footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{lrr}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrlrrccr}
 \toprule
- & Braking lead & Curved crossing\\
- & 8\,m/s & 8\,m/s\\
+ & $v_*$ & & $t$ & & $M$ & $\gamma_C$ & $\kappa_C$ (m$^{-1}$) & $A_C$ (m/s$^2$) & 3\,s\\
+Scenario & (m/s) & Seed & (s) & Stage & & ($^\circ$) & publ.; true & publ.; true & (m)\\
 \midrule
-Time of the failing sample (s) & 2.65 & 7.10\\
-Horizon $M$ (holds) & 84 & 104\\
-Trust scale $\sigma$ & 0.68 & 1.00\\
-$A_C$, estimate; truth (m/s$^2$) & $-0.078$; $-0.5$ & $0.780$; $0.5$\\
-$\beta_C$, estimate; truth (rad) & $0.008$; $0$ & $0.041$; $0.040$\\
-Speed, estimate; truth (m/s) & 6.70; 6.68 & 12.84; 12.75\\
-Forecast error at the endpoint (m) & 3.7 & 5.6\\
+Curved head-on & 8 & 4 & 0.25 & primary & 29 & $2.8$ & $-0.0065$; $-0.0050$ & $-0.13$; $0.0$ & 0.8\\
+Curved head-on & 8 & 1 & 0.75 & primary & 18 & $-4.8$ & $-0.0175$; $-0.0050$ & $-0.10$; $0.0$ & 5.5\\
+Curved head-on & 8 & 2 & 0.75 & primary & 17 & $-4.6$ & $-0.0158$; $-0.0050$ & $-0.28$; $0.0$ & 4.9\\
+Curved head-on & 8 & 3 & 0.75 & primary & 41 & $-4.5$ & $-0.0127$; $-0.0050$ & $-0.12$; $0.0$ & 4.1\\
+Curved head-on & 8 & 6 & 0.75 & primary & 42 & $-2.9$ & $-0.0019$; $-0.0050$ & $-0.83$; $0.0$ & 4.4\\
+Curved head-on & 15 & 4 & 0.55 & step & 52 & $1.4$ & $-0.0241$; $-0.0050$ & $-0.42$; $0.0$ & 4.6\\
+Curved head-on & 15 & 1 & 2.15 & primary & 34 & $0.7$ & $0.0015$; $-0.0050$ & $0.20$; $0.0$ & 2.4\\
+Head-on & 8 & 3 & 0.55 & step & 40 & $-0.3$ & $-0.0155$; $0.0000$ & $-0.35$; $0.0$ & 4.4\\
+Braking lead & 15 & 5 & 3.30 & primary & 98 & $0.1$ & $-0.0023$; $0.0000$ & $-1.06$; $-0.5$ & 3.1\\
+Braking lead & 8 & 5 & 5.95 & step & 8 & $-0.6$ & $0.0017$; $0.0000$ & $-0.53$; $-0.5$ & 0.1\\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
-Both runs stop in a sample whose horizon is long while the published
-$A_C$ is far from the truth (Table~\ref{tab:failures}). In the braking
-lead, the estimate of $A_C$ in the eight preceding samples ranged from
-$-1.10$\,m/s$^2$, the limit of the declared range, to $-0.59$\,m/s$^2$,
-and jumped to $-0.08$\,m/s$^2$ in the failing sample. In the curved
-crossing the horizon had been eight holds; the separating speed at the
-endpoint of the plan had fallen to 0.56\,m/s, near the margin
-$v_{\rm sep}$, and in the failing sample the rollout continued for 104
-holds before it reached the terminal set. An error of $A_C$ displaces
-the forecast quadratically in time: at the end of these horizons the
-forecast obstacle is 3.7 and 5.6\,m from the true one.
+Table~\ref{tab:failures} lists the ten runs. Eight stop within 2.2\,s
+of the start, with the obstacle acquired before the first sample, and
+in all eight the parameters published for the obstacle are far from its
+motion: the course by up to $4.8^\circ$ and the curvature by up to
+$0.019$\,m$^{-1}$ against true values of $0$ and $-0.005$\,m$^{-1}$,
+so that the forecast on which the plan and its continuation are
+evaluated is 0.8 to 5.5\,m from the true position 3\,s later and 1.5
+to 12.6\,m after 5\,s. The continuation of an endpoint
+that ends in a stop is evaluated against that forecast until the
+obstacle leaves the range, several seconds beyond the plan, which is
+where a course or curvature error is largest. In the four runs that were
+re-solved offline from the saved sample (three curved head-ons and the
+15\,m/s braking lead), the primary program was certified primal
+infeasible at every trust scale, from the shifted plan and from the
+fresh rollout alike: a hard row cannot be met, and the failure is not a
+numerical breakdown. The 15\,m/s braking lead stops at 3.3\,s while
+passing a lead whose published deceleration is twice the true value,
+after five fresh rollouts; the 8\,m/s braking lead of the same seed
+stops at 5.95\,s while following the lead 5\,m behind it, with the
+parameters published correctly, at a sample whose primary program needs
+36\,m of summed relaxation and from whose solution no step is
+acceptable. None of the ten is a
+violation of a published bound: the published parameter sets contain the
+truth, but the controller forecasts with their centers.
 
-The failing problems were solved again with groups of rows removed.
-Without the collision rows, or without the terminal separation row
-\eqref{eq:terminal_separation}, both are feasible; removing the road,
-handling or road-recovery rows does not help. With all collision rows
-relaxed, the slack is nonzero only at the end of the horizon (holds 58
-to 85 and 102 to 105). The conflict is therefore between the forecast
-obstacle near the end of a long horizon and the requirement to separate
-from it there, in a part of the horizon whose rows have no slack and
-whose forecast no enclosure covers. Neither failure is a violation of a
-published bound.
-
-As an ablation, the published $A_C$ and $\beta_C$ were replaced by a
-least-squares fit of the constant-parameter trajectory
-\eqref{eq:target_flow} to the last 2\,s of relative-position
-measurements, with the tracker's position, velocity and enclosures
-unchanged. The errors of $A_C$ and $\beta_C$ fell to medians of
-0.02\,m/s$^2$ and 0.0005\,rad, all 84 runs succeeded, and the smallest
-distance to a road edge was 1.00\,m. The fit is a second estimator
-outside the certificate of Section~\ref{sec:estimator} and is not part
-of the reported design.
+The terminal set of the October 5 design of this controller, which
+required only a separating relative velocity at the endpoint and was
+not invariant, recovered 82 of the same 84 runs. The present set
+recovers 74 and is invariant: the eight runs are the price of trusting
+the forecast until the obstacle has left the range instead of until the
+plan ends, with the published parameters of this estimator.
 
 \subsection{Computation}
-\label{subsec:computation}
+\label{subsec:computationResults}
 
-Four exact-state encounters were timed one at a time on the same
-machine (8\,m/s head-on and turning crossing, 15\,m/s head-on and
-crossing, about 800 holds). One controller call took a median of
-9.2\,ms and a 95th percentile of 41\,ms, and 3.4\% of the calls
-exceeded the 50\,ms hold. These timings precede the last estimator
-change, which does not alter the exact-state controller. In the
-campaign itself eight runs shared the machine
-(Fig.~\ref{fig:closedLoop}(f)): the median call time was 12 to 13\,ms,
-6.8\% of the exact-state calls and 7.9 to 8.6\% of the estimated-state
-calls exceeded the hold, and the largest call took 1.1\,s. The
-estimator took a median of 16 to 19\,ms per hold, for four estimator
-samples. The slow calls are those with long horizons or a second
-linearization. Because the computation time is not applied as a delay,
-the outcomes describe the algorithm with instantaneous computation.
+One controller call took a median of 5.5\,ms and a 95th percentile of
+19\,ms with exact states, and 7.3 and 36\,ms with estimated states, in
+the campaign itself, with six runs sharing the machine
+(Fig.~\ref{fig:closedLoop}(f)); 1.1\% of the exact-state calls and 2.3\%
+of the estimated-state calls exceeded the 50\,ms hold, and the largest
+calls took 0.11 and 0.30\,s. The estimator took a median of 12\,ms per
+hold, for four estimator samples. The time grows with the plan length:
+the slow calls are those with long horizons, up to 184 holds, and the
+28 samples that solved a fresh rollout after an infeasible shifted
+problem. In a separate benchmark with exact states, two runs sharing the
+machine and the obstacle appearing after 2\,s of target-free driving,
+the sample at which the obstacle appears took 26\,ms in the median and
+72\,ms at most, and all samples 6.5\,ms in the median and 23\,ms at the
+95th percentile. The measures of Section~\ref{subsec:computation} halved
+these times against the previous implementation of the same problem,
+whose 95th percentile with estimated states was 136\,ms; the solver
+tolerances account for about 6\% of the time at the median and 15\% at
+the 95th percentile, and cost 0.1\,s of recovery time at the median. Because the computation time is not applied as a
+delay, the outcomes describe the algorithm with instantaneous
+computation.
 
 \section{Discussion}
 \label{sec:discussion}
 
 Of the six statements of Section~\ref{subsec:argument}, the estimation
-links are the strongest and the recursive-feasibility link is the
-weakest. Theorem~\ref{thm:cascadeISS} is a continuous-time statement about the
-velocity--target cascade, and the gain selection of
-Section~\ref{subsec:gainSelection} takes place inside its certificate.
-With a shape chosen outside the certificate, only the scale can be
-adjusted to it, and the gains come out larger than the certificate
-requires; choosing the shape inside the certificate lowered the
-predicted velocity noise and the certified radii together. The remaining
-losses against the tuned reference in the open-loop trials are
-consistent with constraints of the certificate. At low relative speed
-the decay floor $\lambda_T=0.8$\,s$^{-1}$ keeps the certified gains
-noisier than the reference's uncertified choice, and in arc following
-the target sideslip bound $\beta_{\max}=0.03$\,rad declared for that
-scenario raises $L_q$ from 0.80 to 2.29\,s$^{-2}$. Less conservative
-Lipschitz multipliers, and separate metrics for the variance bound and
-the dissipation inequality, are the natural refinements.
+links remain the strongest, and the recursive-feasibility link has
+moved from open to conditional. Theorem~\ref{thm:cascadeISS} is a
+continuous-time statement about the velocity--target cascade, and the
+gain selection of Section~\ref{subsec:gainSelection} takes place inside
+its certificate. With a shape chosen outside the certificate, only the
+scale can be adjusted to it, and the gains come out larger than the
+certificate requires; choosing the shape inside the certificate lowered
+the predicted velocity noise and the certified radii together. The
+remaining losses against the tuned reference in the open-loop trials
+are consistent with constraints of the certificate: at low relative
+speed the decay floor $\lambda_T=0.8$\,s$^{-1}$ keeps the certified
+gains noisier than the reference's uncertified choice, and in arc
+following the target sideslip bound $\beta_{\max}=0.03$\,rad declared
+for that scenario raises $L_q$ from 0.80 to 2.29\,s$^{-2}$.
+
+The terminal set is the change since the design of October 5, and it
+trades measured success for a proved property. The former set asked the
+endpoint to separate from the obstacle and to be able to stop its
+lateral motion before the road edge; it was not invariant, and the next
+sample could find no feasible plan. The present set is built from the
+obstacle's own motion model and one braking law, is invariant under
+that law, and makes the problem recursively feasible on the declared
+model (Proposition~\ref{prop:recursive}). In the loop the statement held
+where its premises held: the shifted plan was accepted at every
+exact-state sample and at 99.8\% of the estimated-state samples. The
+cost is that the forecast of the obstacle is now trusted until it leaves
+the range, which for a stop in the lane means several seconds beyond
+the plan, and the published course and curvature of an obstacle
+acquired half a second earlier are not good enough for that on the
+curved road: eight of the ten failures are of this kind, and the
+October 5 design, with a weaker terminal condition, recovered 82 of 84.
+The published parameter sets contained the truth in every audited
+sample; the controller forecasts with their centers. A terminal set
+evaluated against the whole published set would be monotone in that
+set, and recursive feasibility with it needs nested information sets, a
+property of a set-membership update that the high-gain observer's
+enclosures do not have. For the ego the same question is the tube
+around the shifted plan that the innovation opens, which needs
+tightened rows along the horizon \cite{ChisciRossiterZappa2001} or a
+plan in feedback form \cite{MayneSeronRakovic2005}. Neither is
+implemented. On the estimator's side, a set-membership enclosure of the
+obstacle's constants over the measurement history, tried with an earlier
+terminal set, halved the published course and speed widths but left the
+acceleration and curvature unresolved in time, and was not adopted.
 
 Closing the loop changed both designs, and most changes came in pairs.
 The estimator's premises are statements about the true motion, and the
@@ -2745,68 +3207,48 @@ for, and the bounds published under it were then wrong, not merely
 loose. Sharing the tire model and the held input replaced that premise
 by one the controller can enforce, and the controller in turn accepted
 two constraints, the sideslip cone and the rear-adhesion cone, whose
-purpose is partly to keep the estimator informative. In the other
-direction, the estimator's enclosure could not be used as a worst case
-throughout the horizon or in the decrease condition: both made the
-programs infeasible or the commands erratic. The implemented compromise
-certifies one hold and replans, and the results show what that leaves
-open. The large difference between observed errors and certified radii
-matters now that the controller consumes the enclosure: the certified
-course and speed radii of the obstacle are one to two orders of
-magnitude above the observed errors, and the wide passes and small road
-margins of the estimated-state runs are their consequence.
+purpose is partly to keep the estimator informative; in the audited
+seed the true motion never left either. In the other direction, the
+estimator's enclosure could not be used as a worst case throughout the
+horizon or in the decrease condition: both made the programs infeasible
+or the commands erratic. The implemented compromise certifies one hold
+and replans. The certified course and speed radii of the obstacle are
+one to two orders of magnitude above the observed errors, and the wide
+passes and small road margins of the estimated-state runs are their
+consequence.
 
-The two runs without a solution point at the acceleration state of the
-tracker. The controller needs the obstacle's motion parameters for a
-forecast over horizons of up to 138 holds, and the reconstruction of
-$A_C$ from a high-gain acceleration state is the noisiest quantity the
-estimator publishes. The ablation with a windowed fit shows that the
-information is in the measurements: a constant-parameter stage inside
-the estimator cascade, with its own certificate, or a variance bound on
-the acceleration state in the gain program \eqref{eq:noise_shape_lmi},
-would address the cause. On the controller side, a forecast enclosure
-that grows along the horizon, used with slack beyond the first hold,
-would state the uncertainty the long horizons actually face. None of
-these was evaluated.
-
-The controller has no certificate for the nonlinear vehicle, and
-success in 96 of 98 runs does not supply one; statements (iv) and (v)
-of Section~\ref{subsec:argument} are where the system's guarantee is
-still missing. The trust box and the
-node margin are not related by a bound on the linearization remainder;
-the innovation-based trust scale keeps the measured remainder near a
-target and is a heuristic. Separation is imposed at nodes and mid-hold
-points only, and the sampled distance falls below the node margin in
-most exact-state runs; whole-hold separation needs a swept or interval
-condition. The terminal set is not invariant, so feasibility at one
-sample does not imply feasibility at the next, and the variable horizon
-moves the difficulty into its length: the samples that fail, and the
-slow calls, are the ones with long horizons. A positive primary optimum
-is executed.
+The control-Lyapunov construction behaves as intended in one respect:
+one obstacle-independent function governs avoidance and recovery, every
+completed run returns to cruise with the same function and programs
+throughout, and the certificate of the cruise law now rests on the
+sampled nonlinear model rather than on its linearization at the trim,
+at the cost of an enclosure hypothesis that is sampled, not proved. The
+decrease requested of the issued input is a request on a local model,
+and the plant misses it in 7\% of the zero-slack samples with exact
+states. The one run in which $V$ increases, at 15\,m/s on the curve,
+points at the tie term: near the path its weight vanishes, the later
+inputs of the plan are then fixed by nothing but the solver's choice,
+and the next anchor inherits them. A floor on that weight is the
+obvious remedy and was not evaluated here.
 
 Several premises of the closed-loop trials are favorable. The plant is
 the prediction model with nominal parameters, so the structural premise
-of the force-balance measurement holds by construction, and the 5\%
-parameter box is a design margin, not a measured mismatch. The obstacle
-follows its declared model. Computation is treated as instantaneous
-although 3 to 9\% of the calls exceed the hold. The steering angle is
-unbounded in magnitude and rate. The road edges are declared, not
-perceived, and the relative-position measurement is synthetic with a
-noise bound of 0.04\,m; on simulated camera and LiDAR captures the
+of the force-balance measurement holds by construction above 4\,m/s,
+and the 5\% parameter box is a design margin, not a measured mismatch.
+The obstacle follows its declared model. Computation is treated as
+instantaneous although 1 to 2\% of the calls exceed the hold. The
+steering angle is unbounded in magnitude and rate, and the
+estimated-state runs use up to 1.04\,rad. The road edges are declared,
+not perceived, and the relative-position measurement is synthetic with
+a noise bound of 0.04\,m; on simulated camera and LiDAR captures the
 perception pipeline of Section~\ref{sec:perception} has so far produced
 position errors above the 0.12\,m bound assumed in
 Section~\ref{subsec:designResults} on most frames, and it has not been
-run in the loop. The sampled realization of the observer is not covered
-by the continuous-time theorem. Each of these premises has to be removed
+run in the loop. Assumption~\ref{asm:mild} carries no mismatch bound,
+and the braking phase of the terminal continuation is sampled like the
+plan. The sampled realization of the observer is not covered by the
+continuous-time theorem. Each of these premises has to be removed
 before physical collision avoidance can be claimed.
-
-The control-Lyapunov construction behaves as intended in one respect:
-one obstacle-independent function governs avoidance and recovery, and
-every completed run returns to cruise with the same function and
-programs throughout. The quadratic form is certified only for the
-linearized model near the trim, and the decrease is requested on an
-affine model of the estimate. The recovery results are therefore
-empirical.
 
 \section{Conclusion}
 \label{sec:conclusion}
@@ -2828,31 +3270,45 @@ after the initial transient; the position error over the complete run
 and most acceleration errors favor the reference.
 
 The controller linearizes a dynamic bicycle model with modified Fiala
-tires along one nonlinear rollout per sample and solves two cone
-programs over a horizon that ends where the plan separates from the
-obstacle and can remain on the road. The two parts are coupled in both
+tires along one nonlinear rollout per sample, solves two cone programs,
+and issues the nonlinear rollout of an accepted step of their solution.
+Its horizon ends in a terminal set built from the obstacle's own motion
+model: past the endpoint the obstacle keeps its forecast and the ego
+brakes to rest with its steering held, and the endpoint is terminal
+when that joint continuation, exact in closed form, stays on the road
+and clears the obstacle until it leaves the perception range. The set
+is forward invariant under the braking law, and on the declared sampled
+model with exact information the plan of one sample shifted by one hold
+is an acceptable plan at the next. The two parts are coupled in both
 directions: the estimator measures the lateral velocity through the
 controller's tire model and held input, and the controller keeps the
 vehicle where that measurement is informative and tightens each hold by
 the estimator's current enclosure. In fourteen collision-threat
 encounters with exact states, every run ends collision-free on the road
-with cruise recovered; with the estimator and bounded sensor noise, 82
-of 84 runs do so, none collides, and two stop without a solved command
-where a long horizon meets a noisy estimate of the obstacle's
-acceleration. These are simulations on the prediction model itself.
+with cruise recovered, and the shifted plan was feasible at every
+sample; with the estimator and bounded sensor noise, 74 of 84 runs do
+so, none collides or leaves the road, and ten stop without a solved
+command, eight of them within the first two seconds of an encounter
+where the published course and curvature of the obstacle place its
+forecast meters from its motion. These are simulations on the
+prediction model itself.
 
 Of the safety argument of Section~\ref{subsec:argument}, the estimation
 link and the propagation of the enclosure into the first hold are
-proved; the perception bound is declared, the estimator's premises are
-enforced on the prediction and audited on the vehicle, the per-hold
-separation is proved for the affine prediction and measured for the
-vehicle, and recursive feasibility is open. Closing the argument requires a
-certified estimate of the obstacle's motion parameters and a forecast
-enclosure along the horizon, a bound that links the linearization step
-to the collision margin, whole-hold separation, an invariant terminal
-condition, actuator constraints, real-time computation, plant mismatch
-and perception in the loop. The system presented here is built to admit
-each of these additions without changing its structure.
+proved; the perception bound is declared; the estimator's premises are
+enforced on the prediction and audited on the vehicle; the per-hold
+separation and the recursive feasibility hold on the declared sampled
+model with exact information and are measured for the vehicle and with
+the estimator; the cruise law's decrease is certified on the sampled
+nonlinear model conditional on a sampled enclosure of its Jacobians.
+Closing the argument requires a terminal set and a plan that are robust
+to the estimator's enclosures rather than tightened by them, which in
+turn needs nested information sets for the obstacle, a bound that links
+the linearization step to the collision margin, whole-hold separation,
+a mismatch bound for the mild-state model, actuator constraints,
+real-time computation, plant mismatch and perception in the loop. The
+system presented here is built to admit each of these additions without
+changing its structure.
 
 \section*{Data and Code Availability}
 
@@ -2863,9 +3319,10 @@ Python scripts, and the illustrations of Section~\ref{sec:perception}
 use simulated camera and LiDAR captures. The raw per-sample traces of
 the closed-loop campaign are kept outside the repository; the summary
 tables derived from them, the scripts that derive the statistics and
-Fig.~\ref{fig:closedLoop}, and the hashes of the sources that produced
-the runs are in its reports. A public repository URL, release commit,
-license, and archival identifier should be inserted before submission.
+Fig.~\ref{fig:closedLoop}, the estimator audit, and the hashes of the
+sources that produced the runs are in its reports. A public repository
+URL, release commit, license, and archival identifier should be
+inserted before submission.
 
 \section*{Ethics Statement}
 
@@ -2894,10 +3351,12 @@ Section~\ref{subsec:modelAided} and
 Sections~\ref{sec:control}--\ref{sec:conclusion}, to revise parts of
 Sections~I--III and \ref{sec:estimator}, and to write the analysis
 scripts and the sources of Figs.~\ref{fig:architecture} and
-\ref{fig:closedLoop}. The quantitative values are drawn from the
-versioned experiment records and checked against their numerical
-exports. The authors remain responsible for verifying every equation,
-citation, result, interpretation, and submission declaration.
+\ref{fig:closedLoop}; the October 11 revision rewrote
+Section~\ref{sec:control} and Sections~\ref{subsec:controlProtocol}
+onward for the controller of that date. The quantitative values are
+drawn from the versioned experiment records and checked against their
+numerical exports. The authors remain responsible for verifying every
+equation, citation, result, interpretation, and submission declaration.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

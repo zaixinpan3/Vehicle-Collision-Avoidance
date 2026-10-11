@@ -151,18 +151,21 @@ conic QP/SOCP rather than a QP with exclusively affine constraints.
 
 The objective is
 
-    (rho + epsilon * lossLower * R(dU)) / max(1,V(x)),
+    (rho + epsilon * max(lossLower,f) * R(dU)) / max(1,V(x)),
     R(dU) = (1/(2M)) sum_i ||diag(r_delta,r_b)^(-1) dU_i||^2.
 
 The input correction box implies 0 <= R <= 1. `lossLower` is a lower bound on
 `e'Qe` over the current affine uncertainty set (exactly `e'Qe` with zero error).
 Therefore, at an exact optimum, the regularizer changes minimum physical
-CLF slack by at most `epsilon * lossLower`, with
-`epsilon = clfTieTolerance = 1e-4`. Its allowance vanishes at nominal behavior.
-Inputs are penalized relative to the
-linearization input, not zero. This also prevents arbitrary future inputs
-from becoming poor trust centers after shifting. Solver tolerances add their
-own numerical error.
+CLF slack by at most `epsilon * max(lossLower,f)`, with
+`epsilon = clfTieTolerance = 1e-4`. On the previous accepted plan the floor
+`f` is one unit of the error scales, so the allowance does not vanish at
+nominal behavior; on a fresh rollout, a search seed, `f = 0`. Inputs are
+penalized relative to the linearization input, not zero. This prevents
+arbitrary future inputs from becoming poor trust centers after shifting; with
+an allowance that vanished at nominal behavior it did not near the path, and
+the 15 m/s cruise oscillated (`report/SOLVER_TOLERANCE_20261011.tex`). Solver
+tolerances add their own numerical error.
 
 With an observer enclosure the row is the same, on the estimate:
 `budget = exp(-2h/T)*V(xhat)` and `lossLower = e0'Qe0` at the estimate.

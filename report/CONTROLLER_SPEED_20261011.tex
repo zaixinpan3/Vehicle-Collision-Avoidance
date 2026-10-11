@@ -52,6 +52,15 @@ reverted (Section~\ref{sec:reverted}).
   whose safety stage is primal infeasible early in the encounter.
 \end{itemize}
 
+\paragraph{Note added later on October 11.}
+Leaving out the rows that the variable boxes imply does not change the
+convex problem. Near the path, however, the CLF stage's optimum is not
+unique, and those rows had decided which optimum the solver returned.
+Without them the 15-m/s cruise oscillated after recovery (speed error down
+to $-0.14$~m/s). This report's campaign stops 1~s after recovery and could
+not see it. \path{report/SOLVER_TOLERANCE_20261011.tex} records the defect
+and its fix, a tie that keeps the inherited plan.
+
 \section{Changes}
 \subsection{The same problem, built faster}
 The changes in this group leave the convex problem's feasible set and

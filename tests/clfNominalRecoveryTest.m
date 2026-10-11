@@ -60,5 +60,29 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 testCase.verifyLessThan(nonlinearBicycleModel.nominalValue(x,road,reference),initialValue);
             end
         end
+        function cruiseStaysOnTheReference(testCase,referenceSpeed,curvature)
+            % Started on the reference, the cruise stays there: the plan's
+            % later inputs, which the CLF row does not see, must not wander
+            % between samples (they did at 15 m/s while the tie vanished).
+            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
+                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2))));
+            road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',600));
+            reference=nonlinearBicycleModel.cruise(cfg,curvature);
+            [position,heading]=laneGeometry.referencePose(0,0,road.referenceCurve);
+            x=[position;heading+reference.state(3);reference.state(4:6)];
+            prior=[];input=reference.input;worst=zeros(5,1);slack=0;
+            for frame=1:300
+                ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5), ...
+                    'yawRate',x(6),'heldActuatorInput',input,'stateTime',(frame-1)*cfg.controller.sampleTime);
+                [command,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,prior);
+                input=command.actuatorInput;x=nonlinearBicycleModel.sample(x,input,cfg);
+                if frame>100
+                    worst=max(worst,abs(nonlinearBicycleModel.error(x,road,reference)));
+                    slack=max(slack,problem.metadata.clfSlack);
+                end
+            end
+            testCase.verifyLessThanOrEqual(worst,[.01;2e-3;.01;.01;2e-3]);
+            testCase.verifyLessThanOrEqual(slack,cfg.solver.feasibilityTolerance);
+        end
     end
 end

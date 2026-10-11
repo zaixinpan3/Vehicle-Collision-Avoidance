@@ -1,0 +1,34 @@
+===== exact =====
+[ref1e-6] runs 14 recovered 14  {'recovered': 14}
+   least replay clearance 0.136 m; median per-run least 0.282 m
+   controller s median 0.005 p95 0.019 max 0.11
+   horizon holds median 16 p95 40 max 117; first frame median 24
+   terminal ends {'exit': 678, 'noTarget': 3343, 'parked': 1517}
+   frames 5538: braking hold appended 20, extension stopped {'': 5520, 'noHoldStaysTerminal': 18}, shifted candidate infeasible 1
+   recovered per scenario: acceleratingHeadOn 2/2, brakingLead 2/2, crossing 2/2, curvedCrossing 2/2, curvedHeadOn 2/2, headOn 2/2, turningCrossing 2/2
+[tol1e-4] runs 14 recovered 7  {'noSolution:pcbfNoNumericalResult': 1, 'notRecovered': 6, 'recovered': 7}
+   least replay clearance 0.141 m; median per-run least 0.562 m
+   controller s median 0.006 p95 0.011 max 0.11
+   horizon holds median 16 p95 18 max 170; first frame median 24
+   terminal ends {'exit': 768, 'noTarget': 14441, 'parked': 1530}
+   frames 16739: braking hold appended 27, extension stopped {'': 16738, 'noHoldStaysTerminal': 1}, shifted candidate infeasible 1
+   recovered per scenario: acceleratingHeadOn 1/2, brakingLead 1/2, crossing 1/2, curvedCrossing 1/2, curvedHeadOn 1/2, headOn 1/2, turningCrossing 1/2
+  tol1e-4 vs ref1e-6: newly recovered 0 []
+  tol1e-4 vs ref1e-6: newly failed 7 [('seed0-speed15-acceleratingHeadOn', 'notRecovered'), ('seed0-speed15-crossing', 'notRecovered'), ('seed0-speed15-curvedHeadOn', 'notRecovered'), ('seed0-speed15-headOn', 'notRecovered'), ('seed0-speed15-brakingLead', 'notRecovered'), ('seed0-speed15-turningCrossing', 'notRecovered'), ('seed0-speed15-curvedCrossing', 'noSolution:pcbfNoNumericalResult')]
+===== noisy =====
+[ref1e-6] runs 84 recovered 74  {'noSolution:nonlinearAcceptanceFailed': 3, 'noSolution:pcbfNoNumericalResult': 7, 'recovered': 74}
+   least replay clearance 0.213 m; median per-run least 1.805 m
+   controller s median 0.007 p95 0.036 max 0.30
+   horizon holds median 16 p95 74 max 184; first frame median 25
+   terminal ends {'exit': 4697, 'noTarget': 11497, 'parked': 6889}
+   frames 23083: braking hold appended 26, extension stopped {'': 23069, 'cruiseHoldInadmissible': 12, 'noHoldStaysTerminal': 2}, shifted candidate infeasible 59
+   recovered per scenario: acceleratingHeadOn 12/12, brakingLead 10/12, crossing 12/12, curvedCrossing 12/12, curvedHeadOn 5/12, headOn 11/12, turningCrossing 12/12
+[tol1e-4] runs 84 recovered 34  {'collision': 4, 'noSolution:nonlinearAcceptanceFailed': 5, 'noSolution:pcbfNoNumericalResult': 8, 'notRecovered': 33, 'recovered': 34}
+   least replay clearance 0.000 m; median per-run least 1.692 m
+   controller s median 0.006 p95 0.016 max 0.34
+   horizon holds median 16 p95 28 max 232; first frame median 25
+   terminal ends {'exit': 4975, 'noTarget': 70747, 'parked': 7275}
+   frames 82997: braking hold appended 26, extension stopped {'': 82986, 'cruiseHoldInadmissible': 10, 'noHoldStaysTerminal': 1}, shifted candidate infeasible 67
+   recovered per scenario: acceleratingHeadOn 5/12, brakingLead 6/12, crossing 5/12, curvedCrossing 6/12, curvedHeadOn 0/12, headOn 6/12, turningCrossing 6/12
+  tol1e-4 vs ref1e-6: newly recovered 2 ['seed3-speed8-headOn', 'seed5-speed8-brakingLead']
+  tol1e-4 vs ref1e-6: newly failed 42 [('seed20261003-speed15-acceleratingHeadOn', 'notRecovered'), ('seed20261003-speed15-crossing', 'notRecovered'), ('seed20261003-speed15-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed20261003-speed15-headOn', 'notRecovered'), ('seed20261003-speed15-brakingLead', 'notRecovered'), ('seed20261003-speed15-turningCrossing', 'notRecovered'), ('seed1-speed15-acceleratingHeadOn', 'notRecovered'), ('seed1-speed15-crossing', 'notRecovered'), ('seed20261003-speed15-curvedCrossing', 'collision'), ('seed1-speed8-crossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed1-speed15-headOn', 'notRecovered'), ('seed2-speed15-acceleratingHeadOn', 'notRecovered'), ('seed1-speed15-brakingLead', 'noSolution:nonlinearAcceptanceFailed'), ('seed2-speed15-crossing', 'notRecovered'), ('seed1-speed15-turningCrossing', 'notRecovered'), ('seed1-speed15-curvedCrossing', 'collision'), ('seed2-speed15-curvedHeadOn', 'notRecovered'), ('seed2-speed15-headOn', 'notRecovered'), ('seed2-speed15-brakingLead', 'noSolution:nonlinearAcceptanceFailed'), ('seed2-speed15-turningCrossing', 'notRecovered'), ('seed3-speed15-acceleratingHeadOn', 'notRecovered'), ('seed2-speed15-curvedCrossing', 'collision'), ('seed3-speed8-acceleratingHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed3-speed15-crossing', 'notRecovered'), ('seed3-speed15-headOn', 'notRecovered'), ('seed3-speed15-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed3-speed15-brakingLead', 'notRecovered'), ('seed3-speed15-turningCrossing', 'notRecovered'), ('seed3-speed15-curvedCrossing', 'notRecovered'), ('seed4-speed15-acceleratingHeadOn', 'notRecovered'), ('seed4-speed15-headOn', 'notRecovered'), ('seed4-speed15-crossing', 'notRecovered'), ('seed4-speed15-brakingLead', 'notRecovered'), ('seed4-speed15-turningCrossing', 'notRecovered'), ('seed4-speed15-curvedCrossing', 'notRecovered'), ('seed5-speed15-acceleratingHeadOn', 'notRecovered'), ('seed5-speed15-crossing', 'notRecovered'), ('seed5-speed15-curvedHeadOn', 'notRecovered'), ('seed5-speed8-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed5-speed15-headOn', 'notRecovered'), ('seed5-speed15-turningCrossing', 'notRecovered'), ('seed5-speed15-curvedCrossing', 'collision')]

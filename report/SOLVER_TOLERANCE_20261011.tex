@@ -1,0 +1,300 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{2em}
+\title{Solver tolerance, and a CLF tie that keeps the plan}
+\author{}
+\date{October 11, 2026}
+\begin{document}
+\maketitle
+\paragraph{Status and scope.}
+On October 11, 2026 the user judged the conic tolerance of $10^{-6}$, set
+earlier that day (commit \texttt{ea88059}), to be more precise than
+necessary. This report tests looser tolerances. They fail, and the report
+traces the failure to a defect of the CLF stage that \texttt{ea88059} had
+exposed, fixes it, and tests the tolerance again. The controller keeps
+$10^{-6}$.
+
+\paragraph{Result.}
+\begin{itemize}
+\item \emph{Looser tolerances on \texttt{ea88059}.} $10^{-4}$ and $10^{-3}$
+  were tried, with the safety-slack cap and the stall acceptance at ten times
+  the tolerance. They recover 7 of 14 exact encounters (every 15-m/s one
+  fails) and 34 and 26 of 84 noisy ones, against 14 and 74. At $10^{-4}$
+  four encounters collide. At 15~m/s the vehicle never settles.
+\item \emph{Cause.} Near the path the CLF stage did not fix the plan's later
+  inputs. The only term for them, the tie
+  $\varepsilon\,\mathrm{lossLower}\,R(dU)$, vanishes there. The solver
+  returned those inputs anywhere in the trust box, and the next sample
+  inherited them as its anchor. In \texttt{ea88059}, leaving out the rows
+  that cannot bind changed where the solver put them, and at $10^{-6}$ too
+  the 15-m/s cruise oscillated: speed error down to $-0.14$~m/s, CLF slack
+  in about a third of the frames. The campaign did not see this, because
+  each encounter stops 1~s after recovery is confirmed. At
+  \texttt{c2df2ea} the solver's choice had been steady by accident.
+\item \emph{Fix.} On the previous accepted plan the tie's loss is at least
+  one unit of the CLF error scales. Cruise is then exact at 8 and 15~m/s,
+  on straight and curved roads. On a fresh rollout the tie is not floored:
+  a floored tie there held the first solution of the exact 15-m/s
+  accelerating head-on so close to the seed that no step was accepted.
+\item \emph{With the fix.} The campaign recovers 14 of 14 exact
+  encounters (14 before) and 73 of 84 noisy ones (74), at the same time per
+  frame. In the onset benchmark, 1 frame is over 50~ms (34 before) and the
+  slowest takes 54~ms (113~ms).
+\item \emph{The tolerance again.} With the fix, $10^{-4}$ recovers 14 of
+  14 and 72 of 84 encounters. Recoveries settle 0.5--0.7~s later at the
+  median, with no measurable gain in time: a solve takes about one
+  interior-point iteration fewer. $10^{-3}$ leaves a standing speed error of
+  0.3~m/s. So $10^{-6}$ stays.
+\end{itemize}
+
+\section{Looser tolerances on \texttt{ea88059}}
+The arms were copies of \texttt{ea88059} that differed only in the solver
+settings. Feasibility and gap tolerances were $10^{-6}$, $10^{-4}$ or
+$10^{-3}$. With them, the lexicographic slack cap and the stall acceptance
+were set to ten times the tolerance, at least $10^{-4}$ (in the
+configuration, \path{solver.lexicographicTieTolerance} and
+\path{solver.reducedTolerance}). The cap must be thicker than the solver's
+precision: with a cap
+of $10^{-5}$ at $10^{-8}$ the CLF stage had stalled before (architecture
+document). The 98 encounters ran with two MATLAB sessions per arm, side by
+side.
+
+\begin{table}[h]
+\centering\small
+\caption{Tolerance without the fix (\texttt{ea88059}).}
+\begin{tabular}{lrrr}
+\toprule
+ & $10^{-6}$ & $10^{-4}$ & $10^{-3}$\\
+\midrule
+exact recovered (14) & 14 & 7 & 7\\
+noisy recovered (84) & 74 & 34 & 26\\
+not settled in 2000 frames (noisy) & 0 & 33 & 39\\
+collision (noisy) & 0 & 4 & 0\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All seven exact losses at each looser tolerance are the 15-m/s encounters,
+and the noisy ones are mostly 15-m/s as well. At the end of these runs the
+speed error is $-0.1$ to $-0.3$~m/s, and on the curve the lateral offset is
+0.24~m ($10^{-4}$) or 0.7--0.9~m ($10^{-3}$). Both are outside the recovery
+tolerances (0.1~m/s, 0.1~m). The four collisions are 15-m/s curved
+crossings at about 91~s, long after the encounter, in runs that had never
+settled. The $10^{-6}$ arm had stopped these encounters at recovery, so it
+never met that situation. \path{without-floor/} holds the comparisons.
+
+\section{The cause}
+\paragraph{A limit cycle.}
+The 15-m/s exact head-on at $10^{-4}$ shows the pattern.
+\begin{itemize}
+\item For about 30 frames, $V$ falls by the required 2.5 percent per
+  frame, as the affine model predicts, and the speed error goes from $-0.24$
+  to $-0.11$~m/s.
+\item Over 7 frames, the correction that the first hold needs relative to
+  the anchor grows from 0.41 to 0.99 of the trust box.
+\item The decrease then becomes infeasible: the CLF slack is $7\cdot10^{-3}$
+  to $3.5\cdot10^{-2}$, and the speed error grows back to $-0.24$~m/s.
+\end{itemize}
+The cycle repeats about every 2~s.
+
+\paragraph{The plan's later inputs are free.}
+Only the first successor enters the CLF row. Near the path, neither that row
+nor the constraints fix the inputs after the first hold. The tie fixes them,
+and its weight $\varepsilon\,\mathrm{lossLower}$, with
+$\mathrm{lossLower}=\|e/\text{scales}\|^2$, vanishes as the errors vanish.
+The solver therefore returns those inputs where its barrier terms put them,
+anywhere in the trust box, and the next sample inherits them as its anchor's
+first input. A cruise probe at $10^{-6}$ shows this: 15~m/s on a straight
+road without a target, from a speed error of $-0.25$~m/s, on the declared
+model. The anchor's first braking ratio jumped between $-0.17$ and $+0.13$,
+while the cruise trim is $0.018$. The table below starts from the
+reference instead, for 600 frames.
+
+\begin{table}[h]
+\centering\small
+\caption{Cruise probe at 15~m/s, frames 300--600 (straight road, from the
+reference).}
+\begin{tabular}{lrrr}
+\toprule
+version & speed error (m/s) & frames with CLF slack & correction at the box\\
+\midrule
+\texttt{c2df2ea} & $-0.010$ to $0.001$ & 0 & 0\\
+\texttt{ea88059} & $-0.142$ to $0.016$ & 192 & 202\\
+\texttt{ea88059}, tolerances $10^{-8}$, $10^{-7}$ & $-0.101$ to $0.011$ & 104 & 123\\
+\texttt{ea88059}, implied rows kept & $-0.011$ to $0.002$ & 0 & 0\\
+\texttt{ea88059}, tie floored & 0.000 & 0 & 0\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Keeping the rows that \texttt{ea88059} leaves out, which cannot bind,
+restores \texttt{c2df2ea}'s behavior. Restoring the old tolerances does not.
+The feasible set and the optimum are the same with and without those rows,
+but the optimum is not unique, and the rows' barrier terms had chosen a
+steady point. On the 15-m/s curve \texttt{ea88059} wandered by up to 6~cm
+and 0.066~m/s, with CLF slack in 27 frames; \texttt{c2df2ea} wandered by
+2~cm and 0.03~m/s. At 8~m/s both versions are steady. The campaign stops
+each encounter 1~s after recovery is confirmed, so it measured none of
+this. The looser tolerances show the defect sooner: with the implied rows
+kept, $10^{-4}$ leaves a standing speed error of up to $-0.07$~m/s and
+$10^{-3}$ CLF slack in 497 of 600 frames.
+
+\section{The fix}
+On the previous accepted plan, the shifted plan, the tie's loss is
+$\max(\mathrm{lossLower},1)$: at least one unit of the CLF error scales.
+The code marks that anchor with \path{problem.inheritedAnchor}. Its largest effect on the scaled CLF slack is then
+$\varepsilon=10^{-4}$, and it keeps the later inputs at the inherited plan
+unless the CLF row or a constraint needs them. On a fresh rollout (startup,
+target onset, restart) the tie is not floored. The rollout is a search seed,
+which may meet the target: a tie floored at 0.1 or 1 held the first solution
+of the exact 15-m/s accelerating head-on so close to the seed that the
+step-size rule accepted no step. With 0 or 0.01 that frame is solved. With
+the floor on every anchor, the campaign lost that exact encounter and
+recovered 77 of 84 noisy ones (4 more than the final version, none fewer;
+\path{global-floor/}).
+
+\begin{table}[h]
+\centering\small
+\caption{Cruise probes with the fix ($10^{-6}$), frames 300--600.}
+\begin{tabular}{lrrr}
+\toprule
+probe & lateral (m) & speed (m/s) & frames with CLF slack\\
+\midrule
+15~m/s straight, from the reference & -- & 0.000 & 0\\
+15~m/s straight, from $-0.25$~m/s & -- & 0.000 & 0\\
+15~m/s curve, from the scenario's start & 0.000 & 0.000 & 0\\
+8~m/s straight (both starts) and curve & 0.000 & 0.000 & 0\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Campaign and benchmark with the fix}
+The fixed controller and \texttt{ea88059} ran side by side, three MATLAB
+sessions each. The \texttt{ea88059} arm reproduced its earlier outcome and
+frame count in all 98 encounters.
+
+\begin{table}[h]
+\centering\small
+\caption{Paired campaign, $10^{-6}$. No collision. Controller time per frame
+in ms.}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (14)} & \multicolumn{2}{c}{noisy (84)}\\
+ & \texttt{ea88059} & fixed & \texttt{ea88059} & fixed\\
+\midrule
+recovered & 14 & 14 & 74 & 73\\
+no solution: \texttt{nonlinearAcceptanceFailed} & 0 & 0 & 3 & 3\\
+no solution: \texttt{pcbfNoNumericalResult} & 0 & 0 & 7 & 8\\
+least replay clearance (m) & 0.136 & 0.136 & 0.213 & 0.213\\
+time, median & 5.4 & 5.7 & 7.1 & 7.2\\
+time, 95th / 99th percentile & 18.6 / 38.0 & 18.6 / 38.1 & 36.0 / 61.7 & 36.3 / 62.1\\
+time, max & 94 & 99 & 358 & 371\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+\item \emph{Lost.} One noisy encounter is lost, the seed-3 15-m/s curved
+  head-on, whose safety stage has no result. Curved head-ons change between
+  versions, and \texttt{c2df2ea} lost this one as well. None is gained.
+\item \emph{Recovery.} Recovery is confirmed no later. The median paired
+  difference is 0.00~s; noisy encounters settle earlier in 33 and later in
+  12.
+\item \emph{Onset benchmark.} In the benchmark of
+  \path{report/CONTROLLER_SPEED_20261011.tex}, run side by side, both
+  versions recover 12 of 14.
+  \begin{itemize}
+  \item The onset frame takes 24.3~ms at the median and 40~ms at most
+    (28.3 and 77~ms).
+  \item Over all frames, the 95th and 99th percentiles are 20.8 and
+    23.7~ms (23.1 and 50.3), and the maximum is 54~ms (113).
+  \item One frame is over 50~ms (34).
+  \end{itemize}
+  The 15-m/s accelerating head-on, lost at its onset frame by every earlier
+  version, is now recovered: the cruise before the onset is steady. The
+  15-m/s braking lead is not confirmed within the benchmark's 400 frames.
+  Its plans are 16 holds at the median and at most 55, against 44 and 117
+  before, and its least clearance is 0.200~m. Those long plans had made the
+  slow frames. In the 2000-frame campaign every braking lead ends as before
+  (the same lateral excursion and clearance).
+\end{itemize}
+
+\section{The tolerance with the fix}
+The fixed controller at $10^{-4}$ (cap and stall acceptance at
+$10^{-3}$) was run against the same arm at $10^{-6}$.
+\begin{itemize}
+\item \emph{Outcomes.} Exact 14 of 14 and noisy 72 of 84 (73), with 4
+  encounters gained and 5 lost.
+\item \emph{Recovery.} Recoveries settle later: median $+0.73$~s exact
+  (12 of 14 later) and $+0.48$~s noisy (58 of 68 later).
+\item \emph{Iterations.} A solve takes 8 interior-point iterations at
+  the median instead of 9, and 13 instead of 15 at the 95th percentile
+  (noisy, \path{solverstats.txt}). The solver's share of the controller
+  time is 0.16 against 0.17.
+\item \emph{Time.} Measured side by side with the tie floored on every
+  anchor, the controller is not faster (noisy, $10^{-4}$ against
+  $10^{-6}$).
+  \begin{itemize}
+  \item Median 7.5 against 7.7~ms; 95th percentile 43.7 against 43.2~ms;
+    99th percentile 81.4 against 76.3~ms.
+  \item Frames over 100~ms: 118 against 79, because the coarser solves
+    left more long plans (1528 against 1090 frames over 80 holds).
+  \end{itemize}
+\end{itemize}
+$10^{-3}$ is too coarse even with the fix: the 15-m/s cruise probe keeps a
+standing $-0.31$~m/s error, with CLF slack in 554 of 600 frames.
+\path{tolerance-1e-4/} and \path{global-floor-tolerance/} hold the
+comparisons.
+
+\section{Checks}
+\begin{itemize}
+\item Full suite: 617 of 617 (\path{tests.txt}; 613 before). The new test
+  \path{clfNominalRecoveryTest/cruiseStaysOnTheReference} runs 300 frames
+  from the reference at 8 and 15~m/s, on straight and curved roads. Over
+  the last 200 frames the lateral and speed errors must stay within 1~cm
+  and 0.01~m/s, the heading and yaw-rate errors within 0.002, the
+  lateral-velocity error within 0.01~m/s, and the CLF slack must stay
+  zero. Without the floor both 15-m/s cases fail; with it all four pass.
+\end{itemize}
+
+\section{Decisions for the user}
+\begin{itemize}
+\item \emph{Tolerance.} $10^{-6}$ is kept. The solver takes about a sixth
+  of the controller's time and converges in about nine iterations, so a
+  looser tolerance has little left to save. The cost of a coarse solve is
+  real: later or no settling.
+\item \emph{Validation.} The campaign's 1-s recovery dwell cannot see a
+  slow oscillation after recovery. The new test covers cruise. A longer
+  dwell, or a stretch of cruise after each encounter, would cover the
+  encounters as well.
+\item \emph{Remaining losses.} Noisy curved head-ons (4 of 12 recovered):
+  the safety stage is primal infeasible early in the encounter. They are
+  unchanged by this step.
+\end{itemize}
+
+\section{Reproduction}
+\begin{itemize}
+\item Unit tests: \texttt{matlab -batch "results = runtests('tests'); assertSuccess(results)"}.
+\item Campaigns: \path{scripts/run-workers.sh} \texttt{2000 W} of this
+  folder, with \texttt{ARMS} naming the arm folders. Each arm folder holds a
+  source tree with a \texttt{solver} link, and the arms differ in their
+  solver settings, or in the tie floor, as described above.
+\item Benchmark: \path{scripts/runSpeedBenchmark.m}, both versions side by
+  side.
+\item Summaries, each with \texttt{python3 -I} from this folder:
+  \begin{itemize}
+  \item \texttt{scripts/compare.py}, \texttt{scripts/timing.py} and
+    \texttt{scripts/recovery.py} as in the speed report;
+  \item \texttt{scripts/solverstats.py <label>=<out-dir> ...} for the
+    solver's iterations and share of the time.
+  \end{itemize}
+  The cruise probes were session scripts and are not kept; their setup is
+  described above. Raw outputs under
+  \path{~/.cache/collisionAvoidance/solver_tolerance_20261011/} are
+  disposable and were deleted after the summaries were copied here.
+\end{itemize}
+\end{document}

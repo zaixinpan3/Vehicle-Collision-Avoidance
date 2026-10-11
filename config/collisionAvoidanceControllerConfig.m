@@ -126,6 +126,10 @@ function cfg=localDefaults()
     % which the step-size rule checks on the nonlinear model before anything
     % is issued, and the lexicographic and CLF ties are 1e-4, so 1e-6 is
     % precise enough (1e-8 and 1e-7 cost about a third more solver time).
+    % Looser buys nothing: at 1e-4 (ties and stall acceptance at 1e-3) a
+    % solve takes about one interior-point iteration fewer, the time per
+    % frame does not change measurably, and recoveries settle about 0.5 s
+    % later (report/SOLVER_TOLERANCE_20261011.tex).
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
         'feasibilityTolerance',1e-5,'constraintTolerance',1e-6, ...
         'optimalityTolerance',1e-6,'lexicographicTieTolerance',1e-4, ...

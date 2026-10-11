@@ -1,0 +1,2 @@
+floor1e-4 - floor1e-6 exact: 14 recovered by both, median +0.73 s, mean +1.32 s; later 12, earlier 2, same 0
+floor1e-4 - floor1e-6 noisy: 68 recovered by both, median +0.48 s, mean +1.07 s; later 58, earlier 8, same 2

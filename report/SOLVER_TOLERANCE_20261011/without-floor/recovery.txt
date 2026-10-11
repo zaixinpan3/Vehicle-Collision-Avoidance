@@ -1,0 +1,6 @@
+tol1e-4 - ref1e-6 exact: 7 recovered by both, median +0.05 s, mean +0.10 s; later 5, earlier 1, same 1
+tol1e-4 - ref1e-6 noisy: 32 recovered by both, median +0.13 s, mean -0.08 s; later 20, earlier 9, same 3
+tol1e-3 - ref1e-6 exact: 7 recovered by both, median +1.45 s, mean +3.71 s; later 7, earlier 0, same 0
+tol1e-3 - ref1e-6 noisy: 25 recovered by both, median +2.05 s, mean +3.88 s; later 25, earlier 0, same 0
+tol1e-3 - tol1e-4 exact: 7 recovered by both, median +1.15 s, mean +3.61 s; later 7, earlier 0, same 0
+tol1e-3 - tol1e-4 noisy: 25 recovered by both, median +1.90 s, mean +4.10 s; later 25, earlier 0, same 0

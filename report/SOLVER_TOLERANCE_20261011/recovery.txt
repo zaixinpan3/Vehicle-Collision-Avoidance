@@ -1,0 +1,2 @@
+floor - ea88059 exact: 14 recovered by both, median +0.00 s, mean +0.01 s; later 3, earlier 6, same 5
+floor - ea88059 noisy: 73 recovered by both, median +0.00 s, mean -0.04 s; later 12, earlier 33, same 28

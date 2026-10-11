@@ -1,0 +1,8 @@
+===== exact =====
+[ref1e-6] frames 5538: solves/frame 1.00; iterations per solve median 9 p95 13; AlmostSolved 0; solve ms median 1.11; solver share of controller time median 0.18; full step 0.989; linearized again 0
+[tol1e-4] frames 16739: solves/frame 1.00; iterations per solve median 8 p95 11; AlmostSolved 0; solve ms median 1.08; solver share of controller time median 0.18; full step 0.998; linearized again 0
+[tol1e-3] frames 17443: solves/frame 1.00; iterations per solve median 10 p95 10; AlmostSolved 0; solve ms median 1.13; solver share of controller time median 0.18; full step 0.999; linearized again 0
+===== noisy =====
+[ref1e-6] frames 23083: solves/frame 1.07; iterations per solve median 9 p95 15; AlmostSolved 0; solve ms median 1.27; solver share of controller time median 0.18; full step 0.990; linearized again 6
+[tol1e-4] frames 82997: solves/frame 1.02; iterations per solve median 8 p95 11; AlmostSolved 0; solve ms median 1.06; solver share of controller time median 0.18; full step 0.998; linearized again 6
+[tol1e-3] frames 87068: solves/frame 1.02; iterations per solve median 10 p95 10; AlmostSolved 0; solve ms median 1.14; solver share of controller time median 0.19; full step 0.997; linearized again 3

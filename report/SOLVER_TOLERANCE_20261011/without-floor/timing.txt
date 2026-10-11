@@ -1,0 +1,14 @@
+===== exact =====
+[ref1e-6] frames 5538: ms median 5.5 p95 19.2 p99 52.9 max 114; over 50 ms 63, over 100 ms 1
+   0-20 holds: 4772 frames, median 5.3 p95 11.5 ms; 21-40 holds: 490 frames, median 12.5 p95 29.6 ms; 41-80 holds: 215 frames, median 19.2 p95 71.6 ms; 81-+ holds: 61 frames, median 52.5 p95 86.0 ms
+[tol1e-4] frames 16739: ms median 6.1 p95 11.0 p99 22.9 max 106; over 50 ms 24, over 100 ms 1
+   0-20 holds: 16001 frames, median 6.1 p95 9.7 ms; 21-40 holds: 479 frames, median 11.6 p95 26.2 ms; 41-80 holds: 169 frames, median 17.4 p95 28.2 ms; 81-+ holds: 90 frames, median 36.9 p95 69.8 ms
+[tol1e-3] frames 17443: ms median 6.1 p95 11.3 p99 24.5 max 105; over 50 ms 27, over 100 ms 1
+   0-20 holds: 16712 frames, median 6.0 p95 9.8 ms; 21-40 holds: 501 frames, median 13.3 p95 29.4 ms; 41-80 holds: 145 frames, median 21.0 p95 31.2 ms; 81-+ holds: 85 frames, median 46.3 p95 60.4 ms
+===== noisy =====
+[ref1e-6] frames 23083: ms median 7.3 p95 36.3 p99 64.2 max 297; over 50 ms 523, over 100 ms 45
+   0-20 holds: 17305 frames, median 6.8 p95 14.3 ms; 21-40 holds: 3184 frames, median 16.5 p95 35.7 ms; 41-80 holds: 1584 frames, median 25.8 p95 67.0 ms; 81-+ holds: 1010 frames, median 39.0 p95 73.3 ms
+[tol1e-4] frames 82997: ms median 6.1 p95 16.4 p99 40.2 max 343; over 50 ms 412, over 100 ms 48
+   0-20 holds: 77270 frames, median 6.0 p95 8.3 ms; 21-40 holds: 3053 frames, median 14.9 p95 32.9 ms; 41-80 holds: 1484 frames, median 24.1 p95 57.7 ms; 81-+ holds: 1190 frames, median 37.7 p95 72.0 ms
+[tol1e-3] frames 87068: ms median 6.0 p95 15.1 p99 38.4 max 238; over 50 ms 354, over 100 ms 28
+   0-20 holds: 81504 frames, median 5.9 p95 8.5 ms; 21-40 holds: 3472 frames, median 14.1 p95 30.3 ms; 41-80 holds: 1086 frames, median 23.3 p95 48.1 ms; 81-+ holds: 1006 frames, median 41.0 p95 70.7 ms

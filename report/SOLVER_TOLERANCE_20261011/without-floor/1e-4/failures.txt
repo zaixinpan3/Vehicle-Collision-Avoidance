@@ -1,0 +1,72 @@
+Unrecovered encounters: outcome, frames executed, and over the last ten
+recorded frames the terminal ends, the extension stops and the stop time
+of the endpoint's continuation (s).
+== ref1e-6
+seed1-speed15-curvedHeadOn             noSolution:pcbfNoNumericalResult frames    43 ends {'exit': 10} extension {'': 10} stop 3.5500000000000003
+seed1-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 0.9500000000000001
+seed2-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 1.1
+seed20261003-speed8-curvedHeadOn       noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 2.1
+seed3-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 9, 'cruiseHoldInadmissible': 1} stop 1.85
+seed3-speed8-headOn                    noSolution:nonlinearAcceptanceFailed frames    11 ends {'parked': 10} extension {'': 10} stop 2.3000000000000003
+seed4-speed15-curvedHeadOn             noSolution:nonlinearAcceptanceFailed frames    11 ends {'exit': 10} extension {'': 10} stop 3.7
+seed4-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames     5 ends {'parked': 5} extension {'': 5} stop 1.2000000000000002
+seed5-speed15-brakingLead              noSolution:pcbfNoNumericalResult frames    66 ends {'parked': 10} extension {'': 10} stop 3.95
+seed5-speed8-brakingLead               noSolution:nonlinearAcceptanceFailed frames   119 ends {'parked': 10} extension {'': 10} stop 1.9000000000000001
+== tol1e-4
+seed0-speed15-acceleratingHeadOn       notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed0-speed15-brakingLead              notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed0-speed15-crossing                 notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed0-speed15-curvedCrossing           noSolution:pcbfNoNumericalResult frames  1802 ends {'noTarget': 10} extension {'': 10} stop 3.8000000000000003
+seed0-speed15-curvedHeadOn             notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed0-speed15-headOn                   notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed0-speed15-turningCrossing          notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed1-speed15-acceleratingHeadOn       notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed1-speed15-brakingLead              noSolution:nonlinearAcceptanceFailed frames   244 ends {'parked': 10} extension {'': 10} stop 2.4000000000000004
+seed1-speed15-crossing                 notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed1-speed15-curvedCrossing           collision                      frames  1827 ends {'exit': 10} extension {'': 10} stop 3.75
+seed1-speed15-curvedHeadOn             noSolution:pcbfNoNumericalResult frames    45 ends {'exit': 10} extension {'': 10} stop 3.6500000000000004
+seed1-speed15-headOn                   notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed1-speed15-turningCrossing          notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed1-speed8-crossing                  noSolution:nonlinearAcceptanceFailed frames    28 ends {'parked': 10} extension {'': 10} stop 1.35
+seed1-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 0.9500000000000001
+seed2-speed15-acceleratingHeadOn       notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed2-speed15-brakingLead              noSolution:nonlinearAcceptanceFailed frames   287 ends {'parked': 10} extension {'': 10} stop 2
+seed2-speed15-crossing                 notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed2-speed15-curvedCrossing           collision                      frames  1825 ends {'exit': 10} extension {'': 10} stop 3.75
+seed2-speed15-curvedHeadOn             notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed2-speed15-headOn                   notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed2-speed15-turningCrossing          notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed2-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 1.1
+seed20261003-speed15-acceleratingHeadOn notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed20261003-speed15-brakingLead       notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.6500000000000004
+seed20261003-speed15-crossing          notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed20261003-speed15-curvedCrossing    collision                      frames  1825 ends {'exit': 10} extension {'': 10} stop 3.7
+seed20261003-speed15-curvedHeadOn      noSolution:nonlinearAcceptanceFailed frames     8 ends {'parked': 5, 'exit': 3} extension {'': 8} stop 3.1
+seed20261003-speed15-headOn            notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed20261003-speed15-turningCrossing   notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed20261003-speed8-curvedHeadOn       noSolution:pcbfNoNumericalResult frames    16 ends {'parked': 10} extension {'': 10} stop 2.3000000000000003
+seed3-speed15-acceleratingHeadOn       notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed3-speed15-brakingLead              notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed3-speed15-crossing                 notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed3-speed15-curvedCrossing           notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed3-speed15-curvedHeadOn             noSolution:pcbfNoNumericalResult frames    46 ends {'exit': 10} extension {'': 10} stop 3.75
+seed3-speed15-headOn                   notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed3-speed15-turningCrossing          notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed3-speed8-acceleratingHeadOn        noSolution:nonlinearAcceptanceFailed frames    11 ends {'parked': 10} extension {'': 10} stop 2.25
+seed3-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 9, 'cruiseHoldInadmissible': 1} stop 1.85
+seed4-speed15-acceleratingHeadOn       notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed4-speed15-brakingLead              notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed4-speed15-crossing                 notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed4-speed15-curvedCrossing           notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed4-speed15-curvedHeadOn             notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed4-speed15-headOn                   notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed4-speed15-turningCrossing          notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed4-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames     5 ends {'parked': 5} extension {'': 5} stop 1.2000000000000002
+seed5-speed15-acceleratingHeadOn       notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.6500000000000004
+seed5-speed15-brakingLead              notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed5-speed15-crossing                 notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed5-speed15-curvedCrossing           collision                      frames  1825 ends {'exit': 10} extension {'': 10} stop 3.7
+seed5-speed15-curvedHeadOn             notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed5-speed15-headOn                   notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.75
+seed5-speed15-turningCrossing          notRecovered                   frames  2000 ends {'noTarget': 10} extension {'': 10} stop 3.7
+seed5-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames  1611 ends {'parked': 10} extension {'': 8, 'cruiseHoldInadmissible': 2} stop 2

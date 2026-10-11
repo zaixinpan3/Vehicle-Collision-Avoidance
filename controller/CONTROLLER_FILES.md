@@ -122,7 +122,8 @@ hold factor) and repeats its sampled check with another seed. `trustInnovationTe
 the next scale, bounded growth, the clamped law, and attribution of a
 posterior departure to the observer part. `clfNominalRecoveryTest` checks target-free
 nonlinear value decrease without requiring the optimizer to issue the nominal
-construction feedback. `nominalClfTest` checks the trim, strict local nonlinear
+construction feedback, and that a cruise started on the reference stays there
+(the plan's later inputs do not wander between samples). `nominalClfTest` checks the trim, strict local nonlinear
 Lyapunov decrease, path-phase invariance, and rejection of retired cost-to-go
 settings. `movingTargetPotentialFieldTest` checks attraction, motion-aware
 repulsion, passing-side retention, and frame invariance.
