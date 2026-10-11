@@ -164,11 +164,14 @@ absolute time, so the horizon shrinks by one hold per frame. While the
 shifted plan is shorter than `N` it is extended by holds of the declared model
 that keep the endpoint in the terminal set with their rows met and their
 midpoint clear: the cruise hold `u = u* + K e` of the CLF's certified
-controller (`terminalSafeSet.cruiseInput`), or else the hold nearest to it on
-the segment toward the realization of the terminal law, the previous steering
-with the braking ratio of deceleration `a_b` (`terminalSafeSet.brakingInput`).
-Braking is kept as small as found because later holds reach the first hold
-nearly unchanged. When no hold keeps the endpoint in the set the plan stays one
+controller (`terminalSafeSet.cruiseInput`); else holds of the startup
+guidance through states outside the set until it is reached again (a longer
+plan that completes the maneuver); else the hold nearest to the cruise hold on
+a segment toward holding the previous steering: at the cruise hold's braking
+ratio, else with the braking ratio of deceleration `a_b`, the terminal law's
+realization, else braking as hard as the rear adhesion admits
+(`terminalSafeSet.brakingInput`). Braking is kept as small as found because
+later holds reach the first hold nearly unchanged. When no hold keeps the endpoint in the set the plan stays one
 hold shorter. An endpoint no longer in the set (a changed forecast or state)
 is extended by cruise holds until one is. Prior affine states are not
 reused. When no target is present, nominal path guidance supplies the
@@ -540,9 +543,11 @@ The terminal set and its proofs are in
 [TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md). In short, an endpoint `y` is in
 the set when it meets all of:
 
-- the terminal law is admissible at `y`: the sideslip lies in the problem's
-  cone, and braking at `a_b` (5 m/s^2) with the held arc's lateral
-  acceleration `r V` lies inside the friction circle;
+- `y` is mild: the sideslip lies in the problem's cone and the held arc's
+  lateral acceleration `|r V|` is at most `a_m` (2 m/s^2); in a mild state the
+  ego is taken to be a kinematic vehicle under the simplest law, steering held
+  and braking at `a_b` (4 m/s^2) to rest (the user's assumption, no mismatch
+  bound);
 - along the continuation (the ego braking at `a_b` with its sideslip and
   course curvature held until it stops at a sample instant, the target on its
   forecast), every node, hold midpoint and the parked pose keeps the ego
@@ -555,7 +560,7 @@ the set when it meets all of:
   margin (exact closed form: vertex paths, segments or arcs, against edges).
 
 In the convex problem these conditions are linearized at the anchor endpoint
-on the endpoint correction: the friction circle as a bound on `|r V|` where
+on the endpoint correction: mildness as a bound on `|r V|` where
 the anchor endpoint is outside it,
 fixed-dual collision rows at the continuation's nodes and midpoints before the
 exit and at the parked pose against the target's closest pose on its track,

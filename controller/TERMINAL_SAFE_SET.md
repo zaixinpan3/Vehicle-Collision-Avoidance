@@ -44,12 +44,18 @@ target's latest estimate and the sample index at which it was taken
 (`targetEpoch`, `targetEpochIndex`). The ego's terminal law below ends at rest
 in the same way.
 
-**Ego.** The ego's terminal law keeps it in the same constant-(A, beta)
-family:
+**Ego.** The terminal set holds only mild states (Section 3), and inside it
+the ego is the simplest vehicle under the simplest law: a kinematic bicycle
+with its steering held, braking at a constant mild rate to rest. In a mild
+state the declared model is taken to follow this kinematic model; this is
+the user's modeling assumption (October 11, 2026), and no bound on the
+mismatch is computed. With the steering held, the kinematic bicycle keeps
+its sideslip and its course curvature, so the terminal law keeps the ego in
+the same constant-(A, beta) family as the target:
 
-    kappa_f(z) = ( A_E = max(-a_b, -V_E/h),  beta_E held ),
+    kappa_f(z) = ( A_E = max(-a_b, -V_E/h),  steering held ),
 
-`a_b = terminal.brakingDecelerationMetersPerSecondSquared` (5 m/s^2). The
+`a_b = terminal.brakingDecelerationMetersPerSecondSquared` (4 m/s^2). The
 acceleration is held over each hold, so the speed falls by `a_b h` per hold
 and by what is left in the last one: the ego stops exactly at the end of
 hold `J = ceil(V_E/(a_b h))`.
@@ -82,13 +88,16 @@ and the target's flow is `predictTarget`. A unit test compares the closed-form
 poses with a fine RK4 integration of the same kinematics (agreement to
 1e-9 m).
 
-**Admissibility (`kappa_f` in U).** The law is admissible at `x` when the
-sideslip lies in the cone of the problem, `|v_y| <= tan(beta_max) v_x`, and
-braking at `a_b` with the held arc's lateral acceleration `r V_E` stays inside
-the friction circle, `hypot(a_b, r V_E) <= mu g` (the smaller axle
-coefficient). Along the continuation `beta_E` is constant and `r V_E =
-kappa_E V_E^2` only falls, so admissibility at `x` holds along it. The
-configuration requires `a_b < mu g`.
+**Mildness.** A state `x` is mild when its sideslip lies in the cone of the
+problem, `|v_y| <= tan(beta_max) v_x`, and the held arc's lateral
+acceleration is small, `|r V_E| <= a_m`
+(`terminal.lateralAccelerationMaximumMetersPerSecondSquared`, 2 m/s^2). The
+tires are then far from saturation: braking at 4 m/s^2 with 2 m/s^2 of
+lateral acceleration uses 54 percent of the friction (`mu g` = 8.3 m/s^2),
+and the configuration requires `hypot(a_b, a_m) < mu g`. Along the
+continuation `beta_E` is constant and `r V_E = kappa_E V_E^2` only falls, so a
+mild state stays mild. An endpoint in the middle of a swerve is not mild: the
+plan has to settle before it is terminal.
 
 ## 3. The terminal set
 
@@ -98,7 +107,7 @@ the plan's own collision rows are sampled), and `t_e(z)` the first of those
 instants at which the target's reference point is farther than `R` from the
 ego's (Inf if none). The terminal set is
 
-    X_f = { z : kappa_f is admissible at z,
+    X_f = { z : the ego is mild at z,
                 every node, midpoint and the parked pose of the continuation
                 keeps the ego rectangle on the road (lateralClearance),
                 every node and midpoint before t_e(z) clears the target's
@@ -174,7 +183,7 @@ any time after the ego has stopped.
 `phi(z)` is `phi^{j+1}(z)`, `j >= 0`: the speed schedule from `V_E - a_b h` is
 the remainder of the schedule from `V_E`, the arc continues on the same circle
 with the same sideslip and curvature, and the target's forecast is evaluated
-at the same absolute times. Admissibility holds at `phi(z)` (Section 2).
+at the same absolute times. Mildness holds at `phi(z)` (Section 2).
 Every sampled pose of the new continuation is a pose of the old one, so the
 road condition and the clearances before the exit hold; the exit is at the
 same absolute instant (or has happened, and the state is `+`); the parked pose
@@ -213,13 +222,14 @@ A plan meeting these rows is *accepted*.
   exactly.
 - H2: the target follows its forecast (the same constant `A` and `beta`).
 - H3: at an endpoint in `X_f`, some hold of the declared model keeps the
-  endpoint in `X_f` with its hard rows met and its midpoint clear. The terminal
-  law is a certificate on the declared model's state, not a hold of that model:
-  the Fiala bicycle with steering and braking-ratio inputs cannot brake while
-  holding its sideslip and course curvature exactly, and its domain ends at
-  `scheduleSpeedFloor` (1 m/s), so it cannot stop. H3 is checked online: the
-  anchor tries the cruise hold of the CLF's certified controller and the holds
-  toward the law's realization (Section 7); it is not proven.
+  endpoint in `X_f` with its hard rows met and its midpoint clear. In a mild
+  state the declared model is taken to follow the kinematic model (the user's
+  assumption, Section 2); then the terminal law's hold (steering held,
+  braking at `a_b`) is such a hold, and H3 follows. The implementation does
+  not rely on the assumption: the anchor tries the cruise hold of the CLF's
+  certified controller and the holds toward the law's realization on the
+  declared model, and keeps a hold only when its endpoint is checked to be in
+  `X_f` (Section 7).
 
 **Proposition.** Under H1 and H2, if the plan of sample `k` is accepted and
 has at least two holds, the shifted plan at `k+1` is accepted:
@@ -255,7 +265,7 @@ initial-feasibility question.
 ## 7. Implementation
 
 **Membership** (`terminalSafeSet.member`) evaluates (3.1) in order:
-admissibility, the road along the continuation (every corner of every pose,
+mildness, the road along the continuation (every corner of every pose,
 one vectorized projection), the target at the continuation's nodes and
 midpoints until the first sampled exit, and the parked check. Where the
 reference distance less both reaches already exceeds the requirement by
@@ -269,12 +279,12 @@ exit, the least clearance beyond the requirement, and the CLF value.
 correction `dz` must meet the set's conditions linearized at the anchor
 endpoint `y`:
 
-- the friction circle of the law, `|r V_E| <= sqrt((mu g)^2 - a_b^2)`
-  (6.7 m/s^2 with the defaults), linearized in the endpoint's speed and yaw
-  rate, only where `y` is outside it (inside it the acceptance check keeps it;
-  as a hard row on its boundary it left the CLF stage's cone program without a
-  numerical result in a hard recovery turn); the sideslip cone is already a row
-  of the problem at every node;
+- mildness, `|r V_E| <= a_m`, linearized in the endpoint's speed and yaw
+  rate, where `y` is within 1 m/s^2 of the bound, keeping up to 0.1 m/s^2 of
+  the margin `y` has (without the reserve an endpoint left on the boundary
+  takes only tiny steps, because every full step leaves the set, and the plan
+  executes its old tail); the sideslip cone is already a row of the problem at
+  every node;
 - fixed-dual collision rows (the ordinary-distance duals of the rest of the
   problem) at every continuation node and midpoint before the exit, and at the
   parked pose against the witness, the target pose nearest it on its track
@@ -301,14 +311,27 @@ the track, or the row is left out.
 one hold. While it is shorter than `horizonSteps`, a hold is appended: the
 cruise hold `u = u* + K e` of the CLF's certified controller
 (`terminalSafeSet.cruiseInput`, NOMINAL_CLF.md) when it keeps the endpoint in
-`X_f` with its rows met and its midpoint clear; otherwise the hold nearest to it
-on the segment toward the law's realization, which holds the previous
-steering and brakes with the ratio whose actuator deceleration is `a_b`, or,
-when that realization does not keep the endpoint in `X_f`, toward braking as
-hard as the rear adhesion admits (`terminalSafeSet.brakingInput`: the far end
-is checked first, then bisected toward the cruise hold with five halvings).
-When neither far end keeps the endpoint in `X_f`, the plan stays one hold
-shorter (`extensionStopped`). An endpoint no longer in the set (a changed
+`X_f` with its rows met and its midpoint clear. Otherwise the plan is first
+extended through states outside `X_f` by holds of the startup guidance
+(potential guidance with a target, path guidance without one), each meeting
+the hard rows and clearing the target at its midpoint and endpoint, until a
+node lies in `X_f` again, at most up to `maximumHorizonSteps`: a longer plan
+that completes the maneuver. Without it an aggressive maneuver longer than
+the plan (a 20-m lane recovery at 15 m/s) could only keep a mild endpoint by
+braking in the plan's tail, and the vehicle braked to the model's speed floor.
+If guidance does not reach `X_f`, the appended hold is the hold nearest to the
+cruise hold on a segment toward holding the previous steering, which keeps a mild
+endpoint mild: at the cruise hold's braking ratio, or, when that does not keep
+the endpoint in `X_f`, braking with the ratio whose actuator deceleration is
+`a_b` (the law's realization), or toward braking as hard as the rear adhesion
+admits (`terminalSafeSet.brakingInput`: each far end is checked in turn, the
+first that keeps the endpoint in `X_f` is bisected toward the cruise hold with
+five halvings). Holding the speed first matters where only mildness stops the
+cruise hold: the plan's tail is not regulated (the CLF stage acts on the first
+successor), and a drifting tail whose cruise hold is no longer mild would
+otherwise be extended by braking, which drifts it further (observed in the
+15-m/s reversed-start recovery test). When no far end keeps the endpoint in
+`X_f`, the plan stays one hold shorter (`extensionStopped`). An endpoint no longer in the set (a changed
 forecast) is extended by cruise holds until one is. The braking holds are
 kept as small as found because the plan's later holds reach the first hold
 nearly unchanged: the CLF stage acts on the first successor and the
@@ -385,11 +408,11 @@ every instant would enlarge it.
 ## 10. Limitations
 
 - Recursive feasibility is proven within one encounter, on the declared
-  sampled model with exact information (H1, H2); the extension that keeps the
-  plan from running out (H3) is checked online, not proven. The terminal law
-  is not a hold of the declared model, and the declared model cannot stop:
-  states whose safe continuations all need a stop below 1 m/s cannot be
-  followed to it.
+  sampled model with exact information (H1, H2) and with the extension that
+  keeps the plan from running out (H3). H3 follows from the user's
+  assumption that in a mild state the declared model follows the kinematic
+  model; no bound on that mismatch is computed, and the implementation checks
+  every appended hold on the declared model instead.
 - The braking phase is sampled at nodes and hold midpoints, like the plan's
   own collision rows; between them no clearance bound is claimed. The parked
   phase is checked in continuous time.
@@ -402,8 +425,9 @@ every instant would enlarge it.
   not check one.
 - The terminal set is certainty-equivalent in the target and widens the ego
   clearance statically (Section 9).
-- The friction-circle condition uses the static friction `mu g` and the held
-  arc's lateral acceleration; load transfer is not modeled.
+- Mildness is a bound on the held arc's lateral acceleration and the
+  sideslip cone; within it the declared model is taken to be the kinematic
+  model, without a computed mismatch bound (the user's assumption).
 
 ## History
 
@@ -427,6 +451,15 @@ point lay outside the range (`report/BRAKING_TERMINAL_SET_20261011.tex`). The
 forecast was then anchored at sample 0 by running the estimate backward; a
 stop is not reversible, so it now runs forward from the latest estimate
 (`report/TARGET_STOP_AT_REST_20261011.tex`).
+
+The set of October 11 (commit `f94a0e2`) admitted every endpoint whose
+braking at 5 m/s^2 with the held arc's lateral acceleration stayed inside the
+friction circle (up to 6.7 m/s^2 of lateral acceleration), and its
+continuation was a certificate on the Fiala state rather than a model the ego
+was taken to follow. At the user's direction the set now holds only mild
+states, in which the ego is taken to be a kinematic vehicle under the
+simplest law (steering held, 4 m/s^2 to rest), without a mismatch bound
+(`report/MILD_TERMINAL_SET_20261011.tex`).
 
 ## References
 

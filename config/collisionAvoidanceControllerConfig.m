@@ -46,21 +46,25 @@ function cfg=localDefaults()
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
     cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50);
-    % Terminal set (controller/terminalSafeSet.m, TERMINAL_SAFE_SET.md): past
-    % the plan's endpoint the target keeps its forecast and the ego brakes at
-    % brakingDecelerationMetersPerSecondSquared [m/s^2] with its sideslip and
-    % course curvature held until it stops at a sample instant; the endpoint
-    % is terminal when that continuation stays on the road and clears the
-    % target until it leaves encounterRangeMeters (after the stop, over the
-    % target's remaining track). The braking rate must lie inside the tire
-    % friction (frictionCoefficient times gravity); with the held arc's
-    % lateral acceleration it must stay inside the friction circle at the
-    % endpoint. No encounter duration is preset.
+    % Terminal set (controller/terminalSafeSet.m, TERMINAL_SAFE_SET.md): it
+    % holds only mild endpoints, inside the sideslip cone and with the held
+    % arc's lateral acceleration |r V| at most
+    % lateralAccelerationMaximumMetersPerSecondSquared [m/s^2], where the ego
+    % is taken to be a kinematic vehicle. Past the plan's endpoint the target
+    % keeps its forecast and the ego brakes at
+    % brakingDecelerationMetersPerSecondSquared [m/s^2] with the steering
+    % (its sideslip and course curvature) held until it stops at a sample
+    % instant; the endpoint is terminal when that continuation stays on the
+    % road and clears the target until it leaves encounterRangeMeters (after
+    % the stop, over the target's remaining track). Braking and the lateral
+    % acceleration together must lie inside the tire friction
+    % (frictionCoefficient times gravity). No encounter duration is preset.
     % acceptanceSteps are the step sizes tried on the nonlinear rollout of the
     % affine correction, largest first; 0 is the shifted plan itself. Without
     % an acceptable step the problem is linearized again at the full step, at
     % most sqpIterations times.
-    cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',5, ...
+    cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',4, ...
+        'lateralAccelerationMaximumMetersPerSecondSquared',2, ...
         'acceptanceSteps',[1,.5,.25,.125,.0625,.03125,0],'sqpIterations',2);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
@@ -156,6 +160,7 @@ function localValidate(cfg)
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.acceptanceSteps,{'double'},{'row','real','finite','>=',0,'<=',1});
     if any(diff(cfg.terminal.acceptanceSteps)>=0) || cfg.terminal.acceptanceSteps(end)~=0
         localInvalid('terminal.acceptanceSteps must decrease strictly and end with 0.');
@@ -171,8 +176,9 @@ function localValidate(cfg)
     for name=["corneringStiffness","frictionCoefficient"]
         validateattributes(cfg.tire.(name),{'double'},{'size',[2,1],'real','finite','positive'});
     end
-    if cfg.terminal.brakingDecelerationMetersPerSecondSquared>=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity
-        localInvalid('The terminal braking rate must lie inside the tire friction.');
+    if hypot(cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
+            cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared)>=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity
+        localInvalid('The terminal braking rate and lateral acceleration must lie inside the tire friction.');
     end
     for name=["brakingRatioMinimum","brakingRatioMaximum"]
         validateattributes(cfg.actuation.(name),{'numeric'},{'scalar','real','finite'});

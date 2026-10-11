@@ -1,0 +1,34 @@
+===== exact =====
+[stop] runs 14 recovered 9  {'noSolution:anchorUnavailable': 2, 'noSolution:nonlinearAcceptanceFailed': 3, 'recovered': 9}
+   least replay clearance 0.089 m; median per-run least 0.200 m
+   controller s median 0.010 p95 0.024 max 0.61
+   horizon holds median 16 p95 16 max 30; first frame median 16
+   terminal ends {'exit': 443, 'noTarget': 3259, 'parked': 1612}
+   frames 5314: braking hold appended 825, extension stopped {'': 5250, 'cruiseHoldInadmissible': 52, 'noHoldStaysTerminal': 12}, shifted candidate infeasible 53
+   recovered per scenario: acceleratingHeadOn 2/2, brakingLead 0/2, crossing 1/2, curvedCrossing 2/2, curvedHeadOn 2/2, headOn 2/2, turningCrossing 0/2
+[mild] runs 14 recovered 13  {'noSolution:anchorUnavailable': 1, 'recovered': 13}
+   least replay clearance 0.140 m; median per-run least 0.455 m
+   controller s median 0.010 p95 0.047 max 0.65
+   horizon holds median 16 p95 45 max 138; first frame median 24
+   terminal ends {'exit': 704, 'noTarget': 3338, 'parked': 1363}
+   frames 5405: braking hold appended 18, extension stopped {'': 5386, 'noHoldStaysTerminal': 19}, shifted candidate infeasible 1
+   recovered per scenario: acceleratingHeadOn 2/2, brakingLead 2/2, crossing 2/2, curvedCrossing 1/2, curvedHeadOn 2/2, headOn 2/2, turningCrossing 2/2
+  mild vs stop: newly recovered 5 ['seed0-speed8-crossing', 'seed0-speed15-brakingLead', 'seed0-speed8-turningCrossing', 'seed0-speed8-brakingLead', 'seed0-speed15-turningCrossing']
+  mild vs stop: newly failed 1 [('seed0-speed8-curvedCrossing', 'noSolution:anchorUnavailable')]
+===== noisy =====
+[stop] runs 84 recovered 54  {'noSolution:anchorUnavailable': 2, 'noSolution:clfNoNumericalResult': 2, 'noSolution:nonlinearAcceptanceFailed': 10, 'noSolution:pcbfNoNumericalResult': 16, 'recovered': 54}
+   least replay clearance 0.422 m; median per-run least 1.589 m
+   controller s median 0.011 p95 0.046 max 0.63
+   horizon holds median 16 p95 24 max 269; first frame median 16
+   terminal ends {'exit': 3362, 'noTarget': 15856, 'parked': 6129}
+   frames 25347: braking hold appended 624, extension stopped {'': 25280, 'cruiseHoldInadmissible': 18, 'noHoldStaysTerminal': 49}, shifted candidate infeasible 91
+   recovered per scenario: acceleratingHeadOn 10/12, brakingLead 3/12, crossing 10/12, curvedCrossing 3/12, curvedHeadOn 7/12, headOn 11/12, turningCrossing 10/12
+[mild] runs 84 recovered 73  {'noSolution:clfNoNumericalResult': 1, 'noSolution:nonlinearAcceptanceFailed': 2, 'noSolution:pcbfNoNumericalResult': 8, 'recovered': 73}
+   least replay clearance 0.391 m; median per-run least 1.849 m
+   controller s median 0.012 p95 0.108 max 1.42
+   horizon holds median 16 p95 79 max 208; first frame median 25
+   terminal ends {'exit': 4638, 'noTarget': 8586, 'parked': 6937}
+   frames 20161: braking hold appended 22, extension stopped {'': 20147, 'cruiseHoldInadmissible': 13, 'noHoldStaysTerminal': 1}, shifted candidate infeasible 53
+   recovered per scenario: acceleratingHeadOn 11/12, brakingLead 11/12, crossing 12/12, curvedCrossing 12/12, curvedHeadOn 3/12, headOn 12/12, turningCrossing 12/12
+  mild vs stop: newly recovered 25 ['seed20261003-speed8-brakingLead', 'seed20261003-speed15-curvedCrossing', 'seed1-speed8-brakingLead', 'seed1-speed8-crossing', 'seed1-speed8-curvedCrossing', 'seed20261003-speed8-headOn', 'seed20261003-speed8-crossing', 'seed20261003-speed8-curvedCrossing', 'seed20261003-speed15-brakingLead', 'seed2-speed8-curvedCrossing', 'seed2-speed8-acceleratingHeadOn', 'seed2-speed8-turningCrossing', 'seed1-speed8-turningCrossing', 'seed2-speed15-curvedCrossing', 'seed3-speed8-brakingLead', 'seed2-speed8-brakingLead', 'seed4-speed8-curvedCrossing', 'seed3-speed8-curvedCrossing', 'seed3-speed15-brakingLead', 'seed3-speed15-curvedCrossing', 'seed4-speed8-brakingLead', 'seed4-speed8-acceleratingHeadOn', 'seed5-speed8-curvedCrossing', 'seed5-speed8-brakingLead', 'seed5-speed8-curvedHeadOn']
+  mild vs stop: newly failed 6 [('seed20261003-speed8-acceleratingHeadOn', 'noSolution:clfNoNumericalResult'), ('seed1-speed8-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed1-speed15-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed3-speed15-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed4-speed15-curvedHeadOn', 'noSolution:nonlinearAcceptanceFailed'), ('seed5-speed15-curvedHeadOn', 'noSolution:pcbfNoNumericalResult')]

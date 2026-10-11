@@ -9,8 +9,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % road throughout.
 % A shifted plan shorter than horizonSteps is extended by holds of the
 % declared model whose endpoint stays in the set: the CLF's certified cruise
-% hold, or else the hold nearest to it toward the realization of the terminal
-% law; a shifted
+% hold, or else the hold nearest to it toward the held steering (at the
+% cruise hold's braking ratio, else braking as the terminal law); a shifted
 % plan whose endpoint is no longer in the set is extended by cruise holds.
 % The PCBF stage minimizes prefix safety slack, then the CLF stage runs; the
 % terminal rows are the set's conditions linearized at the anchor endpoint
@@ -137,6 +137,7 @@ function [solution,search,model] = localRound(model,previousState,timer)
     search.anchorCertified=isfield(anchor,'certified') && anchor.certified;
     search.appendedTerminalSteps=0;if isfield(anchor,'appended'),search.appendedTerminalSteps=anchor.appended;end
     search.appendedBrakingSteps=0;if isfield(anchor,'appendedBraking'),search.appendedBrakingSteps=anchor.appendedBraking;end
+    search.appendedGuidedSteps=0;if isfield(anchor,'appendedGuided'),search.appendedGuidedSteps=anchor.appendedGuided;end
     search.extensionStopped="";if isfield(anchor,'extensionStopped'),search.extensionStopped=anchor.extensionStopped;end
     search.anchorHolds=size(anchor.inputs,2);
     search.seedReachedTerminalSet=NaN;
@@ -491,15 +492,15 @@ function [anchor,source,failure]=localInitialization(model,previous)
     % the terminal set at the same absolute time. When the plan is shorter
     % than the prefix it is extended by holds of the declared model that keep
     % the endpoint in the set: the cruise hold of the CLF's certified
-    % controller, or else the hold nearest to it toward the realization of
-    % the terminal law (terminalSafeSet.brakingInput).
+    % controller, or else the hold nearest to it toward the held steering
+    % (terminalSafeSet.brakingInput).
     % An endpoint no longer in the set (a changed forecast) is extended by
     % cruise holds until one is.
     domainErrors=["collisionAvoidanceController:nonlinearDomain", ...
         "collisionAvoidanceController:invalidTireOperatingPoint", ...
         "collisionAvoidanceController:singularTireLinearization"];
     count=size(shifted,2);inputs=shifted;states=zeros(6,count+1);states(:,1)=model.initialState;
-    context=terminalSafeSet.context(model);appended=0;braking=0;stopped="";
+    context=terminalSafeSet.context(model);appended=0;braking=0;guided=0;stopped="";
     try
         for index=1:count
             [~,states(:,index+1)]=terminalSafeSet.holdStates(states(:,index),inputs(:,index),cfg);
@@ -511,6 +512,15 @@ function [anchor,source,failure]=localInitialization(model,previous)
             if ok,[stays,context]=terminalSafeSet.member(context,next,count+1);end
             stays=stays && terminalSafeSet.clears(context,middle,count+.5);
             if member && ~stays
+                % First, guidance through states outside the set until it
+                % is reached again: a longer plan that completes the
+                % maneuver instead of braking to keep the endpoint mild.
+                [through,passed,context]=localGuideToSet(states(:,end),inputs(:,end),count,model,context,maximum);
+                if passed
+                    n=size(through.inputs,2);
+                    inputs=[inputs,through.inputs];states=[states,through.states]; %#ok<AGROW>
+                    count=count+n;appended=appended+n;guided=guided+n;member=true;continue;
+                end
                 [u,next,stays]=terminalSafeSet.brakingInput(states(:,end),inputs(:,end),u,model,context,count);
                 if ~stays,stopped="noHoldStaysTerminal";break;end
                 braking=braking+1;
@@ -526,7 +536,49 @@ function [anchor,source,failure]=localInitialization(model,previous)
     end
     anchor=struct('inputs',inputs,'states',states,'terminalContext',context, ...
         'certified',member && count>=minimum,'appended',appended,'appendedBraking',braking, ...
-        'extensionStopped',stopped);
+        'appendedGuided',guided,'extensionStopped',stopped);
+end
+
+function [through,passed,context]=localGuideToSet(x,previous,count,model,context,maximum)
+    % Holds of the startup guidance (localGuidance) from the endpoint x at
+    % plan node 'count' until a node lies in the terminal set again, each
+    % meeting the hard rows and clearing the target at its midpoint and
+    % endpoint, at most up to maximumHorizonSteps; passed is false when a
+    % hold fails or the set is not reached.
+    cfg=model.cfg;through=struct('inputs',zeros(2,0),'states',zeros(6,0));passed=false;side=0;
+    nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
+    while count<maximum
+        [u,side]=localGuidance(x,previous,count*cfg.controller.sampleTime,model,side,nominal);
+        try
+            [middle,next]=terminalSafeSet.holdStates(x,u,cfg);
+        catch exception
+            if startsWith(string(exception.identifier),"collisionAvoidanceController:"),return;end
+            rethrow(exception);
+        end
+        if ~terminalSafeSet.admissible(x,middle,next,u,model) || ~terminalSafeSet.clears(context,middle,count+.5) ...
+                || ~terminalSafeSet.clears(context,next,count+1)
+            return;
+        end
+        through.inputs(:,end+1)=u;through.states(:,end+1)=next;count=count+1;x=next;previous=u;
+        [passed,context]=terminalSafeSet.member(context,next,count);
+        if passed,return;end
+    end
+end
+
+function [u,side]=localGuidance(x,previous,time,model,side,nominal)
+    % One input of the startup guidance at the time 'time' after now:
+    % potential guidance with a target, path guidance without one.
+    cfg=model.cfg;reference=model.nominalReference;
+    if isempty(model.target)
+        u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominal);
+    else
+        [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.target,time,cfg,side, ...
+            model.road.lateralClearance);
+        course=x(3)+atan2(x(5),x(4));
+        yawRate=reference.curvature*hypot(x(4),x(5)) ...
+            -cfg.nominalClf.courseGain*atan2(sin(course-heading),cos(course-heading));
+        u=localGuidanceInput(x,previous,yawRate,speed,cfg,reference);
+    end
 end
 
 function anchor=localPotentialFieldSeed(model,minimum,maximum)
@@ -539,17 +591,7 @@ function anchor=localPotentialFieldSeed(model,minimum,maximum)
     nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
     context=terminalSafeSet.context(model);member=false;
     for index=1:maximum
-        time=(index-1)*h;
-        if isempty(model.target)
-            u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominal);
-        else
-            [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.target,time,cfg,side, ...
-                model.road.lateralClearance);
-            course=x(3)+atan2(x(5),x(4));
-            yawRate=reference.curvature*hypot(x(4),x(5)) ...
-                -cfg.nominalClf.courseGain*atan2(sin(course-heading),cos(course-heading));
-            u=localGuidanceInput(x,previous,yawRate,speed,cfg,reference);
-        end
+        [u,side]=localGuidance(x,previous,(index-1)*h,model,side,nominal);
         inputs(:,index)=u;[~,x]=terminalSafeSet.holdStates(x,u,cfg);states(:,index+1)=x;previous=u;
         if index>=minimum
             [member,context]=terminalSafeSet.member(context,x,index);

@@ -1,0 +1,52 @@
+Unrecovered encounters: outcome, frames executed, and over the last ten
+recorded frames the terminal ends, the extension stops and the stop time
+of the endpoint's continuation (s).
+== stop
+seed0-speed15-brakingLead              noSolution:nonlinearAcceptanceFailed frames   502 ends {'parked': 10} extension {'': 6, 'cruiseHoldInadmissible': 4} stop 0.45
+seed0-speed15-turningCrossing          noSolution:nonlinearAcceptanceFailed frames   133 ends {'parked': 10} extension {'': 4, 'cruiseHoldInadmissible': 3, 'noHoldStaysTerminal': 3} stop 0.25
+seed0-speed8-brakingLead               noSolution:anchorUnavailable   frames   265 ends {'parked': 10} extension {'': 2, 'cruiseHoldInadmissible': 2, 'noHoldStaysTerminal': 6} stop 0.25
+seed0-speed8-crossing                  noSolution:anchorUnavailable   frames    33 ends {'parked': 10} extension {'': 5, 'cruiseHoldInadmissible': 4, 'noHoldStaysTerminal': 1} stop 0.25
+seed0-speed8-turningCrossing           noSolution:nonlinearAcceptanceFailed frames    29 ends {'parked': 10} extension {'': 9, 'noHoldStaysTerminal': 1} stop 0.25
+seed1-speed8-brakingLead               noSolution:pcbfNoNumericalResult frames   249 ends {'parked': 10} extension {'': 10} stop 0.55
+seed1-speed8-crossing                  noSolution:nonlinearAcceptanceFailed frames    27 ends {'parked': 10} extension {'': 10} stop 1.3
+seed1-speed8-curvedCrossing            noSolution:pcbfNoNumericalResult frames     7 ends {'parked': 7} extension {'': 7} stop 1.3
+seed1-speed8-turningCrossing           noSolution:nonlinearAcceptanceFailed frames    32 ends {'parked': 10} extension {'': 10} stop 1.3
+seed2-speed15-curvedCrossing           noSolution:anchorUnavailable   frames    34 ends {'parked': 10} extension {'noHoldStaysTerminal': 10} stop 2.6500000000000004
+seed2-speed8-acceleratingHeadOn        noSolution:nonlinearAcceptanceFailed frames    13 ends {'parked': 10} extension {'': 10} stop 2
+seed2-speed8-brakingLead               noSolution:pcbfNoNumericalResult frames   254 ends {'parked': 10} extension {'': 10} stop 0.5
+seed2-speed8-curvedCrossing            noSolution:pcbfNoNumericalResult frames     9 ends {'parked': 9} extension {'': 9} stop 1.25
+seed2-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 0.9500000000000001
+seed2-speed8-turningCrossing           noSolution:nonlinearAcceptanceFailed frames    33 ends {'parked': 10} extension {'': 10} stop 1.25
+seed20261003-speed15-brakingLead       noSolution:clfNoNumericalResult frames    87 ends {'exit': 9, 'parked': 1} extension {'': 10} stop 3
+seed20261003-speed15-curvedCrossing    noSolution:anchorUnavailable   frames    35 ends {'parked': 10} extension {'noHoldStaysTerminal': 10} stop 2.6
+seed20261003-speed8-brakingLead        noSolution:pcbfNoNumericalResult frames   263 ends {'parked': 10} extension {'': 10} stop 0.4
+seed20261003-speed8-crossing           noSolution:nonlinearAcceptanceFailed frames    30 ends {'parked': 10} extension {'': 10} stop 1.35
+seed20261003-speed8-curvedCrossing     noSolution:pcbfNoNumericalResult frames     7 ends {'parked': 7} extension {'': 7} stop 1.3
+seed20261003-speed8-curvedHeadOn       noSolution:pcbfNoNumericalResult frames    14 ends {'parked': 10} extension {'': 10} stop 1.1500000000000001
+seed20261003-speed8-headOn             noSolution:nonlinearAcceptanceFailed frames    17 ends {'parked': 10} extension {'': 10} stop 1.9000000000000001
+seed3-speed15-brakingLead              noSolution:nonlinearAcceptanceFailed frames    63 ends {'parked': 10} extension {'': 10} stop 3
+seed3-speed15-curvedCrossing           noSolution:nonlinearAcceptanceFailed frames    28 ends {'parked': 10} extension {'': 2, 'noHoldStaysTerminal': 8} stop 2.5
+seed3-speed8-brakingLead               noSolution:pcbfNoNumericalResult frames   264 ends {'parked': 10} extension {'': 10} stop 0.5
+seed3-speed8-curvedCrossing            noSolution:pcbfNoNumericalResult frames     7 ends {'parked': 7} extension {'': 7} stop 1.3
+seed3-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 1.25
+seed4-speed8-acceleratingHeadOn        noSolution:nonlinearAcceptanceFailed frames    28 ends {'parked': 10} extension {'': 10} stop 1.35
+seed4-speed8-brakingLead               noSolution:pcbfNoNumericalResult frames   259 ends {'parked': 10} extension {'': 10} stop 0.5
+seed4-speed8-curvedCrossing            noSolution:pcbfNoNumericalResult frames     9 ends {'parked': 9} extension {'': 9} stop 1.25
+seed4-speed8-curvedHeadOn              noSolution:nonlinearAcceptanceFailed frames  1573 ends {'parked': 10} extension {'': 10} stop 1.1500000000000001
+seed5-speed15-brakingLead              noSolution:clfNoNumericalResult frames   199 ends {'parked': 2, 'exit': 8} extension {'': 9, 'cruiseHoldInadmissible': 1} stop 2.95
+seed5-speed8-brakingLead               noSolution:pcbfNoNumericalResult frames   245 ends {'parked': 10} extension {'': 10} stop 0.65
+seed5-speed8-curvedCrossing            noSolution:pcbfNoNumericalResult frames     7 ends {'parked': 7} extension {'': 7} stop 1.3
+seed5-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames  1597 ends {'parked': 10} extension {'': 10} stop 1.25
+== mild
+seed0-speed8-curvedCrossing            noSolution:anchorUnavailable   frames    27 ends {'parked': 10} extension {'': 2, 'noHoldStaysTerminal': 8} stop 1.6
+seed1-speed15-curvedHeadOn             noSolution:pcbfNoNumericalResult frames    45 ends {'exit': 10} extension {'': 10} stop 3.6
+seed1-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 0.8500000000000001
+seed2-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 10} stop 1.1
+seed20261003-speed8-acceleratingHeadOn noSolution:clfNoNumericalResult frames    20 ends {'exit': 5, 'parked': 5} extension {'': 10} stop 2.2
+seed20261003-speed8-curvedHeadOn       noSolution:pcbfNoNumericalResult frames    16 ends {'parked': 10} extension {'': 10} stop 2.3000000000000003
+seed3-speed15-curvedHeadOn             noSolution:pcbfNoNumericalResult frames    45 ends {'exit': 10} extension {'': 10} stop 3.6
+seed3-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames    15 ends {'parked': 10} extension {'': 9, 'cruiseHoldInadmissible': 1} stop 1.85
+seed4-speed15-curvedHeadOn             noSolution:nonlinearAcceptanceFailed frames    11 ends {'exit': 10} extension {'': 10} stop 3.7
+seed4-speed8-curvedHeadOn              noSolution:pcbfNoNumericalResult frames     5 ends {'parked': 5} extension {'': 5} stop 1.2000000000000002
+seed5-speed15-brakingLead              noSolution:nonlinearAcceptanceFailed frames    75 ends {'parked': 10} extension {'': 10} stop 3.95
+seed5-speed15-curvedHeadOn             noSolution:pcbfNoNumericalResult frames    45 ends {'exit': 10} extension {'': 10} stop 3.7

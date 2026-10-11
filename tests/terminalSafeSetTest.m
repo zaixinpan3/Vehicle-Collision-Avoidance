@@ -94,12 +94,13 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % A lead far enough ahead: the ego stops behind it and the lead
             % leaves the range of the parked ego. A slower lead only a little
             % ahead still leaves room to stop.
+            % The ego stops in 2 s after 8 m (4 m/s^2 from 8 m/s).
             lead=localDecision(testCase,[0;0;0;8;0;0],[40;0;0;6;0;0;1.6;2.4;.95;0;0],true,"parked");
-            testCase.verifyEqual(lead.exitSeconds,1.6+(50-(40+6*1.6-6.4))/6,AbsTol=1e-9);
+            testCase.verifyEqual(lead.exitSeconds,2+(50-(40+6*2-8))/6,AbsTol=1e-9);
             close=localDecision(testCase,[0;0;0;8;0;0],[8;0;0;6;0;0;1.6;2.4;.95;0;0],true,"parked");
-            % The gap closes until the speeds match (0.4 s): 3.2 - 0.4 m of
+            % The gap closes until the speeds match (0.5 s): 3.2 - 0.5 m of
             % clearance against the 0.2-m margin.
-            testCase.verifyEqual(close.margin,2.6,AbsTol=1e-6);
+            testCase.verifyEqual(close.margin,2.5,AbsTol=1e-6);
             % Too close to stop behind a stationary target.
             localDecision(testCase,[0;0;0;8;0;0],[6;0;0;0;0;0;1.6;2.4;.95;0;0],false,"continuationMeetsTarget");
             % A stationary target beyond the stopping distance stays in range
@@ -114,7 +115,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % and stays there; one that rests too close is met while the ego
             % still brakes; a gently braking lead leaves the range first.
             rest=localDecision(testCase,[0;0;0;8;0;0],[10;0;0;6;-4;0;1.6;2.4;.95;0;0],true,"parked");
-            testCase.verifyEqual(rest.margin,10+4.5-6.4-4.8-.2,AbsTol=1e-6);
+            testCase.verifyEqual(rest.margin,10+4.5-8-4.8-.2,AbsTol=1e-6);
             testCase.verifyEqual(rest.exitSeconds,Inf);
             localDecision(testCase,[0;0;0;8;0;0],[6;0;0;4;-4;0;1.6;2.4;.95;0;0],false,"continuationMeetsTarget");
             localDecision(testCase,[0;0;0;8;0;0],[20;0;0;7;-.5;0;1.6;2.4;.95;0;0],true,"parked");
@@ -125,22 +126,24 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % A target circling beside the road never comes near.
             localDecision(testCase,[0;0;0;8;0;0],[0;40;0;5;0;.05;1.6;2.4;.95;0;0],true,"parked");
         end
-        function theLawMustBeAdmissibleAndTheContinuationOnTheRoad(testCase)
+        function theEndpointMustBeMildAndTheContinuationOnTheRoad(testCase)
             model=localModel([0;.3;0;8;0;0],[]);context=terminalSafeSet.context(model);
             [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
             testCase.verifyTrue(member);testCase.verifyEqual(info.reason,"noTarget");
             % Heading toward the left edge: the braking arc leaves the road.
             [member,~,info]=terminalSafeSet.member(context,[0;9;.6;8;0;0],0);
             testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"continuationLeavesRoad");
-            % Braking at a_b with the lateral acceleration r V of the held arc
-            % exceeds the friction circle.
-            fast=[0;0;0;15;0;.5];
-            [member,~,info]=terminalSafeSet.member(context,fast,0);
-            testCase.verifyGreaterThan(hypot(context.deceleration,fast(6)*fast(4)),context.friction);
-            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"terminalLawInadmissible");
+            % The held arc's lateral acceleration r V above the mild maximum
+            % (2.4 m/s^2), although well inside the tire friction; at
+            % 1.6 m/s^2 the same arc is mild.
+            [member,~,info]=terminalSafeSet.member(context,[0;0;0;8;0;.3],0);
+            testCase.verifyGreaterThan(.3*8,context.lateralMaximum);
+            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"notMild");
+            [~,~,info]=terminalSafeSet.member(context,[0;0;0;8;0;.2],0);
+            testCase.verifyNotEqual(info.reason,"notMild");
             % Outside the sideslip cone.
             [member,~,info]=terminalSafeSet.member(context,[0;0;0;8;3;0],0);
-            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"terminalLawInadmissible");
+            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"notMild");
         end
         function theRowsLinearizeTheSetAtTheAnchor(testCase)
             % A member meets every row with the zero correction; each row
@@ -157,7 +160,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [~,~,after]=terminalSafeSet.member(context,y+dz,0);
             testCase.verifyEqual(min(bounds-rows*dz)+.05,after.margin,AbsTol=5e-3);
             % At the boundary the rows keep what is left and no more.
-            close=localModel([0;0;0;8;0;0],[5.42;0;0;6;0;0;1.6;2.4;.95;0;0]);
+            close=localModel([0;0;0;8;0;0],[5.52;0;0;6;0;0;1.6;2.4;.95;0;0]);
             closeContext=terminalSafeSet.context(close);
             [~,bounds,~,info]=terminalSafeSet.rows(closeContext,close.initialState,0);
             testCase.verifyLessThan(info.margin,.05);testCase.verifyGreaterThan(info.margin,0);
@@ -176,9 +179,9 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % toward the law's realization that keeps the endpoint terminal;
             % the realization itself brakes at about a_b with the steering
             % held.
-            % 0.65 m apart, closing at 2 m/s: braking at once keeps 0.25 m, one
+            % 0.75 m apart, closing at 2 m/s: braking at once keeps 0.25 m, one
             % cruise hold first leaves 0.15 m against the 0.2-m margin.
-            model=localModel([0;0;0;8;0;0],[5.45;0;0;6;0;0;1.6;2.4;.95;0;0]);x=model.initialState;
+            model=localModel([0;0;0;8;0;0],[5.55;0;0;6;0;0;1.6;2.4;.95;0;0]);x=model.initialState;
             context=terminalSafeSet.context(model);
             testCase.verifyTrue(terminalSafeSet.member(context,x,0));
             [cruise,next]=terminalSafeSet.cruiseInput(x,model);
@@ -205,6 +208,10 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
         function theBrakingRateMustLieInsideTheTireFriction(testCase)
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('terminal', ...
                 struct('brakingDecelerationMetersPerSecondSquared',9))),'collisionAvoidanceController:invalidConfiguration');
+            % Together with the mild lateral acceleration (8.34 m/s^2 here).
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('terminal', ...
+                struct('brakingDecelerationMetersPerSecondSquared',7,'lateralAccelerationMaximumMetersPerSecondSquared',5))), ...
+                'collisionAvoidanceController:invalidConfiguration');
         end
     end
 end

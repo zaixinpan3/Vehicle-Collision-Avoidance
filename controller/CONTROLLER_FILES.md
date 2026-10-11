@@ -10,7 +10,7 @@ terminal set and recursive feasibility.
 | `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
 | `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout, or the shifted accepted plan extended by declared-model holds that keep the endpoint terminal) over a horizon that reaches the terminal set; PCBF slack stage with the linearized terminal rows, CLF stage, step-size rule on the nonlinear rollout, full-step remainder trust |
-| `terminalSafeSet.m` | Braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego braking at `a_b` with sideslip and course curvature held, the target on its forecast), membership (admissibility, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the law's realization), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
+| `terminalSafeSet.m` | Mild braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with its steering, hence sideslip and course curvature, held; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the held steering), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
@@ -22,7 +22,8 @@ Each sample builds one nonlinear anchor: a potential-field rollout at startup,
 stopped at its first node in the terminal set; otherwise the shifted previous
 plan, extended while it is shorter than `horizonSteps` by holds of the declared
 model that keep the endpoint in the set (the cruise hold, or else the hold
-nearest to it toward the realization of the terminal law), and by cruise
+nearest to it toward the held steering, after guidance holds through states
+outside the set until it is reached again), and by cruise
 holds when its endpoint has left the set. The anchor is linearized once;
 the PCBF stage minimizes prefix safety slack and the CLF stage follows. A
 primary problem that is primal infeasible inside the trust region is re-solved
