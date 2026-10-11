@@ -34,8 +34,15 @@ Eq. (2); `predictiveSafetyGeometry.predictTarget`):
     p_T' = V_T [cos(psi_T + beta_T); sin(psi_T + beta_T)],
     psi_T' = V_T sin(beta_T) / l_r,T,   V_T' = A_T,   A_T' = beta_T' = 0,
 
-with signed speed: a target whose speed reaches zero turns back along its
-track. Its orbit is a line for `beta_T = 0` and a circle otherwise.
+with braking that ends at rest: the speed is `V_T + A_T t` until it reaches
+zero and zero from then on (the state's `A_T` becomes 0 there), and a target
+at rest moves off only forward (`A_T > 0`). For a forward target the speed is
+`max(0, V_T + A_T t)` (`predictiveSafetyGeometry.targetArc`). Its orbit is a
+line for `beta_T = 0` and a circle otherwise, and it never turns back along it.
+A stop cannot be run backward, so the controller forecasts forward from the
+target's latest estimate and the sample index at which it was taken
+(`targetEpoch`, `targetEpochIndex`). The ego's terminal law below ends at rest
+in the same way.
 
 **Ego.** The ego's terminal law keeps it in the same constant-(A, beta)
 family:
@@ -112,18 +119,19 @@ endpoint itself clears the target and the road.
 
 After the stop the ego is a fixed rectangle `E` and the target moves along its
 line or circle. Let `sigma(tau) = V tau + A tau^2 / 2` be its arc length after
-the stop (`terminalSafeSet.parkedClearance`).
+the stop until it comes to rest, and constant from then on
+(`terminalSafeSet.parkedClearance`).
 
 **The swept stretch.** The arc lengths at which the reference point is within
 `R` of the parked reference point form one interval `[a, b]` around 0 (a
 quadratic inequality on a line, an arc of angles on a circle, the whole circle
 when the circle lies inside the range). From 0 the target moves toward `b`
 (or `a`). When `V` and `A` have the same sign it sweeps `[0, b]` and leaves.
-When they have opposite signs it turns at `sigma* = -V^2/(2A)`: if it leaves
-before turning it sweeps `[0, b]`; otherwise it turns and runs back through 0
-until it leaves at `a`, sweeping `[a, sigma*]`. On a circle a sweep of at
-least `2 pi / |kappa|` is the whole circle. A stationary target sweeps the
-single point 0 and never leaves.
+When they have opposite signs it brakes to rest at `sigma* = -V^2/(2A)`: if
+it leaves before then it sweeps `[0, b]`; otherwise it sweeps `[0, sigma*]`,
+stays there and never leaves. On a circle a sweep of at least
+`2 pi / |kappa|` is the whole circle. A target at rest without forward
+acceleration sweeps the single point 0 and never leaves.
 
 **Rectangle against track.** The distance between `E` and the target
 rectangle is continuous along the track, and while the two are apart it is
@@ -147,13 +155,13 @@ target's frame. The arc-to-segment distance has the candidates
   the segment and the arc, or an intersection inside both (distance 0).
 
 These 32 pairs give the exact least distance and the target pose attaining
-it (the witness, used to linearize). In 2917 random cases (1141 sweeping their
-whole circle, 1307 with speed and acceleration of opposite signs) the closed
-form was never above the least distance of a dense sampling of the swept
-stretch (spacing at most 1.05 mm) and within 1.8e-7 m of it, and the witness
-reproduced it to 1.6e-12 m (`report/BRAKING_TERMINAL_SET_20261011`,
-`checkParkedClearance.m`); the unit test repeats the comparison on five
-targets.
+it (the witness, used to linearize). In 2895 random cases (1216 braking, 646
+sweeping their whole circle, 1826 never leaving the range) the closed form was
+never above the least distance of a dense sampling in time of the forecast
+itself (spacing at most 2.4 mm; above it by at most 5.2e-13 m, rounding) and
+within 2.8e-7 m of it, and the witness reproduced it to 5.2e-13 m
+(`report/TARGET_STOP_AT_REST_20261011`, `checkParkedClearance.m`); the unit
+test repeats the comparison on five targets.
 
 ## 5. Forward invariance
 
@@ -385,10 +393,10 @@ every instant would enlarge it.
 - The braking phase is sampled at nodes and hold midpoints, like the plan's
   own collision rows; between them no clearance bound is claimed. The parked
   phase is checked in continuous time.
-- The target contract has signed speed: a target braking to zero turns back
-  along its track, and a state behind a target that turns back within range is
-  not terminal. A physical stop at zero speed is a different, hybrid contract
-  (predictor and simulated truth alike).
+- Braking ends at rest for both vehicles (target contract since October 11,
+  2026, in the forecast and the simulated truth alike). A target that comes to
+  rest inside the range stays in it for ever, so its rest pose must clear the
+  parked ego; a target at rest moves off only forward.
 - The first exit ends the encounter, as the convention of the finite task.
   The plan's own collision rows also apply at a later re-entry; the set does
   not check one.
@@ -410,6 +418,15 @@ and its certified size was bounded by the controller's certificate
 remains as the CLF's (NOMINAL_CLF.md) and its hold extends the anchor. The
 joint-state construction that motivated the present set is in
 `report/JOINT_TERMINAL_SET_DESIGN_20261010.tex`.
+
+Until the user's decision of October 11, 2026, the target contract had signed
+speed: a target whose speed reached zero turned back along its track and
+accelerated in reverse, in the forecast and in the simulated truth, and a
+parked ego behind a braking lead was terminal only when the lead's turning
+point lay outside the range (`report/BRAKING_TERMINAL_SET_20261011.tex`). The
+forecast was then anchored at sample 0 by running the estimate backward; a
+stop is not reversible, so it now runs forward from the latest estimate
+(`report/TARGET_STOP_AT_REST_20261011.tex`).
 
 ## References
 

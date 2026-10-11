@@ -1,0 +1,34 @@
+===== exact =====
+[signed] runs 14 recovered 9  {'noSolution:anchorUnavailable': 1, 'noSolution:nonlinearAcceptanceFailed': 4, 'recovered': 9}
+   least replay clearance 0.089 m; median per-run least 0.209 m
+   controller s median 0.011 p95 0.027 max 0.96
+   horizon holds median 16 p95 16 max 30; first frame median 16
+   terminal ends {'exit': 443, 'noTarget': 3259, 'parked': 1227}
+   frames 4929: braking hold appended 500, extension stopped {'': 4910, 'cruiseHoldInadmissible': 3, 'noHoldStaysTerminal': 16}, shifted candidate infeasible 4
+   recovered per scenario: acceleratingHeadOn 2/2, brakingLead 0/2, crossing 1/2, curvedCrossing 2/2, curvedHeadOn 2/2, headOn 2/2, turningCrossing 0/2
+[stop] runs 14 recovered 9  {'noSolution:anchorUnavailable': 2, 'noSolution:nonlinearAcceptanceFailed': 3, 'recovered': 9}
+   least replay clearance 0.089 m; median per-run least 0.200 m
+   controller s median 0.014 p95 0.031 max 0.87
+   horizon holds median 16 p95 16 max 30; first frame median 16
+   terminal ends {'exit': 443, 'noTarget': 3259, 'parked': 1612}
+   frames 5314: braking hold appended 825, extension stopped {'': 5250, 'cruiseHoldInadmissible': 52, 'noHoldStaysTerminal': 12}, shifted candidate infeasible 53
+   recovered per scenario: acceleratingHeadOn 2/2, brakingLead 0/2, crossing 1/2, curvedCrossing 2/2, curvedHeadOn 2/2, headOn 2/2, turningCrossing 0/2
+  stop vs signed: newly recovered 0 []
+  stop vs signed: newly failed 0 []
+===== noisy =====
+[signed] runs 84 recovered 60  {'noSolution:anchorUnavailable': 2, 'noSolution:clfNoNumericalResult': 2, 'noSolution:nonlinearAcceptanceFailed': 8, 'noSolution:pcbfNoNumericalResult': 12, 'recovered': 60}
+   least replay clearance 0.422 m; median per-run least 1.682 m
+   controller s median 0.015 p95 0.128 max 1.63
+   horizon holds median 16 p95 79 max 294; first frame median 16
+   terminal ends {'exit': 3738, 'noTarget': 16308, 'parked': 5978}
+   frames 26024: braking hold appended 314, extension stopped {'': 25955, 'cruiseHoldInadmissible': 18, 'noHoldStaysTerminal': 51}, shifted candidate infeasible 124
+   recovered per scenario: acceleratingHeadOn 9/12, brakingLead 8/12, crossing 12/12, curvedCrossing 4/12, curvedHeadOn 6/12, headOn 11/12, turningCrossing 10/12
+[stop] runs 84 recovered 54  {'noSolution:anchorUnavailable': 2, 'noSolution:clfNoNumericalResult': 2, 'noSolution:nonlinearAcceptanceFailed': 10, 'noSolution:pcbfNoNumericalResult': 16, 'recovered': 54}
+   least replay clearance 0.422 m; median per-run least 1.589 m
+   controller s median 0.015 p95 0.065 max 0.94
+   horizon holds median 16 p95 24 max 269; first frame median 16
+   terminal ends {'exit': 3362, 'noTarget': 15856, 'parked': 6129}
+   frames 25347: braking hold appended 624, extension stopped {'': 25280, 'cruiseHoldInadmissible': 18, 'noHoldStaysTerminal': 49}, shifted candidate infeasible 91
+   recovered per scenario: acceleratingHeadOn 10/12, brakingLead 3/12, crossing 10/12, curvedCrossing 3/12, curvedHeadOn 7/12, headOn 11/12, turningCrossing 10/12
+  stop vs signed: newly recovered 3 ['seed20261003-speed8-acceleratingHeadOn', 'seed1-speed8-curvedHeadOn', 'seed2-speed15-brakingLead']
+  stop vs signed: newly failed 9 [('seed20261003-speed8-brakingLead', 'noSolution:pcbfNoNumericalResult'), ('seed20261003-speed8-crossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed1-speed8-crossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed20261003-speed15-brakingLead', 'noSolution:clfNoNumericalResult'), ('seed4-speed8-curvedCrossing', 'noSolution:pcbfNoNumericalResult'), ('seed4-speed8-brakingLead', 'noSolution:pcbfNoNumericalResult'), ('seed2-speed8-brakingLead', 'noSolution:pcbfNoNumericalResult'), ('seed5-speed15-brakingLead', 'noSolution:clfNoNumericalResult'), ('seed5-speed8-brakingLead', 'noSolution:pcbfNoNumericalResult')]

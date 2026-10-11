@@ -1,0 +1,12 @@
+{
+  "seed": 11,
+  "cases": 2895,
+  "skippedLongerThan120Seconds": 22,
+  "fullCircles": 646,
+  "braking": 1216,
+  "neverLeaving": 1826,
+  "largestDenseMinusClosedMeters": 2.81217842186543E-7,
+  "smallestDenseMinusClosedMeters": -5.2402526762307389E-13,
+  "largestWitnessMismatchMeters": 5.2402526762307389E-13,
+  "largestSampleSpacingMeters": 0.0024339528736211018
+}

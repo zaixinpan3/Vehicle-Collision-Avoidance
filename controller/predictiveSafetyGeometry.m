@@ -63,12 +63,15 @@ classdef predictiveSafetyGeometry
             % Exact analytic enclosure of constant-A, constant-beta paths.
             % Split the arc-length endpoint error from the course/curvature
             % error on the nominal arc. No future observer decay is assumed.
+            % Braking that ends at rest keeps the arc-length error bound:
+            % the speed max(0, V + A t) is 1-Lipschitz in (V, A t) for
+            % targets that travel forward (targetArc).
             % q may hold one column per time (each time from its own start).
             time=reshape(time,1,[]);
             tube=struct('positionRadius',zeros(size(time)),'yawRadius',zeros(size(time)), ...
                 'courseRadius',zeros(size(time)),'speedRadius',zeros(size(time)));
             if isempty(errorSet),return;end
-            arc=q(4,:).*time+.5*q(5,:).*time.^2;
+            arc=predictiveSafetyGeometry.targetArc(q,time);
             arcError=errorSet.speedRadius*abs(time)+.5*errorSet.accelerationRadius*time.^2;
             curvature=abs(sin(q(6,:))./q(7,:));
             tube.positionRadius=errorSet.positionRadius+arcError+abs(arc)*errorSet.courseRadius ...
@@ -85,7 +88,7 @@ classdef predictiveSafetyGeometry
             % would incorrectly charge its full size in every normal.
             support=zeros(size(normal,1),1);
             if isempty(errorSet),return;end
-            arc=q(4)*time+.5*q(5)*time^2;kappa=sin(q(6))/q(7);
+            arc=predictiveSafetyGeometry.targetArc(q,time);kappa=sin(q(6))/q(7);
             ds=errorSet.speedRadius*abs(time)+.5*errorSet.accelerationRadius*time^2;
             dg=errorSet.courseRadius;dk=errorSet.curvatureRadius;
             course=q(3)+q(6);theta=course+kappa*arc;
@@ -224,15 +227,40 @@ classdef predictiveSafetyGeometry
 
         function next = predictTarget(q,time)
             % Sharma NRMM (2026), Eq. (17), in inertial coordinates:
-            % Vdot=A, betadot=0, psidot=V*sin(beta)/lr. Constant curvature
-            % makes the position integral elementary even when A is nonzero.
+            % Vdot=A, betadot=0, psidot=V*sin(beta)/lr, with braking that
+            % ends at rest (targetArc): a speed that reaches zero stays zero
+            % and the state's A becomes 0 there. Constant curvature makes
+            % the position integral elementary even when A is nonzero.
             if isempty(q),next=q;return;end
-            time=reshape(time,1,[]);arc=q(4)*time+.5*q(5)*time.^2;
+            time=reshape(time,1,[]);[arc,speed,rest]=predictiveSafetyGeometry.targetArc(q,time);
             curvature=sin(q(6))/q(7);a=curvature*arc/2;scale=ones(size(a));
             nonzero=a~=0;scale(nonzero)=sin(a(nonzero))./a(nonzero);
             next=repmat(q,1,numel(time));
             next(1:2,:)=q(1:2)+(arc.*scale).*predictiveSafetyGeometry.direction(q(3)+q(6)+a);
-            next(3,:)=q(3)+curvature*arc;next(4,:)=q(4)+q(5)*time;
+            next(3,:)=q(3)+curvature*arc;next(4,:)=speed;next(5,rest)=0;
+        end
+
+        function [arc,speed,rest] = targetArc(q,time)
+            % Signed arc length and speed of the targets q (one column, or one
+            % per time) after 'time'. The speed is V + A t until it reaches
+            % zero and zero from then on: braking ends at rest and never turns
+            % the target back. A target at rest moves off only forward
+            % (A > 0). For V >= 0 the speed is max(0, V + A t), so the arc
+            % length is 1-Lipschitz in (V, A) per unit of (t, t^2/2) among
+            % forward targets. rest marks the times at rest after a stop.
+            % Negative times run the motion backward and may not pass
+            % through rest (a stop is not reversible).
+            V=q(4,:);A=q(5,:);
+            speed=V+A.*time;arc=V.*time+.5*A.*time.^2;
+            if any(time<0 & ((V>=0 & speed<0) | (V<0 & speed>0)))
+                error('collisionAvoidanceController:irreversibleTargetStop', ...
+                    'A target forecast cannot be run backward through rest.');
+            end
+            braking=V.*A<0;stopped=V==0 & A<=0;
+            rest=time>0 & ((braking & time>=-V./A) | stopped);
+            restArc=zeros(size(V));restArc(braking)=-V(braking).^2./(2*A(braking));
+            restArc=restArc+zeros(size(time));
+            arc(rest)=restArc(rest);speed(rest)=0;
         end
 
         function tangent = direction(angle)

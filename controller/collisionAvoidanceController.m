@@ -5,6 +5,9 @@ function [command,predictedInput,prediction,controllerState] = ...
 % Every current target estimate updates the prediction; its A and beta are
 % held constant within this frame, independently of proof-metadata availability.
 % Passing [] as previousState starts a new problem and a new target epoch.
+% The target epoch is the latest target estimate and the sample index at
+% which it was taken (targetEpochIndex); the forecast runs forward from it,
+% because braking that ends at rest cannot be run backward.
 % Collision interaction is active inside the configured position radius.
 % A complete current sensor scan with no target clears the previous forecast.
     persistent lastState
@@ -16,7 +19,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     end
     explicitState=nargin>=5;
     if ~explicitState,previousState=lastState;end
-    if isstruct(previousState) && (~isfield(previousState,'version') || previousState.version~=77),previousState=[];end
+    if isstruct(previousState) && (~isfield(previousState,'version') || previousState.version~=78),previousState=[];end
     if nargin<4,cfg=[];end
     if nargin<3,laneCenterline=[];end
     if nargin<2,targetEstimate=[];end
@@ -29,13 +32,14 @@ function [command,predictedInput,prediction,controllerState] = ...
     context={cfg.vehicle,cfg.tire,cfg.roadLoad,cfg.model,cfg.actuation,cfg.collision, ...
         cfg.controller,cfg.referenceSpeed,cfg.clf,cfg.nominalClf,cfg.initialization, ...
         cfg.nonlinear.integrationStep,cfg.terminal,frame,lane};
-    index=0;epochTime=ego.stateTime;targetEpoch=observed;
+    index=0;epochTime=ego.stateTime;targetEpoch=observed;targetEpochIndex=0;
     if isstruct(previousState)
         if ~isequaln(context,previousState.context)
             error('collisionAvoidanceController:changedContinuationProblem', ...
                 'Model, constraints or reference path changed. Pass an empty previousState to initialize a new problem.');
         end
         index=previousState.sampleIndex+1;epochTime=previousState.epochTime;targetEpoch=previousState.targetEpoch;
+        targetEpochIndex=previousState.targetEpochIndex;
         expectedTime=epochTime+index*cfg.controller.sampleTime;
         if isfinite(ego.stateTime) && isfinite(epochTime) && abs(ego.stateTime-expectedTime)>1e-9*max(1,abs(expectedTime))
             error('collisionAvoidanceController:invalidSampleTime','Continuation requires consecutive absolute sample times.');
@@ -49,14 +53,14 @@ function [command,predictedInput,prediction,controllerState] = ...
             targetEpoch=[];
         end
     end
-    q=predictiveSafetyGeometry.predictTarget(targetEpoch,index*cfg.controller.sampleTime);
+    q=predictiveSafetyGeometry.predictTarget(targetEpoch,(index-targetEpochIndex)*cfg.controller.sampleTime);
     if ~isempty(observed) && ~isempty(q)
         observed(3)=q(3)+atan2(sin(observed(3)-q(3)),cos(observed(3)-q(3)));
     end
     if ~isempty(observed)
         % Reanchor the prediction at the current estimate without resetting
         % the ego input warm start. Cross-frame constancy is not required.
-        targetEpoch=predictiveSafetyGeometry.predictTarget(observed,-index*cfg.controller.sampleTime);
+        targetEpoch=observed;targetEpochIndex=index;
         q=observed;
     end
     previous=zeros(2,1);
@@ -70,7 +74,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     nominalReference=nonlinearBicycleModel.cruise(cfg,frame(4));
     model=struct('cfg',cfg,'initialState',ego.modelState,'jointState',jointState, ...
         'targetParameters',targetParameters,'previousInput',previous,'target',q,'targetEpoch',targetEpoch, ...
-        'sampleIndex',index,'epochTime',epochTime,'lane',lane,'road',road,'frame',frame, ...
+        'targetEpochIndex',targetEpochIndex,'sampleIndex',index,'epochTime',epochTime,'lane',lane,'road',road,'frame',frame, ...
         'nominalReference',nominalReference,'stateTime',ego.stateTime, ...
         'uncertainty',uncertainty);
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
@@ -85,7 +89,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     if ~isempty(q)
         targetStates=zeros(4,size(solution.states,2));
         for step=1:size(targetStates,2)
-            future=predictiveSafetyGeometry.predictTarget(targetEpoch,(index+step-1)*cfg.controller.sampleTime);
+            future=predictiveSafetyGeometry.predictTarget(targetEpoch,(index-targetEpochIndex+step-1)*cfg.controller.sampleTime);
             targetStates(:,step)=future(1:4);
         end
         predictedJointState=[predictedJointState;targetStates];
@@ -144,8 +148,8 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.safetyObjective="sumOfRobustnessDeficitsWithHardNominalCollisionRows";
         metadata.safetyScope="hardNominalGeometryWithRelaxedObserverMargins";
     end
-    controllerState=struct('version',77,'trust',model.trust,'stateTime',ego.stateTime,'sampleTime',cfg.controller.sampleTime, ...
-        'sampleIndex',index,'epochTime',epochTime,'targetEpoch',targetEpoch,'context',{context}, ...
+    controllerState=struct('version',78,'trust',model.trust,'stateTime',ego.stateTime,'sampleTime',cfg.controller.sampleTime, ...
+        'sampleIndex',index,'epochTime',epochTime,'targetEpoch',targetEpoch,'targetEpochIndex',targetEpochIndex,'context',{context}, ...
         'jointState',jointState,'predictedJointState',predictedJointState, ...
         'appliedInput',first,'inputTrajectory',predictedInput,'stateTrajectory',solution.states, ...
         'stageSlacks',solution.stageSlacks,'safetyBudget',solution.safety, ...

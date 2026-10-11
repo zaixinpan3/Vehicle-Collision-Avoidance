@@ -1,0 +1,223 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{2em}
+\title{Braking ends at rest: the target contract without reversal}
+\author{}
+\date{October 11, 2026}
+\begin{document}
+\maketitle
+\paragraph{Status and scope.}
+On October 11, 2026 the user decided that braking never turns a vehicle back:
+``braking is braking; at most it brings the speed to zero''. The ego's
+terminal law already ended at rest. The target contract did not: under the
+signed-speed constant-$(A,\beta)$ forecast of
+\path{predictiveSafetyGeometry.predictTarget}, a target whose speed reached
+zero turned back along its track and accelerated in reverse. The simulated
+truth followed the same forecast. This report records the change, its
+checks, and a paired campaign against the braking-continuation terminal set
+of commit \texttt{ef6ca13} (signed speed, otherwise identical).
+
+\paragraph{Result.}
+The forecast, the simulated truth and the terminal set's parked check now
+stop a braking target at rest, and the full suite passes (608 of 608). The
+campaign does not recover more encounters: 9 of 14 exact (9 before, the same
+encounters) and 54 of 84 noisy (60 before). With a lead that comes to rest,
+stopping behind it is now terminal. The 16-hold plan therefore follows a
+braking lead in its lane instead of passing it. The declared model and the
+plant cannot go below 1~m/s, so the plan fails as the lead slows to rest. In
+the noisy runs, braking leads fall from 8 to 3 of 12. The change is the
+physical contract the user asked for. It exposes the two limits named in the
+previous report: the model cannot stop, and nothing in a short plan rewards
+passing.
+
+\section{The change}
+\paragraph{Contract.}
+The target keeps Sharma's constant tangential acceleration $A$ and sideslip
+$\beta$. Its speed is $V+At$ until it reaches zero and zero afterwards. The
+state's $A$ becomes 0 at rest, so the forecast keeps the semigroup property.
+A target at rest moves off only forward ($A>0$). For a forward target the
+speed is $\max(0,V+At)$ and the arc length is its integral
+(\texttt{predictiveSafetyGeometry.targetArc}). A target braking from $V$
+rests after $-V/A$ seconds at the arc length $-V^2/(2A)$. A target in reverse
+($V<0$) that brakes ($A>0$) also stops.
+
+\paragraph{Forecast epoch.}
+The controller used to anchor the forecast at sample 0 by running the latest
+estimate backward, $q_0=\phi(q,-kh)$, and forecast every later time from
+$q_0$. A stop cannot be run backward: an accelerating target observed at
+3~m/s after 10~s at $A=0.5$~m/s$^2$ has a backward speed of $-2$~m/s. Its
+forward forecast from that epoch would then stop it after 4~s. The
+controller now keeps the latest estimate and the sample index at which it
+was taken (\texttt{targetEpoch}, \texttt{targetEpochIndex}; controller state
+version 78) and forecasts forward from there. Running a forecast backward
+through rest raises \texttt{collisionAvoidanceController:irreversibleTargetStop};
+only the scenario construction runs backward, along motion that does not
+pass through rest.
+
+\paragraph{Terminal set.}
+The parked check's swept stretch (\texttt{localTrack}) ends at the rest point
+when the target comes to rest inside the range. Such a target never leaves,
+and its rest pose must clear the parked ego. A target at rest without
+forward acceleration sweeps a single point. The braking phase uses the
+forecast directly.
+
+\paragraph{Uncertainty enclosure.}
+The observer's constant-parameter enclosure (\texttt{targetErrorTube},
+\texttt{targetPositionSupport}) now uses the nominal arc of the contract.
+Its arc-length error bound $\delta V\,|t|+\delta A\,t^2/2$ still holds. The
+speed $\max(0,V+At)$ is 1-Lipschitz in $V+At$, so two forward targets'
+arc lengths differ by at most the integral of $|\delta V+\delta A\,\tau|$.
+A speed interval that straddles zero mixes forward and reverse targets, and
+this bound does not cover that case.
+
+\section{Checks}
+\begin{itemize}
+\item \emph{Unit tests.} The forecast tests now check the following.
+  \begin{itemize}
+  \item Braking ends at rest, at 1~m for 2~m/s and $-2$~m/s$^2$, and stays
+    there, with the semigroup property and the batched form.
+  \item A reverse-moving target that brakes stops.
+  \item A target at rest with $A<0$ stays still; with $A>0$ it moves off forward.
+  \item A turning target stops on its arc.
+  \item Running backward through rest is refused, and a backward run that
+    does not reach rest inverts exactly.
+  \end{itemize}
+  The terminal-set tests cover these cases.
+  \begin{itemize}
+  \item A braking target's swept stretch ends at its rest point and never
+    leaves; at rest it is a point, or it moves off forward.
+  \item A lead braking hard rests ahead of the parked ego with the clearance
+    $10+4.5-6.4-4.8-0.2=3.1$~m.
+  \item A lead that rests too close is met during the ego's braking.
+  \end{itemize}
+  Full suite: 608 of 608 (\path{tests.txt}; 606 before, plus two new tests).
+\item \emph{Parked check against the forecast.}
+  \path{scripts/checkParkedClearance.m} samples the target in time through
+  \texttt{predictTarget} (200001 samples up to its first exit, its rest plus
+  1~s, or one turn of its circle plus 1~s). This is independent of the
+  closed form's swept stretch. The check covered 2895 cases (seed 11; 22
+  needing more than 120~s skipped): 1216 braking, 646 sweeping a whole circle
+  and 1826 never leaving the range. The closed form was never above the
+  sampled least distance (at worst $5.2\cdot10^{-13}$~m, rounding) and at most
+  $2.8\cdot10^{-7}$~m below it. The witness reproduced it to
+  $5.2\cdot10^{-13}$~m, and the samples were at most 2.4~mm apart
+  (\path{parked-clearance-check.json}).
+\end{itemize}
+
+\section{Campaign}
+The 98 encounters of the earlier reports (seven geometries at 8 and 15~m/s;
+seed 0 exact with the \texttt{ode45} plant, six seeds with the estimator in
+the loop) were run for both arms: \texttt{ef6ca13} (signed speed) and the
+working tree (stop at rest). Each arm ran three MATLAB sessions side by side
+on the same encounter sequence. The signed arm reproduced the outcome and the
+frame count of \path{report/BRAKING_TERMINAL_SET_20261011.tex} in all 98
+encounters.
+
+\begin{table}[h]
+\centering\small
+\caption{Paired campaign. No collision in either arm.}
+\label{tab:campaign}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (14)} & \multicolumn{2}{c}{noisy (84)}\\
+ & signed & stop & signed & stop\\
+\midrule
+recovered & 9 & 9 & 60 & 54\\
+no solution: \texttt{nonlinearAcceptanceFailed} & 4 & 3 & 8 & 10\\
+no solution: \texttt{anchorUnavailable} (plan ran out) & 1 & 2 & 2 & 2\\
+no solution: \texttt{pcbfNoNumericalResult} & 0 & 0 & 12 & 16\\
+no solution: \texttt{clfNoNumericalResult} & 0 & 0 & 2 & 2\\
+least replay clearance (m) & 0.089 & 0.089 & 0.422 & 0.422\\
+horizon, 95th percentile holds & 16 & 16 & 79 & 24\\
+controller time per frame, 95th percentile (s) & 0.027 & 0.031 & 0.128 & 0.065\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\caption{Recovered encounters per geometry (both speeds).}
+\label{tab:geometry}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (2 each)} & \multicolumn{2}{c}{noisy (12 each)}\\
+ & signed & stop & signed & stop\\
+\midrule
+head-on & 2 & 2 & 11 & 11\\
+accelerating head-on & 2 & 2 & 9 & 10\\
+braking lead & 0 & 0 & 8 & 3\\
+crossing & 1 & 1 & 12 & 10\\
+turning crossing & 0 & 0 & 10 & 10\\
+curved head-on & 2 & 2 & 6 & 7\\
+curved crossing & 2 & 2 & 4 & 3\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The nine exact encounters that both arms recover are identical in frame
+count, recovery time (median 9.9~s), lateral deviation and clearance. Before
+its lead stops, a target's forecast and truth are the same under both
+contracts. The unrecovered exact 8-m/s crossing and 15-m/s turning crossing,
+whose targets do not brake, end 3 and 10 frames later than before. The
+forecast is now evaluated from the latest estimate instead of through a
+backward epoch, which changes it only by rounding, and these runs end at an
+acceptance boundary. Of the 51 noisy encounters both arms recover, 42 have identical
+frame counts. The noisy estimate's $A$ can be negative for a target that
+does not brake, and its forecast then stops the target, so these runs
+diverge. Three noisy encounters are newly recovered and nine newly lost
+(\path{comparison.txt}, \path{campaign-runs.csv}, \path{failures.txt}).
+
+\paragraph{Braking leads.}
+The lead starts 6.25~m ahead at the ego's speed and brakes at 0.5~m/s$^2$.
+It rests after 16~s (8~m/s) or 30~s (15~m/s). Under the signed contract it
+then reverses toward the ego, and a parked ego behind a slow lead was not
+terminal unless the lead's turning point lay outside the 50-m range. The
+plan therefore had to pass. Noisy seeds 2 and 4 at 8~m/s passed it (largest
+lateral position 5.6 and 5.2~m, least speed 5.6 and 6.2~m/s) and recovered
+by 16.9 and 16.7~s. Under the stop contract, stopping behind the lead is
+terminal. The same encounters followed the lead in its lane (largest lateral
+position 1.3 and 1.4~m) and failed at 12.7 and 12.9~s at 1.32 and 1.69~m/s,
+with the lead at 1.68 and 1.55~m/s. All six noisy 8-m/s braking leads end
+this way, after 245--264 frames (\texttt{pcbfNoNumericalResult}), with an
+endpoint stop time of 0.4--0.65~s. The exact braking leads fail later than
+before, at 1.43~m/s after 13.2~s (8~m/s) and 2.72~m/s after 25.1~s (15~m/s),
+against 3.58~m/s after 2.65~s and 1.28~m/s after 17.0~s.
+
+\paragraph{Mechanism.}
+The terminal set says the ego could brake to rest behind the lead. Nothing
+in a 16-hold plan prefers passing to following, so the plan follows. The
+declared model's domain ends at 1~m/s, as does the plant's, so the vehicle
+cannot follow the lead to rest. Under the signed contract, the lead's
+reversal had forced the pass that recovery requires.
+
+\section{Decisions for the user}
+\begin{enumerate}
+\item \emph{A low-speed regime of the declared model and the plant.} Stopping
+behind a stopped vehicle is now a terminal state that the vehicle cannot
+reach. A kinematic bicycle blended in below a few m/s, with more integration
+steps per hold, would let it.
+\item \emph{A reason to pass.} A terminal cost on the endpoint (its CLF
+value, or the progress along the path), or a minimum horizon longer than
+the soft prefix, would let the planner prefer passing to following.
+\item \emph{Keep the stop contract.} It is the user's decision and is
+committed as the production contract; the signed contract is at
+\texttt{ef6ca13}.
+\end{enumerate}
+
+\section{Reproduction}
+\begin{itemize}
+\item Unit tests: \texttt{matlab -batch "results = runtests('tests'); assertSuccess(results)"}.
+\item Parked check: \path{scripts/checkParkedClearance.m} of this folder,
+  \texttt{checkParkedClearance('<folder>/parked-clearance-check.json', 3000, 11)}.
+\item Campaign: \path{scripts/run-workers.sh 2000 3} of this folder. The signed
+  arm is a \texttt{git archive} of \texttt{ef6ca13}, the stop arm a copy of
+  the working tree; each has a \texttt{solver} link. Then
+  \texttt{python3 -I scripts/compare.py <out-signed> <out-stop> <folder>}.
+  Raw outputs under \path{~/.cache/collisionAvoidance/target_stop_20261011/}
+  are disposable and were deleted after the summaries were copied here.
+\end{itemize}
+\end{document}

@@ -23,8 +23,8 @@ classdef terminalSafeSet
 %             the range clears the parked rectangle by the same margin }.
 % The track check is exact and in closed form (parkedClearance): the track is
 % a stretch of the target's line or circle that ends where the target leaves
-% the range, or the whole circle; under the signed-speed contract a target
-% whose speed reaches zero turns back along its track. Rectangle against
+% the range or comes to rest, or the whole circle; braking ends at rest for
+% both vehicles and never turns either back. Rectangle against
 % track reduces to vertex paths (segments or arcs) against edges, the
 % rectangle form of the point-to-arc distance. The target's first exit ends
 % the encounter: no property of the target after it is used.
@@ -63,6 +63,7 @@ classdef terminalSafeSet
                 'inflation',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'range',cfg.collision.encounterRangeMeters,'clearance',clearance, ...
                 'hasTarget',~isempty(model.target),'targetEpoch',model.targetEpoch, ...
+                'targetEpochIndex',localEpochIndex(model), ...
                 'sampleIndex',model.sampleIndex,'lane',model.lane,'stationNow',here.station, ...
                 'reference',model.nominalReference);
         end
@@ -192,7 +193,8 @@ classdef terminalSafeSet
             % Least distance between the ego rectangle parked at 'pose' and the
             % target rectangle over the target's remaining track from its
             % state q until it first leaves the range about the parked
-            % reference point, and the target state attaining it (witness).
+            % reference point or comes to rest, and the target state
+            % attaining it (witness).
             % Exact when the two are apart at q: the distance is continuous
             % along the track, and while the rectangles are apart it is the
             % least distance from a vertex of one to an edge of the other, so
@@ -524,7 +526,12 @@ end
 function q = localTarget(context,node,time)
     % The target's forecast at times 'time' after plan node 'node'.
     q=predictiveSafetyGeometry.predictTarget(context.targetEpoch, ...
-        (context.sampleIndex+node)*context.sampleTime+time);
+        (context.sampleIndex-context.targetEpochIndex+node)*context.sampleTime+time);
+end
+
+function index = localEpochIndex(model)
+    % Sample index of the target epoch (0 when a model carries none).
+    index=0;if isfield(model,'targetEpochIndex'),index=model.targetEpochIndex;end
 end
 
 function [gap,out] = localClearances(context,pose,q)
@@ -584,8 +591,9 @@ function [lower,upper,full,exitSeconds] = localTrack(q,centre,range)
     % (relative to its position in q) that its reference point sweeps from q
     % on until it first leaves the disk of radius 'range' about 'centre';
     % full when it sweeps its whole circle; and the time of that exit (Inf
-    % when it never leaves). Signed speed V(t) = V + A t: a target whose
-    % speed reaches zero turns back along its track.
+    % when it never leaves). The speed is V + A t until it reaches zero:
+    % braking ends at rest at the arc length -V^2/(2A), and a target at rest
+    % moves off only forward (predictiveSafetyGeometry.targetArc).
     V=q(4);A=q(5);k=sin(q(6))/q(7);course=q(3)+q(6);full=false;exitSeconds=Inf;
     % The arc-length interval [a, b] (a <= 0 <= b) within range.
     if k==0
@@ -608,16 +616,17 @@ function [lower,upper,full,exitSeconds] = localTrack(q,centre,range)
             if k>0,a=-down/k;b=up/k;else,a=up/k;b=-down/k;end
         end
     end
-    if V==0 && A==0,lower=0;upper=0;return;end
-    direction=sign(V);if direction==0,direction=sign(A);end
+    if V==0 && A<=0,lower=0;upper=0;return;end
+    direction=sign(V);if direction==0,direction=1;end
+    leave=Inf;
     if V*A>=0
         if direction>0,lower=0;upper=b;leave=b;else,lower=a;upper=0;leave=a;end
     else
-        turn=-V^2/(2*A);
-        if direction>0 && b<turn,lower=0;upper=b;leave=b;
-        elseif direction<0 && a>turn,lower=a;upper=0;leave=a;
-        elseif direction>0,lower=a;upper=turn;leave=a;
-        else,lower=turn;upper=b;leave=b;
+        rest=-V^2/(2*A);
+        if direction>0 && b<rest,lower=0;upper=b;leave=b;
+        elseif direction<0 && a>rest,lower=a;upper=0;leave=a;
+        elseif direction>0,lower=0;upper=rest;
+        else,lower=rest;upper=0;
         end
     end
     full=k~=0 && (upper-lower)*abs(k)>=2*pi;

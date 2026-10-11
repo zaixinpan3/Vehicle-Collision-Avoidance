@@ -55,9 +55,9 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyEqual(hypot(x(4),x(5)),0);
         end
         function theParkedCheckIsExactOverTheTargetsTrack(testCase)
-            % Straight, circling, reversing and stationary targets: the closed
-            % form is attained on the swept stretch and no sampled pose of the
-            % track comes closer.
+            % Straight, circling, braking (forward and in reverse) and
+            % stationary targets: the closed form is attained on the swept
+            % stretch and no sampled pose of the track comes closer.
             context=struct('range',50,'shape',[2.4;.95;0;0]);
             targets={[12;-3;2.6;4;0;0;1.6;2.4;.95;0;0],[-9;4;-.4;6;-1.5;0;1.6;2.4;.95;0;0], ...
                 [5;10;.3;5;0;.15;1.6;2.4;.95;0;0],[-8;-6;1;-3;.8;-.1;1.6;2.4;.95;0;0], ...
@@ -78,12 +78,17 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
                 testCase.verifyLessThanOrEqual(distance,sampled+1e-12);
                 testCase.verifyLessThanOrEqual(sampled-distance,.02);
             end
-            % A target turning back under the signed-speed contract sweeps its
-            % track beyond its starting point as well.
+            % A braking target comes to rest after V^2/(2|A|) and stays there:
+            % its track ends at the rest point, inside the range for ever.
             q=[0;-6;pi/2;3;-1;0;1.6;2.4;.95;0;0];
             [~,~,track]=terminalSafeSet.parkedClearance(context,[30;0;0],q);
-            testCase.verifyEqual(track.upper,4.5,AbsTol=1e-12);
-            testCase.verifyLessThan(track.lower,-30);
+            testCase.verifyEqual([track.lower,track.upper],[0,4.5],AbsTol=1e-12);
+            testCase.verifyEqual(track.exitSeconds,Inf);
+            % At rest with A < 0 it stays; with A > 0 it moves off forward.
+            [~,~,track]=terminalSafeSet.parkedClearance(context,[30;0;0],[0;-6;pi/2;0;-1;0;1.6;2.4;.95;0;0]);
+            testCase.verifyEqual([track.lower,track.upper],[0,0]);
+            [~,~,track]=terminalSafeSet.parkedClearance(context,[30;0;0],[0;-6;pi/2;0;1;0;1.6;2.4;.95;0;0]);
+            testCase.verifyEqual(track.lower,0);testCase.verifyGreaterThan(track.upper,30);
         end
         function theEncounterEndsAtTheExitOrAfterTheParkedCheck(testCase)
             % A lead far enough ahead: the ego stops behind it and the lead
@@ -105,10 +110,13 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % to the left it passes.
             localDecision(testCase,[0;0;0;8;0;0],[40;0;pi;8;0;0;1.6;2.4;.95;0;0],false,"parkedEgoMeetsTarget");
             localDecision(testCase,[0;0;0;8;0;0],[40;3.66;pi;8;0;0;1.6;2.4;.95;0;0],true,"parked");
-            % A lead that brakes hard turns back under the signed-speed
-            % contract into the parked ego; a gently braking lead leaves the
-            % range first.
-            localDecision(testCase,[0;0;0;8;0;0],[15;0;0;6;-4;0;1.6;2.4;.95;0;0],false,"parkedEgoMeetsTarget");
+            % A lead that brakes hard comes to rest ahead of the parked ego
+            % and stays there; one that rests too close is met while the ego
+            % still brakes; a gently braking lead leaves the range first.
+            rest=localDecision(testCase,[0;0;0;8;0;0],[10;0;0;6;-4;0;1.6;2.4;.95;0;0],true,"parked");
+            testCase.verifyEqual(rest.margin,10+4.5-6.4-4.8-.2,AbsTol=1e-6);
+            testCase.verifyEqual(rest.exitSeconds,Inf);
+            localDecision(testCase,[0;0;0;8;0;0],[6;0;0;4;-4;0;1.6;2.4;.95;0;0],false,"continuationMeetsTarget");
             localDecision(testCase,[0;0;0;8;0;0],[20;0;0;7;-.5;0;1.6;2.4;.95;0;0],true,"parked");
             % A target leaving the range while the ego still brakes ends the
             % encounter at that sample.

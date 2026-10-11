@@ -180,10 +180,13 @@ reference, not a safety certificate. No maneuver bank is used.
 The target keeps Sharma et al. (2026), Eq. (17)'s constant tangential
 acceleration `A` and constant sideslip `beta`. The prediction uses inertial
 coordinates, with `V(t)=V0+A*t` and curvature `sin(beta)/lr`; yaw rate therefore
-changes with speed. There is no added sideslip-rate state. The exact arc-length
-prediction supplies both initialization and collision constraints at matching
-absolute times. The existing signed-velocity continuation is retained; a stop
-clamp would change the constant-acceleration model.
+changes with speed. There is no added sideslip-rate state. Braking ends at
+rest: a speed that reaches zero stays zero, and a target at rest moves off
+only forward (user decision, October 11, 2026; the simulated truth follows the
+same forecast). The exact arc-length prediction supplies both initialization
+and collision constraints at matching absolute times; it runs forward from the
+latest target estimate and the sample index at which it was taken, because a
+stop cannot be run backward.
 
 The initialization borrows Zhai et al. (2024), IEEE Access,
 DOI 10.1109/ACCESS.2024.3355952: direction-dependent obstacle influence,

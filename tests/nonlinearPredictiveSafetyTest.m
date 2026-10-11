@@ -38,20 +38,43 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(next(3),q(3)+15*sin(.1)/1.6,AbsTol=1e-14);
             testCase.verifyEqual(next(4)*sin(next(6))/next(7),1.5*q(4)*sin(q(6))/q(7),AbsTol=1e-14);
         end
-        function brakingRetainsConstantAccelerationThroughZeroVelocity(testCase)
+        function brakingEndsAtRest(testCase)
+            % Braking stops the target and never turns it back; the state at
+            % rest carries A = 0, so the forecast keeps the semigroup property.
             q=[0;0;0;2;-2;0;1.6;2.4;.95;0;0];
             stopped=predictiveSafetyGeometry.predictTarget(q,1);
-            reversed=predictiveSafetyGeometry.predictTarget(stopped,2);
-            testCase.verifyEqual(stopped(1:4),[1;0;0;0]);
-            testCase.verifyEqual(reversed(1:5),[-3;0;0;-4;-2]);
-            testCase.verifyEqual(reversed,predictiveSafetyGeometry.predictTarget(q,3));
+            later=predictiveSafetyGeometry.predictTarget(stopped,2);
+            testCase.verifyEqual(stopped(1:5),[1;0;0;0;0]);
+            testCase.verifyEqual(later,stopped);
+            testCase.verifyEqual(later,predictiveSafetyGeometry.predictTarget(q,3));
+            testCase.verifyEqual(predictiveSafetyGeometry.predictTarget(q,[.5,1,7]), ...
+                [predictiveSafetyGeometry.predictTarget(q,.5),stopped,stopped]);
+            % A reversing target that brakes stops as well.
+            back=predictiveSafetyGeometry.predictTarget([0;0;0;-3;1;0;1.6;2.4;.95;0;0],10);
+            testCase.verifyEqual(back(1:5),[-4.5;0;0;0;0]);
         end
-        function aTurningTargetRetracesItsPathAfterStopping(testCase,targetSideslip)
+        function aTargetAtRestMovesOffOnlyForward(testCase)
+            q=[0;0;0;0;-2;0;1.6;2.4;.95;0;0];
+            still=predictiveSafetyGeometry.predictTarget(q,4);
+            testCase.verifyEqual(still(1:5),[0;0;0;0;0]);
+            q(5)=2;moving=predictiveSafetyGeometry.predictTarget(q,1);
+            testCase.verifyEqual(moving(1:5),[1;0;0;2;2]);
+        end
+        function aTurningTargetStopsOnItsArc(testCase,targetSideslip)
             q=[3;1;.2;2;-2;targetSideslip;1.6;2.4;.95;0;0];
             stopped=predictiveSafetyGeometry.predictTarget(q,1);
-            returned=predictiveSafetyGeometry.predictTarget(stopped,1);
-            testCase.verifyEqual(returned(1:3),q(1:3),AbsTol=2e-14);
-            testCase.verifyEqual(returned(4:7),[-2;-2;targetSideslip;1.6]);
+            testCase.verifyEqual(predictiveSafetyGeometry.predictTarget(q,5),stopped);
+            testCase.verifyEqual(stopped(4:7),[0;0;targetSideslip;1.6]);
+            % It rests at the end of its stopping arc, V^2/(2|A|) = 1 m long.
+            moving=q;moving(4)=1;moving(5)=0;along=predictiveSafetyGeometry.predictTarget(moving,1);
+            testCase.verifyEqual(stopped(1:3),along(1:3),AbsTol=2e-14);
+        end
+        function aStopCannotBeRunBackward(testCase)
+            q=[0;0;0;1;2;0;1.6;2.4;.95;0;0];
+            testCase.verifyError(@()predictiveSafetyGeometry.predictTarget(q,-1), ...
+                'collisionAvoidanceController:irreversibleTargetStop');
+            back=predictiveSafetyGeometry.predictTarget(q,-.25);
+            testCase.verifyEqual(predictiveSafetyGeometry.predictTarget(back,.25),q,AbsTol=1e-15);
         end
         function rectangleDualMatchesDistance(testCase,orientation)
             e=[0;0;orientation];t=[10;3;-.2];shape=[2.4;.95;0;0];
@@ -151,7 +174,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             ego=localSuccessor(ego,prior);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
             [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
             testCase.verifyGreaterThan(next(3),pi);
-            testCase.verifyEqual(state.targetEpoch,prior.targetEpoch,AbsTol=1e-12);
+            % The new estimate equals the forecast (its heading unwrapped
+            % next to it), so the re-anchored epoch continues the forecast.
+            testCase.verifyEqual(state.targetEpoch,next,AbsTol=1e-12);
+            testCase.verifyEqual(state.targetEpochIndex,1);
             testCase.verifyEqual(problem.model.target,next,AbsTol=1e-12);
             testCase.verifyTrue(problem.metadata.optimizationReturned);
             next(3)=next(3)+.01;
@@ -166,6 +192,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             expected=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
             testCase.verifyEqual(state.targetEpoch,q,AbsTol=1e-12);
+            testCase.verifyEqual(state.targetEpochIndex,0);
             % The horizon length follows the terminal set and may differ.
             count=min(size(problem.predictedJointState,2),size(prior.predictedJointState,2)-1);
             testCase.verifyEqual(problem.predictedJointState(7:10,1:count), ...
@@ -212,15 +239,15 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,77);
+            testCase.verifyEqual(state.version,78);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
-            q=[24;6;pi;2;-1;0;1.6;2.4;.95;0;0];
+            q=[24;6;pi;2;1;0;1.6;2.4;.95;0;0];
             next=predictiveSafetyGeometry.predictTarget(q,1e8);
             testCase.verifyEqual(next(2),q(2));
             q(3)=pi-1e-12;
             next=predictiveSafetyGeometry.predictTarget(q,1e8);
-            testCase.verifyLessThan(next(2),q(2)-1);
+            testCase.verifyGreaterThan(next(2),q(2)+1);
         end
         function finiteBrakingSlewUsesAppliedInputMemory(testCase)
             [ego,road,cfg]=localFixture();

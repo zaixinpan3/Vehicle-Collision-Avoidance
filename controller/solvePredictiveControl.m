@@ -935,5 +935,11 @@ function [low,high]=localStateLimits(cfg)
 end
 
 function q=localTargetAt(model,time)
-    q=predictiveSafetyGeometry.predictTarget(model.targetEpoch,model.sampleIndex*model.cfg.controller.sampleTime+time);
+    q=predictiveSafetyGeometry.predictTarget(model.targetEpoch, ...
+        (model.sampleIndex-localEpochIndex(model))*model.cfg.controller.sampleTime+time);
+end
+
+function index=localEpochIndex(model)
+    % Sample index of the target epoch (0 when a model carries none).
+    index=0;if isfield(model,'targetEpochIndex'),index=model.targetEpochIndex;end
 end

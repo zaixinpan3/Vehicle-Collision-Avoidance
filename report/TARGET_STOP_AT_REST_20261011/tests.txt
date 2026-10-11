@@ -1,0 +1,224 @@
+Running certifiedKinematicCourseCorrespondenceTest
+......
+Done certifiedKinematicCourseCorrespondenceTest
+__________
+
+Running clfNominalRecoveryTest
+.......... ..
+Done clfNominalRecoveryTest
+__________
+
+Running collisionAvoidanceControllerConfigTest
+.......... .......... .......... .......... ..........
+.......... .......... ....
+Done collisionAvoidanceControllerConfigTest
+__________
+
+Running collisionThreatScenarioTest
+.......... .......... .......... .
+Done collisionThreatScenarioTest
+__________
+
+Running controllerInputGeometryTest
+.......... .....
+Done controllerInputGeometryTest
+__________
+
+Running controllerKernelTest
+........
+Done controllerKernelTest
+__________
+
+Running controllerSourceBudgetTest
+.
+Done controllerSourceBudgetTest
+__________
+
+Running fitPerceivedRoadBoundariesTest
+...
+Done fitPerceivedRoadBoundariesTest
+__________
+
+Running longitudinalRoadLoadTest
+.......... ..........
+Done longitudinalRoadLoadTest
+__________
+
+Running modifiedFialaTireTest
+.......... .......... ...
+Done modifiedFialaTireTest
+__________
+
+Running movingTargetPotentialFieldTest
+.......... ...
+Done movingTargetPotentialFieldTest
+__________
+
+Running nominalClfTest
+.......... .......... .......... .......... ..........
+.......... ...
+Done nominalClfTest
+__________
+
+Running nominalRecoveryValidationTest
+recovery: 3/12 frames, max 0.172 s, failure 
+.recovery: 4/12 holds, last 0.008 s, source twoStageRealTimeIteration
+recovery: 6/12 frames, max 0.024 s, failure 
+.recovery: 2/2 frames, max 0.008 s, failure 
+.recovery: 2/2 frames, max 0.007 s, failure 
+.recovery: 2/2 frames, max 0.023 s, failure 
+recovery: 4/4 holds, last 0.006 s, source twoStageRealTimeIteration
+recovery: 4/4 frames, max 0.023 s, failure 
+recovery: 4/4 holds, last 0.006 s, source twoStageRealTimeIteration
+recovery: 4/4 frames, max 0.007 s, failure 
+.recovery: 1/1 frames, max 0.022 s, failure 
+.oncoming: 4/4 holds, last 0.016 s, source twoStageRealTimeIteration
+oncoming: 4/4 frames, max 0.101 s, failure 
+.oncoming: 4/40 holds, last 0.007 s, source twoStageRealTimeIteration
+oncoming: 8/40 holds, last 0.007 s, source twoStageRealTimeIteration
+oncoming: 12/40 holds, last 0.006 s, source twoStageRealTimeIteration
+oncoming: 16/40 holds, last 0.007 s, source twoStageRealTimeIteration
+oncoming: 20/40 holds, last 0.007 s, source twoStageRealTimeIteration
+oncoming: 24/40 holds, last 0.007 s, source twoStageRealTimeIteration
+oncoming: 25/40 frames, max 0.013 s, failure runNonlinearPredictiveSafetyValidation:collision: Ground-truth rectangles touched or overlapped.
+.oncoming: 0/1 frames, max 0.000 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+.
+Done nominalRecoveryValidationTest
+__________
+
+Running nonlinearPredictiveSafetyTest
+.......... .......... .......... .......... ..........
+.......
+Done nonlinearPredictiveSafetyTest
+__________
+
+Running nrmmCascadeCertificateTest
+..........
+Done nrmmCascadeCertificateTest
+__________
+
+Running nrmmControllerErrorBoundsTest
+.......... ........
+Done nrmmControllerErrorBoundsTest
+__________
+
+Running nrmmDirectVelocityTest
+.......... ..
+Done nrmmDirectVelocityTest
+__________
+
+Running nrmmModelAidedEstimationTest
+....
+Done nrmmModelAidedEstimationTest
+__________
+
+Running nrmmModelFormulationTest
+.......... ..
+Done nrmmModelFormulationTest
+__________
+
+Running nrmmNativeKernelTest
+...
+Done nrmmNativeKernelTest
+__________
+
+Running nrmmObserverVectorFieldTest
+....
+Done nrmmObserverVectorFieldTest
+__________
+
+Running nrmmPositionErrorBoundTest
+.......... ..........
+Done nrmmPositionErrorBoundTest
+__________
+
+Running nrmmStructuredHighGainTest
+..........
+Done nrmmStructuredHighGainTest
+__________
+
+Running nrmmTargetHistoryTest
+.......
+Done nrmmTargetHistoryTest
+__________
+
+Running nrmmTargetParameterErrorBoundsTest
+..
+Done nrmmTargetParameterErrorBoundsTest
+__________
+
+Running nrmmTruthEnclosureAuditTest
+.....
+Done nrmmTruthEnclosureAuditTest
+__________
+
+Running nrmmYawObserverTest
+.........
+Done nrmmYawObserverTest
+__________
+
+Running nrmmYawSetTest
+.......... .
+Done nrmmYawSetTest
+__________
+
+Running observerGainSynthesisTest
+.......... .........
+Done observerGainSynthesisTest
+__________
+
+Running observerPredictiveControlTest
+.......... .....
+Done observerPredictiveControlTest
+__________
+
+Running onlineNrmmTrackingRuntimeTest
+.......... .......... .......... .
+Done onlineNrmmTrackingRuntimeTest
+__________
+
+Running ordinaryDistanceDualTest
+.......... ........
+Done ordinaryDistanceDualTest
+__________
+
+Running perceptionRangeTest
+.........
+Done perceptionRangeTest
+__________
+
+Running predictiveConicSolverTest
+.......
+Done predictiveConicSolverTest
+__________
+
+Running sharmaBaselineObserverTest
+......
+Done sharmaBaselineObserverTest
+__________
+
+Running sweptCollisionIntervalTest
+.....
+Done sweptCollisionIntervalTest
+__________
+
+Running terminalSafeSetTest
+.........
+Done terminalSafeSetTest
+__________
+
+Running trustInnovationTest
+.....
+Done trustInnovationTest
+__________
+
+Running twoStagePredictiveControlTest
+.......... .......... ..
+Done twoStagePredictiveControlTest
+__________
+
+    Name    Passed    Failed    Incomplete    Duration    Details
+    ____    ______    ______    __________    ________    _______
+
+
+PASSED 608 FAILED 0 INCOMPLETE 0
