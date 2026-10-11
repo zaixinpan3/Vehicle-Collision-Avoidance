@@ -1,0 +1,469 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs,array}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\setlength{\emergencystretch}{2em}
+\newcommand{\R}{\mathbb R}
+\newcommand{\C}{\mathcal C}
+\newcommand{\K}{\mathcal K}
+\newcommand{\D}{\mathcal D}
+\newcommand{\Sf}{\mathcal S}
+\newcommand{\B}{\mathcal B}
+\newcommand{\Pre}{\operatorname{Pre}}
+\newtheorem{proposition}{Proposition}
+\title{A joint-state terminal safety set under the constant-parameter target contract}
+\author{}
+\date{Prepared October 10, 2026}
+\begin{document}
+\maketitle
+
+\paragraph{Status and scope.}
+This is a design study, not an adopted controller or a new safety certificate.
+The production baseline examined is commit
+\texttt{423e3e885d63d3461f8567726f3a9a5946c757ec}: steering angle and braking
+ratio remain the inputs, and the terminal law is $u=u^*+Ke$.
+No vehicle campaign or MATLAB suite was rerun for this study.
+The question is how to define a terminal set that expresses safety of the
+ego--target interaction, uses the constant tangential acceleration and
+sideslip contract, and admits a short invariance argument without making
+nominal cruise a prerequisite for every safe state.
+
+\paragraph{Recommendation.}
+Use the joint viability kernel as the ideal mathematical object. Construct
+a certified inner approximation by safe predecessors of a joint invariant
+core, or by the safe flow of one joint feedback into that core. Retain the
+existing cruise certificate as a useful local ingredient after separation
+has been certified. With imperfect observations, apply the construction to
+an information set of joint states, with one common causal policy for all
+states consistent with the measurements. This does not require a high
+dimensional grid, although finding a useful certified approximation is a
+substantial remaining problem.
+
+\section{What the current construction establishes}
+The current ellipsoid $\Omega=\{x:e(x)^TPe(x)\leq1\}$ is a contraction
+domain for the cruise feedback; its certification addresses the sampled
+nonlinear ego model and the input and error boxes. Collision clearance is
+established separately by checking the ego CLF tube against the target
+forecast. Thus the implemented terminal set is already parameterized by
+target information: with an exact target state $q$, it can be written as
+$\Sf(q)$, a section of a joint set
+\begin{equation}
+\Sf_{\rm joint}=\{(x,q):x\in\Sf(q)\}.
+\end{equation}
+A parameterized set or a time-dependent set indexed by an exact forecast
+can be equivalent to an explicitly augmented state representation. Merely
+concatenating state vectors adds no safety theorem. The essential question
+is whether the joint evolution preserves the defining safety conditions.
+An ego-only set could also be safe if it is robust to every allowed target,
+but that stronger requirement may make it very small or empty.
+
+The baseline proves recursive feasibility conditionally: exact ego state
+and declared plant (H1), the unchanged constant-parameter target forecast
+(H2), and containment of the sampled nonlinear maps in the recorded
+enclosure (H3). Section 9 of \path{controller/TERMINAL_SAFE_SET.md} analyzes
+joint estimation and control; Section 10 states that the target part is
+certainty-equivalent. Its numerical H3 is supported by samples and a margin,
+not by an interval proof. This study does not upgrade those premises.
+
+The present terminal policy is restricted to returning to the given path
+trim at the configured speed. A safe same-lane following state can therefore
+be excluded even when admissible braking and a lower speed would maintain
+separation. Enlarging the ellipsoid changes this policy's certified domain;
+it cannot by itself recover states requiring a different policy.
+
+\section{Autonomous joint dynamics and exact target flow}
+Let the ego state be $x=(p_E,\psi_E,v_x,v_y,r_E)$ and its controlled
+nonlinear bicycle dynamics be $\dot x=f_E(x,u)$, with
+$u=(\delta,\lambda_b)$ the existing steering angle and braking ratio.
+Write the dynamic target state, omitting known dimensions, as
+$q=(p_T,\psi_T,V_T,A_T,\beta_T)$. The target contract is
+\begin{align}
+\dot p_T&=V_T\begin{bmatrix}\cos(\psi_T+\beta_T)\\
+                                  \sin(\psi_T+\beta_T)\end{bmatrix}, &
+\dot\psi_T&=\frac{V_T\sin\beta_T}{l_{r,T}},\label{eq:target}\\
+\dot V_T&=A_T, & \dot A_T&=0,\qquad\dot\beta_T=0.\nonumber
+\end{align}
+These equations are the inertial model in Sharma et al., Eq.~(2); its
+ego-frame form is their Eq.~(17) \cite{sharma}. They agree with
+\texttt{predictiveSafetyGeometry.predictTarget}.
+The augmented state $z=(x,q)$ obeys an autonomous system
+$\dot z=F(z,u)$: no independent future target input is introduced.
+
+Let $k_T=\sin\beta_T/l_{r,T}$, $\chi_0=\psi_T+\beta_T$, and
+\begin{equation}
+\ell(t)=V_Tt+\tfrac12 A_Tt^2.
+\end{equation}
+The exact flow is
+\begin{align}
+V_T(t)&=V_T+A_Tt, & \psi_T(t)&=\psi_T+k_T\ell(t),\\
+p_T(t)&=p_T+\ell(t)\operatorname{sinc}\!\left(\frac{k_T\ell(t)}2\right)
+\begin{bmatrix}\cos(\chi_0+k_T\ell(t)/2)\\
+                \sin(\chi_0+k_T\ell(t)/2)\end{bmatrix},\label{eq:flow}
+\end{align}
+where $\operatorname{sinc}(a)=\sin(a)/a$ with value 1 at zero.
+Thus the spatial orbit is a line for $k_T=0$ and a circle otherwise;
+acceleration determines progress along the orbit. This gives exact target
+propagation, a consistent semigroup $\phi_{t+s}(q)=\phi_t(\phi_s(q))$,
+and analytic geometric ingredients for tail certificates. It does not
+make the nonlinear ego dynamics or the joint safe kernel elementary.
+
+Unknown constants remain unknown constants. For example, if
+$A_T\in[A_-,A_+]$, the admissible trajectories are parameterized by one
+fixed $A_T$ throughout each trajectory. Replacing this with an adversary
+free to pick a new acceleration at every instant enlarges the motion class
+and discards valuable temporal correlation. The same applies to sideslip.
+Target position, heading, speed and parameter uncertainty should be
+propagated with their correlations whenever feasible.
+
+\paragraph{Contract validity.}
+The production predictor uses signed $V_T$, so a negative constant
+acceleration continues through zero into reversal. Equation~\eqref{eq:flow}
+is exact for that declared contract. A physical rule that stops the target
+at zero speed is a different, hybrid model and requires a corresponding
+terminal analysis. Positive constant acceleration likewise implies
+unbounded speed if extrapolated indefinitely. A finite model-validity
+interval needs a certified continuation contract; it cannot alone support
+an infinite-horizon safety claim.
+
+\section{A natural relative-state representation}
+Let $R(\psi)$ be planar rotation,
+$J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$,
+$\rho=R(-\psi_E)(p_T-p_E)$ and $\eta=\psi_T-\psi_E$.
+Then
+\begin{align}
+\dot\rho&=V_T\begin{bmatrix}\cos(\eta+\beta_T)\\\sin(\eta+\beta_T)\end{bmatrix}
+       -\begin{bmatrix}v_x\\v_y\end{bmatrix}-r_EJ\rho,\label{eq:relative}\\
+\dot\eta&=k_TV_T-r_E, & \dot V_T&=A_T, &
+\dot A_T&=\dot\beta_T=0.\nonumber
+\end{align}
+Rectangle separation depends on $(\rho,\eta)$ and the known body shapes,
+while road clearance depends on ego path coordinates and heading. For a
+spatially homogeneous road, a useful representation is
+\begin{equation}
+\zeta=(d_E,\theta_E,v_x,v_y,r_E,\rho_x,\rho_y,\eta,V_T,A_T,\beta_T),
+\end{equation}
+where $\theta_E$ is ego body heading relative to the path tangent.
+Along-path station must be retained when road width, curvature, endpoints
+or other constraints depend on it. Coordinates must also preserve any
+needed winding or branch information on circular paths. Removing global
+coordinates without these conditions would change the problem.
+
+This representation connects directly to the NRMM observer's relative
+position and yaw states. Frozen $(A_T,\beta_T)$ define parameterized
+leaves of the dynamics rather than extra controlled directions. The
+target's analytic orbit offers structure for computation; it does not
+eliminate all the degrees of freedom in joint viability.
+
+\section{The ideal set: joint viability}
+Let $\C$ be the set of joint configurations with positive rectangle
+clearance, ego road containment and the required state constraints.
+Use a strictly positive collision buffer when expressing clearance through
+ordinary set distance. Input and mixed handling constraints belong to the
+admissible controls and hold conditions. With known states and exact
+dynamics, the ideal terminal set is
+\begin{equation}
+\boxed{\K=\{z_0:\exists\pi\text{ admissible and causal},\quad
+                  z^\pi(t;z_0)\in\C\ \forall t\geq0\}.}\label{eq:kernel}
+\end{equation}
+Under standard well-posedness and control-selection conditions, this is
+the largest controlled invariant subset of $\C$, the viability kernel
+\cite{aubin}. Maximal here means set inclusion under the specified model,
+constraints and information pattern; it does not mean fastest travel,
+minimum intervention, or any particular ellipsoid volume.
+
+For a sampled implementation, define $\Psi_\tau(z,u)$ as the declared
+within-hold evolution with constant input $u$, for $0\leq\tau\leq h$.
+The ego and target models used to define $\Psi$ must match the certification
+model. The safe predecessor is
+\begin{equation}
+\Pre(S)=\{z:\exists u\text{ admissible over the hold},\quad
+\Psi_\tau(z,u)\in\C\ \forall\tau\in[0,h],\quad\Psi_h(z,u)\in S\}.\label{eq:pre}
+\end{equation}
+The greatest fixed point of $S\mapsto\C\cap\Pre(S)$ is the kernel for
+this held-control class. It can differ from the kernel with unrestricted
+continuous-time feedback. Checking only the two hold endpoints does not
+establish the intersample condition.
+
+The kernel may be empty for some encounters, such as an unavoidable
+oncoming vehicle in a narrow corridor with insufficient braking or lateral
+authority. The contract determines the threat; it does not guarantee that
+the ego has an escape. This is a property to report, not an excuse to
+weaken the collision constraint.
+
+\section{A constructive terminal set with a short proof}
+Computing the full kernel of the Fiala bicycle and rotating rectangles
+is not presently tractable through a generic dense grid. Instead choose
+a joint core $\D\subset\C$ with a certified admissible feedback and safe
+holds that return to $\D$. Define
+\begin{equation}
+\Sf_0=\D,\qquad\Sf_{m+1}=\Sf_m\cup\Pre(\Sf_m).\label{eq:expansion}
+\end{equation}
+Each $\Sf_m$ contains the joint states from which a feasible continuation
+can reach the core within at most $m$ holds. The continuation is a witness
+that must be preserved or replaced by another verified witness.
+
+\begin{proposition}
+Every $\Sf_m$ in \eqref{eq:expansion} is controlled invariant at sample
+instants, with safety throughout the holds, provided the core and
+predecessor conditions are sound.
+\end{proposition}
+\begin{proof}
+For $m=0$, use the core feedback. Inductively a state already in $\Sf_m$
+has a safe input with successor in $\Sf_m\subset\Sf_{m+1}$. A newly
+admitted predecessor has a safe input with successor in $\Sf_m$ by
+\eqref{eq:pre}. Thus every state in $\Sf_{m+1}$ has a safe hold and a
+successor in $\Sf_{m+1}$. Repeat the argument at each sample.
+\end{proof}
+This also gives the terminal part of the MPC shift proof: shift the
+accepted joint trajectory and append one of these feasible terminal
+holds. Entire-plan safety additionally requires hard collision and road
+constraints over the executed part of the plan. The baseline's soft
+prefix collision deficits are recovery measures and do not by themselves
+guarantee collision freedom within that prefix.
+
+A simpler, more conservative specialization fixes one joint backup
+feedback $\kappa_b(z)$ that preserves $\D$. For an integer $M$ its
+safe-capture set is
+\begin{equation}
+\Sf_b^M=\{z:\text{all }M\text{ backup holds are safe and }
+\Phi_b^M(z)\in\D\}.\label{eq:backup}
+\end{equation}
+Shifting those $M$ holds and adding a core hold proves invariance at
+sample instants. If a separate core controller is used, the continuation
+must include its certified transition, or use the safe-predecessor
+construction. This is the backup-set principle; the standard continuous
+flow formulation is given by Chen et al., Eq.~(9) and Theorem~1
+\cite{backup}. Its application to this project's dynamics still needs
+model, input and intersample certificates.
+
+\paragraph{What must constitute the core.}
+A cruise contraction domain is usable only with joint separation. One
+candidate core combines that domain, road containment, and a certificate
+that the entire future target orbit and timing avoid the future ego tube.
+For a straight road a relative-motion tail calculation can certify this;
+for a turning target, separation from its swept orbit is a sufficient
+geometric condition. Circular ego paths need future winding and recurrence
+handled explicitly. Another core could admit safe following at the target
+speed, but that behavior needs its own admissibility and invariance proof.
+No such general following core is implemented or certified by this study.
+
+\paragraph{Completeness and computation.}
+The sets in \eqref{eq:expansion} are inner approximations of the kernel.
+States that stay safe forever without ever reaching $\D$ may be omitted,
+even as $m$ grows. A maximum kernel computation therefore cannot be claimed
+from finite safe capture alone. Larger $M$ also increases online work;
+this study supplies no timing bound or performance prediction. A robust
+nominal-trajectory tube or a certified implicit barrier can represent an
+inner approximation without enumerating the full joint state space.
+
+\section{Cruise is a preference within the viable controls}
+For a chosen certified $\Sf$, define
+\begin{equation}
+\mathcal U_{\Sf}(z)=\{u:\text{the hold is admissible and safe, and }
+\Psi_h(z,u)\in\Sf\}.
+\end{equation}
+A joint terminal feedback may then be selected by
+\begin{equation}
+\kappa_f(z)\in\underset{u\in\mathcal U_{\Sf}(z)}{\operatorname{argmin}}
+\|u-\kappa_{\rm cruise}(x)\|_R^2.\label{eq:governor}
+\end{equation}
+Nonemptiness of the feasible control set comes from invariance, not from
+the cruise objective. This one control rule tries to cruise whenever that
+is compatible with continued safety. It may reduce speed or alter steering
+when the interaction requires it. Its inputs remain steering angle and
+braking ratio, without an inverse tire-force map or prescribed lane modes.
+The nonlinear predecessor and rectangle constraints need not be convex;
+\eqref{eq:governor} is not automatically a QP or a cheap online algorithm.
+A smooth CBF is one possible representation of a certified set, not an
+independent reason for feasibility.
+The existing $(P,K)$ contraction and its tube apply to the original cruise
+law on its certified domain. A governor that changes that input cannot
+reuse the same contraction or tube without a new proof or an explicit
+bound on the change. A joint backup and its capture set therefore need
+their own certificate; reusing the cruise core does not bypass this step.
+
+Safety and asymptotic cruise recovery are different theorems. An invariance
+constraint alone does not ensure eventual cruise, progress or comfort.
+The existing CLF can support recovery once the interaction permits it;
+requiring fixed-speed CLF decay at every joint state would again exclude
+otherwise viable following states. The PCBF literature likewise requires
+an invariant terminal set and distinguishes set safety from equilibrium
+stabilization \cite{pcbf}.
+
+\section{A transparent one-dimensional example}
+Consider aligned vehicles on a straight path with a constant-speed target
+($A_T=\beta_T=0$). Let $g$ be the bumper clearance minus the required
+buffer and $w=v_E-v_T$ the closing speed. Suppose the simplified ego
+model can brake at $b>0$ until it matches an admissible target speed, then
+maintain that speed. Define
+\begin{equation}
+B(g,w)=g-\frac{[w]_+^2}{2b}.\label{eq:braking}
+\end{equation}
+The set $B\geq0$ is invariant under braking while $w>0$ and matching the
+target speed afterwards. Indeed $\dot g=-w$, $\dot w=-b$, so while closing,
+$\dot B=-w-(w/b)(-b)=0$. Once $w=0$, both $g$ and $B$ remain constant.
+For $w<0$, maintaining the speeds increases the gap. A state with
+$g<[w]_+^2/(2b)$ cannot be saved by longitudinal control bounded below by
+$-b$ in this simplified same-lane model, since maximum braking minimizes
+the accumulated closing displacement. Thus this example has a direct
+viability interpretation, and is a relative-motion version of the standard
+stopping-distance barrier \cite{backup}.
+
+The terminal safety criterion depends on both vehicles, and a safe cruise
+speed can be the target's speed rather than the mission's preferred speed.
+Equation~\eqref{eq:braking} is an illustration, not a certificate for the
+production bicycle: tire force, yaw, slip, sampling, speed limits, target
+acceleration and model errors must be included before using it there.
+
+\section{Imperfect observations: an information-set kernel}
+Let $\B_k$ contain all joint states and fixed target parameters consistent
+with the history of measurements, bounded errors and the motion contract.
+The correct output-feedback requirement is
+\begin{equation}
+\exists\ \text{one causal observation-based policy}\quad
+\forall z_k\in\B_k:\quad \text{the resulting joint trajectory is safe}.
+\end{equation}
+It is stronger than $\forall z\in\B_k,\ \exists\kappa_z$.
+The latter permits different controls for indistinguishable states and
+does not give an executable policy. In particular, $\B\subset\K$ alone
+does not establish robust output-feedback viability.
+
+With one common held input $u$, predict the set $\overline\B^+(\B,u)$
+and intersect it with the set consistent with the next possible
+measurement $y$:
+\begin{equation}
+\B^+(\B,u,y)=\overline\B^+(\B,u)\cap\mathcal M(y).
+\end{equation}
+The prediction includes every allowed ego disturbance, and holds the
+unknown $A_T,\beta_T$ fixed on each trajectory. Define the information
+predecessor of a family of information sets $\mathfrak S$ by
+\begin{align}
+\Pre_I(\mathfrak S)=\{\B:\ &\exists\text{ one admissible }u,
+\text{ all within-hold joint trajectories are in }\C,\nonumber\\
+&\B^+(\B,u,y)\in\mathfrak S\text{ for every consistent }y\}.\label{eq:info}
+\end{align}
+The greatest fixed point is the information-state safety kernel. The
+core-and-predecessor induction applies here as well. Product sets for ego
+and target uncertainty are acceptable sound outer bounds, but can lose
+correlations from shared sensors and coordinates.
+
+Measurement intersection gives
+$\B_{k+1}\subseteq\overline\B^+(\B_k,u_k)$: containment compares the
+sets at the same successor time. It does not assert
+$\B_{k+1}\subseteq\B_k$ in different-time coordinates. Future target
+predictions generated from this update can be nested at matching absolute
+times. This is a convenient sufficient route to reusing an earlier
+certificate, not a universal necessity for every robust control method.
+Methods that explicitly accommodate future information changes can also
+establish safety. Replacing one point forecast by a freshly estimated one
+without these consistency conditions does not preserve a shift proof.
+The need to account for measurement errors is independently established
+by the measurement-robust CBF framework \cite{measurement}.
+
+\section{Perception exit is not physical non-reencounter}
+The baseline defines a finite encounter with an absorbing exit when the
+target leaves the perception range. This is a stated task convention;
+it is not a proof of physical all-time separation from that target.
+Under the repository's signed-speed target contract, take an ego at
+8~m/s and a straight target initially 45~m ahead, with initial speed
+18~m/s and constant acceleration $-2$~m/s$^2$. The reference-point gap is
+\begin{equation}
+d(t)=45+10t-t^2.
+\end{equation}
+It exceeds 50~m after 0.528~s, returns below 50~m after 9.472~s, and the
+reference points meet at 13.367~s. Rectangle contact occurs earlier.
+This is a counterexample to treating range exit alone as a physical
+infinite-horizon safety certificate. It is not a contradiction of the
+baseline's explicitly finite-encounter theorem.
+
+For physical safety, remove the target from the joint state only after a
+certificate of continued separation under the declared contract, or retain
+it in a valid uncertainty model. The collision-cone certificate is useful
+when it actually checks all later motion for the prescribed continuation.
+Merely receding at the present instant is insufficient. Newly entering,
+unmodeled vehicles need additional perception and initial-viability
+assumptions; a one-target terminal set cannot cover arbitrary unseen
+traffic.
+
+\section{Derivation checks and remaining obligations}
+Independent arithmetic checks, seed 20261010, compared the analytic target
+flow with a separate RK4 integration of \eqref{eq:target}, and checked
+the rotation derivative in \eqref{eq:relative} by central finite
+differences. Straight and curved cases, near-zero sideslip, signed speeds
+and passage through zero speed were included. They are numerical
+consistency checks, not exhaustive or interval certificates.
+
+\begin{center}
+\begin{tabular}{@{}p{0.54\linewidth}rp{0.25\linewidth}@{}}
+\toprule
+Check & Cases & Largest absolute discrepancy\\
+\midrule
+Target-flow semigroup & 64 & $2.85\,10^{-14}$\\
+Target flow versus independent RK4, 4096 steps over 4~s & 14 & $7.52\,10^{-12}$\\
+Relative position/yaw vector field, finite-difference step $10^{-5}$~s & 64 & $7.57\,10^{-9}$\\
+Scalar braking barrier along brake-to-match trajectories & 100 & $2.25\,10^{-14}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Position, angle and velocity component errors in the target-flow checks
+use their respective native SI units; the maximum listed is a numerical
+component maximum, not a dimensionally meaningful norm across unlike units.
+Source and exact results are stored with this study; the computation does
+not measure collision-avoidance success rates or real-time feasibility.
+The reproducible command from the repository root is
+\begin{quote}\small
+\path{python scripts/checkJointTerminalSetDerivations.py --output}\\
+\path{report/JOINT_TERMINAL_SET_DESIGN_20261010/derivation-checks.json}
+\end{quote}
+
+Before implementation, a useful nonempty joint core and an admissible
+continuation policy must be certified on the declared bicycle model.
+The hold clearance and target-tail bounds must be sound; sampling with a
+margin alone should be identified as a numerical hypothesis. For noisy
+operation, common-policy uncertainty propagation and a compatible
+information update are also required. An efficient inner approximation
+must be evaluated on the same exact and noisy campaigns; no improvement
+is predicted here. Existing prescribed lane backups, force-level input
+maps and removed target-estimation modules are not reinstated by this
+proposal. The research conclusion is a proposed mathematical architecture,
+not an implementation decision by the user.
+
+\paragraph{Source verification.}
+The primary papers below were checked against their arXiv preprints or
+publisher pages. Sharma's Eqs.~(2), (16), (17) were read from the local
+reference PDF. The local Zotero API was probed but was not running; no
+library items were modified. The joint predecessor and information-set
+formulation here are an application and synthesis of invariant-set ideas
+to this repository, not a claim of a new general theorem.
+
+\begin{thebibliography}{9}
+\bibitem{sharma}
+G. Sharma, H. Alai, and R. Rajamani,
+``Simultaneous ego-vehicle state estimation and vehicle trajectory tracking
+using a multistage high gain observer,''
+\emph{Transportation Research Part C}, vol. 182, 105411, 2026.
+\href{https://doi.org/10.1016/j.trc.2025.105411}{doi:10.1016/j.trc.2025.105411}.
+\bibitem{aubin}
+J.-P. Aubin, ``A Survey of Viability Theory,''
+\emph{SIAM Journal on Control and Optimization}, 1990.
+\href{https://doi.org/10.1137/0328044}{doi:10.1137/0328044}.
+\bibitem{backup}
+Y. Chen, M. Jankovic, M. Santillo, and A. D. Ames,
+``Backup Control Barrier Functions: Formulation and Comparative Study,''
+2021. \url{https://arxiv.org/abs/2104.11332}.
+\bibitem{pcbf}
+J. Huang, H. Wang, K. Margellos, and P. Goulart,
+``Predictive Control Barrier Functions: Bridging model predictive control
+and control barrier functions,'' arXiv version 2, 2025.
+\url{https://arxiv.org/abs/2502.08400}.
+\bibitem{measurement}
+R. K. Cosner, A. W. Singletary, A. J. Taylor, T. G. Molnar,
+K. L. Bouman, and A. D. Ames,
+``Measurement-Robust Control Barrier Functions: Certainty in Safety with
+Uncertainty in State,'' 2021.
+\url{https://arxiv.org/abs/2104.14030}.
+\end{thebibliography}
+\end{document}

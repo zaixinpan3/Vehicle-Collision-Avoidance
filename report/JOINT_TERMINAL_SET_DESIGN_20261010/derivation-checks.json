@@ -1,0 +1,33 @@
+{
+  "seed": 20261010,
+  "target_semigroup": {
+    "cases": 64,
+    "max_abs_error": 2.842170943040401e-14
+  },
+  "target_flow_vs_independent_rk4": {
+    "cases": 14,
+    "steps_per_case": 4096,
+    "duration_seconds": 4.0,
+    "max_abs_error": 7.51754214434186e-12
+  },
+  "relative_vector_field": {
+    "cases": 64,
+    "max_abs_error": 7.560421622088143e-09
+  },
+  "scalar_braking_margin": {
+    "cases": 100,
+    "max_abs_error": 2.2426505097428162e-14,
+    "unsafe_cases_rejected": 100
+  },
+  "signed_contract_range_return_counterexample": {
+    "ego_speed_mps": 8,
+    "target_initial_speed_mps": 18,
+    "target_acceleration_mps2": -2,
+    "initial_gap_m": 45,
+    "range_m": 50,
+    "exit_seconds": 0.5278640450004204,
+    "return_seconds": 9.47213595499958,
+    "reference_point_intersection_seconds": 13.366600265340756
+  },
+  "scope": "Numerical checks of analytic derivations only; no full vehicle simulation, production change, or robust safety certificate."
+}
