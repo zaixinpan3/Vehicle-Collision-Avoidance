@@ -1,6 +1,6 @@
-Full MATLAB suite after the change (matlab -batch "results = runtests('tests'); ..."), run concurrently with the paired campaign:
-passed 602 of 602
+Full MATLAB suite on the steering-level design of this commit (matlab -batch "results = runtests('tests'); ..."), run concurrently with the paired campaign:
+passed 603 of 603
 
-First full run before the test fixes (same code except tests/nominalClfTest.m, tests/terminalSafeSetTest.m and the stored enclosure basis): 597 of 602; the five failures were the four freshJacobiansLieInTheRecordedEnclosure cases (the stored basis was overwritten by a reused variable in the synthesis script, fixed) and the crosser fixture of theEncounterEndsAtItsExitOrOutsideTheCollisionCone (moved from 3 m to 4.6 m beside the 2-m tube).
+Focused runs on the final table: nominalClfTest + terminalSafeSetTest + collisionAvoidanceControllerConfigTest 143 of 143 (the crosser fixture of theEncounterEndsAtItsExitOrOutsideTheCollisionCone sits 4.2 m beside the 1.5-m tube; the retired option clf.certificationFrontForceFraction is rejected).
 
-Focused runs after the fixes: nominalClfTest + terminalSafeSetTest 71 of 71.
+Force-level design of commit e2046e0 (superseded): full suite 602 of 602 after the fixes; the first full run gave 597 of 602 (the stored enclosure basis had been overwritten by a reused variable in the synthesis script, fixed; the crosser fixture had to move beside the 2-m tube).

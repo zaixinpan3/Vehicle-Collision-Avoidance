@@ -4,31 +4,24 @@ function entries = synthesizeClfMatrices(operatingPoints,options)
 % configuration overrides and path curvature) this script certifies, on the
 % sampled nonlinear bicycle model itself, a quadratic CLF V = e'Pe of the
 % transverse error e = [lateral; heading; vx - vx*; vy - vy*; r - r*] and the
-% gain K of the terminal controller (terminalSafeSet.terminalInput), whose
-% virtual input w = K e is, by default (InputMap "force"), the deviation of
-% the front lateral force and of the braking ratio from the trim's, turned
-% into a steering angle by the inverse Fiala curve (terminalSafeSet.inputOf:
-% feedback linearization of the front tire), or (InputMap "steering") the
-% deviation of the steering angle and braking ratio, such that on the sublevel
-% set Omega = {V <= 1}
+% gain K of the terminal controller u = u* + K e
+% (terminalSafeSet.terminalInput), such that on the sublevel set
+% Omega = {V <= 1}
 %
 %   V(x+) <= rho V(x),   rho = exp(-2h/T), T = clf.convergenceTimeConstantSeconds,
-%   |K_j e| <= ubar_j,   ubar = [clf.certificationFrontForceFraction * (front lateral capacity);
-%                                clf.certificationBrakingRatio]   (force map), or
-%                        ubar = [clf.certificationSteeringRadians; clf.certificationBrakingRatio]   (steering map),
+%   |K_j e| <= ubar_j,   ubar = [clf.certificationSteeringRadians; clf.certificationBrakingRatio],
 %   Omega lies inside the certification box |e_i| <= box_i
 %                        (clf.certificationLateralMeters, ...HeadingRadians,
 %                         ...SpeedMetersPerSecond, ...LateralVelocityMetersPerSecond,
 %                         ...YawRateRadiansPerSecond).
 %
-% Method (TERMINAL_SAFE_SET.md, Section 2; NOMINAL_CLF.md). Let g(e, w) be the
-% sampled error map of one hold from x(e) with the virtual input w. The trim is
-% a fixed point, g(0, 0) = 0, so along the ray from 0 to (e, w)
+% Method (TERMINAL_SAFE_SET.md, Section 2; NOMINAL_CLF.md). Let g(e, du) be the
+% sampled error map of one hold from x(e) with input u* + du. The trim is a
+% fixed point, g(0, 0) = 0, so along the ray from 0 to (e, du)
 %
-%   g(e, w) = Gbar(e, w) [e; w],   Gbar = integral_0^1 G(t e, t w) dt,
+%   g(e, du) = Gbar(e, du) [e; du],   Gbar = integral_0^1 G(t e, t du) dt,
 %
-% with G = [dg/de, dg/dw] the Jacobian of the sampled map (through the input
-% map's derivatives). The certificate
+% with G = [dg/de, dg/ddu] the Jacobian of the sampled map. The certificate
 % encloses the ray averages Gbar themselves (terminalSafeSet.rayJacobians,
 % Gauss-Legendre quadrature; the quadrature's residual in the identity joins
 % the enclosure's residual as a rank-one term), not the pointwise Jacobians:
@@ -55,8 +48,11 @@ function entries = synthesizeClfMatrices(operatingPoints,options)
 % Growth times the current set and over inputs within GainStep (in units of
 % ubar) of the current controller, and solves the LMI with the new set inside
 % that inflated set (S' <= Growth S) and the new gain within GainStep of the
-% old one on it. Every iteration's pair is therefore certified by the enclosure
-% it was designed with; the pair with the largest fill is kept, re-verified by
+% old one on it (a round with no design is retried with half and a quarter of
+% the growth, then with a band two and four times as wide; the entry records
+% the growth and band of the kept round). Every iteration's pair is therefore
+% certified by the enclosure it was designed with; the pair with the largest
+% fill is kept, re-verified by
 % eigenvalues, and the smallest contraction it certifies is recorded. The same
 % enclosures of the partial-hold maps give the hold factor, the largest
 % exp(s/T) sqrt(V(x(s)) / V(x)) inside a hold, by which the CLF tube is
@@ -79,7 +75,6 @@ function entries = synthesizeClfMatrices(operatingPoints,options)
         options.MarginFactor (1,1) double {mustBeGreaterThanOrEqual(options.MarginFactor,1)} = 1.25
         options.BoundarySamples (1,1) double {mustBePositive,mustBeInteger} = 1200
         options.InteriorSamples (1,1) double {mustBePositive,mustBeInteger} = 600
-        options.InputMap (1,1) string {mustBeMember(options.InputMap,["force","steering"])} = "force"
         options.Iterations (1,1) double {mustBePositive,mustBeInteger} = 10
         options.Growth (1,1) double {mustBeGreaterThan(options.Growth,1)} = 1.3
         options.GainStep (1,1) double {mustBeNonnegative} = .1
@@ -137,29 +132,17 @@ end
 
 function entry=localSynthesize(cfg,curvature,key,options)
     point=nonlinearBicycleModel.operatingPoint(cfg,curvature);
-    reference=struct('state',point.state,'input',point.input,'curvature',curvature,'inputMap',options.InputMap,'trimForce',0);
-    reference.trimForce=terminalSafeSet.trimForce(reference,cfg);
+    reference=struct('state',point.state,'input',point.input,'curvature',curvature);
     h=cfg.controller.sampleTime;T=cfg.clf.convergenceTimeConstantSeconds;rho=exp(-2*h/T);
     % The LMIs ask for a contraction DesignMargin stricter than rho, so that
     % the eigenvalue re-verification at rho has a margin above solver tolerance.
     design=rho*(1-options.DesignMargin);
     box=[cfg.clf.certificationLateralMeters;cfg.clf.certificationHeadingRadians;cfg.clf.certificationSpeedMetersPerSecond; ...
         cfg.clf.certificationLateralVelocityMetersPerSecond;cfg.clf.certificationYawRateRadiansPerSecond];
-    % The input box of the virtual input: [front lateral force (N); braking
-    % ratio] for the force map, [steering (rad); braking ratio] for the
-    % steering map.
-    tire=modifiedFialaTire.parameters(cfg);
-    if options.InputMap=="force",ubar=[cfg.clf.certificationFrontForceFraction*tire.longitudinalForceScale(1);cfg.clf.certificationBrakingRatio];
-    else,ubar=[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio];end
+    ubar=[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio];
     low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);high=min(1-1e-8,cfg.actuation.brakingRatioMaximum);
     if point.input(2)-ubar(2)<low || point.input(2)+ubar(2)>high
         error('synthesizeClfMatrices:inputBox','The certification braking box leaves the actuator range at speed %g.',cfg.referenceSpeed);
-    end
-    if options.InputMap=="force"
-        eta=sqrt(1-(abs(point.input(2))+ubar(2))^2);
-        if abs(reference.trimForce)+ubar(1)>=.98*tire.longitudinalForceScale(1)*eta
-            error('synthesizeClfMatrices:inputBox','The certification force box reaches the front lateral capacity at speed %g.',cfg.referenceSpeed);
-        end
     end
     scale=struct('state',diag(box),'input',diag(ubar));
     [a0,b0]=terminalSafeSet.jacobians(reference,cfg,zeros(5,1),zeros(2,1),h);
@@ -174,23 +157,30 @@ function entry=localSynthesize(cfg,curvature,key,options)
     localReport(options,'  plain LMI: fill %.3f, extents %s\n',fill,mat2str((sqrt(diag(s)).*box).',3));
     % 2. Self-consistent growth: enclose over Growth times the current set and
     % the input band around the current gain, design inside both.
-    candidates=struct('s',{},'k',{},'enclosure',{},'fill',{},'margin',{});
+    candidates=struct('s',{},'k',{},'enclosure',{},'fill',{},'margin',{},'band',{},'growth',{});
     for iteration=1:options.Iterations
-        k=y/s;gamma=options.Growth;
-        for attempt=1:3
-            enclosure=localEnclosure(reference,cfg,gamma*s,k,scale,a0,b0,h,options,stream);
-            [s2,y2,fill2,ok2]=localLmi(at,bt,enclosure.directions,enclosure.residualNorm,design,gamma*s,ones(5,1),struct('k',k,'delta',options.GainStep));
+        k=y/s;ok2=false;fill2=0;
+        % A round that admits no design at the nominal growth is retried with
+        % half and a quarter of the growth, then with a gain band twice and
+        % four times as wide (the enclosure is sampled again for each band).
+        for band=options.GainStep*[1,2,4]
+            gamma=options.Growth;
+            for attempt=1:3
+                enclosure=localEnclosure(reference,cfg,gamma*s,k,scale,a0,b0,h,options,stream,band);
+                [s2,y2,fill2,ok2]=localLmi(at,bt,enclosure.directions,enclosure.residualNorm,design,gamma*s,ones(5,1),struct('k',k,'delta',band));
+                if ok2 && fill2>1e-6,break;end
+                localReport(options,'  iteration %d: growth %.3f, band %.2f infeasible (bounds %s, residual %.4f)\n', ...
+                    iteration,gamma,band,mat2str(enclosure.coefficientBounds.',3),enclosure.residualNorm);
+                gamma=1+(gamma-1)/2;
+            end
             if ok2 && fill2>1e-6,break;end
-            localReport(options,'  iteration %d: growth %.3f infeasible (bounds %s, residual %.4f)\n', ...
-                iteration,gamma,mat2str(enclosure.coefficientBounds.',3),enclosure.residualNorm);
-            gamma=1+(gamma-1)/2;
         end
         if ~ok2 || fill2<=1e-6,break;end
         k2=y2/s2;margin=localVertexMargin(at,bt,enclosure,rho,k2,s2);
-        localReport(options,'  iteration %d: growth %.3f, coefficient bounds %s, residual %.4f (quadrature %.1e); fill %.3f, margin %.1e, extents %s\n', ...
-            iteration,gamma,mat2str(enclosure.coefficientBounds.',3),enclosure.residualNorm,enclosure.quadratureResidual, ...
+        localReport(options,'  iteration %d: growth %.3f, band %.2f, coefficient bounds %s, residual %.4f (quadrature %.1e); fill %.3f, margin %.1e, extents %s\n', ...
+            iteration,gamma,band,mat2str(enclosure.coefficientBounds.',3),enclosure.residualNorm,enclosure.quadratureResidual, ...
             fill2,margin,mat2str((sqrt(diag(s2)).*box).',3));
-        candidates(end+1)=struct('s',s2,'k',k2,'enclosure',enclosure,'fill',fill2,'margin',margin); %#ok<AGROW>
+        candidates(end+1)=struct('s',s2,'k',k2,'enclosure',enclosure,'fill',fill2,'margin',margin,'band',band,'growth',gamma); %#ok<AGROW>
         s=s2;y=y2;
     end
     candidates=candidates([candidates.margin]>=-1e-6);
@@ -208,7 +198,7 @@ function entry=localSynthesize(cfg,curvature,key,options)
     for step=1:options.HoldSubdivisions-1
         duration=h*step/options.HoldSubdivisions;
         [a0s,b0s]=terminalSafeSet.jacobians(reference,cfg,zeros(5,1),zeros(2,1),duration);
-        partial=localEnclosure(reference,cfg,s2,k,scale,a0s,b0s,duration,options,stream,enclosure.errors,enclosure.inputs);
+        partial=localEnclosure(reference,cfg,s2,k,scale,a0s,b0s,duration,options,stream,best.band,enclosure.errors,enclosure.inputs);
         bound=localVertexNorm(scale.state\a0s*scale.state,scale.state\b0s*scale.input,partial,k,factorScaled);
         holdFactor=max(holdFactor,exp(duration/T)*bound);residualHold=max(residualHold,partial.residualNorm);
     end
@@ -216,13 +206,12 @@ function entry=localSynthesize(cfg,curvature,key,options)
     % 5. Unscale and check independently on the final set.
     p=scale.state\inv(s2)/scale.state;p=(p+p.')/2;gain=scale.input*k/scale.state;
     full=struct('state',point.state,'input',point.input,'curvature',curvature,'matrix',p,'factor',chol(p), ...
-        'gain',gain,'nominalA',a0,'nominalB',b0,'inputMap',options.InputMap,'trimForce',reference.trimForce);
+        'gain',gain,'nominalA',a0,'nominalB',b0);
     check=RandStream('mt19937ar','Seed',options.CertificateSeed+1);
     directions=randn(check,5,800);unit=full.factor\(directions./vecnorm(directions));
     sampled=terminalSafeSet.certificate(full,cfg,unit.*sqrt([ones(1,400),rand(check,1,400)]),options.HoldSubdivisions);
     assert(all(isfinite(sampled.contraction)),'synthesizeClfMatrices:certificate','A sample of the certified set left the model domain.');
     entry=struct('key',key,'referenceSpeed',cfg.referenceSpeed,'curvature',curvature,'matrix',p,'gain',gain, ...
-        'inputMap',options.InputMap,'trimForce',reference.trimForce, ...
         'nominalA',a0,'nominalB',b0,'certifiedContraction',certified,'requiredContraction',rho, ...
         'certifiedTimeConstantSeconds',-2*h/log(certified),'requiredTimeConstantSeconds',T, ...
         'certifiedLevel',1,'holdFactor',holdFactor,'regionFill',fill,'extents',sqrt(diag(inv(p))));
@@ -230,7 +219,7 @@ function entry=localSynthesize(cfg,curvature,key,options)
         'directions',enclosure.basis,'coefficientBounds',enclosure.coefficientBounds,'residualNorm',enclosure.residualNorm, ...
         'residualNormWithinHold',residualHold,'quadratureNodes',options.QuadratureNodes, ...
         'quadratureResidual',enclosure.quadratureResidual,'meanValueResidual',enclosure.meanValueResidual, ...
-        'marginFactor',options.MarginFactor,'growth',options.Growth,'inputBand',options.GainStep, ...
+        'marginFactor',options.MarginFactor,'growth',best.growth,'inputBand',best.band, ...
         'iterationsUsed',numel(candidates),'boundarySamples',options.BoundarySamples,'interiorSamples',options.InteriorSamples, ...
         'seed',options.CertificateSeed,'iterations',options.Iterations,'holdSubdivisions',options.HoldSubdivisions, ...
         'lmiMinimumEigenvalue',minimumEigenvalue,'maximumInput',max(abs(enclosure.inputs),[],2), ...
@@ -238,20 +227,20 @@ function entry=localSynthesize(cfg,curvature,key,options)
         'sampledHoldFactor',max(sampled.holdFactor),'sampledRowsSatisfied',all(sampled.rows));
 end
 
-function enclosure=localEnclosure(reference,cfg,s,k,scale,a0,b0,duration,options,stream,errors,inputs)
+function enclosure=localEnclosure(reference,cfg,s,k,scale,a0,b0,duration,options,stream,band,errors,inputs)
     % Zonotope enclosure of the scaled deviations of the ray-averaged
     % Jacobians over the set {e' S^-1 e <= 1} (scaled coordinates) and over
-    % inputs within GainStep ubar of u = K e: boundary-heavy samples, the
+    % inputs within band*ubar of u = K e: boundary-heavy samples, the
     % leading principal directions with their coefficient bounds, and the
     % residual norm (the principal residual plus the rank-one quadrature
     % correction of the mean-value identity), all widened by MarginFactor.
-    if nargin<11
+    if nargin<12
         lower=chol(s,'lower');
         d=randn(stream,5,options.BoundarySamples+options.InteriorSamples);
         radius=[ones(1,options.BoundarySamples),sqrt(rand(stream,1,options.InteriorSamples))];
         scaled=lower*(d./vecnorm(d)).*radius;
         errors=scale.state*scaled;
-        inputs=scale.input*(k*scaled+options.GainStep*(2*rand(stream,2,size(scaled,2))-1));
+        inputs=scale.input*(k*scaled+band*(2*rand(stream,2,size(scaled,2))-1));
     end
     [a,b,gap]=terminalSafeSet.rayJacobians(reference,cfg,errors,inputs,duration,options.QuadratureNodes);
     assert(all(isfinite(a(:))) && all(isfinite(b(:))),'synthesizeClfMatrices:enclosure','A sample left the model domain.');
@@ -268,13 +257,8 @@ function enclosure=localEnclosure(reference,cfg,s,k,scale,a0,b0,duration,options
     residual=x-u*coefficients;
     eps=options.MarginFactor*(max(arrayfun(@(j)norm(reshape(residual(:,j),5,7)),1:n))+quadrature);
     directions=zeros(5,7,m);for index=1:m,directions(:,:,index)=bounds(index)*reshape(u(:,index),5,7);end
-    steering=zeros(1,n);
-    for j=1:n
-        state=[0;0;reference.state(3)+errors(2,j);reference.state(4:6)+errors(3:5,j)];
-        physical=terminalSafeSet.inputOf(reference,cfg,state,inputs(:,j));steering(j)=physical(1);
-    end
     front=abs(atan2(reference.state(5)+errors(4,:)+cfg.vehicle.lf*(reference.state(6)+errors(5,:)), ...
-        reference.state(4)+errors(3,:))-steering);
+        reference.state(4)+errors(3,:))-(reference.input(1)+inputs(1,:)));
     rear=abs(atan2(reference.state(5)+errors(4,:)-cfg.vehicle.lr*(reference.state(6)+errors(5,:)),reference.state(4)+errors(3,:)));
     enclosure=struct('directions',directions,'basis',u,'coefficientBounds',bounds,'residualNorm',eps, ...
         'quadratureResidual',quadrature,'meanValueResidual',meanValue, ...

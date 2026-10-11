@@ -17,7 +17,13 @@ unproven one (0.6~m of lateral error at 8~m/s against 1.9~m), the plans
 became longer and the conic solver failed more often. The user asked for a
 brainstorm of mathematically elegant ways to construct the terminal set and
 then asked to try the elegant ones. This report records what was tried, what
-each construction certifies, and which ones went into the code.
+each construction certifies, and which ones went into the code. After the
+first adoption (commit \texttt{e2046e0}: force-level controller with the
+secant enclosure) the user decided to keep the controller's input as it was,
+steering angle and braking ratio, and to go with the first idea alone; the
+production certificate of this commit is the secant enclosure with the
+self-consistent growth on the steering-level controller $u=u^*+Ke$
+(Section~\ref{sec:production}).
 
 \section{Starting point}
 The certificate of commit \texttt{8faf395} encloses, in box-scaled
@@ -261,81 +267,99 @@ variant & point & lat & head & speed & $v_y$ & $r$ & $T_c$ & $\mu$ & worst \\
 \end{table}
 
 \section{The production certificate}
-The production synthesis (\path{scripts/synthesizeClfMatrices.m}) now uses
-the force-level input map, the ray-averaged enclosure (8 nodes, quadrature
-residual carried) and the self-consistent growth ($\gamma=1.3$,
-$\delta=0.1$, ten rounds, start inside half the box), with the certification
-box widened to $[2~\text{m},0.2~\text{rad},1~\text{m/s},0.3~\text{m/s},0.2~\text{rad/s}]$
-and the force box at 0.4 of the front lateral capacity. The certified sets
+\label{sec:production}
+The production synthesis (\path{scripts/synthesizeClfMatrices.m}) uses the
+ray-averaged enclosure (8 nodes, quadrature residual carried) and the
+self-consistent growth ($\gamma=1.3$, $\delta=0.1$, ten rounds, start inside
+half the box; a round with no design is retried with half and a quarter of
+the growth and then with a band two and four times as wide, and the entry
+records the growth and band of the kept round) on the steering-level
+controller $u=u^*+Ke$, with the certification box widened to
+$[2~\text{m},0.2~\text{rad},1~\text{m/s},0.3~\text{m/s},0.2~\text{rad/s}]$
+and the input box unchanged (0.075~rad, 0.125). The certified sets
 (\path{synthesis.txt}; \path{config/clfMatrices.json}) are in
-Table~\ref{tab:production}. Every set reaches the 2-m lateral box; the
-heading extent is 0.167~rad at 8~m/s and 0.118~rad at 15~m/s. Against the
-certificate of \texttt{8faf395} the lateral extent is 3.2 times larger at
-8~m/s and 2 to 2.9 times at 15~m/s, and against the former unproven linear
-certificate (1.9~m, 0.18~rad at 8~m/s) it is the same size or larger. The
-hold factors are 1.004--1.012 (the former 1.009--1.026), the independent
-sampled check finds worst contractions of 0.957--0.966 against the required
-0.975, and the enclosure samples (over the 1.3-times inflated set and the
-input band) reach front slips of 0.042--0.060~rad against the former
-0.027~rad: the front tire's saturation is the controller's to handle through
-the inverse curve, not the certificate's to absorb.
+Table~\ref{tab:production}: 1.49 and 1.59~m of lateral error at 8~m/s
+(straight, curve) with headings of 0.142 and 0.144~rad, and the 2-m box at
+15~m/s with 0.115~rad. Against the certificate of \texttt{8faf395} the
+lateral extent is 2.4 to 2.8 times larger at 8~m/s and 2 to 2.9 times at
+15~m/s; against the former unproven linear certificate (1.9~m, 0.18~rad at
+8~m/s) it is about 0.8 of the size at 8~m/s and larger at 15~m/s. The hold
+factors are 1.005--1.025, the independent sampled check finds worst
+contractions of 0.941--0.963 against the required 0.975, and the enclosure
+samples (over the 1.3-times inflated set and the input band) reach front
+slips of 0.061--0.080~rad against the former 0.027~rad. The 8-m/s curve
+needed the band fallback: with the band at 0.1 its second round admits no
+design at any growth; the round with the band doubled does, and the later
+rounds return to the narrow band.
+
+For the record, the force-level controller with the same enclosure and
+growth (commit \texttt{e2046e0}, the first adoption) certified 2.00~m at
+every operating point with headings of 0.167~rad (8~m/s) and 0.118~rad
+(15~m/s), hold factors 1.004--1.012; its campaign is reported in
+Section~\ref{sec:campaign} beside the steering-level one. It was not kept
+because its steering command passes through the inverse of the tire model,
+which the user did not want the controller's input to depend on.
 
 \begin{table}
 \centering\small
 \caption{Production certificate (\texttt{synthesizeClfMatrices}, this
-commit) against commit \texttt{8faf395}. Extents in m, rad, m/s, m/s, rad/s;
-certified time constant in s; hold factor; worst sampled contraction.}
+commit, steering-level controller) against commit \texttt{8faf395} and the
+force-level controller of \texttt{e2046e0}. Extents in m, rad, m/s, m/s,
+rad/s; certified time constant in s; hold factor; worst sampled contraction.}
 \label{tab:production}
 \begin{tabular}{llrrrrrrrr}
 \toprule
 point & certificate & lat & head & speed & $v_y$ & $r$ & $T_c$ & $\mu$ & worst \\
 \midrule
 8 / 0 & \texttt{8faf395} & 0.62 & 0.053 & 0.37 & 0.107 & 0.067 & 3.83 & 1.026 & 0.945 \\
-8 / 0 & this & 2.00 & 0.167 & 0.52 & 0.272 & 0.200 & 3.85 & 1.010 & 0.961 \\
+8 / 0 & force, \texttt{e2046e0} & 2.00 & 0.167 & 0.52 & 0.272 & 0.200 & 3.85 & 1.010 & 0.961 \\
+8 / 0 & this & 1.49 & 0.142 & 0.49 & 0.263 & 0.200 & 3.92 & 1.025 & 0.941 \\
 8 / 0.005 & \texttt{8faf395} & 0.57 & 0.050 & 0.31 & 0.098 & 0.066 & 3.47 & 1.020 & 0.946 \\
-8 / 0.005 & this & 2.00 & 0.167 & 0.63 & 0.277 & 0.200 & 3.86 & 1.012 & 0.957 \\
+8 / 0.005 & force, \texttt{e2046e0} & 2.00 & 0.167 & 0.63 & 0.277 & 0.200 & 3.86 & 1.012 & 0.957 \\
+8 / 0.005 & this & 1.59 & 0.144 & 0.74 & 0.246 & 0.200 & 3.92 & 1.017 & 0.943 \\
 15 / 0 & \texttt{8faf395} & 0.99 & 0.055 & 0.41 & 0.149 & 0.079 & 3.93 & 1.009 & 0.957 \\
-15 / 0 & this & 2.00 & 0.118 & 0.48 & 0.233 & 0.200 & 3.87 & 1.005 & 0.966 \\
+15 / 0 & force, \texttt{e2046e0} & 2.00 & 0.118 & 0.48 & 0.233 & 0.200 & 3.87 & 1.005 & 0.966 \\
+15 / 0 & this & 2.00 & 0.115 & 0.52 & 0.270 & 0.200 & 3.90 & 1.005 & 0.962 \\
 15 / 0.005 & \texttt{8faf395} & 0.70 & 0.040 & 0.30 & 0.089 & 0.056 & 3.67 & 1.002 & 0.962 \\
-15 / 0.005 & this & 2.00 & 0.118 & 0.61 & 0.261 & 0.200 & 3.85 & 1.004 & 0.963 \\
+15 / 0.005 & force, \texttt{e2046e0} & 2.00 & 0.118 & 0.61 & 0.261 & 0.200 & 3.85 & 1.004 & 0.963 \\
+15 / 0.005 & this & 2.00 & 0.114 & 0.61 & 0.186 & 0.200 & 3.85 & 1.006 & 0.963 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Implementation}
 \begin{itemize}
-\item \path{controller/terminalSafeSet.m}: \texttt{inputOf} (the input map:
-  steering or force, with its derivatives), \texttt{inverseSteering},
-  \texttt{trimForce}; \texttt{jacobians} composes the map's derivatives into
-  the chain rule and returns the error after the hold; \texttt{rayJacobians}
-  (Gauss--Legendre ray average and the identity's gap);
-  \texttt{terminalInput} and \texttt{certificate} command through
-  \texttt{inputOf}.
+\item \path{controller/terminalSafeSet.m}: \texttt{jacobians} returns the
+  error after the hold as well; \texttt{rayJacobians} (Gauss--Legendre ray
+  average and the identity's gap). The terminal controller is unchanged,
+  $u=u^*+Ke$. (The force-level map of commit \texttt{e2046e0},
+  \texttt{inputOf}, \texttt{inverseSteering} and \texttt{trimForce}, was
+  removed again at the user's direction; the study script keeps its own copy.)
 \item \path{scripts/synthesizeClfMatrices.m}: the ray-averaged enclosure with
   the quadrature residual, the self-consistent growth (options
   \texttt{Growth}, \texttt{GainStep}, \texttt{StartFraction},
-  \texttt{QuadratureNodes}, \texttt{InputMap}), no final fixed-gain step; the
-  entry records \texttt{inputMap}, \texttt{trimForce} and the new
+  \texttt{QuadratureNodes}; a stalled round retried with smaller growth and
+  a wider band), no final fixed-gain step; the entry records the new
   certificate fields (\texttt{quadratureNodes}, \texttt{quadratureResidual},
   \texttt{meanValueResidual}, \texttt{growth}, \texttt{inputBand},
   \texttt{iterationsUsed}).
 \item \path{config/collisionAvoidanceControllerConfig.m}: the wider
-  certification box and \texttt{clf.certificationFrontForceFraction} (0.4);
-  \texttt{certificationSteeringRadians} remains the box of the steering map.
-\item \path{controller/nonlinearBicycleModel.m}: the reference carries
-  \texttt{inputMap} and \texttt{trimForce}; entries without them are stale.
+  certification box; the input box is unchanged. The option
+  \texttt{clf.certificationFrontForceFraction} of \texttt{e2046e0} is retired
+  and rejected.
 \item \path{config/clfMatrices.json}: regenerated (five entries).
-\item Tests: \texttt{nominalClfTest} checks the input box against the entry's
-  recorded box and the map, and tests fresh ray averages (with their
-  quadrature correction) against the recorded zonotope.
-\item Documents: \path{controller/TERMINAL_SAFE_SET.md} (Sections 1, 2, 10),
+\item Tests: \texttt{nominalClfTest} tests fresh ray averages (with their
+  quadrature correction) against the recorded zonotope;
+  \texttt{terminalSafeSetTest}'s crosser fixture sits beside the 1.5-m tube;
+  \texttt{collisionAvoidanceControllerConfigTest} rejects the retired option.
+\item Documents: \path{controller/TERMINAL_SAFE_SET.md} (Sections 2, 8, 10),
   \path{controller/NOMINAL_CLF.md}, \path{controller/PCBF_CLF_ARCHITECTURE.md},
   \path{controller/CONTROLLER_FILES.md}.
 \end{itemize}
 
 \section{What is proven and what is assumed}
 Unchanged in structure from \path{TERMINAL_CONTROLLER_CERTIFICATE_20261010.tex}:
-the terminal controller is an explicit static feedback, its contraction on
+the terminal controller is an explicit linear feedback, its contraction on
 the certified set follows from the vertex LMIs by the mean-value identity,
 and the hold factor from the partial-hold enclosures. The hypotheses are H1
 (the declared RK4 sampled model with exact state), H2 (the target follows its
@@ -345,69 +369,77 @@ sampled (1200 boundary and 600 interior samples of the 1.3-times inflated set
 and of the input band, margin 1.25, the quadrature's gap carried as a
 rank-one residual) and re-checked on fresh samples by a unit test. The input
 band is part of the certificate: the gain the LMI returns lies within it by
-a constraint, so the enclosure covers the controller actually used. The
-inversion's derivatives are central differences of a smooth closed form;
-their error ($10^{-8}$ relative) is far below the margin.
+a constraint, so the enclosure covers the controller actually used.
 
 \section{Campaign}
+\label{sec:campaign}
 The same 98 encounters as before (seven geometries at 8 and 15~m/s; seed 0
 with exact states, six noisy seeds with the estimator in the loop) were run
 for the baseline, commit \texttt{8faf395} (a \texttt{git archive} copy), and
-for the working tree of this commit (a tar copy), interleaved in one pool of
-eight processes so that both see the same load
-(\path{scripts/run-campaign.sh}; \path{comparison.txt},
+for the working tree, interleaved in one pool of eight processes so that both
+see the same load (\path{scripts/run-campaign.sh}), twice: once for the
+force-level controller of commit \texttt{e2046e0}
+(\path{comparison-force-e2046e0.txt} and the files of that suffix) and once
+for the steering-level controller of this commit (\path{comparison.txt},
 \path{campaign-runs.csv}, \path{encounter-ends.txt}, \path{horizons.txt}).
-The baseline reproduces its October 10 result (12 of 14, 39 of 84).
+The baseline reproduces its October 10 result in both runs (12 of 14, 39 of
+84; its failure kinds shift by one or two encounters between runs under the
+different loads).
 
 \begin{table}
 \centering\small
-\caption{Paired campaign under the same load. Recovered encounters; no
-collision in either variant (least replay clearance 0.157 and 0.146~m exact,
-0.240 and 0.245~m noisy).}
+\caption{Paired campaigns under the same load. Recovered encounters; no
+collision in any variant (least replay clearance 0.146--0.157~m exact,
+0.240--0.260~m noisy).}
 \label{tab:campaign}
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
- & \multicolumn{2}{c}{exact (14)} & \multicolumn{2}{c}{noisy (84)} \\
- & \texttt{8faf395} & this & \texttt{8faf395} & this \\
+ & \multicolumn{3}{c}{exact (14)} & \multicolumn{3}{c}{noisy (84)} \\
+ & \texttt{8faf395} & force & this & \texttt{8faf395} & force & this \\
 \midrule
-recovered & 12 & 13 & 39 & 53 \\
-no solution: \texttt{clfNoNumericalResult} & 2 & 1 & 16 & 2 \\
-no solution: \texttt{timeLimit} & 0 & 0 & 11 & 9 \\
-no solution: \texttt{nonlinearAcceptanceFailed} & 0 & 0 & 12 & 11 \\
-no solution: \texttt{pcbfNoNumericalResult} & 0 & 0 & 6 & 9 \\
-first-frame horizon, median holds & 130 & 105 & 120 & 105 \\
-horizon, 95th percentile holds & 217 & 104 & 116 & 103 \\
-controller time per frame, 95th percentile (s) & 0.371 & 0.172 & 0.225 & 0.230 \\
+recovered & 12 & 13 & 14 & 39 & 53 & 53 \\
+no solution: \texttt{clfNoNumericalResult} & 2 & 1 & 0 & 16 & 2 & 1 \\
+no solution: \texttt{timeLimit} & 0 & 0 & 0 & 9--11 & 9 & 9 \\
+no solution: \texttt{nonlinearAcceptanceFailed} & 0 & 0 & 0 & 12 & 11 & 11 \\
+no solution: \texttt{pcbfNoNumericalResult} & 0 & 0 & 0 & 6--8 & 9 & 10 \\
+first-frame horizon, median holds & 130 & 105 & 109 & 120 & 105 & 109 \\
+horizon, 95th percentile holds & 217 & 104 & 166 & 116 & 103 & 104 \\
+controller time per frame, 95th percentile (s) & 0.33--0.37 & 0.17 & 0.25 & 0.23 & 0.23 & 0.21 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The larger certified set does what the October 10 report expected: the plans
-need not reach a 0.6-m set any more, the horizons shorten (first frame 130 to
-105 holds exact, 120 to 105 noisy; 95th percentile 217 to 104 exact), and the
-CLF-stage conic failures on long plans, which caused the October 10 losses,
-fall from 18 to 3. Fifteen noisy encounters and two exact ones are newly
-recovered (head-ons, accelerating head-ons, crossings, turning crossings and
-curved head-ons at both speeds); one exact run (15~m/s braking lead) and one
-noisy run (seed 1, 15~m/s crossing) are newly lost, both to
-\texttt{clfNoNumericalResult}. Against commit \texttt{deb4dac}, the last
-uncertified design (14 of 14, 54 of 84), the certified controller is now
-within one encounter in each group. The twelve noisy braking leads still
-stop at their first frames (nine on the solver's time limit, two on a
-numerical failure, one on the acceptance search), as in every variant since
-October 8; that is the startup problem of the first estimate, not the
-terminal set. The encounter ends later after the endpoint at the 99th
-percentile (7.4 against 4.4~s exact, 5.7 against 4.6~s noisy): the wider
-tube takes longer to clear a target.
+need not reach a 0.6-m set any more, the horizons shorten (first frame 130
+and 120 to 109 holds), and the CLF-stage conic failures on long plans, which
+caused the October 10 losses, fall from 18 encounters to 1. With the
+steering-level controller two exact encounters (the curved head-ons at both
+speeds) and seventeen noisy ones are newly recovered (head-ons, accelerating
+head-ons, crossings, turning crossings, curved crossings and curved head-ons
+at both speeds), and three noisy ones are newly lost (two 8-m/s turning
+crossings, on the solver's time limit and on the acceptance search, and one
+15-m/s crossing on a CLF-stage numerical failure). The force-level
+controller's campaign gave 13 of 14 and 53 of 84 with the same character.
+Against commit \texttt{deb4dac}, the last uncertified design (14 of 14, 54 of
+84), the certified controller is now equal on the exact encounters and within
+one on the noisy ones. The twelve noisy braking leads still stop at their
+first frames (nine on the solver's time limit, two on a numerical failure,
+one on the acceptance search), as in every variant since October 8; that is
+the startup problem of the first estimate, not the terminal set. The
+encounter ends later after the endpoint at the 99th percentile (5.7 against
+4.4~s exact, 5.5 against 4.6~s noisy): the wider tube takes longer to clear
+a target.
 
 \section{Reproduction}
 \begin{itemize}
 \item \texttt{matlab -batch "addpath('scripts'); synthesizeClfMatrices"}
   regenerates \path{config/clfMatrices.json} (\path{synthesis.txt}; about
-  four minutes per operating point on a loaded machine). The first run of the
-  script stored a wrong enclosure basis (a reused variable); the
-  regeneration after the fix reproduced every matrix, gain and hold factor
-  bit for bit.
+  four minutes per operating point on a loaded machine; the 8-m/s curve
+  entry's log is appended, from its regeneration after the band fallback
+  was added). \path{synthesis-force-e2046e0.txt} is the force-level table's
+  log. The first run of the script stored a wrong enclosure basis (a reused
+  variable); the regeneration after the fix reproduced every matrix, gain
+  and hold factor bit for bit.
 \item Study: \texttt{runAlternatives('<tokens>', '<out.jsonl>', 'eight' |
   'rest' | 'intervalLow' | 'intervalHigh')} in \path{scripts/} of this folder
   (it addresses the repository by its own location), \texttt{summarize.py}
@@ -415,12 +447,13 @@ tube takes longer to clear a target.
   \texttt{quadratureCheck.m}, \texttt{trimOffset.m} and
   \texttt{polyLmiDebug.m} for the checks quoted in the text. The first-scheme
   rows were produced by the script before its final step was replaced; the
-  JSON lines record the options of every row.
-\item Tests: \path{tests.txt} (602 of 602 after the change).
-\item Campaign: \texttt{run-campaign.sh} with
+  JSON lines record the options of every row. The study script keeps its own
+  force-level input map.
+\item Tests: \path{tests.txt} (603 of 603 after the change).
+\item Campaign: \texttt{run-campaign.sh variantM} with
   \path{report/TERMINAL_BACKUP_SET_20261008/scripts/campaign-pair.sh},
   \texttt{compare.py} and \texttt{encounterEnds.py}; raw outputs under
   \path{~/.cache/collisionAvoidance/terminal_alternatives_20261010/}
-  (disposable).
+  (disposable, deleted after the summaries were copied here).
 \end{itemize}
 \end{document}

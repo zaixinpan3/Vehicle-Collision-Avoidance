@@ -1,5 +1,5 @@
-Horizon (holds) and controller time per frame, paired campaign out-K0 (commit 8faf395) against out-L (this commit); exact = seed 0, noisy = the other six seeds.
-out-K0 exact: frames 4273; horizon median 16 p95 217 max 326; first-frame horizon median 130; controller s median 0.017 p95 0.371 max 1.68
-out-K0 noisy: frames 17999; horizon median 16 p95 116 max 512; first-frame horizon median 120; controller s median 0.015 p95 0.225 max 4.31
-out-L exact: frames 5650; horizon median 16 p95 104 max 248; first-frame horizon median 105; controller s median 0.015 p95 0.172 max 1.19
-out-L noisy: frames 20063; horizon median 16 p95 103 max 512; first-frame horizon median 105; controller s median 0.016 p95 0.230 max 4.01
+Horizon (holds) and controller time per frame, paired campaign out-K0 (commit 8faf395) against out-M (this commit, steering-level controller); exact = seed 0, noisy = the other six seeds.
+out-K0 exact: frames 4273; horizon median 16 p95 217 max 326; first-frame horizon median 130; controller s median 0.017 p95 0.330 max 1.48
+out-K0 noisy: frames 17999; horizon median 16 p95 116 max 512; first-frame horizon median 120; controller s median 0.015 p95 0.226 max 4.23
+out-M exact: frames 5968; horizon median 16 p95 166 max 297; first-frame horizon median 109; controller s median 0.014 p95 0.254 max 1.26
+out-M noisy: frames 22629; horizon median 16 p95 104 max 512; first-frame horizon median 109; controller s median 0.015 p95 0.214 max 5.10

@@ -1,19 +1,19 @@
 ===== exact =====
 [out-K0] runs 14 recovered 12  {'recovered': 12, 'noSolution:clfNoNumericalResult': 2}
    min clearance 0.157 m; median per-run minimum 0.607 m
-   controller s median 0.017 p95 0.371 max 1.68
-[out-L] runs 14 recovered 13  {'recovered': 13, 'noSolution:clfNoNumericalResult': 1}
-   min clearance 0.146 m; median per-run minimum 1.150 m
-   controller s median 0.015 p95 0.172 max 1.19
-  out-L vs out-K0: newly recovered 2 ['seed0-speed8-curvedHeadOn', 'seed0-speed15-curvedHeadOn']
-  out-L vs out-K0: newly failed 1 [('seed0-speed15-brakingLead', 'noSolution:clfNoNumericalResult')]
+   controller s median 0.017 p95 0.330 max 1.48
+[out-M] runs 14 recovered 14  {'recovered': 14}
+   min clearance 0.148 m; median per-run minimum 0.696 m
+   controller s median 0.014 p95 0.254 max 1.26
+  out-M vs out-K0: newly recovered 2 ['seed0-speed8-curvedHeadOn', 'seed0-speed15-curvedHeadOn']
+  out-M vs out-K0: newly failed 0 []
 ===== noisy =====
-[out-K0] runs 84 recovered 39  {'noSolution:clfNoNumericalResult': 16, 'noSolution:timeLimit': 11, 'noSolution:nonlinearAcceptanceFailed': 12, 'recovered': 39, 'noSolution:pcbfNoNumericalResult': 6}
+[out-K0] runs 84 recovered 39  {'noSolution:clfNoNumericalResult': 16, 'noSolution:timeLimit': 9, 'noSolution:nonlinearAcceptanceFailed': 12, 'recovered': 39, 'noSolution:pcbfNoNumericalResult': 8}
    min clearance 0.240 m; median per-run minimum 2.408 m
-   controller s median 0.015 p95 0.225 max 4.31
-[out-L] runs 84 recovered 53  {'noSolution:timeLimit': 9, 'recovered': 53, 'noSolution:nonlinearAcceptanceFailed': 11, 'noSolution:pcbfNoNumericalResult': 9, 'noSolution:clfNoNumericalResult': 2}
-   min clearance 0.245 m; median per-run minimum 2.039 m
-   controller s median 0.016 p95 0.230 max 4.01
-  out-L vs out-K0: newly recovered 15 ['seed20261003-speed8-headOn', 'seed20261003-speed8-acceleratingHeadOn', 'seed20261003-speed8-crossing', 'seed20261003-speed8-turningCrossing', 'seed20261003-speed15-crossing', 'seed1-speed8-acceleratingHeadOn', 'seed20261003-speed15-curvedHeadOn', 'seed1-speed15-curvedHeadOn', 'seed2-speed15-crossing', 'seed3-speed8-acceleratingHeadOn', 'seed3-speed8-curvedHeadOn', 'seed3-speed15-crossing', 'seed4-speed8-acceleratingHeadOn', 'seed4-speed8-turningCrossing', 'seed5-speed15-curvedHeadOn']
-  out-L vs out-K0: newly failed 1 [('seed1-speed15-crossing', 'noSolution:clfNoNumericalResult')]
+   controller s median 0.015 p95 0.226 max 4.23
+[out-M] runs 84 recovered 53  {'recovered': 53, 'noSolution:pcbfNoNumericalResult': 10, 'noSolution:nonlinearAcceptanceFailed': 11, 'noSolution:timeLimit': 9, 'noSolution:clfNoNumericalResult': 1}
+   min clearance 0.260 m; median per-run minimum 2.090 m
+   controller s median 0.015 p95 0.214 max 5.10
+  out-M vs out-K0: newly recovered 17 ['seed20261003-speed8-headOn', 'seed20261003-speed8-acceleratingHeadOn', 'seed20261003-speed8-crossing', 'seed20261003-speed8-turningCrossing', 'seed20261003-speed8-curvedCrossing', 'seed20261003-speed15-crossing', 'seed1-speed8-acceleratingHeadOn', 'seed20261003-speed15-curvedHeadOn', 'seed1-speed15-curvedHeadOn', 'seed2-speed8-curvedHeadOn', 'seed2-speed15-crossing', 'seed3-speed8-curvedHeadOn', 'seed3-speed15-crossing', 'seed4-speed8-acceleratingHeadOn', 'seed4-speed15-curvedHeadOn', 'seed5-speed8-turningCrossing', 'seed5-speed15-curvedHeadOn']
+  out-M vs out-K0: newly failed 3 [('seed2-speed8-turningCrossing', 'noSolution:timeLimit'), ('seed3-speed8-turningCrossing', 'noSolution:nonlinearAcceptanceFailed'), ('seed5-speed15-crossing', 'noSolution:clfNoNumericalResult')]
 per-run table: /home/zai/.cache/collisionAvoidance/terminal_alternatives_20261010/campaign-runs.csv

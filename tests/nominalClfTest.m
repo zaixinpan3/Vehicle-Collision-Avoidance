@@ -30,14 +30,8 @@ classdef nominalClfTest < matlab.unittest.TestCase
             testCase.verifyEqual(reference.gain,reshape(entry.gain,2,5),AbsTol=1e-12);
             testCase.verifyEqual(reference.nominalA,reshape(entry.nominalA,5,5),AbsTol=1e-12);
             inputBound=sqrt(diag(reference.gain*(reference.matrix\reference.gain.')));
-            testCase.verifyLessThanOrEqual(inputBound,entry.certificate.inputBox(:)*(1+1e-6));
-            tire=modifiedFialaTire.parameters(cfg);
-            if reference.inputMap=="force"
-                testCase.verifyEqual(entry.certificate.inputBox(:),[cfg.clf.certificationFrontForceFraction*tire.longitudinalForceScale(1);cfg.clf.certificationBrakingRatio],RelTol=1e-12);
-                testCase.verifyEqual(reference.trimForce,terminalSafeSet.trimForce(reference,cfg),AbsTol=1e-9);
-            else
-                testCase.verifyEqual(entry.certificate.inputBox(:),[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio],RelTol=1e-12);
-            end
+            testCase.verifyLessThanOrEqual(inputBound,[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio]*(1+1e-6));
+            testCase.verifyEqual(entry.certificate.inputBox(:),[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio],RelTol=1e-12);
             box=[cfg.clf.certificationLateralMeters;cfg.clf.certificationHeadingRadians;cfg.clf.certificationSpeedMetersPerSecond; ...
                 cfg.clf.certificationLateralVelocityMetersPerSecond;cfg.clf.certificationYawRateRadiansPerSecond];
             s=inv(reference.matrix);
@@ -84,7 +78,7 @@ classdef nominalClfTest < matlab.unittest.TestCase
             certificate=entry.certificate;
             box=[cfg.clf.certificationLateralMeters;cfg.clf.certificationHeadingRadians;cfg.clf.certificationSpeedMetersPerSecond; ...
                 cfg.clf.certificationLateralVelocityMetersPerSecond;cfg.clf.certificationYawRateRadiansPerSecond];
-            inputBox=certificate.inputBox(:);
+            inputBox=[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio];
             stream=RandStream('mt19937ar','Seed',11+referenceSpeed+1000*curvature);
             directions=randn(stream,5,200);unit=reference.factor\(directions./vecnorm(directions));
             errors=unit.*sqrt([ones(1,120),rand(stream,1,80)]);

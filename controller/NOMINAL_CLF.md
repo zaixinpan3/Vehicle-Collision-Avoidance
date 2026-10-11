@@ -115,7 +115,8 @@ nonlinear at slips of a few hundredths of a radian), which is why the
 certificate now encloses the Jacobians over the set instead of trusting one
 linearization. With the pointwise Jacobians (October 10, first version) the
 certified lateral extent was 0.6 m at 8 m/s; the ray averages and the
-self-consistent growth (October 11) are what recover the former size
+self-consistent growth (later on October 10) are what recover most of the
+former size (1.5--1.6 m at 8 m/s, the 2-m box at 15 m/s)
 (`report/TERMINAL_SET_ALTERNATIVES_20261010.tex` compares the constructions
 tried: secant enclosure, force-level input map, saturation hull,
 poly-quadratic function, slower decay, polytope, interval certificate).
