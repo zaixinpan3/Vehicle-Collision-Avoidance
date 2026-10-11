@@ -10,10 +10,20 @@ function [command,predictedInput,prediction,controllerState] = ...
 % because braking that ends at rest cannot be run backward.
 % Collision interaction is active inside the configured position radius.
 % A complete current sensor scan with no target clears the previous forecast.
+% collisionAvoidanceController("warmUp", cfg) runs one synthetic encounter
+% (lane following, then a head-on target that appears and is tracked) and
+% resets: every code path has then been compiled, and the compiled kernels
+% and the straight-road trim loaded, before the first sample. Call it at
+% start-up; the first sample would otherwise take about a second.
     persistent lastState
-    if nargin==1 && (ischar(egoState) || isstring(egoState))
-        if ~isscalar(string(egoState)) || string(egoState)~="resetNominalTrajectory"
-            error('collisionAvoidanceController:invalidAction','Use resetNominalTrajectory.');
+    if nargin<=2 && (ischar(egoState) || isstring(egoState))
+        action=string(egoState);
+        if ~isscalar(action) || ~any(action==["resetNominalTrajectory","warmUp"])
+            error('collisionAvoidanceController:invalidAction','Use resetNominalTrajectory or warmUp.');
+        end
+        if action=="warmUp"
+            if nargin<2,targetEstimate=[];end
+            localWarmUp(targetEstimate);
         end
         lastState=[];command=[];predictedInput=[];prediction=[];controllerState=[];return;
     end
@@ -57,6 +67,9 @@ function [command,predictedInput,prediction,controllerState] = ...
     if ~isempty(observed) && ~isempty(q)
         observed(3)=q(3)+atan2(sin(observed(3)-q(3)),cos(observed(3)-q(3)));
     end
+    % A target that the previous plan did not know of (onset): its shifted
+    % plan is not a useful anchor, and the problem starts from a fresh rollout.
+    targetOnset=~isempty(observed) && isstruct(previousState) && isempty(previousState.targetEpoch);
     if ~isempty(observed)
         % Reanchor the prediction at the current estimate without resetting
         % the ego input warm start. Cross-frame constancy is not required.
@@ -74,7 +87,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     nominalReference=nonlinearBicycleModel.cruise(cfg,frame(4));
     model=struct('cfg',cfg,'initialState',ego.modelState,'jointState',jointState, ...
         'targetParameters',targetParameters,'previousInput',previous,'target',q,'targetEpoch',targetEpoch, ...
-        'targetEpochIndex',targetEpochIndex,'sampleIndex',index,'epochTime',epochTime,'lane',lane,'road',road,'frame',frame, ...
+        'targetEpochIndex',targetEpochIndex,'targetOnset',targetOnset,'sampleIndex',index,'epochTime',epochTime,'lane',lane,'road',road,'frame',frame, ...
         'nominalReference',nominalReference,'stateTime',ego.stateTime, ...
         'uncertainty',uncertainty);
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
@@ -176,4 +189,32 @@ function command=localCommand(input,state,cfg)
         'axleLateralForce',lateral,'axleNormalLoad',tire.staticNormalLoad,'tireSideslipAngle',slip, ...
         'aerodynamicResistanceForce',components.aerodynamicForce, ...
         'rollingResistanceForce',components.rollingResistanceForce,'totalRoadLoadForce',road);
+end
+
+function localWarmUp(cfg)
+    % One synthetic encounter on a straight road with an explicit state:
+    % four target-free samples, then a head-on target 40 m ahead at 8 m/s
+    % that appears and is tracked for one second. A sample without a
+    % solution ends it early; what it reached has been compiled.
+    cfg=collisionAvoidanceControllerConfig(cfg);h=cfg.controller.sampleTime;
+    road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
+    x=[0;0;0;cfg.referenceSpeed;0;0];input=[0;0];state=[];
+    q=[40;0;pi;8;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
+    for frame=1:24
+        target=[];
+        if frame>4
+            p=predictiveSafetyGeometry.predictTarget(q,(frame-5)*h);
+            target=struct('targetPositionInertial',p(1:2),'targetVelocityInertial',p(4)*[cos(p(3));sin(p(3))], ...
+                'targetYawInertial',p(3));
+        end
+        ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
+            'heldActuatorInput',input,'stateTime',(frame-1)*h);
+        try
+            [command,~,~,state]=collisionAvoidanceController(ego,target,road,cfg,state);
+        catch exception
+            if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
+            return;
+        end
+        input=command.actuatorInput;x=nonlinearBicycleModel.sample(x,input,cfg);
+    end
 end

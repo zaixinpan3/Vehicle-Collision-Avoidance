@@ -158,6 +158,26 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             localVerifyAnchorRollout(testCase,problem.model.linearization,cfg);
             localVerifyNonlinearRollout(testCase,problem,cfg);
         end
+        function aTargetOnsetStartsFromAFreshRollout(testCase)
+            % The previous plan did not know of the target.
+            [ego,road,cfg]=localFixture();
+            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            ego=localSuccessor(ego,prior);ego.stateTime=cfg.controller.sampleTime;prior.stateTime=0;
+            target=struct('targetPositionInertial',[30;0],'targetVelocityInertial',[-8;0],'targetYawInertial',pi);
+            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            search=problem.metadata.search;
+            testCase.verifyTrue(problem.model.targetOnset);
+            testCase.verifyEqual(search.initializationFailure,"targetOnset");
+            testCase.verifyEqual(search.attempts(1).initialization,"movingTargetPotentialField");
+            testCase.verifyTrue(search.clfStageCompleted);
+            % The next sample knows the target: the shifted plan is used.
+            ego=localSuccessor(ego,state);ego.stateTime=2*cfg.controller.sampleTime;
+            q=predictiveSafetyGeometry.predictTarget(problem.model.target,cfg.controller.sampleTime);
+            target.targetPositionInertial=q(1:2);
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,state);
+            testCase.verifyFalse(problem.model.targetOnset);
+            testCase.verifyEqual(problem.metadata.search.attempts(1).initialization,"shiftedInputRollout");
+        end
         function overlappingHardRowsHaveNoInventedRestorationDirection(testCase)
             [ego,road,cfg]=localFixture();
             cfg.controller.horizonSteps=1;

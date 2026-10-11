@@ -119,10 +119,17 @@ function cfg=localDefaults()
         'speedGain',.5,'brakingRatioLimit',.35);
     % The two convex solves share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
+    % constraintTolerance and optimalityTolerance are the conic solver's
+    % feasibility and gap tolerances; reducedTolerance is the precision at
+    % which a solve whose interior-point iterations stall is still accepted
+    % (Clarabel's AlmostSolved). A solve's point is only a search direction,
+    % which the step-size rule checks on the nonlinear model before anything
+    % is issued, and the lexicographic and CLF ties are 1e-4, so 1e-6 is
+    % precise enough (1e-8 and 1e-7 cost about a third more solver time).
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
-        'feasibilityTolerance',1e-5,'constraintTolerance',1e-8, ...
-        'optimalityTolerance',1e-7,'lexicographicTieTolerance',1e-4, ...
-        'clfTieTolerance',1e-4);
+        'feasibilityTolerance',1e-5,'constraintTolerance',1e-6, ...
+        'optimalityTolerance',1e-6,'lexicographicTieTolerance',1e-4, ...
+        'clfTieTolerance',1e-4,'reducedTolerance',1e-4);
     cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6);
 end
 
@@ -232,8 +239,11 @@ function localValidate(cfg)
     end
     validateattributes(cfg.solver.maxIterations,{'double'},{'scalar','real','finite','integer','positive'});
     validateattributes(cfg.solver.timeLimitSeconds,{'double'},{'scalar','real','positive'});
-    for name=["feasibilityTolerance","constraintTolerance","optimalityTolerance","clfTieTolerance"]
+    for name=["feasibilityTolerance","constraintTolerance","optimalityTolerance","clfTieTolerance","reducedTolerance"]
         validateattributes(cfg.solver.(name),{'double'},{'scalar','real','finite','positive'});
+    end
+    if cfg.solver.reducedTolerance<max(cfg.solver.feasibilityTolerance,cfg.solver.constraintTolerance)
+        localInvalid('solver.reducedTolerance cannot be tighter than the feasibility and constraint tolerances.');
     end
     validateattributes(cfg.solver.lexicographicTieTolerance,{'double'},{'scalar','real','finite','nonnegative'});
     for name=["defaultLength","defaultWidth","rearAxleDistance"]

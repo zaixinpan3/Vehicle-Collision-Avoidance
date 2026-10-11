@@ -1,0 +1,6 @@
+speed - c2df2ea exact: 13 recovered by both, median +0.05 s, mean -0.05 s; later 7, earlier 4, same 2
+speed - c2df2ea noisy: 70 recovered by both, median +0.10 s, mean +0.29 s; later 46, earlier 13, same 11
+tight - c2df2ea exact: 13 recovered by both, median +0.00 s, mean -0.13 s; later 6, earlier 4, same 3
+tight - c2df2ea noisy: 71 recovered by both, median +0.00 s, mean -0.03 s; later 20, earlier 22, same 29
+tight - speed exact: 14 recovered by both, median +0.05 s, mean -0.05 s; later 7, earlier 6, same 1
+tight - speed noisy: 71 recovered by both, median -0.10 s, mean -0.25 s; later 13, earlier 45, same 13

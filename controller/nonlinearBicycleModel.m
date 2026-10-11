@@ -191,10 +191,16 @@ classdef nonlinearBicycleModel
             % Constant-speed, constant-curvature trim and its sampled
             % transverse model e+ = A e + B (u - u_ref).
             speed=cfg.referenceSpeed;
-            objective=@(p)localTrimResidual(p,speed,curvature,cfg);
-            options=optimoptions('fsolve','Display','off','FunctionTolerance',1e-12, ...
-                'StepTolerance',1e-12,'OptimalityTolerance',1e-12);
-            [solution,residual,flag]=fsolve(objective,[0;atan(cfg.vehicle.wheelbase*curvature);.02],options);
+            % Newton's method on [sideslip; steering; braking ratio] with the
+            % analytic tangent (no Optimization Toolbox start-up in the
+            % controller's first sample); fsolve only if it does not converge.
+            [solution,residual,flag]=localTrimNewton([0;atan(cfg.vehicle.wheelbase*curvature);.02],speed,curvature,cfg);
+            if flag<=0
+                objective=@(p)localTrimResidual(p,speed,curvature,cfg);
+                options=optimoptions('fsolve','Display','off','FunctionTolerance',1e-12, ...
+                    'StepTolerance',1e-12,'OptimalityTolerance',1e-12);
+                [solution,residual,flag]=fsolve(objective,[0;atan(cfg.vehicle.wheelbase*curvature);.02],options);
+            end
             if flag<=0 || norm(residual,inf)>1e-8
                 error('collisionAvoidanceController:unrealizableReference','No positive-speed constant-curvature trim was found.');
             end
@@ -477,6 +483,31 @@ function entry=localClfEntry(key)
                 'Run scripts/synthesizeClfMatrices before the experiment.'],name);
         end
     end
+end
+
+function [point,residual,flag]=localTrimNewton(point,speed,curvature,cfg)
+    % Damped Newton iterations on the trim residual with its analytic
+    % tangent; flag 1 when the residual is below 1e-12, else 0.
+    flag=0;residual=localTrimResidual(point,speed,curvature,cfg);
+    for iteration=1:40
+        if norm(residual,inf)<=1e-12,flag=1;return;end
+        beta=point(1);[~,x,u]=localTrimResidual(point,speed,curvature,cfg);
+        try
+            [a,b]=nonlinearBicycleModel.jacobian(x,u,cfg,curvature);
+        catch exception
+            if ~startsWith(exception.identifier,'collisionAvoidanceController:'),rethrow(exception);end
+            return;
+        end
+        tangent=[a(4:6,:)*[0;0;-1;-speed*sin(beta);speed*cos(beta);0],b(4:6,:)];
+        step=-tangent\residual;
+        if any(~isfinite(step)),return;end
+        for halving=0:20
+            trial=point+2^-halving*step;candidate=localTrimResidual(trial,speed,curvature,cfg);
+            if norm(candidate)<norm(residual),break;end
+        end
+        point=trial;residual=candidate;
+    end
+    flag=double(norm(residual,inf)<=1e-12);
 end
 
 function [residual,x,u]=localTrimResidual(point,speed,curvature,cfg)

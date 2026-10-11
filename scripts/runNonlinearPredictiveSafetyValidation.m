@@ -45,6 +45,10 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     for index=1:numel(options.Scenarios)
         name=options.Scenarios(index);
         [ego,target,road,cfg,initialTarget]=localFixture(name,options.ControllerConfiguration);prior=[];
+        % As at a vehicle's start-up: every controller code path compiled and
+        % loaded before the encounter's first sample (a no-op cost after the
+        % first scenario of a session).
+        warmUpTimer=tic;collisionAvoidanceController("warmUp",cfg);controllerWarmUpSeconds=toc(warmUpTimer);
         estimatorContext=[];estimatorConfiguration=options.EstimatorConfiguration;estimatorInitializationSeconds=0;
         if useEstimator
             assert(~isempty(initialTarget),'The NRMM adapter requires a target truth trajectory.');
@@ -299,6 +303,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'totalSolverCalls',solverCalls,'targetInitialState',initialTarget,'configuration',cfg, ...
             'observationModel',observationModel,'perceptionRadiusMeters',cfg.collision.encounterRangeMeters, ...
             'estimatorConfiguration',estimatorConfiguration,'estimatorInitializationSeconds',estimatorInitializationSeconds, ...
+            'controllerWarmUpSeconds',controllerWarmUpSeconds, ...
             'baselineCruise',baseline,'trace',trace);
         if useEstimator,results{index}.randomSeed=estimatorConfiguration.randomSeed;end
         if strlength(options.ContinuationFile)>0

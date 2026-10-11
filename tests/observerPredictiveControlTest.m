@@ -22,7 +22,10 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(tube.positionRadius(end),tube.positionRadius(1));
         end
         function largerTargetEnclosuresActuallyChangeTheAvoidanceOptimization(testCase)
-            [ego,target,road,cfg]=localFixture(.01);
+            % With the target 20 m ahead the tightened collision rows bind;
+            % at the scenario's 24 m they cannot, the problem leaves them out
+            % and the two optimizations are the same.
+            [ego,target,road,cfg]=localFixture(.01,20);
             [~,smallInputs,small]=collisionAvoidanceController(ego,target,road,cfg,[]);
             target.predictionErrorSet.positionRadius=.10;
             target.controllerErrorBound.bounds(1:2)=.10;
@@ -178,8 +181,9 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
     end
 end
 
-function [ego,target,road,cfg]=localFixture(radius)
+function [ego,target,road,cfg]=localFixture(radius,gap)
     [x,q,road,cfg]=collisionThreatScenario("headOn",struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
+    if nargin>1,q(1)=x(1)+gap;end
     [ego,target]=localPublication(x,q,0,radius,zeros(6,1));
 end
 

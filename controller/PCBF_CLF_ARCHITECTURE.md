@@ -161,7 +161,7 @@ and zero sensitivities. The vanishing tail of the fading brake, with
 coefficients of 1e-4 to 1e-7, left the CLF stage's cone program without a
 numerical result while the vehicle crept to a stop; under light braking that
 tail would cover about 1.5 cm more. The simulated plant (`ode45` on the same
-derivative) has no such step and creeps that tail. The simulated plant is the same model. The
+derivative) has no such step and creeps that tail. The
 Fiala tire's own floor (`scheduleSpeedFloor`, 1 m/s) lies inside the kinematic
 regime, where the Fiala forces are not evaluated. In the kinematic regime the
 rear-adhesion cone reduces to `|b| <= 1`, and the sideslip cone applies above
@@ -190,12 +190,14 @@ realization, else braking as hard as the rear adhesion admits
 (`terminalSafeSet.brakingInput`). Braking is kept as small as found because
 later holds reach the first hold nearly unchanged. When no hold keeps the endpoint in the set the plan stays one
 hold shorter. An endpoint no longer in the set (a changed forecast or state)
-is extended by cruise holds until one is. Prior affine states are not
-reused. When no target is present, nominal path guidance supplies the
-startup rollout. A shifted plan that cannot be rolled out (non-finite inputs,
-a braking ratio at the limit, or a tire-domain error) is reported as no
-solution; no other anchor replaces it. Potential guidance is a search
-reference, not a safety certificate. No maneuver bank is used.
+is extended by cruise holds until one is. A target that the previous plan
+did not know of (onset: the previous sample had no target) starts from a fresh
+rollout (`targetOnset`). Prior affine states are not reused. When no target is
+present, nominal path guidance supplies the startup rollout. A shifted plan
+that cannot be rolled out (non-finite inputs, a braking ratio at the limit, or
+a tire-domain error) is reported as no solution; no other anchor replaces it.
+Potential guidance is a search reference, not a safety certificate. No
+maneuver bank is used.
 
 The target keeps Sharma et al. (2026), Eq. (17)'s constant tangential
 acceleration `A` and constant sideslip `beta`. The prediction uses inertial
@@ -276,6 +278,42 @@ trust scale is estimated from the plan innovation (below).
 Steering has no physical
 magnitude or slew bound. Physical braking/model-domain bounds remain. These
 numerical boxes are not certified nonlinear remainder bounds.
+
+## Computation
+
+The first four measures leave the convex problem and the step-size rule's
+decisions unchanged; the last two change only the solves' precision and the
+start-up:
+
+- every inequality row is a small dense block on the few variables it
+  involves (a node's state, or a hold's start state and input, and its
+  slack); the sparse matrices are assembled once, the target forecast at all
+  nodes and midpoints is one call, and the lane projection of all ego corners
+  is one call (building the matrices row by row cost time quadratic in the
+  plan length);
+- a row that every correction inside the variables' boxes satisfies (the
+  state box of the trust region, and the input box at `trustMaximumScale`)
+  cannot bind and is left out, so the feasible set and the optimum are
+  unchanged: most road rows, collision rows far from the target and state-limit
+  rows; a collision dual is not even computed where the reference distance
+  less both reaches, the margin and the largest enclosure tightening exceeds
+  the most the pose can move over the boxes, and the terminal set skips its
+  continuation duals and road rows by the same test on the continuation's
+  sensitivity;
+- a larger trust scale (`localExpand`) reuses the formulated problem and
+  changes only the input increments' bounds;
+- the step-size rule checks every hold of a candidate at once (state limits,
+  handling, road, collision with a reference-distance shortcut), with the
+  same decisions as a hold-by-hold scan;
+- the conic solves use 1e-6 tolerances and accept a stalled solve at 1e-4
+  (`solver.reducedTolerance`, Clarabel's AlmostSolved), because the point is a
+  search direction that the step-size rule checks on the nonlinear model;
+- the trim is solved by Newton's method with the analytic tangent (fsolve only
+  if it does not converge), and `collisionAvoidanceController("warmUp", cfg)`
+  runs one synthetic encounter so that every code path has been compiled and
+  the kernels loaded before the first sample.
+
+`report/CONTROLLER_SPEED_20261011.tex` has the measurements.
 
 ## Ordinary distance dual and fixed collision multipliers
 

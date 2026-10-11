@@ -1,0 +1,406 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{2em}
+\title{Controller speed: the same problem, built and checked faster}
+\author{}
+\date{October 11, 2026}
+\begin{document}
+\maketitle
+\paragraph{Status and scope.}
+On October 11, 2026 the user asked for the controller to be made as fast as
+possible. Control may be somewhat worse, and some extreme scenarios may fail,
+but most ordinary scenarios should still succeed. The request followed two
+measurements at commit \texttt{c2df2ea} (the low-speed model).
+\begin{itemize}
+\item Over ten exact encounters, building the problem took 44 percent of the
+  controller's time, the two conic solves 26 percent and the step-size
+  rule's checks 24 percent. The time grew with the plan length.
+\item The frame at which an oncoming target appeared took 114--155~ms with
+  everything warm, and about 1.1~s when it was also the session's first
+  call.
+\end{itemize}
+This report records the changes, the checks that the rewritten parts leave
+the problem and the decisions unchanged, a benchmark in which the target
+appears after the ego has been driving, and a paired campaign against
+\texttt{c2df2ea}. One rule tried along the way lost encounters and was
+reverted (Section~\ref{sec:reverted}).
+
+\paragraph{Result.}
+\begin{itemize}
+\item \emph{Time.} In the 98-encounter campaign with the estimator in the
+  loop, the controller's time per frame falls from 15.8 to 8.2~ms at the
+  median, from 136 to 41~ms at the 95th percentile and from 1.65 to 0.37~s
+  at the maximum. Frames over 100~ms fall from 1510 to 81.
+\item \emph{Outcomes.} The campaign recovers 14 of 14 exact encounters (13
+  before) and 74 of 84 noisy ones (72), with no collision.
+\item \emph{Target onset.} In a benchmark where the target appears after 2~s
+  of target-free driving, the onset frame takes 26~ms at the median and
+  72~ms at most (88 and 225~ms before). The session's first call, now made
+  by a warm-up action at start-up, takes 0.73~s (0.95~s).
+\item \emph{Cost in control quality.} Noisy encounters that both versions
+  recover are confirmed recovered 0.10~s later at the median (later in 46
+  of 70). This comes from the looser solver tolerances. With the old
+  tolerances and every other change, recovery is confirmed as early as at
+  \texttt{c2df2ea}, with the same outcome counts, but the time per frame is
+  higher (95th percentile 50.6 against 43.3~ms, measured side by side).
+\item \emph{Remaining losses.} They are unchanged and predate this step. The
+  main one is the noisy curved head-ons (5 of 12 recovered, 3 before),
+  whose safety stage is primal infeasible early in the encounter.
+\end{itemize}
+
+\section{Changes}
+\subsection{The same problem, built faster}
+The changes in this group leave the convex problem's feasible set and
+optimum unchanged, and the step-size rule's decisions.
+\begin{itemize}
+\item \emph{Dense blocks.} Each inequality row is a small dense block on
+  the few variables it involves: a node's state, or a hold's start state,
+  input and slack. The sparse matrices are assembled in one call. The target
+  forecast at all nodes and midpoints is one call, and so is the lane
+  projection of all ego corners. Building the matrices row by row had cost
+  time quadratic in the plan length.
+\item \emph{Rows the boxes imply.} A row $a^\top z\le b$ whose largest
+  value over the variables' boxes is below $b$ cannot bind, and it is left
+  out. The boxes are the state box of the trust region and the input box at
+  \texttt{trustMaximumScale}, which contains every box that the trust
+  expansion uses. Most road rows, state-limit rows and collision rows far
+  from the target go this way.
+\item \emph{Collision duals not computed.} The test is the reference
+  distance, less both vehicles' reaches, the margin and the largest
+  enclosure tightening. Where this exceeds the most the pose can move over
+  the boxes, the collision row cannot bind and its distance dual is not
+  computed. The terminal set skips its continuation's duals and road rows
+  by the same test on the continuation's sensitivity.
+\item \emph{Trust expansion.} A larger trust scale reuses the formulated
+  problem and changes only the input increments' bounds.
+\item \emph{Step-size rule.} Every hold of a candidate is checked at once
+  (state limits, handling, road, collision), with the first failing hold and
+  the reason that a hold-by-hold scan would give. Exact rectangle distances
+  are computed only where a lower bound from the reference distance is
+  below the margin.
+\item \emph{Trim.} The cruise trim is solved by Newton's method with the
+  analytic tangent. \texttt{fsolve} remains only for the case where Newton's
+  method does not converge.
+\end{itemize}
+
+\subsection{Changes that alter results}
+\begin{itemize}
+\item \emph{Solver tolerances.} The conic solves stop at $10^{-6}$ in
+  feasibility and gap ($10^{-8}$ and $10^{-7}$ before). A stalled solve
+  is accepted at $10^{-4}$ (\texttt{solver.reducedTolerance}, Clarabel's
+  AlmostSolved; $10^{-5}$, the feasibility tolerance, before). A solve's
+  point is a search direction, which the step-size rule checks on the
+  nonlinear model before anything is issued, and the lexicographic and CLF
+  ties are $10^{-4}$.
+\item \emph{Target onset.} When a target appears that the previous plan did
+  not know of (the previous sample had no target), the sample starts from a
+  fresh potential-field rollout. It no longer starts from the shifted
+  target-free plan. Before, that plan was extended by cruise holds until its
+  endpoint reached the terminal set (62 holds in the profiled frame). It was
+  then linearized, solved and found infeasible, and only then replaced by
+  the rollout, which was linearized and solved again. The rule also fires
+  when a target reappears after a complete scan without it. In the campaign
+  that happened only when curved-road targets re-entered the range long
+  after the encounter (7 frames, all after frame 1000). The simulated
+  radar misses no detection, so a dropout during a maneuver is untested.
+\item \emph{Warm-up.} \texttt{collisionAvoidanceController("warmUp", cfg)}
+  runs one synthetic encounter and resets: lane following, then a head-on
+  target that appears and is tracked. Every code path is then compiled and
+  the kernels are loaded before the first sample. The validation driver
+  calls it before each encounter.
+\end{itemize}
+
+\section{Checks}
+\begin{itemize}
+\item \emph{Unit tests.} Full suite: 613 of 613 (\path{tests.txt}; 612
+  before). One
+  test is new, and two needed attention.
+  \begin{itemize}
+  \item New: at a target's onset the sample starts from the rollout, and
+    the next sample uses the shifted plan.
+  \item The enclosure test of \path{observerPredictiveControlTest} now
+    places the target 20~m ahead instead of the scenario's 24~m. At 24~m
+    the tightened collision rows cannot bind, the problem leaves them out,
+    and the optimizations with the small and the large enclosure are
+    identical. Before, the test passed only because the redundant rows
+    changed the solver's path. At 20~m the rows bind, and both versions'
+    first inputs differ between the two enclosures.
+  \item The 15-m/s curved-road recovery from a displaced and reversed state
+    (\path{clfNominalRecoveryTest}) failed once the implied rows were left
+    out. At frame 7 the CLF stage stalled (Clarabel InsufficientProgress,
+    primal residual $2.5\cdot10^{-5}$) and returned no point. The reduced
+    tolerance accepts that solve.
+  \end{itemize}
+\item \emph{Formulation.} The anchors were 60 plans captured from six
+  encounters, each formulated with and without synthetic enclosures (120
+  problems). On them the block assembly reproduced the previous matrices to
+  $4.4\cdot10^{-16}$. This check preceded leaving the implied rows out.
+\item \emph{Step-size rule.} On 2880 candidate plans the batched check gave
+  the same decision and reason as the hold-by-hold scan in every case.
+\item \emph{Solver output.} The previous and the new solver ran on the same
+  inputs and configuration in 210 frames captured from seven encounters.
+  They had the same solve status and plan length in every frame, and equal
+  objective values. Where the optimum is not unique the points differ, by up
+  to $5.2\cdot10^{-3}$ in an input. In two frames the step-size rule then
+  accepted a different step (1/32 instead of 1/16, and 1/16 instead of 1/8).
+\end{itemize}
+
+\section{Benchmark: a target that appears}
+\paragraph{Setup.}
+The 14 encounters are the campaign's seven geometries at 8 and 15~m/s,
+with exact states and the declared model with RK4 holds as the plant. The
+ego first drives 2~s (40 frames) on its lane without a target. Then the
+target appears at the scenario's $t=0$ state. An encounter is recovered when
+the transverse errors stay within the campaign's tolerances for 1~s after
+the scenario's impact time, and it stops 400 frames after the onset. Before
+the encounters the harness runs the warm-up encounter itself, so that it
+also applies to \texttt{c2df2ea}; the cold start is its first call. Both
+versions ran at the same time in two MATLAB sessions. Another session's job
+was using about five of the sixteen cores.
+
+\begin{table}[h]
+\centering\small
+\caption{Benchmark with a target that appears after 2~s. Times per frame
+in ms.}
+\begin{tabular}{lrr}
+\toprule
+ & \texttt{c2df2ea} & this step\\
+\midrule
+recovered & 10 & 12\\
+no solution & 3 & 2\\
+not recovered in 400 frames & 1 & 0\\
+session's first call & 950 & 726\\
+whole warm-up encounter & 1672 & 1194\\
+onset frame, median / max & 88.5 / 225 & 26.3 / 72\\
+all frames, median / 95th / 99th percentile & 12.4 / 37.4 / 63.4 & 6.5 / 22.9 / 50.9\\
+all frames, max & 225 & 108\\
+frames over 50~ms & 88 of 2831 & 34 of 3041\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Failures.}
+\begin{itemize}
+\item Both versions fail the 15-m/s accelerating head-on at the onset
+  frame. The fresh rollout itself meets the target, and no step of its
+  correction is accepted (\texttt{nonlinearAcceptanceFailed}).
+\item \texttt{c2df2ea} also fails the 8-m/s braking lead
+  (\texttt{clfNoNumericalResult} after 49 frames) and the 8-m/s crossing
+  (\texttt{anchorUnavailable} after 27). It does not recover the 15-m/s
+  braking lead in 400 frames.
+\item This step fails the 8-m/s turning crossing (\texttt{anchorUnavailable}
+  after 26 frames). From 0.9~s after the onset no hold keeps the endpoint
+  in the set, and the plan runs out at 1.25~s. This is the extension
+  hypothesis H3 failing, as in \texttt{c2df2ea}'s 8-m/s crossing.
+\end{itemize}
+Of this step's 34 frames over 50~ms, 32 are in the 15-m/s braking lead,
+whose plans are 44 holds long at the median and up to 117 while it passes
+the lead.
+
+\section{Campaign}
+The 98 encounters are those of the earlier reports: seven geometries at 8
+and 15~m/s, seed 0 exact with the \texttt{ode45} plant, and six seeds with
+the estimator in the loop. Each runs for up to 2000 frames with a recovery
+dwell of 1~s. Each arm ran in three MATLAB sessions, side by side with the
+other. The \texttt{c2df2ea} arm was run twice, once with each new arm. Both
+runs gave the same outcome and frame count in all 98 encounters.
+
+\begin{table}[h]
+\centering\small
+\caption{Paired campaign. No collision in either arm. Controller time per
+frame in ms.}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (14)} & \multicolumn{2}{c}{noisy (84)}\\
+ & \texttt{c2df2ea} & this step & \texttt{c2df2ea} & this step\\
+\midrule
+recovered & 13 & 14 & 72 & 74\\
+no solution: \texttt{anchorUnavailable} & 1 & 0 & 0 & 0\\
+no solution: \texttt{nonlinearAcceptanceFailed} & 0 & 0 & 1 & 3\\
+no solution: \texttt{pcbfNoNumericalResult} & 0 & 0 & 9 & 7\\
+no solution: \texttt{clfNoNumericalResult} & 0 & 0 & 2 & 0\\
+least replay clearance (m) & 0.001 & 0.136 & 0.391 & 0.213\\
+horizon, 95th percentile / max holds & 45 / 138 & 40 / 117 & 89 / 287 & 74 / 184\\
+frames & 5399 & 5538 & 19983 & 23083\\
+time, median & 11.9 & 6.4 & 15.8 & 8.2\\
+time, 95th / 99th percentile & 55.0 / 131 & 21.8 / 41.0 & 136 / 291 & 41.1 / 73.5\\
+time, max & 736 & 102 & 1654 & 372\\
+frames over 50~ms & 309 & 22 & 3430 & 744\\
+frames over 100~ms & 101 & 1 & 1510 & 81\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\caption{Median controller time per frame (ms) by plan length.}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact} & \multicolumn{2}{c}{noisy}\\
+holds & \texttt{c2df2ea} & this step & \texttt{c2df2ea} & this step\\
+\midrule
+up to 20 & 11.5 & 6.1 & 13.3 & 7.4\\
+21--40 & 32.6 & 13.9 & 41.8 & 18.6\\
+41--80 & 62.7 & 20.6 & 78.6 & 29.2\\
+over 80 & 131 & 46.7 & 188 & 44.1\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\caption{Recovered encounters per geometry (both speeds).}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (2 each)} & \multicolumn{2}{c}{noisy (12 each)}\\
+ & \texttt{c2df2ea} & this step & \texttt{c2df2ea} & this step\\
+\midrule
+head-on & 2 & 2 & 12 & 11\\
+accelerating head-on & 2 & 2 & 12 & 12\\
+braking lead & 2 & 2 & 9 & 10\\
+crossing & 2 & 2 & 12 & 12\\
+turning crossing & 2 & 2 & 12 & 12\\
+curved head-on & 2 & 2 & 3 & 5\\
+curved crossing & 1 & 2 & 12 & 12\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Outcomes.}
+\begin{itemize}
+\item \emph{Exact.} The 8-m/s curved crossing, whose plan ran out at
+  \texttt{c2df2ea}, is now recovered.
+\item \emph{Noisy, newly recovered (4).} Two seed-3 braking leads and two
+  15-m/s curved head-ons.
+\item \emph{Noisy, newly lost (2).} The seed-3 8-m/s head-on (frame 12)
+  and the seed-5 8-m/s braking lead (frame 120), both
+  \texttt{nonlinearAcceptanceFailed}. Both failing frames were re-solved
+  offline from the saved inputs. The \texttt{c2df2ea} code also finds no
+  acceptable step there, with the same safety slack (7.15~m and 35.6~m in
+  the first round), and the old tolerances change nothing. The noisy
+  trajectories leave \texttt{c2df2ea}'s within the first frames, because of
+  solver-level differences: points where the optimum is not unique, and the
+  tolerance. These two reach states that neither version can handle, and
+  four others avoid states where \texttt{c2df2ea} fails.
+\end{itemize}
+\path{comparison.txt}, \path{campaign-runs.csv}, \path{failures.txt} and
+\path{timing.txt} list every encounter.
+
+\paragraph{Recovery time.}
+Of the 70 noisy encounters that both arms recover, this step confirms
+recovery later in 46, earlier in 13 and at the same frame in 11. The median
+paired difference is $+0.10$~s. In the 13 exact encounters both recover it
+is $+0.05$~s (7 later, 4 earlier, 2 the same). The largest lateral
+deviation does not change systematically: the median paired difference is
+0.00~m (noisy, 38 larger and 32 smaller).
+
+\paragraph{The tolerances.}
+To find the cause, this step was run once more with the old tolerances
+($10^{-8}$ and $10^{-7}$; the reduced tolerance stays $10^{-4}$), side by
+side with an identical rerun of this step. The rerun reproduced every
+encounter's outcome and frame count.
+\begin{itemize}
+\item \emph{Outcomes.} The old tolerances recover the same counts: 14 of 14
+  exact and 74 of 84 noisy, with three noisy encounters gained and three
+  lost against this step.
+\item \emph{Recovery time.} Against \texttt{c2df2ea} the median paired
+  difference is 0.00~s (noisy: 20 later, 22 earlier, 29 the same). Against
+  this step it is $-0.10$~s (45 earlier, 13 later).
+\item \emph{Time per frame}, noisy, the old tolerances against this step:
+  median 9.5 against 8.9~ms, 95th percentile 50.6 against 43.3~ms, 99th
+  percentile 79.1 against 75.2~ms. Frames over 50~ms number 1066 against
+  839 (of 20640 and 23083 frames). Exact: median 7.4 against 6.9~ms, 95th
+  percentile 24.9 against 21.4~ms.
+\end{itemize}
+So the looser tolerances buy about 6 percent at the median and 15 percent
+at the 95th percentile, and cost about 0.1~s of recovery confirmation at the
+median (0.25~s in the mean). They are kept, because the user accepted
+somewhat worse control for speed. \path{tolerance/} and \path{recovery.txt}
+have the comparison.
+
+\paragraph{Slow frames.}
+The time per frame still grows with the plan length: a line fitted to the
+noisy arm's frames without a restart has 0.41~ms per hold and 4.2~ms at
+zero. In the noisy arm, 63 of the 81 frames over 100~ms are long plans.
+The other 18 are restarts: the shifted problem is infeasible at every trust
+scale and is solved again from a fresh rollout (28 such frames, median
+193~ms, at most 372~ms, all in 15-m/s braking leads). At \texttt{c2df2ea}
+the 26 restart frames took 425~ms at the median and up to 1.65~s.
+
+\section{A rule that was reverted}
+\label{sec:reverted}
+The first version of this step had one more rule, meant to avoid long
+extensions. A shifted plan whose endpoint had left the terminal set got at
+most \texttt{horizonSteps} cruise holds to return to it, and was otherwise
+replaced by a fresh rollout before any solve.
+\begin{itemize}
+\item \emph{Campaign.} The arm was run against the same \texttt{c2df2ea}
+  arm. The rule fired in 120 frames of 37 noisy encounters, and 13 of
+  those encounters failed. The arm recovered 68 of 84 noisy encounters (72
+  for \texttt{c2df2ea}), with 7 newly lost and 3 newly recovered. The exact
+  arm was identical to the final one.
+\item \emph{Mechanism.} Two of the failing frames were re-solved offline.
+  In both, the fresh rollout's problem was primal infeasible at every trust
+  scale (Clarabel PrimalInfeasible), and nothing fell back to the shifted
+  plan, which \texttt{c2df2ea} had extended and solved. In two of the seven
+  lost encounters the steering also changed sign at the restart.
+\end{itemize}
+The rule was reverted. The shifted plan is again extended by cruise holds
+until its endpoint is in the set, at most to the maximum horizon
+(\texttt{maximumHorizonSteps}). The fresh rollout at a target's onset
+was kept, because no maneuver is in progress then. The rule gained little
+time. Relative to \texttt{c2df2ea} under the same load, the noisy 95th
+percentile was 0.29 with it and 0.30 without it. \path{rejected-rule/} has
+its comparison.
+
+\section{Decisions for the user}
+\begin{itemize}
+\item \emph{Tolerances.} $10^{-6}$ is kept for speed. Restoring $10^{-8}$
+  and $10^{-7}$ (\texttt{solver.constraintTolerance},
+  \texttt{solver.optimalityTolerance}) brings the recovery confirmation
+  back to \texttt{c2df2ea}'s and gives up 6--15 percent of the time per
+  frame.
+\item \emph{Long plans.} The horizon ends where the plan reaches the
+  terminal set, so its length, and the time with it, is not bounded below
+  \texttt{maximumHorizonSteps}. A cap on the plan length, or a time budget
+  per frame with a rule for what happens when it runs out, would bound the
+  time. Either changes the algorithm.
+\item \emph{The main remaining loss.} With the estimator in the loop, 7 of
+  12 curved head-ons fail, mostly within 5--15 frames on
+  \texttt{pcbfNoNumericalResult}. Three of them and a braking lead were
+  re-solved offline from the saved inputs. In each, the safety stage is
+  primal infeasible (certified by the solver) at every trust scale, from the
+  shifted plan and from the fresh rollout alike: a hard row cannot be met,
+  not a numerical breakdown. It predates this step and is the next
+  candidate.
+\end{itemize}
+
+\section{Reproduction}
+\begin{itemize}
+\item Unit tests: \texttt{matlab -batch "results = runtests('tests'); assertSuccess(results)"}.
+\item Benchmark: \path{scripts/runSpeedBenchmark.m} of this folder,
+  \texttt{runSpeedBenchmark(<source root>, <output.json>)}, for a
+  \texttt{git archive} of \texttt{c2df2ea} and for this step, run side by
+  side (\path{benchmark-c2df2ea.json}, \path{benchmark-speed.json}).
+\item Campaign: \path{scripts/run-workers.sh} \texttt{2000 3} of this
+  folder, with \texttt{ARMS} naming the arm folders. Each arm folder holds a
+  source tree with a \texttt{solver} link: a \texttt{git archive} of
+  \texttt{c2df2ea}; copies of the working tree, with and without the reverted
+  rule; and a copy with the old tolerances in
+  \path{config/collisionAvoidanceControllerConfig.m}.
+\item Summaries, each with \texttt{python3 -I} from this folder:
+  \begin{itemize}
+  \item \texttt{scripts/compare.py <out-base> <out-new> <folder>}
+    \texttt{c2df2ea speed};
+  \item \texttt{scripts/timing.py c2df2ea=<out-base> speed=<out-new>};
+  \item \texttt{scripts/recovery.py c2df2ea=<out-base>}
+    \texttt{speed=<out-new> tight=<out-tight>}.
+  \end{itemize}
+  Raw outputs under \path{~/.cache/collisionAvoidance/controller_speed_20261011/}
+  are disposable and were deleted after the summaries were copied here.
+\end{itemize}
+\end{document}

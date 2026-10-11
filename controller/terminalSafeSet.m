@@ -131,7 +131,7 @@ classdef terminalSafeSet
             next=[path.pose(:,3);V*cos(path.sideslip);V*sin(path.sideslip);path.curvature*V];
         end
 
-        function [rows,bounds,context,info] = rows(context,y,node)
+        function [rows,bounds,context,info] = rows(context,y,node,box)
             % The terminal set linearized at the anchor endpoint y on the
             % endpoint correction dz, rows*dz <= bounds:
             % - mildness, |r V| <= the lateral acceleration maximum, where y
@@ -151,20 +151,35 @@ classdef terminalSafeSet
             % the next sample's shift survives a small departure (the plant
             % or the appended hold's departure from the law); a row is never
             % tighter than y itself, so when y is in X_f the zero correction
-            % meets every row.
-            [~,info]=localDecide(context,y,node);
+            % meets every row. With 'box' (bounds on |dz|), a collision
+            % condition whose margin exceeds the most its pose can move over
+            % the box is left out before its dual is computed: it cannot bind.
+            if nargin<4,box=Inf(6,1);end
+            [~,info,parts]=localDecide(context,y,node);
             info.value=nonlinearBicycleModel.nominalValue(y,context.lane,context.reference);
             band=localBand();required=context.required;
-            path=terminalSafeSet.continuation(context,y);
+            path=parts.path;if isempty(path),path=terminalSafeSet.continuation(context,y);end
             jacobian=localPoseJacobian(context,y,path.steps);
+            % Largest change of a fixed-dual row at each pose over the box:
+            % |normal . dp| + reach |dpsi|, normal of unit length.
+            reach=context.reach;
+            movement=reshape(sum((abs(jacobian(1,:,:))+abs(jacobian(2,:,:))+reach*abs(jacobian(3,:,:))).*box(:).',2),1,[]);
+            movement(isnan(movement))=Inf;
             V=hypot(y(4),y(5));limit=context.lateralMaximum;
             rows=zeros(0,6);bounds=zeros(0,1);
             if V>0 && abs(y(6)*V)>limit-localMildBand()
                 gradient=sign(y(6))*[0,0,0,y(6)*y(4)/V,y(6)*y(5)/V,V];
                 rows=gradient;bounds=localKeep(limit-abs(y(6)*V),localMildReserve());
             end
-            [margin,lateral,normal,local]=localRoad(context,path.pose);
-            for k=find(margin<context.inflation+band)
+            if isempty(parts.road)
+                [margin,lateral,normal,local]=localRoad(context,path.pose);
+            else
+                margin=parts.road.margin;lateral=parts.road.lateral;normal=parts.road.normal;local=parts.road.local;
+            end
+            % A corner moves at most as far as the pose's movement over the
+            % box (its lever is at most the reach); poses whose road margin
+            % exceeds it form no rows.
+            for k=find(margin-context.inflation<min(band,localReserve()+movement))
                 c=cos(path.pose(3,k));s=sin(path.pose(3,k));
                 for corner=1:4
                     derivative=normal(:,corner,k).'*[eye(2),[-s,-c;c,-s]*local(:,corner)]*jacobian(:,:,k);
@@ -174,17 +189,24 @@ classdef terminalSafeSet
                 end
             end
             if ~context.hasTarget,return;end
-            q=localTarget(context,node,path.time);
-            [gap,out]=localClearances(context,path.pose,q);
+            if isempty(parts.gap)
+                q=localTarget(context,node,path.time);[gap,out]=localClearances(context,path.pose,q);
+            else
+                q=parts.q;gap=parts.gap;out=parts.out;
+            end
             last=numel(gap);if ~isempty(out),last=out-1;end
-            for k=find(gap(1:last)<required+band)
+            for k=find(gap(1:last)<required+min(band,localReserve()+movement(1:last)))
                 dual=localDual(path.pose(:,k),context.shape,q(:,k),[]);
                 if isempty(dual),continue;end
                 rows=[rows;-dual.jacobian*jacobian(:,:,k)];bounds=[bounds;localKeep(dual.value-required)]; %#ok<AGROW>
             end
             if isempty(out)
-                [distance,witness]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
-                if distance<required+band
+                if isempty(parts.parked)
+                    [distance,witness]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
+                else
+                    distance=parts.parked.distance;witness=parts.parked.witness;
+                end
+                if distance<required+min(band,localReserve()+movement(end))
                     % A witness at exact contact (a vertex path crossing an
                     % edge) has no well-defined normal; a pose 1 mm or 1 cm
                     % along the track stands for it.
@@ -426,32 +448,39 @@ classdef terminalSafeSet
         end
 
         function ok = stateRows(x,cfg)
+            % State limits of each column of x.
             low=[cfg.model.speedMinimum;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
             high=[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
-            ok=all(x(4:6)>=low-1e-9 & x(4:6)<=high+1e-9);
+            ok=all(x(4:6,:)>=low-1e-9 & x(4:6,:)<=high+1e-9,1);
         end
 
         function ok = handlingRows(x,u,cfg)
             % Rear adhesion ||[w/k; v_x b]|| <= v_x above the declared
             % model's kinematic regime, and the sideslip cone above
             % model.brakeHoldSpeed (at rest the sideslip is undefined).
+            % Each column of x under the corresponding column of u.
             tire=modifiedFialaTire.parameters(cfg);
             k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
-            adhesion=hypot((x(5)-cfg.vehicle.lr*x(6))/k,x(4)*u(2));
-            ok=(x(4)<=cfg.model.kinematicSpeedRange(1) || adhesion<=x(4)*(1+1e-9)) ...
-                && (x(4)<=cfg.model.brakeHoldSpeed || abs(x(5))<=tan(cfg.model.sideslipMaximum)*x(4)*(1+1e-9));
+            adhesion=hypot((x(5,:)-cfg.vehicle.lr*x(6,:))/k,x(4,:).*u(2,:));
+            ok=(x(4,:)<=cfg.model.kinematicSpeedRange(1) | adhesion<=x(4,:)*(1+1e-9)) ...
+                & (x(4,:)<=cfg.model.brakeHoldSpeed | abs(x(5,:))<=tan(cfg.model.sideslipMaximum)*x(4,:)*(1+1e-9));
         end
 
         function margin = roadMargin(x,model)
-            % Smallest distance of an ego corner inside the road (negative outside).
-            margin=Inf;
+            % Smallest distance of an ego corner inside the road (negative
+            % outside), for each column of x, in one projection.
+            margin=Inf(1,size(x,2));
             if isempty(model.road.lateralClearance),return;end
             cfg=model.cfg;clearance=model.road.lateralClearance;
             corners=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
-            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-            projection=laneGeometry.project(x(1:2)+rotation*corners,model.lane);
-            lateral=projection.lateralPosition;
-            margin=min([clearance(2)-lateral(:);clearance(1)+lateral(:)]);
+            n=size(x,2);c=cos(x(3,:));s=sin(x(3,:));points=zeros(2,4,n);
+            for corner=1:4
+                points(:,corner,:)=reshape(x(1:2,:)+[c*corners(1,corner)-s*corners(2,corner); ...
+                    s*corners(1,corner)+c*corners(2,corner)],2,1,n);
+            end
+            projection=laneGeometry.project(reshape(points,2,[]),model.lane);
+            lateral=reshape(projection.lateralPosition,4,n);
+            margin=min([clearance(2)-lateral;clearance(1)+lateral],[],1);
         end
     end
 end
@@ -518,33 +547,37 @@ function band = localBand()
     band=5;
 end
 
-function [member,info] = localDecide(context,x,node)
+function [member,info,parts] = localDecide(context,x,node)
     % Membership of x at plan node 'node' in X_f, evaluated in this order:
     % mildness, the road along the continuation, the target at
     % its nodes and midpoints until the exit, and the parked pose against the
-    % target's remaining track.
+    % target's remaining track. parts keeps what was computed on the way
+    % (empty fields where the decision stopped earlier), for rows.
     info=struct('reason',"",'end',"",'stopSeconds',NaN,'exitSeconds',NaN, ...
         'margin',Inf,'roadMargin',Inf);
+    parts=struct('path',[],'road',[],'q',[],'gap',[],'out',[],'parked',[]);
     member=false;V=hypot(x(4),x(5));
     if V>0 && ((x(4)>context.holdSpeed && abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9)) ...
             || abs(x(6)*V)>context.lateralMaximum*(1+1e-9))
         info.reason="notMild";return;
     end
-    path=terminalSafeSet.continuation(context,x);
+    path=terminalSafeSet.continuation(context,x);parts.path=path;
     info.stopSeconds=path.steps*context.sampleTime;
-    margin=localRoad(context,path.pose);
+    [margin,lateral,normal,local]=localRoad(context,path.pose);
+    parts.road=struct('margin',margin,'lateral',lateral,'normal',normal,'local',local);
     info.roadMargin=min(margin)-context.inflation;
     if info.roadMargin<-1e-6,info.reason="continuationLeavesRoad";return;end
     if ~context.hasTarget,member=true;info.reason="noTarget";info.end="noTarget";return;end
     q=localTarget(context,node,path.time);
-    [gap,out]=localClearances(context,path.pose,q);
+    [gap,out]=localClearances(context,path.pose,q);parts.q=q;parts.gap=gap;parts.out=out;
     last=numel(gap);if ~isempty(out),last=out-1;end
     if last>0,info.margin=min(gap(1:last))-context.required;end
     if info.margin<-1e-6,info.reason="continuationMeetsTarget";return;end
     if ~isempty(out)
         member=true;info.reason="exit";info.end="exit";info.exitSeconds=path.time(out);return;
     end
-    [distance,~,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
+    [distance,witness,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
+    parts.parked=struct('distance',distance,'witness',witness);
     info.margin=min(info.margin,distance-context.required);
     info.exitSeconds=info.stopSeconds+track.exitSeconds;
     if distance-context.required<-1e-6,info.reason="parkedEgoMeetsTarget";return;end

@@ -1,0 +1,34 @@
+===== exact =====
+[c2df2ea] runs 14 recovered 13  {'noSolution:anchorUnavailable': 1, 'recovered': 13}
+   least replay clearance 0.001 m; median per-run least 0.457 m
+   controller s median 0.010 p95 0.048 max 0.67
+   horizon holds median 16 p95 45 max 138; first frame median 24
+   terminal ends {'exit': 699, 'noTarget': 3338, 'parked': 1362}
+   frames 5399: braking hold appended 18, extension stopped {'': 5379, 'noHoldStaysTerminal': 20}, shifted candidate infeasible 1
+   recovered per scenario: acceleratingHeadOn 2/2, brakingLead 2/2, crossing 2/2, curvedCrossing 1/2, curvedHeadOn 2/2, headOn 2/2, turningCrossing 2/2
+[rule] runs 14 recovered 14  {'recovered': 14}
+   least replay clearance 0.136 m; median per-run least 0.282 m
+   controller s median 0.005 p95 0.018 max 0.09
+   horizon holds median 16 p95 40 max 117; first frame median 24
+   terminal ends {'exit': 678, 'noTarget': 3343, 'parked': 1517}
+   frames 5538: braking hold appended 20, extension stopped {'': 5520, 'noHoldStaysTerminal': 18}, shifted candidate infeasible 1
+   recovered per scenario: acceleratingHeadOn 2/2, brakingLead 2/2, crossing 2/2, curvedCrossing 2/2, curvedHeadOn 2/2, headOn 2/2, turningCrossing 2/2
+  rule vs c2df2ea: newly recovered 1 ['seed0-speed8-curvedCrossing']
+  rule vs c2df2ea: newly failed 0 []
+===== noisy =====
+[c2df2ea] runs 84 recovered 72  {'noSolution:clfNoNumericalResult': 2, 'noSolution:nonlinearAcceptanceFailed': 1, 'noSolution:pcbfNoNumericalResult': 9, 'recovered': 72}
+   least replay clearance 0.391 m; median per-run least 1.843 m
+   controller s median 0.013 p95 0.113 max 1.44
+   horizon holds median 16 p95 89 max 287; first frame median 25
+   terminal ends {'exit': 4772, 'noTarget': 8876, 'parked': 6335}
+   frames 19983: braking hold appended 25, extension stopped {'': 19970, 'cruiseHoldInadmissible': 13}, shifted candidate infeasible 57
+   recovered per scenario: acceleratingHeadOn 12/12, brakingLead 9/12, crossing 12/12, curvedCrossing 12/12, curvedHeadOn 3/12, headOn 12/12, turningCrossing 12/12
+[rule] runs 84 recovered 68  {'noSolution:nonlinearAcceptanceFailed': 1, 'noSolution:pcbfNoNumericalResult': 15, 'recovered': 68}
+   least replay clearance 0.227 m; median per-run least 1.879 m
+   controller s median 0.007 p95 0.033 max 0.27
+   horizon holds median 16 p95 59 max 233; first frame median 25
+   terminal ends {'exit': 4151, 'noTarget': 8458, 'parked': 6664}
+   frames 19273: braking hold appended 26, extension stopped {'': 19271, 'noHoldStaysTerminal': 2}, shifted candidate infeasible 30
+   recovered per scenario: acceleratingHeadOn 10/12, brakingLead 9/12, crossing 12/12, curvedCrossing 11/12, curvedHeadOn 3/12, headOn 11/12, turningCrossing 12/12
+  rule vs c2df2ea: newly recovered 3 ['seed3-speed15-brakingLead', 'seed3-speed15-curvedHeadOn', 'seed5-speed15-curvedHeadOn']
+  rule vs c2df2ea: newly failed 7 [('seed20261003-speed8-curvedCrossing', 'noSolution:pcbfNoNumericalResult'), ('seed20261003-speed15-curvedHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed1-speed8-acceleratingHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed3-speed8-headOn', 'noSolution:pcbfNoNumericalResult'), ('seed4-speed15-brakingLead', 'noSolution:pcbfNoNumericalResult'), ('seed4-speed8-acceleratingHeadOn', 'noSolution:pcbfNoNumericalResult'), ('seed5-speed8-curvedHeadOn', 'noSolution:pcbfNoNumericalResult')]

@@ -7,9 +7,9 @@ terminal set and recursive feasibility.
 
 | Source | Responsibility |
 | --- | --- |
-| `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
+| `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout, or the shifted accepted plan extended by declared-model holds that keep the endpoint terminal) over a horizon that reaches the terminal set; PCBF slack stage with the linearized terminal rows, CLF stage, step-size rule on the nonlinear rollout, full-step remainder trust |
+| `solvePredictiveControl.m` | One anchor per sample (startup or target-onset potential-field rollout, or the shifted accepted plan extended by declared-model holds that keep the endpoint terminal) over a horizon that reaches the terminal set; the problem assembled from dense row blocks without rows the variable boxes imply; PCBF slack stage with the linearized terminal rows, CLF stage, step-size rule on the nonlinear rollout (all holds at once), full-step remainder trust |
 | `terminalSafeSet.m` | Mild braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with its steering, hence sideslip and course curvature, held; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the held steering), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
@@ -110,8 +110,8 @@ braking bounds, input increments distinct from physical steering limits,
 positive-slack reporting, terminal-set membership of the endpoint, that the
 issued plan is the nonlinear rollout of its inputs, that the shifted plan is a
 feasible candidate at the next samples, the shortest target-free horizon, the
-single fresh re-solve of a failed shift, and that an unusable shift is
-reported. `terminalSafeSetTest` checks the closed-form continuation against
+single fresh re-solve of a failed shift, the fresh rollout at a target's
+onset, and that an unusable shift is reported. `terminalSafeSetTest` checks the closed-form continuation against
 an RK4 integration of the terminal law, invariance under the law down to
 rest, the exact parked check against dense sampling of the target's track
 (straight, circling, turning and stationary targets), the end of an encounter

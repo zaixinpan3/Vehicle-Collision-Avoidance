@@ -297,7 +297,10 @@ endpoint `y`:
 each composed with the derivative of the continuation's pose with respect to
 `y`, by central differences of the closed form with the schedule held.
 Conditions whose clearance exceeds the requirement by more than 5 m are left
-out; the exact set decides acceptance. Each row keeps up to 5 cm of the margin
+out, and so are those whose margin exceeds the most their pose can move over
+the endpoint correction's box (|dx| + |dy| + reach |dpsi| through the
+continuation's sensitivity; they cannot bind); the exact set decides
+acceptance. Each row keeps up to 5 cm of the margin
 it has at `y` (`b - min(0.05, max(b, 0))` for a row bound `b`): without it the
 optimizer leaves the endpoint on the boundary of `X_f`, where the next
 sample's shift falls out of the set under millimetres of plant mismatch or of

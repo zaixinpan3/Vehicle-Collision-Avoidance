@@ -1,7 +1,8 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl One affine model per sample; no fallback algorithm.
-% Startup uses a potential-field rollout; later samples start from the
-% previous accepted plan shifted by one hold. The horizon ends where the
+% Startup, and the sample at which a target appears that the previous plan
+% did not know of, use a potential-field rollout; later samples start from
+% the previous accepted plan shifted by one hold. The horizon ends where the
 % anchor enters the terminal set (terminalSafeSet): the joint continuation
 % under the terminal law (the ego brakes at a constant rate with its
 % sideslip and course curvature held until it stops, the target keeps its
@@ -257,36 +258,32 @@ function [plan,context]=localEvaluatePlan(inputs,model,context)
     plan.states=states;
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     margin=cfg.collision.safetyMarginMeters;tolerance=1e-6;
-    deficits=zeros(1,count+1);
-    for index=1:count
-        u=inputs(:,index);x=states(:,index);next=states(:,index+1);middle=middles(:,index);
-        if ~terminalSafeSet.stateRows(next,cfg) || ~terminalSafeSet.stateRows(middle,cfg)
-            plan.reason="stateLimits";return;
-        end
-        if ~terminalSafeSet.handlingRows(next,u,cfg) || (index>1 && ~terminalSafeSet.handlingRows(x,u,cfg))
-            plan.reason="handlingEnvelope";return;
-        end
-        if ~isempty(model.road.lateralClearance)
-            if (index>1 && terminalSafeSet.roadMargin(x,model)<-tolerance) || terminalSafeSet.roadMargin(middle,model)<-tolerance
-                plan.reason="road";return;
-            end
-        end
-        for point=[1,2]
-            if point==1,pose=x;time=(index-1)*h;else,pose=middle;time=(index-.5)*h;end
-            deficit=max(0,margin-localClearance(pose,time,model,shape));
-            if index<=prefix
-                deficits(index)=max(deficits(index),deficit);
-            elseif deficit>tolerance
-                plan.reason="collision";return;
-            end
-        end
+    % Every row of every hold at once; the first failing hold, and within it
+    % the first failing check in the order state limits, handling, road,
+    % collision, gives the reason, as a hold-by-hold scan would.
+    stateFail=~(terminalSafeSet.stateRows(states(:,2:end),cfg) & terminalSafeSet.stateRows(middles,cfg));
+    handlingFail=~terminalSafeSet.handlingRows(states(:,2:end),inputs,cfg);
+    handlingFail(2:end)=handlingFail(2:end) | ~terminalSafeSet.handlingRows(states(:,2:count),inputs(:,2:end),cfg);
+    roadFail=false(1,count);endRoadFail=false;
+    if ~isempty(model.road.lateralClearance)
+        roads=terminalSafeSet.roadMargin([states,middles],model);
+        roadFail=roads(count+2:end)<-tolerance;roadFail(2:end)=roadFail(2:end) | roads(2:count)<-tolerance;
+        endRoadFail=roads(count+1)<-tolerance;
     end
-    if ~isempty(model.road.lateralClearance) && terminalSafeSet.roadMargin(states(:,end),model)<-tolerance
-        plan.reason="road";return;
+    % Collision clearance at the nodes and midpoints (record times j h/2).
+    gaps=localClearances([reshape([states(:,1:count);middles],6,[]),states(:,end)],(0:2*count)*h/2,model,shape);
+    pointDeficits=max(0,margin-gaps);
+    holdDeficits=max(pointDeficits(1:2:2*count),pointDeficits(2:2:2*count));
+    collisionFail=(1:count)>prefix & holdDeficits>tolerance;
+    failed=find(stateFail | handlingFail | roadFail | collisionFail,1);
+    if ~isempty(failed)
+        reasons=["stateLimits","handlingEnvelope","road","collision"];
+        plan.reason=reasons(find([stateFail(failed),handlingFail(failed),roadFail(failed),collisionFail(failed)],1));return;
     end
-    gap=localClearance(states(:,end),count*h,model,shape);
-    if count+1<=prefix,deficits(count+1)=max(0,margin-gap);
-    elseif margin-gap>tolerance,plan.reason="collision";return;
+    deficits=zeros(1,count+1);within=1:min(prefix,count);deficits(within)=holdDeficits(within);
+    if endRoadFail,plan.reason="road";return;end
+    if count+1<=prefix,deficits(count+1)=pointDeficits(end);
+    elseif pointDeficits(end)>tolerance,plan.reason="collision";return;
     end
     [member,context,terminal]=terminalSafeSet.member(context,states(:,end),count);
     plan.terminalValue=terminal.value;plan.terminalMargin=min(terminal.margin,terminal.roadMargin);
@@ -296,13 +293,21 @@ function [plan,context]=localEvaluatePlan(inputs,model,context)
     plan.softDeficits=deficits;plan.softSum=sum(deficits);plan.feasible=true;
 end
 
-function gap=localClearance(pose,time,model,shape)
-    % Ordinary rectangle distance to the target forecast; Inf when no target
-    % or beyond the encounter range (the target no longer exists there).
-    gap=Inf;if isempty(model.target),return;end
-    q=localTargetAt(model,time);
-    if norm(pose(1:2)-q(1:2))>model.cfg.collision.encounterRangeMeters,return;end
-    gap=predictiveSafetyGeometry.rectangle(pose(1:3),shape,q(1:3),q(8:11));
+function gaps=localClearances(poses,times,model,shape)
+    % Ordinary rectangle distance to the target forecast at each pose (its
+    % time in 'times'); Inf when no target or beyond the encounter range
+    % (the target no longer exists there). Where the reference distance less
+    % both reaches is already beyond the safety margin, that lower bound
+    % stands for the distance: every decision on it is the same.
+    gaps=Inf(1,size(poses,2));if isempty(model.target),return;end
+    cfg=model.cfg;q=localTargetAt(model,times);
+    distance=vecnorm(poses(1:2,:)-q(1:2,:),2,1);
+    bound=distance-norm(shape(1:2))-norm(shape(3:4))-vecnorm(q(8:9,:),2,1)-vecnorm(q(10:11,:),2,1);
+    inside=distance<=cfg.collision.encounterRangeMeters;
+    gaps(inside)=bound(inside);
+    for j=find(inside & bound<cfg.collision.safetyMarginMeters)
+        gaps(j)=predictiveSafetyGeometry.rectangle(poses(1:3,j),shape,q(1:3,j),q(8:11,j));
+    end
 end
 
 function [point,problem,search,model,attempts,stages,selected]=localExpand( ...
@@ -315,7 +320,7 @@ function [point,problem,search,model,attempts,stages,selected]=localExpand( ...
     while localInfeasible(point,search) && model.inputTrustScale<cfg.nonlinear.trustMaximumScale ...
             && toc(timer)<cfg.solver.timeLimitSeconds
         model.inputTrustScale=min(2*model.inputTrustScale,cfg.nonlinear.trustMaximumScale);
-        [point,problem,search,model]=localPrimary(anchor,model,source,timer);
+        [point,problem,search,model]=localPrimary(anchor,model,source,timer,problem);
         attempts(end+1)=localAttempt(search);stages=[stages,search.stages];selected=numel(attempts); %#ok<AGROW>
     end
 end
@@ -356,17 +361,25 @@ function search=localSearch(problem,model,initialization,formulationSeconds)
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}));
 end
 
-function [point,problem,search,model]=localPrimary(anchor,model,initialization,timer)
-    cfg=model.cfg;point=[];
-    wall=tic;[problem,model]=localFormulate(anchor,model);formulationSeconds=toc(wall);
-    model.linearization=anchor;
+function [point,problem,search,model]=localPrimary(anchor,model,initialization,timer,problem)
+    % Formulate the anchor's problem and solve its safety stage. A problem
+    % already formulated on this anchor (a larger trust scale) is reused:
+    % the scale changes only the input increments' bounds.
+    cfg=model.cfg;point=[];formulationSeconds=0;
+    if nargin<5 || isempty(problem)
+        wall=tic;[problem,model]=localFormulate(anchor,model);formulationSeconds=toc(wall);
+        model.linearization=anchor;
+    else
+        problem=localInputBounds(problem,model);
+    end
     search=localSearch(problem,model,initialization,formulationSeconds);
     remaining=cfg.solver.timeLimitSeconds-toc(timer);if remaining<=0,return;end
     primaryCount=problem.clfIndex-1;primaryCone=problem.cones(1:problem.primaryConeCount);wall=tic;
     coneFeasible=true;
     for index=1:numel(primaryCone)
-        cone=primaryCone(index);coneFeasible=coneFeasible && norm(cone.b)<=-cone.gamma;
-        primaryCone(index).A=cone.A(:,1:primaryCount);primaryCone(index).d=cone.d(1:primaryCount);
+        cone=primaryCone(index);
+        coneFeasible=coneFeasible && all(vecnorm(reshape(cone.b,cone.size,[]),2,1)<=-cone.gamma(:).');
+        primaryCone(index).A=cone.A(:,1:primaryCount);primaryCone(index).D=cone.D(:,1:primaryCount);
     end
     % A feasible zero correction with zero nonnegative slacks attains the
     % global lower bound. Include every primary constraint, not just safety.
@@ -458,29 +471,33 @@ function [point,flag,solverInfo]=localConicSolve(quadratic,objective,cones,a,b,e
     rows=cell(1,numel(cones)+1);bounds=cell(size(rows));
     rows{1}=[equal;a;-identity(low,:);identity(high,:)];
     bounds{1}=[rhs;b;-lower(low);upper(high)];
-    dimensions=[size(equal,1),size(a,1)+nnz(low)+nnz(high),zeros(1,numel(cones))];
+    % Each cone block holds cones of equal dimension; every cone enters the
+    % solver as its d-row followed by its rows of A.
+    coneDimensions=cell(1,numel(cones));
     for k=1:numel(cones)
-        cone=cones(k);rows{k+1}=[-cone.d.';-cone.A];bounds{k+1}=[-cone.gamma;-cone.b];
-        dimensions(k+2)=size(cone.A,1)+1;
+        cone=cones(k);m=numel(cone.gamma);n=cone.size;
+        order=reshape([1:m;m+reshape(1:m*n,n,m)],[],1);
+        stacked=[-cone.D;-cone.A];offsets=[-cone.gamma(:);-cone.b];
+        rows{k+1}=stacked(order,:);bounds{k+1}=offsets(order);coneDimensions{k}=repmat(n+1,1,m);
     end
+    coneDimensions=[coneDimensions{:}];
+    dimensions=[size(equal,1),size(a,1)+nnz(low)+nnz(high),coneDimensions];
     [point,flag,solverInfo]=solver(quadratic,objective, ...
-        vertcat(rows{:}),vertcat(bounds{:}),dimensions,[0,1,2*ones(1,numel(cones))], ...
-        [cfg.solver.maxIterations;remaining;cfg.solver.constraintTolerance;gapTolerance;cfg.solver.feasibilityTolerance]);
-end
-
-function cone=localCone(a,b,d,gamma)
-    cone=struct('A',sparse(a),'b',full(b),'d',sparse(d),'gamma',gamma);
+        vertcat(rows{:}),vertcat(bounds{:}),dimensions,[0,1,2*ones(1,numel(coneDimensions))], ...
+        [cfg.solver.maxIterations;remaining;cfg.solver.constraintTolerance;gapTolerance;cfg.solver.reducedTolerance]);
 end
 
 function [anchor,source,failure]=localInitialization(model,previous)
-    % Startup: one potential-field rollout. Later samples: the shifted plan,
-    % extended by path guidance. Either rollout stops at the first node that
-    % reaches the terminal set, between horizonSteps and maximumHorizonSteps.
+    % Startup and target onset: one potential-field rollout. Later samples:
+    % the shifted plan, extended by path guidance. Either rollout stops at
+    % the first node that reaches the terminal set, between horizonSteps and
+    % maximumHorizonSteps.
     % An unusable shifted plan is reported; no other anchor replaces it.
     cfg=model.cfg;minimum=cfg.controller.horizonSteps;maximum=cfg.controller.maximumHorizonSteps;
     anchor=[];failure="";
-    if ~isstruct(previous)
+    if ~isstruct(previous) || (isfield(model,'targetOnset') && model.targetOnset)
         source="movingTargetPotentialField";if isempty(model.target),source="laneFeedbackRollout";end
+        if isstruct(previous),failure="targetOnset";end
         anchor=localPotentialFieldSeed(model,minimum,maximum);return;
     end
     source="shiftedInputRollout";
@@ -632,17 +649,20 @@ function [problem,model]=localFormulate(anchor,model)
     if robustRelaxation,slackCount=count+1;end
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
     is=iu(end)+(1:slackCount);ic=is(end)+1;nv=ic;
-    equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
-    rhs(1:6)=model.initialState-anchor.states(:,1);
-    rows=cell(1,9*count+8);bounds=cell(size(rows));rowCount=0;
+    % Every inequality row is a small dense block on the few variables it
+    % involves (a node's state, or a hold's start state and input, and its
+    % slack), in the order of the rows; the sparse matrices are built once
+    % from these blocks (localAssemble). Building them row by row in sparse
+    % form cost time quadratic in the plan length.
+    blockRows=cell(1,12*count+8);blockColumns=blockRows;blockBounds=blockRows;blockCount=0;
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
-    lower(iu(:))=-repmat(model.inputTrustScale*radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
+    lower([is,ic])=0;
     % Numerical RTI corrections are local to the new anchor at every sample.
     % Steering still has no actuator magnitude or slew constraint.
     inputLower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
     inputUpper=[Inf;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
-    rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
+    rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;finite=isfinite(rate);
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=0;
     % Information-consistent uncertainty. The estimator publishes a fresh
@@ -663,75 +683,113 @@ function [problem,model]=localFormulate(anchor,model)
     targetTube=localTargetTube(model,times,max(0,ceil((0:2*count)/2)-1)*h);
     uncertaintyPrediction=struct('time',times,'target',targetTube, ...
         'egoStateRadius',zeros(6,2*count+1),'collisionStateRadius',zeros(6,2*count+1));
-    primaryCones=struct('A',{},'b',{},'d',{},'gamma',{});
+    % The target forecast at every node and midpoint (record times), and
+    % the lane projection of the ego corners at every node and midpoint,
+    % each in one call.
+    middles=reshape([stages.middle],6,count);
+    forecast=[];if ~isempty(model.target),forecast=localTargetAt(model,times);end
+    clearance=model.road.lateralClearance;road=[];
+    if ~isempty(clearance),road=localRoadProjection([anchor.states,middles],model);end
+    % Equality rows: the anchor's start, then x_{i+1} - A_i x_i - B_i u_i.
+    a3=reshape([stages.a],6,6,count);b3=reshape([stages.b],6,2,count);
+    rowIndex=6*reshape(1:count,1,1,count)+(1:6).';
+    equal=sparse([(1:6).';reshape(rowIndex,[],1);reshape(repmat(rowIndex,1,6,1),[],1);reshape(repmat(rowIndex,1,2,1),[],1)], ...
+        [ix(:,1);reshape(ix(:,2:end),[],1);reshape(repmat(reshape(ix(:,1:count),1,6,count),6,1,1),[],1); ...
+        reshape(repmat(reshape(iu,1,2,count),6,1,1),[],1)], ...
+        [ones(6+6*count,1);-a3(:);-b3(:)],6*(count+1),nv);
+    rhs=[model.initialState-anchor.states(:,1);reshape(reshape([stages.next],6,count)-anchor.states(:,2:end),[],1)];
+    % Handling cones: two per hold after the first (one per hold for the
+    % first), in the order of the former per-cone assembly.
+    coneCount=2*count-1;coneState=zeros(6,coneCount);coneBrake=zeros(1,coneCount);
+    coneSlip=zeros(6,coneCount);coneForward=zeros(6,coneCount);coneB=zeros(2,coneCount);coneGamma=zeros(1,coneCount);cones=0;
+    tire=modifiedFialaTire.parameters(cfg);k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
+    tangent=tan(cfg.model.sideslipMaximum);side=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];
+    % Collision rows that cannot bind are not formed (localBinding): the
+    % pose moves at most this much over the variables' boxes (inputs at
+    % trustMaximumScale), in |dx| + |dy| + reach |dpsi| per unit of each
+    % variable's box.
+    stateBox=radius*[5;5;.5;5;3;1.5];inputBox=cfg.nonlinear.trustMaximumScale*radius*[.15;.25];
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];reach=norm(shape(1:2))+norm(shape(3:4));
+    nodeMovement=[1,1,reach,0,0,0]*stateBox;
     for index=1:count
         x=anchor.states(:,index);input=anchor.inputs(:,index);nextReference=anchor.states(:,index+1);
         stage=stages(index);middle=stage.middle;am=stage.am;bm=stage.bm;
-        next=stage.next;a=stage.a;b=stage.b;
         % Node index closes hold index-1 (or is the present sample).
         collisionGenerator=localRelativeGenerator(x,generator,model,holdCenter);
-        middleGenerator=am*initialGenerator;nextGenerator=a*initialGenerator;
+        middleGenerator=am*initialGenerator;nextGenerator=stage.a*initialGenerator;
         middleCenter=model.initialState;if index>1,middleCenter=x;end
         middleCollisionGenerator=localRelativeGenerator(middle,middleGenerator,model,middleCenter);
         uncertaintyPrediction.egoStateRadius(:,2*index-1:2*index)=[sum(abs(generator),2),sum(abs(middleGenerator),2)];
         uncertaintyPrediction.collisionStateRadius(:,2*index-1:2*index)=[sum(abs(collisionGenerator),2),sum(abs(middleCollisionGenerator),2)];
-        eq=6*index+(1:6);equal(eq,ix(:,index+1))=eye(6);equal(eq,ix(:,index))=-a;equal(eq,iu(:,index))=-b;
-        rhs(eq)=next-nextReference;
-        lower(iu(:,index))=max(lower(iu(:,index)),inputLower-input);
-        upper(iu(:,index))=min(upper(iu(:,index)),inputUpper-input);
-        r=sparse(2,nv);r(:,iu(:,index))=eye(2);previous=model.previousInput;
-        if index>1,r(:,iu(:,index-1))=-eye(2);previous=anchor.inputs(:,index-1);end
-        finite=isfinite(rate);difference=input-previous;
-        rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
-        map=sparse(6,nv);map(:,ix(:,index))=eye(6);
-        % The current measured node is fixed; every later node stays on the road.
-        if index>1 && ~isempty(model.road.lateralClearance)
-            [r,bound]=localRoadRows(x,model,generator,map);
-            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+        if any(finite)
+            previous=model.previousInput;rateRows=eye(2);rateColumns=iu(:,index);
+            if index>1,previous=anchor.inputs(:,index-1);rateRows=[eye(2),-eye(2)];rateColumns=[iu(:,index);iu(:,index-1)];end
+            difference=input-previous;
+            blockCount=blockCount+1;blockRows{blockCount}=[rateRows(finite,:);-rateRows(finite,:)];blockColumns{blockCount}=rateColumns;
+            blockBounds{blockCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
         end
-        if ~localBeyondRange(x,(index-1)*h,model,collisionGenerator,holdStart)
+        nodeColumns=ix(:,index);
+        % The current measured node is fixed; every later node stays on the road.
+        if index>1 && ~isempty(clearance)
+            [r,bound]=localRoadBlock(road,index,x,eye(6),generator,clearance);
+            blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;blockBounds{blockCount}=bound;
+        end
+        point=2*index-1;
+        if ~localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg)
             departure=index;
-            [g,j,tightening]=localSafetyRows(x,(index-1)*h,model,collisionGenerator,holdStart);
+        end
+        if departure==index && localBinding(x,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg)
+            [g,j,tightening]=localSafety(x,forecast(:,point),(index-1)*h,model,collisionGenerator,holdStart);
             maximumTightening=max(maximumTightening,max(tightening));
             if index==1,primaryLowerBound=max(0,-min(g));end
-            r=-j*map;
+            r=[-j,zeros(4,3)];
             if robustRelaxation && index>prefix
-                rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+                blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;blockBounds{blockCount}=g+tightening;
             end
-            if index<=slackCount,r(:,is(index))=-1;end
-            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+            blockCount=blockCount+1;
+            if index<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[nodeColumns;is(index)];
+            else,blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;end
+            blockBounds{blockCount}=g;
         end
-        map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
-        if ~isempty(model.road.lateralClearance)
-            [r,bound]=localRoadRows(middle,model,middleGenerator,map);
-            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+        middleMap=[am,bm];middleColumns=[ix(:,index);iu(:,index)];
+        if ~isempty(clearance)
+            [r,bound]=localRoadBlock(road,count+1+index,middle,middleMap,middleGenerator,clearance);
+            blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=bound;
         end
-        if ~localBeyondRange(middle,(index-.5)*h,model,middleCollisionGenerator,(index-1)*h)
-            departure=index;
-            [g,j,tightening]=localSafetyRows(middle,(index-.5)*h,model,middleCollisionGenerator,(index-1)*h);
+        point=2*index;inRange=~localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg);
+        if inRange,departure=index;end
+        middleMovement=[1,1,reach]*abs(middleMap(1:3,:))*[stateBox;inputBox];
+        if inRange && localBinding(middle,forecast(:,point),point,middleCollisionGenerator,targetTube,middleMovement,cfg)
+            [g,j,tightening]=localSafety(middle,forecast(:,point),(index-.5)*h,model,middleCollisionGenerator,(index-1)*h);
             maximumTightening=max(maximumTightening,max(tightening));
-            r=-j*map;
+            r=-j*middleMap(1:3,:);
             if robustRelaxation && index>prefix
-                rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
+                blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=g+tightening;
             end
-            if index<=slackCount,r(:,is(index))=-1;end
-            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+            blockCount=blockCount+1;
+            if index<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[middleColumns;is(index)];
+            else,blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;end
+            blockBounds{blockCount}=g;
         end
-        rowCount=rowCount+1;rows{rowCount}=[map(4:6,:);-map(4:6,:)];
         middleRadius=sum(abs(middleGenerator(4:6,:)),2);nextRadius=sum(abs(nextGenerator(4:6,:)),2);
-        bounds{rowCount}=[physicalUpper-middle(4:6)-middleRadius;middle(4:6)-physicalLower-middleRadius];
+        blockCount=blockCount+1;blockRows{blockCount}=[middleMap(4:6,:);-middleMap(4:6,:)];blockColumns{blockCount}=middleColumns;
+        blockBounds{blockCount}=[physicalUpper-middle(4:6)-middleRadius;middle(4:6)-physicalLower-middleRadius];
         jx=ix(:,index+1);
         lower(jx(4:6))=max(lower(jx(4:6)),physicalLower-nextReference(4:6)+nextRadius);
         upper(jx(4:6))=min(upper(jx(4:6)),physicalUpper-nextReference(4:6)-nextRadius);
-        % Handling envelope at both ends of the hold, under its own input.
-        % The measured node is fixed and is not constrained.
-        nodeMap=sparse(6,nv);nodeMap(:,jx)=speye(6);
-        [r,bound,cone]=localHandling(nextReference,input,iu(2,index),model,nextGenerator,nodeMap);
-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;primaryCones(end+1)=cone; %#ok<AGROW>
+        % Handling envelope at both ends of the hold, under its own input
+        % (localHandling). The measured node is fixed and is not constrained.
+        % The sideslip cone applies above model.brakeHoldSpeed; at rest the
+        % sideslip is undefined.
+        if nextReference(4)>cfg.model.brakeHoldSpeed
+            blockCount=blockCount+1;blockRows{blockCount}=side;blockColumns{blockCount}=jx;
+            blockBounds{blockCount}=-side*nextReference-sum(abs(side*nextGenerator),2);
+        end
+        cones=cones+1;[coneSlip(:,cones),coneForward(:,cones),coneB(:,cones),coneGamma(cones)]=localHandling(nextReference,input,k,cfg);
+        coneState(:,cones)=jx;coneBrake(cones)=iu(2,index);
         if index>1
-            nodeMap=sparse(6,nv);nodeMap(:,ix(:,index))=speye(6);
-            [~,~,cone]=localHandling(x,input,iu(2,index),model,generator,nodeMap);
-            primaryCones(end+1)=cone; %#ok<AGROW>
+            cones=cones+1;[coneSlip(:,cones),coneForward(:,cones),coneB(:,cones),coneGamma(cones)]=localHandling(x,input,k,cfg);
+            coneState(:,cones)=nodeColumns;coneBrake(cones)=iu(2,index);
         end
         generator=nextGenerator;holdCenter=middleCenter;holdStart=(index-1)*h;
     end
@@ -746,32 +804,51 @@ function [problem,model]=localFormulate(anchor,model)
     % against the target's closest track pose, and road rows along the
     % continuation, all on dx_N. The anchor endpoint meets them when it is in
     % the set, so the zero correction stays feasible.
-    y=anchor.states(:,end);map=sparse(6,nv);map(:,ix(:,end))=eye(6);
-    time=count*h;
-    if ~localBeyondRange(y,time,model,collisionGenerator,holdStart)
+    y=anchor.states(:,end);endColumns=ix(:,end);
+    time=count*h;point=2*count+1;
+    if ~localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg)
         departure=count+1;
-        [g,j,tightening]=localSafetyRows(y,time,model,collisionGenerator,holdStart);
-        maximumTightening=max(maximumTightening,max(tightening));
-        r=-j*map;
-        if robustRelaxation && count+1>prefix
-            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g+tightening;
-        end
-        if count+1<=slackCount,r(:,is(count+1))=-1;end
-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
     end
-    if ~isempty(model.road.lateralClearance)
-        [r,bound]=localRoadRows(y,model,generator,map);
-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+    if departure==count+1 && localBinding(y,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg)
+        [g,j,tightening]=localSafety(y,forecast(:,point),time,model,collisionGenerator,holdStart);
+        maximumTightening=max(maximumTightening,max(tightening));
+        r=[-j,zeros(4,3)];
+        if robustRelaxation && count+1>prefix
+            blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=g+tightening;
+        end
+        blockCount=blockCount+1;
+        if count+1<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[endColumns;is(count+1)];
+        else,blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;end
+        blockBounds{blockCount}=g;
+    end
+    if ~isempty(clearance)
+        [r,bound]=localRoadBlock(road,count+1,y,eye(6),generator,clearance);
+        blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=bound;
     end
     context=localTerminalContext(anchor,model);
-    [terminalRows,terminalBounds,~,terminalInfo]=terminalSafeSet.rows(context,y,count);
+    [terminalRows,terminalBounds,~,terminalInfo]=terminalSafeSet.rows(context,y,count,radius*[5;5;.5;5;3;1.5]);
     if ~isempty(terminalRows)
-        rowCount=rowCount+1;rows{rowCount}=sparse(terminalRows)*map;bounds{rowCount}=terminalBounds;
+        blockCount=blockCount+1;blockRows{blockCount}=terminalRows;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=terminalBounds;
     end
+    % Rows that every correction in the variables' boxes meets are left out:
+    % they cannot bind, so the feasible set and the optimum are unchanged.
+    % The input increments' box is taken at trustMaximumScale, so the rows
+    % kept serve every trust scale of localExpand.
+    reachLower=lower;reachUpper=upper;
+    box=cfg.nonlinear.trustMaximumScale*radius*[.15;.25];
+    reachLower(iu)=max(-box,physicalInputLower-anchor.inputs);reachUpper(iu)=min(box,physicalInputUpper-anchor.inputs);
+    [inequality,bounds]=localAssemble(blockRows,blockColumns,blockBounds,blockCount,nv,reachLower,reachUpper);
+    % One block of three-dimensional handling cones ||[w/k; v_x b]|| <= v_x.
+    coneRows=[2*(1:cones)-1;2*(1:cones)];
+    coneA=sparse([reshape(repmat(coneRows(1,:),6,1),[],1);coneRows(2,:).'], ...
+        [reshape(coneState(:,1:cones),[],1);coneBrake(1:cones).'], ...
+        [reshape(coneSlip(:,1:cones),[],1);ones(cones,1)],2*cones,nv);
+    coneD=sparse(reshape(repmat(1:cones,6,1),[],1),reshape(coneState(:,1:cones),[],1),reshape(coneForward(:,1:cones),[],1),cones,nv);
+    handling=localConeBlock(coneA,reshape(coneB(:,1:cones),[],1),coneD,coneGamma(1:cones).',2);
     objective=zeros(nv,1);objective(is)=1;
-    problem=struct('a',vertcat(rows{1:rowCount}),'b',vertcat(bounds{1:rowCount}), ...
-        'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',primaryCones, ...
-        'primaryConeCount',numel(primaryCones), ...
+    problem=struct('a',inequality,'b',bounds, ...
+        'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',handling, ...
+        'primaryConeCount',1, ...
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
         'encounterExit',departure, ...
@@ -781,6 +858,151 @@ function [problem,model]=localFormulate(anchor,model)
         'terminalAnchorReason',terminalInfo.reason);
     model.robustnessRelaxation=robustRelaxation;
     problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
+    problem.inputIncrementLower=physicalInputLower-anchor.inputs;problem.inputIncrementUpper=physicalInputUpper-anchor.inputs;
+    problem=localInputBounds(problem,model);
+end
+
+function [matrix,vector]=localAssemble(rows,columns,bounds,count,nv,lower,upper)
+    % Stack dense row blocks on their columns into one sparse matrix,
+    % leaving out every row r z <= b that the box lower <= z <= upper
+    % already implies (max over the box of r z below b).
+    rows=rows(1:count);columns=columns(1:count);bounds=bounds(1:count);
+    for j=1:count
+        r=rows{j};if isempty(r),continue;end
+        c=columns{j}(:);low=lower(c).';high=upper(c).';
+        reach=max(r.*low,r.*high);reach(r==0)=0;
+        keep=~(sum(reach,2)<bounds{j});
+        if ~all(keep),rows{j}=r(keep,:);bounds{j}=bounds{j}(keep);end
+    end
+    m=cellfun('size',rows,1);n=cellfun('size',rows,2);
+    offsets=cumsum([0,m(1:end-1)]);total=sum(m.*n);
+    I=zeros(total,1);J=I;V=I;at=0;
+    for j=1:count
+        e=m(j)*n(j);if e==0,continue;end
+        I(at+(1:e))=offsets(j)+repmat((1:m(j)).',n(j),1);
+        J(at+(1:e))=reshape(repmat(reshape(columns{j},1,[]),m(j),1),[],1);
+        V(at+(1:e))=rows{j}(:);at=at+e;
+    end
+    matrix=sparse(I,J,V,sum(m),nv);vector=vertcat(bounds{1:count});
+end
+
+function cone=localConeBlock(A,b,D,gamma,rowsPerCone)
+    % A block of second-order cones of equal dimension: cone j is
+    % ||A(rows j) z + b(rows j)|| <= D(j,:) z - gamma(j) in the solver's
+    % convention (localConicSolve), with 'size' rows of A per cone.
+    cone=struct('A',A,'b',b,'D',D,'gamma',gamma,'size',rowsPerCone);
+end
+
+function road=localRoadProjection(poses,model)
+    % Lane projection of the four ego corners at every pose (columns).
+    cfg=model.cfg;corners=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
+    n=size(poses,2);c=cos(poses(3,:));s=sin(poses(3,:));points=zeros(2,4,n);
+    for corner=1:4
+        points(:,corner,:)=reshape(poses(1:2,:)+[c*corners(1,corner)-s*corners(2,corner); ...
+            s*corners(1,corner)+c*corners(2,corner)],2,1,n);
+    end
+    projection=laneGeometry.project(reshape(points,2,[]),model.lane);
+    road=struct('lateral',reshape(projection.lateralPosition,4,n),'heading',reshape(projection.heading,4,n),'corners',corners);
+end
+
+function [rows,bounds]=localRoadBlock(road,point,pose,map,generator,clearance)
+    % The ego drives on the road: every rectangle corner within
+    % lateralClearance=[right;left] of the path, linearized at the anchor
+    % corner on the local path normal, on the columns of 'map' (the pose's
+    % dependence on the problem's variables). Applied at every predicted node.
+    c=cos(pose(3));s=sin(pose(3));derivative=[-s,-c;c,-s];
+    rows=zeros(8,size(map,2));bounds=zeros(8,1);
+    for corner=1:4
+        heading=road.heading(corner,point);normal=[-sin(heading);cos(heading)];
+        jacobian=normal.'*[eye(2),derivative*road.corners(:,corner)];
+        reserve=sum(abs(jacobian*generator(1:3,:)));
+        r=jacobian*map(1:3,:);
+        rows(2*corner-1,:)=r;bounds(2*corner-1)=clearance(2)-road.lateral(corner,point)-reserve;
+        rows(2*corner,:)=-r;bounds(2*corner)=clearance(1)+road.lateral(corner,point)-reserve;
+    end
+end
+
+function [values,jacobian,tightening]=localSafety(x,q,time,model,generator,holdStart)
+    % Fixed-dual collision rows at a pose against the target's forecast q,
+    % on the pose (jacobian, 4x3), tightened by the enclosures.
+    cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    dual=predictiveSafetyGeometry.supportLinearization(x(1:3),shape,q(1:3),q(8:11));
+    values=dual.value-cfg.collision.safetyMarginMeters;
+    jacobian=dual.jacobian;
+    % Directional position support retains correlation across the affine
+    % ego dynamics. Rotation uses an exact chord bound for each rectangle.
+    normal=jacobian(:,1:2);normalNorm=vecnorm(normal,2,2);
+    [tube,targetSupport]=localTargetTube(model,time,holdStart,normal);
+    egoReach=norm(shape(1:2))+norm(shape(3:4));
+    targetReach=norm(q(8:9))+norm(q(10:11));
+    yawRadius=sum(abs(generator(3,:)));
+    reserve=2*egoReach*sin(min(pi,yawRadius)/2) ...
+        +2*targetReach*sin(tube.yawRadius/2);
+    tightening=sum(abs(normal*generator(1:2,:)),2)+targetSupport+normalNorm*reserve;
+    values=values-tightening;
+end
+
+function binding=localBinding(x,q,point,generator,tube,movement,cfg)
+    % Can a collision row at this pose bind within the variables' boxes?
+    % Every fixed-dual row value is at least the rectangle distance, hence at
+    % least the reference distance less both reaches; the tightening is at
+    % most the ego enclosure's position radius, the target tube's position
+    % radius and both rotation chords (localSafety); a row changes by at
+    % most 'movement' over the boxes (unit normal, yaw lever at most the
+    % reach). Rows whose bound exceeds that change cannot bind and are not
+    % formed: the problem's feasible set is the same.
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    egoReach=norm(shape(1:2))+norm(shape(3:4));targetReach=norm(q(8:9))+norm(q(10:11));
+    yawRadius=sum(abs(generator(3,:)));
+    tightening=sum(vecnorm(generator(1:2,:)))+tube.positionRadius(point) ...
+        +2*egoReach*sin(min(pi,yawRadius)/2)+2*targetReach*sin(tube.yawRadius(point)/2);
+    lower=norm(x(1:2)-q(1:2))-egoReach-targetReach-cfg.collision.safetyMarginMeters-tightening;
+    binding=~(lower>movement);
+end
+
+function beyond=localBeyond(x,forecast,point,generator,tube,cfg)
+    % The target's reference point beyond the encounter range at record
+    % point 'point' (no target: beyond), with the enclosures as reserve.
+    beyond=isempty(forecast);
+    if ~beyond
+        reserve=sum(vecnorm(generator(1:2,:)))+tube.positionRadius(point);
+        beyond=norm(x(1:2)-forecast(1:2,point))-reserve>cfg.collision.encounterRangeMeters;
+    end
+end
+
+function [slip,forward,b,gamma]=localHandling(y,input,k,cfg)
+    % Stable handling envelope at one node under the input of an adjacent
+    % hold: the cone ||[w/k; v_x b]|| <= v_x on the node's state (slip and
+    % forward rows, 6x1 each) and its braking ratio (unit coefficient).
+    %   Rear adhesion: the rear Fiala tire stays below saturation,
+    %     |w| <= k v_x sqrt(1-b^2),  w = v_y - lr r,  k = 3 mu_r Fz_r / C_r,
+    %   with v_x frozen at the anchor in the product v_x b. A saturated rear
+    %   axle has no restoring yaw moment (the vehicle spins) and its force
+    %   no longer determines the slip, so the estimator's force-balance
+    %   measurement loses its information. It is a handling and
+    %   observability row, not part of the safety certificate, and acts on
+    %   the estimate. The cone is divided by the anchor speed, so its
+    %   entries are the normalized rear slip tan(alpha_r)/tan(alpha_sat), the
+    %   braking ratio and their unit bound: a well-scaled cone for the
+    %   interior-point solver. In the declared model's kinematic regime
+    %   (anchor speed at or below model.kinematicSpeedRange(1)) the rear tire
+    %   has no lateral force to saturate: the cone is only |b| <= 1.
+    slip=zeros(6,1);forward=zeros(6,1);
+    if y(4)>cfg.model.kinematicSpeedRange(1)
+        scale=max(y(4),cfg.model.scheduleSpeedFloor);
+        slip(5:6)=[1;-cfg.vehicle.lr]/(k*scale);forward(4)=1/scale;
+        b=-[(y(5)-cfg.vehicle.lr*y(6))/(k*scale);input(2)];gamma=-y(4)/scale;
+    else
+        b=-[0;input(2)];gamma=-1;
+    end
+end
+
+function problem=localInputBounds(problem,model)
+    % Bounds of the input increments: the trust box of the present scale,
+    % within the actuator limits about the anchor inputs.
+    iu=problem.inputIndices;box=model.inputTrustScale*model.cfg.nonlinear.trustRadius*[.15;.25];
+    problem.lower(iu)=max(-box,problem.inputIncrementLower);
+    problem.upper(iu)=min(box,problem.inputIncrementUpper);
 end
 
 function stages=localLinearization(anchor,model)
@@ -822,7 +1044,7 @@ function problem=localAddClf(problem,anchor,model)
     map=nominalMap;offset=nominalOffset;
     modelConstant=0;constant=currentBudget/scale;
     axis=sparse(1,nv);axis(ic)=1;
-    cone=localCone([2*map;axis],[-2*offset;1-constant],axis.',-1-constant);
+    cone=localConeBlock([2*map;axis],[-2*offset;1-constant],axis,-1-constant,6);
     inputScale=repmat(1./(model.inputTrustScale*model.cfg.nonlinear.trustRadius*[.15;.25]*sqrt(2*count)),count,1);
     increment=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
     problem.clfTieBound=model.cfg.solver.clfTieTolerance*lossLower;
@@ -857,25 +1079,6 @@ function u=localClip(u,previous,cfg)
     u=min(upper,max(lower,min(previous+rate,max(previous-rate,u))));
 end
 
-function [values,jacobian,tightening]=localSafetyRows(x,time,model,generator,holdStart)
-    cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    q=localTargetAt(model,time);
-    dual=predictiveSafetyGeometry.supportLinearization(x(1:3),shape,q(1:3),q(8:11));
-    values=dual.value-cfg.collision.safetyMarginMeters;
-    jacobian=[dual.jacobian,zeros(4,3)];
-    % Directional position support retains correlation across the affine
-    % ego dynamics. Rotation uses an exact chord bound for each rectangle.
-    normal=jacobian(:,1:2);normalNorm=vecnorm(normal,2,2);
-    [tube,targetSupport]=localTargetTube(model,time,holdStart,normal);
-    egoReach=norm(shape(1:2))+norm(shape(3:4));
-    targetReach=norm(q(8:9))+norm(q(10:11));
-    yawRadius=sum(abs(generator(3,:)));
-    reserve=2*egoReach*sin(min(pi,yawRadius)/2) ...
-        +2*targetReach*sin(tube.yawRadius/2);
-    tightening=sum(abs(normal*generator(1:2,:)),2)+targetSupport+normalNorm*reserve;
-    values=values-tightening;
-end
-
 function [tube,support]=localTargetTube(model,time,holdStart,normal)
     % Target enclosure of the hold that starts at holdStart: the observer
     % set restarted from the target's predicted state there, for the time
@@ -891,77 +1094,6 @@ function [tube,support]=localTargetTube(model,time,holdStart,normal)
     tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,time-holdStart);
     if nargin>3
         support=predictiveSafetyGeometry.targetPositionSupport(starts,model.uncertainty.target,time-holdStart,normal);
-    end
-end
-
-function beyond=localBeyondRange(x,time,model,generator,holdStart)
-    beyond=isempty(model.target);
-    if ~beyond
-        cfg=model.cfg;
-        q=localTargetAt(model,time);
-        tube=localTargetTube(model,time,holdStart);
-        reserve=sum(vecnorm(generator(1:2,:)))+tube.positionRadius;
-        beyond=norm(x(1:2)-q(1:2))-reserve>cfg.collision.encounterRangeMeters;
-    end
-end
-
-function [rows,bounds,cone]=localHandling(y,input,brakingIndex,model,generator,map)
-    % Stable handling envelope and the estimator's domain at one node, under
-    % the input of an adjacent hold.
-    %   Rear adhesion: the rear Fiala tire stays below saturation,
-    %     |w| <= k v_x sqrt(1-b^2),  w = v_y - lr r,  k = 3 mu_r Fz_r / C_r,
-    %   i.e. the cone ||[w/k; v_x b]|| <= v_x with v_x frozen at the anchor in
-    %   the product v_x b. A saturated rear axle has no restoring yaw moment
-    %   (the vehicle spins) and its force no longer determines the slip, so
-    %   the estimator's force-balance measurement loses its information. It is
-    %   a handling and observability row, not part of the safety certificate,
-    %   and acts on the estimate: the certified lateral-velocity radius widens
-    %   exactly as the rear slip nears saturation, and its reserve excluded
-    %   states well inside the envelope.
-    %   Sideslip cone: |v_y| <= tan(model.sideslipMaximum) v_x, the premise of
-    %   the estimator's force-balance and course inversions, robust to the
-    %   ego enclosure (generator).
-    % The cone is divided by the anchor speed, so its entries are the
-    % normalized rear slip tan(alpha_r)/tan(alpha_sat), the braking ratio and
-    % their unit bound: a well-scaled cone for the interior-point solver.
-    cfg=model.cfg;tire=modifiedFialaTire.parameters(cfg);
-    k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
-    slip=[0,0,0,0,1,-cfg.vehicle.lr];forward=[0,0,0,1,0,0];
-    % In the declared model's kinematic regime (anchor speed at or below
-    % model.kinematicSpeedRange(1)) the rear tire has no lateral force to
-    % saturate: the cone is only |b| <= 1. The sideslip cone applies above
-    % model.brakeHoldSpeed; at rest the sideslip is undefined.
-    brake=sparse(1,brakingIndex,1,1,size(map,2));
-    if y(4)>cfg.model.kinematicSpeedRange(1)
-        scale=max(y(4),cfg.model.scheduleSpeedFloor);
-        cone=localCone([slip*map/(k*scale);brake],-[slip*y/(k*scale);input(2)], ...
-            (forward*map).'/scale,-y(4)/scale);
-    else
-        cone=localCone([sparse(1,size(map,2));brake],-[0;input(2)],sparse(size(map,2),1),-1);
-    end
-    rows=zeros(0,size(map,2));bounds=zeros(0,1);
-    if y(4)>cfg.model.brakeHoldSpeed
-        tangent=tan(cfg.model.sideslipMaximum);side=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];
-        rows=side*map;bounds=-side*y-sum(abs(side*generator),2);
-    end
-end
-
-function [rows,bounds]=localRoadRows(y,model,generator,map)
-    % The ego drives on the road: every rectangle corner within
-    % lateralClearance=[right;left] of the path, linearized at the anchor
-    % corner on the local path normal. Applied at every predicted node.
-    cfg=model.cfg;clearance=model.road.lateralClearance;
-    corners=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
-    c=cos(y(3));s=sin(y(3));rotation=[c,-s;s,c];derivative=[-s,-c;c,-s];
-    rows=sparse(8,size(map,2));bounds=zeros(8,1);
-    for k=1:4
-        projection=laneGeometry.project(y(1:2)+rotation*corners(:,k),model.lane);
-        normal=[-sin(projection.heading);cos(projection.heading)];
-        jacobian=normal.'*[eye(2),derivative*corners(:,k)];
-        reserve=sum(abs(jacobian*generator(1:3,:)));
-        r=jacobian*map(1:3,:);
-        rows(2*k-1,:)=r;bounds(2*k-1)=clearance(2)-projection.lateralPosition-reserve;
-        rows(2*k,:)=-r;bounds(2*k)=clearance(1)+projection.lateralPosition-reserve;
     end
 end
 
