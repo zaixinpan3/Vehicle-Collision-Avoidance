@@ -46,20 +46,21 @@ function cfg=localDefaults()
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
     cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50);
-    % Terminal set (controller/terminalSafeSet.m, TERMINAL_SAFE_SET.md): the
-    % CLF level of the endpoint is at most levelMaximum (the CLF's certified
-    % region; it is further capped where the state rows bind) and the CLF tube
-    % of the endpoint misses the target's forecast until the encounter ends
-    % (the target leaves encounterRangeMeters, or its relative motion is
-    % outside the tube's collision cone), checked at the endpoint's own time
-    % and, when needed, on a grid of timeStepSeconds [s] (it must divide half
-    % the sample time) until the tube has settled; no encounter duration is
-    % preset.
+    % Terminal set (controller/terminalSafeSet.m, TERMINAL_SAFE_SET.md): past
+    % the plan's endpoint the target keeps its forecast and the ego brakes at
+    % brakingDecelerationMetersPerSecondSquared [m/s^2] with its sideslip and
+    % course curvature held until it stops at a sample instant; the endpoint
+    % is terminal when that continuation stays on the road and clears the
+    % target until it leaves encounterRangeMeters (after the stop, over the
+    % target's remaining track). The braking rate must lie inside the tire
+    % friction (frictionCoefficient times gravity); with the held arc's
+    % lateral acceleration it must stay inside the friction circle at the
+    % endpoint. No encounter duration is preset.
     % acceptanceSteps are the step sizes tried on the nonlinear rollout of the
     % affine correction, largest first; 0 is the shifted plan itself. Without
     % an acceptable step the problem is linearized again at the full step, at
     % most sqpIterations times.
-    cfg.terminal=struct('levelMaximum',1,'timeStepSeconds',.005, ...
+    cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',5, ...
         'acceptanceSteps',[1,.5,.25,.125,.0625,.03125,0],'sqpIterations',2);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
@@ -77,7 +78,7 @@ function cfg=localDefaults()
     % One quadratic CLF V = e' P e. Each sample requires
     %   V(next) <= rho V(now),  rho = exp(-2 sampleTime / convergenceTimeConstantSeconds),
     % so the error sqrt(V) shrinks by at least 1/e every time constant.
-    % P and the terminal controller's gain K are synthesized offline
+    % P and the gain K of the cruise controller u = u* + K e are synthesized offline
     % (scripts/synthesizeClfMatrices.m) and read from config/clfMatrices.json:
     % inside the certification box of transverse errors (|lateral| <=
     % certificationLateralMeters, |heading| <= certificationHeadingRadians,
@@ -87,8 +88,10 @@ function cfg=localDefaults()
     % certificationSteeringRadians and certificationBrakingRatio of the trim,
     % the largest sublevel set V <= 1 on which u = u* + K e contracts by rho
     % against every ray-averaged Jacobian of the sampled nonlinear model over
-    % the set is certified (NOMINAL_CLF.md); the terminal set lives inside that
-    % set. The box only bounds the set; its size is set by the certificate.
+    % the set is certified (NOMINAL_CLF.md). The anchor appends holds of that
+    % controller while they keep the endpoint in the terminal set; the
+    % terminal set itself does not use the CLF. The box only bounds the set;
+    % its size is set by the certificate.
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
         'convergenceTimeConstantSeconds',4, ...
@@ -152,9 +155,7 @@ function localValidate(cfg)
     end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
-    for name=["levelMaximum","timeStepSeconds"]
-        validateattributes(cfg.terminal.(name),{'double'},{'scalar','real','finite','positive'});
-    end
+    validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.acceptanceSteps,{'double'},{'row','real','finite','>=',0,'<=',1});
     if any(diff(cfg.terminal.acceptanceSteps)>=0) || cfg.terminal.acceptanceSteps(end)~=0
         localInvalid('terminal.acceptanceSteps must decrease strictly and end with 0.');
@@ -169,6 +170,9 @@ function localValidate(cfg)
     validateattributes(cfg.vehicle.rectangleOffset,{'double'},{'size',[2,1],'real','finite'});
     for name=["corneringStiffness","frictionCoefficient"]
         validateattributes(cfg.tire.(name),{'double'},{'size',[2,1],'real','finite','positive'});
+    end
+    if cfg.terminal.brakingDecelerationMetersPerSecondSquared>=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity
+        localInvalid('The terminal braking rate must lie inside the tire friction.');
     end
     for name=["brakingRatioMinimum","brakingRatioMaximum"]
         validateattributes(cfg.actuation.(name),{'numeric'},{'scalar','real','finite'});

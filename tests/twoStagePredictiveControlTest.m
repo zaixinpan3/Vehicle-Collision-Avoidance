@@ -27,14 +27,13 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 -problem.solution.clfInitialValue+problem.solution.clfRequiredDecrease),AbsTol=cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
-            % Terminal set: the endpoint's CLF tube misses the target until it
-            % leaves the perception range.
-            testCase.verifyEqual(problem.metadata.terminalSet,"clfTubeEncounterSafe");
+            % Terminal set: the endpoint's braking continuation clears the
+            % target until it leaves the perception range.
+            testCase.verifyEqual(problem.metadata.terminalSet,"brakingContinuationEncounterSafe");
             testCase.verifyTrue(ismember(problem.metadata.acceptedStep,cfg.terminal.acceptanceSteps));
             context=terminalSafeSet.context(problem.model);
             testCase.verifyTrue(terminalSafeSet.member(context,problem.predictedState(:,end),size(inputs,2)));
             testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,0);
-            testCase.verifyGreaterThan(size(inputs,2),cfg.controller.horizonSteps);
             localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function targetFreeInitializationRunsBothLexicographicStages(testCase)
@@ -227,8 +226,9 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             y=problem.predictedState(:,end);context=terminalSafeSet.context(problem.model);
             [member,~,info]=terminalSafeSet.member(context,y,size(inputs,2));
             testCase.verifyTrue(member);
-            testCase.verifyLessThanOrEqual(info.value,context.levelMaximum);
+            testCase.verifyEqual(info.reason,"noTarget");
             testCase.verifyEqual(problem.metadata.terminalValue,info.value,AbsTol=1e-12);
+            testCase.verifyEqual(problem.metadata.terminalStopSeconds,info.stopSeconds,AbsTol=1e-12);
             testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,0);
         end
         function shiftedPlanIsAFeasibleCandidateAtTheNextSample(testCase)

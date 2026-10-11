@@ -182,7 +182,7 @@ classdef nonlinearBicycleModel
             point=nonlinearBicycleModel.operatingPoint(cfg,curvature);
             entry=localClfEntry(key);
             p=reshape(entry.matrix,5,5);p=(p+p.')/2;
-            % The terminal controller's gain and its nonlinear certificate
+            % The cruise controller's gain and its nonlinear certificate
             % (certified level, hold factor) are synthesized with P.
             reference=struct('state',point.state,'input',point.input,'curvature',curvature, ...
                 'matrix',p,'factor',chol(p),'contraction',exp(-2*cfg.controller.sampleTime/cfg.clf.convergenceTimeConstantSeconds), ...
@@ -362,7 +362,7 @@ function entry=localClfEntry(key)
     for name=["gain","certifiedLevel","holdFactor","nominalA","nominalB"]
         if ~isfield(entry,name)
             error('collisionAvoidanceController:staleClfMatrix', ...
-                ['The CLF entry for this operating point predates the terminal controller''s certificate (no %s). ' ...
+                ['The CLF entry for this operating point predates the cruise controller''s certificate (no %s). ' ...
                 'Run scripts/synthesizeClfMatrices before the experiment.'],name);
         end
     end

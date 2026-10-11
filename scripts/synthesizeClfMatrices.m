@@ -1,11 +1,11 @@
 function entries = synthesizeClfMatrices(operatingPoints,options)
-%synthesizeClfMatrices Certify the CLF and the terminal controller offline, before experiments.
+%synthesizeClfMatrices Certify the CLF and its cruise controller offline, before experiments.
 % The controller never computes P. For each operating point (controller
 % configuration overrides and path curvature) this script certifies, on the
 % sampled nonlinear bicycle model itself, a quadratic CLF V = e'Pe of the
 % transverse error e = [lateral; heading; vx - vx*; vy - vy*; r - r*] and the
-% gain K of the terminal controller u = u* + K e
-% (terminalSafeSet.terminalInput), such that on the sublevel set
+% gain K of the cruise controller u = u* + K e
+% (terminalSafeSet.cruiseInput), such that on the sublevel set
 % Omega = {V <= 1}
 %
 %   V(x+) <= rho V(x),   rho = exp(-2h/T), T = clf.convergenceTimeConstantSeconds,
@@ -15,7 +15,7 @@ function entries = synthesizeClfMatrices(operatingPoints,options)
 %                         ...SpeedMetersPerSecond, ...LateralVelocityMetersPerSecond,
 %                         ...YawRateRadiansPerSecond).
 %
-% Method (TERMINAL_SAFE_SET.md, Section 2; NOMINAL_CLF.md). Let g(e, du) be the
+% Method (NOMINAL_CLF.md). Let g(e, du) be the
 % sampled error map of one hold from x(e) with input u* + du. The trim is a
 % fixed point, g(0, 0) = 0, so along the ray from 0 to (e, du)
 %
@@ -55,8 +55,8 @@ function entries = synthesizeClfMatrices(operatingPoints,options)
 % fill is kept, re-verified by
 % eigenvalues, and the smallest contraction it certifies is recorded. The same
 % enclosures of the partial-hold maps give the hold factor, the largest
-% exp(s/T) sqrt(V(x(s)) / V(x)) inside a hold, by which the CLF tube is
-% inflated between samples. The one non-algebraic step is the enclosure: it is
+% exp(s/T) sqrt(V(x(s)) / V(x)) inside a hold, the excess of the CLF radius
+% between samples. The one non-algebraic step is the enclosure: it is
 % built from samples (boundary-heavy, with a fixed seed) and widened by
 % MarginFactor; the entry records the samples, the slips they reach and an
 % independent sampled check (terminalSafeSet.certificate).

@@ -22,7 +22,7 @@ classdef nominalClfTest < matlab.unittest.TestCase
             entry=entries(arrayfun(@(e)string(e.key)==nonlinearBicycleModel.clfKey(cfg,curvature),entries));
             testCase.verifyNumElements(entry,1);
             testCase.verifyEqual(reference.matrix,(entry.matrix+entry.matrix.')/2,AbsTol=1e-12);
-            % The terminal controller's gain and its certificate: the input bound
+            % The cruise controller's gain and its certificate: the input bound
             % on V <= 1, the set inside the certification box with the recorded
             % fill, a certified contraction no slower than the requested one, a
             % hold factor of at least one, and the vertex inequalities verified.

@@ -1,4 +1,4 @@
-# PCBF slack and one-step CLF optimization to a CLF-tube terminal set
+# PCBF slack and one-step CLF optimization to a braking-continuation terminal set
 
 Every frame uses the same target-independent analytic quadratic CLF, defined in
 [NOMINAL_CLF.md](NOMINAL_CLF.md). Every frame minimizes PCBF slack, then CLF
@@ -12,18 +12,21 @@ a fresh potential-field rollout in the same way. Any other failure reports no
 solution.
 
 The horizon ends in the terminal set of
-[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md): the CLF tube of the endpoint, the
-region every trajectory of the terminal controller (the linear feedback
-`u = u* + K e` certified with the CLF on the nonlinear model) stays in, misses
-the target until the encounter ends: the target leaves
-the perception range, or the target's forecast motion relative to the tube's
-box is outside their collision cone (the two never come within the collision
-buffer again). No encounter duration is preset, and no lane or other mode is
-used. The issued plan is the nonlinear rollout of an accepted step of the
-affine solution (*Issuing the solved plan*). On the declared sampled model with
-exact information the previous plan, shifted by one hold, is always an
-acceptable step, which makes the problem recursively feasible within an
-encounter.
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md): past the endpoint the target
+keeps its forecast and the ego follows one terminal law, braking at
+`terminal.brakingDecelerationMetersPerSecondSquared` with its sideslip and
+course curvature held until it stops at a sample instant; the endpoint is
+terminal when that joint continuation, exact and in closed form, stays on the
+road and clears the target until it leaves the perception range (after the
+stop, over the target's remaining track, in closed form). Neither the stop nor
+the exit has to occur within the plan, no encounter duration is preset, and no
+lane or other mode is used. The issued plan is the nonlinear rollout of an
+accepted step of the affine solution (*Issuing the solved plan*). On the
+declared sampled model with exact information the previous plan, shifted by
+one hold, is always an acceptable step while it has holds left, which makes the
+problem recursively feasible within an encounter; holds of the declared model
+that keep the endpoint in the set extend it, and whether one exists is checked
+online (hypothesis H3 there).
 
 The implementation now consumes timestamped NRMM observer enclosures. Every hold
 of the plan starts from the current enclosure and propagates it through that
@@ -117,8 +120,9 @@ Missing current target
 observations retain the last target forecast. Neither this extrapolation nor a revised point estimate
 is relabeled a certified enclosure.
 
-The terminal rows subtract the ego generator support; the target enters
-the terminal rows as its estimate (see Terminal constraints). Uncertainty is not
+The terminal rows widen the clearances by the ego enclosure's position radius
+and yaw chord; the target enters the terminal rows as its estimate (see
+Terminal constraints). Uncertainty is not
 dropped to force a solve, and these rows do not establish robust continuation.
 
 ### Experimental outcomes versus theorem premises
@@ -156,13 +160,18 @@ the terminal set; a rollout that never reaches it uses
 
 Later frames shift the previous accepted plan by one hold and roll its inputs
 out from the current estimate. The plan keeps its endpoint at the same
-absolute time, so the horizon shrinks by one hold per frame. Only when the
-shifted plan is shorter than `N`, or its endpoint is no longer in the terminal
-set (a changed forecast or state), is it extended by holds of the terminal
-controller (`terminalSafeSet.terminalInput`): `u = u* + K e` with the
-certified gain, whose successor meets the CLF without slack on the certified
-set. Prior affine states are
-not reused. When no target is present, nominal path guidance supplies the
+absolute time, so the horizon shrinks by one hold per frame. While the
+shifted plan is shorter than `N` it is extended by holds of the declared model
+that keep the endpoint in the terminal set with their rows met and their
+midpoint clear: the cruise hold `u = u* + K e` of the CLF's certified
+controller (`terminalSafeSet.cruiseInput`), or else the hold nearest to it on
+the segment toward the realization of the terminal law, the previous steering
+with the braking ratio of deceleration `a_b` (`terminalSafeSet.brakingInput`).
+Braking is kept as small as found because later holds reach the first hold
+nearly unchanged. When no hold keeps the endpoint in the set the plan stays one
+hold shorter. An endpoint no longer in the set (a changed forecast or state)
+is extended by cruise holds until one is. Prior affine states are not
+reused. When no target is present, nominal path guidance supplies the
 startup rollout. A shifted plan that cannot be rolled out (non-finite inputs,
 a braking ratio at the limit, or a tire-domain error) is reported as no
 solution; no other anchor replaces it. Potential guidance is a search
@@ -416,8 +425,8 @@ that satisfies all of:
 - its prefix collision deficit does not exceed the anchor's.
 
 `alpha = 0` is the anchor itself. When the anchor is the previous plan
-shifted (and extended by the terminal controller), it is feasible by
-construction under the hypotheses of
+shifted (and extended by holds that keep the endpoint in the terminal set), it
+is feasible by construction under the hypotheses of
 [TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md), Section 6.
 
 Without an acceptable step (possible only when the anchor is not a feasible
@@ -525,34 +534,46 @@ a braking ratio of +0.95 (rear lateral capacity 32%); the vehicle spun to a
 ## Terminal constraints
 
 The terminal set and its proofs are in
-[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md). In short, with the CLF
-`V = e'Pe`, an endpoint `y` is in the set when it meets all of:
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md). In short, an endpoint `y` is in
+the set when it meets all of:
 
-- `V(y) <= cbar`, the smaller of the CLF's certified region (1) and the
-  largest level whose ellipsoid lies inside the state rows (0.403 at 8 m/s on
-  the straight road, where rear adhesion binds);
-- the tube of every terminal-controller trajectory from `y` (lateral and
-  heading errors shrinking as `exp(-t/T)`, station within a bounded drift of
-  the trim's) stays on the road;
-- that tube does not meet the target's forecast rectangle until the
-  encounter ends: the target leaves the perception range, or the target's
-  forecast motion relative to that box, widened by the tube's remaining
-  drift, is outside their collision cone (straight road: the relative
-  parabola under constant `A` never enters the summed box), checked at the
-  endpoint's own time in closed form and, when needed, along the grid over a
-  span the forecast's geometry bounds.
+- the terminal law is admissible at `y`: the sideslip lies in the problem's
+  cone, and braking at `a_b` (5 m/s^2) with the held arc's lateral
+  acceleration `r V` lies inside the friction circle;
+- along the continuation (the ego braking at `a_b` with its sideslip and
+  course curvature held until it stops at a sample instant, the target on its
+  forecast), every node, hold midpoint and the parked pose keeps the ego
+  rectangle on the road;
+- every node and hold midpoint of the continuation clears the target's
+  forecast rectangle by `safetyMarginMeters` until the target's reference
+  point is first farther than `R` from the ego's;
+- if the target has not left by the stop, its remaining track until it leaves
+  the range about the parked ego clears the parked rectangle by the same
+  margin (exact closed form: vertex paths, segments or arcs, against edges).
 
-In the convex problem this is one cone at the last node,
-`||F (e(y) + J dx_N)|| <= sqrt(c*)`, with `c*` the largest level whose tube at
-the anchor endpoint's station is clear. The endpoint also carries the
-collision rows of every other node inside `R` and the road rows. Membership
-of the issued plan's endpoint is checked on its nonlinear rollout.
+In the convex problem these conditions are linearized at the anchor endpoint
+on the endpoint correction: the friction circle as a bound on `|r V|` where
+the anchor endpoint is outside it,
+fixed-dual collision rows at the continuation's nodes and midpoints before the
+exit and at the parked pose against the target's closest pose on its track,
+and corner rows on the road along the continuation, through the derivative of
+the closed-form continuation with its schedule held. Conditions with more
+than 5 m to spare are left out, and each row keeps up to 5 cm of the margin it
+has at the anchor. The
+endpoint also carries the collision rows of every other node inside `R` and
+the road rows. Membership of the issued plan's endpoint is checked exactly on
+its nonlinear rollout. With an ego enclosure the clearances and road margins
+are widened by its position radius and yaw chord.
 
-This replaces the earlier separating, road-recoverable terminal set
-(separating relative velocity, lateral road recovery
-`max(w,0)^2 <= 2 a d`). That set was not invariant: a braking lead, a target
+This replaces the CLF-tube terminal set of October 6 to 10, 2026 (the region
+every trajectory of the certified cruise controller stays in, missing the
+target until it left the range or its relative motion left the tube's
+collision cone), which required plans that reach a state from which cruising
+on the given path clears the target. Before that, a separating,
+road-recoverable terminal set (separating relative velocity, lateral road
+recovery `max(w,0)^2 <= 2 a d`) was not invariant: a braking lead, a target
 whose sideslip turns it back, or the ego's own return to the path could close
-the distance again. No recursive-feasibility argument held for it.
+the distance again.
 
 The road rows are the same at every node: every predicted node after the
 measured one and every hold midpoint keeps all four rectangle corners within
@@ -562,11 +583,13 @@ Collision rows apply at nodes inside `R`, including a later re-entry.
 
 The terminal records are:
 
-- `terminalValue` and `terminalLevel` (the endpoint's `V` and `c*`);
-- `terminalExitSeconds`;
-- `terminalDistanceMeters` and `terminalRoadMarginMeters`;
+- `terminalEnd` (`exit`, `parked` or `noTarget`), `terminalStopSeconds`,
+  `terminalExitSeconds` and `terminalMarginMeters`;
+- `terminalValue` (the endpoint's CLF value), `terminalDistanceMeters` and
+  `terminalRoadMarginMeters`;
 - `acceptedStep`, `candidateFeasible`, `anchorCertified`,
-  `appendedTerminalSteps` and `linearizationGapMeters`.
+  `appendedTerminalSteps`, `appendedBrakingSteps`, `extensionStopped` and
+  `linearizationGapMeters`.
 
 ## Issued commands, diagnostics and limits
 
@@ -598,7 +621,7 @@ Metadata retains the explicit scope:
 - `egoUncertaintyModel = currentPosteriorEnclosurePropagatedThroughEachHold`,
   `targetUncertaintyModel = constantParametersRestartedEachHoldFromCurrentObserverSet`;
 - `recursiveFeasibilityScope = shiftedPlanOnDeclaredModelWithConsistentForecast`;
-- `terminalSet = clfTubeEncounterSafe`;
+- `terminalSet = brakingContinuationEncounterSafe`;
 - unmeasured constraint residuals and margins are NaN;
 - `clfFunction = quadraticTransverseError`, with no tertiary objective;
 - required decrease, modeled successor value and bounded CLF tie allowance are recorded.

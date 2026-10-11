@@ -1,0 +1,401 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{2em}
+\title{A terminal set from the target's model: the braking continuation}
+\author{}
+\date{October 11, 2026}
+\begin{document}
+\maketitle
+
+\paragraph{Status and scope.}
+This report implements and measures the terminal set specified by the user
+on October 11, 2026, in place of the CLF-tube terminal set of commit
+\texttt{423e3e8} (unchanged at \texttt{710a228}, the baseline here). Past the
+plan's endpoint both vehicles continue in the constant tangential
+acceleration and sideslip family: the target with its own $(A_C,\beta_C)$,
+the ego with the terminal law
+\[
+\kappa_f(z)=\bigl(\max(-a_b,-V_E/\Delta T),\ \beta_E\bigr),
+\]
+braking at $a_b$ with its sideslip held until it stops at a sample instant;
+the terminal set keeps the states whose joint continuation stays
+collision-free while the target is in range, with one closed-form check
+after the ego has parked. The theory and the implementation are in
+\path{controller/TERMINAL_SAFE_SET.md}; this report records the choices that
+the specification leaves open or that the controller's declared model
+forces, the checks, the pilot runs that shaped the anchor extension, the
+paired campaign, and the decisions that remain the user's.
+
+\paragraph{Result.}
+The construction is exact where it is closed form: the continuation agrees
+with an RK4 integration of the law to $10^{-9}$~m, the parked check with a
+dense sampling of the target's track to $1.8\cdot10^{-7}$~m in 2917 random
+cases, and $X_f$ is invariant under the law down to rest. In the paired
+campaign against the CLF-tube set (the same 98 encounters) it recovers 9 of
+14 exact encounters against 14 and 60 of 84 noisy ones against 53, with no
+collision in either arm. It is the first terminal set to recover noisy
+braking leads (8 of 12; every earlier variant lost all 12 at or near the
+first frame), and it plans 16 holds at the first frame instead of 109, with
+the 95th-percentile controller time per frame at 0.023~s against 0.174~s
+(exact). Its losses have three mechanisms: $X_f$ always contains stopping, so
+a plan that cannot certify cruising yields, and the declared model cannot
+follow a yield to rest (four exact encounters end at 1.3--3.6~m/s); the law
+is not a hold of the declared model, and in three noisy 15-m/s curved
+crossings no declared-model hold keeps the endpoint in $X_f$ until the plan
+runs out (hypothesis H3); and braking during a swerve meets the rear-adhesion
+envelope in five noisy encounters. Fourteen noisy failures are numerical, as
+are eighteen of the baseline's. The remaining design decisions are in
+Section~\ref{sec:decisions}.
+
+\section{The construction as implemented}
+\paragraph{Terminal law and one-step map.}
+The plan's state is the Fiala bicycle's $x=(p,\psi,v_x,v_y,r)$, reduced to the
+family by $V_E=\lVert(v_x,v_y)\rVert$, $\beta_E=\operatorname{atan2}(v_y,v_x)$
+and the course curvature $\kappa_E=r/V_E$. The speed falls by $a_bh$ per hold
+($h=\Delta T=0.05$~s, $a_b=5$~m/s$^2$,
+\path{terminal.brakingDecelerationMetersPerSecondSquared}) and by what is
+left in the last one, so the ego stops at node $J=\lceil V_E/(a_bh)\rceil$
+(61 nodes from 15~m/s). Both vehicles move on arcs of constant curvature with
+a piecewise linear speed, so the joint one-step map $\phi$ and every
+continuation pose are explicit functions of the endpoint
+(\texttt{terminalSafeSet.continuation}); the unit test compares them with a
+fine RK4 integration of the same kinematics (agreement to $10^{-9}$~m).
+
+\paragraph{The set.}
+$X_f$ holds an endpoint when the law is admissible there (the sideslip cone
+of the problem, and $a_b$ with the held arc's lateral acceleration $rV_E$
+inside the friction circle $\mu g$), every node, hold midpoint and the parked
+pose of the continuation keeps the ego rectangle on the road, every node and
+midpoint before the target's first sampled exit from the 50-m range clears
+the target's forecast rectangle by the 0.2-m margin, and, if the target has
+not left by the stop, the target's remaining track until it leaves the range
+about the parked ego clears the parked rectangle by the same margin.
+
+\paragraph{Invariance, maximality, recursive feasibility.}
+The continuation of $\phi(z)$ is the remainder of the continuation of $z$ at
+the same absolute times, so $X_f$ (with the absorbing end of the encounter) is
+forward invariant under $\kappa_f$, and it is the largest set that $\kappa_f$
+keeps safe. With exact information on the declared model (H1) and an
+unchanged forecast (H2), the shifted plan keeps its endpoint at the same
+absolute time and is therefore accepted at the next sample while it has holds
+left; the step $\alpha=0$ of the step-size rule is that candidate. What keeps
+the plan from running out is an extension by holds of the declared model that
+keep the endpoint in $X_f$; whether one exists is hypothesis H3, checked
+online and not proven, because the terminal law is not a hold of the declared
+model (Section~\ref{sec:model}).
+
+\section{Choices the specification leaves open}
+\label{sec:choices}
+\begin{itemize}
+\item \emph{The ego's curvature.} Sharma's relation $\kappa=\sin\beta/l_r$
+presumes a rear axle without slip. For the Fiala state it is wrong at speed:
+in the trim of a 4~m/s$^2$ left turn at 15~m/s the sideslip at the centre of
+mass is $-0.0093$~rad, so that relation would continue the turn as a right
+turn ($-0.0056$ against $0.0178$~1/m), about 6~m off the actual arc at the
+end of the 22.5-m stop. The continuation holds the measured course curvature
+$r/V_E$ with the sideslip, the same family with an effective
+$l_r=V_E\sin\beta_E/r$.
+\item \emph{Rectangles instead of a centre distance.} Every collision row of
+the controller is a rectangle distance, and a centre distance $d$ covering two
+4.8-by-1.9-m rectangles (5.4~m with the margin) would exclude a target
+passing a parked ego in the next lane (3.66~m). The braking phase uses the
+rectangle distance at the continuation's nodes and hold midpoints, the
+instants at which the plan's own rows are sampled. After the stop, the
+point-to-arc formula becomes vertex paths against edges: on a line each
+vertex sweeps a segment, on a circle an arc about the circle's centre, and
+the arc-to-segment distance has the candidates of the point-to-arc distance
+(the foot point when the arc passes it, otherwise an end) plus the line
+against the circle. Because the rectangles are apart at the stop and the
+distance is continuous along the track, the least vertex-to-edge distance
+over the swept stretch is the exact least distance.
+\item \emph{The track's end under signed speed.} The repository's contract
+(and the simulated truth) has signed speed: a target whose speed reaches
+zero turns back and runs on beyond its starting point. The swept stretch is
+therefore $[0,b]$ when the target leaves first, and $[a,\sigma^*]$ when it
+turns at $\sigma^*=-V^2/(2A)$ inside the range and leaves at $a$ behind; the
+specification's ``ends where the target stops or turns back'' holds for a
+target that stays stopped, a different (hybrid) contract.
+\item \emph{Road and admissibility.} $X_f\subset X$ requires the
+continuation to stay on the road; it is checked at every continuation pose,
+independently of the target. $\kappa_f\in U$ is read as the sideslip cone and
+the friction circle at the endpoint (both only relax along the
+continuation).
+\item \emph{Terminal rows.} Problem (8)'s ``$\lVert e\rVert\ge d$ at the
+$J_b$ continuation points'' becomes fixed-dual rectangle rows at the
+continuation's nodes and midpoints before the exit, the parked pose's rows
+against the target pose nearest it on its track (the derivative of a
+minimum is that of its minimizer), road rows along the continuation, and,
+where the anchor endpoint is outside it, the friction circle as a bound on
+$|rV_E|$, linearized on the endpoint
+correction through central differences of the closed form with the schedule
+held. Conditions with more than 5~m to spare are left out; each row keeps up
+to 5~cm of the margin it has at the anchor (Section~\ref{sec:pilot}); the exact set decides
+acceptance. Where a pose is an exact contact (the parked witness of a track
+crossing the parked rectangle), the ordinary-distance dual is not defined and
+the witness is moved 1~mm or 1~cm along the track. The campaign's first
+pass showed both needs: without the friction row the optimizer could not see
+an inadmissible endpoint and returned a zero correction, and the contact
+raised an assertion in two encounters. A friction row present at every
+sample (second pass) then left the CLF stage's cone program without a
+numerical result on the boundary of the circle in a hard recovery turn of
+\path{clfNominalRecoveryTest} (15~m/s, curved road, 2.5~rad initial heading
+error), so the row enters only where the endpoint is outside the circle.
+\end{itemize}
+
+\section{What the declared model forces}
+\label{sec:model}
+The terminal law is a certificate evaluated at the declared model's state,
+not a hold of that model: the Fiala bicycle with steering and braking-ratio
+inputs cannot brake while holding its sideslip and course curvature, its
+domain ends at \texttt{scheduleSpeedFloor} (1~m/s), and its one RK4 step per
+50-ms hold loses stability below about 2~m/s (the lateral eigenvalue is about
+$-116/v_x$ s$^{-1}$; RK4 needs $|\lambda h|<2.78$). The shift with an unchanged
+endpoint needs no hold of the law, but once the plan has shrunk to
+\texttt{horizonSteps} every sample has to append a hold of the declared model
+whose endpoint is in $X_f$.
+
+\section{Pilot runs that shaped the anchor extension}
+\label{sec:pilot}
+Exact-state encounters (seed 0, 2000 frames, the campaign's settings) were run
+on the working tree while the extension was designed; their raw outputs were
+disposable and are summarized here.
+\begin{enumerate}
+\item \emph{Append the law's realization whenever the shifted plan is short}
+(previous steering, braking ratio $-a_b/(\mu g)=-0.60$). The braking tail is
+executed: later holds reach the first hold nearly unchanged, because the CLF
+stage acts on the first successor and the correction of each hold is bounded
+by the input trust region ($\pm0.125\,s$ in braking ratio, $s\le1$). The
+exact 15-m/s braking lead fell to the 1-m/s floor while the lead still ran at
+10~m/s, and the plan ran out (\texttt{anchorUnavailable}); the 8-m/s curved
+crossing braked from 8 to about 1.3~m/s in 1.4~s.
+\item \emph{Cruise hold if it keeps the endpoint in $X_f$, else the hold
+nearest to it on the segment toward the realization} (bisection). The curved
+crossing, the accelerating head-on and the curved head-on recovered; both
+braking leads and the 8-m/s turning crossing did not. The endpoint sat on the
+boundary of $X_f$ (least margin 0--9~mm): the exact runs integrate the plant
+with \texttt{ode45}, not the declared RK4 map, and the appended hold departs
+from the law, so the shifted endpoint fell out of $X_f$ (H1 and H3 fail by
+millimetres) and the step-size search had to repair it.
+\item \emph{Searching toward the hardest braking the rear adhesion admits}
+first made it worse (the 8-m/s crossing failed as well): the extra braking
+reaches the first hold.
+\item \emph{Final form.} Toward the law's realization first and the hardest
+admissible braking only if it fails; the terminal rows of the convex problem
+keep up to 5~cm of the margin each condition has at the anchor (never tighter
+than the anchor, so the zero correction stays feasible and the exact set
+still decides acceptance). Shifted candidates fell out of $X_f$ in 2 frames
+of the four pilot runs that completed (13 of 5025 exact frames in the
+campaign), but the turning crossings still braked to the floor (the 8-m/s one
+from 8 to 2.8~m/s in 1.45~s, its plan's endpoint at 1.24~m/s), where no
+acceptable step exists. A latent bug surfaced there and was fixed: when the
+full step's rollout leaves the model's domain, the re-linearization was built
+on an empty anchor (\texttt{MATLAB:badsubscript}); the search now stops.
+\end{enumerate}
+The mechanism common to the failures is that $X_f$ always contains stopping:
+when cruising is not certified the plan yields, and the declared model cannot
+follow a yield to a stop.
+
+
+\section{Checks}
+\begin{itemize}
+\item \emph{Continuation.} \path{terminalSafeSetTest} compares the closed-form
+poses at every node and hold midpoint with a fine RK4 integration of the
+constant-$(A,\beta)$ kinematics under $\kappa_f$ (400 steps per half hold):
+agreement to $10^{-9}$~m, and the speed reaches zero at the last node.
+\item \emph{Invariance.} From a member, the successor under $\phi$ is a
+member at every hold down to rest; its remaining stop and exit times are the
+original ones less the elapsed holds, and its continuation poses are the
+remainder of the original ones (to $10^{-9}$~m).
+\item \emph{Parked check.} 2917 random cases (seed 11; 1141 sweeping their
+whole circle, 1307 with speed and acceleration of opposite signs) compared
+with the least rectangle distance over 200001 samples of the swept stretch
+(spacing at most 1.05~mm): the closed form is never above the sampled minimum
+(at worst $-6.3\cdot10^{-13}$~m), at most $1.8\cdot10^{-7}$~m below it, and the
+witness pose reproduces it to $1.6\cdot10^{-12}$~m
+(\path{parked-clearance-check.json}). An earlier version of this check
+filtered sampled poses by a fixed 8-m reference distance and reported
+spurious gaps of up to 0.47~m on whole circles; the minimizer lay farther
+than 8~m from the parked ego.
+\item \emph{Encounters, admissibility, rows, holds.} Unit cases for a lead
+far and near, a stationary target beyond and within the stopping distance,
+an oncoming target in the ego lane and in the next, a lead braking hard
+(turns back into the parked ego) and gently (leaves the range first), a
+target leaving the range during the braking, a circling target; the road,
+the friction circle and the sideslip cone; the linearized rows (zero
+correction feasible, the 5-cm reserve, first-order prediction of the binding
+clearance to 5~mm); the anchor's cruise and braking holds.
+\item \emph{Suite.} The full MATLAB suite passes, 606 of 606 tests on the committed code (\path{tests.txt}; 604 before, plus two retired terminal settings that the configuration must reject).
+\end{itemize}
+
+\section{Campaign}
+The 98 encounters of the earlier reports (seven geometries at 8 and 15~m/s;
+seed 0 with exact states and the \texttt{ode45} plant, six seeds with the
+estimator in the loop) were run for the baseline and for this design. The
+braking arm was run three times while the terminal rows were corrected:
+without the friction row and the contact guard (exact 9 of 14, noisy 51 of
+84; two encounters stopped on the contact assertion and were rerun after the
+guard), with a friction row at every sample (9 and 50; a target-free recovery
+test then failed, Section~\ref{sec:choices}), and with the committed code
+(9 and 60), reported below. The baseline arm ran beside the first two passes
+with identical outcomes and frame counts in all 98 encounters; the third pass
+reran the braking arm alone with the same three sessions.
+
+\begin{table}[h]
+\centering\small
+\caption{Paired campaign, committed code. No collision in either arm.}
+\label{tab:campaign}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (14)} & \multicolumn{2}{c}{noisy (84)}\\
+ & CLF tube & braking & CLF tube & braking\\
+\midrule
+recovered & 14 & 9 & 53 & 60\\
+no solution: \texttt{nonlinearAcceptanceFailed} & 0 & 4 & 11 & 8\\
+no solution: \texttt{anchorUnavailable} (plan ran out) & 0 & 1 & 0 & 2\\
+no solution: \texttt{pcbfNoNumericalResult} & 0 & 0 & 17 & 12\\
+no solution: \texttt{clfNoNumericalResult}, \texttt{timeLimit} & 0 & 0 & 3 & 2\\
+least replay clearance (m) & 0.148 & 0.089 & 0.260 & 0.422\\
+first-frame horizon, median holds & 109 & 16 & 109 & 16\\
+horizon, 95th percentile holds & 166 & 16 & 104 & 79\\
+controller time per frame, 95th percentile (s) & 0.174 & 0.023 & 0.131 & 0.087\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\caption{Recovered encounters per geometry (both speeds).}
+\label{tab:geometry}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (2 each)} & \multicolumn{2}{c}{noisy (12 each)}\\
+ & CLF tube & braking & CLF tube & braking\\
+\midrule
+head-on & 2 & 2 & 11 & 11\\
+accelerating head-on & 2 & 2 & 8 & 9\\
+braking lead & 2 & 0 & 0 & 8\\
+crossing & 2 & 1 & 11 & 12\\
+turning crossing & 2 & 0 & 8 & 10\\
+curved head-on & 2 & 2 & 8 & 6\\
+curved crossing & 2 & 2 & 7 & 4\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Seventeen noisy encounters are newly recovered (eight braking leads, four at
+each speed; four accelerating head-ons; two turning crossings; a crossing, a
+head-on and an 8-m/s curved crossing) and ten newly lost: three 15-m/s curved
+crossings, four 8-m/s accelerating head-ons and head-ons, and three 8-m/s
+curved encounters (\path{comparison.txt}, \path{campaign-runs.csv}). On the
+encounters both arms recover (9 exact, 43 noisy), the median recovery
+confirmation time is 9.9 against 10.3~s (exact) and 11.3 against 10.2~s
+(noisy), the median largest lateral deviation 4.1 against 5.9~m (exact) and
+6.2 against 7.9~m (noisy), and the median least speed 0.76 and 0.82 of the
+reference speed against 0.75 and 0.77, with a lowest of 0.31 and 0.43
+against 0.59 and 0.60. Of the 4929 exact frames, the continuation ended by
+the target's exit in 443 and after the parked check in 1227; a braking hold
+was appended in 500 exact and 314 noisy frames, the extension stopped without
+a hold in 19 exact and 69 noisy frames, and the shifted plan was not a
+feasible candidate in 4 exact and 124 noisy frames (in the noisy runs the
+estimate and the forecast change between samples, so H1 and H2 do not
+hold).
+
+\paragraph{Failures.}
+\path{failures.txt} lists every unrecovered encounter with the speed at its
+last solved frame and the reasons of the step-size search.
+\begin{itemize}
+\item \emph{Yield to low speed} (exact braking leads at 8 and 15~m/s, the
+8-m/s crossing and turning crossing): the ego slows to 1.3--3.6~m/s
+following the lead or waiting for the crosser, where the declared model has
+no acceptable step (the 15-m/s lead's plan runs out at 1.3~m/s). The exact
+15-m/s turning crossing ends at 6.6~m/s with the parked ego met by the
+target's track.
+\item \emph{The plan runs out} (three noisy 15-m/s curved crossings, at about
+12~m/s after 1.4--1.8~s): for the last eight to ten solved frames no
+declared-model hold kept the endpoint in $X_f$, the plan shrank one hold per
+frame, and the shift became empty or unacceptable (H3 fails).
+\item \emph{Braking in a swerve} (five noisy 8-m/s encounters: two turning
+crossings, two accelerating head-ons and a head-on): full steps are rejected
+on the rear-adhesion envelope (\texttt{handlingEnvelope}) or the law's
+admissibility until no step is acceptable.
+\item \emph{Numerical} (fourteen noisy encounters): five 8-m/s curved
+crossings within their first 8 frames and three 8-m/s curved head-ons within
+15, two 8-m/s curved head-ons after 79~s, two 8-m/s braking leads after
+about 4~s (\texttt{pcbfNoNumericalResult}, 12), a 15-m/s braking lead after
+5.5~s and an 8-m/s accelerating head-on (\texttt{clfNoNumericalResult}, 2).
+The baseline has 18 such failures.
+\item \emph{Other} (two noisy): a 15-m/s braking lead at 14.9~m/s after
+3.2~s and an 8-m/s curved head-on after 79~s, both
+\texttt{nonlinearAcceptanceFailed} with full steps accepted in their last
+solved frames.
+\end{itemize}
+Eleven of the baseline's noisy braking leads fail within their first two
+frames (numerical or time limit) and the twelfth at frame 14; with this set the first plan is 16 holds long at the
+median.
+
+\paragraph{Sessions.}
+MATLAB's licensing service refused most session starts when one was started
+per encounter (error 5001), and a long-running local service host had to be
+restarted once; the campaign therefore runs three long-lived sessions per
+arm. Every session that ran the controller, in both arms, reported a heap
+corruption at exit (\texttt{free(): chunks in smallbin corrupted}) after its
+last result had been written, and some then hung until stopped; this
+predates the change.
+
+\section{Decisions for the user}
+\label{sec:decisions}
+The construction is implemented as specified where the controller allows
+it; the measured differences come from three properties of the rest of the
+controller, each a design decision rather than a defect of the set.
+\begin{enumerate}
+\item \emph{The declared model cannot stop.} $X_f$ always contains
+stopping, so when cruising is not certified the plan yields; the Fiala
+RK4 model ends at 1~m/s and is unstable below about 2~m/s at one step per
+hold. A low-speed regime of the declared model (a kinematic bicycle blended
+in below a few m/s, or more integration steps per hold) would let the plan
+follow a yield to rest, and below that speed the terminal law would be a
+hold of the declared model, which would turn H3 into a property there.
+\item \emph{Nothing asks the plan to pass.} The CLF stage acts on the first
+successor and the horizon stays at \texttt{horizonSteps} (8 or 16 holds)
+because $X_f$ is reached at once; the CLF-tube set forced plans of about 110
+holds that contained the whole pass. A minimum horizon longer than the soft
+prefix, or a progress or CLF term over the whole plan, would let the
+optimizer plan passes inside the same terminal set.
+\item \emph{The target contract after zero speed.} Under the signed-speed
+contract a target that brakes to zero within range turns back into a
+parked ego; a hybrid stop rule (predictor and simulated truth) would admit
+stopping behind it.
+\end{enumerate}
+Smaller choices made here that the user may revisit: the braking rate
+$a_b=5$~m/s$^2$; the friction-circle condition (binding in hard swerves at
+15~m/s on the curve); holding the measured course curvature instead of
+$\sin\beta/l_r$; the 5-cm reserve of the terminal rows; and keeping this set
+as the production terminal set (it replaces the CLF-tube set in this commit;
+the CLF-tube set is at \texttt{423e3e8}).
+
+
+\section{Reproduction}
+\begin{itemize}
+\item Unit tests: \texttt{matlab -batch "results = runtests('tests'); assertSuccess(results)"}
+  (\path{tests.txt}); the new behavior is in \path{tests/terminalSafeSetTest.m}.
+\item Parked check against dense sampling: \path{checkParkedClearance.m} in
+  \path{scripts/} of this folder, called with the output file
+  \path{report/BRAKING_TERMINAL_SET_20261011/parked-clearance-check.json}
+  (seed 11, 3000 drawn cases).
+\item Campaign: \path{scripts/run-workers.sh} of this folder (98 encounters
+  per arm through \path{runOneEncounter.m}; the baseline is a
+  \texttt{git archive} of \texttt{710a228}, the braking arm a copy of the
+  working tree; three MATLAB sessions per arm work through the same encounter
+  sequence side by side (\path{runEncounterQueue.m}), one session per worker
+  because the licensing service refused most of a start per encounter), then
+  \texttt{python3 -I scripts/compare.py <out-baseline> <out-braking> <folder>}
+  for \path{comparison.txt} and \path{campaign-runs.csv}. Raw outputs under
+  \path{~/.cache/collisionAvoidance/braking_terminal_20261011/} are
+  disposable and were deleted after the summaries were copied here.
+\end{itemize}
+
+\end{document}

@@ -1,373 +1,288 @@
 classdef terminalSafeSet
-%terminalSafeSet Encounter-safe terminal set of the CLF terminal controller.
-% After the horizon the controller is the linear feedback u = u* + K e(x) on
-% the transverse error to the given path's trim, with the gain K certified
-% offline together with the CLF matrix P (NOMINAL_CLF.md) on the sampled
-% nonlinear model, through an enclosure of the ray-averaged Jacobians of the
-% error map (rayJacobians): on the certified level set {V <= certifiedLevel}
-% every hold satisfies V(x+) <= rho V(x), rho = exp(-2h/T), with an input
-% inside the certification bound. The CLF
-% therefore decays as V(t) <= exp(-2t/T) V(0) at the samples, and inside a
-% hold up to the certified hold factor. Any such motion keeps the transverse
-% error in
-%   |e_i(t)| <= a_i sqrt(V0) exp(-t/T),    a_i = holdFactor sqrt((inv(P))_ii),
-% and the path station within s0 + vPath t +/- G(V0,t), G the integral of a
-% bound on the path-speed error. The ego rectangle therefore stays in a box
-% in path coordinates (the CLF tube). The terminal set is
-%   S = { x : V(x) <= levelMaximum, the tube of x stays on the road, and it
-%         does not meet the target's forecast rectangle until the encounter
-%         ends }.
-% The encounter ends at the first of two events, both of which can be
-% computed, so no encounter duration is preset:
-%   exit        the target leaves encounterRangeMeters of every point of the
-%               tube;
-%   separation  from that time on the target's forecast motion relative to
-%               the tube's box lies outside their collision cone, so the two
-%               provably never come within the collision buffer again
-%               (straight road; see collisionCone).
-% The end is an absorbing state: no property of the target after it is used.
-% The check reads the forecast at the node's own time first (closed-form
-% tests) and follows the grid only when needed, for a span the forecast's own
-% geometry bounds (clear, scanBound); a tube that reaches the end of that span
-% with neither event is not terminal. levelMaximum is the smallest of
-% terminal.levelMaximum, the certified level of the gain, and the largest
-% level whose ellipsoid, inflated by the squared hold factor, lies inside the
-% state rows of the problem (speed, lateral velocity and yaw-rate limits,
-% sideslip cone, rear adhesion at the certification braking ratio), so that
-% every hold of the terminal controller from S meets the problem's rows at
-% its nodes and midpoints.
-% The tube shrinks along any CLF-satisfying trajectory (V1 <= rho V0 nests
-% the tube of x1 in the tube of x0 shifted by one hold), so both events only
-% come earlier and S is forward invariant under the terminal controller
-% until the encounter ends; see TERMINAL_SAFE_SET.md.
-% "Does not meet" is checked on a time grid of step dt: at each grid point
-% the two boxes must be farther apart than the distance their bodies can
-% move in dt/2 (a continuous-time no-collision bound), and at least
-% safetyMarginMeters, so that the continuation also satisfies the
-% problem's own sampled collision rows at its nodes and hold midpoints,
-% which lie on the grid. The ego estimation enclosure, when present,
-% inflates the tube.
+%terminalSafeSet Terminal set of the braking continuation, and the anchor's holds.
+% Past the plan's endpoint both vehicles continue in the constant tangential
+% acceleration and sideslip family of the target contract (Sharma et al.,
+% 2026, Eq. (2)). The target keeps its forecast A and beta. The ego follows
+% the terminal law
+%   kappa_f(z) = ( A = max(-a_b, -V/h),  beta held ),
+% a = terminal.brakingDecelerationMetersPerSecondSquared, h the sample time:
+% it brakes at a_b with its sideslip angle beta = atan2(v_y, v_x) and its
+% course curvature r/V held, and stops exactly at the end of a hold, after
+% J = ceil(V/(a_b h)) holds. phi, the joint one-step map under this law, is
+% exact and in closed form: both vehicles move on arcs of constant curvature
+% (continuation, successor). The terminal set is
+%   X_f = { z : the law is admissible at z (sideslip cone; braking and the
+%           held arc's lateral acceleration r V inside the friction circle),
+%           and along phi^j(z), j >= 0,
+%           - every node, hold midpoint and the parked pose keeps the ego
+%             rectangle on the road,
+%           - every node and hold midpoint clears the target's forecast
+%             rectangle by safetyMarginMeters until the target leaves
+%             encounterRangeMeters,
+%           - after the stop, the target's remaining track until it leaves
+%             the range clears the parked rectangle by the same margin }.
+% The track check is exact and in closed form (parkedClearance): the track is
+% a stretch of the target's line or circle that ends where the target leaves
+% the range, or the whole circle; under the signed-speed contract a target
+% whose speed reaches zero turns back along its track. Rectangle against
+% track reduces to vertex paths (segments or arcs) against edges, the
+% rectangle form of the point-to-arc distance. The target's first exit ends
+% the encounter: no property of the target after it is used.
+% X_f is forward invariant under the law by construction: the continuation of
+% phi(z) is the remainder of the continuation of z, at the same absolute
+% times, and the exit is the same. It is the largest set that this law keeps
+% safe. The ego enclosure, when present, widens every clearance by its
+% position radius and the chord of its yaw radius. See TERMINAL_SAFE_SET.md.
+%
+% The ego's continuation is a certificate evaluated at the declared model's
+% state, not a hold of that model. Holds appended to the anchor are holds of
+% the declared model, kept only when their endpoint is in X_f: the hold of the
+% CLF's certified cruise controller u = u* + K e (cruiseInput), or else the
+% hold nearest to it toward braking with the steering held, as hard as the
+% rear adhesion admits or at the law's rate a_b (brakingInput). jacobians, rayJacobians, certificate and stateLevel belong
+% to the offline certificate of the cruise controller and the CLF
+% (NOMINAL_CLF.md).
     methods (Static)
         function context = context(model)
-            % Constants of one frame and a lazily extended target table on
-            % the absolute grid of this frame (step dt, index 0 = now).
-            cfg=model.cfg;reference=model.nominalReference;terminal=cfg.terminal;
-            % Tube half-axes a_i, inflated by the certified hold factor so that
-            % the tube also bounds the state inside each hold (Section 3).
-            scale=reference.holdFactor*sqrt(diag(inv(reference.matrix)));
-            offset=reference.state(3);velocity=reference.state(4:5);
-            pathSpeed=velocity(1)*cos(offset)-velocity(2)*sin(offset);
-            positionRadius=0;yawRadius=0;
+            % Constants of one frame.
+            cfg=model.cfg;positionRadius=0;yawRadius=0;
             if isfield(model,'uncertainty') && isfield(model.uncertainty,'egoGenerator')
                 generator=model.uncertainty.egoGenerator;
                 positionRadius=sum(vecnorm(generator(1:2,:),2,1));yawRadius=sum(abs(generator(3,:)));
             end
-            h=cfg.controller.sampleTime;dt=terminal.timeStepSeconds;
-            ratio=round(h/(2*dt))*2;
-            if abs(ratio*dt-h)>1e-9*h
-                error('collisionAvoidanceController:invalidTerminalGrid', ...
-                    'terminal.timeStepSeconds must divide half the sample time.');
-            end
-            here=laneGeometry.project(model.initialState(1:2),model.lane);
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            reach=norm(shape(1:2))+norm(shape(3:4));
             clearance=[Inf;Inf];
             if ~isempty(model.road.lateralClearance),clearance=model.road.lateralClearance;end
-            context=struct('scale',scale,'timeConstant',cfg.clf.convergenceTimeConstantSeconds, ...
-                'contraction',reference.contraction,'yawOffset',offset,'velocity',velocity, ...
-                'yawRate',reference.state(6),'pathSpeed',pathSpeed,'curvature',reference.curvature, ...
-                'halfLength',cfg.vehicle.length/2,'halfWidth',cfg.vehicle.width/2, ...
-                'offset',norm(cfg.vehicle.rectangleOffset), ...
-                'reach',norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset), ...
-                'buffer',cfg.collision.safetyMarginMeters,'range',cfg.collision.encounterRangeMeters, ...
-                'clearance',clearance, ...
-                'levelMaximum',min([terminal.levelMaximum,reference.certifiedLevel, ...
-                    terminalSafeSet.stateLevel(reference,cfg)/reference.holdFactor^2]), ...
-                'dt',dt,'ratio',ratio, ...
-                'pathHeading',here.heading,'targetMotion',localTargetMotion(model), ...
-                'positionRadius',positionRadius,'yawRadius',yawRadius, ...
-                'hasTarget',~isempty(model.target),'stationNow',here.station, ...
-                'covered',-1,'targetStation',zeros(2,0),'targetLateral',zeros(2,0), ...
-                'targetSpeed',zeros(1,0),'pointStation',zeros(1,0),'pointLateral',zeros(1,0), ...
-                'targetCourse',zeros(1,0),'targetVelocity',zeros(1,0));
-            context.model=struct('targetEpoch',model.targetEpoch,'sampleIndex',model.sampleIndex, ...
-                'sampleTime',h,'lane',model.lane,'reference',reference);
+            here=laneGeometry.project(model.initialState(1:2),model.lane);
+            context=struct('deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
+                'sampleTime',cfg.controller.sampleTime, ...
+                'friction',min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity, ...
+                'sideslipMaximum',cfg.model.sideslipMaximum,'shape',shape,'reach',reach, ...
+                'margin',cfg.collision.safetyMarginMeters,'required',cfg.collision.safetyMarginMeters+positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
+                'inflation',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
+                'range',cfg.collision.encounterRangeMeters,'clearance',clearance, ...
+                'hasTarget',~isempty(model.target),'targetEpoch',model.targetEpoch, ...
+                'sampleIndex',model.sampleIndex,'lane',model.lane,'stationNow',here.station, ...
+                'reference',model.nominalReference);
         end
 
         function [member,context,info] = member(context,x,node)
-            % x at plan node 'node' (0 = now). V(x) is the tube level.
-            [value,station]=terminalSafeSet.coordinates(context,x);
-            [member,context,info]=terminalSafeSet.clear(context,value,station,node);
-            info.value=value;
+            % x at plan node 'node' (0 = now). info records how the
+            % continuation ends ('exit', 'parked' or 'noTarget'), the time to
+            % the stop and to the target's exit after x, the least clearance
+            % beyond the requirement, and the CLF value of x.
+            [member,info]=localDecide(context,x,node);
+            info.value=nonlinearBicycleModel.nominalValue(x,context.lane,context.reference);
         end
 
-        function [level,context,info] = level(context,x,node)
-            % Largest CLF level whose tube at x's station is clear (-Inf if
-            % none). Clearance is monotone in the level: tubes are nested.
-            [value,station]=terminalSafeSet.coordinates(context,x);
-            [top,context,info]=terminalSafeSet.clear(context,context.levelMaximum,station,node);
-            if top,level=context.levelMaximum;info.value=value;return;end
-            [bottom,context]=terminalSafeSet.clear(context,0,station,node);
-            if ~bottom,level=-Inf;info.value=value;return;end
-            low=0;high=context.levelMaximum;
-            for iteration=1:30
-                middle=(low+high)/2;
-                [ok,context]=terminalSafeSet.clear(context,middle,station,node);
-                if ok,low=middle;else,high=middle;end
-                if high-low<=1e-4*context.levelMaximum,break;end
+        function path = continuation(context,x,steps)
+            % The ego's continuation from x under the terminal law, in closed
+            % form: its poses (columns [px; py; yaw]) at times k h/2 after x,
+            % k = 0..2J, nodes and hold midpoints until it stops at node J.
+            % The speed falls by a_b h per hold, and by what is left in the
+            % last one; the arc length is exact for that piecewise linear
+            % speed. 'steps' fixes J (to differentiate with the schedule held).
+            h=context.sampleTime;a=context.deceleration;V=hypot(x(4),x(5));
+            beta=0;kappa=0;
+            if V>0,beta=atan2(x(5),x(4));kappa=x(6)/V;end
+            if nargin<3
+                steps=0;if V>0,steps=ceil(V/(a*h));end
             end
-            level=low;[~,context,info]=terminalSafeSet.clear(context,level,station,node);info.value=value;
+            speed=[V-(0:steps-1)*a*h,0];
+            if steps==0,speed=V;end
+            node=[0,cumsum((speed(1:end-1)+speed(2:end))*h/2)];
+            arc=zeros(1,2*steps+1);arc(1:2:end)=node;
+            arc(2:2:end)=node(1:end-1)+(3*speed(1:end-1)+speed(2:end))*h/8;
+            half=kappa*arc/2;scale=ones(size(half));
+            bend=half~=0;scale(bend)=sin(half(bend))./half(bend);
+            position=x(1:2)+(arc.*scale).*predictiveSafetyGeometry.direction(x(3)+beta+half);
+            path=struct('pose',[position;x(3)+kappa*arc],'time',(0:2*steps)*h/2,'arc',arc, ...
+                'steps',steps,'speed',V,'sideslip',beta,'curvature',kappa);
         end
 
-        function [value,station] = coordinates(context,x)
-            lane=context.model.lane;reference=context.model.reference;
-            projection=laneGeometry.project(x(1:2),lane,context.stationNow);
-            value=nonlinearBicycleModel.nominalValue(x,lane,reference);station=projection.station;
+        function clear = clears(context,x,node)
+            % Does the ego rectangle at x, at plan node 'node' (a half node is
+            % a hold midpoint), meet the problem's own sampled collision row:
+            % safetyMarginMeters from the target's forecast, or the target
+            % beyond the range there.
+            clear=true;if ~context.hasTarget,return;end
+            q=localTarget(context,node,0);
+            if norm(x(1:2)-q(1:2))>context.range,return;end
+            clear=predictiveSafetyGeometry.rectangle(x(1:3),context.shape,q(1:3),q(8:11))>=context.margin-1e-6;
         end
 
-        function [ok,context,info] = clear(context,value,station,node)
-            % Tube of level 'value' starting at 'station' at plan node 'node'.
-            % The node's own grid point is checked first: the tube and the
-            % forecast at one time, so a relative motion outside the cone (or
-            % a target already out of range) is certified in closed form. Only
-            % otherwise does the check follow the grid, in 2-s chunks, until
-            % the first exit or cone certificate, over a span that scanBound
-            % derives from the forecast itself (on a straight road in closed
-            % form: a forecast that meets the settled tube before the target
-            % can leave the range is rejected at once). A tube that reaches
-            % the end of the span with neither event is not terminal. Nothing
-            % about the encounter is preset.
-            info=struct('exitSeconds',NaN,'margin',Inf,'reason',"");ok=false;
-            if ~(value<=context.levelMaximum*(1+1e-12))
-                info.reason="levelAboveCertifiedRegion";return;
+        function next = successor(context,x)
+            % The ego part of phi: one hold of the terminal law from x, as a
+            % state with the same sideslip and course curvature (zero speed
+            % once stopped). Its continuation is that of x shifted by a hold.
+            path=terminalSafeSet.continuation(context,x);
+            if path.steps==0,next=[x(1:3);0;0;0];return;end
+            V=max(path.speed-context.deceleration*context.sampleTime,0);
+            next=[path.pose(:,3);V*cos(path.sideslip);V*sin(path.sideslip);path.curvature*V];
+        end
+
+        function [rows,bounds,context,info] = rows(context,y,node)
+            % The terminal set linearized at the anchor endpoint y on the
+            % endpoint correction dz, rows*dz <= bounds:
+            % - the friction circle of the law, |r V| <= sqrt((mu g)^2 - a_b^2),
+            %   only where y is outside it (inside it the acceptance check
+            %   keeps it: as a hard row on the boundary it left the CLF
+            %   stage's cone program without a numerical result in a hard
+            %   recovery turn); the sideslip cone is a row of the problem at
+            %   every node;
+            % - fixed-dual collision rows at the continuation's nodes and
+            %   midpoints before the exit, and at the parked pose against the
+            %   target's closest pose on its track (the minimizer's own rows);
+            % - corner rows on the road at the continuation's poses.
+            % The continuation's poses are differentiated with the schedule
+            % held. Conditions whose clearance exceeds the requirement by more
+            % than localBand are left out; the exact set decides acceptance.
+            % Each row keeps up to localReserve of the margin it has at y, so
+            % that an endpoint off the boundary stays off it by that much and
+            % the next sample's shift survives a small departure (the plant
+            % or the appended hold's departure from the law); a row is never
+            % tighter than y itself, so when y is in X_f the zero correction
+            % meets every row.
+            [~,info]=localDecide(context,y,node);
+            info.value=nonlinearBicycleModel.nominalValue(y,context.lane,context.reference);
+            band=localBand();required=context.required;
+            path=terminalSafeSet.continuation(context,y);
+            jacobian=localPoseJacobian(context,y,path.steps);
+            V=hypot(y(4),y(5));limit=sqrt(max(context.friction^2-context.deceleration^2,0));
+            rows=zeros(0,6);bounds=zeros(0,1);
+            if abs(y(6)*V)>limit
+                gradient=sign(y(6))*[0,0,0,y(6)*y(4)/V,y(6)*y(5)/V,V];
+                rows=gradient;bounds=limit-abs(y(6)*V);
             end
-            % The lateral extent is largest at the start and only shrinks.
-            [ego,~,~,rate]=terminalSafeSet.tube(context,value,station,0,0);
-            if ego.lateral(2)>context.clearance(2) || -ego.lateral(1)>context.clearance(1)
-                info.reason="tubeLeavesRoad";return;
-            end
-            if ~context.hasTarget,ok=true;info.exitSeconds=0;info.reason="noTarget";return;end
-            start=node*context.ratio;chunk=round(2/context.dt);
-            steps=0;shift=0;cap=0;ending="";
-            while true
-                if steps==0,last=start;else,last=min(start+steps+chunk,start+cap);end
-                context=terminalSafeSet.extend(context,last);
-                tau=(steps:last-start)*context.dt;
-                [ego,box,guard,rate]=terminalSafeSet.tube(context,value,station,tau,shift);
-                index=start+(steps:last-start)+1;
-                pointGap=terminalSafeSet.separation(context,box.station,box.lateral, ...
-                    context.pointStation(:,index),context.pointLateral(:,index));
-                exitAt=find(pointGap>context.range,1);
-                apart=terminalSafeSet.collisionCone(context,ego,rate,index);
-                bodyGap=terminalSafeSet.separation(context,ego.station,ego.lateral, ...
-                    context.targetStation(:,index),context.targetLateral(:,index));
-                required=max(context.buffer,guard+context.dt/2*context.targetSpeed(index));
-                % Grid points before an exit must be clear; the collision-cone
-                % certificate covers the time from its own grid point on, so
-                % that grid point is checked as well.
-                limit=numel(tau);reason="exit";stop=exitAt;
-                if ~isempty(apart) && (isempty(exitAt) || apart<=exitAt),stop=apart;reason="outsideCollisionCone";end
-                if ~isempty(stop),limit=stop-(reason=="exit");end
-                if limit>0
-                    margin=bodyGap(1:limit)-required(1:limit);info.margin=min(info.margin,min(margin));
-                    if any(margin<0),info.reason="tubeMeetsTarget";return;end
+            [margin,lateral,normal,local]=localRoad(context,path.pose);
+            for k=find(margin<context.inflation+band)
+                c=cos(path.pose(3,k));s=sin(path.pose(3,k));
+                for corner=1:4
+                    derivative=normal(:,corner,k).'*[eye(2),[-s,-c;c,-s]*local(:,corner)]*jacobian(:,:,k);
+                    rows=[rows;derivative;-derivative]; %#ok<AGROW>
+                    bounds=[bounds;localKeep(context.clearance(2)-lateral(corner,k)-context.inflation); ...
+                        localKeep(context.clearance(1)+lateral(corner,k)-context.inflation)]; %#ok<AGROW>
                 end
-                if ~isempty(stop),ok=true;info.exitSeconds=tau(stop);info.reason=reason;return;end
-                if steps==0
-                    % Neither event at the node itself: the span to follow.
-                    [cap,ending]=terminalSafeSet.scanBound(context,value,station,ego,box,rate,index);
+            end
+            if ~context.hasTarget,return;end
+            q=localTarget(context,node,path.time);
+            [gap,out]=localClearances(context,path.pose,q);
+            last=numel(gap);if ~isempty(out),last=out-1;end
+            for k=find(gap(1:last)<required+band)
+                dual=localDual(path.pose(:,k),context.shape,q(:,k),[]);
+                if isempty(dual),continue;end
+                rows=[rows;-dual.jacobian*jacobian(:,:,k)];bounds=[bounds;localKeep(dual.value-required)]; %#ok<AGROW>
+            end
+            if isempty(out)
+                [distance,witness]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
+                if distance<required+band
+                    % A witness at exact contact (a vertex path crossing an
+                    % edge) has no well-defined normal; a pose 1 mm or 1 cm
+                    % along the track stands for it.
+                    dual=localDual(path.pose(:,end),context.shape,witness,[1e-3,-1e-3,1e-2,-1e-2]);
+                    if ~isempty(dual)
+                        rows=[rows;-dual.jacobian*jacobian(:,:,end)];bounds=[bounds;localKeep(dual.value-required)];
+                    end
                 end
-                % Neither event within the span: not terminal.
-                if last>=start+cap,info.reason=ending;return;end
-                shift=box.shift;steps=last-start+1;
             end
         end
 
-        function [cap,ending] = scanBound(context,value,station,ego,box,rate,index)
-            % Grid steps the time-resolved check may follow after a node whose
-            % own point certified nothing, and the reason reported when the
-            % span ends with neither event. cap = 0 rejects the node at once.
-            %   Straight road, straight-line target: the relative motion is a
-            %   parabola (collisionCone). If it enters the settled tube's box
-            %   (level 0) at u_hit, the tube meets the target then unless the
-            %   target has left the range before: the span is the first time
-            %   the reference point is surely out of range, or none when that
-            %   time is not before u_hit. Otherwise the parabola leaves the
-            %   whole tube's box (widened by the total drift) for good at
-            %   u_out, where the cone certifies at the latest: the span is
-            %   u_out, or the tube's settling time when the parabola never
-            %   leaves (a co-moving target).
-            %   Circling target: the span is the time the tube's box has passed
-            %   the target's disk, where the disk test certifies.
-            %   Curved road: no cone; the span is the settling time plus the
-            %   time the ego needs for the range diameter, 2R/v. A target still
-            %   in range then has neither passed nor been passed.
-            T=context.timeConstant;dt=context.dt;b=context.buffer;R=context.range;v=context.pathSpeed;
-            r0=sqrt(max(value,0));remaining=T*rate;
-            settle=max(remaining,context.scale(1)*r0);tolerance=max(b,1e-2);
-            tSettle=0;if settle>tolerance,tSettle=T*log(settle/tolerance);end
-            motion=context.targetMotion;ending="noExitWithinSpan";
-            if context.curvature~=0 || ~motion.available
-                cap=max(1,ceil((tSettle+2*R/max(v,.5))/dt));return;
-            end
-            if ~motion.straight
-                behind=motion.centre(1)+motion.diskRadius+b-(ego.station(1)-remaining);
-                cap=max(1,ceil(behind/max(v,.5)/dt));return;
-            end
-            ending="insideCollisionCone";
-            angle=context.targetCourse(index)-context.pathHeading;c=cos(angle);s=sin(angle);
-            V=context.targetVelocity(index);A=motion.acceleration;
-            aS=c*A/2;bS=c*V-v;aD=s*A/2;bD=s*V;
-            targetS=context.targetStation(:,index);targetD=context.targetLateral(:,index);
-            gS=mean(targetS)-mean(ego.station);gD=mean(targetD)-mean(ego.lateral);
-            settled=terminalSafeSet.tube(context,0,station,0,0);
-            halfS0=diff(settled.station)/2+diff(targetS)/2+b;halfD0=diff(settled.lateral)/2+diff(targetD)/2+b;
-            excess=rate*dt;
-            halfS=diff(ego.station)/2+remaining+excess+diff(targetS)/2+b;halfD=diff(ego.lateral)/2+diff(targetD)/2+b;
-            [entry,~]=localParabolaBoxSpan(aS,bS,gS,halfS0,aD,bD,gD,halfD0);
-            if isfinite(entry)
-                % The forecast meets the settled tube at 'entry'.
-                radius=hypot(diff(box.station)/2+remaining+excess,diff(box.lateral)/2);
-                gRefS=context.pointStation(1,index)-mean(box.station);gRefD=context.pointLateral(1,index)-mean(box.lateral);
-                leave=localParabolaDiskExit(aS,bS,gRefS,aD,bD,gRefD,R+radius);
-                if ~(leave<entry),cap=0;return;end
-                cap=max(1,ceil(leave/dt)+1);return;
-            end
-            [~,out]=localParabolaBoxSpan(aS,bS,gS,halfS,aD,bD,gD,halfD);
-            cap=max(1,ceil(min(out,tSettle)/dt)+1);
+        function [distance,witness,track] = parkedClearance(context,pose,q)
+            % Least distance between the ego rectangle parked at 'pose' and the
+            % target rectangle over the target's remaining track from its
+            % state q until it first leaves the range about the parked
+            % reference point, and the target state attaining it (witness).
+            % Exact when the two are apart at q: the distance is continuous
+            % along the track, and while the rectangles are apart it is the
+            % least distance from a vertex of one to an edge of the other, so
+            % the least distance over the track is the least distance from a
+            % vertex path (segment or arc) to an edge (localTrackDistance).
+            [lower,upper,full,exitSeconds]=localTrack(q,pose(1:2),context.range);
+            [distance,sigma]=localTrackDistance(pose,context.shape,q,lower,upper,full);
+            witness=localAlong(q,sigma);
+            track=struct('lower',lower,'upper',upper,'fullCircle',full,'exitSeconds',exitSeconds);
         end
 
-        function first = collisionCone(context,ego,rate,index)
-            % First grid point from which the target provably never meets the
-            % tube's rectangle box again, or []: the target's forecast motion
-            % relative to the box is outside the collision cone of the two
-            % boxes. Only on a straight road.
-            %   From a grid time the ego band across the road only shrinks; along
-            %   the road the box moves at the trim's station rate v and drifts
-            %   by at most T*sigma(r) more (sigma(lambda r) <= lambda sigma(r),
-            %   r decays as exp(-t/T)). Widened by that drift, the ego box is
-            %   fixed in a frame moving at v.
-            %   A straight-line target (beta = 0) moves its box by c s(u) along
-            %   and s s(u) across the road, s(u) = V u + A u^2/2, c and s the
-            %   cosine and sine of its course to the road, also through a stop.
-            %   In the moving frame the difference of the box centres is a
-            %   parabola in u, and the boxes meet at some u >= 0 iff the
-            %   parabola enters the sum box (half-widths H_s, H_d, with the
-            %   buffer): the relative motion lies inside the collision cone.
-            %   Equivalently, the least normalized box distance
-            %   max(|q_s|/H_s, |q_d|/H_d) over u >= 0 is at most 1; it is
-            %   attained at u = 0, at a vertex or zero of q_s or q_d, or where
-            %   |q_s|/H_s = |q_d|/H_d, and is evaluated at all of these, so the
-            %   test is exact for the forecast (localParabolaMeetsBox).
-            %   A circling target (beta ~= 0) stays in the disk of its circle
-            %   widened by its body reach: a disk beside the ego band, or behind
-            %   it while the ego moves forward, stays apart.
-            first=[];
-            if context.curvature~=0,return;end
-            motion=context.targetMotion;
-            if ~motion.available,return;end
-            v=context.pathSpeed;b=context.buffer;
-            remaining=context.timeConstant*rate;
-            lateral=ego.lateral;along=ego.station;
-            if motion.straight
-                angle=context.targetCourse(index)-context.pathHeading;
-                c=cos(angle);s=sin(angle);speed=context.targetVelocity(index);A=motion.acceleration;
-                target=context.targetLateral(:,index);station=context.targetStation(:,index);
-                gapS=mean(station,1)-mean(along,1);halfS=diff(along,1,1)/2+remaining+diff(station,1,1)/2+b;
-                gapD=mean(target,1)-mean(lateral,1);halfD=diff(lateral,1,1)/2+diff(target,1,1)/2+b;
-                apart=~localParabolaMeetsBox(c*A/2,c.*speed-v,gapS,halfS,s*A/2,s.*speed,gapD,halfD);
+        function [middle,next] = holdStates(x,u,cfg)
+            % The hold's midpoint and endpoint exactly as nonlinearBicycleModel.hold
+            % forms them, without tangents.
+            half=cfg.controller.sampleTime/2;
+            if nonlinearBicycleModel.meshCount(cfg)==1
+                next=nonlinearBicycleModel.sample(x,u,cfg);middle=(x+next)/2;
             else
-                radius=motion.diskRadius;centre=motion.centre;
-                apart=(centre(2)-radius-lateral(2,:)>=b) | (lateral(1,:)-centre(2)-radius>=b) ...
-                    | (along(1,:)-remaining-centre(1)-radius>=b & v>=0);
+                middle=nonlinearBicycleModel.sample(x,u,cfg,[],half);
+                next=nonlinearBicycleModel.sample(middle,u,cfg,[],half);
             end
-            first=find(apart,1);
         end
 
-        function [ego,box,guard,rate] = tube(context,value,station,tau,shift)
-            % Path-coordinate boxes of the ego rectangle (ego) and of its
-            % reference point (box) at times tau after the node, the distance
-            % (guard) an ego body point can move in dt/2 there, and the bound
-            % on the station-rate error (rate).
-            radius=sqrt(max(value,0))*exp(-tau/context.timeConstant);
-            a=context.scale;kappa=abs(context.curvature);
-            lateral=a(1)*radius+context.positionRadius;
-            heading=min(pi/2,abs(context.yawOffset)+a(2)*radius+context.yawRadius);
-            % |v_t - v_t*| for theta = psi* + e_psi, |e_psi| <= a2 r (TERMINAL_SAFE_SET.md, (3.2)):
-            % |dvx| + |dvy| (|sin psi*| + a2 r) + |vx*| (|sin psi*| a2 r + (a2 r)^2/2) + |vy*| a2 r;
-            % the heading enters a straight road's station rate only at second order.
-            yaw=a(2)*radius;tilt=abs(sin(context.yawOffset));
-            tangentError=a(3)*radius+a(4)*radius.*(tilt+yaw)+abs(context.velocity(1))*(tilt*yaw+yaw.^2/2) ...
-                +abs(context.velocity(2))*yaw;
-            speedError=(tangentError+context.pathSpeed*kappa*a(1)*radius)./max(1-kappa*a(1)*radius,.5);
-            % Left Riemann sum of a nonincreasing integrand bounds its integral.
-            drift=shift+[0,cumsum(speedError(1:end-1))]*context.dt;
-            centre=station+context.pathSpeed*tau;
-            along=context.halfLength*cos(heading)+context.halfWidth*sin(heading)+context.offset;
-            across=context.halfLength*sin(heading)+context.halfWidth*cos(heading)+context.offset;
-            bulge=kappa*(2*context.halfLength)^2/8;
-            outer=lateral+across+bulge;
-            stretch=along./max(1-kappa*outer,.5);
-            ego.station=[centre-drift-stretch-context.positionRadius;centre+drift+stretch+context.positionRadius];
-            ego.lateral=[-outer;outer];
-            box.station=[centre-drift;centre+drift];box.lateral=[-lateral;lateral];
-            box.shift=drift(end)+speedError(end)*context.dt;rate=speedError;
-            % Body-point speed over [tau-dt/2,tau+dt/2]: |v| + |r| reach.
-            early=radius*exp(context.dt/(2*context.timeConstant));
-            speed=hypot(abs(context.velocity(1))+a(3)*early,abs(context.velocity(2))+a(4)*early) ...
-                +(abs(context.yawRate)+a(5)*early)*context.reach;
-            guard=context.dt/2*speed;
+        function [input,next,ok,value,middle] = cruiseInput(x,model)
+            % One hold of the CLF's certified cruise controller u = u* + K e(x),
+            % the gain certified offline together with P (NOMINAL_CLF.md). On
+            % the certified level set the hold satisfies V(next) <= rho V(x)
+            % and the input bound. ok evaluates the decrease and the hard rows
+            % on this hold. The anchor appends it while its endpoint stays in
+            % the terminal set.
+            cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
+            e=nonlinearBicycleModel.error(x,lane,reference);
+            input=reference.input+reference.gain*e;
+            low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);high=min(1-1e-8,cfg.actuation.brakingRatioMaximum);
+            input(2)=min(high,max(low,input(2)));
+            bound=reference.contraction*sum((reference.factor*e).^2)*(1+1e-9)+1e-12;
+            next=[];middle=[];ok=false;value=Inf;
+            try
+                [middle,next]=terminalSafeSet.holdStates(x,input,cfg);
+            catch exception
+                if startsWith(string(exception.identifier),"collisionAvoidanceController:"),return;end
+                rethrow(exception);
+            end
+            value=nonlinearBicycleModel.nominalValue(next,lane,reference);
+            ok=value<=bound && terminalSafeSet.admissible(x,middle,next,input,model);
         end
 
-        function gap = separation(context,station,lateral,otherStation,otherLateral)
-            % Lower bound of the Euclidean distance between two path boxes.
-            alongGap=max(0,max(otherStation(1,:)-station(2,:),station(1,:)-otherStation(2,:)));
-            acrossGap=max(0,max(otherLateral(1,:)-lateral(2,:),lateral(1,:)-otherLateral(2,:)));
-            kappa=context.curvature;
-            if kappa==0
-                gap=hypot(alongGap,acrossGap);return;
+        function [input,next,ok,middle,fraction] = brakingInput(x,previous,cruise,model,context,node)
+            % One hold of the declared model from x at plan node 'node' that
+            % keeps the endpoint in X_f, meets the hard rows and clears the
+            % target at its midpoint, as close as found to the cruise input.
+            % The far end of the search holds the previous steering and
+            % brakes with the ratio of actuator deceleration a_b, the law's
+            % realization (road load neglected), or else as hard as the rear
+            % adhesion at x admits (with 5 percent to spare); a far end that
+            % keeps the endpoint in X_f is bisected (five halvings) toward the
+            % cruise input along u = cruise + lambda (far - cruise), lambda in
+            % (0, 1], and the least lambda found is returned. ok is false when
+            % neither far end keeps the endpoint in X_f. The realization
+            % follows the law's continuation only approximately; braking
+            % harder in the first hold leaves the continuation behind it
+            % slower. Every candidate is checked.
+            cfg=model.cfg;
+            low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);
+            tire=modifiedFialaTire.parameters(cfg);
+            k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
+            adhesion=sqrt(max(0,1-((x(5)-cfg.vehicle.lr*x(6))/(k*x(4)))^2));
+            law=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
+            fraction=1;ok=false;
+            for braking=[max(low,law),max(low,-.95*adhesion)]
+                input=[previous(1);braking];
+                [ok,next,middle]=localHoldStays(x,input,model,context,node);
+                if ok,break;end
             end
-            radius=1/abs(kappa);
-            if kappa>0,inner=radius-max(lateral(2,:),otherLateral(2,:));
-            else,inner=radius+min(lateral(1,:),otherLateral(1,:));
+            if ~ok,return;end
+            far=input;lower=0;upper=1;
+            for halving=1:5
+                lambda=(lower+upper)/2;candidate=cruise+lambda*(far-cruise);
+                [stays,candidateNext,candidateMiddle]=localHoldStays(x,candidate,model,context,node);
+                if stays
+                    upper=lambda;input=candidate;next=candidateNext;middle=candidateMiddle;fraction=lambda;
+                else
+                    lower=lambda;
+                end
             end
-            chord=2*max(inner,0).*sin(min(pi/2,alongGap/(2*radius)));
-            gap=max(acrossGap,chord);
-        end
-
-        function context = extend(context,last)
-            % Target rectangle and reference point in path coordinates on the
-            % absolute grid up to index 'last' (inclusive), and the largest
-            % speed of a target body point within dt/2 of each grid time.
-            if last<=context.covered,return;end
-            index=context.covered+1:last;time=index*context.dt;
-            m=context.model;
-            q=predictiveSafetyGeometry.predictTarget(m.targetEpoch,m.sampleIndex*m.sampleTime+time);
-            hint=context.stationNow+context.pathSpeed*time;
-            c=cos(q(3,:));s=sin(q(3,:));signs=[-1,1,1,-1;-1,-1,1,1];
-            station=zeros(4,numel(index));lateral=zeros(4,numel(index));
-            for corner=1:4
-                lx=q(10,:)+q(8,:)*signs(1,corner);ly=q(11,:)+q(9,:)*signs(2,corner);
-                points=[q(1,:)+c.*lx-s.*ly;q(2,:)+s.*lx+c.*ly];
-                projection=laneGeometry.project(points,m.lane,hint);
-                station(corner,:)=projection.station;lateral(corner,:)=projection.lateralPosition;
-            end
-            bulge=abs(context.curvature)*(2*max(q(8:9,:),[],1)).^2/8;
-            reference=laneGeometry.project(q(1:2,:),m.lane,hint);
-            speed=abs(q(4,:))+abs(q(5,:))*context.dt/2;
-            reach=vecnorm(q(8:9,:),2,1)+vecnorm(q(10:11,:),2,1);
-            speed=speed.*(1+abs(sin(q(6,:))./q(7,:)).*reach);
-            context.targetStation=[context.targetStation,[min(station,[],1);max(station,[],1)]];
-            context.targetLateral=[context.targetLateral,[min(lateral,[],1)-bulge;max(lateral,[],1)+bulge]];
-            context.targetSpeed=[context.targetSpeed,speed];
-            context.pointStation=[context.pointStation,[reference.station;reference.station]];
-            context.pointLateral=[context.pointLateral,[reference.lateralPosition;reference.lateralPosition]];
-            context.targetCourse=[context.targetCourse,q(3,:)+q(6,:)];
-            context.targetVelocity=[context.targetVelocity,q(4,:)];
-            context.covered=last;
         end
 
         function level = stateLevel(reference,cfg)
             % Largest c with {e : e'Pe <= c} inside the linear state rows g'e <= b:
-            % c = min b^2/(g' inv(P) g).
+            % c = min b^2/(g' inv(P) g). Part of the cruise controller's certificate.
             x=reference.state;tire=modifiedFialaTire.parameters(cfg);
             k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
             t=tan(cfg.model.sideslipMaximum);lr=cfg.vehicle.lr;
@@ -383,43 +298,6 @@ classdef terminalSafeSet
                 t*x(4)-x(5);t*x(4)+x(5);adhesion*x(4)-w;adhesion*x(4)+w];
             spread=sum((g/reference.matrix).*g,2);
             level=min(max(b,0).^2./spread);
-        end
-
-        function [middle,next] = holdStates(x,u,cfg)
-            % The hold's midpoint and endpoint exactly as nonlinearBicycleModel.hold
-            % forms them, without tangents.
-            half=cfg.controller.sampleTime/2;
-            if nonlinearBicycleModel.meshCount(cfg)==1
-                next=nonlinearBicycleModel.sample(x,u,cfg);middle=(x+next)/2;
-            else
-                middle=nonlinearBicycleModel.sample(x,u,cfg,[],half);
-                next=nonlinearBicycleModel.sample(middle,u,cfg,[],half);
-            end
-        end
-
-        function [input,next,ok,value] = terminalInput(x,model)
-            % One hold of the terminal controller u = u* + K e(x): the gain
-            % certified offline together with P (NOMINAL_CLF.md). On the
-            % certified level set the hold satisfies V(next) <= rho V(x), the
-            % input bound and, below the state-row level, the state and
-            % handling rows (TERMINAL_SAFE_SET.md, Section 2). ok evaluates
-            % the same conditions on this hold: a guard on the certificate,
-            % and the decision for states outside the set.
-            cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
-            e=nonlinearBicycleModel.error(x,lane,reference);
-            input=reference.input+reference.gain*e;
-            low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);high=min(1-1e-8,cfg.actuation.brakingRatioMaximum);
-            input(2)=min(high,max(low,input(2)));
-            bound=reference.contraction*sum((reference.factor*e).^2)*(1+1e-9)+1e-12;
-            next=[];ok=false;value=Inf;
-            try
-                [middle,next]=terminalSafeSet.holdStates(x,input,cfg);
-            catch exception
-                if startsWith(string(exception.identifier),"collisionAvoidanceController:"),return;end
-                rethrow(exception);
-            end
-            value=nonlinearBicycleModel.nominalValue(next,lane,reference);
-            ok=value<=bound && terminalSafeSet.admissible(x,middle,next,input,model);
         end
 
         function [a,b,plus] = jacobians(reference,cfg,errors,inputs,duration)
@@ -461,8 +339,8 @@ classdef terminalSafeSet
             % is a fixed point of the map) that the quadrature leaves. For
             % the saturating tire the ray averages spread like the secants of
             % its curve, not like its tangents, which is why the certificate
-            % encloses them (TERMINAL_SAFE_SET.md, Section 2). NaN where the
-            % model's domain is left.
+            % encloses them (NOMINAL_CLF.md). NaN where the model's domain is
+            % left.
             if nargin<5 || isempty(duration),duration=cfg.controller.sampleTime;end
             if nargin<6,nodes=8;end
             beta=.5./sqrt(1-(2*(1:nodes-1)).^(-2));tridiagonal=diag(beta,1)+diag(beta,-1);
@@ -479,20 +357,20 @@ classdef terminalSafeSet
         end
 
         function result = certificate(reference,cfg,errors,subdivisions)
-            % Sampled check of the terminal controller on the trim's own
-            % lane. For each column e of errors (transverse errors), one hold
-            % from x(e) under u = u* + K e gives
+            % Sampled check of the cruise controller on the trim's own lane.
+            % For each column e of errors (transverse errors), one hold from
+            % x(e) under u = u* + K e gives
             %   contraction  V(x+) / V(x);
             %   remainder    ||F (e(x+) - (A0 + B0 K) e)|| / ||F e||, F = chol(P),
             %                the departure from the trim's Jacobian in CLF units;
             %   holdFactor   max over s in (0, h] of exp(s/T) sqrt(V(x(s)) / V(x)),
-            %                the excess of the tube radius inside the hold;
+            %                the excess of the CLF radius inside the hold;
             %   rows         state and handling rows at the hold's midpoint and
             %                endpoint;
             % NaN where the model's domain is left. The certificate itself is
             % the robust LMI of scripts/synthesizeClfMatrices over the enclosure
-            % of the Jacobians (TERMINAL_SAFE_SET.md, Section 2); these samples
-            % test it independently.
+            % of the Jacobians (NOMINAL_CLF.md); these samples test it
+            % independently.
             if nargin<4,subdivisions=10;end
             curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);
             lane=struct('referenceCurve',curve);
@@ -562,108 +440,309 @@ classdef terminalSafeSet
     end
 end
 
-function hit = localParabolaMeetsBox(aS,bS,gS,hS,aD,bD,gD,hD)
-    % Per column: does the parabola (aS u^2 + bS u + gS, aD u^2 + bD u + gD),
-    % u >= 0, enter the box |q_s| <= hS, |q_d| <= hD? Exact: the least
-    % normalized box distance over u >= 0 is attained at u = 0, at a vertex or
-    % zero of either coordinate, or where the two normalized distances are
-    % equal, and it is evaluated at all of them.
-    n=numel(gS);aS=aS+zeros(1,n);aD=aD+zeros(1,n);
-    u=[zeros(1,n);localVertex(aS,bS);localVertex(aD,bD);localRoots(aS,bS,gS);localRoots(aD,bD,gD); ...
-        localRoots(aS./hS-aD./hD,bS./hS-bD./hD,gS./hS-gD./hD); ...
-        localRoots(aS./hS+aD./hD,bS./hS+bD./hD,gS./hS+gD./hD)];
-    u(u<0)=NaN;
-    qS=aS.*u.^2+bS.*u+gS;qD=aD.*u.^2+bD.*u+gD;
-    distance=max(abs(qS)./hS,abs(qD)./hD);
-    hit=min(distance,[],1,'omitnan')<=1+1e-9;
+function [stays,next,middle] = localHoldStays(x,u,model,context,node)
+    % Does one hold of the declared model with input u from x at plan node
+    % 'node' meet the hard rows, clear the target at its midpoint and end in
+    % X_f?
+    stays=false;next=[];middle=[];
+    try
+        [middle,next]=terminalSafeSet.holdStates(x,u,model.cfg);
+    catch exception
+        if startsWith(string(exception.identifier),"collisionAvoidanceController:"),return;end
+        rethrow(exception);
+    end
+    stays=terminalSafeSet.admissible(x,middle,next,u,model) && terminalSafeSet.clears(context,middle,node+.5) ...
+        && terminalSafeSet.member(context,next,node+1);
 end
 
-function [entry,leave] = localParabolaBoxSpan(aS,bS,gS,hS,aD,bD,gD,hD)
-    % First and last time u >= 0 at which the parabola (aS u^2 + bS u + gS,
-    % aD u^2 + bD u + gD) is inside the box |q_s| <= hS, |q_d| <= hD; Inf and
-    % Inf when never, entry and Inf when it stays inside.
-    bandS=localBand(aS,bS,gS,hS);bandD=localBand(aD,bD,gD,hD);
-    entry=Inf;leave=Inf;hit=false;
-    for i=1:size(bandS,1)
-        for j=1:size(bandD,1)
-            lo=max(bandS(i,1),bandD(j,1));hi=min(bandS(i,2),bandD(j,2));
-            if lo<=hi
-                if ~hit,leave=-Inf;hit=true;end
-                entry=min(entry,lo);leave=max(leave,hi);
+function dual = localDual(pose,shape,q,shifts)
+    % The fixed-dual rows of the ego rectangle at 'pose' against the target
+    % state q, or, where the closest features give no consistent dual (an
+    % exact contact), against q moved along its track by each of 'shifts' in
+    % turn; [] when none has one, and the row is left out (the exact set
+    % decides acceptance).
+    dual=[];
+    for shift=[0,shifts]
+        target=q;if shift~=0,target=localAlong(q,shift);end
+        try
+            dual=predictiveSafetyGeometry.supportLinearization(pose,shape,target(1:3),target(8:11));return;
+        catch exception
+            if exception.identifier~="MATLAB:assertion:failed",rethrow(exception);end
+        end
+    end
+end
+
+function bound = localKeep(margin)
+    % A row's bound that keeps up to localReserve of the margin it has.
+    bound=margin-min(localReserve(),max(margin,0));
+end
+
+function reserve = localReserve()
+    % Margin [m] that the terminal rows keep where the anchor has it.
+    reserve=.05;
+end
+
+function band = localBand()
+    % Clearance and road margin beyond the requirement [m] up to which a
+    % continuation condition enters the convex problem's terminal rows.
+    band=5;
+end
+
+function [member,info] = localDecide(context,x,node)
+    % Membership of x at plan node 'node' in X_f, evaluated in this order:
+    % the law's admissibility, the road along the continuation, the target at
+    % its nodes and midpoints until the exit, and the parked pose against the
+    % target's remaining track.
+    info=struct('reason',"",'end',"",'stopSeconds',NaN,'exitSeconds',NaN, ...
+        'margin',Inf,'roadMargin',Inf);
+    member=false;V=hypot(x(4),x(5));
+    if V>0 && (abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9) ...
+            || hypot(context.deceleration,x(6)*V)>context.friction)
+        info.reason="terminalLawInadmissible";return;
+    end
+    path=terminalSafeSet.continuation(context,x);
+    info.stopSeconds=path.steps*context.sampleTime;
+    margin=localRoad(context,path.pose);
+    info.roadMargin=min(margin)-context.inflation;
+    if info.roadMargin<-1e-6,info.reason="continuationLeavesRoad";return;end
+    if ~context.hasTarget,member=true;info.reason="noTarget";info.end="noTarget";return;end
+    q=localTarget(context,node,path.time);
+    [gap,out]=localClearances(context,path.pose,q);
+    last=numel(gap);if ~isempty(out),last=out-1;end
+    if last>0,info.margin=min(gap(1:last))-context.required;end
+    if info.margin<-1e-6,info.reason="continuationMeetsTarget";return;end
+    if ~isempty(out)
+        member=true;info.reason="exit";info.end="exit";info.exitSeconds=path.time(out);return;
+    end
+    [distance,~,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
+    info.margin=min(info.margin,distance-context.required);
+    info.exitSeconds=info.stopSeconds+track.exitSeconds;
+    if distance-context.required<-1e-6,info.reason="parkedEgoMeetsTarget";return;end
+    member=true;info.reason="parked";info.end="parked";
+end
+
+function q = localTarget(context,node,time)
+    % The target's forecast at times 'time' after plan node 'node'.
+    q=predictiveSafetyGeometry.predictTarget(context.targetEpoch, ...
+        (context.sampleIndex+node)*context.sampleTime+time);
+end
+
+function [gap,out] = localClearances(context,pose,q)
+    % Rectangle clearance at each continuation pose until the first pose
+    % whose reference point is farther than the range from the target's (out,
+    % [] when none; gap is NaN from there). Where the reference distance less
+    % both reaches already exceeds the requirement by the band, that lower
+    % bound stands for the clearance.
+    n=size(pose,2);gap=nan(1,n);
+    distance=vecnorm(pose(1:2,:)-q(1:2,:),2,1);
+    out=find(distance>context.range,1);
+    last=n;if ~isempty(out),last=out-1;end
+    bound=distance-context.reach-vecnorm(q(8:9,:),2,1)-vecnorm(q(10:11,:),2,1);
+    for k=1:last
+        if bound(k)>=context.required+localBand()
+            gap(k)=bound(k);
+        else
+            gap(k)=predictiveSafetyGeometry.rectangle(pose(:,k),context.shape,q(1:3,k),q(8:11,k));
+        end
+    end
+end
+
+function [margin,lateral,normal,local] = localRoad(context,pose)
+    % Least distance of an ego corner inside the road at each pose (Inf
+    % without road clearance), with each corner's lateral position, the path
+    % normal at its projection and the corners in the body frame.
+    shape=context.shape;n=size(pose,2);
+    local=shape(3:4)+shape(1:2).*[1,1,-1,-1;1,-1,1,-1];
+    margin=Inf(1,n);lateral=zeros(4,n);normal=zeros(2,4,n);
+    if all(isinf(context.clearance)),return;end
+    c=cos(pose(3,:));s=sin(pose(3,:));points=zeros(2,4,n);
+    for corner=1:4
+        points(:,corner,:)=reshape(pose(1:2,:)+[c*local(1,corner)-s*local(2,corner); ...
+            s*local(1,corner)+c*local(2,corner)],2,1,n);
+    end
+    projection=laneGeometry.project(reshape(points,2,[]),context.lane,context.stationNow);
+    lateral=reshape(projection.lateralPosition,4,n);
+    heading=reshape(projection.heading,1,4,n);
+    normal=[-sin(heading);cos(heading)];
+    margin=min([context.clearance(2)-lateral;context.clearance(1)+lateral],[],1);
+end
+
+function jacobian = localPoseJacobian(context,y,steps)
+    % d pose / d y at every continuation pose (3x6xK), central differences of
+    % the closed-form continuation with the schedule held.
+    n=2*steps+1;jacobian=zeros(3,6,n);delta=[1e-6;1e-6;1e-7;1e-6;1e-6;1e-7];
+    for i=1:6
+        e=zeros(6,1);e(i)=delta(i);
+        plus=terminalSafeSet.continuation(context,y+e,steps);
+        minus=terminalSafeSet.continuation(context,y-e,steps);
+        jacobian(:,i,:)=reshape((plus.pose-minus.pose)/(2*delta(i)),3,1,n);
+    end
+end
+
+function [lower,upper,full,exitSeconds] = localTrack(q,centre,range)
+    % The stretch [lower, upper] of arc length along the target's track
+    % (relative to its position in q) that its reference point sweeps from q
+    % on until it first leaves the disk of radius 'range' about 'centre';
+    % full when it sweeps its whole circle; and the time of that exit (Inf
+    % when it never leaves). Signed speed V(t) = V + A t: a target whose
+    % speed reaches zero turns back along its track.
+    V=q(4);A=q(5);k=sin(q(6))/q(7);course=q(3)+q(6);full=false;exitSeconds=Inf;
+    % The arc-length interval [a, b] (a <= 0 <= b) within range.
+    if k==0
+        u=predictiveSafetyGeometry.direction(course);w=q(1:2)-centre;
+        p=u.'*w;c=w.'*w-range^2;root=sqrt(max(p^2-c,0));
+        a=min(0,-p-root);b=max(0,-p+root);
+    else
+        middle=q(1:2)+[-sin(course);cos(course)]/k;rho=1/abs(k);
+        d=middle-centre;w=q(1:2)-middle;dd=norm(d);C=Inf;
+        if dd>0,C=(range^2-dd^2-rho^2)/(2*rho*dd);end
+        if C>=1
+            a=-Inf;b=Inf;
+        else
+            % Out of range where |y| < alpha, y the angle of the target about
+            % its centre measured from the side facing away from 'centre'.
+            alpha=acos(max(-1,C));angle=atan2(w(2),w(1))-atan2(d(2),d(1));
+            y=atan2(sin(angle),cos(angle));
+            if y>=0,up=2*pi-alpha-y;down=y-alpha;else,up=-alpha-y;down=2*pi-alpha+y;end
+            up=max(up,0);down=max(down,0);
+            if k>0,a=-down/k;b=up/k;else,a=up/k;b=-down/k;end
+        end
+    end
+    if V==0 && A==0,lower=0;upper=0;return;end
+    direction=sign(V);if direction==0,direction=sign(A);end
+    if V*A>=0
+        if direction>0,lower=0;upper=b;leave=b;else,lower=a;upper=0;leave=a;end
+    else
+        turn=-V^2/(2*A);
+        if direction>0 && b<turn,lower=0;upper=b;leave=b;
+        elseif direction<0 && a>turn,lower=a;upper=0;leave=a;
+        elseif direction>0,lower=a;upper=turn;leave=a;
+        else,lower=turn;upper=b;leave=b;
+        end
+    end
+    full=k~=0 && (upper-lower)*abs(k)>=2*pi;
+    if isfinite(leave),exitSeconds=localFirstTime(V,A,leave);end
+end
+
+function t = localFirstTime(V,A,s)
+    % Least t >= 0 with V t + A t^2/2 = s.
+    if A==0,t=s/V;return;end
+    r=roots([A/2,V,-s]);r=real(r(abs(imag(r))<=1e-9*max(1,abs(r)) & real(r)>=0));
+    t=min([r(:);Inf]);
+end
+
+function [distance,sigma] = localTrackDistance(pose,shape,q,lower,upper,full)
+    % Least vertex-to-edge distance between the fixed rectangle at 'pose' and
+    % the target rectangle over arc lengths [lower, upper] of its track (the
+    % whole circle when full), and the arc length attaining it. A straight
+    % track translates the target: its vertices sweep segments against the
+    % fixed edges, and the fixed vertices sweep the opposite segments in the
+    % target's frame. A circular track rotates the target about the circle's
+    % centre: the paths are arcs about that centre (localArcSegment).
+    E=localCorners(pose,shape);B=localCorners(q(1:3),q(8:11));next=[2,3,4,1];
+    if lower==upper
+        distance=predictiveSafetyGeometry.rectangle(pose,shape,q(1:3),q(8:11));sigma=0;return;
+    end
+    distance=Inf;sigma=0;k=sin(q(6))/q(7);course=q(3)+q(6);
+    if k==0
+        u=predictiveSafetyGeometry.direction(course);
+        for i=1:4
+            for j=1:4
+                [d,t]=localSegmentSegment(B(:,i)+lower*u,B(:,i)+upper*u,E(:,j),E(:,next(j)));
+                if d<distance,distance=d;sigma=lower+t*(upper-lower);end
+                [d,t]=localSegmentSegment(E(:,i)-upper*u,E(:,i)-lower*u,B(:,j),B(:,next(j)));
+                if d<distance,distance=d;sigma=upper-t*(upper-lower);end
+            end
+        end
+        return;
+    end
+    centre=q(1:2)+[-sin(course);cos(course)]/k;
+    if full,span=[0,2*pi];else,span=sort(k*[lower,upper]);end
+    for i=1:4
+        b=B(:,i)-centre;e=E(:,i)-centre;
+        angleB=atan2(b(2),b(1));angleE=atan2(e(2),e(1));
+        for j=1:4
+            [d,phi]=localArcSegment(centre,norm(b),angleB+span(1),angleB+span(2),E(:,j),E(:,next(j)));
+            if d<distance,distance=d;sigma=(phi-angleB)/k;end
+            [d,phi]=localArcSegment(centre,norm(e),angleE-span(2),angleE-span(1),B(:,j),B(:,next(j)));
+            if d<distance,distance=d;sigma=(angleE-phi)/k;end
+        end
+    end
+end
+
+function q = localAlong(q,sigma)
+    % The target state at arc length sigma along its track (pose only).
+    k=sin(q(6))/q(7);half=k*sigma/2;scale=1;if half~=0,scale=sin(half)/half;end
+    q(1:2)=q(1:2)+sigma*scale*predictiveSafetyGeometry.direction(q(3)+q(6)+half);
+    q(3)=q(3)+k*sigma;
+end
+
+function corners = localCorners(pose,shape)
+    rotation=[cos(pose(3)),-sin(pose(3));sin(pose(3)),cos(pose(3))];
+    corners=pose(1:2)+rotation*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);
+end
+
+function [distance,t] = localPointSegment(p,a,b)
+    d=b-a;length2=d.'*d;t=0;
+    if length2>0,t=min(1,max(0,((p-a).'*d)/length2));end
+    distance=norm(p-a-t*d);
+end
+
+function [distance,t] = localSegmentSegment(p1,p2,q1,q2)
+    % Least distance between the segments [p1,p2] and [q1,q2], and the
+    % parameter t on the first where it is attained.
+    d1=p2-p1;d2=q2-q1;cross=d1(1)*d2(2)-d1(2)*d2(1);
+    if abs(cross)>1e-14*max(1,norm(d1)*norm(d2))
+        tu=[d1,-d2]\(q1-p1);
+        if all(tu>=0 & tu<=1),distance=0;t=tu(1);return;end
+    end
+    [distance,~]=localPointSegment(p1,q1,q2);t=0;
+    [d,~]=localPointSegment(p2,q1,q2);if d<distance,distance=d;t=1;end
+    [d,s]=localPointSegment(q1,p1,p2);if d<distance,distance=d;t=s;end
+    [d,s]=localPointSegment(q2,p1,p2);if d<distance,distance=d;t=s;end
+end
+
+function [distance,angle] = localArcSegment(centre,radius,first,last,a,b)
+    % Least distance between the arc of 'radius' about 'centre' over the
+    % angles [first, last] (last - first <= 2 pi) and the segment [a, b], and
+    % the arc angle (in [first, last]) where it is attained. Candidates: the
+    % arc's ends against the segment, the segment's ends against the arc (the
+    % point-to-arc distance: | |p - centre| - radius | when the arc passes
+    % the point's angle), and the segment's line against the circle (the
+    % circle point nearest the line, or an intersection).
+    span=last-first;full=span>=2*pi-1e-12;
+    p=centre+radius*[cos(first);sin(first)];distance=localPointSegment(p,a,b);angle=first;
+    p=centre+radius*[cos(last);sin(last)];d=localPointSegment(p,a,b);
+    if d<distance,distance=d;angle=last;end
+    if radius==0,return;end
+    for p=[a,b]
+        w=p-centre;[inside,phi]=localWithin(atan2(w(2),w(1)),first,span,full);
+        if inside
+            d=abs(norm(w)-radius);if d<distance,distance=d;angle=phi;end
+        end
+    end
+    direction=b-a;length2=direction.'*direction;
+    if length2==0,return;end
+    t=((centre-a).'*direction)/length2;foot=a+t*direction;w=foot-centre;height=norm(w);
+    if height>=radius
+        if t>=0 && t<=1
+            [inside,phi]=localWithin(atan2(w(2),w(1)),first,span,full);
+            if inside && height-radius<distance,distance=height-radius;angle=phi;end
+        end
+    else
+        offset=sqrt(radius^2-height^2)/sqrt(length2);
+        for s=[t-offset,t+offset]
+            if s>=0 && s<=1
+                w=a+s*direction-centre;[inside,phi]=localWithin(atan2(w(2),w(1)),first,span,full);
+                if inside,distance=0;angle=phi;return;end
             end
         end
     end
 end
 
-function band = localBand(a,b,g,h)
-    % {u >= 0 : |a u^2 + b u + g| <= h} as rows [lo, hi] (hi may be Inf).
-    f=@(u)a*u.^2+b*u+g;
-    points=[localScalarRoots(a,b,g-h),localScalarRoots(a,b,g+h)];points=sort(points(points>0));
-    edges=[0,points,Inf];band=zeros(0,2);
-    for k=1:numel(edges)-1
-        lo=edges(k);hi=edges(k+1);
-        if isinf(hi),probe=lo+1;else,probe=(lo+hi)/2;end
-        if abs(f(probe))<=h*(1+1e-9)+1e-12
-            if ~isempty(band) && band(end,2)==lo,band(end,2)=hi;else,band(end+1,:)=[lo,hi];end %#ok<AGROW>
-        end
-    end
-end
-
-function r = localScalarRoots(a,b,c)
-    % Real roots of a u^2 + b u + c = 0 (scalar coefficients).
-    if a==0
-        if b==0,r=zeros(1,0);else,r=-c/b;end
-        return;
-    end
-    disc=b^2-4*a*c;
-    if disc<0,r=zeros(1,0);return;end
-    sgn=sign(b);if sgn==0,sgn=1;end
-    q=-(b+sgn*sqrt(disc))/2;
-    if q==0,r=0;else,r=[q/a,c/q];end
-end
-
-function first = localParabolaDiskExit(aS,bS,gS,aD,bD,gD,rho)
-    % First time u >= 0 at which the parabola is farther than rho from the
-    % origin, Inf when never.
-    p=conv([aS,bS,gS],[aS,bS,gS])+conv([aD,bD,gD],[aD,bD,gD]);p(end)=p(end)-rho^2;
-    if polyval(p,0)>0,first=0;return;end
-    r=roots(p);r=sort(real(r(abs(imag(r))<1e-9*max(1,abs(r)) & real(r)>0))).';
-    first=Inf;
-    for k=1:numel(r)
-        if k<numel(r),probe=(r(k)+r(k+1))/2;else,probe=r(k)+1;end
-        if polyval(p,probe)>0,first=r(k);return;end
-    end
-end
-
-function u = localVertex(a,b)
-    u=nan(size(b));at=a~=0;u(at)=-b(at)./(2*a(at));
-end
-
-function r = localRoots(a,b,c)
-    % Real roots of a u^2 + b u + c = 0 per column, two rows, NaN where absent.
-    % Stable for small a: q = -(b + sign(b) sqrt(disc))/2, roots q/a and c/q.
-    n=numel(c);r=nan(2,n);
-    linear=a==0;at=linear & b~=0;r(1,at)=-c(at)./b(at);
-    disc=b.^2-4*a.*c;ok=~linear & disc>=0;
-    sgn=sign(b);sgn(sgn==0)=1;q=-(b+sgn.*sqrt(max(disc,0)))/2;
-    r(1,ok)=q(ok)./a(ok);
-    at=ok & q~=0;r(2,at)=c(at)./q(at);
-end
-
-function motion = localTargetMotion(model)
-    % Constants of the target's forecast used by the separation certificate:
-    % its tangential acceleration, and for beta ~= 0 the centre of its circle
-    % in path coordinates and the circle's radius widened by the body reach.
-    motion=struct('available',false,'straight',true,'acceleration',0,'diskRadius',Inf,'centre',[NaN;NaN]);
-    q=model.targetEpoch;
-    if isempty(q),return;end
-    motion.available=true;motion.acceleration=q(5);
-    curvature=sin(q(6))/q(7);
-    if curvature==0,return;end
-    motion.straight=false;
-    course=q(3)+q(6);
-    centre=q(1:2)+[-sin(course);cos(course)]/curvature;
-    projection=laneGeometry.project(centre,model.lane);
-    motion.centre=[projection.station;projection.lateralPosition];
-    motion.diskRadius=1/abs(curvature)+norm(q(8:9))+norm(q(10:11));
+function [inside,angle] = localWithin(angle,first,span,full)
+    % Is 'angle' on the arc [first, first + span]; the same angle unwrapped
+    % into it.
+    offset=mod(angle-first,2*pi);inside=full || offset<=span*(1+1e-12)+1e-12;
+    angle=first+offset;
 end

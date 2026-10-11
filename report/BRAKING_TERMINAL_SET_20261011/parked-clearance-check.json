@@ -1,0 +1,10 @@
+{
+  "seed": 11,
+  "cases": 2917,
+  "fullCircles": 1141,
+  "turning": 1307,
+  "largestDenseMinusClosedMeters": 1.770522367328109E-7,
+  "smallestDenseMinusClosedMeters": -6.2883032114768866E-13,
+  "largestWitnessMismatchMeters": 1.6040502259784262E-12,
+  "largestSampleSpacingMeters": 0.0010482717194580798
+}

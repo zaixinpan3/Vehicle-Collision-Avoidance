@@ -9,8 +9,8 @@ terminal set and recursive feasibility.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout, or the shifted accepted plan extended by the terminal controller) over a horizon that reaches the terminal set; PCBF slack stage, CLF stage with the terminal CLF-level cone, step-size rule on the nonlinear rollout, full-step remainder trust |
-| `terminalSafeSet.m` | CLF-tube terminal set: tube of the terminal controller, encounter end (exit or a relative motion outside the collision cone), level bisection, state-row level, the terminal controller's hold (`u = u* + K e`), nonlinear hard-row checks, the Jacobians of the sampled error map and their ray averages (`rayJacobians`) and the sampled check of the offline certificate |
+| `solvePredictiveControl.m` | One anchor per sample (startup potential-field rollout, or the shifted accepted plan extended by declared-model holds that keep the endpoint terminal) over a horizon that reaches the terminal set; PCBF slack stage with the linearized terminal rows, CLF stage, step-size rule on the nonlinear rollout, full-step remainder trust |
+| `terminalSafeSet.m` | Braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego braking at `a_b` with sideslip and course curvature held, the target on its forecast), membership (admissibility, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the law's realization), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
@@ -20,8 +20,10 @@ terminal set and recursive feasibility.
 
 Each sample builds one nonlinear anchor: a potential-field rollout at startup,
 stopped at its first node in the terminal set; otherwise the shifted previous
-plan, extended by terminal-controller holds when it is shorter than
-`horizonSteps` or its endpoint has left the set. The anchor is linearized once;
+plan, extended while it is shorter than `horizonSteps` by holds of the declared
+model that keep the endpoint in the set (the cruise hold, or else the hold
+nearest to it toward the realization of the terminal law), and by cruise
+holds when its endpoint has left the set. The anchor is linearized once;
 the PCBF stage minimizes prefix safety slack and the CLF stage follows. A
 primary problem that is primal infeasible inside the trust region is re-solved
 with the trust scale doubled until feasible (at most `trustMaximumScale`); a
@@ -35,11 +37,13 @@ is no inherited slack budget or alternate controller. The input trust scale is
 estimated from the full step's second-order remainder. Positive PCBF slack
 still denotes relaxation.
 
-The terminal set is the set of states whose CLF tube misses the target until
-the encounter ends: the target leaves the perception range or its forecast
-motion relative to the tube's box is outside their collision cone
-(`terminalSafeSet`). In the convex
-problem it is one cone on the endpoint's CLF level. The endpoint also carries
+The terminal set is the set of states whose joint continuation under the
+terminal law (the ego braking to a stop with its sideslip and course
+curvature held, the target on its forecast) stays on the road and clears the
+target until it leaves the perception range, after the stop over the target's
+remaining track (`terminalSafeSet`). In the convex problem its conditions are
+linearized at the anchor endpoint: collision rows at the continuation's nodes,
+midpoints and parked pose, and road rows along it. The endpoint also carries
 the collision and road rows. The road `lateralClearance = [right; left]` is the
 only lateral constraint: every ego rectangle corner stays inside it at every
 predicted node and hold midpoint, including the endpoint. Both ends of every
@@ -106,9 +110,12 @@ positive-slack reporting, terminal-set membership of the endpoint, that the
 issued plan is the nonlinear rollout of its inputs, that the shifted plan is a
 feasible candidate at the next samples, the shortest target-free horizon, the
 single fresh re-solve of a failed shift, and that an unusable shift is
-reported. `terminalSafeSetTest` checks invariance under the terminal
-controller, nesting of levels, the state-row level, the end of an encounter
-(exit or outside the collision cone) and the grid; `nominalClfTest` checks
+reported. `terminalSafeSetTest` checks the closed-form continuation against
+an RK4 integration of the terminal law, invariance under the law down to
+rest, the exact parked check against dense sampling of the target's track
+(straight, circling, turning and stationary targets), the end of an encounter
+(exit or parked check), admissibility and the road, the linearized rows, and
+the anchor's holds; `nominalClfTest` checks
 the stored certificate of P and K (input bound, box, fill, contraction,
 hold factor) and repeats its sampled check with another seed. `trustInnovationTest` checks the full-step remainder trust law:
 the next scale, bounded growth, the clamped law, and attribution of a

@@ -12,12 +12,13 @@ For the given path and desired cruise trim, define
     V(x) = e(x)' P e(x),       P > 0.
 
 Longitudinal path phase is free. `nonlinearBicycleModel.cruise` computes the trim
-and reads P, the terminal controller's gain K and their certificate from
+and reads P, the gain K of the cruise controller and their certificate from
 `config/clfMatrices.json`; it never computes them. `nominalValue` evaluates
 this quadratic directly. There is no LQR design; the gain K is used only by
-the terminal controller `u = u* + K e` of the terminal set
-([TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md), Section 2), never by the
-optimizer. No nominal-policy rollout, finite-difference Hessian, cost-to-go
+the cruise controller `u = u* + K e`, whose hold extends the anchor while it
+keeps the endpoint in the terminal set (`terminalSafeSet.cruiseInput`;
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md), Section 7), never by the
+optimizer. The terminal set itself does not use the CLF. No nominal-policy rollout, finite-difference Hessian, cost-to-go
 kernel, or additional terminal value is used to construct the CLF.
 
 ## Requested decrease: a convergence time constant
@@ -33,7 +34,7 @@ of the error as V measures it; one lane width (3.66 m) returns to within
 (eta = 0.5 times e'Qe), whose speed differed between error directions by a
 factor of about 25 for the same eta.
 
-## Offline certificate of P and the terminal controller
+## Offline certificate of P and the cruise controller
 
 `scripts/synthesizeClfMatrices.m` computes P and K before experiments, for
 each operating point (vehicle parameters, speed, path curvature, sample time
@@ -93,11 +94,11 @@ enclosure's growth stops it; the pair with the largest fill is kept. Its
 vertex inequalities are re-verified by eigenvalues and the smallest
 contraction they certify is recorded (`certifiedContraction`, at most `rho`).
 The partial-hold maps are enclosed the same way, on the same samples, to give
-the hold factor by which the CLF tube is inflated between samples.
+the hold factor, the excess of the CLF radius inside a hold.
 YALMIP/SeDuMi from `solver/`.
 
-The only non-algebraic step is the enclosure (hypothesis H3 of
-TERMINAL_SAFE_SET.md): it is built from 1200 boundary and 600 interior
+The only non-algebraic step is the enclosure hypothesis (the ray averages
+over the set lie in the recorded zonotope): it is built from 1200 boundary and 600 interior
 samples of the inflated set with a recorded seed. The entry records the
 samples' seed, the coefficient bounds, the residual (with the quadrature's
 share), the largest slip angles reached, the inputs' maxima, and an
@@ -109,7 +110,7 @@ The former certificate (until October 10, 2026) was the fastest contraction
 of the linearized sampled model with the input bound and a shape constraint
 (time constants 2.1 s at 8 m/s and 1.5 s at 15 m/s against the required 4 s);
 its gain was discarded and the nonlinear decrease was checked online by the
-terminal controller. Closing that gap with a Lipschitz bound on the nonlinear
+then terminal controller. Closing that gap with a Lipschitz bound on the nonlinear
 remainder fails by two orders of magnitude (the modified Fiala tire is
 nonlinear at slips of a few hundredths of a radian), which is why the
 certificate now encloses the Jacobians over the set instead of trusting one

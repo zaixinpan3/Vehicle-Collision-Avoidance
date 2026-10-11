@@ -1,0 +1,65 @@
+Unrecovered encounters of the paired campaign: frames executed, ego speed and the
+endpoint's stop time (braking arm) at the last solved frame, and the acceptance reasons of
+the last ten solved frames ("" = full step accepted).
+== baseline
+seed1-speed15-acceleratingHeadOn       nonlinearAcceptanceFailed  frames    0 v     - stop     - reasons {} 
+seed1-speed15-brakingLead              pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed1-speed8-brakingLead               pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed1-speed8-curvedCrossing            pcbfNoNumericalResult      frames   27 v  5.76 stop     - reasons {'terminal:levelAboveCertifiedRegion': 3, '': 5, 'terminal:tubeMeetsTarget': 2} 
+seed1-speed8-curvedHeadOn              nonlinearAcceptanceFailed  frames 1581 v  6.73 stop     - reasons {'': 5, 'terminal:levelAboveCertifiedRegion': 5} 
+seed1-speed8-turningCrossing           pcbfNoNumericalResult      frames    8 v  6.56 stop     - reasons {'': 8} 
+seed2-speed15-brakingLead              timeLimit                  frames    1 v 15.00 stop     - reasons {'': 1} 
+seed2-speed8-brakingLead               timeLimit                  frames    1 v  8.00 stop     - reasons {'': 1} 
+seed2-speed8-curvedCrossing            pcbfNoNumericalResult      frames    5 v  7.26 stop     - reasons {'': 5} 
+seed2-speed8-turningCrossing           pcbfNoNumericalResult      frames   12 v  5.96 stop     - reasons {'': 9, 'terminal:levelAboveCertifiedRegion': 1} 
+seed20261003-speed15-brakingLead       pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed20261003-speed8-brakingLead        pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed20261003-speed8-curvedHeadOn       nonlinearAcceptanceFailed  frames    8 v  6.78 stop     - reasons {'': 6, 'terminal:levelAboveCertifiedRegion': 2} 
+seed3-speed15-brakingLead              pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed3-speed8-acceleratingHeadOn        nonlinearAcceptanceFailed  frames   11 v  6.30 stop     - reasons {'': 3, 'terminal:levelAboveCertifiedRegion': 7} 
+seed3-speed8-brakingLead               pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed3-speed8-curvedCrossing            pcbfNoNumericalResult      frames   34 v  4.26 stop     - reasons {'': 10} 
+seed3-speed8-turningCrossing           nonlinearAcceptanceFailed  frames   13 v  6.37 stop     - reasons {'': 10} 
+seed4-speed15-acceleratingHeadOn       nonlinearAcceptanceFailed  frames    0 v     - stop     - reasons {} 
+seed4-speed15-brakingLead              pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed4-speed15-headOn                   nonlinearAcceptanceFailed  frames    0 v     - stop     - reasons {} 
+seed4-speed8-brakingLead               pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed4-speed8-curvedCrossing            pcbfNoNumericalResult      frames   22 v  4.77 stop     - reasons {'': 8, 'terminal:tubeMeetsTarget': 2} 
+seed4-speed8-curvedHeadOn              nonlinearAcceptanceFailed  frames    9 v  6.62 stop     - reasons {'': 3, 'terminal:levelAboveCertifiedRegion': 6} 
+seed4-speed8-turningCrossing           pcbfNoNumericalResult      frames   29 v  6.17 stop     - reasons {'': 5, 'terminal:levelAboveCertifiedRegion': 5} 
+seed5-speed15-brakingLead              pcbfNoNumericalResult      frames    0 v     - stop     - reasons {} 
+seed5-speed15-crossing                 clfNoNumericalResult       frames    0 v     - stop     - reasons {} 
+seed5-speed8-acceleratingHeadOn        nonlinearAcceptanceFailed  frames   10 v  6.45 stop     - reasons {'terminal:levelAboveCertifiedRegion': 6, '': 4} 
+seed5-speed8-brakingLead               nonlinearAcceptanceFailed  frames   14 v  7.60 stop     - reasons {'': 8, 'terminal:levelAboveCertifiedRegion': 2} 
+seed5-speed8-curvedCrossing            pcbfNoNumericalResult      frames   34 v  5.92 stop     - reasons {'': 10} 
+seed5-speed8-curvedHeadOn              nonlinearAcceptanceFailed  frames    8 v  6.78 stop     - reasons {'': 6, 'terminal:levelAboveCertifiedRegion': 2} 
+== braking
+seed0-speed15-brakingLead              anchorUnavailable          frames  341 v  1.28 stop  0.25 reasons {'terminal:parkedEgoMeetsTarget': 10} extension {'noHoldStaysTerminal': 10}
+seed0-speed15-turningCrossing          nonlinearAcceptanceFailed  frames  123 v  6.64 stop  0.50 reasons {'': 3, 'terminal:parkedEgoMeetsTarget': 7} extension {'': 10}
+seed0-speed8-brakingLead               nonlinearAcceptanceFailed  frames   54 v  3.58 stop  0.35 reasons {'terminal:parkedEgoMeetsTarget': 10} extension {'': 10}
+seed0-speed8-crossing                  nonlinearAcceptanceFailed  frames   30 v  2.79 stop  0.25 reasons {'': 8, 'terminal:continuationMeetsTarget': 2} extension {'': 8, 'cruiseHoldInadmissible': 2}
+seed0-speed8-turningCrossing           nonlinearAcceptanceFailed  frames   29 v  3.15 stop  0.25 reasons {'': 9, 'terminal:continuationMeetsTarget': 1} extension {'': 9, 'noHoldStaysTerminal': 1}
+seed1-speed8-brakingLead               pcbfNoNumericalResult      frames   79 v  7.67 stop  1.55 reasons {'': 10} extension {'': 10}
+seed1-speed8-curvedCrossing            pcbfNoNumericalResult      frames    7 v  6.93 stop  1.30 reasons {'': 7} extension {'': 7}
+seed1-speed8-curvedHeadOn              pcbfNoNumericalResult      frames 1584 v  5.63 stop  1.20 reasons {'': 9, 'terminal:continuationMeetsTarget': 1} extension {'': 10}
+seed1-speed8-turningCrossing           nonlinearAcceptanceFailed  frames   32 v  4.44 stop  1.30 reasons {'': 9, 'handlingEnvelope': 1} extension {'': 10}
+seed2-speed15-brakingLead              clfNoNumericalResult       frames  109 v 16.11 stop  3.00 reasons {'': 10} extension {'': 10}
+seed2-speed15-curvedCrossing           anchorUnavailable          frames   34 v 12.87 stop  2.65 reasons {'': 10} extension {'noHoldStaysTerminal': 10}
+seed2-speed8-acceleratingHeadOn        nonlinearAcceptanceFailed  frames   13 v  6.06 stop  2.00 reasons {'': 8, 'terminal:terminalLawInadmissible': 1, 'handlingEnvelope': 1} extension {'': 10}
+seed2-speed8-curvedCrossing            pcbfNoNumericalResult      frames    8 v  6.71 stop  1.30 reasons {'': 8} extension {'': 8}
+seed2-speed8-curvedHeadOn              pcbfNoNumericalResult      frames   15 v  5.73 stop  1.00 reasons {'': 6, 'terminal:parkedEgoMeetsTarget': 2, 'terminal:continuationMeetsTarget': 2} extension {'': 10}
+seed2-speed8-turningCrossing           nonlinearAcceptanceFailed  frames   33 v  3.88 stop  1.25 reasons {'': 7, 'handlingEnvelope': 3} extension {'': 10}
+seed20261003-speed15-curvedCrossing    anchorUnavailable          frames   35 v 12.59 stop  2.60 reasons {'': 10} extension {'noHoldStaysTerminal': 10}
+seed20261003-speed8-acceleratingHeadOn clfNoNumericalResult       frames   36 v  9.17 stop  1.75 reasons {'': 8, 'terminal:terminalLawInadmissible': 1, 'handlingEnvelope': 1} extension {'': 10}
+seed20261003-speed8-curvedCrossing     pcbfNoNumericalResult      frames    7 v  6.92 stop  1.30 reasons {'': 7} extension {'': 7}
+seed20261003-speed8-curvedHeadOn       pcbfNoNumericalResult      frames   14 v  5.86 stop  1.15 reasons {'': 8, 'terminal:continuationMeetsTarget': 2} extension {'': 10}
+seed20261003-speed8-headOn             nonlinearAcceptanceFailed  frames   17 v  5.61 stop  1.90 reasons {'': 3, 'terminal:terminalLawInadmissible': 4, 'handlingEnvelope': 3} extension {'': 10}
+seed3-speed15-brakingLead              nonlinearAcceptanceFailed  frames   63 v 14.90 stop  3.00 reasons {'': 10} extension {'': 10}
+seed3-speed15-curvedCrossing           nonlinearAcceptanceFailed  frames   28 v 11.89 stop  2.50 reasons {'': 10} extension {'': 2, 'noHoldStaysTerminal': 8}
+seed3-speed8-brakingLead               pcbfNoNumericalResult      frames   83 v  8.11 stop  1.60 reasons {'': 9, 'terminal:parkedEgoMeetsTarget': 1} extension {'': 10}
+seed3-speed8-curvedCrossing            pcbfNoNumericalResult      frames    7 v  6.92 stop  1.30 reasons {'': 7} extension {'': 7}
+seed3-speed8-curvedHeadOn              pcbfNoNumericalResult      frames   15 v  5.74 stop  1.25 reasons {'': 7, 'terminal:parkedEgoMeetsTarget': 1, 'terminal:continuationMeetsTarget': 2} extension {'': 10}
+seed4-speed8-acceleratingHeadOn        nonlinearAcceptanceFailed  frames   28 v  5.07 stop  1.35 reasons {'': 3, 'handlingEnvelope': 7} extension {'': 10}
+seed4-speed8-curvedHeadOn              nonlinearAcceptanceFailed  frames 1573 v  7.34 stop  1.15 reasons {'': 9, 'terminal:parkedEgoMeetsTarget': 1} extension {'': 10}
+seed5-speed8-curvedCrossing            pcbfNoNumericalResult      frames    7 v  6.93 stop  1.30 reasons {'': 7} extension {'': 7}
+seed5-speed8-curvedHeadOn              pcbfNoNumericalResult      frames 1597 v  5.16 stop  1.25 reasons {'': 10} extension {'': 10}
