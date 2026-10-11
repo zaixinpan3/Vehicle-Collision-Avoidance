@@ -3,21 +3,19 @@ classdef nonlinearBicycleModel
     % RK4 and its variational equations define the numerical prediction model.
     methods (Static)
         function dx = derivative(x,u,cfg,curvature)
+            % The declared model: the Fiala bicycle above
+            % model.kinematicSpeedRange, a kinematic bicycle below it, and a
+            % smooth blend between (localBody); position and heading follow
+            % the body velocities in all three. Above the range it is the
+            % Fiala bicycle exactly. Braking ends at rest (exactly at the end of
+            % a hold, in sample).
             if nargin<4,curvature=[];end
-            if x(4)<=cfg.model.scheduleSpeedFloor || abs(u(2))>1
+            if x(4)<-cfg.model.brakeHoldSpeed || abs(u(2))>1
                 error('collisionAvoidanceController:nonlinearDomain', ...
-                    'Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.');
+                    'The declared model requires forward travel and |b|<=1.');
             end
-            tire=modifiedFialaTire.parameters(cfg);
-            slip=atan2([x(5)+cfg.vehicle.lf*x(6);x(5)-cfg.vehicle.lr*x(6)],x(4))-[u(1);0];
-            fy=modifiedFialaTire.evaluate(slip,u(2),cfg);
-            fx=u(2)*tire.longitudinalForceScale;
-            c=cos(u(1));s=sin(u(1));frontX=fx(1)*c-fy(1)*s;frontY=fx(1)*s+fy(1)*c;
-            v=x(4);load=nonlinearBicycleModel.roadLoad(v,cfg);
-            dx=[v*cos(x(3))-x(5)*sin(x(3));v*sin(x(3))+x(5)*cos(x(3));x(6); ...
-                (frontX+fx(2)-load)/cfg.vehicle.m+x(5)*x(6); ...
-                (frontY+fy(2))/cfg.vehicle.m-v*x(6); ...
-                (cfg.vehicle.lf*frontY-cfg.vehicle.lr*fy(2))/cfg.vehicle.Iz];
+            v=x(4);
+            dx=[v*cos(x(3))-x(5)*sin(x(3));v*sin(x(3))+x(5)*cos(x(3));x(6);localBody(x,u,cfg)];
             if ~isempty(curvature)
                 denominator=1-curvature*x(2);
                 if denominator<=0,error('collisionAvoidanceController:nonlinearDomain','Invalid Frenet chart.');end
@@ -102,29 +100,25 @@ classdef nonlinearBicycleModel
         end
 
         function [a,b] = jacobian(x,u,cfg,curvature)
-            % Analytic combined-slip tire and body-force derivatives.
+            % Analytic derivatives of derivative: combined-slip tire and
+            % body forces above the kinematic speed range, the kinematic
+            % bicycle below it, and between them the blend with the slope of
+            % its weight.
             if nargin<4,curvature=[];end
-            tire=modifiedFialaTire.affineModel(x,u,cfg);
-            scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
-            fx=u(2)*scale;c=cos(u(1));s=sin(u(1));
-            frontX=fx(1)*c-tire.force(1)*s;frontY=fx(1)*s+tire.force(1)*c;
-            forceX=-s*tire.state(1,:);
-            forceY=c*tire.state(1,:);
-            inputX=-s*tire.input(1,:)+[-frontY,c*scale(1)];
-            inputY=c*tire.input(1,:)+[frontX,s*scale(1)];
-            [~,loadSlope]=nonlinearBicycleModel.roadLoad(x(4),cfg);
-            a=zeros(6);b=zeros(6,2);cp=cos(x(3));sp=sin(x(3));
-            a(1,3)=-x(4)*sp-x(5)*cp;a(1,4:5)=[cp,-sp];
-            a(2,3)=x(4)*cp-x(5)*sp;a(2,4:5)=[sp,cp];a(3,6)=1;
-            a(4,:)=forceX/cfg.vehicle.m;a(4,4)=a(4,4)-loadSlope/cfg.vehicle.m;
-            a(4,5:6)=a(4,5:6)+[x(6),x(5)];
-            a(5,:)=(forceY+tire.state(2,:))/cfg.vehicle.m;
-            a(5,[4,6])=a(5,[4,6])-[x(6),x(4)];
-            a(6,:)=(cfg.vehicle.lf*forceY-cfg.vehicle.lr*tire.state(2,:))/cfg.vehicle.Iz;
-            b(4,:)=(inputX+[0,scale(2)])/cfg.vehicle.m;
-            b(5,:)=(inputY+tire.input(2,:))/cfg.vehicle.m;
-            b(6,:)=(cfg.vehicle.lf*inputY-cfg.vehicle.lr*tire.input(2,:))/cfg.vehicle.Iz;
+            [weight,slope]=localBlend(x(4),cfg);
+            if weight==1
+                [a,b]=localFialaJacobian(x,u,cfg);
+            else
+                [a,b]=localKinematicJacobian(x,u,cfg);
+                if weight>0
+                    [af,bf]=localFialaJacobian(x,u,cfg);
+                    a(4:6,:)=weight*af(4:6,:)+(1-weight)*a(4:6,:);
+                    b(4:6,:)=weight*bf(4:6,:)+(1-weight)*b(4:6,:);
+                    a(4:6,4)=a(4:6,4)+slope*(localFialaBody(x,u,cfg)-localKinematicBody(x,u,cfg));
+                end
+            end
             if ~isempty(curvature)
+                cp=cos(x(3));sp=sin(x(3));
                 denominator=1-curvature*x(2);
                 forward=x(4)*cp-x(5)*sp;
                 a(1,:)=a(1,:)/denominator;
@@ -283,6 +277,99 @@ function a=localWrap(a)
     a=atan2(sin(a),cos(a));
 end
 
+function [weight,slope]=localBlend(speed,cfg)
+    % Weight of the Fiala bicycle: 0 below model.kinematicSpeedRange, 1
+    % above it, a cubic smoothstep between; and its derivative in speed.
+    range=cfg.model.kinematicSpeedRange;
+    s=min(1,max(0,(speed-range(1))/(range(2)-range(1))));
+    weight=s^2*(3-2*s);slope=6*s*(1-s)/(range(2)-range(1));
+end
+
+function body=localBody(x,u,cfg)
+    % Body accelerations [v_x'; v_y'; r'] of the declared model.
+    weight=localBlend(x(4),cfg);body=zeros(3,1);
+    if weight>0,body=weight*localFialaBody(x,u,cfg);end
+    if weight<1,body=body+(1-weight)*localKinematicBody(x,u,cfg);end
+end
+
+function body=localFialaBody(x,u,cfg)
+    % The Fiala bicycle's body accelerations (Fahmy et al., 2018).
+    if x(4)<=cfg.model.scheduleSpeedFloor
+        error('collisionAvoidanceController:nonlinearDomain', ...
+            'Positive-speed Fiala dynamics require vx above the declared domain floor.');
+    end
+    tire=modifiedFialaTire.parameters(cfg);
+    slip=atan2([x(5)+cfg.vehicle.lf*x(6);x(5)-cfg.vehicle.lr*x(6)],x(4))-[u(1);0];
+    fy=modifiedFialaTire.evaluate(slip,u(2),cfg);
+    fx=u(2)*tire.longitudinalForceScale;
+    c=cos(u(1));s=sin(u(1));frontX=fx(1)*c-fy(1)*s;frontY=fx(1)*s+fy(1)*c;
+    v=x(4);load=nonlinearBicycleModel.roadLoad(v,cfg);
+    body=[(frontX+fx(2)-load)/cfg.vehicle.m+x(5)*x(6); ...
+        (frontY+fy(2))/cfg.vehicle.m-v*x(6); ...
+        (cfg.vehicle.lf*frontY-cfg.vehicle.lr*fy(2))/cfg.vehicle.Iz];
+end
+
+function body=localKinematicBody(x,u,cfg)
+    % The kinematic bicycle: the yaw rate relaxes with
+    % model.kinematicLagSeconds to v_x tan(delta)/L and the lateral velocity
+    % to l_r times it (no slip at the rear axle); the longitudinal force is
+    % the braking ratio times the axles' force scales (no lateral tire
+    % force), and braking fades below model.brakeHoldSpeed, so that it ends
+    % at rest and never reverses the vehicle.
+    scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+    wheelbase=cfg.vehicle.lf+cfg.vehicle.lr;lag=cfg.model.kinematicLagSeconds;
+    hold=tanh(x(4)/cfg.model.brakeHoldSpeed);
+    force=(max(u(2),0)+min(u(2),0)*hold)*(scale(1)*cos(u(1))+scale(2));
+    rate=x(4)*tan(u(1))/wheelbase;
+    body=[(force-nonlinearBicycleModel.roadLoad(x(4),cfg))/cfg.vehicle.m+x(5)*x(6); ...
+        (cfg.vehicle.lr*rate-x(5))/lag;(rate-x(6))/lag];
+end
+
+function [a,b]=localFialaJacobian(x,u,cfg)
+    % Analytic combined-slip tire and body-force derivatives.
+    tire=modifiedFialaTire.affineModel(x,u,cfg);
+    scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+    fx=u(2)*scale;c=cos(u(1));s=sin(u(1));
+    frontX=fx(1)*c-tire.force(1)*s;frontY=fx(1)*s+tire.force(1)*c;
+    forceX=-s*tire.state(1,:);
+    forceY=c*tire.state(1,:);
+    inputX=-s*tire.input(1,:)+[-frontY,c*scale(1)];
+    inputY=c*tire.input(1,:)+[frontX,s*scale(1)];
+    [~,loadSlope]=nonlinearBicycleModel.roadLoad(x(4),cfg);
+    a=zeros(6);b=zeros(6,2);cp=cos(x(3));sp=sin(x(3));
+    a(1,3)=-x(4)*sp-x(5)*cp;a(1,4:5)=[cp,-sp];
+    a(2,3)=x(4)*cp-x(5)*sp;a(2,4:5)=[sp,cp];a(3,6)=1;
+    a(4,:)=forceX/cfg.vehicle.m;a(4,4)=a(4,4)-loadSlope/cfg.vehicle.m;
+    a(4,5:6)=a(4,5:6)+[x(6),x(5)];
+    a(5,:)=(forceY+tire.state(2,:))/cfg.vehicle.m;
+    a(5,[4,6])=a(5,[4,6])-[x(6),x(4)];
+    a(6,:)=(cfg.vehicle.lf*forceY-cfg.vehicle.lr*tire.state(2,:))/cfg.vehicle.Iz;
+    b(4,:)=(inputX+[0,scale(2)])/cfg.vehicle.m;
+    b(5,:)=(inputY+tire.input(2,:))/cfg.vehicle.m;
+    b(6,:)=(cfg.vehicle.lf*inputY-cfg.vehicle.lr*tire.input(2,:))/cfg.vehicle.Iz;
+end
+
+function [a,b]=localKinematicJacobian(x,u,cfg)
+    % Derivatives of localKinematicBody with the position rows. At b = 0 the
+    % braking-ratio derivative is that of braking.
+    scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+    wheelbase=cfg.vehicle.lf+cfg.vehicle.lr;lag=cfg.model.kinematicLagSeconds;
+    holdSpeed=cfg.model.brakeHoldSpeed;hold=tanh(x(4)/holdSpeed);
+    traction=scale(1)*cos(u(1))+scale(2);gain=max(u(2),0)+min(u(2),0)*hold;
+    [~,loadSlope]=nonlinearBicycleModel.roadLoad(x(4),cfg);
+    t=tan(u(1));m=cfg.vehicle.m;
+    a=zeros(6);b=zeros(6,2);cp=cos(x(3));sp=sin(x(3));
+    a(1,3)=-x(4)*sp-x(5)*cp;a(1,4:5)=[cp,-sp];
+    a(2,3)=x(4)*cp-x(5)*sp;a(2,4:5)=[sp,cp];a(3,6)=1;
+    a(4,4)=(min(u(2),0)*traction*(1-hold^2)/holdSpeed-loadSlope)/m;a(4,5:6)=[x(6),x(5)];
+    a(5,4)=cfg.vehicle.lr*t/(wheelbase*lag);a(5,5)=-1/lag;
+    a(6,4)=t/(wheelbase*lag);a(6,6)=-1/lag;
+    b(4,1)=-gain*scale(1)*sin(u(1))/m;
+    if u(2)>0,b(4,2)=traction/m;else,b(4,2)=hold*traction/m;end
+    b(5,1)=cfg.vehicle.lr*x(4)*(1+t^2)/(wheelbase*lag);
+    b(6,1)=x(4)*(1+t^2)/(wheelbase*lag);
+end
+
 function y=localIntegrate(x,u,cfg,curvature,duration,variational)
     % One even integration mesh for full holds and their midpoints.
     count=max(1,round(nonlinearBicycleModel.meshCount(cfg)*duration/cfg.controller.sampleTime));
@@ -295,6 +382,19 @@ function y=localIntegrate(x,u,cfg,curvature,duration,variational)
         k4=localDerivative(y+h*k3,u,cfg,curvature,variational);
         y=y+h*(k1+2*k2+2*k3+k4)/6;
     end
+    % A braked vehicle slower than a fifth of brakeHoldSpeed (5 cm/s) at the
+    % end of the integration is at rest: its body velocities and their
+    % sensitivities are exact zeros, not the vanishing tail of the fading
+    % brake, whose coefficients of 1e-4 to 1e-7 left the convex problem
+    % ill-conditioned while the vehicle crept to a stop. Under light braking
+    % the tail would still cover about 1.5 cm.
+    if u(2)<=0 && y(4)<.2*cfg.model.brakeHoldSpeed
+        y(4:6)=0;
+        if variational
+            a=reshape(y(7:42),6,6);b=reshape(y(43:54),6,2);a(4:6,:)=0;b(4:6,:)=0;
+            y(7:42)=a(:);y(43:54)=b(:);
+        end
+    end
 end
 
 function p=localKernelParameters(cfg)
@@ -303,7 +403,8 @@ function p=localKernelParameters(cfg)
         cfg.roadLoad.airDensity;cfg.roadLoad.dragCoefficient;cfg.roadLoad.frontalArea; ...
         cfg.roadLoad.rollingCoefficient;cfg.roadLoad.rollingSpeedCoefficient; ...
         cfg.roadLoad.rollingQuarticCoefficient;cfg.roadLoad.rollingTransitionSpeed; ...
-        cfg.controller.sampleTime;cfg.nonlinear.integrationStep];
+        cfg.controller.sampleTime;cfg.nonlinear.integrationStep; ...
+        cfg.model.kinematicSpeedRange(:);cfg.model.kinematicLagSeconds;cfg.model.brakeHoldSpeed];
 end
 
 function kernel=localKernel(cfg)
@@ -317,12 +418,22 @@ function kernel=localKernel(cfg)
         native=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
         if isfile(fullfile(native,['bicycleSampleKernelMex.',mexext]))
             previous=addpath(native);candidate=@bicycleSampleKernelMex;
-            x=[.3;-.2;.1;max(8,2*cfg.model.scheduleSpeedFloor);.4;-.2];u=[.05;-.3];
-            duration=cfg.controller.sampleTime/2;
-            y=localIntegrate(x,u,cfg,[],duration,true);
-            [next,a,b]=candidate(x,u,localKernelParameters(cfg),duration,true);
+            % Probes in the Fiala, blended and kinematic regimes; a kernel
+            % with another parameter layout fails the call.
+            range=cfg.model.kinematicSpeedRange;
+            probes=[.3;-.2;.1;max(8,2*range(2));.4;-.2]+[zeros(3,3);[0,mean(range)-max(8,2*range(2)),range(1)/2-max(8,2*range(2))];zeros(2,3)];
+            u=[.05;-.3];duration=cfg.controller.sampleTime/2;same=true;
+            for j=1:size(probes,2)
+                y=localIntegrate(probes(:,j),u,cfg,[],duration,true);
+                try
+                    [next,a,b]=candidate(probes(:,j),u,localKernelParameters(cfg),duration,true);
+                    same=same && isequal(y,[next;a(:);b(:)]);
+                catch
+                    same=false;
+                end
+            end
             path(previous);
-            if isequal(y,[next;a(:);b(:)]),handle=candidate;
+            if same,handle=candidate;
             else
                 warning('collisionAvoidanceController:staleModelKernel', ...
                     'The compiled bicycle kernel differs from the model source and is not used. Rebuild it with buildControllerKernels.');

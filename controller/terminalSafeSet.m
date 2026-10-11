@@ -65,7 +65,8 @@ classdef terminalSafeSet
             context=struct('deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
                 'sampleTime',cfg.controller.sampleTime, ...
                 'lateralMaximum',cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared, ...
-                'sideslipMaximum',cfg.model.sideslipMaximum,'shape',shape,'reach',reach, ...
+                'sideslipMaximum',cfg.model.sideslipMaximum,'holdSpeed',cfg.model.brakeHoldSpeed, ...
+                'shape',shape,'reach',reach, ...
                 'margin',cfg.collision.safetyMarginMeters,'required',cfg.collision.safetyMarginMeters+positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'inflation',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'range',cfg.collision.encounterRangeMeters,'clearance',clearance, ...
@@ -270,7 +271,8 @@ classdef terminalSafeSet
             low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);
             tire=modifiedFialaTire.parameters(cfg);
             k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
-            adhesion=sqrt(max(0,1-((x(5)-cfg.vehicle.lr*x(6))/(k*x(4)))^2));
+            adhesion=1;
+            if x(4)>cfg.model.kinematicSpeedRange(1),adhesion=sqrt(max(0,1-((x(5)-cfg.vehicle.lr*x(6))/(k*x(4)))^2));end
             law=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
             fraction=1;ok=false;
             for braking=[cruise(2),max(low,law),max(low,-.95*adhesion)]
@@ -424,17 +426,20 @@ classdef terminalSafeSet
         end
 
         function ok = stateRows(x,cfg)
-            low=[max(cfg.model.speedMinimum,cfg.model.scheduleSpeedFloor+1e-4);-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
+            low=[cfg.model.speedMinimum;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
             high=[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
             ok=all(x(4:6)>=low-1e-9 & x(4:6)<=high+1e-9);
         end
 
         function ok = handlingRows(x,u,cfg)
-            % Rear adhesion ||[w/k; v_x b]|| <= v_x and the sideslip cone.
+            % Rear adhesion ||[w/k; v_x b]|| <= v_x above the declared
+            % model's kinematic regime, and the sideslip cone above
+            % model.brakeHoldSpeed (at rest the sideslip is undefined).
             tire=modifiedFialaTire.parameters(cfg);
             k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
             adhesion=hypot((x(5)-cfg.vehicle.lr*x(6))/k,x(4)*u(2));
-            ok=adhesion<=x(4)*(1+1e-9) && abs(x(5))<=tan(cfg.model.sideslipMaximum)*x(4)*(1+1e-9);
+            ok=(x(4)<=cfg.model.kinematicSpeedRange(1) || adhesion<=x(4)*(1+1e-9)) ...
+                && (x(4)<=cfg.model.brakeHoldSpeed || abs(x(5))<=tan(cfg.model.sideslipMaximum)*x(4)*(1+1e-9));
         end
 
         function margin = roadMargin(x,model)
@@ -521,7 +526,7 @@ function [member,info] = localDecide(context,x,node)
     info=struct('reason',"",'end',"",'stopSeconds',NaN,'exitSeconds',NaN, ...
         'margin',Inf,'roadMargin',Inf);
     member=false;V=hypot(x(4),x(5));
-    if V>0 && (abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9) ...
+    if V>0 && ((x(4)>context.holdSpeed && abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9)) ...
             || abs(x(6)*V)>context.lateralMaximum*(1+1e-9))
         info.reason="notMild";return;
     end

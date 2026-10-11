@@ -47,6 +47,11 @@ unchanged.
     alpha_f = atan2(v_y + lf*r, v_x) - d,   alpha_r = atan2(v_y - lr*r, v_x),
 
 with the controller's modified Fiala tires. The accelerometer measures `a_y`.
+Below `model.kinematicSpeedRange` the controller's declared model, and with
+it the simulated plant, blends into a kinematic bicycle whose lateral forces
+are not those of the Fiala tires. The estimator's domain still ends at
+`scheduleSpeedFloor`, so its force-balance measurement is a model of the
+vehicle above that speed only.
 Each axle force is non-increasing in `v_y`, so the measured `a_y` determines
 `v_y`.
 

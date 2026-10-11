@@ -148,8 +148,25 @@ hold or that recursive feasibility has been established.
 
 ## Prediction and initialization
 
-The Fiala bicycle state is `x = [px; py; yaw; vx; vy; yawRate]` and its input is
-`u = [steering; brakingRatio]`. RK4 defines the prediction map and its tangents.
+The declared model's state is `x = [px; py; yaw; vx; vy; yawRate]` and its input is
+`u = [steering; brakingRatio]`. It is the Fiala bicycle above
+`model.kinematicSpeedRange` (4 m/s), a kinematic bicycle below 2.5 m/s and a
+smooth blend between, so that the vehicle can slow to rest and stay there: in
+the kinematic bicycle the yaw rate and lateral velocity relax with
+`model.kinematicLagSeconds` (0.1 s) to `v_x tan(steering)/L` and `l_r` times it,
+and braking fades below `model.brakeHoldSpeed` (0.25 m/s), so it ends at rest
+and never reverses the vehicle; a braked vehicle slower than a fifth of that
+(5 cm/s) at the end of a hold is at rest exactly, with zero body velocities
+and zero sensitivities. The vanishing tail of the fading brake, with
+coefficients of 1e-4 to 1e-7, left the CLF stage's cone program without a
+numerical result while the vehicle crept to a stop; under light braking that
+tail would cover about 1.5 cm more. The simulated plant (`ode45` on the same
+derivative) has no such step and creeps that tail. The simulated plant is the same model. The
+Fiala tire's own floor (`scheduleSpeedFloor`, 1 m/s) lies inside the kinematic
+regime, where the Fiala forces are not evaluated. In the kinematic regime the
+rear-adhesion cone reduces to `|b| <= 1`, and the sideslip cone applies above
+`brakeHoldSpeed` (at rest the sideslip is undefined). RK4 defines the
+prediction map and its tangents.
 The default uses one 50-ms RK4 step; its midpoint collision node is an endpoint
 interpolant, not an independently integrated half hold.
 

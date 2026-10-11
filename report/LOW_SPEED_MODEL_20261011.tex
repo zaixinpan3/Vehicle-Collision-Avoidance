@@ -1,0 +1,196 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{2em}
+\title{A low-speed regime of the vehicle model: the vehicle can stop}
+\author{}
+\date{October 11, 2026}
+\begin{document}
+\maketitle
+\paragraph{Status and scope.}
+This is the second step approved by the user on October 11, 2026, after the
+mild terminal set of commit \texttt{8d43230}. The terminal set treats a mild
+state as kinematic, and it contains stops: the ego brakes to rest behind a
+vehicle that stays in the range. The declared model, and with it the
+simulated plant, ended at 1~m/s and could not reach those states. This step
+gives the declared model a kinematic regime at low speed. It reports the
+checks, a probe in which stopping is the only safe outcome, and a paired
+campaign against \texttt{8d43230}.
+
+\paragraph{Result.}
+On a road too narrow to pass, behind a stationary vehicle 30~m ahead at
+8~m/s, the controller now stops 0.23~m behind it and stays there for the
+30~s of the probe. Before this step it failed at 1.07~m/s after 3.8~s. The
+campaign is nearly unchanged: 13 of 14 exact encounters (the same ones) and
+72 of 84 noisy (73 before), with no collision. The campaign seldom slows
+the vehicle below 4~m/s: 11 encounters dip to 3.6--3.9~m/s, and none goes
+lower. The differences come from numerical failures of the conic programs and a
+different plan in one exact crossing, whose least replay clearance is
+0.001~m (0.140~m before) at speeds above 6~m/s.
+
+\section{The model}
+The declared model (\texttt{nonlinearBicycleModel.derivative}) is the Fiala
+bicycle above \texttt{model.kinematicSpeedRange}~$=[2.5,4]$~m/s and a
+kinematic bicycle below it. Between the two it blends with the cubic
+smoothstep weight $\lambda(v_x)$. Position and heading follow the body
+velocities in all three. Above 4~m/s it is the Fiala bicycle exactly, so the
+CLF certificates at 8 and 15~m/s are unaffected. The Fiala tire's own floor
+(\texttt{scheduleSpeedFloor}, 1~m/s) lies inside the kinematic regime, where
+the Fiala forces are not evaluated.
+
+The kinematic bicycle has three parts.
+\begin{itemize}
+\item \emph{Lateral states.} The yaw rate relaxes with
+  \texttt{kinematicLagSeconds}~$=0.1$~s to $v_x\tan\delta/L$. The lateral
+  velocity relaxes to $l_r$ times that value, which means no slip at the
+  rear axle.
+\item \emph{Longitudinal force.} It is the braking ratio times the axles'
+  force scales (the front one through $\cos\delta$), with the road load and
+  $v_yr$.
+\item \emph{Braking.} It fades as $\tanh(v_x/0.25)$
+  (\texttt{brakeHoldSpeed}), so it ends at rest and never reverses the
+  vehicle; driving does not fade, so the vehicle can move off from rest.
+\end{itemize}
+
+\paragraph{Exact rest.}
+A vehicle that is braked and slower than 5~cm/s at the end of a hold is at
+rest exactly: its body velocities and their sensitivities are set to zero.
+Without this step, the fading brake leaves a tail of velocities and
+coefficients of 1e-4 to 1e-7. In the probe below that tail left the CLF
+stage's cone program without a numerical result, about 1~s after the
+vehicle had stopped, and again while it crept to rest under light braking.
+A diagnostic run that snapped the plant to rest kept the solves at
+residuals of $5\cdot10^{-13}$, and with exact rest in the model the probe
+holds the stop to its end. The
+simulated plant (\texttt{ode45} on the same derivative) has no such step and
+creeps the tail, about 1.5~cm under light braking.
+
+\paragraph{Rows.}
+The state's speed bound is now \texttt{speedMinimum} (0) instead of the
+Fiala floor. In the kinematic regime the rear-adhesion cone reduces to
+$|b|\le1$, because the rear tire has no lateral force there to saturate. The
+sideslip cone applies above 0.25~m/s, because at rest the sideslip is
+undefined, and the terminal set's mildness check skips it there as well.
+
+\paragraph{Compiled kernel.}
+The kernel's parameter vector gains the four constants (23 entries). The
+interpreted model checks a compiled kernel against itself at a probe in each
+regime, and a kernel that fails the call (another parameter layout) is not
+used. An older checkout, whose check has no such guard, needs its kernels
+rebuilt (\texttt{scripts/buildControllerKernels.m}).
+
+\section{Checks}
+\begin{itemize}
+\item Full suite: 612 of 612 (\path{tests.txt}; 608 before). The new tests
+  are listed below.
+  \begin{itemize}
+  \item The analytic tangent against finite differences in the blended
+    (3.2~m/s) and kinematic (1.5 and 0.1~m/s) regimes, braking and
+    driving, on straight and curved charts.
+  \item Braking at the terminal law's ratio from 6~m/s to rest: never in
+    reverse, the handling rows met, then exactly at rest with zero
+    sensitivities. The distance is 4.4~m against 4.5~m for constant
+    braking at $a_b$, because road load adds to the braking and the brake
+    fades.
+  \item At rest the vehicle stays still under braking, and moves off under
+    driving.
+  \item Above the kinematic range the derivative does not depend on the
+    range.
+  \end{itemize}
+  The kernel test now draws speeds from 0 to 14~m/s.
+\item Offline: the worst relative tangent error is $4.6\cdot10^{-10}$. From
+  6~m/s the vehicle is below 1~mm/s after 1.8~s (1.5~s at a constant
+  4~m/s$^2$).
+\end{itemize}
+
+\section{Stopping behind a stationary vehicle}
+The probe uses a straight road with 1.2~m of lateral clearance on each side
+of the lane centre, too narrow to pass. A stationary vehicle stands in the
+lane 30~m ahead, and the ego starts at 8~m/s. The plant is the declared model
+with RK4 holds, and the run lasts 600 frames.
+\begin{itemize}
+\item \texttt{8d43230}: the plan ran out after 77 frames (3.8~s) at 1.07~m/s
+  and 0.38~m from the vehicle (\texttt{anchorUnavailable}).
+\item This step, before exact rest: the ego stopped 0.23~m behind the
+  vehicle after about 5~s, and the CLF stage failed numerically about 1~s
+  later.
+\item This step: the ego stops 0.23~m behind the vehicle and stays at rest
+  to frame 600. The least clearance is 0.20~m.
+\end{itemize}
+The same probe at 15~m/s with the vehicle 45~m ahead fails at the first
+frame in both versions (\texttt{pcbfNoNumericalResult}). Its startup
+rollout cannot pass on this road, and this step does not address that.
+
+\section{Campaign}
+The 98 encounters were run with \texttt{8d43230} (``mild'') and with this
+step (``low speed''). The base arm used kernels built from its own source.
+The new arm was run twice: before and after exact rest. Both runs gave the
+same outcome in every encounter; the second is reported.
+
+\begin{table}[h]
+\centering\small
+\caption{Paired campaign. No collision in either arm.}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{exact (14)} & \multicolumn{2}{c}{noisy (84)}\\
+ & mild & low speed & mild & low speed\\
+\midrule
+recovered & 13 & 13 & 73 & 72\\
+no solution: \texttt{nonlinearAcceptanceFailed} & 0 & 0 & 2 & 1\\
+no solution: \texttt{anchorUnavailable} & 1 & 1 & 0 & 0\\
+no solution: \texttt{pcbfNoNumericalResult} & 0 & 0 & 8 & 9\\
+no solution: \texttt{clfNoNumericalResult} & 0 & 0 & 1 & 2\\
+least replay clearance (m) & 0.140 & 0.001 & 0.391 & 0.391\\
+median per-run least clearance (m) & 0.455 & 0.457 & 1.849 & 1.843\\
+horizon, 95th percentile holds & 45 & 45 & 79 & 89\\
+controller time per frame, 95th percentile (s) & 0.046 & 0.049 & 0.122 & 0.115\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Per geometry, the exact results are identical. The noisy results differ in
+two geometries. Accelerating head-ons go from 11 to 12 of 12. Braking leads
+go from 11 to 9 of 12: both 8 and 15~m/s with seed 3 now fail on
+\texttt{clfNoNumericalResult}, the 15-m/s one at the first frame, and the
+8-m/s one while following at 3.9~m/s in the blended regime.
+\path{comparison.txt}, \path{campaign-runs.csv} and \path{failures.txt} list
+every encounter.
+
+\paragraph{The exact crossing at 0.001 m.}
+In the exact 8-m/s crossing the vehicle never drops below 5.96~m/s, so it
+never enters the low-speed regime. The plans differ nonetheless, because a
+plan's braking tail now runs into the kinematic regime. From 1.2~s on, the
+new arm chose a sharper swerve (steering to $-0.73$~rad), and the replay
+clearance dropped to 0.9~mm, against 0.14~m before. Both are below the
+0.2-m margin, which binds only at the plan's sampled nodes, and in the prefix
+only as a minimized slack. No collision occurred.
+
+\section{Decisions for the user}
+\begin{itemize}
+\item Keep this model as the declared model and the plant (committed). It is
+  what lets a stop behind a vehicle be reached at all.
+\item Below 4~m/s the estimator still assumes the Fiala force balance, and
+  its domain ends at 1~m/s. No noisy encounter slowed below 3.5~m/s, so
+  estimator-in-the-loop stops are untested.
+\item Numerical failures of the two conic stages remain the main loss (12
+  of 84 noisy encounters). Curved head-ons alone account for 9, and they
+  predate this step.
+\end{itemize}
+
+\section{Reproduction}
+\begin{itemize}
+\item Kernels: \texttt{matlab -batch "addpath('scripts'); buildControllerKernels"}.
+\item Unit tests: \texttt{matlab -batch "results = runtests('tests'); assertSuccess(results)"}.
+\item Campaign: \path{scripts/run-workers.sh 2000 3} of this folder (base arm
+  a \texttt{git archive} of \texttt{8d43230} with its own kernels, new arm a
+  copy of the working tree), then
+  \texttt{python3 -I scripts/compare.py <out-base> <out-new> <folder> mild lowspeed}.
+  Raw outputs under \path{~/.cache/collisionAvoidance/low_speed_20261011/}
+  are disposable and were deleted after the summaries were copied here.
+\item The stopping probe was a session script and is not kept; its setup is
+  described above.
+\end{itemize}
+\end{document}

@@ -75,8 +75,18 @@ function cfg=localDefaults()
         'rollingTransitionSpeed',.5);
     % sideslipMaximum b is the sideslip cone |v_y| <= tan(b) v_x shared with the
     % estimator (its force-balance and course inversions assume it); the
-    % controller enforces it on every predicted node.
+    % controller enforces it on every predicted node above brakeHoldSpeed (at
+    % rest the sideslip is undefined).
+    % The declared model (nonlinearBicycleModel.derivative) is the Fiala
+    % bicycle above kinematicSpeedRange [m/s], a kinematic bicycle below it
+    % and a smooth blend between, so that the vehicle can slow to rest:
+    % scheduleSpeedFloor is the Fiala tire's own floor, below the range. In
+    % the kinematic bicycle the yaw rate and lateral velocity relax to their
+    % kinematic values with kinematicLagSeconds, and braking fades below
+    % brakeHoldSpeed [m/s], so that it ends at rest; a braked vehicle below a
+    % fifth of brakeHoldSpeed at the end of a hold is at rest exactly.
     cfg.model=struct('speedMinimum',0,'speedMaximum',18,'scheduleSpeedFloor',1, ...
+        'kinematicSpeedRange',[2.5,4],'kinematicLagSeconds',.1,'brakeHoldSpeed',.25, ...
         'brakingRatioRateMaximum',Inf,'lateralVelocityMaximum',12,'yawRateMaximum',5, ...
         'sideslipMaximum',.25);
     % One quadratic CLF V = e' P e. Each sample requires
@@ -201,6 +211,16 @@ function localValidate(cfg)
         localInvalid('The positive-speed model domain must have positive width.');
     end
     validateattributes(cfg.model.brakingRatioRateMaximum,{'double'},{'scalar','real','positive'});
+    validateattributes(cfg.model.kinematicSpeedRange,{'double'},{'size',[1,2],'real','finite','increasing'});
+    if cfg.model.kinematicSpeedRange(1)<=cfg.model.scheduleSpeedFloor || cfg.model.kinematicSpeedRange(2)>=cfg.model.speedMaximum
+        localInvalid('The kinematic speed range must lie above the Fiala floor and below the maximum speed.');
+    end
+    for name=["kinematicLagSeconds","brakeHoldSpeed"]
+        validateattributes(cfg.model.(name),{'double'},{'scalar','real','finite','positive'});
+    end
+    if cfg.model.brakeHoldSpeed>=cfg.model.kinematicSpeedRange(1)
+        localInvalid('Braking must fade inside the kinematic regime.');
+    end
     for name=string(fieldnames(cfg.clf)).'
         validateattributes(cfg.clf.(name),{'double'},{'scalar','real','finite','positive'});
     end

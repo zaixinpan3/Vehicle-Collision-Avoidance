@@ -23,7 +23,9 @@ classdef controllerKernelTest < matlab.unittest.TestCase
             count=max(1,round(nonlinearBicycleModel.meshCount(cfg)*fraction));
             stream=RandStream('mt19937ar','Seed',7);
             for trial=1:40
-                x=[10*randn(stream,2,1);randn(stream);4+10*rand(stream);.8*randn(stream);.4*randn(stream)];
+                % Speeds across the kinematic, blended and Fiala regimes.
+                speed=14*rand(stream);
+                x=[10*randn(stream,2,1);randn(stream);speed;.8*randn(stream)*min(1,speed/4);.4*randn(stream)*min(1,speed/4)];
                 u=[.15*randn(stream);max(-.9,min(.9,.4*randn(stream)))];
                 [expected,a,b]=localReference(x,u,cfg,duration,count);
                 [next,an,bn]=nonlinearBicycleModel.sample(x,u,cfg,[],duration);
@@ -50,7 +52,7 @@ classdef controllerKernelTest < matlab.unittest.TestCase
         end
         function kernelKeepsTheModelDomainErrors(testCase)
             cfg=collisionAvoidanceControllerConfig();
-            testCase.verifyError(@()nonlinearBicycleModel.sample([0;0;0;.5;0;0],[0;0],cfg), ...
+            testCase.verifyError(@()nonlinearBicycleModel.sample([0;0;0;-.5;0;0],[0;0],cfg), ...
                 'collisionAvoidanceController:nonlinearDomain');
             testCase.verifyError(@()nonlinearBicycleModel.sample([0;0;0;8;0;0],[0;1.5],cfg), ...
                 'collisionAvoidanceController:nonlinearDomain');

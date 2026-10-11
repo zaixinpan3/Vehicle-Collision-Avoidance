@@ -927,11 +927,23 @@ function [rows,bounds,cone]=localHandling(y,input,brakingIndex,model,generator,m
     cfg=model.cfg;tire=modifiedFialaTire.parameters(cfg);
     k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
     slip=[0,0,0,0,1,-cfg.vehicle.lr];forward=[0,0,0,1,0,0];
-    brake=sparse(1,brakingIndex,1,1,size(map,2));scale=max(y(4),cfg.model.scheduleSpeedFloor);
-    cone=localCone([slip*map/(k*scale);brake],-[slip*y/(k*scale);input(2)], ...
-        (forward*map).'/scale,-y(4)/scale);
-    tangent=tan(cfg.model.sideslipMaximum);side=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];
-    rows=side*map;bounds=-side*y-sum(abs(side*generator),2);
+    % In the declared model's kinematic regime (anchor speed at or below
+    % model.kinematicSpeedRange(1)) the rear tire has no lateral force to
+    % saturate: the cone is only |b| <= 1. The sideslip cone applies above
+    % model.brakeHoldSpeed; at rest the sideslip is undefined.
+    brake=sparse(1,brakingIndex,1,1,size(map,2));
+    if y(4)>cfg.model.kinematicSpeedRange(1)
+        scale=max(y(4),cfg.model.scheduleSpeedFloor);
+        cone=localCone([slip*map/(k*scale);brake],-[slip*y/(k*scale);input(2)], ...
+            (forward*map).'/scale,-y(4)/scale);
+    else
+        cone=localCone([sparse(1,size(map,2));brake],-[0;input(2)],sparse(size(map,2),1),-1);
+    end
+    rows=zeros(0,size(map,2));bounds=zeros(0,1);
+    if y(4)>cfg.model.brakeHoldSpeed
+        tangent=tan(cfg.model.sideslipMaximum);side=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];
+        rows=side*map;bounds=-side*y-sum(abs(side*generator),2);
+    end
 end
 
 function [rows,bounds]=localRoadRows(y,model,generator,map)
@@ -972,7 +984,7 @@ function solution=localTerminalMetrics(solution,model,acceptance)
 end
 
 function [low,high]=localStateLimits(cfg)
-    low=[max(cfg.model.speedMinimum,cfg.model.scheduleSpeedFloor+1e-4);-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
+    low=[cfg.model.speedMinimum;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
     high=[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
 end
 

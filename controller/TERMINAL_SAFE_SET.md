@@ -60,7 +60,9 @@ acceleration is held over each hold, so the speed falls by `a_b h` per hold
 and by what is left in the last one: the ego stops exactly at the end of
 hold `J = ceil(V_E/(a_b h))`.
 
-The plan's state is the Fiala bicycle's `x = [p; psi; v_x; v_y; r]`. Its
+The plan's state is the declared model's `x = [p; psi; v_x; v_y; r]` (the
+Fiala bicycle above 4 m/s, a kinematic bicycle below 2.5 m/s, which can slow to
+rest). Its
 reduction to the family is
 
     V_E = hypot(v_x, v_y),   beta_E = atan2(v_y, v_x),   kappa_E = r / V_E,
@@ -318,7 +320,8 @@ the hard rows and clearing the target at its midpoint and endpoint, until a
 node lies in `X_f` again, at most up to `maximumHorizonSteps`: a longer plan
 that completes the maneuver. Without it an aggressive maneuver longer than
 the plan (a 20-m lane recovery at 15 m/s) could only keep a mild endpoint by
-braking in the plan's tail, and the vehicle braked to the model's speed floor.
+braking in the plan's tail, and the vehicle braked to what was then the
+model's 1-m/s speed floor.
 If guidance does not reach `X_f`, the appended hold is the hold nearest to the
 cruise hold on a segment toward holding the previous steering, which keeps a mild
 endpoint mild: at the cruise hold's braking ratio, or, when that does not keep

@@ -102,6 +102,51 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             end
             testCase.verifyEqual([a,b],finite,AbsTol=2e-6);
         end
+        function lowSpeedTangentMatchesFiniteDifferences(testCase,curvature)
+            % The blended (3.2 m/s) and kinematic (1.5 and 0.1 m/s) regimes,
+            % braking and driving.
+            [~,~,cfg]=localFixture();
+            for state=[[2;.2;.1;3.2;.1;.05],[2;.2;.1;1.5;.05;.04],[2;.2;.1;.1;.002;.01]]
+                for u=[[.03;-.4],[-.05;.2]]
+                    [a,b]=nonlinearBicycleModel.jacobian(state,u,cfg,curvature);
+                    finite=zeros(6,8);point=[state;u];h=1e-7;
+                    for j=1:8
+                        lo=point;hi=point;lo(j)=lo(j)-h;hi(j)=hi(j)+h;
+                        finite(:,j)=(nonlinearBicycleModel.derivative(hi(1:6),hi(7:8),cfg,curvature) ...
+                            -nonlinearBicycleModel.derivative(lo(1:6),lo(7:8),cfg,curvature))/(2*h);
+                    end
+                    testCase.verifyEqual([a,b],finite,AbsTol=1e-5);
+                end
+            end
+        end
+        function theVehicleBrakesToRestAndMovesOffFromIt(testCase)
+            % Braking at the terminal law's ratio with the steering held ends
+            % at rest, never in reverse, with the handling rows met.
+            [~,~,cfg]=localFixture();
+            u=[.05;-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg)];
+            x=[0;0;0;6;0;0];
+            for k=1:60
+                x=nonlinearBicycleModel.sample(x,u,cfg);
+                testCase.verifyGreaterThanOrEqual(x(4),0);
+                testCase.verifyTrue(terminalSafeSet.stateRows(x,cfg) && terminalSafeSet.handlingRows(x,u,cfg));
+            end
+            % At rest exactly, with zero sensitivities of the body velocities.
+            testCase.verifyEqual(x(4:6),zeros(3,1));
+            [~,a,b]=nonlinearBicycleModel.sample(x,u,cfg);
+            testCase.verifyEqual([a(4:6,:),b(4:6,:)],zeros(3,8));
+            % 4.4 m against 4.5 m for constant braking at a_b: road load
+            % adds to the braking and the braking fades near rest.
+            testCase.verifyEqual(x(1),4.4,AbsTol=.1);
+            rest=nonlinearBicycleModel.sample([0;0;0;0;0;0],[0;-.5],cfg);
+            testCase.verifyEqual(rest,zeros(6,1));
+            moving=[0;0;0;0;0;0];
+            for k=1:20,moving=nonlinearBicycleModel.sample(moving,[0;.2],cfg);end
+            testCase.verifyGreaterThan(moving(4),1);
+            % Above the kinematic range the model is the Fiala bicycle.
+            x=[0;0;.1;6;.2;.1];
+            testCase.verifyEqual(nonlinearBicycleModel.derivative(x,[.02;-.1],cfg), ...
+                nonlinearBicycleModel.derivative(x,[.02;-.1],setfield(cfg,'model',setfield(cfg.model,'kinematicSpeedRange',[2,3]))));
+        end
         function jointTargetCoordinatesAreUnactuated(testCase)
             [~,~,cfg]=localFixture();z=[0;0;0;8;0;0;20;3;.4;6];parameters=[1.2;.08;1.6;2.4;.95;0;0];
             [next,a,b]=nonlinearBicycleModel.jointSample(z,[.01;.02],parameters,cfg);
