@@ -145,6 +145,49 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [member,~,info]=terminalSafeSet.member(context,[0;0;0;8;3;0],0);
             testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"notMild");
         end
+        function terminalSideslipIsStricterThanTheEstimatorOperatingCone(testCase)
+            model=localModel([0;0;0;15;2.7;0],[]);
+            model.road.lateralClearance=[100;100];
+            context=terminalSafeSet.context(model);
+            beta=atan2(model.initialState(5),model.initialState(4));
+            testCase.verifyLessThan(beta,model.cfg.model.sideslipMaximum);
+            testCase.verifyGreaterThan(beta,context.sideslipMaximum);
+            [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
+            testCase.verifyFalse(member);
+            testCase.verifyEqual(info.reason,"notMild");
+        end
+        function smallForwardSpeedCannotHideLargeLateralMotion(testCase)
+            model=localModel([0;0;0;.1;.3;0],[]);
+            context=terminalSafeSet.context(model);
+            testCase.verifyLessThan(model.initialState(4),context.holdSpeed);
+            testCase.verifyGreaterThan(hypot(model.initialState(4),model.initialState(5)),context.holdSpeed);
+            [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
+            testCase.verifyFalse(member);
+            testCase.verifyEqual(info.reason,"notMild");
+        end
+        function theSettledConeRemainsConsistentWithItsRowsNearRest(testCase)
+            model=localModel([0;0;0;.1;.02;0],[]);
+            context=terminalSafeSet.context(model);
+            testCase.verifyLessThan(hypot(.1,.02),context.holdSpeed);
+            [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
+            testCase.verifyFalse(member);
+            testCase.verifyEqual(info.reason,"notMild");
+            [~,bounds]=terminalSafeSet.rows(context,model.initialState,0);
+            testCase.verifyLessThan(min(bounds),0);
+        end
+        function aMildEndpointMustKeepRearAdhesionDuringTerminalBraking(testCase)
+            model=localModel([0;0;0;3;.1;-.27],[]);
+            model.road.lateralClearance=[100;100];
+            context=terminalSafeSet.context(model);
+            testCase.verifyTrue(terminalSafeSet.handlingRows(model.initialState,[0;0],model.cfg));
+            testCase.verifyLessThan(atan2(.1,3),context.sideslipMaximum);
+            [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
+            testCase.verifyFalse(member);
+            testCase.verifyEqual(info.reason,"terminalRearAdhesion");
+            [rows,bounds]=terminalSafeSet.rows(context,model.initialState,0);
+            testCase.verifyLessThan(min(bounds),0);
+            testCase.verifyEqual(size(rows,2),6);
+        end
         function theRowsLinearizeTheSetAtTheAnchor(testCase)
             % A member meets every row with the zero correction; each row
             % keeps 5 cm of the margin it has, and the rows predict the change
@@ -155,10 +198,11 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [rows,bounds,~,info]=terminalSafeSet.rows(context,y,0);
             testCase.verifyTrue(terminalSafeSet.member(context,y,0));
             testCase.verifyNotEmpty(rows);testCase.verifyGreaterThanOrEqual(min(bounds),-1e-9);
-            testCase.verifyEqual(min(bounds)+.05,info.margin,AbsTol=1e-6);
+            geometryRows=any(abs(rows(:,1:3))>1e-9,2);
+            testCase.verifyEqual(min(bounds(geometryRows))+.05,info.margin,AbsTol=1e-6);
             dz=[0;0;0;.2;0;0];
             [~,~,after]=terminalSafeSet.member(context,y+dz,0);
-            testCase.verifyEqual(min(bounds-rows*dz)+.05,after.margin,AbsTol=5e-3);
+            testCase.verifyEqual(min(bounds(geometryRows)-rows(geometryRows,:)*dz)+.05,after.margin,AbsTol=5e-3);
             % At the boundary the rows keep what is left and no more.
             close=localModel([0;0;0;8;0;0],[5.52;0;0;6;0;0;1.6;2.4;.95;0;0]);
             closeContext=terminalSafeSet.context(close);

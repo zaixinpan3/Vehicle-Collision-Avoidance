@@ -74,15 +74,15 @@ estimate. The controller is a predictive control barrier function in
 the sense of Huang et al., with a terminal set built from the obstacle's
 predicted motion and one braking maneuver of the ego, and a control
 Lyapunov function for lane following and recovery. Huang's guarantees
-hold with exact information. We show that they survive the estimation
-error and a forecast revised at every sample: with the obstacle sets
-intersected over the measurement history and the ego error carried by a
-tube that the certificate bounds, the minimal relaxation of the
-predictive barrier is nonincreasing along the closed loop and its zero
-set is invariant. In fourteen collision-threat encounters with exact
-states every run ends collision-free with cruise recovered; with the
-estimator and bounded sensor noise, 74 of 84 runs do so, and none
-collides or leaves the road.
+hold with exact information. For an ideal robust problem we derive recursive
+feasibility with nonzero estimation error by intersecting joint enclosures
+with their propagated reachable sets and requiring a common admissible,
+zero-slack terminal continuation. Applying a safety-optimal input makes the
+relaxation nonincreasing and its zero set invariant. The implementation
+premises are stated separately. In the October 11 baseline, all fourteen
+exact-state collision-threat encounters recover cruise without collision;
+with the estimator and bounded noise, 74 of 84 recover, and none collides
+or leaves the road. The direct-execution revision is not that campaign.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -200,29 +200,19 @@ cone and below the rear-tire saturation at which that measurement would
 stop being informative; and the estimator's enclosure tightens the
 controller's constraints.
 
-What remained open is the link between the two certificates. Huang's
-guarantees hold with exact information, so the estimator's bound did not
-enter the safety proof, and the forecast that is revised at every sample
-has no place in a time-invariant argument. We close this gap in the
-following way. Because the obstacle's acceleration and curvature are
-constants of its model, the sets the estimator publishes can be
-intersected along the measurement history into an information set that
-can only shrink; the family of forecasts consistent with it is nested
-from one sample to the next, so a constraint written against the whole
-family can only become easier to satisfy. On the ego side, the departure
-of the next estimate from the plan is bounded by the certificate, and a
-tube seeded by the current enclosure and driven by that bound absorbs
-it along the horizon, in the manner of constraint tightening for
-disturbed systems \cite{ChisciRossiterZappa2001,MayneSeronRakovic2005}
-and of output-feedback predictive control with online estimation bounds
-\cite{KohlerMullerAllgower2021}. With these two devices Huang's shifted
-solution is again a feasible candidate, the minimal relaxation is
-nonincreasing despite the estimation error and the revised forecast, and
-its zero set is invariant (Theorem~\ref{thm:robust}). The theorem is
-honest about its price: it needs the tube to be bounded along the
-horizon and the obstacle's constants to be certified at a width the
-plan can live with, and we report where the present implementation
-stands against both.
+What remained open is the link between the two certificates. A new
+estimate changes the prediction center, and a revised obstacle forecast
+changes the constraints. Section~\ref{subsec:robust} proves recursive
+feasibility for an ideal joint-information formulation: the current joint
+enclosure is intersected with the reachable set after the applied input,
+all future constraints are universal on the propagated sets, and the
+terminal set has a common admissible zero-slack continuation. The new
+reachable sets are then subsets of the old ones at the same absolute
+times. A shifted feasible plan remains feasible; when a primary minimizer
+is applied, its optimal relaxation is nonincreasing and the zero set is
+invariant. This is a theorem about the stated mathematical problem,
+not numerical solver return. Its joint posterior and setwise terminal
+premises are not implemented by per-hold affine tightening.
 
 The contributions are the following.
 \begin{enumerate}
@@ -240,8 +230,8 @@ forward invariant and makes the problem recursively feasible on the
 declared model, and one CLF for lane following and recovery
 (Section~\ref{sec:control}).
 \item The transfer of the PCBF guarantee to the information the
-controller actually has: nested obstacle information sets, an ego tube
-driven by the estimator's certificate, and a theorem that the minimal
+controller can retain: joint reachable-set posterior intersections, a
+common admissible zero-slack terminal continuation, and a theorem that the minimal
 relaxation is nonincreasing and its zero set invariant under the
 certified uncertainty and revised forecasts
 (Section~\ref{subsec:robust}).
@@ -1320,9 +1310,9 @@ relaxation of the collision constraints over a horizon that ends in a
 terminal set, then, with that relaxation held, minimize the violation of
 a decrease condition on one CLF. Every sample builds one nonlinear
 rollout, linearizes the vehicle model along it, and solves the two
-programs on that affine model. The affine solution is a search
-direction: the issued plan is the nonlinear rollout of the largest
-acceptable step along it, and the first input of that plan is applied.
+programs on that affine model. The completed secondary input sequence is
+issued directly. A nonlinear rollout supplies prediction and trust data
+only, with no post-solve scaling or feasibility veto.
 The horizon ends in a terminal set that is forward invariant under one
 braking law, so that on the declared model with exact information the
 plan of one sample, shifted by one hold, is an acceptable plan at the
@@ -1772,12 +1762,14 @@ of a 4\,m/s$^2$ left turn at 15\,m/s, whose sideslip at the center of
 mass is $-0.0093$\,rad, that relation would continue the turn as a
 right turn.
 
-A state is \emph{mild} when its sideslip lies in the cone
+A state is \emph{mild} when its sideslip lies in the separate terminal
+cone ($|\beta_E|\le0.05$~rad in the current configuration), inside
 \eqref{eq:sideslip_cone} and the lateral acceleration of the held arc is
 small, $|rV|\leq a_{\rm m}$. With $a_{\rm b}=4$\,m/s$^2$ and
 $a_{\rm m}=2$\,m/s$^2$ the continuation uses 54\% of the friction
 budget $\mu g=8.3$\,m/s$^2$, and the configuration requires
-$\sqrt{a_{\rm b}^2+a_{\rm m}^2}<\mu g$. Along the continuation
+$\sqrt{a_{\rm b}^2+a_{\rm m}^2}<\mu g$. The terminal braking ratio is also checked against the actuator bounds and
+rear adhesion. Along the continuation
 $\beta_E$ is constant and $|rV|=|\kappa_E|V^2$ only falls, so a mild
 state stays mild. An endpoint in the middle of a swerve is not mild: the
 plan has to settle before it is terminal.
@@ -1846,8 +1838,8 @@ later under $\kappa_{\rm f}$, with the obstacle on its forecast. Then
 $\bm z'\in\mathcal X_f$, or the obstacle has left the range. No sampled
 pose of the continuation from $\bm z$ meets the obstacle before the
 exit, nor does the parked ego at any time after the stop while the
-obstacle is in range. $\mathcal X_f$ is the largest set with these
-properties for the law $\kappa_{\rm f}$.
+obstacle is in range. $\mathcal X_f$ is the largest such set within the settled admissible
+domain for the law $\kappa_{\rm f}$.
 \end{proposition}
 
 \begin{IEEEproof}
@@ -1859,7 +1851,7 @@ absolute times. $\bm z'$ is mild because $\beta_E$ is held and $|rV|$
 falls. Every sampled pose of the new continuation is a pose of the old
 one, so (a) holds and (b) holds up to the same exit instant; the parked
 pose and the obstacle's remaining track are the same, so (c) holds. The
-safety statements are (b) and (c) themselves. A state outside
+safety statements are (b) and (c) themselves. A state in the settled admissible domain but outside
 $\mathcal X_f$ has a continuation under $\kappa_{\rm f}$ that leaves the
 road or meets the obstacle at a sampled instant before the exit or after
 the stop, so no set that the law keeps safe contains it.
@@ -1889,9 +1881,9 @@ plant or of an appended hold from the law; a row is never tighter than
 the anchor itself, so when $\bar{\bm x}_M\in\mathcal X_f$ the zero
 correction satisfies every row. Conditions with more than 5\,m to
 spare, or whose margin exceeds the most their pose can move over the
-trust boxes, are left out. Membership of the issued plan's endpoint is
-decided exactly on its nonlinear rollout (Section~\ref{subsec:program}),
-never by these rows.
+trust boxes, are left out. Exact membership is used when building the
+anchor. The current direct-execution policy does not apply a post-solve
+terminal membership test to the issued inputs.
 
 \subsection{Quadratic Control-Lyapunov Function and Cruise Law}
 \label{subsec:clf}
@@ -2069,9 +2061,9 @@ $\bm n^{\trans}\Delta\bm p_C+2r_C\sin(|\Delta\psi_C|/2)$, and the ego
 terms are the supports of its own pose set.
 
 For the first hold, \eqref{eq:hold_generator} and
-\eqref{eq:target_tube} are the propagation of the current certified
-sets through the affine model, which is what the safety of the applied
-hold needs. For later holds they are an approximation: they assume that
+\eqref{eq:target_tube} propagate the current enclosures through the affine
+ego model and the declared target family. Nonlinear ego remainders are
+additional and have not been certified by this affine propagation. For later holds they are an approximation: they assume that
 the enclosure at the start of hold $i$ will equal the present one and
 that the estimate will then lie on the plan. Neither the family of
 possible future estimates nor the forecast error of the target beyond
@@ -2151,8 +2143,8 @@ $10^{-5}$\,m the zero-slack set is a slab a few micrometers thick, and
 the cone solver repeatedly stalled on the secondary program. Both
 programs are solved by an interior-point cone solver to feasibility and
 gap tolerances of $10^{-6}$, and a solve that stalls is accepted at
-$10^{-4}$: the solution is a search direction that the step-size rule
-below checks on the nonlinear model before anything is issued.
+$10^{-4}$. The current policy issues the completed input sequence directly;
+positive numerical termination is not a nonlinear safety certificate.
 
 When the solver certifies the primary program primal infeasible, the
 input trust scale $\sigma$ is doubled on the same linearization, up to
@@ -2162,32 +2154,16 @@ anchor is still infeasible, one fresh anchor is rolled out under the
 guidance feedback and treated the same way. The secondary program is
 then solved on the selected model.
 
-The affine solution $(\Delta\bm u^\star,\Delta\bm x^\star)$ is a search
-direction about the anchor. For
-$\alpha\in\{1,\tfrac12,\ldots,\tfrac1{32},0\}$, in that order, the
-inputs $\bar{\bm u}+\alpha\Delta\bm u^\star$ are rolled out through $F$
-from the estimate, and the first $\alpha$ is accepted whose rollout
-meets every hard row (road, state limits and handling envelope at every
-node and mid-hold point, and the exact rectangle clearance $d_{\rm m}$
-at every node and mid-hold point beyond the primary holds), whose
-endpoint lies in $\mathcal X_f$ by the exact evaluation of
-\eqref{eq:terminal_set}, and whose summed clearance deficit over the
-primary holds does not exceed the anchor's. The step $\alpha=0$ is the
-anchor itself. The issued plan is that rollout, and the applied command
-is its first input, unclipped. If no step is acceptable, which is
-possible only when the anchor is not itself an acceptable plan, as at
-the first sample of an encounter, the problem is linearized again at
-the rollout of the full step and solved again, at most twice, after
-which no command is issued and the run stops. The run also stops when
-the shifted plan cannot be rolled out, when the primary program has no
-solution after the steps above, or when the secondary program returns
-no converged point. Neither the previous plan nor a primary-only point
-is substituted. A positive $J_1^\star$ is executed and recorded: without
-an enclosure it is a relaxation of the margin within the primary holds;
-with an enclosure it is the summed relaxation of the tightened rows over
-the horizon, while the untightened rows beyond the primary holds remain
-hard and hold on the issued rollout. In neither case is it a statement
-of safety.
+The completed secondary program supplies its input sequence directly. Its
+first input is applied without clipping, post-solve scaling, or a nonlinear
+feasibility veto. A nonlinear rollout of that same sequence supplies prediction
+and the trust remainder only; it does not replace the optimized slacks or
+objective. A rollout outside the declared model domain is reported as
+unavailable and the affine prediction is retained. A frame without a usable
+primary and secondary result reports no optimization solution. Numerical
+solver return is not part of the mathematical recursive-feasibility claim.
+A positive primary value remains a relaxation of modeled margins, not a
+statement of physical safety.
 
 \subsection{Recursive Feasibility With Exact Information}
 \label{subsec:recursive}
@@ -2196,8 +2172,8 @@ Call a plan \emph{accepted} when it is the rollout of its inputs through
 $F$ from the current state, meets the road, state and handling rows at
 every node and mid-hold point, clears the obstacle by $d_{\rm m}$ at
 every node and mid-hold point after the $N$ primary holds, and ends in
-$\mathcal X_f$; the issued plan of Section~\ref{subsec:program} is
-accepted by construction. Consider the hypotheses: (H1) the plant is $F$
+$\mathcal X_f$. This defines feasibility of the ideal nonlinear problem; a
+local convex output is not assumed to meet these exact rows. Consider the hypotheses: (H1) the plant is $F$
 and the state is known exactly; (H2) the obstacle follows the forecast
 used at sample $k$, with the same $A_C$ and $\beta_C$; (H3) from the
 endpoint of the plan, some hold of $F$ keeps the endpoint in
@@ -2226,377 +2202,227 @@ $\mathcal X_f$, whose condition (b) at $j=0$ includes the node's own
 clearance.
 \end{IEEEproof}
 
-This is the shifted solution of \cite[eq.~(10)]{HuangWangMargellosGoulart2025}
-for this problem, and the optimizer never has to find it: it is the step
-$\alpha=0$ of the rule in Section~\ref{subsec:program}. Under (H1) and
-(H2), once a plan of an encounter has been accepted, no later sample
-reports no solution while the plan has holds left, and (H3) is what
-keeps the plan from running out. Under Assumption~\ref{asm:mild} the
-terminal law's own hold satisfies (H3), since it keeps the endpoint in
-$\mathcal X_f$ by Proposition~\ref{prop:invariance}; the implementation
-does not use the assumption but tries holds of $F$ and keeps one only
-when its endpoint is checked in $\mathcal X_f$
-(Section~\ref{subsec:initialization}). When (H3) fails at consecutive
-samples the plan shrinks by one hold per sample until it is empty. The
-start of an encounter, when an obstacle enters or re-enters the range,
-is an initial-feasibility question outside the statement, and so is a
-re-entry of the obstacle after the exit that ends the continuation: the
-plan's own collision rows apply there, the terminal set does not check
-it.
+This is an existence proof for the ideal problem, following
+\cite[eq.~(10)]{HuangWangMargellosGoulart2025}. It does not assert that a
+solver returns a command. Assumption~\ref{asm:mild} identifies the mild
+model with the terminal kinematics; to infer (H3), the terminal input must
+also meet actuator, rear-adhesion and any slew bounds. The runtime checks
+these on appended holds of the declared model. The start of an encounter
+and re-acquisition after its absorbing exit remain initial-feasibility
+questions outside the proposition.
 
 \subsection{Guarantees Under the Estimator's Certified Uncertainty and
 Revised Forecasts}
 \label{subsec:robust}
 
-Proposition~\ref{prop:recursive} needs what the result of
-\cite{HuangWangMargellosGoulart2025} needs: the state is known, and the
-problem solved at sample $k+1$ is the problem of sample $k$ one step
-later. In the loop neither holds. The controller has an estimate whose
-error the estimator bounds but does not remove, so the shifted plan
-reproduces the old one only up to the innovation, the departure of the
-new estimate from the plan's second node, propagated along the horizon.
-And every new estimate revises the obstacle's forecast, so the collision
-rows and the terminal set are evaluated against a different obstacle at
-the next sample; the shifted endpoint may fall out of the set through no
-fault of the plan. This subsection shows that the two certificates of
-Section~\ref{sec:estimator} are enough to restore the argument, provided
-they are used in a particular way: the obstacle sets intersected over
-the history rather than replaced, and the ego error carried as a tube
-along the horizon rather than charged to each hold on its own. The
-result is a theorem on the information the controller has, not on a
-state it does not have.
+Recursive feasibility is a property of the mathematical problem: a
+feasible problem remains feasible after its first planned input is applied.
+It does not assert that a numerical solver returns a command. The following
+argument retains estimation error and applies the first input of the
+optimization directly. It uses joint information sets rather than replacing
+their center and charging the current enclosure to each hold anew.
 
-\subsubsection{The obstacle's information set}
-Let $\bm\theta=(\bm p_C,\gamma_C,V_C,A_C,\kappa_C)\in\R^6$ collect the
-obstacle's position, course, speed, scalar acceleration and curvature,
-and let $\varphi_\tau$ be the flow of \eqref{eq:target_flow} over a
-time $\tau$: it moves the position and course along the arc, lowers the
-speed to rest and leaves the constants unchanged, except that $A_C$
-becomes zero at rest. Because the arc length adds, the course is affine
-in it and $\max(0,\max(0,V+A\tau_1)+A\tau_2)=\max(0,V+A(\tau_1+\tau_2))$
-once $A$ is set to zero at rest, the flow is a semigroup,
-$\varphi_{\tau_2}\circ\varphi_{\tau_1}=\varphi_{\tau_1+\tau_2}$. At
-sample $k$ the estimator publishes the set $\mathcal Q_k$ of
-Section~\ref{subsec:enclosure} with the true $\bm\theta_k\in\mathcal Q_k$;
-at a sample without a published set put $\mathcal Q_k=\R^6$. Starting
-from the acquisition sample $k_a$, define
+\subsubsection{The information state and its update}
+Let $\bm\zeta$ include the ego state, the obstacle state and parameters,
+and the previous held input, so that slew bounds are constraints on the
+augmented state. A finite encounter includes an absorbing ended flag;
+re-acquisition starts a new initial-feasibility problem. Let
+$\mathcal T(\mathcal J,\bm u)$ be the exact one-hold reachable set from
+$\mathcal J$ under a common held input, including any declared plant-defect
+set, and $\mathcal T_\sigma(\mathcal J,\bm u)$ its images at constrained
+fractions of the hold. The model and defect contract are unchanged across
+samples. These maps are monotone under set inclusion.
+
+At sample $k$ the estimator supplies a joint enclosure
+$\mathcal Q_k^J$ containing the true joint state. Its ego component is
+$\hat{\bm x}_k\oplus\mathcal E_k$, with $\mathcal E_k$ bounded by the
+ISS certificate; relative measurements may retain their correlation with
+the ego pose. Define
 \begin{equation}
-    \mathcal S_{k_a}=\mathcal Q_{k_a},\qquad
-    \mathcal S_{k+1}=\varphi_{T_s}(\mathcal S_k)\cap\mathcal Q_{k+1},
+    \mathcal I_0=\mathcal Q_0^J,\qquad
+    \mathcal I_{k+1}=\mathcal T(\mathcal I_k,\bm u_k)
+        \cap\mathcal Q_{k+1}^J.
     \label{eq:information_set}
 \end{equation}
-and the family of forecasts consistent with the information at $k$,
+An absent measurement contributes the whole declared domain. The truth
+belongs to both sets in the intersection under sound model/defect and
+estimator contracts, so $\mathcal I_k$ is nonempty. Let $\mathcal S_k$
+be its obstacle projection and define
 \begin{equation}
-    \mathcal F_k(t)=\varphi_{t-t_k}(\mathcal S_k),\qquad t\geq t_k .
+    \mathcal F_k(t)=\varphi_{t-t_k}(\mathcal S_k),\qquad t\ge t_k.
     \label{eq:forecast_family}
 \end{equation}
+The obstacle flow includes its rest rule. In particular acceleration is
+reset to zero at rest; the propagated acceleration state must be used in
+an intersection across that event.
 
 \begin{lemma}
 \label{lem:nested}
-Let the obstacle follow \eqref{eq:target_flow} with constants fixed
-from acquisition, and let $\bm\theta_j\in\mathcal Q_j$ for every
-$j\geq k_a$. Then $\bm\theta(t)\in\mathcal F_k(t)$ for all $t\geq t_k$,
-and
+Under sound joint enclosures and the unchanged transition/defect contract,
+the true state belongs to $\mathcal I_k$ at every sample, and
 \begin{equation}
-    \mathcal F_{k+1}(t)\subseteq\mathcal F_k(t)\qquad
-    \text{for all } t\geq t_{k+1}.
+    \mathcal I_{k+1}\subseteq\mathcal T(\mathcal I_k,\bm u_k),
+    \qquad \mathcal F_{k+1}(t)\subseteq\mathcal F_k(t),\quad t\ge t_{k+1}.
     \label{eq:nesting}
 \end{equation}
 \end{lemma}
-
 \begin{IEEEproof}
-$\bm\theta_{k_a}\in\mathcal S_{k_a}$. If $\bm\theta_k\in\mathcal S_k$,
-then $\bm\theta_{k+1}=\varphi_{T_s}(\bm\theta_k)\in\varphi_{T_s}(\mathcal S_k)$
-and $\bm\theta_{k+1}\in\mathcal Q_{k+1}$, so
-$\bm\theta_{k+1}\in\mathcal S_{k+1}$. Hence
-$\bm\theta(t)=\varphi_{t-t_k}(\bm\theta_k)\in\mathcal F_k(t)$. For the
-nesting, $\mathcal S_{k+1}\subseteq\varphi_{T_s}(\mathcal S_k)$ and the
-semigroup property give
-$\mathcal F_{k+1}(t)=\varphi_{t-t_{k+1}}(\mathcal S_{k+1})
-\subseteq\varphi_{t-t_{k+1}}(\varphi_{T_s}(\mathcal S_k))
-=\varphi_{t-t_k}(\mathcal S_k)=\mathcal F_k(t)$.
+Truth containment follows by induction: the next true state is a member
+of the reachable set and of the newly published enclosure. The first
+inclusion is the intersection in \eqref{eq:information_set}. Since the
+obstacle is autonomous, its projection satisfies
+$\mathcal S_{k+1}\subseteq\varphi_{T_s}(\mathcal S_k)$; the semigroup
+property gives the second inclusion at the same absolute time.
 \end{IEEEproof}
 
-This is the unknown-but-bounded recursion of set-membership estimation
-\cite{Schweppe1968,MilaneseVicino1991} applied to the constants of the
-obstacle model, and it is the step that the published sets by
-themselves do not take. Each $\mathcal Q_k$ is a ball and a few intervals
-about the latest estimate; consecutive ones overlap but neither
-contains the other, and a forecast drawn from the center of
-$\mathcal Q_{k+1}$ can lie anywhere in $\mathcal Q_{k+1}$ relative to the
-one drawn from $\mathcal Q_k$. The intersection turns the sequence into
-one that can only shrink, and \eqref{eq:nesting} says that a constraint
-written against every forecast in the family can only become easier to
-meet at the next sample. That is exactly what the time-invariant
-argument needs from the obstacle. The exact set $\mathcal S_k$ is not
-convex, and an outer approximation used in a program must keep the
-nesting; one that does is obtained by intersecting the published
-intervals of the constants $A_C$ and $\kappa_C$ over the history, which
-the flow leaves unchanged while the obstacle moves, and enclosing the
-position and course at each absolute time by the smallest of the
-enclosures \eqref{eq:target_tube} of the individual published sets,
-each evaluated with the intersected intervals. Every term of that
-construction is monotone in the history, so the enclosure of
-$\mathcal F_{k+1}(t)$ lies inside that of $\mathcal F_k(t)$, and each
-contains $\mathcal F_k(t)$ because
-$\mathcal S_k\subseteq\varphi_{t_k-t_j}(\mathcal Q_j)$ for every $j\leq k$.
+This update uses the information the estimator supplies without assuming
+that its consecutive raw balls are nested. Choosing the smallest-radius
+ball with a changed center does not preserve inclusion. A conservative
+implementation may use a monotone outer reachable-set operator and an
+intersection that preserves truth containment and the first inclusion of
+\eqref{eq:nesting}. Fresh point estimates alone do neither.
 
-\subsubsection{The ego tube and the innovation}
-Let $\bm\epsilon_k=\bm x_k-\hat{\bm x}_k\in\mathcal E_k$ be the
-estimation error, with $\mathcal E_k$ the published zonotope
-\eqref{eq:ego_set}, and $\bar{\mathcal E}\supseteq\mathcal E_k$ the
-fixed set that the uniform bound \eqref{eq:uniform_bound} gives. Let
-the plant be $\bm x_{k+1}=F(\bm x_k,\bm u_k)+\bm w_k$ with
-$\bm w_k\in\mathcal W$. With $\bm z_{1|k}=F(\hat{\bm x}_k,\bm u_k)$ the
-plan's second node, the innovation is
+The innovation is still present. With
+$\bm\epsilon_k=\bm x_k-\hat{\bm x}_k$ and plant defect $\bm w_k$,
 \begin{equation}
-    \begin{split}
-    \bm\delta_k&=\hat{\bm x}_{k+1}-\bm z_{1|k}\\
-    &=-\bm\epsilon_{k+1}
-      +F(\hat{\bm x}_k+\bm\epsilon_k,\bm u_k)-F(\hat{\bm x}_k,\bm u_k)
-      +\bm w_k,
-    \end{split}
+    \bm\delta_k=-\bm\epsilon_{k+1}
+      +F(\hat{\bm x}_k+\bm\epsilon_k,\bm u_k)
+      -F(\hat{\bm x}_k,\bm u_k)+\bm w_k.
     \label{eq:innovation}
 \end{equation}
-so that $\bm\delta_k\in\bar\Delta:=\bar{\mathcal E}\oplus
-\bar A\bar{\mathcal E}\oplus\mathcal R_0\oplus\mathcal W$, where
-$\bar A\bar{\mathcal E}\oplus\mathcal R_0$ encloses the increment of $F$
-over $\bar{\mathcal E}$ for every state and input of the operating
-domain, and $\oplus$ is the Minkowski sum. The set $\bar\Delta$ is the
-whole contribution of the estimator to the ego side of the argument:
-the comparison system fixes $\bar{\mathcal E}$, and $\bar{\mathcal E}$
-fixes $\bar\Delta$. Index the constrained instants of a plan and its
-continuation by $s\in\{\tfrac12,1,\tfrac32,\ldots\}$, the mid-hold and
-end instants counted from the sample at which the plan is solved, and
-let $\bm z_{s|k}$ be the nominal state there. A \emph{tube} is a family
-of sets $\mathcal D_s$ with two properties.
-\begin{itemize}
-\item[(T1)] $\mathcal D_{1/2}$ and $\mathcal D_1$ contain the departure
-of the true mid-hold and end states of the applied hold from
-$\bm z_{1/2|k}$ and $\bm z_{1|k}$ for every $\bm\epsilon_k\in\mathcal E_k$
-and $\bm w_k\in\mathcal W$; on the affine model these are
-$\tfrac12(I+A_k)\mathcal E_k$ and $A_k\mathcal E_k$, each with
-its share of $\mathcal R_0\oplus\mathcal W$, which is the propagation
-\eqref{eq:hold_generator} of the present enclosure through the first
-hold.
-\item[(T2)] For every constrained instant $s$,
-\begin{equation}
-    \mathcal D_{s+1}\supseteq\mathcal D_s\oplus\Phi_s\bar\Delta
-        \oplus\mathcal R_s ,
-    \label{eq:tube_growth}
-\end{equation}
-where $\Phi_s$ is the sensitivity of the state at instant $s$ to the
-state at the sample, along the law that the shifted candidate uses
-between them, and $\mathcal R_s$ encloses the remainder of that map over
-$\bar\Delta$.
-\end{itemize}
-Condition (T2) is the constraint tightening of
-\cite{ChisciRossiterZappa2001} with the innovation as the disturbance.
-Which law the candidate uses matters only through $\Phi_s$. If the
-shifted inputs are simply rolled out again from the new estimate, as
-the implementation does, $\Phi_s$ is the open-loop transition of the
-plan's linearization and the sets grow without bound along a long
-horizon, because a heading error is integrated into a lateral offset
-with nothing to pull it back. If the candidate corrects the shifted
-inputs by a feedback on the deviation from the old nominal, in the
-manner of \cite{MayneSeronRakovic2005}, $\Phi_s$ is the closed-loop
-transition and the sets settle at the size of the innovation's
-accumulated response. Along the continuation the law is the braking law,
-whose transition is the derivative of \eqref{eq:continuation}; its
-arc is finite, so the growth there is bounded in any case.
+The information-set update covers it by containment of the true reachable
+states, instead of postulating that a new center reproduces the old plan.
+An affine propagation of $\mathcal E_k$ without nonlinear remainders does
+not establish this containment.
 
-\subsubsection{The robust problem}
-At sample $k$ the problem $\mathcal P_k$ chooses the inputs of $M$
-holds, hence the nominal plan $\bm z_{s|k}$ through $F$ from
-$\hat{\bm x}_k$, its continuation under $\kappa_{\rm f}$ from
-$\bm z_{M|k}$, and slacks $\xi_s\geq0$, subject to: the input bounds;
-at every constrained instant $s$ of the plan and the continuation, the
-road, state-limit, handling and mildness conditions on every state of
-$\bm z_{s|k}\oplus\mathcal D_s$, without slack; at every constrained
-instant $s$ at which some member of $\mathcal F_k(t_k+sT_s)$ is within
-$R_{\rm enc}$ of some pose of $\bm z_{s|k}\oplus\mathcal D_s$, the
-separation
+\subsubsection{A zero-slack terminal continuation on sets}
+Let $\mathcal B$ contain nonempty joint sets whose members are all settled
+and share one admissible braking continuation. Every reachable member
+under that common continuation satisfies the road, state, handling,
+actuator and slew constraints, and every constrained pose clears every
+admitted obstacle by $d_{\rm m}$, including the parked phase. The allowed
+backup continuations are closed under deleting their first hold. This
+family is a mathematical witness, not a command substituted after a
+solver failure. Small sideslip and lateral acceleration are part of
+settledness; they do not alone prove actuator or rear-adhesion capability.
+
+The definition makes $\mathcal B$ downward closed: a subset can use the
+same continuation. It also gives, for $\mathcal J\in\mathcal B$, a first
+backup input $\bm b$ whose hold satisfies every hard condition, has zero
+collision deficit, and obeys $\mathcal T(\mathcal J,\bm b)\in\mathcal B$.
+The tail of the old witness certifies that successor. No claim that a
+perturbed nominal parking schedule equals the old schedule is needed.
+
+A finite certificate checks the complete reachable sets until every
+admitted ego trajectory is parked, then checks invariance of the parked
+ego set and its clearance against the remaining obstacle family. With
+an exact forward-only model and no plant defect the parked pose stays
+fixed while its uncertainty remains. If a persistent defect can move the
+parked vehicle, parked-set invariance is an additional requirement.
+The nominal closed-form set of Section~\ref{subsec:terminal} is not this
+setwise certificate. In the exact-information limit, a common admissible
+terminal continuation on the declared model reduces to its usual
+zero-slack terminal witness.
+
+\subsubsection{The ideal robust problem}
+For $N\le M\le M_{\max}$, choose the common held inputs
+$\bm u_{0|k},\ldots,\bm u_{M-1|k}$ and let
+$\mathcal R_{0|k}=\mathcal I_k$,
+$\mathcal R_{i+1|k}=\mathcal T(\mathcal R_{i|k},\bm u_{i|k})$.
+Impose every hard condition on the corresponding hold images. One
+nonnegative slack $\xi_{i|k}$ covers all constrained fractions of primary
+hold $i$:
 \begin{equation}
-    \begin{gathered}
-    \dist\bigl(\mathcal V_E(\bm z),\mathcal V_C(\bm\theta)\bigr)
-    \geq d_{\rm m}-\xi_s\\
-    \text{for all }\bm z\in\bm z_{s|k}\oplus\mathcal D_s
-    \text{ and }\bm\theta\in\mathcal F_k(t_k+sT_s),
-    \end{gathered}
+    \dist\bigl(\mathcal V_E(\bm\zeta),\mathcal V_C(\bm\zeta)\bigr)
+       \ge d_{\rm m}-\xi_{i|k},\qquad
+    \bm\zeta\in\mathcal T_\sigma(\mathcal R_{i|k},\bm u_{i|k}).
     \label{eq:robust_row}
 \end{equation}
-of the two rectangles; and, if the obstacle family has not left the
-range by the stop, the parked check of condition (c) against every
-member of the family with the parked rectangle enlarged by the final
-tube set, with its own slack. The encounter ends at the first instant
-at which every member of the family is out of range of every pose in
-the tube; no row is imposed after it. When the candidate corrects the
-inputs by a feedback on the deviation from the nominal, the input bounds
-and the input-dependent handling rows are tightened by the range of
-that correction over $\mathcal D_s$, as in tube predictive control. The value is
-$V_k^\star=\min\sum_s\xi_s$, and $\xi^\star_{0|k}=\xi^\star_{1/2|k}
-+\xi^\star_{1|k}$ is the deficit of the applied hold. In the convex
-program, \eqref{eq:robust_row} is the row \eqref{eq:collision_rows}
-with the tightening \eqref{eq:collision_tightening} in which the
-obstacle support is that of $\mathcal F_k$ at the instant; by
-Lemma~\ref{lem:dualRows}(i) and the soundness of the tightening, the row
-implies \eqref{eq:robust_row}, so the program's feasible set is an inner
-approximation of $\mathcal P_k$'s, and the step-size rule evaluates the
-exact conditions on the issued rollout.
+There is no collision slack after the $N$ primary holds or in the
+terminal continuation. Require $\mathcal R_{M|k}\in\mathcal B$ and
+minimize $V_k^\star=\sum_{i=0}^{N-1}\xi_{i|k}$ over feasible choices.
+A performance stage may select among primary minimizers. Its first
+optimized input is applied directly. Optimal-value conclusions require
+an attained primary minimum; feasibility itself requires only a
+feasible executed plan.
 
 \begin{theorem}
 \label{thm:robust}
-Let the following hold along the closed loop: (R1) the hypotheses of
-Theorem~\ref{thm:cascadeISS}, so that $\bm\epsilon_k\in\mathcal E_k
-\subseteq\bar{\mathcal E}$ and $\bm\theta_k\in\mathcal Q_k$ at every
-sample; (R2) the plant is $F$ up to a defect in $\mathcal W$, and the
-obstacle follows \eqref{eq:target_flow} with constants fixed from
-acquisition; (R3) the tube satisfies (T1) and (T2); (R4)
-Assumption~\ref{asm:mild}. If $\mathcal P_k$ is feasible and the first
-input of a feasible plan is applied, then:
-\begin{enumerate}
-\item[(i)] $\mathcal P_{k+1}$ is feasible, and
-$V^\star_{k+1}\leq V^\star_k-\xi^\star_{0|k}$;
-\item[(ii)] at the mid-hold and end instants of the applied hold the
-true rectangles are separated by at least
-$d_{\rm m}-\xi^\star_{1/2|k}$ and $d_{\rm m}-\xi^\star_{1|k}$, and the
-true ego state satisfies the road, limit and handling conditions there;
-\item[(iii)] $\sum_{j\geq k}\xi^\star_{0|j}\leq V^\star_k$; in
-particular, if $V^\star_k=0$ then $V^\star_j=0$ for every $j\geq k$,
-and every hold applied from sample $k$ on separates the true vehicles
-by $d_{\rm m}$ at its constrained instants, until the obstacle has
-left the range.
-\end{enumerate}
+Suppose the current joint enclosures contain the truth, the model/defect
+contract is unchanged, update \eqref{eq:information_set} is used, the
+hold constraints are universal on their reachable sets, and the
+nonempty terminal collection $\mathcal B$ has the downward and successor
+properties above. Then applying the first input of any feasible plan
+preserves mathematical feasibility. If that plan is safety-optimal,
+\[
+    V_{k+1}^\star\le V_k^\star-\xi_{0|k}^\star.
+\]
+The true applied hold satisfies the hard conditions and has sampled
+clearance at least $d_{\rm m}-\xi_{0|k}$. For safety-optimal plans the
+first-hold deficits are summable, and the zero-slack information states
+are invariant until the declared encounter ends.
 \end{theorem}
-
 \begin{IEEEproof}
-Take a feasible plan of $\mathcal P_k$ with slacks $\xi^\star_{s|k}$
-and apply its first input. As the candidate for $\mathcal P_{k+1}$ take
-the shifted inputs $\bm v_{1|k},\ldots,\bm v_{M-1|k}$, corrected by the
-candidate's law if one is used, followed by the hold of the terminal
-law at the resulting endpoint, which is a hold of $F$ by (R4); roll
-them out through $F$ from $\hat{\bm x}_{k+1}=\bm z_{1|k}+\bm\delta_k$.
-Its state at the candidate's instant $s$ differs from the old state at
-instant $s+1$, at the same absolute time, by $\Phi_s\bm\delta_k$ plus a
-remainder in $\mathcal R_s$, and $\bm\delta_k\in\bar\Delta$ by (R1),
-(R2) and \eqref{eq:innovation}. By (T2),
-$\bm z'_{s}\oplus\mathcal D_s\subseteq\bm z_{s+1|k}\oplus\mathcal D_{s+1}$
-for every constrained instant $s$ of the candidate, including those of
-its continuation, which is the old continuation from its second instant
-on. Every hard condition of $\mathcal P_{k+1}$ at instant $s$ is a
-condition on $\bm z'_s\oplus\mathcal D_s$ that $\mathcal P_k$ imposed on
-the larger set $\bm z_{s+1|k}\oplus\mathcal D_{s+1}$ at the same absolute
-time, and the inputs are the old ones and the terminal law's, within
-their bounds; so the hard rows hold. For the obstacle rows, the family
-at the candidate's instant $s$ is $\mathcal F_{k+1}(t_k+(s+1)T_s)
-\subseteq\mathcal F_k(t_k+(s+1)T_s)$ by Lemma~\ref{lem:nested}, and the
-ego set is contained in the old one, so \eqref{eq:robust_row} holds
-with $\xi'_s=\xi^\star_{s+1|k}$; an instant at which every member of
-$\mathcal F_k$ was out of range of the old set is one at which every
-member of $\mathcal F_{k+1}$ is out of range of the new set, so the
-candidate's rows are a subset of the old ones in absolute time, and the
-parked check is the old one against a smaller family and a smaller
-rectangle. The candidate is therefore feasible with
-$\sum_s\xi'_s=V^\star_k-\xi^\star_{0|k}$, which proves (i).
-For (ii), by (T1) the true mid-hold and end states of the applied hold
-lie in $\bm z_{1/2|k}\oplus\mathcal D_{1/2}$ and
-$\bm z_{1|k}\oplus\mathcal D_1$, and by Lemma~\ref{lem:nested} the true
-obstacle lies in $\mathcal F_k$ at those instants; the rows of
-$\mathcal P_k$ at $s=\tfrac12$ and $s=1$ give the separation and the
-hard conditions. For (iii), sum (i) from $k$ on and use
-$V^\star\geq0$; if $V^\star_k=0$ then $\xi^\star_{0|k}=0$ and
-$V^\star_{k+1}\leq0$, so $V^\star_{k+1}=0$, and (ii) applies at every
-later sample.
+After applying $\bm u_{0|k}$,
+$\mathcal I_{k+1}\subseteq\mathcal R_{1|k}$ by Lemma~\ref{lem:nested}.
+Take the old inputs $\bm u_{1|k},\ldots,\bm u_{M-1|k}$ as the first
+$M-1$ inputs of a candidate. Monotonicity of the reachable-set map gives
+by induction
+\begin{equation}
+    \mathcal R'_{i|k+1}\subseteq\mathcal R_{i+1|k},
+    \qquad i=0,\ldots,M-1.
+    \label{eq:tube_growth}
+\end{equation}
+All old hard conditions still hold on these subsets. Downward closure
+puts $\mathcal R'_{M-1|k+1}$ in $\mathcal B$. Append its first witness
+input: it satisfies every hard condition, has zero deficit, and leaves
+the new terminal reachable set in $\mathcal B$. The candidate has the
+same $M$, hence satisfies both horizon bounds.
+
+For its primary holds set $\xi'_i=\xi_{i+1|k}$ for $i<N-1$ and
+$\xi'_{N-1}=0$. That last hold was an old hard-tail hold if $M>N$,
+or is the appended terminal hold if $M=N$. Universal collision
+conditions remain true on subsets, so the candidate cost is the old
+cost minus its first slack. This proves feasibility for any feasible
+executed plan and the value inequality when the old cost was $V_k^\star$.
+Truth containment gives the applied-hold statements. Nonnegativity and
+telescoping give $\sum_{j\ge k}\xi_{0|j}^\star\le V_k^\star$; if the
+initial value is zero, the next minimum is zero at each sample.
 \end{IEEEproof}
 
-Statement (i) is inequality (11) of
-\cite{HuangWangMargellosGoulart2025}, and (iii) is its consequence
-there: the minimal relaxation is nonincreasing along the closed loop,
-the deficit of the applied holds is summable, and the set of
-information states on which no relaxation is needed is positively
-invariant. The theorem transfers them to a controller that works from
-an estimate and revises its forecast at every sample. What has changed
-is the object the barrier function lives on. $V^\star$ is a function of
-the estimate and of the information set $\mathcal S_k$, not of the
-state, and its decrease is paid for twice: by the tube, which absorbs
-the innovation that the certificate bounds, and by the nesting, which
-keeps the obstacle from moving the goalposts. Neither device is free.
-The tube enlarges the hard rows along the horizon, and a long horizon
-with an open-loop candidate cannot afford it; the nesting is only as
-tight as the published sets, and a family that still spans the whole
-range of $A_C$ and $\kappa_C$ several seconds ahead leaves little room
-for a plan. The theorem does not say that the robust problem is
-feasible; it says that feasibility, once obtained, is kept, and that
-the first-hold deficit cannot grow. With exact information
-$\mathcal E_k=\{0\}$, $\mathcal W=\{0\}$ and $\mathcal Q_k=\{\bm\theta_k\}$,
-the tube is trivial, the family is a point, and the theorem reduces to
-Proposition~\ref{prop:recursive} with the obstacle rows soft. The
-relative formulation of Section~\ref{subsec:uncertainty}, in which the
-common pose error of the ego cancels from the distance, is a tighter
-instance of the same rows for the applied hold; writing the obstacle
-set in inertial coordinates, as above, counts that error on both sides
-and is conservative, not unsound.
+This is the shifted-solution argument of
+\cite[eqs.~(10)--(11)]{HuangWangMargellosGoulart2025} on the joint
+information state. It retains estimation error, gives the appended
+hold zero slack, and separates feasibility from optimal-value descent.
+For an executed plan of cost $J_k$ it gives only
+$V_{k+1}^\star\le J_k-\xi_{0|k}$. A certified bound
+$J_k\le V_k^\star+\eta_k$ adds $\eta_k$ to the decrease inequality;
+summability then needs a summable error budget. A fixed numerical
+precision or a local convex optimum is not such a bound for the exact
+robust problem.
 
-The CLF receives a disturbance term from the same tube. On $\Omega$ the
-certified cruise law satisfies
-$\sqrt{V(F(\bm x,\bm u_*+K\bm e(\bm x)))}\leq\sqrt{\rho^\star}\sqrt{V(\bm x)}$.
-Applied to the estimate instead of the state, and with the plant's
-defect, the successor's transverse error moves by an amount bounded,
-in the norm $\normtwo{P^{1/2}\,\cdot\,}$, by a constant $\sigma$ that
-depends on $\bar{\mathcal E}$, $\mathcal W$ and the Jacobians of $F$ and
-of the path chart on $\Omega$, as long as the applied input stays within
-the certified bound; then
-$\sqrt{V_{k+1}}\leq\sqrt{\rho^\star}\sqrt{V_k}+\sigma$ and
-$\limsup_k\sqrt{V_k}\leq\sigma/(1-\sqrt{\rho^\star})$. Recovery of the
-true state reaches a neighborhood of cruise whose size the certificate
-sets. This is a statement about the cruise law; the input the programs
-issue is checked against \eqref{eq:clf_model} on the estimate, and its
-decrease on the plant is measured (Section~\ref{subsec:controlResults}).
+\subsubsection{Relation to the executable convex problem}
+The controller now applies the completed CLF-program inputs directly,
+without post-solve scaling or a constraint veto. Its nonlinear rollout
+supplies prediction and trust data only. Its terminal sideslip bound is
+0.05~rad, independently of the estimator operating cone; rear adhesion
+is also imposed under the terminal braking ratio. These changes express
+a settled terminal endpoint and preserve the completed optimization's
+inputs and slack budget.
 
-\subsubsection{What the implementation realizes}
-The controller of Sections~\ref{subsec:uncertainty}--\ref{subsec:program}
-realizes (T1) and nothing of (T2): hold $i$ is tightened by the present
-enclosure propagated through that hold alone, which certifies the
-applied hold and is why statement (iv) of Section~\ref{subsec:argument}
-holds, but it does not carry the innovation forward, so the shifted
-plan is not guaranteed to meet the tightened rows at the next sample.
-It forecasts the obstacle from the center of $\mathcal Q_k$ and charges
-the current set to each hold anew; the family is neither intersected
-nor nested, so the terminal membership of the shifted endpoint can
-change with the forecast. Both departures were measured rather than
-chosen. The open-loop image $G_{i+1}=A_iG_i$ of the ego enclosure over
-the whole horizon, which is (T2) with the open-loop $\Phi_s$, made the
-road and state rows infeasible in the noisy encounters; propagating the
-obstacle set from the present sample over the whole horizon recovered
-31 of 84 encounters and produced one collision, because the robust and
-the nominal row of a node shared one slack within the primary holds, so
-that a large robust relaxation relaxed the nominal row with it. The
-first measurement is the tube growing without feedback; the second is
-the width of the published family. With the medians of
-Section~\ref{subsec:loopEstimation}, a course radius of 0.20\,rad and a
-speed radius of 1.4\,m/s, and the declared bounds of the closed-loop
-contract on the constants, 1.1\,m/s$^2$ for $A_C$ and
-0.034\,m$^{-1}$ for $\kappa_C$, \eqref{eq:target_tube} gives for an
-obstacle at 8\,m/s a position radius of about 5\,m one second ahead and
-more than 20\,m three seconds ahead, while the continuation of a stop
-is evaluated several seconds beyond the plan. A robust row at that
-width has no feasible plan on a road of four lanes. The obstacle's
-constants are the binding width: their published intervals are the
-whole domain, while the tracker's actual errors in $A_C$ have a
-root-mean-square of 0.26\,m/s$^2$ (Section~\ref{subsec:loopEstimation}).
-The theorem therefore locates the work that remains on each side. The
-estimator has to certify $A_C$ and $\kappa_C$ at a width near their
-error, which the intersection \eqref{eq:information_set} can only
-inherit, not create; a set-membership enclosure of the constants over
-the measurement history, tried with an earlier terminal set, halved the
-published course and speed widths but did not resolve the constants in
-time (Section~\ref{sec:discussion}). The controller has to carry a
-tube in feedback form along the horizon so that (T2) holds with a
-bounded $\mathcal D_s$, and to keep the nominal row apart from the
-robust one. Until then the closed-loop results of
-Section~\ref{sec:results} are the measured behavior of a controller that
-certifies each applied hold and replans, and Theorem~\ref{thm:robust} is
-the statement it is built to satisfy.
+The code does not implement \eqref{eq:information_set}, monotone
+full-horizon outer reachable sets, or the setwise terminal collection
+$\mathcal B$. Its per-hold affine uncertainty propagation does not
+establish nonlinear truth containment. The first-order collision rows
+without a remainder allowance are not a general inner certificate of
+\eqref{eq:robust_row}. A theorem for the successive convex problems
+would additionally require the shifted witness to remain feasible in
+each new restriction. Consequently Theorem~\ref{thm:robust} is a
+mathematical result for the stated robust formulation, not a certificate
+for every local convex controller output. Allowing solver failures in
+experiments does not waive these problem-definition premises. The full
+construction and its finite-terminal certification obligations are
+recorded in \path{controller/ROBUST_RECURSIVE_FEASIBILITY.md}.
 
 \subsection{Trust Scale from the Model Remainder}
 \label{subsec:trust}
@@ -2607,7 +2433,7 @@ correction of size $s$, the largest input change from the anchor in
 units of $\bm\tau_u$, the affine prediction differs from the nonlinear
 rollout of the same inputs by a second-order remainder of the form
 $Ls^2$, with a coefficient $L$ that depends on the operating point. The
-step-size rule rolls out the full step. With
+prediction-only nonlinear rollout evaluates the full step. With
 $\varpi(\Delta\bm x)=\normtwo{\Delta\bm p}+r_E|\Delta\psi|$, which bounds
 the displacement of any body point, $\tilde{\bm x}_j$ that rollout,
 $\hat{\bm x}_j$ the affine prediction of the same inputs and
@@ -2638,49 +2464,29 @@ remainder or on the separation.
 \subsection{Scope of the Guarantees}
 \label{subsec:scope}
 
-Four statements hold in exact arithmetic. First, the issued plan is a
-rollout of the declared model $F$ that satisfies every hard row and
-clears the obstacle, by the exact rectangle distance, by at least
-$d_{\rm m}$ at every node and mid-hold point beyond the primary holds,
-by $d_{\rm m}$ plus the tightening \eqref{eq:collision_tightening}
-where an enclosure is supplied; within the primary holds its clearance
-deficit is minimized and recorded. Second, its endpoint lies in
-$\mathcal X_f$, which is forward invariant under the braking law with
-the obstacle on its forecast (Proposition~\ref{prop:invariance}).
-Third, on the declared model with exact information the shifted plan is
-accepted at the next sample for as long as the encounter lasts and holds
-of $F$ keep extending it (Proposition~\ref{prop:recursive}); under the
-certified uncertainty and revised forecasts the same holds for the
-robust problem on the hypotheses of Theorem~\ref{thm:robust}, of which
-the implementation realizes (T1). Fourth, on $\Omega$ the cruise law
-contracts $V$ by $\rho^\star<\rho_V$ per hold within the input bound,
-conditional on the enclosure hypothesis of Section~\ref{subsec:clf}.
+The implemented optimizer enforces affine sampled constraints and its
+linearized terminal rows. The completed inputs are applied directly; a
+nonlinear prediction is not a certificate that those exact constraints
+hold. Positive primary slack is relaxation. Zero CLF slack refers to the
+local value model, not to a nonlinear decrease of the plant.
 
-The statements are about the sampled model at its sampled instants.
-Two rectangles separated at consecutive constrained instants can
-intersect in between, and the braking phase of the continuation is
-sampled in the same way; only the parked phase is checked in continuous
-time. A bound on the rectangle distance between instants follows from
-the speeds and yaw rates of the two bodies and could be charged as a
-reserve; it is not. The plant of Section~\ref{sec:results} integrates
-the same differential equations with a different scheme, and the
-mismatch is measured, not bounded. The enclosure enters the
-implementation as a static tightening of each hold and of the terminal
-clearances, not as a tube, and the row \eqref{eq:clf_model} acts on the
-estimate. Whether some hold of $F$ keeps the endpoint in
-$\mathcal X_f$, (H3), is checked online; Assumption~\ref{asm:mild},
-under which it always does, carries no mismatch bound. The first exit
-of the obstacle ends the continuation, and a re-entry is handled by the
-plan's rows alone. The trust boxes and $d_{\rm m}$ are not linked by a
-bound on the linearization remainder; the trust update keeps a measured
-remainder near $\tau_e$ but bounds nothing. A positive $J_1^\star$ is
-executed. Zero slack in \eqref{eq:secondary_program} is a statement
-about the local model \eqref{eq:clf_model}, and the certificate of $K$
-says nothing about the input the programs issue. The scheme follows the
-real-time-iteration idea of \cite{DiehlBockSchloder2005}: it solves
-convex programs on one linearization per sample instead of iterating to
-convergence, and what it inherits from the nonlinear problem is the
-acceptance of the issued plan on $F$, not optimality.
+Proposition~\ref{prop:invariance} concerns the declared terminal law.
+Proposition~\ref{prop:recursive} proves feasibility of an ideal
+exact-information problem under a common forecast and an admissible
+appended hold. Theorem~\ref{thm:robust} proves it for the stated
+joint-set robust problem under its information-update and terminal
+premises. Neither promises numerical solver return. The cruise-law
+certificate is conditional on its sampled enclosure hypothesis and is
+not a certificate for the input selected by the local convex programs.
+
+Collision constraints are sampled at nodes and midpoints; separation
+between them is not proved. Plant integration mismatch is measured,
+not bounded. The executable per-hold affine tightening omits nonlinear
+remainder bounds and does not implement the joint-set recursion or
+robust terminal certificate. These distinctions remain necessary when
+solver failures in an experiment are accepted. A forecast re-acquired
+after the absorbing encounter exit requires a new initial-feasibility
+problem.
 
 \subsection{Computation}
 \label{subsec:computation}
@@ -2695,10 +2501,8 @@ optimum unchanged; most road rows, state-limit rows and collision rows
 far from the obstacle go this way, and a collision multiplier is not
 computed where the reference distance less both reaches, the margin and
 the largest tightening exceeds the most the pose can move over the
-boxes. A larger trust scale reuses the formulated problem. The
-step-size rule checks every hold of a candidate at once, and exact
-rectangle distances are computed only where a lower bound from the
-reference distance is below the margin. The cruise trim is solved by
+boxes. A larger trust scale reuses the formulated problem. The nonlinear rollout now supplies prediction data only. Exact rectangle
+checks remain in anchor construction and independent experimental replay. The cruise trim is solved by
 Newton's method with the analytic tangent. On 120 captured problems the
 block assembly reproduced the previous matrices to $4.4\cdot10^{-16}$,
 and on 2880 candidate plans the batched rule gave the same decision as a
@@ -2706,6 +2510,15 @@ hold-by-hold scan. A warm-up action runs one synthetic encounter at
 start-up, so that every code path is compiled before the first sample.
 
 \section{Results}
+
+The experiments below describe the October 11 baseline at commit
+\path{4ed2344}, including its nonlinear acceptance-step policy and earlier
+terminal sideslip definition. The October 12 direct-execution revision and
+its settled terminal constraints have not been rerun through that campaign;
+its bounded-error theorem is stated for the ideal problem of
+Section~\ref{subsec:robust}. No baseline number is attributed to the new
+execution policy.
+
 \label{sec:results}
 
 All results are synthetic. Sections~\ref{subsec:designResults} and
@@ -3385,7 +3198,8 @@ keep the estimator informative; in the audited seed the true motion
 never left either. In the other direction, the estimator's enclosure
 could not be used as a worst case throughout the horizon or in the
 decrease condition: both made the programs infeasible or the commands
-erratic. The implemented compromise certifies one hold and replans.
+erratic. The baseline compromise tightens one affine hold and replans; it does
+not certify the nonlinear hold without remainder bounds.
 
 \subsubsection*{The terminal set and the ten failures}
 The terminal set is built from the obstacle's own motion model and one
@@ -3421,10 +3235,11 @@ constants is radar noise passed through gains whose level the
 certificate fixes. A stage that certifies the constants at a width near
 their actual error, and feeds the intersection of
 Section~\ref{subsec:robust}, is the estimator-side item the theorem asks
-for. On the controller's side it asks for a tube in feedback form along
-the horizon \cite{MayneSeronRakovic2005,MayneRakovicFindeisenAllgower2006,KohlerMullerAllgower2021}, so
-that (T2) holds with bounded sets, in place of the per-hold tightening
-that grew without feedback until the road rows were infeasible.
+for. On the controller's side the revised theorem requires joint posterior
+intersection, monotone reachable sets and a zero-slack setwise terminal
+certificate. Feedback tubes can reduce their conservatism
+\cite{MayneSeronRakovic2005,MayneRakovicFindeisenAllgower2006,KohlerMullerAllgower2021};
+they are not asserted to exist merely from bounded observer error.
 
 \subsubsection*{The CLF}
 One obstacle-independent function governs avoidance and recovery, every
@@ -3485,21 +3300,17 @@ CLF for the lane and the return to it. The controller keeps the vehicle
 where the estimator's measurement is informative, and the enclosure
 tightens each hold.
 
-The link that was missing, the estimator's certificate inside the
-controller's guarantee, is supplied by Theorem~\ref{thm:robust}. If the
-obstacle sets are intersected over the history, the forecasts
-consistent with them are nested, and if the ego's innovation is carried
-along the horizon by a tube that the comparison system bounds, then the
-shifted plan is again a feasible candidate and the minimal relaxation
-of the predictive barrier is nonincreasing along the closed loop with
-an invariant zero set, under the estimation error and the revised
-forecast alike. The theorem reduces to the exact-information result
-when the uncertainty vanishes, and it names the two quantities on which
-everything turns: the innovation set, which the certificate fixes, and
-the width of the obstacle family, which the certificate of the
-obstacle's constants fixes.
+Theorem~\ref{thm:robust} supplies the conditional mathematical link:
+retain the estimator's sound enclosures in a joint reachable-set posterior,
+impose universal hold constraints, and terminate in a downward-closed
+collection of sets sharing an admissible zero-slack braking continuation.
+The shifted candidate is feasible despite nonzero estimation error and
+revised measurements; its cost loses the applied hold's slack. Optimal
+value descent requires executing a primary minimizer. The exact-information
+case has singleton sets and the usual admissible terminal witness. These
+are conditions on the formulation, not a promise of numerical solver return.
 
-In fourteen collision-threat encounters with exact states every run
+In the October 11 baseline, in fourteen collision-threat encounters with exact states every run
 ends collision-free on the road with cruise recovered and the shifted
 plan feasible at every sample. With the estimator and bounded sensor
 noise, 74 of 84 runs do so, none collides or leaves the road, and ten
@@ -3509,8 +3320,9 @@ its forecast meters from its motion. The published enclosures contained
 the truth in every audited sample. These are simulations on the
 prediction model itself. What stands between them and the guarantee of
 Theorem~\ref{thm:robust} is concrete: a certificate for the obstacle's
-constants at a width near their error, a tube in feedback form along
-the horizon, separation between the constrained instants, a mismatch
+constants at a width near their error, joint posterior intersection and
+monotone reachable sets, a setwise zero-slack terminal certificate,
+separation between the constrained instants, a mismatch
 bound for the mild-state model, actuator limits, real-time computation,
 plant mismatch and perception in the loop. The system is built to take
 each of these without changing its structure.

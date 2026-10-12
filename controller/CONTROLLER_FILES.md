@@ -9,7 +9,7 @@ terminal set and recursive feasibility.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | One anchor per sample (startup or target-onset potential-field rollout, or the shifted accepted plan extended by declared-model holds that keep the endpoint terminal) over a horizon that reaches the terminal set; the problem assembled from dense row blocks without rows the variable boxes imply; PCBF slack stage with the linearized terminal rows, CLF stage, step-size rule on the nonlinear rollout (all holds at once), full-step remainder trust |
+| `solvePredictiveControl.m` | One anchor per sample (startup or target-onset potential-field rollout, or the shifted solved plan extended by declared-model holds that keep the endpoint terminal) over a horizon that reaches the terminal set; the problem assembled from dense row blocks without rows the variable boxes imply; PCBF slack stage with the linearized terminal rows, CLF stage, direct unmodified optimizer inputs, prediction-only nonlinear rollout, full-step remainder trust |
 | `terminalSafeSet.m` | Mild braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with its steering, hence sideslip and course curvature, held; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the held steering), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
@@ -20,7 +20,7 @@ terminal set and recursive feasibility.
 
 Each sample builds one nonlinear anchor: a potential-field rollout at startup,
 stopped at its first node in the terminal set; otherwise the shifted previous
-plan, extended while it is shorter than `horizonSteps` by holds of the declared
+solved plan, extended while it is shorter than `horizonSteps` by holds of the declared
 model that keep the endpoint in the set (the cruise hold, or else the hold
 nearest to it toward the held steering, after guidance holds through states
 outside the set until it is reached again), and by cruise
@@ -29,14 +29,14 @@ the PCBF stage minimizes prefix safety slack and the CLF stage follows. A
 primary problem that is primal infeasible inside the trust region is re-solved
 with the trust scale doubled until feasible (at most `trustMaximumScale`); a
 shifted plan still infeasible is solved once more from a fresh potential-field
-rollout in the same way. The issued plan is the nonlinear rollout of the
-largest acceptable step of the solution, where `alpha = 0`, the shifted plan,
-is acceptable by construction on the declared model. Without an acceptable
-step the problem is linearized again at most twice. An unusable shift, or a
-frame still without an accepted plan, reports `noOptimizationSolution`. There
-is no inherited slack budget or alternate controller. The input trust scale is
-estimated from the full step's second-order remainder. Positive PCBF slack
-still denotes relaxation.
+rollout in the same way. The completed CLF result is issued directly, without
+post-solve scaling, constraint checks or acceptance relinearization. A nonlinear
+rollout supplies prediction and trust data only; it does not replace the optimized
+slacks or veto the solved input. There is no inherited slack budget or alternate
+controller. Positive PCBF slack still denotes relaxation. Mathematical recursive
+feasibility is scoped to the ideal problem; solver failures in experiments are
+separate. The bounded-error proof and its implementation premises are in
+[ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md).
 
 The terminal set is the set of states whose joint continuation under the
 terminal law (the ego braking to a stop with its sideslip and course
@@ -108,8 +108,8 @@ use the feasible dual of the least-penetrated rectangle axis
 target ranges, primary priority, affine dynamics with consistent anchors,
 braking bounds, input increments distinct from physical steering limits,
 positive-slack reporting, terminal-set membership of the endpoint, that the
-issued plan is the nonlinear rollout of its inputs, that the shifted plan is a
-feasible candidate at the next samples, the shortest target-free horizon, the
+issued inputs are the unmodified completed optimization and that prediction
+rollouts do not certify nonlinear feasibility, the shortest target-free horizon, the
 single fresh re-solve of a failed shift, the fresh rollout at a target's
 onset, and that an unusable shift is reported. `terminalSafeSetTest` checks the closed-form continuation against
 an RK4 integration of the terminal law, invariance under the law down to

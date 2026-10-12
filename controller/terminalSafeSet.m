@@ -38,7 +38,7 @@ classdef terminalSafeSet
 % X_f is forward invariant under the law by construction: the continuation of
 % phi(z) is the remainder of the continuation of z, at the same absolute
 % times, and the exit is the same. It is the largest set that this law keeps
-% safe. The ego enclosure, when present, widens every clearance by its
+% safe within the settled admissible domain. The ego enclosure, when present, widens every clearance by its
 % position radius and the chord of its yaw radius. See TERMINAL_SAFE_SET.md.
 %
 % Mildness is kept along the continuation: the sideslip is held and |r V|
@@ -52,7 +52,7 @@ classdef terminalSafeSet
     methods (Static)
         function context = context(model)
             % Constants of one frame.
-            cfg=model.cfg;positionRadius=0;yawRadius=0;
+            cfg=model.cfg;tire=modifiedFialaTire.parameters(cfg);positionRadius=0;yawRadius=0;
             if isfield(model,'uncertainty') && isfield(model.uncertainty,'egoGenerator')
                 generator=model.uncertainty.egoGenerator;
                 positionRadius=sum(vecnorm(generator(1:2,:),2,1));yawRadius=sum(abs(generator(3,:)));
@@ -65,7 +65,11 @@ classdef terminalSafeSet
             context=struct('deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
                 'sampleTime',cfg.controller.sampleTime, ...
                 'lateralMaximum',cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared, ...
-                'sideslipMaximum',cfg.model.sideslipMaximum,'holdSpeed',cfg.model.brakeHoldSpeed, ...
+                'sideslipMaximum',cfg.terminal.sideslipMaximumRadians,'holdSpeed',cfg.model.brakeHoldSpeed, ...
+                'brakingRatio',-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg), ...
+                'brakingBounds',[cfg.actuation.brakingRatioMinimum;cfg.actuation.brakingRatioMaximum], ...
+                'rearAxleDistance',cfg.vehicle.lr,'kinematicSpeed',cfg.model.kinematicSpeedRange(1), ...
+                'rearAdhesion',3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2), ...
                 'shape',shape,'reach',reach, ...
                 'margin',cfg.collision.safetyMarginMeters,'required',cfg.collision.safetyMarginMeters+positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'inflation',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
@@ -145,7 +149,7 @@ classdef terminalSafeSet
             % - corner rows on the road at the continuation's poses.
             % The continuation's poses are differentiated with the schedule
             % held. Conditions whose clearance exceeds the requirement by more
-            % than localBand are left out; the exact set decides acceptance.
+            % than localBand are left out; the exact set is used when building the anchor.
             % Each row keeps up to localReserve of the margin it has at y, so
             % that an endpoint off the boundary stays off it by that much and
             % the next sample's shift survives a small departure (the plant
@@ -166,10 +170,21 @@ classdef terminalSafeSet
             movement=reshape(sum((abs(jacobian(1,:,:))+abs(jacobian(2,:,:))+reach*abs(jacobian(3,:,:))).*box(:).',2),1,[]);
             movement(isnan(movement))=Inf;
             V=hypot(y(4),y(5));limit=context.lateralMaximum;
-            rows=zeros(0,6);bounds=zeros(0,1);
+            tangent=tan(context.sideslipMaximum);
+            rows=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];bounds=-rows*y;
+            if y(4)>context.kinematicSpeed
+                reserve=context.rearAdhesion*sqrt(max(0,1-context.brakingRatio^2));
+                rear=[0,0,0,-reserve,1,-context.rearAxleDistance; ...
+                    0,0,0,-reserve,-1,context.rearAxleDistance];
+                rows=[rows;rear];bounds=[bounds;-rear*y];
+            end
+            if V>0 && (context.brakingRatio<context.brakingBounds(1) ...
+                    || context.brakingRatio>context.brakingBounds(2))
+                rows=[rows;zeros(1,6)];bounds=[bounds;-1];
+            end
             if V>0 && abs(y(6)*V)>limit-localMildBand()
                 gradient=sign(y(6))*[0,0,0,y(6)*y(4)/V,y(6)*y(5)/V,V];
-                rows=gradient;bounds=localKeep(limit-abs(y(6)*V),localMildReserve());
+                rows=[rows;gradient];bounds=[bounds;localKeep(limit-abs(y(6)*V),localMildReserve())];
             end
             if isempty(parts.road)
                 [margin,lateral,normal,local]=localRoad(context,path.pose);
@@ -505,7 +520,7 @@ function dual = localDual(pose,shape,q,shifts)
     % state q, or, where the closest features give no consistent dual (an
     % exact contact), against q moved along its track by each of 'shifts' in
     % turn; [] when none has one, and the row is left out (the exact set
-    % decides acceptance).
+    % decides anchor membership).
     dual=[];
     for shift=[0,shifts]
         target=q;if shift~=0,target=localAlong(q,shift);end
@@ -557,9 +572,17 @@ function [member,info,parts] = localDecide(context,x,node)
         'margin',Inf,'roadMargin',Inf);
     parts=struct('path',[],'road',[],'q',[],'gap',[],'out',[],'parked',[]);
     member=false;V=hypot(x(4),x(5));
-    if V>0 && ((x(4)>context.holdSpeed && abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9)) ...
+    if V>0 && ((abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9)) ...
             || abs(x(6)*V)>context.lateralMaximum*(1+1e-9))
         info.reason="notMild";return;
+    end
+    if V>0 && (context.brakingRatio<context.brakingBounds(1) ...
+            || context.brakingRatio>context.brakingBounds(2))
+        info.reason="terminalInputBounds";return;
+    end
+    if x(4)>context.kinematicSpeed && abs(x(5)-context.rearAxleDistance*x(6)) ...
+            >context.rearAdhesion*x(4)*sqrt(max(0,1-context.brakingRatio^2))*(1+1e-9)
+        info.reason="terminalRearAdhesion";return;
     end
     path=terminalSafeSet.continuation(context,x);parts.path=path;
     info.stopSeconds=path.steps*context.sampleTime;

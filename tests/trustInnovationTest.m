@@ -19,17 +19,17 @@ classdef trustInnovationTest < matlab.unittest.TestCase
             % scale of the next frame.
             [ego,road,cfg]=localFixture();
             [~,inputs,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            search=problem.metadata.search;acceptance=search.acceptance;
+            search=problem.metadata.search;rollout=search.rollout;
             testCase.verifyEqual(search.inputTrustScale,cfg.nonlinear.trustInitialScale);
             testCase.verifyTrue(state.trust.updated);
-            testCase.verifyEqual(state.trust.modelInnovation,acceptance.fullGap,AbsTol=0);
-            prior=struct('scale',cfg.nonlinear.trustInitialScale,'correction',acceptance.fullCorrection, ...
+            testCase.verifyEqual(state.trust.modelInnovation,rollout.fullGap,AbsTol=0);
+            prior=struct('scale',cfg.nonlinear.trustInitialScale,'correction',rollout.fullCorrection, ...
                 'curvature',cfg.nonlinear.trustInnovationMeters/cfg.nonlinear.trustInitialScale^2);
-            testCase.verifyEqual(state.trust.scale,localExpectedScale(prior,acceptance.fullGap,cfg),RelTol=1e-12);
+            testCase.verifyEqual(state.trust.scale,localExpectedScale(prior,rollout.fullGap,cfg),RelTol=1e-12);
             unit=cfg.nonlinear.trustRadius*[.15;.25];
             anchor=problem.model.linearization.inputs;
             testCase.verifyEqual(state.trust.correction,max(abs(inputs-anchor)./unit,[],'all'),AbsTol=1e-12);
-            testCase.verifyLessThanOrEqual(acceptance.fullCorrection, ...
+            testCase.verifyLessThanOrEqual(rollout.fullCorrection, ...
                 search.inputTrustScale+cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(problem.metadata.trust.scale,state.trust.scale);
         end
@@ -37,10 +37,10 @@ classdef trustInnovationTest < matlab.unittest.TestCase
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,~,problem,state]=collisionAvoidanceController(localSuccessor(ego,prior),[],road,cfg,prior);
-            trust=problem.metadata.trust;acceptance=problem.metadata.search.acceptance;
+            trust=problem.metadata.trust;rollout=problem.metadata.search.rollout;
             testCase.verifyEqual(problem.metadata.search.inputTrustScale,prior.trust.scale);
             testCase.verifyLessThan(trust.modelInnovation,cfg.nonlinear.trustInnovationMeters);
-            previous=prior.trust;previous.correction=acceptance.fullCorrection;
+            previous=prior.trust;previous.correction=rollout.fullCorrection;
             testCase.verifyEqual(trust.scale,localExpectedScale(previous,trust.modelInnovation,cfg),RelTol=1e-12);
             testCase.verifyLessThanOrEqual(trust.scale, ...
                 prior.trust.scale/sqrt(cfg.nonlinear.trustRetention)*(1+1e-12));
@@ -63,10 +63,10 @@ classdef trustInnovationTest < matlab.unittest.TestCase
             for target=[1e-12,10]
                 [ego,road,cfg]=localFixture();cfg.nonlinear.trustInnovationMeters=target;
                 [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
-                acceptance=problem.metadata.search.acceptance;
-                prior=struct('scale',cfg.nonlinear.trustInitialScale,'correction',acceptance.fullCorrection, ...
+                rollout=problem.metadata.search.rollout;
+                prior=struct('scale',cfg.nonlinear.trustInitialScale,'correction',rollout.fullCorrection, ...
                     'curvature',target/cfg.nonlinear.trustInitialScale^2);
-                testCase.verifyEqual(state.trust.scale,localExpectedScale(prior,acceptance.fullGap,cfg),RelTol=1e-12);
+                testCase.verifyEqual(state.trust.scale,localExpectedScale(prior,rollout.fullGap,cfg),RelTol=1e-12);
                 testCase.verifyGreaterThanOrEqual(state.trust.scale,cfg.nonlinear.trustMinimumScale);
                 testCase.verifyLessThanOrEqual(state.trust.scale,cfg.nonlinear.trustMaximumScale);
             end

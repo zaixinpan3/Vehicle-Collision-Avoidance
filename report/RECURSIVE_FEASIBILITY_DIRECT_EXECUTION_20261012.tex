@@ -1,0 +1,149 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{hyperref}
+\usepackage{xurl}
+\setlength{\emergencystretch}{3em}
+\title{Direct execution and recursive feasibility with estimation error}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 12, 2026}
+\begin{document}
+\maketitle
+
+\section{Technical decisions}
+Recursive feasibility is an existence statement about a mathematical
+optimization problem. Numerical failure in an experiment is accepted and
+is not a counterexample to that existence statement. The executable
+controller now issues the completed CLF-program inputs directly. There is
+no post-solve step-size rule, acceptance relinearization, or nonlinear
+constraint veto. The optimized affine slacks are retained rather than
+replaced by deficits measured on a different nonlinear plan. A nonlinear
+rollout remains prediction and trust data only. Uncomputed nonlinear
+margins are reported as NaN, and nonlinear validation is false.
+
+The terminal state should be settled. The former test bounded the held
+arc's lateral acceleration and used the estimator's 0.25~rad sideslip
+cone. It admitted substantial lateral drift with small yaw rate. The
+terminal sideslip limit is now an independent 0.05~rad (about 2.9 degrees)
+design setting. Rear adhesion is also checked under the terminal braking
+ratio, and that ratio must be within the actuator bounds. The new linear
+sideslip and fixed-braking rear rows enter the optimization. These changes
+do not establish equality of the Fiala/blended model and the closed-form
+terminal law, or admissibility under every finite slew setting; the
+mathematical terminal witness must include those conditions.
+
+The archived implementation audit of October 12 identified a solver-return
+limitation in addition to mathematical limitations. The user's subsequent
+scope decision removes solver return from the required theorem; it does
+not remove the need for a feasible terminal witness or sound reachable
+sets. Historical audit entries are not rewritten.
+
+\section{Completed mathematical construction}
+The proof is in \path{controller/ROBUST_RECURSIVE_FEASIBILITY.md} and the
+revised manuscript's subsection on certified uncertainty and revised
+forecasts. Let $\mathcal T(\mathcal J,u)$ be the exact reachable joint set
+under a held input and declared defects. The joint state includes input
+memory and the obstacle's motion parameters. A sound observer enclosure
+$\mathcal Q_k^J$ is retained by
+\[
+ \mathcal I_{k+1}=\mathcal T(\mathcal I_k,u_k)\cap\mathcal Q_{k+1}^J.
+\]
+Truth containment follows by induction and implies
+$\mathcal I_{k+1}\subseteq\mathcal T(\mathcal I_k,u_k)$ without assuming
+zero error, no innovation, or shrinking raw observer balls. The obstacle's
+projected future families are nested by its flow semigroup, including the
+rest rule. A propagated acceleration state, rather than an unchanged
+pre-stop interval, enters the update after the acceleration reset.
+
+The terminal collection consists of information sets sharing a common
+admissible zero-slack braking continuation, with hard and collision rows
+on every reachable member and a safe parked phase. The continuation family
+is closed under deleting its first hold. A subset can use the same
+witness, so the collection is downward closed. Its one-hold successor has
+the tail as its witness, giving robust invariance, including actuator and
+slew constraints. A finite certificate needs a bound by which all ego
+members stop, plus a parked-set invariance and clearance check. Generic
+persistent pose defects do not supply parked invariance automatically.
+
+The robust problem imposes universal hold constraints on propagated sets,
+relaxes only the primary holds, and ends in that zero-slack collection.
+After the first input, the old inputs shifted by one hold give new reachable
+sets contained in the old ones at the same absolute times. The old terminal
+set contains the shifted terminal set; append its first common witness
+input. That hold has zero slack and preserves the horizon length. The
+candidate's primary budget is the old budget minus its first hold's slack.
+This proves feasibility for any feasible executed plan. For an executed
+primary minimizer it proves
+\[
+ V^*(\mathcal I_{k+1})\le V^*(\mathcal I_k)-\xi^*_{0|k},
+\]
+with summable first-hold deficits and an invariant zero set. A secondary
+performance problem may select within the primary minimizers. An arbitrary
+feasible plan or a numerical/local approximation does not inherit the
+optimal-value conclusion without a certified suboptimality budget.
+
+This specializes the shifted-candidate argument of Huang, Wang, Margellos
+and Goulart (2025), Lemma~III.5, equations~(9)--(11),
+\url{https://arxiv.org/html/2502.08400v1}, to a joint information state.
+It does not assert that the executable per-hold affine formulation already
+implements the set intersection, monotone nonlinear reachability operator,
+or setwise terminal certificate. A theorem for consecutive convex
+restrictions additionally needs a shifted feasible witness in the new
+restriction. The remainder of a vertex rotation and of nonlinear dynamics
+cannot be omitted to claim an exact inner certificate.
+
+\section{Deterministic verification}
+\path{scripts/verifyInformationSetRecursiveFeasibility.m} checks a scalar
+specialization: forward straight kinematics, a stationary target, 0.2~s
+holds, a common 4~m/s$^2$ braking continuation, summed rectangle half-length
+4.8~m and required clearance 0.2~m. Initial position and speed interval
+widths are 0.8~m and 0.6~m/s. No random seed is used. The monotone interval
+map encloses the whole hold. The script verifies truth containment,
+posterior inclusion, shifted-set inclusion, hard-tail zero slack and safe
+terminal braking/parked intervals. Results are recorded in
+\path{RECURSIVE_FEASIBILITY_DIRECT_EXECUTION_20261012/verification.json}.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Quantity & Zero-slack case & Positive-slack case\\
+\midrule
+Primary / horizon holds & 2 / 3 & 4 / 4\\
+Position innovation (m) & 0.26 & 0.40\\
+Old candidate budget (m) & 0 & 0.60\\
+Applied-hold deficit (m) & 0 & 0.20\\
+Shifted candidate budget (m) & 0 & 0.40\\
+Old terminal margin (m) & 0.53875 & 4.26\\
+New terminal margin (m) & 0.53875 & 7.12\\
+Terminal margin after raw reset (m) & $-0.20$ & 6.68\\
+\bottomrule
+\end{tabular}
+\end{center}
+Both new raw measurement sets are not nested; their posterior intersections
+are. In the first case a raw reset loses the terminal certificate, whereas
+intersection preserves it. In the second case the candidate budget loses
+exactly the applied hold's 0.2~m deficit. The positive-slack case deliberately starts with overlapping rectangles;
+it checks budget algebra and is not a collision-free encounter. These are
+checks of a concrete mathematical specialization, not a Fiala-model campaign or a numerical
+certificate for every joint uncertainty set.
+
+\section{Validation and scope}
+The new tests check unmodified optimizer inputs, prediction-only metadata,
+settled terminal sideslip, rear adhesion during terminal braking, the
+current continuation trace schema, and the two interval examples. The
+108-test interface regression passed. The scalar verification's two tests
+passed. The full suite passed 624 tests (zero failed or incomplete). After the
+final near-rest sideslip condition and its test were added, all 128 affected
+regression tests passed. Seven changed source files were checked with the
+MATLAB Code Analyzer; its only remaining diagnostic was a settings-file
+warning that caused it to use default analyzer settings. No source
+analyzer warning remained in the new interval verifier. The manuscript and this standalone
+report are compiled as validation; repository PDFs remain generated files.
+
+The October 11 campaign numbers remain explicitly identified as baseline
+results. That campaign has not been repeated for direct execution or the
+new terminal limits. No new physical-vehicle, continuous-time, or nonlinear
+robust safety claim follows from the unit tests or scalar examples.
+\end{document}

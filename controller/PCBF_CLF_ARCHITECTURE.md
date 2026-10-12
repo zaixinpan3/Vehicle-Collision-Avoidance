@@ -20,13 +20,13 @@ terminal when that joint continuation, exact and in closed form, stays on the
 road and clears the target until it leaves the perception range (after the
 stop, over the target's remaining track, in closed form). Neither the stop nor
 the exit has to occur within the plan, no encounter duration is preset, and no
-lane or other mode is used. The issued plan is the nonlinear rollout of an
-accepted step of the affine solution (*Issuing the solved plan*). On the
-declared sampled model with exact information the previous plan, shifted by
-one hold, is always an acceptable step while it has holds left, which makes the
-problem recursively feasible within an encounter; holds of the declared model
-that keep the endpoint in the set extend it, and whether one exists is checked
-online (hypothesis H3 there).
+lane or other mode is used. The completed CLF inputs are issued directly, with no post-solve step scaling or
+constraint veto. The nonlinear rollout supplies prediction and trust data only.
+Mathematical recursive feasibility is an existence statement about the ideal
+problem, not a guarantee of numerical solver return. Its exact-information scope
+is in [TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md); a full bounded-error shift
+proof using joint information sets is in
+[ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md).
 
 The implementation now consumes timestamped NRMM observer enclosures. Every hold
 of the plan starts from the current enclosure and propagates it through that
@@ -263,8 +263,8 @@ and is never executable by itself.
 **Normal frames shift the previous input plan.** The field rollout is
 constructed at startup, and once more when the primary problem around the
 shifted plan is primal infeasible inside the trust region. Each trajectory is
-linearized once; a second linearization happens only when no step of the
-solution is acceptable on the nonlinear model (*Issuing the solved plan*).
+linearized once. A fresh initialization may rebuild the problem after
+primary infeasibility, but there is no post-solve acceptance relinearization.
 
 For an anchor `(xbar_i, ubar_i)` the shared model is
 
@@ -281,7 +281,7 @@ numerical boxes are not certified nonlinear remainder bounds.
 
 ## Computation
 
-The first four measures leave the convex problem and the step-size rule's
+The first four measures leave the convex problem and the prediction rollout's
 decisions unchanged; the last two change only the solves' precision and the
 start-up:
 
@@ -302,12 +302,11 @@ start-up:
   sensitivity;
 - a larger trust scale (`localExpand`) reuses the formulated problem and
   changes only the input increments' bounds;
-- the step-size rule checks every hold of a candidate at once (state limits,
-  handling, road, collision with a reference-distance shortcut), with the
-  same decisions as a hold-by-hold scan;
+- the nonlinear rollout evaluates prediction error without checking or modifying
+  the completed optimizer input;
 - the conic solves use 1e-6 tolerances and accept a stalled solve at 1e-4
   (`solver.reducedTolerance`, Clarabel's AlmostSolved), because the point is a
-  search direction that the step-size rule checks on the nonlinear model;
+  search direction that the prediction rollout checks on the nonlinear model;
 - the trim is solved by Newton's method with the analytic tangent (fsolve only
   if it does not converge), and `collisionAvoidanceController("warmUp", cfg)`
   runs one synthetic encounter so that every code path has been compiled and
@@ -486,42 +485,19 @@ no point. `solverInfo` records native status, iterations and residuals.
 
 ## Issuing the solved plan
 
-The affine solution is a search direction about the anchor. The issued plan
-is the rollout, on the sampled nonlinear model, of `anchor + alpha*correction`
-for the largest `alpha` in `terminal.acceptanceSteps = [1, 1/2, ..., 1/32, 0]`
-that satisfies all of:
+The completed CLF-stage input sequence is issued exactly. There is no line
+search, post-solve feasibility check, accepted fraction or acceptance
+relinearization. The command is the sequence's first input, without clipping.
+A nonlinear rollout of that same sequence supplies prediction and the trust
+remainder. It does not alter inputs, optimized slacks, or the objective and does
+not decide whether a command is issued. If the rollout leaves the declared
+model domain, the affine prediction is retained and that diagnostic is reported.
 
-- the rollout meets every hard row (road, state limits, handling envelope,
-  and collision clearance after the prefix, at nodes and hold midpoints);
-- it ends in the terminal set;
-- its prefix collision deficit does not exceed the anchor's.
-
-`alpha = 0` is the anchor itself. When the anchor is the previous plan
-shifted (and extended by holds that keep the endpoint in the terminal set), it
-is feasible by construction under the hypotheses of
-[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md), Section 6.
-
-Without an acceptable step (possible only when the anchor is not a feasible
-plan, e.g. a startup rollout), the problem is linearized again at the full
-step's rollout and solved again. This happens at most
-`terminal.sqpIterations = 2` times, and then the controller reports no
-solution (`nonlinearAcceptanceFailed`).
-
-This is a step-size rule of one sequential convex method. It is not a second
-controller, and a previous plan is issued only when it satisfies the current
-problem. The issued plan is a nonlinear rollout, so the next frame's shift
-reproduces it.
-
-A frame fails, with `collisionAvoidanceController:noOptimizationSolution`, in
-any of these cases:
-
-- its anchor is unavailable;
-- its CLF stage returns no result;
-- its fresh re-solve still has no result;
-- no step is acceptable.
-
-No enlarged box, inherited budget or incomplete numerical point is used
-instead.
+A frame reports no optimization solution when its anchor is unavailable or
+its primary/CLF stages do not return a usable numerical point. Numerical
+failure is permitted by the mathematical recursive-feasibility scope. Feasibility
+of the ideal problem does not guarantee a solver return. Local convex optimality
+is not global optimality of the nonlinear robust problem.
 
 ## Input trust scale from the plan innovation
 
@@ -571,7 +547,7 @@ stayed below about 3 cm needed few fresh restarts at both speeds. One `tau`
 therefore yields about 0.4-0.5 at 8 m/s and 0.2-0.27 at 15 m/s, without a
 speed schedule.
 
-The step-size rule, not the trust scale, decides what is issued; the scale
+The completed CLF solve determines the input; the scale
 only bounds the next correction. `tau` is an empirical consistency target,
 not a certified bound on the nonlinear remainder or on separation.
 
@@ -635,8 +611,7 @@ the closed-form continuation with its schedule held. Conditions with more
 than 5 m to spare are left out, and each row keeps up to 5 cm of the margin it
 has at the anchor. The
 endpoint also carries the collision rows of every other node inside `R` and
-the road rows. Membership of the issued plan's endpoint is checked exactly on
-its nonlinear rollout. With an ego enclosure the clearances and road margins
+the road rows. Anchor membership is checked on its nonlinear rollout. With an ego enclosure the clearances and road margins
 are widened by its position radius and yaw chord.
 
 This replaces the CLF-tube terminal set of October 6 to 10, 2026 (the region
@@ -661,7 +636,7 @@ The terminal records are:
   `terminalExitSeconds` and `terminalMarginMeters`;
 - `terminalValue` (the endpoint's CLF value), `terminalDistanceMeters` and
   `terminalRoadMarginMeters`;
-- `acceptedStep`, `candidateFeasible`, `anchorCertified`,
+- `postSolveInputModification = false`, `postSolveFeasibilityCheck = false`, `anchorCertified`,
   `appendedTerminalSteps`, `appendedBrakingSteps`, `extensionStopped` and
   `linearizationGapMeters`.
 
@@ -679,22 +654,21 @@ termination it is not a certified optimum. Attempt logs retain all primary
 models and timings; `selectedAttempt` identifies the model supplying the
 command. `optimizationConverged` describes the numerical stages of the selected
 problem, not optimality of the issued point under nonlinear dynamics.
-Continuation state version 77 stores the per-stage slacks and their total,
+Continuation state version 79 stores the per-stage slacks and their total,
 the issued nonlinear plan (inputs and states) and the trust estimate
 (`scale`, coefficient `curvature`, last `correction`).
 
 Metadata retains the explicit scope:
 
-- `predictionModel = nonlinearFialaRk4RolloutOfAffineStep`;
-- `safetyScope = nonlinearRolloutSampledConstraints`;
+- `predictionModel = nonlinearPredictionOfUnmodifiedOptimizedInputs`;
+- `safetyScope = affineSampledConstraints`;
 - `affineValidationPerformed = false`;
-- `nonlinearValidationPerformed = true` and `nonlinearPredictionEvaluated = true`
-  (the issued plan is the RK4 rollout that met the rows; this is the sampled
-  model, not the physical vehicle);
+- `nonlinearValidationPerformed = false`; `nonlinearPredictionEvaluated`
+  records whether the diagnostic rollout was available, not feasibility;
 - `trust` (scale, curvature, correction, innovation, observationInnovation, modelInnovation, updated);
 - `egoUncertaintyModel = currentPosteriorEnclosurePropagatedThroughEachHold`,
   `targetUncertaintyModel = constantParametersRestartedEachHoldFromCurrentObserverSet`;
-- `recursiveFeasibilityScope = shiftedPlanOnDeclaredModelWithConsistentForecast`;
+- `recursiveFeasibilityScope = idealMathematicalProblemOnly`;
 - `terminalSet = brakingContinuationEncounterSafe`;
 - unmeasured constraint residuals and margins are NaN;
 - `clfFunction = quadraticTransverseError`, with no tertiary objective;
@@ -708,11 +682,10 @@ these dense ODE45 safety/recovery measurements remain offline. Online
 nonlinear RK4 expansion evaluates approximation accuracy, not a full
 physical-vehicle safety certificate.
 
-This is a bounded-work RTI implementation with a step-size rule. Its
-recursive feasibility is the conditional statement of
-[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md), Section 6; it does not cover
-estimation error, model mismatch or forecast changes (Section 9 there). For the general RTI
-method see Diehl, Bock and Schloder,
-[Real-Time Iterations for Nonlinear Optimal Feedback Control](https://cdn.syscop.de/publications/Diehl2005c.pdf).
+This is a bounded-work RTI implementation with direct optimizer inputs. The
+bounded-error recursive-feasibility proof requires joint posterior intersection,
+monotone reachable sets and a robust terminal certificate, as stated in
+[ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md). The current
+per-hold tightening is not that complete formulation.
 Vehicle-specific results and full controller-call timing belong in the dated
 experiment report under `report/`.

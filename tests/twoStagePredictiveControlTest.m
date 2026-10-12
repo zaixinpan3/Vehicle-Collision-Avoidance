@@ -1,6 +1,6 @@
 classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
     % Safety slack then CLF on an affine model; the issued plan is the
-    % nonlinear rollout of an accepted step and ends in the terminal set.
+    % unmodified optimizer input sequence, with a nonlinear prediction only.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -10,7 +10,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function issuedPlanIsTheNonlinearRolloutOfAnAcceptedStep(testCase)
+        function issuedInputsAreTheUnmodifiedCompletedOptimization(testCase)
             [ego,~,cfg]=localFixture();
             [~,q,road]=collisionThreatScenario("headOn",cfg);
             target=struct('targetPositionInertial',q(1:2), ...
@@ -30,10 +30,14 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             % Terminal set: the endpoint's braking continuation clears the
             % target until it leaves the perception range.
             testCase.verifyEqual(problem.metadata.terminalSet,"brakingContinuationEncounterSafe");
-            testCase.verifyTrue(ismember(problem.metadata.acceptedStep,cfg.terminal.acceptanceSteps));
+            testCase.verifyEqual(inputs,problem.model.linearization.inputs+problem.solution.inputCorrection,AbsTol=0);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
+            testCase.verifyFalse(problem.metadata.postSolveInputModification);
+            testCase.verifyFalse(problem.metadata.postSolveFeasibilityCheck);
+            testCase.verifyFalse(problem.metadata.nonlinearValidationPerformed);
             context=terminalSafeSet.context(problem.model);
             testCase.verifyTrue(terminalSafeSet.member(context,problem.predictedState(:,end),size(inputs,2)));
-            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,0);
+            testCase.verifyTrue(isnan(problem.metadata.terminalRoadMarginMeters));
             localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function targetFreeInitializationRunsBothLexicographicStages(testCase)
@@ -54,9 +58,9 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.appliedInput,inputs(:,1),AbsTol=0);
             testCase.verifyFalse(isfield(state,'witness'));
-            testCase.verifyTrue(problem.metadata.nonlinearValidationPerformed);
-            testCase.verifyEqual(problem.metadata.safetyScope,"nonlinearRolloutSampledConstraints");
-            testCase.verifyEqual(problem.metadata.recursiveFeasibilityScope,"shiftedPlanOnDeclaredModelWithConsistentForecast");
+            testCase.verifyFalse(problem.metadata.nonlinearValidationPerformed);
+            testCase.verifyEqual(problem.metadata.safetyScope,"affineSampledConstraints");
+            testCase.verifyEqual(problem.metadata.recursiveFeasibilityScope,"idealMathematicalProblemOnly");
             localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function encounterUsesTheSameNominalClf(testCase)
@@ -200,7 +204,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyEqual(size(inputs,2),cfg.controller.horizonSteps);
             testCase.verifyTrue(problem.metadata.roadConstraintsEnforced);
-            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,-1e-3);
+            testCase.verifyTrue(isnan(problem.metadata.terminalRoadMarginMeters));
             testCase.verifyEqual(problem.metadata.terminalDistanceMeters,Inf);
         end
         function everyPredictedNodeKeepsTheRectangleOnTheRoad(testCase)
@@ -249,7 +253,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(info.reason,"noTarget");
             testCase.verifyEqual(problem.metadata.terminalValue,info.value,AbsTol=1e-12);
             testCase.verifyEqual(problem.metadata.terminalStopSeconds,info.stopSeconds,AbsTol=1e-12);
-            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalRoadMarginMeters,0);
+            testCase.verifyTrue(isnan(problem.metadata.terminalRoadMarginMeters));
         end
         function shiftedPlanIsAFeasibleCandidateAtTheNextSample(testCase)
             % Recursive feasibility on the declared model: when the state is
@@ -266,7 +270,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                     'targetVelocityInertial',future(4)*[cos(future(3));sin(future(3))],'targetYawInertial',future(3));
                 [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,state);
                 testCase.verifyTrue(problem.metadata.anchorCertified);
-                testCase.verifyTrue(problem.metadata.candidateFeasible);
+                testCase.verifyFalse(problem.metadata.postSolveFeasibilityCheck);
                 localVerifyNonlinearRollout(testCase,problem,cfg);
             end
         end

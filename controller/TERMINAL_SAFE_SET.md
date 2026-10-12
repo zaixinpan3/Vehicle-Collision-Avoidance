@@ -2,7 +2,7 @@
 
 This note defines the terminal set used by `solvePredictiveControl`, proves
 its forward invariance under the terminal law, and states the
-recursive-feasibility property of the resulting optimization together with
+recursive-feasibility property of the ideal mathematical optimization together with
 its hypotheses. The setting is discrete time with the sample period `h`, the
 same as the plan's; Section 4 adds a continuous-time check for the time after
 the ego has stopped. Section 9 states what the set has to become when the
@@ -126,6 +126,14 @@ state `+`, the terminal set is `X_f U {+}`, and no property of the target
 after its exit is used. `j = 0` makes `X_f` a subset of the safe set: the
 endpoint itself clears the target and the road.
 
+The terminal sideslip bound is now `terminal.sideslipMaximumRadians` (default
+0.05 rad), independently of the estimator operating cone. The rear handling
+row is checked under the terminal braking ratio, not merely under the final
+optimized hold's ratio. Terminal membership also checks that ratio against
+the actuator bounds. These strengthen the settled-state definition; they do
+not prove equality of the Fiala model and the closed-form continuation or
+admissibility under an arbitrary finite slew limit.
+
 ## 4. The parked check in closed form
 
 After the stop the ego is a fixed rectangle `E` and the target moves along its
@@ -197,9 +205,10 @@ continuation is the parked check alone. The unit test follows a member to rest
 and checks membership, the remaining stop and exit times and the continuation
 poses at every hold.
 
-**Largest for this law.** A state outside `X_f` has a continuation under
+**Largest within the settled admissible domain.** A state in that domain
+but outside `X_f` has a continuation under
 `kappa_f` that leaves the road or meets the target before the exit, so no set
-that `kappa_f` keeps safe contains it: `X_f` is the largest such set, and its
+that `kappa_f` keeps safe within the domain contains it: `X_f` is the largest such set, and its
 shape adds no conservatism. The only design choice is the terminal maneuver.
 The construction is the backup-set principle of Chen et al. (2021), used only
 to define the terminal set; the plan's free holds still enlarge the feasible
@@ -224,10 +233,9 @@ A plan meeting these rows is *accepted*.
   exactly.
 - H2: the target follows its forecast (the same constant `A` and `beta`).
 - H3: at an endpoint in `X_f`, some hold of the declared model keeps the
-  endpoint in `X_f` with its hard rows met and its midpoint clear. In a mild
-  state the declared model is taken to follow the kinematic model (the user's
-  assumption, Section 2); then the terminal law's hold (steering held,
-  braking at `a_b`) is such a hold, and H3 follows. The implementation does
+  endpoint in `X_f` with its hard rows met and its midpoint clear. A terminal witness must also satisfy actuator, rear-adhesion and slew
+  bounds. Equality of the mild model to the kinematic continuation alone
+  does not establish those input conditions. The implementation does
   not rely on the assumption: the anchor tries the cruise hold of the CLF's
   certified controller and the holds toward the law's realization on the
   declared model, and keeps a hold only when its endpoint is checked to be in
@@ -253,12 +261,13 @@ before: it is in `X_f`. An appended hold meets the hard rows, its midpoint
 clears the target, and its endpoint is in `X_f`, whose condition at `j = 0`
 includes the node's own clearance; its deficits are zero. QED
 
-The optimizer never has to find this candidate: it is the step `alpha = 0`
-of the step-size rule. Consequently, under H1 and H2, once a plan of an
-encounter has been accepted no later sample reports no solution while the
-plan has holds left; H3 is what keeps the plan from running out. A plan
-whose extension fails at consecutive samples shrinks by one hold per sample,
-and the controller reports no solution when the shifted plan is empty.
+This is an existence proof for the ideal nonlinear problem. It does not
+assert that a numerical solver returns a command. The runtime issues the
+completed CLF-program input directly; no post-solve step-size rule substitutes
+the shifted candidate. Numerical failure in an experiment is separate from
+mathematical feasibility. For the bounded-error proof, including the terminal
+input and posterior-inclusion premises, see
+[ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md).
 
 The start of an encounter is outside this statement. When the target first
 enters the range or re-enters it after leaving, the new encounter is an
@@ -300,14 +309,13 @@ Conditions whose clearance exceeds the requirement by more than 5 m are left
 out, and so are those whose margin exceeds the most their pose can move over
 the endpoint correction's box (|dx| + |dy| + reach |dpsi| through the
 continuation's sensitivity; they cannot bind); the exact set decides
-acceptance. Each row keeps up to 5 cm of the margin
+anchor membership. Each row keeps up to 5 cm of the margin
 it has at `y` (`b - min(0.05, max(b, 0))` for a row bound `b`): without it the
 optimizer leaves the endpoint on the boundary of `X_f`, where the next
 sample's shift falls out of the set under millimetres of plant mismatch or of
 departure of an appended hold from the law. A row is never tighter than `y`
 itself, so when `y` is in `X_f` the zero correction meets every row, and the
-zero-slack shortcut of the PCBF stage and the step `alpha = 0` remain
-consistent with the exact set. Where the closest features of a pose give no
+zero-slack shortcut of the PCBF stage remains consistent with the anchor. Where the closest features of a pose give no
 consistent dual (an exact contact, typically the parked witness of a track
 that crosses the parked rectangle), the witness is moved 1 mm or 1 cm along
 the track, or the row is left out.
@@ -346,20 +354,16 @@ rollout runs until its first node in `X_f` from `horizonSteps` on, at most
 `maximumHorizonSteps`. The rollout supplies a linearization, never an issued
 input.
 
-**Step-size rule.** The affine solution is a search direction. The issued
-plan is the rollout, on the sampled nonlinear model, of
-`anchor + alpha * correction` for the largest `alpha` in
-`terminal.acceptanceSteps = [1, 1/2, ..., 1/32, 0]` that meets every hard row,
-ends in `X_f`, and does not increase the prefix deficit sum of the anchor.
-`alpha = 0` is the candidate of Section 6. If no step is acceptable (only
-possible when the anchor itself is not a feasible plan, e.g. at startup), the
-problem is linearized again at the full step's rollout, up to
-`terminal.sqpIterations` (2) times, and then no solution is reported.
+**Direct execution.** The CLF program's full input sequence is issued without
+post-solve scaling or a constraint veto. Its nonlinear prediction is diagnostic
+data. The exact terminal evaluator is used to build and extend the anchor; it
+is not a post-solve acceptance gate. Accordingly a predicted nonlinear endpoint
+need not satisfy the linearized terminal rows exactly. The ideal terminal-set
+proof is not a theorem about every local convex solution.
 
 **Records.** The issued plan records `terminalEnd`, `terminalStopSeconds`,
-`terminalExitSeconds`, `terminalMarginMeters` (the least clearance or road
-margin beyond the requirement along the continuation), `terminalValue` (the
-endpoint's CLF value), `appendedTerminalSteps`, `appendedBrakingSteps` and
+`terminalExitSeconds` and `terminalMarginMeters` (NaN when not evaluated),
+`terminalValue` (the predicted endpoint's CLF value), `appendedTerminalSteps`, `appendedBrakingSteps` and
 `extensionStopped`.
 
 ## 8. Measured behavior

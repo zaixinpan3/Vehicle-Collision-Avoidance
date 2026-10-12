@@ -1,0 +1,42 @@
+[
+  {
+    "scenario": "zeroSlack",
+    "sampleTimeSeconds": 0.2,
+    "prefixSteps": 2,
+    "horizonSteps": 3,
+    "brakingMetersPerSecondSquared": 4,
+    "initialPositionWidthMeters": 0.8,
+    "initialSpeedWidthMetersPerSecond": 0.59999999999999964,
+    "positionInnovationMeters": 0.26000000000000023,
+    "rawMeasurementNested": false,
+    "posteriorNested": true,
+    "shiftSetsIncluded": true,
+    "oldCostMeters": 0,
+    "firstDeficitMeters": 0,
+    "candidateCostMeters": 0,
+    "inheritedBudgetMeters": 0,
+    "oldTerminalMarginMeters": 0.53875000000000051,
+    "candidateTerminalMarginMeters": 0.53875000000000051,
+    "rawResetTerminalMarginMeters": -0.2
+  },
+  {
+    "scenario": "positiveSlack",
+    "sampleTimeSeconds": 0.2,
+    "prefixSteps": 4,
+    "horizonSteps": 4,
+    "brakingMetersPerSecondSquared": 4,
+    "initialPositionWidthMeters": 0.80000000000000071,
+    "initialSpeedWidthMetersPerSecond": 0.60000000000000142,
+    "positionInnovationMeters": 0.40000000000000213,
+    "rawMeasurementNested": false,
+    "posteriorNested": true,
+    "shiftSetsIncluded": true,
+    "oldCostMeters": 0.60000000000000009,
+    "firstDeficitMeters": 0.2,
+    "candidateCostMeters": 0.4,
+    "inheritedBudgetMeters": 0.4,
+    "oldTerminalMarginMeters": 4.2600000000000051,
+    "candidateTerminalMarginMeters": 7.1200000000000081,
+    "rawResetTerminalMarginMeters": 6.6800000000000068
+  }
+]

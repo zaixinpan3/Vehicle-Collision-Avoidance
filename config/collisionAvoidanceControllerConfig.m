@@ -59,13 +59,11 @@ function cfg=localDefaults()
     % the stop, over the target's remaining track). Braking and the lateral
     % acceleration together must lie inside the tire friction
     % (frictionCoefficient times gravity). No encounter duration is preset.
-    % acceptanceSteps are the step sizes tried on the nonlinear rollout of the
-    % affine correction, largest first; 0 is the shifted plan itself. Without
-    % an acceptable step the problem is linearized again at the full step, at
-    % most sqpIterations times.
+    % Terminal sideslip is stricter than the estimator's operating cone:
+    % a settled endpoint, rather than a large lateral drift with small yaw.
     cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',4, ...
         'lateralAccelerationMaximumMetersPerSecondSquared',2, ...
-        'acceptanceSteps',[1,.5,.25,.125,.0625,.03125,0],'sqpIterations',2);
+        'sideslipMaximumRadians',.05);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -122,9 +120,8 @@ function cfg=localDefaults()
     % constraintTolerance and optimalityTolerance are the conic solver's
     % feasibility and gap tolerances; reducedTolerance is the precision at
     % which a solve whose interior-point iterations stall is still accepted
-    % (Clarabel's AlmostSolved). A solve's point is only a search direction,
-    % which the step-size rule checks on the nonlinear model before anything
-    % is issued, and the lexicographic and CLF ties are 1e-4, so 1e-6 is
+    % (Clarabel's AlmostSolved). The completed CLF inputs are issued directly.
+    % The lexicographic and CLF ties are 1e-4, so 1e-6 is
     % precise enough (1e-8 and 1e-7 cost about a third more solver time).
     % Looser buys nothing: at 1e-4 (ties and stall acceptance at 1e-3) a
     % solve takes about one interior-point iteration fewer, the time per
@@ -182,11 +179,7 @@ function localValidate(cfg)
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(cfg.terminal.acceptanceSteps,{'double'},{'row','real','finite','>=',0,'<=',1});
-    if any(diff(cfg.terminal.acceptanceSteps)>=0) || cfg.terminal.acceptanceSteps(end)~=0
-        localInvalid('terminal.acceptanceSteps must decrease strictly and end with 0.');
-    end
-    validateattributes(cfg.terminal.sqpIterations,{'double'},{'scalar','real','integer','nonnegative'});
+    validateattributes(cfg.terminal.sideslipMaximumRadians,{'double'},{'scalar','real','finite','positive','<',pi/2});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters
         localInvalid('The encounter range must exceed the collision safety margin.');
     end
@@ -218,6 +211,9 @@ function localValidate(cfg)
         validateattributes(cfg.model.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.model.sideslipMaximum,{'double'},{'scalar','real','positive','<',pi/2});
+    if cfg.terminal.sideslipMaximumRadians>cfg.model.sideslipMaximum
+        localInvalid('The terminal sideslip bound must lie inside the estimator operating cone.');
+    end
     if cfg.model.speedMaximum<=max(cfg.model.speedMinimum,cfg.model.scheduleSpeedFloor)
         localInvalid('The positive-speed model domain must have positive width.');
     end

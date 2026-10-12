@@ -2,7 +2,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 %solvePredictiveControl One affine model per sample; no fallback algorithm.
 % Startup, and the sample at which a target appears that the previous plan
 % did not know of, use a potential-field rollout; later samples start from
-% the previous accepted plan shifted by one hold. The horizon ends where the
+% the previous solved plan shifted by one hold. The horizon ends where the
 % anchor enters the terminal set (terminalSafeSet): the joint continuation
 % under the terminal law (the ego brakes at a constant rate with its
 % sideslip and course curvature held until it stops, the target keeps its
@@ -21,15 +21,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % linearization with the trust scale doubled until it is feasible or
 % reaches trustMaximumScale. A shifted plan still infeasible is then solved
 % from a fresh potential-field rollout in the same way.
-% The issued plan is the nonlinear rollout of anchor + alpha*correction for
-% the largest alpha in terminal.acceptanceSteps whose rollout meets every
-% hard row and ends in the terminal set, without increasing the prefix
-% safety deficit; alpha = 0 is the shifted plan, feasible by construction
-% when the forecast and the state evolved as predicted (recursive
-% feasibility; an appended hold is kept only when its endpoint stays in the
-% set). Without an acceptable step the problem is linearized again at the
-% full step, at most terminal.sqpIterations times, and then reports that it
-% has no solution.
+% The completed CLF program supplies the issued inputs directly. There is no
+% post-solve step scaling, feasibility veto or acceptance relinearization.
+% A nonlinear rollout is prediction data only; it does not change the inputs
+% or the optimized slacks. Its remainder sets the next sample's trust scale.
 % The input trust scale is an estimate: the second-order error coefficient
 % revealed by the nonlinear rollout of the full affine step sets the next
 % step bound.
@@ -44,8 +39,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     model.linearizationBuilds=0;
     [solution,search,model]=localRound(model,previousState,timer);
     if ~isempty(solution)
-        model.trust=localTrustRecord(model.trust,solution,model,search.acceptance);
-        solution=localTerminalMetrics(solution,model,search.acceptance);
+        model.trust=localTrustRecord(model.trust,solution,model,search.rollout);
+        solution=localTerminalMetrics(solution,model);
     end
     search.trust=model.trust;
     search.linearizationCount=sum([search.attempts.modelBuilt]);
@@ -66,9 +61,9 @@ end
 
 function model=localAdaptTrust(model,previous)
     % Departure of the present estimate from the previous plan's prediction
-    % of it (observation innovation). The plan is a nonlinear rollout, so this
+    % of it (observation innovation). The prediction is a nonlinear rollout, so this
     % is the estimator's and the plant's share; the model share is measured
-    % when a step is accepted (localTrustRecord).
+    % by the completed input's prediction (localTrustRecord).
     trust=model.trust;
     if ~isfield(previous,'stateTrajectory') || size(previous.stateTrajectory,2)<2,return;end
     trust.observationInnovation=localPoseDiscrepancy(model.initialState,previous.stateTrajectory(:,2),model.cfg);
@@ -83,7 +78,7 @@ function discrepancy=localPoseDiscrepancy(first,second,cfg)
     discrepancy=vecnorm(difference(1:2,:))+reach*abs(atan2(sin(difference(3,:)),cos(difference(3,:))));
 end
 
-function trust=localTrustRecord(trust,solution,model,acceptance)
+function trust=localTrustRecord(trust,solution,model,rollout)
     % Store the correction actually taken, in units of the unit input box,
     % and update the error coefficient from the full affine step: its
     % nonlinear rollout departs from the affine prediction by the
@@ -91,11 +86,11 @@ function trust=localTrustRecord(trust,solution,model,acceptance)
     cfg=model.cfg;unit=cfg.nonlinear.trustRadius*[.15;.25];
     anchor=model.linearization.inputs;count=min(size(anchor,2),size(solution.inputs,2));
     trust.correction=max(abs(solution.inputs(:,1:count)-anchor(:,1:count))./unit,[],'all');
-    if ~isfinite(acceptance.fullGap) || ~(acceptance.fullCorrection>0),return;end
-    trust.modelInnovation=acceptance.fullGap;
+    if ~isfinite(rollout.fullGap) || ~(rollout.fullCorrection>0),return;end
+    trust.modelInnovation=rollout.fullGap;
     % A step far inside the box carries little information about its boundary.
-    step=max(acceptance.fullCorrection,trust.scale/2);
-    curvature=max(acceptance.fullGap/step^2,cfg.nonlinear.trustRetention*trust.curvature);
+    step=max(rollout.fullCorrection,trust.scale/2);
+    curvature=max(rollout.fullGap/step^2,cfg.nonlinear.trustRetention*trust.curvature);
     curvature=max(curvature,eps);
     trust.scale=min(cfg.nonlinear.trustMaximumScale,max(cfg.nonlinear.trustMinimumScale, ...
         sqrt(cfg.nonlinear.trustInnovationMeters/curvature)));
@@ -131,7 +126,7 @@ function [solution,search,model] = localRound(model,previousState,timer)
     end
     [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
     stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
-    [solution,search,model,stages]=localAcceptance(solution,problem,anchor,model,search,timer,stages);
+    [solution,search.rollout]=localPrediction(solution,anchor,model);
     search.attempts=attempts;search.selectedAttempt=selected;search.stages=stages;
     search.solverCalls=sum([stages.numericalSolve]);search.potentialFieldRestarted=restarted;
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);
@@ -145,88 +140,30 @@ function [solution,search,model] = localRound(model,previousState,timer)
     if isfield(anchor,'seedReachedTerminalSet'),search.seedReachedTerminalSet=anchor.seedReachedTerminalSet;end
 end
 
-function [solution,search,model,stages]=localAcceptance(solution,problem,anchor,model,search,timer,stages)
-    % Step-size rule on the nonlinear sampled model. The affine solution is
-    % a search direction about the anchor. The issued plan is the nonlinear
-    % rollout of anchor + alpha*correction for the largest alpha in
-    % terminal.acceptanceSteps whose rollout meets every hard row and ends
-    % in the terminal set, without increasing the soft prefix deficit of the
-    % anchor. alpha = 0 is the anchor itself: when it is the previous plan
-    % shifted by one hold (and, if needed, extended by the terminal
-    % controller), it meets these rows by construction, so a feasible plan
-    % exists at every sample. Without any acceptable step the problem is
-    % linearized again at the full step (another iteration of the same
-    % sequential convex method); after terminal.sqpIterations it reports
-    % that it has no solution.
-    cfg=model.cfg;
-    search.acceptance=struct('step',NaN,'candidateFeasible',false,'candidateReason',"",'iterations',0, ...
-        'linearizationGap',NaN,'fullGap',NaN,'fullCorrection',NaN,'terminalMargin',NaN, ...
-        'terminalValue',NaN,'terminalStopSeconds',NaN,'terminalExitSeconds',NaN,'terminalEnd',"",'reason',"");
+function [solution,rollout]=localPrediction(solution,anchor,model)
+    % Prediction and trust data only. Never replace, rescale or reject the
+    % completed program's inputs, slacks or objective on a nonlinear check.
+    rollout=struct('available',false,'reason',"noCompletedOptimization", ...
+        'fullGap',NaN,'fullCorrection',NaN);
     if isempty(solution),return;end
-    for iteration=0:cfg.terminal.sqpIterations
-        [accepted,info]=localLineSearch(solution,anchor,model);
-        if iteration==0
-            search.acceptance.candidateFeasible=info.candidateFeasible;search.acceptance.candidateReason=info.candidateReason;
+    solution.affineStates=solution.states;
+    solution.inputCorrection=solution.inputs-anchor.inputs;
+    unit=model.cfg.nonlinear.trustRadius*[.15;.25];
+    rollout.fullCorrection=max(abs(solution.inputCorrection)./unit,[],'all');
+    states=zeros(size(solution.states));states(:,1)=model.initialState;
+    try
+        for index=1:size(solution.inputs,2)
+            states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),solution.inputs(:,index),model.cfg);
         end
-        search.acceptance.iterations=iteration;search.acceptance.reason=info.reason;
-        search.acceptance.fullGap=info.fullGap;search.acceptance.fullCorrection=info.fullCorrection;
-        if ~isempty(accepted)
-            solution.inputs=accepted.inputs;solution.states=accepted.states;
-            solution.stageSlacks=accepted.softDeficits;solution.safety=accepted.softSum;
-            search.acceptance.step=accepted.step;search.acceptance.linearizationGap=accepted.linearizationGap;
-            search.acceptance.terminalValue=accepted.terminalValue;search.acceptance.terminalMargin=accepted.terminalMargin;
-            search.acceptance.terminalStopSeconds=accepted.terminalStopSeconds;
-            search.acceptance.terminalExitSeconds=accepted.terminalExitSeconds;
-            search.acceptance.terminalEnd=accepted.terminalEnd;
-            return;
-        end
-        % A full step whose rollout leaves the model's domain has no states
-        % to linearize again at.
-        if iteration==cfg.terminal.sqpIterations || toc(timer)>=cfg.solver.timeLimitSeconds ...
-                || isempty(info.fullInputs),break;end
-        anchor=struct('inputs',info.fullInputs,'states',info.fullStates,'terminalContext',info.context);
-        [point,problem,again,model]=localPrimary(anchor,model,"acceptanceRelinearization",timer);
-        stages=[stages,again.stages];
-        if isempty(point),break;end
-        [solution,again,model]=localSecondary(point,problem,anchor,model,again,timer);
-        stages=[stages,again.stages(2:end)];
-        if isempty(solution),break;end
+    catch exception
+        if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
+        % The affine prediction remains available even outside the nonlinear
+        % model's domain. A diagnostic failure does not veto a solved input.
+        rollout.reason=string(exception.identifier);return;
     end
-    solution=[];search.returned=false;search.terminationReason="nonlinearAcceptanceFailed";
-end
-
-function [accepted,info]=localLineSearch(solution,anchor,model)
-    cfg=model.cfg;steps=cfg.terminal.acceptanceSteps;
-    correction=solution.inputs-anchor.inputs;affineStates=solution.states-anchor.states;
-    context=localTerminalContext(anchor,model);
-    unit=cfg.nonlinear.trustRadius*[.15;.25];
-    accepted=[];info=struct('candidateFeasible',false,'candidateReason',"",'reason',"",'fullInputs',[],'fullStates',[], ...
-        'context',context,'fullGap',NaN, ...
-        'fullCorrection',max(abs(correction)./unit,[],'all'));
-    [candidate,context]=localEvaluatePlan(anchor.inputs,model,context);
-    info.candidateFeasible=candidate.feasible;info.candidateReason=candidate.reason;
-    reference=Inf;if candidate.feasible,reference=candidate.softSum;end
-    for alpha=steps(:).'
-        if alpha==0
-            plan=candidate;
-        else
-            [plan,context]=localEvaluatePlan(anchor.inputs+alpha*correction,model,context);
-        end
-        if alpha==1 && ~isempty(plan.states)
-            info.fullInputs=plan.inputs;info.fullStates=plan.states;
-            info.fullGap=max(localPoseDiscrepancy(plan.states,solution.states,cfg));
-        end
-        if isempty(plan.states),info.reason=plan.reason;continue;end
-        decrease=plan.softSum<=reference+cfg.solver.lexicographicTieTolerance*max(1,reference);
-        if plan.feasible && (decrease || ~candidate.feasible)
-            plan.step=alpha;
-            prediction=anchor.states+alpha*affineStates;
-            plan.linearizationGap=max(localPoseDiscrepancy(plan.states,prediction,cfg));
-            accepted=plan;break;
-        end
-        if plan.feasible,info.reason="prefixDeficitIncrease";else,info.reason=plan.reason;end
-    end
-    info.context=context;
+    rollout.available=true;rollout.reason="predictionOnly";
+    rollout.fullGap=max(localPoseDiscrepancy(states,solution.affineStates,model.cfg));
+    solution.states=states;
 end
 
 function context=localTerminalContext(anchor,model)
@@ -234,79 +171,6 @@ function context=localTerminalContext(anchor,model)
         context=anchor.terminalContext;
     else
         context=terminalSafeSet.context(model);
-    end
-end
-
-function [plan,context]=localEvaluatePlan(inputs,model,context)
-    % Nonlinear rollout of one input sequence and its hard and soft rows:
-    % road, state limits and handling envelope at every hold, collision
-    % clearance at nodes and hold midpoints (soft in the prefix, hard after
-    % it), and the terminal set at the endpoint.
-    cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;h=cfg.controller.sampleTime;
-    plan=struct('inputs',inputs,'states',[],'feasible',false,'softSum',Inf,'softDeficits',zeros(1,0), ...
-        'reason',"",'terminalValue',NaN,'terminalMargin',NaN,'terminalStopSeconds',NaN, ...
-        'terminalExitSeconds',NaN,'terminalEnd',"");
-    states=zeros(6,count+1);middles=zeros(6,count);states(:,1)=model.initialState;
-    try
-        for index=1:count
-            [middles(:,index),states(:,index+1)]=terminalSafeSet.holdStates(states(:,index),inputs(:,index),cfg);
-        end
-    catch exception
-        if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
-        plan.reason="nonlinearDomain";return;
-    end
-    plan.states=states;
-    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    margin=cfg.collision.safetyMarginMeters;tolerance=1e-6;
-    % Every row of every hold at once; the first failing hold, and within it
-    % the first failing check in the order state limits, handling, road,
-    % collision, gives the reason, as a hold-by-hold scan would.
-    stateFail=~(terminalSafeSet.stateRows(states(:,2:end),cfg) & terminalSafeSet.stateRows(middles,cfg));
-    handlingFail=~terminalSafeSet.handlingRows(states(:,2:end),inputs,cfg);
-    handlingFail(2:end)=handlingFail(2:end) | ~terminalSafeSet.handlingRows(states(:,2:count),inputs(:,2:end),cfg);
-    roadFail=false(1,count);endRoadFail=false;
-    if ~isempty(model.road.lateralClearance)
-        roads=terminalSafeSet.roadMargin([states,middles],model);
-        roadFail=roads(count+2:end)<-tolerance;roadFail(2:end)=roadFail(2:end) | roads(2:count)<-tolerance;
-        endRoadFail=roads(count+1)<-tolerance;
-    end
-    % Collision clearance at the nodes and midpoints (record times j h/2).
-    gaps=localClearances([reshape([states(:,1:count);middles],6,[]),states(:,end)],(0:2*count)*h/2,model,shape);
-    pointDeficits=max(0,margin-gaps);
-    holdDeficits=max(pointDeficits(1:2:2*count),pointDeficits(2:2:2*count));
-    collisionFail=(1:count)>prefix & holdDeficits>tolerance;
-    failed=find(stateFail | handlingFail | roadFail | collisionFail,1);
-    if ~isempty(failed)
-        reasons=["stateLimits","handlingEnvelope","road","collision"];
-        plan.reason=reasons(find([stateFail(failed),handlingFail(failed),roadFail(failed),collisionFail(failed)],1));return;
-    end
-    deficits=zeros(1,count+1);within=1:min(prefix,count);deficits(within)=holdDeficits(within);
-    if endRoadFail,plan.reason="road";return;end
-    if count+1<=prefix,deficits(count+1)=pointDeficits(end);
-    elseif pointDeficits(end)>tolerance,plan.reason="collision";return;
-    end
-    [member,context,terminal]=terminalSafeSet.member(context,states(:,end),count);
-    plan.terminalValue=terminal.value;plan.terminalMargin=min(terminal.margin,terminal.roadMargin);
-    plan.terminalStopSeconds=terminal.stopSeconds;plan.terminalExitSeconds=terminal.exitSeconds;
-    if member,plan.terminalEnd=terminal.reason;end
-    if ~member,plan.reason="terminal:"+terminal.reason;return;end
-    plan.softDeficits=deficits;plan.softSum=sum(deficits);plan.feasible=true;
-end
-
-function gaps=localClearances(poses,times,model,shape)
-    % Ordinary rectangle distance to the target forecast at each pose (its
-    % time in 'times'); Inf when no target or beyond the encounter range
-    % (the target no longer exists there). Where the reference distance less
-    % both reaches is already beyond the safety margin, that lower bound
-    % stands for the distance: every decision on it is the same.
-    gaps=Inf(1,size(poses,2));if isempty(model.target),return;end
-    cfg=model.cfg;q=localTargetAt(model,times);
-    distance=vecnorm(poses(1:2,:)-q(1:2,:),2,1);
-    bound=distance-norm(shape(1:2))-norm(shape(3:4))-vecnorm(q(8:9,:),2,1)-vecnorm(q(10:11,:),2,1);
-    inside=distance<=cfg.collision.encounterRangeMeters;
-    gaps(inside)=bound(inside);
-    for j=find(inside & bound<cfg.collision.safetyMarginMeters)
-        gaps(j)=predictiveSafetyGeometry.rectangle(poses(1:3,j),shape,q(1:3,j),q(8:11,j));
     end
 end
 
@@ -370,7 +234,7 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
         wall=tic;[problem,model]=localFormulate(anchor,model);formulationSeconds=toc(wall);
         model.linearization=anchor;
         % The next sample inherits this plan's later inputs only when the
-        % anchor is the previous accepted plan (localAddClf).
+        % anchor is the previous solved plan (localAddClf).
         problem.inheritedAnchor=initialization=="shiftedInputRollout";
     else
         problem=localInputBounds(problem,model);
@@ -508,7 +372,7 @@ function [anchor,source,failure]=localInitialization(model,previous)
     if isempty(shifted) || ~all(isfinite(shifted(:))) || ~all(abs(shifted(2,:))<1)
         failure="unusableShiftedInputs";return;
     end
-    % The previous accepted plan, shifted by one hold. Its endpoint lies in
+    % The previous solved plan, shifted by one hold. Its endpoint lies in
     % the terminal set at the same absolute time. When the plan is shorter
     % than the prefix it is extended by holds of the declared model that keep
     % the endpoint in the set: the cruise hold of the CLF's certified
@@ -1037,7 +901,7 @@ function problem=localAddClf(problem,anchor,model)
     e0=nonlinearBicycleModel.errorLinearization(model.initialState,model.lane,model.nominalReference);
     scales=[model.cfg.clf.lateralPositionErrorScale;model.cfg.clf.headingErrorScale; ...
         model.cfg.clf.speedErrorScale;model.cfg.clf.lateralVelocityErrorScale;model.cfg.clf.yawRateErrorScale];
-    % On the previous accepted plan the tie's loss is at least one unit of
+    % On the previous solved plan the tie's loss is at least one unit of
     % the CLF error scales. Only the first successor enters the CLF row, so
     % near the path the row and the constraints leave the later inputs free,
     % and the tie is what keeps them. A tie that vanished there left them
@@ -1108,21 +972,19 @@ function [tube,support]=localTargetTube(model,time,holdStart,normal)
     end
 end
 
-function solution=localTerminalMetrics(solution,model,acceptance)
-    % Terminal quantities of the issued (nonlinear) plan, for records.
+function solution=localTerminalMetrics(solution,model)
+    % Simple prediction quantities; no post-solve constraint evaluation.
     cfg=model.cfg;y=solution.states(:,end);count=size(solution.inputs,2);
-    solution.terminalValue=acceptance.terminalValue;solution.terminalMarginMeters=acceptance.terminalMargin;
-    solution.terminalStopSeconds=acceptance.terminalStopSeconds;
-    solution.terminalExitSeconds=acceptance.terminalExitSeconds;solution.terminalEnd=acceptance.terminalEnd;
-    solution.acceptedStep=acceptance.step;solution.candidateFeasible=acceptance.candidateFeasible;
-    solution.linearizationGap=acceptance.linearizationGap;
-    solution.terminalDistanceMeters=Inf;solution.terminalRoadMarginMeters=Inf;
+    solution.terminalValue=nonlinearBicycleModel.nominalValue(y,model.lane,model.nominalReference);
+    solution.terminalMarginMeters=NaN;solution.terminalRoadMarginMeters=NaN;
+    solution.terminalStopSeconds=ceil(hypot(y(4),y(5))/(cfg.terminal.brakingDecelerationMetersPerSecondSquared ...
+        *cfg.controller.sampleTime))*cfg.controller.sampleTime;
+    solution.terminalExitSeconds=NaN;solution.terminalEnd="notValidated";
+    solution.linearizationGap=model.trust.modelInnovation;
+    solution.terminalDistanceMeters=Inf;
     if ~isempty(model.target)
         q=localTargetAt(model,count*cfg.controller.sampleTime);
         solution.terminalDistanceMeters=norm(y(1:2)-q(1:2));
-    end
-    if ~isempty(model.road.lateralClearance)
-        solution.terminalRoadMarginMeters=terminalSafeSet.roadMargin(y,model);
     end
 end
 
