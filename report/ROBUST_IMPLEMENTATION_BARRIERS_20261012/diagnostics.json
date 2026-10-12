@@ -1,0 +1,101 @@
+{
+  "sampleTimeSeconds": 0.05,
+  "target": {
+    "nominalSpeedMetersPerSecond": 8,
+    "errorSet": {
+      "positionRadius": 0.03,
+      "courseRadius": 0.01,
+      "speedRadius": 0.1,
+      "accelerationRadius": 0.2,
+      "curvatureRadius": 0.001,
+      "sideslipRadius": 0.002
+    },
+    "timeSeconds": [
+      1,
+      3,
+      5
+    ],
+    "fullHorizonPositionRadiusMeters": [
+      0.34199999999999997,
+      1.7580000000000002,
+      4.2299999999999995
+    ],
+    "resetEachHoldPositionRadiusMeters": [
+      0.039330000000000004,
+      0.039330000000000004,
+      0.039330000000000004
+    ],
+    "admittedAccelerationErrorMetersPerSecondSquared": 0.2,
+    "exactPositionErrorMeters": [
+      0.099999999999999645,
+      0.89999999999999858,
+      2.5
+    ]
+  },
+  "nonlinearImage": {
+    "initialState": [
+      0,
+      0,
+      0,
+      15,
+      0,
+      0
+    ],
+    "input": [
+      0,
+      0
+    ],
+    "yawPerturbationRadians": 0.1,
+    "tangentLongitudinalRadiusMeters": 0,
+    "exactLongitudinalErrorMeters": -0.0037459193002011837,
+    "remainderNorm": 0.0037480011760598233
+  },
+  "terminal": [
+    {
+      "initialState": [
+        0,
+        0,
+        0,
+        15,
+        0,
+        0
+      ],
+      "terminalMember": true,
+      "sideslipRadians": 0,
+      "lateralAccelerationMetersPerSecondSquared": 0,
+      "input": [
+        0,
+        -0.47970258439767344
+      ],
+      "positionDifferenceMeters": 0.00019089754632561906,
+      "bodyVelocityDifferenceMetersPerSecond": [
+        -0.0076232729410588007,
+        0
+      ],
+      "yawRateDifferenceRadiansPerSecond": 0
+    },
+    {
+      "initialState": [
+        0,
+        0,
+        0,
+        15,
+        0.3,
+        0.03
+      ],
+      "terminalMember": true,
+      "sideslipRadians": 0.019997333973150535,
+      "lateralAccelerationMetersPerSecondSquared": 0.45008999100179958,
+      "input": [
+        0,
+        -0.47970258439767344
+      ],
+      "positionDifferenceMeters": 0.0027541700147778506,
+      "bodyVelocityDifferenceMetersPerSecond": [
+        -0.0073502220014063369,
+        -0.10095638501378462
+      ],
+      "yawRateDifferenceRadiansPerSecond": -0.00870566357731085
+    }
+  ]
+}

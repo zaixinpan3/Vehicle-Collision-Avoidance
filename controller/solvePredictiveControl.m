@@ -532,12 +532,13 @@ function [problem,model]=localFormulate(anchor,model)
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;finite=isfinite(rate);
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=0;
-    % Information-consistent uncertainty. The estimator publishes a fresh
+    % Per-hold affine uncertainty. The estimator publishes a fresh
     % enclosure G0 of its estimate at every sample, and every hold of the
     % plan is issued from such an estimate. Hold i therefore starts from G0
     % and propagates it through that hold only: G(t_i+tau) = Phi_i(tau) G0,
     % and the target set restarts from its predicted state at t_i. The
-    % first hold is the certified one; later holds assume that the estimator's
+    % first hold uses the present enclosure's tangent image; nonlinear
+    % remainders are not certified. Later holds assume that the estimator's
     % enclosure at their start equals the present one. Issued inputs carry
     % no uncertainty of their own.
     initialGenerator=model.uncertainty.egoGenerator;generator=initialGenerator;
@@ -957,7 +958,8 @@ end
 function [tube,support]=localTargetTube(model,time,holdStart,normal)
     % Target enclosure of the hold that starts at holdStart: the observer
     % set restarted from the target's predicted state there, for the time
-    % elapsed in the hold. Same constant-parameter family as before.
+    % elapsed in the hold. This is not propagation of the current family
+    % over the complete horizon; future measurement updates are assumed.
     tube=struct('positionRadius',zeros(size(time)),'yawRadius',zeros(size(time)), ...
         'courseRadius',zeros(size(time)),'speedRadius',zeros(size(time)));support=[];
     if isempty(model.target) || isempty(model.uncertainty.target)

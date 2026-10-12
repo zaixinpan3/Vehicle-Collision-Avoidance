@@ -56,8 +56,9 @@ given path defines the single CLF; there is no separate path corridor.
 Observer inputs tighten affine sampled collision, road, physical-state,
 handling and terminal constraints. Each hold starts from the current enclosure
 and propagates it through that hold only; the CLF row acts on the estimate. No
-posterior-inclusion proof has been implemented, and the terminal set is
-invariant only under exact information (TERMINAL_SAFE_SET.md, Section 9); the
+posterior-inclusion algorithm has been implemented, and terminal invariance
+is established for the closed-form terminal law, not the complete Fiala
+information-set dynamics (TERMINAL_SAFE_SET.md, Section 9); the
 radii are not discarded to obtain a command. `observerPredictiveControlTest`
 and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
 and expose that limitation. Complete nonlinear robust safety remains conditional
