@@ -181,3 +181,100 @@ Direct issuance of optimized inputs can be retained by incorporating the
 uncertainty and backup constraints into the optimization. This assessment
 does not introduce post-solve correction or a new runtime algorithm. No
 complete joint theorem is claimed for the current executable controller.
+
+## Subsequent scope clarification: omit roads and establish uniform bounds
+
+The user clarified that the current theoretical derivation omits road
+boundaries entirely. Remove the road part of H in this scoped theorem; this
+does not change the runtime road constraints. No road-width or remaining-road
+margin condition is an obstacle to the scoped derivation. The joint design
+should establish uniform bounds on the current information uncertainty and
+the uncertainty within each finite prediction, as well as a certified terminal
+extension. Known finite error at each isolated time is weaker than a single
+finite bound valid for all time.
+
+The existing continuous observer core already has the relevant structure:
+
+    D+ B_v <= -k_v B_v + d_v,
+    D+ B_T <= -lambda_T B_T + c_Tv B_v + d_T.
+
+For fixed positive gains, bounded nonnegative forcing d_v<=d_v_max,
+d_T<=d_T_max, and valid finite initial bounds, define
+
+    B_v_max = max(B_v(0), d_v_max/k_v),
+    B_T_max = max(B_T(0), (c_Tv*B_v_max+d_T_max)/lambda_T).
+
+At either upper boundary the outward derivative is nonpositive, so this
+rectangle is invariant for the positive comparison dynamics. Both bounds are
+uniform in absolute time. The target metric bound maps to its physical
+component bounds using the positive definite certificate matrix. Initial
+transients are retained; the equilibrium radius alone is insufficient.
+This is a direct consequence of `estimator/OBSERVER_ISS_THEORY.md`, Section 6,
+under that certificate's premises. Absolute pose, heading and reconstructed
+parameter channels must retain their own valid uniform bounds; the core
+certificate alone is not their proof. A valid gyro-only orientation set can
+grow to the full circle, whose angular radius is pi, without an angular
+convergence claim. Availability and model/sensing assumptions still matter.
+
+There are two different time variables. The current estimate error is
+B(k), measured over absolute control cycles k. The prediction radius is
+r(i|k), measured i steps ahead of the information available at cycle k.
+Bounded B(k) does not justify restarting r(i|k) from B(k) at every future
+hold before those future measurements exist.
+
+Nevertheless, an infinitely contractive open-loop prediction is unnecessary
+for a uniformly bounded *finite-horizon* formulation. Suppose the current
+observer information Q_k has a uniform size bound B_max, and use the existing
+sound posterior recursion I_k=T_outer(I_(k-1),u_(k-1)) intersect Q_k. Then
+I_k is contained in Q_k. In a fixed weighted coordinate norm, its diameter
+is bounded by twice Q_k's radius. Translation of Q_k's center does not
+invalidate this diameter bound or the cross-sample set inclusion.
+
+Suppose a certified, time-uniform, nondecreasing one-hold growth bound Gamma
+maps finite uncertainty sizes to finite sizes over the admitted model/input
+domain. For the fixed maximum horizon M_max,
+
+    r(0|k) <= B_max,
+    r(i+1|k) <= Gamma(r(i|k)),
+    r(i|k) <= max_{0<=j<=M_max} Gamma^j(B_max) = R_max < infinity.
+
+This bound is independent of k, even if some predictions expand with i.
+For the illustrative linear bound Gamma(r)=L*r+d, its j-step bound is
+
+    L^j B_max + d * sum_{ell=0}^{j-1} L^ell.
+
+L<1 is sufficient for an infinite-horizon bound, but is not necessary for
+a fixed finite maximum horizon. The current default maximum is 512 holds
+of 0.05 s, or 25.6 s. This corollary assumes a certified uniform growth map;
+the current per-hold tangent reset is not its implementation. Across the
+discontinuous stop reset, use a certified piecewise/outer map rather than
+postulating a global Lipschitz constant. A finite but excessively conservative
+R_max does not itself prove collision/handling/terminal feasibility.
+
+For a feedback tube design, a contracting radius recursion
+r_next<=a*r+b*B_max+d with a<1 yields the invariant upper bound
+max(r(0),(b*B_max+d)/(1-a)). This is an alternative way to keep deviations
+bounded. It requires actual incremental control properties and must be
+designed consistently with direct optimized-input execution; it is not a
+property supplied by observer ISS alone. The finite-horizon information-set
+route does not require inserting such an auxiliary feedback after a solve.
+
+An infinite frozen target forecast has a different limitation. Consider two
+admitted straight constant-speed targets starting at the same point, with
+speeds V-delta and V+delta, delta>0. Their positions separate by 2*delta*tau.
+Any enclosure containing both has diameter at least 2*delta*tau, so no finite
+uniform position diameter exists as tau tends to infinity. This is compatible
+with bounded online observer error, because later observations refine the
+current information. A fixed finite horizon bounds this growth; alternatively
+the terminal proof can check an entire swept target family directly. A safe
+parked ego set does not require an infinitely long target position-error ball
+of uniformly bounded radius, but it does require universal target clearance
+under the declared encounter convention. Finite encounter termination must
+not be silently changed into an unrestricted infinite-time claim.
+
+Thus the scoped joint result should establish: uniform valid current observer
+bounds; uniform finite-horizon uncertainty bounds; a road-free robust terminal
+extension; and shifted-witness feasibility under the same forecast/update
+contract. Observer boundedness, finite prediction boundedness and recursive
+feasibility are distinct propositions that must be connected. There is no
+need to introduce a road-space premise into this scoped derivation.
