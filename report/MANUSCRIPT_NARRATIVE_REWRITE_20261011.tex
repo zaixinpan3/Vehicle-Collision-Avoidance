@@ -1,0 +1,171 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{url}
+\title{Rewriting the manuscript around one narrative, with the PCBF guarantee
+under the estimator's certified uncertainty}
+\date{Prepared October 11, 2026}
+\begin{document}
+\maketitle
+
+\section{Question}
+The user asked for \path{paper/manuscript.tex} to be rewritten so that it reads
+as natural, human-written prose and follows one narrative: lane keeping and
+collision avoidance should be one system; existing designs assume known states
+and give no assurance that a safe action still exists a moment later; Sharma
+et al.\ (2026) showed that tracking from a maneuvering car needs an
+ego-motion-aware relative motion model but assumed constant ego acceleration
+and yaw rate and reported no usable error bound; Huang et al.\ (2025) turned a
+finite-horizon problem into a barrier function but assumed an exact state and
+a time-invariant problem; our estimator and controller are designed for each
+other. The user named the remaining gap, that Huang's guarantees are
+established only with exact information so the estimator's certificate does
+not enter the safety proof, and asked that the mathematics be developed in
+the paper for the PCBF guarantee under the estimator's certified uncertainty
+and under a forecast that is revised at every sample.
+
+\section{What was read}
+The whole manuscript of the previous revision (\texttt{1000635}, synchronized
+with \texttt{ea88059}); the two reference papers (Sharma, Alai and Rajamani,
+Transp.\ Res.\ C 182, 2026: models (2), (17), Assumption~1, Theorems~1--2;
+Huang, Wang, Margellos and Goulart, ECC 2025: problem (8), the shifted
+solution (10), inequality (11), Lemmas III.1 and III.5, Theorems~1--4);
+\path{controller/OBSERVER_ROBUST_PCBF_THEORY.tex},
+\path{controller/TERMINAL_SAFE_SET.md} (Sections 6 and 9),
+\path{controller/PCBF_CLF_ARCHITECTURE.md}, \path{controller/NOMINAL_CLF.md},
+\path{estimator/OBSERVER_ISS_THEORY.md}, \path{estimator/MODEL_AIDED_ESTIMATION.md},
+\path{estimator/nrmmControllerErrorBounds.m} (the published target set),
+\path{controller/predictiveSafetyGeometry.m} (\texttt{targetErrorTube}),
+\path{scripts/collisionThreatContract.m} (the declared bounds of the
+closed-loop target contract), \path{README.md}, \path{report/README.md},
+\path{paper/README.md}, the local Zotero library (206 items) for the added
+references, and \path{reference/vehicle_collision_avoidance_literature_review.md}.
+
+\section{The derivation added (Section IV-J, Theorem 2)}
+Let $\boldsymbol\theta=(\boldsymbol p_C,\gamma_C,V_C,A_C,\kappa_C)$ be the
+obstacle's state and constants, $\varphi_\tau$ the flow of the forecast
+(constant $A$ and $\kappa$, braking to rest, $A$ zero at rest), and
+$\mathcal Q_k$ the set the estimator publishes at sample $k$. The flow is a
+semigroup. The information set
+$\mathcal S_{k+1}=\varphi_{T_s}(\mathcal S_k)\cap\mathcal Q_{k+1}$ contains the
+truth, and the forecast families $\mathcal F_k(t)=\varphi_{t-t_k}(\mathcal S_k)$
+are nested, $\mathcal F_{k+1}(t)\subseteq\mathcal F_k(t)$ (Lemma~6). This is
+the unknown-but-bounded recursion of set-membership estimation applied to the
+constants; the published sets alone are not nested. A computable nested outer
+approximation intersects the published intervals of $A_C$ and $\kappa_C$ over
+the history and takes, at each absolute time, the smallest of the enclosures
+(eq.\ \texttt{target\_tube}) of the individual published sets evaluated with the
+intersected intervals.
+
+On the ego side the innovation
+$\boldsymbol\delta_k=\hat{\boldsymbol x}_{k+1}-F(\hat{\boldsymbol x}_k,\boldsymbol u_k)
+=-\boldsymbol\epsilon_{k+1}+F(\hat{\boldsymbol x}_k+\boldsymbol\epsilon_k,\boldsymbol u_k)
+-F(\hat{\boldsymbol x}_k,\boldsymbol u_k)+\boldsymbol w_k$ lies in a fixed set
+$\bar\Delta$ determined by the uniform bound of the ISS comparison solution
+(Corollary~1 now states $\boldsymbol z(t)\le\sup_\tau\boldsymbol z(\tau)<\infty$),
+the Jacobian bound of $F$ and the plant defect. A tube is a family of sets
+$\mathcal D_s$ over the constrained instants $s\in\{\tfrac12,1,\tfrac32,\dots\}$
+with (T1) $\mathcal D_{1/2},\mathcal D_1$ containing the true deviation of the
+applied hold (the implemented per-hold propagation) and (T2)
+$\mathcal D_{s+1}\supseteq\mathcal D_s\oplus\Phi_s\bar\Delta\oplus\mathcal R_s$
+(Chisci-type growth, with $\Phi_s$ the sensitivity along the candidate's law,
+open loop or in feedback form). The robust problem imposes the ego rows on
+$\boldsymbol z_{s|k}\oplus\mathcal D_s$ without slack, and the obstacle rows
+against every member of $\mathcal F_k$ with slacks; $V_k^\star$ is the minimal
+slack sum.
+
+Theorem~2: under the hypotheses of Theorem~1 along the loop, a plant equal to
+$F$ up to a bounded defect, an obstacle on the constant-parameter model, a
+tube with (T1)--(T2) and Assumption~3, feasibility of the robust problem is
+kept at the next sample, $V^\star_{k+1}\le V^\star_k-\xi^\star_{0|k}$, the
+applied hold separates the true vehicles by $d_{\rm m}$ less its slack, the
+first-hold deficits are summable, and the zero set of $V^\star$ is invariant.
+The proof is Huang's shifted-solution argument with the candidate's state at
+instant $s$ contained in the old instant $s+1$'s tube (by (T2)) and the new
+forecast family contained in the old one (by Lemma~6); the encounter end and
+the parked check are monotone for the same reason. The theorem reduces to
+Proposition~2 with exact information. A paragraph states what the
+implementation realizes: (T1) only; forecasts from the centers of
+$\mathcal Q_k$; no intersection. The two earlier measurements (open-loop
+full-horizon ego tube infeasible; full-horizon target set 31 of 84 with one
+collision from a shared slack) are read as the tube growing without feedback
+and the width of the published family.
+
+\section{Numbers}
+No simulation or test was run. Every number of the results section is that of
+the previous revision. One illustrative calculation was added: the position
+radius of the forecast family under eq.\ \texttt{target\_tube} with the median
+published radii of the estimated-state campaign (course 0.20~rad, speed
+1.4~m/s, position 0.064~m) and the declared bounds of the closed-loop target
+contract on the constants ($|A_C|\le1.1$~m/s$^2$, $|\kappa_C|\le\sin(0.055)/1.6
+=0.034$~m$^{-1}$, from \path{scripts/collisionThreatContract.m} over the seven
+scenarios widened by 10\%), for an obstacle at 8~m/s on a straight course:
+4.7~m one second ahead, 12.7~m at two seconds, 23.9~m at three seconds
+(\path{MANUSCRIPT_NARRATIVE_REWRITE_20261011/forecastFamilyWidth.py}, output in
+\path{forecastFamilyWidth.txt}). The manuscript quotes ``about 5~m one second
+ahead and more than 20~m three seconds ahead''.
+
+\section{Manuscript changes}
+\begin{itemize}
+\item Abstract and introduction rewritten around the narrative; the
+  contributions are the estimator, the PCBF controller, the transfer of the
+  guarantee (Section IV-J) and the closed-loop evaluation.
+\item Section II (Problem, Models and System): the task, the vehicle models,
+  the architecture with the obstacle perception pipeline as a short part of
+  it, and the safety argument whose link (v) now cites Theorem~2 as well as
+  Proposition~2. The former Section III (Perception) is gone: its
+  obstacle-perception subsection is condensed into Section II-C, and the
+  road-curb extraction subsection, whose code was removed from the repository
+  on October 6, 2026 and whose figure cannot be regenerated, is removed
+  together with the figure.
+\item Section III (Estimator): prose rewritten; the assumptions, Lemmas~1--4,
+  Theorem~1 and the gain programs unchanged; Corollary~1 extended by the
+  uniform bound; the published ego and target sets named ($\mathcal E_k$,
+  $\mathcal Q_k$).
+\item Section IV (Control): prose rewritten; Lemma~5, Assumption~3,
+  Propositions~1--2 and every equation unchanged; the soundness of the
+  tightening stated after eq.\ \texttt{collision\_tightening}; Section IV-I
+  retitled ``Recursive feasibility with exact information''; new Section IV-J
+  with Lemma~6 and Theorem~2; the scope subsection updated.
+\item Section V (Results): numbers unchanged; two sentences connect the
+  shifted-plan failures and the published target widths to Section IV-J.
+\item Discussion and conclusion rewritten; the AI-assistance disclosure
+  updated.
+\item Seven references added from the Zotero library and the literature:
+  Xu, Grizzle, Tabuada and Ames (2018); V\"or\"os et al.\ (2026); Alan et al.\
+  (2023); Jeon, Zemouche and Rajamani (2019); Mayne, Rakovi\'c, Findeisen and
+  Allg\"ower (2006); Schweppe (1968); Milanese and Vicino (1991).
+\item Compiled with \texttt{latexmk}: 28 pages, no undefined reference or
+  citation, no overfull line.
+\end{itemize}
+
+\section{Documentation changes}
+\path{paper/README.md} rewritten for this revision; \path{report/README.md}
+(this entry); the manuscript sentence of \path{CLAUDE.md} updated. No
+executable statement and no controller or estimator document was changed.
+
+\section{Open items for review}
+\begin{itemize}
+\item The proof of Theorem~2 and Lemma~6, and the semigroup argument for the
+  flow with the rest rule, have not been independently reviewed. The theorem
+  is conditional on the tube hypothesis (T2), which the implementation does
+  not realize; the manuscript says so.
+\item The abstract is 275 words; IEEE Transactions typically ask for at most
+  250.
+\item The bibliographic data of the three references that are not in the
+  Zotero library (Mayne et al.\ 2006, Schweppe 1968, Milanese and Vicino
+  1991) were entered from memory and should be checked against the
+  publishers' records; the four taken from Zotero should be checked as well.
+\item Whether the removal of the road-curb subsection is what the user wants;
+  the architecture figure still shows the road-curb branch, labeled unused in
+  the caption.
+\item The estimator-alone results (Sections V-A and V-B) were not rerun.
+\item The remarks on the implemented approximation (per-hold tightening,
+  forecast centers) restate \path{controller/PCBF_CLF_ARCHITECTURE.md} and
+  \path{controller/TERMINAL_SAFE_SET.md}, Section~9; the theory document
+  \path{controller/OBSERVER_ROBUST_PCBF_THEORY.tex}, which predates the
+  braking-continuation terminal set and claims no recursive feasibility, was
+  not updated to the new result.
+\end{itemize}
+\end{document}
