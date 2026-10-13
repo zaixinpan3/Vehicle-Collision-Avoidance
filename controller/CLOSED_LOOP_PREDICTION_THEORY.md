@@ -51,6 +51,85 @@ and Theorem 4 give a nonlinear framework with observer/tracking bounds and
 recursive feasibility. Applying it here requires our own domain, actuator and
 terminal certificates. [Primary source](https://arxiv.org/html/2105.03427v1).
 
+## Include the actual observer update in the prediction
+
+The proposed joint model should propagate the physical ego/target state X,
+the actual observer runtime state s, nominal policy/reference memory z,
+observer bound/set state B, and held-input memory. At a future sample:
+
+    estimates_i = reconstruct(s_i, measurements_i, B_i),
+    u_i = pi_i(estimates_i, z_i, B_i),
+    X_(i+1) = plantHold(X_i,u_i,defects_i),
+    s_(i+1),B_(i+1) = observerHoldAndUpdate(s_i,B_i,u_i,sensorHistory_i),
+    z_(i+1) = nominalPolicyUpdate(z_i, estimates_i, u_nominal_i).
+
+The sensor history is generated consistently from the same physical branch,
+timestamps, held inputs and bounded noise. Propagate all admitted noise/defect
+histories. Feedback uses available estimates, never the unknown true state.
+The known current s_i is common to all initial branches; uncertainty starts
+from the current physical/parameter enclosure, not arbitrary independent
+perturbations of the known software state. Future s becomes branch-dependent
+through its measurement update.
+
+The present NRMM runtime's numerical point state is 15-dimensional:
+body velocity (2), inertial position (2), GNSS predictor (2), target core (6),
+radar predictor (2) and yaw (1). Synchronization, orientation sets, history and
+bound updates add information memory. `nrmmObserverVectorField("integrate",...)`
+supplies the RK4 point flow; `onlineNrmmTrackingRuntime` resets measurement
+predictors, updates sets/bounds, then advances held measurements and reconstructs
+outputs. The augmented predictor must follow this order and sample/hold contract.
+The eight-state continuous core certificate is useful but is not itself the
+complete published ego/target-state update.
+
+For clarity, consider a linear predictor-form illustration:
+
+    x_next = A*x+B*u+w,          y=C*x+n,
+    xhat_next = A*xhat+B*u+L*(y-C*xhat),
+    z_next = A*z+B*v,            u=v+K*(xhat-z).
+
+With e=x-xhat and delta=xhat-z,
+
+    [e_next    ] = [A-L*C    0    ] [e    ] + [I  -L] [w],
+    [delta_next]   [ L*C   A+B*K ] [delta]   [0   L] [n].
+
+The actual tracking deviation is e+delta. The same measurement-noise column
+enters the two components with opposite signs. Its immediate contribution to
+their sum cancels under this predictor timing; noise still affects later
+physical inputs through the estimate. Treating these components independently
+can lose the cancellation. In the real code shared gyro and common-pose
+columns likewise must remain shared; primitive sensor noise and the observer
+error it produces must not be added as unrelated disturbances.
+
+If measurement correction or reconstruction feedthrough precedes the current
+control, include its immediate control-to-plant noise path as well. The runtime
+publishes measured yaw rate directly in the ego output, so the real feedback
+can have such feedthrough. The illustrative cancellation does not mean that
+sensor noise cannot affect physical motion through the chosen control.
+
+If both diagonal blocks are Schur stable, this illustrative augmented matrix
+is Schur stable. A bounded noise set then admits an augmented invariant tube
+Omega satisfying A_joint*Omega+noiseImage subset Omega. The physical tube is
+the projection [I I]*Omega, and input deviation is the projection [0 K]*Omega.
+At initialization z=xhat implies delta=0; e retains the observer-certified
+nonzero initial error. These correlations should be retained in the initial set.
+
+This is a linear explanatory derivation, not our NRMM observer equation.
+For the nonlinear implementation derive the joint map/Jacobian or certified
+comparison dynamics from the actual point flow, reconstruction and bound
+updates. Validate a joint invariant/contraction condition over the admitted
+nominal, error and input domains, including midpoints and mode transitions.
+Stable observer ISS and the existing path CLF do not by themselves certify
+incremental joint contraction. The uncontrolled target's absolute-position
+spread remains; relative/coupled safety coordinates are still needed.
+
+Including the updater enables a tighter causal description; it does not
+automatically guarantee a smaller tube. A poor outer approximation can still
+discard its correlations. The full updater can be used for offline proof and
+coefficient construction, with compact certified radius/generator recursions
+online. Observer states need not all become optimization decision variables.
+The shifted-policy proof below applies to this augmented transition when its
+outer images are sound, monotone and retain the same causal-policy witness.
+
 ## Construct a fixed invariant set for the sampled tangent model
 
 The research verifier uses straight-cruise sampled A,B and a fixed six-state
