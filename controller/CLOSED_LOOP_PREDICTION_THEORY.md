@@ -122,6 +122,30 @@ Stable observer ISS and the existing path CLF do not by themselves certify
 incremental joint contraction. The uncontrolled target's absolute-position
 spread remains; relative/coupled safety coordinates are still needed.
 
+The October 13 research probes now execute the actual NRMM update and bound
+memory, rather than injecting arbitrary bounded errors in place of an observer.
+For an ego-only cruise policy, the point map reduces to six physical states
+and five persistent ego observer states: GNSS predictor resets remove its
+memory, and the target point subsystem does not feed this ego-only policy.
+Four shared sensor-noise vectors are retained per controller hold. The known
+current software state and the common current-input first-hold image are
+included in the initial set. At 8 and 15 m/s, the numerical local joint maps
+are Schur stable and admit fixed linear physical position half widths of
+about 0.244 m longitudinally and 0.20 m laterally. Actual nonlinear replay
+over 25.6 s keeps sampled position errors below 0.081 m, with available
+current observer bounds containing the tested errors.
+
+An additional actual-target-tracker following probe preserves relative
+separation despite 5.12 m branch spread in both vehicles' absolute position.
+It is evidence for using relative/joint safety coordinates, not a guarantee
+over the entire published target-parameter set. The numerical maps are
+secants above the force-balance inverse's bisection resolution; no uniform
+nonlinear remainder or interval arithmetic certificate is supplied.
+See [actual NRMM probe methods and limits](../report/JOINT_NRMM_PREDICTION_20261013.md)
+and `scripts/verifyJointNrmmPrediction.m` / `scripts/verifyNrmmRelativeFeedback.m`.
+Production optimization and the complete recursive-feasibility claim remain
+unchanged by these research probes.
+
 Including the updater enables a tighter causal description; it does not
 automatically guarantee a smaller tube. A poor outer approximation can still
 discard its correlations. The full updater can be used for offline proof and

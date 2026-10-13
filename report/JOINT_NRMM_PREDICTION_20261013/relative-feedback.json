@@ -1,0 +1,70 @@
+{
+  "scope": "twoStraightConstantSpeedWorldsWithActualNrmmRelativeFeedback",
+  "nrmmObserverExecuted": true,
+  "nonlinearRobustCertificate": false,
+  "targetSpeedOffsetsMetersPerSecond": [
+    -0.1,
+    0.1
+  ],
+  "separationMeters": 8,
+  "horizonSeconds": 25.6,
+  "firstInputs": [
+    [
+      -2.3881679775631423E-7,
+      -2.3881679775631423E-7
+    ],
+    [
+      0.018375607123988946,
+      0.018375607123988946
+    ]
+  ],
+  "rootTargetPredictionSet": {
+    "kind": "nrmm-constant-parameter-set-v1",
+    "time": 0.25000000000000006,
+    "available": true,
+    "referenceEgoPose": [
+      3.7500000000000062,
+      0,
+      -1.9750476365487657E-7
+    ],
+    "relativePosition": [
+      8.000000000000016,
+      -7.40426567629741E-8
+    ],
+    "positionRadius": 0.040000074042713607,
+    "courseCenter": 1.321340958131707E-7,
+    "courseRadius": 0.18213088088401055,
+    "speedInterval": [
+      12.338604906593327,
+      17.661395093406448
+    ],
+    "accelerationInterval": [
+      -1.1,
+      1.1
+    ],
+    "curvatureInterval": [
+      -0.034357671891917331,
+      0.034357671891917331
+    ],
+    "rearAxleDistance": 1.6,
+    "scope": "currentObserverEnclosureWithConstantParameters",
+    "futureMeasurementsAssumed": false
+  },
+  "peakRelativeTrackingErrorMeters": [
+    0.017802483738704997,
+    0.02672676787911496
+  ],
+  "targetPositionDiameterMeters": 5.1199999999997772,
+  "egoPositionDiameterMeters": 5.11999838326858,
+  "terminalRelativePositionDiameterMeters": 1.6167311969184084E-6,
+  "independentMarginalLongitudinalGapMeters": -1.9211987447176737,
+  "minimumSampledRectangleClearanceMeters": 3.1822519203736128,
+  "maximumAbsoluteInput": [
+    0.0092388514714863684,
+    0.34956257886585185
+  ],
+  "peakTargetPositionEstimationErrorMeters": 0.037963894210204636,
+  "peakTargetSpeedEstimationErrorMetersPerSecond": 0.25902537833982286,
+  "unavailableTargetBoundSamples": 0,
+  "uncontainedAvailableTargetBoundSamples": 0
+}
