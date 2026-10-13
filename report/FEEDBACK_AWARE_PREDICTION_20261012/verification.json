@@ -1,0 +1,294 @@
+{
+  "scope": "localLinearInvariantTubeAndNonlinearFeedbackProbes",
+  "nonlinearRobustCertificate": false,
+  "nrmmObserverExecuted": false,
+  "sampleTimeSeconds": 0.05,
+  "horizonSteps": 512,
+  "measurementErrorRadius": [
+    0.05,
+    0.05,
+    0.005,
+    0.02,
+    0.02,
+    0.005
+  ],
+  "lqrStateWeights": [
+    1,
+    4,
+    20,
+    1,
+    1,
+    2
+  ],
+  "lqrInputWeights": [
+    20,
+    1
+  ],
+  "oldFullStateSpectralRadius": 1,
+  "newFullStateSpectralRadius": 0.9508682198698728,
+  "feedbackGain": [
+    [
+      2.6854253454979684E-17,
+      -0.27742638704032391,
+      -1.7802566703739864,
+      4.775797378747048E-17,
+      -0.044400724460595779,
+      -0.1011224851853133
+    ],
+    [
+      -0.79419403840031622,
+      6.8067782238445125E-17,
+      -4.3285865768710426E-15,
+      -0.90535578215892,
+      6.7929202384084233E-17,
+      -4.7516401071230933E-16
+    ]
+  ],
+  "linearTube": {
+    "model": "sampledStraightTrimTangentOnly",
+    "metric": [
+      [
+        21.769637378691886,
+        7.5518658970406906E-16,
+        3.87483873115937E-15,
+        1.2760234702541715,
+        1.7269076682831581E-16,
+        -1.5955275238996066E-16
+      ],
+      [
+        7.5518658970406906E-16,
+        8.6239656053296088,
+        23.987410347879809,
+        -4.5960206913858779E-16,
+        0.43507917716679551,
+        0.21125394155363886
+      ],
+      [
+        3.87483873115937E-15,
+        23.987410347879809,
+        140.97789948633223,
+        -7.9801376145688709E-15,
+        0.44836381747650955,
+        2.869231725869561
+      ],
+      [
+        1.2760234702541715,
+        -4.5960206913858779E-16,
+        -7.9801376145688709E-15,
+        1.795311828710707,
+        2.7474839555796711E-18,
+        -3.4245363686761859E-16
+      ],
+      [
+        1.7269076682831581E-16,
+        0.43507917716679551,
+        0.44836381747650955,
+        2.7474839555796711E-18,
+        1.755151849146579,
+        -0.65266368127346031
+      ],
+      [
+        -1.5955275238996066E-16,
+        0.21125394155363886,
+        2.869231725869561,
+        -3.4245363686761859E-16,
+        -0.65266368127346031,
+        1.6914476854711424
+      ]
+    ],
+    "contraction": 0.99655171449358415,
+    "zonotopeTerms": 256,
+    "initialMetricRadius": 0.31079746727343921,
+    "lastNoiseMetricRadius": 4.6910708548097148E-8,
+    "initialHullTerms": 256,
+    "noiseTailEllipsoidRadius": 1.3604067430268028E-5,
+    "initialTailEllipsoidRadius": 6.8814116385802971E-7,
+    "coordinateRadius": [
+      0.12319938813785336,
+      0.14576020920221283,
+      0.028747171939300018,
+      0.14763313678190326,
+      0.16046232358288212,
+      0.23092569206920494
+    ],
+    "inputCorrectionRadius": [
+      0.081539171124126536,
+      0.18324387256437144
+    ]
+  },
+  "timeSeconds": [
+    0,
+    1,
+    3,
+    5,
+    25.6
+  ],
+  "openLoopRadius": [
+    [
+      0.05,
+      0.069926679744597986,
+      0.10934333534085047,
+      0.14818480408087126,
+      0.51671526670685952
+    ],
+    [
+      0.05,
+      0.1321705394973508,
+      0.29369620609747926,
+      0.45522176392687141,
+      2.1189350095696016
+    ],
+    [
+      0.005,
+      0.005384170106578174,
+      0.0053841852609795952,
+      0.0053841852609797106,
+      0.0053841852609797106
+    ],
+    [
+      0.02,
+      0.019853538903877178,
+      0.019563826485244663,
+      0.019278341690005453,
+      0.016569642789703905
+    ],
+    [
+      0.02,
+      3.0730206851554911E-6,
+      2.3355215404127665E-14,
+      1.7739453783388927E-22,
+      4.1559547456513044E-106
+    ],
+    [
+      0.005,
+      3.4864004105736178E-7,
+      2.6564036721838037E-15,
+      2.0176714103476035E-23,
+      4.7269499813185537E-107
+    ]
+  ],
+  "linearStressPeak": [
+    0.050620249770817229,
+    0.0513133880908436,
+    0.0085980970047990369,
+    0.093049931630877228,
+    0.071979302371402057,
+    0.12554845891069694
+  ],
+  "nonlinearFeedback": {
+    "worldCount": 8,
+    "initialCornerIndices": [
+      1,
+      9,
+      17,
+      25,
+      33,
+      41,
+      49,
+      64
+    ],
+    "measurementSequence": "deterministicBoundedSines",
+    "peakStateError": [
+      0.052082085216336171,
+      0.060374696779503058,
+      0.008877856412728662,
+      0.068414932534885509,
+      0.057627426390905727,
+      0.097524473684817856
+    ],
+    "maximumAbsoluteSteeringRadians": 0.042135462057562093,
+    "maximumAbsoluteBrakingRatio": 0.1064516806760914,
+    "inputAvailable": true,
+    "nonlinearCertificate": false
+  },
+  "targetRelative": {
+    "nominalTargetSpeedMetersPerSecond": 15,
+    "trueSpeedOffsetsMetersPerSecond": [
+      -0.1,
+      0.1
+    ],
+    "separationMeters": 6,
+    "currentSpeedErrorBoundMetersPerSecond": 0.1,
+    "futureSpeedErrorBoundMetersPerSecond": 0.1,
+    "injectedFutureSpeedErrorAmplitudeMetersPerSecond": 0.02,
+    "futurePositionErrorBoundMeters": 0.02,
+    "firstInputs": [
+      [
+        0,
+        0
+      ],
+      [
+        0.018375607123583382,
+        0.018375607123583382
+      ]
+    ],
+    "terminalTimeSeconds": 25.6,
+    "targetPositionDiameterMeters": 5.1199999999999477,
+    "egoPositionDiameterMeters": 5.1199977208860332,
+    "relativePositionDiameterMeters": 2.2791139144828776E-6,
+    "peakRelativeTrackingErrorMeters": [
+      0.013424572577521943,
+      0.015058070294677428
+    ],
+    "minimumSampledRectangleDistanceMeters": 1.1848432160418092,
+    "independentMarginalLongitudinalGapMeters": -3.9184214849990893,
+    "targetTrajectoryPhysicalUncertaintyRemoved": false
+  },
+  "relativeLinearTube": {
+    "model": "linearizedRelativeFollowingConstantUnknownTargetSpeed",
+    "targetSpeedIntervalMetersPerSecond": [
+      14.9,
+      15.1
+    ],
+    "targetMeasurementRadius": [
+      0.02,
+      0.02,
+      0.1
+    ],
+    "currentRelativeErrorRadius": [
+      0.07,
+      0.07,
+      0.005,
+      0.12,
+      0.02,
+      0.005
+    ],
+    "fixedRelativeCoordinateRadius": [
+      0.28267576563418628,
+      0.18608233134842728,
+      0.036125670125042315,
+      0.43142765956172813,
+      0.19442433499616513,
+      0.28422386423954382
+    ],
+    "gainFeedforwardConsistencyResidual": 6.9388939039072284E-18,
+    "maximumAbsoluteInputFromLinearTube": [
+      0.10026410873434062,
+      0.539183301050897
+    ],
+    "longitudinalRectangleGapLowerBoundMeters": 0.88300484774702348,
+    "requiredSafetyMarginMeters": 0.2,
+    "coversAllAdmittedLinearMeasurementSequences": true,
+    "nonlinearCertificate": false
+  },
+  "constantVelocityBias": {
+    "model": "sampledStraightTrimTangentOnly",
+    "velocityMeasurementBiasMetersPerSecond": 0.02,
+    "timeSeconds": [
+      5,
+      25.6,
+      100
+    ],
+    "oldGainPositionErrorMeters": [
+      -0.090274413527561714,
+      -0.500775471183417,
+      -1.9833644677388296
+    ],
+    "fullGainPositionErrorMeters": [
+      -0.022630467674627716,
+      -0.022799359813277388,
+      -0.022799359813440737
+    ],
+    "fullGainSteadyPositionErrorMeters": -0.022799359813440757
+  }
+}

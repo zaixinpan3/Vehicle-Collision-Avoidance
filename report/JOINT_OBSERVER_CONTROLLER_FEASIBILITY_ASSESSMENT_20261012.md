@@ -278,3 +278,16 @@ extension; and shifted-witness feasibility under the same forecast/update
 contract. Observer boundedness, finite prediction boundedness and recursive
 feasibility are distinct propositions that must be connected. There is no
 need to introduce a road-space premise into this scoped derivation.
+
+## Stronger prediction-width objective
+
+The user subsequently clarified that a large but finite endpoint envelope is
+insufficient: future measurement/control feedback should be represented so
+the prediction tube can keep a fixed admissible width. The resulting design
+is in `controller/CLOSED_LOOP_PREDICTION_THEORY.md`, with mechanisms verified
+in `report/FEEDBACK_AWARE_PREDICTION_20261012.md`. It uses invariant tubes and
+causal policy shifts, preserving direct issuance of the optimized current
+input. Unknown future target trajectories require coupled target/ego response
+or relative-coordinate certificates; future observation accuracy alone cannot
+shrink their physical marginal union about one frozen trajectory. The local
+research verifier is not the completed production joint controller.

@@ -64,6 +64,12 @@ and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
 and expose that limitation. Complete nonlinear robust safety remains conditional
 on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.
 
+`CLOSED_LOOP_PREDICTION_THEORY.md` develops the proposed feedback-aware policy
+prediction, invariant tubes and policy-shift proof. The research verifier
+`../scripts/verifyFeedbackAwarePrediction.m` tests local linear invariance,
+nonlinear feedback probes and correlated target response; it does not change
+the runtime or certify nonlinear avoidance/parking.
+
 The estimator shares the controller's vehicle model, input and domain; see
 `../estimator/MODEL_AIDED_ESTIMATION.md`. The latest point estimate always refreshes target A and beta, held constant
 only within the current prediction. Unavailable or stale certificates do not

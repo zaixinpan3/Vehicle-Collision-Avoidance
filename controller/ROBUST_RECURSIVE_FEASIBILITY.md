@@ -12,6 +12,13 @@ current executable controller issues its convex-program inputs directly but
 does not implement the joint set recursion below. Consequently the theorem
 must not be attributed to its point-estimate, one-linearization problem.
 
+The stronger design objective of keeping prediction tubes from expanding with
+the horizon requires explicit future feedback. The complementary
+`CLOSED_LOOP_PREDICTION_THEORY.md` derives invariant tubes and shifts causal
+control policies rather than only held-input sequences. Its target prediction
+retains correlations between future observations and ego response. That
+proposed formulation is also not yet the runtime algorithm.
+
 ## 1. Separate feasibility from optimality
 
 Recursive feasibility means that a feasible problem at sample k implies a
