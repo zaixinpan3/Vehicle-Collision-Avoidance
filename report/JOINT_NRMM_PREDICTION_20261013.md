@@ -11,7 +11,66 @@ external model service was used. Production control and the manuscript were
 not changed. This is local numerical evidence and a linear invariant-set
 construction, not a nonlinear recursive-feasibility theorem.
 
-## Finding
+## Goal clarification and finite-horizon propagation
+
+Later on October 13 the user clarified that a fixed-width nonlinear invariant
+tube is not the objective. Future observer updates and feedback must enter the
+prediction so that the tail does not acquire the artificial growth of a
+frozen-input open-loop rollout. Tube widths may vary. The earlier fixed-width
+experiment below is retained as an optional diagnostic and historical result.
+
+`verifyJointNrmmPrediction` now primarily propagates a varying finite-horizon
+joint tube. `ComputeInvariantTube` defaults to false; the finite recursion
+does not call a Lyapunov equation or require a contraction/invariance test.
+For the constructed linear surrogate, propagate the actual known software
+offset in the center, retain current physical uncertainty only in the root
+generator, use the common fixed current input in the first map, and include
+future observer/feedback noise in later maps. The finite center and generator
+maps are
+
+    m_next = J_i*m+c_i,       Z_next = [J_i*Z,D_i].
+
+Coordinate/input supports are computed after the full matrix products,
+preserving each shared noise column. The efficient constant-cruise recursion
+keeps separate propagated initial/root-noise images and accumulated future
+noise-image supports, rather than multiplying a coordinate box by abs(J).
+The initial uncertainty is not reset at each predicted hold, and future
+measurements are not assumed known or noiseless. Each terminal coordinate
+support is independently attained by an explicit adjoint-selected noise
+history in the conservative linear sensor-box model. Those box corners need
+not belong to the smaller Euclidean sensor balls; the boxes enclose the actual
+noise contract and their attainment is a check of the linear calculation.
+
+Retained new data: `JOINT_NRMM_PREDICTION_20261013/finite-horizon.json`.
+At 15 m/s, the physical position half widths evolve as follows (meters):
+
+| Prediction time | Joint closed-loop, longitudinal/lateral | Frozen-input initial-error propagation, longitudinal/lateral |
+| --- | --- | --- |
+| 0 s | 0.0400 / 0.0400 | 0.0400 / 0.0400 |
+| 1 s | 0.0893 / 0.0827 | 0.0899 / 0.0961 |
+| 3 s | 0.1292 / 0.0913 | 0.1887 / 0.2101 |
+| 5 s | 0.1353 / 0.0914 | 0.2860 / 0.3240 |
+| 25.6 s | 0.1363 / 0.0914 | 1.2093 / 1.4977 |
+
+The width grows from the current enclosure as future noisy observations
+affect control, then approaches its operating noise envelope. It is neither
+fixed nor artificially capped. The 8 m/s endpoint widths are 0.1363 / 0.0965 m.
+The initial-error contribution at the endpoint is approximately 1.6e-12 m
+longitudinally and less than 4e-16 m laterally; the future noise contribution
+dominates. Maximum absolute braking ratios over these finite tubes are
+0.0612 and 0.0659, respectively. This establishes the finite calculation for
+the local linear maps; it is not a full nonlinear safety/feasibility certificate.
+
+The new 512-step data run executes the actual updater to build the local maps
+but sets `Replay=false`; the earlier nonlinear 512-step replays remain in the
+original JSON. Updated tests run new 80-step nonlinear replays with the actual
+NRMM and compare them with the finite-horizon supports. They retain the
+target-relative/common-current-input checks and verify terminal linear
+support attainment. The nonlinear work now required is a sound finite-horizon
+outer image of the closed-loop joint map and its terminal/shift connection,
+not proof of a constant-radius nonlinear invariant tube.
+
+## Earlier fixed-width diagnostic
 
 Future observation and feedback prevent the secular ego-error growth in the
 tested straight-cruise cases. For the local joint linear surrogate, an
@@ -168,14 +227,14 @@ constructed here.
 Continue with a causal output-feedback tube formulation. Propagate the
 joint actual update offline to design gains and sound enclosure coefficients;
 online, compact sets/radii can suffice. Preserve known current software
-state, shared sensor columns and ego/target relative correlation. Reserve a
-fixed noise floor, rather than repeatedly adding independent absolute
-state-error boxes. Current input must remain the explicit optimized decision;
+state, shared sensor columns and ego/target relative correlation. Account for
+persistent sensor noise in the finite joint recursion and avoid repeatedly
+adding independent absolute state-error boxes. Current input must remain the explicit optimized decision;
 future feedback belongs inside the optimized policy and its constraints.
 
-The next substantive proof is a uniform nonlinear invariant image over the
-admitted nominal trajectories, sensor histories and physical/parameter
-uncertainties, including quantization and hold/midpoint effects. This must
+The next substantive proof is sound nonlinear finite-horizon joint images over
+the admitted nominal trajectories, sensor histories and physical/parameter
+uncertainties, including quantization and hold/midpoint effects. These must
 also admit feedback input/handling limits, turn/straight transitions, the
 low-speed model and a robust parked terminal policy. A joint moving-target
 certificate must cover the whole published parameter family and preserve
@@ -203,13 +262,32 @@ verifyJointNrmmPrediction('report/JOINT_NRMM_PREDICTION_20261013/verification.js
 verifyNrmmRelativeFeedback('report/JOINT_NRMM_PREDICTION_20261013/relative-feedback.json');
 ```
 
+Those original fixed-tube/replay artifacts were generated at commit
+`7abaee4451ea3cbf557b0b5c4e40de9f61510d67`. With the revised script, fixed-width
+diagnostics can be requested explicitly using `ComputeInvariantTube=true`.
+The new varying-tube artifact is generated with
+
+```matlab
+addpath('scripts');
+verifyJointNrmmPrediction('report/JOINT_NRMM_PREDICTION_20261013/finite-horizon.json',Replay=false);
+```
+
 The new behavior tests exercise the actual observer, bounded-noise feedback,
 common current input, target-relative tracking and certificate scope. The
 existing feedback-aware verifier is checked alongside it. No production
 solver campaign or complete repository test suite is claimed for this
 research-only change.
 
-The combined MATLAB run passes all 11 tests, with zero failures or incomplete
+The original combined MATLAB run passed all 11 tests, with zero failures or incomplete
 tests. Code Analyzer uses default settings because this installation lacks
 `MLintDefaultSettings.txt`; after routine cleanup it reports only that
 environmental settings message, with no source-code findings.
+
+After the scope correction the combined MATLAB run passes all 12 tests, with
+zero failures or incomplete tests. The updated probe and test class again
+produce only the missing-settings Code Analyzer message. JSON consistency
+checks confirm varying widths, no requested/computed invariant tube, linear
+terminal support attainment, finite input admission, and endpoint position
+supports below one fifth of the corresponding open-loop initial-error
+supports for both speeds. The 512-step new data run did not repeat the original
+nonlinear scenario replay or execute the production MPC solver.

@@ -3,6 +3,8 @@ function results = verifyJointNrmmPrediction(outputFile, options)
 % The local joint model retains six physical ego states and five persistent
 % ego observer states. GNSS predictors reset at each of four sensor samples;
 % the target subsystem is executed but does not drive this ego-only policy.
+% The primary output is a varying finite-horizon joint tube; no invariant
+% radius or contraction test is required. Fixed RPI bounds are optional.
 % Numerical Jacobians and nonlinear replays are research evidence, not a
 % uniform nonlinear invariant-set or recursive-feasibility certificate.
     arguments
@@ -10,6 +12,8 @@ function results = verifyJointNrmmPrediction(outputFile, options)
         options.Speeds (1,:) double = [8 15]
         options.HorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 512
         options.WorldCount (1,1) double {mustBeInteger,mustBePositive} = 3
+        options.ComputeInvariantTube (1,1) logical = false
+        options.Replay (1,1) logical = true
     end
     root = fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'scripts'),fullfile(root,'controller'), ...
@@ -58,29 +62,43 @@ function results = verifyJointNrmmPrediction(outputFile, options)
         initialGenerator = [initialAtSample,rootMatrix*initialAtSample,rootNoise,rootDefect];
         inputProjection = gain*[zeros(5,6),eye(5);zeros(1,5),1,zeros(1,5)];
         directNoise = gain(:,6)*amplitude(7);
-        tube = localInvariantTube(joint,[noise,defect],initialGenerator, ...
-            inputProjection,directNoise);
-        independent = localInvariantTube(a+b*gain,b*gain*generator,generator,gain,gain*generator);
+        knownOffset = localObserverPoint(runtime)-nominal(1:5);
+        finite = localFiniteTube(joint,noise,defect,rootMatrix,rootNoise,rootDefect, ...
+            [generator;zeros(5,size(generator,2))],[knownOffset;0;knownOffset], ...
+            inputProjection,directNoise,fixedInput-reference.input,options.HorizonSteps,cfg.controller.sampleTime);
+        tube = struct([]);independent = struct([]);invariantInput = [];
+        if options.ComputeInvariantTube
+            tube = localInvariantTube(joint,[noise,defect],initialGenerator, ...
+                inputProjection,directNoise);
+            independent = localInvariantTube(a+b*gain,b*gain*generator,generator,gain,gain*generator);
+            invariantInput = abs(reference.input)+tube.inputRadius;
+        end
         times = unique([0 1 3 5 options.HorizonSteps*cfg.controller.sampleTime]);
         open = zeros(6,numel(times));
         for index = 1:numel(times)
             open(:,index) = sum(abs(a^round(times(index)/cfg.controller.sampleTime)*generator),2);
         end
-        replay = localReplay(runtime,cfg,reference,gain,estimator,options.HorizonSteps,options.WorldCount);
+        replay = struct([]);
+        if options.Replay
+            replay = localReplay(runtime,cfg,reference,gain,estimator,options.HorizonSteps,options.WorldCount);
+        end
         row = struct('speedMetersPerSecond',speed,'currentObserverRadius',published.controllerStateErrorBound, ...
             'currentObserverGenerator',generator,'feedbackGain',gain, ...
             'jointSpectralRadius',max(abs(eig(joint))),'jointTransition',joint, ...
             'sensorNoiseMap',noise,'nominalHoldDefect',defect, ...
             'finiteDifferenceRelativeChange',convergence, ...
-            'jointLinearTube',tube,'independentObserverErrorLinearTube',independent, ...
+            'finiteHorizonTube',finite,'jointLinearTube',tube,'independentObserverErrorLinearTube',independent, ...
             'timeSeconds',times,'openLoopInitialRadius',open,'replay',replay, ...
-            'maximumAbsoluteInputFromJointLinearTube',abs(reference.input)+tube.inputRadius);
+            'maximumAbsoluteInputFromFiniteHorizonTube',abs(reference.input)+finite.maximumInputRadius, ...
+            'maximumAbsoluteInputFromJointLinearTube',invariantInput);
         if isempty(cases),cases = row;else,cases(end+1) = row;end %#ok<AGROW>
-        fprintf('JOINT speed %.0f: spectral %.6f, fixed position radii %.4f/%.4f m, replay %.4f/%.4f m\n', ...
-            speed,row.jointSpectralRadius,tube.coordinateRadius(1:2),replay.closedLoopPeak(1:2));
+        fprintf('JOINT speed %.0f: finite-horizon tail position radii %.4f/%.4f m\n', ...
+            speed,finite.coordinateRadius(1:2,end));
     end
-    results = struct('scope',"actualNrmmEgoUpdateLocalLinearInvariantTubeAndNonlinearReplays", ...
+    results = struct('scope',"actualNrmmEgoUpdateFiniteHorizonClosedLoopTubes", ...
         'nrmmObserverExecuted',true,'productionControllerChanged',false, ...
+        'invariantTubeRequired',false,'invariantTubeComputed',options.ComputeInvariantTube, ...
+        'nonlinearReplayExecuted',options.Replay, ...
         'nonlinearRobustCertificate',false,'roadBoundariesIncluded',false, ...
         'sampleTimeSeconds',cfg.controller.sampleTime, ...
         'observerSampleTimeSeconds',runtime.samplePeriod,'horizonSteps',options.HorizonSteps, ...
@@ -90,6 +108,60 @@ function results = verifyJointNrmmPrediction(outputFile, options)
         cleanup = onCleanup(@()fclose(file));
         fprintf(file,'%s\n',jsonencode(results,PrettyPrint=true));
     end
+end
+
+function tube = localFiniteTube(matrix,noise,defect,rootMatrix,rootNoise,rootDefect, ...
+        initial,center,inputProjection,directNoise,currentDeviation,count,h)
+    % Exact zonotope supports for the constructed linear maps. Preserve each
+    % noise column through every matrix product before taking absolute values;
+    % propagating a coordinate box with abs(matrix) would lose correlation.
+    dimension = size(matrix,1);projection = [eye(6),zeros(6,dimension-6)];
+    radius = zeros(6,count+1);input = zeros(2,count);
+    radius(:,1) = abs(projection*center)+sum(abs(projection*initial),2);
+    input(:,1) = abs(currentDeviation);initialRadius = sum(abs(projection*initial),2);
+    rootInitial = rootMatrix*initial;rootDisturbance = rootNoise;
+    mean = rootMatrix*center+rootDefect;power = eye(dimension);
+    sensorRadius = zeros(6,1);inputSensorRadius = zeros(2,1);
+    for index = 1:count
+        radius(:,index+1) = abs(projection*mean)+sum(abs(projection*rootInitial),2) ...
+            +sum(abs(projection*rootDisturbance),2)+sensorRadius;
+        if index<count
+            input(:,index+1) = abs(inputProjection*mean)+sum(abs(inputProjection*rootInitial),2) ...
+                +sum(abs(inputProjection*rootDisturbance),2)+inputSensorRadius ...
+                +sum(abs(directNoise),2);
+        end
+        if index==count,break;end
+        rootInitial = matrix*rootInitial;rootDisturbance = matrix*rootDisturbance;
+        sensorRadius = sensorRadius+sum(abs(projection*power*noise),2);
+        inputSensorRadius = inputSensorRadius+sum(abs(inputProjection*power*noise),2);
+        power = matrix*power;mean = matrix*mean+defect;
+    end
+    % Each coordinate's terminal support has an explicit noise history that
+    % attains it in the linear box model. This checks both directions of the
+    % support computation, rather than testing a few arbitrary noise draws.
+    attained = zeros(6,1);
+    for coordinate = 1:6
+        direction = projection(coordinate,:).';
+        if projection(coordinate,:)*mean<0,direction = -direction;end
+        signs = zeros(size(noise,2),max(count-1,0));adjoint = direction;
+        for index = count:-1:2
+            signs(:,index-1) = sign(noise'*adjoint);adjoint = matrix'*adjoint;
+        end
+        rootSigns = sign(rootNoise'*adjoint);
+        initialSigns = sign(initial'*rootMatrix'*adjoint);
+        state = rootMatrix*(center+initial*initialSigns)+rootNoise*rootSigns+rootDefect;
+        for index = 2:count,state = matrix*state+noise*signs(:,index-1)+defect;end
+        attained(coordinate) = abs(projection(coordinate,:)*state);
+    end
+    assert(all(abs(attained-radius(:,end))<1e-9));
+    tube = struct('timeSeconds',(0:count)*h,'coordinateRadius',radius, ...
+        'inputRadius',input,'maximumCoordinateRadius',max(radius,[],2), ...
+        'maximumInputRadius',max(input,[],2),'currentInputUncertaintyRadius',zeros(2,1), ...
+        'initialCoordinateRadius',initialRadius, ...
+        'initialContributionAtTail',sum(abs(projection*rootInitial),2), ...
+        'sensorContributionAtTail',sum(abs(projection*rootDisturbance),2)+sensorRadius, ...
+        'meanAtTail',projection*mean,'attainedTerminalRadius',attained, ...
+        'constantWidthAssumed',false,'contractionRequired',false,'nonlinearCertificate',false);
 end
 
 function [matrix,noise,defect] = localLinearize(runtime,cfg,reference,gain,amplitude,fraction,fixedInput)

@@ -12,18 +12,25 @@ classdef jointNrmmPredictionTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function realObserverFeedbackAdmitsAFixedLocalLinearTube(testCase)
+        function realObserverFeedbackPropagatesAVaryingFiniteHorizonTube(testCase)
             result = testCase.joint;row = result.cases;
             testCase.verifyTrue(result.nrmmObserverExecuted);
-            testCase.verifyLessThan(row.jointSpectralRadius,.99);
-            testCase.verifyLessThan(row.jointLinearTube.contraction,1);
-            testCase.verifyLessThan(max(row.jointLinearTube.coordinateRadius(1:2)),.3);
-            testCase.verifyLessThan(row.maximumAbsoluteInputFromJointLinearTube(2),1);
+            testCase.verifyEmpty(row.jointLinearTube);
+            testCase.verifyGreaterThan(row.finiteHorizonTube.coordinateRadius(1,end), ...
+                row.finiteHorizonTube.coordinateRadius(1,1));
+            testCase.verifyLessThan(row.finiteHorizonTube.coordinateRadius(1:2,end), ...
+                row.openLoopInitialRadius(1:2,end));
+            testCase.verifyLessThan(row.maximumAbsoluteInputFromFiniteHorizonTube(2),1);
+        end
+        function terminalSupportsAreAttainedByAdmittedLinearNoiseHistories(testCase)
+            tube = testCase.joint.cases.finiteHorizonTube;
+            testCase.verifyEqual(tube.attainedTerminalRadius,tube.coordinateRadius(:,end),AbsTol=1e-9);
+            testCase.verifyGreaterThan(min(tube.sensorContributionAtTail),0);
         end
         function measuredFeedbackKeepsTheNonlinearReplayAndObserverBoundsSmall(testCase)
             row = testCase.joint.cases;replay = row.replay;
             testCase.verifyLessThan(max(replay.closedLoopPeak(1:2)),.1);
-            testCase.verifyLessThanOrEqual(replay.closedLoopPeak,row.jointLinearTube.coordinateRadius(1:6));
+            testCase.verifyLessThanOrEqual(replay.closedLoopPeak,row.finiteHorizonTube.maximumCoordinateRadius);
             testCase.verifyEqual(replay.unavailableObserverBoundSamples,0);
             testCase.verifyEqual(replay.uncontainedObserverBoundSamples,0);
             testCase.verifyLessThan(replay.maximumAbsoluteInput(2),1);

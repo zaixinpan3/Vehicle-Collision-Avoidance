@@ -65,7 +65,10 @@ and expose that limitation. Complete nonlinear robust safety remains conditional
 on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.
 
 `CLOSED_LOOP_PREDICTION_THEORY.md` develops the proposed feedback-aware policy
-prediction, invariant tubes and policy-shift proof. The research verifier
+prediction, varying finite-horizon tubes and policy-shift proof. Fixed-width
+invariant tubes are optional diagnostics. `../scripts/verifyJointNrmmPrediction.m`
+propagates the actual NRMM joint local maps with shared future sensor noise;
+the current input is common and future inputs include feedback. The research verifier
 `../scripts/verifyFeedbackAwarePrediction.m` tests local linear invariance,
 nonlinear feedback probes and correlated target response; it does not change
 the runtime or certify nonlinear avoidance/parking.

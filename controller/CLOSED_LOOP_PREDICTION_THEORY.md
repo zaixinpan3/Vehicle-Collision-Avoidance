@@ -1,9 +1,16 @@
-# Feedback-aware prediction and invariant uncertainty tubes
+# Feedback-aware prediction over finite horizons
 
 Date: October 12, 2026. Design/theory, not the current runtime formulation.
 The current theoretical scope omits road boundaries. Observer, model, input,
 handling and collision premises remain. Optimized current inputs are issued
 directly; feedback belongs in the optimization's policy and prediction.
+
+Scope clarification, October 13, 2026: the user requires future observer
+updates and causal feedback to enter prediction, so uncertainty is not
+propagated as if the future inputs were fixed open loop. Tube widths may
+vary along the horizon. A constant-width or uniformly contracting nonlinear
+invariant tube is not a required design objective. Earlier fixed-width
+constructions below remain optional research diagnostics.
 
 ## Predict a control rule that uses future observations
 
@@ -26,6 +33,61 @@ The propagation matrix is A+B*K, not A. Observer error enters as a bounded
 feedback disturbance. Input constraints must cover K*(eta-epsilon), including
 input memory/slew. Clipping an input outside this model changes the policy.
 
+## Propagate a varying closed-loop tube over the finite horizon
+
+Let q contain physical deviations and actual observer/software state, together
+with reference, input and mode memory when needed. The current software state
+and observation are known. The initial set retains the observer-certified
+physical uncertainty, while the current policy returns one common input.
+For each future hold, the joint map G_i includes the nonlinear vehicle,
+bounded sensor history, actual observer update and chosen causal policy.
+Construct sound outer sets satisfying
+
+    Omega_(i+1) contains {G_i(q,nu): q in Omega_i, nu in W_i}.
+
+The physical tube at node i is the projection of Omega_i, with separate
+sound hold/midpoint images as required by the constraint contract. There is
+no requirement Omega_(i+1) subset Omega_i or that all projected widths equal
+a single radius. Different nominal states, gains, observation quality and
+noise contributions can produce different widths. Keep the same policy/set
+meaning when shifting the plan and conditioning on the next measurement.
+
+A comparison implementation can use time-varying certified coefficients,
+
+    E_(i+1) <= a_(o,i)*E_i+d_(o,i),
+    r_(i+1) <= rho_i*r_i+gamma_i*E_i+d_(F,i).
+
+These describe future observation correction and physical tracking, rather
+than a frozen-input plant-only growth factor. Temporary expansion is allowed.
+No common contraction metric or constant invariant radius is prerequisite for
+finite-horizon propagation. Compact scalar comparisons must still be sound;
+joint generators can retain correlations that scalar boxing discards.
+
+For a linear joint surrogate q_next=J_i*q+D_i*nu+c_i, propagate a center m
+and generator Z by m_next=J_i*m+c_i and Z_next=[J_i*Z,D_i]. Take directional
+supports after the matrix products. Repeatedly propagating coordinate widths
+with abs(J_i) loses cancellation between the plant and observer and may itself
+create large artificial tails. Initial uncertainty is not restarted at each
+hold, and primitive measurement noise is not added again as an independent
+observer-error disturbance. The first map uses the known current input;
+subsequent maps include the future feedback law and its gyro feedthrough.
+
+Small future estimation error about each branch's updated estimate does not
+by itself bound physical deviation from a frozen nominal trajectory. The
+feedback policy's input variation must therefore be part of G_i. Replanning
+in experiments alone does not specify that prediction policy. Unknown future
+measurements remain bounded variables, not known or noise-free values.
+
+The remaining nonlinear work is to construct sound finite-horizon images,
+admit their policy-generated inputs and constraints, and connect the endpoint
+set to the robust terminal continuation. Once entering the mild terminal
+model, braking and a fixed physical parked pose set may be certified without
+requiring continued contraction of the noisy yaw estimate. Recursive
+feasibility uses the cross-sample inclusion and terminal shift argument below;
+it does not require a constant prediction-tube width.
+
+## Optional fixed-width construction
+
 Suppose the observer has a predictable envelope B_next<=a_o*B+d_o, a_o<1,
 and (1) has a certified weighted-norm bound
 
@@ -41,8 +103,8 @@ rho*r_bar+gamma*B_bar+d_F(r_bar,B_bar)<=r_bar with input/state admission.
 This is an invariant-tube condition. No future measurement realization or
 vanishing noise is assumed. A radius above its noise floor may decrease;
 a radius below the floor can increase. Strict decrease from every arbitrarily
-small initial width is therefore not promised. A fixed invariant width meets
-the nonexpanding prediction requirement. Held-input midpoints need their own
+small initial width is therefore not promised. A fixed invariant width is
+one possible sufficient design, rather than the user's requirement. Held-input midpoints need their own
 envelope; it may vary with hold fraction but must repeat without secular growth.
 
 Koehler, Mueller and Allgoewer (2021), *Robust output feedback model predictive
@@ -116,8 +178,8 @@ nonzero initial error. These correlations should be retained in the initial set.
 This is a linear explanatory derivation, not our NRMM observer equation.
 For the nonlinear implementation derive the joint map/Jacobian or certified
 comparison dynamics from the actual point flow, reconstruction and bound
-updates. Validate a joint invariant/contraction condition over the admitted
-nominal, error and input domains, including midpoints and mode transitions.
+updates. Validate sound finite-horizon joint images over the admitted nominal,
+error and input domains, including midpoints and mode transitions.
 Stable observer ISS and the existing path CLF do not by themselves certify
 incremental joint contraction. The uncontrolled target's absolute-position
 spread remains; relative/coupled safety coordinates are still needed.
@@ -154,7 +216,7 @@ online. Observer states need not all become optimization decision variables.
 The shifted-policy proof below applies to this augmented transition when its
 outer images are sound, monotone and retain the same causal-policy witness.
 
-## Construct a fixed invariant set for the sampled tangent model
+## Optional invariant set for the sampled tangent model
 
 The research verifier uses straight-cruise sampled A,B and a fixed six-state
 gain K. Observer error lies in G*U, U=[-1,1]^6; sign symmetry gives disturbance
@@ -286,7 +348,7 @@ remains an allowed candidate. This requires no post-solve scaling, clipping
 or constraint veto.
 
 Outstanding runtime work: consume current/predicted observer enclosures;
-certify scheduled full-state/relative feedback and invariant tubes; add policy
+certify scheduled full-state/relative feedback and finite-horizon tubes; add policy
 and input-margin constraints; retain target/observer branch correlations;
 certify braking/parked modes; preserve shifted witnesses. The research verifier
 demonstrates mechanisms, not completion of this runtime.
