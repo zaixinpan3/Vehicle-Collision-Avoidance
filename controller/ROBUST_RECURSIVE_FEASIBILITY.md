@@ -29,6 +29,18 @@ it is not a second independent estimation-error disturbance. The constructive
 joint-image and certificate-carrying policy proof is in
 [CLOSED_LOOP_PREDICTION_THEORY.md](CLOSED_LOOP_PREDICTION_THEORY.md).
 
+**Theoretical completion criterion.** The object is the mathematical joint
+observer-controller design, with exact reachable sets or proved sound outer
+sets, compatible uncertainty premises, causal shift-closed policies and the
+common terminal continuation. Its recursive-feasibility proof is complete
+under the explicitly stated initial-feasibility and model/observer assumptions.
+Numerical computation of enclosure constants and production realization are
+separate tasks, not missing steps of this exact-set proof. A particular
+approximate prediction rule would require its own soundness argument; this
+distinction cannot justify an unproved mathematical assumption. Initial
+feasibility for every possible encounter, constant tube widths and guaranteed
+numerical solver success are not conclusions of the theorem.
+
 ## 1. Separate feasibility from optimality
 
 Recursive feasibility means that a feasible problem at sample k implies a

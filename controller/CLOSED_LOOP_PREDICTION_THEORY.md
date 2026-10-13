@@ -19,6 +19,36 @@ proof that can reuse certified tubes. These are mathematical constructions;
 the existing NRMM probes still use nominal plant parameters and numerical
 local maps, and are not their nonlinear implementation.
 
+## Mathematical object and proof completion
+
+The theorem concerns the joint nonlinear output-feedback design defined in
+this note, not whether a production program implements it. Its controller
+selects causal policies and sets satisfying the universal stage constraints
+and the common robust terminal continuation, then executes its definite
+current input. Model mismatch, observation noise and nonzero estimation
+uncertainty are retained in that problem.
+
+For a purely mathematical formulation, take every prediction set to be its
+exact joint reachable image T_pi(J). Image containment is then a consequence
+of the definition, and monotonicity follows by set inclusion. The terminal
+family is defined by common admissible safe continuations; its downward
+closure and successor closure are proved below and in the recursive-feasibility
+note. Posterior conditioning, policy closure and the slack shift complete
+the recursive-feasibility argument. The second soft CLF stage preserves
+existence of a feasible point. This is a complete conditional theorem for
+that mathematical design, under its declared model/observer contract and
+initial feasibility; it does not assume exact state information.
+
+Computing numerical tube radii, validating a particular approximate enclosure,
+constructing a tractable terminal-membership routine or implementing these
+operations is not required for this exact-set existence proof. If the
+mathematical design instead specifies a particular approximate tube or hard
+restriction, its soundness and preservation of the shifted candidate must
+be proved; an unproved approximation cannot borrow the exact-set theorem.
+The nonlinear bounds and carried certificates below provide sufficient
+constructions for that extension. Production correspondence is outside the
+requested theoretical completion criterion.
+
 ## Predict a control rule that uses future observations
 
 An open-loop plan fixes u_0,...,u_(M-1). A feedback plan fixes causal rules
