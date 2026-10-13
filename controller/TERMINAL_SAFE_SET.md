@@ -415,6 +415,29 @@ Holding each unknown constant fixed on each trajectory keeps the target's
 reach set to the orbits of the contract; letting `A` and `beta` change at
 every instant would enlarge it.
 
+**Common robust continuation.** The bounded-error extension uses joint sets
+of vehicle/target states, persistent vehicle parameters and observer/input
+memory. One causal terminal rule must certify the entire endpoint set. The
+nominal formula max(-a_b,-V_E/h) must not be interpreted as different
+commands selected from unknown true speeds in different branches. A common
+held steering/braking command together with the declared forward-only stop
+rule is one possible witness. With a uniformly certified realized braking
+rate a_min>0, every branch stops by V_bar/a_min and travels at most
+V_bar^2/(2*a_min) additional arc length. Pose, speed and parameter uncertainty
+are propagated through that continuation; static widening of its center is
+insufficient. The full parked rectangle family is checked against the full
+target family, and residual disturbances capable of moving it require a
+parked invariant-set certificate.
+
+This construction retains the accepted mild kinematic terminal model.
+Its image/row certificates are carried when the policy is shifted, and
+invalid low-speed observer enclosures cannot replace the retained physical
+set. The mathematical proof and its exact scalar validation are in
+[ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md) and
+[CLOSED_LOOP_PREDICTION_THEORY.md](CLOSED_LOOP_PREDICTION_THEORY.md).
+The executable terminal membership remains the center-based construction
+described above; this joint certificate is not yet implemented there.
+
 ## 10. Limitations
 
 - Recursive feasibility is proven within one encounter, on the declared

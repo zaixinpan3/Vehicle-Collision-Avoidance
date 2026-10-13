@@ -12,6 +12,13 @@ vary along the horizon. A constant-width or uniformly contracting nonlinear
 invariant tube is not a required design objective. Earlier fixed-width
 constructions below remain optional research diagnostics.
 
+The October 13 extension below treats persistent vehicle-parameter mismatch,
+residual plant disturbances, measurement noise and the actual observer as one
+joint system. It supplies a constructive outer-image argument and a shift
+proof that can reuse certified tubes. These are mathematical constructions;
+the existing NRMM probes still use nominal plant parameters and numerical
+local maps, and are not their nonlinear implementation.
+
 ## Predict a control rule that uses future observations
 
 An open-loop plan fixes u_0,...,u_(M-1). A feedback plan fixes causal rules
@@ -85,6 +92,233 @@ model, braking and a fixed physical parked pose set may be certified without
 requiring continued contraction of the noisy yaw estimate. Recursive
 feasibility uses the cross-sample inclusion and terminal shift argument below;
 it does not require a constant prediction-tube width.
+
+## One uncertainty source and its different consequences
+
+Let theta be a fixed unknown vehicle-parameter vector in Theta. The initial
+project family varies front/rear cornering stiffness and friction within the
+observer's declared relative box (default 5%); mass, inertia and geometry are
+not implicitly uncertain merely because that box is present. Let d_i be any
+separately declared residual plant disturbance and nu_i the primitive sensor
+noise history. The tire box restricts parameter values; constancy or a drift
+rate does not follow from a value bound alone. Actuator errors and external
+forces require compatible bounds if admitted; the tire box does not cover
+arbitrary additional forces.
+
+Take decision instants after the measurements used for that input are known.
+Let q contain the physical ego/target state X, theta, actual observer point
+and bound/history state s, the available measurement record y, previous input,
+mode/encounter memory, and the policy's reference memory where necessary.
+The observer uses its specified nominal model and parameter bounds. The true
+plant uses theta. The chronological sampled map is
+
+    u_i = pi_i(s_i,y_i,reference_i),
+    q_(i+1) = G_(pi_i)(q_i,d_i,nu_i),   theta_(i+1)=theta_i.       (M1)
+
+G executes the plant, measurement generation, predictor resets, observer
+integration and reconstruction in their actual sample/hold order. Future
+measurements come from the same physical branch. A raw gyro channel is a
+measurement, not privileged true yaw rate. Its noise is sampled once and
+shared by every path through the observer and control. G also defines the
+held-input trajectory images at constrained instants and over the full hold.
+
+If parameters may vary, replace the identity in (M1) by a declared transition
+theta_next in Gamma(theta), including any intra-hold parameter history. A
+range-only contract can use Gamma(theta)=Theta, without asserting a drift
+rate. Retain one shared parameter history in plant and observer effects.
+The outer-image and shift proofs apply with that same transition at both
+frames. Equations (M3), (M4) and the constant-parameter term in (M8) specialize
+to fixed parameters; they must not be used for a broader varying family.
+
+At the root, current s and y are known: all physically possible branches
+receive the same current input. Future s and y become branch dependent. The
+root information set is
+
+    I_k = {q consistent with the retained information history,
+           X in the published physical enclosure,
+           theta in the retained parameter set,
+           s=s_k, y=y_k and known input/mode memory}.             (M2)
+
+The product of a published enclosure and Theta is a sound initialization if
+only marginal information is available; it can lose correlation with theta.
+Subsequent propagation retains the same theta and conditions the joint set.
+No new independent parameter draw is added at each hold.
+
+The published error enclosure already contains effects of past admitted
+mismatch and noise. It initializes physical uncertainty and can further
+condition predicted sets. It is not another independent disturbance to inject
+after G has propagated those same sources through the observer. Future plant
+mismatch nevertheless acts again through the plant dynamics. Describing that
+effect is not adding the past state error for a second time.
+
+For an exact linear illustration, let
+
+    x_next=A*x+B*u+P*deltaTheta+w,   y=C*x+n,
+    xhat_next=A*xhat+B*u+L*(y-C*xhat),
+    z_next=A*z+B*v,                 u=v+K*(xhat-z).
+
+With eta=x-z and epsilon=x-xhat, the joint recursion is
+
+    [eta_next       ]   [A+B*K  -B*K  P] [eta       ]   [I   0] [w]
+    [epsilon_next   ] = [0      A-L*C P] [epsilon   ] + [I  -L] [n]
+    [deltaTheta_next]   [0      0     I] [deltaTheta]   [0   0].    (M3)
+
+The block notation uses a final zero row in each disturbance column. The
+same w and deltaTheta enter both error equations. In the difference
+eta_next-epsilon_next their direct contributions cancel, as the observer's
+nominal point update requires. Independent copies would destroy this identity.
+This is a timing-specific illustration; (M1) handles actual feedthrough.
+
+For a scheduled affine error block r_next=J_i*r+P_i*deltaTheta+D_i*nu+c_i,
+preserve the persistent parameter generator by
+
+    H_(i+1)=J_i*H_i+P_i*G_theta,
+    Z_(i+1)=[J_i*Z_i,D_i],   m_(i+1)=J_i*m_i+c_i.              (M4)
+
+H and Z are concatenated only when taking supports, with any initial shared
+columns preserved. Equivalently propagate theta as a state with identity
+transition. Such an augmented matrix has unit parameter eigenvalues even
+when its tracking/observer block is stable; a Schur test on the entire
+parameter-augmented matrix is not a requirement. A constant parameter may
+produce a bounded tracking offset. Neither (M3) nor (M4) bounds the nonlinear
+remainder without the construction below.
+
+**Observer compatibility.** Every published enclosure used in (M2) or a
+posterior must be valid for the same Theta, residual-disturbance contract and
+sensor bounds used in G. Extra lateral force, for example, changes the
+force-balance measurement premise as well as the plant. Its force bound must
+enter that measurement's interval calculation; adding it only to plant
+prediction while keeping an incompatible observer certificate is unsound.
+The current 5% tire family can be studied with no extra residual disturbance.
+For an added disturbance, certificate validity must first be extended.
+
+While relying on a finite observer certificate, its continuous-motion
+premises must hold over each whole hold. Checking the sideslip/domain premise
+only at nodes or midpoints does
+not prove it between those instants. Collision clearance remains a separate
+node/midpoint contract unless a continuous-time clearance image is certified.
+In a terminal mode outside that certificate's domain, retain the propagated
+physical set and use an unrestrictive Q instead of a finite invalid enclosure.
+
+## Construct sound nonlinear images, then propagate by induction
+
+Define the exact joint image for a fixed causal rule by
+
+    T_pi(J)={G_pi(q,d,nu): q in J, (d,nu) in the declared history set}.
+
+It retains theta and every shared source and is monotone in J. For each
+stage construct an outer set R_(i+1) with
+
+    T_(pi_i)(R_i) subset R_(i+1).                              (M5)
+
+The initial containment (M2) and induction on (M5) prove containment of every
+allowed nonlinear trajectory for the entire finite horizon. Initial errors
+are not restarted at each hold. Widths can vary, and (M5) requires neither
+contraction nor an invariant constant radius.
+
+Here is a constructive way to certify (M5). Partition the relevant joint
+state/parameter/noise domain into cells. On a convex cell C for the combined
+argument a=(q,d,nu), choose a_C and a matrix L_C. If G is continuously
+differentiable on C and a validated convex matrix-box enclosure of
+DG(C)-L_C is M_C, then
+
+    G(C) subset G(a_C)+L_C*(C-a_C)+M_C*(C-a_C).                 (M6)
+
+**Proof.** Along the segment from a_C to a,
+G(a)-G(a_C)=integral_0^1 DG(a_C+t*(a-a_C))*(a-a_C) dt.
+Subtract L_C*(a-a_C); the average remaining Jacobian belongs to M_C by its
+convexity. An interval hull of its matrix-vector product is a valid reserve.
+For coordinate radii rho and entrywise absolute bound Delta on M_C, the
+coordinate reserve is Delta*rho. Keep the affine joint generators before
+adding this reserve, so shared theta/noise columns remain shared. QED
+
+If component j has a validated Hessian bound |D^2G_j|<=H_j, a tighter smooth
+cell reserve is one half rho'*H_j*rho. These bounds are over the entire cell,
+including parameter-state and input-state interactions. A numerical Jacobian
+at its center or finite differences at two step sizes do not establish them.
+Physical/model mismatch belongs in G before linearization; the reserve covers
+the error of approximating that uncertain nonlinear G, rather than a second
+copy of the same parameter mismatch.
+
+For switching or discontinuous algorithm branches, split the guards and take
+the union of images of every possible branch. The Fiala saturation, low-speed
+blend, stop reset, angle conventions and force-balance bisection/fallbacks
+cannot all be covered by assuming one globally differentiable map. Interval
+extensions of the executed primitive operations give an alternative to (M6).
+If an exact inverse replaces the implemented bisection for analysis, its
+finite termination error must also be enclosed. Numerical plant integration
+is the declared map, or its defect from a continuous plant is included once
+in the residual contract; those are distinct model choices.
+
+A monotone outer operator can be defined on a fixed covering partition:
+union the validated cell images for all cells intersecting J. A subset of J
+then selects a subset of cells. Bounds must remain valid for the cell's whole
+domain and the fixed policy. This supplies a constructive sufficient operator,
+but can be computationally costly or too wide. An adaptive enclosure need not
+be globally monotone; the certificate-carrying proof below avoids requiring
+every fresh enclosure to be narrower than its predecessor.
+
+For input/handling/collision rows, bound the input image pi(R_i) and the
+appropriate held-state images from the same joint cells. A state tube alone
+does not certify input reserves. Nonlinear rectangle rows require sound
+geometry bounds as well. All these checks are constraints in the mathematical
+optimization; the optimized current input is still executed directly.
+
+Every certified cell must lie in a domain where the plant, observer and
+policy updates are defined. An undefined branch cannot be silently omitted
+from an enclosure. It must be excluded by a valid domain certificate or
+handled by an explicitly declared mode/fallback in G.
+
+## Finite-horizon widths with persistent mismatch and nonlinear reserves
+
+On the certified cells, write the error projection as
+
+    r_(i+1)=J_i*r_i+P_i*deltaTheta+D_i*nu_i+c_i+zeta_i,
+    zeta_i in the certified remainder set U_i.                 (M7)
+
+Each U_i encloses the actual joint-map residual on R_i, including parameter
+interactions. Bounding residuals independently is a permissible outer
+approximation; it must not introduce another copy of parameter or sensor
+terms already explicitly present in (M7).
+
+Let Phi(i,j)=J_(i-1)...J_j, with Phi(j,j)=I. For independent root generators
+G_0 and G_theta, the parameter response and nominal center are
+
+    H_i=sum_(j=0)^(i-1) Phi(i,j+1)*P_j,
+    m_i=Phi(i,0)*m_0+sum_(j=0)^(i-1) Phi(i,j+1)*c_j.
+
+For every direction ell, a finite-horizon support bound is
+
+    |ell*m_i| + ||ell*Phi(i,0)*G_0||_1
+       + ||ell*H_i*G_theta||_1
+       + sum_j ||ell*Phi(i,j+1)*D_j||_1
+       + sum_j support_abs(U_j,ell*Phi(i,j+1)).                 (M8)
+
+Here sensor variables are normalized unit boxes, and support_abs(U,a) is
+sup_(zeta in U)|a*zeta|. Shared initial/parameter/noise columns are combined
+before taking absolute values; (M8) displays the simpler independent-root
+case. Any declared temporal noise correlation can also be retained instead
+of replaced by independent boxes.
+
+**Proof.** Unroll (M7), collect all occurrences of the same deltaTheta into
+H_i*deltaTheta, and take directional supports of the resulting Minkowski
+sum. This proves a varying nonlinear outer tube whenever each remainder
+bound has been certified on the tube where it is used. Taking absolute
+values before collecting the parameter terms loses cross-step cancellation.
+No fixed width, cap or zero future noise enters the derivation. QED
+
+The matrices in Phi describe observer and feedback dynamics, not a
+frozen-input plant. If their error-block products satisfy
+||Phi(i,j)||<=c*rho^(i-j), rho<1, and the parameter/noise/residual forcing is
+uniformly bounded, the geometric sum gives a bounded physical-error tail.
+Individual steps may expand; persistent parameters still have identity
+dynamics. This is a sufficient mechanism, not an imposed constant-radius
+objective. For a finite horizon one can verify (M8) and the associated domain
+and constraint inclusions step by step without such a uniform inequality.
+This error-block stability condition is not a claim that the uncontrolled
+target's absolute reachable set is bounded; safety uses joint/relative images.
+The current local Schur matrices alone do not establish either a uniform
+nonlinear transition-product bound or validated U_i for the actual 5% family.
 
 ## Optional fixed-width construction
 
@@ -175,6 +409,10 @@ the projection [I I]*Omega, and input deviation is the projection [0 K]*Omega.
 At initialization z=xhat implies delta=0; e retains the observer-certified
 nonzero initial error. These correlations should be retained in the initial set.
 
+This stability statement concerns the error blocks in this illustration.
+Including persistent unknown parameters adds identity parameter dynamics,
+as in (M3); full augmented Schur stability must not be inferred from it.
+
 This is a linear explanatory derivation, not our NRMM observer equation.
 For the nonlinear implementation derive the joint map/Jacobian or certified
 comparison dynamics from the actual point flow, reconstruction and bound
@@ -214,7 +452,8 @@ discard its correlations. The full updater can be used for offline proof and
 coefficient construction, with compact certified radius/generator recursions
 online. Observer states need not all become optimization decision variables.
 The shifted-policy proof below applies to this augmented transition when its
-outer images are sound, monotone and retain the same causal-policy witness.
+outer images are sound and their causal-policy witnesses and certificates
+are retained. A monotone outer operator is one sufficient construction.
 
 ## Optional invariant set for the sampled tangent model
 
@@ -250,12 +489,13 @@ a nonlinear Fiala certificate.
 
 ## Quantify the nonlinear and mode-dependent extension
 
-At admissible straight cruise above the blend/stop regime, sampled Fiala F
+At admissible nominal straight cruise above the blend/stop regime, sampled Fiala F
 has continuous first derivatives locally. Stable A_c admits a contracting
 metric. Continuity gives a sufficiently small neighborhood with contractive
 eta derivative in (1) and bounded epsilon derivative. The mean-value argument
 then gives (3) for compatible sufficiently small observer errors. This proves
-local existence, not a quantified tube for the current NRMM bounds. Compute
+local existence, not a quantified tube for the current NRMM bounds or the
+entire 5% parameter box. Compute
 and certify its domain, nonlinear/decision reserves, input reserve and hold
 fractions. Empirical rollout maxima are not universal bounds.
 
@@ -317,26 +557,101 @@ even when uncontrolled absolute-position marginals grow.
 Augment the information state with true ego/target state, observer internal
 and bound state, previous input and required mode/history. Its transition
 includes plant defects, measurement noise, observer update and policy input.
-Let T#_pi(J) be a sound monotone outer image under the same causal policy for
-all admitted observation histories. Conditioning on the actual new observation
-gives
+Let T_pi be the exact image under the same causal policy and uncertainty
+contract. A certified plan consists of policies, sets R_0,...,R_M, hard-row
+certificates, prefix slacks and a terminal witness, with I_k=R_0 and (M5).
+Condition the old first successor on the valid new observer enclosure and
+the actual known observer/measurement/input memory:
 
-    I_(k+1) subset T#_(pi_0)(I_k).                           (6)
+    I_(k+1)=R_1 intersect Q_(k+1) intersect knownMemory_(k+1),
+    true q_(k+1) in I_(k+1) subset R_1.                         (6)
+
+Both sets contain the same true augmented state; intersection is therefore
+nonempty. At initialization use (M2). If no valid observer enclosure is
+available, Q is the unrestrictive set, not an invalid finite ball. Reference
+memory of the shifted policy must remain an allowed candidate. An absorbing
+encounter-ended flag is propagated with the same convention on both frames.
 
 Hard rows and collision deficits are universal over joint images, including
-policy-generated inputs and declared held-input constraint instants. A
-downward-closed robust terminal family B admits a causal policy pi_f with all
-hard rows, zero collision deficit and T#_(pi_f)(J) in B for J in B.
+policy-generated inputs and declared held-input constraint instants. For each
+J in a downward-closed terminal family B, there is a causal rule pi_f and
+a certified outer successor R_f(J) in B such that T_(pi_f)(J) subset R_f(J),
+all hard rows hold on J under that rule, and its collision deficit is zero.
 
-Given feasible pi_0,...,pi_(M-1), execute its definite optimized input pi_0(o_k).
-At the next sample shift pi_1,...,pi_(M-1) and append pi_f. Monotonicity and (6)
-make every new joint image a subset of its old image at the same absolute time.
-Shifted rows remain valid; terminal closure certifies the appended stage and
-endpoint. The prefix slack shift gives the old budget minus its first deficit.
-Feasibility follows for any feasible executed policy; optimal-value descent
-additionally needs a primary minimizer. The allowed policy class and each new
-convex restriction must retain this witness. Arbitrary relinearizations, trust
-regions, separating planes or gain changes do not establish that property.
+A concrete admissible policy class can contain scheduled affine output laws
+u_i=v_i+K_i*(publishedState_i-z_i) together with the held terminal rule.
+Nominal centers/reference memory and stored gains remain free to inherit the
+old tail; z_0 is not forced to equal the new estimate in the carried candidate.
+The initial physical set still uses the current observer information.
+Certificates are evaluated on physical joint sets, irrespective of which
+nominal center is used to represent them. This class is closed under dropping
+the first rule and appending the allowed terminal rule. A narrower policy
+class requires its own closure argument.
+
+**Certificate-carrying theorem.** Suppose a feasible certified plan exists
+with 1<=N<=M<=M_max; the observer enclosures obey the same uncertainty
+contract; the policy/certificate class permits shifting and terminal
+appending; and terminal B has the properties just stated. Execute the
+definite optimized current input without changing it after the solve.
+Then the next mathematical problem is feasible for every admitted parameter,
+disturbance and sensor history.
+
+**Proof.** Shift pi_1,...,pi_(M-1) and append a witness pi_f for R_M. Set
+R'_0=I_(k+1), retain R'_i=R_(i+1) for 1<=i<=M-1, and take R'_M to be the
+certified terminal successor of R_M. For M>=2 the first new image satisfies
+
+    T_(pi_1)(I_(k+1)) subset T_(pi_1)(R_1) subset R_2.
+
+All subsequent old transitions and row certificates are unchanged. The
+last hold starts in R_M; its terminal witness certifies the last rows and
+R'_M in B. If M=1, the new root is a subset of R_M, and the same terminal
+witness applies by downward closure. Input memory in q includes the applied
+input, so the shifted and appended slew rows are included. The new plan has
+the same M and respects both horizon limits.
+
+Let old prefix slacks be xi_0,...,xi_(N-1). Use xi'_i=xi_(i+1) for
+0<=i<N-1 and xi'_(N-1)=0. That last stage was either an old hard-tail stage
+or the appended terminal stage. Its candidate budget is therefore the old
+budget minus xi_0. If the executed plan is a primary minimizer, comparison
+with the next minimum proves V*(I_(k+1))<=V*(I_k)-xi_0*. Feasibility itself
+requires only a feasible executed plan. Zero budget implies the specified
+collision clearances; positive slacks do not give a zero-deficit safety
+claim. QED
+
+This proof retains valid outer sets, rather than demanding that a freshly
+computed adaptive approximation be a subset of the previous approximation.
+Any refinement can intersect sound images of the same shifted rule with the
+retained old tube; the intersection remains sound. A numerical optimization
+failure is outside this existence statement.
+
+For a convex implementation the feasible representation must retain this
+carried candidate and its valid separating/geometry/domain certificates.
+Replacing them by arbitrary new tangents, gain changes or trust regions can
+remove the candidate even though the nonlinear robust problem is feasible.
+The current production point-estimate programs do not yet implement this
+certificate-carrying formulation.
+
+## The second CLF stage preserves mathematical feasibility
+
+Suppose the primary minimum is attained in the certified formulation above.
+The second stage retains the same hard rows and certificates, caps the
+primary slack sum at that minimum, and imposes a CLF residual g<=rho_CLF with
+rho_CLF>=0 and no finite upper bound. For any primary minimizer whose CLF
+residual is finite on its certified set, choose
+
+    rho_CLF=max(0,sup g).
+
+This is a feasible second-stage point: an unbounded soft CLF row cannot remove
+that primary candidate. A point/nominal CLF residual is the scalar special
+case. A hard CLF row, a bounded CLF slack or a new restrictive trust region
+needs an additional feasibility proof. Attainment of a secondary optimum is
+separate from this existence statement.
+
+Executing a feasible secondary point preserves recursive feasibility by the
+theorem. Optimal primary-value descent additionally requires the exact
+primary cap; a relaxed cap with numerical tolerance only yields the
+corresponding cost-error inequality. Neither conclusion requires a solver
+to successfully return a point in every experiment.
 
 ## Issue the optimized current input directly
 
@@ -352,3 +667,9 @@ certify scheduled full-state/relative feedback and finite-horizon tubes; add pol
 and input-margin constraints; retain target/observer branch correlations;
 certify braking/parked modes; preserve shifted witnesses. The research verifier
 demonstrates mechanisms, not completion of this runtime.
+
+Independent exact-arithmetic specializations of (M3)--(M6), persistent
+parameter supports, posterior/certificate reuse and a common uncertain-rate
+braking law are checked by scripts/checkJointMismatchDerivations.py and
+tests/jointMismatchDerivationsTest.py. They check the stated algebra and
+specializations, not a quantified full-domain NRMM/Fiala certificate.

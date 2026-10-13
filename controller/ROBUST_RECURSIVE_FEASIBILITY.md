@@ -21,6 +21,14 @@ sequences. Its target prediction retains correlations between future
 observations and ego response. Fixed-width constructions are optional
 diagnostics. That proposed formulation is also not yet the runtime algorithm.
 
+The current theoretical scope omits road boundaries. Its model uncertainty
+includes a declared persistent vehicle-parameter family and any compatible
+residual disturbance, alongside the observer error and sensor history. The
+same mismatch is retained across time and through plant/observer updates;
+it is not a second independent estimation-error disturbance. The constructive
+joint-image and certificate-carrying policy proof is in
+[CLOSED_LOOP_PREDICTION_THEORY.md](CLOSED_LOOP_PREDICTION_THEORY.md).
+
 ## 1. Separate feasibility from optimality
 
 Recursive feasibility means that a feasible problem at sample k implies a
@@ -44,6 +52,17 @@ constraints rather than an unmodeled boundary condition. A finite encounter
 may include an absorbing ended flag; re-acquisition is a new initial-feasibility
 problem. Alternatively impose collision constraints for the whole forecast,
 including re-entry. Do not change this convention between successive problems.
+
+Include fixed uncertain vehicle parameters in z with theta_next=theta. All
+images retain that identity. If parameter variation is allowed, use its
+declared transition/history at both frames instead; a value box alone does
+not establish temporal constancy. For future output feedback augment z with the
+actual observer, measurements and policy memory as in the complementary
+joint formulation. The published current physical enclosure and parameter
+box can initialize a product outer set; this does not justify drawing a new
+independent parameter at each future hold. Enclosures Q must cover the same
+physical uncertainty contract as T. Declaring a new residual force without
+extending an observer certificate that excludes it is not a sound update.
 
 Let T(J,u) be the exact one-hold reachable set from a joint set J under a
 common held input u. It includes any *declared* plant-defect set. T_s(J,u)
@@ -85,11 +104,15 @@ intervals as if that state were an unchanged latent parameter.
 
 ## 3. Stage conditions are monotone in the information set
 
-H(J,u) denotes the road, physical-state, handling, actuator and slew conditions
+H(J,u) denotes physical-state, handling, actuator and slew conditions
 for every joint state in J and every declared defect, at the declared nodes
 and hold midpoints. C(J,u) is the largest nonnegative collision-margin deficit
 at those instants. One slack covers a whole hold, including its endpoint; this
 fixes the indexing and prevents dropping an endpoint condition during a shift.
+When relying on a finite observer enclosure, its continuous operating-domain
+premises additionally require whole-hold domain images. Road rows can be
+added under the same monotonicity
+argument when roads are brought back into the theoretical scope.
 For a smaller initial set, the same input has no harder conditions:
 
     H(J,u) and J' subset J  =>  H(J',u),
@@ -154,6 +177,61 @@ vehicle, parked-set invariance requires an additional control/defect condition.
 A generic bounded defect is not enough. An infinite safe-backup definition is
 not, by itself, a completed finite numerical certificate for the Fiala model.
 
+### A common finite braking certificate under the mild-terminal contract
+
+Under the accepted terminal modeling assumption, each branch holds its
+sideslip and course curvature while one stored steering/braking policy slows
+the vehicle to a forward-only absorbing rest state. Let every branch have
+0<=V<=V_bar initially and realized braking a(t)>=a_min>0 while V>0.
+The rate bound must follow from the declared terminal uncertainty family,
+not from the nominal command alone. Then
+
+    V(t)<=max(0,V_bar-a_min*t),
+    stopTime<=V_bar/a_min,
+    remainingArcLength<=V_bar^2/(2*a_min).                    (T1)
+
+Proof: integrate V_dot<=-a_min until its first zero, then use the rest rule;
+integrating the triangular upper speed envelope gives the length bound.
+The common rule holds its actuator command and uses the physical stop rule.
+It does not choose a different last braking input using each unknown true
+speed. For a sampled stop reset, include its specified detection delay in
+the time/length bound instead of silently applying the continuous formula.
+
+For each mild branch, constant beta and kappa give
+
+    |lateralAcceleration(t)|=|kappa|*V(t)^2,
+    tan(alpha_rear)=(sin(beta)-l_r*kappa)/cos(beta).
+
+The first quantity decreases and the second remains constant until rest.
+With fixed geometry, one sufficient robust rear-adhesion entry condition is
+
+    sup_J |tan(alpha_rear)|
+      <= 3*mu_rear,min*Fz_rear*sqrt(1-b_f^2)/C_rear,max.        (T2)
+
+Thus the same condition persists for fixed b_f and every constant parameter
+in the box. Actuator bounds are checked on b_f and stored steering; only the
+first backup input changes the old input memory, so its slew bound is checked
+explicitly and all subsequent held-command slew differences are zero.
+Other declared handling rows are verified on their joint images as usual.
+
+Check the full joint continuation to ceil(V_bar/(a_min*h)) holds for the
+continuous absorbing-stop contract. Verify terminal actuator/slew/handling
+rows, mildness for every branch and zero collision deficit at every declared
+constraint instant. Then check the entire parked ego rectangle family against
+every remaining allowed target trajectory, with the established encounter
+convention. Fixed physical tire-parameter mismatch does not move a parked
+vehicle under this contract. A residual disturbance that can do so requires
+a separately invariant parked set and cannot be discarded.
+
+If these checks pass, the same braking tail certifies every successor and
+every subset, proving (4)--(5) with nonzero pose and speed uncertainty.
+No parked yaw-estimate contraction is needed: the parked policy need not
+use an uninformative yaw estimate or intersect an invalid finite enclosure.
+The exact scalar uncertain-rate specialization is independently checked by
+scripts/checkJointMismatchDerivations.py. This is a finite construction of
+the certificate, not a completed numerical membership test for the whole
+project vehicle/target parameter domain.
+
 ## 5. The ideal robust problem and the shift proof
 
 For N prefix holds and any allowed M with N <= M <= M_max, choose held inputs
@@ -215,6 +293,15 @@ and propagate every prediction with the same operator. The proof above still
 works on those outer sets if H,C and B are certified against them. This is a
 constructive alternative to merely postulating a tube-growth inequality.
 
+Alternatively, treat outer tubes and their verified image/row certificates
+as plan variables and carry them into the next problem. A new root is a
+subset of the old first successor, while the remaining old outer tubes and
+certificates can be reused. This uses monotonicity of the exact image and
+does not require every freshly computed numerical enclosure to be monotone.
+The complete policy version, including M=1, is proved in the complementary
+joint note. A representation that discards the carried witness does not
+inherit that theorem.
+
 An arbitrary per-frame linearization is not necessarily such an operator. Its
 remainder must cover the complete decision and uncertainty domain. Nor does a
 convex inner approximation inherit feasibility simply because the exact
@@ -242,9 +329,10 @@ slacks retained; an independent nonlinear prediction for state/trust data;
 a separate settled-terminal sideslip bound and terminal-braking rear rows.
 Uncomputed nonlinear margins are NaN and nonlinear validation is false.
 
-Not implemented: joint posterior intersection (1), monotone full-horizon outer
-reachable sets, and a setwise finite terminal certificate satisfying (4)--(5)
-on the declared Fiala/blended model. These are mathematical data of the robust
+Not implemented: joint posterior intersection (1), full-horizon nonlinear
+outer sets over the persistent mismatch family, and carried setwise finite
+terminal certificates satisfying (4)--(5) on the declared mild-terminal
+uncertainty contract. These are mathematical data of the robust
 formulation, not solver reliability assumptions. The supplied observer bounds
 can initialize Q_k but cannot replace these operations. Numerical failures in
 experiments are permitted by the theoretical scope; a theorem is not claimed

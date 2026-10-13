@@ -183,6 +183,20 @@ removes the kinematic premise from the truth audit.
 
 ## Scope
 
+The declared relative parameter box is used by the force-balance interval for
+cornering stiffness and friction. The current implementation does not vary
+mass, inertia or geometry over that box. A vehicle-model parameter struct
+containing those values does not itself certify their uncertainty.
+
+For joint predictive control, this enclosure initializes the physical state
+set, while the same unknown true tire parameters remain fixed along each
+future branch. Their effects on true motion, measurements and observer
+updates must share one uncertainty source. The observer error is not a new
+independent noise to add after those updates have already been propagated.
+The default parameter box does not cover arbitrary residual physical forces;
+admitting those requires compatible observer and plant bounds. See
+[joint mismatch propagation](../controller/CLOSED_LOOP_PREDICTION_THEORY.md).
+
 The ego and target enclosures are conditional on the stated sensor bounds, the
 shared model structure with its parameter box, the sideslip cone, and the
 target contract. The plant used in the simulations has exactly this structure,
