@@ -1,5 +1,5 @@
 classdef predictiveSafetyGeometry
-    %predictiveSafetyGeometry Target prediction, potential guidance and polygon geometry.
+    %predictiveSafetyGeometry Target prediction, uncertainty tubes and polygon geometry.
     methods (Static)
         function uncertainty = observerUncertainty(ego,observation,q)
             % A common uncertain rigid pose cancels from pairwise distance.
@@ -119,75 +119,6 @@ classdef predictiveSafetyGeometry
                 +vecnorm(normal,2,2)*remainder;
             ball=predictiveSafetyGeometry.targetErrorTube(q,errorSet,time);
             support=min(support,vecnorm(normal,2,2)*ball.positionRadius);
-        end
-
-        function [heading,speed,side,risk] = potentialGuidance(x,lane,epoch,time,cfg,side,clearance)
-            % Zhai-inspired motion-aware repulsion with a passing circulation.
-            % Matching-time prediction adapts the field to target speed and
-            % acceleration; it is guidance, not a safety certificate.
-            projection=laneGeometry.project(x(1:2),lane);
-            tangent=[cos(projection.heading);sin(projection.heading)];normal=[-tangent(2);tangent(1)];
-            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-            velocity=rotation*x(4:5);progress=max(1,tangent.'*velocity);
-            lateral=projection.lateralPosition;risk=0;obstacleLateral=0;closing=0;
-            if ~isempty(epoch)
-                times=0:cfg.initialization.previewStepSeconds:cfg.initialization.previewSeconds;
-                if isfield(lane,'referenceCurve')
-                    [positions,angles]=laneGeometry.referencePose(projection.station+progress*times,lateral*exp(-times/cfg.nominalClf.lookaheadSeconds),lane.referenceCurve);
-                else
-                    positions=projection.point+progress*tangent*times+normal*(lateral*exp(-times/cfg.nominalClf.lookaheadSeconds));angles=projection.heading+zeros(size(times));
-                end
-                target=predictiveSafetyGeometry.predictTarget(epoch,time+times);
-                centers=target(1:2,:)+[cos(target(3,:)).*target(10,:)-sin(target(3,:)).*target(11,:); ...
-                    sin(target(3,:)).*target(10,:)+cos(target(3,:)).*target(11,:)];
-                differences=positions-centers;
-                longitudinal=sum([cos(angles);sin(angles)].*differences,1);
-                transverse=sum([-sin(angles);cos(angles)].*differences,1);
-                yaw=target(3,:)-angles;
-                % Both rectangles' extents along the path and its normal: the
-                % ego's own heading relative to the path widens it as well.
-                egoYaw=x(3)-projection.heading;
-                egoAlong=abs(cos(egoYaw))*cfg.vehicle.length/2+abs(sin(egoYaw))*cfg.vehicle.width/2;
-                egoAcross=abs(sin(egoYaw))*cfg.vehicle.length/2+abs(cos(egoYaw))*cfg.vehicle.width/2;
-                a=egoAlong+abs(cos(yaw)).*target(8,:)+abs(sin(yaw)).*target(9,:)+cfg.initialization.clearancePaddingMeters+norm(cfg.vehicle.rectangleOffset);
-                b=egoAcross+abs(sin(yaw)).*target(8,:)+abs(cos(yaw)).*target(9,:)+cfg.initialization.clearancePaddingMeters+norm(cfg.vehicle.rectangleOffset);
-                rho=(longitudinal./a).^2+(transverse./b).^2;
-                potential=exp(-.5*rho-times/(2*cfg.nominalClf.lookaheadSeconds));
-                [risk,k]=max(potential);
-                targetVelocity=target(4,k)*[cos(target(3,k)+target(6,k));sin(target(3,k)+target(6,k))];
-                futureTangent=[cos(angles(k));sin(angles(k))];
-                if side==0
-                    [~,closest]=min(rho);
-                    otherVelocity=target(4,closest)*[cos(target(3,closest)+target(6,closest));sin(target(3,closest)+target(6,closest))];
-                    preference=transverse(closest)-.3*[-sin(angles(closest)),cos(angles(closest))]*otherVelocity;
-                    if nargin>=7 && ~isempty(clearance)
-                        % Clearing the target on the left needs b-transverse
-                        % of lateral motion, on the right b+transverse. Half
-                        % the difference of the road room beside the target
-                        % is added, so the side that keeps more road margin
-                        % after clearing wins; a head-on in the lane is then
-                        % no longer decided by estimation noise.
-                        targetLateral=lateral*exp(-times(closest)/cfg.nominalClf.lookaheadSeconds)-transverse(closest);
-                        preference=preference+((clearance(2)-targetLateral)-(clearance(1)+targetLateral))/2;
-                    end
-                    side=1;if preference < -1e-8,side=-1;end
-                end
-                radial=x(1:2)-centers(:,1);
-                circulation=-side*tangent.'*radial/max(norm(radial),1);
-                obstacleLateral=.7*cfg.referenceSpeed*risk*(transverse(k)/b(k)+2*circulation);
-                closing=max(0,futureTangent.'*(progress*futureTangent-targetVelocity))/cfg.referenceSpeed;
-            end
-            desiredLateral=-lateral/cfg.nominalClf.lookaheadSeconds+obstacleLateral;
-            % Project the guidance velocity into the road, lateralClearance =
-            % [right;left] less half the body width. This shapes a seed; only
-            % the optimizer enforces the road rows on its prediction.
-            if nargin>=7 && ~isempty(clearance)
-                span=cfg.nominalClf.lookaheadSeconds;half=cfg.vehicle.width/2;
-                desiredLateral=min((clearance(2)-half-lateral)/span, ...
-                    max((-clearance(1)+half-lateral)/span,desiredLateral));
-            end
-            speed=max(max(1.5,.5*cfg.referenceSpeed),cfg.referenceSpeed*(1-.35*risk*min(2,closing)));
-            heading=projection.heading+atan2(desiredLateral,speed);
         end
 
         function q = target(observation,raw,~)
@@ -337,7 +268,15 @@ classdef predictiveSafetyGeometry
             centers=poseE(1:2)+re*shapeE(3:4)-poseT(1:2)-rt*shapeT(3:4);
             axes=[re,rt];offset=centers.'*axes;
             gap=abs(offset)-shapeE(1:2).'*abs(re.'*axes)-shapeT(1:2).'*abs(rt.'*axes);
-            [~,index]=max(gap);orientation=1;if offset(index)<0,orientation=-1;end
+            [~,index]=max(gap);orientation=1;
+            if abs(offset(index))>1e-8
+                if offset(index)<0,orientation=-1;end
+            elseif axes(:,index).'*re(:,2)<0
+                % At a symmetric overlap, roundoff must not select opposite
+                % escape sides at adjacent prediction nodes. Break the tie
+                % in the ego lateral frame, invariant to world rotation.
+                orientation=-1;
+            end
             normal=orientation*axes(:,index);body=rt.'*normal;
             lambda=[max(body,0);max(-body,0)];
             [values,jacobian]=predictiveSafetyGeometry.fixedDualRows(poseE,shapeE,poseT,shapeT,lambda);
@@ -393,7 +332,7 @@ classdef predictiveSafetyGeometry
                 pose=(1-fraction)*first+fraction*last;
                 target=predictiveSafetyGeometry.predictTarget(targetEpoch,time+fraction*duration);
                 value=predictiveSafetyGeometry.rectangle(pose,shape,target(1:3),target(8:11));
-                check.fractions(end+1)=fraction; %#ok<AGROW>
+                check.fractions(end+1)=fraction;
                 check.minimumSampledClearance=min(check.minimumSampledClearance,value);
                 if value<margin || value<=0,check.lowerBound=0;return;end
                 pending=[pending;row(1),fraction,row(3),value;fraction,row(2),value,row(4)]; %#ok<AGROW>

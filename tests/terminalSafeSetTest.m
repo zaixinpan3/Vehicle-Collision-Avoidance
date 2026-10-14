@@ -90,6 +90,27 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [~,~,track]=terminalSafeSet.parkedClearance(context,[30;0;0],[0;-6;pi/2;0;1;0;1.6;2.4;.95;0;0]);
             testCase.verifyEqual(track.lower,0);testCase.verifyGreaterThan(track.upper,30);
         end
+        function parkedLineCollisionRestoresAcrossTheTrackInsteadOfAlongIt(testCase)
+            x=[0;0;0;8;0;0];q=[40;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            model=localModel(x,q);context=terminalSafeSet.context(model);
+            [rows,bounds]=terminalSafeSet.rows(context,x,0);
+            along=[5;0;0;0;0;0];across=[0;3;0;0;0;0];
+            testCase.verifyFalse(terminalSafeSet.member(context,x+along,0));
+            testCase.verifyTrue(terminalSafeSet.member(context,x+across,0));
+            testCase.verifyGreaterThanOrEqual(max(rows*along-bounds),max(-bounds)-1e-8);
+            testCase.verifyLessThanOrEqual(max(rows*across-bounds),1e-8);
+        end
+        function parkedCircleCollisionRestoresBeyondTheSweptArc(testCase)
+            x=[11;0;0;8;0;0];beta=asin(1.6/8);
+            q=[8;8;pi-beta;6;0;beta;1.6;2.4;.95;0;0];
+            model=localModel(x,q);context=terminalSafeSet.context(model);
+            testCase.verifyFalse(terminalSafeSet.member(context,x,0));
+            [rows,bounds,context]=terminalSafeSet.rows(context,x,0);
+            shift=[2;0;0;0;0;0];
+            testCase.verifyTrue(terminalSafeSet.member(context,x+shift,0));
+            testCase.verifyLessThanOrEqual(max(rows*shift-bounds),1e-6);
+            testCase.verifyEqual(context.trackSide,1);
+        end
         function theEncounterEndsAtTheExitOrAfterTheParkedCheck(testCase)
             % A lead far enough ahead: the ego stops behind it and the lead
             % leaves the range of the parked ego. A slower lead only a little

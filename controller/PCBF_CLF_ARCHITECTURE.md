@@ -1,59 +1,32 @@
-# PCBF slack and one-step CLF optimization to a braking-continuation terminal set
+# Successive-convexification PCBF/CLF control
 
-Every frame uses the same target-independent analytic quadratic CLF, defined in
-[NOMINAL_CLF.md](NOMINAL_CLF.md). Every frame minimizes PCBF slack, then CLF
-slack, on one affine model. A bounded input-increment tie term regularizes the
-future plan. There is no third optimization stage, target-range CLF switch,
-direct nominal-feedback command, inherited slack budget or executable backup.
-A primary problem infeasible inside the trust region is re-solved on the same
-linearization with the trust scale doubled until feasible (at most
-`trustMaximumScale = 1`); a shifted plan still infeasible is then solved from
-a fresh potential-field rollout in the same way. Any other failure reports no
-solution.
+The controller directly optimizes a nonlinear vehicle input sequence by repeated
+convex approximation. There is no independent avoidance-path planner. A nominal
+lane-feedback rollout, or the previous solution's shifted inputs rolled out from
+the current estimate, supplies a starting reference. That reference may intersect
+the target or fail the terminal conditions.
 
-The horizon ends in the terminal set of
-[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md): past the endpoint the target
-keeps its forecast and the ego follows one terminal law, braking at
-`terminal.brakingDecelerationMetersPerSecondSquared` with its sideslip and
-course curvature held until it stops at a sample instant; the endpoint is
-terminal when that joint continuation, exact and in closed form, stays on the
-road and clears the target until it leaves the perception range (after the
-stop, over the target's remaining track, in closed form). Neither the stop nor
-the exit has to occur within the plan, no encounter duration is preset, and no
-lane or other mode is used. The completed CLF inputs are issued directly, with no post-solve step scaling or
-constraint veto. The nonlinear rollout supplies prediction and trust data only.
-Mathematical recursive feasibility is an existence statement about the ideal
-problem, not a guarantee of numerical solver return. Its exact-information scope
-is in [TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md); a full bounded-error shift
-proof using joint information sets is in
-[ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md).
+At each iteration the controller updates the Fiala vehicle tangents, rectangle
+separation multipliers, observer-margin approximations and braking-continuation
+terminal rows. It solves the safety stage followed by the same target-independent
+one-step quadratic CLF stage. An internal elastic variable restores feasibility
+of the local state/path constraints; it cannot remain above the configured
+residual tolerance in a returned solution. Nonlinear rollout determines which
+trial steps the optimizer accepts. The returned actuator sequence is exactly one
+completed accepted convex optimization's sequence, without clipping or blending.
 
-The implementation now consumes timestamped NRMM observer enclosures. Every hold
-of the plan starts from the current enclosure and propagates it through that
-hold only: the target's constant-parameter set analytically, and the ego error
-box through the shared affine variational model (see *Current observer
-integration*). Their supports tighten collision, road, physical-state,
-stable-handling and terminal constraints. The CLF row acts on the estimate.
-Usable current enclosures remain optimization data. Unavailable, stale,
-incomplete or misaligned proof metadata does not prevent
-optimization around the current point estimates. Its unsupported tightening
-is omitted explicitly; this does not assert that the corresponding error is
-zero. Inputs without uncertainty metadata use point-estimate prediction.
-This is an affine uncertainty integration, **not a certified nonlinear
-output-feedback PCBF**. The earlier baseline audit is retained in
-[the observer-to-PCBF gap analysis](../report/OBSERVER_ROBUST_PCBF_GAP_20261003.tex).
+This is a local numerical method. Iteration or time limits can prevent a feasible
+return, and a returned feasible iterate need not be a stationary or global
+optimum. The theoretical recursive-feasibility claim concerns the ideal nonlinear
+problem and its causal information-set policies, not numerical solver success.
+See [ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md) and
+[OBSERVER_ROBUST_PCBF_THEORY.tex](OBSERVER_ROBUST_PCBF_THEORY.tex).
 
-The completed mathematical design is in
-[Observer-to-robust-PCBF theory](OBSERVER_ROBUST_PCBF_THEORY.tex). It derives
-current joint uncertainty sets, causal prediction tubes, whole-hold robust
-rectangle constraints, a per-sample safety statement with a separating terminal set, and
-disturbance-dependent recovery with this same CLF. A vanishing proximal
-weight preserves dissipation in one convex solve. These are conditional
-theoretical results, with finite checks in
-`scripts/verifyObserverRobustConnection.m`. The executable interface realizes
-part of that design; nonlinear remainder bounds, a causal output-feedback
-prediction policy, posterior-set inclusion and
-continuous-hold safety remain unimplemented certification premises.
+The nonlinear check applies to sampled nominal constraints with the current
+affine observer margins. It does not certify nonlinear error-set propagation,
+future posterior inclusion or continuous-time collision avoidance. The existing
+observer integration remains as described below; no error radius is removed to
+obtain a command.
 
 ## Current observer integration
 
@@ -146,546 +119,226 @@ The ideal conditional theorem is unchanged. A successful run with unverified
 premises is empirical robustness evidence, not a proof that those premises
 hold or that recursive feasibility has been established.
 
-## Prediction and initialization
-
-The declared model's state is `x = [px; py; yaw; vx; vy; yawRate]` and its input is
-`u = [steering; brakingRatio]`. It is the Fiala bicycle above
-`model.kinematicSpeedRange` (4 m/s), a kinematic bicycle below 2.5 m/s and a
-smooth blend between, so that the vehicle can slow to rest and stay there: in
-the kinematic bicycle the yaw rate and lateral velocity relax with
-`model.kinematicLagSeconds` (0.1 s) to `v_x tan(steering)/L` and `l_r` times it,
-and braking fades below `model.brakeHoldSpeed` (0.25 m/s), so it ends at rest
-and never reverses the vehicle; a braked vehicle slower than a fifth of that
-(5 cm/s) at the end of a hold is at rest exactly, with zero body velocities
-and zero sensitivities. The vanishing tail of the fading brake, with
-coefficients of 1e-4 to 1e-7, left the CLF stage's cone program without a
-numerical result while the vehicle crept to a stop; under light braking that
-tail would cover about 1.5 cm more. The simulated plant (`ode45` on the same
-derivative) has no such step and creeps that tail. The
-Fiala tire's own floor (`scheduleSpeedFloor`, 1 m/s) lies inside the kinematic
-regime, where the Fiala forces are not evaluated. In the kinematic regime the
-rear-adhesion cone reduces to `|b| <= 1`, and the sideslip cone applies above
-`brakeHoldSpeed` (at rest the sideslip is undefined). RK4 defines the
-prediction map and its tangents.
-The default uses one 50-ms RK4 step; its midpoint collision node is an endpoint
-interpolant, not an independently integrated half hold.
-
-The prediction length is not fixed. At startup the potential-field rollout
-stops at the first node `M` with `N <= M <= maximumHorizonSteps` that lies in
-the terminal set; a rollout that never reaches it uses
-`M = maximumHorizonSteps`, and the optimization then decides feasibility.
-
-Later frames shift the previous accepted plan by one hold and roll its inputs
-out from the current estimate. The plan keeps its endpoint at the same
-absolute time, so the horizon shrinks by one hold per frame. While the
-shifted plan is shorter than `N` it is extended by holds of the declared model
-that keep the endpoint in the terminal set with their rows met and their
-midpoint clear: the cruise hold `u = u* + K e` of the CLF's certified
-controller (`terminalSafeSet.cruiseInput`); else holds of the startup
-guidance through states outside the set until it is reached again (a longer
-plan that completes the maneuver); else the hold nearest to the cruise hold on
-a segment toward holding the previous steering: at the cruise hold's braking
-ratio, else with the braking ratio of deceleration `a_b`, the terminal law's
-realization, else braking as hard as the rear adhesion admits
-(`terminalSafeSet.brakingInput`). Braking is kept as small as found because
-later holds reach the first hold nearly unchanged. When no hold keeps the endpoint in the set the plan stays one
-hold shorter. An endpoint no longer in the set (a changed forecast or state)
-is extended by cruise holds until one is. A target that the previous plan
-did not know of (onset: the previous sample had no target) starts from a fresh
-rollout (`targetOnset`). Prior affine states are not reused. When no target is
-present, nominal path guidance supplies the startup rollout. A shifted plan
-that cannot be rolled out (non-finite inputs, a braking ratio at the limit, or
-a tire-domain error) is reported as no solution; no other anchor replaces it.
-Potential guidance is a search reference, not a safety certificate. No
-maneuver bank is used.
-
-The target keeps Sharma et al. (2026), Eq. (17)'s constant tangential
-acceleration `A` and constant sideslip `beta`. The prediction uses inertial
-coordinates, with `V(t)=V0+A*t` and curvature `sin(beta)/lr`; yaw rate therefore
-changes with speed. There is no added sideslip-rate state. Braking ends at
-rest: a speed that reaches zero stays zero, and a target at rest moves off
-only forward (user decision, October 11, 2026; the simulated truth follows the
-same forecast). The exact arc-length prediction supplies both initialization
-and collision constraints at matching absolute times; it runs forward from the
-latest target estimate and the sample index at which it was taken, because a
-stop cannot be run backward.
-
-The initialization borrows Zhai et al. (2024), IEEE Access,
-DOI 10.1109/ACCESS.2024.3355952: direction-dependent obstacle influence,
-motion-dependent repulsion, and joint course/speed guidance. It is an adaptation,
-not a reproduction of their printed potential equations, tracked-vehicle model,
-Bezier path, or eight behavioral priorities. The local-paper assessment in
-[Zhai initialization assessment](../report/FLOW_INITIALIZATION_ZHAI_20261002.tex)
-records the formula issues and the need for longitudinal planning.
-
-At each seed hold, project the actual nonlinear ego state onto the given path.
-Preview station using its measured tangent velocity, and preview lateral return
-as `d(tau) = d(0)*exp(-tau/T)`, with `T = lookaheadSeconds`. Compare these positions
-with the target at the same absolute times. With rectangle supports `a_j,b_j`
-in the local road axes, define
-
-    r_j^2 = (Delta_s_j/a_j)^2 + (Delta_d_j/b_j)^2,
-    w_j = exp(-r_j^2/2 - tau_j/(2*T)),  w = max_j w_j.
-
-The supports include both vehicles' dimensions along the path and its normal,
-including the ego's own heading relative to the path, the target orientation,
-body center offsets, and the seed padding. They are a directional guidance
-envelope, not an exact collision constraint. A held passing sign is selected
-once per seed from the closest predicted encounter and transverse target
-velocity. With a road it also compares the room beside the target: clearing the
-target on the left needs `b - Delta_d` of lateral motion and on the right
-`b + Delta_d`, so half the difference of the room left and right of the target
-is added to the preference, and the side that keeps more road margin after
-clearing wins. Before this term a head-on in the lane was decided by the sign
-of the estimated target sideslip (noise of +/-0.03 rad); in four noisy runs it
-chose the narrower right side and the swerve then ran toward the road edge.
-A bounded circulation component resolves symmetric head-on geometry. The field is
-
-    v_d = -d/T + 0.7*v_ref*w*(Delta_d_star/b_star + 2*c),
-    v_s = max(1.5, 0.5*v_ref, v_ref*(1-0.35*w*min(2,closing/v_ref))),
-    heading_d = heading_path + atan2(v_d,v_s).
-
-Here `c = -side*tangent'*(p_ego-p_target)/max(norm(p_ego-p_target),1)`.
-The star denotes the largest predicted influence. This combines attraction,
-a normalized lateral repulsion and circulation; it is not claimed to be the
-full gradient of one scalar potential. There is no division by closing speed.
-Both acceleration and sideslip affect the target preview through the exact prediction.
-The Gaussian now measures predicted interaction; no fitted Gaussian displacement
-or fixed nominal-speed station clock is used.
-
-Course guidance produces a yaw-rate demand. Inverse Fiala force feedback and a
-speed loop produce controls, which are rolled out through the same nonlinear
-bicycle RK4 map. Seed-only friction and braking shaping keep this reference
-within the useful tire region; they do not add steering magnitude or slew limits
-to the optimization. A seed may still violate collision or terminal constraints
-and is never executable by itself.
-
-**Normal frames shift the previous input plan.** The field rollout is
-constructed at startup, and once more when the primary problem around the
-shifted plan is primal infeasible inside the trust region. Each trajectory is
-linearized once. A fresh initialization may rebuild the problem after
-primary infeasibility, but there is no post-solve acceptance relinearization.
-
-For an anchor `(xbar_i, ubar_i)` the shared model is
-
-    x_(i+1) = f_h(xbar_i,ubar_i) + A_i (x_i-xbar_i) + B_i (u_i-ubar_i).
-
-The same anchor supplies dynamics, tire derivatives, collision directions,
-the terminal rows and the analytic first-successor CLF approximation. Input/state correction
-boxes are numerical iteration bounds. At unit trust scale, the steering
-correction is +/-0.075 rad and the braking-ratio correction +/-0.125. The
-trust scale is estimated from the plan innovation (below).
-Steering has no physical
-magnitude or slew bound. Physical braking/model-domain bounds remain. These
-numerical boxes are not certified nonlinear remainder bounds.
-
-## Computation
-
-The first four measures leave the convex problem and the prediction rollout's
-decisions unchanged; the last two change only the solves' precision and the
-start-up:
-
-- every inequality row is a small dense block on the few variables it
-  involves (a node's state, or a hold's start state and input, and its
-  slack); the sparse matrices are assembled once, the target forecast at all
-  nodes and midpoints is one call, and the lane projection of all ego corners
-  is one call (building the matrices row by row cost time quadratic in the
-  plan length);
-- a row that every correction inside the variables' boxes satisfies (the
-  state box of the trust region, and the input box at `trustMaximumScale`)
-  cannot bind and is left out, so the feasible set and the optimum are
-  unchanged: most road rows, collision rows far from the target and state-limit
-  rows; a collision dual is not even computed where the reference distance
-  less both reaches, the margin and the largest enclosure tightening exceeds
-  the most the pose can move over the boxes, and the terminal set skips its
-  continuation duals and road rows by the same test on the continuation's
-  sensitivity;
-- a larger trust scale (`localExpand`) reuses the formulated problem and
-  changes only the input increments' bounds;
-- the nonlinear rollout evaluates prediction error without checking or modifying
-  the completed optimizer input;
-- the conic solves use 1e-6 tolerances and accept a stalled solve at 1e-4
-  (`solver.reducedTolerance`, Clarabel's AlmostSolved), because the point is a
-  search direction that the prediction rollout checks on the nonlinear model;
-- the trim is solved by Newton's method with the analytic tangent (fsolve only
-  if it does not converge), and `collisionAvoidanceController("warmUp", cfg)`
-  runs one synthetic encounter so that every code path has been compiled and
-  the kernels loaded before the first sample.
-
-`report/CONTROLLER_SPEED_20261011.tex` has the measurements.
-
-## Ordinary distance dual and fixed collision multipliers
-
-Collision rows follow the distance-dual / fixed-multiplier sequence of
-Li et al. (2023), [Section 3, equations (12)--(13)](https://doi.org/10.1007/s42154-023-00222-7).
-Only the collision formulation is adopted; the PCBF/CLF objectives and
-Fiala dynamics remain the project model.
-
-For target body inequalities `A (z-pT) <= b` and the four ego vertices
-`v_j(x)`, the finite-body meaning of the paper's set `S(x)` is made explicit:
-
-    maximize alpha - b' lambda
-    subject to alpha <= lambda' A (v_j(xbar)-pT), j=1,...,4,
-               lambda >= 0, norm(A' lambda,2) <= 1.
-
-This is the ordinary nonnegative set distance dual: the minimum over a
-rectangle is attained at a vertex, and `alpha` is just its hypograph variable.
-For rectangles its optimum is now constructed from the closest-feature
-normal `n` supplied by the exact rectangle geometry. If `w = R_T' n`, then
-`lambda = [max(w,0); max(-w,0)]`. The normal has unit norm for disjoint
-rectangles and provides a supporting hyperplane at a closest feature, so
-these nonnegative multipliers attain the same ordinary-distance optimum.
-Overlap (and the implemented touching convention) gives `n = 0` and
-`lambda = 0` for the ordinary-distance optimum. The resulting
-`lambda` is fixed when assembling all four trajectory inequalities
-
-    lambda' [A (v_j(x)-pT) - b] + s_i >= safetyMarginMeters.
-
-At overlap the trajectory rows do not use the zero multiplier, whose row has
-no gradient in the ego pose. `supportLinearization` selects another feasible
-dual instead: the unit normal of the rectangle axis (of the four axes of both
-bodies) with the least penetration, oriented from the target to the ego. Any
-feasible multiplier gives a lower bound of the distance, so the row remains a
-sufficient separation condition; its value is negative at the anchor and its
-gradient points along that axis. This is not a signed-distance objective: the
-multiplier is fixed, and the row still needs slack until the bodies separate.
-
-The existing affine RTI model retains the first derivative of the rotated
-vertices with respect to ego yaw. Thus the paper's unspecified set notation
-is explicitly represented by both full rectangles, rather than replacing
-the ego by a point or silently freezing its orientation. This representation
-and the yaw tangent are stated here; they are not a claim to reproduce an
-uninspected author implementation. At the anchor, the optimized minimum
-equals the ordinary rectangle distance up to solver tolerance.
-
-There is no signed-distance objective, preferred passing direction or normal
-normalization. Contact duals may be nonunique. Potential-field initialization
-does not replace the multipliers. The retired signed-direction MEX is neither
-called nor built.
-The geometric construction retains the nonnegative-multiplier, unit-normal
-and primal-dual identities as numerical assertions. It removes the many
-five-variable `coneprog` calls and their near-optimal stopping failures;
-it does not relax a trajectory constraint. The distant recovery geometry
-that previously aborted with a 1.68-micrometer gap now has a gap of order
-1e-14 m. Nonunique touching normals remain a property of the
-ordinary-distance formulation.
-
-The trajectory stages share the remaining soft frame budget. Formulation
-and a currently running factorization are not interrupted by a hard deadline.
-The original conic distance implementation and its historical experiment
-results remain recorded in the dated reports; they do not describe the
-current geometric implementation.
-
-## PCBF slack and CLF dissipation
-
-One nonnegative collision slack is assigned to each primary-horizon stage;
-it relaxes the start and midpoint separation rows. Completion-tail rows are
-hard. With an observer enclosure every node also carries a slack on its
-tightened row, and the untightened row stays hard after the prefix only, so the
-formulation reduces to the certainty-equivalent one as the enclosure vanishes.
-(Hard untightened rows in the prefix made the problem stricter for a small
-reported enclosure than for none. In a single-change ablation on `d1c31d6`
-they left 79 of 84 noisy encounters recovering instead of 82, with three new
-failures at the closest approach of the 15-m/s accelerating head-on;
-`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`.) The node buffer is 0.20 m, whereas the experiment's physical pass criterion
-is positive rectangle clearance. The road is the only lateral constraint: every
-ego rectangle corner stays within `lateralClearance` at every predicted node,
-hold midpoint and the endpoint, hard in both stages (see Terminal constraints).
-The former 10-m center corridor around the path is removed.
-
-The first problem minimizes the sum of PCBF slacks. The unbounded CLF slack
-and its cone are eliminated from this problem without changing its feasible
-projection. If the zero correction with zero slacks satisfies every linear
-row, equality, bound and path cone, it attains the global lower bound zero.
-The primary stage is then completed analytically; the CLF stage still runs.
-`numericalSolve` distinguishes analytic completion from an actual solver call. The primary therefore contains only the
-shared dynamics, state/input limits, collision, path and terminal rows.
-
-A finite positive primary value need not be a useful safety result. The fixed
-current-state rows supply the unavoidable lower bound
-
-    J_lower = max(0, -min(g(x_current))).
-
-A primary value above this lower bound is issued as positive slack. When the
-solver certifies a primary problem primal infeasible, the input trust scale is
-doubled on the same linearization, never beyond `trustMaximumScale = 1`, until
-the problem is feasible. An earlier cap of 16 produced feasible problems on an
-inaccurate linearization: model innovation rose to 1.7 m and issued inputs
-reached their physical limits. If the shifted plan is still infeasible, one fresh
-potential-field model is solved with the same expansion, starting again from
-the estimated scale. The expansion does not change the online trust estimate.
-Positive slack, numerical stalls and a CLF stage without a result are reported,
-not re-solved. There is no second fresh model. A finite array from a failed
-primary solve is not a valid PCBF optimum.
-
-On the selected model the single CLF requirement is
-
-    V(x_next) <= exp(-2 h / T) * V(x) + rho,    rho >= 0,
-    V(x) = e(x)' P e(x),
-
-on the estimate: `x` is the current estimate and `x_next` its affine first
-successor. Estimation error enters as an input (ISS); the row carries no
-observer enclosure. A worst case over the enclosure (the previous version)
-asks for a decrease below the enclosure's own size, which no input achieves
-near the path. That turned the CLF stage into a greedy one-step minimizer;
-in a noisy 15-m/s head-on the braking ratio then chattered (standard deviation
-0.21) and the run did not recover in 100 s. In a single-change ablation on
-`d1c31d6`, the worst-case row left 38 of 84 noisy encounters recovering
-instead of 82; 37 of the 42 at 15 m/s did not recover within 100 s
-(`report/TRACKER_NOISE_AND_DESIGN_ABLATIONS_20261005.tex`).
-
-with T = `clf.convergenceTimeConstantSeconds` = 4 s. P is a quadratic CLF
-synthesized offline by an LMI for the given-path cruise trim and read from
-`config/clfMatrices.json` (see [NOMINAL_CLF.md](NOMINAL_CLF.md)); there is no
-LQR design. The analytic
-error Jacobian applied to the affine first successor gives a convex quadratic
-with Hessian J' P J. One second-order cone represents its epigraph. There are
-no cost-to-go rollouts or finite-difference curvature calculations. This
-quadratic is locally justified, not a global nonlinear CLF; positive slack can
-remain necessary away from cruise even without a target. The secondary minimizes
-
-    (rho + epsilon * max(lossLower,f) * R(dU)) / max(V(x),1),
-    sum(xi) <= achievedPrimary + lexicographicTieTolerance * max(1, achievedPrimary),
-
-with `lexicographicTieTolerance = 1e-4` m. With a 1e-5 cap the CLF stage often
-stalled in Clarabel (InsufficientProgress, primal residual 1e-5 to 6e-5) because
-the zero-slack set is a slab only micrometres thick; 0.1 mm restored progress.
-
-`R` is the normalized squared input increment about the linearization inputs.
-At an exact optimum its effect on minimum physical CLF slack is bounded by
-`epsilon * max(lossLower,f)`, where `epsilon = clfTieTolerance = 1e-4` and
-`lossLower` bounds `e'Qe` from below over the current affine error set
-(`Q` built from the CLF error scales). The floor `f` is one error-scale unit
-when the anchor is the previous accepted plan, and 0 on a fresh rollout. Only
-the first successor enters the CLF row, so near the path the tie is what keeps
-the plan's later inputs, which the next sample inherits. While it vanished
-there, the solver returned them anywhere in the trust box; the plan, and with
-it the next sample's anchor, wandered between samples, and the 15 m/s cruise
-oscillated (speed error down to -0.14 m/s, with recurring CLF slack). Which
-point the solver returned had depended on rows that never bind, and leaving
-those rows out exposed it. A fresh rollout is only a search seed: a floored tie
-on it held the 15 m/s accelerating head-on's first solution so close to the
-seed that no step was accepted (`report/SOLVER_TOLERANCE_20261011.tex`). It
-penalizes neither absolute zero input
-nor deviation from the construction feedback. PCBF priority is retained;
-CLF minimization has this explicit bounded tie allowance. A zero primary
-result still runs the CLF stage. The componentwise input boxes imply `R <= 1`,
-so the former epigraph `R <= sigma <= 1` is eliminated exactly. Clarabel solves
-the native sparse quadratic objective with the path and CLF cones retained;
-these are conic QPs rather than linearly constrained QPs. State variables remain
-explicit to preserve dynamic sparsity.
-
-The compiled adapter seeks the configured constraint/optimality precision.
-Its reduced-accuracy termination uses `solver.reducedTolerance` (default 1e-4)
-for primal/dual residuals and absolute/relative objective gap.
-Flags 1 and 2 distinguish full and reduced-accuracy convergence. Numerical
-acceptance error is additional to the analytic lexicographic tie bounds.
-Infeasibility rays, time-limit iterates and unresolved numerical failures return
-no point. `solverInfo` records native status, iterations and residuals.
-
-## Issuing the solved plan
-
-The completed CLF-stage input sequence is issued exactly. There is no line
-search, post-solve feasibility check, accepted fraction or acceptance
-relinearization. The command is the sequence's first input, without clipping.
-A nonlinear rollout of that same sequence supplies prediction and the trust
-remainder. It does not alter inputs, optimized slacks, or the objective and does
-not decide whether a command is issued. If the rollout leaves the declared
-model domain, the affine prediction is retained and that diagnostic is reported.
-
-A frame reports no optimization solution when its anchor is unavailable or
-its primary/CLF stages do not return a usable numerical point. Numerical
-failure is permitted by the mathematical recursive-feasibility scope. Feasibility
-of the ideal problem does not guarantee a solver return. Local convex optimality
-is not global optimality of the nonlinear robust problem.
-
-## Input trust scale from the plan innovation
-
-The correction box `+/-Delta*r*[0.15;0.25]` (`r = trustRadius`) bounds how far
-one solve moves the inputs from its anchor. `Delta` is estimated, not set.
-
-For a correction of size `s` (largest input change from the anchor, in box
-units), the affine prediction differs from the nonlinear rollout of the same
-inputs by a second-order remainder, `e ~ L*s^2`. The coefficient `L` depends
-on the operating point (speed, tire slip) and is not known in advance.
-
-The nonlinear rollout of the full affine step measures it in the frame that
-takes the step. With the safety body-point metric
-`P(dx) = norm(dp) + r_E * abs(dpsi)`, the model innovation is
-
-    e_k = max_j P(x_nl,j - x_aff,j),
-
-the largest departure of the full step's nonlinear rollout from its affine
-prediction. The departure of the next posterior from the plan's second node is
-recorded separately as the observation innovation: it belongs to the
-estimator and the plant, and it does not set the scale.
-
-Before the issued plan was a nonlinear rollout, the model share was obtained
-at the next frame by replaying the shifted inputs from the plan's own
-prediction. An earlier variant subtracted twice the observer's worst-case
-tube radius from the total innovation instead. On the noisy-estimator
-campaign that bound explained every innovation (0.27 m included), so the
-scale rose to its maximum and the encounters became infeasible within 10 to
-70 holds.
-
-The coefficient estimate uses fast attack and slow release, and the scale is
-the step whose predicted remainder equals the target innovation `tau`:
-
-    Lhat_k  = max( e_k / max(s_k, Delta_k/2)^2 , gamma * Lhat_(k-1) ),
-    Delta_(k+1) = clip( sqrt(tau / Lhat_k), Delta_min, Delta_max ),
-
-with `s_k` the full step's size in box units. `Delta` grows by at most
-`1/sqrt(gamma)` per sample and shrinks at once. A step far inside the box
-(`s < Delta/2`) is not taken as evidence about the box boundary. Startup uses
-`Delta_0` with `Lhat_0 = tau/Delta_0^2`. The defaults are `tau = 0.02 m`,
-`Delta_0 = 0.125`, `Delta` in `[1/16, 1]` and `gamma = 0.5`.
-
-On the fourteen exact-observation encounters (2026-10-04), the measured
-`e/s^2` was about 0.07-0.09 m at 8 m/s and 0.25-0.30 m at 15 m/s, almost
-independent of a fixed `Delta` between 0.125 and 0.5. Runs whose innovation
-stayed below about 3 cm needed few fresh restarts at both speeds. One `tau`
-therefore yields about 0.4-0.5 at 8 m/s and 0.2-0.27 at 15 m/s, without a
-speed schedule.
-
-The completed CLF solve determines the input; the scale
-only bounds the next correction. `tau` is an empirical consistency target,
-not a certified bound on the nonlinear remainder or on separation.
-
-## Stable-handling envelope and the estimator's domain
-
-At both ends of every hold, under that hold's input, except the measured node:
-
-    ||[ (v_y - lr r)/k ; v_x b ]|| <= v_x,   k = 3 mu_r Fz_r / C_r,    (rear adhesion)
-    |v_y| <= tan(model.sideslipMaximum) v_x,                            (sideslip cone)
-
-with `v_x` frozen at the anchor in the product `v_x b`. The first is the
-rear Fiala tire's unsaturated region under the braking ratio's capacity
-`sqrt(1 - b^2)`, a stable-handling envelope in the sense of Beal and Gerdes
-(2013), *IEEE Trans. Control Syst. Technol.* 21(4). A saturated rear axle has
-no restoring yaw moment, and its force no longer determines the slip, so the
-estimator's force-balance measurement would lose its information
-(`estimator/MODEL_AIDED_ESTIMATION.md`). The second is that measurement's cone
-premise; it is robust to the hold's ego enclosure. The adhesion cone is a
-handling and observability row, not part of the safety certificate (the
-estimator's enclosures need only the sideslip cone), and acts on the estimate.
-The certified lateral-velocity radius widens exactly as the rear slip nears
-saturation. In a noisy 15-m/s turning crossing it reached 0.81 m/s, and its
-reserve lowered the admissible normalized rear slip to 0.71 while the current
-state was at 0.75 and decreasing along the plan: the problem was infeasible.
-The cone is divided by the anchor speed so that its entries are of order one;
-unscaled, the CLF stage stalled numerically (Clarabel insufficient progress) in
-a noisy 15-m/s head-on.
-Before this envelope, a noisy 15-m/s head-on combined steering of -0.40 rad with
-a braking ratio of +0.95 (rear lateral capacity 32%); the vehicle spun to a
-0.68-rad sideslip.
-
-## Terminal constraints
-
-The terminal set and its proofs are in
-[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md). In short, an endpoint `y` is in
-the set when it meets all of:
-
-- `y` is mild: the sideslip lies in the problem's cone and the held arc's
-  lateral acceleration `|r V|` is at most `a_m` (2 m/s^2); in a mild state the
-  ego is taken to be a kinematic vehicle under the simplest law, steering held
-  and braking at `a_b` (4 m/s^2) to rest (the user's assumption, no mismatch
-  bound);
-- along the continuation (the ego braking at `a_b` with its sideslip and
-  course curvature held until it stops at a sample instant, the target on its
-  forecast), every node, hold midpoint and the parked pose keeps the ego
-  rectangle on the road;
-- every node and hold midpoint of the continuation clears the target's
-  forecast rectangle by `safetyMarginMeters` until the target's reference
-  point is first farther than `R` from the ego's;
-- if the target has not left by the stop, its remaining track until it leaves
-  the range about the parked ego clears the parked rectangle by the same
-  margin (exact closed form: vertex paths, segments or arcs, against edges).
-
-In the convex problem these conditions are linearized at the anchor endpoint
-on the endpoint correction: mildness as a bound on `|r V|` where
-the anchor endpoint is outside it,
-fixed-dual collision rows at the continuation's nodes and midpoints before the
-exit and at the parked pose against the target's closest pose on its track,
-and corner rows on the road along the continuation, through the derivative of
-the closed-form continuation with its schedule held. Conditions with more
-than 5 m to spare are left out, and each row keeps up to 5 cm of the margin it
-has at the anchor. The
-endpoint also carries the collision rows of every other node inside `R` and
-the road rows. Anchor membership is checked on its nonlinear rollout. With an ego enclosure the clearances and road margins
-are widened by its position radius and yaw chord.
-
-This replaces the CLF-tube terminal set of October 6 to 10, 2026 (the region
-every trajectory of the certified cruise controller stays in, missing the
-target until it left the range or its relative motion left the tube's
-collision cone), which required plans that reach a state from which cruising
-on the given path clears the target. Before that, a separating,
-road-recoverable terminal set (separating relative velocity, lateral road
-recovery `max(w,0)^2 <= 2 a d`) was not invariant: a braking lead, a target
-whose sideslip turns it back, or the ego's own return to the path could close
-the distance again.
-
-The road rows are the same at every node: every predicted node after the
-measured one and every hold midpoint keeps all four rectangle corners within
-`lateralClearance`. Each row linearizes one corner's lateral coordinate on the
-path normal at the anchor corner, with the ego generator support subtracted.
-Collision rows apply at nodes inside `R`, including a later re-entry.
-
-The terminal records are:
-
-- `terminalEnd` (`exit`, `parked` or `noTarget`), `terminalStopSeconds`,
-  `terminalExitSeconds` and `terminalMarginMeters`;
-- `terminalValue` (the endpoint's CLF value), `terminalDistanceMeters` and
-  `terminalRoadMarginMeters`;
-- `postSolveInputModification = false`, `postSolveFeasibilityCheck = false`, `anchorCertified`,
-  `appendedTerminalSteps`, `appendedBrakingSteps`, `extensionStopped` and
-  `linearizationGapMeters`.
-
-## Issued commands, diagnostics and limits
-
-The selected CLF optimizer result supplies the applied input. Its applied
-input is not clipped. A nonpositive solver flag cannot supply an input. Positive
-numerical termination is required; it is not a continuous-time safety
-certificate. If no completed CLF result exists,
-the controller reports `collisionAvoidanceController:noOptimizationSolution`.
-No previous trajectory or primary-only point is issued instead.
-
-`primaryOptimum` records the achieved primary value; without positive solver
-termination it is not a certified optimum. Attempt logs retain all primary
-models and timings; `selectedAttempt` identifies the model supplying the
-command. `optimizationConverged` describes the numerical stages of the selected
-problem, not optimality of the issued point under nonlinear dynamics.
-Continuation state version 79 stores the per-stage slacks and their total,
-the issued nonlinear plan (inputs and states) and the trust estimate
-(`scale`, coefficient `curvature`, last `correction`).
-
-Metadata retains the explicit scope:
-
-- `predictionModel = nonlinearPredictionOfUnmodifiedOptimizedInputs`;
-- `safetyScope = affineSampledConstraints`;
-- `affineValidationPerformed = false`;
-- `nonlinearValidationPerformed = false`; `nonlinearPredictionEvaluated`
-  records whether the diagnostic rollout was available, not feasibility;
-- `trust` (scale, curvature, correction, innovation, observationInnovation, modelInnovation, updated);
-- `egoUncertaintyModel = currentPosteriorEnclosurePropagatedThroughEachHold`,
-  `targetUncertaintyModel = constantParametersRestartedEachHoldFromCurrentObserverSet`;
-- `recursiveFeasibilityScope = idealMathematicalProblemOnly`;
-- `terminalSet = brakingContinuationEncounterSafe`;
-- unmeasured constraint residuals and margins are NaN;
-- `clfFunction = quadraticTransverseError`, with no tertiary objective;
-- required decrease, modeled successor value and bounded CLF tie allowance are recorded.
-
-Positive PCBF slack is relaxation, not collision freedom. Zero modeled CLF
-slack alone is not a nonlinear decrease theorem: the local RTI value model is
-an approximation. The local quadratic construction and its remaining proof obligations are stated in NOMINAL_CLF.md.
-Independent ODE45 replay measures actual clearance and recovery offline;
-these dense ODE45 safety/recovery measurements remain offline. Online
-nonlinear RK4 expansion evaluates approximation accuracy, not a full
-physical-vehicle safety certificate.
-
-This is a bounded-work RTI implementation with direct optimizer inputs. The
-bounded-error recursive-feasibility proof requires joint posterior intersection,
-monotone reachable sets and a robust terminal certificate, as stated in
-[ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md). The current
-per-hold tightening is not that complete formulation.
-Vehicle-specific results and full controller-call timing belong in the dated
-experiment report under `report/`.
+## Starting reference and prediction horizon
+
+The state is `x = [px; py; yaw; vx; vy; yawRate]`; the input is
+`u = [frontWheelSteeringAngle; signedLongitudinalForceRatio]`. The declared model
+is the modified-Fiala bicycle at higher speed, a kinematic bicycle at low speed,
+and a smooth blend between them. RK4 and variational equations share the same
+mesh. With the default single-step mesh, the hold midpoint is the endpoint
+interpolant, not a separately integrated half hold.
+
+Without a target the requested horizon is `controller.horizonSteps`. With a
+target it covers at least `scp.minimumPredictionSeconds` (three seconds), and
+extends through the nearest forecast interaction along prescribed cruise plus
+`scp.settlingSeconds` (two seconds), up to `scp.predictionSeconds` (six seconds).
+Current geometric enclosures widen the interaction trigger. This selects duration
+only: the prescribed cruise contains no avoidance maneuver. A late braking-lead
+conflict gets a longer horizon than an immediate head-on. The maximum hold count
+still bounds the result. A longer inherited sequence is retained while a target
+is present; missing tail inputs come from nominal lane feedback. Seed avoidance
+and terminal membership are not prerequisites for constructing a subproblem.
+Target onset retains the input warm start and refreshes the geometry branch.
+A shifted reference receives at most 60 percent of the frame's wall budget.
+If it stalls or fails without an eligible result, the same optimizer can restart
+once from nominal feedback using the remaining budget. Terminal and escape
+geometry are rebuilt. A restart does not execute an unoptimized nominal input.
+
+Every reference is an exact declared-model rollout. Consequently zero dynamics
+increments satisfy its linearized dynamics, even if the reference is unsafe.
+No virtual dynamic control is needed for this shooting-reference implementation.
+The target retains the current constant tangential acceleration and sideslip
+forecast, with braking absorbed at rest and parameter estimates refreshed each
+frame.
+
+## Convex subproblem and restoration
+
+For reference `(x_bar, u_bar)` the dynamics increments obey
+
+    dx_0 = 0,
+    dx_{i+1} = A_i dx_i + B_i du_i.
+
+State and input increments lie in local trust boxes. Actual input magnitude
+bounds remain hard. State, road, sideslip, sampled collision and terminal rows
+are relaxed by one shared nonnegative elastic variable `e`; the handling cone's
+right-hand side receives the same relaxation. Prefix PCBF slacks `xi_i` retain
+their existing meaning. With usable nonzero observer enclosures, tightened
+collision deficits remain soft over the horizon and nominal collision rows stay
+hard after the prefix. The elastic variable is separate from these PCBF deficits.
+
+The first stage minimizes
+
+    J_s = sum_i xi_i + scp.restorationWeight * e.
+
+The second stage caps `J_s` at the computed first-stage optimum plus the declared
+numerical tie, then minimizes one-step CLF slack plus a bounded combination of
+whole-horizon nominal tracking and input-increment proximity. The CLF remains `V(x) = error(x)' P error(x)` with
+
+    V(x_next) <= exp(-2*h/T) V(x_now) + rho.
+
+Only the estimate enters this performance row. The tie has a minimum
+loss scale of one, including at trim. Half its bound goes to mean predicted
+nominal CLF value, normalized by its maximum over the local state box, and half
+to input-increment proximity. The sum cannot exceed `clfTieBound/clfScale` on
+the box. This distinguishes future passing/recovery from following a slow lead
+while controlling otherwise free future inputs. It does not generate another avoidance route. The exact optimum of
+each convex subproblem is distinct from the nonlinear problem's optimum.
+
+## Collision separation updates
+
+Rectangle distance supplies target-to-ego normals and feasible nonnegative dual
+multipliers. Four fixed-multiplier rows account for all ego corners, including
+the yaw derivative. Those multipliers are rebuilt after every accepted nonlinear
+rollout. At overlap the ordinary distance dual is zero; the least-penetrated
+rectangle axis instead supplies a feasible nonzero dual and an escape derivative.
+At symmetric lateral overlap, a small signed projection cannot let roundoff pick
+opposite sides at adjacent prediction nodes: orientation is tied to the ego
+lateral axis. This tie is invariant under a common rotation of the scene and
+chooses a local geometry branch, not a precomputed maneuver.
+
+One side is selected for each encounter, away from a target approaching from
+one side of the road, or using the wider available side for an aligned target.
+At an intersecting reference, longitudinal and that lateral support direction
+are smoothly combined using their signed geometric gaps. Near longitudinal
+alignment the lateral direction dominates. This avoids both a zero escape
+derivative and forcing pure lateral separation too early. Once separated,
+a compatible closest-feature normal supplies the exact ordinary-distance dual.
+
+For targets mainly traveling along the road, an active escape branch survives
+relinearization and shifted frames until the reference passes the target.
+Crossing targets use refreshed closest geometry so that the vehicle can yield
+without chasing a target laterally across the road. This changes geometric
+linearization, not the control law or objective hierarchy. Target onset and
+absence clear the geometry memory. These local branch choices do not establish
+global optimality.
+
+The local constraints are affine approximations of rotated-corner support rows.
+Positive sampled separation does not establish a continuous-hold or robust
+nonlinear safety certificate. Positive PCBF slack explicitly denotes relaxation.
+
+## Complete handling-product derivative
+
+Rear adhesion uses `w = vy - lr*yawRate`,
+`k = 3*rearLongitudinalForceScale/rearCorneringStiffness`, and
+
+    norm([w/k; vx*b]) <= vx.
+
+The bilinear product must include both first derivatives:
+
+    vx*b ≈ vx_bar*b_bar + b_bar*dvx + vx_bar*db.
+
+The cone is normalized by `vx_bar`. Omitting `b_bar*dvx` gives an inconsistent
+first-order model when braking and speed change together; reducing the trust
+region alone cannot repair that missing derivative. Below the declared
+kinematic threshold the cone reduces to `abs(b) <= 1`. The node sideslip bound
+and sampled physical state limits are rebuilt on each reference.
+
+Front slip remains inside the Fiala model's angle domain:
+`abs(atan2(vy + lf*yawRate, vx) - steering) < pi/2`.
+Its rows use the angle derivative and the current body's interval enclosure
+when forward velocity remains positive over that enclosure. They apply at hold
+ends and midpoints; nonlinear trials outside the angle domain are unavailable.
+Front-wheel force saturation is allowed: the Fiala model already limits force,
+and steering still changes its direction in the body frame. No extra front
+nonsaturation or steering actuator cap is imposed. Force-ratio bounds include a
+small numerical reserve inside the model domain, rather than clipping a returned
+command.
+
+## Nonlinear merit and trust updates
+
+A trial is rolled out with its unchanged optimized inputs. The controller
+rebuilds the constraint approximation at that rollout and evaluates the zero-step
+hard residual `H`, the PCBF slacks required there, and the true one-step CLF
+deficit. Its merit is
+
+    M = restorationWeight*max(0,H-constraintTolerance)
+        + sum(required PCBF slacks)
+        + performanceWeight*true CLF deficit/max(1,V_now)
+        + bounded horizon-tracking and input-proximity terms.
+
+Predicted reduction uses the corresponding convex elastic excess above tolerance,
+PCBF slacks, scaled CLF slack and bounded tie terms. Reference and trial tracking
+costs use the same local normalization for that ratio. Hard residuals within
+the declared numerical tolerance are not penalized as infeasible. The ratio of actual to predicted reduction decides whether
+to accept a step and enlarge or shrink its input trust region. A rejected step
+keeps the reference and rebuilds the input bounds for a smaller trial. Twelve
+iterations without material restoration progress, or a rejected step at the
+minimum trust scale, terminate an unsuccessful reference early. The optional
+nominal restart shares the original frame deadline.
+
+If a convexly feasible step leaves nonlinear hard residual above tolerance, the
+next trust scale is reduced using that measured residual even if total merit
+improved. The intra-solve scale may fall below the across-frame trust estimator's
+minimum: `scp.minimumTrustScale` avoids the old fixed correction floor preventing
+boundary refinement. All accepted references are nonlinear rollouts.
+
+An accepted completed trial is eligible for return only if both its elastic
+variable and its reevaluated hard residual are at most
+`scp.constraintTolerance` (default `1e-3` in each row's units; handling cones
+are normalized). The loop keeps the latest eligible trial while refining.
+`scp.feasibleRefinementIterations` limits eligible refinements to three by
+default; restoration can use up to 80 iterations per reference within the shared wall budget.
+The reported termination distinguishes this finite refinement limit from the
+small interior-step convergence criterion. Reaching an iteration/time limit can
+return an eligible trial, with
+`optimizationConverged = false`. If none exists, it reports no optimization
+solution. There is no alternate controller or previous-plan execution fallback.
+The first input of the selected completed optimization is issued directly.
+Nonlinear merit checks are iterations inside the optimizer, not a separate
+post-solve actuator modification.
+
+The across-frame trust estimate still records full-step affine/nonlinear pose
+error and distinguishes it from departure of the new estimate from the previous
+prediction. This estimate is a numerical heuristic, not a proved remainder bound.
+
+## Braking-continuation terminal conditions
+
+The terminal set remains the mild-state braking-continuation set in
+[TERMINAL_SAFE_SET.md](TERMINAL_SAFE_SET.md). It allows motion: the endpoint
+must admit the declared kinematic law that brakes to rest with fixed sideslip
+and course curvature. Continuation nodes and midpoints stay on the optional
+road and clear the target until its exit; the parked pose clears the remaining
+target track. The actual stop need not occur inside the prediction horizon.
+
+These terminal rows, including continuation and parked-witness geometry, are
+relinearized at each accepted endpoint. Their nominal kinematic modeling
+assumption and the observer-set certification limits are unchanged. Numerical
+SCP feasibility must not be substituted for the exact-set terminal-invariance
+premises of the theoretical proof.
+
+At an unsafe parked pose, an arbitrary first contact on the target track
+cannot provide a useful longitudinal escape derivative: the contact point moves
+with the pose. Straight-track restoration uses a transverse support direction.
+For a circular track, inner-hole corner radii or an outer support of the complete
+remaining arc provide the restoration rows, with one local radial branch kept
+within the solve. Target rectangle vertex radii and arc support extrema are
+computed directly; an arbitrary contact witness cannot switch the gradient.
+These are sufficient local restoration conditions. Exact terminal membership
+and the declared terminal law are unchanged.
+
+## Diagnostics and validation
+
+`search.iterations` records accepted/rejected steps, elastic slack, reevaluated
+hard residual, merit ratio and trust scale. `scpIterations`,
+`scpRestorationSlack`, `nonlinearHardResidual` and `realizedSafetyValue` expose
+the selected solution's scope. `search.stopReason` distinguishes small interior-step termination, finite
+feasible refinement, stalled restoration, iteration limit and time limit.
+`search.nominalRestarted` records the one permitted initialization restart. The reported primary/CLF quantities belong to
+the selected convex solve; realized quantities belong to its nonlinear rollout.
+`robustNonlinearSafetyCertified` remains false.
+
+`twoStagePredictiveControlTest` checks restoration from intersecting nominal
+references, infeasible/budget-limited failure, lexicographic priority, unmodified
+optimized input return, model-successor continuation, actuator bounds, handling,
+road geometry and nonlinear rollout consistency. `ordinaryDistanceDualTest`
+checks symmetric-overlap orientation as well as ordinary dual and corner
+geometry. Scenario drivers independently replay issued holds using `ode45`,
+fixed target truth, optional noisy NRMM feedback and nominal-recovery dwell.
+Routine campaign outputs can remain in a temporary directory.
+
+The design uses the trust-region and feasibility-restoration ideas of
+[Mao, Szmuk and Açıkmeşe (2016)](https://arxiv.org/abs/1608.05133) and
+[Mao et al. (2017)](https://arxiv.org/abs/1701.00558). This implementation uses
+dynamically consistent rollout references and path-row elastic relaxation;
+it does not claim those papers' convergence theorems apply to its lexicographic
+PCBF/CLF formulation or to its approximate observer margins.

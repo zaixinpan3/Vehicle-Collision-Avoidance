@@ -9,34 +9,23 @@ terminal set and recursive feasibility.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | One anchor per sample (startup or target-onset potential-field rollout, or the shifted solved plan extended by declared-model holds that keep the endpoint terminal) over a horizon that reaches the terminal set; the problem assembled from dense row blocks without rows the variable boxes imply; PCBF slack stage with the linearized terminal rows, CLF stage, direct unmodified optimizer inputs, prediction-only nonlinear rollout, full-step remainder trust |
+| `solvePredictiveControl.m` | Successive convexification from nominal or shifted-input rollout references; repeated dynamics, collision-dual and terminal updates; internal elastic restoration, PCBF/CLF subproblems, nonlinear merit and trust decisions, unmodified selected optimizer inputs |
 | `terminalSafeSet.m` | Mild braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with its steering, hence sideslip and course curvature, held; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the held steering), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
-Each sample builds one nonlinear anchor: a potential-field rollout at startup,
-stopped at its first node in the terminal set; otherwise the shifted previous
-solved plan, extended while it is shorter than `horizonSteps` by holds of the declared
-model that keep the endpoint in the set (the cruise hold, or else the hold
-nearest to it toward the held steering, after guidance holds through states
-outside the set until it is reached again), and by cruise
-holds when its endpoint has left the set. The anchor is linearized once;
-the PCBF stage minimizes prefix safety slack and the CLF stage follows. A
-primary problem that is primal infeasible inside the trust region is re-solved
-with the trust scale doubled until feasible (at most `trustMaximumScale`); a
-shifted plan still infeasible is solved once more from a fresh potential-field
-rollout in the same way. The completed CLF result is issued directly, without
-post-solve scaling, constraint checks or acceptance relinearization. A nonlinear
-rollout supplies prediction and trust data only; it does not replace the optimized
-slacks or veto the solved input. There is no inherited slack budget or alternate
-controller. Positive PCBF slack still denotes relaxation. Mathematical recursive
-feasibility is scoped to the ideal problem; solver failures in experiments are
-separate. The bounded-error proof and its implementation premises are in
-[ROBUST_RECURSIVE_FEASIBILITY.md](ROBUST_RECURSIVE_FEASIBILITY.md).
+Each sample iterates convex subproblems around exact declared-model rollouts.
+A starting reference may be unsafe or nonterminal; temporary elastic relaxation
+allows local restoration. Accepted nonlinear rollouts update the dynamics,
+collision multipliers and terminal rows. Only a completed accepted optimization
+with small elastic and nonlinear hard residual is eligible for return. The first
+input is issued unchanged. There is no separate avoidance-path generator,
+inherited slack budget or alternate controller. Numerical failures remain
+separate from the ideal mathematical recursive-feasibility claim.
 
 The terminal set is the set of states whose joint continuation under the
 terminal law (the ego braking to a stop with its sideslip and course
@@ -53,8 +42,9 @@ ratio (one second-order cone) and the sideslip inside the estimator's cone
 `model.sideslipMaximum`. Without a target the horizon is `horizonSteps`. The
 given path defines the single CLF; there is no separate path corridor.
 
-Observer inputs tighten affine sampled collision, road, physical-state,
-handling and terminal constraints. Each hold starts from the current enclosure
+Observer inputs tighten sampled collision, road, physical-state, sideslip,
+front model-domain and terminal constraints. Rear handling cones act on the
+nominal state. Each hold starts from the current enclosure
 and propagates it through that hold only; the CLF row acts on the estimate. No
 posterior-inclusion algorithm has been implemented, and terminal invariance
 is established for the closed-form terminal law, not the complete Fiala
@@ -84,12 +74,11 @@ no solved control output. Recovery, margin shortfalls and unverified theory
 premises are separate observations. `nominalRecoveryValidationTest` and
 `../scripts/verifyExperimentalAssumptionPolicy.m` exercise these distinctions.
 
-Initialization metadata uses `movingTargetPotentialField`, `laneFeedbackRollout`
-and `shiftedInputRollout`; `predictTarget` advances the prescribed target
-motion, whose braking ends at rest (`targetArc`). The experiment entry points are `runPotentialFieldCampaign` and
-`extendPotentialFieldRecovery` in `scripts/`. Saved validation continuations
-must use the current trace schema. Historical reports and recorded artifacts
-retain the names used when those experiments were performed.
+Initialization metadata uses `nominalFeedbackRollout` and `shiftedInputRollout`.
+The legacy experiment entry names `runPotentialFieldCampaign` and
+`extendPotentialFieldRecovery` remain for existing campaign callers; the
+controller itself no longer uses potential-field guidance. Historical experiment
+records describe the algorithm version that actually produced them.
 
 MATLAB Control System Toolbox and the compiled Clarabel 0.11.1 adapter are required.
 Optimization Toolbox is used by independent comparison tests.
@@ -114,29 +103,11 @@ zero multipliers and translation invariance. At overlap the trajectory rows
 use the feasible dual of the least-penetrated rectangle axis
 (`supportLinearization`), which the test checks as an escape direction.
 
-`twoStagePredictiveControlTest` checks both objectives, the same CLF at all
-target ranges, primary priority, affine dynamics with consistent anchors,
-braking bounds, input increments distinct from physical steering limits,
-positive-slack reporting, terminal-set membership of the endpoint, that the
-issued inputs are the unmodified completed optimization and that prediction
-rollouts do not certify nonlinear feasibility, the shortest target-free horizon, the
-single fresh re-solve of a failed shift, the fresh rollout at a target's
-onset, and that an unusable shift is reported. `terminalSafeSetTest` checks the closed-form continuation against
-an RK4 integration of the terminal law, invariance under the law down to
-rest, the exact parked check against dense sampling of the target's track
-(straight, circling, turning and stationary targets), the end of an encounter
-(exit or parked check), admissibility and the road, the linearized rows, and
-the anchor's holds; `nominalClfTest` checks
-the stored certificate of P and K (input bound, box, fill, contraction,
-hold factor) and repeats its sampled check with another seed. `trustInnovationTest` checks the full-step remainder trust law:
-the next scale, bounded growth, the clamped law, and attribution of a
-posterior departure to the observer part. `clfNominalRecoveryTest` checks target-free
-nonlinear value decrease without requiring the optimizer to issue the nominal
-construction feedback, and that a cruise started on the reference stays there
-(the plan's later inputs do not wander between samples). `nominalClfTest` checks the trim, strict local nonlinear
-Lyapunov decrease, path-phase invariance, and rejection of retired cost-to-go
-settings. `movingTargetPotentialFieldTest` checks attraction, motion-aware
-repulsion, passing-side retention, and frame invariance.
-`../scripts/validateNominalClf.m` supplies sampled nominal-feedback diagnostics, not a regional proof. Model, geometry and
-configuration tests retain their mathematical checks. Scenario campaigns and
-independent nonlinear replay belong in `scripts/`, with results in `report/`.
+`twoStagePredictiveControlTest` checks elastic restoration, repeated nonlinear
+relinearization, selected unmodified inputs, lexicographic priority, terminal
+membership, road and handling limits, actuator bounds and failure without an
+elastic fallback. `ordinaryDistanceDualTest` also checks consistent lateral
+orientation at symmetric overlap. `terminalSafeSetTest`, `nominalClfTest`,
+`trustInnovationTest` and `clfNominalRecoveryTest` retain their model, terminal,
+CLF, across-frame trust and recovery checks. Scenario campaigns use independent
+nonlinear replay and can keep routine results in temporary directories.

@@ -66,6 +66,20 @@ classdef ordinaryDistanceDualTest < matlab.unittest.TestCase
             testCase.verifyEqual(min(value),.2,AbsTol=1e-12);
             testCase.verifyGreaterThanOrEqual(distance,min(value)-1e-12);
         end
+        function symmetricOverlapDoesNotReverseEscapeDirectionAlongTheHorizon(testCase)
+            shape=[2.4;.95;0;0];pose=[0;0;0];
+            for longitudinal=[-1.2,-.8,0,.8,1.2]
+                for roundoff=[-1e-14,0,1e-14]
+                    target=[longitudinal;roundoff;pi];
+                    rows=predictiveSafetyGeometry.supportLinearization(pose,shape,target,shape);
+                    testCase.verifyGreaterThan(rows.normal(2),.99);
+                    angle=.7;rotation=[cos(angle),-sin(angle);sin(angle),cos(angle)];
+                    movedE=[rotation*pose(1:2);angle];movedT=[rotation*target(1:2);target(3)+angle];
+                    moved=predictiveSafetyGeometry.supportLinearization(movedE,shape,movedT,shape);
+                    testCase.verifyEqual(moved.normal,rotation*rows.normal,AbsTol=1e-12);
+                end
+            end
+        end
         function optimizedMultipliersAreInvariantToWorldTranslation(testCase)
             pose=[1;.2;.3];target=[10;3;-.2];shape=[2.4;.95;.2;-.1];offset=[100;-70;0];
             first=predictiveSafetyGeometry.dualLinearization(pose,shape,target,shape);

@@ -50,12 +50,17 @@ passes through zero signed velocity at 2 s. Each export records the initial
 target state and parameters for independent reconstruction; the audit's
 `--files` option selects individual JSON exports. Historical exports without
 the revised target state require the audit source from their recorded commit.
-The optimizer builds one affine model and solves PCBF slack first, then CLF
-slack subject to the attained PCBF cap. It returns both zero-slack and
-positive-slack results without nonlinear admission or correction. The previous
-trajectory only supplies the next linearization. Returned prediction states
-are affine states; independent replay determines measured physical clearance. See
+The optimizer uses successive convexification: nominal or shifted-input rollouts
+start the search, and accepted nonlinear trials update dynamics, collision duals
+and terminal rows. Each subproblem solves PCBF plus elastic restoration first,
+then CLF slack at the attained cap. An eligible completed trial has small elastic
+and reevaluated hard residual; its inputs are returned unchanged. Prediction
+states are nonlinear rollouts. Independent replay still determines physical
+clearance, which includes errors absent from the sampled prediction. See
 [the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
+The campaign entry names containing `PotentialField` are retained for callers;
+they run the current controller, which has no potential-field avoidance planner.
+Routine outputs can use `/tmp/` instead of a persistent validation directory.
 
 `prepareCollisionAvoidanceController` warms MATLAB and the optimizer using a
 discarded call. It does not build native controller libraries:

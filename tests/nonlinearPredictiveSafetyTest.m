@@ -199,7 +199,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
             testCase.verifySize(command.actuatorInput,[2,1]);
             testCase.verifyFalse(isfield(problem,'certificate'));
-            testCase.verifyEqual(problem.metadata.safetyScope,"affineSampledConstraints");
+            testCase.verifyEqual(problem.metadata.safetyScope,"nonlinearSampledConstraints");
         end
         function changedTargetForecastRetainsTheInputWarmStart(testCase)
             [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;0;1.6;2.4;.95;0;0]);
@@ -283,8 +283,8 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [ego,road,cfg]=localFixture();prior=struct('version',56,'target',ones(10,1));
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
-            testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,79);
+            testCase.verifyEqual(problem.metadata.search.initialization,"nominalFeedbackRollout");
+            testCase.verifyEqual(state.version,80);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;1;0;1.6;2.4;.95;0;0];

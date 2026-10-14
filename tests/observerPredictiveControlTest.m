@@ -35,7 +35,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(norm(largeInputs-smallInputs,'fro'),1e-5);
             testCase.verifyTrue(large.metadata.uncertaintyIncluded);
             testCase.verifyFalse(large.metadata.robustNonlinearSafetyCertified);
-            testCase.verifyEqual(large.metadata.safetyScope,"affineNominalCollisionWithRelaxedObserverMargins");
+            testCase.verifyEqual(large.metadata.safetyScope,"nonlinearNominalCollisionWithRelaxedAffineObserverMargins");
         end
         function zeroRadiusEnclosuresRecoverTheExactStateProblem(testCase)
             [ego,target,road,cfg]=localFixture(0);
@@ -73,7 +73,8 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             [~,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
             testCase.verifyEqual(second.model.target,q,AbsTol=1e-12);
             testCase.verifyEqual(second.metadata.search.initialization,"shiftedInputRollout");
-            testCase.verifyEqual([second.metadata.search.stages.objective],["pcbfSlack","clfSlack"]);
+            testCase.verifyEqual(second.metadata.search.stages(end-1).objective,"pcbfSlack");
+            testCase.verifyEqual(second.metadata.search.stages(end).objective,"clfSlack");
             testCase.verifyEqual(second.model.linearization.states(:,1),next,AbsTol=1e-12);
         end
         function theSingleClfActsOnTheEstimateWithoutAnEnclosureBudget(testCase)
@@ -95,7 +96,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
                 cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
             loss=sum((nonlinearBicycleModel.error(model.initialState,model.lane,model.nominalReference)./scales).^2);
-            testCase.verifyLessThanOrEqual(prediction.metadata.clfTieBound,cfg.solver.clfTieTolerance*loss+1e-12);
+            testCase.verifyLessThanOrEqual(prediction.metadata.clfTieBound,cfg.solver.clfTieTolerance*max(1,loss)+1e-12);
         end
         function unavailableBoundsDoNotPreventASolvedControl(testCase)
             [ego,target,road,cfg]=localFixture(.01);

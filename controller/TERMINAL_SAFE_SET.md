@@ -174,7 +174,8 @@ target's frame. The arc-to-segment distance has the candidates
   the segment and the arc, or an intersection inside both (distance 0).
 
 These 32 pairs give the exact least distance and the target pose attaining
-it (the witness, used to linearize). In 2895 random cases (1216 braking, 646
+it. This witness evaluates membership; it is not treated as a fixed contact
+when restoring an intersecting reference (Section 7). In 2895 random cases (1216 braking, 646
 sweeping their whole circle, 1826 never leaving the range) the closed form was
 never above the least distance of a dense sampling in time of the forecast
 itself (spacing at most 2.4 mm; above it by at most 5.2e-13 m, rounding) and
@@ -235,11 +236,9 @@ A plan meeting these rows is *accepted*.
 - H3: at an endpoint in `X_f`, some hold of the declared model keeps the
   endpoint in `X_f` with its hard rows met and its midpoint clear. A terminal witness must also satisfy actuator, rear-adhesion and slew
   bounds. Equality of the mild model to the kinematic continuation alone
-  does not establish those input conditions. The implementation does
-  not rely on the assumption: the anchor tries the cruise hold of the CLF's
-  certified controller and the holds toward the law's realization on the
-  declared model, and keeps a hold only when its endpoint is checked to be in
-  `X_f` (Section 7).
+  does not establish those input conditions. This is a mathematical
+  existence premise, not a guarantee of the numerical SCP routine. The
+  routine's reference extension by nominal feedback does not certify H3.
 
 **Proposition.** Under H1 and H2, if the plan of sample `k` is accepted and
 has at least two holds, the shifted plan at `k+1` is accepted:
@@ -275,98 +274,57 @@ initial-feasibility question.
 
 ## 7. Implementation
 
-**Membership** (`terminalSafeSet.member`) evaluates (3.1) in order:
-mildness, the road along the continuation (every corner of every pose,
-one vectorized projection), the target at the continuation's nodes and
-midpoints until the first sampled exit, and the parked check. Where the
-reference distance less both reaches already exceeds the requirement by
-5 m, that lower bound stands for the rectangle distance; elsewhere the
-rectangle distance is exact. The continuation from 15 m/s has 61 nodes and
-60 midpoints; a call costs 0.3 to 20 ms. `info` records the end
-(`exit`, `parked` or `noTarget`), the time to the stop and to the target's
-exit, the least clearance beyond the requirement, and the CLF value.
+**Membership** (`terminalSafeSet.member`) evaluates (3.1): mildness and
+terminal-input conditions, the road along the continuation, sampled target
+clearance before the exit, and exact parked-track clearance. A separated
+reference-distance lower bound avoids unnecessary rectangle calculations.
+The set and kinematic continuation are unchanged by the numerical solver's
+restoration strategy.
 
-**Terminal rows** (`terminalSafeSet.rows`). In the convex problem the endpoint
-correction `dz` must meet the set's conditions linearized at the anchor
-endpoint `y`:
+**Terminal rows** (`terminalSafeSet.rows`) linearize mildness, terminal
+sideslip, terminal braking admissibility, road corners and continuation
+collision support at the current endpoint. Continuation sensitivities use
+central differences with the braking schedule fixed. Rows with margins beyond
+their correction box can be omitted. Small reserves retain part of an existing
+margin without making an already feasible reference infeasible.
 
-- mildness, `|r V_E| <= a_m`, linearized in the endpoint's speed and yaw
-  rate, where `y` is within 1 m/s^2 of the bound, keeping up to 0.1 m/s^2 of
-  the margin `y` has (without the reserve an endpoint left on the boundary
-  takes only tiny steps, because every full step leaves the set, and the plan
-  executes its old tail); the sideslip cone is already a row of the problem at
-  every node;
-- fixed-dual collision rows (the ordinary-distance duals of the rest of the
-  problem) at every continuation node and midpoint before the exit, and at the
-  parked pose against the witness, the target pose nearest it on its track
-  (the minimizer's own rows: the derivative of a minimum is that of its
-  minimizer);
-- corner rows on the road at the continuation's poses;
+The starting reference can now intersect the target or fail these rows.
+An ordinary distance dual vanishes at overlap; a feasible nonzero support
+direction provides an escape gradient. For mainly parallel target motion,
+continuation overlaps use the encounter's selected road side. For a parked
+rectangle intersecting a moving straight target's track, restoration uses a
+transverse normal: moving the parked point along that track does not remove
+an intersection, even though freezing a contact witness would suggest it did.
 
-each composed with the derivative of the continuation's pose with respect to
-`y`, by central differences of the closed form with the schedule held.
-Conditions whose clearance exceeds the requirement by more than 5 m are left
-out, and so are those whose margin exceeds the most their pose can move over
-the endpoint correction's box (|dx| + |dy| + reach |dpsi| through the
-continuation's sensitivity; they cannot bind); the exact set decides
-anchor membership. Each row keeps up to 5 cm of the margin
-it has at `y` (`b - min(0.05, max(b, 0))` for a row bound `b`): without it the
-optimizer leaves the endpoint on the boundary of `X_f`, where the next
-sample's shift falls out of the set under millimetres of plant mismatch or of
-departure of an appended hold from the law. A row is never tighter than `y`
-itself, so when `y` is in `X_f` the zero correction meets every row, and the
-zero-slack shortcut of the PCBF stage remains consistent with the anchor. Where the closest features of a pose give no
-consistent dual (an exact contact, typically the parked witness of a track
-that crosses the parked rectangle), the witness is moved 1 mm or 1 cm along
-the track, or the row is left out.
+Circular parked-track rows use one radial branch within the solve. An inner
+branch bounds all ego corner radii by the target rectangle's minimum radius
+about its rotation center, less clearance. An outer branch separates all ego
+corners from the support of the target's complete remaining arc. Target vertex
+radii and arc support extrema are computed directly. These sufficient local
+conditions avoid a contact witness jumping to an opposing gradient. They can
+be conservative; they do not redefine the exact membership evaluator.
 
-**Anchor.** Later samples start from the previous accepted plan, shifted by
-one hold. While it is shorter than `horizonSteps`, a hold is appended: the
-cruise hold `u = u* + K e` of the CLF's certified controller
-(`terminalSafeSet.cruiseInput`, NOMINAL_CLF.md) when it keeps the endpoint in
-`X_f` with its rows met and its midpoint clear. Otherwise the plan is first
-extended through states outside `X_f` by holds of the startup guidance
-(potential guidance with a target, path guidance without one), each meeting
-the hard rows and clearing the target at its midpoint and endpoint, until a
-node lies in `X_f` again, at most up to `maximumHorizonSteps`: a longer plan
-that completes the maneuver. Without it an aggressive maneuver longer than
-the plan (a 20-m lane recovery at 15 m/s) could only keep a mild endpoint by
-braking in the plan's tail, and the vehicle braked to what was then the
-model's 1-m/s speed floor.
-If guidance does not reach `X_f`, the appended hold is the hold nearest to the
-cruise hold on a segment toward holding the previous steering, which keeps a mild
-endpoint mild: at the cruise hold's braking ratio, or, when that does not keep
-the endpoint in `X_f`, braking with the ratio whose actuator deceleration is
-`a_b` (the law's realization), or toward braking as hard as the rear adhesion
-admits (`terminalSafeSet.brakingInput`: each far end is checked in turn, the
-first that keeps the endpoint in `X_f` is bisected toward the cruise hold with
-five halvings). Holding the speed first matters where only mildness stops the
-cruise hold: the plan's tail is not regulated (the CLF stage acts on the first
-successor), and a drifting tail whose cruise hold is no longer mild would
-otherwise be extended by braking, which drifts it further (observed in the
-15-m/s reversed-start recovery test). When no far end keeps the endpoint in
-`X_f`, the plan stays one hold shorter (`extensionStopped`). An endpoint no longer in the set (a changed
-forecast) is extended by cruise holds until one is. The braking holds are
-kept as small as found because the plan's later holds reach the first hold
-nearly unchanged: the CLF stage acts on the first successor and the
-correction of each hold is bounded by the trust region. At startup the potential-field
-rollout runs until its first node in `X_f` from `horizonSteps` on, at most
-`maximumHorizonSteps`. The rollout supplies a linearization, never an issued
-input.
+**Successive convexification.** The numerical controller starts from shifted
+inputs rolled out from the current estimate, or nominal lane feedback. It
+extends the reference with nominal feedback, without an avoidance planner or
+terminal-membership prerequisite. Prediction duration is chosen from the
+forecast interaction and configured bounds; it need not end at a stop.
 
-**Direct execution.** The CLF program's full input sequence is issued without
-post-solve scaling or a constraint veto. Its nonlinear prediction is diagnostic
-data. The exact terminal evaluator is used to build and extend the anchor; it
-is not a post-solve acceptance gate. Accordingly a predicted nonlinear endpoint
-need not satisfy the linearized terminal rows exactly. The ideal terminal-set
-proof is not a theorem about every local convex solution.
+Each accepted nonlinear rollout rebuilds the terminal and other constraint
+rows. One elastic variable permits restoration of an infeasible reference.
+A completed convex trial is eligible only when its nonlinear sampled hard
+residual and elastic slack satisfy the configured tolerance. The selected
+trial's inputs are issued unchanged. A stalled warm start can be replaced by
+one nominal-feedback reference within the same wall budget; this is another
+optimization initialization, not a substitute command.
 
-**Records.** The issued plan records `terminalEnd`, `terminalStopSeconds`,
-`terminalExitSeconds` and `terminalMarginMeters` (NaN when not evaluated),
-`terminalValue` (the predicted endpoint's CLF value), `appendedTerminalSteps`, `appendedBrakingSteps` and
-`extensionStopped`.
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) describes merit, trust
+updates, primary/secondary objectives and termination. A numerical SCP return
+with affine uncertainty margins does not establish the full joint-set
+terminal certificate of Section 9 or the hypotheses of the theoretical
+recursive-feasibility theorem. Numerical failure remains possible.
 
-## 8. Measured behavior
+## 8. Historical measured behavior
 
 `report/BRAKING_TERMINAL_SET_20261011.tex` compares this set with the CLF-tube
 set it replaces (commit `423e3e8`, unchanged at `710a228`) on the same 98
@@ -442,10 +400,10 @@ described above; this joint certificate is not yet implemented there.
 
 - Recursive feasibility is proven within one encounter, on the declared
   sampled model with exact information (H1, H2) and with the extension that
-  keeps the plan from running out (H3). H3 follows from the user's
-  assumption that in a mild state the declared model follows the kinematic
-  model; no bound on that mismatch is computed, and the implementation checks
-  every appended hold on the declared model instead.
+  keeps the plan from running out (H3). The mild-model assumption alone
+  does not prove terminal-input admissibility, particularly with finite slew
+  limits. H3 remains an explicit premise; the runtime reference extension is
+  not its certificate.
 - The braking phase is sampled at nodes and hold midpoints, like the plan's
   own collision rows; between them no clearance bound is claimed. The parked
   phase is checked in continuous time.
@@ -472,7 +430,7 @@ It required the plan to reach a state from which cruising on the given path
 clears the target, which needed plans of about 110 holds at the first frame,
 and its certified size was bounded by the controller's certificate
 (`report/TERMINAL_SET_ALTERNATIVES_20261010.tex`). The certificate of `K`
-remains as the CLF's (NOMINAL_CLF.md) and its hold extends the anchor. The
+remains as the CLF's (NOMINAL_CLF.md) and supplies nominal reference feedback. The
 joint-state construction that motivated the present set is in
 `report/JOINT_TERMINAL_SET_DESIGN_20261010.tex`.
 

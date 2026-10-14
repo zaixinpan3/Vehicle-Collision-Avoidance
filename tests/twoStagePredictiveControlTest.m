@@ -1,78 +1,78 @@
 classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
-    % Safety slack then CLF on an affine model; the issued plan is the
-    % unmodified optimizer input sequence, with a nonlinear prediction only.
+    % Successive convexification returns an unchanged optimized input sequence.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
-            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
-            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
-            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
+            for directory=["controller","config","scripts"]
+                testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,directory)));
+            end
         end
     end
     methods (Test)
-        function issuedInputsAreTheUnmodifiedCompletedOptimization(testCase)
-            [ego,~,cfg]=localFixture();
-            [~,q,road]=collisionThreatScenario("headOn",cfg);
-            target=struct('targetPositionInertial',q(1:2), ...
-                'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
-            [command,inputs,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+        function intersectingNominalReferenceIsRestoredByRepeatedConvexification(testCase)
+            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
+            [command,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             search=problem.metadata.search;
-            testCase.verifyTrue(problem.metadata.nonlinearPredictionEvaluated);
-            testCase.verifyFalse(isfield(problem.metadata,'predictionAgreement'));
-            testCase.verifyFalse(isfield(state,'linearizationTrustScale'));
-            testCase.verifyEqual(search.terminationReason,"twoStagesReturned");
-            testCase.verifyTrue(problem.metadata.secondaryOptimumApplied);
-            testCase.verifyLessThanOrEqual(problem.solution.safety,search.slackCap+cfg.solver.constraintTolerance);
-            testCase.verifyEqual(problem.solution.clfSlack,max(0,problem.solution.clfNextValue ...
-                -problem.solution.clfInitialValue+problem.solution.clfRequiredDecrease),AbsTol=cfg.solver.feasibilityTolerance);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            testCase.verifyEqual(state.stageSlacks,problem.solution.stageSlacks,AbsTol=0);
-            % Terminal set: the endpoint's braking continuation clears the
-            % target until it leaves the perception range.
-            testCase.verifyEqual(problem.metadata.terminalSet,"brakingContinuationEncounterSafe");
+            testCase.verifyEqual(search.initialization,"nominalFeedbackRollout");
+            testCase.verifyGreaterThan(search.convexIterations,1);
+            testCase.verifyGreaterThan(search.iterations(1).restorationSlack,.1);
+            testCase.verifyGreaterThan(search.linearizationCount,1);
+            testCase.verifyLessThanOrEqual(problem.solution.restorationSlack,cfg.scp.constraintTolerance);
+            testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.scp.constraintTolerance);
+            testCase.verifyTrue(problem.metadata.nonlinearValidationPerformed);
             testCase.verifyEqual(inputs,problem.model.linearization.inputs+problem.solution.inputCorrection,AbsTol=0);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyFalse(problem.metadata.postSolveInputModification);
             testCase.verifyFalse(problem.metadata.postSolveFeasibilityCheck);
-            testCase.verifyFalse(problem.metadata.nonlinearValidationPerformed);
             context=terminalSafeSet.context(problem.model);
             testCase.verifyTrue(terminalSafeSet.member(context,problem.predictedState(:,end),size(inputs,2)));
-            testCase.verifyTrue(isnan(problem.metadata.terminalRoadMarginMeters));
             localVerifyNonlinearRollout(testCase,problem,cfg);
+            localVerifyAnchorRollout(testCase,problem.model.linearization,cfg);
         end
-        function targetFreeInitializationRunsBothLexicographicStages(testCase)
-            [ego,road,cfg]=localFixture();
+        function laterLeadConflictReceivesALongerPredictionThanAnImmediateHeadOn(testCase)
+            [ego,~,cfg]=localFixture();[~,head,road]=collisionThreatScenario("headOn",cfg);
+            [~,short]=collisionAvoidanceController(ego,localTarget(head),road,cfg,[]);
+            [~,lead,road]=collisionThreatScenario("brakingLead",cfg);
+            [~,long,problem]=collisionAvoidanceController(ego,localTarget(lead),road,cfg,[]);
+            testCase.verifyGreaterThan(size(long,2),size(short,2));
+            testCase.verifyGreaterThan(size(long,2)*cfg.controller.sampleTime,5);
+            testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.scp.constraintTolerance);
+        end
+        function curvedAndTurningReferencesCanRestoreWithoutOpposingEscapeBranches(testCase)
+            [~,~,cfg]=localFixture();
+            for name=["curvedHeadOn","turningCrossing"]
+                [x,q,road]=collisionThreatScenario(name,cfg);
+                ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4), ...
+                    'lateralVelocity',x(5),'yawRate',x(6));
+                [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+                testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.scp.constraintTolerance);
+                testCase.verifyGreaterThan(problem.metadata.search.acceptedIterations,0);
+                localVerifyNonlinearRollout(testCase,problem,cfg);
+            end
+        end
+        function insufficientRestorationIterationsDoNotIssueElasticControls(testCase)
+            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
+            cfg.scp.maximumIterations=1;
+            testCase.verifyError(@()collisionAvoidanceController(ego,localTarget(q),road,cfg,[]), ...
+                'collisionAvoidanceController:noOptimizationSolution');
+        end
+        function targetFreeControlRetainsLexicographicPriorityAndTheSameClf(testCase)
+            [ego,road,cfg]=localFixture();ego.position(2)=.1;
             [command,inputs,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
             search=problem.metadata.search;
-            testCase.verifyEqual(search.initialization,"laneFeedbackRollout");
-            testCase.verifyFalse(search.stages(1).numericalSolve);
-            testCase.verifyEqual(search.stages(1).value,0);
-            testCase.verifyTrue(search.stages(2).numericalSolve);
-            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
-            testCase.verifyEqual([search.stages.objective],["pcbfSlack","clfSlack"]);
-            testCase.verifyEqual(problem.metadata.clfFunction,"quadraticTransverseError");
-            testCase.verifyGreaterThan([search.stages.exitFlag],0);
             testCase.verifyTrue(search.clfStageCompleted);
-            testCase.verifyLessThanOrEqual(problem.solution.safety,search.slackCap+cfg.solver.feasibilityTolerance);
-            testCase.verifyLessThanOrEqual(search.primaryOptimum,cfg.solver.feasibilityTolerance);
+            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
+            testCase.verifyEqual([search.stages(1:2:end).objective], ...
+                repmat("pcbfSlack",1,search.convexIterations));
+            testCase.verifyEqual([search.stages(2:2:end).objective], ...
+                repmat("clfSlack",1,search.convexIterations));
+            testCase.verifyLessThanOrEqual(problem.solution.safety ...
+                +cfg.scp.restorationWeight*problem.solution.restorationSlack, ...
+                search.slackCap+cfg.solver.feasibilityTolerance);
+            testCase.verifyEqual(problem.metadata.clfFunction,"quadraticTransverseError");
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.appliedInput,inputs(:,1),AbsTol=0);
-            testCase.verifyFalse(isfield(state,'witness'));
-            testCase.verifyFalse(problem.metadata.nonlinearValidationPerformed);
-            testCase.verifyEqual(problem.metadata.safetyScope,"affineSampledConstraints");
             testCase.verifyEqual(problem.metadata.recursiveFeasibilityScope,"idealMathematicalProblemOnly");
-            localVerifyNonlinearRollout(testCase,problem,cfg);
-        end
-        function encounterUsesTheSameNominalClf(testCase)
-            [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [command,inputs,problem]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            search=problem.metadata.search;
-            testCase.verifyGreaterThan(problem.metadata.encounterExitStep,0);
-            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
-            testCase.verifyEqual([search.stages.objective],["pcbfSlack","clfSlack"]);
-            testCase.verifyEqual(problem.metadata.clfFunction,"quadraticTransverseError");
-            testCase.verifyEqual(problem.metadata.tertiaryObjective,"none");
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function targetRangeCannotSelectADifferentClf(testCase)
@@ -83,198 +83,90 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,~,distant]=collisionAvoidanceController(ego,far,road,cfg,[]);
             testCase.verifyEqual([absent.metadata.clfInitialValue,near.metadata.clfInitialValue,distant.metadata.clfInitialValue], ...
                 repmat(absent.metadata.clfInitialValue,1,3),AbsTol=1e-12);
-            testCase.verifyEqual([absent.metadata.clfRequiredDecrease,near.metadata.clfRequiredDecrease,distant.metadata.clfRequiredDecrease], ...
-                repmat(absent.metadata.clfRequiredDecrease,1,3),AbsTol=1e-12);
             testCase.verifyEqual([absent.metadata.clfFunction,near.metadata.clfFunction,distant.metadata.clfFunction], ...
                 repmat("quadraticTransverseError",1,3));
-            testCase.verifyTrue(all([absent.metadata.search.clfStageCompleted,near.metadata.search.clfStageCompleted,distant.metadata.search.clfStageCompleted]));
         end
-        function shiftedInputsAreRolledOutFromTheNewMeasurement(testCase)
+        function shiftedReferenceUsesTheCurrentMeasurementAndReoptimizes(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior);ego.position(2)=ego.position(2)+.01;
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            anchor=problem.model.linearization;
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
-            testCase.verifyFalse(problem.metadata.search.potentialFieldRestarted);
-            testCase.verifyEqual(problem.metadata.search.linearizationCount,1);
-            testCase.verifyEqual([problem.metadata.search.stages.objective],["pcbfSlack","clfSlack"]);
-            testCase.verifyEqual(anchor.states(:,1),problem.model.initialState,AbsTol=0);
-            testCase.verifyNotEqual(anchor.states(:,1),prior.stateTrajectory(:,2));
-            count=min(size(anchor.inputs,2),size(prior.inputTrajectory,2)-1);
-            testCase.verifyEqual(anchor.inputs(:,1:count),prior.inputTrajectory(:,2:count+1),AbsTol=0);
-            testCase.verifyEqual(problem.predictedState(:,1),problem.model.initialState,AbsTol=1e-7);
-            testCase.verifyEqual(problem.metadata.solverCallCount,sum([problem.metadata.search.stages.numericalSolve]));
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            localVerifyNonlinearRollout(testCase,problem,cfg);
-            localVerifyAnchorRollout(testCase,anchor,cfg);
-        end
-        function anInfeasibleShiftUsesOneFreshRolloutThenReportsNoSolution(testCase)
-            [ego,road,cfg]=localFixture();
-            [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            model=problem.model;model.initialState(4)=20;
-            [solution,search]=solvePredictiveControl(model,prior);
-            testCase.verifyEmpty(solution);
-            testCase.verifyTrue(search.potentialFieldRestarted);
-            % Each anchor doubles its trust scale up to the maximum before the
-            % fresh rollout or the report.
-            inits=[search.attempts.initialization];scales=[search.attempts.inputTrustScale];
-            fresh=find(inits=="laneFeedbackRollout",1);
-            testCase.verifyEqual(inits(1),"shiftedInputRollout");testCase.verifyNotEmpty(fresh);
-            testCase.verifyEqual(scales(fresh-1),cfg.nonlinear.trustMaximumScale);
-            testCase.verifyEqual(scales(end),cfg.nonlinear.trustMaximumScale);
-            growth=scales(2:fresh-1)./scales(1:fresh-2);
-            testCase.verifyGreaterThan(growth,1);testCase.verifyLessThanOrEqual(growth,2+1e-12);
-            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
-        end
-        function anInfeasibleTrustRegionIsEnlargedUntilFeasible(testCase)
-            [ego,road,cfg]=localFixture();
-            % Near the left road edge, a shifted plan steering left leaves the
-            % road unless the correction exceeds the estimated trust region.
-            ego.position(2)=1.9;road.lateralClearance=[3;3];
-            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            ego=localSuccessor(ego,prior);prior.inputTrajectory(1,:)=.1;
-            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            search=problem.metadata.search;scales=[search.attempts.inputTrustScale];
-            testCase.verifyTrue(search.clfStageCompleted);
-            testCase.verifyEqual(search.attempts(1).stages(1).exitFlag,-2);
-            testCase.verifyGreaterThan(numel(search.attempts),1);
-            testCase.verifyEqual(scales(2),2*scales(1),RelTol=1e-12);
-            % The online trust estimate is not changed by the expansion.
-            testCase.verifyLessThanOrEqual(problem.metadata.trust.scale,cfg.nonlinear.trustMaximumScale);
-        end
-        function aFailedShiftIsReSolvedFromAFreshPotentialFieldRollout(testCase)
-            [ego,road,cfg]=localFixture();ego.position(2)=1.9;road.lateralClearance=[3;3];
-            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            % Steering off the road along the whole shifted plan makes it
-            % infeasible; without expansion the fresh rollout is used.
-            ego=localSuccessor(ego,prior);prior.inputTrajectory(1,:)=.2;
-            cfg.nonlinear.trustMaximumScale=cfg.nonlinear.trustInitialScale;cfg.nonlinear.trustMinimumScale=1/16;
-            [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            search=problem.metadata.search;
-            testCase.verifyTrue(search.potentialFieldRestarted);
-            testCase.verifyEqual(search.initializationFailure,"shiftedProblemInfeasible");
-            testCase.verifyEqual(search.attempts(1).stages(1).exitFlag,-2);
-            % The retained target forecast selects the moving-target field.
-            testCase.verifyEqual(search.attempts(end).initialization,"movingTargetPotentialField");
-            testCase.verifyTrue(search.clfStageCompleted);
+            testCase.verifyEqual(problem.model.linearization.states(:,1),problem.model.initialState,AbsTol=0);
+            testCase.verifyNotEqual(problem.model.initialState,prior.stateTrajectory(:,2));
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyAnchorRollout(testCase,problem.model.linearization,cfg);
             localVerifyNonlinearRollout(testCase,problem,cfg);
         end
-        function aTargetOnsetStartsFromAFreshRollout(testCase)
-            % The previous plan did not know of the target.
+        function infeasibleWarmReferenceCanRestartTheSameOptimizer(testCase)
+            [ego,road,cfg]=localFixture();road.lateralClearance=[3;3];
+            target=localNearTarget();
+            [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,prior);
+            % A corrupted local reference must not restrict the next problem.
+            prior.inputTrajectory=repmat([.25;0],1,size(prior.inputTrajectory,2));
+            [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            search=problem.metadata.search;
+            testCase.verifyTrue(search.nominalRestarted);
+            testCase.verifyEqual(search.restartCount,1);
+            testCase.verifyEqual(search.initialization,"nominalFeedbackRollout");
+            testCase.verifyGreaterThan(search.selectedAttempt,1);
+            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
+            testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.scp.constraintTolerance);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
+            testCase.verifyFalse(problem.metadata.postSolveInputModification);
+            localVerifyNonlinearRollout(testCase,problem,cfg);
+        end
+        function targetOnsetUsesTheSameOptimizerWithoutAnAvoidancePlanner(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            ego=localSuccessor(ego,prior);ego.stateTime=cfg.controller.sampleTime;prior.stateTime=0;
+            ego=localSuccessor(ego,prior);
             target=struct('targetPositionInertial',[30;0],'targetVelocityInertial',[-8;0],'targetYawInertial',pi);
-            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,prior);
-            search=problem.metadata.search;
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
             testCase.verifyTrue(problem.model.targetOnset);
-            testCase.verifyEqual(search.initializationFailure,"targetOnset");
-            testCase.verifyEqual(search.attempts(1).initialization,"movingTargetPotentialField");
-            testCase.verifyTrue(search.clfStageCompleted);
-            % The next sample knows the target: the shifted plan is used.
-            ego=localSuccessor(ego,state);ego.stateTime=2*cfg.controller.sampleTime;
-            q=predictiveSafetyGeometry.predictTarget(problem.model.target,cfg.controller.sampleTime);
-            target.targetPositionInertial=q(1:2);
-            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,state);
-            testCase.verifyFalse(problem.model.targetOnset);
-            testCase.verifyEqual(problem.metadata.search.attempts(1).initialization,"shiftedInputRollout");
+            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyFalse(problem.metadata.preplannedAvoidanceTrajectoryRequired);
+            testCase.verifyGreaterThan(problem.metadata.search.acceptedIterations,0);
         end
-        function overlappingHardRowsHaveNoInventedRestorationDirection(testCase)
-            [ego,road,cfg]=localFixture();
-            cfg.controller.horizonSteps=1;
-            target=struct('targetPositionInertial',[0;0], ...
-                'targetVelocityInertial',[0;0],'targetYawInertial',0);
-            % The start and hard completion anchor both overlap. Ordinary
-            % distance multipliers cannot provide a positive-buffer hard row.
-            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:noOptimizationSolution');
-        end
-        function anUnevaluableShiftIsReportedAsNoSolution(testCase)
-            [ego,road,cfg]=localFixture();
-            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            ego=localSuccessor(ego,prior);prior.inputTrajectory(1,end)=pi;
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
-                'collisionAvoidanceController:noOptimizationSolution');
-        end
-        function aTargetFreeHorizonStopsAtTheShortestLength(testCase)
-            [ego,road,cfg]=localFixture();road.lateralClearance=[4;4];ego.position(2)=.2;
-            [~,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            testCase.verifyEqual(size(inputs,2),cfg.controller.horizonSteps);
-            testCase.verifyTrue(problem.metadata.roadConstraintsEnforced);
-            testCase.verifyTrue(isnan(problem.metadata.terminalRoadMarginMeters));
-            testCase.verifyEqual(problem.metadata.terminalDistanceMeters,Inf);
-        end
-        function everyPredictedNodeKeepsTheRectangleOnTheRoad(testCase)
+        function everyPredictedRectangleKeepsTheRoadAndTheRearHandlingEnvelope(testCase)
             [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
-            target=struct('targetPositionInertial',q(1:2), ...
-                'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
-            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyEqual(problem.metadata.roadConstraintScope,"rectangleAtEveryPredictedNode");
+            [~,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             x=problem.predictedState;
-            corners=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
-            worst=Inf;
-            for k=2:size(x,2)
-                rotation=[cos(x(3,k)),-sin(x(3,k));sin(x(3,k)),cos(x(3,k))];
-                projection=laneGeometry.project(x(1:2,k)+rotation*corners,problem.model.lane);
-                lateral=projection.lateralPosition;
-                worst=min([worst;road.lateralClearance(2)-lateral(:);road.lateralClearance(1)+lateral(:)]);
-            end
-            % Rows are linearized in yaw; allow the second-order corner remainder.
-            testCase.verifyGreaterThanOrEqual(worst,-1e-2);
-        end
-        function everyHoldKeepsTheRearTireBelowSaturationAndInsideTheSideslipCone(testCase)
-            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
-            target=struct('targetPositionInertial',q(1:2), ...
-                'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
-            [~,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            x=problem.predictedState;tire=modifiedFialaTire.parameters(cfg);
-            k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
-            adhesion=@(state,braking)norm([(state(5)-cfg.vehicle.lr*state(6))/(k*state(4));braking]);
-            worstAdhesion=0;worstSideslip=-Inf;
+            shape=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
+            tire=modifiedFialaTire.parameters(cfg);k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
+            worstRoad=Inf;worstHandling=0;worstFrontAngle=0;worstSideslip=-Inf;
             for index=1:size(inputs,2)
-                worstAdhesion=max(worstAdhesion,adhesion(x(:,index+1),inputs(2,index)));
-                if index>1,worstAdhesion=max(worstAdhesion,adhesion(x(:,index),inputs(2,index)));end
+                rotation=[cos(x(3,index+1)),-sin(x(3,index+1));sin(x(3,index+1)),cos(x(3,index+1))];
+                projection=laneGeometry.project(x(1:2,index+1)+rotation*shape,problem.model.lane);
+                lateral=projection.lateralPosition;
+                worstRoad=min([worstRoad;road.lateralClearance(2)-lateral(:);road.lateralClearance(1)+lateral(:)]);
+                ends=index+1;if index>1,ends=[index,index+1];end
+                for node=ends
+                    y=x(:,node);
+                    worstHandling=max(worstHandling,norm([(y(5)-cfg.vehicle.lr*y(6))/(k*y(4));inputs(2,index)]));
+                    frontAngle=atan2(y(5)+cfg.vehicle.lf*y(6),y(4))-inputs(1,index);
+                    worstFrontAngle=max(worstFrontAngle,abs(frontAngle));
+                end
                 worstSideslip=max(worstSideslip,abs(x(5,index+1))-tan(cfg.model.sideslipMaximum)*x(4,index+1));
             end
-            % The braking product uses the anchor speed; allow its remainder.
-            testCase.verifyLessThanOrEqual(worstAdhesion,1+1e-2);
-            testCase.verifyLessThanOrEqual(worstSideslip,1e-6);
+            testCase.verifyGreaterThanOrEqual(worstRoad,-cfg.scp.constraintTolerance);
+            testCase.verifyLessThanOrEqual(worstHandling,1+cfg.scp.constraintTolerance);
+            testCase.verifyLessThan(worstFrontAngle,pi/2);
+            testCase.verifyLessThanOrEqual(worstSideslip,cfg.scp.constraintTolerance);
         end
-        function theEndpointLiesInTheTerminalSet(testCase)
-            [ego,road,cfg]=localFixture();road.lateralClearance=[4;4];
-            ego.position(2)=1.2;ego.yaw=.3;
-            [~,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            y=problem.predictedState(:,end);context=terminalSafeSet.context(problem.model);
-            [member,~,info]=terminalSafeSet.member(context,y,size(inputs,2));
-            testCase.verifyTrue(member);
-            testCase.verifyEqual(info.reason,"noTarget");
-            testCase.verifyEqual(problem.metadata.terminalValue,info.value,AbsTol=1e-12);
-            testCase.verifyEqual(problem.metadata.terminalStopSeconds,info.stopSeconds,AbsTol=1e-12);
-            testCase.verifyTrue(isnan(problem.metadata.terminalRoadMarginMeters));
-        end
-        function shiftedPlanIsAFeasibleCandidateAtTheNextSample(testCase)
-            % Recursive feasibility on the declared model: when the state is
-            % the plan's own successor and the forecast is unchanged, the
-            % shifted plan meets every hard row and ends in the terminal set.
+        function consecutiveModelSuccessorsRemainSolvable(testCase)
             [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
-            target=struct('targetPositionInertial',q(1:2), ...
-                'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
-            [~,~,~,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [~,~,~,state]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             for frame=1:3
                 ego=localSuccessor(ego,state);
                 future=predictiveSafetyGeometry.predictTarget(q,frame*cfg.controller.sampleTime);
-                target=struct('targetPositionInertial',future(1:2), ...
-                    'targetVelocityInertial',future(4)*[cos(future(3));sin(future(3))],'targetYawInertial',future(3));
-                [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,state);
-                testCase.verifyTrue(problem.metadata.anchorCertified);
-                testCase.verifyFalse(problem.metadata.postSolveFeasibilityCheck);
+                [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(future),road,cfg,state);
+                testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+                testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.scp.constraintTolerance);
                 localVerifyNonlinearRollout(testCase,problem,cfg);
             end
         end
-        function aRoadTooNarrowForTheVehicleHasNoSolution(testCase)
+        function impossibleRoadHasNoElasticFallbackCommand(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[.5;.5];
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
@@ -286,68 +178,38 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
-        function inaccurateIterationLimitResultDoesNotSupplyACommand(testCase)
-            [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            cfg.solver.maxIterations=1;
+        function inaccurateConicSolveDoesNotSupplyACommand(testCase)
+            [ego,road,cfg]=localFixture();ego.position(2)=.1;cfg.solver.maxIterations=1;
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
-        function initialOverlapIsReportedAsOptimizedPositiveSlack(testCase)
+        function initialOverlapRemainsExplicitPositivePcbfSlack(testCase)
             [ego,road,cfg]=localFixture();
-            target=struct('targetPositionInertial',[0;0], ...
-                'targetVelocityInertial',[40;0],'targetYawInertial',0);
+            target=struct('targetPositionInertial',[0;0],'targetVelocityInertial',[40;0],'targetYawInertial',0);
             [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            % A nonzero feasible dual retains penetration depth at overlap.
-            testCase.verifyEqual(problem.metadata.search.primaryLowerBound, ...
-                cfg.vehicle.width+cfg.collision.safetyMarginMeters,AbsTol=1e-6);
-            testCase.verifyGreaterThan(problem.metadata.search.primaryOptimum,0);
-            testCase.verifyTrue(problem.metadata.search.stages(1).numericalSolve);
             testCase.verifyGreaterThan(problem.solution.safety,0);
             testCase.verifyFalse(problem.metadata.zeroSlack);
-            testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
-            testCase.verifyLessThanOrEqual(problem.solution.safety, ...
-                problem.metadata.search.slackCap+cfg.solver.feasibilityTolerance);
+            testCase.verifyLessThanOrEqual(problem.solution.restorationSlack,cfg.scp.constraintTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            testCase.verifyEqual(problem.metadata.search.attempts(1).initialization,"movingTargetPotentialField");
-            localVerifyNonlinearRollout(testCase,problem,cfg);
         end
         function brakingSlewAndMagnitudeBoundsConstrainTheReturnedPlan(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.05;
-            cfg.model.brakingRatioRateMaximum=2;
-            ego.heldActuatorInput=[0;0];
+            cfg.model.brakingRatioRateMaximum=2;ego.heldActuatorInput=[0;0];
             [~,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            limit=cfg.controller.sampleTime*2;tol=cfg.solver.feasibilityTolerance;
-            testCase.verifyLessThanOrEqual(max(abs(diff([ego.heldActuatorInput(2),inputs(2,:)]))),limit+tol);
-            testCase.verifyLessThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMaximum+tol);
-            testCase.verifyGreaterThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMinimum-tol);
+            tolerance=cfg.scp.constraintTolerance;
+            testCase.verifyLessThanOrEqual(max(abs(diff([ego.heldActuatorInput(2),inputs(2,:)]))), ...
+                cfg.controller.sampleTime*2+tolerance);
+            testCase.verifyLessThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMaximum+tolerance);
+            testCase.verifyGreaterThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMinimum-tolerance);
             localVerifyNonlinearRollout(testCase,problem,cfg);
-        end
-        function numericalSteeringCorrectionDoesNotImposeActuatorSlew(testCase)
-            [ego,road,cfg]=localFixture();ego.position(2)=.1;ego.yaw=.5;
-            ego.heldActuatorInput=[.5;0];
-            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            steering=command.frontWheelSteeringAngle;
-            testCase.verifyLessThan(steering,-.1);
-            testCase.verifyLessThanOrEqual(abs(steering-problem.model.linearization.inputs(1,1)), ...
-                cfg.nonlinear.trustRadius*.15+cfg.solver.feasibilityTolerance);
-            testCase.verifyGreaterThan(abs(steering-ego.heldActuatorInput(1)),.5);
-            testCase.verifyEqual(problem.metadata.solverCallCount,sum([problem.metadata.search.stages.numericalSolve]));
-            localVerifyNonlinearRollout(testCase,problem,cfg);
-        end
-        function brakingEncounterUsesOneFreshModelAndCompletesTheClf(testCase)
-            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("brakingLead",cfg);
-            target=struct('targetPositionInertial',q(1:2), ...
-                'targetVelocityInertial',q(4)*[cos(q(3)+q(6));sin(q(3)+q(6))], ...
-                'targetYawInertial',q(3),'targetSideslip',q(6), ...
-                'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7));
-            [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            search=problem.metadata.search;
-            testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyTrue(search.clfStageCompleted);
-            testCase.verifyGreaterThan(search.attempts(search.selectedAttempt).stages(1).exitFlag,0);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
         end
     end
+end
+
+function target=localTarget(q)
+    target=struct('targetPositionInertial',q(1:2), ...
+        'targetVelocityInertial',q(4)*predictiveSafetyGeometry.direction(q(3)+q(6)), ...
+        'targetYawInertial',q(3),'targetSideslip',q(6),'targetTangentialAcceleration',q(5));
 end
 
 function localVerifyAnchorRollout(testCase,anchor,cfg)

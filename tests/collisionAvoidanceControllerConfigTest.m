@@ -66,6 +66,19 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function successiveConvexificationCannotDisableItsRestorationChecks(testCase)
+            invalid={struct('maximumIterations',0),struct('maximumIterations',Inf), ...
+                struct('feasibleRefinementIterations',0), ...
+                struct('constraintTolerance',0),struct('minimumTrustScale',0), ...
+                struct('acceptanceRatio',1),struct('restorationWeight',0)};
+            for index=1:numel(invalid)
+                testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('scp',invalid{index})), ...
+                    'collisionAvoidanceController:invalidConfiguration');
+            end
+            testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
+                struct('initialization',struct('yawRateBlendFraction',.5))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
         function targetRearAxleDistanceIsPositiveAndIndependentOfEgoGeometry(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('target',struct('rearAxleDistance',1.8)));
             testCase.verifyEqual(cfg.target.rearAxleDistance,1.8);

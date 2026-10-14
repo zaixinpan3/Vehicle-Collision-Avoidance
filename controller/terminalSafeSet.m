@@ -77,7 +77,7 @@ classdef terminalSafeSet
                 'hasTarget',~isempty(model.target),'targetEpoch',model.targetEpoch, ...
                 'targetEpochIndex',localEpochIndex(model), ...
                 'sampleIndex',model.sampleIndex,'lane',model.lane,'stationNow',here.station, ...
-                'reference',model.nominalReference);
+                'reference',model.nominalReference,'collisionSide',localCollisionSide(model),'trackSide',0);
         end
 
         function [member,context,info] = member(context,x,node)
@@ -164,6 +164,24 @@ classdef terminalSafeSet
             band=localBand();required=context.required;
             path=parts.path;if isempty(path),path=terminalSafeSet.continuation(context,y);end
             jacobian=localPoseJacobian(context,y,path.steps);
+            if context.hasTarget && context.trackSide==0
+                target=localTarget(context,node,path.time(end));curvature=sin(target(6))/target(7);
+                if curvature~=0
+                    course=predictiveSafetyGeometry.direction(target(3)+target(6));
+                    center=target(1:2)+[-course(2);course(1)]/curvature;
+                    radial=path.pose(1:2,end)-center;radius=norm(radial);trackRadius=1/abs(curvature);
+                    band=context.reach+norm(target(8:9))+norm(target(10:11));
+                    if abs(radius-trackRadius)>band
+                        context.trackSide=sign(radius-trackRadius);
+                    else
+                        projection=laneGeometry.project(path.pose(1:2,end),context.lane);
+                        forward=predictiveSafetyGeometry.direction(projection.heading);
+                        preferred=context.collisionSide*[-forward(2);forward(1)];
+                        if abs(radial.'*forward)>sqrt(.5)*radius,preferred=forward;end
+                        context.trackSide=1;if radial.'*preferred<0,context.trackSide=-1;end
+                    end
+                end
+            end
             % Largest change of a fixed-dual row at each pose over the box:
             % |normal . dp| + reach |dpsi|, normal of unit length.
             reach=context.reach;
@@ -212,20 +230,51 @@ classdef terminalSafeSet
             last=numel(gap);if ~isempty(out),last=out-1;end
             for k=find(gap(1:last)<required+min(band,localReserve()+movement(1:last)))
                 dual=localDual(path.pose(:,k),context.shape,q(:,k),[]);
+                if gap(k)<=1e-8
+                    projection=laneGeometry.project(path.pose(1:2,k),context.lane);
+                    forward=predictiveSafetyGeometry.direction(projection.heading);
+                    course=predictiveSafetyGeometry.direction(q(3,k)+q(6,k));
+                    if abs(forward.'*course)>=sqrt(.5)
+                        normal=context.collisionSide*[-forward(2);forward(1)];
+                        dual=localNormalDual(path.pose(:,k),context.shape,q(:,k),normal);
+                    end
+                end
                 if isempty(dual),continue;end
                 rows=[rows;-dual.jacobian*jacobian(:,:,k)];bounds=[bounds;localKeep(dual.value-required)]; %#ok<AGROW>
             end
             if isempty(out)
                 if isempty(parts.parked)
-                    [distance,witness]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
+                    [distance,witness,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
                 else
-                    distance=parts.parked.distance;witness=parts.parked.witness;
+                    distance=parts.parked.distance;witness=parts.parked.witness;track=parts.parked.track;
                 end
                 if distance<required+min(band,localReserve()+movement(end))
                     % A witness at exact contact (a vertex path crossing an
                     % edge) has no well-defined normal; a pose 1 mm or 1 cm
                     % along the track stands for it.
                     dual=localDual(path.pose(:,end),context.shape,witness,[1e-3,-1e-3,1e-2,-1e-2]);
+                    if distance<=1e-8 && (q(4,end)~=0 || q(5,end)>0)
+                        % The closest track witness moves along the track
+                        % when the parked pose moves longitudinally. A contact
+                        % normal along that track gives a false escape slope.
+                        % Use a track-transverse direction instead.
+                        curvature=sin(witness(6))/witness(7);
+                        course=predictiveSafetyGeometry.direction(witness(3)+witness(6));
+                        if curvature~=0
+                            [r,b,context]=localCircleRows(context,path.pose(:,end),q(:,end),track,jacobian(:,:,end));
+                            rows=[rows;r];bounds=[bounds;b];dual=[];
+                        else
+                            normal=[-course(2);course(1)];
+                            projection=laneGeometry.project(path.pose(1:2,end),context.lane);
+                            forward=predictiveSafetyGeometry.direction(projection.heading);
+                            preferred=forward;
+                            if abs(normal.'*forward)<sqrt(.5)
+                                preferred=context.collisionSide*[-forward(2);forward(1)];
+                            end
+                            if normal.'*preferred<0,normal=-normal;end
+                        end
+                        if curvature==0,dual=localNormalDual(path.pose(:,end),context.shape,witness,normal);end
+                    end
                     if ~isempty(dual)
                         rows=[rows;-dual.jacobian*jacobian(:,:,end)];bounds=[bounds;localKeep(dual.value-required)];
                     end
@@ -515,6 +564,66 @@ function [stays,next,middle] = localHoldStays(x,u,model,context,node)
         && terminalSafeSet.member(context,next,node+1);
 end
 
+function [rows,bounds,context]=localCircleRows(context,pose,q,track,map)
+    % A rotating target rectangle sweeps radial distances [rhoMin,rhoMax].
+    % A collision witness at first contact is not a differentiable distance
+    % minimizer. Use the circle's hole or an outer support of the whole
+    % remaining arc instead; these have a consistent restoration direction.
+    curvature=sin(q(6))/q(7);course=predictiveSafetyGeometry.direction(q(3)+q(6));
+    center=q(1:2)+[-course(2);course(1)]/curvature;
+    targetRotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+    localCenter=targetRotation.'*(center-q(1:2))-q(10:11);
+    rhoMin=norm(localCenter-min(q(8:9),max(-q(8:9),localCenter)));
+    if rhoMin<=context.required,context.trackSide=1;end
+    rotation=[cos(pose(3)),-sin(pose(3));sin(pose(3)),cos(pose(3))];
+    corners=context.shape(3:4)+context.shape(1:2).*[-1,1,1,-1;-1,-1,1,1];
+    world=pose(1:2)+rotation*corners;relative=world-center;
+    rows=zeros(4,6);
+    if context.trackSide<0
+        radius=vecnorm(relative,2,1);
+        for index=1:4
+            jacobian=[eye(2),rotation*[0,-1;1,0]*corners(:,index)]*map;
+            if radius(index)>0,rows(index,:)=relative(:,index).'*jacobian/radius(index);end
+        end
+        bounds=rhoMin-context.required-radius.';return;
+    end
+    body=rotation.'*(center-pose(1:2))-context.shape(3:4);
+    closest=pose(1:2)+rotation*(context.shape(3:4)+min(context.shape(1:2),max(-context.shape(1:2),body)));
+    normal=closest-center;
+    if norm(normal)>eps,normal=normal/norm(normal);
+    else,normal=predictiveSafetyGeometry.direction(pose(3));end
+    targetCorners=q(10:11)+q(8:9).*[-1,1,1,-1;-1,-1,1,1];
+    vertex=q(1:2)+targetRotation*targetCorners-center;
+    angles=sort(curvature*[track.lower,track.upper]);support=-Inf;
+    direction=atan2(normal(2),normal(1));
+    for index=1:4
+        radius=norm(vertex(:,index));phase=atan2(vertex(2,index),vertex(1,index))-direction;
+        if track.fullCircle || angles(2)-angles(1)>=2*pi ...
+                || mod(-phase-angles(1),2*pi)<=angles(2)-angles(1)+1e-12
+            value=radius;
+        else
+            value=radius*max(cos(phase+angles));
+        end
+        support=max(support,value);
+    end
+    for index=1:4
+        jacobian=[eye(2),rotation*[0,-1;1,0]*corners(:,index)]*map;
+        rows(index,:)=-normal.'*jacobian;
+    end
+    bounds=(normal.'*relative-support-context.required).';
+end
+
+function side=localCollisionSide(model)
+    side=1;if isfield(model,'collisionSide'),side=model.collisionSide;end
+end
+
+function dual=localNormalDual(pose,shape,q,normal)
+    rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+    body=rotation.'*normal;lambda=[max(body,0);max(-body,0)];
+    [value,jacobian]=predictiveSafetyGeometry.fixedDualRows(pose,shape,q(1:3),q(8:11),lambda);
+    dual=struct('value',value,'jacobian',jacobian);
+end
+
 function dual = localDual(pose,shape,q,shifts)
     % The fixed-dual rows of the ego rectangle at 'pose' against the target
     % state q, or, where the closest features give no consistent dual (an
@@ -600,7 +709,7 @@ function [member,info,parts] = localDecide(context,x,node)
         member=true;info.reason="exit";info.end="exit";info.exitSeconds=path.time(out);return;
     end
     [distance,witness,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
-    parts.parked=struct('distance',distance,'witness',witness);
+    parts.parked=struct('distance',distance,'witness',witness,'track',track);
     info.margin=min(info.margin,distance-context.required);
     info.exitSeconds=info.stopSeconds+track.exitSeconds;
     if distance-context.required<-1e-6,info.reason="parkedEgoMeetsTarget";return;end

@@ -21,25 +21,29 @@ end
 
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
-    % horizonSteps carries safety slack and is the shortest horizon. The
-    % horizon extends until the anchor reaches the terminal set, at most
-    % maximumHorizonSteps; a plan that cannot reach it has no solution.
+    % horizonSteps is the soft-collision prefix and the shortest horizon.
+    % Target encounters cover the nearest cruise conflict plus settling time,
+    % between the configured minimum and maximum durations. The terminal
+    % endpoint is an optimization constraint, not a seed stopping condition.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
-    % trustRadius scales RTI state/input corrections about each fresh rollout.
+    % trustRadius scales local state/input corrections about each SCP reference.
     % The input trust scale adapts to the plan innovation: the scale whose
     % second-order prediction error equals trustInnovationMeters [m], within
     % [trustMinimumScale,trustMaximumScale]. trustRetention is the per-sample
     % retention of the estimated error coefficient; the scale grows by at most
     % 1/sqrt(trustRetention) per sample and shrinks at once.
-    % A primary problem infeasible inside the trust region is re-solved with
-    % the scale doubled up to trustMaximumScale; the estimate is not changed.
+    % This across-frame estimate initializes the SCP trust region; internal
+    % merit and residual tests can reduce it to scp.minimumTrustScale.
     cfg.nonlinear=struct('integrationStep',.05,'trustRadius',.5, ...
         'trustInnovationMeters',.02,'trustInitialScale',.125, ...
         'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
-    % Potential-field seed parameters; these are not optimized actuator limits.
-    cfg.initialization=struct('previewSeconds',3,'previewStepSeconds',.1, ...
-        'clearancePaddingMeters',.7,'brakingRatioLimit',.3, ...
-        'lateralAccelerationFraction',.98,'frontForceFraction',.98,'speedGain',1);
+    % The nonlinear solver starts from lane feedback or shifted inputs.
+    % Elastic rows restore local feasibility while relinearization updates
+    % both dynamics and collision normals. Elastic slack must be below the numerical feasibility tolerance.
+    cfg.scp=struct('maximumIterations',80,'predictionSeconds',6,'minimumPredictionSeconds',3,'settlingSeconds',2, ...
+        'restorationWeight',1000,'performanceWeight',1, ...
+        'constraintTolerance',1e-3,'feasibleRefinementIterations',3,'minimumTrustScale',1e-4,'stepTolerance',.01,'meritTolerance',1e-4, ...
+        'acceptanceRatio',.05,'expansionRatio',.75);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
     % Collision rows apply at nodes inside it, including a later re-entry.
@@ -100,9 +104,8 @@ function cfg=localDefaults()
     % certificationSteeringRadians and certificationBrakingRatio of the trim,
     % the largest sublevel set V <= 1 on which u = u* + K e contracts by rho
     % against every ray-averaged Jacobian of the sampled nonlinear model over
-    % the set is certified (NOMINAL_CLF.md). The anchor appends holds of that
-    % controller while they keep the endpoint in the terminal set; the
-    % terminal set itself does not use the CLF. The box only bounds the set;
+    % the set is certified (NOMINAL_CLF.md). Nominal feedback supplies
+    % the search reference; the terminal set itself does not use the CLF. The box only bounds the set;
     % its size is set by the certificate.
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
@@ -115,12 +118,12 @@ function cfg=localDefaults()
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
         'speedGain',.5,'brakingRatioLimit',.35);
-    % The two convex solves share the remaining controller-call budget.
+    % All SCP subproblems share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     % constraintTolerance and optimalityTolerance are the conic solver's
     % feasibility and gap tolerances; reducedTolerance is the precision at
     % which a solve whose interior-point iterations stall is still accepted
-    % (Clarabel's AlmostSolved). The completed CLF inputs are issued directly.
+    % (Clarabel's AlmostSolved). A completed accepted SCP trial supplies the issued inputs directly.
     % The lexicographic and CLF ties are 1e-4, so 1e-6 is
     % precise enough (1e-8 and 1e-7 cost about a third more solver time).
     % Looser buys nothing: at 1e-4 (ties and stall acceptance at 1e-3) a
@@ -166,15 +169,16 @@ function localValidate(cfg)
             || cfg.nonlinear.trustInitialScale>cfg.nonlinear.trustMaximumScale
         localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
     end
-    for name=string(fieldnames(cfg.initialization)).'
-        validateattributes(cfg.initialization.(name),{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.scp.maximumIterations,{'double'},{'scalar','integer','finite','positive'});
+    validateattributes(cfg.scp.feasibleRefinementIterations,{'double'},{'scalar','integer','finite','positive'});
+    for name=["predictionSeconds","minimumPredictionSeconds","settlingSeconds","restorationWeight","performanceWeight", ...
+            "constraintTolerance","stepTolerance","meritTolerance"]
+        validateattributes(cfg.scp.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    if cfg.initialization.previewStepSeconds>cfg.initialization.previewSeconds
-        localInvalid('Initialization preview step cannot exceed its duration.');
-    end
-    for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit"]
-        if cfg.initialization.(name)>=1,localInvalid('initialization.%s must lie in (0,1).',name);end
-    end
+    validateattributes(cfg.scp.minimumPredictionSeconds,{'double'},{'<=',cfg.scp.predictionSeconds});
+    validateattributes(cfg.scp.minimumTrustScale,{'double'},{'scalar','real','finite','positive','<=',cfg.nonlinear.trustMinimumScale});
+    validateattributes(cfg.scp.acceptanceRatio,{'double'},{'scalar','real','>',0,'<',1});
+    validateattributes(cfg.scp.expansionRatio,{'double'},{'scalar','real','>',cfg.scp.acceptanceRatio,'<',1});
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
