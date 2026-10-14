@@ -4,6 +4,7 @@
 extern "C" {
 #include "clarabel.h"
 }
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -27,7 +28,19 @@ static ClarabelCscMatrix_f64 matrix(const mxArray* value) {
         reinterpret_cast<const uintptr_t*>(mxGetIr(value)), mxGetDoubles(value)};
 }
 
+using SteadyClock = std::chrono::steady_clock;
+struct SolveDeadline {
+    SteadyClock::time_point start;
+    double seconds;
+};
+
+static int deadlineReached(ClarabelDefaultInfo_f64*, void* userdata) {
+    const auto* deadline = static_cast<SolveDeadline*>(userdata);
+    return std::chrono::duration<double>(SteadyClock::now()-deadline->start).count() >= deadline->seconds;
+}
+
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
+    const auto entryTime = SteadyClock::now();
     require(nrhs==7 && nlhs>=2 && nlhs<=3, "Use [x,flag,info] = predictiveConicSolverMex(P,q,A,b,dimensions,types,settings).");
     for (int k=0; k<7; ++k) requireReal(prhs[k], k==0 || k==2);
     const size_t n=mxGetN(prhs[0]), m=mxGetM(prhs[2]);
@@ -72,6 +85,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
     auto* solver=clarabel_DefaultSolver_f64_new(&P,mxGetDoubles(prhs[1]),&A,mxGetDoubles(prhs[3]),count,cones,&settings);
     mxFree(cones);
     if (!solver) mexErrMsgIdAndTxt("predictiveConicSolver:constructionFailed", "Clarabel could not construct the problem.");
+    // Include MEX validation and native problem construction, which the
+    // solver's own iteration timer excludes. A factorization is not preempted.
+    SolveDeadline deadline{entryTime, options[1]};
+    clarabel_DefaultSolver_f64_set_termination_callback(solver,deadlineReached,&deadline);
     clarabel_DefaultSolver_f64_solve(solver);
     const auto result=clarabel_DefaultSolver_f64_solution(solver);
     double flag=-7;
@@ -80,16 +97,18 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
     else if (result.status==ClarabelPrimalInfeasible || result.status==ClarabelAlmostPrimalInfeasible) flag=-2;
     else if (result.status==ClarabelDualInfeasible || result.status==ClarabelAlmostDualInfeasible) flag=-3;
     else if (result.status==ClarabelMaxIterations || result.status==ClarabelMaxTime) flag=0;
+    if (flag<=0 && deadlineReached(nullptr,&deadline)) flag=0;
     // Infeasibility certificates and unfinished iterates are not solutions.
     plhs[0]=mxCreateDoubleMatrix(flag>0 ? n : 0,1,mxREAL);
     if (flag>0) std::memcpy(mxGetDoubles(plhs[0]),result.x,n*sizeof(double));
     plhs[1]=mxCreateDoubleScalar(flag);
     if (nlhs==3) {
-        const char* names[]={"nativeStatus","iterations","solveSeconds","primalResidual","dualResidual","objective"};
+        const char* names[]={"nativeStatus","iterations","solveSeconds","primalResidual","dualResidual","objective","wallSeconds"};
         const double values[]={static_cast<double>(result.status),static_cast<double>(result.iterations),
-            result.solve_time,result.r_prim,result.r_dual,result.obj_val};
-        plhs[2]=mxCreateStructMatrix(1,1,6,names);
-        for (int k=0; k<6; ++k) mxSetFieldByNumber(plhs[2],0,k,mxCreateDoubleScalar(values[k]));
+            result.solve_time,result.r_prim,result.r_dual,result.obj_val,
+            std::chrono::duration<double>(SteadyClock::now()-entryTime).count()};
+        plhs[2]=mxCreateStructMatrix(1,1,7,names);
+        for (int k=0; k<7; ++k) mxSetFieldByNumber(plhs[2],0,k,mxCreateDoubleScalar(values[k]));
     }
     clarabel_DefaultSolver_f64_free(solver);
 }

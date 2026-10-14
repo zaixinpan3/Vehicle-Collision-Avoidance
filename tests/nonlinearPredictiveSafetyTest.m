@@ -1,5 +1,5 @@
 classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
-    % Nominal PCBF/CLF/SCvx behavior; no native verifier dependency.
+    % Nominal PCBF/CLF/RTI behavior; no native verifier dependency.
     properties (TestParameter)
         targetSideslip={0,1e-12,.08,-.08};
         targetAcceleration={0,1.2,-1.2};
@@ -199,7 +199,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
             testCase.verifySize(command.actuatorInput,[2,1]);
             testCase.verifyFalse(isfield(problem,'certificate'));
-            testCase.verifyEqual(problem.metadata.safetyScope,"nonlinearSampledConstraints");
+            testCase.verifyEqual(problem.metadata.safetyScope,"affineSampledConstraints");
         end
         function changedTargetForecastRetainsTheInputWarmStart(testCase)
             [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;0;1.6;2.4;.95;0;0]);
@@ -284,7 +284,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"nominalFeedbackRollout");
-            testCase.verifyEqual(state.version,80);
+            testCase.verifyEqual(state.version,81);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;1;0;1.6;2.4;.95;0;0];
@@ -308,7 +308,8 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
 end
 
 function [ego,road,cfg]=localFixture()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8), ...
+        'solver',struct('timeLimitSeconds',5)));
     ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
 end

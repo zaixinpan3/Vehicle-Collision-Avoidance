@@ -47,6 +47,13 @@ classdef predictiveConicSolverTest < matlab.unittest.TestCase
             testCase.verifyEmpty(x);
             testCase.verifyEqual(flag,0);
         end
+        function exhaustedWallBudgetDoesNotReturnAnUnfinishedPoint(testCase)
+            options=localOptions();options(2)=1e-12;
+            [x,flag,info]=predictiveConicSolverMex(sparse(1),-2,sparse([1;-1]),[1;1],2,1,options);
+            testCase.verifyEmpty(x);
+            testCase.verifyEqual(flag,0);
+            testCase.verifyGreaterThanOrEqual(info.wallSeconds,info.solveSeconds);
+        end
         function malformedConeDimensionsRaiseAMatlabError(testCase)
             testCase.verifyError(@()localMalformedCall(),'predictiveConicSolver:invalidData');
         end

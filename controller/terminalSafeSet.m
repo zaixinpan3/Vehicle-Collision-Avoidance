@@ -78,6 +78,7 @@ classdef terminalSafeSet
                 'targetEpochIndex',localEpochIndex(model), ...
                 'sampleIndex',model.sampleIndex,'lane',model.lane,'stationNow',here.station, ...
                 'reference',model.nominalReference,'collisionSide',localCollisionSide(model),'trackSide',0);
+
         end
 
         function [member,context,info] = member(context,x,node)
@@ -159,6 +160,7 @@ classdef terminalSafeSet
             % condition whose margin exceeds the most its pose can move over
             % the box is left out before its dual is computed: it cannot bind.
             if nargin<4,box=Inf(6,1);end
+            localCheckDeadline(context);
             [~,info,parts]=localDecide(context,y,node);
             info.value=nonlinearBicycleModel.nominalValue(y,context.lane,context.reference);
             band=localBand();required=context.required;
@@ -213,6 +215,7 @@ classdef terminalSafeSet
             % box (its lever is at most the reach); poses whose road margin
             % exceeds it form no rows.
             for k=find(margin-context.inflation<min(band,localReserve()+movement))
+                localCheckDeadline(context);
                 c=cos(path.pose(3,k));s=sin(path.pose(3,k));
                 for corner=1:4
                     derivative=normal(:,corner,k).'*[eye(2),[-s,-c;c,-s]*local(:,corner)]*jacobian(:,:,k);
@@ -229,6 +232,7 @@ classdef terminalSafeSet
             end
             last=numel(gap);if ~isempty(out),last=out-1;end
             for k=find(gap(1:last)<required+min(band,localReserve()+movement(1:last)))
+                localCheckDeadline(context);
                 dual=localDual(path.pose(:,k),context.shape,q(:,k),[]);
                 if gap(k)<=1e-8
                     projection=laneGeometry.project(path.pose(1:2,k),context.lane);
@@ -739,6 +743,7 @@ function [gap,out] = localClearances(context,pose,q)
     last=n;if ~isempty(out),last=out-1;end
     bound=distance-context.reach-vecnorm(q(8:9,:),2,1)-vecnorm(q(10:11,:),2,1);
     for k=1:last
+        if mod(k,16)==1,localCheckDeadline(context);end
         if bound(k)>=context.required+localBand()
             gap(k)=bound(k);
         else
@@ -772,6 +777,7 @@ function jacobian = localPoseJacobian(context,y,steps)
     % the closed-form continuation with the schedule held.
     n=2*steps+1;jacobian=zeros(3,6,n);delta=[1e-6;1e-6;1e-7;1e-6;1e-6;1e-7];
     for i=1:6
+        localCheckDeadline(context);
         e=zeros(6,1);e(i)=delta(i);
         plus=terminalSafeSet.continuation(context,y+e,steps);
         minus=terminalSafeSet.continuation(context,y-e,steps);
@@ -947,4 +953,10 @@ function [inside,angle] = localWithin(angle,first,span,full)
     % into it.
     offset=mod(angle-first,2*pi);inside=full || offset<=span*(1+1e-12)+1e-12;
     angle=first+offset;
+end
+
+function localCheckDeadline(context)
+    if isfield(context,'solveTimer') && toc(context.solveTimer)>=context.solveTimeLimitSeconds
+        error('collisionAvoidanceController:timeBudgetExceeded','The current RTI computation budget is exhausted.');
+    end
 end

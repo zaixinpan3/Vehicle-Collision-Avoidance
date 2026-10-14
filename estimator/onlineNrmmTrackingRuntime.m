@@ -873,10 +873,16 @@ function tolerance = localTimeTolerance(time)
 end
 
 function localAddProjectPaths()
-    estimatorRoot = fileparts(mfilename("fullpath"));
-    repoRoot = fileparts(estimatorRoot);
-    addpath(fullfile(repoRoot, "config"));
-    addpath(estimatorRoot);
-    nativePath = fullfile(repoRoot,"solver","nrmm");
-    if isfolder(nativePath),addpath(nativePath);end
+    % Avoid changing MATLAB's search path on every observer publication.
+    % Detect an external path reset instead of caching availability forever.
+    persistent preparedPath
+    currentPath=path;
+    if isequal(currentPath,preparedPath),return;end
+    estimatorRoot=fileparts(mfilename("fullpath"));repoRoot=fileparts(estimatorRoot);
+    required={char(fullfile(repoRoot,'config')),char(estimatorRoot)};
+    nativePath=char(fullfile(repoRoot,'solver','nrmm'));
+    if isfolder(nativePath),required{end+1}=nativePath;end
+    entries=strsplit(currentPath,pathsep);missing=required(~ismember(required,entries));
+    if ~isempty(missing),addpath(missing{:});end
+    preparedPath=path;
 end

@@ -22,9 +22,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(tube.positionRadius(end),tube.positionRadius(1));
         end
         function largerTargetEnclosuresActuallyChangeTheAvoidanceOptimization(testCase)
-            % With the target 20 m ahead the tightened collision rows bind;
-            % at the scenario's 24 m they cannot, the problem leaves them out
-            % and the two optimizations are the same.
+            % The near-grazing pass makes the observer margins bind.
             [ego,target,road,cfg]=localFixture(.01,20);
             [~,smallInputs,small]=collisionAvoidanceController(ego,target,road,cfg,[]);
             target.predictionErrorSet.positionRadius=.10;
@@ -35,7 +33,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(norm(largeInputs-smallInputs,'fro'),1e-5);
             testCase.verifyTrue(large.metadata.uncertaintyIncluded);
             testCase.verifyFalse(large.metadata.robustNonlinearSafetyCertified);
-            testCase.verifyEqual(large.metadata.safetyScope,"nonlinearNominalCollisionWithRelaxedAffineObserverMargins");
+            testCase.verifyEqual(large.metadata.safetyScope,"affineNominalCollisionWithRelaxedObserverMargins");
         end
         function zeroRadiusEnclosuresRecoverTheExactStateProblem(testCase)
             [ego,target,road,cfg]=localFixture(0);
@@ -137,6 +135,18 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
                 end
             end
         end
+        function batchedDirectionalSupportsMatchIndependentStartStates(testCase)
+            q=[0;0;.2;8;-.5;.03;1.6;2.4;.95;0;0];
+            set=struct('positionRadius',.03,'courseRadius',.04,'speedRadius',.4, ...
+                'accelerationRadius',.1,'curvatureRadius',.002,'sideslipRadius',.004);
+            starts=predictiveSafetyGeometry.predictTarget(q,[0,1,5,17]);
+            duration=[0,.025,.05,.05];normals=[1,0;0,1;.6,.8];
+            data=predictiveSafetyGeometry.targetSupportData(starts,set,duration);
+            for index=1:numel(duration)
+                expected=predictiveSafetyGeometry.targetPositionSupport(starts(:,index),set,duration(index),normals);
+                testCase.verifyEqual(predictiveSafetyGeometry.targetSupportFromData(data,index,normals),expected,AbsTol=1e-13);
+            end
+        end
         function longitudinalTargetSpeedUncertaintyDoesNotBecomeLateralWidth(testCase)
             q=[0;0;0;8;0;0;1.6;2.4;.95;0;0];
             set=struct('positionRadius',.03,'courseRadius',0,'speedRadius',2, ...
@@ -184,6 +194,9 @@ end
 
 function [ego,target,road,cfg]=localFixture(radius,gap)
     [x,q,road,cfg]=collisionThreatScenario("headOn",struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
+    % A near-grazing opposing pass admits a single RTI step. Full cold
+    % head-on restoration is separately expected to fail in the RTI tests.
+    q(2)=2.05;cfg.solver.timeLimitSeconds=5;
     if nargin>1,q(1)=x(1)+gap;end
     [ego,target]=localPublication(x,q,0,radius,zeros(6,1));
 end

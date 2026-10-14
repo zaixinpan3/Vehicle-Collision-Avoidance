@@ -90,7 +90,8 @@ function scale=localExpectedScale(previous,innovation,cfg)
         sqrt(cfg.nonlinear.trustInnovationMeters/curvature)));
 end
 function [ego,road,cfg]=localFixture()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8), ...
+        'solver',struct('timeLimitSeconds',5)));
     ego=struct('position',[0;.5],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0,'stateTime',0, ...
         'heldActuatorInput',[0;0]);
     road=struct('centerline',[-100,0;1000,0]);

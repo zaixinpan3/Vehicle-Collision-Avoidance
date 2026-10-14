@@ -70,6 +70,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
                 TargetEstimateFunction=@localRevisedTarget);
             r=report.results;
             testCase.verifyEqual(r.targetInitialState(5:6),zeros(2,1),AbsTol=0);
+            testCase.verifyEqual(r.targetInitialState(2),0,AbsTol=0);
             testCase.verifyEqual(r.executedFrames,4);
             testCase.verifyFalse(r.experimentFailed);
             testCase.verifyEqual(r.outcome,"observationLimit");
@@ -88,11 +89,21 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyEqual(r.minimumReplayClearanceMeters,0,AbsTol=1e-12);
             testCase.verifyTrue(all([r.trace.optimizationReturned]));
         end
+        function failedControllerTimeExcludesEarlierPipelineWork(testCase)
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=1, ...
+                TargetEstimateFunction=@localDelayedImpossibleTarget);
+            result=report.results;
+            testCase.verifyTrue(result.controlUnavailable);
+            testCase.verifyGreaterThanOrEqual(result.failedPipelineSeconds,result.failedFrameSeconds+.02);
+            testCase.verifyEqual(result.deadlineMisses,double(result.failedFrameSeconds>.05));
+            testCase.verifyEqual(result.pipelineDeadlineMisses,double(result.failedPipelineSeconds>.05));
+        end
         function anActualOptimizationFailureRemainsAnExperimentalFailure(testCase)
             cfg=struct('referenceSpeed',15,'controller',struct('horizonSteps',16));
             report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=1, ...
                 ControllerConfiguration=cfg,TargetEstimateFunction=@localImpossibleTarget);
             testCase.verifyTrue(report.results.controlUnavailable);
+            testCase.verifyGreaterThanOrEqual(report.results.failedPipelineSeconds,report.results.failedFrameSeconds);
             testCase.verifyTrue(report.results.experimentFailed);
             testCase.verifyFalse(report.results.collisionDetected);
             testCase.verifyEqual(report.results.outcome,"controlUnavailable");
@@ -102,6 +113,9 @@ end
 
 function target=localRevisedTarget(target,ego)
     time=ego.stateTime;
+    % Keep this information-flow fixture locally feasible for one-step RTI.
+    % The physical target remains on the oncoming centerline.
+    target.targetPositionInertial(2)=target.targetPositionInertial(2)+6;
     target.targetTangentialAcceleration=.02*cos(9*time);
     target.targetSideslip=.001*sin(9*time);
     course=target.targetYawInertial+target.targetSideslip;
@@ -119,4 +133,9 @@ function target=localImpossibleTarget(~,~)
     target=struct('targetPositionInertial',[20;0],'targetVelocityInertial',[-15;0], ...
         'targetYawInertial',pi,'targetTangentialAcceleration',0,'targetSideslip',0, ...
         'targetLength',20000,'targetWidth',20000);
+end
+
+function target=localDelayedImpossibleTarget(targetTruth,egoTruth)
+    pause(.03);
+    target=localImpossibleTarget(targetTruth,egoTruth);
 end

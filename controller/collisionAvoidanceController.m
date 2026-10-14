@@ -1,6 +1,6 @@
 function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
-%collisionAvoidanceController Successive-convexification PCBF/CLF control.
+%collisionAvoidanceController One-step RTI PCBF/CLF control.
 % Controller state retains a target prediction and a linearization trajectory.
 % Every current target estimate updates the prediction; its A and beta are
 % held constant within this frame, independently of proof-metadata availability.
@@ -10,11 +10,11 @@ function [command,predictedInput,prediction,controllerState] = ...
 % because braking that ends at rest cannot be run backward.
 % Collision interaction is active inside the configured position radius.
 % A complete current sensor scan with no target clears the previous forecast.
-% collisionAvoidanceController("warmUp", cfg) runs one synthetic encounter
-% (lane following, then a head-on target that appears and is tracked) and
-% resets: every code path has then been compiled, and the compiled kernels
-% and the straight-road trim loaded, before the first sample. Call it at
-% start-up; the first sample would otherwise take about a second.
+% collisionAvoidanceController("warmUp", cfg) primes exact cruise and
+% bounded low-speed opposing-target probes, then resets its state.
+% It loads the compiled kernels and straight-road trim before timed samples.
+% Integrations with observer bounds also prime their bounded-input path.
+% Startup preparation is separate from the online computation budget.
     persistent lastState
     if nargin<=2 && (ischar(egoState) || isstring(egoState))
         action=string(egoState);
@@ -29,7 +29,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     end
     explicitState=nargin>=5;
     if ~explicitState,previousState=lastState;end
-    if isstruct(previousState) && (~isfield(previousState,'version') || previousState.version~=80),previousState=[];end
+    if isstruct(previousState) && (~isfield(previousState,'version') || previousState.version~=81),previousState=[];end
     if nargin<4,cfg=[];end
     if nargin<3,laneCenterline=[];end
     if nargin<2,targetEstimate=[];end
@@ -40,7 +40,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     uncertainty=predictiveSafetyGeometry.observerUncertainty(ego,observation,observed);
     frame=predictiveSafetyGeometry.roadFrame(lane,road);
     context={cfg.vehicle,cfg.tire,cfg.roadLoad,cfg.model,cfg.actuation,cfg.collision, ...
-        cfg.controller,cfg.referenceSpeed,cfg.clf,cfg.nominalClf,cfg.scp, ...
+        cfg.controller,cfg.referenceSpeed,cfg.clf,cfg.nominalClf,cfg.rti, ...
         cfg.nonlinear.integrationStep,cfg.terminal,frame,lane};
     index=0;epochTime=ego.stateTime;targetEpoch=observed;targetEpochIndex=0;
     if isstruct(previousState)
@@ -68,7 +68,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         observed(3)=q(3)+atan2(sin(observed(3)-q(3)),cos(observed(3)-q(3)));
     end
     % Onset refreshes all collision rows. Its nominal input warm start can
-    % still be used because SCP does not require an avoidance seed.
+    % still be used because RTI does not require an avoidance seed.
     targetOnset=~isempty(observed) && isstruct(previousState) && isempty(previousState.targetEpoch);
     if ~isempty(observed)
         % Reanchor the prediction at the current estimate without resetting
@@ -93,7 +93,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
     if isempty(solution)
         error('collisionAvoidanceController:noOptimizationSolution', ...
-            'Successive convexification did not produce a feasible completed optimization (%s; %s).', ...
+            'RTI did not produce a completed optimization within its budget (%s; %s).', ...
             search.terminationReason,search.stopReason);
     end
     predictedInput=solution.inputs;first=predictedInput(:,1);
@@ -101,15 +101,13 @@ function [command,predictedInput,prediction,controllerState] = ...
     command.measurementTime=ego.stateTime;command.actuationTime=ego.stateTime;command.holdSeconds=cfg.controller.sampleTime;
     predictedJointState=solution.states;
     if ~isempty(q)
-        targetStates=zeros(4,size(solution.states,2));
-        for step=1:size(targetStates,2)
-            future=predictiveSafetyGeometry.predictTarget(targetEpoch,(index-targetEpochIndex+step-1)*cfg.controller.sampleTime);
-            targetStates(:,step)=future(1:4);
-        end
+        future=predictiveSafetyGeometry.predictTarget(targetEpoch, ...
+            (index-targetEpochIndex+(0:size(solution.states,2)-1))*cfg.controller.sampleTime);
+        targetStates=future(1:4,:);
         predictedJointState=[predictedJointState;targetStates];
     end
     metadata=struct('optimizationReturned',search.returned,'predictiveBarrierValue',solution.safety, ...
-        'zeroSlack',solution.safety<=cfg.solver.lexicographicTieTolerance+cfg.solver.feasibilityTolerance,'safetyScope',"nonlinearSampledConstraints", ...
+        'zeroSlack',solution.safety<=cfg.solver.lexicographicTieTolerance+cfg.solver.feasibilityTolerance,'safetyScope',"affineSampledConstraints", ...
         'predictionModel',"nonlinearPredictionOfUnmodifiedOptimizedInputs",'affineValidationPerformed',false,'nonlinearValidationPerformed',solution.nonlinearValidationPerformed, ...
         'recursiveFeasibilityScope',"idealMathematicalProblemOnly", ...
         'hasTarget',~isempty(q),'targetMotionModel',"constantTangentialAccelerationAndSideslip", ...
@@ -126,7 +124,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         'clfTieBound',solution.clfTieBound,'clfLocalModel',"quadraticOnAffineFirstSuccessor", ...
         'nominalTrackingMatrix',nominalReference.matrix,'clfReferenceState',nominalReference.state, ...
         'clfOperatingInput',nominalReference.input,'clfOperatingCurvature',frame(4), ...
-        'controlSource',search.source,'solverAlgorithm',"elasticSuccessiveConvexification", ...
+        'controlSource',search.source,'solverAlgorithm',"realTimeIteration", ...
         'nonlinearPredictionEvaluated',search.rollout.available, ...
         'solverCallCount',search.solverCalls,'search',search,'hardConstraintResidual',solution.hard, ...
         'optimizationConverged',search.converged,'affineFeasibilityTolerance',cfg.solver.feasibilityTolerance,'minimumCollisionMargin',solution.minimumCollisionMargin, ...
@@ -148,11 +146,9 @@ function [command,predictedInput,prediction,controllerState] = ...
         'encounterRangeMeters',cfg.collision.encounterRangeMeters,'encounterExitStep',solution.encounterExit, ...
         'predictedNextState',solution.states(:,2),'initialEgoState',ego.modelState,'runtimeSeconds',toc(timer));
     metadata.trust=search.trust;
-    metadata.scpIterations=search.convexIterations;
-    metadata.scpRestorationSlack=solution.restorationSlack;
-    metadata.nonlinearHardResidual=solution.hard;
-    metadata.realizedSafetyValue=solution.realizedSafety;
-    metadata.realizedClfSlack=solution.realizedClfSlack;
+    metadata.rtiIterations=search.rtiIterations;
+    metadata.affineSubproblemCompleted=search.convexSolveCompleted;
+    metadata.nonlinearHardResidual=NaN;
     if ~search.rollout.available,metadata.predictionModel="affinePredictionNonlinearRolloutUnavailable";end
     metadata.uncertaintyIncluded=uncertainty.specified;
     metadata.commonPoseCancelled=uncertainty.relativeFrame;
@@ -163,13 +159,13 @@ function [command,predictedInput,prediction,controllerState] = ...
     metadata.clfWorstNextValue=solution.clfWorstNextValue;
     metadata.clfCurrentBudget=solution.clfCurrentBudget;
     if uncertainty.specified
-        metadata.safetyScope="nonlinearSampledConstraintsWithAffineObserverMargins";
+        metadata.safetyScope="affineSampledConstraintsWithObserverMargins";
     end
     if model.robustnessRelaxation
         metadata.safetyObjective="sumOfRobustnessDeficitsWithHardNominalCollisionRows";
-        metadata.safetyScope="nonlinearNominalCollisionWithRelaxedAffineObserverMargins";
+        metadata.safetyScope="affineNominalCollisionWithRelaxedObserverMargins";
     end
-    controllerState=struct('version',80,'trust',model.trust,'stateTime',ego.stateTime,'sampleTime',cfg.controller.sampleTime, ...
+    controllerState=struct('version',81,'trust',model.trust,'stateTime',ego.stateTime,'sampleTime',cfg.controller.sampleTime, ...
         'sampleIndex',index,'epochTime',epochTime,'targetEpoch',targetEpoch,'targetEpochIndex',targetEpochIndex,'context',{context}, ...
         'jointState',jointState,'predictedJointState',predictedJointState, ...
         'appliedInput',first,'inputTrajectory',predictedInput,'stateTrajectory',solution.states, ...
@@ -201,29 +197,52 @@ function command=localCommand(input,state,cfg)
 end
 
 function localWarmUp(cfg)
-    % One synthetic encounter on a straight road with an explicit state:
-    % four target-free samples, then a head-on target 40 m ahead at 8 m/s
-    % that appears and is tracked for one second. A sample without a
-    % solution ends it early; what it reached has been compiled.
+    % Startup probes cover cruise and bounded low-speed feedback, including
+    % a curved target. Every command and controller state is discarded.
     cfg=collisionAvoidanceControllerConfig(cfg);h=cfg.controller.sampleTime;
+    cfg.solver.timeLimitSeconds=max(1,cfg.solver.timeLimitSeconds);
+    cfg.solver.maxIterations=max(80,cfg.solver.maxIterations);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
-    x=[0;0;0;cfg.referenceSpeed;0;0];input=[0;0];state=[];
-    q=[40;0;pi;8;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
-    for frame=1:24
-        target=[];
-        if frame>4
-            p=predictiveSafetyGeometry.predictTarget(q,(frame-5)*h);
-            target=struct('targetPositionInertial',p(1:2),'targetVelocityInertial',p(4)*[cos(p(3));sin(p(3))], ...
-                'targetYawInertial',p(3));
+    for bounded=[false,true]
+        x=[0;0;0;cfg.referenceSpeed;0;0];input=[0;0];state=[];
+        q=[40;3;pi;8;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
+        if bounded
+            x(4)=0;q(1:6)=[-9;3.5;pi-.02;8;.1;.02];
         end
-        ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
-            'heldActuatorInput',input,'stateTime',(frame-1)*h);
-        try
-            [command,~,~,state]=collisionAvoidanceController(ego,target,road,cfg,state);
-        catch exception
-            if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
-            return;
+        for frame=1:24
+            time=(frame-1)*h;target=[];
+            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+            if frame>4 || bounded
+                if bounded && frame>12,q(3)=pi+.02;q(5)=-3;q(6)=-.02;end
+                p=predictiveSafetyGeometry.predictTarget(q,max(0,(frame-5)*h));
+                course=p(3)+p(6);
+                target=struct('targetPositionInertial',p(1:2), ...
+                    'targetVelocityInertial',p(4)*[cos(course);sin(course)], ...
+                    'targetYawInertial',p(3),'targetSideslip',p(6),'targetTangentialAcceleration',p(5));
+            end
+            ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
+                'heldActuatorInput',input,'stateTime',time);
+            if bounded
+                velocity=rotation*x(4:5);
+                ego.egoState=[x(1);velocity(1);0;x(2);velocity(2);0];ego.egoYaw=x(3);ego.egoYawRate=x(6);
+                bounds=[.001;.001;1e-4;1e-4;1e-4;1e-4];
+                ego.controllerErrorBound=struct('kind',"ego-state-v1",'time',time,'bounds',bounds, ...
+                    'available',true,'generator',diag(bounds),'generatorConvention',"commonPoseColumnsFirst");
+                target.controllerErrorBound=struct('kind',"target-state-v1",'time',time, ...
+                    'bounds',.001*ones(8,1),'available',true);
+                target.predictionErrorSet=struct('kind',"nrmm-constant-parameter-set-v1",'time',time,'available',true, ...
+                    'referenceEgoPose',x(1:3),'relativePosition',rotation.'*(p(1:2)-x(1:2)), ...
+                    'positionRadius',.001,'courseCenter',course-x(3),'courseRadius',1e-4, ...
+                    'speedInterval',p(4)+[-.001;.001],'accelerationInterval',p(5)+[-.001;.001], ...
+                    'curvatureInterval',sin(p(6))/p(7)+[-1e-5;1e-5],'rearAxleDistance',p(7));
+            end
+            try
+                [command,~,~,state]=collisionAvoidanceController(ego,target,road,cfg,state);
+            catch exception
+                if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
+                break;
+            end
+            input=command.actuatorInput;x=nonlinearBicycleModel.sample(x,input,cfg);
         end
-        input=command.actuatorInput;x=nonlinearBicycleModel.sample(x,input,cfg);
     end
 end

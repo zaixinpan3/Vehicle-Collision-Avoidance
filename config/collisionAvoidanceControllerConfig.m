@@ -25,25 +25,20 @@ function cfg=localDefaults()
     % Target encounters cover the nearest cruise conflict plus settling time,
     % between the configured minimum and maximum durations. The terminal
     % endpoint is an optimization constraint, not a seed stopping condition.
-    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
-    % trustRadius scales local state/input corrections about each SCP reference.
+    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',40);
+    % trustRadius scales local state/input corrections about the RTI reference.
     % The input trust scale adapts to the plan innovation: the scale whose
     % second-order prediction error equals trustInnovationMeters [m], within
     % [trustMinimumScale,trustMaximumScale]. trustRetention is the per-sample
     % retention of the estimated error coefficient; the scale grows by at most
     % 1/sqrt(trustRetention) per sample and shrinks at once.
-    % This across-frame estimate initializes the SCP trust region; internal
-    % merit and residual tests can reduce it to scp.minimumTrustScale.
+    % Only a completed prediction updates this scale for the next sample.
     cfg.nonlinear=struct('integrationStep',.05,'trustRadius',.5, ...
-        'trustInnovationMeters',.02,'trustInitialScale',.125, ...
+        'trustInnovationMeters',.02,'trustInitialScale',1, ...
         'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
-    % The nonlinear solver starts from lane feedback or shifted inputs.
-    % Elastic rows restore local feasibility while relinearization updates
-    % both dynamics and collision normals. Elastic slack must be below the numerical feasibility tolerance.
-    cfg.scp=struct('maximumIterations',80,'predictionSeconds',6,'minimumPredictionSeconds',3,'settlingSeconds',2, ...
-        'restorationWeight',1000,'performanceWeight',1, ...
-        'constraintTolerance',1e-3,'feasibleRefinementIterations',3,'minimumTrustScale',1e-4,'stepTolerance',.01,'meritTolerance',1e-4, ...
-        'acceptanceRatio',.05,'expansionRatio',.75);
+    % RTI builds one model per sample; prediction duration is independent
+    % of the number of nonlinear iterations (exactly one, not configurable).
+    cfg.rti=struct('predictionSeconds',2,'minimumPredictionSeconds',1,'settlingSeconds',.5);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
     % Collision rows apply at nodes inside it, including a later re-entry.
@@ -118,22 +113,17 @@ function cfg=localDefaults()
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
         'speedGain',.5,'brakingRatioLimit',.35);
-    % All SCP subproblems share the remaining controller-call budget.
+    % Both RTI stages share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     % constraintTolerance and optimalityTolerance are the conic solver's
-    % feasibility and gap tolerances; reducedTolerance is the precision at
-    % which a solve whose interior-point iterations stall is still accepted
-    % (Clarabel's AlmostSolved). A completed accepted SCP trial supplies the issued inputs directly.
-    % The lexicographic and CLF ties are 1e-4, so 1e-6 is
-    % precise enough (1e-8 and 1e-7 cost about a third more solver time).
-    % Looser buys nothing: at 1e-4 (ties and stall acceptance at 1e-3) a
-    % solve takes about one interior-point iteration fewer, the time per
-    % frame does not change measurably, and recoveries settle about 0.5 s
-    % later (report/SOLVER_TOLERANCE_20261011.tex).
-    cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
-        'feasibilityTolerance',1e-5,'constraintTolerance',1e-6, ...
-        'optimalityTolerance',1e-6,'lexicographicTieTolerance',1e-4, ...
-        'clfTieTolerance',1e-4,'reducedTolerance',1e-4);
+    % feasibility and gap tolerances; reducedTolerance is the precision
+    % for an AlmostSolved result. Budget includes controller preprocessing;
+    % the reserve leaves time for prediction and output assembly. Native
+    % solves also count their construction time against the remaining budget.
+    cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.05,'completionReserveSeconds',.020, ...
+        'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
+        'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
+        'clfTieTolerance',1e-3,'reducedTolerance',1e-3);
     cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6);
 end
 
@@ -169,16 +159,10 @@ function localValidate(cfg)
             || cfg.nonlinear.trustInitialScale>cfg.nonlinear.trustMaximumScale
         localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
     end
-    validateattributes(cfg.scp.maximumIterations,{'double'},{'scalar','integer','finite','positive'});
-    validateattributes(cfg.scp.feasibleRefinementIterations,{'double'},{'scalar','integer','finite','positive'});
-    for name=["predictionSeconds","minimumPredictionSeconds","settlingSeconds","restorationWeight","performanceWeight", ...
-            "constraintTolerance","stepTolerance","meritTolerance"]
-        validateattributes(cfg.scp.(name),{'double'},{'scalar','real','finite','positive'});
+    for name=["predictionSeconds","minimumPredictionSeconds","settlingSeconds"]
+        validateattributes(cfg.rti.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    validateattributes(cfg.scp.minimumPredictionSeconds,{'double'},{'<=',cfg.scp.predictionSeconds});
-    validateattributes(cfg.scp.minimumTrustScale,{'double'},{'scalar','real','finite','positive','<=',cfg.nonlinear.trustMinimumScale});
-    validateattributes(cfg.scp.acceptanceRatio,{'double'},{'scalar','real','>',0,'<',1});
-    validateattributes(cfg.scp.expansionRatio,{'double'},{'scalar','real','>',cfg.scp.acceptanceRatio,'<',1});
+    validateattributes(cfg.rti.minimumPredictionSeconds,{'double'},{'<=',cfg.rti.predictionSeconds});
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
@@ -242,7 +226,8 @@ function localValidate(cfg)
         if cfg.nominalClf.(name)>=1,localInvalid('nominalClf.%s must lie in (0,1).',name);end
     end
     validateattributes(cfg.solver.maxIterations,{'double'},{'scalar','real','finite','integer','positive'});
-    validateattributes(cfg.solver.timeLimitSeconds,{'double'},{'scalar','real','positive'});
+    validateattributes(cfg.solver.timeLimitSeconds,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.solver.completionReserveSeconds,{'double'},{'scalar','real','finite','nonnegative'});
     for name=["feasibilityTolerance","constraintTolerance","optimalityTolerance","clfTieTolerance","reducedTolerance"]
         validateattributes(cfg.solver.(name),{'double'},{'scalar','real','finite','positive'});
     end

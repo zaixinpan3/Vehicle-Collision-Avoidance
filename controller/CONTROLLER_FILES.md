@@ -9,7 +9,7 @@ terminal set and recursive feasibility.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | Successive convexification from nominal or shifted-input rollout references; repeated dynamics, collision-dual and terminal updates; internal elastic restoration, PCBF/CLF subproblems, nonlinear merit and trust decisions, unmodified selected optimizer inputs |
+| `solvePredictiveControl.m` | One RTI model from a shifted, nominal or initial braking rollout; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
 | `terminalSafeSet.m` | Mild braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with its steering, hence sideslip and course curvature, held; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the held steering), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
@@ -18,14 +18,14 @@ terminal set and recursive feasibility.
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
-Each sample iterates convex subproblems around exact declared-model rollouts.
-A starting reference may be unsafe or nonterminal; temporary elastic relaxation
-allows local restoration. Accepted nonlinear rollouts update the dynamics,
-collision multipliers and terminal rows. Only a completed accepted optimization
-with small elastic and nonlinear hard residual is eligible for return. The first
-input is issued unchanged. There is no separate avoidance-path generator,
-inherited slack budget or alternate controller. Numerical failures remain
-separate from the ideal mathematical recursive-feasibility claim.
+Each sample builds one affine model from one exact declared-model rollout and
+runs at most two native solves for the PCBF/CLF objectives. Cold conflicts use
+one mild-braking reference; other cold references use nominal lane feedback.
+There is no separate avoidance planner, nonlinear restoration loop, same-frame
+restart or previous-plan execution fallback. Nonlinear prediction does not
+certify nonlinear feasibility. Failed or unfinished optimization returns no
+command. The first optimized input is issued unchanged. The ideal mathematical
+recursive-feasibility theorem is independent of numerical RTI success.
 
 The terminal set is the set of states whose joint continuation under the
 terminal law (the ego braking to a stop with its sideslip and course
@@ -103,11 +103,12 @@ zero multipliers and translation invariance. At overlap the trajectory rows
 use the feasible dual of the least-penetrated rectangle axis
 (`supportLinearization`), which the test checks as an escape direction.
 
-`twoStagePredictiveControlTest` checks elastic restoration, repeated nonlinear
-relinearization, selected unmodified inputs, lexicographic priority, terminal
-membership, road and handling limits, actuator bounds and failure without an
-elastic fallback. `ordinaryDistanceDualTest` also checks consistent lateral
-orientation at symmetric overlap. `terminalSafeSetTest`, `nominalClfTest`,
-`trustInnovationTest` and `clfNominalRecoveryTest` retain their model, terminal,
-CLF, across-frame trust and recovery checks. Scenario campaigns use independent
-nonlinear replay and can keep routine results in temporary directories.
+`twoStagePredictiveControlTest` checks one-model RTI, both objective stages,
+unchanged optimized inputs, measurement updates, limits and explicit failure
+without retries or fallback. `observerPredictiveControlTest` retains enclosure
+integration and directional-family containment tests, including batch/scalar
+support equivalence. `ordinaryDistanceDualTest`, `terminalSafeSetTest`,
+`nominalClfTest`, `trustInnovationTest` and `clfNominalRecoveryTest` retain their
+geometry, terminal, CLF, trust and recovery checks. Functional tests can use an
+explicit generous wall budget; scenario timing uses the real-time defaults.
+Routine numerical outputs can remain in temporary directories.

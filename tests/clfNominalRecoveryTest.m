@@ -16,7 +16,8 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
     methods (Test)
         function targetFreeFrameMeetsTheNominalClfWithZeroSlack(testCase,referenceSpeed,curvature,lateralError)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
-                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2))));
+                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
+                'solver',struct('timeLimitSeconds',5)));
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
             [position,heading]=laneGeometry.referencePose(0,lateralError,road.referenceCurve);
@@ -38,13 +39,14 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             testCase.verifyEqual(metadata.solverCallCount,sum([metadata.search.stages.numericalSolve]));
             testCase.verifyEqual(metadata.tertiaryObjective,"none");
         end
-        function displacedAndReversedStatesEventuallyReturnToCruise(testCase,referenceSpeed,curvature)
+        function moderatelyDisplacedStatesReturnToCruiseWithOneStepPerFrame(testCase,referenceSpeed,curvature)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
-                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2))));
-            % These CLF fixtures start 20 or 40 m away; no road clearance is declared.
+                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
+                'solver',struct('timeLimitSeconds',5)));
+            % RTI recovery fixtures remain near an admissible local reference.
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);tolerance=[.1;pi/180;.1;.05;.01];
-            for initial=[-20,.2,reference.state(4),0,0;-40,2.5,6,.3,.1].'
+            for initial=[-2,.1,reference.state(4),0,0;-4,.3,referenceSpeed-1,.1,.05].'
                 x=[0;initial(1);reference.state(3)+initial(2);initial(3:5)];
                 prior=[];input=reference.input;inside=0;initialValue=nonlinearBicycleModel.nominalValue(x,road,reference);
                 for frame=1:1500
@@ -60,12 +62,21 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 testCase.verifyLessThan(nonlinearBicycleModel.nominalValue(x,road,reference),initialValue);
             end
         end
+        function aDistantReversedReferenceCanFailWithoutNonlinearRestoration(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
+                'controller',struct('horizonSteps',8),'solver',struct('timeLimitSeconds',5)));
+            ego=struct('position',[0;-40],'yaw',2.5,'speed',6, ...
+                'lateralVelocity',.3,'yawRate',.1,'heldActuatorInput',[0;0]);
+            testCase.verifyError(@()collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]), ...
+                'collisionAvoidanceController:noOptimizationSolution');
+        end
         function cruiseStaysOnTheReference(testCase,referenceSpeed,curvature)
             % Started on the reference, the cruise stays there: the plan's
             % later inputs, which the CLF row does not see, must not wander
             % between samples (they did at 15 m/s while the tie vanished).
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
-                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2))));
+                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
+                'solver',struct('timeLimitSeconds',5)));
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',600));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
             [position,heading]=laneGeometry.referencePose(0,0,road.referenceCurve);

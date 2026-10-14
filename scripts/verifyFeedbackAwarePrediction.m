@@ -16,7 +16,8 @@ function results = verifyFeedbackAwarePrediction(outputFile)
     radius=[.05;.05;.005;.02;.02;.005];generator=diag(radius);
     signs=2*(dec2bin(0:63,6)-'0')'-1;
     tube=localLinearTube(closed,b*gain*generator,generator,signs,gain);
-    count=cfg.controller.maximumHorizonSteps;h=cfg.controller.sampleTime;
+    % Offline stress duration is independent of the online RTI work budget.
+    count=512;h=cfg.controller.sampleTime;
     times=[0,1,3,5,count*h];steps=round(times/h);
     open=zeros(6,numel(steps));
     for index=1:numel(steps),open(:,index)=sum(abs(a^steps(index)*generator),2);end

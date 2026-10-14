@@ -50,14 +50,14 @@ passes through zero signed velocity at 2 s. Each export records the initial
 target state and parameters for independent reconstruction; the audit's
 `--files` option selects individual JSON exports. Historical exports without
 the revised target state require the audit source from their recorded commit.
-The optimizer uses successive convexification: nominal or shifted-input rollouts
-start the search, and accepted nonlinear trials update dynamics, collision duals
-and terminal rows. Each subproblem solves PCBF plus elastic restoration first,
-then CLF slack at the attained cap. An eligible completed trial has small elastic
-and reevaluated hard residual; its inputs are returned unchanged. Prediction
-states are nonlinear rollouts. Independent replay still determines physical
-clearance, which includes errors absent from the sampled prediction. See
-[the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
+The optimizer uses one RTI step per frame: one reference rollout and affine
+model, followed by PCBF and CLF objectives on that same model. It performs no
+nonlinear restoration loop or same-frame restart. Cold predicted conflicts use
+one mild-braking reference; no independent avoidance path is planned. Completed
+optimized inputs are returned unchanged; their nonlinear rollout is prediction,
+not nonlinear feasibility validation. The default 50 ms computation budget can
+return an explicit failure. Independent replay determines actual clearance and
+recovery. See [the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
 The campaign entry names containing `PotentialField` are retained for callers;
 they run the current controller, which has no potential-field avoidance planner.
 Routine outputs can use `/tmp/` instead of a persistent validation directory.

@@ -86,39 +86,56 @@ classdef predictiveSafetyGeometry
             % Directional enclosure of the same constant-parameter family.
             % A speed error moves principally along the target path; a ball
             % would incorrectly charge its full size in every normal.
-            support=zeros(size(normal,1),1);
+            data=predictiveSafetyGeometry.targetSupportData(q,errorSet,time);
+            support=predictiveSafetyGeometry.targetSupportFromData(data,1,normal);
+        end
+
+        function data = targetSupportData(q,errorSet,time)
+            % Batch the parameter-family support coefficients once per frame.
+            time=reshape(time,1,[]);count=numel(time);
+            data=struct('positionRadius',0,'direction',zeros(2,count),'arcError',zeros(1,count), ...
+                'courseDerivative',zeros(2,count),'curvatureDerivative',zeros(2,count), ...
+                'courseRadius',0,'curvatureRadius',0,'remainder',zeros(1,count),'ballRadius',zeros(1,count));
             if isempty(errorSet),return;end
-            arc=predictiveSafetyGeometry.targetArc(q,time);kappa=sin(q(6))/q(7);
-            ds=errorSet.speedRadius*abs(time)+.5*errorSet.accelerationRadius*time^2;
+            arc=predictiveSafetyGeometry.targetArc(q,time);kappa=sin(q(6,:))./q(7,:);
+            ds=errorSet.speedRadius*abs(time)+.5*errorSet.accelerationRadius*time.^2;
             dg=errorSet.courseRadius;dk=errorSet.curvatureRadius;
-            course=q(3)+q(6);theta=course+kappa*arc;
-            point=predictiveSafetyGeometry.predictTarget(q,time);
-            displacement=point(1:2)-q(1:2);
-            courseDerivative=[-displacement(2);displacement(1)];
-            a=kappa*arc;
-            if abs(a)<1e-3
-                % Integrate tau*J*t(course+kappa*tau) without division by a
-                % vanishing curvature. The retained series has O(a^5) error.
-                realPart=-a/3+a^3/30-a^5/840;
-                imaginaryPart=.5-a^2/8+a^4/144-a^6/5760;
-                curvatureDerivative=arc^2*[cos(course),-sin(course);sin(course),cos(course)] ...
-                    *[realPart;imaginaryPart];
-                seriesPadding=abs(arc)^2*abs(a)^7/45360;
-            else
-                curvatureDerivative=(arc*predictiveSafetyGeometry.direction(theta)-displacement)/kappa;
-                seriesPadding=0;
+            course=q(3,:)+q(6,:);theta=course+kappa.*arc;
+            half=kappa.*arc/2;scale=ones(size(half));nonzero=half~=0;
+            scale(nonzero)=sin(half(nonzero))./half(nonzero);
+            displacement=(arc.*scale).*predictiveSafetyGeometry.direction(course+half);
+            a=kappa.*arc;small=abs(a)<1e-3;
+            realPart=-a/3+a.^3/30-a.^5/840;
+            imaginaryPart=.5-a.^2/8+a.^4/144-a.^6/5760;
+            curvatureDerivative=arc.^2.*[cos(course).*realPart-sin(course).*imaginaryPart; ...
+                sin(course).*realPart+cos(course).*imaginaryPart];
+            large=~small;denominator=kappa;
+            if isscalar(denominator),denominator=repmat(denominator,1,count);end
+            if any(large)
+                curvatureDerivative(:,large)=(arc(large).*predictiveSafetyGeometry.direction(theta(large)) ...
+                    -displacement(:,large))./denominator(large);
             end
-            % Taylor remainder in (course, curvature), followed by the arc
-            % endpoint perturbation. Bounds hold also for negative arc length.
+            seriesPadding=zeros(1,count);seriesPadding(small)=abs(arc(small)).^2.*abs(a(small)).^7/45360;
             length=abs(arc);
-            remainder=.5*length*dg^2+.5*length^2*dg*dk+length^3*dk^2/6 ...
-                +ds*(dg+length*dk)+.5*(abs(kappa)+dk)*ds^2+dk*seriesPadding;
-            support=errorSet.positionRadius*vecnorm(normal,2,2) ...
-                +abs(normal*predictiveSafetyGeometry.direction(theta))*ds ...
-                +abs(normal*courseDerivative)*dg+abs(normal*curvatureDerivative)*dk ...
-                +vecnorm(normal,2,2)*remainder;
+            remainder=.5*length*dg^2+.5*length.^2*dg*dk+length.^3*dk^2/6 ...
+                +ds.*(dg+length*dk)+.5*(abs(kappa)+dk).*ds.^2+dk*seriesPadding;
             ball=predictiveSafetyGeometry.targetErrorTube(q,errorSet,time);
-            support=min(support,vecnorm(normal,2,2)*ball.positionRadius);
+            data.positionRadius=errorSet.positionRadius;
+            data.direction=predictiveSafetyGeometry.direction(theta);data.arcError=ds;
+            data.courseDerivative=[-displacement(2,:);displacement(1,:)];
+            data.curvatureDerivative=curvatureDerivative;
+            data.courseRadius=dg;data.curvatureRadius=dk;
+            data.remainder=remainder;data.ballRadius=ball.positionRadius;
+        end
+
+        function support = targetSupportFromData(data,index,normal)
+            magnitude=vecnorm(normal,2,2);
+            support=data.positionRadius*magnitude ...
+                +abs(normal*data.direction(:,index))*data.arcError(index) ...
+                +abs(normal*data.courseDerivative(:,index))*data.courseRadius ...
+                +abs(normal*data.curvatureDerivative(:,index))*data.curvatureRadius ...
+                +magnitude*data.remainder(index);
+            support=min(support,magnitude*data.ballRadius(index));
         end
 
         function q = target(observation,raw,~)

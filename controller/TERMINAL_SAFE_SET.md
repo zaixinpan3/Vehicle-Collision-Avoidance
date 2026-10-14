@@ -237,7 +237,7 @@ A plan meeting these rows is *accepted*.
   endpoint in `X_f` with its hard rows met and its midpoint clear. A terminal witness must also satisfy actuator, rear-adhesion and slew
   bounds. Equality of the mild model to the kinematic continuation alone
   does not establish those input conditions. This is a mathematical
-  existence premise, not a guarantee of the numerical SCP routine. The
+  existence premise, not a guarantee of the numerical RTI routine. The
   routine's reference extension by nominal feedback does not certify H3.
 
 **Proposition.** Under H1 and H2, if the plan of sample `k` is accepted and
@@ -304,25 +304,25 @@ radii and arc support extrema are computed directly. These sufficient local
 conditions avoid a contact witness jumping to an opposing gradient. They can
 be conservative; they do not redefine the exact membership evaluator.
 
-**Successive convexification.** The numerical controller starts from shifted
-inputs rolled out from the current estimate, or nominal lane feedback. It
-extends the reference with nominal feedback, without an avoidance planner or
-terminal-membership prerequisite. Prediction duration is chosen from the
-forecast interaction and configured bounds; it need not end at a stop.
+**Real-time iteration.** The numerical controller selects one reference per
+frame: shifted optimized inputs, nominal lane feedback, or one cold mild-braking
+rollout at a predicted collision. It builds the terminal rows once at that
+reference endpoint and solves the two convex objectives on the same model.
+Prediction duration follows the forecast interaction and configured bounds; it
+need not end at rest. No independent avoidance route or initial terminal
+membership is required to formulate the subproblem.
 
-Each accepted nonlinear rollout rebuilds the terminal and other constraint
-rows. One elastic variable permits restoration of an infeasible reference.
-A completed convex trial is eligible only when its nonlinear sampled hard
-residual and elastic slack satisfy the configured tolerance. The selected
-trial's inputs are issued unchanged. A stalled warm start can be replaced by
-one nominal-feedback reference within the same wall budget; this is another
-optimization initialization, not a substitute command.
+There is no shared elastic hard-row relaxation, nonlinear merit loop or
+same-frame restart. A completed RTI subproblem supplies unchanged optimized
+inputs. Their nonlinear rollout is prediction only; exact nonlinear terminal
+membership is not tested or claimed. A cold head-on reference can therefore
+remain locally infeasible and produce no command. A time-budget failure also
+returns no command, without executing the reference or old plan.
 
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) describes merit, trust
-updates, primary/secondary objectives and termination. A numerical SCP return
-with affine uncertainty margins does not establish the full joint-set
-terminal certificate of Section 9 or the hypotheses of the theoretical
-recursive-feasibility theorem. Numerical failure remains possible.
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) describes the hierarchy,
+trust update and computation budget. RTI with affine uncertainty margins does
+not establish the full joint-set terminal certificate of Section 9 or the
+premises of the ideal recursive-feasibility theorem.
 
 ## 8. Historical measured behavior
 

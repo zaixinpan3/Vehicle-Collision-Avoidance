@@ -13,6 +13,24 @@ classdef perceptionRangeTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aDiscardedStartupProbePreservesTheFirstPublicationAndRandomStream(testCase)
+            cfg=estimatorControllerIntegrationConfig();
+            ego=struct('position',[0;0],'yaw',0,'longitudinalVelocity',8, ...
+                'lateralVelocity',0,'yawRate',0);
+            target=@(time,unused)struct('targetPositionInertial',[20+8*time;3]);
+            context=nrmmEstimatorControllerAdapter("initialize",cfg,ego,target);
+            randomState=context.randomStream.State;runtime=context.runtime;
+            [~,probeEgo,probeTarget,probeFrame]=nrmmEstimatorControllerAdapter( ...
+                "sample",context,0,ego,target(0,ego));
+            testCase.verifyTrue(context.initialFramePending);
+            testCase.verifyEqual(context.randomStream.State,randomState);
+            testCase.verifyEqual(context.runtime,runtime);
+            [~,actualEgo,actualTarget,actualFrame]=nrmmEstimatorControllerAdapter( ...
+                "sample",context,0,ego,target(0,ego));
+            testCase.verifyEqual(actualEgo,probeEgo);
+            testCase.verifyEqual(actualTarget,probeTarget);
+            testCase.verifyEqual(actualFrame,probeFrame);
+        end
         function positionsArePublishedOnlyWithinFiftyMeters(testCase,rangeMeters,azimuth)
             cfg=estimatorControllerIntegrationConfig();
             testCase.verifyEqual(cfg.sensor.radar.rangeMaximum,50);
