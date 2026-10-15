@@ -1,10 +1,11 @@
 function runPotentialFieldCampaign(sourceRoot,outputDirectory,frameCount,options)
 %runPotentialFieldCampaign Follow each encounter through nominal cruise recovery.
-% frameCount is an observation cap, never a success deadline.
+% By default run to nominal recovery or failure. A finite frameCount is an
+% explicitly requested diagnostic observation cap, never a success deadline.
     arguments
         sourceRoot
         outputDirectory
-        frameCount (1,1) double {mustBeInteger,mustBePositive}
+        frameCount (1,1) double {mustBePositive} = Inf
         options.EstimatorConfiguration (1,1) struct = struct()
     end
     cd(sourceRoot);addpath('controller','config','scripts');

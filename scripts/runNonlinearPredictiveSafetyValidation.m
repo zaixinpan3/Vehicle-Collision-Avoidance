@@ -4,8 +4,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
 % The audit is offline evidence; it is not an execution admission layer.
 % Terminal membership certifies a possible safe continuation of the prediction;
 % it does not end the driving task or activate the terminal policy.
-% Continue until a failure, the observation cap, or an enabled nominal-recovery
-% dwell. A finite observation cap does not by itself establish task recovery.
+% By default continue until failure or sustained nominal recovery. Frames=Inf
+% imposes no simulation-duration limit; finite Frames enables a bounded diagnostic.
+% A finite observation cap does not by itself establish task recovery.
 % Frames is a cumulative observation cap, including when resuming a saved
 % continuation. A completed duration is distinct from confirmed recovery.
 % TargetEstimateFunction(targetTruth,egoTruth) is an optional synthetic
@@ -15,14 +16,14 @@ function report = runNonlinearPredictiveSafetyValidation(options)
 % FailureFile saves experiment inputs for offline reproduction only.
 % Theoretical certificate availability is not an experiment failure criterion.
     arguments
-        options.Frames (1,1) double {mustBeInteger,mustBePositive} = 8
+        options.Frames (1,1) double {mustBePositive} = Inf
         options.Scenarios (1,:) string = ["recovery","oncoming","circular","turningTarget"]
         options.OutputFile (1,1) string = ""
         options.ControllerConfiguration (1,1) struct = struct('referenceSpeed',8, ...
             'controller',struct('horizonSteps',8))
         options.StateTransition (1,1) string {mustBeMember(options.StateTransition,["ode45","nominalRk4"])} = "ode45"
         options.RequireCollisionThreat (1,1) logical = false
-        options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
+        options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 1
         options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
         options.RecoveryTolerances (5,1) double {mustBePositive,mustBeFinite} = [.1;pi/180;.1;.05;.01]
         options.ContinuationFile (1,1) string = ""
@@ -31,6 +32,10 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         options.EstimatorConfiguration (1,1) struct = struct()
         options.FailureFile (1,1) string = ""
     end
+    assert(isreal(options.Frames) && (options.Frames==Inf || ...
+        (isfinite(options.Frames) && options.Frames==fix(options.Frames))), ...
+        'runNonlinearPredictiveSafetyValidation:invalidFrameLimit', ...
+        'Frames must be a positive integer or Inf.');
     assert(isempty(options.TargetEstimateFunction) || isa(options.TargetEstimateFunction,'function_handle'), ...
         'TargetEstimateFunction must be empty or a function handle.');
     observationModel="exactTargetState";
@@ -79,7 +84,19 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             end
         end
         controllerWarmUpSeconds=toc(warmUpTimer);
-        baseline=givenPathCollisionBaseline(road,initialTarget,cfg,options.Frames*cfg.controller.sampleTime);
+        if strlength(options.ResumeFrom)>0
+            saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;
+            baseline=saved.result.baselineCruise;
+        else
+            baselineDuration=options.Frames*cfg.controller.sampleTime;
+            if isinf(baselineDuration)
+                % Finite qualification of the initial encounter, not a cap
+                % on closed-loop execution or future observer/controller updates.
+                baselineDuration=max(cfg.rti.predictionSeconds, ...
+                    2*cfg.collision.encounterRangeMeters/cfg.referenceSpeed);
+            end
+            baseline=givenPathCollisionBaseline(road,initialTarget,cfg,baselineDuration);
+        end
         if options.RequireCollisionThreat && (~baseline.collisionDetected || baseline.initialClearanceMeters<=0)
             error('runNonlinearPredictiveSafetyValidation:notCollisionThreat', ...
                 'Scenario %s must start separated and collide under given-path constant-speed cruise.',name);
@@ -96,12 +113,12 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'entryTimeSeconds',NaN,'confirmationTimeSeconds',NaN);
         % A recovery dwell must follow the prescribed encounter, rather than
         % an arbitrary elapsed duration or the initially nominal state.
-        if options.RequireCollisionThreat
+        if baseline.collisionDetected
             recovery.minimumTimeSeconds=max(recovery.minimumTimeSeconds,baseline.lastCollisionSeconds);
         end
         recoveryStart=NaN;
         if strlength(options.ResumeFrom)>0
-            saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;r=saved.result;
+            r=saved.result;
             assert(~isfield(r,'terminalHandoff'), ...
                 'runNonlinearPredictiveSafetyValidation:incompatibleTaskSemantics', ...
                 'The saved run uses the retired terminal-entry experiment schema.');
@@ -130,7 +147,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             recoveryStart=saved.recoveryStart;
         end
         recoveryOptions=recovery;truthPath=[];
-        for frame=frames+1:options.Frames
+        frame=frames;
+        while frame<options.Frames
+            frame=frame+1;
             frameTimer=tic;
             phase="observer";controllerTimer=[];
             egoTruth=ego;targetTruth=target;priorAtFrame=prior;
@@ -351,6 +370,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     report=struct('model',"nonlinear combined-slip Fiala; one constant-acceleration/constant-sideslip target", ...
         'targetStateOrder',["X","Y","psi","V","A","beta","lr","halfLength","halfWidth","offsetX","offsetY"], ...
         'scope',"RTI PCBF/CLF with independent offline replay", ...
+        'observationLimitEnabled',isfinite(options.Frames), ...
         'stateObservation',options.StateTransition+" ego successor; target observation: "+observationModel, ...
         'targetTruth',"fixed initial constant-A/constant-beta trajectory, independent of estimated forecasts", ...
         'failureCriteria',["groundTruthCollision","noSolvedControlOutput"], ...

@@ -83,9 +83,10 @@ enclosures still tighten the same optimization. Experimental collision checks
 use independent fixed-parameter target truth, and failure means collision or
 no solved control output. Terminal membership is a predicted-endpoint safety
 certificate, not an execution mode, shutdown trigger or nominal-task success
-criterion. Scenario runs continue until failure, an observation cap or an
-explicitly enabled nominal-recovery dwell. Campaigns measure recovery to lane
-keeping and cruise control after the encounter. Recovery, margin shortfalls and unverified theory
+criterion. Scenario runs default to no frame limit and continue until failure
+or sustained nominal recovery. Finite frame limits are explicit diagnostics.
+Campaigns measure recovery to lane keeping and cruise control after the
+encounter. Recovery, margin shortfalls and unverified theory
 premises are separate observations. `nominalRecoveryValidationTest` and
 `../scripts/verifyExperimentalAssumptionPolicy.m` exercise these distinctions.
 

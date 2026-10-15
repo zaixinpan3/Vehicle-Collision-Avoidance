@@ -2,11 +2,11 @@ function campaign = runCollisionThreatValidation(options)
 %runCollisionThreatValidation Test only baseline-certified collision conflicts.
 % Historical benign fixtures remain available as separate regression controls.
     arguments
-        options.Frames (1,1) double {mustBePositive,mustBeInteger} = 160
+        options.Frames (1,1) double {mustBePositive} = Inf
         options.Speeds (1,:) double {mustBePositive,mustBeFinite} = [8,15]
         options.OutputDirectory (1,1) string = string(tempname)
-        options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
-        options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 8
+        options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 1
+        options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
     end
     names = ["headOn","acceleratingHeadOn","brakingLead","crossing", ...
         "turningCrossing","curvedHeadOn","curvedCrossing"];

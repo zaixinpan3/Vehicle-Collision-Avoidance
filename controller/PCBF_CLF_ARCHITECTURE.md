@@ -185,8 +185,12 @@ recovery throughout the observation. Current-state terminal membership does
 not stop simulation or count as task completion. The terminal set certifies
 a possible safe continuation at the predicted endpoint; the controller keeps
 executing its optimized first input on each frame. Campaign recovery requires
-a sustained dwell near the prescribed path and speed after the encounter;
-an observation cap alone does not establish recovery.
+a sustained dwell near the prescribed path and speed after the encounter.
+An optional finite observation cap is a diagnostic setting; by default
+`Frames=Inf` runs until recovery or failure without a simulation-time limit.
+A finite counterfactual baseline qualifies the initial encounter independently
+of the closed-loop duration. Resumed observations retain their original
+baseline and minimum recovery time.
 
 Controller-state schema 82 rejects old numerical state schemas. The ideal
 recursive-feasibility theorem, its model-mismatch bookkeeping and causal policy

@@ -9,6 +9,32 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function defaultObservationHasNoFrameLimitAndStopsOnRecovery(testCase)
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",RecoveryDwellSeconds=.1);
+            r=report.results;
+            testCase.verifyEqual(r.requestedFrames,Inf);
+            testCase.verifyFalse(report.observationLimitEnabled);
+            testCase.verifyTrue(r.recovery.recovered);
+            testCase.verifyEqual(r.outcome,"recovered");
+            testCase.verifyTrue(isfinite(r.baselineCruise.durationSeconds));
+        end
+        function aLimitedObservationCanContinueWithoutAFrameLimit(testCase)
+            file=string(tempname)+".mat";testCase.addTeardown(@()delete(file));
+            first=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=2, ...
+                RecoveryDwellSeconds=.2,ContinuationFile=file,StateTransition="nominalRk4");
+            resumed=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=Inf, ...
+                RecoveryDwellSeconds=.2,ResumeFrom=file,StateTransition="nominalRk4");
+            r=resumed.results;
+            testCase.verifyTrue(r.recovery.recovered);
+            testCase.verifyFalse(resumed.observationLimitEnabled);
+            testCase.verifyEqual([r.trace(1:2).nextState],[first.results.trace.nextState]);
+            testCase.verifyEqual(r.baselineCruise,first.results.baselineCruise);
+        end
+        function frameLimitsMustBeWholeNumbersOrUnlimited(testCase)
+            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
+                Scenarios="recovery",Frames=1.5), ...
+                'runNonlinearPredictiveSafetyValidation:invalidFrameLimit');
+        end
         function anInitiallyTerminalCruiseStateStillRunsPredictiveControl(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=4);
             r=report.results;x=r.trace(1).estimatedState;cfg=r.configuration;
@@ -68,8 +94,8 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyFalse(report.results.experimentFailed);
             testCase.verifyEqual(report.results.outcome,"observationLimit");
         end
-        function defaultFixedDurationDoesNotClaimRecovery(testCase)
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=2);
+        function explicitFixedDurationDoesNotClaimRecovery(testCase)
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=2,RecoveryDwellSeconds=0);
             testCase.verifyTrue(report.results.completed);
             testCase.verifyFalse(report.results.recovery.enabled);
             testCase.verifyFalse(report.results.recovery.recovered);
