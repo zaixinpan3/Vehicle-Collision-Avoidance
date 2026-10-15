@@ -96,21 +96,22 @@ robust model predictive control, vehicle state estimation.
 
 \section{Introduction}
 
-\IEEEPARstart{L}{ane}-keeping systems are a mature product
-\cite{WeiPfefferEdelmann2024}. They regulate the lateral offset and
-heading of the vehicle relative to a lane reference, and when another
-vehicle threatens a collision they hand the problem back to the driver.
-A good deal of work has gone into closing that gap by combining lane
-keeping with an automated evasive response
+\IEEEPARstart{L}{ane}-following systems are widely deployed in
+production vehicles to automate steering and maintain travel within a
+designated lane \cite{WeiPfefferEdelmann2024}. Together with longitudinal
+speed control, they enable a vehicle to cruise along its lane without
+continuous steering or speed corrections by the driver
+\cite{XuGrizzleTabuadaAmes2018}. Lane following alone, however, does not
+provide the evasive response needed when a nearby vehicle poses a
+collision threat, and timely driver intervention may still be required
+\cite{ChengLiLiuLiGuo2021}. Integrating lane following with vehicle
+collision avoidance has therefore attracted sustained research interest
 \cite{TurriCarvalhoTsengJohanssonBorrelli2013,FahmyGhanyBaumann2018,
-ChengLiLiuLiGuo2021,BruggemannSteevesKrstic2022,XuGrizzleTabuadaAmes2018,
-VorosEtAl2026}. The behavior we want is simple to state. The car follows
-its lane at a set speed. When another vehicle is about to collide with
-it, the car steers and brakes to avoid that vehicle, stays on the road
-while it does so, and afterwards returns to its lane and its speed.
-Lane keeping and collision avoidance should be one system, because the
-return to the lane is part of the avoidance and the avoidance is a
-departure from the lane.
+ChengLiLiuLiGuo2021,BruggemannSteevesKrstic2022}. This paper presents an
+integrated system that follows a prescribed lane at a desired cruising
+speed, autonomously steers and brakes to avoid threatening vehicles,
+and returns to nominal cruising after the encounter, without requiring
+driver intervention throughout the maneuver.
 
 Existing integrated designs, and collision-avoidance controllers more
 generally, fall short in two ways. The first concerns information. Most
