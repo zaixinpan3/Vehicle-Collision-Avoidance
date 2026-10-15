@@ -1,0 +1,246 @@
+{
+  "prepared_date": "2026-10-14",
+  "scope": "Selected original-PDF full-main-body review of planar constrained vehicle barrier methods and ego-motion-aware target estimation. No manuscript revision or experiment reproduction.",
+  "source_method": "Read-only Zotero Desktop local API; attached local original PDFs; pdftotext with page breaks; selected original page renders.",
+  "reviewed_count": 11,
+  "reviewed_sources": [
+    {
+      "key": "X3EUXWYE",
+      "title": "High-Order Control Barrier Functions",
+      "DOI": "10.1109/TAC.2021.3105491",
+      "pdf_pages": 8,
+      "pdf_sha256": "1db13b94d2ac5d42e839e2138711313a5ad28292e29c8e6654c7ef820a0d282c",
+      "zotero_attachment_key": "ZAM294SY",
+      "original_pdf_filename": "Xiao and Belta - 2022 - High-Order Control Barrier Functions.pdf",
+      "coverage": "Full original PDF pp1-8 all sections, proofs and references.",
+      "findings": [
+        "Definition8 Eq13 includes sup over admissible U on intersection C1...Cm; Theorem4 requires initial state in all derivative-defined sets and controller satisfying final inequality for all time. Raw distance is seed, not a first-order CBF merely by writing inequality.",
+        "Remark1 boundary b=0 and bdot<0 cannot satisfy first derivative barrier for any class-K tuning. Direct formal support for independently derived planar example.",
+        "Theorem5 and Corollary1 provide sufficient conditions for input compatibility; penalty adjustment also changes admissible initial set. SecIVB parameterization seeks feasible designs offline; not universal arbitrary-state guarantee.",
+        "SecVB is DIRECT bounded-input planar unicycle example, not just longitudinal ACC: yaw-rate limit .2rad/s, accel .5m/s2, speed0..2m/s, squared-distance second-order HOCBF plus speed/CLFs. Supports distinction between position-only first-order failure and legitimate distance-seeded HOCBF.",
+        "Remark8 explicitly warns sampled implementation may lose safety between sample instants. Do not assert HOCBF framework intrinsically ignores actuation bounds."
+      ]
+    },
+    {
+      "key": "VCX6LIPN",
+      "title": "Obstacle Avoidance for Low-Speed Autonomous Vehicles With Barrier Function",
+      "DOI": "10.1109/TCST.2017.2654063",
+      "pdf_pages": 13,
+      "pdf_sha256": "0e11f50affccc59986201f52bcc45ff7324e4c9c9ea85fdad465980e1ad8e068",
+      "zotero_attachment_key": "HNN8WQR9",
+      "original_pdf_filename": "Chen et al. - 2018 - Obstacle Avoidance for Low-Speed Autonomous Vehicles With Barrier Function.pdf",
+      "coverage": "Full original PDF pages1-13 including AppendicesA-L and proofs.",
+      "findings": [
+        "Acceleration/yaw-rate unicycle, speed/yaw/acceleration/friction constraints Eq3 and Eq39. Relative 4D state includes positions,speed,bearing. Constructs avoidable set via polar algorithm before reciprocal facet barriers Eq40 and mixed-integer disjunction Eq44. Genuine input/dynamics-aware alternative, not naive rawdistance.",
+        "Safety definition is passive-friendly responsibility Eq8: stopped-vehicle contact and rear contact excluded. Accurate full state sensing assumed p2. Bounded adversarial pedestrian speed Eq9. Do not advertise theorem as unconditional physical noncollision.",
+        "SectionVA infeasible set uses braking only and grid convex hull, intentionally conservative relative to steering options. p7 multiple-obstacle filter may become infeasible; common emergency braking fallback preserves defined passive safety outside braking infeasible sets.",
+        "AppendixH sampled inequality derived assuming state derivative constant within interval EqA32, despite nonlinear original dynamics; no general exact intersample certificate established by that Taylor derivation.",
+        "1000 trials compare polar/HJ/potential field, not our simulations. No reproduction performed."
+      ]
+    },
+    {
+      "key": "PHWFIKQE",
+      "title": "Simultaneous Lane-Keeping and Obstacle Avoidance by Combining Model Predictive Control and Control Barrier Functions",
+      "DOI": "10.1109/CDC51059.2022.9992613",
+      "pdf_pages": 6,
+      "pdf_sha256": "c9003d845a6cde0704611148bd1e4cdd30fc037a2d207522191dc0f0075fb0f0",
+      "zotero_attachment_key": "969ZCJGW",
+      "original_pdf_filename": "Bruggemann et al. - 2022 - Simultaneous Lane-Keeping and Obstacle Avoidance by Combining Model Predictive Control and Control B.pdf",
+      "coverage": "Full original PDF pages 1-6, all main sections and references.",
+      "findings": [
+        "Constant longitudinal speed, linear lateral bicycle model and nonlinear global position mapping; steering bounded. Relative degree two explicitly identified pp2-3.",
+        "Lane/obstacle deforming barriers, not raw circular distance; exponential and prescribed-time backstepping. Lemma1 assumes nonzero decoupling coefficient everywhere in safe domain, symmetric gains and positive left-lane expansion Eq13. p3 admits coefficients can vanish.",
+        "Lemma1 feasible QP optimizes over R, so unbounded-control control-sharing is not physical steering-bound feasibility. ICCBF SecIII-D further restricts set and requires sup over |u|<=umax Eq18; validating it hard, finite successful iteration count open, combined PTSf-ICCBF theory outside scope.",
+        "SectionV simulations use ev=0 despite positive expansion assumption in proof. Late obstacle15m at20m/s, steering5deg: saturating non-input-aware safety filter causes collision, ICCBF counterpart avoids in the reported case. Direct 2D evidence supporting bounded-input critique.",
+        "Sensing, computing and acquisition beyond scope. Conclusion ongoing research for theoretical guarantees of combined variants."
+      ]
+    },
+    {
+      "key": "BXD33RMX",
+      "title": "Rule-Based Safety-Critical Control Design using Control Barrier Functions with Application to Autonomous Lane Change",
+      "DOI": "10.23919/ACC50511.2021.9482848",
+      "pdf_pages": 8,
+      "pdf_sha256": "c0d9f2fee4c6ed41f318dcc4da000c238c3f5a8cbb087802313f593b3f6e3397",
+      "zotero_attachment_key": "DBW4J3IM",
+      "original_pdf_filename": "He et al. - 2021 - Rule-Based Safety-Critical Control Design using Control Barrier Functions with Application to Autono.pdf",
+      "coverage": "Full original PDF pp1-8 including discussion, tables and references.",
+      "findings": [
+        "Small-sideslip CG kinematic bicycle: direct beta affects translational velocity Eq2; cannot transplant rear-axle unicycle relative-degree calculation unchanged. Input and beta-rate constraints TableIII.",
+        "Barrier constraints Eq11-13 include time headway and relative-speed-squared braking-distance terms; abort-state lateral clearance is piecewise. NOT simply raw Euclidean distance.",
+        "Uses FSM switches on QP solvability; safe switching requires membership in both safe sets. No blanket all-state bounded-input recursive feasibility result established by general CBF preliminaries.",
+        "TableVI infeasible fractions .48% urban and .20% highway, but paper attributes failures to unphysical surrounding cars passing through each other and consequent selected-target/barrier discontinuity. Must not relabel as proof of actuator-induced infeasibility.",
+        "Remark2 accurate surrounding state data; SecV explicitly assumes exact perception/no delay and leaves state estimator/noisy-distance safety margin and communication delay to future work."
+      ]
+    },
+    {
+      "key": "2N6ZYVGF",
+      "title": "Safety-Critical Control With Nonaffine Control Inputs Via a Relaxed Control Barrier Function for an Autonomous Vehicle",
+      "DOI": "10.1109/LRA.2022.3142408",
+      "pdf_pages": 8,
+      "pdf_sha256": "2cd65b8d153a667725246582f60f424f7c607bddb117527bf7c4078c35410d9e",
+      "zotero_attachment_key": "GD28FWDY",
+      "original_pdf_filename": "Seo et al. - 2022 - Safety-Critical Control With Nonaffine Control Inputs Via a Relaxed Control Barrier Function for an.pdf",
+      "coverage": "Full original PDF pages1-8 including singular-perturbation proof and both experiments.",
+      "findings": [
+        "Nonaffine dynamic bicycle with flat output and dynamic-inversion control. CBF relaxed into penalty. Theorem1/Remark1 guarantee enlarged h>=-mu rather than exact h>=0.",
+        "Numerical lane-change safety function is speed limit h=vs^2-vx^2 p4; CarMaker front-car/cut-in uses h=D-0.5*ydot1 p7 (longitudinal time-headway). NOT a pure planar distance obstacle CBF example.",
+        "Parameter tr in[-1,1] modeled, but DI update Eq17 has no explicit displayed projection/invariance of bounded input set. Assumption1 requires invertibility and exact tracking solution existence. No need claim theorem false to establish restricted scope.",
+        "Full-state sensor info in CarMaker p7, relaxed barrier and discretization admit small violations p7. Exclude as direct counterexample to user planar-distance claim."
+      ]
+    },
+    {
+      "key": "3GHTX9QC",
+      "title": "Turning Circle-Based Control Barrier Function for Efficient Collision Avoidance of Nonholonomic Vehicles",
+      "DOI": "10.1109/TCST.2026.3692226",
+      "pdf_pages": 8,
+      "pdf_sha256": "c62b84a97bd85885698d7bd5072c2eacca2010068a06af07c7cb1db16b238974",
+      "zotero_attachment_key": "KKMLKN96",
+      "original_pdf_filename": "Lee et al. - 2026 - Turning Circle-Based Control Barrier Function for Efficient Collision Avoidance of Nonholonomic Vehi.pdf",
+      "coverage": "Full original PDF pages 1-8, including geometric proof, MPC, experiments and conclusion; pages 4-5 reread after initial tool truncation.",
+      "findings": [
+        "Eq5 acceleration/yaw-rate unicycle with speed state; bounded yaw-rate. Eq6 raw Euclidean clearance is seed; Eq7 ED comparator is hdot+alpha*h, not a position-only first-order barrier. Remark1 explicitly calls it second-order.",
+        "TC geometry incorporates turning radius R=u/rmax and smooth underapproximation of max(left,right clearances). Proposition1 gives a fixed turning-circle safety witness for static obstacle, constant speed and instant saturated yaw-rate; this is not a recursive-feasibility proof for the full rate-constrained, moving-obstacle MPC.",
+        "MPC Eq13 has state/input/rate constraints and discrete barrier over finite horizon; terminal cost but no displayed invariant terminal-set constraint. Constant-velocity obstacle predictions.",
+        "ASV hardware rather than road-car hardware. Remark2 says robust tube tightening is future. Conclusion excludes noise/delay and calls for more rigorous mathematical formulation beyond geometry."
+      ]
+    },
+    {
+      "key": "I55U59XZ",
+      "title": "A Collision Cone Approach for Control Barrier Functions",
+      "DOI": "10.1109/TCST.2026.3661160",
+      "pdf_pages": 14,
+      "pdf_sha256": "bbb000688b12528a3b70cefcf2680cc3e7b4fb245cd4ce2b114568fe1fb50bc8",
+      "zotero_attachment_key": "IDB9K9YS",
+      "original_pdf_filename": "Tayal et al. - 2026 - A Collision Cone Approach for Control Barrier Functions.pdf",
+      "coverage": "Original PDF main body and AppendicesA-C pp1-12 read in full; pp13-14 reference/biography pages not substantive review scope.",
+      "findings": [
+        "Unicycle acceleration and angular acceleration; bicycle small-slip affine CG model; obstacle constant-velocity assumptions Theorems1-2. Collision-cone h uses relative position AND velocity.",
+        "SectionII-C p1300 explicitly optimizes over R^m and states infinite control authority, leaving input limits future; conclusion p1307 confirms no input limits in simulations and high-speed hardware failures from saturation. Strong direct bounded-input caveat, not a naive-position-only example.",
+        "Theorem2 validity on C rather than whole D; unicycle proof referred to earlier source, not supplied here; source was not independently read. AppendixA bicycle uses approximated relative velocity unequal to actual position derivative p1301, conservative radius and small-beta assumptions.",
+        "Remark2 p1303 single-obstacle guarantees; conflicting multiobstacle cones and perception-boundary selection theory left future. Stopping fallback in conclusion is not unconditional noncollision against moving obstacles.",
+        "Motion capture used in ground experiments, EKF described for quadrotor. Neither justifies claiming all works ignore estimation altogether."
+      ]
+    },
+    {
+      "key": "9D45ZPMM",
+      "title": "Future-Focused Control Barrier Functions for Autonomous Vehicle Control",
+      "DOI": "10.23919/ACC55779.2023.10156163",
+      "pdf_pages": 8,
+      "pdf_sha256": "488b9c7c3b0941b9a89119645d50eba09c2318e9dff6499b0ede5866fd45dfc8",
+      "zotero_attachment_key": "8C96J6YM",
+      "original_pdf_filename": "Black et al. - 2023 - Future-Focused Control Barrier Functions for Autonomous Vehicle Control.pdf",
+      "coverage": "Full original PDF pp1-8 including appendix and experiments.",
+      "findings": [
+        "Dynamically extended kinematic bicycle with slip-angle rate and acceleration inputs Eq8. ff-CBF uses minimum predicted distance under constant-velocity surrogate, not just current distance. Assumption1 excludes initially predicted collisions over horizon.",
+        "Theorem1 proves regularity and relation to physical barrier, not bounded-input existence. p5 explicitly states valid CBF IF admissible-input sup condition holds. Theorem2 assumes feasible boundary condition for all time.",
+        "Centralized simulations optimize acceleration with bounds; turning nominal clipped separately. ff-CBF 96.3% feasibility one-left-turn, relaxed version100% in1000 trials. p6 explicitly leaves theoretical feasibility guarantees future.",
+        "Hardware uses Vicon and PX4 EKF; cannot claim no state estimation considered. No propagated deterministic tracking-error tube in safety theorem is provided in examined formulation.",
+        "Constant zero-input surrogate generally still curves for nonzero slip in Eq8, whereas distance prediction assumes straight constant velocity; do not claim constant-input kinematic trajectory equivalence generally."
+      ]
+    },
+    {
+      "key": "AI2W6SI7",
+      "title": "Safety-Critical Model Predictive Control with Discrete-Time Control Barrier Function",
+      "DOI": "10.48550/arXiv.2007.11718",
+      "pdf_pages": 9,
+      "pdf_sha256": "5b8789704c0a9faebac33a139840a5b43629bcc46219ee3598a83bbef9d6654c",
+      "zotero_attachment_key": "L8LFJVWA",
+      "original_pdf_filename": "Zeng et al. - 2021 - Safety-Critical Model Predictive Control with Discrete-Time Control Barrier Function.pdf",
+      "coverage": "Full original arXiv v3 PDF pp1-9 including racing appendix.",
+      "findings": [
+        "Discrete barrier Eq10f plus bounded-input MPC; raw quadratic-distance obstacle h Eq17 and quartic shape h Eq21; discrete setting is not the continuous first-order derivative test.",
+        "SecIIIC feasibility analysis qualitative; Remark4 p5 explicitly says fixed decay parameter generally provides pointwise feasibility and persistent feasibility remains open. Generic terminal-set symbol does not by itself construct a suitable terminal safe policy.",
+        "2D double integrator example is not nonholonomic; racing example uses lateral dynamic model with regressed linear prediction, perfect position estimates explicitly assumed p8, other cars constant lateral offset/speed.",
+        "A proof of safety under indefinitely feasible exact discrete constraints must be separated from recursive feasibility, model mismatch and continuous intersample safety."
+      ]
+    },
+    {
+      "key": "8P4BHHZU",
+      "title": "Simultaneous ego-vehicle state estimation and vehicle trajectory tracking using a multistage high gain observer",
+      "DOI": "10.1016/j.trc.2025.105411",
+      "pdf_pages": 20,
+      "pdf_sha256": "f8414de25dd6bfa1d65ed4c4681d57b692bf5837622a5e2fbee7bafff4f03621",
+      "zotero_attachment_key": "TM3DRHJL",
+      "original_pdf_filename": "Sharma et al. - 2026 - Simultaneous ego-vehicle state estimation and vehicle trajectory tracking using a multistage high ga.pdf",
+      "coverage": "Full original published PDF pp1-20 including derivations, observer conditions, experiment discussion, tables and references.",
+      "findings": [
+        "Eqs9-12 derive rotating-ego relative-position terms and quantify mismatch from misusing inertial dynamics as relative dynamics. Eq15 shows inertial-converted measurement error scaling with ego pose error and range.",
+        "NRMM Eq16-18 uses relative position/heading but absolute target speed/acceleration/slip, body ego velocities and yaw-rate. Motion-model Eq17 assumes target acceleration and sideslip constant; this is a model class, not arbitrary unknown maneuver coverage.",
+        "Assumption1 p6 sets measured BODY acceleration derivatives adotx=adoty=0 and yaw-rate derivative udot3=0. Eqs24-25 still have nonzero inertial jerk during turning; do not paraphrase as zero inertial jerk. NRMM companion derivation uses this again p10.",
+        "Lipschitz calculation pp11-12 freezes ego and target yaw rates; do not reuse constant-rate partial Jacobian as uniform certificate over arbitrary maneuvering domain. Need project-specific validated domains/derivatives.",
+        "Theorem1 nominal exponential observer result; yaw observer Theorem2 H-infinity L2 attenuation does not supply a deterministic pointwise collision tube automatically. Position/velocity chart has divisions by target speed squared.",
+        "Full-scale road data (not closed-loop evasive collision-avoidance control), two highway cases and RMM near-relative-zero failure; Table3 NRMM not best in every metric: InMM absolute-speed RMS .24 vs NRMM .41; RMM course RMS1.12 vsNRMM1.19deg. Do not repeat blanket superiority.",
+        "Alai2024 provides same relative-model antecedent; NRMM not proved unique necessary model. Any consistent relative or properly transformed inertial model with certified errors could in principle be used."
+      ]
+    },
+    {
+      "key": "MZVVMVMM",
+      "title": "On the Importance of Accurate Relative Motion Models for Target Vehicle Trajectory Tracking",
+      "DOI": "10.1016/j.ifacol.2024.12.035",
+      "pdf_pages": 6,
+      "pdf_sha256": "701f4179ee8103801418417d602018edb178aa4be4de382e39af33f4c53d5a6e",
+      "zotero_attachment_key": "VH7FC6LE",
+      "original_pdf_filename": "Alai et al. - 2024 - On the Importance of Accurate Relative Motion Models for Target Vehicle Trajectory Tracking.pdf",
+      "coverage": "Full original PDF pp1-6 including sensor alternatives, simulations, EKF experimental section and conclusions; garbled extracted equations require visual check.",
+      "findings": [
+        "Eqs11-16 derive body-frame relative motion with rotation terms from ego translation/yaw; requires ego velocity and yaw rate, not global ego position/yaw. Mixed relative and absolute state.",
+        "Constant target acceleration and slowly changing/constant target sideslip kinematic assumptions. Low-cost ego velocity options Sec3 have additional kinematic/tire-slip/bias limitations.",
+        "Experiments use EKF with radar,IMU,speedometer. Does not itself prove deterministic joint estimator-controller collision safety. Affects attribution: cite Alai etal2024 for relative model and Sharma etal2026 for multistage observer."
+      ]
+    }
+  ],
+  "located_but_not_substantively_reviewed": [
+    {
+      "key": "UNBXLN66",
+      "title": "Control Barrier Function Based Quadratic Programs for Safety Critical Systems",
+      "DOI": "10.1109/TAC.2016.2638961"
+    },
+    {
+      "key": "KGKNRS7M",
+      "title": "Safety-Critical Control using Optimal-decay Control Barrier Function with Guaranteed Point-wise Feasibility",
+      "DOI": "10.48550/arXiv.2103.12375"
+    },
+    {
+      "key": "MT8F4HTY",
+      "title": "Predictive Control Barrier Functions: Enhanced Safety Mechanisms for Learning-Based Control",
+      "DOI": "10.1109/TAC.2022.3175628"
+    },
+    {
+      "key": "MYXPQ55F",
+      "title": "Predictive Control Barrier Functions: Bridging model predictive control and control barrier functions",
+      "DOI": "10.23919/ECC65951.2025.11187291"
+    },
+    {
+      "key": "GNWC9L9J",
+      "title": "Control Barrier Functions and Input-to-State Safety With Application to Automated Vehicles",
+      "DOI": "10.1109/TCST.2023.3286090"
+    },
+    {
+      "key": "PBSEUYDR",
+      "title": "Safe Lane-Keeping With Control Barrier Functions: From Theory to Practical Implementation",
+      "DOI": "10.1109/TCST.2026.3657870"
+    },
+    {
+      "key": "AA9VSPDY",
+      "title": "Real-time MPC with Control Barrier Functions for Autonomous Driving using Safety Enhanced Collocation",
+      "DOI": "10.48550/arXiv.2401.06648"
+    }
+  ],
+  "visual_checks": [
+    {
+      "key": "I55U59XZ",
+      "pdf_page": 4,
+      "purpose": "Unbounded input set and explicit future input-limit statement"
+    },
+    {
+      "key": "8P4BHHZU",
+      "pdf_page": 6,
+      "purpose": "Body acceleration derivative and gyro derivative assumption"
+    },
+    {
+      "key": "MZVVMVMM",
+      "pdf_page": 3,
+      "purpose": "Relative motion equations obscured by duplicated-font text extraction"
+    }
+  ]
+}
