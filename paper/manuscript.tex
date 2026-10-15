@@ -121,34 +121,67 @@ theoretical safety guarantees. One common way to obtain such guarantees
 is through control barrier functions (CBFs), which constrain the control
 input to keep trajectories starting in a prescribed safe set inside that
 set \cite{AmesXuGrizzleTabuada2017}. This forward-invariance property
-provides a theoretical safety guarantee. For a constrained vehicle,
-however, the CBF condition must be satisfiable using the inputs the
-vehicle can actually apply. Geometric separation alone is insufficient
-because heading, velocity and finite actuation determine whether
-collision remains avoidable. High-order CBFs incorporate successive
-separation derivatives; their guarantees require initial membership in
-derivative-defined safe sets and compatibility with admissible inputs
-\cite{XiaoBelta2022}. Including relative velocity
-does not remove the input-feasibility requirement. For example,
+provides a theoretical safety guarantee. A reactive constraint based
+only on present separation, however, is not automatically a valid CBF
+for a nonholonomic vehicle with bounded actuation. The geometric
+collision-free set includes states whose heading and velocity make
+collision unavoidable within the available steering and braking limits.
+For acceleration- or force-controlled vehicle models, an inward-moving
+state on the separation boundary has a negative clearance derivative
+that the current input cannot change. A position-only clearance function
+therefore fails the first-order CBF condition on that full geometric
+state set \cite{AmesXuGrizzleTabuada2017,XiaoBelta2022}.
+Higher-order CBFs expose the effect of control through successive
+separation derivatives and restrict the certified initial set accordingly,
+while still requiring
+compatibility with admissible inputs \cite{XiaoBelta2022}.
+Velocity-dependent constructions also incorporate the approach geometry:
 collision-cone barriers exclude collision-producing relative-velocity
-directions, yet the construction in \cite{TayalEtAl2026} assumes
+directions, but the construction in \cite{TayalEtAl2026} assumes
 unlimited control authority and reports saturation-related hardware
-failures in high-speed corner cases. When barrier constraints are used
-in predictive control, feasibility must also persist between successive
-optimizations. Prediction can anticipate conflicts through discrete-time
-CBF constraints throughout a model predictive control (MPC) horizon
-\cite{ZengZhangSreenath2021}, or through future-focused barriers based
-on predicted closest separation and relaxed virtual clearance
-constraints \cite{BlackJankovicSharmaPanagou2023}. However, these
-formulations explicitly leave persistent feasibility or a theoretical
-feasibility guarantee open
+failures in high-speed corner cases. Input-constrained CBFs explicitly
+address limited authority by further restricting the candidate safe set.
+For example, the lane-deformation design in
+\cite{BruggemannSteevesKrstic2022} adds derivative constraints that
+account for bounded steering, although their validity still requires
+an additional bounded-input admissibility condition whose verification
+the authors identify as difficult.
+These constructions make clear that the barrier must encode a set in
+which admissible avoidance actions remain available. Pointwise
+feasibility does not ensure that admissible controls will remain
+available as the maneuver evolves. Prediction offers a way to assess
+future conflicts: discrete-time CBF constraints can be
+imposed throughout a model predictive control (MPC) horizon
+\cite{ZengZhangSreenath2021}, while future-focused barriers use
+predicted closest separation and relaxed virtual clearance constraints
+\cite{BlackJankovicSharmaPanagou2023}. However, the cited formulations
+leave persistent feasibility or a theoretical feasibility guarantee open
 \cite{ZengZhangSreenath2021,BlackJankovicSharmaPanagou2023}.
+A further step is to derive the barrier from the predictive optimization
+itself, so that the dynamics, input constraints and a safe terminal
+continuation enter its construction. Wabersich and Zeilinger construct
+a predictive CBF from an optimal constraint-relaxation cost, using
+progressive constraint tightening and a terminal CBF to ensure decrease
+and recovery of a safe feasible set \cite{WabersichZeilinger2023}.
+The tightening restricts its zero-level safe set relative to the
+untightened safety filter. Huang \emph{et al.} remove this tightening
+and minimize accumulated state-constraint slack subject to admissible
+inputs and a hard invariant terminal-set constraint
+\cite{HuangWangMargellosGoulart2025}. Shifting the previous optimal
+plan and appending an admissible terminal action preserves feasibility
+and makes the optimal slack cost nonincreasing. This value function is
+a predictive control barrier function (PCBF), whose zero-level set is
+safe and invariant on the feasible domain. Their construction provides
+the predictive safety framework adopted here; extending its known-state,
+time-invariant formulation to an estimated moving vehicle requires
+accounting for estimation error and for revisions of the forecast,
+constraints and terminal set between samples.
+
 A separate modeling issue concerns the maneuvering capability represented
 by the vehicle model and its control inputs. Steering-only designs
 include the field-based tracker \cite{ChengLiLiuLiGuo2021}, shared MPC
 that balances path tracking against the driver's steering command
-\cite{LiangYinNie2021}, and CBF filters that deform lane boundaries
-around an obstacle while overriding nominal MPC steering
+\cite{LiangYinNie2021}, and the lane-deformation filter
 \cite{BruggemannSteevesKrstic2022}. The latter two designs also fix
 longitudinal speed \cite{LiangYinNie2021,BruggemannSteevesKrstic2022}.
 These restrictions leave steering--braking coordination unresolved.
@@ -163,27 +196,22 @@ control for path and speed tracking \cite{GuoHuWang2016}, or through
 numerical optimization of steering, braking ratio and sampling interval
 on a coupled four-wheel model with modified Fiala tires
 \cite{FahmyGhanyBaumann2018}. These methods also lack a theoretical
-guarantee of collision avoidance against an uncertain moving target;
-coupled actuation and a safety guarantee therefore remain distinct
-requirements. A further issue concerns the target-state information on
-which the safety constraints depend. Rule-based lane-change control
-combines a finite-state machine for changing or aborting with quadratic
-programs using time-headway and braking-distance barriers
+guarantee of collision avoidance against an uncertain moving target.
+A safety guarantee for the combined evasive maneuvers considered here
+must therefore account for coupled dynamics and joint control feasibility.
+
+A further issue concerns the target-state information on which the
+safety constraints depend. Rule-based lane-change control combines a
+finite-state machine for changing or aborting with quadratic programs
+using time-headway and braking-distance barriers
 \cite{HeZengZhangSreenath2021}, but assumes accurate, delay-free
 surrounding-state data. Perfect vehicle-position estimates are likewise
 assumed in the racing example of \cite{ZengZhangSreenath2021}.
 These assumptions leave estimation error outside the safety argument,
 although evasive ego motion changes the relative dynamics observed by
-onboard sensors. For the combined evasive maneuvers considered here,
-the safety, modeling and information requirements must therefore be
-addressed together: coupled steering--braking prediction and jointly
-realizable controls must be combined with explicit estimation-error
-bounds in the safety and recursive-feasibility analysis.
-
-Two lines of prior work supply what such a system needs, and each stops
-short. On the estimation side, Rajamani and co-workers showed that
-tracking another vehicle from a maneuvering car requires a relative
-motion model that accounts for the ego vehicle's own motion
+onboard sensors. Rajamani and co-workers showed that tracking another
+vehicle from a maneuvering car requires a relative motion model that
+accounts for the ego vehicle's own motion
 \cite{JeonZemoucheRajamani2019,AlaiZemoucheRajamani2024,
 AlaiSharmaAlexanderRajamani2024}, and Sharma \emph{et al.} built a
 multistage high-gain observer on such a nonlinear relative motion model
@@ -192,23 +220,13 @@ multistage high-gain observer on such a nonlinear relative motion model
 the ego kinematics into companion coordinates and assumes constant
 measured body acceleration and yaw rate, which an evasive maneuver can
 violate. It also does not supply the online error enclosure required by
-the safety constraints here. On the control side, the predictive
-control barrier function (PCBF) of Huang \emph{et al.}
-\cite{HuangWangMargellosGoulart2025} turns a finite-horizon problem into
-a barrier function: the minimal relaxation of the state constraints over
-the horizon is nonincreasing along the closed loop, so safety is
-recovered whenever recovery is possible and, once recovered, is kept,
-because the shifted plan remains available from one sample to the next.
-Related constructions reach a barrier from a finite-horizon value
-function or a backup policy
-\cite{WabersichZeilinger2023,BreedenPanagou2022,
-ChenJankovicSantilloAmes2021,ZengZhangSreenath2021}. Huang et al.'s
-formulation uses an exactly known state and a time-invariant problem.
-Its application to an estimated moving obstacle therefore requires
-accounting for state-estimation error and for revisions of the forecast,
-constraints and terminal set at successive samples.
+the safety constraints here. The predictive collision-avoidance argument
+must therefore connect maneuver-compatible target estimation and
+explicit error bounds to the coupled vehicle model, admissible controls
+and preservation of feasibility under successive information updates.
 
-This paper brings the two together. The estimator keeps Sharma's NRMM
+This paper combines maneuver-compatible state estimation with predictive
+collision avoidance. The estimator keeps Sharma's NRMM
 but not its differentiated ego coordinates, so that measured
 acceleration and yaw rate stay exogenous inputs and nothing is
 differentiated; it remains valid during the ego's own maneuvers, carries

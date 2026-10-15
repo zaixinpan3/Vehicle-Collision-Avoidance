@@ -2,7 +2,7 @@
   "prepared_date": "2026-10-14",
   "scope": "Selected original-PDF full-main-body review of planar constrained vehicle barriers, ego-motion-aware target estimation, lateral-longitudinal coupling, and field-based avoidance. The initial and coupling phases were read-only; the method-description addendum supports Introduction paragraph two revision.",
   "source_method": "Read-only Zotero Desktop local API; attached local original PDFs; pdftotext with page breaks; selected original page renders.",
-  "reviewed_count": 17,
+  "reviewed_count": 19,
   "reviewed_sources": [
     {
       "key": "X3EUXWYE",
@@ -400,6 +400,41 @@
         "Sec5 varies operating speed across cases36,72,108km/h,not joint braking optimization during a maneuver. Valid to group with Cheng and Bruggemann for steering-only control; only Liang/Bruggemann explicitly fix longitudinal speed.",
         "No closed-loop collision-free invariant-set proof. Shared-driver setting and state-estimation assumption are distinct from autonomous robust moving-target avoidance."
       ]
+    },
+    {
+      "key": "MT8F4HTY",
+      "title": "Predictive Control Barrier Functions: Enhanced Safety Mechanisms for Learning-Based Control",
+      "DOI": "10.1109/TAC.2022.3175628",
+      "pdf_pages": 14,
+      "pdf_sha256": "4ec3b71198958672a2d8f846e7c41e4ab75ff3958d718b660d6371ec76f95aa9",
+      "zotero_attachment_key": "85UCA336",
+      "original_pdf_filename": "Wabersich and Zeilinger - 2023 - Predictive Control Barrier Functions Enhanced Safety Mechanisms for Learning-Based Control.pdf",
+      "coverage": "Full original PDF pp1-14, all Sections I-VI, complete appendix, references and author information.",
+      "findings": [
+        "Sections II-III: nominal filter (5) has admissible inputs and a terminal safe set; recursive feasibility is already established. Do not label the predictive-CBF literature universally infeasible or without a guarantee.",
+        "Problem (9) minimizes stage slack norms and weighted terminal slack. Stage constraints (11)-(12) progressively tighten; Assumption 1 supplies a terminal CBF. Theorem III.6 proves optimal value is a CBF on domain (18).",
+        "Printed2642 explicitly states the zero-level safe set is contained in the untightened predictive-filter feasible set; tightening supports strict decrease and recovery but restricts the certified set.",
+        "Recovery applies on the declared domain under nominal dynamics after disturbances cease, not globally under arbitrary continuing model errors. SecIV terminal verification requires global solutions for an unconditional certificate.",
+        "SecVB kinematic car includes steering-rate and acceleration inputs; not a steering-only counterexample. No certified moving-target observer-error propagation is constructed in the displayed formulation."
+      ]
+    },
+    {
+      "key": "MYXPQ55F",
+      "title": "Predictive Control Barrier Functions: Bridging model predictive control and control barrier functions",
+      "DOI": "10.23919/ECC65951.2025.11187291",
+      "pdf_pages": 7,
+      "pdf_sha256": "aabbce274eeb616a8f583daf05a53417fb17fea7ca2801d6469ccacc8e3ad7b3",
+      "zotero_attachment_key": "BYTYEF28",
+      "original_pdf_filename": "Huang et al. - 2025 - Predictive Control Barrier Functions Bridging model predictive control and control barrier function.pdf",
+      "coverage": "Full original published ECC PDF pp1-7, all Sections I-V, all displayed proofs, examples and references.",
+      "findings": [
+        "Problem (8) minimizes accumulated nonnegative state slack with admissible inputs and a hard invariant terminal-set constraint; no progressively tightened stage constraints are required.",
+        "Lemma III.1 and shifted candidate (10) provide recursive feasibility. Inequality (11) proves nonincrease of the optimal slack cost, bounded by minus the current slack, without requiring strict value decrease everywhere outside the zero set.",
+        "Theorem4 identifies the optimal value as a discrete-time CBF whose zero-level set is the hard-feasible safe invariant set, on the relaxed-feasible domain.",
+        "Theorems1-2 discuss convergence to a safe invariant set within state-constrained feasible domain; do not claim all geometric noncollision states are viable or finite-horizon feasible.",
+        "SectionII uses a known state and time-invariant discrete system; problem (8) uses fixed constraints and terminal set. Estimated moving targets, error enclosures and forecast/terminal revisions require a separate extension.",
+        "SectionsIV-V demonstrate linear and nonlinear systems, compare tightening and hand-designed barriers, and leave quantitative approximation to the maximal invariant set prospective. No first-invention claim for predictive CBFs."
+      ]
     }
   ],
   "located_but_not_substantively_reviewed": [
@@ -412,16 +447,6 @@
       "key": "KGKNRS7M",
       "title": "Safety-Critical Control using Optimal-decay Control Barrier Function with Guaranteed Point-wise Feasibility",
       "DOI": "10.48550/arXiv.2103.12375"
-    },
-    {
-      "key": "MT8F4HTY",
-      "title": "Predictive Control Barrier Functions: Enhanced Safety Mechanisms for Learning-Based Control",
-      "DOI": "10.1109/TAC.2022.3175628"
-    },
-    {
-      "key": "MYXPQ55F",
-      "title": "Predictive Control Barrier Functions: Bridging model predictive control and control barrier functions",
-      "DOI": "10.23919/ECC65951.2025.11187291"
     },
     {
       "key": "GNWC9L9J",
@@ -443,6 +468,15 @@
       "title": "Emergency steering control of autonomous vehicle for collision avoidance and stabilisation",
       "DOI": "10.1080/00423114.2018.1537494",
       "coverage": "Attachment located and keyword-scanned only in October15 scope search; not read in full and not used for a new manuscript claim."
+    },
+    {
+      "key": "RB8B84VE",
+      "title": "Predictive Control Barrier Functions for Online Safety Critical Control",
+      "DOI": "10.1109/CDC51059.2022.9992926",
+      "zotero_attachment_key": "ZTALTBNY",
+      "pdf_pages": 8,
+      "pdf_sha256": "6ea36c99697996d0a1fd2715bd91ad946de5dd8e43b59d05ea89945796212642",
+      "coverage": "Located and extracted only in this task; not read in full and not used for a new manuscript claim."
     }
   ],
   "visual_checks": [
@@ -485,6 +519,21 @@
       "key": "DEKEZTHA",
       "pdf_page": 3,
       "purpose": "Printed4808 coupled four-wheel body model and braking-dependent modified Fiala tires."
+    },
+    {
+      "key": "MYXPQ55F",
+      "pdf_page": 4,
+      "purpose": "Printed2626 shifted candidate (10), slack inequality (11) and feasibility/recovery scope."
+    },
+    {
+      "key": "MYXPQ55F",
+      "pdf_page": 5,
+      "purpose": "Printed2627 Theorem4 identifies the predictive value function as a discrete-time CBF."
+    },
+    {
+      "key": "MT8F4HTY",
+      "pdf_page": 5,
+      "purpose": "Printed2642 progressive constraint tightening and restricted zero-level safe set."
     }
   ],
   "coupling_addendum": {
@@ -561,5 +610,30 @@
       "Fahmy already combines steering/braking and modified Fiala tires.",
       "The implementation/theory limitations recorded in earlier addenda remain."
     ]
+  },
+  "predictive_chain_addendum": {
+    "date": "2026-10-15",
+    "new_full_originals": [
+      "MT8F4HTY",
+      "MYXPQ55F"
+    ],
+    "sequence": [
+      "Field-based examples and their missing theoretical safety guarantee",
+      "CBF forward invariance as a response",
+      "Failure of raw position-only first-order distance candidate on full geometric state set for acceleration/force-controlled vehicles",
+      "Higher-order and velocity-aware constructions with explicit initial-set and input-authority qualifications",
+      "Input-constrained set restriction and bounded-input admissibility verification",
+      "Present feasibility versus continued feasibility; cited anticipatory formulations leave persistent/theoretical feasibility open",
+      "Construct the barrier from predictive optimization: Wabersich/Zeilinger tightening and terminal CBF",
+      "Huang slack-value construction with a hard invariant terminal set, recursive feasibility and nonincrease without progressive stage tightening",
+      "Separate subsequent coupled-model and estimated-target-information requirements; common estimation/control synthesis"
+    ],
+    "qualification": "Nonholonomy alone does not invalidate every distance-based CBF. The failed object/domain is the raw position-only first-order candidate over the full geometric collision-free state set. Existing higher-order, input-constrained and predictive guarantees are acknowledged.",
+    "metadata_correction": {
+      "parent_item_key": "UNBXLN66",
+      "pdf_attachment_key": "HINPFCGD",
+      "reason": "The prior prose called the parent item key an attachment key; source identity and selected-section reading are unchanged."
+    },
+    "implementation_scope": "Manuscript/literature argument only; no algorithm, experiment or new numerical result."
   }
 }
