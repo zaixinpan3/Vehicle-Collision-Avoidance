@@ -116,12 +116,8 @@ optimal-preview steering controller to track the resulting path
 \cite{ChengLiLiuLiGuo2021}. Wang \emph{et al.} reshape obstacle repulsion
 into an ellipse using a driving-risk model and introduce virtual target
 points to escape potential-field local minima
-\cite{WangGaoLiSunCheng2019}. However, neither method establishes
-closed-loop invariance of a collision-free set, despite successful
-avoidance in simulations and vehicle tests.
-A collision-free reference path therefore still requires a certificate
-that the controlled vehicle can follow it safely under its dynamics and
-input constraints. A further limitation arises when avoidance is
+\cite{WangGaoLiSunCheng2019}. However, these methods do not provide
+theoretical safety guarantees. A further limitation arises when avoidance is
 restricted to steering, leaving its coordination with braking unresolved.
 Steering-only designs include the field-based tracker
 \cite{ChengLiLiuLiGuo2021}, shared model predictive control (MPC)
@@ -136,15 +132,15 @@ share finite friction capacity \cite{GuoHuWang2016,BealBoyd2019}.
 A fixed-speed prediction cannot assess braking-induced changes in
 turning response, and independent force limits can admit jointly
 unattainable demands. Coordinating both inputs addresses this physical
-coupling, but does not by itself establish collision avoidance. Existing
+coupling, but does not by itself guarantee collision avoidance. Existing
 solutions include nonlinear backstepping with adaptive fuzzy sliding-mode
 control for coordinated path and speed tracking \cite{GuoHuWang2016},
 and numerical optimization of steering, braking ratio and sampling
 interval on a coupled four-wheel model with modified Fiala tires
-\cite{FahmyGhanyBaumann2018}. Their tracking analysis and numerical
-results do not establish collision-free invariance against an uncertain
-moving target. A formal safety certificate must therefore be compatible
-with the coupled dynamics and the admissible input set. Instantaneous
+\cite{FahmyGhanyBaumann2018}. These methods also lack a theoretical
+guarantee of collision avoidance against an uncertain moving target.
+Such a guarantee must account for the coupled dynamics and the
+admissible input set. Instantaneous
 geometric separation is insufficient because heading, velocity and
 finite actuation determine whether collision remains avoidable.
 High-order CBFs incorporate successive separation derivatives, but their
