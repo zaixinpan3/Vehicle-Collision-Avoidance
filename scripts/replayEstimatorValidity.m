@@ -6,7 +6,7 @@ function rows = replayEstimatorValidity(campaign,speedList,nameList,observerOver
 % validation uses (estimatorConfigurationFromController with the scenario
 % target contract), and every sensor sample is taken from the recorded
 % plant trajectory: each hold is integrated again from its recorded state
-% with its recorded input (ode45, 1e-11/1e-12), exactly as
+% with its recorded input (ode45, 1e-11/1e-12 and the recorded rest-reset rule), as
 % runNonlinearPredictiveSafetyValidation supplies its truth path.
 % Each output row gives, per run: the first time the ego bound became
 % invalid and why; frames whose true motion leaves the shared domain
@@ -26,7 +26,10 @@ rows=struct([]);
 R=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(R,'scripts'),fullfile(R,'config'),fullfile(R,'controller'),fullfile(R,'estimator'));
 for speed=speedList
 for name=nameList
-  r=jsondecode(fileread(fullfile(campaign,sprintf('speed%d-%s.json',speed,name)))).results;tr=r.trace;
+  report=jsondecode(fileread(fullfile(campaign,sprintf('speed%d-%s.json',speed,name))));
+  resetAtEnd=isfield(report,'replay') && isfield(report.replay,'sampleEndReset') ...
+      && string(report.replay.sampleEndReset)=="brakedSpeedBelowOneFifthHoldSpeed-v1";
+  r=report.results;tr=r.trace;
   if isempty(tr),fprintf('VALID %2d %-19s no frames\n',speed,name);continue;end
   cfgC=collisionAvoidanceControllerConfig(struct('referenceSpeed',speed,'controller',struct('horizonSteps',8+8*(speed==15))));
   [~,q0,~,cfgC]=collisionThreatScenario(name,cfgC);
@@ -68,6 +71,9 @@ for name=nameList
     solution=ode45(@(~,state)nonlinearBicycleModel.derivative(state,tr(f).input(:),cfgC), ...
         [0,h],x,odeset('RelTol',1e-11,'AbsTol',1e-12));
     states=deval(solution,pathTimes);accelerations=zeros(2,numel(pathTimes));
+    if resetAtEnd
+      states(:,end)=nonlinearBicycleModel.sampleEndState(states(:,end),tr(f).input(:),cfgC);
+    end
     for j=1:numel(pathTimes)
       d=nonlinearBicycleModel.derivative(states(:,j),tr(f).input(:),cfgC);
       accelerations(:,j)=[d(4)-states(6,j)*states(5,j);d(5)+states(6,j)*states(4,j)];

@@ -47,6 +47,14 @@ classdef nonlinearBicycleModel
             if variational,a=reshape(y(7:42),6,6);b=reshape(y(43:54),6,2);end
         end
 
+        function [next,stopped] = sampleEndState(x,u,cfg)
+            % Common discrete rest transition after prediction or plant replay.
+            % Continuous integration precedes this reset. Position and heading
+            % retain their integrated values; driving inputs do not trigger it.
+            next=x;stopped=u(2)<=0 && x(4)<.2*cfg.model.brakeHoldSpeed;
+            if stopped,next(4:6)=0;end
+        end
+
         function [middle,am,bm,next,a,b] = hold(x,u,cfg)
             % One hold and its midpoint with their tangents. A one-step mesh
             % has no midpoint node; its midpoint is the linear interpolant
@@ -394,8 +402,9 @@ function y=localIntegrate(x,u,cfg,curvature,duration,variational)
     % brake, whose coefficients of 1e-4 to 1e-7 left the convex problem
     % ill-conditioned while the vehicle crept to a stop. Under light braking
     % the tail would still cover about 1.5 cm.
-    if u(2)<=0 && y(4)<.2*cfg.model.brakeHoldSpeed
-        y(4:6)=0;
+    [next,stopped]=nonlinearBicycleModel.sampleEndState(y(1:6),u,cfg);
+    y(1:6)=next;
+    if stopped
         if variational
             a=reshape(y(7:42),6,6);b=reshape(y(43:54),6,2);a(4:6,:)=0;b(4:6,:)=0;
             y(7:42)=a(:);y(43:54)=b(:);

@@ -75,6 +75,16 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyTrue(report.results.recovery.recovered);
             testCase.verifyLessThan(report.results.executedFrames,12);
         end
+        function continuationsWithTheOldPlantTransitionAreRejected(testCase)
+            file=string(tempname)+".mat";testCase.addTeardown(@()delete(file));
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=1,ContinuationFile=file);
+            testCase.verifyEqual(report.replay.sampleEndReset,"brakedSpeedBelowOneFifthHoldSpeed-v1");
+            saved=load(file,'continuation');continuation=rmfield(saved.continuation,'sampleEndReset');
+            save(file,'continuation');
+            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
+                Scenarios="recovery",Frames=2,ResumeFrom=file), ...
+                'runNonlinearPredictiveSafetyValidation:incompatiblePlantTransition');
+        end
         function recoveryRequiresMinimumTimeAndSustainedDwell(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=12, ...
                 RecoveryDwellSeconds=.1,RecoveryMinimumSeconds=.2);

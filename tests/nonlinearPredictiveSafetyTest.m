@@ -119,6 +119,30 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
                 end
             end
         end
+        function independentReplayAndPredictionShareTheRestTransition(testCase)
+            [~,~,cfg]=localFixture();cfg.nonlinear.integrationStep=.005;
+            x=[2;-.1;.2;.04;.001;-.002];u=[.02;-.48];
+            [~,replay]=ode45(@(~,state)nonlinearBicycleModel.derivative(state,u,cfg), ...
+                [0,cfg.controller.sampleTime],x,odeset('RelTol',1e-11,'AbsTol',1e-12));
+            integrated=replay(end,:).';
+            testCase.verifyGreaterThan(integrated(4),0);
+            [actual,stopped]=nonlinearBicycleModel.sampleEndState(integrated,u,cfg);
+            [predicted,a,b]=nonlinearBicycleModel.sample(x,u,cfg);
+            testCase.verifyTrue(stopped);
+            testCase.verifyEqual(actual(1:3),integrated(1:3));
+            testCase.verifyEqual(actual(4:6),predicted(4:6));
+            testCase.verifyEqual(actual(4:6),zeros(3,1));
+            testCase.verifyEqual([a(4:6,:),b(4:6,:)],zeros(3,8));
+            testCase.verifyEqual(actual(1:3),predicted(1:3),AbsTol=1e-6);
+        end
+        function theRestTransitionPreservesDrivingAndFasterMotion(testCase)
+            [~,~,cfg]=localFixture();x=[2;-.1;.2;.01;.001;-.002];
+            [next,stopped]=nonlinearBicycleModel.sampleEndState(x,[.02;.1],cfg);
+            testCase.verifyFalse(stopped);testCase.verifyEqual(next,x);
+            x(4)=.2*cfg.model.brakeHoldSpeed;
+            [next,stopped]=nonlinearBicycleModel.sampleEndState(x,[.02;-.48],cfg);
+            testCase.verifyFalse(stopped);testCase.verifyEqual(next,x);
+        end
         function theVehicleBrakesToRestAndMovesOffFromIt(testCase)
             % Braking at the terminal law's ratio with the steering held ends
             % at rest, never in reverse, with the handling rows met.

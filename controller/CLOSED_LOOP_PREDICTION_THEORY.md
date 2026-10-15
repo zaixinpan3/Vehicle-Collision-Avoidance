@@ -805,6 +805,51 @@ low-speed endpoint does not describe the future observer's uncertainty.
 This observation does not authorize discarding genuine physical velocity
 error or scaling its bound by a guessed speed ratio.
 
+### Concrete velocity-coordinate construction during braking
+
+Keep inertial velocity in the joint propagation and reconstruct body velocity
+at each nominal pose. Let R_i rotate body coordinates to inertial coordinates,
+J=[0,-1;1,0], and vB_i=R_i' vI_i. Shared generator columns give
+
+    G_vB,i = R_i' G_vI,i - J vB_i G_psi,i.
+
+This is a coordinate projection of the propagated joint set, not a rule for
+shrinking the present observer bound. The yaw column is multiplied by the
+future nominal velocity. Its lateral contribution therefore tends to zero
+as that velocity tends to zero, even if heading uncertainty does not shrink.
+The inertial-velocity residual, measurement noise, parameter mismatch and
+tracking uncertainty remain. Apply the same construction separately to the
+physical and estimator projections of the joint set. A predicted small
+estimation error alone does not bound physical departure from the nominal.
+
+The rotation projection has a simple nonlinear reserve. If |deltaPsi| <= a
+and ||deltaVI|| <= b, the norm of the omitted terms is at most
+
+    2 sin(min(pi,a)/2) b + 0.5 ||vI_i|| a^2.
+
+The first term bounds the product of velocity and rotation errors; the
+second bounds the rotation Taylor remainder. It is valid for correlated
+errors too. Add a sound enclosing ball or box for this reserve while
+retaining the shared linear columns. This reserve certifies only this
+coordinate transformation, not the preceding observer/vehicle propagation.
+
+The integration sequence is: initialize from the published correlated set;
+execute the definite current input; propagate the plant, persistent mismatch,
+sensor samples, actual observer updates and future feedback jointly; project
+the resulting physical/estimator sets into the next nominal body frame;
+then form constraint supports. Future noise is introduced at its actual
+sample, not replaced by a fresh copy of the current error box. A prototype
+can use maneuver-dependent numerical joint maps offline, but those maps need
+validated nonlinear reserves before they supply certified runtime bounds.
+
+The sample-end rest reset is another branch of this joint map. The plant
+replay and observer truth samples must apply it at the same control boundary
+as prediction. If the admitted set straddles the speed threshold or the
+braking/driving boundary, enclose both reset and non-reset images. A tangent
+with zero velocity rows on the stopped branch cannot cover the moving
+branch. This is compatible with the exact-set recursive-feasibility theorem;
+it is an additional requirement for an approximate implementation.
+
 ### Constraints, nonlinear reserves, and next-frame reuse
 
 Use separate physical-state, estimate, relative-pose, input and hold-image
