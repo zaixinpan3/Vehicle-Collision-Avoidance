@@ -118,8 +118,20 @@ trajectories through convex planning or model predictive control (MPC)
 AmmourOrjuelaBasset2022,ThompsonDallasGohBalachandran2024}, or use
 reinforcement learning for maneuver selection above a model-based
 tracking controller
-\cite{ChenAksunGuvenc2025}. These routes do not uniformly provide a
-formal collision-avoidance guarantee: the cited field-based designs
+\cite{ChenAksunGuvenc2025}. Model simplifications can restrict their
+applicability to combined evasive maneuvers. For example, the
+steering-only formulation in \cite{BruggemannSteevesKrstic2022} fixes
+longitudinal speed and therefore excludes braking-induced changes in
+lateral dynamics. During simultaneous steering and braking, however,
+the two actions affect both vehicle motion and the tire-force capacity
+available to the other channel \cite{GuoHuWang2016,BealBoyd2019}.
+Neglecting these interactions, or imposing longitudinal and lateral
+force limits independently, can admit control combinations that the
+vehicle cannot realize. Coordinated steering and braking address this
+coupling \cite{GuoHuWang2016,LaiYang2023}, but coordination or tracking
+stability alone does not establish collision avoidance under uncertain
+target states. Formal safety is a separate requirement: the cited
+field-based designs
 evaluate successful avoidance in simulations and vehicle trials without
 proving forward invariance or recursive feasibility
 \cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}. Control barrier
@@ -145,10 +157,14 @@ the ego frame accelerates and rotates, coupling relative target motion
 to ego velocity and yaw rate; target-state estimation and its error
 cannot be treated as trivial inputs
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
-Accordingly, our design retains Sharma et al.'s nonlinear relative
-motion model (NRMM), derives estimation-error enclosures compatible
-with the ego's maneuvers, and incorporates them into the predictive
-avoidance constraints and recursive-feasibility argument.
+Safety and feasibility must therefore be assessed using a vehicle
+model that retains steering--braking coupling and jointly realizable
+actuation, with maneuver-dependent state-estimation errors included
+explicitly. Accordingly, our design combines a coupled nonlinear
+bicycle model with modified Fiala tires, estimation-error enclosures
+derived from Sharma et al.'s nonlinear relative motion model (NRMM),
+and predictive avoidance constraints that incorporate these enclosures
+into the collision-safety and recursive-feasibility argument.
 
 Two lines of prior work supply what such a system needs, and each stops
 short. On the estimation side, Rajamani and co-workers showed that
