@@ -109,86 +109,46 @@ collision avoidance has therefore attracted sustained research interest
 \cite{TurriCarvalhoTsengJohanssonBorrelli2013,FahmyGhanyBaumann2018,
 ChengLiLiuLiGuo2021,BruggemannSteevesKrstic2022}.
 
-Several complementary approaches have been developed for vehicle
-collision avoidance and its integration with lane following. Artificial
-potential fields and virtual-flow models generate evasive reference
-paths from lane geometry and obstacle positions, followed by a
-path-tracking controller
-\cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}; field-based planning
-requires additional treatment of local minima and path trackability,
-and the virtual-flow design in \cite{ChengLiLiuLiGuo2021} leaves moving
-obstacles and stability-aware planning for further development.
-Optimization-based methods compute collision-avoiding trajectories
-subject to vehicle and road constraints through convex optimization or
-receding-horizon control, including linear and nonlinear model
-predictive control (MPC)
+Existing approaches generate evasive paths using artificial potential
+fields or virtual-flow models
+\cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}, coordinate steering
+and braking \cite{GuoHuWang2016,LaiYang2023}, optimize constrained
+trajectories through convex planning or model predictive control (MPC)
 \cite{LiZhangGuoLenzoGuo2023,TurriCarvalhoTsengJohanssonBorrelli2013,
-AmmourOrjuelaBasset2022,ThompsonDallasGohBalachandran2024}, but must
-balance model fidelity against online computation; finite-horizon
-collision constraints alone also do not establish recursive feasibility
-\cite{HuangWangMargellosGoulart2025}.
-Coordinated steering and braking strategies regulate the coupled
-longitudinal and lateral motion during emergency maneuvers to address
-avoidance and vehicle stability jointly
-\cite{GuoHuWang2016,LaiYang2023}, although stabilizing a prescribed
-evasive reference does not itself ensure that the reference remains
-collision-free under revised obstacle forecasts. Control barrier function (CBF)
-approaches encode safety requirements as control constraints and use
-quadratic-programming safety filters to modify nominal commands
-\cite{AmesXuGrizzleTabuada2017,HeZengZhangSreenath2021}, but their
-invariance guarantees require admissible barrier-satisfying inputs, and
-instantaneous formulations can be myopic
-\cite{BlackJankovicSharmaPanagou2023}. Hybrid MPC--CBF architectures
-add predictive or hierarchical coordination
-\cite{ZengZhangSreenath2021,BruggemannSteevesKrstic2022}, while their
-guarantees remain conditional on the assumed dynamics and available
-state information.
-Learning-based approaches use deep reinforcement learning to select
-maneuvers, with control Lyapunov function (CLF)--CBF controllers
-providing trajectory tracking and collision-avoidance constraints at
-the control layer \cite{ChenAksunGuvenc2025}; the cited study evaluates
-static-obstacle simulations, leaving robustness to uncertain moving
-vehicles outside its reported validation.
-
-Existing integrated designs, and collision-avoidance controllers more
-generally, fall short in two ways. The first concerns information. Most
-of them assume that the motion states of both vehicles are known
-\cite{TurriCarvalhoTsengJohanssonBorrelli2013,HeZengZhangSreenath2021,
-AmmourOrjuelaBasset2022,ZengZhangSreenath2021}. Yet collision avoidance
-is exactly the moment at which the ego vehicle maneuvers hardest, and a
-car that is swerving and braking has the most difficulty tracking the
-vehicle it is trying to avoid: its own yaw rate and acceleration enter
-the relative motion, and an estimator that ignores them is wrong
-precisely then. A controller whose guarantee assumes exact states loses
-the guarantee when it matters. The second concerns time. Many designs
-offer no mathematical assurance that a safe action will still exist a
-moment later. A control barrier function (CBF) makes a prescribed set
-forward invariant provided an admissible input satisfies its condition
-\cite{AmesXuGrizzleTabuada2017}, and a pointwise CBF filter enforces that
-condition at the current instant only. Feasibility now does not imply
-feasibility next \cite{ZengZhangLiSreenath2021}, and a filter that looks
-only at the present can reject an evasive trajectory that first closes
-the longitudinal gap while it builds lateral clearance, which makes it
-myopic or deadlocked \cite{BlackJankovicSharmaPanagou2023}. Robust
-variants bound the effect of disturbances on the barrier condition
-\cite{XuTabuadaGrizzleAmes2015,AlanTaylorHeAmesOrosz2023} but do not
-address the horizon. Predictive controllers impose geometric or dynamic
-constraints over a horizon and produce convincing maneuvers
-\cite{TurriCarvalhoTsengJohanssonBorrelli2013,
-ForsAnistratovOlofssonNielsen2021,AmmourOrjuelaBasset2022,
-ThompsonDallasGohBalachandran2024}, but most do not prove that the
-problem stays feasible after each update. A further habit of the field
-is to organize avoidance around a prescribed maneuver, a lane change, a
-braking action or a return, selected by a supervisory logic
-\cite{HeZengZhangSreenath2021,AmmourOrjuelaBasset2022,
-ChenAksunGuvenc2025,HeLiuLvJiLiu2019,DingZhuangHuEtAl2024}, on
-models whose validity is tied to small slip or low curvature
-\cite{BruggemannSteevesKrstic2022,ChengLiLiuLiGuo2021}. Evasive steering
-and braking couple the longitudinal and lateral dynamics through the
-tires \cite{GuoHuWang2016,BealBoyd2019}, and the available force is
-strongly nonlinear near saturation
-\cite{ParkGerdes2017,ForsAnistratovOlofssonNielsen2021,LaiYang2023}; we
-prefer one dynamic model and one program that chooses the maneuver.
+AmmourOrjuelaBasset2022,ThompsonDallasGohBalachandran2024}, or use
+reinforcement learning for maneuver selection above a model-based
+tracking controller
+\cite{ChenAksunGuvenc2025}. These routes do not uniformly provide a
+formal collision-avoidance guarantee: the cited field-based designs
+evaluate successful avoidance in simulations and vehicle trials without
+proving forward invariance or recursive feasibility
+\cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}. Control barrier
+function (CBF) filters introduce a formal invariance condition
+\cite{AmesXuGrizzleTabuada2017}, but it must admit a control from the
+vehicle's actual input set throughout the claimed safe domain. With
+limited braking and tire-force authority, geometric nonoverlap can
+include states from which collision is already unavoidable. A
+distance-based separation function is therefore only a CBF candidate
+until its defining condition is verified for the constrained vehicle;
+enforcing an unverified candidate as a quadratic-program constraint can
+lead to infeasibility \cite{ZengZhangLiSreenath2021}. Input-aware and
+predictive constructions address aspects of this difficulty
+\cite{BruggemannSteevesKrstic2022,ZengZhangSreenath2021}, while
+pointwise feasibility alone does not establish continued feasibility,
+and reactive filtering can remain myopic
+\cite{ZengZhangLiSreenath2021,BlackJankovicSharmaPanagou2023}. A further
+gap concerns the information supplied to the safety controller:
+representative lane-change work assumes accurate, delay-free perception
+and leaves estimation and noisy measurements for subsequent development
+\cite{HeZengZhangSreenath2021}. During evasive steering and braking,
+the ego frame accelerates and rotates, coupling relative target motion
+to ego velocity and yaw rate; target-state estimation and its error
+cannot be treated as trivial inputs
+\cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
+Accordingly, our design retains Sharma et al.'s nonlinear relative
+motion model (NRMM), derives estimation-error enclosures compatible
+with the ego's maneuvers, and incorporates them into the predictive
+avoidance constraints and recursive-feasibility argument.
 
 Two lines of prior work supply what such a system needs, and each stops
 short. On the estimation side, Rajamani and co-workers showed that
@@ -199,10 +159,10 @@ AlaiSharmaAlexanderRajamani2024}, and Sharma \emph{et al.} built a
 multistage high-gain observer on such a nonlinear relative motion model
 (NRMM) and validated it on a full-scale vehicle
 \cite{SharmaAlaiRajamani2026}. Their observer, however, differentiates
-the ego kinematics into companion coordinates, and so it has to assume
-that the ego vehicle's acceleration and turning rate are constant, which
-is exactly what an evasive maneuver violates. It also reports no error
-bound that a controller could use. On the control side, the predictive
+the ego kinematics into companion coordinates and assumes constant
+measured body acceleration and yaw rate, which an evasive maneuver can
+violate. It also does not supply the online error enclosure required by
+the safety constraints here. On the control side, the predictive
 control barrier function (PCBF) of Huang \emph{et al.}
 \cite{HuangWangMargellosGoulart2025} turns a finite-horizon problem into
 a barrier function: the minimal relaxation of the state constraints over
@@ -212,11 +172,11 @@ because the shifted plan remains available from one sample to the next.
 Related constructions reach a barrier from a finite-horizon value
 function or a backup policy
 \cite{WabersichZeilinger2023,BreedenPanagou2022,
-ChenJankovicSantilloAmes2021,ZengZhangSreenath2021}. Their guarantees,
-however, assume an exactly known state and a time-invariant problem. A
-moving obstacle known only through an estimator violates both: the
-state is an estimate with an error, and the obstacle's forecast, and
-with it the constraints and the terminal set, change at every sample.
+ChenJankovicSantilloAmes2021,ZengZhangSreenath2021}. Huang et al.'s
+formulation uses an exactly known state and a time-invariant problem.
+Its application to an estimated moving obstacle therefore requires
+accounting for state-estimation error and for revisions of the forecast,
+constraints and terminal set at successive samples.
 
 This paper brings the two together. The estimator keeps Sharma's NRMM
 but not its differentiated ego coordinates, so that measured
