@@ -108,16 +108,17 @@ collision threat, and timely driver intervention may still be required
 with vehicle collision avoidance has therefore attracted sustained research interest.
 
 Extensive research has addressed vehicle collision avoidance and its
-integration with lane keeping. Field-based trajectory generation is a
-common approach to vehicle
-collision avoidance. Virtual fluid-flow guidance combines flow between
-lane boundaries with flow around a cylindrical obstacle to generate a
-reference path, which is followed by an optimal-preview steering
-controller \cite{ChengLiLiuLiGuo2021}. Risk-shaped artificial potential
-fields instead adjust elliptical obstacle repulsion and use virtual
-target points to escape local minima \cite{WangGaoLiSunCheng2019}.
-These designs demonstrate avoidance in simulation and vehicle tests,
-but neither establishes closed-loop invariance of a collision-free set.
+integration with lane keeping. For example, field-based methods have
+been used to generate evasive reference trajectories. Cheng \emph{et al.}
+develop a virtual fluid-flow model that combines flow between lane
+boundaries with flow around a cylindrical obstacle, and use an
+optimal-preview steering controller to track the resulting path
+\cite{ChengLiLiuLiGuo2021}. Wang \emph{et al.} reshape obstacle repulsion
+into an ellipse using a driving-risk model and introduce virtual target
+points to escape potential-field local minima
+\cite{WangGaoLiSunCheng2019}. However, neither method establishes
+closed-loop invariance of a collision-free set, despite successful
+avoidance in simulations and vehicle tests.
 A collision-free reference path therefore still requires a certificate
 that the controlled vehicle can follow it safely under its dynamics and
 input constraints. A further limitation arises when avoidance is
