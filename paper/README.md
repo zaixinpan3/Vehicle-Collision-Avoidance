@@ -1,10 +1,9 @@
 # Draft manuscript
 
 `manuscript.tex` is the IEEE Transactions-style draft titled
-"Integrated Lane Keeping and Cruise Control With Safety-Guaranteed Vehicle
-Collision Avoidance". Lane keeping and cruise control denote maintaining
-travel within a designated lane and regulating speed to a prescribed value,
-respectively. The October 14 terminology revision uses these functional names
+"Integrated Lane-Keeping and Cruise Control System With Vehicle Collision Avoidance". A lane-keeping and cruise control system
+maintains travel within a designated lane at a prescribed speed. The
+October 14 terminology revision presents this as a single nominal system
 throughout the manuscript. The October 13, 2026
 revision synchronizes the joint
 observer--controller mathematical design with the current theory documents.

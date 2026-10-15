@@ -29,8 +29,8 @@
 \newcommand{\norminf}[1]{\left\lVert #1\right\rVert_\infty}
 \newcommand{\normone}[1]{\left\lVert #1\right\rVert_1}
 
-\title{Integrated Lane Keeping and Cruise Control With
-Safety-Guaranteed Vehicle Collision Avoidance}
+\title{Integrated Lane-Keeping and Cruise Control System With
+Vehicle Collision Avoidance}
 
 \author{Author Name(s)%
 \thanks{Author names, affiliations, corresponding-author information, and
@@ -38,15 +38,15 @@ funding acknowledgments must be completed before submission. This manuscript
 is a research draft based on the accompanying MATLAB repository.}}
 
 \markboth{Draft Manuscript---October 2026}%
-{Author Name(s): Integrated Lane Keeping, Cruise Control, and Collision Avoidance}
+{Author Name(s): Lane-Keeping and Cruise Control With Collision Avoidance}
 
 \hypersetup{
-    pdftitle={Integrated Lane Keeping and Cruise Control With
-Safety-Guaranteed Vehicle Collision Avoidance},
+    pdftitle={Integrated Lane-Keeping and Cruise Control System With
+Vehicle Collision Avoidance},
     pdfauthor={Author Name(s)},
     pdfsubject={An estimator and a predictive controller designed together
-for lane keeping, cruise control, and vehicle collision avoidance, with the safety
-guarantee carried through the estimator's certified uncertainty},
+for a lane-keeping and cruise control system with vehicle collision avoidance,
+with the safety guarantee carried through the estimator's certified uncertainty},
     pdfkeywords={autonomous vehicles, collision avoidance, control barrier
 function, control Lyapunov function, high-gain observer, input-to-state
 stability, lane keeping, cruise control, nonlinear relative motion model, predictive
@@ -58,11 +58,11 @@ control, robust model predictive control, vehicle state estimation}
 \maketitle
 
 \begin{abstract}
-Lane keeping, cruise control, and vehicle collision avoidance are usually
-handled by separate controllers.
-We treat them as one: the vehicle holds its lane at a set speed, and
-when another vehicle threatens a collision it steers and brakes around
-it, stays on the road, and returns to its lane. The evasive maneuver is
+A lane-keeping and cruise control system maintains a vehicle within its
+lane at a set speed. We integrate this system with vehicle collision
+avoidance: when another vehicle threatens a collision, the ego vehicle
+steers and brakes around it, stays on the road, and returns to its lane.
+The evasive maneuver is
 the moment at which the other vehicle is hardest to track from the
 moving car, and a safe action that exists now may not exist a moment
 later. We design an estimator and a predictive controller for each
@@ -97,14 +97,14 @@ robust model predictive control, vehicle state estimation.
 
 \section{Introduction}
 
-\IEEEPARstart{L}{ane} keeping and cruise control jointly enable a vehicle
+\IEEEPARstart{A}{} lane-keeping and cruise control system enables a vehicle
 to travel within a designated lane at a prescribed speed without
 continuous steering or speed corrections by the driver
 \cite{WeiPfefferEdelmann2024,XuGrizzleTabuadaAmes2018}.
-These functions alone, however, do not
+This system alone, however, does not
 provide the evasive response needed when a nearby vehicle poses a
 collision threat, and timely driver intervention may still be required
-\cite{ChengLiLiuLiGuo2021}. Integrating lane keeping and cruise control
+\cite{ChengLiLiuLiGuo2021}. Integrating this system
 with vehicle collision avoidance has therefore attracted sustained research interest
 \cite{TurriCarvalhoTsengJohanssonBorrelli2013,FahmyGhanyBaumann2018,
 ChengLiLiuLiGuo2021,BruggemannSteevesKrstic2022}.
@@ -3443,8 +3443,8 @@ describe the algorithm with instantaneous computation.
 \section{Discussion}
 \label{sec:discussion}
 
-The paper set out to make lane keeping, cruise control, and vehicle
-collision avoidance one system and to say, link by link, what is proved about its safety. We
+The paper integrates a lane-keeping and cruise control system with vehicle
+collision avoidance and examines, link by link, what is proved about its safety. We
 discuss the links in the order in which they turned out to matter.
 
 \subsubsection*{The estimator during the maneuver}
@@ -3557,9 +3557,9 @@ before physical collision avoidance can be claimed.
 \section{Conclusion}
 \label{sec:conclusion}
 
-Lane keeping, cruise control, and vehicle collision avoidance were
-treated as one control problem, and the estimator and the controller that solve it were
-designed for each other. The estimator keeps the ego-motion-aware
+A lane-keeping and cruise control system was integrated with vehicle
+collision avoidance, and its estimator and controller were designed for
+each other. The estimator keeps the ego-motion-aware
 relative motion model of Sharma \emph{et al.} but takes the measured
 acceleration and yaw rate as inputs instead of differentiating them
 away, so it needs neither zero jerk nor zero yaw acceleration; it
