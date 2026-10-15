@@ -107,83 +107,73 @@ collision threat, and timely driver intervention may still be required
 \cite{ChengLiLiuLiGuo2021}. Integrating this system
 with vehicle collision avoidance has therefore attracted sustained research interest.
 
-Extensive research has addressed vehicle collision avoidance and its
-integration with lane keeping. Cheng \emph{et al.} generate an avoidance
-path by combining virtual fluid flow between lane boundaries with flow
-around an obstacle represented as a cylinder, and use an optimal-preview
-steering controller to track the resulting path
-\cite{ChengLiLiuLiGuo2021}. Wang \emph{et al.} reshape obstacle repulsion
-into an ellipse using a driving-risk model and introduce virtual target
-points to escape potential-field local minima
-\cite{WangGaoLiSunCheng2019}. Both approaches demonstrate avoidance in
-simulation and vehicle tests, but neither establishes closed-loop
-invariance of a collision-free set. The control inputs and prediction
-model also restrict the available evasive maneuvers.
-Liang \emph{et al.} use multi-objective model predictive control (MPC)
-to balance reference-path tracking and the driver's steering command
-\cite{LiangYinNie2021}, while Br\"uggemann \emph{et al.} filter nominal
-MPC steering through control barrier functions (CBFs) that deform lane
-boundaries around an obstacle \cite{BruggemannSteevesKrstic2022}.
-Together with Cheng \emph{et al.}'s steering tracker, these designs do
-not jointly optimize steering and braking; Liang \emph{et al.} and
-Br\"uggemann \emph{et al.} additionally fix longitudinal speed
-\cite{ChengLiLiuLiGuo2021,LiangYinNie2021,BruggemannSteevesKrstic2022}.
-Such restrictions matter during combined evasive maneuvers: braking
-changes speed and the subsequent lateral response, while longitudinal
-and lateral tire forces share finite friction capacity
-\cite{GuoHuWang2016,BealBoyd2019}. Fixing longitudinal speed prevents
-the prediction from assessing how braking changes the turning response,
-and independent force limits can admit jointly unattainable demands.
-Coordinated designs address this interaction. Guo \emph{et al.} combine
-nonlinear backstepping with adaptive fuzzy sliding-mode control to
-coordinate steering and brake pressure while tracking a reference path
-and speed under model uncertainty \cite{GuoHuWang2016}. Fahmy
-\emph{et al.} optimize steering, braking ratio and sampling interval on
-a coupled four-wheel model with modified Fiala tires, using tracking
-costs and slip-angle restrictions \cite{FahmyGhanyBaumann2018}.
-These designs account for coupled actuation, but their tracking analysis
-and numerical optimization do not establish collision-free invariance
-against an uncertain moving target. Thus, coordination must be
-accompanied by a safety certificate valid for the same dynamics and
-admissible controls. Geometric separation alone is insufficient: for
-an acceleration-controlled vehicle, heading, velocity and finite
-actuation determine whether collision remains avoidable from a
-currently nonoverlapping state. Xiao and Belta's high-order CBF construction incorporates
-successive separation derivatives, with a guarantee requiring initial
-membership in derivative-defined safe sets and compatibility with
-admissible inputs \cite{XiaoBelta2022}. Incorporating relative velocity
-does not remove this admissible-input requirement. Tayal \emph{et al.}
-construct a collision-cone CBF from relative position and velocity to
-exclude collision-producing directions for static or constant-velocity
-obstacles \cite{TayalEtAl2026}; however, their QP assumes unlimited
-control authority, and they report saturation-related hardware failures
-in high-speed corner cases. Moreover, feasibility at one instant does
-not ensure that safe inputs remain available as the maneuver unfolds.
-To anticipate future conflicts, Zeng \emph{et al.} impose discrete-time
-CBF constraints throughout an MPC horizon, enabling early avoidance and
-overtaking of moving cars \cite{ZengZhangSreenath2021}, while Black
-\emph{et al.} construct future-focused barriers from predicted closest
-separation under a constant-velocity surrogate and relax their virtual
-constraints to improve intersection traversal
-\cite{BlackJankovicSharmaPanagou2023}. Despite this anticipation, the
-two formulations explicitly leave persistent feasibility or a theoretical
+Field-based trajectory generation is a common approach to vehicle
+collision avoidance. Virtual fluid-flow guidance combines flow between
+lane boundaries with flow around a cylindrical obstacle to generate a
+reference path, which is followed by an optimal-preview steering
+controller \cite{ChengLiLiuLiGuo2021}. Risk-shaped artificial potential
+fields instead adjust elliptical obstacle repulsion and use virtual
+target points to escape local minima \cite{WangGaoLiSunCheng2019}.
+These designs demonstrate avoidance in simulation and vehicle tests,
+but neither establishes closed-loop invariance of a collision-free set.
+A collision-free reference path therefore still requires a certificate
+that the controlled vehicle can follow it safely under its dynamics and
+input constraints. A further limitation arises when avoidance is
+restricted to steering, leaving its coordination with braking unresolved.
+Steering-only designs include the field-based tracker
+\cite{ChengLiLiuLiGuo2021}, shared model predictive control (MPC)
+that balances path tracking against the driver's steering command
+\cite{LiangYinNie2021}, and control barrier function (CBF) filters
+that deform lane boundaries around an obstacle while overriding nominal
+MPC steering \cite{BruggemannSteevesKrstic2022}. The latter two designs also fix longitudinal
+speed \cite{LiangYinNie2021,BruggemannSteevesKrstic2022}. During a
+combined evasive maneuver, however, braking changes speed and the
+subsequent lateral response, while longitudinal and lateral tire forces
+share finite friction capacity \cite{GuoHuWang2016,BealBoyd2019}.
+A fixed-speed prediction cannot assess braking-induced changes in
+turning response, and independent force limits can admit jointly
+unattainable demands. Coordinating both inputs addresses this physical
+coupling, but does not by itself establish collision avoidance. Existing
+solutions include nonlinear backstepping with adaptive fuzzy sliding-mode
+control for coordinated path and speed tracking \cite{GuoHuWang2016},
+and numerical optimization of steering, braking ratio and sampling
+interval on a coupled four-wheel model with modified Fiala tires
+\cite{FahmyGhanyBaumann2018}. Their tracking analysis and numerical
+results do not establish collision-free invariance against an uncertain
+moving target. A formal safety certificate must therefore be compatible
+with the coupled dynamics and the admissible input set. Instantaneous
+geometric separation is insufficient because heading, velocity and
+finite actuation determine whether collision remains avoidable.
+High-order CBFs incorporate successive separation derivatives, but their
+guarantee requires initial membership in derivative-defined safe sets
+and compatibility with admissible inputs \cite{XiaoBelta2022}.
+Including relative velocity does not remove that requirement:
+collision-cone barriers exclude collision-producing relative-velocity
+directions, yet the construction in \cite{TayalEtAl2026} assumes
+unlimited control authority and reports saturation-related hardware
+failures in high-speed corner cases. Feasibility must also persist as
+the maneuver evolves; finding a safe input now does not ensure that one
+will remain available. Prediction can anticipate conflicts by imposing
+discrete-time CBF constraints throughout an MPC horizon
+\cite{ZengZhangSreenath2021}, or by constructing future-focused barriers
+from predicted closest separation and relaxing virtual clearance
+constraints \cite{BlackJankovicSharmaPanagou2023}. However, these
+formulations explicitly leave persistent feasibility or a theoretical
 feasibility guarantee open
-\cite{ZengZhangSreenath2021,BlackJankovicSharmaPanagou2023}. Establishing
-such a guarantee also requires accounting for the information used to
-evaluate the safety constraints. He \emph{et al.} combine a finite-state
-machine for lane changing and aborting with quadratic programs using
-control Lyapunov functions (CLFs) and time-headway and braking-distance
-CBFs \cite{HeZengZhangSreenath2021}. That work assumes accurate,
-delay-free surrounding-state data, and Zeng \emph{et al.}'s racing
-example likewise assumes perfectly estimated vehicle positions
-\cite{HeZengZhangSreenath2021,ZengZhangSreenath2021}. The resulting
-safety calculations do not account for target-state estimation error,
+\cite{ZengZhangSreenath2021,BlackJankovicSharmaPanagou2023}. Finally,
+safety and feasibility guarantees must account for the target-state
+information used to evaluate their constraints. Rule-based lane-change
+control combines a finite-state machine for changing or aborting with
+quadratic programs using time-headway and braking-distance barriers
+\cite{HeZengZhangSreenath2021}, but assumes accurate, delay-free
+surrounding-state data. Perfect vehicle-position estimates are likewise
+assumed in the racing example of \cite{ZengZhangSreenath2021}.
+These assumptions leave estimation error outside the safety argument,
 although evasive ego motion changes the relative dynamics observed by
 onboard sensors. A guarantee for the combined evasive maneuvers
-considered here must therefore include coupled steering--braking
-prediction, jointly realizable controls and
-explicit estimation-error bounds within the same safety and
-recursive-feasibility argument.
+considered here must therefore incorporate coupled steering--braking
+prediction, jointly realizable controls and explicit estimation-error
+bounds within the same safety and recursive-feasibility analysis.
 
 Two lines of prior work supply what such a system needs, and each stops
 short. On the estimation side, Rajamani and co-workers showed that
