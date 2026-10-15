@@ -2,7 +2,7 @@
   "prepared_date": "2026-10-14",
   "scope": "Selected original-PDF full-main-body review of planar constrained vehicle barriers, ego-motion-aware target estimation, lateral-longitudinal coupling, and field-based avoidance. The initial and coupling phases were read-only; the method-description addendum supports Introduction paragraph two revision.",
   "source_method": "Read-only Zotero Desktop local API; attached local original PDFs; pdftotext with page breaks; selected original page renders.",
-  "reviewed_count": 15,
+  "reviewed_count": 17,
   "reviewed_sources": [
     {
       "key": "X3EUXWYE",
@@ -334,6 +334,72 @@
         "Conclusion PDFpp12-13 identifies ideal structured-road constant-velocity scope and leaves multiple-obstacle/variable-speed conditions prospective. Both motion and risk factors are already included, so do not criticize their absence.",
         "No closed-loop collision-free invariant-set proof. Can group with Cheng for this missing certificate, not for exclusion of moving obstacles. Project nominal NRMM allows scalar acceleration and curvature under explicit model bounds, not arbitrary target motion."
       ]
+    },
+    {
+      "key": "DEKEZTHA",
+      "title": "Vehicle Risk Assessment and Control for Lane-Keeping and Collision Avoidance at Low-Speed and High-Speed Scenarios",
+      "DOI": "10.1109/TVT.2018.2807796",
+      "authors": [
+        {
+          "firstName": "Hazem M.",
+          "lastName": "Fahmy",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Mohamed A. Abd El",
+          "lastName": "Ghany",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Gerd",
+          "lastName": "Baumann",
+          "creatorType": "author"
+        }
+      ],
+      "pdf_pages": 13,
+      "pdf_sha256": "c15edabda2a80b3c543271738f0caf724fc0303bc6b84a492d245ada9501f515",
+      "zotero_attachment_key": "245BKR24",
+      "original_pdf_filename": "Fahmy et al. - 2018 - Vehicle Risk Assessment and Control for Lane-Keeping and Collision Avoidance at Low-Speed and High-S.pdf",
+      "coverage": "Full original PDF pages1-13, including complete methods, simulation results, conclusion and references; model page also visually inspected.",
+      "findings": [
+        "Four-wheel model Eqs1-5 contains longitudinal/lateral cross-axis dynamics and rotated tire forces. Modified Fiala tire Eqs6-13 includes braking-dependent lateral force scale; this is already coupled prior art.",
+        "Optimization Eqs16,27-29 jointly chooses steering,braking ratio and variable time interval; position/orientation/velocity/slip-angle tracking penalties and command constraints.",
+        "Paper supplies numerical simulation and trial/error validation,not collision-free invariance or recursive-feasibility theorem. Some slip-angle violations and rapid commands acknowledged in discussion; do not describe all tests as certified.",
+        "Not a valid example of steering-only or ignored coupling. Introduce after explaining physical coupling,and group with Guo for remaining absence of an uncertain-moving-target invariance certificate."
+      ]
+    },
+    {
+      "key": "U37MICCR",
+      "title": "Shared Steering Control for Lane Keeping and Obstacle Avoidance Based on Multi-Objective MPC",
+      "DOI": "10.3390/s21144671",
+      "authors": [
+        {
+          "firstName": "Yang",
+          "lastName": "Liang",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Zhishuai",
+          "lastName": "Yin",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Linzhen",
+          "lastName": "Nie",
+          "creatorType": "author"
+        }
+      ],
+      "pdf_pages": 19,
+      "pdf_sha256": "341a2b907f940d1d7aadd53b5d8769e9f72ffd274e8e6ee8abfa954524c8cd61",
+      "zotero_attachment_key": "A7YAPDIE",
+      "original_pdf_filename": "Liang et al. - 2021 - Shared Steering Control for Lane Keeping and Obstacle Avoidance Based on Multi-Objective MPC.pdf",
+      "coverage": "Full original PDF pages1-19, including complete methods, simulation results, conclusion and references; model page also visually inspected.",
+      "findings": [
+        "Sec2 PDFp3 explicitly lateral-only control,unchanged longitudinal speed,front-wheel steering sole input. Sec3 Eq7 vxDot=0,lateral acceleration input; Eq11 inverse-distance obstacle cost.",
+        "Shared MPC Eq20 balances reference tracking and driver steering; Eq17 steering increment input,Eq21-22 angle/increment limits. TTC and TLC assess BOTH longitudinal/lateral risk; do not call this no longitudinal consideration.",
+        "Sec5 varies operating speed across cases36,72,108km/h,not joint braking optimization during a maneuver. Valid to group with Cheng and Bruggemann for steering-only control; only Liang/Bruggemann explicitly fix longitudinal speed.",
+        "No closed-loop collision-free invariant-set proof. Shared-driver setting and state-estimation assumption are distinct from autonomous robust moving-target avoidance."
+      ]
     }
   ],
   "located_but_not_substantively_reviewed": [
@@ -371,6 +437,12 @@
       "key": "AA9VSPDY",
       "title": "Real-time MPC with Control Barrier Functions for Autonomous Driving using Safety Enhanced Collocation",
       "DOI": "10.48550/arXiv.2401.06648"
+    },
+    {
+      "key": "XSQ4K3HK",
+      "title": "Emergency steering control of autonomous vehicle for collision avoidance and stabilisation",
+      "DOI": "10.1080/00423114.2018.1537494",
+      "coverage": "Attachment located and keyword-scanned only in October15 scope search; not read in full and not used for a new manuscript claim."
     }
   ],
   "visual_checks": [
@@ -403,6 +475,16 @@
       "key": "W6FZ33E7",
       "pdf_page": 11,
       "purpose": "Moving10km/h obstacle vehicle in experimental Scenario2; distinguish from static-only scope."
+    },
+    {
+      "key": "U37MICCR",
+      "pdf_page": 3,
+      "purpose": "Explicit lateral-only control and unchanged longitudinal-speed scope."
+    },
+    {
+      "key": "DEKEZTHA",
+      "pdf_page": 3,
+      "purpose": "Printed4808 coupled four-wheel body model and braking-dependent modified Fiala tires."
     }
   ],
   "coupling_addendum": {
@@ -454,6 +536,30 @@
       "Nominal NRMM positive-speed, constant scalar acceleration and curvature with declared defect contracts.",
       "Coupled Fiala force realization does not establish enforcement of every actuator bound; explicit steering magnitude/slew constraints absent in current solver.",
       "Conditional robust recursive feasibility has initial-feasibility/information/model premises and currently excludes road boundaries."
+    ]
+  },
+  "argument_structure_addendum": {
+    "date": "2026-10-15",
+    "new_full_originals": [
+      "U37MICCR",
+      "DEKEZTHA"
+    ],
+    "sequence": [
+      "Path-generation successes and missing collision invariance",
+      "Concrete steering-only design examples",
+      "Shared absence of joint steering/braking decision; fixed-speed assumption only for Liang and Bruggemann",
+      "Physical cross-axis and shared tire-force coupling",
+      "Existing coordinated control and remaining invariant-set certificate gap",
+      "Same-model admissible-input compatibility and barrier domains",
+      "Present versus continued feasibility and anticipatory designs",
+      "Perception dependence and estimation-error gap"
+    ],
+    "preserved_decisions": [
+      "No restored obstacle-motion comparison sentence.",
+      "No blanket uncoupled label for separated architectures.",
+      "Liang considers longitudinal risk without braking optimization.",
+      "Fahmy already combines steering/braking and modified Fiala tires.",
+      "The implementation/theory limitations recorded in earlier addenda remain."
     ]
   }
 }
