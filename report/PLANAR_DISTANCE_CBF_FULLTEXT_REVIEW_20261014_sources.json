@@ -1,8 +1,8 @@
 {
   "prepared_date": "2026-10-14",
-  "scope": "Selected original-PDF full-main-body review of planar constrained vehicle barriers, ego-motion-aware target estimation, and lateral-longitudinal coupling. Includes two-paper coupling addendum; no manuscript revision or experiment reproduction.",
+  "scope": "Selected original-PDF full-main-body review of planar constrained vehicle barriers, ego-motion-aware target estimation, lateral-longitudinal coupling, and field-based avoidance. The initial and coupling phases were read-only; the method-description addendum supports Introduction paragraph two revision.",
   "source_method": "Read-only Zotero Desktop local API; attached local original PDFs; pdftotext with page breaks; selected original page renders.",
-  "reviewed_count": 13,
+  "reviewed_count": 15,
   "reviewed_sources": [
     {
       "key": "X3EUXWYE",
@@ -248,6 +248,92 @@
         "Section3.2 state-dependent available derivative directions and braking trajectories illustrate limits of constant-speed analysis. Section3.3 validates one operating-curve representation, not all initial states.",
         "Section5 explicitly says state portraits do not prove stability. Hierarchical critical-cornering example jointly selects steering/braking under input constraints; hierarchy does not imply ignored physical coupling. Actuator bandwidth omitted in simulated example."
       ]
+    },
+    {
+      "key": "GQ8832LY",
+      "title": "Virtual Fluid-Flow-Model-Based Lane-Keeping Integrated With Collision Avoidance Control System Design for Autonomous Vehicles",
+      "DOI": "10.1109/TITS.2020.2990211",
+      "authors": [
+        {
+          "firstName": "Shuo",
+          "lastName": "Cheng",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Liang",
+          "lastName": "Li",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Yong-Gang",
+          "lastName": "Liu",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Wei-Bing",
+          "lastName": "Li",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Hong-Qiang",
+          "lastName": "Guo",
+          "creatorType": "author"
+        }
+      ],
+      "pdf_pages": 10,
+      "pdf_sha256": "ed13a80d7a3bea98a862096903ef6461204dea5107ac125cbca8f8e1b8da9c22",
+      "zotero_attachment_key": "H2WNCQ37",
+      "original_pdf_filename": "Cheng et al. - 2021 - Virtual Fluid-Flow-Model-Based Lane-Keeping Integrated With Collision Avoidance Control System Desig.pdf",
+      "coverage": "Full original PDF pages1-10, complete methods, results, conclusion and references; key motion-scope page also visually inspected.",
+      "findings": [
+        "SecII-B assumes 2D incompressible steady flow. SecIII-A plate-flow lane guidance and III-B cylinder-flow superposition plus modified stream function Eqs24-36; optimal-preview steering tracker Eqs37-43.",
+        "SecIV fixed-location obstacles in simulation and obstacle-bus test below20km/h; actual ego speed decreases to10km/h, so do not claim constant ego speed throughout experiments.",
+        "Printedp6240 conclusion explicitly leaves obstacles in motion to future work. No closed-loop collision-free invariant-set proof is provided. Strong relevant comparison with declared moving-target NRMM and error-aware predictive collision constraints.",
+        "Steering angle and angular velocity constraints stated after Eq43. Do not label entire method unconstrained."
+      ]
+    },
+    {
+      "key": "W6FZ33E7",
+      "title": "Obstacle Avoidance Path Planning Design for Autonomous Driving Vehicles Based on an Improved Artificial Potential Field Algorithm",
+      "DOI": "10.3390/en12122342",
+      "authors": [
+        {
+          "firstName": "Pengwei",
+          "lastName": "Wang",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Song",
+          "lastName": "Gao",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Liang",
+          "lastName": "Li",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Binbin",
+          "lastName": "Sun",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Shuo",
+          "lastName": "Cheng",
+          "creatorType": "author"
+        }
+      ],
+      "pdf_pages": 14,
+      "pdf_sha256": "11cc0679b6c6fbcf1cff13aabe3381c4892b68770b14011f86fdd5adae8cfd2e",
+      "zotero_attachment_key": "VBLGMJ76",
+      "original_pdf_filename": "Wang et al. - 2019 - Obstacle Avoidance Path Planning Design for Autonomous Driving Vehicles Based on an Improved Artific.pdf",
+      "coverage": "Full original PDF pages1-14, complete methods, results, conclusion and references; key motion-scope page also visually inspected.",
+      "findings": [
+        "Sec2 relative-motion safety/risk model; Sec3 elliptical obstacle repulsion with driving-risk dimensions, two virtual targets for local minima, road fields and steering/lateral-acceleration restrictions Eqs5-22.",
+        "Sec4 simulation has15km/h moving obstacle with40/80km/h ego. Sec5 PDFp11 hardware has static and10km/h moving obstacles with20km/h initial ego speed; NOT static-only.",
+        "Conclusion PDFpp12-13 identifies ideal structured-road constant-velocity scope and leaves multiple-obstacle/variable-speed conditions prospective. Both motion and risk factors are already included, so do not criticize their absence.",
+        "No closed-loop collision-free invariant-set proof. Can group with Cheng for this missing certificate, not for exclusion of moving obstacles. Project nominal NRMM allows scalar acceleration and curvature under explicit model bounds, not arbitrary target motion."
+      ]
     }
   ],
   "located_but_not_substantively_reviewed": [
@@ -307,6 +393,16 @@
       "key": "KJEGSTLS",
       "pdf_page": 5,
       "purpose": "Body force projection, yaw/velocity coupling and slip-angle equations"
+    },
+    {
+      "key": "GQ8832LY",
+      "pdf_page": 9,
+      "purpose": "Printedp6240 explicitly leaves moving obstacles to future work."
+    },
+    {
+      "key": "W6FZ33E7",
+      "pdf_page": 11,
+      "purpose": "Moving10km/h obstacle vehicle in experimental Scenario2; distinguish from static-only scope."
     }
   ],
   "coupling_addendum": {
@@ -333,5 +429,31 @@
       "Solver explicitly has no steering magnitude/slew limit; joint optimization does not imply every physical actuator limit is enforced."
     ],
     "validation": "Read-only algorithm inspection; no new complete-controller theory audit or experiment."
+  },
+  "method_description_addendum": {
+    "prepared_date": "2026-10-14",
+    "new_full_originals": [
+      "GQ8832LY",
+      "W6FZ33E7"
+    ],
+    "targeted_rechecks": {
+      "CGS9N6G6": "PDFpp3-8 coupled plant, backstepping, fuzzy reaching, tracking proof and vision error; prior full11-page reading retained.",
+      "PHWFIKQE": "PDFpp2-6 lane-deforming high-order barriers, ICCBF and fixed-speed simulations; prior full6-page reading retained.",
+      "X3EUXWYE": "PDFpp2-4 derivative-defined sets, Remark1, Def8 and input compatibility; prior full8-page reading retained.",
+      "I55U59XZ": "PDFpp4-7 and11 collision-cone construction, constant-velocity target, unbounded QP and saturation limits; prior main-body/appendix reading retained.",
+      "AI2W6SI7": "PDFpp2-5,7-8 MPC constraints, Remark4 and perfect-position racing assumption; prior full9-page reading retained.",
+      "9D45ZPMM": "PDFpp3-6 future-focused/relaxed construction, conditional theorem, empirical feasibility/future work; prior full8-page reading retained.",
+      "BXD33RMX": "PDFpp2-8 FSM, braking/timeheadway barriers, input limits, accurate perception and prospective estimator/noise margins; prior full8-page reading retained."
+    },
+    "grouping_decisions": [
+      "Cheng and Wang: common absence of closed-loop collision-invariance proof; only Cheng excludes moving obstacles.",
+      "Zeng and Black: anticipatory mechanisms differ; persistent/theoretical feasibility remains open.",
+      "He and Zeng racing: precise-information assumptions differ in scope; both omit a certified target-position-error propagation in the displayed safety formulation."
+    ],
+    "project_claim_limits": [
+      "Nominal NRMM positive-speed, constant scalar acceleration and curvature with declared defect contracts.",
+      "Coupled Fiala force realization does not establish enforcement of every actuator bound; explicit steering magnitude/slew constraints absent in current solver.",
+      "Conditional robust recursive feasibility has initial-feasibility/information/model premises and currently excludes road boundaries."
+    ]
   }
 }
