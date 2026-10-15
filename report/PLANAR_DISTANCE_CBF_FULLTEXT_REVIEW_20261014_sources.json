@@ -1,8 +1,8 @@
 {
   "prepared_date": "2026-10-14",
-  "scope": "Selected original-PDF full-main-body review of planar constrained vehicle barrier methods and ego-motion-aware target estimation. No manuscript revision or experiment reproduction.",
+  "scope": "Selected original-PDF full-main-body review of planar constrained vehicle barriers, ego-motion-aware target estimation, and lateral-longitudinal coupling. Includes two-paper coupling addendum; no manuscript revision or experiment reproduction.",
   "source_method": "Read-only Zotero Desktop local API; attached local original PDFs; pdftotext with page breaks; selected original page renders.",
-  "reviewed_count": 11,
+  "reviewed_count": 13,
   "reviewed_sources": [
     {
       "key": "X3EUXWYE",
@@ -187,6 +187,67 @@
         "Constant target acceleration and slowly changing/constant target sideslip kinematic assumptions. Low-cost ego velocity options Sec3 have additional kinematic/tire-slip/bias limitations.",
         "Experiments use EKF with radar,IMU,speedometer. Does not itself prove deterministic joint estimator-controller collision safety. Affects attribution: cite Alai etal2024 for relative model and Sharma etal2026 for multistage observer."
       ]
+    },
+    {
+      "key": "CGS9N6G6",
+      "title": "Nonlinear Coordinated Steering and Braking Control of Vision-Based Autonomous Vehicles in Emergency Obstacle Avoidance",
+      "creators": [
+        {
+          "firstName": "Jinghua",
+          "lastName": "Guo",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Ping",
+          "lastName": "Hu",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Rongben",
+          "lastName": "Wang",
+          "creatorType": "author"
+        }
+      ],
+      "DOI": "10.1109/TITS.2016.2544791",
+      "pdf_pages": 11,
+      "pdf_sha256": "290874b6b307f5d479a5a288a23ab6542167e7dc020a210d838be59b2497a17b",
+      "zotero_attachment_key": "TKS24C22",
+      "original_pdf_filename": "Guo et al. - 2016 - Nonlinear Coordinated Steering and Braking Control of Vision-Based Autonomous Vehicles in Emergency.pdf",
+      "coverage": "Full original PDF pages1-11 including complete main body, displayed derivations, results, conclusion and references.",
+      "review_phase": "Lateral-longitudinal coupling addendum,2026-10-14",
+      "findings": [
+        "Printedp3231 discusses kinematic, tire-force and load-transfer coupling; its actual reduced model ignores vertical,roll,pitch motion, so do not claim all listed mechanisms are modeled.",
+        "Eqs1-3 retain body cross-axis dynamics and steering contributions. Eq36 jointly determines brake pressure and steering; coordinated versus separate LTV-steering/SMC-braking field comparison.",
+        "Theorem1 tracking statement and proof ultimate-bound calculation are not collision-free invariance certificates. Existing coordinated emergency avoidance work defeats a first-to-couple claim."
+      ]
+    },
+    {
+      "key": "KJEGSTLS",
+      "title": "Coupled lateral-longitudinal vehicle dynamics and control design with three-dimensional state portraits",
+      "creators": [
+        {
+          "firstName": "Craig E.",
+          "lastName": "Beal",
+          "creatorType": "author"
+        },
+        {
+          "firstName": "Christina",
+          "lastName": "Boyd",
+          "creatorType": "author"
+        }
+      ],
+      "DOI": "10.1080/00423114.2018.1467019",
+      "pdf_pages": 29,
+      "pdf_sha256": "3799fbd6803676ddffc3d622fb53f872ea2d78683328d435a0687b5154995ecd",
+      "zotero_attachment_key": "LXFID7F7",
+      "original_pdf_filename": "Beal and Boyd - 2019 - Coupled lateral-longitudinal vehicle dynamics and control design with three-dimensional state portra.pdf",
+      "coverage": "Full original PDF pages1-29 including complete main body, displayed derivations, results, conclusion and references.",
+      "review_phase": "Lateral-longitudinal coupling addendum,2026-10-14",
+      "findings": [
+        "Section2 Eqs1-6 retains variable longitudinal speed,four-wheel force projection,nonlinear slip and coupled brush tire forces. Full29-page early-access PDF includes cover; online2018, subsequently volume57(2),pages286-313.",
+        "Section3.2 state-dependent available derivative directions and braking trajectories illustrate limits of constant-speed analysis. Section3.3 validates one operating-curve representation, not all initial states.",
+        "Section5 explicitly says state portraits do not prove stability. Hierarchical critical-cornering example jointly selects steering/braking under input constraints; hierarchy does not imply ignored physical coupling. Actuator bandwidth omitted in simulated example."
+      ]
     }
   ],
   "located_but_not_substantively_reviewed": [
@@ -241,6 +302,36 @@
       "key": "MZVVMVMM",
       "pdf_page": 3,
       "purpose": "Relative motion equations obscured by duplicated-font text extraction"
+    },
+    {
+      "key": "KJEGSTLS",
+      "pdf_page": 5,
+      "purpose": "Body force projection, yaw/velocity coupling and slip-angle equations"
     }
-  ]
+  ],
+  "coupling_addendum": {
+    "date": "2026-10-14",
+    "independent_calculation": "Ideal isotropic tire friction circle: longitudinal utilization0.8 leaves lateral capacity sqrt(1-0.8^2)=0.6; independent0.8 component requests have combined utilization sqrt(1.28)>1. No simulation.",
+    "scope_decision": "Criticize ignored or uncoordinated coupling within the claimed operating domain; do not equate hierarchical or separate-module control with decoupled physical modeling. Coupling alone is not novel.",
+    "code_inspection": [
+      {
+        "path": "controller/nonlinearBicycleModel.m",
+        "sha256": "3b2f95cb4ad89f4515cce89a087d70b7515d75c22099e16b61f2d2d240338c8d"
+      },
+      {
+        "path": "controller/modifiedFialaTire.m",
+        "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0"
+      },
+      {
+        "path": "controller/solvePredictiveControl.m",
+        "sha256": "5cb6e17f6b6a15432bd15329efa439966063b5a4bd0dd4a1d8d58dbaa7089705"
+      }
+    ],
+    "code_findings": [
+      "Fiala branch retains cross-axis dynamics,front force projection and longitudinal-ratio-dependent lateral saturation; per-hold optimization contains both inputs.",
+      "Low-speed kinematic branch/blend has different model scope; wheel inertia/dynamic normal-load effects are reduced-model residuals.",
+      "Solver explicitly has no steering magnitude/slew limit; joint optimization does not imply every physical actuator limit is enforced."
+    ],
+    "validation": "Read-only algorithm inspection; no new complete-controller theory audit or experiment."
+  }
 }

@@ -6,7 +6,7 @@ Prepared on October 14, 2026. Research discussion record; the manuscript was not
 
 The question is two-dimensional obstacle avoidance by a nonholonomic vehicle with physical input limits. Longitudinal adaptive cruise control alone is not a sufficient counterexample to this concern. The review also checks the related claim that evasive ego motion requires an estimation model and error analysis compatible with the moving sensor frame.
 
-Eleven original PDFs attached to the local Zotero library were examined through their main bodies, mathematical statements, proofs supplied in those PDFs, results, and conclusions. For ten papers this included every PDF page. For Tayal et al., pages 1–12 include the complete main body and appendices; its final reference/biography pages were not used as substantive evidence. This is a selected full-text review, not an exhaustive or prevalence-estimating survey of the library. Eighteen PDFs were located, but the seven remaining items were not substantively reviewed in this activity and support no findings below.
+The initial review examined eleven original PDFs attached to the local Zotero library through their main bodies, mathematical statements, proofs supplied in those PDFs, results, and conclusions. For ten papers this included every PDF page. For Tayal et al., pages 1–12 include the complete main body and appendices; its final reference/biography pages were not used as substantive evidence. The coupling addendum below examines two further original PDFs in full, bringing the reviewed source count to thirteen. This is a selected full-text review, not an exhaustive or prevalence-estimating survey of the library. Eighteen PDFs were located initially; the seven unreviewed items remain outside the substantive evidence, and the two addendum sources were located subsequently.
 
 The companion [source and reading record](PLANAR_DISTANCE_CBF_FULLTEXT_REVIEW_20261014_sources.json) identifies the Zotero parent/attachment keys, DOI, PDF SHA-256, page counts, actual reading coverage, and paper-specific findings. Original PDFs remain in Zotero. Temporary text extraction preserved page breaks; critical statements on Tayal PDF page 4, Sharma page 6, and Alai page 3 were additionally checked against rendered original pages. No source code, solver implementation, or author-supplied experiment was reproduced. Paper-reported outcomes below are literature evidence, not new project experiments.
 
@@ -187,6 +187,51 @@ The following stronger generalizations are not justified: most/all CBF vehicle p
 
 An experiment that fails under steering/force limits is a useful diagnostic. The paper argument should identify the failed mathematical condition and domain, while preserving the distinction between lack of a proof, an explicitly conditional proof, and a counterexample to a claimed guarantee.
 
+## Coupling addendum: lateral and longitudinal control
+
+The additional research question is whether treating lateral and longitudinal vehicle control separately is appropriate for obstacle-avoidance maneuvers. The supported criticism concerns **neglected or uncoordinated coupling under the intended maneuvering conditions**. A hierarchy, two control outputs, or mathematical decoupling through a coordinate transformation does not by itself establish that physical coupling is neglected. An integrated optimization likewise does not guarantee adequate coupling if its prediction model or feasible-force constraints omit it.
+
+### Physical mechanisms and the feasibility consequence
+
+In a body-frame planar model, the translational dynamics contain
+
+\[
+\dot v_x=F_x^{\mathrm{body}}/m+r v_y,\qquad
+\dot v_y=F_y^{\mathrm{body}}/m-r v_x.
+\]
+
+Steering rotates the front-wheel longitudinal and lateral forces into both body axes; speed and yaw alter slip angles and subsequent tire forces. These terms are present even before considering shared tire saturation. Their effect is state- and maneuver-dependent, so there is no claim that every gentle lane-following maneuver requires the same model complexity.
+
+A second mechanism is the common tire-force budget. Under an ideal isotropic friction-circle approximation for a tire,
+
+\[
+F_x^2+F_y^2\leq(\mu F_z)^2.
+\]
+
+If \(|F_x|=0.8\mu F_z\), then \(|F_y|\leq0.6\mu F_z\). Independently requesting longitudinal and lateral force magnitudes of \(0.8\mu F_z\) satisfies the two scalar component bounds, but the combined norm is \(\sqrt{1.28}\mu F_z>\mu F_z\). This is an illustrative calculation from the stated idealized force constraint, not experimental evidence or a claim that a friction circle captures every tire effect.
+
+Braking also reduces subsequent speed and therefore the lateral acceleration approximately required for curvature tracking, \(a_y\simeq v^2\kappa\). Consequently, stronger braking can consume lateral force capacity immediately while making later turning demands easier to satisfy. The net result requires a trajectory-level assessment. It is incorrect to assert that braking always reduces overall avoidance capability.
+
+Independent command bounds are not the same as independent achievable tire forces. Steering and braking commands may legitimately have a Cartesian admissible set while their joint tire-force image is strongly coupled. Thus the relevant modeling question is whether prediction and safety constraints preserve that image, rather than whether command limits have a rectangular notation.
+
+For the earlier CBF discussion, ignoring this coupling can make a barrier inequality appear feasible under assumed lateral and longitudinal authority even though the requested force combination is unavailable. That is a mismatch between the certified model and plant; it is not a universal objection to structured or separately implemented controllers. A structured architecture can be valid if it coordinates the shared resources or bounds the coupling and establishes the required closed-loop property.
+
+### Direct original-source evidence and counterexamples
+
+**Guo, Hu, and Wang (2016), Nonlinear Coordinated Steering and Braking Control of Vision-Based Autonomous Vehicles in Emergency Obstacle Avoidance**, [DOI](https://doi.org/10.1109/TITS.2016.2544791), Zotero `CGS9N6G6`: all eleven original PDF pages were read, including the vision pipeline, controller derivation, Lyapunov analysis, field tests, and conclusion. Printed page 3231 identifies tire-force, load-transfer, and kinematic coupling as mechanisms; this discussion must be distinguished from its reduced plant, which ignores vertical/roll/pitch motion. Equations (1)–(3) retain cross-axis body dynamics and steering contributions; equation (36) jointly determines steering and brake pressure. Experiments compare coordinated control against separate LTV steering and sliding-mode longitudinal controllers. This supports the motivation and precludes claiming that coordinated control is new. The displayed proof concerns tracking behavior; its ultimate-bound calculation must not be advertised as a collision-free invariant-set proof.
+
+**Beal and Boyd, Coupled Lateral-Longitudinal Vehicle Dynamics and Control Design With Three-Dimensional State Portraits**, [DOI](https://doi.org/10.1080/00423114.2018.1467019), Zotero `KJEGSTLS`: the entire 29-page original early-access PDF, including its cover and references, was read. It appeared online in 2018 and subsequently in volume 57(2), pages 286–313. Section 2, equations (1)–(6), retains variable longitudinal speed, four-wheel force projection, nonlinear slip, and a coupled brush-tire model. Section 3.2 shows that the directions reachable by steering/braking depend on state and that constant-speed portraits omit useful braking dynamics. The critical-cornering example is hierarchical yet computes steering and braking together, illustrating why hierarchy alone is not the criticism. Section 5 explicitly says state portraits do not prove stability; the example does not supply a general collision-avoidance invariant-set guarantee. Actuator bandwidth is omitted in the simulated example, and the reported experimental comparison validates a particular operating curve rather than every initial state.
+
+The previously reviewed **Brüggemann et al.** paper provides a narrower example of simplification: Assumption 1 fixes longitudinal speed and steering is the avoidance input. This confines its maneuver class; it is not evidence that the method is wrong within that class. **Seo et al.**, introduction page 1944 and dynamic model (1), explicitly motivates coupled longitudinal/lateral control and retains cross-axis dynamics. Its use of flat-output decoupling is a control design technique, not permission to label the underlying physical model uncoupled. **Chen et al.**, equation (3), already couples acceleration and yaw-rate demands through \(a^2+v^2r^2\leq\mu^2g^2\); it is another counterexample to any blanket claim of independent maneuver budgets.
+
+### Connection to the current project and manuscript scope
+
+Read-only inspection confirms that `localFialaBody` in [nonlinearBicycleModel.m](../controller/nonlinearBicycleModel.m) evaluates steering and longitudinal-force commands together, rotates front-tire forces, and retains \(r v_y\) and \(-r v_x\). [modifiedFialaTire.m](../controller/modifiedFialaTire.m) uses the shared longitudinal ratio \(b\), longitudinal force \(b\mu_iF_{z,i}\), and lateral saturation scale \(\mu_iF_{z,i}\sqrt{1-b^2}\). Both input components are decision variables at each prediction hold in [solvePredictiveControl.m](../controller/solvePredictiveControl.m). The safety/CLF stages do not partition the longitudinal and lateral channels.
+
+These facts support stating that the dynamic prediction retains the declared coupling. They do not establish a complete high-fidelity chassis model: the runtime has a separate low-speed kinematic branch and a blend; wheel inertia and dynamic normal-load effects are not represented by the reduced model. Inspection also finds that the solver explicitly omits steering magnitude/slew limits; joint input optimization must not be described as evidence that every physical actuator bound is enforced. No algorithm change or new validation was performed here.
+
+The proposed argument is therefore that **safety and feasibility should be assessed using a maneuver-compatible coupled model and coordinated steering/longitudinal actuation, together with the declared estimation uncertainty**. It is not that every architecture with separate modules is invalid, nor that existing work has not addressed coupling. This point belongs with the physical validity of the safety model and admissible-control argument; coupling alone is not an established novelty claim. The manuscript remains outside this task's edit scope.
+
 ## Verification performed
 
-Source identity and coverage were checked against the local attachment inventory. Main-body and supplied-appendix readings are recorded paper by paper. Three critical original pages were visually checked. The planar counterexample was derived explicitly; it required no simulation. The report and source record received whitespace/diff, JSON parsing, source-hash, and cross-reference checks. No MATLAB tests or vehicle experiments were required or run, and neither manuscript source was edited by this task.
+Source identity and coverage were checked against the local attachment inventories. Main-body and supplied-appendix readings are recorded paper by paper. Three initial critical original pages and Beal/Boyd's body-force equation page were visually checked. The planar counterexample and friction-circle example were derived explicitly; neither required simulation. The report and source record received whitespace/diff, JSON parsing, source-hash, and cross-reference checks. No MATLAB tests or vehicle experiments were required or run, and neither manuscript source was edited by these review tasks.
