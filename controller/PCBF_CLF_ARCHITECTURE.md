@@ -28,24 +28,33 @@ equations use the same mesh. On the default one-step mesh the midpoint is the
 endpoint interpolant.
 
 A usable previous input sequence is shifted and rolled out from the current
-measured estimate. Missing tail inputs use nominal lane feedback. Without an
-inherited sequence, nominal feedback supplies the reference. If prescribed cruise
-intersects the target, cold initialization instead uses one mild-braking rollout,
-with lane feedback for steering and the terminal braking rate for longitudinal
-input, respecting actuator and slew limits. The same selection applies when a
-conflict first appears. This is one initialization selected before optimization;
-no old-reference solve is attempted first, no avoidance path is planned, and no
-reference input can be executed without optimization. A head-on encounter may
-still be infeasible: braking alone does not produce a lateral passing reference.
+measured estimate. Its absolute endpoint is retained while the horizon shrinks
+one hold per frame, down to `controller.horizonSteps`. This also applies when
+the target disappears. Missing tail holds from a terminal endpoint prefer a
+checked cruise hold; otherwise the existing bounded braking-hold search tries
+to keep the reference in the terminal set. These are reference construction
+checks, not post-solve input checks or robust terminal certificates. If no such
+hold is found, nominal feedback supplies an explicitly uncertified reference.
 
-Without a target the horizon is `controller.horizonSteps`. With a target,
-`rti.minimumPredictionSeconds` is the minimum duration (1 s). The nearest
-predicted cruise interaction plus `rti.settlingSeconds` (0.5 s) can extend it to
-`rti.predictionSeconds` (2 s). A longer inherited sequence is retained while a
-target is present, within `controller.maximumHorizonSteps` (40 by default). This selects duration,
-not an avoidance route. Initial avoidance and terminal membership are not
-prerequisites for constructing the one subproblem; failure to satisfy its hard
-rows remains an optimization failure.
+Cold nominal operation uses lane feedback. A cold cruise conflict, including
+one first appearing during a continuation, invokes a bounded trajectory planner
+before the single RTI formulation. It compares exactly three candidate routes:
+straight braking and two passing offsets derived from rectangle widths, target
+pose, available position enclosures and a clearance reserve. Passing routes
+use moderate braking and lateral feedback with a mild endpoint acceleration
+envelope. Nonlinear rollouts and a node-clearance/terminal score choose one
+reference; node collision or road violation is penalized ahead of terminal
+membership. This bounded candidate choice is not a trajectory optimization,
+robust certificate, whole-hold check, post-failure restart or executable fallback.
+
+Cold no-target operation uses `controller.horizonSteps`. Cold nonconflicting
+target predictions use the nearest prescribed-cruise interaction plus settling,
+within `rti.minimumPredictionSeconds` and `rti.predictionSeconds` (1--2 s by
+default). Planned conflicts use the configured maximum prediction duration,
+limited by `controller.maximumHorizonSteps` (40). The selected route provides
+both vehicle linearizations and collision-dual reference geometry. A reference
+need not satisfy every constraint to construct the one subproblem; failure to
+satisfy its hard rows remains an optimization failure.
 
 Every reference is an exact declared-model rollout. The dynamics increments obey
 
@@ -141,7 +150,7 @@ the target enters as its estimate. This is not full robust terminal membership.
 ## Computation budget and diagnostics
 
 Defaults target a 50 ms sample: `solver.timeLimitSeconds=0.05`, at most 40 native
-interior-point iterations per stage, and a 20 ms completion reserve. Preprocessing
+interior-point iterations per stage, and a 10 ms completion reserve. Preprocessing
 counts against the same timer as model construction and both solves. Reference
 rollout, tangent/constraint construction, CLF construction, terminal geometry and
 optimized-input prediction check the timer. A native termination callback includes
@@ -151,7 +160,7 @@ timer. Native infeasibility certificates and unfinished iterates are never input
 These checks bound the admitted work, not a hard wall-clock guarantee on a desktop
 MATLAB process. A running factorization, allocation, initial JIT compilation or OS
 preemption cannot be interrupted by the checks. Warm up before timed execution;
-`warmUp` uses a separate startup budget for cruise and bounded low-speed
+`warmUp` uses a separate startup budget for cold avoidance planning, cruise and bounded low-speed
 feedback with curved targets, and discards every probe command.
 The integrated scenario driver warms after observer initialization, including
 one discarded bounded-input startup probe. It does not reuse that probe's
@@ -171,9 +180,13 @@ at most two. `convexSolveCompleted` records completion of both convex objectives
 `nonlinearValidationPerformed` is false and `nonlinearHardResidual` is unavailable.
 The reported PCBF and CLF quantities belong to the affine subproblem;
 `predictedState` is a nonlinear prediction of the unchanged optimized inputs.
-Independent scenario replay measures actual clearance, road margins and recovery.
+Independent scenario replay measures actual clearance and road margins until
+current physical-state terminal entry by default. This offline truth-scored
+boundary is explicitly not noisy information-set certification. No terminal
+controller hold, restart or cruise-recovery requirement follows. Optional
+`StopAtTerminal=false` retains the older duration/recovery diagnostics.
 
-Controller-state schema 81 rejects old numerical state schemas. The ideal
+Controller-state schema 82 rejects old numerical state schemas. The ideal
 recursive-feasibility theorem, its model-mismatch bookkeeping and causal policy
 shift are unchanged. Neither RTI success nor its time limit establishes the
 ideal theorem's hypotheses for the executable controller.

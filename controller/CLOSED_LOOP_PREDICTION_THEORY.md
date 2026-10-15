@@ -695,7 +695,9 @@ or constraint veto.
 Outstanding runtime work: consume current/predicted observer enclosures;
 certify scheduled full-state/relative feedback and finite-horizon tubes; add policy
 and input-margin constraints; retain target/observer branch correlations;
-certify braking/parked modes; preserve shifted witnesses. The research verifier
+establish robust terminal-handoff membership; preserve shifted witnesses.
+Post-handoff terminal operation and restart are outside the active MPC task.
+The research verifier
 demonstrates mechanisms, not completion of this runtime.
 
 Independent exact-arithmetic specializations of (M3)--(M6), persistent
@@ -703,3 +705,156 @@ parameter supports, posterior/certificate reuse and a common uncertain-rate
 braking law are checked by scripts/checkJointMismatchDerivations.py and
 tests/jointMismatchDerivationsTest.py. They check the stated algebra and
 specializations, not a quantified full-domain NRMM/Fiala certificate.
+
+## Implementation design: finite feedback prediction and terminal handoff
+
+October 14, 2026. This section specifies a proposed implementation; it does
+not change the runtime's uncertainty propagation. The active MPC task ends
+when its *current* information set belongs to the robust terminal family.
+Predicted endpoint membership alone does not end the task. The terminal
+continuation remains the mathematical witness defining that family; no
+subsequent MPC solve, restart, cruise recovery, or simulated terminal hold is
+required. The numerical scenario driver separately labels its physical-state
+membership scoring; this is not an information-set certificate under noise.
+
+### State and interface contract
+
+Use a joint deviation state containing physical ego/target deviations,
+observer persistent states, persistent uncertain parameters, and all memory
+needed by the sampled maps. The actual NRMM predictor resets, bound updates,
+angle wrapping, held-input memory and measurement availability belong to
+that map. Four 12.5-ms sensor updates occur within the default 50-ms control
+hold. Sampling order must match `onlineNrmmTrackingRuntime` and its adapter;
+replacing these updates by one generic correction gain is only a surrogate.
+
+A current six-dimensional error radius or generator is insufficient to
+reconstruct this map. An integration packet needs the known observer state,
+its gain/model version, relevant predictor and bound memory, sensor-noise and
+dropout contracts, persistent parameter set and allowed drift, and the joint
+root generators. Exact software-state history need not be copied when a
+proved sufficient state or sound enclosure exists. A proposed packet must
+identify which of these two meanings it carries.
+
+One convenient reduced derivation uses r=x-z and e=x-xhat. With
+u=v+K(r-e), the root generator must use the *same* columns for r and e:
+
+    [r_0; e_0] = [G_0; G_0] xi,   |xi| <= 1,
+    K(r_0-e_0) = 0.
+
+Here z_0=xhat_0; known offsets can be included explicitly. Therefore every
+root branch receives the same optimized current input. Independently boxing
+r_0 and e_0 would introduce fictitious uncertainty in that definite input.
+Subsequent branches receive different causal feedback inputs after their
+own measurements, exactly as intended by the policy prediction.
+
+For illustration only, consider a linear plant and a predict/correct observer
+with the same nominal model, output matrix C and correction gain L. With a
+constant parameter deviation theta and residual process error w,
+
+    r_next = (A+B K) r - B K e + E theta + w,
+    e_next = (I-L C) A e + (I-L C)(E theta+w) - L nu,
+    theta_next = theta.
+
+The same theta and w occur in both equations. They are not two independent
+physical mismatches. The actual NRMM joint map must be derived from its own
+updates, including measured acceleration and gyro feedthrough; these
+illustrative observer equations cannot be substituted for it.
+
+### Correlation and mismatch accounting
+
+Linearize the *joint* sampled map along the planned maneuver, obtaining
+
+    q_next = m_i + M_i q + N_i nu + D_i d + R_i(q,nu,d).
+
+A fixed parameter is a state block with identity transition. Its generator
+is introduced once at the root; a declared parameter drift introduces only
+the allowed increment. Residual process disturbances and newly sampled
+measurement noise introduce new columns at their actual sample times. Past
+mismatch is already represented in the current observer enclosure. Future
+mismatch changes future physical motion and observer residuals and must
+still enter the future joint map.
+
+For a sound remainder enclosure Rset and independent new primitive boxes,
+
+    G_next = [M_i G_i, N_i G_noise, D_i G_residual, G_remainder].
+
+Shared sources use one common column before these operations. Take absolute
+values only when evaluating supports of constraint directions. Do not first
+replace G_i by a diagonal box or inject a fresh arbitrary observer-error box
+at every hold. Either operation discards correlations that the joint map was
+introduced to retain. Full histories can be compressed with a sound outer
+approximation, while protecting the common pose and persistent-parameter
+columns. An intersection with an independently valid observer enclosure can
+reduce a set; the intersection must actually be represented or soundly
+outer-approximated. Taking the smaller of unrelated coordinate radii is not a
+general joint-set intersection algorithm.
+
+There is a concrete correlation already published by this project's
+`nrmmControllerErrorBounds`: its yaw generator also changes inferred body
+velocity by [v_y; -v_x] times the yaw radius. In the inertial velocity
+R(psi) v, this first-order contribution cancels the corresponding rotation
+term. A large body lateral-velocity coordinate radius can therefore mostly
+represent uncertain coordinates, rather than equally large uncertain
+inertial lateral motion. Dropping this column correlation charges both
+terms separately. During deceleration the future velocity dependence must
+be recomputed by the joint map; copying a high-speed publication to a
+low-speed endpoint does not describe the future observer's uncertainty.
+This observation does not authorize discarding genuine physical velocity
+error or scaling its bound by a guessed speed ratio.
+
+### Constraints, nonlinear reserves, and next-frame reuse
+
+Use separate physical-state, estimate, relative-pose, input and hold-image
+projections of the same joint set. Rear adhesion, front tire domain, actuator
+bounds and slew constraints must include the feedback input projection,
+not only physical pose inflation. Target model uncertainty remains in the
+relative map even though ego steering cannot control the target. Future
+radar loss follows its declared availability contract, rather than silently
+assuming that every future measurement is informative.
+
+For the nonlinear remainder, bound derivatives or the direct map on the
+entire admitted state/input/parameter/noise region, accounting for every
+reachable model branch. A finite-difference Jacobian and a collection of
+nonlinear replays are useful diagnostics but provide no uniform remainder
+certificate. Offline interval derivative tables or validated local map
+bounds are plausible implementations. If an admitted tube leaves their
+validated cells, the computation needs an enclosing branch or must report
+that no certified tube is available. It must not reduce the radius to stay
+inside a table.
+
+Next-frame feasibility uses posterior conditioning of the old joint policy
+and its carried sets. Retain a previous certified witness when a fresh
+approximate propagation is wider. A planner's new reference and newly
+scheduled gain do not automatically preserve that witness: the admissible
+policy/set parameterization must still include it. The terminal condition
+is a common causal continuation for every branch of the endpoint information
+set; individual pointwise stopping trajectories are insufficient. This
+requirement concerns the handoff certificate, not continued operation of
+MPC after handoff.
+
+### Bounded online computation and validation gates
+
+For the real-time design, schedule gains and validated map/remainder bounds
+offline. Propagate support directions or a bounded generator representation
+online, alongside the one RTI model. Do not run dozens of finite-difference
+observer replays inside each control frame. Preserve the known-current-input
+root map and the subsequent feedback maps as distinct operations.
+
+The next implementation gates are: (1) an observer prediction packet and
+maneuver-dependent joint local-map prototype with persistent mismatch;
+(2) validated nonlinear outer images and feedback input margins over the
+admitted maneuver cells; (3) terminal information-set membership and carried
+policy/set witnesses across frames. Local map agreement, support attainment
+and nonlinear sampled replays should be reported separately from uniform
+coverage. None of these gates requires a constant-width invariant tube or
+monotonic shrinkage at every node. Their objective is finite-horizon
+closed-loop prediction with honest uncertainty accounting and manageable
+supports, while retaining the actual noise floor.
+
+This implementation direction is consistent with the distinction between
+current estimation error, future estimation error and estimated-to-nominal
+prediction error in Koehler, Mueller and Allgoewer, *Robust output feedback
+model predictive control using online estimation bounds*, Sections III--IV
+([author manuscript](https://www.ist.uni-stuttgart.de/dokumente/public/Output.pdf)).
+That paper provides related sufficient constructions; it does not establish
+the required NRMM/Fiala bounds or numerical timing for this repository.

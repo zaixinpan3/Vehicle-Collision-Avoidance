@@ -1,6 +1,20 @@
 classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target prediction, uncertainty tubes and polygon geometry.
     methods (Static)
+        function offsets = passingOffsets(model,side)
+            % Finite reference routes; the optimizer retains every hard row.
+            cfg=model.cfg;q=model.target;
+            projection=laneGeometry.project(q(1:2),model.lane);
+            angle=q(3)-projection.heading;
+            targetWidth=abs(sin(angle))*q(8)+abs(cos(angle))*q(9)+norm(q(10:11));
+            generator=model.uncertainty.collisionGenerator;
+            inflation=sum(vecnorm(generator(1:2,:),2,1));
+            if ~isempty(model.uncertainty.target),inflation=inflation+model.uncertainty.target.positionRadius;end
+            width=cfg.vehicle.width/2+targetWidth+cfg.collision.safetyMarginMeters ...
+                +cfg.planner.clearanceReserveMeters+inflation;
+            offsets=projection.lateralPosition+side*width*[1,1.6];
+        end
+
         function uncertainty = observerUncertainty(ego,observation,q)
             % A common uncertain rigid pose cancels from pairwise distance.
             % Relative target balls are therefore used in the frame frozen at

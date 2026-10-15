@@ -9,23 +9,33 @@ terminal set and recursive feasibility.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | One RTI model from a shifted, nominal or initial braking rollout; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
+| `solvePredictiveControl.m` | One RTI model from a shifted, nominal or bounded planned avoidance rollout; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
 | `terminalSafeSet.m` | Mild braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with its steering, hence sideslip and course curvature, held; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the held steering), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, finite passing-offset candidates, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
-Each sample builds one affine model from one exact declared-model rollout and
-runs at most two native solves for the PCBF/CLF objectives. Cold conflicts use
-one mild-braking reference; other cold references use nominal lane feedback.
-There is no separate avoidance planner, nonlinear restoration loop, same-frame
-restart or previous-plan execution fallback. Nonlinear prediction does not
-certify nonlinear feasibility. Failed or unfinished optimization returns no
-command. The first optimized input is issued unchanged. The ideal mathematical
-recursive-feasibility theorem is independent of numerical RTI success.
+Each sample builds one affine model from one declared-model reference rollout
+and runs at most two native solves for the PCBF/CLF objectives. A cold cruise
+conflict invokes a bounded reference planner: straight braking and two
+geometry-derived passing offsets are rolled out nonlinearly, with lateral
+settling near the endpoint. The selected reference supplies dynamics and
+collision linearizations. Its node-clearance/terminal score is guidance, not
+a robust or whole-hold safety certificate. The optimized inputs are never
+replaced by a planner candidate. Other cold references use nominal feedback.
+Warm references shift the previous inputs from the current estimate, retain
+their absolute endpoint until the minimum prefix is reached, and extend a
+terminal endpoint with a checked cruise or braking hold when available.
+Those extension checks concern the reference and the sampled declared model;
+they do not certify robust terminal invariance or veto an optimized input.
+There is no nonlinear restoration loop, same-frame solve restart or
+previous-plan execution fallback. Failed or unfinished optimization returns
+no command. The first optimized input is issued unchanged. The ideal
+mathematical recursive-feasibility theorem is independent of numerical RTI
+success.
 
 The terminal set is the set of states whose joint continuation under the
 terminal law (the ego braking to a stop with its sideslip and course
@@ -39,7 +49,8 @@ only lateral constraint: every ego rectangle corner stays inside it at every
 predicted node and hold midpoint, including the endpoint. Both ends of every
 hold also keep the rear tire below Fiala saturation under the hold's braking
 ratio (one second-order cone) and the sideslip inside the estimator's cone
-`model.sideslipMaximum`. Without a target the horizon is `horizonSteps`. The
+`model.sideslipMaximum`. A cold no-target horizon is `horizonSteps`; a shifted longer horizon shrinks
+one hold per frame until that minimum. The
 given path defines the single CLF; there is no separate path corridor.
 
 Observer inputs tighten sampled collision, road, physical-state, sideslip,
@@ -70,14 +81,19 @@ block execution; unsupported uncertainty padding is omitted without declaring
 zero estimation error. No assumption-status diagnostics are produced. Usable finite
 enclosures still tighten the same optimization. Experimental collision checks
 use independent fixed-parameter target truth, and failure means collision or
-no solved control output. Recovery, margin shortfalls and unverified theory
+no solved control output before task completion. The default validation task ends
+on current physical-state terminal entry and explicitly labels this as offline
+truth scoring, not noisy information-set certification. No terminal hold or
+restart follows. `StopAtTerminal=false` retains duration/recovery diagnostics.
+Recovery, margin shortfalls and unverified theory
 premises are separate observations. `nominalRecoveryValidationTest` and
 `../scripts/verifyExperimentalAssumptionPolicy.m` exercise these distinctions.
 
-Initialization metadata uses `nominalFeedbackRollout` and `shiftedInputRollout`.
+Initialization metadata uses `nominalFeedbackRollout`, `plannedAvoidanceRollout`
+and `shiftedInputRollout`.
 The legacy experiment entry names `runPotentialFieldCampaign` and
 `extendPotentialFieldRecovery` remain for existing campaign callers; the
-controller itself no longer uses potential-field guidance. Historical experiment
+controller uses bounded rollout planning rather than the former potential field. Historical experiment
 records describe the algorithm version that actually produced them.
 
 MATLAB Control System Toolbox and the compiled Clarabel 0.11.1 adapter are required.

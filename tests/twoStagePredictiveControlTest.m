@@ -39,19 +39,23 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             ego=localSuccessor(ego,prior);ego.position(2)=ego.position(2)+.01;
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(size(inputs,2),max(cfg.controller.horizonSteps,size(prior.inputTrajectory,2)-1));
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyEqual(problem.model.linearization.states(:,1),problem.model.initialState,AbsTol=0);
             testCase.verifyNotEqual(problem.model.initialState,prior.stateTrajectory(:,2));
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
         end
-        function coldCrossingSelectsOneBrakingReferenceBeforeTheRtiSolve(testCase)
+        function coldCrossingPlansOneReferenceBeforeTheRtiSolve(testCase)
             [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("crossing",cfg);
             [command,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
-            testCase.verifyEqual(problem.metadata.search.initialization,"brakingFeedbackRollout");
+            testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyFalse(problem.metadata.search.nominalRestarted);
             testCase.verifyLessThan(problem.model.linearization.inputs(2,1),0);
+            testCase.verifyTrue(problem.metadata.search.planner.used);
+            testCase.verifyEqual(problem.metadata.search.planner.candidateCount,3);
+            testCase.verifyFalse(problem.metadata.search.planner.robustCertificate);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
         end

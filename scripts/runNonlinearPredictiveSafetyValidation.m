@@ -2,7 +2,10 @@ function report = runNonlinearPredictiveSafetyValidation(options)
 %runNonlinearPredictiveSafetyValidation Deterministic nonlinear closed-loop audit.
 % A tight ode45 replay checks each issued hold independently of the affine prediction.
 % The audit is offline evidence; it is not an execution admission layer.
-% A positive RecoveryDwellSeconds enables sampled nominal-recovery stopping.
+% By default the task ends when the current physical state enters X_f.
+% This is independent truth-based experiment scoring, not controller feedback
+% or a certificate for the observer information set. No terminal hold is run.
+% StopAtTerminal=false retains fixed-duration/recovery diagnostic experiments.
 % Frames is a cumulative observation cap, including when resuming a saved
 % continuation. A completed duration is distinct from confirmed recovery.
 % TargetEstimateFunction(targetTruth,egoTruth) is an optional synthetic
@@ -19,6 +22,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'controller',struct('horizonSteps',8))
         options.StateTransition (1,1) string {mustBeMember(options.StateTransition,["ode45","nominalRk4"])} = "ode45"
         options.RequireCollisionThreat (1,1) logical = false
+        options.StopAtTerminal (1,1) logical = true
         options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
         options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
         options.RecoveryTolerances (5,1) double {mustBePositive,mustBeFinite} = [.1;pi/180;.1;.05;.01]
@@ -97,12 +101,16 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             recovery.minimumTimeSeconds=max(recovery.minimumTimeSeconds,baseline.lastCollisionSeconds);
         end
         recoveryStart=NaN;
+        terminalHandoff=struct('enabled',options.StopAtTerminal,'reached',false, ...
+            'timeSeconds',NaN,'state',[],'marginMeters',NaN,'reason',"", ...
+            'membershipScope',"currentPhysicalStateOfflineScoring", ...
+            'robustInformationSetCertified',false,'terminalControllerSimulated',false);
         if strlength(options.ResumeFrom)>0
             saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;r=saved.result;
             assert(isequaln(r.configuration,cfg) && r.scenario==name ...
                 && saved.stateTransition==options.StateTransition ...
                 && isfield(saved,'observationModel') && saved.observationModel==observationModel ...
-                && saved.prior.version==81, ...
+                && saved.prior.version==82, ...
                 'Continuation scenario, configuration and transition must match.');
             assert(isequaln(saved.recoveryOptions,recovery),'Recovery settings must match.');
             assert(isempty(r.trace) || (isfield(r.trace,'terminalDistanceMeters') ...
@@ -111,6 +119,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 'Continuation trace must use the current RTI metadata schema.');
             assert(strlength(r.failure)==0 && ~r.recovery.recovered && r.executedFrames<options.Frames, ...
                 'Only an unfinished, successful duration can be extended.');
+            assert(isfield(r,'terminalHandoff') && r.terminalHandoff.enabled==options.StopAtTerminal ...
+                && ~r.terminalHandoff.reached,'Continuation must use the same unfinished task boundary.');
             ego=saved.ego;target=saved.target;prior=saved.prior;frames=r.executedFrames;
             if useEstimator
                 assert(isequaln(saved.estimatorConfiguration,estimatorConfiguration),'Estimator settings must match.');
@@ -125,6 +135,16 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         end
         recoveryOptions=recovery;truthPath=[];
         for frame=frames+1:options.Frames
+            if options.StopAtTerminal && frame==1
+                [member,info,currentGap,currentRoad]=localTerminalMembership(ego,target,road,cfg);
+                if member
+                    terminalHandoff.reached=true;terminalHandoff.timeSeconds=ego.stateTime;
+                    terminalHandoff.state=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];
+                    terminalHandoff.marginMeters=info.margin;terminalHandoff.reason=info.reason;
+                    minimumClearance=min(minimumClearance,currentGap);minimumRoadMargin=min(minimumRoadMargin,currentRoad);
+                    break;
+                end
+            end
             frameTimer=tic;
             phase="observer";controllerTimer=[];
             egoTruth=ego;targetTruth=target;priorAtFrame=prior;
@@ -262,6 +282,14 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                         failure,struct('command',command,'problem',problem,'times',times,'states',states));
                     break;
                 end
+                if options.StopAtTerminal
+                    [member,info]=localTerminalMembership(ego,target,road,cfg);
+                    if member
+                        terminalHandoff.reached=true;terminalHandoff.timeSeconds=ego.stateTime;
+                        terminalHandoff.state=next;terminalHandoff.marginMeters=info.margin;
+                        terminalHandoff.reason=info.reason;break;
+                    end
+                end
                 if recovery.enabled
                     inside=all(abs(finalError)<=options.RecoveryTolerances) ...
                         && ego.stateTime>=recovery.minimumTimeSeconds;
@@ -299,11 +327,13 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         if ~isempty(later),medianLater=median(later);p95Later=prctile(later,95);end
         outcome="observationLimit";
         if recovery.recovered,outcome="recovered";end
+        if terminalHandoff.reached,outcome="terminalReached";end
         if executionError,outcome="executionError";end
         if controlUnavailable,outcome="controlUnavailable";end
         if collisionDetected,outcome="collision";end
         results{index}=struct('scenario',name,'requestedFrames',options.Frames,'executedFrames',frames, ...
-            'completed',strlength(failure)==0 && (frames==options.Frames || recovery.recovered),'recovery',recovery, ...
+            'completed',strlength(failure)==0 && (frames==options.Frames || recovery.recovered || terminalHandoff.reached), ...
+            'recovery',recovery,'terminalHandoff',terminalHandoff, ...
             'outcome',outcome,'experimentFailed',collisionDetected || controlUnavailable, ...
             'collisionDetected',collisionDetected,'collisionTimeSeconds',collisionTime, ...
             'controlUnavailable',controlUnavailable,'executionError',executionError, ...
@@ -353,6 +383,22 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         file=fopen(options.OutputFile,'w');assert(file>=0);cleanup=onCleanup(@()fclose(file));
         fprintf(file,'%s\n',jsonencode(report));
     end
+end
+
+function [member,info,gap,roadMargin]=localTerminalMembership(ego,target,road,cfg)
+    % Score the current truth only. This model never supplies an MPC input.
+    [state,lane,metadata,observation]=readControllerInputs(ego,target,road,cfg);
+    q=predictiveSafetyGeometry.target(observation,target,cfg);
+    if ~isempty(q) && norm(q(1:2)-state.modelState(1:2))>cfg.collision.encounterRangeMeters,q=[];end
+    frame=predictiveSafetyGeometry.roadFrame(lane,metadata);
+    model=struct('cfg',cfg,'initialState',state.modelState,'lane',lane,'road',metadata, ...
+        'target',q,'targetEpoch',q,'targetEpochIndex',0,'sampleIndex',0, ...
+        'nominalReference',nonlinearBicycleModel.cruise(cfg,frame(4)));
+    context=terminalSafeSet.context(model);
+    [member,~,info]=terminalSafeSet.member(context,state.modelState,0);
+    gap=Inf;
+    if ~isempty(q),gap=predictiveSafetyGeometry.rectangle(state.modelState(1:3),context.shape,q(1:3),q(8:11));end
+    roadMargin=terminalSafeSet.roadMargin(state.modelState,model);
 end
 
 function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)

@@ -29,7 +29,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     end
     explicitState=nargin>=5;
     if ~explicitState,previousState=lastState;end
-    if isstruct(previousState) && (~isfield(previousState,'version') || previousState.version~=81),previousState=[];end
+    if isstruct(previousState) && (~isfield(previousState,'version') || previousState.version~=82),previousState=[];end
     if nargin<4,cfg=[];end
     if nargin<3,laneCenterline=[];end
     if nargin<2,targetEstimate=[];end
@@ -40,7 +40,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     uncertainty=predictiveSafetyGeometry.observerUncertainty(ego,observation,observed);
     frame=predictiveSafetyGeometry.roadFrame(lane,road);
     context={cfg.vehicle,cfg.tire,cfg.roadLoad,cfg.model,cfg.actuation,cfg.collision, ...
-        cfg.controller,cfg.referenceSpeed,cfg.clf,cfg.nominalClf,cfg.rti, ...
+        cfg.controller,cfg.referenceSpeed,cfg.clf,cfg.nominalClf,cfg.rti,cfg.planner, ...
         cfg.nonlinear.integrationStep,cfg.terminal,frame,lane};
     index=0;epochTime=ego.stateTime;targetEpoch=observed;targetEpochIndex=0;
     if isstruct(previousState)
@@ -165,7 +165,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.safetyObjective="sumOfRobustnessDeficitsWithHardNominalCollisionRows";
         metadata.safetyScope="affineNominalCollisionWithRelaxedObserverMargins";
     end
-    controllerState=struct('version',81,'trust',model.trust,'stateTime',ego.stateTime,'sampleTime',cfg.controller.sampleTime, ...
+    controllerState=struct('version',82,'trust',model.trust,'stateTime',ego.stateTime,'sampleTime',cfg.controller.sampleTime, ...
         'sampleIndex',index,'epochTime',epochTime,'targetEpoch',targetEpoch,'targetEpochIndex',targetEpochIndex,'context',{context}, ...
         'jointState',jointState,'predictedJointState',predictedJointState, ...
         'appliedInput',first,'inputTrajectory',predictedInput,'stateTrajectory',solution.states, ...
@@ -203,6 +203,16 @@ function localWarmUp(cfg)
     cfg.solver.timeLimitSeconds=max(1,cfg.solver.timeLimitSeconds);
     cfg.solver.maxIterations=max(80,cfg.solver.maxIterations);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
+    % Prime the cold planner as well as nominal and bounded feedback paths.
+    probe=struct('position',[0;0],'yaw',0,'speed',cfg.referenceSpeed, ...
+        'lateralVelocity',0,'yawRate',0,'heldActuatorInput',[0;0],'stateTime',0);
+    opposing=struct('targetPositionInertial',[24;0], ...
+        'targetVelocityInertial',[-8;0],'targetYawInertial',pi);
+    try
+        collisionAvoidanceController(probe,opposing,road,cfg,[]);
+    catch exception
+        if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
+    end
     for bounded=[false,true]
         x=[0;0;0;cfg.referenceSpeed;0;0];input=[0;0];state=[];
         q=[40;3;pi;8;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];

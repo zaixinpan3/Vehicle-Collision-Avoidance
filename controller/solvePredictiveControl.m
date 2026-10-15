@@ -66,6 +66,11 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.stopReason=search.terminationReason;
     search.rollout=rollout;search.trust=model.trust;
     search.anchorCertified=false;search.appendedTerminalSteps=0;search.appendedBrakingSteps=0;
+    search.planner=localPlannerMetadata();
+    if exist('anchor','var')
+        search.appendedTerminalSteps=anchor.appendedTerminalSteps;
+        search.appendedBrakingSteps=anchor.appendedBrakingSteps;search.planner=anchor.planner;
+    end
     search.appendedGuidedSteps=0;search.extensionStopped="";
     search.potentialFieldRestarted=false;search.initializationFailure="";
     search.attempts=localAttempt(search);search.selectedAttempt=double(search.returned);
@@ -135,41 +140,125 @@ function [anchor,source]=localRtiInitialize(model,previous)
     if ~isempty(model.target)
         [encounterCount,conflict]=localEncounterHorizon(model);count=max(count,encounterCount);
     end
-    count=min(count,cfg.controller.maximumHorizonSteps);
     inherited=isstruct(previous) && isfield(previous,'inputTrajectory') ...
         && size(previous.inputTrajectory,2)>1 && all(isfinite(previous.inputTrajectory),'all');
-    % Select one reference before optimization. An appearing conflict uses
-    % one mild-braking rollout, not an avoidance route or a solve/restart.
-    coldBrake=conflict && (~inherited || model.targetOnset);
-    if coldBrake,inherited=false;end
+    plan=conflict && (~inherited || model.targetOnset);
+    if plan
+        % A bounded planner supplies the route, never an executable fallback.
+        count=min(cfg.controller.maximumHorizonSteps,ceil(cfg.rti.predictionSeconds/cfg.controller.sampleTime));
+        anchor=localPlanReference(model,count);source="plannedAvoidanceRollout";return;
+    end
     old=zeros(2,0);source="nominalFeedbackRollout";
-    if coldBrake,source="brakingFeedbackRollout";end
     if inherited
         old=previous.inputTrajectory(:,2:end);source="shiftedInputRollout";
-        if ~isempty(model.target),count=max(count,min(size(old,2),cfg.controller.maximumHorizonSteps));end
+        % Keep the previous absolute endpoint until the minimum prefix is
+        % reached. Neither a disappearing target nor a rolling fixed duration
+        % may replace a valid terminal endpoint with an arbitrary cruise tail.
+        count=max(cfg.controller.horizonSteps,size(old,2));
     end
+    count=min(count,cfg.controller.maximumHorizonSteps);
     inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=model.initialState;
+    context=terminalSafeSet.context(model);
+    context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
+    appended=0;braking=0;
     prior=model.previousInput;nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
     for index=1:count
-        if index<=size(old,2),u=old(:,index);
-        else,u=nonlinearBicycleModel.nominalFeedback(states(:,index),prior,model.lane,model.nominalReference,cfg,nominal);end
-        if coldBrake
-            brake=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
-            rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
-            u(2)=max(cfg.actuation.brakingRatioMinimum,min(cfg.actuation.brakingRatioMaximum, ...
-                max(prior(2)-rate,min(prior(2)+rate,brake))));
-        end
-        try
-            next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
-        catch exception
-            if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
+        if index<=size(old,2)
+            u=old(:,index);next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
+        elseif inherited && terminalSafeSet.member(context,states(:,index),index-1)
+            [u,next,ok,~,middle]=terminalSafeSet.cruiseInput(states(:,index),model);
+            ok=ok && terminalSafeSet.clears(context,middle,index-.5) ...
+                && terminalSafeSet.member(context,next,index);
+            if ~ok
+                [u,next,ok]=terminalSafeSet.brakingInput(states(:,index),prior,u,model,context,index-1);
+                braking=braking+double(ok);
+            end
+            if ~ok
+                % No certified realization was found; this is an uncertified
+                % reference for the single RTI, not a terminal certificate.
+                u=nonlinearBicycleModel.nominalFeedback(states(:,index),prior,model.lane,model.nominalReference,cfg,nominal);
+                next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
+            end
+            appended=appended+double(ok);
+        else
             u=nonlinearBicycleModel.nominalFeedback(states(:,index),prior,model.lane,model.nominalReference,cfg,nominal);
             next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
         end
         inputs(:,index)=u;states(:,index+1)=next;prior=u;
         if mod(index,4)==0,localCheckDeadline(model);end
     end
-    anchor=struct('inputs',inputs,'states',states);
+    anchor=struct('inputs',inputs,'states',states,'terminalContext',context, ...
+        'appendedTerminalSteps',appended,'appendedBrakingSteps',braking,'planner',localPlannerMetadata());
+end
+
+function anchor=localPlanReference(model,count)
+    % A straight braking route and two geometry-derived passing offsets. Rollouts
+    % use the actual nonlinear model and settle lateral acceleration near the
+    % endpoint. Their score guides initialization; it certifies no robust set.
+    cfg=model.cfg;[side,~]=localCollisionSide(model);
+    offsets=[0,predictiveSafetyGeometry.passingOffsets(model,side)];
+    context=terminalSafeSet.context(model);
+    context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
+    best=Inf;anchor=[];
+    nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
+    target=localTargetAt(model,(0:count)*cfg.controller.sampleTime);
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    for candidate=1:numel(offsets)
+        localCheckDeadline(model);
+        inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=model.initialState;
+        prior=model.previousInput;valid=true;gap=Inf;roadMargin=Inf;
+        for index=1:count
+            x=states(:,index);projection=laneGeometry.project(x(1:2),model.lane);
+            virtual=x;virtual(1:2)=x(1:2)-offsets(candidate)*[-sin(projection.heading);cos(projection.heading)];
+            guidance=cfg;guidance.nominalClf.lookaheadSeconds=cfg.planner.lookaheadSeconds;
+            remaining=(count-index)*cfg.controller.sampleTime;
+            peak=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
+            mild=.75*cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared;
+            acceleration=mild+(peak-mild)*min(1,max(0,(remaining-.25)/.75));
+            guidance.nominalClf.lateralAccelerationFraction=acceleration/(min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity);
+            u=nonlinearBicycleModel.nominalFeedback(virtual,prior,model.lane,model.nominalReference,guidance,nominal);
+            deceleration=cfg.planner.decelerationMetersPerSecondSquared;
+            if candidate==1,deceleration=cfg.terminal.brakingDecelerationMetersPerSecondSquared;end
+            brake=-deceleration/modifiedFialaTire.accelerationGain(cfg);
+            rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
+            u(2)=max(cfg.actuation.brakingRatioMinimum,min(cfg.actuation.brakingRatioMaximum,max(prior(2)-rate,min(prior(2)+rate,brake))));
+            try
+                next=nonlinearBicycleModel.sample(x,u,cfg);
+            catch exception
+                if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
+                valid=false;break;
+            end
+            inputs(:,index)=u;states(:,index+1)=next;prior=u;
+            gap=min(gap,predictiveSafetyGeometry.rectangle(next(1:3),shape,target(1:3,index+1),target(8:11,index+1)));
+            roadMargin=min(roadMargin,terminalSafeSet.roadMargin(next,model));
+            if mod(index,4)==0,localCheckDeadline(model);end
+        end
+        if ~valid,continue;end
+        member=terminalSafeSet.member(context,states(:,end),count);
+        endpoint=states(:,end);speed=hypot(endpoint(4),endpoint(5));
+        violation=max(0,abs(endpoint(6))*speed-cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared) ...
+            +max(0,abs(endpoint(5))-tan(cfg.terminal.sideslipMaximumRadians)*endpoint(4));
+        score=10000*double(gap<cfg.collision.safetyMarginMeters || roadMargin<0) ...
+            +100*double(~member)+1000*max(0,-roadMargin)+1000*max(0,cfg.collision.safetyMarginMeters-gap) ...
+            +10*violation+abs(offsets(candidate));
+        if score<best
+            best=score;planner=localPlannerMetadata();planner.used=true;
+            planner.selectedOffsetMeters=offsets(candidate);planner.referenceTerminalMember=member;
+            planner.referenceMinimumNodeGapMeters=gap;
+            anchor=struct('inputs',inputs,'states',states,'terminalContext',context, ...
+                'appendedTerminalSteps',0,'appendedBrakingSteps',0,'planner',planner);
+        end
+    end
+    if isempty(anchor)
+        error('collisionAvoidanceController:referenceUnavailable','All bounded planner rollouts left the model domain.');
+    end
+    anchor.planner.candidateCount=numel(offsets);
+end
+
+function planner=localPlannerMetadata()
+    planner=struct('used',false,'candidateCount',0,'selectedOffsetMeters',NaN, ...
+        'referenceTerminalMember',false,'referenceMinimumNodeGapMeters',NaN, ...
+        'robustCertificate',false);
 end
 
 function trust=localTrustPrior(previous,cfg)

@@ -39,6 +39,9 @@ function cfg=localDefaults()
     % RTI builds one model per sample; prediction duration is independent
     % of the number of nonlinear iterations (exactly one, not configurable).
     cfg.rti=struct('predictionSeconds',2,'minimumPredictionSeconds',1,'settlingSeconds',.5);
+    % Bounded nonlinear reference planner: braking and two passing offsets, no optimizer.
+    cfg.planner=struct('clearanceReserveMeters',1.1,'lookaheadSeconds',.5, ...
+        'decelerationMetersPerSecondSquared',1,'lateralAccelerationFraction',.9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
     % Collision rows apply at nodes inside it, including a later re-entry.
@@ -120,7 +123,7 @@ function cfg=localDefaults()
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for prediction and output assembly. Native
     % solves also count their construction time against the remaining budget.
-    cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.05,'completionReserveSeconds',.020, ...
+    cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.05,'completionReserveSeconds',.010, ...
         'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
         'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
         'clfTieTolerance',1e-3,'reducedTolerance',1e-3);
@@ -163,6 +166,10 @@ function localValidate(cfg)
         validateattributes(cfg.rti.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.rti.minimumPredictionSeconds,{'double'},{'<=',cfg.rti.predictionSeconds});
+    for name=["clearanceReserveMeters","lookaheadSeconds","decelerationMetersPerSecondSquared"]
+        validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
+    end
+    validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});

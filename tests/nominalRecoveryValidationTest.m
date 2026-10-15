@@ -1,5 +1,5 @@
 classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
-    % Recovery is an observed dwell in all transverse coordinates.
+    % Current terminal entry ends the task; optional recovery uses a dwell.
     methods (TestClassSetup)
         function preparePaths(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -9,15 +9,41 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function anInitiallyTerminalStateNeedsNoPredictiveCommand(testCase)
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=4);
+            r=report.results;
+            testCase.verifyTrue(r.completed);
+            testCase.verifyEqual(r.outcome,"terminalReached");
+            testCase.verifyEqual(r.executedFrames,0);
+            testCase.verifyEmpty(r.trace);
+            testCase.verifyEqual(r.terminalHandoff.timeSeconds,0);
+            testCase.verifyFalse(r.terminalHandoff.terminalControllerSimulated);
+            testCase.verifyFalse(r.terminalHandoff.robustInformationSetCertified);
+            directory=tempname;mkdir(directory);testCase.addTeardown(@()rmdir(directory,'s'));
+            r.speed=8;file=fopen(fullfile(directory,'summary.json'),'w');
+            fprintf(file,'%s',jsonencode(r));fclose(file);
+            root=fileparts(fileparts(mfilename('fullpath')));
+            rows=extendPotentialFieldRecovery(root,directory,8);
+            testCase.verifyEqual(rows.executedFrames,0);
+            testCase.verifyFalse(isfile(fullfile(directory,'recovery-summary.json')));
+        end
+        function predictedTerminalEndpointsDoNotEndTheCurrentTask(testCase)
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="crossing",Frames=1, ...
+                ControllerConfiguration=struct('solver',struct('timeLimitSeconds',5)));
+            r=report.results;
+            testCase.verifyEqual(r.executedFrames,1);
+            testCase.verifyFalse(r.terminalHandoff.reached);
+            testCase.verifyEqual(r.outcome,"observationLimit");
+        end
         function defaultRecoveryHasNoArbitraryMinimumDuration(testCase)
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=12, ...
+            report=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="recovery",Frames=12, ...
                 RecoveryDwellSeconds=.1);
             testCase.verifyEqual(report.results.recovery.minimumTimeSeconds,0);
             testCase.verifyTrue(report.results.recovery.recovered);
             testCase.verifyLessThan(report.results.executedFrames,12);
         end
         function recoveryRequiresMinimumTimeAndSustainedDwell(testCase)
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=12, ...
+            report=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="recovery",Frames=12, ...
                 RecoveryDwellSeconds=.1,RecoveryMinimumSeconds=.2);
             result=report.results;
             testCase.verifyTrue(result.completed);
@@ -27,7 +53,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(result.recovery.confirmationTimeSeconds, .3-1e-10);
         end
         function completedDurationDoesNotMeanRecovered(testCase)
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=2, ...
+            report=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="recovery",Frames=2, ...
                 RecoveryDwellSeconds=.1,RecoveryMinimumSeconds=0,RecoveryTolerances=1e-9*ones(5,1));
             testCase.verifyTrue(report.results.completed);
             testCase.verifyFalse(report.results.recovery.recovered);
@@ -36,7 +62,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyEqual(report.results.outcome,"observationLimit");
         end
         function defaultFixedDurationDoesNotClaimRecovery(testCase)
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=2);
+            report=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="recovery",Frames=2);
             testCase.verifyTrue(report.results.completed);
             testCase.verifyFalse(report.results.recovery.enabled);
             testCase.verifyFalse(report.results.recovery.recovered);
@@ -44,11 +70,11 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         function extendingDurationPreservesTheControllerAndPlantState(testCase)
             file=string(tempname)+".mat";
             testCase.addTeardown(@()delete(file));
-            runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=2, ...
+            runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="recovery",Frames=2, ...
                 StateTransition="nominalRk4",ContinuationFile=file);
-            resumed=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=4, ...
+            resumed=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="recovery",Frames=4, ...
                 StateTransition="nominalRk4",ResumeFrom=file);
-            uninterrupted=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=4, ...
+            uninterrupted=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="recovery",Frames=4, ...
                 StateTransition="nominalRk4");
             testCase.verifyEqual([resumed.results.trace.nextState],[uninterrupted.results.trace.nextState]);
             testCase.verifyEqual([resumed.results.trace.input],[uninterrupted.results.trace.input]);
@@ -57,16 +83,16 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         function incompatibleContinuationIsRejectedBeforeAdvancingThePlant(testCase)
             file=string(tempname)+".mat";
             testCase.addTeardown(@()delete(file));
-            runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=1,ContinuationFile=file);
+            runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="recovery",Frames=1,ContinuationFile=file);
             saved=load(file,'continuation');continuation=saved.continuation;
             continuation.result.trace=rmfield(continuation.result.trace,'terminalDistanceMeters');
             save(file,'continuation');
-            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
+            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation(StopAtTerminal=false, ...
                 Scenarios="recovery",Frames=2,ResumeFrom=file), ...
                 'runNonlinearPredictiveSafetyValidation:incompatibleTraceSchema');
         end
         function revisedUncertifiedForecastsDoNotChangeTargetTruthOrFailTheExperiment(testCase)
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=4, ...
+            report=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="oncoming",Frames=4, ...
                 TargetEstimateFunction=@localRevisedTarget);
             r=report.results;
             testCase.verifyEqual(r.targetInitialState(5:6),zeros(2,1),AbsTol=0);
@@ -77,7 +103,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyTrue(all([r.trace.optimizationReturned]));
         end
         function aCollisionWithTruthFailsEvenWhenTheEstimatedTargetIsFarAway(testCase)
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=40, ...
+            report=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="oncoming",Frames=40, ...
                 TargetEstimateFunction=@localFarTarget);
             r=report.results;
             testCase.verifyTrue(r.collisionDetected);
@@ -90,7 +116,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyTrue(all([r.trace.optimizationReturned]));
         end
         function failedControllerTimeExcludesEarlierPipelineWork(testCase)
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=1, ...
+            report=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="oncoming",Frames=1, ...
                 TargetEstimateFunction=@localDelayedImpossibleTarget);
             result=report.results;
             testCase.verifyTrue(result.controlUnavailable);
@@ -100,7 +126,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
         function anActualOptimizationFailureRemainsAnExperimentalFailure(testCase)
             cfg=struct('referenceSpeed',15,'controller',struct('horizonSteps',16));
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=1, ...
+            report=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios="oncoming",Frames=1, ...
                 ControllerConfiguration=cfg,TargetEstimateFunction=@localImpossibleTarget);
             testCase.verifyTrue(report.results.controlUnavailable);
             testCase.verifyGreaterThanOrEqual(report.results.failedPipelineSeconds,report.results.failedFrameSeconds);
