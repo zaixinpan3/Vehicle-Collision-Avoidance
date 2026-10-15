@@ -109,62 +109,50 @@ with vehicle collision avoidance has therefore attracted sustained research inte
 \cite{TurriCarvalhoTsengJohanssonBorrelli2013,FahmyGhanyBaumann2018,
 ChengLiLiuLiGuo2021,BruggemannSteevesKrstic2022}.
 
-Existing approaches generate evasive paths using artificial potential
-fields or virtual-flow models
-\cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}, coordinate steering
-and braking \cite{GuoHuWang2016,LaiYang2023}, optimize constrained
-trajectories through convex planning or model predictive control (MPC)
-\cite{LiZhangGuoLenzoGuo2023,TurriCarvalhoTsengJohanssonBorrelli2013,
-AmmourOrjuelaBasset2022,ThompsonDallasGohBalachandran2024}, or use
-reinforcement learning for maneuver selection above a model-based
-tracking controller
-\cite{ChenAksunGuvenc2025}. Model simplifications can restrict their
-applicability to combined evasive maneuvers. For example, the
-steering-only formulation in \cite{BruggemannSteevesKrstic2022} fixes
-longitudinal speed and therefore excludes braking-induced changes in
-lateral dynamics. During simultaneous steering and braking, however,
-the two actions affect both vehicle motion and the tire-force capacity
-available to the other channel \cite{GuoHuWang2016,BealBoyd2019}.
-Neglecting these interactions, or imposing longitudinal and lateral
-force limits independently, can admit control combinations that the
-vehicle cannot realize. Coordinated steering and braking address this
-coupling \cite{GuoHuWang2016,LaiYang2023}, but coordination or tracking
-stability alone does not establish collision avoidance under uncertain
-target states. Formal safety is a separate requirement: the cited
-field-based designs
-evaluate successful avoidance in simulations and vehicle trials without
-proving forward invariance or recursive feasibility
-\cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}. Control barrier
-function (CBF) filters introduce a formal invariance condition
-\cite{AmesXuGrizzleTabuada2017}, but it must admit a control from the
-vehicle's actual input set throughout the claimed safe domain. With
-limited braking and tire-force authority, geometric nonoverlap can
-include states from which collision is already unavoidable. A
-distance-based separation function is therefore only a CBF candidate
-until its defining condition is verified for the constrained vehicle;
-enforcing an unverified candidate as a quadratic-program constraint can
-lead to infeasibility \cite{ZengZhangLiSreenath2021}. Input-aware and
-predictive constructions address aspects of this difficulty
-\cite{BruggemannSteevesKrstic2022,ZengZhangSreenath2021}, while
-pointwise feasibility alone does not establish continued feasibility,
-and reactive filtering can remain myopic
-\cite{ZengZhangLiSreenath2021,BlackJankovicSharmaPanagou2023}. A further
-gap concerns the information supplied to the safety controller:
-representative lane-change work assumes accurate, delay-free perception
-and leaves estimation and noisy measurements for subsequent development
-\cite{HeZengZhangSreenath2021}. During evasive steering and braking,
-the ego frame accelerates and rotates, coupling relative target motion
-to ego velocity and yaw rate; target-state estimation and its error
-cannot be treated as trivial inputs
+Artificial-potential-field and virtual-flow designs demonstrate evasive
+path generation and lane-keeping integration, but their reported
+avoidance results do not establish forward invariance of a
+collision-free set \cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}.
+Control barrier functions (CBFs) provide an invariance condition, but
+that condition must admit a control from the actual input set
+throughout the claimed safe domain \cite{AmesXuGrizzleTabuada2017}.
+For a vehicle with finite braking and turning authority, instantaneous
+geometric clearance does not imply that collision remains avoidable.
+A position-only distance function is therefore insufficient as a safety
+certificate unless its derivative conditions and admissible state
+domain are verified for the constrained dynamics; higher-order
+constructions likewise require input compatibility
+\cite{XiaoBelta2022}. This distinction has practical consequences:
+Tayal \emph{et al.}'s collision-cone CBF analysis assumes unlimited
+control authority, and the paper reports hardware failures caused by
+saturation in high-speed cases \cite{TayalEtAl2026}.
+Adding prediction does not by itself close the feasibility gap:
+Zeng \emph{et al.}'s CBF-constrained model predictive control (MPC)
+leaves persistent feasibility open \cite{ZengZhangSreenath2021}, while
+Black \emph{et al.}'s future-focused CBFs demonstrate improved
+feasibility empirically but leave its theoretical guarantee to future
+work \cite{BlackJankovicSharmaPanagou2023}. The vehicle model also
+restricts which avoidance maneuvers these guarantees can cover. The
+steering-only formulation of Br\"uggemann \emph{et al.} fixes
+longitudinal speed, excluding combined steering--braking maneuvers
+\cite{BruggemannSteevesKrstic2022}. During such maneuvers, longitudinal
+and lateral motion are dynamically coupled and share tire-force
+capacity \cite{GuoHuWang2016,BealBoyd2019}; neglecting these
+interactions can admit predicted force combinations that are jointly
+unattainable. Coordinated steering and braking address the coupling,
+but the tracking analysis in \cite{GuoHuWang2016} does not establish
+invariance of a collision-free set. A safety guarantee for exact target
+states does not extend to estimated states without an error analysis.
+For example, the lane-change controller in
+\cite{HeZengZhangSreenath2021} assumes accurate, delay-free perception
+and leaves estimation and noisy measurements to future work. Evasive
+ego motion further couples relative target dynamics to the ego
+vehicle's translation and rotation, making an ego-motion-consistent
+estimation model necessary
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
-Safety and feasibility must therefore be assessed using a vehicle
-model that retains steering--braking coupling and jointly realizable
-actuation, with maneuver-dependent state-estimation errors included
-explicitly. Accordingly, our design combines a coupled nonlinear
-bicycle model with modified Fiala tires, estimation-error enclosures
-derived from Sharma et al.'s nonlinear relative motion model (NRMM),
-and predictive avoidance constraints that incorporate these enclosures
-into the collision-safety and recursive-feasibility argument.
+These limitations motivate a safety and recursive-feasibility analysis
+that combines coupled steering--braking dynamics, jointly realizable
+control actions, and explicit bounds on target-state estimation error.
 
 Two lines of prior work supply what such a system needs, and each stops
 short. On the estimation side, Rajamani and co-workers showed that
