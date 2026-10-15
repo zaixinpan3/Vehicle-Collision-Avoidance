@@ -107,11 +107,48 @@ collision threat, and timely driver intervention may still be required
 \cite{ChengLiLiuLiGuo2021}. Integrating lane following with vehicle
 collision avoidance has therefore attracted sustained research interest
 \cite{TurriCarvalhoTsengJohanssonBorrelli2013,FahmyGhanyBaumann2018,
-ChengLiLiuLiGuo2021,BruggemannSteevesKrstic2022}. This paper presents an
-integrated system that follows a prescribed lane at a desired cruising
-speed, autonomously steers and brakes to avoid threatening vehicles,
-and returns to nominal cruising after the encounter, without requiring
-driver intervention throughout the maneuver.
+ChengLiLiuLiGuo2021,BruggemannSteevesKrstic2022}.
+
+Several complementary approaches have been developed for vehicle
+collision avoidance and its integration with lane following. Artificial
+potential fields and virtual-flow models generate evasive reference
+paths from lane geometry and obstacle positions, followed by a
+path-tracking controller
+\cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}; field-based planning
+requires additional treatment of local minima and path trackability,
+and the virtual-flow design in \cite{ChengLiLiuLiGuo2021} leaves moving
+obstacles and stability-aware planning for further development.
+Optimization-based methods compute collision-avoiding trajectories
+subject to vehicle and road constraints through convex optimization or
+receding-horizon control, including linear and nonlinear model
+predictive control (MPC)
+\cite{LiZhangGuoLenzoGuo2023,TurriCarvalhoTsengJohanssonBorrelli2013,
+AmmourOrjuelaBasset2022,ThompsonDallasGohBalachandran2024}, but must
+balance model fidelity against online computation; finite-horizon
+collision constraints alone also do not establish recursive feasibility
+\cite{HuangWangMargellosGoulart2025}.
+Coordinated steering and braking strategies regulate the coupled
+longitudinal and lateral motion during emergency maneuvers to address
+avoidance and vehicle stability jointly
+\cite{GuoHuWang2016,LaiYang2023}, although stabilizing a prescribed
+evasive reference does not itself ensure that the reference remains
+collision-free under revised obstacle forecasts. Control barrier function (CBF)
+approaches encode safety requirements as control constraints and use
+quadratic-programming safety filters to modify nominal commands
+\cite{AmesXuGrizzleTabuada2017,HeZengZhangSreenath2021}, but their
+invariance guarantees require admissible barrier-satisfying inputs, and
+instantaneous formulations can be myopic
+\cite{BlackJankovicSharmaPanagou2023}. Hybrid MPC--CBF architectures
+add predictive or hierarchical coordination
+\cite{ZengZhangSreenath2021,BruggemannSteevesKrstic2022}, while their
+guarantees remain conditional on the assumed dynamics and available
+state information.
+Learning-based approaches use deep reinforcement learning to select
+maneuvers, with control Lyapunov function (CLF)--CBF controllers
+providing trajectory tracking and collision-avoidance constraints at
+the control layer \cite{ChenAksunGuvenc2025}; the cited study evaluates
+static-obstacle simulations, leaving robustness to uncertain moving
+vehicles outside its reported validation.
 
 Existing integrated designs, and collision-avoidance controllers more
 generally, fall short in two ways. The first concerns information. Most
