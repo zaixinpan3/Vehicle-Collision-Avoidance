@@ -170,7 +170,8 @@
         "Lipschitz calculation pp11-12 freezes ego and target yaw rates; do not reuse constant-rate partial Jacobian as uniform certificate over arbitrary maneuvering domain. Need project-specific validated domains/derivatives.",
         "Theorem1 nominal exponential observer result; yaw observer Theorem2 H-infinity L2 attenuation does not supply a deterministic pointwise collision tube automatically. Position/velocity chart has divisions by target speed squared.",
         "Full-scale road data (not closed-loop evasive collision-avoidance control), two highway cases and RMM near-relative-zero failure; Table3 NRMM not best in every metric: InMM absolute-speed RMS .24 vs NRMM .41; RMM course RMS1.12 vsNRMM1.19deg. Do not repeat blanket superiority.",
-        "Alai2024 provides same relative-model antecedent; NRMM not proved unique necessary model. Any consistent relative or properly transformed inertial model with certified errors could in principle be used."
+        "Alai2024 provides same relative-model antecedent; NRMM not proved unique necessary model. Any consistent relative or properly transformed inertial model with certified errors could in principle be used.",
+        "Selected recheck October15: Theorem1 p7 is nominal exponential stability; Theorem2 p8 is yaw H-infinity L2 attenuation; NRMM Eqs62-65 pp10-11 use estimated ego inputs. No complete disturbed-cascade ISS comparison propagating upstream ego-estimation errors into certified target-state bounds is established. This is not a claim of absent stability/noise analysis."
       ]
     },
     {
@@ -433,7 +434,8 @@
         "Theorem4 identifies the optimal value as a discrete-time CBF whose zero-level set is the hard-feasible safe invariant set, on the relaxed-feasible domain.",
         "Theorems1-2 discuss convergence to a safe invariant set within state-constrained feasible domain; do not claim all geometric noncollision states are viable or finite-horizon feasible.",
         "SectionII uses a known state and time-invariant discrete system; problem (8) uses fixed constraints and terminal set. Estimated moving targets, error enclosures and forecast/terminal revisions require a separate extension.",
-        "SectionsIV-V demonstrate linear and nonlinear systems, compare tightening and hand-designed barriers, and leave quantitative approximation to the maximal invariant set prospective. No first-invention claim for predictive CBFs."
+        "SectionsIV-V demonstrate linear and nonlinear systems, compare tightening and hand-designed barriers, and leave quantitative approximation to the maximal invariant set prospective. No first-invention claim for predictive CBFs.",
+        "Selected recheck October15: fixed state constraints and a time-invariant system do not mean stationary-obstacle-only applicability. SecIV examples are linear/nonlinear two-state systems, not static-obstacle avoidance. Deterministic target motion may be augmented at the modeling level; theorem assumptions and online uncertain forecast/terminal updates still require justification."
       ]
     }
   ],
@@ -534,6 +536,21 @@
       "key": "MT8F4HTY",
       "pdf_page": 5,
       "purpose": "Printed2642 progressive constraint tightening and restricted zero-level safe set."
+    },
+    {
+      "key": "8P4BHHZU",
+      "pdf_page": 8,
+      "purpose": "Recheck yaw Theorem2 H-infinity energy formulation versus a complete pointwise cascade enclosure."
+    },
+    {
+      "key": "8P4BHHZU",
+      "pdf_page": 11,
+      "purpose": "NRMM observer Eq65 explicitly incorporates ego-state estimates as dynamic inputs."
+    },
+    {
+      "key": "MYXPQ55F",
+      "pdf_page": 2,
+      "purpose": "Printed2624 specifies time-invariant dynamics and fixed polytopic constraints, without a stationary-obstacle restriction."
     }
   ],
   "coupling_addendum": {
@@ -635,5 +652,51 @@
       "reason": "The prior prose called the parent item key an attachment key; source identity and selected-section reading are unchanged."
     },
     "implementation_scope": "Manuscript/literature argument only; no algorithm, experiment or new numerical result."
+  },
+  "cascade_iss_moving_scope_addendum": {
+    "date": "2026-10-15",
+    "review_type": "Selected-section rechecks of two previously fully read originals; no increment of full-read count.",
+    "sources": [
+      {
+        "key": "8P4BHHZU",
+        "rechecked_pages": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "locations": [
+          "Theorem1, nominal exponential stability",
+          "Theorem2 and Eqs38-43, yaw H-infinity energy statement",
+          "Eqs62-65, estimated ego inputs to the NRMM observer"
+        ]
+      },
+      {
+        "key": "MYXPQ55F",
+        "rechecked_pages": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "locations": [
+          "SectionII-A Eqs1-3, known-state time-invariant system and fixed constraints",
+          "Problem8 and shifted candidate10",
+          "Theorem4, value-function CBF"
+        ],
+        "web_cross_check": "https://arxiv.org/html/2502.08400v1"
+      }
+    ],
+    "project_derivation": "Restate the existing two-stage positive comparison and its transient variation-of-constants bounds; derive the elementary relative-position clearance margin from a sound enclosure. No new observer theorem or full predictive safety proof is claimed.",
+    "decisions": [
+      "Critique the absence of a complete disturbed-cascade error bound in Sharma, while acknowledging nominal exponential stability and yaw H-infinity analysis.",
+      "Robust safety must account for admitted state uncertainty. Cascade ISS is this project's route to certified enclosures, not a universal necessary property of every possible safe estimator/controller.",
+      "Retain initial transients and upstream ego-estimation forcing in target bounds; a steady-state radius or noise-energy gain alone is insufficient without the corresponding initial/disturbance assumptions.",
+      "Do not describe Huang as stationary-obstacle-only. The relevant extension is to online-estimated moving-target uncertainty, changing forecasts and compatible shifted/terminal continuations.",
+      "Augmenting deterministic target motion is a modeling observation, not an automatic check of Huang's polytopic constraints, regularity and terminal assumptions.",
+      "Discuss these claim corrections with the user before inserting the candidate wording into the manuscript; manuscript unchanged in this task."
+    ]
   }
 }

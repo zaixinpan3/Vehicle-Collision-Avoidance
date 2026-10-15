@@ -338,3 +338,69 @@ The second Introduction paragraph now ends with Huang's construction and the est
 The companion source record promotes these two originals from located to fully reviewed, increasing the total from seventeen to nineteen. The Breeden/Panagou original was located and extracted but not read in full during this task; it does not support a new claim here. The earlier Ames note's key label is corrected: `UNBXLN66` is the parent item, and `HINPFCGD` is its PDF attachment. Source identity and the earlier selected-section reading remain unchanged. No vehicle experiment, algorithm change or new numerical result was performed.
 
 Verification: the first paragraph and all source from the estimator contribution description onward remain byte-identical to the pre-edit manuscript. The revised review region has nineteen distinct citation keys, all present in the existing bibliography. Argument-order, source-record parsing/count/uniqueness and the two newly reviewed PDF SHA-256 checks passed. The manuscript compiled to twenty-nine pages with resolved citations/references; reading-order PDF extraction with normalized line hyphenation confirmed the main transitions, and the first two manuscript pages were visually checked. The initial layout-preserving phrase check was sensitive to line hyphenation; the normalized reading-order check and rendered pages confirmed the intended text. Whitespace checks passed. No MATLAB tests were required or run for this prose-only change.
+
+## Discussion: cascade error bounds and moving-target PCBF scope (October 15, 2026)
+
+This addendum checks two proposed Introduction claims before inserting them into the manuscript, following the user's instruction to discuss problematic claims first. Both originals were already read in full; the present work rechecks selected mathematical statements and develops their implications. The full-read count remains nineteen. The manuscript is unchanged in this discussion task.
+
+### Sharma: the missing result is a complete disturbed-cascade bound
+
+Rechecked Sharma, Alai and Rajamani, DOI [10.1016/j.trc.2025.105411](https://doi.org/10.1016/j.trc.2025.105411), original PDF pages 6--11. Theorem 1, page 7, gives nominal exponential stability under its observer/Lipschitz conditions. Theorem 2, page 8, gives a yaw-observer H-infinity condition for energy-bounded disturbances. Equations (62)--(65), pages 10--11, use ego-state estimates as inputs to the NRMM target observer. These statements do not establish an end-to-end cascade ISS estimate that quantifies upstream ego-estimation errors, sensor disturbances and model defects in the target-state error. This is the defensible omission; it would be incorrect to claim that the paper has no stability or noise analysis. Original pages 8 and 11 were visually rechecked.
+
+For the project's continuous two-stage core, the existing certificate has the comparison form
+
+\[
+D^+\|e_v\|\leq-k_v\|e_v\|+d_v(t),\qquad
+D^+W_T\leq-\lambda_TW_T+c_{Tv}\|e_v\|+d_T(t),
+\]
+
+with positive decay rates and nonnegative forcing bounds. Thus, for initial radii containing the initial errors,
+
+\[
+r_v(t)=e^{-k_vt}r_{v0}
+ +\int_0^t e^{-k_v(t-\tau)}\bar d_v(\tau)\,d\tau,
+\]
+\[
+r_T(t)=e^{-\lambda_Tt}r_{T0}
+ +\int_0^t e^{-\lambda_T(t-\tau)}
+       [c_{Tv}r_v(\tau)+\bar d_T(\tau)]\,d\tau
+\]
+
+give \(\|e_v(t)\|\leq r_v(t)\) and \(W_T(t)\leq r_T(t)\). These are the componentwise variation-of-constants bounds from `estimator/OBSERVER_ISS_THEORY.md`, Sections 5--6, and the manuscript's cascade ISS theorem, not a newly proved observer theorem. The off-diagonal term explicitly carries the upstream velocity-estimation error into the target uncertainty. Metric projection then gives a relative-position radius \(\epsilon_\rho(t)=c_\rho r_T(t)\). The initial transient must be retained; an ultimate bound alone does not cover arbitrary initial errors.
+
+The requirement for a robust safety argument is a sound uncertainty description containing the true state. Cascade ISS is the method used here to construct that description; it is not a universally necessary mathematical property of every safe estimator/controller. A valid finite-time reachable enclosure, set observer or another justified disturbance/storage estimate could serve the same containment role. For example, a storage inequality combined with explicit initial-storage and disturbance-energy bounds can sometimes produce a pointwise enclosure from H-infinity analysis; an energy-gain statement alone must not be silently relabeled such an enclosure.
+
+An elementary position-margin calculation explains the connection without replacing the dynamic safety proof. If the ego-frame relative position satisfies \(\|\rho-\hat\rho\|\leq\epsilon_\rho\), then
+
+\[
+\|\rho\|\geq\|\hat\rho\|-\epsilon_\rho.
+\]
+
+Consequently \(\|\hat\rho\|\geq R+\epsilon_\rho\) implies current true center separation of at least \(R\). This is only an illustrative circular-clearance implication. The actual rectangle constraints also require orientation/footprint uncertainty, and continued safety still requires admissible dynamics, intersample coverage and a recursively feasible predictive construction. A continuous-time cascade ISS certificate initializes physical error sets; its publication does not automatically certify the sampled implementation, prospective observer updates or the full prediction horizon.
+
+The Introduction's warranted argument is: estimated ego motion drives the target observer; upstream errors therefore affect target uncertainty; robust collision constraints must cover those errors and the transient; this project uses a cascade ISS comparison to obtain explicit time-dependent enclosures. The necessity concerns accounting for the admitted errors, rather than requiring the name or form of ISS in every possible proof.
+
+### Huang: fixed constraints do not imply stationary obstacles only
+
+Rechecked Huang et al.'s published ECC original, DOI [10.23919/ECC65951.2025.11187291](https://doi.org/10.23919/ECC65951.2025.11187291), PDF pages 2--5, and cross-checked Section II-A in the [primary author preprint](https://arxiv.org/html/2502.08400v1). Its model is a known-state, time-invariant discrete system with fixed state/input constraints and a fixed terminal invariant set. It is not a static-obstacle avoidance paper: Section IV uses an unstable linear system and a nonlinear two-state system. The label "limited to stationary obstacles" is unsupported. Original page 2624 was visually rechecked.
+
+At the modeling level, deterministic moving targets can be incorporated into an autonomous joint state:
+
+\[
+z=(x_E,x_T),\qquad
+z^+=(f_E(x_E,u),f_T(x_T)).
+\]
+
+The relative noncollision condition can then be a fixed set in the joint state space even though the target moves in world coordinates. This observation refutes an intrinsic stationary-obstacle restriction; it does not establish applicability of every theorem without checking its assumptions. In particular, Huang's stated polytopic-constraint assumptions, regularity and terminal construction still require attention for nonlinear nonconvex vehicle geometry.
+
+The project-relevant extension concerns uncertain moving vehicles estimated online: target-state enclosures and forecasts are updated between samples, so a previous feasible plan need not remain compatible with a freshly recentered estimate or terminal set. The safety argument must preserve truth containment and a valid shifted continuation under these information updates. Joint target prediction, retained model-error identity, posterior intersection and a compatible terminal continuation address that specific issue under the project's declared premises. Motion by itself does not prove the original time-invariant framework inapplicable.
+
+### Candidate Introduction wording for discussion
+
+The following is a discussion draft only; it has not been inserted into the manuscript.
+
+> Sharma et al. establish nominal exponential convergence and a yaw-estimation H-infinity condition, but do not provide a cascade ISS analysis that propagates ego-state estimation errors into certified target-state bounds. Since the estimated ego motion drives the relative target observer, these upstream errors must be included when constructing uncertainty sets for collision avoidance. We therefore derive a cascade ISS bound that accounts for initial errors, sensor disturbances and model mismatch, and supplies time-dependent error enclosures to the safety constraints.
+
+> Huang et al. establish their PCBF guarantees for a known-state, time-invariant constrained system with a fixed terminal invariant set. For moving vehicles estimated online, the safety argument must additionally account for target-state uncertainty and successive forecast updates, while preserving feasibility of the shifted plan and its terminal continuation.
+
+These proposed statements use the existing citation keys `SharmaAlaiRajamani2026` and `HuangWangMargellosGoulart2025`. No new full-paper reading, experimental result or implementation change is claimed. Both original PDF hashes and the source-record count were rechecked; the manuscript was verified unchanged. No manuscript recompilation or MATLAB test was needed for this discussion note.
