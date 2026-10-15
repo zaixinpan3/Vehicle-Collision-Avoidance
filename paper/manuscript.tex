@@ -171,11 +171,13 @@ inputs and a hard invariant terminal-set constraint
 plan and appending an admissible terminal action preserves feasibility
 and makes the optimal slack cost nonincreasing. This value function is
 a predictive control barrier function (PCBF), whose zero-level set is
-safe and invariant on the feasible domain. Their construction provides
-the predictive safety framework adopted here; extending its known-state,
-time-invariant formulation to an estimated moving vehicle requires
-accounting for estimation error and for revisions of the forecast,
-constraints and terminal set between samples.
+safe and invariant on the feasible domain. This construction provides
+the predictive safety framework adopted here. However, it assumes a known
+current state, fixed constraints and a fixed terminal set, and does not
+address moving vehicles whose states are estimated online. Applying it
+here requires accounting for estimation error and successive forecast
+revisions while preserving feasibility of the shifted plan and its
+terminal continuation.
 
 A separate modeling issue concerns the maneuvering capability represented
 by the vehicle model and its control inputs. Steering-only designs
@@ -219,8 +221,17 @@ multistage high-gain observer on such a nonlinear relative motion model
 \cite{SharmaAlaiRajamani2026}. Their observer, however, differentiates
 the ego kinematics into companion coordinates and assumes constant
 measured body acceleration and yaw rate, which an evasive maneuver can
-violate. It also does not supply the online error enclosure required by
-the safety constraints here. The predictive collision-avoidance argument
+violate. The paper establishes nominal exponential convergence and a
+yaw-estimation $H_\infty$ condition, but does not derive an error bound
+for the complete ego--target estimation cascade under sensor and model
+errors \cite{SharmaAlaiRajamani2026}. These results do not directly
+supply the uncertainty enclosure needed for collision avoidance: the
+NRMM observer uses estimated ego motion, so upstream errors propagate
+into the target-state estimate, and safety must hold during the initial
+estimation transient as well as afterward. A cascade input-to-state
+stability (ISS) analysis offers a systematic way to derive time-dependent
+error bounds from initial errors, sensor disturbances and model mismatch.
+The predictive collision-avoidance argument
 must therefore connect maneuver-compatible target estimation and
 explicit error bounds to the coupled vehicle model, admissible controls
 and preservation of feasibility under successive information updates.
@@ -230,7 +241,7 @@ collision avoidance. The estimator keeps Sharma's NRMM
 but not its differentiated ego coordinates, so that measured
 acceleration and yaw rate stay exogenous inputs and nothing is
 differentiated; it remains valid during the ego's own maneuvers, carries
-a cascade input-to-state stability (ISS) certificate, and publishes with
+a cascade ISS certificate, and publishes with
 every estimate a bound on its error. The controller is a PCBF applied to
 vehicle collision avoidance on a dynamic bicycle with modified Fiala
 tires. Safety comes first, through a terminal set built from the
