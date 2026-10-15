@@ -81,11 +81,11 @@ block execution; unsupported uncertainty padding is omitted without declaring
 zero estimation error. No assumption-status diagnostics are produced. Usable finite
 enclosures still tighten the same optimization. Experimental collision checks
 use independent fixed-parameter target truth, and failure means collision or
-no solved control output before task completion. The default validation task ends
-on current physical-state terminal entry and explicitly labels this as offline
-truth scoring, not noisy information-set certification. No terminal hold or
-restart follows. `StopAtTerminal=false` retains duration/recovery diagnostics.
-Recovery, margin shortfalls and unverified theory
+no solved control output. Terminal membership is a predicted-endpoint safety
+certificate, not an execution mode, shutdown trigger or nominal-task success
+criterion. Scenario runs continue until failure, an observation cap or an
+explicitly enabled nominal-recovery dwell. Campaigns measure recovery to lane
+keeping and cruise control after the encounter. Recovery, margin shortfalls and unverified theory
 premises are separate observations. `nominalRecoveryValidationTest` and
 `../scripts/verifyExperimentalAssumptionPolicy.m` exercise these distinctions.
 

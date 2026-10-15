@@ -17,6 +17,15 @@ endpoint both vehicles are continued with a model, the target with its own
 forecast and the ego with one braking law, and the set keeps the states whose
 continuation stays collision-free while the target is in range.
 
+Terminal membership is a certificate of an available safe continuation, not
+a command to execute that continuation. The finite-horizon constraint acts
+on the predicted endpoint. A currently cruising vehicle may also be a member;
+its MPC can continue optimizing and executing lane keeping and cruise control.
+Membership alone neither ends the driving task nor proves nominal recovery.
+The terminal controller is appended to the shifted candidate in the proof;
+actual execution need not follow that candidate. This is the distinction in
+Huang et al. (2025), Section III, equations (8) and (10).
+
 Neither the ego's stop nor the target's exit has to happen within the plan.
 The ego never has to brake: the braking law only certifies that a safe
 continuation exists. The plan length only sets how much maneuvering the

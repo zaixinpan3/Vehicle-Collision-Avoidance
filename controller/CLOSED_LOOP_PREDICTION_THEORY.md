@@ -695,8 +695,9 @@ or constraint veto.
 Outstanding runtime work: consume current/predicted observer enclosures;
 certify scheduled full-state/relative feedback and finite-horizon tubes; add policy
 and input-margin constraints; retain target/observer branch correlations;
-establish robust terminal-handoff membership; preserve shifted witnesses.
-Post-handoff terminal operation and restart are outside the active MPC task.
+establish robust predicted-endpoint terminal membership; preserve shifted witnesses.
+The terminal continuation is a feasibility witness, not a command to stop
+nominal driving when the current state belongs to the terminal family.
 The research verifier
 demonstrates mechanisms, not completion of this runtime.
 
@@ -706,16 +707,18 @@ braking law are checked by scripts/checkJointMismatchDerivations.py and
 tests/jointMismatchDerivationsTest.py. They check the stated algebra and
 specializations, not a quantified full-domain NRMM/Fiala certificate.
 
-## Implementation design: finite feedback prediction and terminal handoff
+## Implementation design: finite feedback prediction and terminal certificates
 
-October 14, 2026. This section specifies a proposed implementation; it does
-not change the runtime's uncertainty propagation. The active MPC task ends
-when its *current* information set belongs to the robust terminal family.
-Predicted endpoint membership alone does not end the task. The terminal
-continuation remains the mathematical witness defining that family; no
-subsequent MPC solve, restart, cruise recovery, or simulated terminal hold is
-required. The numerical scenario driver separately labels its physical-state
-membership scoring; this is not an information-set certificate under noise.
+October 14, 2026; terminal semantics corrected October 15, 2026. This section
+specifies a proposed implementation; it does not change the runtime's
+uncertainty propagation. The predicted endpoint information set belongs to a
+robust terminal family with a common admissible safe continuation. That
+continuation supplies the shifted feasibility witness; it need not be
+executed by the optimized closed-loop trajectory. Current-state membership
+does not end the driving task or require terminal braking. Normal cruising
+may belong to this family while the controller continues to optimize for
+lane keeping and cruise control. No condition excludes nominal states from
+the terminal family, and no terminal-set attraction objective is introduced.
 
 ### State and interface contract
 
@@ -829,8 +832,9 @@ scheduled gain do not automatically preserve that witness: the admissible
 policy/set parameterization must still include it. The terminal condition
 is a common causal continuation for every branch of the endpoint information
 set; individual pointwise stopping trajectories are insufficient. This
-requirement concerns the handoff certificate, not continued operation of
-MPC after handoff.
+requirement concerns the predicted-endpoint feasibility certificate. Actual
+MPC operation continues on subsequent measurements, including when the
+current information set already belongs to the terminal family.
 
 ### Bounded online computation and validation gates
 

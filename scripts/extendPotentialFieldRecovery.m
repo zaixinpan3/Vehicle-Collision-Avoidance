@@ -1,15 +1,16 @@
 function rows=extendPotentialFieldRecovery(root,directory,frameCount)
-%extendPotentialFieldRecovery Extend legacy duration/recovery diagnostics only.
+%extendPotentialFieldRecovery Extend unfinished nominal-recovery observations.
     cd(root);addpath('controller','config','scripts');
     rows=jsondecode(fileread(fullfile(directory,'summary.json')));
     for index=1:numel(rows)
         r=rows(index);
         if ~r.completed || r.recovery.recovered,continue;end
-        % A terminal-entry task is never extended into post-handoff recovery.
-        if isfield(r,'terminalHandoff') && r.terminalHandoff.enabled,continue;end
+        assert(~isfield(r,'terminalHandoff'), ...
+            'extendPotentialFieldRecovery:incompatibleTaskSemantics', ...
+            'Terminal-entry scores cannot be extended as nominal driving observations.');
         stem=fullfile(directory,sprintf('speed%g-%s',r.speed,r.scenario));
         configuration=struct('referenceSpeed',r.speed,'controller',struct('horizonSteps',8+8*(r.speed==15)));
-        result=runNonlinearPredictiveSafetyValidation(StopAtTerminal=false,Scenarios=string(r.scenario),Frames=frameCount, ...
+        result=runNonlinearPredictiveSafetyValidation(Scenarios=string(r.scenario),Frames=frameCount, ...
             ControllerConfiguration=configuration,RequireCollisionThreat=true,RecoveryDwellSeconds=1, ...
             OutputFile=stem+"-recovery.json",ContinuationFile=stem+"-recovery.mat",ResumeFrom=stem+".mat");
         next=result.results;next=rmfield(next,{'trace','configuration'});next.speed=r.speed;

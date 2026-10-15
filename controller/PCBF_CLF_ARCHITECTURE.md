@@ -180,11 +180,13 @@ at most two. `convexSolveCompleted` records completion of both convex objectives
 `nonlinearValidationPerformed` is false and `nonlinearHardResidual` is unavailable.
 The reported PCBF and CLF quantities belong to the affine subproblem;
 `predictedState` is a nonlinear prediction of the unchanged optimized inputs.
-Independent scenario replay measures actual clearance and road margins until
-current physical-state terminal entry by default. This offline truth-scored
-boundary is explicitly not noisy information-set certification. No terminal
-controller hold, restart or cruise-recovery requirement follows. Optional
-`StopAtTerminal=false` retains the older duration/recovery diagnostics.
+Independent scenario replay measures clearance, road margins and nominal
+recovery throughout the observation. Current-state terminal membership does
+not stop simulation or count as task completion. The terminal set certifies
+a possible safe continuation at the predicted endpoint; the controller keeps
+executing its optimized first input on each frame. Campaign recovery requires
+a sustained dwell near the prescribed path and speed after the encounter;
+an observation cap alone does not establish recovery.
 
 Controller-state schema 82 rejects old numerical state schemas. The ideal
 recursive-feasibility theorem, its model-mismatch bookkeeping and causal policy

@@ -1,5 +1,5 @@
 function runPotentialFieldCampaign(sourceRoot,outputDirectory,frameCount,options)
-%runPotentialFieldCampaign Follow each encounter until current-state terminal entry.
+%runPotentialFieldCampaign Follow each encounter through nominal cruise recovery.
 % frameCount is an observation cap, never a success deadline.
     arguments
         sourceRoot
@@ -16,14 +16,14 @@ function runPotentialFieldCampaign(sourceRoot,outputDirectory,frameCount,options
         for name=names
             stem=fullfile(outputDirectory,sprintf('speed%g-%s',speed,name));
             result=runNonlinearPredictiveSafetyValidation(Scenarios=name,Frames=frameCount, ...
-                ControllerConfiguration=configuration,RequireCollisionThreat=true,StopAtTerminal=true, ...
+                ControllerConfiguration=configuration,RequireCollisionThreat=true,RecoveryDwellSeconds=1, ...
                 EstimatorConfiguration=options.EstimatorConfiguration,FailureFile=stem+"-failure.mat", ...
                 OutputFile=stem+".json",ContinuationFile=stem+".mat");
             r=result.results;r=rmfield(r,{'trace','configuration'});r.speed=speed;
             summaries=[summaries,r]; %#ok<AGROW>
             fid=fopen(fullfile(outputDirectory,'summary.json'),'w');fprintf(fid,'%s\n',jsonencode(summaries));fclose(fid);
-            fprintf('RESULT %g %s holds=%d gap=%.6g terminal=%d max=%.6g failure=%s\n', ...
-                speed,name,r.executedFrames,r.minimumReplayClearanceMeters,r.terminalHandoff.reached,r.maximumFrameSeconds,r.failure);
+            fprintf('RESULT %g %s holds=%d gap=%.6g recovery=%d max=%.6g failure=%s\n', ...
+                speed,name,r.executedFrames,r.minimumReplayClearanceMeters,r.recovery.recovered,r.maximumFrameSeconds,r.failure);
         end
     end
 end
