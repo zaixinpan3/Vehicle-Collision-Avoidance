@@ -1,8 +1,11 @@
 # Draft manuscript
 
 `manuscript.tex` is the IEEE Transactions-style draft titled
-"Simultaneous Lane Following and Vehicle Collision Avoidance System with
-Safety Guarantees". The October 13, 2026 revision synchronizes the joint
+"Integrated Lane Keeping Cruise Control With Safety-Guaranteed Vehicle
+Collision Avoidance". Lane keeping cruise control (LKCC) denotes cruising
+at a prescribed speed within a designated lane. The October 14 terminology
+revision uses this term throughout the manuscript. The October 13, 2026
+revision synchronizes the joint
 observer--controller mathematical design with the current theory documents.
 The abstract, introduction, safety argument, robust derivation, discussion
 and conclusion use the same guarantee scope.
