@@ -29,7 +29,7 @@
 \newcommand{\norminf}[1]{\left\lVert #1\right\rVert_\infty}
 \newcommand{\normone}[1]{\left\lVert #1\right\rVert_1}
 
-\title{Integrated Lane Keeping Cruise Control With
+\title{Integrated Lane Keeping and Cruise Control With
 Safety-Guaranteed Vehicle Collision Avoidance}
 
 \author{Author Name(s)%
@@ -38,18 +38,18 @@ funding acknowledgments must be completed before submission. This manuscript
 is a research draft based on the accompanying MATLAB repository.}}
 
 \markboth{Draft Manuscript---October 2026}%
-{Author Name(s): Integrated LKCC and Vehicle Collision Avoidance}
+{Author Name(s): Integrated Lane Keeping, Cruise Control, and Collision Avoidance}
 
 \hypersetup{
-    pdftitle={Integrated Lane Keeping Cruise Control With
+    pdftitle={Integrated Lane Keeping and Cruise Control With
 Safety-Guaranteed Vehicle Collision Avoidance},
     pdfauthor={Author Name(s)},
     pdfsubject={An estimator and a predictive controller designed together
-for lane keeping cruise control and vehicle collision avoidance, with the safety
+for lane keeping, cruise control, and vehicle collision avoidance, with the safety
 guarantee carried through the estimator's certified uncertainty},
     pdfkeywords={autonomous vehicles, collision avoidance, control barrier
 function, control Lyapunov function, high-gain observer, input-to-state
-stability, lane keeping cruise control, nonlinear relative motion model, predictive
+stability, lane keeping, cruise control, nonlinear relative motion model, predictive
 control, robust model predictive control, vehicle state estimation}
 }
 
@@ -58,8 +58,8 @@ control, robust model predictive control, vehicle state estimation}
 \maketitle
 
 \begin{abstract}
-Lane keeping cruise control and vehicle collision avoidance are usually
-separate controllers.
+Lane keeping, cruise control, and vehicle collision avoidance are usually
+handled by separate controllers.
 We treat them as one: the vehicle holds its lane at a set speed, and
 when another vehicle threatens a collision it steers and brakes around
 it, stays on the road, and returns to its lane. The evasive maneuver is
@@ -74,8 +74,8 @@ stability certificate and publishes an error enclosure with every
 estimate. The controller is a predictive control barrier function in
 the sense of Huang et al., with a terminal set built from the obstacle's
 predicted motion and one braking maneuver of the ego, and a control
-Lyapunov function for lane keeping cruise control and recovery. For the uncertainty-aware
-mathematical design, we propagate the nonlinear
+Lyapunov function for lane keeping, cruise control, and recovery. For the
+uncertainty-aware mathematical design, we propagate the nonlinear
 plant, future observer updates and causal feedback jointly, preserving the
 same model-mismatch sources. Posterior intersections, retained prediction
 certificates and a common zero-slack terminal continuation prove recursive
@@ -91,21 +91,21 @@ or leaves the road. The direct-execution revision is not that campaign.
 \begin{IEEEkeywords}
 Autonomous vehicles, collision avoidance, control barrier function,
 control Lyapunov function, high-gain observer, input-to-state stability,
-lane keeping cruise control, nonlinear relative motion model, predictive control,
+lane keeping, cruise control, nonlinear relative motion model, predictive control,
 robust model predictive control, vehicle state estimation.
 \end{IEEEkeywords}
 
 \section{Introduction}
 
-\IEEEPARstart{L}{ane} keeping cruise control (LKCC) combines lane keeping
-and speed regulation to enable a vehicle to cruise at a prescribed speed
-within a designated lane without continuous steering or speed corrections
-by the driver \cite{WeiPfefferEdelmann2024,XuGrizzleTabuadaAmes2018}.
-LKCC alone, however, does not
+\IEEEPARstart{L}{ane} keeping and cruise control jointly enable a vehicle
+to travel within a designated lane at a prescribed speed without
+continuous steering or speed corrections by the driver
+\cite{WeiPfefferEdelmann2024,XuGrizzleTabuadaAmes2018}.
+These functions alone, however, do not
 provide the evasive response needed when a nearby vehicle poses a
 collision threat, and timely driver intervention may still be required
-\cite{ChengLiLiuLiGuo2021}. Integrating LKCC with vehicle
-collision avoidance has therefore attracted sustained research interest
+\cite{ChengLiLiuLiGuo2021}. Integrating lane keeping and cruise control
+with vehicle collision avoidance has therefore attracted sustained research interest
 \cite{TurriCarvalhoTsengJohanssonBorrelli2013,FahmyGhanyBaumann2018,
 ChengLiLiuLiGuo2021,BruggemannSteevesKrstic2022}.
 
@@ -206,8 +206,8 @@ obstacle's own predicted motion and one braking maneuver of the ego: past
 the horizon the obstacle keeps its forecast and the ego brakes to rest
 with its steering held, and an endpoint is terminal when that joint
 continuation stays on the road and clears the obstacle until it has left
-the sensing range. Lane keeping cruise control and post-avoidance recovery come second,
-through a quadratic control Lyapunov function (CLF) certified for a
+the sensing range. Lane keeping, cruise control, and post-avoidance
+recovery come second, through a quadratic control Lyapunov function (CLF) certified for a
 cruise law on the sampled nonlinear model. The two parts are designed for
 each other. The estimator measures the lateral velocity through the
 lateral force balance of the controller's own tire model under the input
@@ -243,7 +243,7 @@ templates: one nonlinear rollout per sample on the Fiala bicycle, two
 second-order cone programs in strict priority order, a terminal set
 built from the obstacle's motion model and one braking law that is
 forward invariant and makes the problem recursively feasible on the
-declared model, and one CLF for lane keeping cruise control and recovery
+declared model, and one CLF for lane keeping, cruise control, and recovery
 (Section~\ref{sec:control}).
 \item A joint nonlinear observer--controller formulation that propagates
 future measurement feedback and shared model mismatch, with sound finite
@@ -3455,8 +3455,8 @@ describe the algorithm with instantaneous computation.
 \section{Discussion}
 \label{sec:discussion}
 
-The paper set out to make lane keeping cruise control and vehicle collision avoidance one
-system and to say, link by link, what is proved about its safety. We
+The paper set out to make lane keeping, cruise control, and vehicle
+collision avoidance one system and to say, link by link, what is proved about its safety. We
 discuss the links in the order in which they turned out to matter.
 
 \subsubsection*{The estimator during the maneuver}
@@ -3569,8 +3569,8 @@ before physical collision avoidance can be claimed.
 \section{Conclusion}
 \label{sec:conclusion}
 
-Lane keeping cruise control and vehicle collision avoidance were treated as one control
-problem, and the estimator and the controller that solve it were
+Lane keeping, cruise control, and vehicle collision avoidance were
+treated as one control problem, and the estimator and the controller that solve it were
 designed for each other. The estimator keeps the ego-motion-aware
 relative motion model of Sharma \emph{et al.} but takes the measured
 acceleration and yaw rate as inputs instead of differentiating them
@@ -3583,8 +3583,8 @@ the vehicle: one nonlinear rollout per sample on a Fiala bicycle, two
 cone programs in priority order, a terminal set built from the
 obstacle's forecast and one braking law that is invariant and makes the
 problem recursively feasible on the declared model, and one quadratic
-CLF for lane keeping cruise control and post-avoidance recovery. The controller keeps the vehicle
-where the estimator's measurement is informative, and the enclosure
+CLF for lane keeping, cruise control, and post-avoidance recovery. The
+controller keeps the vehicle where the estimator's measurement is informative, and the enclosure
 tightens each hold.
 
 Theorem~\ref{thm:robust} completes the conditional mathematical link
