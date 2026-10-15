@@ -22,6 +22,13 @@ Sources examined:
 - `controller/TERMINAL_SAFE_SET.md`, terminal-model assumptions and scope.
 - `paper/manuscript.tex`, the safety-argument list, prediction model,
   terminal assumption, cruise CLF, joint robust subsection and guarantee scope.
+- Follow-up clarification on October 14:
+  `controller/OBSERVER_ROBUST_PCBF_THEORY.tex`, the section "One CLF:
+  nominal dissipation with an explicit uncertainty supply", especially
+  Proposition `prop:clf`, "One-solve CLF recovery with a vanishing tie".
+  The initial audit omitted this existing conditional recovery proposition;
+  its omission must not be read as absence of a CLF convergence argument
+  anywhere in the project.
 
 ## Assessment of the main joint theorem
 
@@ -66,10 +73,11 @@ at the specified constraint instants.
 
 ### Closed-loop return to cruise
 
-The soft-CLF corollary establishes feasibility of the secondary problem,
-not convergence of the controller selected after avoidance. In particular,
-it does not establish that the optimized CLF slack eventually vanishes or
-is bounded by a summable sequence.
+The soft-CLF corollary in the joint recursive-feasibility subsection
+establishes feasibility of the secondary problem, not convergence by itself.
+The project also already contains a conditional CLF recovery proposition in
+`controller/OBSERVER_ROBUST_PCBF_THEORY.tex`. These statements serve different
+purposes and must be assessed together.
 
 As a logical example, let `x_(k+1) = 2*x_k`, `W(x) = x^2`, and
 `0 < rho < 1`. The soft row
@@ -79,15 +87,61 @@ state. This illustrates why feasibility alone cannot prove recovery; it
 is not a counterexample to the stated joint theorem or a simulated vehicle
 trajectory.
 
+The existing recovery proposition supplies the missing implication when a
+zero-CLF-slack candidate is admissible in the optimization from some sample
+onward. Write the robust row as
+
+`V_(k+1) - V_k <= -eta*ell_k + delta_k + sigma_k`.
+
+Here `sigma_k` is the derived disturbance supply. For the objective
+`delta_k + epsilon*ellLower_k*R_k`, with `0 <= R_k <= 1`,
+`0 <= ellLower_k <= ell_k`, and `0 <= epsilon < eta`, a zero-slack
+candidate costs at most `epsilon*ellLower_k`. An optimizer with objective
+gap `tau_k` therefore has
+
+`delta_k <= epsilon*ell_k + tau_k`,
+
+and consequently
+
+`V_(k+1) - V_k <= -(eta-epsilon)*ell_k + sigma_k + tau_k`.
+
+On an invariant recovery domain where `ell_k >= mu*V_k` and
+`0 < c = (eta-epsilon)*mu <= 1`, iteration gives
+
+`V_(k+j) <= (1-c)^j*V_k + sum_(s=0)^(j-1) (1-c)^(j-1-s)*(sigma_(k+s)+tau_(k+s))`.
+
+Thus vanishing supplies imply `V_k -> 0`; uniformly bounded supplies give
+the corresponding practical neighborhood. Exact minimization of CLF slack
+alone is the case `epsilon = tau_k = 0`. Nonzero transient estimation error
+need not prevent exact recovery when its supply tends to zero.
+
+For the simpler noise-free multiplicative row
+`V_(k+1) <= rho*V_k + delta_k`, `0 < rho < 1`, an admissible zero-slack
+candidate and exact slack minimization give `delta_k = 0` and
+`V_k <= rho^(k-k0)*V_(k0)`. Since `V=e'*P*e`, `P>0`, this proves
+convergence to the nominal path-following cruise manifold with free
+longitudinal phase. No separate convergence mechanism is required.
+
+When collision constraints cease to apply, the safety objective no longer
+obstructs that candidate. The candidate must still satisfy the other hard
+conditions and any retained terminal requirement. If the post-avoidance state
+is in a CLF-valid invariant recovery domain where this compatibility holds,
+the existing argument proves the requested recovery. Removal of collision
+constraints alone does not establish that every possible post-avoidance
+state belongs to such a domain. This is the domain/compatibility hypothesis,
+not a need for an additional generic Lyapunov theorem.
+
 The manuscript's separate cruise-law argument is local and conditional on
 containment of its nonlinear ray-average Jacobians in a recorded zonotope.
 The manuscript explicitly says that this enclosure is constructed and
 checked using finite samples, and is not a universal nonlinear inclusion
 proof. Even a sound local cruise-law certificate would not, on its own,
 establish entry into that region or convergence of the full optimized
-output-feedback controller. A theoretical claim of inevitable return to
-cruise therefore requires an additional argument. This does not invalidate
-the joint recursive-feasibility theorem.
+output-feedback controller. Applying the existing conditional recovery
+proposition to a larger post-avoidance set requires the corresponding domain
+and candidate-compatibility argument. This does not invalidate either the
+joint recursive-feasibility theorem or the existing conditional recovery
+proposition. No global recovery claim is inferred from the local certificate.
 
 ### Continuous-time clearance and road containment
 
@@ -105,6 +159,9 @@ must retain these restrictions or prove the additional rows/images.
   rational shared-mismatch, persistent-parameter, nonlinear-reserve,
   carried-certificate and common-braking specializations.
 - `python3 tests/jointMismatchDerivationsTest.py`: seven tests passed.
+- Follow-up: manually reconstructed the existing CLF recovery proposition
+  using the zero-slack comparison candidate, the bounded vanishing tie,
+  and the stable scalar convolution; no new experiment was required.
 - The two scalar implication examples were checked algebraically; neither
   is a vehicle experiment or a counterexample to the stated theorem.
 
@@ -112,5 +169,7 @@ No manuscript or runtime algorithm was modified. No MATLAB simulation,
 controller campaign, literature novelty assessment, full observer-proof
 audit or universal nonlinear vehicle certification is claimed. The
 appropriate status is: the focused review found the conditional joint
-recursive-feasibility proof structurally closed; it did not establish an
-unqualified absence of all theoretical errors or a global recovery theorem.
+recursive-feasibility proof structurally closed and the follow-up confirmed
+an existing conditional CLF recovery proof. It did not establish an
+unqualified absence of all theoretical errors, global recovery-domain entry,
+or exact recovery under arbitrary persistent disturbances.
