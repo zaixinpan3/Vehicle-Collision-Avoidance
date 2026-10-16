@@ -24,6 +24,11 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
             target = [24;0;pi;8;1;0;lr;2.4;.95;0;0];
             impactTime = 48/(cfg.referenceSpeed+8+sqrt((cfg.referenceSpeed+8)^2+48));
             return;
+        case "stoppedLead"
+            % Fixed target: increasing ego speed creates a closing-speed test.
+            target = [34;0;0;0;0;0;lr;2.4;.95;0;0];
+            impactTime = 34/cfg.referenceSpeed;
+            return;
         case "brakingLead"
             impactTime = 5;
             targetSpeed = cfg.referenceSpeed-.5*impactTime;

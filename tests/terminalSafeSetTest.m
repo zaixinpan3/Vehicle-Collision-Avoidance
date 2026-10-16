@@ -273,17 +273,17 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [~,bounds]=terminalSafeSet.rows(context,model.initialState,0);
             testCase.verifyLessThan(min(bounds),0);
         end
-        function aMildEndpointMustKeepRearAdhesionDuringTerminalBraking(testCase)
+        function mildTerminalGeometryDoesNotImposeAnExtraRearSaturationCone(testCase)
             model=localModel([0;0;0;3;.1;-.27],[]);
             model.road.lateralClearance=[100;100];
             context=terminalSafeSet.context(model);
             testCase.verifyTrue(terminalSafeSet.handlingRows(model.initialState,[0;0],model.cfg));
             testCase.verifyLessThan(atan2(.1,3),context.sideslipMaximum);
             [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
-            testCase.verifyFalse(member);
-            testCase.verifyEqual(info.reason,"terminalRearAdhesion");
+            testCase.verifyTrue(member);
+            testCase.verifyEqual(info.reason,"noTarget");
             [rows,bounds]=terminalSafeSet.rows(context,model.initialState,0);
-            testCase.verifyLessThan(min(bounds),0);
+            testCase.verifyGreaterThanOrEqual(min(bounds),0);
             testCase.verifyEqual(size(rows,2),6);
         end
         function theRowsLinearizeTheSetAtTheAnchor(testCase)

@@ -42,6 +42,20 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
             narrow=nrmmEgoCourseGeometry("lateralVelocity",x(4:5),x(6),acceleration,input,model,exact,0.3);
             testCase.verifyLessThan(narrow.radius,1e-4);
         end
+        function saturatedRearForceStillProducesAnEnclosingInterval(testCase)
+            [model,sensors,cfg]=localModel(0.05);
+            x=[0;0;0;15;2;0];input=[0;.8];
+            tire=modifiedFialaTire.parameters(cfg);
+            saturationTangent=3*tire.longitudinalForceScale(2)*sqrt(1-input(2)^2)/tire.corneringStiffness(2);
+            testCase.verifyGreaterThan(x(5)/x(4),saturationTangent);
+            d=nonlinearBicycleModel.derivative(x,input,cfg);
+            acceleration=[d(4)-x(6)*x(5);d(5)+x(6)*x(4)];
+            lateral=nrmmEgoCourseGeometry("lateralVelocity",x(4:5),x(6),acceleration,input,model,sensors,cfg.model.sideslipMaximum);
+            testCase.verifyTrue(lateral.consistent);
+            testCase.verifyLessThanOrEqual(lateral.lower,x(5));
+            testCase.verifyGreaterThanOrEqual(lateral.upper,x(5));
+            testCase.verifyTrue(terminalSafeSet.handlingRows(x,input,cfg));
+        end
         function contradictoryMeasurementsGiveAnEmptyInterval(testCase)
             [model,sensors]=localModel(0.05);
             % Straight driving with zero steering cannot produce 8 m/s^2.

@@ -104,10 +104,10 @@ function [side,retain]=localCollisionSide(model)
     end
 end
 
-function [count,conflict]=localEncounterHorizon(model)
+function [count,conflict,conflictTime]=localEncounterHorizon(model)
     % Choose prediction duration, not an avoidance trajectory: the given
     % path's prescribed cruise identifies the nearest forecast interaction.
-    cfg=model.cfg;time=0:cfg.controller.sampleTime:cfg.rti.predictionSeconds;
+    cfg=model.cfg;time=0:cfg.controller.sampleTime:max(cfg.rti.predictionSeconds,cfg.planner.threatPredictionSeconds);
     projection=laneGeometry.project(model.initialState(1:2),model.lane);
     if isfield(model.lane,'referenceCurve')
         [position,heading]=laneGeometry.referencePose(projection.station+cfg.referenceSpeed*time,0,model.lane.referenceCurve);
@@ -138,29 +138,36 @@ function [count,conflict]=localEncounterHorizon(model)
         duration=min(cfg.rti.predictionSeconds,max(duration,time(index)+cfg.rti.settlingSeconds));
     end
     count=ceil(duration/cfg.controller.sampleTime);
-    conflict=false;
+    conflict=false;conflictTime=NaN;
     if distance<=reach
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
         for node=1:last
             gap=predictiveSafetyGeometry.rectangle([position(:,node);heading(node)+model.nominalReference.state(3)], ...
                 shape,target(1:3,node),target(8:11,node));
-            if gap<=cfg.collision.safetyMarginMeters,conflict=true;break;end
+            if gap<=cfg.collision.safetyMarginMeters+cfg.planner.clearanceReserveMeters
+                conflict=true;conflictTime=time(node);break;
+            end
         end
     end
 end
 
 function [anchor,source]=localRtiInitialize(model,previous)
-    cfg=model.cfg;count=cfg.controller.horizonSteps;conflict=false;
+    cfg=model.cfg;count=cfg.controller.horizonSteps;conflict=false;conflictTime=NaN;
     if ~isempty(model.target)
-        [encounterCount,conflict]=localEncounterHorizon(model);count=max(count,encounterCount);
+        [encounterCount,conflict,conflictTime]=localEncounterHorizon(model);count=max(count,encounterCount);
     end
     inherited=isstruct(previous) && isfield(previous,'inputTrajectory') ...
         && size(previous.inputTrajectory,2)>1 && all(isfinite(previous.inputTrajectory),'all');
-    plan=conflict && (~inherited || model.targetOnset);
+    planned=inherited && isfield(previous,'avoidanceInitialized') && previous.avoidanceInitialized;
+    plan=conflict && (~planned || model.targetOnset);
     if plan
         % A bounded planner supplies the route, never an executable fallback.
         count=min(cfg.controller.maximumHorizonSteps,ceil(cfg.rti.predictionSeconds/cfg.controller.sampleTime));
-        anchor=localPlanReference(model,count);source="plannedAvoidanceRollout";return;
+        guideCount=count;
+        if conflictTime>cfg.rti.predictionSeconds
+            guideCount=ceil(min(cfg.planner.threatPredictionSeconds,conflictTime+cfg.rti.settlingSeconds)/cfg.controller.sampleTime);
+        end
+        anchor=localPlanReference(model,count,guideCount);source="plannedAvoidanceRollout";return;
     end
     old=zeros(2,0);source="nominalFeedbackRollout";
     if inherited
@@ -213,10 +220,10 @@ function input=localTailSeed(x,prior,model,parameters)
     end
 end
 
-function anchor=localPlanReference(model,count)
+function anchor=localPlanReference(model,count,guideCount)
     % One analytic guide, one dynamically consistent rollout, then one RTI.
     cfg=model.cfg;[side,~]=localCollisionSide(model);wall=tic;
-    guide=predictiveSafetyGeometry.avoidanceGuide(model,count,side);
+    guide=predictiveSafetyGeometry.avoidanceGuide(model,guideCount,side);
     geometrySeconds=toc(wall);localCheckDeadline(model);
     context=terminalSafeSet.context(model);
     context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
@@ -582,9 +589,7 @@ function [problem,model]=localFormulate(anchor,model)
     lower([is,ic])=0;
     % Numerical corrections are local to the one RTI reference.
     % Steering still has no actuator magnitude or slew constraint.
-    domainReserve=10*cfg.solver.constraintTolerance;
-    inputLower=[-Inf;max(-1+domainReserve,cfg.actuation.brakingRatioMinimum)];
-    inputUpper=[Inf;min(1-domainReserve,cfg.actuation.brakingRatioMaximum)];
+    [inputLower,inputUpper]=nonlinearBicycleModel.inputBounds(cfg);
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;finite=isfinite(rate);
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=0;encounterEnded=isempty(model.target);exitRecord=NaN;
@@ -626,11 +631,6 @@ function [problem,model]=localFormulate(anchor,model)
         reshape(repmat(reshape(iu,1,2,count),6,1,1),[],1)], ...
         [ones(6+6*count,1);-a3(:);-b3(:)],6*(count+1),nv);
     rhs=[model.initialState-anchor.states(:,1);reshape(reshape([stages.next],6,count)-anchor.states(:,2:end),[],1)];
-    % Handling cones: two per hold after the first (one per hold for the
-    % first), in the order of the former per-cone assembly.
-    coneCount=2*count-1;coneState=zeros(6,coneCount);coneBrake=zeros(1,coneCount);
-    coneProduct=zeros(1,coneCount);coneSlip=zeros(6,coneCount);coneForward=zeros(6,coneCount);coneB=zeros(2,coneCount);coneGamma=zeros(1,coneCount);cones=0;
-    tire=modifiedFialaTire.parameters(cfg);k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
     tangent=tan(cfg.model.sideslipMaximum);side=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];
     % Collision rows that cannot bind are not formed (localBinding): the
     % pose moves at most this much over the variables' boxes (inputs at
@@ -724,19 +724,13 @@ function [problem,model]=localFormulate(anchor,model)
         jx=ix(:,index+1);
         lower(jx(4:6))=max(lower(jx(4:6)),physicalLower-nextReference(4:6)+nextRadius);
         upper(jx(4:6))=min(upper(jx(4:6)),physicalUpper-nextReference(4:6)-nextRadius);
-        % Handling envelope at both ends of the hold, under its own input
-        % (localHandling). The measured node is fixed and is not constrained.
+        % The shared observer operating cone is distinct from tire saturation.
+        % The measured node is fixed and is not constrained.
         % The sideslip cone applies above model.brakeHoldSpeed; at rest the
         % sideslip is undefined.
         if nextReference(4)>cfg.model.brakeHoldSpeed
             blockCount=blockCount+1;blockRows{blockCount}=side;blockColumns{blockCount}=jx;
             blockBounds{blockCount}=-side*nextReference-sum(abs(side*nextGenerator),2);
-        end
-        cones=cones+1;[coneSlip(:,cones),coneForward(:,cones),coneB(:,cones),coneGamma(cones),coneProduct(cones)]=localHandling(nextReference,input,k,cfg);
-        coneState(:,cones)=jx;coneBrake(cones)=iu(2,index);
-        if index>1
-            cones=cones+1;[coneSlip(:,cones),coneForward(:,cones),coneB(:,cones),coneGamma(cones),coneProduct(cones)]=localHandling(x,input,k,cfg);
-            coneState(:,cones)=nodeColumns;coneBrake(cones)=iu(2,index);
         end
         generator=nextGenerator;holdCenter=middleCenter;
     end
@@ -800,17 +794,12 @@ function [problem,model]=localFormulate(anchor,model)
     box=cfg.nonlinear.trustMaximumScale*radius*[.15;.25];
     reachLower(iu)=max(-box,physicalInputLower-anchor.inputs);reachUpper(iu)=min(box,physicalInputUpper-anchor.inputs);
     [inequality,bounds]=localAssemble(blockRows,blockColumns,blockBounds,blockCount,nv,reachLower,reachUpper);
-    % One block of three-dimensional handling cones ||[w/k; v_x b]|| <= v_x.
-    coneRows=[2*(1:cones)-1;2*(1:cones)];
-    coneA=sparse([reshape(repmat(coneRows(1,:),6,1),[],1);coneRows(2,:).';coneRows(2,:).'], ...
-        [reshape(coneState(:,1:cones),[],1);coneBrake(1:cones).';coneState(4,1:cones).'], ...
-        [reshape(coneSlip(:,1:cones),[],1);ones(cones,1);coneProduct(1:cones).'],2*cones,nv);
-    coneD=sparse(reshape(repmat(1:cones,6,1),[],1),reshape(coneState(:,1:cones),[],1),reshape(coneForward(:,1:cones),[],1),cones,nv);
-    handling=localConeBlock(coneA,reshape(coneB(:,1:cones),[],1),coneD,coneGamma(1:cones).',2);
+    % Tire saturation belongs to Fiala dynamics, not an extra force cone.
+    cones=struct('A',{},'b',{},'D',{},'gamma',{},'size',{});
     objective=zeros(nv,1);objective(is)=1;
     problem=struct('a',inequality,'b',bounds, ...
-        'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',handling, ...
-        'primaryConeCount',1, ...
+        'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',cones, ...
+        'primaryConeCount',0, ...
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
         'encounterExit',departure, ...
@@ -983,33 +972,6 @@ function beyond=localBeyond(x,forecast,point,generator,tube,cfg,movement)
     if ~beyond
         reserve=sum(vecnorm(generator(1:2,:)))+tube.positionRadius(point)+movement;
         beyond=norm(x(1:2)-forecast(1:2,point))-reserve>cfg.collision.encounterRangeMeters;
-    end
-end
-
-function [slip,forward,b,gamma,product]=localHandling(y,input,k,cfg)
-    % Stable handling envelope at one node under the input of an adjacent
-    % hold: the cone ||[w/k; v_x b]|| <= v_x on the node's state (slip and
-    % forward rows, 6x1 each) and its braking ratio (unit coefficient).
-    %   Rear adhesion: the rear Fiala tire stays below saturation,
-    %     |w| <= k v_x sqrt(1-b^2),  w = v_y - lr r,  k = 3 mu_r Fz_r / C_r,
-    %   with both first derivatives of v_x b retained. A saturated rear
-    %   axle has no restoring yaw moment (the vehicle spins) and its force
-    %   no longer determines the slip, so the estimator's force-balance
-    %   measurement loses its information. It is a handling and
-    %   observability row, not part of the safety certificate, and acts on
-    %   the estimate. The cone is divided by the anchor speed, so its
-    %   entries are the normalized rear slip tan(alpha_r)/tan(alpha_sat), the
-    %   braking ratio and their unit bound: a well-scaled cone for the
-    %   interior-point solver. In the declared model's kinematic regime
-    %   (anchor speed at or below model.kinematicSpeedRange(1)) the rear tire
-    %   has no lateral force to saturate: the cone is only |b| <= 1.
-    slip=zeros(6,1);forward=zeros(6,1);product=0;
-    if y(4)>cfg.model.kinematicSpeedRange(1)
-        scale=max(y(4),cfg.model.scheduleSpeedFloor);
-        slip(5:6)=[1;-cfg.vehicle.lr]/(k*scale);forward(4)=1/scale;product=input(2)/scale;
-        b=-[(y(5)-cfg.vehicle.lr*y(6))/(k*scale);input(2)];gamma=-y(4)/scale;
-    else
-        b=-[0;input(2)];gamma=-1;
     end
 end
 

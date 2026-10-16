@@ -143,14 +143,14 @@ one estimated center is not verification of the whole set.
 
 Small lateral acceleration alone does not rule out a large lateral drift. The
 runtime terminal set now uses a separate sideslip limit (default 0.05 rad,
-about 2.9 degrees), tighter than the estimator operating cone of 0.25 rad, and
-checks rear adhesion under the terminal braking ratio. This is a design
+about 2.9 degrees), tighter than the estimator operating cone of 0.25 rad.
+No additional rear-tire nonsaturation constraint is imposed. This is a design
 setting, not a measured bound on model mismatch.
 
 For the declared kinematic terminal law, beta and curvature kappa are held,
-V decreases, and therefore beta stays small and |kappa| V^2 decreases. Also
-(v_y-l_r r)/v_x stays constant until rest, so rear adhesion under a constant
-braking ratio is preserved while that model applies. The ratio and stored
+V decreases, and therefore beta stays small and |kappa| V^2 decreases.
+The acceleration budget is a premise of the declared terminal model.
+The ratio and stored
 steering must be admissible, and any slew limit from the last optimized input
 must be included. The friction-budget inequality alone proves none of these
 input conditions. The executable Fiala/blended model is not identically this
@@ -211,22 +211,13 @@ It does not choose a different last braking input using each unknown true
 speed. For a sampled stop reset, include its specified detection delay in
 the time/length bound instead of silently applying the continuous formula.
 
-For each mild branch, constant beta and kappa give
-
-    |lateralAcceleration(t)|=|kappa|*V(t)^2,
-    tan(alpha_rear)=(sin(beta)-l_r*kappa)/cos(beta).
-
-The first quantity decreases and the second remains constant until rest.
-With fixed geometry, one sufficient robust rear-adhesion entry condition is
-
-    sup_J |tan(alpha_rear)|
-      <= 3*mu_rear,min*Fz_rear*sqrt(1-b_f^2)/C_rear,max.        (T2)
-
-Thus the same condition persists for fixed b_f and every constant parameter
-in the box. Actuator bounds are checked on b_f and stored steering; only the
-first backup input changes the old input memory, so its slew bound is checked
-explicitly and all subsequent held-command slew differences are zero.
-Other declared handling rows are verified on their joint images as usual.
+For each mild branch, constant beta and kappa give decreasing
+|lateralAcceleration(t)|=|kappa|*V(t)^2 and preserve the mild sideslip domain.
+No extra rear-tire nonsaturation condition is required. Actuator bounds are
+checked on b_f and stored steering; only the first backup input changes the
+old input memory, so its slew bound is checked explicitly and all subsequent
+held-command slew differences are zero. Other declared physical and observer
+domain rows are verified on their joint images as usual.
 
 Check the full joint continuation to ceil(V_bar/(a_min*h)) holds for the
 continuous absorbing-stop contract. Verify terminal actuator/slew/handling

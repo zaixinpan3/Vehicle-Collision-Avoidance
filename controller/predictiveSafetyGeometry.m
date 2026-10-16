@@ -43,6 +43,12 @@ classdef predictiveSafetyGeometry
             % Moderate deceleration is part of the sole seed, not an alternate
             % command. Stopping truncates the distance and velocity together.
             deceleration=cfg.planner.decelerationMetersPerSecondSquared;
+            targetDirection=predictiveSafetyGeometry.direction(target(3,1)+target(6,1));
+            if rotation(:,1).'*targetDirection>=sqrt(.5)
+                % A slower lead requires a passing reference; braking the
+                % guide first would erase the conflict that triggered it.
+                deceleration=0;
+            end
             if guide.initialConflict,deceleration=cfg.terminal.brakingDecelerationMetersPerSecondSquared;end
             [position,baseVelocity,baseAcceleration,baseHeading]=localGuideBase(x,curvature,deceleration,time,cfg);
             relative=position-target(1:2,:);squared=sum(relative.^2,1);squared(~active)=Inf;

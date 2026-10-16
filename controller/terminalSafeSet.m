@@ -45,14 +45,14 @@ classdef terminalSafeSet
 % falls with the speed. Holds appended to the anchor are holds of the
 % declared model, kept only when their endpoint is in X_f: the hold of the
 % CLF's certified cruise controller u = u* + K e (cruiseInput), or else the
-% hold nearest to it toward braking with the steering held, as hard as the
-% rear adhesion admits or at the law's rate a_b (brakingInput). jacobians, rayJacobians, certificate and stateLevel belong
+% hold nearest to it toward admissible braking with the steering held
+% (brakingInput). jacobians, rayJacobians, certificate and stateLevel belong
 % to the offline certificate of the cruise controller and the CLF
 % (NOMINAL_CLF.md).
     methods (Static)
         function context = context(model)
             % Constants of one frame.
-            cfg=model.cfg;tire=modifiedFialaTire.parameters(cfg);positionRadius=0;yawRadius=0;
+            cfg=model.cfg;positionRadius=0;yawRadius=0;
             if isfield(model,'uncertainty') && isfield(model.uncertainty,'egoGenerator')
                 generator=model.uncertainty.egoGenerator;
                 positionRadius=sum(vecnorm(generator(1:2,:),2,1));yawRadius=sum(abs(generator(3,:)));
@@ -68,8 +68,7 @@ classdef terminalSafeSet
                 'sideslipMaximum',cfg.terminal.sideslipMaximumRadians,'holdSpeed',cfg.model.brakeHoldSpeed, ...
                 'brakingRatio',-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg), ...
                 'brakingBounds',[cfg.actuation.brakingRatioMinimum;cfg.actuation.brakingRatioMaximum], ...
-                'rearAxleDistance',cfg.vehicle.lr,'kinematicSpeed',cfg.model.kinematicSpeedRange(1), ...
-                'rearAdhesion',3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2), ...
+                'rearAxleDistance',cfg.vehicle.lr, ...
                 'shape',shape,'reach',reach, ...
                 'margin',cfg.collision.safetyMarginMeters,'required',cfg.collision.safetyMarginMeters+positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'inflation',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
@@ -236,12 +235,6 @@ classdef terminalSafeSet
             V=hypot(y(4),y(5));limit=context.lateralMaximum;
             tangent=tan(context.sideslipMaximum);
             rows=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];bounds=-rows*y;
-            if y(4)>context.kinematicSpeed
-                reserve=context.rearAdhesion*sqrt(max(0,1-context.brakingRatio^2));
-                rear=[0,0,0,-reserve,1,-context.rearAxleDistance; ...
-                    0,0,0,-reserve,-1,context.rearAxleDistance];
-                rows=[rows;rear];bounds=[bounds;-rear*y];
-            end
             if context.brakingRatio<context.brakingBounds(1) ...
                     || context.brakingRatio>context.brakingBounds(2) ...
                     || any(context.stateLower>0 | context.stateUpper<0)
@@ -372,7 +365,7 @@ classdef terminalSafeSet
             cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
             e=nonlinearBicycleModel.error(x,lane,reference);
             input=reference.input+reference.gain*e;
-            low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);high=min(1-1e-8,cfg.actuation.brakingRatioMaximum);
+            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg);low=lower(2);high=upper(2);
             input(2)=min(high,max(low,input(2)));
             bound=reference.contraction*sum((reference.factor*e).^2)*(1+1e-9)+1e-12;
             next=[];middle=[];ok=false;value=Inf;
@@ -392,14 +385,10 @@ classdef terminalSafeSet
             % where a declared-model hold can preserve terminal membership.
             % These fixed-cost seed checks add no optimizer iterations.
             cfg=model.cfg;
-            low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);
-            tire=modifiedFialaTire.parameters(cfg);
-            k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
-            adhesion=1;
-            if x(4)>cfg.model.kinematicSpeedRange(1),adhesion=sqrt(max(0,1-((x(5)-cfg.vehicle.lr*x(6))/(k*x(4)))^2));end
+            [lower,~]=nonlinearBicycleModel.inputBounds(cfg);low=lower(2);
             law=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
             fraction=1;ok=false;
-            for braking=[cruise(2),max(low,law),max(low,-.95*adhesion)]
+            for braking=[cruise(2),max(low,law),max(low,-.95)]
                 input=[previous(1);braking];
                 [ok,next,middle]=localHoldStays(x,input,model,context,node);
                 ok=ok && abs(input(2)-previous(2))<=context.brakingChangeMaximum+1e-9;
@@ -559,14 +548,9 @@ classdef terminalSafeSet
         end
 
         function ok = handlingRows(x,u,cfg)
-            % Rear adhesion ||[w/k; v_x b]|| <= v_x above the declared
-            % model's kinematic regime, and the sideslip cone above
-            % model.brakeHoldSpeed (at rest the sideslip is undefined).
-            % Each column of x under the corresponding column of u.
-            tire=modifiedFialaTire.parameters(cfg);
-            k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
-            adhesion=hypot((x(5,:)-cfg.vehicle.lr*x(6,:))/k,x(4,:).*u(2,:));
-            ok=(x(4,:)<=cfg.model.kinematicSpeedRange(1) | adhesion<=x(4,:)*(1+1e-9)) ...
+            % Shared observer sideslip domain and physical input magnitude.
+            % Fiala dynamics already account for saturation at either axle.
+            ok=abs(u(2,:))<=1+1e-9 ...
                 & (x(4,:)<=cfg.model.brakeHoldSpeed | abs(x(5,:))<=tan(cfg.model.sideslipMaximum)*x(4,:)*(1+1e-9));
         end
 
@@ -741,10 +725,6 @@ function [member,info,parts] = localDecide(context,x,node)
     if context.brakingRatio<context.brakingBounds(1) ...
             || context.brakingRatio>context.brakingBounds(2)
         info.reason="terminalInputBounds";return;
-    end
-    if x(4)>context.kinematicSpeed && abs(x(5)-context.rearAxleDistance*x(6)) ...
-            >context.rearAdhesion*x(4)*sqrt(max(0,1-context.brakingRatio^2))*(1+1e-9)
-        info.reason="terminalRearAdhesion";return;
     end
     path=terminalSafeSet.continuation(context,x);parts.path=path;
     info.stopSeconds=V/context.deceleration;

@@ -1,7 +1,7 @@
 classdef collisionThreatScenarioTest < matlab.unittest.TestCase
     % Baseline danger is required independently of avoidance performance.
     properties (TestParameter)
-        scenario = {"headOn","acceleratingHeadOn","brakingLead","crossing", ...
+        scenario = {"headOn","acceleratingHeadOn","brakingLead","stoppedLead","crossing", ...
             "turningCrossing","curvedHeadOn","curvedCrossing"};
         referenceSpeed = {8,15};
     end
@@ -30,6 +30,20 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             future = predictiveSafetyGeometry.predictTarget(target,impactTime);
             egoPosition = laneGeometry.referencePose(baseline.initialStationMeters+referenceSpeed*impactTime,0,baseline.referenceCurve);
             testCase.verifyEqual(future(1:2),egoPosition,AbsTol=1e-11);
+        end
+        function fastStoppedLeadRequiresMoreThanStraightMaximumBraking(testCase)
+            [x,q,~,cfg]=collisionThreatScenario("stoppedLead", ...
+                struct('referenceSpeed',25,'model',struct('speedMaximum',30)));
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            minimum=Inf;
+            for step=1:100
+                x=nonlinearBicycleModel.sample(x,[0;-1],cfg);
+                minimum=min(minimum,abs(q(1)-x(1))-shape(1)-q(8));
+                if x(4)==0,break;end
+            end
+            testCase.verifyLessThan(minimum,0);
+            testCase.verifyEqual(x(4),0);
+            testCase.verifyGreaterThan(x(1),q(1)-cfg.vehicle.length);
         end
         function benignSideBrakingIsNotAdmitted(testCase)
             testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...

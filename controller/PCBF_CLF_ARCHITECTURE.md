@@ -38,14 +38,21 @@ certificates. When no certificate is found, a moving endpoint uses nominal
 feedback and a stopped endpoint keeps a nonpositive longitudinal command.
 Thus the terminal certificate does not become a parking objective.
 
-Cold nominal operation uses lane feedback. A cold cruise conflict, including
-one first appearing during a continuation, invokes one analytic geometric
-planner before the single RTI formulation. NRMM prediction and rectangle
-checks cover the full horizon, including hold midpoints in the guide. The
+Cold nominal operation uses lane feedback. On acquisition, nominal-cruise
+threat screening looks ahead `planner.threatPredictionSeconds` (5 s by
+default), stopping at the first predicted perception exit. A detected threat
+invokes one analytic geometric planner, including when a previously benign
+target becomes threatening during a continuation. An encounter flag prevents
+replanning an already initialized maneuver every frame. The optimizer still
+covers at most 2 s: when the first conflict lies beyond it, the geometric guide
+extends through that conflict and supplies only its initial segment to RTI.
+NRMM prediction and rectangle checks include hold midpoints in the guide. The
 planner chooses one displacement direction from closest-approach relative
 motion and constructs one quintic rise-and-hold reference. It retains the
 offset through the end of the horizon; the nominal-path CLF remains unchanged.
-Longitudinal encounters retain the prescribed passing side. The chosen guide,
+Longitudinal encounters retain the prescribed passing side. A same-direction
+lead uses the unbraked base curve so that seed deceleration cannot erase the
+very conflict for which a passing reference is needed. The chosen guide,
 RTI prefix overlap normals share that side after a reference shift. Circular
 terminal-track rows choose the nearer inner or outer geometric chart; they
 do not inherit a road-side preference.
@@ -103,7 +110,7 @@ the affine predicted states. No second model is constructed from that rollout.
 State and input increments lie in local trust boxes. Actual longitudinal-force
 magnitude and optional slew limits remain hard. Steering has no artificial
 actuator magnitude or slew limit; the Fiala angle domain is enforced. State
-limits, sideslip, optional road-corner rows, rear handling cones and terminal
+limits, sideslip, optional road-corner rows and terminal
 rows retain their existing meanings. No shared elastic variable relaxes them.
 
 Nominal collision rows in the first `controller.horizonSteps` nodes carry
@@ -129,15 +136,19 @@ and stabilizes otherwise free future controls. It introduces no additional
 avoidance controller. Both stages must complete; an unfinished secondary stage
 does not cause execution of the primary point.
 
-Rear adhesion uses `w = vy-lr*yawRate`,
-`k = 3*rearLongitudinalForceScale/rearCorneringStiffness`, and
+Modified Fiala dynamics include saturation at both axles. There is no extra
+rear-tire nonsaturation cone in the optimization or terminal membership test.
+The force-balance observer encloses saturated forces too; its interval can
+widen when the measurement becomes less informative. Its separate sideslip
+premise `|vy| <= tan(model.sideslipMaximum)*vx` remains enforced, with observer
+support margins. Removing that premise would require a new observer enclosure.
+The precomputed local cruise certificate may use a conservative nonsaturated
+neighborhood; that local certificate does not impose a full-horizon cone.
 
-    norm([w/k; vx*b]) <= vx,
-    vx*b approximately vx_bar*b_bar + b_bar*dvx + vx_bar*db.
-
-Both derivatives of this bilinear product are retained. Below the kinematic
-threshold the cone reduces to the force-ratio domain. No front-tire
-nonsaturation restriction is introduced; Fiala saturation is part of the model.
+Seeds and optimization share `nonlinearBicycleModel.inputBounds`, including
+the differentiable force-ratio reserve of ten constraint tolerances. The
+50 ms total timing budget now reserves 2 ms for completion instead of 10 ms;
+the RTI formulation and maximum number of native solves are unchanged.
 
 ## Collision geometry and observer information
 
@@ -187,7 +198,7 @@ the target enters as its estimate. This is not full robust terminal membership.
 ## Computation budget and diagnostics
 
 Defaults target a 50 ms sample: `solver.timeLimitSeconds=0.05`, at most 40 native
-interior-point iterations per stage, and a 10 ms completion reserve. Preprocessing
+interior-point iterations per stage, and a 2 ms completion reserve. Preprocessing
 counts against the same timer as model construction and both solves. Reference
 rollout, tangent/constraint construction, CLF construction, terminal geometry and
 optimized-input prediction check the timer. A native termination callback includes

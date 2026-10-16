@@ -39,8 +39,9 @@ function cfg=localDefaults()
     % RTI builds one model per sample; prediction duration is independent
     % of the number of nonlinear iterations (exactly one, not configurable).
     cfg.rti=struct('predictionSeconds',2,'minimumPredictionSeconds',1,'settlingSeconds',.5);
-    % Single analytic rectangle-aware guide and one vehicle-model rollout.
-    cfg.planner=struct('clearanceReserveMeters',.2,'lookaheadSeconds',.5, ...
+    % Threat screening can look beyond RTI without adding optimization nodes.
+    % One analytic rectangle-aware guide and one vehicle-model rollout.
+    cfg.planner=struct('threatPredictionSeconds',5,'clearanceReserveMeters',.2,'lookaheadSeconds',.5, ...
         'decelerationMetersPerSecondSquared',1,'lateralAccelerationFraction',.9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
@@ -124,7 +125,7 @@ function cfg=localDefaults()
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for prediction and output assembly. Native
     % solves also count their construction time against the remaining budget.
-    cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.05,'completionReserveSeconds',.010, ...
+    cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.05,'completionReserveSeconds',.002, ...
         'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
         'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
         'clfTieTolerance',1e-3,'reducedTolerance',1e-3);
@@ -167,7 +168,7 @@ function localValidate(cfg)
         validateattributes(cfg.rti.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.rti.minimumPredictionSeconds,{'double'},{'<=',cfg.rti.predictionSeconds});
-    for name=["clearanceReserveMeters","lookaheadSeconds","decelerationMetersPerSecondSquared"]
+    for name=["threatPredictionSeconds","clearanceReserveMeters","lookaheadSeconds","decelerationMetersPerSecondSquared"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});

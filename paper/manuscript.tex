@@ -255,8 +255,8 @@ cruise law on the sampled nonlinear model. The two parts are designed for
 each other. The estimator measures the lateral velocity through the
 lateral force balance of the controller's own tire model under the input
 the controller holds; the controller keeps the car inside the sideslip
-cone and below the rear-tire saturation at which that measurement would
-stop being informative; and the estimator's enclosure tightens the
+cone used by the inversion; saturated tire forces can widen the
+measurement interval, and the estimator's enclosure tightens the
 controller's constraints.
 
 The mathematical link between the certificates is developed in
@@ -432,9 +432,8 @@ linearization point is kept strictly inside the input interval. The tire
 model is used above 4\,m/s. Below that speed the prediction model blends
 into a kinematic bicycle so that the vehicle can come to rest
 (Section~\ref{subsec:predictionModel}). The saturation branch bounds the
-lateral force; the controller keeps the rear axle below it by a cone
-constraint on the prediction (Section~\ref{subsec:envelope}) and leaves
-the front axle free. Speed, sideslip and course are
+lateral force at both axles without an additional nonsaturation
+constraint (Section~\ref{subsec:envelope}). Speed, sideslip and course are
 \begin{equation}
     V_E=\normtwo{\bm v_E},
     \qquad
@@ -490,8 +489,8 @@ and force-ratio command of that rollout. Three signals close the design
 between the two parts. The controller passes the input it holds back to
 the estimator, which inverts the tire model under it. The estimator's
 operating domain is derived from the controller's state limits, and the
-controller enforces the estimator's sideslip cone and a rear-adhesion
-envelope so that the motion stays where the measurement is informative.
+controller enforces the estimator's sideslip cone. Saturation may reduce
+measurement information; the observer then reports a wider interval.
 The estimator's enclosure tightens the controller's constraints.
 
 The relative-position measurement is produced as follows. A YOLO
@@ -575,7 +574,7 @@ force-balance interval of Section~\ref{subsec:modelAided}).
 \item[(iii)] Whenever a finite observer certificate is used, its
 true-motion premises hold throughout the hold. The joint mathematical
 constraints impose these premises on every admitted branch; the numerical
-prediction and audits check the sideslip and rear-adhesion limits
+prediction and audits check the sideslip limits
 (Section~\ref{subsec:envelope}).
 \item[(iv)] Zero-deficit universal joint collision rows separate the true
 bodies at the specified constraint instants
@@ -905,9 +904,9 @@ cancellation of Lemma~\ref{lem:egoRows} is not retained in
 not uniform: near saturation the force no longer determines the slip and
 the interval widens, to about 3\,m/s for $\epsilon_{\rm par}=0.05$, and
 becomes asymmetric, which is why its midpoint is not used as the
-measurement. The controller keeps the rear tire below saturation and
-the motion inside the cone (Section~\ref{subsec:envelope}), which keeps
-the inversion informative. The same interval, divided by the speed
+measurement. The controller retains the cone premise
+(Section~\ref{subsec:envelope}), but does not prohibit rear-tire
+saturation. The interval accounts for the corresponding loss of information. The same interval, divided by the speed
 interval, replaces $\hat\beta\pm\bar e_\beta$ in the course
 correspondence of Lemma~\ref{lem:course}. Without the model or a held
 input, the kinematic measurement of Section~\ref{subsec:egoObserver} is
@@ -1531,9 +1530,15 @@ the anchor never reaches it.
 \subsection{The Anchor}
 \label{subsec:initialization}
 
-At a cold nominal sample the anchor is a lane-feedback rollout. At a cold
-or newly observed conflict, an analytic geometric avoidance guide supplies
-one dynamically consistent rollout. Each later sample shifts the previous
+At a cold nominal sample the anchor is a lane-feedback rollout. On target
+acquisition, threat screening looks up to 5 s ahead, truncated at the first
+predicted sensing-range exit. A detected conflict, including one first
+recognized during a continuation, invokes one analytic geometric guide.
+If the conflict lies beyond the 2 s RTI horizon, only the guide extends
+beyond that horizon; the optimization keeps its original node limit.
+A same-direction lead uses an unbraked guide base, preventing seed
+deceleration from erasing the passing opportunity. An encounter flag avoids
+repeating this initialization each frame. Each later sample shifts the previous
 input plan by one hold and rolls it through $F$ from the current estimate.
 Its absolute endpoint is retained until the minimum prefix length $N$ is
 reached. Missing holds from a terminal endpoint prefer a checked
@@ -1723,8 +1728,10 @@ $d\geq d_{\rm m}-\tfrac12r_E\Delta\psi_i^2$ for the affine-predicted
 pose, where $r_E=\max_j\normtwo{\bm o_j}$; with the values of
 Section~\ref{sec:results} ($r_E=2.58$\,m, $|\Delta\psi|\leq0.25$\,rad,
 $d_{\rm m}=0.20$\,m) the right side is at least $0.119$\,m. The issued
-plan is checked against the exact rectangle distance at the same
-instants (Section~\ref{subsec:program}).
+plan is rolled out under the nonlinear prediction model without
+post-solve input substitution. Independent scenario replay checks its
+rectangle distances; the affine rows alone do not certify the nonlinear
+trajectory.
 
 \subsection{Road, Handling Envelope and Estimator Domain}
 \label{subsec:envelope}
@@ -1739,38 +1746,19 @@ one and at every mid-hold point, each rectangle vertex satisfies
 linearized in position and heading on the path normal at the anchor
 vertex. These rows carry no slack in either program.
 
-Two more conditions tie the plan to the estimator of
-Section~\ref{subsec:modelAided}. At both ends of every hold, under that
-hold's force ratio $\beta_i$,
-\begin{equation}
-    \left\lVert\begin{bmatrix}(v_y-l_{r,E}r)/k_r^{\rm sl}\\
-        \bar v_x\beta_i\end{bmatrix}\right\rVert_2\leq v_x,
-    \qquad k_r^{\rm sl}=\frac{3\mu_rF_{zr}}{C_r},
-    \label{eq:adhesion_cone}
-\end{equation}
+The observer's force-balance inversion assumes the sideslip domain
 \begin{equation}
     |v_y|\leq v_x\tan\beta_{\rm dom}.
     \label{eq:sideslip_cone}
 \end{equation}
-With $\bar v_x$ replaced by $v_x$, \eqref{eq:adhesion_cone} reads
-$|\tan\alpha_r|\leq k_r^{\rm sl}\sqrt{1-\beta_i^2}
-=\tan\alpha_{{\rm sl},r}$: the rear tire stays below the saturation
-branch of \eqref{eq:fiala_force} at the capacity left by the
-longitudinal force. The implementation freezes $v_x$ at its anchor
-value $\bar v_x$ in the bilinear product, which makes the condition one
-second-order cone, and divides the cone by $\bar v_x$ so that its
-entries are of order one. This is a stable-handling envelope in the
-sense of \cite{BealGerdes2013}, since a saturated rear axle supplies no
-restoring yaw moment, and it is at the same time an observability
-condition, because a saturated force no longer determines the slip and
-the inversion of \eqref{eq:force_balance} loses its information.
-Condition \eqref{eq:sideslip_cone} is the cone premise of that
-inversion, with the same $\beta_{\rm dom}$. The adhesion cone applies at
-nodes whose anchor speed is above $v_1$, where the rear tire has a
-lateral force to saturate, and the sideslip cone above $v_{\rm h}$,
-where the sideslip is defined. Before these rows existed, a run with
-estimated states at 15\,m/s combined a steering angle of $-0.40$\,rad
-with a force ratio of $0.95$ and spun to a sideslip of 0.68\,rad.
+The numerical program imposes this condition above $v_{\rm h}$, where
+sideslip is defined, with the observer's support margin. It is a premise
+of the observer enclosure, not a tire-force capacity constraint.
+Modified Fiala dynamics already limit both axles' forces. No additional
+rear-tire nonsaturation cone is imposed: the interval inversion includes
+the saturated branch and widens when that branch loses information.
+The local cruise certificate may retain a conservative nonsaturated
+neighborhood without imposing it on the entire avoidance horizon.
 
 \subsection{Terminal Set}
 \label{subsec:terminal}
@@ -1819,8 +1807,7 @@ cone ($|\beta_E|\le0.05$~rad in the current configuration), inside
 small, $|rV|\leq a_{\rm m}$. With $a_{\rm b}=4$\,m/s$^2$ and
 $a_{\rm m}=2$\,m/s$^2$ the continuation uses 54\% of the friction
 budget $\mu g=8.3$\,m/s$^2$, and the configuration requires
-$\sqrt{a_{\rm b}^2+a_{\rm m}^2}<\mu g$. The terminal braking ratio is also checked against the actuator bounds and
-rear adhesion. Along the continuation
+$\sqrt{a_{\rm b}^2+a_{\rm m}^2}<\mu g$. The terminal braking ratio is also checked against the actuator bounds. Along the continuation
 $\beta_E$ is constant and $|rV|=|\kappa_E|V^2$ only falls, so a mild
 state stays mild. An endpoint in the middle of a swerve is not mild: the
 plan has to settle before it is terminal.
@@ -2074,10 +2061,8 @@ the road rows \eqref{eq:road_rows}, the body-velocity bounds and the
 sideslip cone \eqref{eq:sideslip_cone}. The terminal rows widen the
 clearances and road margins of \eqref{eq:terminal_set} by the position
 radius of $G_0$ and the chord of its heading radius, as a static offset;
-the continuation is not propagated from the enclosure. The adhesion
-cone \eqref{eq:adhesion_cone} acts on the estimate, because the
-certified lateral-velocity radius widens exactly as the rear slip nears
-saturation, and its reserve excluded states well inside the envelope.
+the continuation is not propagated from the enclosure. No separate
+rear-adhesion cone is used.
 
 The target is measured relative to the ego, so an error of the ego pose
 moves both bodies rigidly and cancels from their distance. For the
@@ -2158,7 +2143,7 @@ Let $\mathcal A$ denote the constraints shared by both programs on
 $(\Delta\bm x_{0:M},\Delta\bm u_{0:M-1},\bm\xi)$: the model
 \eqref{eq:affine_model}, the force-ratio and body-velocity bounds, the
 collision rows \eqref{eq:collision_rows} with $\bm\xi\geq0$, the road
-rows \eqref{eq:road_rows}, the cones \eqref{eq:adhesion_cone} and rows
+rows \eqref{eq:road_rows}, the sideslip rows
 \eqref{eq:sideslip_cone}, and the terminal rows of
 Section~\ref{subsec:terminal} on $\Delta\bm x_M$, each with its
 tightening. The primary program is
@@ -2271,7 +2256,7 @@ This is an existence proof for the ideal problem, following
 \cite[eq.~(10)]{HuangWangMargellosGoulart2025}. It does not assert that a
 solver returns a command. Assumption~\ref{asm:mild} identifies the mild
 model with the terminal kinematics; to infer (H3), the terminal input must
-also meet actuator, rear-adhesion and any slew bounds. The runtime checks
+also meet actuator and any slew bounds. The runtime checks
 these on appended holds of the declared model. The start of an encounter
 and re-acquisition after its absorbing exit remain initial-feasibility
 questions outside the proposition.
@@ -2582,21 +2567,12 @@ The fixed command of Section~\ref{subsec:terminal} is common to all
 branches; their stop times differ through the forward-only stop rule,
 not through commands selected from unknown true speeds.
 
-Along each such branch $|\kappa|V^2$ decreases and
-\[
-    \tan\alpha_r=\frac{\sin\beta-l_{r,E}\kappa}{\cos\beta}
-\]
-is constant until rest. For fixed geometry, a sufficient robust
-rear-adhesion entry condition under held ratio $b_f$ is
-\begin{equation}
-    \sup_{\mathcal J}|\tan\alpha_r|
-      \le\frac{3\mu_{r,\min}F_{z,r}\sqrt{1-b_f^2}}{C_{r,\max}} .
-    \label{eq:robust_rear_entry}
-\end{equation}
-It therefore persists throughout the continuation for parameters
-inside the box. Actuator admissibility and the first slew from the
-stored prior input are checked explicitly; later held-command slew
-differences are zero.
+Along each such branch $|\kappa|V^2$ decreases and the sideslip remains
+constant, preserving mildness under the declared terminal model.
+The terminal acceleration budget is a premise of that model, not an
+additional Fiala nonsaturation constraint. Actuator admissibility and
+the first slew from the stored prior input are checked explicitly;
+later held-command slew differences are zero.
 
 A finite membership construction checks all joint continuation sets
 through $\lceil\overline V/(a_{\min}T_s)\rceil$ holds under the
@@ -3393,7 +3369,7 @@ and neither failed to contain the truth. The medians of the ego radii
 within a run were 0.062 to 0.064\,m in position, 0.005 to 0.018\,rad in
 heading and 0.08 to 0.15\,m/s in lateral velocity. The true motion
 stayed inside the sideslip cone \eqref{eq:sideslip_cone} and below the
-adhesion condition \eqref{eq:adhesion_cone} in every sample, including
+rear-tire saturation threshold in every sample of that earlier version, including
 the two runs of the seed that slow into the blended regime, where the
 plant's lateral forces are no longer those of the Fiala model that the
 force-balance measurement inverts. The audit covers the sampled
@@ -3535,10 +3511,11 @@ motion. The kinematic premise of the velocity measurement failed in
 exactly the maneuvers the controller exists for, and the bounds
 published under it were then wrong, not merely loose. Sharing the tire
 model and the held input replaced that premise by one the controller
-can enforce, and the controller in turn accepted two constraints, the
-sideslip cone and the rear-adhesion cone, whose purpose is partly to
-keep the estimator informative; in the audited seed the true motion
-never left either. In the other direction, the estimator's enclosure
+can enforce. The current controller retains the sideslip domain
+and allows Fiala saturation; the force-balance interval accounts for
+its loss of information. The earlier audited controller also imposed
+a rear-nonsaturation cone, so its recorded results should not be
+interpreted as validation of the revised constraint set. In the other direction, the estimator's enclosure
 could not be used as a worst case throughout the horizon or in the
 decrease condition: both made the programs infeasible or the commands
 erratic. The baseline compromise tightens one affine hold and replans; it does

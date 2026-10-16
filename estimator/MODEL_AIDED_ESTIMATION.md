@@ -78,11 +78,14 @@ used its midpoint and fed the observer a biased measurement (yaw error p95
 0.061 rad, `v_y` error p95 0.92 m/s in a noisy 15-m/s head-on). With the nominal
 solution these were 0.0046 rad and 0.031 m/s.
 
-The controller's rear-adhesion cone keeps the rear tire below saturation (see
-`controller/PCBF_CLF_ARCHITECTURE.md`, *Stable-handling envelope*), so the
-inversion stays informative. Without the shared model or a held input (for
-example over the initialization history), the kinematic relation and its
-declared mismatch are used unchanged (`nrmmEgoCourseGeometry("kinematicCourse", ...)`).
+The controller does not impose a separate rear-tire nonsaturation cone.
+Saturation is already part of the modified Fiala model and of this interval
+inversion. Near a flat force branch, the interval widens instead of claiming
+an accurate lateral measurement. The shared sideslip cone remains a premise;
+removing it requires a different enclosure. Without the shared model or a held
+input (for example over the initialization history), the kinematic relation
+and its declared mismatch are used unchanged
+(`nrmmEgoCourseGeometry("kinematicCourse", ...)`).
 
 ## 3. Body-velocity observer and its bound
 
@@ -205,8 +208,8 @@ covers every frame of the fourteen noisy encounters (seed 20261003, tracker
 output). The published ego bounds (5,958 frames) and target bounds (2,291
 frames) contained the truth in every frame. The ego bound stayed valid
 throughout. The true motion stayed inside the sideslip cone. In three frames
-(15-m/s runs) it reached a rear-adhesion ratio of 1.0004-1.0072, since the
-controller's adhesion row acts on the estimate. The force-balance certificate
+(15-m/s runs) it reached a rear-adhesion ratio of 1.0004-1.0072, in that earlier controller version, whose
+adhesion row acted on the estimate. The force-balance certificate
 needs only the cone. The target prediction-parameter set is still wide. Its
 per-run medians were a course of +/-0.24 to 0.53 rad and a speed of +/-1.9 to
 4.0 m/s, with the whole contract range for `A` and curvature. The controller

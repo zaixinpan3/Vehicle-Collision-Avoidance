@@ -65,7 +65,13 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             forceDerivative=(command.totalLongitudinalActuatorForce ...
                 -command.aerodynamicResistanceForce-command.rollingResistanceForce)/cfg.vehicle.m;
             testCase.verifyEqual(command.bodyLongitudinalVelocityDerivative,derivative(4),AbsTol=1e-12);
-            testCase.verifyEqual(derivative(4),forceDerivative,AbsTol=1e-8);
+            % A solver may return a tiny nonzero steering angle even on a
+            % straight road. Compare the full body-frame force balance.
+            delta=command.frontWheelSteeringAngle;
+            steeringCorrection=(command.axleLongitudinalForce(1)*(cos(delta)-1) ...
+                -command.axleLateralForce(1)*sin(delta))/cfg.vehicle.m;
+            coriolis=problem.model.initialState(6)*problem.model.initialState(5);
+            testCase.verifyEqual(derivative(4),forceDerivative+steeringCorrection+coriolis,AbsTol=1e-12);
             testCase.verifyEqual(command.totalLongitudinalActuatorForce, ...
                 cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg)*command.actuatorInput(2), AbsTol=1.0e-10);
             testCase.verifyEqual(forceDerivative, (command.totalLongitudinalTireForce ...

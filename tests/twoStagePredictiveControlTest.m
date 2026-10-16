@@ -60,6 +60,31 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
         end
+        function aNewLeadThreatBeyondTwoSecondsPlansBeforeItBecomesUrgent(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,q]=collisionThreatScenario("brakingLead",cfg);
+            [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            search=problem.metadata.search;
+            testCase.verifyTrue(search.planner.used);
+            testCase.verifyTrue(state.avoidanceInitialized);
+            testCase.verifyGreaterThan(search.planner.conflictStartSeconds,cfg.rti.predictionSeconds);
+            testCase.verifyGreaterThan(search.planner.amplitudeMeters,1);
+            testCase.verifyLessThanOrEqual(size(problem.inputTrajectory,2),cfg.controller.maximumHorizonSteps);
+            testCase.verifyEqual(search.rtiIterations,1);
+            ego=localSuccessor(ego,state);q=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
+            [~,~,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
+            testCase.verifyFalse(next.metadata.search.planner.used);
+        end
+        function seedAndOptimizationShareTheDifferentiableInputDomain(testCase)
+            [ego,road,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=1.8;
+            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg);
+            [input,~,~]=terminalSafeSet.cruiseInput([0;0;0;1.8;0;0],problem.model);
+            testCase.verifyLessThanOrEqual(input(2),upper(2));
+            testCase.verifyGreaterThanOrEqual(input(2),lower(2));
+            testCase.verifyLessThanOrEqual(max(problem.model.linearization.inputs(2,:)),upper(2));
+            testCase.verifyGreaterThanOrEqual(min(problem.model.linearization.inputs(2,:)),lower(2));
+        end
         function anUnsafeColdReferenceStillGetsOnlyOneRtiModel(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
