@@ -117,7 +117,13 @@ function [count,conflict]=localEncounterHorizon(model)
         position=model.initialState(1:2)-projection.lateralPosition*normal+cfg.referenceSpeed*time.*tangent;
         heading=repmat(projection.heading,size(time));
     end
-    target=localTargetAt(model,time);[distance,index]=min(vecnorm(position-target(1:2,:),2,1));
+    target=localTargetAt(model,time);separation=vecnorm(position-target(1:2,:),2,1);
+    exitReserve=norm(cfg.nonlinear.trustRadius*[5;5]) ...
+        +sum(vecnorm(model.uncertainty.collisionGenerator(1:2,:)));
+    if ~isempty(model.uncertainty.target),exitReserve=exitReserve+model.uncertainty.target.positionRadius;end
+    outside=find(separation>cfg.collision.encounterRangeMeters+exitReserve,1);
+    last=numel(time);if ~isempty(outside),last=outside-1;end
+    separation(last+1:end)=Inf;[distance,index]=min(separation);
     reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(target(8:9,1)) ...
         +norm(cfg.vehicle.rectangleOffset)+norm(target(10:11,1))+cfg.collision.safetyMarginMeters;
     generator=model.uncertainty.collisionGenerator;
@@ -135,7 +141,7 @@ function [count,conflict]=localEncounterHorizon(model)
     conflict=false;
     if distance<=reach
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        for node=1:numel(time)
+        for node=1:last
             gap=predictiveSafetyGeometry.rectangle([position(:,node);heading(node)+model.nominalReference.state(3)], ...
                 shape,target(1:3,node),target(8:11,node));
             if gap<=cfg.collision.safetyMarginMeters,conflict=true;break;end
@@ -175,21 +181,20 @@ function [anchor,source]=localRtiInitialize(model,previous)
             u=old(:,index);next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
         elseif inherited && terminalSafeSet.member(context,states(:,index),index-1)
             [u,next,ok,~,middle]=terminalSafeSet.cruiseInput(states(:,index),model);
-            ok=ok && terminalSafeSet.clears(context,middle,index-.5) ...
+            ok=ok && abs(u(2)-prior(2))<=context.brakingChangeMaximum+1e-9 ...
+                && terminalSafeSet.clears(context,middle,index-.5) ...
                 && terminalSafeSet.member(context,next,index);
             if ~ok
                 [u,next,ok]=terminalSafeSet.brakingInput(states(:,index),prior,u,model,context,index-1);
                 braking=braking+double(ok);
             end
             if ~ok
-                % No certified realization was found; this is an uncertified
-                % reference for the single RTI, not a terminal certificate.
-                u=nonlinearBicycleModel.nominalFeedback(states(:,index),prior,model.lane,model.nominalReference,cfg,nominal);
+                u=localTailSeed(states(:,index),prior,model,nominal);
                 next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
             end
             appended=appended+double(ok);
         else
-            u=nonlinearBicycleModel.nominalFeedback(states(:,index),prior,model.lane,model.nominalReference,cfg,nominal);
+            u=localTailSeed(states(:,index),prior,model,nominal);
             next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
         end
         inputs(:,index)=u;states(:,index+1)=next;prior=u;
@@ -197,6 +202,15 @@ function [anchor,source]=localRtiInitialize(model,previous)
     end
     anchor=struct('inputs',inputs,'states',states,'terminalContext',context, ...
         'appendedTerminalSteps',appended,'appendedBrakingSteps',braking,'planner',localPlannerMetadata());
+end
+
+function input=localTailSeed(x,prior,model,parameters)
+    input=nonlinearBicycleModel.nominalFeedback(x,prior,model.lane,model.nominalReference,model.cfg,parameters);
+    % An uncertified stopped tail must not restart into a positive-input
+    % trust box. Moving tails still seek the nominal cruise equilibrium.
+    if hypot(x(4),x(5))<=.2*model.cfg.model.brakeHoldSpeed
+        input=[prior(1);min(0,prior(2))];
+    end
 end
 
 function anchor=localPlanReference(model,count)
@@ -573,7 +587,7 @@ function [problem,model]=localFormulate(anchor,model)
     inputUpper=[Inf;min(1-domainReserve,cfg.actuation.brakingRatioMaximum)];
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;finite=isfinite(rate);
     [physicalLower,physicalUpper]=localStateLimits(cfg);
-    primaryLowerBound=0;departure=0;
+    primaryLowerBound=0;departure=0;encounterEnded=isempty(model.target);exitRecord=NaN;
     % Per-hold affine uncertainty. The estimator publishes a fresh
     % enclosure G0 of its estimate at every sample, and every hold of the
     % plan is issued from such an estimate. Hold i therefore starts from G0
@@ -650,7 +664,11 @@ function [problem,model]=localFormulate(anchor,model)
             blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;blockBounds{blockCount}=bound;
         end
         point=2*index-1;
-        if ~localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg)
+        exitMovement=norm(stateBox(1:2));if index==1,exitMovement=0;end
+        if ~encounterEnded && localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg,exitMovement)
+            encounterEnded=true;exitRecord=point;
+        end
+        if ~encounterEnded && ~localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg)
             departure=index;
         end
         if departure==index && localBinding(x,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg)
@@ -672,7 +690,12 @@ function [problem,model]=localFormulate(anchor,model)
             [r,bound]=localRoadBlock(road,count+1+index,middle,middleMap,middleGenerator,clearance);
             blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=bound;
         end
-        point=2*index;inRange=~localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg);
+        point=2*index;
+        exitMovement=norm(abs(middleMap(1:2,:))*[stateBox;inputBox]);
+        if ~encounterEnded && localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg,exitMovement)
+            encounterEnded=true;exitRecord=point;
+        end
+        inRange=~encounterEnded && ~localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg);
         if inRange,departure=index;end
         middleMovement=[1,1,reach]*abs(middleMap(1:3,:))*[stateBox;inputBox];
         if inRange && localBinding(middle,forecast(:,point),point,middleCollisionGenerator,targetTube,middleMovement,cfg)
@@ -732,7 +755,10 @@ function [problem,model]=localFormulate(anchor,model)
     % the set, so the zero correction stays feasible.
     y=anchor.states(:,end);endColumns=ix(:,end);
     time=count*h;point=2*count+1;
-    if ~localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg)
+    if ~encounterEnded && localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg,norm(stateBox(1:2)))
+        encounterEnded=true;exitRecord=point;
+    end
+    if ~encounterEnded && ~localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg)
         departure=count+1;
     end
     if departure==count+1 && localBinding(y,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg)
@@ -753,10 +779,16 @@ function [problem,model]=localFormulate(anchor,model)
         blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=bound;
     end
     context=localTerminalContext(anchor,model);
+    context.encounterEnded=encounterEnded;
+    % The appended terminal command starts from the final optimized input,
+    % not from this frame's measured previous input.
+    lastBrake=iu(2,end);entry=context.brakingRatio-anchor.inputs(2,end);
+    lower(lastBrake)=max(lower(lastBrake),entry-context.brakingChangeMaximum);
+    upper(lastBrake)=min(upper(lastBrake),entry+context.brakingChangeMaximum);
     localCheckDeadline(model);
     [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,count,radius*[5;5;.5;5;3;1.5]);
     localCheckDeadline(model);
-    model.terminalContext=context;
+    model.terminalContext=context;model.encounterExitRecord=exitRecord;
     if ~isempty(terminalRows)
         blockCount=blockCount+1;blockRows{blockCount}=terminalRows;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=terminalBounds;
     end
@@ -943,12 +975,13 @@ function binding=localBinding(x,q,point,generator,tube,movement,cfg)
     binding=~(lower>movement);
 end
 
-function beyond=localBeyond(x,forecast,point,generator,tube,cfg)
+function beyond=localBeyond(x,forecast,point,generator,tube,cfg,movement)
     % The target's reference point beyond the encounter range at record
     % point 'point' (no target: beyond), with the enclosures as reserve.
+    if nargin<7,movement=0;end
     beyond=isempty(forecast);
     if ~beyond
-        reserve=sum(vecnorm(generator(1:2,:)))+tube.positionRadius(point);
+        reserve=sum(vecnorm(generator(1:2,:)))+tube.positionRadius(point)+movement;
         beyond=norm(x(1:2)-forecast(1:2,point))-reserve>cfg.collision.encounterRangeMeters;
     end
 end
@@ -1115,8 +1148,7 @@ function solution=localTerminalMetrics(solution,model)
     cfg=model.cfg;y=solution.states(:,end);count=size(solution.inputs,2);
     solution.terminalValue=nonlinearBicycleModel.nominalValue(y,model.lane,model.nominalReference);
     solution.terminalMarginMeters=NaN;solution.terminalRoadMarginMeters=NaN;
-    solution.terminalStopSeconds=ceil(hypot(y(4),y(5))/(cfg.terminal.brakingDecelerationMetersPerSecondSquared ...
-        *cfg.controller.sampleTime))*cfg.controller.sampleTime;
+    solution.terminalStopSeconds=hypot(y(4),y(5))/cfg.terminal.brakingDecelerationMetersPerSecondSquared;
     solution.terminalExitSeconds=NaN;solution.terminalEnd="notValidated";
     solution.linearizationGap=model.trust.modelInnovation;
     solution.terminalDistanceMeters=Inf;

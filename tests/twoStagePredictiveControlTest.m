@@ -137,6 +137,34 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyFalse(problem.metadata.preplannedAvoidanceTrajectoryRequired);
         end
+        function anUncertifiedStoppedTailDoesNotRestartTheSeed(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            model=nominal.model;model.initialState=zeros(6,1);model.previousInput=zeros(2,1);
+            % An overlapping stationary target makes membership false. The
+            % diagnostic solve may fail, but its single seed must not move off.
+            q=[3;0;0;0;0;0;1.6;2.4;.95;0;0];
+            model.target=q;model.targetEpoch=q;model.targetOnset=false;
+            prior=struct('inputTrajectory',zeros(2,cfg.controller.horizonSteps));
+            [~,search,model]=solvePredictiveControl(model,prior,tic);
+            testCase.verifyEqual(search.rtiIterations,1);
+            testCase.verifyLessThanOrEqual(model.linearization.inputs(2,end),0);
+            testCase.verifyEqual(model.linearization.states(4:6,end),zeros(3,1),AbsTol=1e-12);
+        end
+        function aCertifiedPrefixExitAlsoEndsTheTerminalEncounter(testCase)
+            [ego,road,cfg]=localFixture();cfg.controller.horizonSteps=40;
+            beta=asin(1.6/20);
+            q=[40;-20;-beta;60;0;beta;1.6;2.4;.95;0;0];
+            [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            point=problem.model.encounterExitRecord;
+            testCase.verifyTrue(isfinite(point));
+            testCase.verifyTrue(problem.model.terminalContext.encounterEnded);
+            forecast=predictiveSafetyGeometry.predictTarget(q,(0:80)*cfg.controller.sampleTime/2);
+            distance=vecnorm(problem.model.sampledStates(1:2,:)-forecast(1:2,:),2,1);
+            testCase.verifyTrue(any(distance(point+1:end)<cfg.collision.encounterRangeMeters));
+            testCase.verifyEqual(problem.model.collisionEscapeNormals(:,point:end),zeros(2,81-point+1));
+            testCase.verifyEqual(problem.metadata.rtiIterations,1);
+        end
         function targetRangeCannotSelectADifferentClf(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             target=localNearTarget();far=target;far.targetPositionInertial(1)=-60;

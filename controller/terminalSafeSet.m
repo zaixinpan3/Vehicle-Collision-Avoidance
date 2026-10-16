@@ -10,11 +10,11 @@ classdef terminalSafeSet
 % acceleration and sideslip family of the target contract (Sharma et al.,
 % 2026, Eq. (2)). The target keeps its forecast A and beta. The ego follows
 % the terminal law
-%   kappa_f(z) = ( A = max(-a_b, -V/h),  steering held ),
+%   kappa_f(z) = ( A = -a_b while moving, forward-only stop, steering held ),
 % a = terminal.brakingDecelerationMetersPerSecondSquared, h the sample time:
 % it brakes at a_b with its sideslip angle beta = atan2(v_y, v_x) and its
-% course curvature r/V held, and stops exactly at the end of a hold, after
-% J = ceil(V/(a_b h)) holds. phi, the joint one-step map under this law, is
+% course curvature r/V held, and stops at V/a_b, possibly inside a hold. After
+% J = ceil(V/(a_b h)) holds it is stationary. The joint one-step map is
 % exact and in closed form: both vehicles move on arcs of constant curvature
 % (continuation, successor). The terminal set is
 %   X_f = { z : the ego is mild at z (inside the sideslip cone, and the held
@@ -77,7 +77,12 @@ classdef terminalSafeSet
                 'hasTarget',~isempty(model.target),'targetEpoch',model.targetEpoch, ...
                 'targetEpochIndex',localEpochIndex(model), ...
                 'sampleIndex',model.sampleIndex,'lane',model.lane,'stationNow',here.station, ...
-                'reference',model.nominalReference,'collisionSide',localCollisionSide(model),'trackSide',0);
+                'reference',model.nominalReference,'collisionSide',localCollisionSide(model),'trackSide',0, ...
+                'encounterEnded',false,'heldInput',zeros(2,1), ...
+                'brakingChangeMaximum',cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime, ...
+                'stateLower',[cfg.model.speedMinimum;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum], ...
+                'stateUpper',[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum]);
+            if isfield(model,'previousInput'),context.heldInput=model.previousInput;end
 
         end
 
@@ -90,24 +95,81 @@ classdef terminalSafeSet
             info.value=nonlinearBicycleModel.nominalValue(x,context.lane,context.reference);
         end
 
+        function joint = jointState(context,x,node)
+            % An encounter state, rather than an ego-only stopping condition.
+            % An ended flag belongs to this encounter and is never cleared by
+            % prediction. A newly observed target creates a new joint state.
+            q=[];if context.hasTarget,q=localTarget(context,node,0);end
+            active=context.hasTarget && ~context.encounterEnded;
+            if active && norm(x(1:2)-q(1:2))>context.range,active=false;end
+            joint=struct('ego',x,'target',q,'active',active,'heldInput',context.heldInput);
+        end
+
+        function control = control(context,joint)
+            % One held actuator command, common to the terminal uncertainty
+            % family. The declared mild model supplies a forward-only stop;
+            % the last command is not adjusted using an unknown true speed.
+            control=struct('actuatorInput',[joint.heldInput(1);context.brakingRatio], ...
+                'tangentialAcceleration',-context.deceleration, ...
+                'stopRule',"forwardOnlyAbsorbingStop",'encounterActive',joint.active);
+        end
+
+        function [next,middle] = jointSuccessor(context,joint)
+            % Exact declared-model flow and absorbing first sampled exit.
+            % Target motion remains available as data after exit; it cannot
+            % reactivate the collision problem within this certificate.
+            next=joint;middle=joint;h=context.sampleTime;
+            path=terminalSafeSet.continuation(context,joint.ego,1);
+            V=hypot(joint.ego(4),joint.ego(5));beta=path.sideslip;kappa=path.curvature;
+            parkedExit=Inf;stopTime=V/context.deceleration;
+            if joint.active && stopTime<=h
+                parkedTarget=predictiveSafetyGeometry.predictTarget(joint.target,stopTime);
+                if norm(path.pose(1:2,end)-parkedTarget(1:2))>context.range
+                    parkedExit=stopTime;
+                else
+                    [~,~,~,duration]=localTrack(parkedTarget,path.pose(1:2,end),context.range);
+                    parkedExit=stopTime+duration;
+                end
+            end
+            for half=1:2
+                speed=max(0,V-context.deceleration*half*h/2);
+                state=[path.pose(:,half+1);speed*cos(beta);speed*sin(beta);kappa*speed];
+                q=predictiveSafetyGeometry.predictTarget(joint.target,half*h/2);
+                active=joint.active;
+                if half==2,active=middle.active;end
+                if active && norm(state(1:2)-q(1:2))>context.range,active=false;end
+                if parkedExit<=half*h/2,active=false;end
+                current=struct('ego',state,'target',q,'active',active, ...
+                    'heldInput',[joint.heldInput(1);context.brakingRatio]);
+                if half==1,middle=current;else,next=current;end
+            end
+        end
+
+        function [member,info] = jointMember(context,joint)
+            % The target state and encounter memory travel with the ego.
+            context.targetEpoch=joint.target;context.hasTarget=~isempty(joint.target);
+            context.targetEpochIndex=0;context.sampleIndex=0;
+            context.encounterEnded=~joint.active;context.heldInput=joint.heldInput;
+            [member,~,info]=terminalSafeSet.member(context,joint.ego,0);
+            if abs(context.brakingRatio-joint.heldInput(2))>context.brakingChangeMaximum+1e-9
+                member=false;info.reason="terminalInputSlew";
+            end
+        end
+
         function path = continuation(context,x,steps)
             % The ego's continuation from x under the terminal law, in closed
             % form: its poses (columns [px; py; yaw]) at times k h/2 after x,
-            % k = 0..2J, nodes and hold midpoints until it stops at node J.
-            % The speed falls by a_b h per hold, and by what is left in the
-            % last one; the arc length is exact for that piecewise linear
-            % speed. 'steps' fixes J (to differentiate with the schedule held).
+            % k = 0..2J. Speed decreases at a_b until the exact stop instant,
+            % possibly before node J, then remains zero. 'steps' fixes J
+            % to differentiate with the sampled schedule held.
             h=context.sampleTime;a=context.deceleration;V=hypot(x(4),x(5));
             beta=0;kappa=0;
             if V>0,beta=atan2(x(5),x(4));kappa=x(6)/V;end
             if nargin<3
                 steps=0;if V>0,steps=ceil(V/(a*h));end
             end
-            speed=[V-(0:steps-1)*a*h,0];
-            if steps==0,speed=V;end
-            node=[0,cumsum((speed(1:end-1)+speed(2:end))*h/2)];
-            arc=zeros(1,2*steps+1);arc(1:2:end)=node;
-            arc(2:2:end)=node(1:end-1)+(3*speed(1:end-1)+speed(2:end))*h/8;
+            time=(0:2*steps)*h/2;movingTime=min(time,V/a);
+            arc=V*movingTime-.5*a*movingTime.^2;
             half=kappa*arc/2;scale=ones(size(half));
             bend=half~=0;scale(bend)=sin(half(bend))./half(bend);
             position=x(1:2)+(arc.*scale).*predictiveSafetyGeometry.direction(x(3)+beta+half);
@@ -120,7 +182,7 @@ classdef terminalSafeSet
             % a hold midpoint), meet the problem's own sampled collision row:
             % safetyMarginMeters from the target's forecast, or the target
             % beyond the range there.
-            clear=true;if ~context.hasTarget,return;end
+            clear=true;if ~context.hasTarget || context.encounterEnded,return;end
             q=localTarget(context,node,0);
             if norm(x(1:2)-q(1:2))>context.range,return;end
             clear=predictiveSafetyGeometry.rectangle(x(1:3),context.shape,q(1:3),q(8:11))>=context.margin-1e-6;
@@ -166,24 +228,6 @@ classdef terminalSafeSet
             band=localBand();required=context.required;
             path=parts.path;if isempty(path),path=terminalSafeSet.continuation(context,y);end
             jacobian=localPoseJacobian(context,y,path.steps);
-            if context.hasTarget && context.trackSide==0
-                target=localTarget(context,node,path.time(end));curvature=sin(target(6))/target(7);
-                if curvature~=0
-                    course=predictiveSafetyGeometry.direction(target(3)+target(6));
-                    center=target(1:2)+[-course(2);course(1)]/curvature;
-                    radial=path.pose(1:2,end)-center;radius=norm(radial);trackRadius=1/abs(curvature);
-                    band=context.reach+norm(target(8:9))+norm(target(10:11));
-                    if abs(radius-trackRadius)>band
-                        context.trackSide=sign(radius-trackRadius);
-                    else
-                        projection=laneGeometry.project(path.pose(1:2,end),context.lane);
-                        forward=predictiveSafetyGeometry.direction(projection.heading);
-                        preferred=context.collisionSide*[-forward(2);forward(1)];
-                        if abs(radial.'*forward)>sqrt(.5)*radius,preferred=forward;end
-                        context.trackSide=1;if radial.'*preferred<0,context.trackSide=-1;end
-                    end
-                end
-            end
             % Largest change of a fixed-dual row at each pose over the box:
             % |normal . dp| + reach |dpsi|, normal of unit length.
             reach=context.reach;
@@ -198,8 +242,9 @@ classdef terminalSafeSet
                     0,0,0,-reserve,-1,context.rearAxleDistance];
                 rows=[rows;rear];bounds=[bounds;-rear*y];
             end
-            if V>0 && (context.brakingRatio<context.brakingBounds(1) ...
-                    || context.brakingRatio>context.brakingBounds(2))
+            if context.brakingRatio<context.brakingBounds(1) ...
+                    || context.brakingRatio>context.brakingBounds(2) ...
+                    || any(context.stateLower>0 | context.stateUpper<0)
                 rows=[rows;zeros(1,6)];bounds=[bounds;-1];
             end
             if V>0 && abs(y(6)*V)>limit-localMildBand()
@@ -224,9 +269,10 @@ classdef terminalSafeSet
                         localKeep(context.clearance(1)+lateral(corner,k)-context.inflation)]; %#ok<AGROW>
                 end
             end
-            if ~context.hasTarget,return;end
+            if ~context.hasTarget || context.encounterEnded,return;end
             if isempty(parts.gap)
                 q=localTarget(context,node,path.time);[gap,out]=localClearances(context,path.pose,q);
+                if ~isempty(out) && path.time(out)>V/context.deceleration,out=[];end
             else
                 q=parts.q;gap=parts.gap;out=parts.out;
             end
@@ -247,8 +293,9 @@ classdef terminalSafeSet
                 rows=[rows;-dual.jacobian*jacobian(:,:,k)];bounds=[bounds;localKeep(dual.value-required)]; %#ok<AGROW>
             end
             if isempty(out)
+                parkedTarget=localTarget(context,node,V/context.deceleration);
                 if isempty(parts.parked)
-                    [distance,witness,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
+                    [distance,witness,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),parkedTarget);
                 else
                     distance=parts.parked.distance;witness=parts.parked.witness;track=parts.parked.track;
                 end
@@ -257,7 +304,7 @@ classdef terminalSafeSet
                     % edge) has no well-defined normal; a pose 1 mm or 1 cm
                     % along the track stands for it.
                     dual=localDual(path.pose(:,end),context.shape,witness,[1e-3,-1e-3,1e-2,-1e-2]);
-                    if distance<=1e-8 && (q(4,end)~=0 || q(5,end)>0)
+                    if distance<=1e-8 && (parkedTarget(4)~=0 || parkedTarget(5)>0)
                         % The closest track witness moves along the track
                         % when the parked pose moves longitudinally. A contact
                         % normal along that track gives a false escape slope.
@@ -265,7 +312,7 @@ classdef terminalSafeSet
                         curvature=sin(witness(6))/witness(7);
                         course=predictiveSafetyGeometry.direction(witness(3)+witness(6));
                         if curvature~=0
-                            [r,b,context]=localCircleRows(context,path.pose(:,end),q(:,end),track,jacobian(:,:,end));
+                            [r,b,context]=localCircleRows(context,path.pose(:,end),parkedTarget,track,jacobian(:,:,end));
                             rows=[rows;r];bounds=[bounds;b];dual=[];
                         else
                             normal=[-course(2);course(1)];
@@ -340,23 +387,10 @@ classdef terminalSafeSet
         end
 
         function [input,next,ok,middle,fraction] = brakingInput(x,previous,cruise,model,context,node)
-            % One hold of the declared model from x at plan node 'node' that
-            % keeps the endpoint in X_f, meets the hard rows and clears the
-            % target at its midpoint, as close as found to the cruise input.
-            % The far end of the search holds the previous steering, which
-            % keeps a mild endpoint mild: at the cruise input's braking
-            % ratio, else braking with the ratio of actuator deceleration
-            % a_b, the law's realization (road load neglected), else as hard
-            % as the rear adhesion at x admits (with 5 percent to spare). The
-            % first far end keeps the plan's tail from braking where only
-            % mildness, not the target, stops the cruise hold. A far end that
-            % keeps the endpoint in X_f is bisected (five halvings) toward the
-            % cruise input along u = cruise + lambda (far - cruise), lambda in
-            % (0, 1], and the least lambda found is returned. ok is false when
-            % no far end keeps the endpoint in X_f. The realization
-            % follows the law's continuation only approximately; braking
-            % harder in the first hold leaves the continuation behind it
-            % slower. Every candidate is checked.
+            % Bounded numerical tail initializer, distinct from control(),
+            % the unique mathematical terminal law. Prefer the cruise command
+            % where a declared-model hold can preserve terminal membership.
+            % These fixed-cost seed checks add no optimizer iterations.
             cfg=model.cfg;
             low=max(-1+1e-8,cfg.actuation.brakingRatioMinimum);
             tire=modifiedFialaTire.parameters(cfg);
@@ -368,6 +402,7 @@ classdef terminalSafeSet
             for braking=[cruise(2),max(low,law),max(low,-.95*adhesion)]
                 input=[previous(1);braking];
                 [ok,next,middle]=localHoldStays(x,input,model,context,node);
+                ok=ok && abs(input(2)-previous(2))<=context.brakingChangeMaximum+1e-9;
                 if ok,break;end
             end
             if ~ok,return;end
@@ -375,6 +410,7 @@ classdef terminalSafeSet
             for halving=1:5
                 lambda=(lower+upper)/2;candidate=cruise+lambda*(far-cruise);
                 [stays,candidateNext,candidateMiddle]=localHoldStays(x,candidate,model,context,node);
+                stays=stays && abs(candidate(2)-previous(2))<=context.brakingChangeMaximum+1e-9;
                 if stays
                     upper=lambda;input=candidate;next=candidateNext;middle=candidateMiddle;fraction=lambda;
                 else
@@ -583,14 +619,6 @@ function [rows,bounds,context]=localCircleRows(context,pose,q,track,map)
     corners=context.shape(3:4)+context.shape(1:2).*[-1,1,1,-1;-1,-1,1,1];
     world=pose(1:2)+rotation*corners;relative=world-center;
     rows=zeros(4,6);
-    if context.trackSide<0
-        radius=vecnorm(relative,2,1);
-        for index=1:4
-            jacobian=[eye(2),rotation*[0,-1;1,0]*corners(:,index)]*map;
-            if radius(index)>0,rows(index,:)=relative(:,index).'*jacobian/radius(index);end
-        end
-        bounds=rhoMin-context.required-radius.';return;
-    end
     body=rotation.'*(center-pose(1:2))-context.shape(3:4);
     closest=pose(1:2)+rotation*(context.shape(3:4)+min(context.shape(1:2),max(-context.shape(1:2),body)));
     normal=closest-center;
@@ -609,6 +637,23 @@ function [rows,bounds,context]=localCircleRows(context,pose,q,track,map)
             value=radius*max(cos(phase+angles));
         end
         support=max(support,value);
+    end
+    if context.trackSide==0
+        % Select the smaller geometric escape, independent of road-side
+        % preferences. This chooses a local convex chart, not another
+        % terminal controller. No extra optimization problem is solved.
+        innerCost=max(vecnorm(relative,2,1)-(rhoMin-context.required));
+        outerCost=max(support+context.required-normal.'*relative);
+        context.trackSide=1;
+        if rhoMin>context.required && innerCost<=outerCost,context.trackSide=-1;end
+    end
+    if context.trackSide<0
+        radius=vecnorm(relative,2,1);
+        for index=1:4
+            jacobian=[eye(2),rotation*[0,-1;1,0]*corners(:,index)]*map;
+            if radius(index)>0,rows(index,:)=relative(:,index).'*jacobian/radius(index);end
+        end
+        bounds=rhoMin-context.required-radius.';return;
     end
     for index=1:4
         jacobian=[eye(2),rotation*[0,-1;1,0]*corners(:,index)]*map;
@@ -685,12 +730,16 @@ function [member,info,parts] = localDecide(context,x,node)
         'margin',Inf,'roadMargin',Inf);
     parts=struct('path',[],'road',[],'q',[],'gap',[],'out',[],'parked',[]);
     member=false;V=hypot(x(4),x(5));
+    if any(x(4:6)<context.stateLower-1e-9 | x(4:6)>context.stateUpper+1e-9) ...
+            || any(context.stateLower>0 | context.stateUpper<0)
+        info.reason="terminalStateBounds";return;
+    end
     if V>0 && ((abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9)) ...
             || abs(x(6)*V)>context.lateralMaximum*(1+1e-9))
         info.reason="notMild";return;
     end
-    if V>0 && (context.brakingRatio<context.brakingBounds(1) ...
-            || context.brakingRatio>context.brakingBounds(2))
+    if context.brakingRatio<context.brakingBounds(1) ...
+            || context.brakingRatio>context.brakingBounds(2)
         info.reason="terminalInputBounds";return;
     end
     if x(4)>context.kinematicSpeed && abs(x(5)-context.rearAxleDistance*x(6)) ...
@@ -698,21 +747,28 @@ function [member,info,parts] = localDecide(context,x,node)
         info.reason="terminalRearAdhesion";return;
     end
     path=terminalSafeSet.continuation(context,x);parts.path=path;
-    info.stopSeconds=path.steps*context.sampleTime;
+    info.stopSeconds=V/context.deceleration;
     [margin,lateral,normal,local]=localRoad(context,path.pose);
     parts.road=struct('margin',margin,'lateral',lateral,'normal',normal,'local',local);
     info.roadMargin=min(margin)-context.inflation;
     if info.roadMargin<-1e-6,info.reason="continuationLeavesRoad";return;end
-    if ~context.hasTarget,member=true;info.reason="noTarget";info.end="noTarget";return;end
+    if ~context.hasTarget || context.encounterEnded
+        member=true;info.reason="noTarget";info.end="noTarget";
+        if context.encounterEnded,info.reason="exit";info.end="exit";info.exitSeconds=0;end
+        return;
+    end
     q=localTarget(context,node,path.time);
-    [gap,out]=localClearances(context,path.pose,q);parts.q=q;parts.gap=gap;parts.out=out;
+    [gap,out]=localClearances(context,path.pose,q);
+    if ~isempty(out) && path.time(out)>info.stopSeconds,out=[];end
+    parts.q=q;parts.gap=gap;parts.out=out;
     last=numel(gap);if ~isempty(out),last=out-1;end
-    if last>0,info.margin=min(gap(1:last))-context.required;end
+    if last>0,info.margin=min(gap(1:last),[],'omitnan')-context.required;end
     if info.margin<-1e-6,info.reason="continuationMeetsTarget";return;end
     if ~isempty(out)
         member=true;info.reason="exit";info.end="exit";info.exitSeconds=path.time(out);return;
     end
-    [distance,witness,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),q(:,end));
+    parkedTarget=localTarget(context,node,info.stopSeconds);
+    [distance,witness,track]=terminalSafeSet.parkedClearance(context,path.pose(:,end),parkedTarget);
     parts.parked=struct('distance',distance,'witness',witness,'track',track);
     info.margin=min(info.margin,distance-context.required);
     info.exitSeconds=info.stopSeconds+track.exitSeconds;
@@ -847,10 +903,11 @@ function [distance,sigma] = localTrackDistance(pose,shape,q,lower,upper,full)
     % fixed edges, and the fixed vertices sweep the opposite segments in the
     % target's frame. A circular track rotates the target about the circle's
     % centre: the paths are arcs about that centre (localArcSegment).
+    % The physical stop can lie between checked samples. Explicitly reject
+    % initial overlap, including containment with no boundary crossing.
+    distance=predictiveSafetyGeometry.rectangle(pose,shape,q(1:3),q(8:11));sigma=0;
+    if distance<=0 || lower==upper,return;end
     E=localCorners(pose,shape);B=localCorners(q(1:3),q(8:11));next=[2,3,4,1];
-    if lower==upper
-        distance=predictiveSafetyGeometry.rectangle(pose,shape,q(1:3),q(8:11));sigma=0;return;
-    end
     distance=Inf;sigma=0;k=sin(q(6))/q(7);course=q(3)+q(6);
     if k==0
         u=predictiveSafetyGeometry.direction(course);

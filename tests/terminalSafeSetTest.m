@@ -12,23 +12,100 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function jointMembershipChecksTheTerminalEntrySlew(testCase)
+            model=localModel([0;0;0;8;0;0],[]);
+            model.cfg.model.brakingRatioRateMaximum=1;
+            context=terminalSafeSet.context(model);
+            joint=terminalSafeSet.jointState(context,model.initialState,0);
+            [member,info]=terminalSafeSet.jointMember(context,joint);
+            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"terminalInputSlew");
+            joint.heldInput(2)=context.brakingRatio;
+            testCase.verifyTrue(terminalSafeSet.jointMember(context,joint));
+        end
+        function terminalMembershipRequiresAdmissibleRestAndHoldingInput(testCase)
+            model=localModel([0;0;0;8;0;0],[]);model.cfg.model.speedMinimum=1;
+            context=terminalSafeSet.context(model);
+            [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
+            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"terminalStateBounds");
+            model=localModel(zeros(6,1),[]);model.cfg.actuation.brakingRatioMinimum=0;
+            context=terminalSafeSet.context(model);
+            [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
+            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"terminalInputBounds");
+        end
+        function aSubsampleStopUsesConstantBrakingWithoutReversing(testCase)
+            model=localModel([0;0;0;.1;0;0],[]);context=terminalSafeSet.context(model);
+            joint=terminalSafeSet.jointState(context,model.initialState,0);
+            command=terminalSafeSet.control(context,joint);
+            [next,middle]=terminalSafeSet.jointSuccessor(context,joint);
+            testCase.verifyEqual(command.tangentialAcceleration,-4);
+            testCase.verifyEqual(next.ego,[.1^2/8;0;0;0;0;0],AbsTol=1e-14);
+            testCase.verifyEqual(middle.ego,next.ego,AbsTol=1e-14);
+            stopped=terminalSafeSet.jointSuccessor(context,next);
+            testCase.verifyEqual(stopped.ego,next.ego,AbsTol=1e-14);
+        end
+        function anEndedJointEncounterCannotReactivateOnPredictedReentry(testCase)
+            beta=asin(1.6/30);phase=-pi+.35;
+            q=[30+30*cos(phase);30*sin(phase);phase+pi/2-beta;8;0;beta;1.6;2.4;.95;0;0];
+            model=localModel(zeros(6,1),q);context=terminalSafeSet.context(model);
+            joint=terminalSafeSet.jointState(context,model.initialState,0);
+            [member,info]=terminalSafeSet.jointMember(context,joint);
+            testCase.verifyTrue(member);testCase.verifyTrue(isfinite(info.exitSeconds));
+            ended=false;
+            for step=1:ceil(23/context.sampleTime)
+                joint=terminalSafeSet.jointSuccessor(context,joint);
+                if ~joint.active,ended=true;end
+                if ended,testCase.verifyFalse(joint.active);end
+            end
+            testCase.verifyTrue(ended);
+            testCase.verifyLessThan(norm(joint.target(1:2)-joint.ego(1:2)),context.range);
+            testCase.verifyTrue(terminalSafeSet.jointMember(context,joint));
+            fresh=joint;fresh.active=true;
+            % Returning just before contact belongs to a different problem.
+            fresh.target=predictiveSafetyGeometry.predictTarget(q,21.5);
+            testCase.verifyFalse(terminalSafeSet.jointMember(context,fresh));
+        end
+        function theParkedTrackRejectsContainmentAtThePhysicalStop(testCase)
+            q=[0;0;0;.1;-1;0;1.6;.5;.3;0;0];
+            model=localModel(zeros(6,1),q);context=terminalSafeSet.context(model);
+            [distance,~]=terminalSafeSet.parkedClearance(context,zeros(3,1),q);
+            testCase.verifyEqual(distance,0,AbsTol=1e-12);
+        end
+        function aTargetBeforeItsFirstExitStillThreatensTheStoppedEgo(testCase)
+            q=[40;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            model=localModel(zeros(6,1),q);context=terminalSafeSet.context(model);
+            joint=terminalSafeSet.jointState(context,model.initialState,0);
+            [member,info]=terminalSafeSet.jointMember(context,joint);
+            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"parkedEgoMeetsTarget");
+        end
+        function theJointSetDependsOnTargetMotionAndPerceptionRange(testCase)
+            q=[40;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            model=localModel(zeros(6,1),q);context=terminalSafeSet.context(model);
+            joint=terminalSafeSet.jointState(context,model.initialState,0);
+            testCase.verifyFalse(terminalSafeSet.jointMember(context,joint));
+            away=joint;away.target(3)=0;
+            testCase.verifyTrue(terminalSafeSet.jointMember(context,away));
+            context.range=30;
+            outside=terminalSafeSet.jointState(context,model.initialState,0);
+            testCase.verifyFalse(outside.active);
+            testCase.verifyTrue(terminalSafeSet.jointMember(context,outside));
+        end
         function theContinuationIsTheExactFlowOfTheTerminalLaw(testCase)
             % The closed-form poses at nodes and hold midpoints equal a fine
             % RK4 integration of the constant-(A, beta) kinematics with
-            % A = max(-a_b, -V/h) held over each hold and the course curvature
-            % held, and the ego stops at the end of a hold.
+            % A = -a_b until a forward-only stop and the course curvature
+            % held, including a stop inside the last hold.
             model=localModel([3;-1;.2;8;.3;.12],[]);context=terminalSafeSet.context(model);
             x=model.initialState;path=terminalSafeSet.continuation(context,x);
             h=context.sampleTime;a=context.deceleration;V=hypot(x(4),x(5));
             testCase.verifyEqual(path.steps,ceil(V/(a*h)));
             beta=atan2(x(5),x(4));kappa=x(6)/V;state=[x(1:3);V];steps=400;
             for hold=1:path.steps
-                A=max(-a,-state(4)/h);
+                A=-a;
                 for half=1:2
                     for k=1:steps
                         f=@(s)[s(4)*cos(s(3)+beta);s(4)*sin(s(3)+beta);kappa*s(4);A];
-                        d=h/2/steps;k1=f(state);k2=f(state+d/2*k1);k3=f(state+d/2*k2);k4=f(state+d*k3);
-                        state=state+d/6*(k1+2*k2+2*k3+k4);
+                        d=min(h/2/steps,max(0,state(4))/a);k1=f(state);k2=f(state+d/2*k1);k3=f(state+d/2*k2);k4=f(state+d*k3);
+                        state=state+d/6*(k1+2*k2+2*k3+k4);state(4)=max(0,state(4));
                     end
                     testCase.verifyEqual(path.pose(:,2*(hold-1)+half+1),state(1:3),AbsTol=1e-9);
                 end
@@ -47,7 +124,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
                 x=terminalSafeSet.successor(context,x);
                 [member,~,next]=terminalSafeSet.member(context,x,node);
                 testCase.verifyTrue(member);
-                testCase.verifyEqual(next.stopSeconds,info.stopSeconds-node*context.sampleTime,AbsTol=1e-9);
+                testCase.verifyEqual(next.stopSeconds,max(0,info.stopSeconds-node*context.sampleTime),AbsTol=1e-9);
                 testCase.verifyEqual(next.exitSeconds,info.exitSeconds-node*context.sampleTime,AbsTol=1e-6);
                 rest=terminalSafeSet.continuation(context,x);
                 testCase.verifyEqual(rest.pose,path.pose(:,2*node+1:end),AbsTol=1e-9);
@@ -253,10 +330,9 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyFalse(terminalSafeSet.member(context,next,1));
             [input,next,ok,~,fraction]=terminalSafeSet.brakingInput(x,[.01;0],cruise,model,context,0);
             testCase.verifyTrue(ok);testCase.verifyTrue(terminalSafeSet.member(context,next,1));
-            testCase.verifyGreaterThan(fraction,0);testCase.verifyLessThan(fraction,1);
-            % The bisection's last rejected fraction is 1/32 below.
-            [~,closer]=terminalSafeSet.holdStates(x,cruise+(fraction-1/32)*(input-cruise)/fraction,model.cfg);
-            testCase.verifyFalse(terminalSafeSet.member(context,closer,1));
+            testCase.verifyGreaterThan(fraction,0);testCase.verifyLessThanOrEqual(fraction,1);
+            policy=terminalSafeSet.control(context,struct('heldInput',[.01;0],'active',true));
+            testCase.verifyEqual(policy.actuatorInput,[.01;context.brakingRatio]);
             braking=-model.cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(model.cfg);
             [~,next]=terminalSafeSet.holdStates(x,[.01;braking],model.cfg);
             deceleration=(x(4)-next(4))/model.cfg.controller.sampleTime;

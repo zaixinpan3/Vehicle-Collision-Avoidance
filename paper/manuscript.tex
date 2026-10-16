@@ -1489,10 +1489,13 @@ and $\beta_C$; the forecast runs forward from the latest estimate and
 the sample at which it was taken, because a stop cannot be run
 backward, and the parameters are constant within one prediction and may
 change at the next sample. When no estimate arrives, the last forecast
-continues. The obstacle is perceived only within the range $R_{\rm enc}$,
-and collision constraints are imposed at the prediction nodes at which
-the two reference points are closer than $R_{\rm enc}$, including after
-a later re-entry.
+continues unless a complete current empty scan confirms its absence.
+The obstacle is perceived only within the range $R_{\rm enc}$. An absorbing
+encounter flag removes collision constraints after the first exit; a later
+actual reacquisition starts a new problem. In the affine RTI prediction,
+exit is certified only after subtracting the published position enclosures
+and the position correction allowed by the trust box from the center
+distance. This flag is passed to the terminal condition as well.
 
 An anchor trajectory $(\bar{\bm x}_i,\bar{\bm u}_i)$, $i=0,\ldots,M$,
 with $\bar{\bm x}_0$ the supplied estimate and
@@ -1528,33 +1531,21 @@ the anchor never reaches it.
 \subsection{The Anchor}
 \label{subsec:initialization}
 
-At the first sample, and at a sample at which an obstacle appears that
-the previous plan did not know of, the anchor is a rollout under a
-guidance feedback: the path-guidance law $\bm\pi$ below without an
-obstacle, and a potential-field guidance with one. It stops at its
-first node $M\geq N$ in $\mathcal X_f$, or at $M_{\max}$. Every later
-sample starts from the previous issued plan, which is itself a
-nonlinear rollout (Section~\ref{subsec:program}), shifted by one hold
-and rolled out again through $F$ from the new estimate; its endpoint
-keeps its absolute time, so the plan is one hold shorter. While the
-shifted plan is shorter than $N$, or its endpoint is no longer in
-$\mathcal X_f$ because the forecast or the state has changed, holds of
-the declared model are appended, each kept only when the hard rows of
-Sections~\ref{subsec:geometry}--\ref{subsec:envelope} hold on it and its
-endpoint lies in $\mathcal X_f$: first the hold of the cruise law
-$\bm u=\bm u_*+K\bm e$ of Section~\ref{subsec:clf}; if that hold takes an
-endpoint out of $\mathcal X_f$, holds of the guidance feedback through
-states outside $\mathcal X_f$ until a node in $\mathcal X_f$ is reached
-again, which lengthens the plan to complete a maneuver instead of
-braking to keep its endpoint mild; and otherwise the hold nearest to
-the cruise hold on a segment toward holding the previous steering angle,
-at the cruise force ratio first, then at the ratio whose deceleration is
-the terminal law's $a_{\rm b}$, then braking as hard as the rear
-adhesion admits, each found by bisection. When no hold keeps the
-endpoint in $\mathcal X_f$, the plan stays one hold shorter. Predicted
-states of the previous affine solution are never reused as the anchor,
-and a fresh rollout is used once more in a sample whose shifted problem
-is infeasible (Section~\ref{subsec:program}).
+At a cold nominal sample the anchor is a lane-feedback rollout. At a cold
+or newly observed conflict, an analytic geometric avoidance guide supplies
+one dynamically consistent rollout. Each later sample shifts the previous
+input plan by one hold and rolls it through $F$ from the current estimate.
+Its absolute endpoint is retained until the minimum prefix length $N$ is
+reached. Missing holds from a terminal endpoint prefer a checked
+cruise-feedback hold. A bounded cruise-to-braking seed search, with at most
+five scalar halvings, can retain terminal membership while avoiding
+unnecessary braking. This numerical initializer is distinct from the
+unique terminal controller $\kappa_{\rm f}$. If no certified hold is found,
+a moving endpoint uses nominal feedback, whereas a stopped endpoint keeps
+a nonpositive longitudinal command instead of restarting into a local
+positive-input box. These are initialization operations, with no extra RTI
+iterations or same-frame nonlinear restart. The optimized input is issued
+without substitution.
 
 The path-guidance law steers the course toward the path through a
 lookahead and regulates the speed through the force ratio. With $\chi$
@@ -1786,7 +1777,10 @@ with a force ratio of $0.95$ and spun to a sideslip of 0.68\,rad.
 
 The horizon ends where a simple continuation of both vehicles is known
 to be safe for the rest of the encounter. Past the endpoint
-$\bm z=\bm x_M$ at time $t_M$ the obstacle keeps its forecast
+at time $t_M$, define the joint terminal state
+$\bm z=(\bm x_{E,M},\bm q_{C,M},a_M,\bm u_{M-1})$, containing both
+vehicles, their motion parameters, an active-encounter flag $a_M$, and
+input memory. The obstacle keeps its forecast
 \eqref{eq:target_flow}, and the ego follows one terminal law
 $\kappa_{\rm f}$: a kinematic vehicle with its steering held, braking
 at the constant rate $a_{\rm b}$ until it stops. With the steering held
@@ -1794,10 +1788,12 @@ a kinematic bicycle keeps its sideslip and its course curvature, so the
 law keeps the ego in the same constant-acceleration, constant-curvature
 family as the obstacle. With $V=\normtwo{\bm v^E}$,
 $\beta_E=\operatorname{atan2}(v_y,v_x)$ and $\kappa_E=r/V$ at $\bm z$,
-the speed is $V_j=\max(V-ja_{\rm b}T_s,0)$ at the $j$th node of the
-continuation and linear in between, so the ego stops exactly at the end
-of hold $J=\lceil V/(a_{\rm b}T_s)\rceil$; with $s(\tau)$ the arc length
-of that schedule and $\vartheta=\tfrac12\kappa_Es$,
+the speed is $V(\tau)=\max(V-a_{\rm b}\tau,0)$ and the stop occurs
+at $t_s=V/a_{\rm b}$, possibly inside a hold. With
+$\tau_m=\min(\tau,t_s)$, the arc length is
+$s(\tau)=V\tau_m-a_{\rm b}\tau_m^2/2$. Set
+$J=\lceil V/(a_{\rm b}T_s)\rceil$ and
+$\vartheta=\tfrac12\kappa_Es$; then
 \begin{equation}
     \begin{aligned}
     \bm p(\tau)&=\bm p+s\,\frac{\sin\vartheta}{\vartheta}
@@ -1846,21 +1842,26 @@ rely on it.
 Let $\phi^j(\bm z)$, $j\geq0$, be the joint continuation at the nodes
 and mid-hold points after $t_M$, $t_e(\bm z)$ the first of these
 instants at which the obstacle's reference point is farther than
-$R_{\rm enc}$ from the ego's ($+\infty$ if none), and $t_s(\bm z)=JT_s$
-the stop. The terminal set is
+$R_{\rm enc}$ from the ego's ($+\infty$ if none), with the parked
+phase's exit evaluated continuously. The flag obeys
+$a^+=a\,\mathbf 1_{\{\|p_C^+-p_E^+\|\le R_{\rm enc}\}}$ at the
+constraint instants; once zero, it stays zero throughout this certificate.
+The actual stop time is $t_s(\bm z)=V/a_{\rm b}$. The terminal set is
 \begin{equation}
     \mathcal X_f=\bigl\{\bm z\ \text{mild}:\ \text{(a), (b) and (c) hold}\bigr\},
     \label{eq:terminal_set}
 \end{equation}
 where (a) every node, mid-hold pose and the parked pose of the
-continuation keeps the ego rectangle on the road; (b) every node and
+continuation keeps the ego rectangle on the road; (b) every active node and
 mid-hold pose before $t_e(\bm z)$ clears the forecast obstacle rectangle
 by $d_{\rm m}$; and (c) if $t_e(\bm z)>t_s(\bm z)$, the obstacle's
 remaining track until it leaves the range about the parked reference
-point, or comes to rest, clears the parked rectangle by $d_{\rm m}$. The
-first exit ends the encounter, and no property of the obstacle after it
-is used. Condition (b) at $j=0$ includes the endpoint itself, so
-$\mathcal X_f$ lies in the safe set. An enclosure, when published,
+point, or comes to rest, clears the parked rectangle by $d_{\rm m}$. Physical state and terminal input bounds, including the
+first command slew from $\bm u_{M-1}$ and admissibility of rest, are also
+required. The first exit ends the encounter, and no property of the obstacle after it
+is used. An already ended encounter has no obstacle rows, but retains
+physical and road conditions. Condition (b) at $j=0$ includes an active
+endpoint itself, so $\mathcal X_f$ lies in the encounter's safe set. An enclosure, when published,
 widens $d_{\rm m}$ in (b) and (c) and the road margin in (a) by the ego
 position radius and the chord of its heading radius
 (Section~\ref{subsec:uncertainty}).
@@ -1873,9 +1874,9 @@ of angles on a circle, the whole circle when it lies inside the range),
 and from its position the obstacle sweeps that stretch until it leaves,
 or until it comes to rest and stays. The distance between two
 rectangles is continuous along the track and, while they are apart, is
-attained between a vertex of one and an edge of the other; since the two
-are apart at the stop, a node of (b), the least distance over the
-stretch is the least distance between a vertex path, a segment on a line
+attained between a vertex of one and an edge of the other. Initial overlap
+at the exact stop time is rejected explicitly, including containment.
+Otherwise, the least distance over the stretch is the least distance between a vertex path, a segment on a line
 or an arc on a circle, and an edge, over the 32 vertex--edge pairs. The
 arc-to-segment distance has three kinds of candidates: the ends of the
 arc against the segment, the ends of the segment against the arc, and
@@ -1888,28 +1889,29 @@ $5\cdot10^{-13}$\,m from rounding) and within $3\cdot10^{-7}$\,m of it.
 
 \begin{proposition}
 \label{prop:invariance}
-Let $\bm z\in\mathcal X_f$ and let $\bm z'$ be the ego state one hold
-later under $\kappa_{\rm f}$, with the obstacle on its forecast. Then
-$\bm z'\in\mathcal X_f$, or the obstacle has left the range. No sampled
+Let $\bm z\in\mathcal X_f$ and let $\bm z'$ be the joint state one hold
+later under $\kappa_{\rm f}$, with the obstacle on its forecast and the
+encounter flag retained. Then $\bm z'\in\mathcal X_f$. No sampled
 pose of the continuation from $\bm z$ meets the obstacle before the
-exit, nor does the parked ego at any time after the stop while the
-obstacle is in range. $\mathcal X_f$ is the largest such set within the settled admissible
+exit, nor does the parked ego after the stop and before that first exit. $\mathcal X_f$ is the largest such set within the settled admissible
 domain for the law $\kappa_{\rm f}$.
 \end{proposition}
 
 \begin{IEEEproof}
 The continuation of $\bm z'$ is the continuation of $\bm z$ shifted by
-one hold: the speed schedule from $V-a_{\rm b}T_s$ is the remainder of
-the schedule from $V$, the arc continues on the same circle with the
+one hold: the clipped-speed flow from $\max(0,V-a_{\rm b}T_s)$ is the
+remainder of the flow from $V$, the arc continues on the same circle with the
 same sideslip and curvature, and the forecast is evaluated at the same
-absolute times. $\bm z'$ is mild because $\beta_E$ is held and $|rV|$
-falls. Every sampled pose of the new continuation is a pose of the old
+absolute times. An ended flag stays ended, so predicted re-entry adds no
+new collision condition. $\bm z'$ is mild because $\beta_E$ is held and $|rV|$
+falls. State bounds persist as velocity components decrease to admissible
+rest, and the repeated command has zero subsequent slew. Every sampled pose of the new continuation is a pose of the old
 one, so (a) holds and (b) holds up to the same exit instant; the parked
 pose and the obstacle's remaining track are the same, so (c) holds. The
 safety statements are (b) and (c) themselves. A state in the settled admissible domain but outside
 $\mathcal X_f$ has a continuation under $\kappa_{\rm f}$ that leaves the
 road or meets the obstacle at a sampled instant before the exit or after
-the stop, so no set that the law keeps safe contains it.
+the stop, so no admissible set that the law keeps safe contains it.
 \end{IEEEproof}
 
 The construction is the backup-set principle of
@@ -1937,8 +1939,11 @@ the anchor itself, so when $\bar{\bm x}_M\in\mathcal X_f$ the zero
 correction satisfies every row. Conditions with more than 5\,m to
 spare, or whose margin exceeds the most their pose can move over the
 trust boxes, are left out. Exact membership is used when building the
-anchor. The current direct-execution policy does not apply a post-solve
-terminal membership test to the issued inputs.
+anchor. At circular-track overlap the local inner or outer separation
+chart is selected by the smaller geometric escape, not by a prescribed
+road-side preference. Both charts describe the same terminal controller;
+no additional nonlinear iteration is introduced. The current direct-execution
+policy does not apply a post-solve terminal membership test to issued inputs.
 
 \subsection{Quadratic Control-Lyapunov Function and Cruise Law}
 \label{subsec:clf}
@@ -2568,11 +2573,14 @@ while $V>0$, for every branch with $V(0)\le\overline V$,
 \end{equation}
 These inequalities follow by integrating $\dot V\le-a_{\min}$ to
 the absorbing stop and integrating the resulting speed envelope.
+Each branch also carries its first-exit flag: a target-center exit alone
+cannot end a joint information-set encounter. All active branches must
+exit before an outer-set certificate discards the target.
 The rate bound belongs to the declared terminal uncertainty contract.
 A sampled delayed stop reset requires its delay allowance.
-The nominal known-state last-hold schedule of
-Section~\ref{subsec:terminal} is not independently applied to different
-unknown speeds.
+The fixed command of Section~\ref{subsec:terminal} is common to all
+branches; their stop times differ through the forward-only stop rule,
+not through commands selected from unknown true speeds.
 
 Along each such branch $|\kappa|V^2$ decreases and
 \[

@@ -61,9 +61,11 @@ Control Barrier Functions*, Lemma III.5 and equations (9)--(11),
 Let z include the ego state, target state and motion parameters, and the
 previous held input. The input memory makes slew bounds state-dependent hard
 constraints rather than an unmodeled boundary condition. A finite encounter
-may include an absorbing ended flag; re-acquisition is a new initial-feasibility
-problem. Alternatively impose collision constraints for the whole forecast,
-including re-entry. Do not change this convention between successive problems.
+includes an absorbing ended flag at the first exit from the ego perception
+disk; re-acquisition is a new initial-feasibility problem. Each reachable
+branch carries its own flag. The target is removed from an outer set only
+after all remaining active branches have exited. This convention is retained
+when the policy and its certificates are shifted.
 
 Include fixed uncertain vehicle parameters in z with theta_next=theta. All
 images retain that identity. If parameter variation is allowed, use its

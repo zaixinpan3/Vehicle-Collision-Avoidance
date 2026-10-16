@@ -44,7 +44,8 @@ function cfg=localDefaults()
         'decelerationMetersPerSecondSquared',1,'lateralAccelerationFraction',.9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
-    % Collision rows apply at nodes inside it, including a later re-entry.
+    % The first certified exit ends this prediction's encounter. A fresh
+    % observation after an actual exit starts a new collision problem.
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
     cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50);
@@ -55,8 +56,8 @@ function cfg=localDefaults()
     % is taken to be a kinematic vehicle. Past the plan's endpoint the target
     % keeps its forecast and the ego brakes at
     % brakingDecelerationMetersPerSecondSquared [m/s^2] with the steering
-    % (its sideslip and course curvature) held until it stops at a sample
-    % instant; the endpoint is terminal when that continuation stays on the
+    % (its sideslip and course curvature) held until a forward-only stop,
+    % possibly inside a hold; the endpoint is terminal when it stays on the
     % road and clears the target until it leaves encounterRangeMeters (after
     % the stop, over the target's remaining track). Braking and the lateral
     % acceleration together must lie inside the tire friction

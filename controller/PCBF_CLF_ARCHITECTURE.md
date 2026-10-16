@@ -31,10 +31,12 @@ A usable previous input sequence is shifted and rolled out from the current
 measured estimate. Its absolute endpoint is retained while the horizon shrinks
 one hold per frame, down to `controller.horizonSteps`. This also applies when
 the target disappears. Missing tail holds from a terminal endpoint prefer a
-checked cruise hold; otherwise the existing bounded braking-hold search tries
-to keep the reference in the terminal set. These are reference construction
-checks, not post-solve input checks or robust terminal certificates. If no such
-hold is found, nominal feedback supplies an explicitly uncertified reference.
+checked cruise hold, then a bounded cruise-to-braking seed search. This
+initializer is distinct from the unique terminal braking law. These are
+reference construction checks, not post-solve input checks or robust terminal
+certificates. When no certificate is found, a moving endpoint uses nominal
+feedback and a stopped endpoint keeps a nonpositive longitudinal command.
+Thus the terminal certificate does not become a parking objective.
 
 Cold nominal operation uses lane feedback. A cold cruise conflict, including
 one first appearing during a continuation, invokes one analytic geometric
@@ -44,8 +46,9 @@ planner chooses one displacement direction from closest-approach relative
 motion and constructs one quintic rise-and-hold reference. It retains the
 offset through the end of the horizon; the nominal-path CLF remains unchanged.
 Longitudinal encounters retain the prescribed passing side. The chosen guide,
-RTI overlap normals and terminal linearization share that side, including
-after a reference shift.
+RTI prefix overlap normals share that side after a reference shift. Circular
+terminal-track rows choose the nearer inner or outer geometric chart; they
+do not inherit a road-side preference.
 The base curve starts at the measured position and course and continues the
 given path's curvature, using NRMM's analytic arc formula. Thus a curved-road
 initialization retains its turning motion instead of extrapolating a straight
@@ -143,6 +146,10 @@ prediction; braking ends at rest. Each current target observation refreshes its
 forecast center and parameters while retaining the input warm start. Complete
 current perception with no target clears the encounter; otherwise a missing
 observation retains the last forecast. Extrapolation is not a new certificate.
+The joint encounter flag latches the first exit. Within a prediction, an exit
+must hold for the published position enclosures and every affine trust-box
+correction before later target rows are removed, including terminal rows.
+An actual reacquisition starts a new encounter ID and target epoch.
 
 Ordinary rectangle distance supplies feasible separating dual multipliers. Four
 fixed-multiplier corner rows include the yaw derivative. At overlap a nonzero

@@ -238,7 +238,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.predictedJointState(7:10,:),expected(1:4,:),AbsTol=1e-11);
         end
         function headingWrapPreservesTheFixedTargetForecast(testCase)
-            [ego,road,cfg]=localFixture();q=[100;100;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
+            [ego,road,cfg]=localFixture();q=[30;25;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             ego=localSuccessor(ego,prior);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
             [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
@@ -286,6 +286,12 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEmpty(state.targetEpoch);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            ego=localSuccessor(ego,state);ego.stateTime=2*cfg.controller.sampleTime;
+            ego.perception.time=ego.stateTime;
+            [~,~,returned,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
+            testCase.verifyTrue(returned.model.targetOnset);
+            testCase.verifyEqual(next.encounterId,prior.encounterId+1);
+            testCase.verifyEqual(next.targetEpochIndex,2);
         end
         function encounterRadiusUsesReferencePositionsRatherThanBodyClearance(testCase)
             [ego,road,cfg]=localFixture();
@@ -296,19 +302,20 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(far.metadata.encounterExitStep,0);
             testCase.verifyGreaterThan(near.metadata.encounterExitStep,0);
         end
-        function anInitiallyDistantForecastCanEnterTheEncounterRadius(testCase)
+        function aDistantObservationCannotForecastANewEncounter(testCase)
             [ego,road,cfg]=localFixture();
             q=[52;10;pi;8;0;0;1.6;2.4;.95;0;0];
             [~,~,prediction]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             testCase.verifyGreaterThan(norm(q(1:2)-ego.position),50);
-            testCase.verifyGreaterThan(prediction.metadata.encounterExitStep,0);
+            testCase.verifyEqual(prediction.metadata.encounterExitStep,0);
+            testCase.verifyEmpty(prediction.model.target);
         end
         function retiredStateCannotRestoreTheOldTargetMotion(testCase)
             [ego,road,cfg]=localFixture();prior=struct('version',56,'target',ones(10,1));
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"nominalFeedbackRollout");
-            testCase.verifyEqual(state.version,82);
+            testCase.verifyEqual(state.version,83);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;1;0;1.6;2.4;.95;0;0];

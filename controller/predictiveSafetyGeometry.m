@@ -21,8 +21,12 @@ classdef predictiveSafetyGeometry
             end
             margin=cfg.collision.safetyMarginMeters+inflation;
             [position,baseVelocity,baseAcceleration,baseHeading]=localGuideBase(x,curvature,0,time,cfg);
-            gap=zeros(size(time));
+            gap=Inf(size(time));active=true(size(time));
+            outside=find(vecnorm(position-target(1:2,:),2,1)> ...
+                cfg.collision.encounterRangeMeters+inflation+norm(cfg.nonlinear.trustRadius*[5;5]),1);
+            if ~isempty(outside),active(outside:end)=false;end
             for index=1:numel(time)
+                if ~active(index),continue;end
                 gap(index)=predictiveSafetyGeometry.rectangle([position(:,index);baseHeading(index)],shape, ...
                     target(1:3,index),target(8:11,index));
             end
@@ -41,7 +45,8 @@ classdef predictiveSafetyGeometry
             deceleration=cfg.planner.decelerationMetersPerSecondSquared;
             if guide.initialConflict,deceleration=cfg.terminal.brakingDecelerationMetersPerSecondSquared;end
             [position,baseVelocity,baseAcceleration,baseHeading]=localGuideBase(x,curvature,deceleration,time,cfg);
-            relative=position-target(1:2,:);[~,closest]=min(sum(relative.^2,1));
+            relative=position-target(1:2,:);squared=sum(relative.^2,1);squared(~active)=Inf;
+            [~,closest]=min(squared);
             relativeVelocity=baseVelocity(:,closest)-target(4,closest) ...
                 *predictiveSafetyGeometry.direction(target(3,closest)+target(6,closest));
             normal=[-relativeVelocity(2);relativeVelocity(1)];
@@ -58,6 +63,7 @@ classdef predictiveSafetyGeometry
             guide.direction=normal;
             demand=predictiveSafetyGeometry.separationOffsets(position,baseHeading,shape, ...
                 target,normal,margin+cfg.planner.clearanceReserveMeters);
+            demand(~active)=0;
             % Each node supplies its own deadline. The most demanding d/t^2
             % selects a rise time analytically: S(q)/q^2 peaks at this q.
             % A rise may therefore continue after the first conflict node.
@@ -80,6 +86,7 @@ classdef predictiveSafetyGeometry
             stopped=vecnorm(guideVelocity,2,1)<1e-8;heading(stopped)=baseHeading(stopped);
             demand=predictiveSafetyGeometry.separationOffsets(position,heading,shape,target,normal, ...
                 margin+cfg.planner.clearanceReserveMeters);
+            demand(~active)=0;
             requested=max(requested,max([0,demand(2:end)./max(b(2:end),eps)]));
             amplitude=min(requested,budget*sqrt(3)*rise^2/10);
             if guide.brakingOnly,amplitude=0;end
@@ -91,6 +98,7 @@ classdef predictiveSafetyGeometry
             guide.maximumAcceleration=max(vecnorm(guide.acceleration,2,1));
             heading=atan2(guide.velocity(2,:),guide.velocity(1,:));heading(stopped)=baseHeading(stopped);
             for index=1:numel(time)
+                if ~active(index),continue;end
                 gap(index)=predictiveSafetyGeometry.rectangle([guide.position(:,index);heading(index)],shape, ...
                     target(1:3,index),target(8:11,index));
             end
