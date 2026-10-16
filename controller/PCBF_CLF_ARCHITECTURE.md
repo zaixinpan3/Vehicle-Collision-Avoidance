@@ -37,15 +37,45 @@ checks, not post-solve input checks or robust terminal certificates. If no such
 hold is found, nominal feedback supplies an explicitly uncertified reference.
 
 Cold nominal operation uses lane feedback. A cold cruise conflict, including
-one first appearing during a continuation, invokes a bounded trajectory planner
-before the single RTI formulation. It compares exactly three candidate routes:
-straight braking and two passing offsets derived from rectangle widths, target
-pose, available position enclosures and a clearance reserve. Passing routes
-use moderate braking and lateral feedback with a mild endpoint acceleration
-envelope. Nonlinear rollouts and a node-clearance/terminal score choose one
-reference; node collision or road violation is penalized ahead of terminal
-membership. This bounded candidate choice is not a trajectory optimization,
-robust certificate, whole-hold check, post-failure restart or executable fallback.
+one first appearing during a continuation, invokes one analytic geometric
+planner before the single RTI formulation. NRMM prediction and rectangle
+checks cover the full horizon, including hold midpoints in the guide. The
+planner chooses one displacement direction from closest-approach relative
+motion and constructs one quintic rise-and-hold reference. It retains the
+offset through the end of the horizon; the nominal-path CLF remains unchanged.
+Longitudinal encounters retain the prescribed passing side. The chosen guide,
+RTI overlap normals and terminal linearization share that side, including
+after a reference shift.
+The base curve starts at the measured position and course and continues the
+given path's curvature, using NRMM's analytic arc formula. Thus a curved-road
+initialization retains its turning motion instead of extrapolating a straight
+line. Its stopping extension remains at the final pose.
+
+At each time, intersecting a displacement ray with a fixed number of rectangle
+support strips gives an outward exit distance. The strips use both vehicle
+axes and the displacement's normal and tangent, so the separating axis can
+change with time. Center offsets and available current pose/target enclosures
+are included. Node-wise displacement deadlines select the rise time and
+amplitude, without requiring the entire maximum offset before the first
+conflict. The most demanding distance divided by squared time selects a
+phase analytically; a single heading-aware support correction follows. Braking
+and deformation share one acceleration budget, including the longitudinal
+component of the displacement and the base curve's turning acceleration.
+Excess displacement demand is recorded rather than resolved by a path search.
+An initial margin conflict uses finite braking
+guidance without claiming to remove the current violation.
+
+One Fiala-model forward rollout tracks this geometry with previewed curvature and
+longitudinal-acceleration feedforward plus the existing path feedback, respecting
+the braking bounds and slew limit. Its endpoint envelope accounts for both
+lateral acceleration and the stricter terminal sideslip cone at the predicted
+speed. The curvature preview uses one yaw-loop response time; it compensates
+the seed tracker's response lag without changing the optimized inputs. The
+geometric and vehicle-rollout clearances and endpoint membership are
+diagnostics, not robust certificates or whole-hold checks; an unsatisfactory
+seed still supplies at most one RTI. This is O(N) initialization, with no
+candidate-path search, additional optimization, post-failure restart or
+executable fallback.
 
 Cold no-target operation uses `controller.horizonSteps`. Cold nonconflicting
 target predictions use the nearest prescribed-cruise interaction plus settling,
@@ -160,8 +190,10 @@ timer. Native infeasibility certificates and unfinished iterates are never input
 These checks bound the admitted work, not a hard wall-clock guarantee on a desktop
 MATLAB process. A running factorization, allocation, initial JIT compilation or OS
 preemption cannot be interrupted by the checks. Warm up before timed execution;
-`warmUp` uses a separate startup budget for cold avoidance planning, cruise and bounded low-speed
-feedback with curved targets, and discards every probe command.
+`collisionAvoidanceController("warmUp", cfg, road)` uses a separate startup
+budget for cold avoidance planning, cruise and bounded low-speed feedback
+with curved targets. The optional road also primes its actual curvature,
+terminal and avoidance geometry. Every probe command is discarded.
 The integrated scenario driver warms after observer initialization, including
 one discarded bounded-input startup probe. It does not reuse that probe's
 solution, consume the first observation or advance its random stream. These

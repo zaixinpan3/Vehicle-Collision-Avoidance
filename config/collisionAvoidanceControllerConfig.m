@@ -39,8 +39,8 @@ function cfg=localDefaults()
     % RTI builds one model per sample; prediction duration is independent
     % of the number of nonlinear iterations (exactly one, not configurable).
     cfg.rti=struct('predictionSeconds',2,'minimumPredictionSeconds',1,'settlingSeconds',.5);
-    % Bounded nonlinear reference planner: braking and two passing offsets, no optimizer.
-    cfg.planner=struct('clearanceReserveMeters',1.1,'lookaheadSeconds',.5, ...
+    % Single analytic rectangle-aware guide and one vehicle-model rollout.
+    cfg.planner=struct('clearanceReserveMeters',.2,'lookaheadSeconds',.5, ...
         'decelerationMetersPerSecondSquared',1,'lateralAccelerationFraction',.9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.

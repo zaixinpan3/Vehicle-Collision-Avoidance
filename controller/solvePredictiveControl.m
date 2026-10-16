@@ -20,11 +20,17 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         wall=tic;[anchor,source]=localRtiInitialize(model,previousState);initializationSeconds=toc(wall);
         model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
         [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
-        if ~isempty(model.target) && ~model.targetOnset && isstruct(previousState) ...
+        if source=="plannedAvoidanceRollout"
+            projection=laneGeometry.project(model.initialState(1:2),model.lane);
+            lateral=anchor.guide.direction.'*[-sin(projection.heading);cos(projection.heading)];
+            if abs(lateral)>1e-8,model.collisionSide=sign(lateral);end
+        end
+        if source=="shiftedInputRollout" && ~isempty(model.target) && ~model.targetOnset && isstruct(previousState) ...
                 && isfield(previousState,'collisionSide')
             model.collisionSide=previousState.collisionSide;
             if isfield(previousState,'retainCollisionSide'),model.retainCollisionSide=previousState.retainCollisionSide;end
         end
+        anchor.terminalContext.collisionSide=model.collisionSide;
         if source=="shiftedInputRollout" && ~isempty(model.target) && ~model.targetOnset ...
                 && isfield(previousState,'collisionEscapeNormals') && isfield(previousState,'collisionSide')
             old=previousState.collisionEscapeNormals(:,3:end);
@@ -129,9 +135,11 @@ function [count,conflict]=localEncounterHorizon(model)
     conflict=false;
     if distance<=reach
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        gap=predictiveSafetyGeometry.rectangle([position(:,index);heading(index)+model.nominalReference.state(3)], ...
-            shape,target(1:3,index),target(8:11,index));
-        conflict=gap<=1e-8;
+        for node=1:numel(time)
+            gap=predictiveSafetyGeometry.rectangle([position(:,node);heading(node)+model.nominalReference.state(3)], ...
+                shape,target(1:3,node),target(8:11,node));
+            if gap<=cfg.collision.safetyMarginMeters,conflict=true;break;end
+        end
     end
 end
 
@@ -192,72 +200,74 @@ function [anchor,source]=localRtiInitialize(model,previous)
 end
 
 function anchor=localPlanReference(model,count)
-    % A straight braking route and two geometry-derived passing offsets. Rollouts
-    % use the actual nonlinear model and settle lateral acceleration near the
-    % endpoint. Their score guides initialization; it certifies no robust set.
-    cfg=model.cfg;[side,~]=localCollisionSide(model);
-    offsets=[0,predictiveSafetyGeometry.passingOffsets(model,side)];
+    % One analytic guide, one dynamically consistent rollout, then one RTI.
+    cfg=model.cfg;[side,~]=localCollisionSide(model);wall=tic;
+    guide=predictiveSafetyGeometry.avoidanceGuide(model,count,side);
+    geometrySeconds=toc(wall);localCheckDeadline(model);
     context=terminalSafeSet.context(model);
     context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
-    best=Inf;anchor=[];
-    nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
-    target=localTargetAt(model,(0:count)*cfg.controller.sampleTime);
+    parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
+    inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=model.initialState;
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    for candidate=1:numel(offsets)
-        localCheckDeadline(model);
-        inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=model.initialState;
-        prior=model.previousInput;valid=true;gap=Inf;roadMargin=Inf;
-        for index=1:count
-            x=states(:,index);projection=laneGeometry.project(x(1:2),model.lane);
-            virtual=x;virtual(1:2)=x(1:2)-offsets(candidate)*[-sin(projection.heading);cos(projection.heading)];
-            guidance=cfg;guidance.nominalClf.lookaheadSeconds=cfg.planner.lookaheadSeconds;
-            remaining=(count-index)*cfg.controller.sampleTime;
-            peak=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-            mild=.75*cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared;
-            acceleration=mild+(peak-mild)*min(1,max(0,(remaining-.25)/.75));
-            guidance.nominalClf.lateralAccelerationFraction=acceleration/(min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity);
-            u=nonlinearBicycleModel.nominalFeedback(virtual,prior,model.lane,model.nominalReference,guidance,nominal);
-            deceleration=cfg.planner.decelerationMetersPerSecondSquared;
-            if candidate==1,deceleration=cfg.terminal.brakingDecelerationMetersPerSecondSquared;end
-            brake=-deceleration/modifiedFialaTire.accelerationGain(cfg);
-            rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
-            u(2)=max(cfg.actuation.brakingRatioMinimum,min(cfg.actuation.brakingRatioMaximum,max(prior(2)-rate,min(prior(2)+rate,brake))));
-            try
-                next=nonlinearBicycleModel.sample(x,u,cfg);
-            catch exception
-                if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
-                valid=false;break;
+    guidance=cfg;guidance.nominalClf.lookaheadSeconds=cfg.planner.lookaheadSeconds;
+    guidance.nominalClf.lateralAccelerationFraction=cfg.planner.lateralAccelerationFraction;
+    prior=model.previousInput;gap=Inf;wall=tic;
+    for index=1:count
+        remaining=(count-index)*cfg.controller.sampleTime;
+        peak=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
+        speedNow=hypot(states(4,index),states(5,index));
+        mild=min(.75*cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared, ...
+            .5*tan(cfg.terminal.sideslipMaximumRadians)*speedNow^2/cfg.vehicle.lr);
+        allowed=mild+(peak-mild)*min(1,max(0,(remaining-.4)/.6));
+        guidance.nominalClf.lateralAccelerationFraction=allowed/(min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity);
+        node=2*index-1;velocity=guide.velocity(:,node);speed=norm(velocity);
+        heading=model.initialState(3);if speed>1e-8,heading=atan2(velocity(2),velocity(1));end
+        lane=struct('referenceCurve',struct('origin',guide.position(:,node), ...
+            'heading',heading,'curvature',0,'length',200));
+        reference=model.nominalReference;reference.state(4)=min(cfg.model.speedMaximum,speed);reference.state(5)=0;
+        reference.curvature=0;
+        if speed<=1e-8,reference.input(2)=min(0,reference.input(2));end
+        if speed>1e-8
+            acceleration=guide.acceleration(:,node);
+            preview=min(numel(guide.time),node+round(2/(cfg.nominalClf.yawRateGain*cfg.controller.sampleTime)));
+            previewVelocity=guide.velocity(:,preview);previewAcceleration=guide.acceleration(:,preview);
+            previewSpeed=norm(previewVelocity);
+            if previewSpeed>1e-8
+                reference.curvature=(previewVelocity(1)*previewAcceleration(2)-previewVelocity(2)*previewAcceleration(1))/previewSpeed^3;
             end
-            inputs(:,index)=u;states(:,index+1)=next;prior=u;
-            gap=min(gap,predictiveSafetyGeometry.rectangle(next(1:3),shape,target(1:3,index+1),target(8:11,index+1)));
-            roadMargin=min(roadMargin,terminalSafeSet.roadMargin(next,model));
-            if mod(index,4)==0,localCheckDeadline(model);end
+            reference.input(2)=reference.input(2)+(velocity.'*acceleration/speed)/modifiedFialaTire.accelerationGain(cfg);
         end
-        if ~valid,continue;end
-        member=terminalSafeSet.member(context,states(:,end),count);
-        endpoint=states(:,end);speed=hypot(endpoint(4),endpoint(5));
-        violation=max(0,abs(endpoint(6))*speed-cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared) ...
-            +max(0,abs(endpoint(5))-tan(cfg.terminal.sideslipMaximumRadians)*endpoint(4));
-        score=10000*double(gap<cfg.collision.safetyMarginMeters || roadMargin<0) ...
-            +100*double(~member)+1000*max(0,-roadMargin)+1000*max(0,cfg.collision.safetyMarginMeters-gap) ...
-            +10*violation+abs(offsets(candidate));
-        if score<best
-            best=score;planner=localPlannerMetadata();planner.used=true;
-            planner.selectedOffsetMeters=offsets(candidate);planner.referenceTerminalMember=member;
-            planner.referenceMinimumNodeGapMeters=gap;
-            anchor=struct('inputs',inputs,'states',states,'terminalContext',context, ...
-                'appendedTerminalSteps',0,'appendedBrakingSteps',0,'planner',planner);
-        end
+        u=nonlinearBicycleModel.nominalFeedback(states(:,index),prior,lane,reference,guidance,parameters);
+        next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
+        inputs(:,index)=u;states(:,index+1)=next;prior=u;
+        node=2*index+1;
+        gap=min(gap,predictiveSafetyGeometry.rectangle(next(1:3),shape, ...
+            guide.target(1:3,node),guide.target(8:11,node)));
+        if mod(index,4)==0,localCheckDeadline(model);end
     end
-    if isempty(anchor)
-        error('collisionAvoidanceController:referenceUnavailable','All bounded planner rollouts left the model domain.');
-    end
-    anchor.planner.candidateCount=numel(offsets);
+    rolloutSeconds=toc(wall);member=terminalSafeSet.member(context,states(:,end),count);
+    planner=localPlannerMetadata();planner.used=true;planner.candidateCount=1;
+    planner.selectedOffsetMeters=guide.amplitude*guide.direction.'*[-sin(model.initialState(3));cos(model.initialState(3))];
+    planner.referenceTerminalMember=member;planner.referenceMinimumNodeGapMeters=gap;
+    planner.conflictStartSeconds=guide.conflictStartSeconds;planner.conflictEndSeconds=guide.conflictEndSeconds;
+    planner.riseSeconds=guide.riseSeconds;planner.requestedAmplitudeMeters=guide.requestedAmplitude;
+    planner.amplitudeMeters=guide.amplitude;planner.geometryMinimumGapMeters=guide.minimumGap;
+    planner.accelerationBudgetMetersPerSecondSquared=guide.accelerationBudget;
+    planner.maximumGuideAccelerationMetersPerSecondSquared=guide.maximumAcceleration;
+    planner.geometricDemandSatisfied=guide.demandSatisfied;planner.brakingOnly=guide.brakingOnly;
+    planner.geometrySeconds=geometrySeconds;planner.rolloutSeconds=rolloutSeconds;
+    anchor=struct('inputs',inputs,'states',states,'terminalContext',context,'guide',guide, ...
+        'appendedTerminalSteps',0,'appendedBrakingSteps',0,'planner',planner);
 end
 
 function planner=localPlannerMetadata()
     planner=struct('used',false,'candidateCount',0,'selectedOffsetMeters',NaN, ...
+        'algorithm',"conflictIntervalAnalyticDeformation", ...
         'referenceTerminalMember',false,'referenceMinimumNodeGapMeters',NaN, ...
+        'conflictStartSeconds',NaN,'conflictEndSeconds',NaN,'riseSeconds',NaN, ...
+        'requestedAmplitudeMeters',NaN,'amplitudeMeters',NaN,'geometryMinimumGapMeters',NaN, ...
+        'accelerationBudgetMetersPerSecondSquared',NaN,'maximumGuideAccelerationMetersPerSecondSquared',NaN, ...
+        'geometricDemandSatisfied',false,'brakingOnly',false,'geometrySeconds',0,'rolloutSeconds',0, ...
         'robustCertificate',false);
 end
 

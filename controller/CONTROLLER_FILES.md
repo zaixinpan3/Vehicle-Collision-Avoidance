@@ -13,18 +13,26 @@ terminal set and recursive feasibility.
 | `terminalSafeSet.m` | Mild braking-continuation terminal set: the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with its steering, hence sideslip and course curvature, held; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and the hold toward the held steering), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, finite passing-offset candidates, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, a single conflict-interval-aware analytic avoidance guide, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
 Each sample builds one affine model from one declared-model reference rollout
 and runs at most two native solves for the PCBF/CLF objectives. A cold cruise
-conflict invokes a bounded reference planner: straight braking and two
-geometry-derived passing offsets are rolled out nonlinearly, with lateral
-settling near the endpoint. The selected reference supplies dynamics and
-collision linearizations. Its node-clearance/terminal score is guidance, not
-a robust or whole-hold safety certificate. The optimized inputs are never
+conflict invokes a single-path analytic reference planner. Its base curve keeps
+the given path's curvature from the measured position and course. NRMM prediction and
+rectangle checks identify the entire conflict interval. Ray exits from
+rectangle support strips give a displacement demand at each time, allowing
+different separating axes during approach, passing and departure. One
+quintic rise-and-hold uses these deadlines; it may finish after the first
+conflict and does not return within the horizon. Moderate braking shares an
+acceleration budget with the deformation. One heading-aware geometry correction
+precedes exactly one nonlinear vehicle rollout, with feedforward and feedback
+tracking, curvature preview and a speed-dependent mild endpoint envelope. This rollout supplies
+the dynamics and collision linearizations. Its geometry, node-clearance and
+terminal diagnostics do not certify robust or whole-hold safety. Unmet guide
+demands remain visible and do not trigger another rollout or RTI. The optimized inputs are never
 replaced by a planner candidate. Other cold references use nominal feedback.
 Warm references shift the previous inputs from the current estimate, retain
 their absolute endpoint until the minimum prefix is reached, and extend a
@@ -94,7 +102,7 @@ Initialization metadata uses `nominalFeedbackRollout`, `plannedAvoidanceRollout`
 and `shiftedInputRollout`.
 The legacy experiment entry names `runPotentialFieldCampaign` and
 `extendPotentialFieldRecovery` remain for existing campaign callers; the
-controller uses bounded rollout planning rather than the former potential field. Historical experiment
+controller uses a single analytic avoidance guide and one vehicle rollout. Historical experiment
 records describe the algorithm version that actually produced them.
 
 MATLAB Control System Toolbox and the compiled Clarabel 0.11.1 adapter are required.

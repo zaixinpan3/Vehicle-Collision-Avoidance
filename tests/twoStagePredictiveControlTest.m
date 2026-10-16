@@ -54,7 +54,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(problem.metadata.search.nominalRestarted);
             testCase.verifyLessThan(problem.model.linearization.inputs(2,1),0);
             testCase.verifyTrue(problem.metadata.search.planner.used);
-            testCase.verifyEqual(problem.metadata.search.planner.candidateCount,3);
+            testCase.verifyEqual(problem.metadata.search.planner.candidateCount,1);
+            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"conflictIntervalAnalyticDeformation");
             testCase.verifyFalse(problem.metadata.search.planner.robustCertificate);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
@@ -70,6 +71,53 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(search.solverCalls,2);
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyEqual(search.returned,~isempty(solution));
+        end
+        function plannedInputsRespectBrakingSlewBeforeTheSingleRti(testCase)
+            [ego,road,cfg]=localFixture();cfg.model.brakingRatioRateMaximum=1;
+            ego.heldActuatorInput=[0;0];
+            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,q]=collisionThreatScenario("crossing",cfg);
+            model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
+            [~,search,model]=solvePredictiveControl(model,[],tic);
+            testCase.verifyEqual(search.rtiIterations,1);
+            testCase.verifyEqual(search.planner.candidateCount,1);
+            inputs=model.linearization.inputs;
+            testCase.verifyLessThanOrEqual(max(abs(diff([0,inputs(2,:)]))), ...
+                cfg.controller.sampleTime+1e-12);
+            states=model.linearization.states;
+            for index=1:size(inputs,2)
+                expected=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),cfg);
+                testCase.verifyEqual(states(:,index+1),expected,AbsTol=1e-12);
+            end
+        end
+        function curvedHeadOnPlanningKeepsTheRtiPassingSide(testCase)
+            for speed=[8,15]
+                [~,~,cfg]=localFixture();cfg.referenceSpeed=speed;
+                [x,q,road]=collisionThreatScenario("curvedHeadOn",cfg);
+                ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
+                [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+                projection=laneGeometry.project(x(1:2),problem.model.lane);
+                lateral=[-sin(projection.heading);cos(projection.heading)];
+                testCase.verifyGreaterThan(problem.model.linearization.guide.direction.'*lateral,0);
+                testCase.verifyEqual(problem.model.collisionSide,1);
+            end
+        end
+        function preparingTheReferenceRoadDoesNotIssueACommand(testCase)
+            [~,~,cfg]=localFixture();[~,~,road]=collisionThreatScenario("curvedHeadOn",cfg);
+            [command,inputs,prediction,state]=collisionAvoidanceController("warmUp",cfg,road);
+            testCase.verifyEmpty(command);testCase.verifyEmpty(inputs);
+            testCase.verifyEmpty(prediction);testCase.verifyEmpty(state);
+        end
+        function shiftingThePlanRetainsItsTerminalPassingSide(testCase)
+            [~,~,cfg]=localFixture();cfg.referenceSpeed=15;
+            [x,q,road]=collisionThreatScenario("curvedCrossing",cfg);
+            ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
+            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            ego=localSuccessor(ego,prior);q=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
+            [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,prior);
+            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(problem.model.collisionSide,prior.collisionSide);
+            testCase.verifyEqual(problem.model.linearization.terminalContext.collisionSide,prior.collisionSide);
         end
         function anInfeasibleWarmReferenceDoesNotRestartOrExecuteAnOldPlan(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[3;3];

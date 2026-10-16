@@ -10,20 +10,22 @@ function [command,predictedInput,prediction,controllerState] = ...
 % because braking that ends at rest cannot be run backward.
 % Collision interaction is active inside the configured position radius.
 % A complete current sensor scan with no target clears the previous forecast.
-% collisionAvoidanceController("warmUp", cfg) primes exact cruise and
+% collisionAvoidanceController("warmUp", cfg, road) primes exact cruise and
 % bounded low-speed opposing-target probes, then resets its state.
+% The optional road also primes its actual curvature and avoidance geometry.
 % It loads the compiled kernels and straight-road trim before timed samples.
 % Integrations with observer bounds also prime their bounded-input path.
 % Startup preparation is separate from the online computation budget.
     persistent lastState
-    if nargin<=2 && (ischar(egoState) || isstring(egoState))
+    if nargin<=3 && (ischar(egoState) || isstring(egoState))
         action=string(egoState);
         if ~isscalar(action) || ~any(action==["resetNominalTrajectory","warmUp"])
             error('collisionAvoidanceController:invalidAction','Use resetNominalTrajectory or warmUp.');
         end
         if action=="warmUp"
             if nargin<2,targetEstimate=[];end
-            localWarmUp(targetEstimate);
+            if nargin<3,laneCenterline=[];end
+            localWarmUp(targetEstimate,laneCenterline);
         end
         lastState=[];command=[];predictedInput=[];prediction=[];controllerState=[];return;
     end
@@ -196,7 +198,7 @@ function command=localCommand(input,state,cfg)
         'rollingResistanceForce',components.rollingResistanceForce,'totalRoadLoadForce',road);
 end
 
-function localWarmUp(cfg)
+function localWarmUp(cfg,referenceRoad)
     % Startup probes cover cruise and bounded low-speed feedback, including
     % a curved target. Every command and controller state is discarded.
     cfg=collisionAvoidanceControllerConfig(cfg);h=cfg.controller.sampleTime;
@@ -253,6 +255,28 @@ function localWarmUp(cfg)
                 break;
             end
             input=command.actuatorInput;x=nonlinearBicycleModel.sample(x,input,cfg);
+        end
+    end
+    if isstruct(referenceRoad) && isfield(referenceRoad,'referenceCurve')
+        % Prepare the supplied road outside the online budget. The opposing
+        % target meets path cruise after 1.6 s; every probe output is discarded.
+        curve=laneGeometry.validateReferenceCurve(referenceRoad.referenceCurve);
+        reference=nonlinearBicycleModel.cruise(cfg,curve.curvature);
+        x=reference.state;x(1:2)=curve.origin;x(3)=x(3)+curve.heading;
+        [position,heading]=laneGeometry.referencePose(cfg.referenceSpeed*1.6,0,curve);
+        beta=asin(-curve.curvature*cfg.target.rearAxleDistance);
+        impact=[position;heading+pi-beta;8;0;beta;cfg.target.rearAxleDistance; ...
+            cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
+        q=predictiveSafetyGeometry.predictTarget(impact,-1.6);
+        ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
+            'heldActuatorInput',[0;0],'stateTime',0);
+        target=struct('targetPositionInertial',q(1:2), ...
+            'targetVelocityInertial',q(4)*predictiveSafetyGeometry.direction(q(3)+q(6)), ...
+            'targetYawInertial',q(3),'targetSideslip',q(6),'targetTangentialAcceleration',q(5));
+        try
+            collisionAvoidanceController(ego,target,referenceRoad,cfg,[]);
+        catch exception
+            if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
         end
     end
 end

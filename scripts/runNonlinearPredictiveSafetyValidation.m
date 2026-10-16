@@ -72,7 +72,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         % Warm after estimator initialization/path setup. A bounded-input
         % probe uses the initial publication without advancing the observer
         % or RNG (initialFramePending is true); its command/state are discarded.
-        warmUpTimer=tic;collisionAvoidanceController("warmUp",cfg);
+        warmUpTimer=tic;collisionAvoidanceController("warmUp",cfg,road);
         if useEstimator && strlength(options.ResumeFrom)==0
             [~,probeEgo,probeTarget]=nrmmEstimatorControllerAdapter( ...
                 "sample",estimatorContext,ego.stateTime,ego,target,[]);

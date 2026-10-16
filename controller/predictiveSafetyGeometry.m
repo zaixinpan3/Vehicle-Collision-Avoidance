@@ -1,18 +1,124 @@
 classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target prediction, uncertainty tubes and polygon geometry.
     methods (Static)
-        function offsets = passingOffsets(model,side)
-            % Finite reference routes; the optimizer retains every hard row.
-            cfg=model.cfg;q=model.target;
-            projection=laneGeometry.project(q(1:2),model.lane);
-            angle=q(3)-projection.heading;
-            targetWidth=abs(sin(angle))*q(8)+abs(cos(angle))*q(9)+norm(q(10:11));
+        function guide = avoidanceGuide(model,count,side)
+            % One O(N) geometric guide. Separation axes may change with time;
+            % the displacement direction and quintic rise-and-hold are fixed.
+            % Acceleration-limited geometry is guidance, never a certificate.
+            cfg=model.cfg;x=model.initialState;h=cfg.controller.sampleTime;
+            time=(0:2*count)*h/2;duration=time(end);
+            target=predictiveSafetyGeometry.predictTarget(model.target,time);
+            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            curvature=model.nominalReference.curvature;
             generator=model.uncertainty.collisionGenerator;
-            inflation=sum(vecnorm(generator(1:2,:),2,1));
-            if ~isempty(model.uncertainty.target),inflation=inflation+model.uncertainty.target.positionRadius;end
-            width=cfg.vehicle.width/2+targetWidth+cfg.collision.safetyMarginMeters ...
-                +cfg.planner.clearanceReserveMeters+inflation;
-            offsets=projection.lateralPosition+side*width*[1,1.6];
+            inflation=sum(vecnorm(generator(1:2,:),2,1)) ...
+                +2*(norm(shape(1:2))+norm(shape(3:4)))*sin(min(pi,sum(abs(generator(3,:))))/2);
+            if ~isempty(model.uncertainty.target)
+                set=model.uncertainty.target;
+                inflation=inflation+set.positionRadius ...
+                    +2*(norm(target(8:9,1))+norm(target(10:11,1)))*sin(min(pi,set.courseRadius+set.sideslipRadius)/2);
+            end
+            margin=cfg.collision.safetyMarginMeters+inflation;
+            [position,baseVelocity,baseAcceleration,baseHeading]=localGuideBase(x,curvature,0,time,cfg);
+            gap=zeros(size(time));
+            for index=1:numel(time)
+                gap(index)=predictiveSafetyGeometry.rectangle([position(:,index);baseHeading(index)],shape, ...
+                    target(1:3,index),target(8:11,index));
+            end
+            conflict=gap<=margin+cfg.planner.clearanceReserveMeters;
+            guide=struct('time',time,'position',position,'velocity',baseVelocity, ...
+                'acceleration',baseAcceleration,'target',target,'direction',side*rotation(:,2), ...
+                'amplitude',0,'requestedAmplitude',0,'riseSeconds',duration, ...
+                'conflictStartSeconds',NaN,'conflictEndSeconds',NaN,'initialConflict',gap(1)<=margin, ...
+                'accelerationBudget',cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity, ...
+                'maximumAcceleration',max(vecnorm(baseAcceleration,2,1)),'minimumGap',min(gap),'demandSatisfied',true,'brakingOnly',false);
+            if ~any(conflict),return;end
+            guide.conflictStartSeconds=time(find(conflict,1));
+            guide.conflictEndSeconds=time(find(conflict,1,'last'));
+            % Moderate deceleration is part of the sole seed, not an alternate
+            % command. Stopping truncates the distance and velocity together.
+            deceleration=cfg.planner.decelerationMetersPerSecondSquared;
+            if guide.initialConflict,deceleration=cfg.terminal.brakingDecelerationMetersPerSecondSquared;end
+            [position,baseVelocity,baseAcceleration,baseHeading]=localGuideBase(x,curvature,deceleration,time,cfg);
+            relative=position-target(1:2,:);[~,closest]=min(sum(relative.^2,1));
+            relativeVelocity=baseVelocity(:,closest)-target(4,closest) ...
+                *predictiveSafetyGeometry.direction(target(3,closest)+target(6,closest));
+            normal=[-relativeVelocity(2);relativeVelocity(1)];
+            if norm(normal)<1e-8,normal=relative(:,closest);end
+            if norm(normal)<1e-8,normal=side*rotation(:,2);end
+            normal=normal/norm(normal);orientation=normal.'*relative(:,closest);
+            aligned=abs(rotation(:,1).'*predictiveSafetyGeometry.direction(target(3,1)+target(6,1)))>=sqrt(.5);
+            if aligned || abs(orientation)<=1e-6
+                % Longitudinal encounters retain the planner/RTI passing side;
+                % tiny curved-path closest-point offsets must not reverse it.
+                if normal.'*(side*rotation(:,2))<0,normal=-normal;end
+            elseif orientation<0,normal=-normal;
+            end
+            guide.direction=normal;
+            demand=predictiveSafetyGeometry.separationOffsets(position,baseHeading,shape, ...
+                target,normal,margin+cfg.planner.clearanceReserveMeters);
+            % Each node supplies its own deadline. The most demanding d/t^2
+            % selects a rise time analytically: S(q)/q^2 peaks at this q.
+            % A rise may therefore continue after the first conflict node.
+            pressure=demand./max(time,h/2).^2;pressure(1)=0;
+            [~,critical]=max(pressure);phase=(5-sqrt(5))/6;
+            rise=min(duration,max(h,time(critical)/phase));
+            s=min(1,time/rise);b=10*s.^3-15*s.^4+6*s.^5;
+            bd=(30*s.^2-60*s.^3+30*s.^4)/rise;
+            bdd=(60*s-180*s.^2+120*s.^3)/rise^2;
+            requested=max([0,demand(2:end)./max(b(2:end),eps)]);
+            projection=abs(normal.'*baseAcceleration);
+            budget=max(0,min(sqrt(max(0,projection.^2+guide.accelerationBudget^2 ...
+                -sum(baseAcceleration.^2,1)))-projection));
+            amplitude=min(requested,budget*sqrt(3)*rise^2/10);
+            if guide.initialConflict,amplitude=0;guide.brakingOnly=true;end
+            % One bounded geometry correction accounts for the guide's body
+            % heading before the sole vehicle rollout. It adds no path search.
+            guideVelocity=baseVelocity+amplitude*normal*bd;
+            heading=atan2(guideVelocity(2,:),guideVelocity(1,:));
+            stopped=vecnorm(guideVelocity,2,1)<1e-8;heading(stopped)=baseHeading(stopped);
+            demand=predictiveSafetyGeometry.separationOffsets(position,heading,shape,target,normal, ...
+                margin+cfg.planner.clearanceReserveMeters);
+            requested=max(requested,max([0,demand(2:end)./max(b(2:end),eps)]));
+            amplitude=min(requested,budget*sqrt(3)*rise^2/10);
+            if guide.brakingOnly,amplitude=0;end
+            guide.position=position+amplitude*normal*b;
+            guide.velocity=baseVelocity+amplitude*normal*bd;
+            guide.acceleration=baseAcceleration+amplitude*normal*bdd;
+            guide.amplitude=amplitude;guide.requestedAmplitude=requested;guide.riseSeconds=rise;
+            guide.demandSatisfied=~guide.initialConflict && amplitude>=requested-1e-9;
+            guide.maximumAcceleration=max(vecnorm(guide.acceleration,2,1));
+            heading=atan2(guide.velocity(2,:),guide.velocity(1,:));heading(stopped)=baseHeading(stopped);
+            for index=1:numel(time)
+                gap(index)=predictiveSafetyGeometry.rectangle([guide.position(:,index);heading(index)],shape, ...
+                    target(1:3,index),target(8:11,index));
+            end
+            guide.minimumGap=min(gap);
+        end
+
+        function offsets = separationOffsets(position,heading,shape,target,normal,margin)
+            % Outward exit from a constant-size outer approximation of the
+            % rectangle Minkowski sum plus a margin disk. Ray/strip intervals
+            % use both vehicle axes and the displacement's tangent and normal.
+            % Outside the last interval endpoint, at least one support plane
+            % separates by margin. No single plane is imposed on every node.
+            count=size(position,2);offsets=zeros(1,count);
+            for index=1:count
+                re=[cos(heading(index)),-sin(heading(index));sin(heading(index)),cos(heading(index))];
+                rt=[cos(target(3,index)),-sin(target(3,index));sin(target(3,index)),cos(target(3,index))];
+                axes=[re,rt,normal,[-normal(2);normal(1)]];
+                center=position(:,index)+re*shape(3:4)-target(1:2,index)-rt*target(10:11,index);
+                support=shape(1:2).'*abs(re.'*axes)+target(8:9,index).'*abs(rt.'*axes)+margin;
+                projection=center.'*axes;slope=normal.'*axes;
+                parallel=abs(slope)<=1e-10;
+                if any(abs(projection(parallel))>support(parallel)),continue;end
+                moving=~parallel;
+                first=(-support(moving)-projection(moving))./slope(moving);
+                last=(support(moving)-projection(moving))./slope(moving);
+                enter=max(min(first,last));leave=min(max(first,last));
+                if enter<=leave && leave>=0,offsets(index)=leave;end
+            end
         end
 
         function uncertainty = observerUncertainty(ego,observation,q)
@@ -417,4 +523,20 @@ end
 function [distance,point]=localPointSegment(vertex,first,last)
     edge=last-first;alpha=min(1,max(0,(vertex-first).'*edge/(edge.'*edge)));
     point=first+alpha*edge;distance=norm(vertex-point);
+end
+
+function [position,velocity,acceleration,heading]=localGuideBase(x,curvature,deceleration,time,cfg)
+    % Continue the path curvature from the current position and course; on a
+    % straight path this is the constant-deceleration line. NRMM's arc formula
+    % keeps position, velocity and the stopped extension consistent.
+    speed=hypot(x(4),x(5));sideslip=atan2(x(5),x(4));course=x(3)+sideslip;
+    beta=asin(curvature*cfg.vehicle.lr);
+    parameters=[x(1:2);course-beta;speed;-deceleration;beta;cfg.vehicle.lr; ...
+        cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    forecast=predictiveSafetyGeometry.predictTarget(parameters,time);
+    direction=[cos(forecast(3,:)+beta);sin(forecast(3,:)+beta)];
+    position=forecast(1:2,:);velocity=direction.*forecast(4,:);
+    acceleration=-deceleration*direction.*(forecast(4,:)>0) ...
+        +curvature*[-direction(2,:);direction(1,:)].*forecast(4,:).^2;
+    heading=forecast(3,:)+beta-sideslip;
 end
