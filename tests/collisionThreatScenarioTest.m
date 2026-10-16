@@ -1,7 +1,7 @@
 classdef collisionThreatScenarioTest < matlab.unittest.TestCase
     % Baseline danger is required independently of avoidance performance.
     properties (TestParameter)
-        scenario = {"headOn","acceleratingHeadOn","brakingLead","stoppedLead","crossing", ...
+        scenario = {"headOn","acceleratingHeadOn","brakingLead","stoppedLead","hardBrakingLead","crossing", ...
             "turningCrossing","curvedHeadOn","curvedCrossing"};
         referenceSpeed = {8,15};
     end
@@ -34,16 +34,24 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         function fastStoppedLeadRequiresMoreThanStraightMaximumBraking(testCase)
             [x,q,~,cfg]=collisionThreatScenario("stoppedLead", ...
                 struct('referenceSpeed',25,'model',struct('speedMaximum',30)));
-            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-            minimum=Inf;
-            for step=1:100
-                x=nonlinearBicycleModel.sample(x,[0;-1],cfg);
-                minimum=min(minimum,abs(q(1)-x(1))-shape(1)-q(8));
-                if x(4)==0,break;end
-            end
-            testCase.verifyLessThan(minimum,0);
-            testCase.verifyEqual(x(4),0);
-            testCase.verifyGreaterThan(x(1),q(1)-cfg.vehicle.length);
+            baseline=maximumBrakingCollisionBaseline(x,q,cfg);
+            testCase.verifyTrue(baseline.collisionDetected);
+            testCase.verifyEqual(baseline.collisionPhase,"braking");
+            testCase.verifyTrue(baseline.allLongitudinalPoliciesCertified);
+            testCase.verifyGreaterThan(baseline.stoppingDistanceMeters,q(1)-cfg.vehicle.length);
+            testCase.verifyEqual(baseline.finalState(4),0);
+        end
+        function aSlowLeadIsExcludedFromTheSteeringChallenge(testCase)
+            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
+                Scenarios="brakingLead",RequireBrakingInsufficient=true), ...
+                'runNonlinearPredictiveSafetyValidation:brakingSuffices');
+        end
+        function stoppingDoesNotDiscardAnOncomingTarget(testCase)
+            [x,q,~,cfg]=collisionThreatScenario("headOn",struct('referenceSpeed',8));
+            baseline=maximumBrakingCollisionBaseline(x,q,cfg);
+            testCase.verifyTrue(baseline.collisionDetected);
+            testCase.verifyEqual(baseline.collisionPhase,"afterStop");
+            testCase.verifyTrue(baseline.allLongitudinalPoliciesCertified);
         end
         function benignSideBrakingIsNotAdmitted(testCase)
             testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...

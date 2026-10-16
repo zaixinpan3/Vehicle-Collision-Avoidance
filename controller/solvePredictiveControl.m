@@ -104,57 +104,60 @@ function [side,retain]=localCollisionSide(model)
     end
 end
 
-function [count,conflict,conflictTime]=localEncounterHorizon(model)
-    % Choose prediction duration, not an avoidance trajectory: the given
-    % path's prescribed cruise identifies the nearest forecast interaction.
-    cfg=model.cfg;time=0:cfg.controller.sampleTime:max(cfg.rti.predictionSeconds,cfg.planner.threatPredictionSeconds);
+function [count,conflict]=localEncounterHorizon(model)
+    % Bracket the nearest nominal encounter, not a fixed number of seconds.
+    % Doubling the geometry grid costs O(N) in its final node count. The same
+    % wall-clock deadline applies during this search and the one RTI solve.
+    cfg=model.cfg;h=cfg.controller.sampleTime;duration=cfg.rti.initialSearchSeconds;
     projection=laneGeometry.project(model.initialState(1:2),model.lane);
-    if isfield(model.lane,'referenceCurve')
-        [position,heading]=laneGeometry.referencePose(projection.station+cfg.referenceSpeed*time,0,model.lane.referenceCurve);
-    else
-        tangent=[cos(projection.heading);sin(projection.heading)];
-        normal=[-tangent(2);tangent(1)];
-        position=model.initialState(1:2)-projection.lateralPosition*normal+cfg.referenceSpeed*time.*tangent;
-        heading=repmat(projection.heading,size(time));
-    end
-    target=localTargetAt(model,time);separation=vecnorm(position-target(1:2,:),2,1);
-    exitReserve=norm(cfg.nonlinear.trustRadius*[5;5]) ...
-        +sum(vecnorm(model.uncertainty.collisionGenerator(1:2,:)));
-    if ~isempty(model.uncertainty.target),exitReserve=exitReserve+model.uncertainty.target.positionRadius;end
-    outside=find(separation>cfg.collision.encounterRangeMeters+exitReserve,1);
-    last=numel(time);if ~isempty(outside),last=outside-1;end
-    separation(last+1:end)=Inf;[distance,index]=min(separation);
-    reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(target(8:9,1)) ...
-        +norm(cfg.vehicle.rectangleOffset)+norm(target(10:11,1))+cfg.collision.safetyMarginMeters;
     generator=model.uncertainty.collisionGenerator;
-    reach=reach+sum(vecnorm(generator(1:2,:))) ...
-        +2*norm([cfg.vehicle.length;cfg.vehicle.width]/2)*sin(min(pi,sum(abs(generator(3,:))))/2);
-    if ~isempty(model.uncertainty.target)
-        set=model.uncertainty.target;
-        reach=reach+set.positionRadius+2*norm(target(8:9,1))*sin(min(pi,set.courseRadius+set.sideslipRadius)/2);
-    end
-    duration=cfg.rti.minimumPredictionSeconds;
-    if distance<=reach
-        duration=min(cfg.rti.predictionSeconds,max(duration,time(index)+cfg.rti.settlingSeconds));
-    end
-    count=ceil(duration/cfg.controller.sampleTime);
-    conflict=false;conflictTime=NaN;
-    if distance<=reach
-        shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    reserve=sum(vecnorm(generator(1:2,:)));
+    if ~isempty(model.uncertainty.target),reserve=reserve+model.uncertainty.target.positionRadius;end
+    exitReserve=norm(cfg.nonlinear.trustRadius*[5;5])+reserve;
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    reach=norm(shape(1:2))+norm(shape(3:4))+norm(model.target(8:9))+norm(model.target(10:11)) ...
+        +cfg.collision.safetyMarginMeters+cfg.planner.clearanceReserveMeters+reserve;
+    while true
+        localCheckDeadline(model);
+        time=(0:ceil(duration/h))*h;
+        if isfield(model.lane,'referenceCurve')
+            [position,heading]=laneGeometry.referencePose(projection.station+cfg.referenceSpeed*time,0,model.lane.referenceCurve);
+        else
+            tangent=[cos(projection.heading);sin(projection.heading)];normal=[-tangent(2);tangent(1)];
+            position=model.initialState(1:2)-projection.lateralPosition*normal+cfg.referenceSpeed*time.*tangent;
+            heading=repmat(projection.heading,size(time));
+        end
+        target=localTargetAt(model,time);separation=vecnorm(position-target(1:2,:),2,1);
+        outside=find(separation>cfg.collision.encounterRangeMeters+exitReserve,1);
+        last=numel(time);if ~isempty(outside),last=outside-1;end
+        conflictNodes=false(1,last);
         for node=1:last
+            if mod(node,16)==1,localCheckDeadline(model);end
+            if separation(node)>reach,continue;end
             gap=predictiveSafetyGeometry.rectangle([position(:,node);heading(node)+model.nominalReference.state(3)], ...
                 shape,target(1:3,node),target(8:11,node));
-            if gap<=cfg.collision.safetyMarginMeters+cfg.planner.clearanceReserveMeters
-                conflict=true;conflictTime=time(node);break;
-            end
+            conflictNodes(node)=gap<=cfg.collision.safetyMarginMeters+cfg.planner.clearanceReserveMeters;
         end
+        conflict=any(conflictNodes);
+        difference=diff(separation(1:last));
+        stationary=isempty(difference) || all(abs(difference)<=1e-10);
+        approaching=~isempty(difference) && difference(end)<-1e-10;
+        bracketed=~isempty(outside) || stationary || (~approaching && ~conflict);
+        if conflict && ~conflictNodes(end),bracketed=true;end
+        if bracketed,break;end
+        duration=2*duration;
     end
+    duration=cfg.rti.minimumPredictionSeconds;
+    if conflict
+        duration=max(cfg.rti.initialSearchSeconds,time(find(conflictNodes,1,'last'))+cfg.rti.settlingSeconds);
+    end
+    count=ceil(duration/h);
 end
 
 function [anchor,source]=localRtiInitialize(model,previous)
-    cfg=model.cfg;count=cfg.controller.horizonSteps;conflict=false;conflictTime=NaN;
+    cfg=model.cfg;count=cfg.controller.horizonSteps;conflict=false;
     if ~isempty(model.target)
-        [encounterCount,conflict,conflictTime]=localEncounterHorizon(model);count=max(count,encounterCount);
+        [encounterCount,conflict]=localEncounterHorizon(model);count=max(count,encounterCount);
     end
     inherited=isstruct(previous) && isfield(previous,'inputTrajectory') ...
         && size(previous.inputTrajectory,2)>1 && all(isfinite(previous.inputTrajectory),'all');
@@ -162,16 +165,17 @@ function [anchor,source]=localRtiInitialize(model,previous)
     plan=conflict && (~planned || model.targetOnset);
     if plan
         % A bounded planner supplies the route, never an executable fallback.
-        count=min(cfg.controller.maximumHorizonSteps,ceil(cfg.rti.predictionSeconds/cfg.controller.sampleTime));
+        count=min(count,cfg.controller.maximumHorizonSteps);
         guideCount=count;
-        if conflictTime>cfg.rti.predictionSeconds
-            guideCount=ceil(min(cfg.planner.threatPredictionSeconds,conflictTime+cfg.rti.settlingSeconds)/cfg.controller.sampleTime);
-        end
         anchor=localPlanReference(model,count,guideCount);source="plannedAvoidanceRollout";return;
     end
     old=zeros(2,0);source="nominalFeedbackRollout";
     if inherited
         old=previous.inputTrajectory(:,2:end);source="shiftedInputRollout";
+        % Preserve the issued command, but build the next tangent at an
+        % interior reference and recompute its complete nonlinear rollout.
+        [seedLower,seedUpper]=nonlinearBicycleModel.inputBounds(cfg,true);
+        old=min(seedUpper,max(seedLower,old));
         % Keep the previous absolute endpoint until the minimum prefix is
         % reached. Neither a disappearing target nor a rolling fixed duration
         % may replace a valid terminal endpoint with an arbitrary cruise tail.
@@ -216,7 +220,8 @@ function input=localTailSeed(x,prior,model,parameters)
     % An uncertified stopped tail must not restart into a positive-input
     % trust box. Moving tails still seek the nominal cruise equilibrium.
     if hypot(x(4),x(5))<=.2*model.cfg.model.brakeHoldSpeed
-        input=[prior(1);min(0,prior(2))];
+        [lower,~]=nonlinearBicycleModel.inputBounds(model.cfg,true);
+        input=[prior(1);max(lower(2),min(0,prior(2)))];
     end
 end
 

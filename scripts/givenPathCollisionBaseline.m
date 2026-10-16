@@ -25,13 +25,8 @@ function baseline = givenPathCollisionBaseline(road, target, cfg, durationSecond
     targetPoses = zeros(3,0);
     initialClearance = Inf;
     if ~isempty(target)
-        arc = target(4)*times+.5*target(5)*times.^2;
-        angle = sin(target(6))/target(7)*arc/2;
-        scale = ones(size(angle));
-        nonzero = angle~=0;
-        scale(nonzero) = sin(angle(nonzero))./angle(nonzero);
-        course = target(3)+target(6)+angle;
-        targetPoses = [target(1:2)+arc.*scale.*[cos(course);sin(course)];target(3)+2*angle];
+        forecast = predictiveSafetyGeometry.predictTarget(target,times);
+        targetPoses = forecast(1:3,:);
         ce = cos(heading);se = sin(heading);
         ct = cos(targetPoses(3,:));st = sin(targetPoses(3,:));
         egoCenter = position+[ce*cfg.vehicle.rectangleOffset(1)-se*cfg.vehicle.rectangleOffset(2); ...

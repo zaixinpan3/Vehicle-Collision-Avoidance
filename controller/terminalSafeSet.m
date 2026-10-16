@@ -365,7 +365,7 @@ classdef terminalSafeSet
             cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
             e=nonlinearBicycleModel.error(x,lane,reference);
             input=reference.input+reference.gain*e;
-            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg);low=lower(2);high=upper(2);
+            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);low=lower(2);high=upper(2);
             input(2)=min(high,max(low,input(2)));
             bound=reference.contraction*sum((reference.factor*e).^2)*(1+1e-9)+1e-12;
             next=[];middle=[];ok=false;value=Inf;
@@ -385,7 +385,7 @@ classdef terminalSafeSet
             % where a declared-model hold can preserve terminal membership.
             % These fixed-cost seed checks add no optimizer iterations.
             cfg=model.cfg;
-            [lower,~]=nonlinearBicycleModel.inputBounds(cfg);low=lower(2);
+            [lower,~]=nonlinearBicycleModel.inputBounds(cfg,true);low=lower(2);
             law=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
             fraction=1;ok=false;
             for braking=[cruise(2),max(low,law),max(low,-.95)]

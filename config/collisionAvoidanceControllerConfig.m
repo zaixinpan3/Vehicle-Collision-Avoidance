@@ -23,9 +23,9 @@ function cfg=localDefaults()
     cfg.referenceSpeed=15;
     % horizonSteps is the soft-collision prefix and the shortest horizon.
     % Target encounters cover the nearest cruise conflict plus settling time,
-    % between the configured minimum and maximum durations. The terminal
+    % with no default duration or node-count cap. The terminal
     % endpoint is an optimization constraint, not a seed stopping condition.
-    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',40);
+    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf);
     % trustRadius scales local state/input corrections about the RTI reference.
     % The input trust scale adapts to the plan innovation: the scale whose
     % second-order prediction error equals trustInnovationMeters [m], within
@@ -38,10 +38,11 @@ function cfg=localDefaults()
         'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
     % RTI builds one model per sample; prediction duration is independent
     % of the number of nonlinear iterations (exactly one, not configurable).
-    cfg.rti=struct('predictionSeconds',2,'minimumPredictionSeconds',1,'settlingSeconds',.5);
-    % Threat screening can look beyond RTI without adding optimization nodes.
-    % One analytic rectangle-aware guide and one vehicle-model rollout.
-    cfg.planner=struct('threatPredictionSeconds',5,'clearanceReserveMeters',.2,'lookaheadSeconds',.5, ...
+    % initialSearchSeconds seeds geometric search; it is not an upper limit.
+    cfg.rti=struct('initialSearchSeconds',2,'minimumPredictionSeconds',1,'settlingSeconds',.5);
+    % Nominal encounter screening sizes the prediction horizon. Initialization
+    % uses one analytic rectangle-aware guide and one vehicle-model rollout.
+    cfg.planner=struct('clearanceReserveMeters',.2,'lookaheadSeconds',.5, ...
         'decelerationMetersPerSecondSquared',1,'lateralAccelerationFraction',.9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
@@ -149,8 +150,10 @@ end
 function localValidate(cfg)
     validateattributes(cfg.referenceSpeed,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
-    for name=["horizonSteps","maximumHorizonSteps"]
-        validateattributes(cfg.controller.(name),{'double'},{'scalar','real','finite','integer','positive'});
+    validateattributes(cfg.controller.horizonSteps,{'double'},{'scalar','real','finite','integer','positive'});
+    validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'scalar','real','positive'});
+    if isfinite(cfg.controller.maximumHorizonSteps)
+        validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'integer'});
     end
     if cfg.controller.horizonSteps>cfg.controller.maximumHorizonSteps
         localInvalid('horizonSteps cannot exceed maximumHorizonSteps.');
@@ -164,11 +167,11 @@ function localValidate(cfg)
             || cfg.nonlinear.trustInitialScale>cfg.nonlinear.trustMaximumScale
         localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
     end
-    for name=["predictionSeconds","minimumPredictionSeconds","settlingSeconds"]
+    for name=["initialSearchSeconds","minimumPredictionSeconds","settlingSeconds"]
         validateattributes(cfg.rti.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    validateattributes(cfg.rti.minimumPredictionSeconds,{'double'},{'<=',cfg.rti.predictionSeconds});
-    for name=["threatPredictionSeconds","clearanceReserveMeters","lookaheadSeconds","decelerationMetersPerSecondSquared"]
+    validateattributes(cfg.rti.minimumPredictionSeconds,{'double'},{'<=',cfg.rti.initialSearchSeconds});
+    for name=["clearanceReserveMeters","lookaheadSeconds","decelerationMetersPerSecondSquared"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});

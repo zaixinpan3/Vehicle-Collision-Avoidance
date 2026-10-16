@@ -39,13 +39,17 @@ feedback and a stopped endpoint keeps a nonpositive longitudinal command.
 Thus the terminal certificate does not become a parking objective.
 
 Cold nominal operation uses lane feedback. On acquisition, nominal-cruise
-threat screening looks ahead `planner.threatPredictionSeconds` (5 s by
-default), stopping at the first predicted perception exit. A detected threat
-invokes one analytic geometric planner, including when a previously benign
-target becomes threatening during a continuation. An encounter flag prevents
-replanning an already initialized maneuver every frame. The optimizer still
-covers at most 2 s: when the first conflict lies beyond it, the geometric guide
-extends through that conflict and supplies only its initial segment to RTI.
+threat screening expands its geometry grid until the approaching interaction
+is bracketed and its sampled conflict interval clears, or the target first
+exits perception. A stationary relative forecast needs no further expansion.
+The initial search span is a numerical starting point, not a prediction limit.
+A detected threat invokes one analytic geometric planner, including when a
+previously benign target becomes threatening during a continuation. An
+encounter flag prevents replanning an initialized maneuver every frame.
+The RTI horizon covers the detected conflict interval plus settling time;
+there is no default duration or node-count cap. Search and formulation remain
+subject to the controller-call deadline. This nominal geometry search is an
+initialization heuristic, not a certificate of all future interactions.
 NRMM prediction and rectangle checks include hold midpoints in the guide. The
 planner chooses one displacement direction from closest-approach relative
 motion and constructs one quintic rise-and-hold reference. It retains the
@@ -87,14 +91,13 @@ seed still supplies at most one RTI. This is O(N) initialization, with no
 candidate-path search, additional optimization, post-failure restart or
 executable fallback.
 
-Cold no-target operation uses `controller.horizonSteps`. Cold nonconflicting
-target predictions use the nearest prescribed-cruise interaction plus settling,
-within `rti.minimumPredictionSeconds` and `rti.predictionSeconds` (1--2 s by
-default). Planned conflicts use the configured maximum prediction duration,
-limited by `controller.maximumHorizonSteps` (40). The selected route provides
-both vehicle linearizations and collision-dual reference geometry. A reference
-need not satisfy every constraint to construct the one subproblem; failure to
-satisfy its hard rows remains an optimization failure.
+Cold no-target operation uses `controller.horizonSteps`. Nonconflicting
+target predictions use `rti.minimumPredictionSeconds`; conflict duration is
+selected from the nominal encounter. `controller.maximumHorizonSteps=Inf`
+disables a default node cap; an explicit finite override is a computational
+choice. The selected route supplies the dynamics and collision reference.
+A reference need not satisfy every constraint to construct the one subproblem;
+failure to satisfy its hard rows remains an optimization failure.
 
 Every reference is an exact declared-model rollout. The dynamics increments obey
 
@@ -145,10 +148,26 @@ support margins. Removing that premise would require a new observer enclosure.
 The precomputed local cruise certificate may use a conservative nonsaturated
 neighborhood; that local certificate does not impose a full-horizon cone.
 
-Seeds and optimization share `nonlinearBicycleModel.inputBounds`, including
-the differentiable force-ratio reserve of ten constraint tolerances. The
-50 ms total timing budget now reserves 2 ms for completion instead of 10 ms;
-the RTI formulation and maximum number of native solves are unchanged.
+Physical input bounds include force ratios -1 and +1. The optimizer uses
+these bounds and issued inputs are unchanged. Only the tangent reference
+uses `nonlinearBicycleModel.inputBounds(cfg,true)`, which keeps its force
+ratio ten constraint tolerances inside the singular endpoints. Shifting a
+saturated previous plan rebuilds this interior seed and its complete rollout;
+this does not change a previously issued command. The 50 ms controller budget
+reserves 2 ms for completion; one RTI model and at most two native solves remain.
+
+The main `runCollisionThreatValidation` campaign defaults to 25 m/s stopped
+and hard-braking lead scenarios. Each must collide both under prescribed
+cruise and under immediate maximum straight braking. The latter independent
+ode45 counterfactual checks the encounter after stopping too. Slower cases
+where this braking policy suffices remain regression fixtures, not evidence
+of steering avoidance. For a collinear lead ahead, scalar longitudinal
+comparison makes full braking the minimum-progress trajectory. Any other
+admissible zero-steering history stays at least as far forward; if full
+braking reaches the lead rectangle, that history must contact it by then
+or already have crossed its occupied interval. The baseline marks this
+nominal-model order argument separately. For general crossing traffic, failure of one braking
+policy alone does not prove that every longitudinal timing policy fails.
 
 ## Collision geometry and observer information
 

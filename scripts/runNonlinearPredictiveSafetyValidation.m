@@ -24,6 +24,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'controller',struct('horizonSteps',8))
         options.StateTransition (1,1) string {mustBeMember(options.StateTransition,["ode45","nominalRk4"])} = "ode45"
         options.RequireCollisionThreat (1,1) logical = false
+        options.RequireBrakingInsufficient (1,1) logical = false
         options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 1
         options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
         options.RecoveryTolerances (5,1) double {mustBePositive,mustBeFinite} = [.1;pi/180;.1;.05;.01]
@@ -54,6 +55,15 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     for index=1:numel(options.Scenarios)
         name=options.Scenarios(index);
         [ego,target,road,cfg,initialTarget]=localFixture(name,options.ControllerConfiguration);prior=[];
+        maximumBraking=struct([]);
+        if options.RequireBrakingInsufficient
+            state=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];
+            maximumBraking=maximumBrakingCollisionBaseline(state,initialTarget,cfg);
+            if maximumBraking.initialClearanceMeters<=0 || ~maximumBraking.collisionDetected
+                error('runNonlinearPredictiveSafetyValidation:brakingSuffices', ...
+                    'Scenario %s does not qualify: immediate maximum straight braking must collide from a separated start.',name);
+            end
+        end
         estimatorContext=[];estimatorConfiguration=options.EstimatorConfiguration;estimatorInitializationSeconds=0;
         if useEstimator
             assert(~isempty(initialTarget),'The NRMM adapter requires a target truth trajectory.');
@@ -93,7 +103,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             if isinf(baselineDuration)
                 % Finite qualification of the initial encounter, not a cap
                 % on closed-loop execution or future observer/controller updates.
-                baselineDuration=max(cfg.rti.predictionSeconds, ...
+                baselineDuration=max(cfg.rti.initialSearchSeconds, ...
                     2*cfg.collision.encounterRangeMeters/cfg.referenceSpeed);
             end
             baseline=givenPathCollisionBaseline(road,initialTarget,cfg,baselineDuration);
@@ -130,7 +140,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             assert(isequaln(r.configuration,cfg) && r.scenario==name ...
                 && saved.stateTransition==options.StateTransition ...
                 && isfield(saved,'observationModel') && saved.observationModel==observationModel ...
-                && saved.prior.version==84, ...
+                && saved.prior.version==85, ...
                 'Continuation scenario, configuration and transition must match.');
             assert(isequaln(saved.recoveryOptions,recovery),'Recovery settings must match.');
             assert(isempty(r.trace) || (isfield(r.trace,'terminalDistanceMeters') ...
@@ -363,7 +373,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'observationModel',observationModel,'perceptionRadiusMeters',cfg.collision.encounterRangeMeters, ...
             'estimatorConfiguration',estimatorConfiguration,'estimatorInitializationSeconds',estimatorInitializationSeconds, ...
             'controllerWarmUpSeconds',controllerWarmUpSeconds, ...
-            'baselineCruise',baseline,'trace',trace);
+            'baselineMaximumBraking',maximumBraking,'baselineCruise',baseline,'trace',trace);
         if useEstimator,results{index}.randomSeed=estimatorConfiguration.randomSeed;end
         if strlength(options.ContinuationFile)>0
             continuation=struct('ego',ego,'target',target,'prior',prior,'result',results{index}, ...
@@ -412,7 +422,7 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
             q=[24;0;pi;8;1;atan(-.1*lr);lr;2.4;.95;0;0];
         case "brakingTarget"
             q=[24;6;pi;2;-1;0;lr;2.4;.95;0;0];
-        case {"headOn","acceleratingHeadOn","stoppedLead","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"}
+        case {"headOn","acceleratingHeadOn","stoppedLead","hardBrakingLead","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"}
             [x,q,road,cfg]=collisionThreatScenario(name,controllerConfiguration);
         otherwise,error('runNonlinearPredictiveSafetyValidation:unknownScenario','Unknown scenario %s.',name);
     end

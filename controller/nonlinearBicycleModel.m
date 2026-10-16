@@ -2,9 +2,12 @@ classdef nonlinearBicycleModel
     %nonlinearBicycleModel Nominal held-input prediction, tangents and lane trims.
     % RK4 and its variational equations define the numerical prediction model.
     methods (Static)
-        function [lower,upper] = inputBounds(cfg)
-            % Shared differentiable force-ratio domain for seeds and RTI.
-            reserve=10*cfg.solver.constraintTolerance;
+        function [lower,upper] = inputBounds(cfg,linearizationPoint)
+            % Physical saturation includes +/-1. Only tangent seeds need an
+            % interior point because the Fiala input slope is singular there.
+            if nargin<2,linearizationPoint=false;end
+            reserve=0;
+            if linearizationPoint,reserve=10*cfg.solver.constraintTolerance;end
             lower=[-Inf;max(-1+reserve,cfg.actuation.brakingRatioMinimum)];
             upper=[Inf;min(1-reserve,cfg.actuation.brakingRatioMaximum)];
         end
@@ -263,7 +266,7 @@ classdef nonlinearBicycleModel
             b=min(p.brakingRatioLimit,max(-p.brakingRatioLimit,b));
             rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
             if isfinite(rate),b=min(previous(2)+rate,max(previous(2)-rate,b));end
-            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg);
+            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
             b=min(upper(2),max(lower(2),b));
             rear=modifiedFialaTire.evaluate([0;atan2(x(5)-cfg.vehicle.lr*x(6),x(4))],b,cfg);
             front=(cfg.vehicle.Iz*p.yawRateGain*(yawRate-x(6))+cfg.vehicle.lr*rear(2))/cfg.vehicle.lf;

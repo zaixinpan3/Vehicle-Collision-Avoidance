@@ -428,7 +428,10 @@ the additional arctangent printed in \cite[eq.~(12)]{FahmyGhanyBaumann2018}
 is inconsistent with it. At \(|\beta|=1\) the force is defined by
 \(Q_i=0\), \(\Phi_i=0\), without evaluating the singular polynomial;
 the derivatives of \(\Phi_i\) are unbounded there, and every
-linearization point is kept strictly inside the input interval. The tire
+linearization point is kept strictly inside the input interval. The
+physical optimization bounds include $\beta=\pm1$; only the tangent
+seed has an interior numerical reserve. A shifted saturated plan is
+rerolled from an interior seed without modifying the issued input. The tire
 model is used above 4\,m/s. Below that speed the prediction model blends
 into a kinematic bicycle so that the vehicle can come to rest
 (Section~\ref{subsec:predictionModel}). The saturation branch bounds the
@@ -1531,11 +1534,15 @@ the anchor never reaches it.
 \label{subsec:initialization}
 
 At a cold nominal sample the anchor is a lane-feedback rollout. On target
-acquisition, threat screening looks up to 5 s ahead, truncated at the first
-predicted sensing-range exit. A detected conflict, including one first
-recognized during a continuation, invokes one analytic geometric guide.
-If the conflict lies beyond the 2 s RTI horizon, only the guide extends
-beyond that horizon; the optimization keeps its original node limit.
+acquisition, nominal geometry search expands until the approaching
+interaction is bracketed and its sampled conflict interval clears, or the
+target first leaves sensing range. A stationary relative forecast terminates
+the expansion. The initial grid span is not a prediction-duration limit.
+A detected conflict, including one first recognized during a continuation,
+invokes one analytic geometric guide. The RTI horizon covers the detected
+conflict interval plus settling time, with no default duration or node cap.
+Search, formulation and solving all share the controller-call time budget.
+This is nominal initialization, not a certificate of every future encounter.
 A same-direction lead uses an unbraked guide base, preventing seed
 deceleration from erasing the passing opportunity. An encounter flag avoids
 repeating this initialization each frame. Each later sample shifts the previous
@@ -1751,6 +1758,12 @@ The observer's force-balance inversion assumes the sideslip domain
     |v_y|\leq v_x\tan\beta_{\rm dom}.
     \label{eq:sideslip_cone}
 \end{equation}
+The implemented value $\beta_{\rm dom}=0.25$ rad is a selected
+observer-domain premise, passed from the controller configuration into the
+observer design. It is not a measured uncertainty radius or a universal
+vehicle limit. The reconstruction bounds in Section~\ref{subsec:modelAided}
+contain $\sec\beta_{\rm dom}$ and require an appropriate finite domain
+strictly below $\pi/2$.
 The numerical program imposes this condition above $v_{\rm h}$, where
 sideslip is defined, with the observer's support margin. It is a premise
 of the observer enclosure, not a tire-force capacity constraint.

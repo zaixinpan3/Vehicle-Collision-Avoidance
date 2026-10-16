@@ -35,6 +35,15 @@ premises from the controller configuration:
 | vehicle model | mass, `lf`, `lr`, gravity, Fiala stiffness and friction, relative parameter uncertainty 5% |
 | target domain | scenario contract (`scripts/collisionThreatContract.m`) |
 
+The numerical value 0.25 rad is a selected operating-domain premise, not a
+sensor output or a universal NRMM requirement. The adapter writes the
+controller configuration into `observer.ego.yaw.sideslipDomainMaximum`.
+The forward-velocity reconstruction and course-to-heading inversion below
+use a finite domain strictly below pi/2; their error coefficients contain
+`1/cos(b)`. Changing this domain requires recomputing compatible bounds and
+gains. Removing it requires a different enclosure or inversion argument;
+the controller must not silently shrink the observer's reported radius.
+
 The adapter passes the input that the controller held over each sample
 (`frame.heldSteeringAngle`, `frame.heldBrakingRatio`). Sensor bounds are
 unchanged.

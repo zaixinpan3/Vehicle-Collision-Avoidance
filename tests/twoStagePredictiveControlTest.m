@@ -67,23 +67,34 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             search=problem.metadata.search;
             testCase.verifyTrue(search.planner.used);
             testCase.verifyTrue(state.avoidanceInitialized);
-            testCase.verifyGreaterThan(search.planner.conflictStartSeconds,cfg.rti.predictionSeconds);
+            testCase.verifyGreaterThan(search.planner.conflictStartSeconds,cfg.rti.initialSearchSeconds);
             testCase.verifyGreaterThan(search.planner.amplitudeMeters,1);
-            testCase.verifyLessThanOrEqual(size(problem.inputTrajectory,2),cfg.controller.maximumHorizonSteps);
+            testCase.verifyGreaterThan(size(problem.inputTrajectory,2)*cfg.controller.sampleTime,5);
             testCase.verifyEqual(search.rtiIterations,1);
             ego=localSuccessor(ego,state);q=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             [~,~,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
             testCase.verifyFalse(next.metadata.search.planner.used);
         end
-        function seedAndOptimizationShareTheDifferentiableInputDomain(testCase)
+        function seedsStayDifferentiableWhilePhysicalInputsIncludeSaturation(testCase)
             [ego,road,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=1.8;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg);
+            [physicalLower,physicalUpper]=nonlinearBicycleModel.inputBounds(cfg);
+            testCase.verifyEqual([physicalLower(2);physicalUpper(2)],[-1;1]);
+            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
             [input,~,~]=terminalSafeSet.cruiseInput([0;0;0;1.8;0;0],problem.model);
             testCase.verifyLessThanOrEqual(input(2),upper(2));
             testCase.verifyGreaterThanOrEqual(input(2),lower(2));
             testCase.verifyLessThanOrEqual(max(problem.model.linearization.inputs(2,:)),upper(2));
             testCase.verifyGreaterThanOrEqual(min(problem.model.linearization.inputs(2,:)),lower(2));
+        end
+        function shiftingASaturatedInputRebuildsAnInteriorTangentSeed(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            prior.inputTrajectory(2,2:end)=1;
+            [~,search,model]=solvePredictiveControl(problem.model,prior,tic);
+            testCase.verifyEqual(search.linearizationCount,1);
+            testCase.verifyLessThan(max(model.linearization.inputs(2,:)),1);
+            testCase.verifyTrue(all(isfinite(model.linearization.states),'all'));
         end
         function anUnsafeColdReferenceStillGetsOnlyOneRtiModel(testCase)
             [ego,road,cfg]=localFixture();

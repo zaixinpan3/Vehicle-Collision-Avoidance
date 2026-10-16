@@ -29,6 +29,14 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
             target = [34;0;0;0;0;0;lr;2.4;.95;0;0];
             impactTime = 34/cfg.referenceSpeed;
             return;
+        case "hardBrakingLead"
+            % Ego and target speeds are independent: braking alone is
+            % insufficient at the 25 m/s campaign operating point.
+            target = [30;0;0;5;-2;0;lr;2.4;.95;0;0];
+            closing = cfg.referenceSpeed-5;
+            impactTime = (-closing+sqrt(closing^2+120))/2;
+            if impactTime>2.5,impactTime=36.25/cfg.referenceSpeed;end
+            return;
         case "brakingLead"
             impactTime = 5;
             targetSpeed = cfg.referenceSpeed-.5*impactTime;
