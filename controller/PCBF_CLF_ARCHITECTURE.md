@@ -180,7 +180,7 @@ these bounds and issued inputs are unchanged. Only the tangent reference
 uses `nonlinearBicycleModel.inputBounds(cfg,true)`, which keeps its force
 ratio ten constraint tolerances inside the singular endpoints. Shifting a
 saturated previous plan rebuilds this interior seed and its complete rollout;
-this does not change a previously issued command. The 50 ms controller budget
+this does not change a previously issued command. The 100 ms controller budget
 reserves 2 ms for completion, including any replan and retry. A successful first
 attempt needs one RTI model and at most two native solves; at most two models
 and four native solves are possible when local infeasibility triggers recovery.
@@ -254,13 +254,19 @@ the target enters as its estimate. This is not full robust terminal membership.
 
 ## Computation budget and diagnostics
 
-Defaults target a 50 ms sample: `solver.timeLimitSeconds=0.05`, at most 40 native
-interior-point iterations per stage, and a 2 ms completion reserve. Preprocessing
+The current research budget is 100 ms (`solver.timeLimitSeconds=0.1`), with
+at most 40 native interior-point iterations per stage and a 2 ms completion
+reserve. The model sample remains 50 ms; these offline simulations do not
+inject computation latency into actuation. Preprocessing
 counts against the same timer as model construction and both solves. Reference
 rollout, tangent/constraint construction, CLF construction, terminal geometry and
 optimized-input prediction check the timer. A native termination callback includes
 MEX validation and problem construction, in addition to Clarabel's iteration
 timer. Native infeasibility certificates and unfinished iterates are never inputs.
+
+Replay exports distinguish the model-sample deadline (`deadlineMisses`) from
+the configured research budget (`controllerBudgetSeconds` and
+`controllerBudgetExceededCalls`).
 
 These checks bound the admitted work, not a hard wall-clock guarantee on a desktop
 MATLAB process. A running factorization, allocation, initial JIT compilation or OS

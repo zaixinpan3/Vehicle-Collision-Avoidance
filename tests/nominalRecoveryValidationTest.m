@@ -17,6 +17,11 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyTrue(r.recovery.recovered);
             testCase.verifyEqual(r.outcome,"recovered");
             testCase.verifyTrue(isfinite(r.baselineCruise.durationSeconds));
+            testCase.verifyFalse(r.roadConstraintsEnforced);
+            testCase.verifyEqual(r.controllerBudgetSeconds,.1);
+            testCase.verifyEqual(r.sampleTimeSeconds,.05);
+            seconds=[r.trace.controllerSeconds,r.failedFrameSeconds];
+            testCase.verifyEqual(r.controllerBudgetExceededCalls,nnz(seconds>.1));
         end
         function aLimitedObservationCanContinueWithoutAFrameLimit(testCase)
             file=string(tempname)+".mat";testCase.addTeardown(@()delete(file));
