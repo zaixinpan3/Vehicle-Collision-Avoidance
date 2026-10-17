@@ -1,15 +1,17 @@
 # Real-time-iteration PCBF/CLF control
 
-Each measured sample runs one RTI step: one reference, one affine dynamics and
-geometry model, and at most two native convex solves on that same model. The
-primary objective minimizes PCBF deficits; the secondary minimizes CLF slack at
-the attained primary cap. There is no within-frame nonlinear iteration, elastic
-restoration, merit acceptance loop, trust-region backtracking or restart.
+Each reference supplies one RTI step: one affine dynamics and geometry model,
+with at most two native convex solves on that model. The primary objective
+minimizes PCBF deficits; the secondary minimizes CLF slack at the attained
+primary cap. If either solve reports primal infeasibility, the controller may
+regenerate the reference once and retry within the original call deadline.
+There is no convergence-driven nonlinear iteration, elastic restoration, merit
+acceptance loop or trust-region backtracking.
 
 The optimized actuator inputs are issued unchanged. A nonlinear rollout predicts
 their effect and updates the next frame's trust scale; it does not certify the
-nonlinear constraints, accept a different iterate or repair an input. An
-infeasible, unfinished or timed-out solve produces no command. No previous-plan
+nonlinear constraints, accept a different iterate or repair an input. A failed
+retry, unfinished solve or exhausted call budget produces no command. No previous-plan
 execution or alternate controller substitutes for a solved command.
 
 This is an approximate numerical implementation. Recursive feasibility concerns
@@ -88,9 +90,24 @@ speed. The curvature preview uses one yaw-loop response time; it compensates
 the seed tracker's response lag without changing the optimized inputs. The
 geometric and vehicle-rollout clearances and endpoint membership are
 diagnostics, not robust certificates or whole-hold checks; an unsatisfactory
-seed still supplies at most one RTI. This is O(N) initialization, with no
-candidate-path search, additional optimization, post-failure restart or
-executable fallback.
+seed still supplies one RTI. This is O(N) initialization per reference, with no
+candidate-path search or executable fallback.
+
+A solver-reported primal-infeasible subproblem triggers at most one fresh
+reference. The failed inputs, inherited separation normals and terminal
+linearization context are discarded. Encounter screening and initialization
+run again from the current measured state, target forecast, observer error
+sets and actual held input. A current conflict generates a new avoidance guide;
+otherwise nominal feedback generates the recovery reference. The old encounter
+initialization flag cannot suppress this retry. If the failed reference was
+already fresh, the retry adds one minimum prefix of settling holds, subject
+to an explicitly configured maximum, instead of rebuilding an identical seed.
+The new reference uses the configured initial trust scale. Dynamics tangents,
+separating directions, dual multipliers, tightened collision rows and terminal
+rows are all rebuilt. The underlying geometry, uncertainty and physical limits
+are unchanged. Numerical iteration limits, timeouts and unavailable nonlinear
+predictions do not trigger replanning. Both attempts share the original timer;
+the retry cannot reset or extend the computation budget.
 
 Cold no-target and nonconflicting operation use `controller.horizonSteps`.
 Conflict duration is selected from the nominal encounter. `controller.maximumHorizonSteps=Inf`
@@ -154,7 +171,9 @@ uses `nonlinearBicycleModel.inputBounds(cfg,true)`, which keeps its force
 ratio ten constraint tolerances inside the singular endpoints. Shifting a
 saturated previous plan rebuilds this interior seed and its complete rollout;
 this does not change a previously issued command. The 50 ms controller budget
-reserves 2 ms for completion; one RTI model and at most two native solves remain.
+reserves 2 ms for completion, including any replan and retry. A successful first
+attempt needs one RTI model and at most two native solves; at most two models
+and four native solves are possible when local infeasibility triggers recovery.
 
 The main `runCollisionThreatValidation` campaign defaults to 25 m/s stopped
 and hard-braking lead scenarios. Each must collide both under prescribed
@@ -250,10 +269,14 @@ successful and failed controller call times must both be measured from the
 same controller timer. Observer/publication preparation belongs to the
 separate pipeline timer; failed pipeline latency is not solver latency. A timeout is an allowed
 failure, not a successful real-time control result. Raising the budget for a
-functional test does not change the one-step RTI algorithm.
+functional test does not change the bounded RTI/replanning policy.
 
-`search.rtiIterations` and `linearizationCount` are at most one; `solverCalls` is
-at most two. `convexSolveCompleted` records completion of both convex objectives.
+`search.rtiIterations` and `linearizationCount` are at most two; `solverCalls`
+is at most four and includes both attempts. `attempts` preserves each result;
+`selectedAttempt` identifies the returned solution, or zero when none is returned.
+`nominalRestarted` and `restartCount` indicate the single allowed replan.
+Initialization and formulation timings sum both attempts. `convexSolveCompleted`
+records completion of both convex objectives on the final reference.
 `optimizationConverged` is false because nonlinear convergence is not tested.
 `nonlinearValidationPerformed` is false and `nonlinearHardResidual` is unavailable.
 The reported PCBF and CLF quantities belong to the affine subproblem;

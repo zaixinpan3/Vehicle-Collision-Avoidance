@@ -9,7 +9,7 @@ terminal set and recursive feasibility.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
-| `solvePredictiveControl.m` | One RTI model from a shifted, nominal or bounded planned avoidance rollout; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
+| `solvePredictiveControl.m` | RTI models from shifted, nominal or planned avoidance rollouts with one infeasibility-triggered replan; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
 | `terminalSafeSet.m` | Joint encounter terminal set and explicit terminal controller (`jointState`, `jointSuccessor`, `jointMember`, `control`): the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with held steering and a forward-only stop, retaining first-exit memory; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and a bounded cruise-to-braking seed search distinct from the terminal law), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
@@ -18,8 +18,9 @@ terminal set and recursive feasibility.
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
-Each sample builds one affine model from one declared-model reference rollout
-and runs at most two native solves for the PCBF/CLF objectives. A cold cruise
+Each reference rollout supplies one affine model and at most two native solves
+for the PCBF/CLF objectives. Local primal infeasibility permits one fresh
+reference and RTI retry, sharing the original sample deadline. A cold cruise
 conflict invokes a single-path analytic reference planner. Its base curve keeps
 the given path's curvature from the measured position and course. NRMM prediction and
 rectangle checks identify the entire conflict interval. Ray exits from
@@ -32,15 +33,19 @@ precedes exactly one nonlinear vehicle rollout, with feedforward and feedback
 tracking, curvature preview and a speed-dependent mild endpoint envelope. This rollout supplies
 the dynamics and collision linearizations. Its geometry, node-clearance and
 terminal diagnostics do not certify robust or whole-hold safety. Unmet guide
-demands remain visible and do not trigger another rollout or RTI. The optimized inputs are never
+demands remain visible; only solver-reported primal infeasibility triggers a retry. The optimized inputs are never
 replaced by a planner candidate. Other cold references use nominal feedback.
 Warm references shift the previous inputs from the current estimate, retain
 their absolute endpoint until the minimum prefix is reached, and extend a
 terminal endpoint with a checked cruise or braking hold when available.
 Those extension checks concern the reference and the sampled declared model;
 they do not certify robust terminal invariance or veto an optimized input.
-There is no nonlinear restoration loop, same-frame solve restart or
-previous-plan execution fallback. Failed or unfinished optimization returns
+A retry discards the failed reference, old separation normals and terminal
+context. It regenerates geometry from the same observation and error sets and
+rebuilds dynamics, collision duals and terminal rows. A previously fresh
+reference gets one additional minimum prefix of settling holds, subject to an
+explicit horizon cap. No nonlinear restoration loop or previous-plan execution
+fallback runs. A failed retry, unfinished solve or exhausted budget returns
 no command. The first optimized input is issued unchanged. The ideal
 mathematical recursive-feasibility theorem is independent of numerical RTI
 success.
@@ -128,9 +133,9 @@ zero multipliers and translation invariance. At overlap the trajectory rows
 use the feasible dual of the least-penetrated rectangle axis
 (`supportLinearization`), which the test checks as an escape direction.
 
-`twoStagePredictiveControlTest` checks one-model RTI, both objective stages,
+`twoStagePredictiveControlTest` checks RTI per reference, bounded replanning, both objective stages,
 unchanged optimized inputs, measurement updates, limits and explicit failure
-without retries or fallback. `observerPredictiveControlTest` retains enclosure
+after the allowed retry, without an execution fallback. `observerPredictiveControlTest` retains enclosure
 integration and directional-family containment tests, including batch/scalar
 support equivalence. `ordinaryDistanceDualTest`, `terminalSafeSetTest`,
 `nominalClfTest`, `trustInnovationTest` and `clfNominalRecoveryTest` retain their

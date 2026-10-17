@@ -36,8 +36,8 @@ function cfg=localDefaults()
     cfg.nonlinear=struct('integrationStep',.05,'trustRadius',.5, ...
         'trustInnovationMeters',.02,'trustInitialScale',1, ...
         'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
-    % RTI builds one model per sample; prediction duration is independent
-    % of the number of nonlinear iterations (exactly one, not configurable).
+    % One RTI model per reference. Local primal infeasibility permits one
+    % fresh reference and retry, sharing the original controller deadline.
     % Encounter search starts from horizonSteps, with no separate time span.
     cfg.rti=struct('settlingSeconds',.5);
     % Nominal encounter screening sizes the prediction horizon. Initialization

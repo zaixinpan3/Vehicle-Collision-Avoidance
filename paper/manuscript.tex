@@ -1546,7 +1546,7 @@ Search, formulation and solving all share the controller-call time budget.
 This is nominal initialization, not a certificate of every future encounter.
 A same-direction lead uses an unbraked guide base, preventing seed
 deceleration from erasing the passing opportunity. An encounter flag avoids
-repeating this initialization each frame. Each later sample shifts the previous
+repeating this initialization at every successful sample. Each later sample shifts the previous
 input plan by one hold and rolls it through $F$ from the current estimate.
 Its absolute endpoint is retained until the minimum prefix length $N$ is
 reached. Missing holds from a terminal endpoint prefer a checked
@@ -1556,9 +1556,19 @@ unnecessary braking. This numerical initializer is distinct from the
 unique terminal controller $\kappa_{\rm f}$. If no certified hold is found,
 a moving endpoint uses nominal feedback, whereas a stopped endpoint keeps
 a nonpositive longitudinal command instead of restarting into a local
-positive-input box. These are initialization operations, with no extra RTI
-iterations or same-frame nonlinear restart. The optimized input is issued
-without substitution.
+positive-input box. If a local convex subproblem reports primal
+infeasibility, one fresh initialization and RTI retry are allowed within the
+original controller-call budget. The retry discards the old input seed,
+separation normals and terminal linearization context, and regenerates the
+reference from the same current observation and uncertainty sets. It bypasses
+the encounter initialization flag. A failed reference that was already fresh
+receives $N$ additional settling holds, subject to an explicitly configured
+horizon maximum. Dynamics tangents, separating directions, collision dual
+multipliers and terminal rows are recomputed at the new reference. No further
+retry is permitted; timeouts and numerical iteration limits do not trigger
+replanning. This is a bounded recovery from local infeasibility, not a
+convergence-driven sequence of nonlinear iterations. A returned optimized
+input is issued without substitution.
 
 The path-guidance law steers the course toward the path through a
 lookahead and regulates the speed through the force ratio. With $\chi$
