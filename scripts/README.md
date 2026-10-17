@@ -2,60 +2,59 @@
 
 ## PCBF / CLF controller
 
-Run the current controller tests, MATLAB code analysis and independent
-nonlinear closed-loop replays from the repository root:
+Run the primary joint observer/controller campaign from the repository root:
 
 ```matlab
 addpath('scripts');
-validateNonlinearPredictiveController('report/new-validation-directory');
+runCollisionThreatValidation(OutputDirectory=string(tempname));
 ```
 
-Then independently audit the exported rectangles and road margins:
+The defaults use the actual NRMM observer with synthetic noisy sensors in
+25 m/s stopped-lead and hard-braking-lead encounters. Both encounters must
+collide under unmodified cruise and immediate maximum straight braking.
+An unsupported observer initialization is recorded as `setupError`, and the
+campaign continues with the next case. It never substitutes exact states.
+Runs continue until sustained nominal cruise recovery or failure; a finite
+`Frames` value is an explicit diagnostic cap, not a recovery deadline.
 
-```bash
-python3 scripts/auditJointPredictiveSafety.py report/new-validation-directory --output report/new-validation-directory/independent-audit.json
-```
-
-The deterministic fixtures cover lane recovery, circular lane following,
-oncoming avoidance and a turning target. Every issued control is replayed
+Every issued control is replayed
 with tight `ode45` tolerances at 31 samples per hold on the nonlinear bicycle
 model itself; no Simulink plant is used. This offline audit reports sampled
 safety and timing; it does not authorize online execution.
-The controller keeps every ego rectangle corner inside the road
-`lateralClearance = [right; left]` at every predicted node; the fixtures use a
-four-lane road, `[8.5344; 12.192]` m. Exports state
-`roadConstraintsEnforced=true` and record the measured road margin and any
-road departure. `auditJointPredictiveSafety.py` still checks a fixed 4-m
-half-width that predates this road; its road verdict does not describe the
-MATLAB road rows. Historical exports retain their original road-constraint
-interpretation. The given path supplies the cruise and recovery reference.
+Road boundaries are disabled by default; the given path supplies the cruise
+and recovery reference. Exports record whether road constraints were enabled.
+The legacy `auditJointPredictiveSafety.py` checks a fixed 4-m half-width;
+its road verdict does not describe this road-free campaign.
 
 The collision-threat encounters are defined in `collisionThreatScenario`
-(seven geometries; `givenPathCollisionBaseline` confirms that unmodified
-cruise collides). `runCollisionThreatValidation` runs them with exact states
-for a fixed number of frames. `runPotentialFieldCampaign` runs them at 8 and
-15 m/s until cruise recovery, with exact states or, with
-`EstimatorConfiguration`, with the NRMM estimator and synthetic noisy sensors
-in the loop; `extendPotentialFieldRecovery` resumes unfinished runs.
+(nine geometries; `givenPathCollisionBaseline` confirms that unmodified
+cruise collides). `runPotentialFieldCampaign(pwd,tempname)` runs the seven
+historical geometries at 8 and 15 m/s, also with the actual noisy-sensor NRMM
+observer by default. Both campaign entry points accept a nonempty
+`EstimatorConfiguration` to change sensor/observer settings;
+`extendPotentialFieldRecovery` resumes unfinished runs using their saved settings.
 `replayEstimatorValidity` audits the estimator's published bounds against the
 recorded truth of such a campaign (it replays seed 20261003).
 `synthesizeClfMatrices` writes `config/clfMatrices.json` and must be run before
 an experiment at a new operating point.
 
-`runNonlinearPredictiveSafetyValidation` also accepts `Scenarios`, `Frames`,
-`ControllerConfiguration`, and `OutputFile` for individual runs. Additional
+`runNonlinearPredictiveSafetyValidation` accepts `Scenarios`, `Frames`,
+`ControllerConfiguration`, `EstimatorConfiguration`, and `OutputFile` for
+individual runs. Its empty-estimator mode and
+`validateNonlinearPredictiveController` retain exact-state diagnostic fixtures;
+these do not count toward the primary joint campaign results. Additional
 fixtures `acceleratingTarget`, `acceleratingTurn`, and `brakingTarget` exercise
 constant tangential acceleration with constant sideslip. The braking fixture
 passes through zero signed velocity at 2 s. Each export records the initial
 target state and parameters for independent reconstruction; the audit's
 `--files` option selects individual JSON exports. Historical exports without
 the revised target state require the audit source from their recorded commit.
-The optimizer uses one RTI step per frame: one reference rollout and affine
-model, followed by PCBF and CLF objectives on that same model. It performs no
-nonlinear restoration loop or same-frame restart. Cold predicted conflicts use
-one mild-braking reference; no independent avoidance path is planned. Completed
+The optimizer uses one RTI step per attempt: one reference rollout and affine
+model, followed by PCBF and CLF objectives on that same model. When the shifted
+plan is locally infeasible, it generates one fresh avoidance path and retries
+RTI, rebuilding the dynamics and collision separation geometry. Completed
 optimized inputs are returned unchanged; their nonlinear rollout is prediction,
-not nonlinear feasibility validation. The default 50 ms computation budget can
+not nonlinear feasibility validation. The default 100 ms computation budget can
 return an explicit failure. Independent replay determines actual clearance and
 recovery. See [the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
 The campaign entry names containing `PotentialField` are retained for callers;

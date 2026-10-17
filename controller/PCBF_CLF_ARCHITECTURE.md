@@ -186,7 +186,12 @@ attempt needs one RTI model and at most two native solves; at most two models
 and four native solves are possible when local infeasibility triggers recovery.
 
 The main `runCollisionThreatValidation` campaign defaults to 25 m/s stopped
-and hard-braking lead scenarios. Each must collide both under prescribed
+and hard-braking lead scenarios with the actual NRMM observer and synthetic
+noisy sensors. `runPotentialFieldCampaign` also defaults to this joint
+observer/controller setup. Exact-state replays are separate diagnostics and
+do not contribute to the primary campaign score. An unsupported target
+initialization is retained as `setupError`; the campaign continues with the
+next case without substituting exact states. Each encounter must collide both under prescribed
 cruise and under immediate maximum straight braking. The latter independent
 ode45 counterfactual checks the encounter after stopping too. Slower cases
 where this braking policy suffices remain regression fixtures, not evidence

@@ -2,6 +2,7 @@ function runPotentialFieldCampaign(sourceRoot,outputDirectory,frameCount,options
 %runPotentialFieldCampaign Follow each encounter through nominal cruise recovery.
 % By default run to nominal recovery or failure. A finite frameCount is an
 % explicitly requested diagnostic observation cap, never a success deadline.
+% Empty EstimatorConfiguration selects the actual noisy-sensor NRMM defaults.
     arguments
         sourceRoot
         outputDirectory
@@ -9,6 +10,10 @@ function runPotentialFieldCampaign(sourceRoot,outputDirectory,frameCount,options
         options.EstimatorConfiguration (1,1) struct = struct()
     end
     cd(sourceRoot);addpath('controller','config','scripts');
+    estimatorConfiguration=options.EstimatorConfiguration;
+    if isempty(fieldnames(estimatorConfiguration))
+        estimatorConfiguration=estimatorControllerIntegrationConfig();
+    end
     if ~isfolder(outputDirectory),mkdir(outputDirectory);end
     names=["headOn","acceleratingHeadOn","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"];
     summaries=struct([]);
@@ -18,7 +23,7 @@ function runPotentialFieldCampaign(sourceRoot,outputDirectory,frameCount,options
             stem=fullfile(outputDirectory,sprintf('speed%g-%s',speed,name));
             result=runNonlinearPredictiveSafetyValidation(Scenarios=name,Frames=frameCount, ...
                 ControllerConfiguration=configuration,RequireCollisionThreat=true,RecoveryDwellSeconds=1, ...
-                EstimatorConfiguration=options.EstimatorConfiguration,FailureFile=stem+"-failure.mat", ...
+                EstimatorConfiguration=estimatorConfiguration,FailureFile=stem+"-failure.mat", ...
                 OutputFile=stem+".json",ContinuationFile=stem+".mat");
             r=result.results;r=rmfield(r,{'trace','configuration'});r.speed=speed;
             summaries=[summaries,r]; %#ok<AGROW>

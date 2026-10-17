@@ -100,7 +100,10 @@ block execution; unsupported uncertainty padding is omitted without declaring
 zero estimation error. No assumption-status diagnostics are produced. Usable finite
 enclosures still tighten the same optimization. Experimental collision checks
 use independent fixed-parameter target truth, and failure means collision or
-no solved control output. Terminal membership is a predicted-endpoint safety
+no solved control output. Primary campaigns use the actual NRMM observer and
+synthetic noisy sensors by default. Observer initialization failures remain
+failed cases; exact-state diagnostics are excluded from the joint campaign
+score. Terminal membership is a predicted-endpoint safety
 certificate, not an execution mode, shutdown trigger or nominal-task success
 criterion. Scenario runs default to no frame limit and continue until failure
 or sustained nominal recovery. Finite frame limits are explicit diagnostics.
