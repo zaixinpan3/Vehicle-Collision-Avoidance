@@ -238,7 +238,9 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.predictedJointState(7:10,:),expected(1:4,:),AbsTol=1e-11);
         end
         function headingWrapPreservesTheFixedTargetForecast(testCase)
-            [ego,road,cfg]=localFixture();q=[30;25;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
+            % Keep the curved track away from the parked terminal continuation;
+            % this case tests angle wrapping, not maneuver feasibility.
+            [ego,road,cfg]=localFixture();q=[30;-25;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             ego=localSuccessor(ego,prior);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
             [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
@@ -315,7 +317,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"nominalFeedbackRollout");
-            testCase.verifyEqual(state.version,85);
+            testCase.verifyEqual(state.version,86);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;1;0;1.6;2.4;.95;0;0];

@@ -42,7 +42,8 @@ Cold nominal operation uses lane feedback. On acquisition, nominal-cruise
 threat screening expands its geometry grid until the approaching interaction
 is bracketed and its sampled conflict interval clears, or the target first
 exits perception. A stationary relative forecast needs no further expansion.
-The initial search span is a numerical starting point, not a prediction limit.
+Search starts with `controller.horizonSteps` holds and expands as needed;
+there is no separate initial or minimum duration in seconds.
 A detected threat invokes one analytic geometric planner, including when a
 previously benign target becomes threatening during a continuation. An
 encounter flag prevents replanning an initialized maneuver every frame.
@@ -91,9 +92,8 @@ seed still supplies at most one RTI. This is O(N) initialization, with no
 candidate-path search, additional optimization, post-failure restart or
 executable fallback.
 
-Cold no-target operation uses `controller.horizonSteps`. Nonconflicting
-target predictions use `rti.minimumPredictionSeconds`; conflict duration is
-selected from the nominal encounter. `controller.maximumHorizonSteps=Inf`
+Cold no-target and nonconflicting operation use `controller.horizonSteps`.
+Conflict duration is selected from the nominal encounter. `controller.maximumHorizonSteps=Inf`
 disables a default node cap; an explicit finite override is a computational
 choice. The selected route supplies the dynamics and collision reference.
 A reference need not satisfy every constraint to construct the one subproblem;
@@ -170,6 +170,15 @@ nominal-model order argument separately. For general crossing traffic, failure o
 policy alone does not prove that every longitudinal timing policy fails.
 
 ## Collision geometry and observer information
+
+The fixed collision buffer and the extra planner clearance have been removed.
+The reference geometry, affine collision rows and terminal continuation use
+zero extra clearance; observer and model-error enclosures still tighten the
+rows. Separation uses a nonzero normal, so a zero threshold excludes interior
+overlap rather than relying on the vacuous ordinary set-distance bound
+`distance >= 0`. Boundary contact remains the mathematical boundary; numerical
+tolerances and the existing affine-model approximation are not a guarantee
+of strictly positive clearance during nonlinear replay.
 
 The target follows constant tangential acceleration and sideslip within each
 prediction; braking ends at rest. Each current target observation refreshes its

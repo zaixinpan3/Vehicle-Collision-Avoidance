@@ -1537,7 +1537,8 @@ At a cold nominal sample the anchor is a lane-feedback rollout. On target
 acquisition, nominal geometry search expands until the approaching
 interaction is bracketed and its sampled conflict interval clears, or the
 target first leaves sensing range. A stationary relative forecast terminates
-the expansion. The initial grid span is not a prediction-duration limit.
+the expansion. The first grid consists of the existing minimum horizon of $N$ holds;
+there is no separate initial-search or minimum-duration parameter in seconds.
 A detected conflict, including one first recognized during a continuation,
 invokes one analytic geometric guide. The RTI horizon covers the detected
 conflict interval plus settling time, with no default duration or node cap.
@@ -1716,9 +1717,15 @@ absolute time, each constrained instant contributes the four rows
     \label{eq:collision_rows}
 \end{equation}
 affine in the decision variables, with $\bm n=H_C^{\trans}\bm\lambda$, a
-node margin $d_{\rm m}$, a slack $\xi_i\geq0$ and a tightening
+node threshold $d_{\rm m}=0$ (no extra design clearance), a slack $\xi_i\geq0$ and a tightening
 $\theta_i\geq0$ that accounts for the estimation error
 (Section~\ref{subsec:uncertainty}; $\theta_i=0$ without an enclosure).
+At the zero threshold, nonoverlap follows from separation by the selected
+nonzero normal, not from the ordinary distance inequality $d\geq0$, which
+also holds for overlapping rectangles. Zero support is boundary contact;
+positive support gives strict separation. No additional fixed clearance is
+used by the geometric guide or terminal continuation; their uncertainty
+reserves remain.
 The constrained instants are the hold starts and mid-hold points within
 $R_{\rm enc}$ and the endpoint of the horizon. Without an enclosure, one
 slack per primary hold relaxes its start and mid-hold rows, and the rows
@@ -1732,9 +1739,9 @@ The vertex rotation is kept to first order, with remainder at most
 $\tfrac12\normtwo{\bm o_j}\Delta\psi^2$, so by Lemma~\ref{lem:dualRows}(i)
 the rows \eqref{eq:collision_rows} with $\xi_i=\theta_i=0$ imply
 $d\geq d_{\rm m}-\tfrac12r_E\Delta\psi_i^2$ for the affine-predicted
-pose, where $r_E=\max_j\normtwo{\bm o_j}$; with the values of
-Section~\ref{sec:results} ($r_E=2.58$\,m, $|\Delta\psi|\leq0.25$\,rad,
-$d_{\rm m}=0.20$\,m) the right side is at least $0.119$\,m. The issued
+pose, where $r_E=\max_j\normtwo{\bm o_j}$. With zero extra clearance,
+this lower bound can be negative: affine feasibility alone does not certify
+nonoverlap of the nonlinear pose. The issued
 plan is rolled out under the nonlinear prediction model without
 post-solve input substitution. Independent scenario replay checks its
 rectangle distances; the affine rows alone do not certify the nonlinear
@@ -3051,6 +3058,13 @@ open-loop trials.
 \subsection{Closed-Loop Protocol}
 \label{subsec:controlProtocol}
 
+The trials in this section were collected under an earlier implementation
+with an additional 0.20\,m design clearance. That buffer and the separate
+planner reserve have since been removed; the current algorithm uses zero
+extra clearance and retains uncertainty tightening. The historical trial
+parameters and measured outcomes below are preserved, and do not constitute
+validation of the current zero-buffer configuration.
+
 \begin{table}[!t]
 \caption{Vehicle, controller and sensing parameters of the closed-loop
 trials.}
@@ -3074,7 +3088,7 @@ $l_{r,C}$, $r_E$ & 1.6\,m, 2.58\,m\\
 $c_{\rm R}$, $c_{\rm L}$ & 8.53\,m, 12.19\,m\\
 $T_s$, $M_{\max}$ & 50\,ms, 512\\
 $N$ at 8\,m/s; at 15\,m/s & 8; 16\\
-$d_{\rm m}$, $R_{\rm enc}$ & 0.20\,m, 50\,m\\
+Historical design clearance, $R_{\rm enc}$ & 0.20\,m, 50\,m\\
 $a_{\rm b}$, $a_{\rm m}$ & 4\,m/s$^2$, 2\,m/s$^2$\\
 $\bm\tau_x$ & (2.5\,m, 2.5\,m, 0.25\,rad,\\
  & \ 2.5\,m/s, 1.5\,m/s, 0.75\,rad/s)\\
@@ -3261,7 +3275,7 @@ head-ons.
 
 With exact states the controller uses the node margin almost
 completely. In six of the fourteen runs the smallest sampled distance
-is below $d_{\rm m}=0.20$\,m, down to 0.136\,m
+is below the historical 0.20\,m design clearance, down to 0.136\,m
 (Fig.~\ref{fig:closedLoop}(d)): the margin is consumed between the
 constrained instants and by the plant's departure from the sampled
 model. The primary optimum is positive at one sample of one run, by
@@ -3277,7 +3291,7 @@ and at most 117 holds; the first sample of a run plans 24 to 25 holds.
 
 With estimated states the passes are wider. The median over the 84 runs
 of the smallest distance is 1.80\,m, against 0.28\,m with exact states,
-and no run comes within $d_{\rm m}$ (least 0.21\,m), because the
+and no run comes within that historical clearance (least 0.21\,m), because the
 tightened rows \eqref{eq:collision_tightening} reserve the current
 enclosure and the forecast of the obstacle changes from sample to
 sample. The wider passes use the road: the lateral deviation reaches

@@ -67,7 +67,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             search=problem.metadata.search;
             testCase.verifyTrue(search.planner.used);
             testCase.verifyTrue(state.avoidanceInitialized);
-            testCase.verifyGreaterThan(search.planner.conflictStartSeconds,cfg.rti.initialSearchSeconds);
+            testCase.verifyGreaterThan(search.planner.conflictStartSeconds,cfg.controller.horizonSteps*cfg.controller.sampleTime);
             testCase.verifyGreaterThan(search.planner.amplitudeMeters,1);
             testCase.verifyGreaterThan(size(problem.inputTrajectory,2)*cfg.controller.sampleTime,5);
             testCase.verifyEqual(search.rtiIterations,1);

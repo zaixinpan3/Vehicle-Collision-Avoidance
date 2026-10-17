@@ -54,6 +54,18 @@ classdef analyticAvoidanceGuideTest < matlab.unittest.TestCase
                 testCase.verifyTrue(all(isfinite([guide.position;guide.velocity;guide.acceleration]),'all'));
             end
         end
+        function aSmallPositiveGapNeedsNoArbitraryPlannerBuffer(testCase)
+            model=localModel("headOn",8);
+            model.target(1:6)=[0;2;0;8;0;0];
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,16,1);
+            testCase.verifyEqual(guide.minimumGap,.1,AbsTol=1e-12);
+            testCase.verifyEqual(guide.amplitude,0);
+            testCase.verifyTrue(isnan(guide.conflictStartSeconds));
+            model.uncertainty.collisionGenerator=diag([0,.15,0,0,0,0]);
+            bounded=predictiveSafetyGeometry.avoidanceGuide(model,16,1);
+            testCase.verifyEqual(bounded.conflictStartSeconds,0);
+            testCase.verifyTrue(bounded.initialConflict);
+        end
         function currentObserverBoundsWidenTheConflictWindow(testCase)
             model=localModel("headOn",8);nominal=predictiveSafetyGeometry.avoidanceGuide(model,40,1);
             model.uncertainty.collisionGenerator=diag([.2,.2,.04,0,0,0]);

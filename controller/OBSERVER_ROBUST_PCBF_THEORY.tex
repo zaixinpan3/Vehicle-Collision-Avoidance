@@ -19,7 +19,7 @@
 \newcommand{\norm}[1]{\left\lVert#1\right\rVert}
 \newcommand{\supp}[2]{\sigma_{#1}(#2)}
 \newcommand{\Reach}{\operatorname{Reach}}
-\newcommand{\dist}{\operatorname{dist}}
+\newcommand{\dist}{\operatorname{sdist}}
 \newcommand{\diag}{\operatorname{diag}}
 \newcommand{\He}{\operatorname{He}}
 \newcommand{\cl}{\operatorname{cl}}
@@ -56,7 +56,15 @@ Let $t_k=kh$ and let $u_k$ be held on $[t_k,t_{k+1})$. We seek
 \end{equation}
 for every admitted initial error, sensor error, plant disturbance and target
 motion. Here $\mathcal V_E,\mathcal V_C$ are the full vehicle rectangles and
-$d_0=0.20\,\mathrm m$ is the present design clearance, not an uncertainty bound.
+$d_0=0$ means no extra design clearance. Here $\operatorname{sdist}$
+is positive Euclidean separation for disjoint rectangles, zero at contact,
+and negative minimum translational penetration depth for overlapping
+interiors. This signed convention is essential: ordinary set distance is
+zero even for overlapping rectangles, so its nonnegativity would be vacuous.
+Unit-normal support inequalities below certify nonoverlap at the zero
+threshold; uncertainty, model-remainder and whole-hold reserves remain.
+Strictly positive separation requires positive slack-free support, while
+zero is the contact boundary of the closed feasible set.
 The nominal behavior is the given path at its desired cruise speed, with free
 longitudinal phase. There is one controller and one nominal CLF throughout the
 encounter and recovery. The terminal set is a condition on the last predicted

@@ -22,15 +22,17 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(tube.positionRadius(end),tube.positionRadius(1));
         end
         function largerTargetEnclosuresActuallyChangeTheAvoidanceOptimization(testCase)
-            % The near-grazing pass makes the observer margins bind.
-            [ego,target,road,cfg]=localFixture(.01,20);
+            % The nominal 0.15 m lateral gap exceeds the small enclosure,
+            % but not the large one. Put the pass inside the minimum horizon.
+            [ego,target,road,cfg]=localFixture(.01,8);
             [~,smallInputs,small]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            target.predictionErrorSet.positionRadius=.10;
-            target.controllerErrorBound.bounds(1:2)=.10;
+            target.predictionErrorSet.positionRadius=.25;
+            target.controllerErrorBound.bounds(1:2)=.25;
             [~,largeInputs,large]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyGreaterThan(large.metadata.maximumCollisionTighteningMeters, ...
-                small.metadata.maximumCollisionTighteningMeters+.08);
-            testCase.verifyGreaterThan(norm(largeInputs-smallInputs,'fro'),1e-5);
+                small.metadata.maximumCollisionTighteningMeters+.20);
+            count=min(size(smallInputs,2),size(largeInputs,2));
+            testCase.verifyGreaterThan(norm(largeInputs(:,1:count)-smallInputs(:,1:count),'fro'),1e-5);
             testCase.verifyTrue(large.metadata.uncertaintyIncluded);
             testCase.verifyFalse(large.metadata.robustNonlinearSafetyCertified);
             testCase.verifyEqual(large.metadata.safetyScope,"affineNominalCollisionWithRelaxedObserverMargins");

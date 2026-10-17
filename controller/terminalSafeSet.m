@@ -24,10 +24,10 @@ classdef terminalSafeSet
 %           - every node, hold midpoint and the parked pose keeps the ego
 %             rectangle on the road,
 %           - every node and hold midpoint clears the target's forecast
-%             rectangle by safetyMarginMeters until the target leaves
+%             rectangle without overlap until the target leaves
 %             encounterRangeMeters,
 %           - after the stop, the target's remaining track until it leaves
-%             the range clears the parked rectangle by the same margin }.
+%             the range does not overlap the parked rectangle }.
 % The track check is exact and in closed form (parkedClearance): the track is
 % a stretch of the target's line or circle that ends where the target leaves
 % the range or comes to rest, or the whole circle; braking ends at rest for
@@ -70,7 +70,7 @@ classdef terminalSafeSet
                 'brakingBounds',[cfg.actuation.brakingRatioMinimum;cfg.actuation.brakingRatioMaximum], ...
                 'rearAxleDistance',cfg.vehicle.lr, ...
                 'shape',shape,'reach',reach, ...
-                'margin',cfg.collision.safetyMarginMeters,'required',cfg.collision.safetyMarginMeters+positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
+                'required',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'inflation',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'range',cfg.collision.encounterRangeMeters,'clearance',clearance, ...
                 'hasTarget',~isempty(model.target),'targetEpoch',model.targetEpoch, ...
@@ -179,12 +179,14 @@ classdef terminalSafeSet
         function clear = clears(context,x,node)
             % Does the ego rectangle at x, at plan node 'node' (a half node is
             % a hold midpoint), meet the problem's own sampled collision row:
-            % safetyMarginMeters from the target's forecast, or the target
+            % without overlap against the target's forecast, or the target
             % beyond the range there.
             clear=true;if ~context.hasTarget || context.encounterEnded,return;end
             q=localTarget(context,node,0);
             if norm(x(1:2)-q(1:2))>context.range,return;end
-            clear=predictiveSafetyGeometry.rectangle(x(1:3),context.shape,q(1:3),q(8:11))>=context.margin-1e-6;
+            % Ordinary rectangle distance is zero for overlap as well as
+            % contact, so a zero threshold must still require separation.
+            clear=predictiveSafetyGeometry.rectangle(x(1:3),context.shape,q(1:3),q(8:11))>0;
         end
 
         function next = successor(context,x)
@@ -743,7 +745,7 @@ function [member,info,parts] = localDecide(context,x,node)
     parts.q=q;parts.gap=gap;parts.out=out;
     last=numel(gap);if ~isempty(out),last=out-1;end
     if last>0,info.margin=min(gap(1:last),[],'omitnan')-context.required;end
-    if info.margin<-1e-6,info.reason="continuationMeetsTarget";return;end
+    if any(gap(1:last)<=0) || info.margin<-1e-6,info.reason="continuationMeetsTarget";return;end
     if ~isempty(out)
         member=true;info.reason="exit";info.end="exit";info.exitSeconds=path.time(out);return;
     end
@@ -752,7 +754,7 @@ function [member,info,parts] = localDecide(context,x,node)
     parts.parked=struct('distance',distance,'witness',witness,'track',track);
     info.margin=min(info.margin,distance-context.required);
     info.exitSeconds=info.stopSeconds+track.exitSeconds;
-    if distance-context.required<-1e-6,info.reason="parkedEgoMeetsTarget";return;end
+    if distance<=0 || distance-context.required<-1e-6,info.reason="parkedEgoMeetsTarget";return;end
     member=true;info.reason="parked";info.end="parked";
 end
 

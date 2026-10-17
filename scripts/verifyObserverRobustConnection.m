@@ -227,7 +227,7 @@ end
 
 function metrics = localWholeHold()
     holdTime = 0.05;
-    margin = 0.20;
+    margin = 0; % Zero extra clearance; hold variation is still enclosed.
     lipschitz = 4;
     time = linspace(0, holdTime, 1001);
     nodes = [0; holdTime/2; holdTime];

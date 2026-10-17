@@ -188,6 +188,17 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(rows*shift-bounds),1e-6);
             testCase.verifyEqual(context.trackSide,1);
         end
+        function positiveClearanceNeedsOnlyTheActualUncertaintyReserve(testCase)
+            model=localModel([0;0;0;0;0;0],[4.9;0;0;0;0;0;1.6;2.4;.95;0;0]);
+            context=terminalSafeSet.context(model);
+            [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
+            testCase.verifyTrue(member);
+            testCase.verifyEqual(info.margin,.1,AbsTol=1e-9);
+            model.uncertainty.egoGenerator=diag([.15,0,0,0,0,0]);
+            context=terminalSafeSet.context(model);
+            testCase.verifyEqual(context.required,.15,AbsTol=1e-12);
+            testCase.verifyFalse(terminalSafeSet.member(context,model.initialState,0));
+        end
         function theEncounterEndsAtTheExitOrAfterTheParkedCheck(testCase)
             % A lead far enough ahead: the ego stops behind it and the lead
             % leaves the range of the parked ego. A slower lead only a little
@@ -197,8 +208,8 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyEqual(lead.exitSeconds,2+(50-(40+6*2-8))/6,AbsTol=1e-9);
             close=localDecision(testCase,[0;0;0;8;0;0],[8;0;0;6;0;0;1.6;2.4;.95;0;0],true,"parked");
             % The gap closes until the speeds match (0.5 s): 3.2 - 0.5 m of
-            % clearance against the 0.2-m margin.
-            testCase.verifyEqual(close.margin,2.5,AbsTol=1e-6);
+            % clearance with no fixed buffer.
+            testCase.verifyEqual(close.margin,2.7,AbsTol=1e-6);
             % Too close to stop behind a stationary target.
             localDecision(testCase,[0;0;0;8;0;0],[6;0;0;0;0;0;1.6;2.4;.95;0;0],false,"continuationMeetsTarget");
             % A stationary target beyond the stopping distance stays in range
@@ -213,7 +224,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % and stays there; one that rests too close is met while the ego
             % still brakes; a gently braking lead leaves the range first.
             rest=localDecision(testCase,[0;0;0;8;0;0],[10;0;0;6;-4;0;1.6;2.4;.95;0;0],true,"parked");
-            testCase.verifyEqual(rest.margin,10+4.5-8-4.8-.2,AbsTol=1e-6);
+            testCase.verifyEqual(rest.margin,10+4.5-8-4.8,AbsTol=1e-6);
             testCase.verifyEqual(rest.exitSeconds,Inf);
             localDecision(testCase,[0;0;0;8;0;0],[6;0;0;4;-4;0;1.6;2.4;.95;0;0],false,"continuationMeetsTarget");
             localDecision(testCase,[0;0;0;8;0;0],[20;0;0;7;-.5;0;1.6;2.4;.95;0;0],true,"parked");
@@ -302,7 +313,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [~,~,after]=terminalSafeSet.member(context,y+dz,0);
             testCase.verifyEqual(min(bounds(geometryRows)-rows(geometryRows,:)*dz)+.05,after.margin,AbsTol=5e-3);
             % At the boundary the rows keep what is left and no more.
-            close=localModel([0;0;0;8;0;0],[5.52;0;0;6;0;0;1.6;2.4;.95;0;0]);
+            close=localModel([0;0;0;8;0;0],[5.32;0;0;6;0;0;1.6;2.4;.95;0;0]);
             closeContext=terminalSafeSet.context(close);
             [~,bounds,~,info]=terminalSafeSet.rows(closeContext,close.initialState,0);
             testCase.verifyLessThan(info.margin,.05);testCase.verifyGreaterThan(info.margin,0);
@@ -321,9 +332,9 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % toward the law's realization that keeps the endpoint terminal;
             % the realization itself brakes at about a_b with the steering
             % held.
-            % 0.75 m apart, closing at 2 m/s: braking at once keeps 0.25 m, one
-            % cruise hold first leaves 0.15 m against the 0.2-m margin.
-            model=localModel([0;0;0;8;0;0],[5.55;0;0;6;0;0;1.6;2.4;.95;0;0]);x=model.initialState;
+            % 0.55 m apart, closing at 2 m/s: braking at once keeps 0.05 m;
+            % one cruise hold first creates about 0.05 m of overlap.
+            model=localModel([0;0;0;8;0;0],[5.35;0;0;6;0;0;1.6;2.4;.95;0;0]);x=model.initialState;
             context=terminalSafeSet.context(model);
             testCase.verifyTrue(terminalSafeSet.member(context,x,0));
             [cruise,next]=terminalSafeSet.cruiseInput(x,model);

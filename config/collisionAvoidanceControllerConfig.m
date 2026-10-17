@@ -38,19 +38,19 @@ function cfg=localDefaults()
         'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
     % RTI builds one model per sample; prediction duration is independent
     % of the number of nonlinear iterations (exactly one, not configurable).
-    % initialSearchSeconds seeds geometric search; it is not an upper limit.
-    cfg.rti=struct('initialSearchSeconds',2,'minimumPredictionSeconds',1,'settlingSeconds',.5);
+    % Encounter search starts from horizonSteps, with no separate time span.
+    cfg.rti=struct('settlingSeconds',.5);
     % Nominal encounter screening sizes the prediction horizon. Initialization
     % uses one analytic rectangle-aware guide and one vehicle-model rollout.
-    cfg.planner=struct('clearanceReserveMeters',.2,'lookaheadSeconds',.5, ...
+    cfg.planner=struct('lookaheadSeconds',.5, ...
         'decelerationMetersPerSecondSquared',1,'lateralAccelerationFraction',.9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
     % The first certified exit ends this prediction's encounter. A fresh
     % observation after an actual exit starts a new collision problem.
-    % safetyMarginMeters is the clearance required at the sampled collision
-    % rows (hold start and midpoint), not a continuous-time clearance bound.
-    cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',50);
+    % Collision rows require nonoverlap after uncertainty tightening. There
+    % is no extra fixed clearance in the optimizer or geometric guide.
+    cfg.collision=struct('encounterRangeMeters',50);
     % Terminal set (controller/terminalSafeSet.m, TERMINAL_SAFE_SET.md): it
     % holds only mild endpoints, inside the sideslip cone and with the held
     % arc's lateral acceleration |r V| at most
@@ -167,22 +167,15 @@ function localValidate(cfg)
             || cfg.nonlinear.trustInitialScale>cfg.nonlinear.trustMaximumScale
         localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
     end
-    for name=["initialSearchSeconds","minimumPredictionSeconds","settlingSeconds"]
-        validateattributes(cfg.rti.(name),{'double'},{'scalar','real','finite','positive'});
-    end
-    validateattributes(cfg.rti.minimumPredictionSeconds,{'double'},{'<=',cfg.rti.initialSearchSeconds});
-    for name=["clearanceReserveMeters","lookaheadSeconds","decelerationMetersPerSecondSquared"]
+    validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
+    for name=["lookaheadSeconds","decelerationMetersPerSecondSquared"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});
-    validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.sideslipMaximumRadians,{'double'},{'scalar','real','finite','positive','<',pi/2});
-    if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters
-        localInvalid('The encounter range must exceed the collision safety margin.');
-    end
     for name=["m","Iz","lf","lr","wheelbase","length","width","gravity"]
         validateattributes(cfg.vehicle.(name),{'double'},{'scalar','real','finite','positive'});
     end

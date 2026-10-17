@@ -73,7 +73,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
                 testCase.verifyError(@()collisionAvoidanceControllerConfig(retired{1}), ...
                     'collisionAvoidanceController:invalidConfiguration');
             end
-            for invalid={struct('initialSearchSeconds',0),struct('minimumPredictionSeconds',7), ...
+            for invalid={struct('initialSearchSeconds',2),struct('minimumPredictionSeconds',1), ...
                     struct('settlingSeconds',Inf)}
                 testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('rti',invalid{1})), ...
                     'collisionAvoidanceController:invalidConfiguration');
@@ -89,18 +89,13 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('target',struct('rearAxleDistance',0))), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
-        function defaultCollisionBufferCanBeExplicitlyDisabled(testCase)
-            cfg = collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0.20);
-            cfg = collisionAvoidanceControllerConfig( ...
-                struct('collision', struct('safetyMarginMeters', 0)));
-            testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0);
-        end
-
-        function collisionBufferCannotBeNegativeOrNonfinite(testCase)
-            for margin = [-0.1, NaN, Inf]
-                testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
-                    struct('collision', struct('safetyMarginMeters', margin))), ...
+        function fixedCollisionAndPlannerBuffersAreNotConfigurationOptions(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            testCase.verifyFalse(isfield(cfg.collision,'safetyMarginMeters'));
+            testCase.verifyFalse(isfield(cfg.planner,'clearanceReserveMeters'));
+            for retired={struct('collision',struct('safetyMarginMeters',.2)), ...
+                    struct('planner',struct('clearanceReserveMeters',.2))}
+                testCase.verifyError(@()collisionAvoidanceControllerConfig(retired{1}), ...
                     'collisionAvoidanceController:invalidConfiguration');
             end
         end
@@ -114,8 +109,10 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidConfiguration');
         end
 
-        function encounterRangeMustExceedTheCollisionBuffer(testCase)
-            for range = [-1, 0, NaN, 0.05]
+        function encounterRangeHasNoArbitraryClearanceFloor(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('collision',struct('encounterRangeMeters',.05)));
+            testCase.verifyEqual(cfg.collision.encounterRangeMeters,.05);
+            for range = [-1, 0, NaN, Inf]
                 testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
                     struct('collision', struct('encounterRangeMeters', range))), ...
                     'collisionAvoidanceController:invalidConfiguration');

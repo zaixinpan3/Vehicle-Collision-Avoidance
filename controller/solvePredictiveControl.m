@@ -108,15 +108,20 @@ function [count,conflict]=localEncounterHorizon(model)
     % Bracket the nearest nominal encounter, not a fixed number of seconds.
     % Doubling the geometry grid costs O(N) in its final node count. The same
     % wall-clock deadline applies during this search and the one RTI solve.
-    cfg=model.cfg;h=cfg.controller.sampleTime;duration=cfg.rti.initialSearchSeconds;
+    cfg=model.cfg;h=cfg.controller.sampleTime;minimumDuration=h*cfg.controller.horizonSteps;duration=minimumDuration;
     projection=laneGeometry.project(model.initialState(1:2),model.lane);
-    generator=model.uncertainty.collisionGenerator;
-    reserve=sum(vecnorm(generator(1:2,:)));
-    if ~isempty(model.uncertainty.target),reserve=reserve+model.uncertainty.target.positionRadius;end
-    exitReserve=norm(cfg.nonlinear.trustRadius*[5;5])+reserve;
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    generator=model.uncertainty.collisionGenerator;
+    reserve=sum(vecnorm(generator(1:2,:))) ...
+        +2*(norm(shape(1:2))+norm(shape(3:4)))*sin(min(pi,sum(abs(generator(3,:))))/2);
+    if ~isempty(model.uncertainty.target)
+        set=model.uncertainty.target;
+        reserve=reserve+set.positionRadius ...
+            +2*(norm(model.target(8:9))+norm(model.target(10:11)))*sin(min(pi,set.courseRadius+set.sideslipRadius)/2);
+    end
+    exitReserve=norm(cfg.nonlinear.trustRadius*[5;5])+reserve;
     reach=norm(shape(1:2))+norm(shape(3:4))+norm(model.target(8:9))+norm(model.target(10:11)) ...
-        +cfg.collision.safetyMarginMeters+cfg.planner.clearanceReserveMeters+reserve;
+        +reserve;
     while true
         localCheckDeadline(model);
         time=(0:ceil(duration/h))*h;
@@ -136,7 +141,7 @@ function [count,conflict]=localEncounterHorizon(model)
             if separation(node)>reach,continue;end
             gap=predictiveSafetyGeometry.rectangle([position(:,node);heading(node)+model.nominalReference.state(3)], ...
                 shape,target(1:3,node),target(8:11,node));
-            conflictNodes(node)=gap<=cfg.collision.safetyMarginMeters+cfg.planner.clearanceReserveMeters;
+            conflictNodes(node)=gap<=reserve;
         end
         conflict=any(conflictNodes);
         difference=diff(separation(1:last));
@@ -147,9 +152,9 @@ function [count,conflict]=localEncounterHorizon(model)
         if bracketed,break;end
         duration=2*duration;
     end
-    duration=cfg.rti.minimumPredictionSeconds;
+    duration=minimumDuration;
     if conflict
-        duration=max(cfg.rti.initialSearchSeconds,time(find(conflictNodes,1,'last'))+cfg.rti.settlingSeconds);
+        duration=max(minimumDuration,time(find(conflictNodes,1,'last'))+cfg.rti.settlingSeconds);
     end
     count=ceil(duration/h);
 end
@@ -894,7 +899,7 @@ function [values,jacobian,tightening,escape]=localSafety(x,q,time,model,generato
             +2*norm(shape(1:2))*sin(min(pi,sum(abs(generator(3,:))))/2) ...
             +2*norm(q(8:9))*sin(tube.yawRadius/2);
         passed=forward.'*(x(1:2)-q(1:2))>norm(shape(1:2))+norm(q(8:9)) ...
-            +norm(shape(3:4))+norm(q(10:11))+cfg.collision.safetyMarginMeters+reserve;
+            +norm(shape(3:4))+norm(q(10:11))+reserve;
         if passed,escape=zeros(2,1);end
     end
     active=norm(escape)>0 || dual.distance<=1e-8;
@@ -902,7 +907,7 @@ function [values,jacobian,tightening,escape]=localSafety(x,q,time,model,generato
         dual=localEscapeDual(x,q,model,dual);
         escape=dual.normal;
     end
-    values=dual.value-cfg.collision.safetyMarginMeters;
+    values=dual.value;
     jacobian=dual.jacobian;
     % Directional position support retains correlation across the affine
     % ego dynamics. Rotation uses an exact chord bound for each rectangle.
@@ -965,7 +970,7 @@ function binding=localBinding(x,q,point,generator,tube,movement,cfg)
     yawRadius=sum(abs(generator(3,:)));
     tightening=sum(vecnorm(generator(1:2,:)))+tube.positionRadius(point) ...
         +2*egoReach*sin(min(pi,yawRadius)/2)+2*targetReach*sin(tube.yawRadius(point)/2);
-    lower=norm(x(1:2)-q(1:2))-egoReach-targetReach-cfg.collision.safetyMarginMeters-tightening;
+    lower=norm(x(1:2)-q(1:2))-egoReach-targetReach-tightening;
     binding=~(lower>movement);
 end
 

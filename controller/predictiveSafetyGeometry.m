@@ -19,7 +19,7 @@ classdef predictiveSafetyGeometry
                 inflation=inflation+set.positionRadius ...
                     +2*(norm(target(8:9,1))+norm(target(10:11,1)))*sin(min(pi,set.courseRadius+set.sideslipRadius)/2);
             end
-            margin=cfg.collision.safetyMarginMeters+inflation;
+            margin=inflation;
             [position,baseVelocity,baseAcceleration,baseHeading]=localGuideBase(x,curvature,0,time,cfg);
             gap=Inf(size(time));active=true(size(time));
             outside=find(vecnorm(position-target(1:2,:),2,1)> ...
@@ -30,7 +30,7 @@ classdef predictiveSafetyGeometry
                 gap(index)=predictiveSafetyGeometry.rectangle([position(:,index);baseHeading(index)],shape, ...
                     target(1:3,index),target(8:11,index));
             end
-            conflict=gap<=margin+cfg.planner.clearanceReserveMeters;
+            conflict=gap<=margin;
             guide=struct('time',time,'position',position,'velocity',baseVelocity, ...
                 'acceleration',baseAcceleration,'target',target,'direction',side*rotation(:,2), ...
                 'amplitude',0,'requestedAmplitude',0,'riseSeconds',duration, ...
@@ -68,7 +68,7 @@ classdef predictiveSafetyGeometry
             end
             guide.direction=normal;
             demand=predictiveSafetyGeometry.separationOffsets(position,baseHeading,shape, ...
-                target,normal,margin+cfg.planner.clearanceReserveMeters);
+                target,normal,margin);
             demand(~active)=0;
             % Each node supplies its own deadline. The most demanding d/t^2
             % selects a rise time analytically: S(q)/q^2 peaks at this q.
@@ -91,7 +91,7 @@ classdef predictiveSafetyGeometry
             heading=atan2(guideVelocity(2,:),guideVelocity(1,:));
             stopped=vecnorm(guideVelocity,2,1)<1e-8;heading(stopped)=baseHeading(stopped);
             demand=predictiveSafetyGeometry.separationOffsets(position,heading,shape,target,normal, ...
-                margin+cfg.planner.clearanceReserveMeters);
+                margin);
             demand(~active)=0;
             requested=max(requested,max([0,demand(2:end)./max(b(2:end),eps)]));
             amplitude=min(requested,budget*sqrt(3)*rise^2/10);

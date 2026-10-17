@@ -82,7 +82,8 @@ claim needs the compatible terminal uncertainty contract described below.
 
 Let Phi_f be the joint flow including the absorbing encounter flag. Let C
 require the declared physical/input conditions and any road constraints,
-and require rectangle separation by d_margin only on active branches.
+and require rectangle nonoverlap only on active branches. The extra design
+clearance is zero; uncertainty inflation remains part of the required support.
 Then the terminal set is the fixed-policy safe set
 
     X_f = { z : x_E is mild and Phi_f(z,t) satisfies C
