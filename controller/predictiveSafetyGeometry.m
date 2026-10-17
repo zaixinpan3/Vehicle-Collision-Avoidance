@@ -2,137 +2,128 @@ classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target prediction, uncertainty tubes and polygon geometry.
     methods (Static)
         function guide = avoidanceGuide(model,count,side)
-            % One O(N) geometric guide. Separation axes may change with time;
-            % the displacement direction and quintic rise-and-hold are fixed.
-            % Acceleration-limited geometry is guidance, never a certificate.
-            cfg=model.cfg;x=model.initialState;h=cfg.controller.sampleTime;
-            time=(0:2*count)*h/2;duration=time(end);
+            % Bounded candidate bank, actual vehicle rollouts, no trajectory
+            % optimizer. The field is guidance, not a robust safety filter.
+            cfg=model.cfg;time=(0:count)*cfg.controller.sampleTime;
             target=predictiveSafetyGeometry.predictTarget(model.target,time);
-            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-            curvature=model.nominalReference.curvature;
             generator=model.uncertainty.collisionGenerator;
-            inflation=sum(vecnorm(generator(1:2,:),2,1)) ...
+            reserve=sum(vecnorm(generator(1:2,:),2,1)) ...
                 +2*(norm(shape(1:2))+norm(shape(3:4)))*sin(min(pi,sum(abs(generator(3,:))))/2);
-            if ~isempty(model.uncertainty.target)
-                set=model.uncertainty.target;
-                inflation=inflation+set.positionRadius ...
-                    +2*(norm(target(8:9,1))+norm(target(10:11,1)))*sin(min(pi,set.courseRadius+set.sideslipRadius)/2);
+            % Match the runtime controller's per-hold target enclosure. A
+            % separate frozen-observer, full-horizon tube would rank seeds
+            % against a different problem and can swamp the actual geometry.
+            holdTime=[0,repmat(cfg.controller.sampleTime,1,count)];
+            starts=predictiveSafetyGeometry.predictTarget(model.target,max(0,time-holdTime));
+            support=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,holdTime);
+            tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,holdTime);
+            targetRadius=norm(target(8:9,1))+norm(target(10:11,1));
+            data=struct('target',target,'shape',shape,'reserve',reserve, ...
+                'support',support,'yawReserve',2*targetRadius*sin(tube.yawRadius/2));
+            data.parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
+            context=terminalSafeSet.context(model);
+            if isfield(model,'solveTimer')
+                context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
             end
-            margin=inflation;
-            [position,baseVelocity,baseAcceleration,baseHeading]=localGuideBase(x,curvature,0,time,cfg);
-            gap=Inf(size(time));active=true(size(time));
-            outside=find(vecnorm(position-target(1:2,:),2,1)> ...
-                cfg.collision.encounterRangeMeters+inflation+norm(cfg.nonlinear.trustRadius*[5;5]),1);
-            if ~isempty(outside),active(outside:end)=false;end
-            for index=1:numel(time)
-                if ~active(index),continue;end
-                gap(index)=predictiveSafetyGeometry.rectangle([position(:,index);baseHeading(index)],shape, ...
-                    target(1:3,index),target(8:11,index));
+            data.context=context;
+            free=localCirculationRollout(model,data,0,0,count,1);
+            conflict=free.gaps<=0;first=NaN;last=NaN;
+            if any(conflict),first=time(find(conflict,1));last=time(find(conflict,1,'last'));end
+            best=free;total=1;diagnostics=localCandidateSummary(free);
+            if any(conflict)
+                % Near rest, a stopping continuation is meaningful whereas
+                % acceleration-to-steering inversion has little authority.
+                if hypot(model.initialState(4),model.initialState(5))<cfg.model.kinematicSpeedRange(1)
+                    candidate=localCirculationRollout(model,data,0,0,count,-1);
+                    total=total+1;diagnostics(end+1)=localCandidateSummary(candidate);
+                    if localCandidateBetter(candidate,best),best=candidate;end
+                end
+                parameters=struct('direction',1,'speed',1,'inflation',reserve+support.positionRadius+data.yawReserve(1));
+                [~,field]=predictiveSafetyGeometry.circulationField(model.initialState,target(:,1),cfg,parameters);
+                projection=laneGeometry.project(model.initialState(1:2),model.lane);
+                lateral=[-sin(projection.heading);cos(projection.heading)];
+                preferred=sign((field.rotation*field.tangent).'*lateral)*side;
+                if preferred==0,preferred=1;end
+                directions=[preferred,-preferred];
+                if isfield(model,'circulationDirection') && model.circulationDirection~=0
+                    directions=model.circulationDirection;
+                end
+                budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
+                radius=field.egoRadius+cfg.planner.contourOffsetFraction*cfg.vehicle.width+parameters.inflation;
+                speed=min(max(norm(field.velocity),1),sqrt(budget*radius));
+                usable=false;
+                for fraction=cfg.planner.circulationSpeedFractions
+                    for direction=directions
+                        % Coasting keeps lateral authority when radial damping
+                        % would brake prematurely. Both variants use the same
+                        % circulation field and the actual Fiala rollout.
+                        for longitudinalWeight=[0,1]
+                            localPlannerDeadline(model);
+                            candidate=localCirculationRollout(model,data,direction,speed*fraction,count,longitudinalWeight);
+                            total=total+1;diagnostics(end+1)=localCandidateSummary(candidate); %#ok<AGROW>
+                            if localCandidateBetter(candidate,best),best=candidate;end
+                            usable=candidate.stateViolation<=1e-9 && min(candidate.gaps)>0 && candidate.terminalMember;
+                            if usable,break;end
+                        end
+                        if usable,break;end
+                    end
+                    if usable,break;end
+                end
             end
-            conflict=gap<=margin;
-            guide=struct('time',time,'position',position,'velocity',baseVelocity, ...
-                'acceleration',baseAcceleration,'target',target,'direction',side*rotation(:,2), ...
-                'amplitude',0,'requestedAmplitude',0,'riseSeconds',duration, ...
-                'conflictStartSeconds',NaN,'conflictEndSeconds',NaN,'initialConflict',gap(1)<=margin, ...
-                'accelerationBudget',cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity, ...
-                'maximumAcceleration',max(vecnorm(baseAcceleration,2,1)),'minimumGap',min(gap),'demandSatisfied',true,'brakingOnly',false);
-            if ~any(conflict),return;end
-            guide.conflictStartSeconds=time(find(conflict,1));
-            guide.conflictEndSeconds=time(find(conflict,1,'last'));
-            % Moderate deceleration is part of the sole seed, not an alternate
-            % command. Stopping truncates the distance and velocity together.
-            deceleration=cfg.planner.decelerationMetersPerSecondSquared;
-            targetDirection=predictiveSafetyGeometry.direction(target(3,1)+target(6,1));
-            if rotation(:,1).'*targetDirection>=sqrt(.5)
-                % A slower lead requires a passing reference; braking the
-                % guide first would erase the conflict that triggered it.
-                deceleration=0;
+            guide=best;guide.time=time;guide.target=target;
+            guide.position=best.states(1:2,:);guide.velocity=zeros(2,count+1);
+            for index=1:count+1
+                angle=best.states(3,index);rotation=[cos(angle),-sin(angle);sin(angle),cos(angle)];
+                guide.velocity(:,index)=rotation*best.states(4:5,index);
             end
-            if guide.initialConflict,deceleration=cfg.terminal.brakingDecelerationMetersPerSecondSquared;end
-            [position,baseVelocity,baseAcceleration,baseHeading]=localGuideBase(x,curvature,deceleration,time,cfg);
-            relative=position-target(1:2,:);squared=sum(relative.^2,1);squared(~active)=Inf;
-            [~,closest]=min(squared);
-            relativeVelocity=baseVelocity(:,closest)-target(4,closest) ...
-                *predictiveSafetyGeometry.direction(target(3,closest)+target(6,closest));
-            normal=[-relativeVelocity(2);relativeVelocity(1)];
-            if norm(normal)<1e-8,normal=relative(:,closest);end
-            if norm(normal)<1e-8,normal=side*rotation(:,2);end
-            normal=normal/norm(normal);orientation=normal.'*relative(:,closest);
-            aligned=abs(rotation(:,1).'*predictiveSafetyGeometry.direction(target(3,1)+target(6,1)))>=sqrt(.5);
-            if aligned || abs(orientation)<=1e-6
-                % Longitudinal encounters retain the planner/RTI passing side;
-                % tiny curved-path closest-point offsets must not reverse it.
-                if normal.'*(side*rotation(:,2))<0,normal=-normal;end
-            elseif orientation<0,normal=-normal;
-            end
-            guide.direction=normal;
-            demand=predictiveSafetyGeometry.separationOffsets(position,baseHeading,shape, ...
-                target,normal,margin);
-            demand(~active)=0;
-            % Each node supplies its own deadline. The most demanding d/t^2
-            % selects a rise time analytically: S(q)/q^2 peaks at this q.
-            % A rise may therefore continue after the first conflict node.
-            pressure=demand./max(time,h/2).^2;pressure(1)=0;
-            [~,critical]=max(pressure);phase=(5-sqrt(5))/6;
-            rise=min(duration,max(h,time(critical)/phase));
-            s=min(1,time/rise);b=10*s.^3-15*s.^4+6*s.^5;
-            bd=(30*s.^2-60*s.^3+30*s.^4)/rise;
-            bdd=(60*s-180*s.^2+120*s.^3)/rise^2;
-            requested=max([0,demand(2:end)./max(b(2:end),eps)]);
-            projection=abs(normal.'*baseAcceleration);
-            budget=max(0,min(sqrt(max(0,projection.^2+guide.accelerationBudget^2 ...
-                -sum(baseAcceleration.^2,1)))-projection));
-            amplitude=min(requested,budget*sqrt(3)*rise^2/10);
-            if guide.initialConflict,amplitude=0;guide.brakingOnly=true;end
-            % One bounded geometry correction accounts for the guide's body
-            % heading before the sole vehicle rollout. It adds no path search.
-            guideVelocity=baseVelocity+amplitude*normal*bd;
-            heading=atan2(guideVelocity(2,:),guideVelocity(1,:));
-            stopped=vecnorm(guideVelocity,2,1)<1e-8;heading(stopped)=baseHeading(stopped);
-            demand=predictiveSafetyGeometry.separationOffsets(position,heading,shape,target,normal, ...
-                margin);
-            demand(~active)=0;
-            requested=max(requested,max([0,demand(2:end)./max(b(2:end),eps)]));
-            amplitude=min(requested,budget*sqrt(3)*rise^2/10);
-            if guide.brakingOnly,amplitude=0;end
-            guide.position=position+amplitude*normal*b;
-            guide.velocity=baseVelocity+amplitude*normal*bd;
-            guide.acceleration=baseAcceleration+amplitude*normal*bdd;
-            guide.amplitude=amplitude;guide.requestedAmplitude=requested;guide.riseSeconds=rise;
-            guide.demandSatisfied=~guide.initialConflict && amplitude>=requested-1e-9;
-            guide.maximumAcceleration=max(vecnorm(guide.acceleration,2,1));
-            heading=atan2(guide.velocity(2,:),guide.velocity(1,:));heading(stopped)=baseHeading(stopped);
-            for index=1:numel(time)
-                if ~active(index),continue;end
-                gap(index)=predictiveSafetyGeometry.rectangle([guide.position(:,index);heading(index)],shape, ...
-                    target(1:3,index),target(8:11,index));
-            end
-            guide.minimumGap=min(gap);
+            guide.acceleration=[diff(guide.velocity,1,2)/cfg.controller.sampleTime,zeros(2,1)];
+            displacement=guide.position-free.states(1:2,:);
+            [~,furthest]=max(vecnorm(displacement,2,1));guide.direction=displacement(:,furthest);
+            if norm(guide.direction)>1e-9,guide.direction=guide.direction/norm(guide.direction);
+            else,guide.direction=side*[-sin(model.initialState(3));cos(model.initialState(3))];end
+            guide.candidateCount=total;guide.candidates=diagnostics;
+            guide.conflictStartSeconds=first;guide.conflictEndSeconds=last;
+            guide.minimumGap=min(best.gaps);guide.nominalMinimumGap=min(best.nominalGaps);
+            guide.initialConflict=conflict(1);guide.robustCertificate=false;
         end
 
-        function offsets = separationOffsets(position,heading,shape,target,normal,margin)
-            % Outward exit from a constant-size outer approximation of the
-            % rectangle Minkowski sum plus a margin disk. Ray/strip intervals
-            % use both vehicle axes and the displacement's tangent and normal.
-            % Outside the last interval endpoint, at least one support plane
-            % separates by margin. No single plane is imposed on every node.
-            count=size(position,2);offsets=zeros(1,count);
-            for index=1:count
-                re=[cos(heading(index)),-sin(heading(index));sin(heading(index)),cos(heading(index))];
-                rt=[cos(target(3,index)),-sin(target(3,index));sin(target(3,index)),cos(target(3,index))];
-                axes=[re,rt,normal,[-normal(2);normal(1)]];
-                center=position(:,index)+re*shape(3:4)-target(1:2,index)-rt*target(10:11,index);
-                support=shape(1:2).'*abs(re.'*axes)+target(8:9,index).'*abs(rt.'*axes)+margin;
-                projection=center.'*axes;slope=normal.'*axes;
-                parallel=abs(slope)<=1e-10;
-                if any(abs(projection(parallel))>support(parallel)),continue;end
-                moving=~parallel;
-                first=(-support(moving)-projection(moving))./slope(moving);
-                last=(support(moving)-projection(moving))./slope(moving);
-                enter=max(min(first,last));leave=min(max(first,last));
-                if enter<=leave && leave>=0,offsets(index)=leave;end
+        function [acceleration,field] = circulationField(x,target,cfg,parameters)
+            % Ideal second-order field in the target rectangle frame. Target
+            % translation, rotation and reference-point offset are retained.
+            % Its barrier algebra is not a certificate for limited Fiala inputs.
+            j=[0,-1;1,0];angle=target(3);r=[cos(angle),-sin(angle);sin(angle),cos(angle)];
+            course=predictiveSafetyGeometry.direction(angle+target(6));
+            curvature=sin(target(6))/target(7);omega=curvature*target(4);omegaDot=curvature*target(5);
+            center=target(1:2)+r*target(10:11);
+            centerVelocity=target(4)*course+omega*r*j*target(10:11);
+            centerAcceleration=target(5)*course+curvature*target(4)^2*j*course ...
+                +omegaDot*r*j*target(10:11)-omega^2*r*target(10:11);
+            re=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+            q=r.'*(x(1:2)-center);w=r.'*(re*x(4:5)-centerVelocity)-omega*j*q;
+            closest=min(target(8:9),max(-target(8:9),q));difference=q-closest;distance=norm(difference);
+            corner=all(abs(q)>target(8:9));
+            if distance>1e-10
+                normal=difference/distance;kappa=double(corner)/distance;
+            else
+                % A colliding seed still needs finite guidance. This extension
+                % has no clearance theorem and is never labelled certified.
+                [depth,axis]=min(target(8:9)-abs(q));normal=zeros(2,1);
+                normal(axis)=sign(q(axis));if normal(axis)==0,normal(axis)=1;end
+                distance=-depth;kappa=0;
             end
+            tangent=j*normal;nu=normal.'*w;tau=tangent.'*w;
+            corners=cfg.vehicle.rectangleOffset+[1,1,-1,-1;1,-1,1,-1].*[cfg.vehicle.length/2;cfg.vehicle.width/2];
+            egoRadius=max(vecnorm(corners,2,1));
+            h=distance-egoRadius-parameters.inflation;
+            desired=cfg.planner.contourOffsetFraction*cfg.vehicle.width;
+            rate=cfg.planner.radialRate;
+            relative=(-kappa*tau^2-2*rate*nu-rate^2*(h-desired))*normal ...
+                +(kappa*nu*tau+cfg.planner.tangentialRate*(parameters.direction*parameters.speed-tau))*tangent;
+            transport=r.'*centerAcceleration+2*omega*j*w+omegaDot*j*q-omega^2*q;
+            acceleration=r*(relative+transport);
+            field=struct('clearance',h,'normalSpeed',nu,'tangentSpeed',tau,'curvature',kappa, ...
+                'normal',normal,'tangent',tangent,'position',q,'velocity',w,'rotation',r, ...
+                'transport',transport,'egoRadius',egoRadius,'initialBarrier',nu+rate*h);
         end
 
         function uncertainty = observerUncertainty(ego,observation,q)
@@ -539,18 +530,124 @@ function [distance,point]=localPointSegment(vertex,first,last)
     point=first+alpha*edge;distance=norm(vertex-point);
 end
 
-function [position,velocity,acceleration,heading]=localGuideBase(x,curvature,deceleration,time,cfg)
-    % Continue the path curvature from the current position and course; on a
-    % straight path this is the constant-deceleration line. NRMM's arc formula
-    % keeps position, velocity and the stopped extension consistent.
-    speed=hypot(x(4),x(5));sideslip=atan2(x(5),x(4));course=x(3)+sideslip;
-    beta=asin(curvature*cfg.vehicle.lr);
-    parameters=[x(1:2);course-beta;speed;-deceleration;beta;cfg.vehicle.lr; ...
-        cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    forecast=predictiveSafetyGeometry.predictTarget(parameters,time);
-    direction=[cos(forecast(3,:)+beta);sin(forecast(3,:)+beta)];
-    position=forecast(1:2,:);velocity=direction.*forecast(4,:);
-    acceleration=-deceleration*direction.*(forecast(4,:)>0) ...
-        +curvature*[-direction(2,:);direction(1,:)].*forecast(4,:).^2;
-    heading=forecast(3,:)+beta-sideslip;
+function candidate=localCirculationRollout(model,data,direction,speed,count,longitudinalWeight)
+    cfg=model.cfg;h=cfg.controller.sampleTime;
+    candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
+        'gaps',Inf(1,count+1),'nominalGaps',Inf(1,count+1),'directionSign',direction, ...
+        'circulationSpeed',speed,'longitudinalWeight',longitudinalWeight, ...
+        'releaseNode',NaN,'terminalMember',false,'stateViolation',0,'cost',0);
+    candidate.states(:,1)=model.initialState;prior=model.previousInput;active=direction~=0;
+    attempts=0;lastRelease=-Inf;encounterEnded=false;
+    for index=1:count+1
+        if mod(index,8)==1,localPlannerDeadline(model);end
+        x=candidate.states(:,index);target=data.target(:,index);
+        [gap,nominal]=localPlannerGap(x,target,data,index);
+        outside=norm(x(1:2)-target(1:2))-data.reserve-data.support.ballRadius(index)>cfg.collision.encounterRangeMeters;
+        % Only an observed active encounter can end. Never suppress a future
+        % approach merely because an unobserved initial target is outside.
+        if index>1 && outside && norm(model.initialState(1:2)-model.target(1:2))<=cfg.collision.encounterRangeMeters
+            encounterEnded=true;
+        end
+        if encounterEnded,gap=Inf;nominal=Inf;end
+        candidate.gaps(index)=gap;candidate.nominalGaps(index)=nominal;
+        violation=localPlannerStateViolation(x,model);
+        candidate.stateViolation=max(candidate.stateViolation,violation);
+        error=nonlinearBicycleModel.error(x,model.lane,model.nominalReference);
+        candidate.cost=candidate.cost+h*(error(1)^2+.2*error(3)^2+.1*x(6)^2);
+        if index>count,break;end
+        if active && encounterEnded,active=false;candidate.releaseNode=index-1;end
+        if longitudinalWeight<0
+            b=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
+            rate=cfg.model.brakingRatioRateMaximum*h;
+            b=min(prior(2)+rate,max(prior(2)-rate,b));
+            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
+            u=[prior(1);min(upper(2),max(lower(2),b))];
+        elseif active
+            parameters=struct('direction',direction,'speed',speed, ...
+                'inflation',data.reserve+data.support.positionRadius+data.yawReserve(index));
+            [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
+            % Release only after a complete return-to-route rollout clears
+            % the same sampled target forecast. No local moving-away rule
+            % alone authorizes the return.
+            if field.normalSpeed>0 && index>2 && attempts<cfg.planner.releaseAttempts ...
+                    && index-lastRelease>=max(1,ceil(count/(cfg.planner.releaseAttempts+1)))
+                attempts=attempts+1;lastRelease=index;
+                continuation=localFreeContinuation(x,prior,index,model,data,count);
+                if continuation.valid
+                    candidate.states(:,index:end)=continuation.states;
+                    candidate.inputs(:,index:end)=continuation.inputs;
+                    active=false;candidate.releaseNode=index-1;
+                end
+            end
+            if active,u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,longitudinalWeight);
+            else,u=candidate.inputs(:,index);end
+        else
+            u=nonlinearBicycleModel.nominalFeedback(x,prior,model.lane,model.nominalReference,cfg,data.parameters);
+        end
+        candidate.inputs(:,index)=u;candidate.states(:,index+1)=nonlinearBicycleModel.sample(x,u,cfg);prior=u;
+    end
+    candidate.terminalMember=terminalSafeSet.member(data.context,candidate.states(:,end),count);
+    candidate.cost=candidate.cost+.01*sum(candidate.inputs(1,:).^2)+.01*sum(candidate.inputs(2,:).^2);
+end
+
+function continuation=localFreeContinuation(x,prior,index,model,data,count)
+    cfg=model.cfg;steps=count-index+1;
+    continuation=struct('states',zeros(6,steps+1),'inputs',zeros(2,steps),'valid',true);
+    continuation.states(:,1)=x;
+    for node=1:steps
+        if mod(node,8)==1,localPlannerDeadline(model);end
+        u=nonlinearBicycleModel.nominalFeedback(x,prior,model.lane,model.nominalReference,cfg,data.parameters);
+        x=nonlinearBicycleModel.sample(x,u,cfg);prior=u;
+        continuation.inputs(:,node)=u;continuation.states(:,node+1)=x;
+        [gap,~]=localPlannerGap(x,data.target(:,index+node),data,index+node);
+        if gap<=0 || localPlannerStateViolation(x,model)>1e-9,continuation.valid=false;return;end
+    end
+end
+
+function violation=localPlannerStateViolation(x,model)
+    cfg=model.cfg;
+    violation=max([0,cfg.model.speedMinimum-x(4),x(4)-cfg.model.speedMaximum, ...
+        abs(x(5))-cfg.model.lateralVelocityMaximum,abs(x(6))-cfg.model.yawRateMaximum]);
+    if x(4)>cfg.model.brakeHoldSpeed
+        violation=max(violation,abs(x(5))-tan(cfg.model.sideslipMaximum)*x(4));
+    end
+    if ~isempty(model.road.lateralClearance)
+        body=cfg.vehicle.rectangleOffset+[cfg.vehicle.length/2;cfg.vehicle.width/2].*[1,1,-1,-1;1,-1,1,-1];
+        rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+        projection=laneGeometry.project(x(1:2)+rotation*body,model.lane);
+        violation=max([violation,max(projection.lateralPosition)-model.road.lateralClearance(2), ...
+            -min(projection.lateralPosition)-model.road.lateralClearance(1)]);
+    end
+end
+
+function [gap,nominal]=localPlannerGap(x,target,data,index)
+    re=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+    rt=[cos(target(3)),-sin(target(3));sin(target(3)),cos(target(3))];axes=[re,rt];
+    center=x(1:2)+re*data.shape(3:4)-target(1:2)-rt*target(10:11);
+    supports=data.shape(1:2).'*abs(re.'*axes)+target(8:9).'*abs(rt.'*axes);
+    rows=abs(center.'*axes)-supports;nominal=max(rows);
+    targetReserve=predictiveSafetyGeometry.targetSupportFromData(data.support,index,axes.');
+    gap=max(rows-targetReserve.'-data.reserve-data.yawReserve(index));
+end
+
+function better=localCandidateBetter(candidate,best)
+    % A validated nominal is preferred, but an incomplete seed may still be
+    % repaired by RTI. Never label a least-violating seed as a safe witness.
+    a=[candidate.stateViolation,max(0,-min(candidate.nominalGaps)),max(0,-min(candidate.gaps)),double(~candidate.terminalMember),candidate.cost];
+    b=[best.stateViolation,max(0,-min(best.nominalGaps)),max(0,-min(best.gaps)),double(~best.terminalMember),best.cost];
+    difference=find(abs(a-b)>1e-9,1);better=~isempty(difference) && a(difference)<b(difference);
+end
+
+function summary=localCandidateSummary(candidate)
+    summary=struct('direction',candidate.directionSign,'speed',candidate.circulationSpeed, ...
+        'longitudinalWeight',candidate.longitudinalWeight, ...
+        'minimumGap',min(candidate.gaps),'nominalMinimumGap',min(candidate.nominalGaps), ...
+        'terminalMember',candidate.terminalMember,'stateViolation',candidate.stateViolation, ...
+        'releaseNode',candidate.releaseNode,'cost',candidate.cost);
+end
+
+function localPlannerDeadline(model)
+    if isfield(model,'solveTimer') && toc(model.solveTimer)>=model.solveTimeLimitSeconds
+        error('collisionAvoidanceController:timeBudgetExceeded','Circulation initialization exhausted the RTI budget.');
+    end
 end

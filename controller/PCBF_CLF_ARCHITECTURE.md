@@ -40,62 +40,70 @@ certificates. When no certificate is found, a moving endpoint uses nominal
 feedback and a stopped endpoint keeps a nonpositive longitudinal command.
 Thus the terminal certificate does not become a parking objective.
 
-With a previous trajectory, RTI first uses its shifted rollout, including on
-target acquisition. Without a previous trajectory, a target invokes the analytic
-planner directly; no target uses lane feedback. Local primal infeasibility
-also invokes this planner directly, without a separate risk-screening gate.
-Inside the planner, the geometric search starts from the measured position,
-course and speed, rather than projecting onto the nominal path at cruise speed.
-Its grid expands until the approaching interaction is bracketed and the conflict
-interval clears, or the target first exits perception. A stationary relative
-forecast stops this expansion. Search starts with `controller.horizonSteps`
-holds; there is no separate duration in seconds. The guide covers the conflict
-interval plus settling time. This is path construction, not a safety certificate.
-NRMM prediction and rectangle checks include hold midpoints in the guide. The
-planner chooses one displacement direction from closest-approach relative
-motion and constructs one quintic rise-and-hold reference. It retains the
-offset through the end of the horizon; the nominal-path CLF remains unchanged.
-Longitudinal encounters retain the prescribed passing side. A same-direction
-lead uses the unbraked base curve so that seed deceleration cannot erase the
-very conflict for which a passing reference is needed. The chosen guide,
-RTI prefix overlap normals share that side after a reference shift. Circular
-terminal-track rows choose the nearer inner or outer geometric chart; they
-do not inherit a road-side preference.
-The base curve starts at the measured position and course and continues the
-given path's curvature, using NRMM's analytic arc formula. Thus a curved-road
-initialization retains its turning motion instead of extrapolating a straight
-line. Its stopping extension remains at the final pose.
+With a previous trajectory, RTI first uses its shifted rollout. Every fresh
+reference with a target invokes the second-order circulation planner; no
+target uses lane feedback. Local primal infeasibility also invokes this
+planner, without a separate risk-screening gate. The encounter horizon starts
+at `controller.horizonSteps` and expands using measured motion and NRMM
+prediction. The initial search spans the larger of that prefix and the current
+stopping time plus settling time, avoiding distant intersections caused by
+nearly equal velocities. This is not a terminal deadline: terminal extension
+still continues until membership or the shared computation deadline.
 
-At each time, intersecting a displacement ray with a fixed number of rectangle
-support strips gives an outward exit distance. The strips use both vehicle
-axes and the displacement's normal and tangent, so the separating axis can
-change with time. Center offsets and available current pose/target enclosures
-are included. Node-wise displacement deadlines select the rise time and
-amplitude, without requiring the entire maximum offset before the first
-conflict. The most demanding distance divided by squared time selects a
-phase analytically; a single heading-aware support correction follows. Braking
-and deformation share one acceleration budget, including the longitudinal
-component of the displacement and the base curve's turning acceleration.
-Excess displacement demand is recorded rather than resolved by a path search.
-An initial margin conflict uses finite braking
-guidance without claiming to remove the current violation.
+The planner first rolls out the existing cruise feedback. If its sampled
+rectangle clearances require avoidance, it evaluates a small bank of clockwise
+and counterclockwise circulation rollouts at prescribed relative speeds, with
+both coasting and field-directed longitudinal acceleration. Near rest it also
+tries a stopping continuation. A
+selected nonzero circulation direction is retained across frames and fresh
+replanning within the same encounter; a new encounter may select either side.
+The distance normal varies with geometry without changing that direction.
 
-One Fiala-model forward rollout tracks this geometry with previewed curvature and
-longitudinal-acceleration feedforward plus the existing path feedback, respecting
-the braking bounds and slew limit. Its endpoint envelope accounts for both
-lateral acceleration and the stricter terminal sideslip cone at the predicted
-speed. The curvature preview uses one yaw-loop response time; it compensates
-the seed tracker's response lag without changing the optimized inputs. The
-geometric and vehicle-rollout clearances and endpoint membership are
-diagnostics, not robust certificates or whole-hold checks; an unsatisfactory
-seed still supplies one RTI. This is O(N) initialization per reference, with no
-candidate-path search or executable fallback.
+The field uses a frame attached to the target rectangle, including translation,
+rotation, angular acceleration and rectangle-center offsets. It encloses the
+ego footprint in a disk only for constructing the field. With clearance h,
+normal speed nu and tangential speed tau, the ideal unconstrained field gives
+
+    h_ddot + 2 lambda h_dot + lambda^2 (h - h_star) = 0,
+    tau_dot = k_t (sigma v_c - tau).
+
+The contour offset h_star is a guidance preference, not an added physical
+collision margin. Circulation speed is limited using the corner-radius and
+acceleration scales. World acceleration is converted to steering and signed
+braking ratio using the existing yaw loop and inverse Fiala force branch.
+The speed-dependent yaw demand also respects the model's sideslip operating
+scale. Braking amplitude and slew are retained, and every candidate state is
+obtained from `nonlinearBicycleModel.sample`. The Fiala input map is nonlinear:
+no affine-input algebraic barrier projection or additional hard friction-cone
+constraint is introduced, and the ideal field's safety theorem is not claimed
+for these limited vehicle controls.
+
+Actual body yaw and rectangle offsets determine candidate separation. Target
+uncertainty uses the same per-hold restarted enclosure as the current RTI;
+it is not replaced by an open-loop full-horizon target tube. This matching is
+an implementation convention, not a proof of the joint observer feedback tube.
+Candidate diagnostics retain nominal and inflated signed separation, state
+violations, terminal membership and candidate cost. A deficient seed may still
+be offered to RTI, but is never labelled a robust certificate.
+
+At a bounded number of release opportunities, a complete cruise-feedback
+continuation is rolled out. Release requires its sampled rectangle and state
+checks to pass. Otherwise circulation continues for that candidate. Candidate
+comparison favors admissible states, collision clearance and terminal
+membership before path and speed tracking cost. Search stops at the first
+candidate passing the sampled inflated geometry, state and terminal checks;
+otherwise it returns the best available seed with explicit deficit diagnostics.
+With a fixed bank and release
+budget, generation is O(N), apart from terminal certification and the existing
+adaptive horizon search. All work shares the controller-call deadline. The
+selected nonlinear rollout supplies both states and inputs for RTI; a planner
+candidate is never substituted for an optimized command.
 
 A solver-reported primal-infeasible subproblem triggers at most one fresh
 reference. The failed inputs, inherited separation normals and terminal
 linearization context are discarded. The planner runs again from the current
 measured state, target forecast, observer error sets and actual held input. Whenever a target is present, the planner supplies
-the fresh reference, even if it finds no geometric deformation necessary.
+the fresh reference, including a cruise rollout when no avoidance is needed.
 Without a target, nominal feedback supplies it. If the failed reference was
 already fresh, the retry adds one minimum prefix of settling holds, subject
 to an explicitly configured maximum, instead of rebuilding an identical seed.

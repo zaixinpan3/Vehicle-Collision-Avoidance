@@ -276,6 +276,43 @@ classdef nonlinearBicycleModel
             u=[atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-slip+terminal.steeringOffset;b];
         end
 
+        function u = accelerationGuidance(x,acceleration,previous,cfg,longitudinalWeight)
+            % Map a virtual world acceleration to initialization inputs using
+            % the existing yaw-rate loop and inverse Fiala branch. This is
+            % not an affine-input barrier projection or an execution filter.
+            if nargin<5,longitudinalWeight=1;end
+            speed=hypot(x(4),x(5));course=x(3)+atan2(x(5),x(4));
+            forward=[cos(course);sin(course)];lateral=[-forward(2);forward(1)];
+            tire=modifiedFialaTire.parameters(cfg);p=cfg.nominalClf;
+            desiredYaw=(lateral.'*acceleration)/max(speed,1);
+            limit=cfg.planner.lateralAccelerationFraction*min(tire.frictionCoefficient)*cfg.vehicle.gravity/max(speed,1);
+            % Slow turns must remain reachable in the same sideslip domain as
+            % the RTI model; a friction-only yaw demand grows as speed falls.
+            kinematicLimit=.8*tan(cfg.model.sideslipMaximum)*max(x(4),0)/cfg.vehicle.lr;
+            limit=min(limit,kinematicLimit);
+            desiredYaw=min(limit,max(-limit,desiredYaw));
+            longitudinal=longitudinalWeight*(forward.'*acceleration);
+            longitudinal=min(longitudinal,(cfg.model.speedMaximum-x(4))/cfg.controller.sampleTime);
+            b=(longitudinal+nonlinearBicycleModel.roadLoad(x(4),cfg)/cfg.vehicle.m)/modifiedFialaTire.accelerationGain(cfg);
+            b=min(p.brakingRatioLimit,max(-p.brakingRatioLimit,b));
+            rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
+            b=min(previous(2)+rate,max(previous(2)-rate,b));
+            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);b=min(upper(2),max(lower(2),b));
+            rear=modifiedFialaTire.evaluate([0;atan2(x(5)-cfg.vehicle.lr*x(6),max(x(4),cfg.model.scheduleSpeedFloor))],b,cfg);
+            front=(cfg.vehicle.Iz*p.yawRateGain*(desiredYaw-x(6))+cfg.vehicle.lr*rear(2))/cfg.vehicle.lf;
+            capacity=tire.longitudinalForceScale(1)*sqrt(1-b^2);
+            fraction=min(abs(front)/capacity,p.frontForceFraction);
+            slip=-sign(front)*atan(3*capacity*(1-(1-fraction)^(1/3))/tire.corneringStiffness(1));
+            steering=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor))-slip;
+            % The declared plant blends to a kinematic bicycle at low speed;
+            % invert that branch too instead of applying a tire-force inverse
+            % whose steering authority vanishes near rest.
+            beta=asin(min(1,max(-1,cfg.vehicle.lr*desiredYaw/max(speed,eps))));
+            kinematicSteering=atan((cfg.vehicle.lf+cfg.vehicle.lr)/cfg.vehicle.lr*tan(beta));
+            weight=localBlend(x(4),cfg);
+            u=[weight*steering+(1-weight)*kinematicSteering;b];
+        end
+
         function parameters = nominalGuidanceParameters(cfg,curvature)
             % Trim correction for the initialization guidance, not a CLF or command.
             persistent savedKey saved

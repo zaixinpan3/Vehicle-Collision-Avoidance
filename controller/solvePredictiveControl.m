@@ -12,6 +12,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     model.inputTrustScale=model.trust.scale;model.linearizationBuilds=0;
     model.solveTimer=timer;
     model.solveTimeLimitSeconds=max(0,cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
+    model.circulationDirection=0;
+    if isfield(model,'targetOnset') && ~model.targetOnset && isstruct(previousState) && isfield(previousState,'circulationDirection')
+        model.circulationDirection=previousState.circulationDirection;
+    end
     baseModel=model;minimumCount=cfg.controller.horizonSteps;
     history=struct([]);anchor=[];replan=false;
     rollout=struct('available',false,'reason',"noCompletedOptimization", ...
@@ -28,6 +32,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
             [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
             if anchor.planner.used
+                if anchor.planner.circulationDirection~=0,model.circulationDirection=anchor.planner.circulationDirection;end
                 projection=laneGeometry.project(model.initialState(1:2),model.lane);
                 lateral=anchor.guide.direction.'*[-sin(projection.heading);cos(projection.heading)];
                 if abs(lateral)>1e-8,model.collisionSide=sign(lateral);end
@@ -63,6 +68,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 else
                     solution.collisionEscapeNormals=model.collisionEscapeNormals;
                     solution.collisionSide=model.collisionSide;
+                    solution.circulationDirection=model.circulationDirection;
                     solution.retainCollisionSide=model.retainCollisionSide;
                     model.trust=localTrustRecord(model.trust,solution,model,rollout);
                     solution=localTerminalMetrics(solution,model);
@@ -147,6 +153,11 @@ function count=localPlanningHorizon(model,minimumCount)
     % wall-clock deadline applies during this search and the one RTI solve.
     cfg=model.cfg;h=cfg.controller.sampleTime;minimumDuration=h*minimumCount;duration=minimumDuration;
     x=model.initialState;speed=hypot(x(4),x(5));beta=atan2(x(5),x(4));
+    % A near-equal-speed target can put the next geometric intersection tens
+    % of seconds away. Initial search need only span a physically meaningful
+    % stopping/settling maneuver; the selected reference is still extended
+    % until terminal membership, without imposing a terminal duration cap.
+    preview=max(minimumDuration,speed/cfg.terminal.brakingDecelerationMetersPerSecondSquared+cfg.rti.settlingSeconds);
     arcBeta=asin(model.nominalReference.curvature*cfg.vehicle.lr);
     egoArc=[x(1:2);x(3)+beta-arcBeta;speed;0;arcBeta;cfg.vehicle.lr; ...
         cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
@@ -164,7 +175,7 @@ function count=localPlanningHorizon(model,minimumCount)
         +reserve;
     while true
         localCheckDeadline(model);
-        duration=min(duration,h*cfg.controller.maximumHorizonSteps);
+        duration=min([duration,preview,h*cfg.controller.maximumHorizonSteps]);
         time=(0:ceil(duration/h))*h;
         forecast=predictiveSafetyGeometry.predictTarget(egoArc,time);
         position=forecast(1:2,:);heading=forecast(3,:)+arcBeta-beta;
@@ -185,7 +196,7 @@ function count=localPlanningHorizon(model,minimumCount)
         approaching=~isempty(difference) && difference(end)<-1e-10;
         bracketed=~isempty(outside) || stationary || (~approaching && ~conflict);
         if conflict && ~conflictNodes(end),bracketed=true;end
-        if bracketed || numel(time)-1>=cfg.controller.maximumHorizonSteps,break;end
+        if bracketed || duration>=preview || numel(time)-1>=cfg.controller.maximumHorizonSteps,break;end
         duration=2*duration;
     end
     duration=minimumDuration;
@@ -203,8 +214,7 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount)
     if plan
         % A bounded planner supplies the route, never an executable fallback.
         count=localPlanningHorizon(model,minimumCount);
-        guideCount=count;
-        anchor=localPlanReference(model,count,guideCount);source="plannedAvoidanceRollout";return;
+        anchor=localPlanReference(model,count);source="plannedAvoidanceRollout";return;
     end
     old=zeros(2,0);source="nominalFeedbackRollout";
     if inherited
@@ -300,76 +310,32 @@ function input=localTailSeed(x,prior,model,parameters)
     end
 end
 
-function anchor=localPlanReference(model,count,guideCount)
-    % One analytic guide, one dynamically consistent rollout, then one RTI.
+function anchor=localPlanReference(model,count)
     cfg=model.cfg;[side,~]=localCollisionSide(model);wall=tic;
-    guide=predictiveSafetyGeometry.avoidanceGuide(model,guideCount,side);
-    geometrySeconds=toc(wall);localCheckDeadline(model);
+    guide=predictiveSafetyGeometry.avoidanceGuide(model,count,side);
     context=terminalSafeSet.context(model);
     context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
-    parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
-    inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=model.initialState;
-    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    guidance=cfg;guidance.nominalClf.lookaheadSeconds=cfg.planner.lookaheadSeconds;
-    guidance.nominalClf.lateralAccelerationFraction=cfg.planner.lateralAccelerationFraction;
-    prior=model.previousInput;gap=Inf;wall=tic;
-    for index=1:count
-        remaining=(count-index)*cfg.controller.sampleTime;
-        peak=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-        speedNow=hypot(states(4,index),states(5,index));
-        mild=min(.75*cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared, ...
-            .5*tan(cfg.terminal.sideslipMaximumRadians)*speedNow^2/cfg.vehicle.lr);
-        allowed=mild+(peak-mild)*min(1,max(0,(remaining-.4)/.6));
-        guidance.nominalClf.lateralAccelerationFraction=allowed/(min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity);
-        node=2*index-1;velocity=guide.velocity(:,node);speed=norm(velocity);
-        heading=model.initialState(3);if speed>1e-8,heading=atan2(velocity(2),velocity(1));end
-        lane=struct('referenceCurve',struct('origin',guide.position(:,node), ...
-            'heading',heading,'curvature',0,'length',200));
-        reference=model.nominalReference;reference.state(4)=min(cfg.model.speedMaximum,speed);reference.state(5)=0;
-        reference.curvature=0;
-        if speed<=1e-8,reference.input(2)=min(0,reference.input(2));end
-        if speed>1e-8
-            acceleration=guide.acceleration(:,node);
-            preview=min(numel(guide.time),node+round(2/(cfg.nominalClf.yawRateGain*cfg.controller.sampleTime)));
-            previewVelocity=guide.velocity(:,preview);previewAcceleration=guide.acceleration(:,preview);
-            previewSpeed=norm(previewVelocity);
-            if previewSpeed>1e-8
-                reference.curvature=(previewVelocity(1)*previewAcceleration(2)-previewVelocity(2)*previewAcceleration(1))/previewSpeed^3;
-            end
-            reference.input(2)=reference.input(2)+(velocity.'*acceleration/speed)/modifiedFialaTire.accelerationGain(cfg);
-        end
-        u=nonlinearBicycleModel.nominalFeedback(states(:,index),prior,lane,reference,guidance,parameters);
-        next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
-        inputs(:,index)=u;states(:,index+1)=next;prior=u;
-        node=2*index+1;
-        gap=min(gap,predictiveSafetyGeometry.rectangle(next(1:3),shape, ...
-            guide.target(1:3,node),guide.target(8:11,node)));
-        if mod(index,4)==0,localCheckDeadline(model);end
-    end
-    rolloutSeconds=toc(wall);member=terminalSafeSet.member(context,states(:,end),count);
-    planner=localPlannerMetadata();planner.used=true;planner.candidateCount=1;
-    planner.selectedOffsetMeters=guide.amplitude*guide.direction.'*[-sin(model.initialState(3));cos(model.initialState(3))];
-    planner.referenceTerminalMember=member;planner.referenceMinimumNodeGapMeters=gap;
+    planner=localPlannerMetadata();planner.used=true;planner.candidateCount=guide.candidateCount;
+    planner.candidates=guide.candidates;planner.circulationDirection=guide.directionSign;
+    planner.referenceTerminalMember=guide.terminalMember;
+    planner.referenceMinimumNodeGapMeters=guide.nominalMinimumGap;
+    planner.referenceMinimumInflatedGapMeters=guide.minimumGap;
+    planner.referenceStateViolation=guide.stateViolation;
+    planner.sampledNominalChecksPassed=guide.nominalMinimumGap>0 && guide.stateViolation<=1e-9 && guide.terminalMember;
     planner.conflictStartSeconds=guide.conflictStartSeconds;planner.conflictEndSeconds=guide.conflictEndSeconds;
-    planner.riseSeconds=guide.riseSeconds;planner.requestedAmplitudeMeters=guide.requestedAmplitude;
-    planner.amplitudeMeters=guide.amplitude;planner.geometryMinimumGapMeters=guide.minimumGap;
-    planner.accelerationBudgetMetersPerSecondSquared=guide.accelerationBudget;
-    planner.maximumGuideAccelerationMetersPerSecondSquared=guide.maximumAcceleration;
-    planner.geometricDemandSatisfied=guide.demandSatisfied;planner.brakingOnly=guide.brakingOnly;
-    planner.geometrySeconds=geometrySeconds;planner.rolloutSeconds=rolloutSeconds;
-    anchor=struct('inputs',inputs,'states',states,'terminalContext',context,'guide',guide, ...
+    planner.releaseSeconds=guide.releaseNode*cfg.controller.sampleTime;
+    planner.rolloutSeconds=toc(wall);
+    anchor=struct('inputs',guide.inputs,'states',guide.states,'terminalContext',context,'guide',guide, ...
         'appendedTerminalSteps',0,'appendedBrakingSteps',0,'planner',planner);
 end
 
 function planner=localPlannerMetadata()
-    planner=struct('used',false,'candidateCount',0,'selectedOffsetMeters',NaN, ...
-        'algorithm',"conflictIntervalAnalyticDeformation", ...
-        'referenceTerminalMember',false,'referenceMinimumNodeGapMeters',NaN, ...
-        'conflictStartSeconds',NaN,'conflictEndSeconds',NaN,'riseSeconds',NaN, ...
-        'requestedAmplitudeMeters',NaN,'amplitudeMeters',NaN,'geometryMinimumGapMeters',NaN, ...
-        'accelerationBudgetMetersPerSecondSquared',NaN,'maximumGuideAccelerationMetersPerSecondSquared',NaN, ...
-        'geometricDemandSatisfied',false,'brakingOnly',false,'geometrySeconds',0,'rolloutSeconds',0, ...
-        'robustCertificate',false);
+    planner=struct('used',false,'candidateCount',0,'algorithm',"secondOrderCirculation", ...
+        'circulationDirection',0,'candidates',struct([]),'referenceTerminalMember',false, ...
+        'referenceMinimumNodeGapMeters',NaN,'referenceMinimumInflatedGapMeters',NaN, ...
+        'referenceStateViolation',NaN,'sampledNominalChecksPassed',false, ...
+        'conflictStartSeconds',NaN,'conflictEndSeconds',NaN,'releaseSeconds',NaN, ...
+        'rolloutSeconds',0,'robustCertificate',false);
 end
 
 function trust=localTrustPrior(previous,cfg)

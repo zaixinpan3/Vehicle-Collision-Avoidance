@@ -13,7 +13,7 @@ terminal set and recursive feasibility.
 | `terminalSafeSet.m` | Joint encounter terminal set and explicit terminal controller (`jointState`, `jointSuccessor`, `jointMember`, `control`): the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with held steering and a forward-only stop, retaining first-exit memory; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and a bounded cruise-to-braking seed search distinct from the terminal law), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, a single conflict-interval-aware analytic avoidance guide, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, second-order circulation candidates with actual vehicle rollouts, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
@@ -21,22 +21,21 @@ terminal set and recursive feasibility.
 Each reference rollout supplies one affine model and at most two native solves
 for the PCBF/CLF objectives. Local primal infeasibility permits one fresh
 reference and RTI retry, sharing the original sample deadline. Every fresh
-reference with a target invokes a single-path analytic planner, including
-infeasibility retries, without a preceding risk gate. Warm references first
-attempt RTI on the shifted plan. The planner's base curve keeps the given
-path's curvature from the measured position and course. NRMM prediction and
-rectangle checks identify the entire conflict interval. Ray exits from
-rectangle support strips give a displacement demand at each time, allowing
-different separating axes during approach, passing and departure. One
-quintic rise-and-hold uses these deadlines; it may finish after the first
-conflict and does not return within the horizon. Moderate braking shares an
-acceleration budget with the deformation. One heading-aware geometry correction
-precedes exactly one nonlinear vehicle rollout, with feedforward and feedback
-tracking, curvature preview and a speed-dependent mild endpoint envelope. This rollout supplies
-the dynamics and collision linearizations. Its geometry, node-clearance and
-terminal diagnostics do not certify robust or whole-hold safety. Unmet guide
-demands remain visible; only solver-reported primal infeasibility triggers a retry. The optimized inputs are never
-replaced by a planner candidate. Cold references without a target use nominal feedback.
+reference with a target invokes the circulation planner, including infeasibility
+retries, without a preceding risk gate. Warm references first attempt RTI on
+the shifted plan. The planner evaluates cruise feedback and, when needed, a
+small bank of target-frame circulation controls, including coasting and
+field-directed speed variants and a near-rest stopping candidate. Search stops
+when a candidate passes all sampled initialization checks. Target transport terms and
+rounded-rectangle distance geometry supply the acceleration guide. The existing
+yaw loop and inverse Fiala map produce inputs, and the declared nonlinear model
+produces every state. Candidate checks use body-yaw rectangles, the runtime's
+per-hold error convention, physical-state limits and terminal membership.
+A bounded number of complete cruise-continuation checks controls release from
+circulation. The selected direction persists within an encounter. These checks
+are initialization diagnostics, not robust certificates. The primary and
+secondary RTI solves and direct execution of the optimized input are unchanged.
+Cold references without a target use nominal feedback.
 Warm references shift the previous inputs from the current estimate, retain
 their absolute endpoint until the minimum prefix is reached, and extend a
 terminal endpoint with a checked cruise or braking hold when available.
@@ -66,15 +65,14 @@ the collision and optional road rows. Road boundaries are disabled by default:
 the input reader clears edge metadata unless `controller.enforceRoadBoundaries` is explicitly enabled. With that opt-in,
 `lateralClearance = [right; left]` is the only lateral road constraint: every
 ego rectangle corner stays inside it at every predicted node and hold midpoint, including the endpoint. Both ends of every
-hold also keep the rear tire below Fiala saturation under the hold's braking
-ratio (one second-order cone) and the sideslip inside the estimator's cone
+hold keep the sideslip inside the estimator's cone
 `model.sideslipMaximum`. Horizon construction starts at `horizonSteps`; a shifted longer horizon shrinks
 one hold per frame until that minimum, then extends if its endpoint is nonterminal. The
 given path defines the single CLF; there is no separate path corridor.
 
 Observer inputs tighten sampled collision, road, physical-state, sideslip,
-front model-domain and terminal constraints. Rear handling cones act on the
-nominal state. Each hold starts from the current enclosure
+front model-domain and terminal constraints. Fiala saturation is part of the
+vehicle model, without an additional rear handling cone. Each hold starts from the current enclosure
 and propagates it through that hold only; the CLF row acts on the estimate. No
 posterior-inclusion algorithm has been implemented, and terminal invariance
 is established for the closed-form terminal law, not the complete Fiala
@@ -116,7 +114,7 @@ Initialization metadata uses `nominalFeedbackRollout`, `plannedAvoidanceRollout`
 and `shiftedInputRollout`.
 The legacy experiment entry names `runPotentialFieldCampaign` and
 `extendPotentialFieldRecovery` remain for existing campaign callers; the
-controller uses a single analytic avoidance guide and one vehicle rollout. Historical experiment
+controller uses a second-order circulation candidate bank and vehicle rollouts. Historical experiment
 records describe the algorithm version that actually produced them.
 
 MATLAB Control System Toolbox and the compiled Clarabel 0.11.1 adapter are required.

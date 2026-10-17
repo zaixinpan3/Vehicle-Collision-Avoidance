@@ -58,7 +58,7 @@ not nonlinear feasibility validation. The default 100 ms computation budget can
 return an explicit failure. Independent replay determines actual clearance and
 recovery. See [the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
 The campaign entry names containing `PotentialField` are retained for callers;
-they run the current controller, which has no potential-field avoidance planner.
+they run the current controller with second-order potential/circulation initialization and Fiala-model candidate rollouts.
 Routine outputs can use `/tmp/` instead of a persistent validation directory.
 
 `prepareCollisionAvoidanceController` warms MATLAB and the optimizer using a

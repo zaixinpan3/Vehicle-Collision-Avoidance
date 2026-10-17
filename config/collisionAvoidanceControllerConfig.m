@@ -38,12 +38,15 @@ function cfg=localDefaults()
         'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
     % One RTI model per reference. Local primal infeasibility permits one
     % fresh reference and retry, sharing the original controller deadline.
-    % Encounter search starts from horizonSteps, with no separate time span.
+    % Encounter search starts from horizonSteps and the current stopping time;
+    % the terminal extension has no separate duration cap.
     cfg.rti=struct('settlingSeconds',.5);
-    % Every fresh reference with a target uses one analytic rectangle-aware
-    % guide and one vehicle-model rollout; no risk gate bypasses replanning.
-    cfg.planner=struct('lookaheadSeconds',.5, ...
-        'decelerationMetersPerSecondSquared',1,'lateralAccelerationFraction',.9);
+    % Second-order circulation supplies initialization controls only. Each
+    % candidate is rolled through the declared Fiala model. Contour offset
+    % is a guidance preference, never an extra collision constraint.
+    cfg.planner=struct('radialRate',1,'tangentialRate',2, ...
+        'contourOffsetFraction',1,'circulationSpeedFractions',[1,.65], ...
+        'releaseAttempts',2,'lateralAccelerationFraction',.9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
     % The first certified exit ends this prediction's encounter. A fresh
@@ -169,9 +172,12 @@ function localValidate(cfg)
         localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
     end
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
-    for name=["lookaheadSeconds","decelerationMetersPerSecondSquared"]
+    for name=["radialRate","tangentialRate","contourOffsetFraction"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
+    validateattributes(cfg.planner.circulationSpeedFractions,{'double'}, ...
+        {'row','nonempty','real','finite','positive','<=',1});
+    validateattributes(cfg.planner.releaseAttempts,{'double'},{'scalar','integer','nonnegative','finite'});
     validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});

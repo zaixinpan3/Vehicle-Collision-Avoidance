@@ -46,16 +46,16 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
         end
-        function coldCrossingPlansOneReferenceBeforeTheRtiSolve(testCase)
+        function coldCrossingSelectsACirculationReferenceBeforeTheRtiSolve(testCase)
             [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("crossing",cfg);
             [command,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyFalse(problem.metadata.search.nominalRestarted);
-            testCase.verifyLessThan(problem.model.linearization.inputs(2,1),0);
+            testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             testCase.verifyTrue(problem.metadata.search.planner.used);
-            testCase.verifyEqual(problem.metadata.search.planner.candidateCount,1);
-            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"conflictIntervalAnalyticDeformation");
+            testCase.verifyGreaterThan(problem.metadata.search.planner.candidateCount,1);
+            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"secondOrderCirculation");
             testCase.verifyFalse(problem.metadata.search.planner.robustCertificate);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
@@ -68,8 +68,10 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(search.planner.used);
             testCase.verifyTrue(state.avoidanceInitialized);
             testCase.verifyGreaterThan(search.planner.conflictStartSeconds,cfg.controller.horizonSteps*cfg.controller.sampleTime);
-            testCase.verifyGreaterThan(search.planner.amplitudeMeters,1);
-            testCase.verifyGreaterThan(size(problem.inputTrajectory,2)*cfg.controller.sampleTime,5);
+            testCase.verifyGreaterThan(max(abs(problem.model.linearization.states(2,:))),1);
+            anchor=problem.model.linearization;
+            testCase.verifyGreaterThan(size(anchor.inputs,2)*cfg.controller.sampleTime,2);
+            testCase.verifyTrue(terminalSafeSet.member(anchor.terminalContext,anchor.states(:,end),size(anchor.inputs,2)));
             testCase.verifyEqual(search.rtiIterations,1);
             ego=localSuccessor(ego,state);q=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             [~,~,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
@@ -116,7 +118,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
             [~,search,model]=solvePredictiveControl(model,[],tic);
             testCase.verifyEqual(search.rtiIterations,1);
-            testCase.verifyEqual(search.planner.candidateCount,1);
+            testCase.verifyGreaterThan(search.planner.candidateCount,1);
             inputs=model.linearization.inputs;
             testCase.verifyLessThanOrEqual(max(abs(diff([0,inputs(2,:)]))), ...
                 cfg.controller.sampleTime+1e-12);
@@ -134,8 +136,9 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
                 projection=laneGeometry.project(x(1:2),problem.model.lane);
                 lateral=[-sin(projection.heading);cos(projection.heading)];
-                testCase.verifyGreaterThan(problem.model.linearization.guide.direction.'*lateral,0);
-                testCase.verifyEqual(problem.model.collisionSide,1);
+                chosen=sign(problem.model.linearization.guide.direction.'*lateral);
+                testCase.verifyNotEqual(chosen,0);
+                testCase.verifyEqual(problem.model.collisionSide,chosen);
             end
         end
         function preparingTheReferenceRoadDoesNotIssueACommand(testCase)
