@@ -140,7 +140,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             assert(isequaln(r.configuration,cfg) && r.scenario==name ...
                 && saved.stateTransition==options.StateTransition ...
                 && isfield(saved,'observationModel') && saved.observationModel==observationModel ...
-                && saved.prior.version==87, ...
+                && saved.prior.version==88, ...
                 'Continuation scenario, configuration and transition must match.');
             assert(isequaln(saved.recoveryOptions,recovery),'Recovery settings must match.');
             assert(isempty(r.trace) || (isfield(r.trace,'terminalDistanceMeters') ...
@@ -227,11 +227,13 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                             collisionDetected=true;collisionTime=ego.stateTime+times(j);
                         end
                     end
-                    rotation=[cos(states(j,3)),-sin(states(j,3));sin(states(j,3)),cos(states(j,3))];
-                    vertices=states(j,1:2).'+rotation*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);
-                    for vertex=1:4
-                        projection=laneGeometry.project(vertices(:,vertex),problem.model.lane);
-                        minimumRoadMargin=min([minimumRoadMargin;projection.lateralPosition+road.lateralClearance(1);road.lateralClearance(2)-projection.lateralPosition]);
+                    if cfg.controller.enforceRoadBoundaries && ~isempty(road.lateralClearance)
+                        rotation=[cos(states(j,3)),-sin(states(j,3));sin(states(j,3)),cos(states(j,3))];
+                        vertices=states(j,1:2).'+rotation*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);
+                        for vertex=1:4
+                            projection=laneGeometry.project(vertices(:,vertex),problem.model.lane);
+                            minimumRoadMargin=min([minimumRoadMargin;projection.lateralPosition+road.lateralClearance(1);road.lateralClearance(2)-projection.lateralPosition]);
+                        end
                     end
                 end
                 centerProjection=laneGeometry.project(states(:,1:2).',problem.model.lane);
@@ -426,6 +428,7 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
             [x,q,road,cfg]=collisionThreatScenario(name,controllerConfiguration);
         otherwise,error('runNonlinearPredictiveSafetyValidation:unknownScenario','Unknown scenario %s.',name);
     end
+    if ~cfg.controller.enforceRoadBoundaries,road.lateralClearance=[];end
     if ~isempty(q),target=localTarget(q);end
     ego=localEgo(x,0,[0;0]);
 end

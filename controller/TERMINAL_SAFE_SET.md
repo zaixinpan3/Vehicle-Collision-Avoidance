@@ -1,5 +1,11 @@
 # Joint encounter terminal set and terminal controller
 
+The current experiment defers road boundaries:
+`controller.enforceRoadBoundaries=false` clears road-edge metadata before
+constructing both the horizon and terminal constraints. The nominal path still
+defines the cruise CLF. Road conditions below apply only with the explicit
+road-boundary opt-in.
+
 ## State and task boundary
 
 The terminal condition belongs to the **joint encounter**, not to an ego speed

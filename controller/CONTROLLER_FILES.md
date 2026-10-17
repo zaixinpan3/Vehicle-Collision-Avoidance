@@ -20,9 +20,11 @@ terminal set and recursive feasibility.
 
 Each reference rollout supplies one affine model and at most two native solves
 for the PCBF/CLF objectives. Local primal infeasibility permits one fresh
-reference and RTI retry, sharing the original sample deadline. A cold cruise
-conflict invokes a single-path analytic reference planner. Its base curve keeps
-the given path's curvature from the measured position and course. NRMM prediction and
+reference and RTI retry, sharing the original sample deadline. Every fresh
+reference with a target invokes a single-path analytic planner, including
+infeasibility retries, without a preceding risk gate. Warm references first
+attempt RTI on the shifted plan. The planner's base curve keeps the given
+path's curvature from the measured position and course. NRMM prediction and
 rectangle checks identify the entire conflict interval. Ray exits from
 rectangle support strips give a displacement demand at each time, allowing
 different separating axes during approach, passing and departure. One
@@ -34,10 +36,13 @@ tracking, curvature preview and a speed-dependent mild endpoint envelope. This r
 the dynamics and collision linearizations. Its geometry, node-clearance and
 terminal diagnostics do not certify robust or whole-hold safety. Unmet guide
 demands remain visible; only solver-reported primal infeasibility triggers a retry. The optimized inputs are never
-replaced by a planner candidate. Other cold references use nominal feedback.
+replaced by a planner candidate. Cold references without a target use nominal feedback.
 Warm references shift the previous inputs from the current estimate, retain
 their absolute endpoint until the minimum prefix is reached, and extend a
 terminal endpoint with a checked cruise or braking hold when available.
+A nonterminal endpoint extends along its tangent until the declared terminal
+membership holds, subject to the shared computation deadline and any explicit
+horizon cap. Thus the minimum prefix is not a fixed terminal deadline.
 Those extension checks concern the reference and the sampled declared model;
 they do not certify robust terminal invariance or veto an optimized input.
 A retry discards the failed reference, old separation normals and terminal
@@ -57,13 +62,14 @@ target until it leaves the perception range, after the stop over the target's
 remaining track (`terminalSafeSet`). In the convex problem its conditions are
 linearized at the anchor endpoint: collision rows at the continuation's nodes,
 midpoints and parked pose, and road rows along it. The endpoint also carries
-the collision and road rows. The road `lateralClearance = [right; left]` is the
-only lateral constraint: every ego rectangle corner stays inside it at every
-predicted node and hold midpoint, including the endpoint. Both ends of every
+the collision and optional road rows. Road boundaries are disabled by default:
+the input reader clears edge metadata unless `controller.enforceRoadBoundaries` is explicitly enabled. With that opt-in,
+`lateralClearance = [right; left]` is the only lateral road constraint: every
+ego rectangle corner stays inside it at every predicted node and hold midpoint, including the endpoint. Both ends of every
 hold also keep the rear tire below Fiala saturation under the hold's braking
 ratio (one second-order cone) and the sideslip inside the estimator's cone
-`model.sideslipMaximum`. A cold no-target horizon is `horizonSteps`; a shifted longer horizon shrinks
-one hold per frame until that minimum. The
+`model.sideslipMaximum`. Horizon construction starts at `horizonSteps`; a shifted longer horizon shrinks
+one hold per frame until that minimum, then extends if its endpoint is nonterminal. The
 given path defines the single CLF; there is no separate path corridor.
 
 Observer inputs tighten sampled collision, road, physical-state, sideslip,

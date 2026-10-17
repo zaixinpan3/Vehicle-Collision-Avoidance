@@ -1525,30 +1525,28 @@ obey box bounds at the nodes and mid-hold points, with $v_x\geq0$. The
 steering angle has neither a magnitude nor a rate bound.
 
 The horizon length $M$ is not fixed. It has $N$ primary holds, on which
-the collision constraints may be relaxed, and it ends at the first node
-$M\geq N$ of the anchor that lies in the terminal set $\mathcal X_f$ of
-Section~\ref{subsec:terminal}, or at a largest length $M_{\max}$ when
-the anchor never reaches it.
+the collision constraints may be relaxed. The shifted plan or geometric guide
+determines an initial length of at least $N$ holds. Its endpoint is then
+extended until it lies in the terminal set $\mathcal X_f$ of
+Section~\ref{subsec:terminal}. An explicit finite $M_{\max}$ may cap extension;
+the default has no such cap. Computation remains subject to the sample deadline.
 
 \subsection{The Anchor}
 \label{subsec:initialization}
 
-At a cold nominal sample the anchor is a lane-feedback rollout. On target
-acquisition, nominal geometry search expands until the approaching
-interaction is bracketed and its sampled conflict interval clears, or the
-target first leaves sensing range. A stationary relative forecast terminates
-the expansion. The first grid consists of the existing minimum horizon of $N$ holds;
-there is no separate initial-search or minimum-duration parameter in seconds.
-A detected conflict, including one first recognized during a continuation,
-invokes one analytic geometric guide. The RTI horizon covers the detected
-conflict interval plus settling time, with no default duration or node cap.
-Search, formulation and solving all share the controller-call time budget.
-This is nominal initialization, not a certificate of every future encounter.
-A same-direction lead uses an unbraked guide base, preventing seed
-deceleration from erasing the passing opportunity. An encounter flag avoids
-repeating this initialization at every successful sample. Each later sample shifts the previous
-input plan by one hold and rolls it through $F$ from the current estimate.
-Its absolute endpoint is retained until the minimum prefix length $N$ is
+Without a previous plan, a target invokes one analytic geometric planner;
+without a target the anchor is a lane-feedback rollout. With a previous plan,
+RTI first shifts its inputs by one hold and rolls them through $F$ from the
+current estimate. No separate threat-screening gate can bypass replanning
+following local infeasibility. The planner's geometric search starts at the
+measured position, course and speed and expands until the approaching
+interaction and its conflict interval are bracketed, or the target first
+leaves sensing range. A stationary relative forecast terminates expansion.
+The first grid uses the minimum prefix of $N$ holds, with no separate duration
+parameter. The guide covers the detected conflict interval plus settling time.
+This is initialization, not a safety certificate. A same-direction lead uses
+an unbraked guide base so that seed deceleration cannot erase a passing conflict.
+The shifted plan's absolute endpoint is retained until the minimum prefix length $N$ is
 reached. Missing holds from a terminal endpoint prefer a checked
 cruise-feedback hold. A bounded cruise-to-braking seed search, with at most
 five scalar halvings, can retain terminal membership while avoiding
@@ -1556,12 +1554,22 @@ unnecessary braking. This numerical initializer is distinct from the
 unique terminal controller $\kappa_{\rm f}$. If no certified hold is found,
 a moving endpoint uses nominal feedback, whereas a stopped endpoint keeps
 a nonpositive longitudinal command instead of restarting into a local
-positive-input box. If a local convex subproblem reports primal
+positive-input box. A nonterminal anchor endpoint is extended along its tangent,
+using the vehicle model and speed-holding feedback, until it belongs to the
+terminal set. An immobile joint reference or an explicit finite horizon cap
+ends extension without certifying membership and leaves correction to RTI.
+The default has no horizon cap; extension shares the computation deadline with
+formulation and optimization. The terminal inequalities remain in the convex
+problem. This reference check is not a robust nonlinear certificate, and does
+not make stopping the nominal objective. Road boundaries are disabled in the
+current experiments; the given path still defines the cruise CLF.
+If a local convex subproblem reports primal
 infeasibility, one fresh initialization and RTI retry are allowed within the
 original controller-call budget. The retry discards the old input seed,
 separation normals and terminal linearization context, and regenerates the
-reference from the same current observation and uncertainty sets. It bypasses
-the encounter initialization flag. A failed reference that was already fresh
+reference from the same current observation and uncertainty sets. A target
+always invokes the planner on this retry; no nominal-cruise risk test gates it.
+A failed reference that was already fresh
 receives $N$ additional settling holds, subject to an explicitly configured
 horizon maximum. Dynamics tangents, separating directions, collision dual
 multipliers and terminal rows are recomputed at the new reference. No further

@@ -12,6 +12,7 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
     % so lateralClearance = [right; left] = [1.5 lanes + shoulder; 2.5 lanes +
     % shoulder] from the given path.
     road = struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
+    if ~cfg.controller.enforceRoadBoundaries,road.lateralClearance=[];end
     state = [0;0;0;cfg.referenceSpeed;0;0];
     lr = cfg.target.rearAxleDistance;
     impactTime = 1.6;curvature = 0;
@@ -56,7 +57,7 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
     end
     curve = struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200);
     if curvature~=0
-        road = struct('referenceCurve',curve,'lateralClearance',[8.5344;12.192]);
+        road = struct('referenceCurve',curve,'lateralClearance',road.lateralClearance);
         trim = nonlinearBicycleModel.cruise(cfg,curvature);
         state = trim.state;state(1:2) = 0;
     end

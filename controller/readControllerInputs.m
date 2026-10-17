@@ -18,6 +18,7 @@ function [ego,lane,road,target] = readControllerInputs(egoState,targetEstimate,l
         end
     end
     [lane,road]=localReadLane(laneCenterline,ego);
+    if ~cfg.controller.enforceRoadBoundaries,road.lateralClearance=[];end
     target=[];
     if isempty(targetEstimate),return;end
     validateattributes(targetEstimate,{'struct'},{'scalar'},mfilename,'targetEstimate');

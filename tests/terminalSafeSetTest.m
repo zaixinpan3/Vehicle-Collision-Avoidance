@@ -236,7 +236,9 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             localDecision(testCase,[0;0;0;8;0;0],[0;40;0;5;0;.05;1.6;2.4;.95;0;0],true,"parked");
         end
         function theEndpointMustBeMildAndTheContinuationOnTheRoad(testCase)
-            model=localModel([0;.3;0;8;0;0],[]);context=terminalSafeSet.context(model);
+            model=localModel([0;.3;0;8;0;0],[]);
+            model.cfg.controller.enforceRoadBoundaries=true;
+            model.road.lateralClearance=[8.5344;12.192];context=terminalSafeSet.context(model);
             [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
             testCase.verifyTrue(member);testCase.verifyEqual(info.reason,"noTarget");
             % Heading toward the left edge: the braking arc leaves the road.

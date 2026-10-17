@@ -157,9 +157,10 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
         function anInfeasibleWarmReferenceReplansBeforeReturningAnOptimizedCommand(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[3;3];
+            cfg.controller.enforceRoadBoundaries=true;cfg.controller.maximumHorizonSteps=32;
             [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior);
-            prior.inputTrajectory=repmat([.25;0],1,size(prior.inputTrajectory,2));
+            prior.inputTrajectory=repmat([.25;0],1,32);
             [command,inputs,problem]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,prior);
             search=problem.metadata.search;
             testCase.verifyTrue(search.nominalRestarted);
@@ -167,7 +168,9 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.selectedAttempt,2);
             testCase.verifyEqual(search.linearizationCount,2);
             testCase.verifyEqual(search.attempts(1).stages(end).exitFlag,-2);
-            testCase.verifyEqual(search.attempts(2).initialization,"nominalFeedbackRollout");
+            testCase.verifyEqual(search.attempts(2).initialization,"plannedAvoidanceRollout");
+            testCase.verifyTrue(search.planner.used);
+            testCase.verifyTrue(isnan(search.planner.conflictStartSeconds));
             testCase.verifyEqual(search.solverCalls,sum([search.attempts.solverCalls]));
             testCase.verifyLessThanOrEqual(search.solverCalls,4);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
@@ -255,11 +258,12 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
         function impossibleRoadHasNoRelaxedCommand(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[.5;.5];
+            cfg.controller.enforceRoadBoundaries=true;cfg.controller.maximumHorizonSteps=16;
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
         function anImpossibleRoadStopsAfterOneFreshReferenceRetry(testCase)
-            [ego,road,cfg]=localFixture();
+            [ego,road,cfg]=localFixture();cfg.controller.maximumHorizonSteps=16;
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             model=nominal.model;model.road.lateralClearance=[.5;.5];timer=tic;
             [solution,search,model]=solvePredictiveControl(model,[],timer);
@@ -274,6 +278,41 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(model.solveTimeLimitSeconds, ...
                 cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
             testCase.verifyEqual(search.solverCalls,sum([search.attempts.solverCalls]));
+        end
+        function roadEdgesAreDeferredWithoutChangingTheCruisePath(testCase)
+            [ego,road,cfg]=localFixture();ego.position(2)=.1;
+            [~,inputs,withoutEdges]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            road.lateralClearance=[.5;.5];
+            [~,withEdges,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            testCase.verifyEmpty(problem.model.road.lateralClearance);
+            testCase.verifyEqual(problem.model.terminalContext.clearance,[Inf;Inf]);
+            testCase.verifyEqual(problem.model.lane,withoutEdges.model.lane);
+            testCase.verifyEqual(problem.metadata.clfInitialValue,withoutEdges.metadata.clfInitialValue);
+            testCase.verifyEqual(withEdges,inputs,AbsTol=1e-10);
+        end
+        function aShortPrefixExtendsUntilTheReferenceCanBrakeSafely(testCase)
+            [ego,road,cfg]=localFixture();
+            ego.position=[21.52;7.33];ego.yaw=.017;ego.speed=6.21;
+            ego.lateralVelocity=-.153;ego.yawRate=-.14;
+            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            anchor=problem.model.linearization;count=size(anchor.inputs,2);
+            testCase.verifyGreaterThan(count,cfg.controller.horizonSteps);
+            testCase.verifyGreaterThan(problem.metadata.search.appendedGuidedSteps,0);
+            testCase.verifyTrue(terminalSafeSet.member(anchor.terminalContext,anchor.states(:,end),count));
+            testCase.verifyEqual(problem.metadata.search.extensionStopped,"terminalMember");
+            testCase.verifyGreaterThan(anchor.states(4,end),5);
+            localVerifyRollouts(testCase,problem,cfg);
+        end
+        function planningUsesMeasuredSpeedWhenCruiseSpeedWouldMissTheConflict(testCase)
+            [ego,road,cfg]=localFixture();cfg.referenceSpeed=15;cfg.controller.horizonSteps=16;
+            ego.position=[84.567;-.623471];ego.yaw=-.0654507;ego.speed=.0799722;
+            ego.lateralVelocity=.00427434;ego.yawRate=.00259123;
+            target=[84.4527;-14.699;1.04376;16.45;1;.05;1.6;2.4;.95;0;0];
+            [~,~,problem]=collisionAvoidanceController(ego,localTarget(target),road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.search.planner.used);
+            testCase.verifyTrue(isfinite(problem.metadata.search.planner.conflictStartSeconds));
+            testCase.verifyLessThan(problem.metadata.search.planner.conflictStartSeconds,1.5);
+            testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
         end
         function exhaustedBudgetDoesNotExecuteThePreviousTrajectory(testCase)
             [ego,road,cfg]=localFixture();

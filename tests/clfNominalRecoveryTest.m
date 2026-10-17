@@ -62,13 +62,16 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 testCase.verifyLessThan(nonlinearBicycleModel.nominalValue(x,road,reference),initialValue);
             end
         end
-        function aDistantReversedReferenceCanFailWithoutNonlinearRestoration(testCase)
+        function aDistantReversedReferenceCanExtendPastTheShortPrefix(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',8),'solver',struct('timeLimitSeconds',5)));
             ego=struct('position',[0;-40],'yaw',2.5,'speed',6, ...
                 'lateralVelocity',.3,'yawRate',.1,'heldActuatorInput',[0;0]);
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]), ...
-                'collisionAvoidanceController:noOptimizationSolution');
+            [command,inputs,problem]=collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]);
+            testCase.verifyGreaterThan(size(inputs,2),cfg.controller.horizonSteps);
+            testCase.verifyTrue(problem.metadata.search.planner.referenceTerminalMember);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
+            testCase.verifyFalse(problem.metadata.postSolveInputModification);
         end
         function cruiseStaysOnTheReference(testCase,referenceSpeed,curvature)
             % Started on the reference, the cruise stays there: the plan's

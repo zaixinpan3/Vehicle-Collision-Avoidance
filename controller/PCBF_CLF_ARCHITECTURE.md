@@ -40,19 +40,17 @@ certificates. When no certificate is found, a moving endpoint uses nominal
 feedback and a stopped endpoint keeps a nonpositive longitudinal command.
 Thus the terminal certificate does not become a parking objective.
 
-Cold nominal operation uses lane feedback. On acquisition, nominal-cruise
-threat screening expands its geometry grid until the approaching interaction
-is bracketed and its sampled conflict interval clears, or the target first
-exits perception. A stationary relative forecast needs no further expansion.
-Search starts with `controller.horizonSteps` holds and expands as needed;
-there is no separate initial or minimum duration in seconds.
-A detected threat invokes one analytic geometric planner, including when a
-previously benign target becomes threatening during a continuation. An
-encounter flag prevents replanning an initialized maneuver every frame.
-The RTI horizon covers the detected conflict interval plus settling time;
-there is no default duration or node-count cap. Search and formulation remain
-subject to the controller-call deadline. This nominal geometry search is an
-initialization heuristic, not a certificate of all future interactions.
+With a previous trajectory, RTI first uses its shifted rollout, including on
+target acquisition. Without a previous trajectory, a target invokes the analytic
+planner directly; no target uses lane feedback. Local primal infeasibility
+also invokes this planner directly, without a separate risk-screening gate.
+Inside the planner, the geometric search starts from the measured position,
+course and speed, rather than projecting onto the nominal path at cruise speed.
+Its grid expands until the approaching interaction is bracketed and the conflict
+interval clears, or the target first exits perception. A stationary relative
+forecast stops this expansion. Search starts with `controller.horizonSteps`
+holds; there is no separate duration in seconds. The guide covers the conflict
+interval plus settling time. This is path construction, not a safety certificate.
 NRMM prediction and rectangle checks include hold midpoints in the guide. The
 planner chooses one displacement direction from closest-approach relative
 motion and constructs one quintic rise-and-hold reference. It retains the
@@ -95,11 +93,10 @@ candidate-path search or executable fallback.
 
 A solver-reported primal-infeasible subproblem triggers at most one fresh
 reference. The failed inputs, inherited separation normals and terminal
-linearization context are discarded. Encounter screening and initialization
-run again from the current measured state, target forecast, observer error
-sets and actual held input. A current conflict generates a new avoidance guide;
-otherwise nominal feedback generates the recovery reference. The old encounter
-initialization flag cannot suppress this retry. If the failed reference was
+linearization context are discarded. The planner runs again from the current
+measured state, target forecast, observer error sets and actual held input. Whenever a target is present, the planner supplies
+the fresh reference, even if it finds no geometric deformation necessary.
+Without a target, nominal feedback supplies it. If the failed reference was
 already fresh, the retry adds one minimum prefix of settling holds, subject
 to an explicitly configured maximum, instead of rebuilding an identical seed.
 The new reference uses the configured initial trust scale. Dynamics tangents,
@@ -109,10 +106,23 @@ are unchanged. Numerical iteration limits, timeouts and unavailable nonlinear
 predictions do not trigger replanning. Both attempts share the original timer;
 the retry cannot reset or extend the computation budget.
 
-Cold no-target and nonconflicting operation use `controller.horizonSteps`.
-Conflict duration is selected from the nominal encounter. `controller.maximumHorizonSteps=Inf`
-disables a default node cap; an explicit finite override is a computational
-choice. The selected route supplies the dynamics and collision reference.
+`controller.horizonSteps` is a minimum, not a terminal deadline. After rolling
+out any seed, a nonterminal endpoint is extended along its tangent using the
+vehicle model and speed-holding path feedback until terminal membership is
+reached. This settling extension removes the artificial requirement to turn
+back to the cruise path within a short prefix. The cruise-path CLF is unchanged,
+and a moving terminal endpoint does not command parking. An immobile reference
+with no moving target is passed to RTI for correction rather than extended
+indefinitely. An explicitly configured finite horizon cap also ends extension;
+otherwise `maximumHorizonSteps=Inf` supplies no time-horizon cap. Geometry,
+extension, formulation and solving share the original computation deadline.
+The endpoint still carries the optimizer's terminal constraints; seed membership
+is not a robust nonlinear certificate.
+
+Road boundaries are deferred by default (`controller.enforceRoadBoundaries=false`).
+Input road metadata then supplies only the nominal path; edge inequalities are
+absent from the horizon, terminal continuation and replay road-departure audit.
+An explicit opt-in retains the optional road-constrained experiment.
 A reference need not satisfy every constraint to construct the one subproblem;
 failure to satisfy its hard rows remains an optimization failure.
 
@@ -122,7 +132,7 @@ Every reference is an exact declared-model rollout. The dynamics increments obey
     dx_{i+1} = A_i dx_i + B_i du_i.
 
 The dynamics, rectangle multipliers and terminal tangents are rebuilt once per
-sample. The nonlinear rollout of the optimized inputs is stored separately from
+reference. The nonlinear rollout of the optimized inputs is stored separately from
 the affine predicted states. No second model is constructed from that rollout.
 
 ## Constraints and objective hierarchy

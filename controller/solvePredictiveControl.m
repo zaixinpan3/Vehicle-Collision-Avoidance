@@ -23,6 +23,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             localCheckDeadline(model);
             wall=tic;
             [anchor,source]=localRtiInitialize(model,previousState,minimumCount);
+            anchor=localExtendReference(anchor,model);
             search.initializationSeconds=toc(wall);search.initialization=source;
             model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
             [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
@@ -105,6 +106,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         search.appendedBrakingSteps=anchor.appendedBrakingSteps;search.planner=anchor.planner;
     end
     search.appendedGuidedSteps=0;search.extensionStopped="";
+    if ~isempty(anchor) && isfield(anchor,'extensionStopped')
+        search.appendedGuidedSteps=anchor.extensionSteps;search.extensionStopped=anchor.extensionStopped;
+    end
     search.potentialFieldRestarted=false;search.initializationFailure="";
     search.attempts=history;search.selectedAttempt=numel(history)*double(search.returned);
     search.solverCalls=sum([history.solverCalls]);
@@ -135,12 +139,17 @@ function [side,retain]=localCollisionSide(model)
     end
 end
 
-function [count,conflict]=localEncounterHorizon(model)
-    % Bracket the nearest nominal encounter, not a fixed number of seconds.
+function count=localPlanningHorizon(model,minimumCount)
+    % Size the geometric path around the encounter from the measured motion.
+    % This never decides whether to call the planner: every fresh reference
+    % with a target is planned, including every infeasibility-triggered retry.
     % Doubling the geometry grid costs O(N) in its final node count. The same
     % wall-clock deadline applies during this search and the one RTI solve.
-    cfg=model.cfg;h=cfg.controller.sampleTime;minimumDuration=h*cfg.controller.horizonSteps;duration=minimumDuration;
-    projection=laneGeometry.project(model.initialState(1:2),model.lane);
+    cfg=model.cfg;h=cfg.controller.sampleTime;minimumDuration=h*minimumCount;duration=minimumDuration;
+    x=model.initialState;speed=hypot(x(4),x(5));beta=atan2(x(5),x(4));
+    arcBeta=asin(model.nominalReference.curvature*cfg.vehicle.lr);
+    egoArc=[x(1:2);x(3)+beta-arcBeta;speed;0;arcBeta;cfg.vehicle.lr; ...
+        cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     generator=model.uncertainty.collisionGenerator;
     reserve=sum(vecnorm(generator(1:2,:))) ...
@@ -155,14 +164,10 @@ function [count,conflict]=localEncounterHorizon(model)
         +reserve;
     while true
         localCheckDeadline(model);
+        duration=min(duration,h*cfg.controller.maximumHorizonSteps);
         time=(0:ceil(duration/h))*h;
-        if isfield(model.lane,'referenceCurve')
-            [position,heading]=laneGeometry.referencePose(projection.station+cfg.referenceSpeed*time,0,model.lane.referenceCurve);
-        else
-            tangent=[cos(projection.heading);sin(projection.heading)];normal=[-tangent(2);tangent(1)];
-            position=model.initialState(1:2)-projection.lateralPosition*normal+cfg.referenceSpeed*time.*tangent;
-            heading=repmat(projection.heading,size(time));
-        end
+        forecast=predictiveSafetyGeometry.predictTarget(egoArc,time);
+        position=forecast(1:2,:);heading=forecast(3,:)+arcBeta-beta;
         target=localTargetAt(model,time);separation=vecnorm(position-target(1:2,:),2,1);
         outside=find(separation>cfg.collision.encounterRangeMeters+exitReserve,1);
         last=numel(time);if ~isempty(outside),last=outside-1;end
@@ -170,7 +175,7 @@ function [count,conflict]=localEncounterHorizon(model)
         for node=1:last
             if mod(node,16)==1,localCheckDeadline(model);end
             if separation(node)>reach,continue;end
-            gap=predictiveSafetyGeometry.rectangle([position(:,node);heading(node)+model.nominalReference.state(3)], ...
+            gap=predictiveSafetyGeometry.rectangle([position(:,node);heading(node)], ...
                 shape,target(1:3,node),target(8:11,node));
             conflictNodes(node)=gap<=reserve;
         end
@@ -180,28 +185,24 @@ function [count,conflict]=localEncounterHorizon(model)
         approaching=~isempty(difference) && difference(end)<-1e-10;
         bracketed=~isempty(outside) || stationary || (~approaching && ~conflict);
         if conflict && ~conflictNodes(end),bracketed=true;end
-        if bracketed,break;end
+        if bracketed || numel(time)-1>=cfg.controller.maximumHorizonSteps,break;end
         duration=2*duration;
     end
     duration=minimumDuration;
     if conflict
         duration=max(minimumDuration,time(find(conflictNodes,1,'last'))+cfg.rti.settlingSeconds);
     end
-    count=ceil(duration/h);
+    count=min(ceil(duration/h),cfg.controller.maximumHorizonSteps);
 end
 
 function [anchor,source]=localRtiInitialize(model,previous,minimumCount)
-    cfg=model.cfg;count=minimumCount;conflict=false;
-    if ~isempty(model.target)
-        [encounterCount,conflict]=localEncounterHorizon(model);count=max(count,encounterCount);
-    end
+    cfg=model.cfg;count=minimumCount;
     inherited=isstruct(previous) && isfield(previous,'inputTrajectory') ...
         && size(previous.inputTrajectory,2)>1 && all(isfinite(previous.inputTrajectory),'all');
-    planned=inherited && isfield(previous,'avoidanceInitialized') && previous.avoidanceInitialized;
-    plan=conflict && (~planned || model.targetOnset);
+    plan=~isempty(model.target) && ~inherited;
     if plan
         % A bounded planner supplies the route, never an executable fallback.
-        count=min(count,cfg.controller.maximumHorizonSteps);
+        count=localPlanningHorizon(model,minimumCount);
         guideCount=count;
         anchor=localPlanReference(model,count,guideCount);source="plannedAvoidanceRollout";return;
     end
@@ -249,6 +250,44 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount)
     end
     anchor=struct('inputs',inputs,'states',states,'terminalContext',context, ...
         'appendedTerminalSteps',appended,'appendedBrakingSteps',braking,'planner',localPlannerMetadata());
+end
+
+function anchor=localExtendReference(anchor,model)
+    % A short prefix is not a terminal deadline. Extend the same reference
+    % along its endpoint tangent until a mild, safe braking endpoint exists.
+    % This changes only the RTI seed; the optimized command is never repaired.
+    cfg=model.cfg;context=anchor.terminalContext;count=size(anchor.inputs,2);
+    initialCount=count;anchor.extensionSteps=0;anchor.extensionStopped="terminalMember";
+    x=anchor.states(:,end);prior=anchor.inputs(:,end);
+    member=terminalSafeSet.member(context,x,count);
+    anchor.planner.referenceTerminalMember=member;
+    if member,return;end
+    heading=x(3)+atan2(x(5),x(4));
+    lane=struct('referenceCurve',struct('origin',x(1:2),'heading',heading,'curvature',0,'length',200));
+    reference=model.nominalReference;reference.curvature=0;
+    reference.state(3)=0;reference.state(4)=min(cfg.model.speedMaximum,hypot(x(4),x(5)));reference.state(5:6)=0;
+    parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,0);
+    while ~member && count<cfg.controller.maximumHorizonSteps
+        localCheckDeadline(model);
+        u=nonlinearBicycleModel.nominalFeedback(x,prior,lane,reference,cfg,parameters);
+        if hypot(x(4),x(5))<=.2*cfg.model.brakeHoldSpeed
+            u=[prior(1);min(0,prior(2))];
+        end
+        next=nonlinearBicycleModel.sample(x,u,cfg);count=count+1;
+        anchor.inputs(:,count)=u;anchor.states(:,count+1)=next;
+        % No reference progress is possible when both vehicles are parked.
+        % Still formulate the local problem so that RTI can repair the seed.
+        stationary=norm(next-x)<1e-12;
+        if stationary && ~isempty(model.target)
+            target=localTargetAt(model,count*cfg.controller.sampleTime);
+            stationary=target(4)==0 && target(5)<=0;
+        end
+        x=next;prior=u;member=terminalSafeSet.member(context,x,count);
+        if stationary && ~member,anchor.extensionStopped="stationaryReference";break;end
+    end
+    if ~member && count>=cfg.controller.maximumHorizonSteps,anchor.extensionStopped="configuredHorizonLimit";end
+    anchor.extensionSteps=count-initialCount;
+    anchor.planner.referenceTerminalMember=member;
 end
 
 function input=localTailSeed(x,prior,model,parameters)

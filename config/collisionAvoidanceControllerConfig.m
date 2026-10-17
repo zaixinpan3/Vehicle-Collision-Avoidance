@@ -22,10 +22,10 @@ end
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
     % horizonSteps is the soft-collision prefix and the shortest horizon.
-    % Target encounters cover the nearest cruise conflict plus settling time,
-    % with no default duration or node-count cap. The terminal
-    % endpoint is an optimization constraint, not a seed stopping condition.
-    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf);
+    % References extend to a terminal endpoint without a default duration cap.
+    % Road edges are deferred; the path remains the cruise/CLF reference.
+    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
+        'enforceRoadBoundaries',false);
     % trustRadius scales local state/input corrections about the RTI reference.
     % The input trust scale adapts to the plan innovation: the scale whose
     % second-order prediction error equals trustInnovationMeters [m], within
@@ -40,8 +40,8 @@ function cfg=localDefaults()
     % fresh reference and retry, sharing the original controller deadline.
     % Encounter search starts from horizonSteps, with no separate time span.
     cfg.rti=struct('settlingSeconds',.5);
-    % Nominal encounter screening sizes the prediction horizon. Initialization
-    % uses one analytic rectangle-aware guide and one vehicle-model rollout.
+    % Every fresh reference with a target uses one analytic rectangle-aware
+    % guide and one vehicle-model rollout; no risk gate bypasses replanning.
     cfg.planner=struct('lookaheadSeconds',.5, ...
         'decelerationMetersPerSecondSquared',1,'lateralAccelerationFraction',.9);
     % encounterRangeMeters is the perception radius: the estimator receives
@@ -59,8 +59,8 @@ function cfg=localDefaults()
     % keeps its forecast and the ego brakes at
     % brakingDecelerationMetersPerSecondSquared [m/s^2] with the steering
     % (its sideslip and course curvature) held until a forward-only stop,
-    % possibly inside a hold; the endpoint is terminal when it stays on the
-    % road and clears the target until it leaves encounterRangeMeters (after
+    % possibly inside a hold; the endpoint is terminal when it respects any
+    % enabled road edges and clears the target until it leaves encounterRangeMeters (after
     % the stop, over the target's remaining track). Braking and the lateral
     % acceleration together must lie inside the tire friction
     % (frictionCoefficient times gravity). No encounter duration is preset.
@@ -151,6 +151,7 @@ function localValidate(cfg)
     validateattributes(cfg.referenceSpeed,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.horizonSteps,{'double'},{'scalar','real','finite','integer','positive'});
+    validateattributes(cfg.controller.enforceRoadBoundaries,{'logical'},{'scalar'});
     validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'scalar','real','positive'});
     if isfinite(cfg.controller.maximumHorizonSteps)
         validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'integer'});
