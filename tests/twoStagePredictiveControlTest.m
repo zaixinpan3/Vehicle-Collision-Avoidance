@@ -47,15 +47,16 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             localVerifyRollouts(testCase,problem,cfg);
         end
         function coldCrossingSelectsACirculationReferenceBeforeTheRtiSolve(testCase)
-            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("crossing",cfg);
+            [ego,~,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=15;
+            [~,q,road]=collisionThreatScenario("crossing",cfg);
             [command,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyFalse(problem.metadata.search.nominalRestarted);
             testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             testCase.verifyTrue(problem.metadata.search.planner.used);
-            testCase.verifyGreaterThan(problem.metadata.search.planner.candidateCount,1);
-            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"secondOrderCirculation");
+            testCase.verifyEqual(problem.metadata.search.planner.candidateCount,1);
+            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"pathAttractedCirculation");
             testCase.verifyFalse(problem.metadata.search.planner.robustCertificate);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
@@ -67,8 +68,10 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             search=problem.metadata.search;
             testCase.verifyTrue(search.planner.used);
             testCase.verifyTrue(state.avoidanceInitialized);
-            testCase.verifyGreaterThan(search.planner.conflictStartSeconds,cfg.controller.horizonSteps*cfg.controller.sampleTime);
-            testCase.verifyGreaterThan(max(abs(problem.model.linearization.states(2,:))),1);
+            % A successful single field need not contain colliding nodes or
+            % produce a prescribed lateral offset to count as planning.
+            testCase.verifyEqual(search.planner.candidateCount,1);
+            testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             anchor=problem.model.linearization;
             testCase.verifyGreaterThan(size(anchor.inputs,2)*cfg.controller.sampleTime,2);
             testCase.verifyTrue(terminalSafeSet.member(anchor.terminalContext,anchor.states(:,end),size(anchor.inputs,2)));
@@ -110,17 +113,17 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyEqual(search.returned,~isempty(solution));
         end
-        function plannedInputsRespectBrakingSlewBeforeTheSingleRti(testCase)
+        function plannedInputsRespectBrakingSlewIncludingAReplan(testCase)
             [ego,road,cfg]=localFixture();cfg.model.brakingRatioRateMaximum=1;
             % Isolate slew handling in the original unbounded encounter.
-            cfg.controller.lateralDeviationMaximumMeters=Inf;
             ego.heldActuatorInput=[0;0];
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,q]=collisionThreatScenario("crossing",cfg);
             model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
             [~,search,model]=solvePredictiveControl(model,[],tic);
-            testCase.verifyEqual(search.rtiIterations,1);
-            testCase.verifyGreaterThan(search.planner.candidateCount,1);
+            testCase.verifyLessThanOrEqual(search.rtiIterations,2);
+            testCase.verifyEqual(search.rtiIterations,1+search.restartCount);
+            testCase.verifyEqual(search.planner.candidateCount,1);
             inputs=model.linearization.inputs;
             testCase.verifyLessThanOrEqual(max(abs(diff([0,inputs(2,:)]))), ...
                 cfg.controller.sampleTime+1e-12);
@@ -152,7 +155,6 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         function shiftingThePlanRetainsItsTerminalPassingSide(testCase)
             [~,~,cfg]=localFixture();cfg.referenceSpeed=15;
             % This fixture tests side continuity, independently of corridor admission.
-            cfg.controller.lateralDeviationMaximumMeters=Inf;
             [x,q,road]=collisionThreatScenario("curvedCrossing",cfg);
             ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
@@ -310,15 +312,17 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(anchor.states(4,end),5);
             localVerifyRollouts(testCase,problem,cfg);
         end
-        function planningUsesMeasuredSpeedWhenCruiseSpeedWouldMissTheConflict(testCase)
+        function planningPreservesMeasuredVelocityAndFinishesANearStop(testCase)
             [ego,road,cfg]=localFixture();cfg.referenceSpeed=15;cfg.controller.horizonSteps=16;
             ego.position=[84.567;-.623471];ego.yaw=-.0654507;ego.speed=.0799722;
             ego.lateralVelocity=.00427434;ego.yawRate=.00259123;
             target=[84.4527;-14.699;1.04376;16.45;1;.05;1.6;2.4;.95;0;0];
             [~,~,problem]=collisionAvoidanceController(ego,localTarget(target),road,cfg,[]);
             testCase.verifyTrue(problem.metadata.search.planner.used);
-            testCase.verifyTrue(isfinite(problem.metadata.search.planner.conflictStartSeconds));
-            testCase.verifyLessThan(problem.metadata.search.planner.conflictStartSeconds,1.5);
+            guide=problem.model.linearization.guide;
+            testCase.verifyEqual(norm(guide.velocity(:,1)),hypot(ego.speed,ego.lateralVelocity),AbsTol=1e-12);
+            testCase.verifyEqual(guide.states(4:6,end),zeros(3,1),AbsTol=1e-12);
+            testCase.verifyLessThanOrEqual(max(guide.inputs(2,:)),0);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
         end
         function exhaustedBudgetDoesNotExecuteThePreviousTrajectory(testCase)

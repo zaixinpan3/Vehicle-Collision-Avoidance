@@ -50,58 +50,71 @@ stopping time plus settling time, avoiding distant intersections caused by
 nearly equal velocities. This is not a terminal deadline: terminal extension
 still continues until membership or the shared computation deadline.
 
-The planner first rolls out the existing cruise feedback. If its sampled
-rectangle clearances require avoidance, it evaluates a small bank of clockwise
-and counterclockwise circulation rollouts at prescribed relative speeds, with
-both coasting and field-directed longitudinal acceleration. Near rest it also
-tries a stopping continuation. A
-selected nonzero circulation direction is retained across frames and fresh
-replanning within the same encounter; a new encounter may select either side.
-The distance normal varies with geometry without changing that direction.
+The planner generates one trajectory through the declared vehicle dynamics.
+There is no candidate bank, weighted score or candidate admission gate. At the
+first initialization, the circulation sense follows the existing target/path
+passing-side convention. It persists within the encounter; a small forward
+tangent advantage does not reverse the route-relative passing side.
 
-The field uses a frame attached to the target rectangle, including translation,
-rotation, angular acceleration and rectangle-center offsets. It encloses the
-ego footprint in a disk only for constructing a smooth field. Directional
-position support and exact target-yaw support determine the uncertainty
-inflation in the current normal. With clearance h, normal speed nu and
-tangential speed tau, the ideal frozen-inflation acceleration requests
+The nominal path is an acceleration attractor. In Frenet coordinates, with
+lateral displacement e, transverse speed v_n, forward speed v_t and route
+curvature kappa, the preferred transverse acceleration is
 
-    h_ddot + 2 lambda h_dot + lambda^2 (h - h_star) = 0,
-    tau_dot = k_t (sigma v_c - tau).
+    a_n = kappa v_t^2 / (1 - kappa e) - 2 lambda v_n - lambda^2 e.
 
-The contour offset h_star is a guidance preference, not an added physical
-collision margin. Directional inflation changes along the trajectory, so the
-constant-inflation ODE is not a safety theorem for this implementation.
-Circulation speed is limited using the corner-radius and acceleration scales.
-World acceleration is converted to steering and signed braking ratio using the
-existing yaw loop and inverse Fiala force branch.
-The speed-dependent yaw demand also respects the model's sideslip operating
-scale. Braking amplitude and slew are retained, and every candidate state is
-obtained from `nonlinearBicycleModel.sample`. The Fiala input map is nonlinear:
-no affine-input algebraic barrier projection or additional hard friction-cone
-constraint is introduced, and the ideal field's safety theorem is not claimed
-for these limited vehicle controls.
+The speed loop restores route progress. Before input mapping, the preferred
+acceleration along the current velocity is set by cruise-speed error. This
+prevents target-frame transport from making the ego track the target's
+translational speed. Wall guidance is applied after that adjustment. The field starts damping
+outward motion before the vehicle reaches its maximum deviation. Target-frame
+transport includes translation, rotation, angular acceleration and footprint
+reference offsets. The target rectangle and the ego's directional body-yaw
+support determine clearance; position and yaw uncertainty use directional
+supports. The target enclosure restarts each hold, matching the current RTI
+implementation rather than introducing a separate open-loop forecast tube.
 
-Actual body yaw and rectangle offsets determine candidate separation. Target
-uncertainty uses the same per-hold restarted enclosure as the current RTI;
-it is not replaced by an open-loop full-horizon target tube. This matching is
-an implementation convention, not a proof of the joint observer feedback tube.
-Candidate diagnostics retain nominal and inflated signed separation, state
-violations, terminal membership and candidate cost. A deficient seed may still
-be offered to RTI, but is never labelled a robust certificate.
+The obstacle adds only the positive outward-normal correction to this route
+acceleration. Circulation activates with that correction and adds acceleration
+in the persistent passing direction only when the route field supplies less.
+A receding target does not attract the ego toward a target-centred orbit, and
+circulation does not slow an already sufficient tangential motion to a fixed
+orbit speed. There is no extra physical clearance or contour-offset target.
 
-At a bounded number of release opportunities, a complete cruise-feedback
-continuation is rolled out. Release requires its sampled rectangle and state
-checks to pass. Otherwise circulation continues for that candidate. Candidate
-comparison favors admissible states, collision clearance and terminal
-membership before path and speed tracking cost. Search stops at the first
-candidate passing the sampled inflated geometry, state and terminal checks;
-otherwise it returns the best available seed with explicit deficit diagnostics.
-With a fixed bank and release
-budget, generation is O(N), apart from terminal certification and the existing
-adaptive horizon search. All work shares the controller-call deadline. The
-selected nonlinear rollout supplies both states and inputs for RTI; a planner
-candidate is never substituted for an optimized command.
+The virtual parallel walls at e = +/- W, with
+`planner.guideHalfWidthMeters=10`, modify only the transverse acceleration.
+Writing f = kappa v_t^2 / (1 - kappa e) and r = `planner.wallRate`,
+the field clips it to
+
+    f - 2 r v_n - r^2 (W + e) <= a_n
+       <= f - 2 r v_n + r^2 (W - e).
+
+The wall rate is separate from the path-attraction rate: early recovery toward
+the centerline and approach to an outer boundary have different roles.
+
+With exact acceleration realization and initial nonnegative wall distances
+and first-order barrier states, these are the second-order wall comparison
+inequalities, a special case of the high-order barrier construction in
+[Xiao and Belta (2019)](https://arxiv.org/abs/1903.04706). They anticipate
+outward velocity, unlike a position-only wall repulsion. This is guidance, not a hard RTI or terminal-set constraint. Actual
+Fiala tracking, input limits, observer error and subsequent RTI changes prevent
+claiming wall invariance from this virtual field alone. `Inf` disables wall
+guidance. The simulation separately stops at an actual deviation above its
+`LateralDeviationLimitMeters` threshold (10 m by default).
+
+The existing yaw loop and inverse Fiala map convert the acceleration into
+steering and signed braking ratio. Every state is obtained from
+`nonlinearBicycleModel.sample`; no affine-input barrier projection is claimed.
+A near-stopped seed completes braking instead of accelerating into the
+encounter again. The single rollout extends until its endpoint is in the
+terminal set and its transverse motion is inward or negligible, subject to the shared deadline and
+any explicit horizon cap. Actual-yaw nominal and inflated rectangle gaps,
+state violations, terminal membership and maximum deviation are diagnostics;
+a deficient seed can still be passed to RTI and is never a robust certificate.
+
+The initial trajectory is the field's output, without a global or local
+minimum-deviation claim. One forward pass costs O(N), apart from terminal
+certification and adaptive horizon extension. The states and controls supply
+the RTI linearization center; only the optimized command is executed.
 
 A solver-reported primal-infeasible subproblem triggers at most one fresh
 reference. The failed inputs, inherited separation normals and terminal
@@ -136,25 +149,10 @@ Road boundaries are deferred by default (`controller.enforceRoadBoundaries=false
 Input road metadata then supplies only the nominal path; edge inequalities are
 absent from the horizon, terminal continuation and replay road-departure audit.
 An explicit opt-in retains the optional road-constrained experiment.
-Independently, `controller.lateralDeviationMaximumMeters=10` imposes a hard
-10 m deviation limit on either side of the nominal path for the ego position
-reference. This is not a full-footprint road boundary. The current absolute
-ego position enclosure tightens candidate and terminal checks; the per-hold
-enclosure tightens horizon nodes and midpoints. Straight paths yield two
-affine inequalities. A circular path of radius R yields the exact outer disk
-of radius R+10 and a supporting halfspace outside the inner radius R-10
-(when positive), both tightened by the position-error radius. This avoids
-unnecessarily restricting progress along the circle. General polylines use
-a sufficient disk about the projected path point. The disk cones appear in
-both optimization stages.
-Their omission is allowed only when the entire local trust box lies inside
-the disk. `Inf` explicitly restores an unbounded path corridor.
-Terminal continuation rows are locally linearized, as are the existing
-terminal geometry rows. These additions do not turn RTI's affine constraints
-into a complete nonlinear closed-loop guarantee. Truth replay records a
-lateral-limit violation as an experiment failure.
-A reference need not satisfy every constraint to construct the one subproblem;
-failure to satisfy its hard rows remains an optimization failure.
+The 10 m experiment threshold is absent from these optimizer rows and from
+the terminal certificate. Parallel-wall guidance shapes the initialization;
+truth replay measures the actual reference-point deviation and stops the
+experiment if it exceeds the independently configured threshold.
 
 Every reference is an exact declared-model rollout. The dynamics increments obey
 

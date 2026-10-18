@@ -23,10 +23,9 @@ function cfg=localDefaults()
     cfg.referenceSpeed=15;
     % horizonSteps is the soft-collision prefix and the shortest horizon.
     % References extend to a terminal endpoint without a default duration cap.
-    % Road edges are deferred. The vehicle position reference nevertheless
-    % stays within this symmetric lateral distance of the nominal path.
+    % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
-        'enforceRoadBoundaries',false,'lateralDeviationMaximumMeters',10);
+        'enforceRoadBoundaries',false);
     % trustRadius scales local state/input corrections about the RTI reference.
     % The input trust scale adapts to the plan innovation: the scale whose
     % second-order prediction error equals trustInnovationMeters [m], within
@@ -42,13 +41,11 @@ function cfg=localDefaults()
     % Encounter search starts from horizonSteps and the current stopping time;
     % the terminal extension has no separate duration cap.
     cfg.rti=struct('settlingSeconds',.5);
-    % Second-order circulation supplies initialization controls only. Each
-    % candidate is rolled through the declared Fiala model. The field uses
-    % directional uncertainty supports; its contour offset remains a
-    % guidance preference, never an extra collision constraint.
-    cfg.planner=struct('radialRate',1,'tangentialRate',2, ...
-        'contourOffsetFraction',1,'circulationSpeedFractions',[1,.65], ...
-        'releaseAttempts',2,'lateralAccelerationFraction',.9);
+    % One path-attracted circulation rollout supplies initialization controls.
+    % The parallel-wall acceleration guide anticipates transverse momentum;
+    % it is not a hard RTI/terminal constraint or an execution certificate.
+    cfg.planner=struct('radialRate',1,'tangentialRate',2,'pathRate',1,'wallRate',2, ...
+        'lateralAccelerationFraction',.9,'guideHalfWidthMeters',10);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
     % The first certified exit ends this prediction's encounter. A fresh
@@ -157,10 +154,6 @@ function localValidate(cfg)
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.horizonSteps,{'double'},{'scalar','real','finite','integer','positive'});
     validateattributes(cfg.controller.enforceRoadBoundaries,{'logical'},{'scalar'});
-    validateattributes(cfg.controller.lateralDeviationMaximumMeters,{'double'},{'scalar','real','positive'});
-    if isnan(cfg.controller.lateralDeviationMaximumMeters)
-        localInvalid('lateralDeviationMaximumMeters must be positive or Inf.');
-    end
     validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'scalar','real','positive'});
     if isfinite(cfg.controller.maximumHorizonSteps)
         validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'integer'});
@@ -178,13 +171,11 @@ function localValidate(cfg)
         localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
     end
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
-    for name=["radialRate","tangentialRate","contourOffsetFraction"]
+    for name=["radialRate","tangentialRate","pathRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    validateattributes(cfg.planner.circulationSpeedFractions,{'double'}, ...
-        {'row','nonempty','real','finite','positive','<=',1});
-    validateattributes(cfg.planner.releaseAttempts,{'double'},{'scalar','integer','nonnegative','finite'});
     validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});
+    validateattributes(cfg.planner.guideHalfWidthMeters,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});

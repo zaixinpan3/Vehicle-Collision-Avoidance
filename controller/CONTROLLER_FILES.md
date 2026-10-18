@@ -13,7 +13,7 @@ terminal set and recursive feasibility.
 | `terminalSafeSet.m` | Joint encounter terminal set and explicit terminal controller (`jointState`, `jointSuccessor`, `jointMember`, `control`): the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with held steering and a forward-only stop, retaining first-exit memory; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and a bounded cruise-to-braking seed search distinct from the terminal law), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, second-order circulation candidates with actual vehicle rollouts, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, one path-attracted circulation rollout with virtual wall guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
@@ -23,22 +23,18 @@ for the PCBF/CLF objectives. Local primal infeasibility permits one fresh
 reference and RTI retry, sharing the original sample deadline. Every fresh
 reference with a target invokes the circulation planner, including infeasibility
 retries, without a preceding risk gate. Warm references first attempt RTI on
-the shifted plan. The planner evaluates cruise feedback and, when needed, a
-small bank of target-frame circulation controls, including coasting and
-field-directed speed variants and a near-rest stopping candidate. Search stops
-when a candidate passes all sampled initialization checks. Target transport
-terms and the ego circumdisk supply a smooth acceleration guide, while
-position and target-yaw uncertainty contribute directional supports in the
-current normal. The contour offset remains a guidance preference, not a hard
-clearance. Inflation is refreshed along the rollout, so the ideal field ODE
-with constant inflation is not a safety theorem for this guide. The existing
-yaw loop and inverse Fiala map produce inputs, and the declared nonlinear model
-produces every state. Candidate checks use body-yaw rectangles, the runtime's
-per-hold error convention, physical-state limits and terminal membership.
-A bounded number of complete cruise-continuation checks controls release from
-circulation. The selected direction persists within an encounter. These checks
-are initialization diagnostics, not robust certificates. The primary and
-secondary RTI solves and direct execution of the optimized input are unchanged.
+the shifted plan. The planner generates one path-attracted circulation rollout, with a persistent
+turn sense determined from the existing target/path passing-side convention. There is no candidate bank,
+scoring or seed admission layer. The path attraction damps outward velocity;
+the obstacle adds outward normal acceleration and a passing-direction
+correction only when needed. Directional footprint and observer-error supports
+replace disk-width clearance. Virtual path-offset walls anticipate outward
+momentum. The cruise-speed loop, rather than target translation, determines
+the preferred acceleration along the ego's current velocity. Actual-yaw gaps and state/terminal checks remain diagnostics. The
+existing inverse Fiala guidance produces inputs and the nonlinear model
+produces every state. The rollout extends to an inward-moving or settled
+terminal endpoint. Only RTI's optimized command is executed; the field is
+neither a robust safety certificate nor a minimum-deviation optimizer.
 Cold references without a target use nominal feedback.
 Warm references shift the previous inputs from the current estimate, retain
 their absolute endpoint until the minimum prefix is reached, and extend a
@@ -46,7 +42,6 @@ terminal endpoint with a checked cruise or braking hold when available.
 A nonterminal endpoint extends with feedback toward the given path until the declared terminal
 membership holds, subject to the shared computation deadline and any explicit
 horizon cap. Thus the minimum prefix is not a fixed terminal deadline.
-An explicitly unbounded lateral corridor retains the endpoint-tangent extension.
 Those extension checks concern the reference and the sampled declared model;
 they do not certify robust terminal invariance or veto an optimized input.
 A retry discards the failed reference, old separation normals and terminal
@@ -73,15 +68,13 @@ ego rectangle corner stays inside it at every predicted node and hold midpoint, 
 hold keep the sideslip inside the estimator's cone
 `model.sideslipMaximum`. Horizon construction starts at `horizonSteps`; a shifted longer horizon shrinks
 one hold per frame until that minimum, then extends if its endpoint is nonterminal. The
-given path defines the single CLF. Independently of road edges, the default
-`controller.lateralDeviationMaximumMeters=10` bounds the ego position reference
-to within 10 m of that path on either side. It does not subtract the vehicle
-footprint. Absolute ego position uncertainty tightens this corridor; collision
-slacks cannot relax it. Straight paths use affine strip rows; circular paths
-use an outer disk and an inner supporting halfspace. General polylines use
-sufficient convex disks about projected path points. Candidate rollouts,
-release continuations and terminal braking also check this limit. An explicit
-`Inf` disables it. `lateralDeviationLimitTest` covers these semantics.
+given path defines the single CLF. The planner's `guideHalfWidthMeters=10`
+defines virtual parallel walls for acceleration guidance, not hard optimizer
+or terminal constraints. Set it to `Inf` to disable the wall field. The
+simulation option `LateralDeviationLimitMeters=10` independently stops and
+reports a truth-replay violation. It measures the ego position reference,
+without subtracting a vehicle footprint or tightening by estimated error.
+`lateralDeviationLimitTest` covers this separation.
 
 Observer inputs tighten sampled collision, road, physical-state, sideslip,
 front model-domain and terminal constraints. Fiala saturation is part of the
@@ -140,7 +133,7 @@ Initialization metadata uses `nominalFeedbackRollout`, `plannedAvoidanceRollout`
 and `shiftedInputRollout`.
 The legacy experiment entry names `runPotentialFieldCampaign` and
 `extendPotentialFieldRecovery` remain for existing campaign callers; the
-controller uses a second-order circulation candidate bank and vehicle rollouts. Historical experiment
+controller uses a single path-attracted circulation field and a vehicle rollout. Historical experiment
 records describe the algorithm version that actually produced them.
 
 MATLAB Control System Toolbox and the compiled Clarabel 0.11.1 adapter are required.

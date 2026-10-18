@@ -5,10 +5,10 @@ The current experiment defers road boundaries:
 constructing both the horizon and terminal constraints. The nominal path still
 defines the cruise CLF. Road conditions below apply only with the explicit
 road-boundary opt-in.
-The separate path-deviation bound is active by default:
-`controller.lateralDeviationMaximumMeters=10` limits the ego dynamics position
-reference to 10 m on either side of the nominal path. It remains active with
-road boundaries disabled and includes terminal braking and the parked pose.
+The simulation's 10 m deviation stop and the planner's parallel-wall guidance
+are absent from the terminal set and its linearized constraints. Terminal
+membership concerns the declared physical-state, encounter and optional road
+conditions; the experiment independently measures actual path deviation.
 
 ## State and task boundary
 

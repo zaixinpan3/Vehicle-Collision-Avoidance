@@ -8,6 +8,40 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function pathAttractionPullsBackAndDampsOutwardMotion(testCase)
+            model=localModel("headOn",8);x=model.initialState;x(2)=3;
+            a=predictiveSafetyGeometry.pathAttraction(x,model);
+            x(5)=2;b=predictiveSafetyGeometry.pathAttraction(x,model);
+            testCase.verifyLessThan(a(2),0);
+            testCase.verifyLessThan(b(2),a(2));
+            x(2)=0;x(5)=0;
+            c=predictiveSafetyGeometry.pathAttraction(x,model);
+            testCase.verifyEqual(c,zeros(2,1),AbsTol=1e-12);
+        end
+        function aRecedingTargetDoesNotPullTheVehicleIntoAnOrbit(testCase)
+            model=localModel("headOn",8);target=model.target;target(1:6)=[-30;0;0;2;0;0];
+            p=struct('direction',1,'speed',4,'inflation',0,'pathAcceleration',[.2;0]);
+            [a,f]=predictiveSafetyGeometry.circulationField(model.initialState,target,model.cfg,p);
+            testCase.verifyEqual(a,p.pathAcceleration,AbsTol=1e-12);
+            testCase.verifyEqual(f.activation,0);
+        end
+        function parallelWallSlowsOutwardMotionBeforeReachingTheWall(testCase)
+            model=localModel("headOn",8);x=model.initialState;x(2)=8;x(5)=3;
+            [a,active]=predictiveSafetyGeometry.wallGuidance(x,[1;100],model);
+            testCase.verifyTrue(active);testCase.verifyLessThan(a(2),0);
+            testCase.verifyEqual(a(1),1,AbsTol=1e-12);
+            % Ideal acceleration realization only: a persistent outward
+            % request approaches the wall without crossing it.
+            [~,z]=ode45(@(t,z)localWallMotion(z,model),[0,6],[8;3], ...
+                odeset('RelTol',1e-9,'AbsTol',1e-11));
+            testCase.verifyLessThan(max(z(:,1)),10);
+            testCase.verifyGreaterThan(z(end,1),9.9);
+        end
+        function aWallDoesNotResistAnAlreadyInwardAcceleration(testCase)
+            model=localModel("headOn",8);x=model.initialState;x(2)=8;x(5)=-1;
+            [a,active]=predictiveSafetyGeometry.wallGuidance(x,[1;-1],model);
+            testCase.verifyFalse(active);testCase.verifyEqual(a,[1;-1],AbsTol=0);
+        end
         function rotatingFrameTransportRetainsTheRequestedFrozenGeometryAcceleration(testCase)
             model=localModel("turningCrossing",8);x=model.initialState;
             target=model.target;target(10:11)=[.4;-.2];x(2)=3;x(5)=.3;
@@ -34,6 +68,7 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         function returnedStatesComeFromTheActualHeldInputModel(testCase)
             model=localModel("crossing",8);model.cfg.model.brakingRatioRateMaximum=1;
             guide=predictiveSafetyGeometry.avoidanceGuide(model,50,1);
+            testCase.verifyEqual(guide.candidateCount,1);
             for k=1:size(guide.inputs,2)
                 next=nonlinearBicycleModel.sample(guide.states(:,k),guide.inputs(:,k),model.cfg);
                 testCase.verifyEqual(guide.states(:,k+1),next,AbsTol=1e-12);
@@ -73,6 +108,12 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyTrue(all(isfinite([guide.states(:);guide.inputs(:)])));
         end
     end
+end
+
+function derivative=localWallMotion(z,model)
+    x=model.initialState;x(2)=z(1);x(5)=z(2);
+    a=predictiveSafetyGeometry.wallGuidance(x,[0;100],model);
+    derivative=[z(2);a(2)];
 end
 
 function model=localModel(name,speed)
