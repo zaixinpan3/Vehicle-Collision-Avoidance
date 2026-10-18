@@ -52,7 +52,7 @@ classdef terminalSafeSet
     methods (Static)
         function context = context(model)
             % Constants of one frame.
-            cfg=model.cfg;positionRadius=0;yawRadius=0;
+            cfg=model.cfg;positionRadius=0;yawRadius=0;generator=zeros(6,0);
             if isfield(model,'uncertainty') && isfield(model.uncertainty,'egoGenerator')
                 generator=model.uncertainty.egoGenerator;
                 positionRadius=sum(vecnorm(generator(1:2,:),2,1));yawRadius=sum(abs(generator(3,:)));
@@ -73,6 +73,7 @@ classdef terminalSafeSet
                 'required',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'inflation',positionRadius+2*reach*sin(min(pi,yawRadius)/2), ...
                 'range',cfg.collision.encounterRangeMeters,'clearance',clearance, ...
+                'lateralLimit',cfg.controller.lateralDeviationMaximumMeters,'positionGenerator',generator(1:2,:), ...
                 'hasTarget',~isempty(model.target),'targetEpoch',model.targetEpoch, ...
                 'targetEpochIndex',localEpochIndex(model), ...
                 'sampleIndex',model.sampleIndex,'lane',model.lane,'stationNow',here.station, ...
@@ -210,7 +211,8 @@ classdef terminalSafeSet
             % - fixed-dual collision rows at the continuation's nodes and
             %   midpoints before the exit, and at the parked pose against the
             %   target's closest pose on its track (the minimizer's own rows);
-            % - corner rows on the road at the continuation's poses.
+            % - corner rows on the road and reference-point corridor rows at
+            %   the continuation's poses.
             % The continuation's poses are differentiated with the schedule
             % held. Conditions whose clearance exceeds the requirement by more
             % than localBand are left out; the exact set is used when building the anchor.
@@ -262,6 +264,17 @@ classdef terminalSafeSet
                     rows=[rows;derivative;-derivative]; %#ok<AGROW>
                     bounds=[bounds;localKeep(context.clearance(2)-lateral(corner,k)-context.inflation); ...
                         localKeep(context.clearance(1)+lateral(corner,k)-context.inflation)]; %#ok<AGROW>
+                end
+            end
+            if isfinite(context.lateralLimit)
+                [deviation,projection,normal,reserve]=laneGeometry.lateralDeviationMargin( ...
+                    path.pose(1:2,:),context.lane,context.lateralLimit,context.positionGenerator);
+                for k=find(deviation<localReserve()+movement)
+                    localCheckDeadline(context);
+                    derivative=normal(:,k).'*jacobian(1:2,:,k);
+                    rows=[rows;derivative;-derivative]; %#ok<AGROW>
+                    bounds=[bounds;localKeep(context.lateralLimit-projection.lateralPosition(k)-reserve(k)); ...
+                        localKeep(context.lateralLimit+projection.lateralPosition(k)-reserve(k))]; %#ok<AGROW>
                 end
             end
             if ~context.hasTarget || context.encounterEnded,return;end
@@ -540,6 +553,12 @@ classdef terminalSafeSet
             ok=terminalSafeSet.stateRows(next,cfg) && terminalSafeSet.stateRows(middle,cfg) ...
                 && terminalSafeSet.handlingRows(x,u,cfg) && terminalSafeSet.handlingRows(next,u,cfg) ...
                 && terminalSafeSet.roadMargin(next,model)>=-1e-6 && terminalSafeSet.roadMargin(middle,model)>=-1e-6;
+            if isfinite(cfg.controller.lateralDeviationMaximumMeters)
+                generator=zeros(6,0);if isfield(model,'uncertainty'),generator=model.uncertainty.egoGenerator;end
+                margin=laneGeometry.lateralDeviationMargin([middle(1:2),next(1:2)],model.lane, ...
+                    cfg.controller.lateralDeviationMaximumMeters,generator);
+                ok=ok && all(margin>=-1e-6);
+            end
         end
 
         function ok = stateRows(x,cfg)
@@ -713,7 +732,7 @@ function [member,info,parts] = localDecide(context,x,node)
     % target's remaining track. parts keeps what was computed on the way
     % (empty fields where the decision stopped earlier), for rows.
     info=struct('reason',"",'end',"",'stopSeconds',NaN,'exitSeconds',NaN, ...
-        'margin',Inf,'roadMargin',Inf);
+        'margin',Inf,'roadMargin',Inf,'lateralDeviationMargin',Inf);
     parts=struct('path',[],'road',[],'q',[],'gap',[],'out',[],'parked',[]);
     member=false;V=hypot(x(4),x(5));
     if any(x(4:6)<context.stateLower-1e-9 | x(4:6)>context.stateUpper+1e-9) ...
@@ -734,6 +753,11 @@ function [member,info,parts] = localDecide(context,x,node)
     parts.road=struct('margin',margin,'lateral',lateral,'normal',normal,'local',local);
     info.roadMargin=min(margin)-context.inflation;
     if info.roadMargin<-1e-6,info.reason="continuationLeavesRoad";return;end
+    if isfinite(context.lateralLimit)
+        info.lateralDeviationMargin=min(laneGeometry.lateralDeviationMargin( ...
+            path.pose(1:2,:),context.lane,context.lateralLimit,context.positionGenerator));
+        if info.lateralDeviationMargin<-1e-6,info.reason="continuationExceedsLateralLimit";return;end
+    end
     if ~context.hasTarget || context.encounterEnded
         member=true;info.reason="noTarget";info.end="noTarget";
         if context.encounterEnded,info.reason="exit";info.end="exit";info.exitSeconds=0;end

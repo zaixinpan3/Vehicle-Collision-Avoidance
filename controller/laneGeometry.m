@@ -1,6 +1,28 @@
 classdef laneGeometry
     %laneGeometry Nominal straight and circular lane coordinates.
     methods (Static)
+        function straight = isStraight(lane)
+            if isfield(lane,'referenceCurve')
+                straight=lane.referenceCurve.curvature==0;
+            else
+                straight=all(abs(lane.tangent-lane.tangent(1,:))<1e-12,'all');
+            end
+        end
+
+        function [margin,projection,normal,reserve] = lateralDeviationMargin(position,lane,limit,generator)
+            % Reference-point deviation, independent of vehicle footprint and
+            % road-edge settings. Absolute ego position error does not cancel.
+            if nargin<4,generator=zeros(2,0);end
+            projection=laneGeometry.project(position,lane);
+            normal=[-sin(projection.heading);cos(projection.heading)];
+            reserve=sum(abs(normal.'*generator(1:2,:)),2).';
+            if ~laneGeometry.isStraight(lane)
+                % Distance to the curved path is 1-Lipschitz in position.
+                reserve=sum(vecnorm(generator(1:2,:),2,1))+zeros(size(reserve));
+            end
+            margin=limit-abs(projection.lateralPosition)-reserve;
+        end
+
         function curve = validateReferenceCurve(curve)
             required = ["origin", "heading", "curvature", "length"];
             if ~isstruct(curve) || ~isscalar(curve) || ~all(isfield(curve, required))

@@ -641,6 +641,11 @@ function violation=localPlannerStateViolation(x,model)
     if x(4)>cfg.model.brakeHoldSpeed
         violation=max(violation,abs(x(5))-tan(cfg.model.sideslipMaximum)*x(4));
     end
+    limit=cfg.controller.lateralDeviationMaximumMeters;
+    if isfinite(limit)
+        margin=laneGeometry.lateralDeviationMargin(x(1:2),model.lane,limit,model.uncertainty.egoGenerator);
+        violation=max(violation,-margin);
+    end
     if ~isempty(model.road.lateralClearance)
         body=cfg.vehicle.rectangleOffset+[cfg.vehicle.length/2;cfg.vehicle.width/2].*[1,1,-1,-1;1,-1,1,-1];
         rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];

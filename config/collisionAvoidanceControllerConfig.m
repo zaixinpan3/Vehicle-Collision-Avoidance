@@ -23,9 +23,10 @@ function cfg=localDefaults()
     cfg.referenceSpeed=15;
     % horizonSteps is the soft-collision prefix and the shortest horizon.
     % References extend to a terminal endpoint without a default duration cap.
-    % Road edges are deferred; the path remains the cruise/CLF reference.
+    % Road edges are deferred. The vehicle position reference nevertheless
+    % stays within this symmetric lateral distance of the nominal path.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
-        'enforceRoadBoundaries',false);
+        'enforceRoadBoundaries',false,'lateralDeviationMaximumMeters',10);
     % trustRadius scales local state/input corrections about the RTI reference.
     % The input trust scale adapts to the plan innovation: the scale whose
     % second-order prediction error equals trustInnovationMeters [m], within
@@ -156,6 +157,10 @@ function localValidate(cfg)
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.horizonSteps,{'double'},{'scalar','real','finite','integer','positive'});
     validateattributes(cfg.controller.enforceRoadBoundaries,{'logical'},{'scalar'});
+    validateattributes(cfg.controller.lateralDeviationMaximumMeters,{'double'},{'scalar','real','positive'});
+    if isnan(cfg.controller.lateralDeviationMaximumMeters)
+        localInvalid('lateralDeviationMaximumMeters must be positive or Inf.');
+    end
     validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'scalar','real','positive'});
     if isfinite(cfg.controller.maximumHorizonSteps)
         validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'integer'});

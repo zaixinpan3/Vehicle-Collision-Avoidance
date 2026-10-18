@@ -119,10 +119,11 @@ predictions do not trigger replanning. Both attempts share the original timer;
 the retry cannot reset or extend the computation budget.
 
 `controller.horizonSteps` is a minimum, not a terminal deadline. After rolling
-out any seed, a nonterminal endpoint is extended along its tangent using the
-vehicle model and speed-holding path feedback until terminal membership is
-reached. This settling extension removes the artificial requirement to turn
-back to the cruise path within a short prefix. The cruise-path CLF is unchanged,
+out any seed, a nonterminal endpoint is extended using the vehicle model and
+feedback toward the given path until terminal membership is reached. With an
+explicitly infinite lateral limit, this instead follows the endpoint tangent.
+This settling extension removes the artificial requirement to finish recovery
+within a short prefix. The cruise-path CLF is unchanged,
 and a moving terminal endpoint does not command parking. An immobile reference
 with no moving target is passed to RTI for correction rather than extended
 indefinitely. An explicitly configured finite horizon cap also ends extension;
@@ -135,6 +136,23 @@ Road boundaries are deferred by default (`controller.enforceRoadBoundaries=false
 Input road metadata then supplies only the nominal path; edge inequalities are
 absent from the horizon, terminal continuation and replay road-departure audit.
 An explicit opt-in retains the optional road-constrained experiment.
+Independently, `controller.lateralDeviationMaximumMeters=10` imposes a hard
+10 m deviation limit on either side of the nominal path for the ego position
+reference. This is not a full-footprint road boundary. The current absolute
+ego position enclosure tightens candidate and terminal checks; the per-hold
+enclosure tightens horizon nodes and midpoints. Straight paths yield two
+affine inequalities. A circular path of radius R yields the exact outer disk
+of radius R+10 and a supporting halfspace outside the inner radius R-10
+(when positive), both tightened by the position-error radius. This avoids
+unnecessarily restricting progress along the circle. General polylines use
+a sufficient disk about the projected path point. The disk cones appear in
+both optimization stages.
+Their omission is allowed only when the entire local trust box lies inside
+the disk. `Inf` explicitly restores an unbounded path corridor.
+Terminal continuation rows are locally linearized, as are the existing
+terminal geometry rows. These additions do not turn RTI's affine constraints
+into a complete nonlinear closed-loop guarantee. Truth replay records a
+lateral-limit violation as an experiment failure.
 A reference need not satisfy every constraint to construct the one subproblem;
 failure to satisfy its hard rows remains an optimization failure.
 
@@ -152,7 +170,7 @@ the affine predicted states. No second model is constructed from that rollout.
 State and input increments lie in local trust boxes. Actual longitudinal-force
 magnitude and optional slew limits remain hard. Steering has no artificial
 actuator magnitude or slew limit; the Fiala angle domain is enforced. State
-limits, sideslip, optional road-corner rows and terminal
+limits, sideslip, reference-point deviation, optional road-corner rows and terminal
 rows retain their existing meanings. No shared elastic variable relaxes them.
 
 Nominal collision rows in the first `controller.horizonSteps` nodes carry

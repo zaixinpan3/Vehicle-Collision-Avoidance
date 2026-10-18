@@ -112,6 +112,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
         function plannedInputsRespectBrakingSlewBeforeTheSingleRti(testCase)
             [ego,road,cfg]=localFixture();cfg.model.brakingRatioRateMaximum=1;
+            % Isolate slew handling in the original unbounded encounter.
+            cfg.controller.lateralDeviationMaximumMeters=Inf;
             ego.heldActuatorInput=[0;0];
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,q]=collisionThreatScenario("crossing",cfg);
@@ -149,6 +151,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
         function shiftingThePlanRetainsItsTerminalPassingSide(testCase)
             [~,~,cfg]=localFixture();cfg.referenceSpeed=15;
+            % This fixture tests side continuity, independently of corridor admission.
+            cfg.controller.lateralDeviationMaximumMeters=Inf;
             [x,q,road]=collisionThreatScenario("curvedCrossing",cfg);
             ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);

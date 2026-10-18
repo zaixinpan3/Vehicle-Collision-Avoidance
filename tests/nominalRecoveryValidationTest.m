@@ -58,7 +58,8 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
         function aForecastTerminalEndpointDoesNotCompleteTheDrivingTask(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="crossing",Frames=1, ...
-                ControllerConfiguration=struct('solver',struct('timeLimitSeconds',5)));
+                ControllerConfiguration=struct('solver',struct('timeLimitSeconds',5), ...
+                'controller',struct('lateralDeviationMaximumMeters',Inf)));
             testCase.verifyEqual(report.results.executedFrames,1);
             testCase.verifyEqual(report.results.outcome,"observationLimit");
             testCase.verifyFalse(report.results.recovery.recovered);

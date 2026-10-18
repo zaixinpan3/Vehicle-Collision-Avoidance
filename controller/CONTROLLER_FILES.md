@@ -43,9 +43,10 @@ Cold references without a target use nominal feedback.
 Warm references shift the previous inputs from the current estimate, retain
 their absolute endpoint until the minimum prefix is reached, and extend a
 terminal endpoint with a checked cruise or braking hold when available.
-A nonterminal endpoint extends along its tangent until the declared terminal
+A nonterminal endpoint extends with feedback toward the given path until the declared terminal
 membership holds, subject to the shared computation deadline and any explicit
 horizon cap. Thus the minimum prefix is not a fixed terminal deadline.
+An explicitly unbounded lateral corridor retains the endpoint-tangent extension.
 Those extension checks concern the reference and the sampled declared model;
 they do not certify robust terminal invariance or veto an optimized input.
 A retry discards the failed reference, old separation normals and terminal
@@ -72,7 +73,15 @@ ego rectangle corner stays inside it at every predicted node and hold midpoint, 
 hold keep the sideslip inside the estimator's cone
 `model.sideslipMaximum`. Horizon construction starts at `horizonSteps`; a shifted longer horizon shrinks
 one hold per frame until that minimum, then extends if its endpoint is nonterminal. The
-given path defines the single CLF; there is no separate path corridor.
+given path defines the single CLF. Independently of road edges, the default
+`controller.lateralDeviationMaximumMeters=10` bounds the ego position reference
+to within 10 m of that path on either side. It does not subtract the vehicle
+footprint. Absolute ego position uncertainty tightens this corridor; collision
+slacks cannot relax it. Straight paths use affine strip rows; circular paths
+use an outer disk and an inner supporting halfspace. General polylines use
+sufficient convex disks about projected path points. Candidate rollouts,
+release continuations and terminal braking also check this limit. An explicit
+`Inf` disables it. `lateralDeviationLimitTest` covers these semantics.
 
 Observer inputs tighten sampled collision, road, physical-state, sideslip,
 front model-domain and terminal constraints. Fiala saturation is part of the
@@ -113,8 +122,9 @@ only within the current prediction. Unavailable or stale certificates do not
 block execution; unsupported uncertainty padding is omitted without declaring
 zero estimation error. No assumption-status diagnostics are produced. Usable finite
 enclosures still tighten the same optimization. Experimental collision checks
-use independent fixed-parameter target truth, and failure means collision or
-no solved control output. Primary campaigns use the actual NRMM observer and
+use independent fixed-parameter target truth, and also count exceeding the
+configured lateral limit as a failure, alongside collision or no solved
+control output. Primary campaigns use the actual NRMM observer and
 synthetic noisy sensors by default. Observer initialization failures remain
 failed cases; exact-state diagnostics are excluded from the joint campaign
 score. Terminal membership is a predicted-endpoint safety

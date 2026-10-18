@@ -276,7 +276,12 @@ function anchor=localExtendReference(anchor,model)
     lane=struct('referenceCurve',struct('origin',x(1:2),'heading',heading,'curvature',0,'length',200));
     reference=model.nominalReference;reference.curvature=0;
     reference.state(3)=0;reference.state(4)=min(cfg.model.speedMaximum,hypot(x(4),x(5)));reference.state(5:6)=0;
-    parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,0);
+    if isfinite(cfg.controller.lateralDeviationMaximumMeters)
+        % A ray along an outward endpoint can never recover a bounded
+        % corridor. Construct its continuation toward the actual route.
+        lane=model.lane;reference=model.nominalReference;
+    end
+    parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
     while ~member && count<cfg.controller.maximumHorizonSteps
         localCheckDeadline(model);
         u=nonlinearBicycleModel.nominalFeedback(x,prior,lane,reference,cfg,parameters);
@@ -629,7 +634,8 @@ function [problem,model]=localFormulate(anchor,model)
     % slack), in the order of the rows; the sparse matrices are built once
     % from these blocks (localAssemble). Building them row by row in sparse
     % form cost time quadratic in the plan length.
-    blockRows=cell(1,12*count+8);blockColumns=blockRows;blockBounds=blockRows;blockCount=0;
+    blockRows=cell(1,14*count+10);blockColumns=blockRows;blockBounds=blockRows;blockCount=0;
+    deviationCones=struct('A',{},'b',{},'D',{},'gamma',{},'size',{});
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
     lower([is,ic])=0;
@@ -704,6 +710,11 @@ function [problem,model]=localFormulate(anchor,model)
             blockBounds{blockCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
         end
         nodeColumns=ix(:,index);
+        if isfinite(cfg.controller.lateralDeviationMaximumMeters)
+            [r,bound,cone]=localDeviationBlock(x,eye(6),generator,nodeColumns,nv,model);
+            blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;blockBounds{blockCount}=bound;
+            deviationCones=[deviationCones,cone]; %#ok<AGROW>
+        end
         % The current measured node is fixed; every later node stays on the road.
         if index>1 && ~isempty(clearance)
             [r,bound]=localRoadBlock(road,index,x,eye(6),generator,clearance);
@@ -732,6 +743,11 @@ function [problem,model]=localFormulate(anchor,model)
             blockBounds{blockCount}=g;
         end
         middleMap=[am,bm];middleColumns=[ix(:,index);iu(:,index)];
+        if isfinite(cfg.controller.lateralDeviationMaximumMeters)
+            [r,bound,cone]=localDeviationBlock(middle,middleMap,middleGenerator,middleColumns,nv,model);
+            blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=bound;
+            deviationCones=[deviationCones,cone]; %#ok<AGROW>
+        end
         if ~isempty(clearance)
             [r,bound]=localRoadBlock(road,count+1+index,middle,middleMap,middleGenerator,clearance);
             blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=bound;
@@ -794,6 +810,11 @@ function [problem,model]=localFormulate(anchor,model)
     % continuation, all on dx_N. The anchor endpoint meets them when it is in
     % the set, so the zero correction stays feasible.
     y=anchor.states(:,end);endColumns=ix(:,end);
+    if isfinite(cfg.controller.lateralDeviationMaximumMeters)
+        [r,bound,cone]=localDeviationBlock(y,eye(6),generator,endColumns,nv,model);
+        blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=bound;
+        deviationCones=[deviationCones,cone];
+    end
     time=count*h;point=2*count+1;
     if ~encounterEnded && localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg,norm(stateBox(1:2)))
         encounterEnded=true;exitRecord=point;
@@ -841,11 +862,11 @@ function [problem,model]=localFormulate(anchor,model)
     reachLower(iu)=max(-box,physicalInputLower-anchor.inputs);reachUpper(iu)=min(box,physicalInputUpper-anchor.inputs);
     [inequality,bounds]=localAssemble(blockRows,blockColumns,blockBounds,blockCount,nv,reachLower,reachUpper);
     % Tire saturation belongs to Fiala dynamics, not an extra force cone.
-    cones=struct('A',{},'b',{},'D',{},'gamma',{},'size',{});
+    cones=deviationCones;
     objective=zeros(nv,1);objective(is)=1;
     problem=struct('a',inequality,'b',bounds, ...
         'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',cones, ...
-        'primaryConeCount',0, ...
+        'primaryConeCount',numel(cones), ...
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
         'encounterExit',departure, ...
@@ -888,6 +909,38 @@ function cone=localConeBlock(A,b,D,gamma,rowsPerCone)
     % ||A(rows j) z + b(rows j)|| <= D(j,:) z - gamma(j) in the solver's
     % convention (localConicSolve), with 'size' rows of A per cone.
     cone=struct('A',A,'b',b,'D',D,'gamma',gamma,'size',rowsPerCone);
+end
+
+function [rows,bounds,cone]=localDeviationBlock(x,map,generator,columns,nv,model)
+    % Hard reference-point corridor, with no PCBF slack. Straight paths give
+    % exact affine strips. Circular paths use an exact outer disk and a
+    % supporting inner halfspace. General polylines use a sufficient disk
+    % about the projected path point. Ego uncertainty remains absolute.
+    limit=model.cfg.controller.lateralDeviationMaximumMeters;
+    [~,projection,normal,reserve]=laneGeometry.lateralDeviationMargin(x(1:2),model.lane,limit,generator);
+    cone=struct('A',{},'b',{},'D',{},'gamma',{},'size',{});
+    if laneGeometry.isStraight(model.lane)
+        row=normal.'*map(1:2,:);
+        rows=[row;-row];bounds=[limit-projection.lateralPosition-reserve;limit+projection.lateralPosition-reserve];
+    else
+        rows=zeros(0,size(map,2));bounds=zeros(0,1);
+        offset=x(1:2)-projection.point;outerRadius=limit;
+        if isfield(model.lane,'referenceCurve')
+            curve=model.lane.referenceCurve;pathRadius=1/abs(curve.curvature);
+            center=curve.origin+[-sin(curve.heading);cos(curve.heading)]/curve.curvature;
+            offset=x(1:2)-center;outerRadius=pathRadius+limit;
+            if pathRadius>limit
+                radial=(projection.point-center)/pathRadius;
+                rows=-radial.'*map(1:2,:);
+                bounds=radial.'*offset-(pathRadius-limit+reserve);
+            end
+        end
+        box=model.cfg.nonlinear.trustRadius*[5;5;.5;5;3;1.5];
+        if size(map,2)==8,box=[box;model.cfg.nonlinear.trustMaximumScale*model.cfg.nonlinear.trustRadius*[.15;.25]];end
+        if norm(offset)+norm(abs(map(1:2,:))*box)+reserve<outerRadius,return;end
+        a=sparse(2,nv);a(:,columns)=map(1:2,:);
+        cone=localConeBlock(a,offset,sparse(1,nv),reserve-outerRadius,2);
+    end
 end
 
 function road=localRoadProjection(poses,model)

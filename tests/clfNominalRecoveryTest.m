@@ -63,8 +63,10 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             end
         end
         function aDistantReversedReferenceCanExtendPastTheShortPrefix(testCase)
+            % The recovery fixture deliberately starts 40 m from the path.
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',8),'solver',struct('timeLimitSeconds',5)));
+                'controller',struct('horizonSteps',8,'lateralDeviationMaximumMeters',Inf), ...
+                'solver',struct('timeLimitSeconds',5)));
             ego=struct('position',[0;-40],'yaw',2.5,'speed',6, ...
                 'lateralVelocity',.3,'yawRate',.1,'heldActuatorInput',[0;0]);
             [command,inputs,problem]=collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]);

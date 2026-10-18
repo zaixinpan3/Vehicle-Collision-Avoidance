@@ -5,6 +5,10 @@ The current experiment defers road boundaries:
 constructing both the horizon and terminal constraints. The nominal path still
 defines the cruise CLF. Road conditions below apply only with the explicit
 road-boundary opt-in.
+The separate path-deviation bound is active by default:
+`controller.lateralDeviationMaximumMeters=10` limits the ego dynamics position
+reference to 10 m on either side of the nominal path. It remains active with
+road boundaries disabled and includes terminal braking and the parked pose.
 
 ## State and task boundary
 
@@ -87,7 +91,8 @@ claim needs the compatible terminal uncertainty contract described below.
 ## Terminal set
 
 Let Phi_f be the joint flow including the absorbing encounter flag. Let C
-require the declared physical/input conditions and any road constraints,
+require the declared physical/input conditions, the reference-point deviation
+bound and any enabled road constraints,
 and require rectangle nonoverlap only on active branches. The extra design
 clearance is zero; uncertainty inflation remains part of the required support.
 Then the terminal set is the fixed-policy safe set
@@ -105,7 +110,10 @@ entry command, not just a geometric certificate.
 The executable membership test checks:
 
 1. Mildness and terminal braking admissibility.
-2. Ego road occupancy at nodes, midpoints, and its parked pose.
+2. Ego reference-point deviation, and road occupancy when enabled, at nodes,
+   midpoints, and its parked pose. Absolute ego position uncertainty tightens
+   the deviation bound; no footprint radius or extra physical clearance is
+   subtracted from it. `Inf` explicitly disables this bound.
 3. Joint rectangle clearance during braking until the first exit.
 4. If the ego stops before exit, its parked rectangle against the target's
    remaining in-range track, beginning at the exact stop time.
