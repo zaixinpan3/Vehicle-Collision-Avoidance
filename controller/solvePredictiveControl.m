@@ -906,7 +906,7 @@ end
 
 function cone=localConeBlock(A,b,D,gamma,rowsPerCone)
     % A block of second-order cones of equal dimension: cone j is
-    % ||A(rows j) z + b(rows j)|| <= D(j,:) z - gamma(j) in the solver's
+    % ||A(rows j) z - b(rows j)|| <= D(j,:) z - gamma(j) in the solver's
     % convention (localConicSolve), with 'size' rows of A per cone.
     cone=struct('A',A,'b',b,'D',D,'gamma',gamma,'size',rowsPerCone);
 end
@@ -939,7 +939,7 @@ function [rows,bounds,cone]=localDeviationBlock(x,map,generator,columns,nv,model
         if size(map,2)==8,box=[box;model.cfg.nonlinear.trustMaximumScale*model.cfg.nonlinear.trustRadius*[.15;.25]];end
         if norm(offset)+norm(abs(map(1:2,:))*box)+reserve<outerRadius,return;end
         a=sparse(2,nv);a(:,columns)=map(1:2,:);
-        cone=localConeBlock(a,offset,sparse(1,nv),reserve-outerRadius,2);
+        cone=localConeBlock(a,-offset,sparse(1,nv),reserve-outerRadius,2);
     end
 end
 

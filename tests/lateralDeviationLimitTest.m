@@ -73,7 +73,44 @@ classdef lateralDeviationLimitTest < matlab.unittest.TestCase
             margin=laneGeometry.lateralDeviationMargin(problem.solution.affineStates(1:2,:),problem.model.lane,10);
             testCase.verifyGreaterThanOrEqual(min(margin),-1e-5);
         end
+        function noisyCurvedEncounterCannotReturnAnOutwardAffineEscape(testCase)
+            root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'estimator')));
+            configuration=struct('referenceSpeed',15,'controller',struct('horizonSteps',16), ...
+                'solver',struct('timeLimitSeconds',20,'maxIterations',200));
+            [x,q,road,cfg]=collisionThreatScenario("curvedCrossing",configuration);
+            ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'longitudinalVelocity',x(4), ...
+                'lateralVelocity',x(5),'yawRate',x(6),'stateTime',0,'heldActuatorInput',[0;0]);
+            estimator=estimatorControllerIntegrationConfig();
+            estimator.sensor.radar.rangeMaximum=cfg.collision.encounterRangeMeters;
+            estimator=estimatorConfigurationFromController(estimator,cfg,collisionThreatContract(WindowSeconds=8));
+            context=nrmmEstimatorControllerAdapter("initialize",estimator,ego, ...
+                @(time,unused)localTarget(predictiveSafetyGeometry.predictTarget(q,time)));
+            [~,estimate,target]=nrmmEstimatorControllerAdapter("sample",context,0,ego,localTarget(q),[]);
+            estimate.heldActuatorInput=ego.heldActuatorInput;
+            try
+                [~,~,problem]=collisionAvoidanceController(estimate,target,road,cfg,[]);
+            catch exception
+                % A hard corridor may make these finite local attempts
+                % infeasible. It must never be bypassed by an outward move.
+                testCase.verifyEqual(exception.identifier,'collisionAvoidanceController:noOptimizationSolution');
+                return;
+            end
+            margin=laneGeometry.lateralDeviationMargin(problem.solution.affineStates(1:2,:),problem.model.lane,10);
+            testCase.verifyGreaterThanOrEqual(min(margin),-1e-5);
+        end
     end
+end
+
+function target=localTarget(q)
+    direction=[cos(q(3)+q(6));sin(q(3)+q(6))];velocity=q(4)*direction;
+    yawRate=q(4)*sin(q(6))/q(7);
+    target=struct('targetPositionInertial',q(1:2),'targetVelocityInertial',velocity, ...
+        'targetYawInertial',q(3),'targetYawRate',yawRate,'targetSideslip',q(6), ...
+        'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7), ...
+        'targetAccelerationInertial',q(5)*direction+yawRate*[-velocity(2);velocity(1)], ...
+        'targetLength',2*q(8),'targetWidth',2*q(9),'targetRectangleOffset',q(10:11));
 end
 
 function model=localModel(x)
