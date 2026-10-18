@@ -8,7 +8,7 @@ function contract = collisionThreatContract(names, speeds, options)
 % within the radar range of the ego's nominal cruise along the given path.
 % Over that window the speed V(t) = V0 + A t, the yaw rate V sin(beta)/lr
 % and the acceleration norm hypot(A, V^2 sin(beta)/lr) are enumerated, and
-% the hull is widened by a relative margin. The speed floor is kept positive.
+% the hull is widened by a relative margin. Stops remain in the speed hull.
     arguments
         names (1,:) string = ["headOn","acceleratingHeadOn","brakingLead","crossing", ...
             "turningCrossing","curvedHeadOn","curvedCrossing"]
@@ -16,7 +16,7 @@ function contract = collisionThreatContract(names, speeds, options)
         options.WindowSeconds (1,1) double {mustBePositive} = 20
         options.Range (1,1) double {mustBePositive} = 50
         options.Margin (1,1) double {mustBeNonnegative} = 0.1
-        options.SpeedFloor (1,1) double {mustBePositive} = 1
+        options.SpeedFloor (1,1) double {mustBeNonnegative} = 0
     end
     speedLow = Inf;speedHigh = 0;acceleration = 0;sideslip = 0;yawRate = 0;norm2 = 0;
     for speed = speeds
@@ -27,7 +27,6 @@ function contract = collisionThreatContract(names, speeds, options)
             if isfield(road,'referenceCurve'),curve = road.referenceCurve;curve.length = 1e4;end
             for t = 0:0.05:options.WindowSeconds
                 q = predictiveSafetyGeometry.predictTarget(q0,t);
-                if q(4) <= 0,break;end
                 position = laneGeometry.referencePose(x0(4)*t,0,curve);
                 if norm(q(1:2)-position(:)) > options.Range,continue;end
                 omega = q(4)*sin(q(6))/q(7);

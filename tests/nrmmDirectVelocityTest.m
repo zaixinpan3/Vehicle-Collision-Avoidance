@@ -103,11 +103,14 @@ classdef nrmmDirectVelocityTest < matlab.unittest.TestCase
             testCase.verifyLessThan(newBound,oldBound);
         end
 
-        function targetStillRequiresAPositiveTrueSpeedFloor(testCase)
+        function restingTargetUsesASeparatePositiveInverseFloor(testCase)
             cfg = testCase.Config;
             cfg.target.domain.speedMinimum = 0;
-            testCase.verifyError(@() synthesizeNrmmObserverGains(cfg), ...
-                "synthesizeNrmmObserverGains:invalidPositiveScalar");
+            design = synthesizeNrmmObserverGains(cfg);
+            testCase.verifyEqual(design.target.domain.speedMinimum,0);
+            testCase.verifyGreaterThan(design.target.domain.regularizationSpeedMinimum,0);
+            testCase.verifyGreaterThan(design.target.regularizationJerkMaximum,0);
+            testCase.verifyEqual(design.target.modelJerkMaximum,0);
         end
 
         function anEgoDomainConsistingOnlyOfStandstillStillHasACertificate(testCase)

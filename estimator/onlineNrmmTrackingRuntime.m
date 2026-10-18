@@ -274,6 +274,12 @@ function [nextState, intervalAudit, positionErrorBound] = localRungeKuttaInterva
         "yaw",struct("correctionBandwidth",design.yaw.correctionBandwidth,"courseModel", ...
         struct("rearAxleDistance",design.yaw.courseModel.rearAxleDistance, ...
         "sideslipDomainMaximum",design.yaw.courseModel.sideslipDomainMaximum)));
+    % The compiled kernel uses only the inverse floor, not the truth-domain
+    % audit. Preserve its existing struct ABI and identical point dynamics.
+    if isfield(design.target.domain,"regularizationSpeedMinimum")
+        kernelDesign.target.domain = rmfield(design.target.domain,"regularizationSpeedMinimum");
+        kernelDesign.target.domain.speedMinimum = design.target.domain.regularizationSpeedMinimum;
+    end
     correspondence = observerInput.courseGeometry.correspondence;
     lateralVelocity = observerInput.courseGeometry.lateralMeasurement.center;
     if observerInput.courseGeometry.lateralMeasurement.source=="kinematic" || ~isfinite(lateralVelocity)

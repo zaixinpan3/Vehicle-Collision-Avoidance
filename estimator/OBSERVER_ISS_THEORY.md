@@ -67,8 +67,8 @@ repeated differentiation of measured ego inputs. Ego jerk and angular
 acceleration need not vanish. The dynamics and their saturation extension in
 `nrmmTargetTrackerDerivative.m` have not been replaced by another motion model.
 
-Truth must remain in the declared positive-speed operating domain:
-`a <= |q| <= b`, `|A| <= Amax`, `|Omega| <= Omax`, `|s| <= S`, and
+Truth must remain in the declared operating domain:
+`Vmin <= |q| <= b`, `|A| <= Amax`, `|Omega| <= Omax`, `|s| <= S`, and
 `|rho| <= rhoMax`, where
 
 \[
@@ -76,7 +76,16 @@ O_{\max}=b\sin(\beta_{\max})/l_r,\qquad
 S=\sqrt{A_{\max}^2+(bO_{\max})^2}.
 \]
 
+For a strictly moving domain, the inverse floor is `a = Vmin > 0`.
+A domain including rest instead declares `Vmin = 0` and a separate positive
+`regularizationSpeedMinimum = a < b`. This floor regularizes divisions; it
+never replaces the Cartesian target velocity by a fictitious positive speed.
+The corresponding model discrepancy is bounded in Section 2 and enters the ISS input.
 The physical heading reconstruction is not observable at zero target speed.
+Without informative heading history, a velocity enclosure containing zero
+requires a full-circle heading enclosure and a speed interval including zero. Below the inverse
+floor, reconstructed yaw-rate and sideslip errors use the physical domain caps,
+because the regularized inverse is not the physical inverse there.
 Estimated states may peak outside this domain: the globally Lipschitz extension
 below keeps the observer defined. Estimated-domain flags report such exits;
 they are not substitutes for checking the assumptions on truth.
@@ -92,7 +101,7 @@ Write `r = |q|`, `d = max(r,a)`, `Q = projection_ball(b,q)`,
 \qquad \Phi_e=-\nu^2Q+3\alpha\nu Je.
 \]
 
-It agrees with `Phi` on the true operating domain and is defined on all of
+It agrees with `Phi` for admissible truth with `V >= a` and is defined on all of
 `R^4`. Ball projections and scalar clips are nonexpansive. Their almost-everywhere
 Jacobians suffice because the maps are continuous and piecewise differentiable.
 Bounds are integrated along the whole line segment in the extended space;
@@ -138,6 +147,33 @@ A maximum over finitely many Jacobian evaluations is not used as the proof. The 
 `Omega(q,s)` is differentiated, rather than frozen as a constant in this bound.
 The legacy scalar `phi = hypot(Lq,Ls)` is only a diagnostic in numerical SI
 coordinates; the physical certificate below uses the separate channels.
+
+For a domain including rest, let `kappaMax = sin(betaMax)/lr`. On a smooth
+constant-acceleration, constant-curvature NRMM arc with `0 < V < a`, the physical
+acceleration is `s = A e + kappa V^2 J e`. The projections and scalar clips are
+inactive at this admissible truth, except for the inverse floor. Consequently,
+
+\[
+\Phi=-\kappa^2 V^3 e+3A\kappa VJe,\qquad
+\Phi_e=(V/a)^4\Phi,
+\]
+\[
+\|\Phi-\Phi_e\|\le
+J_{\mathrm{reg}}=
+\sqrt{\kappa_{\max}^4a^6+9A_{\max}^2\kappa_{\max}^2a^2}.
+\]
+
+At rest, `q = s = 0` gives `Phi = Phi_e = 0`. The same finite bound therefore
+covers stationary targets and smooth low-speed arcs. Gain synthesis and online
+observer propagation use `observerModelJerkMaximum = modelJerkMaximum +
+regularizationJerkMaximum` exactly once. The physical prediction contract and
+measurement-history bounds retain `modelJerkMaximum`: inverse regularization
+is not a new physical target maneuver.
+
+An instantaneous acceleration reset when a braking target reaches rest is a
+separate hybrid transition. This finite-jerk argument does not certify that
+jump or a differentiation window spanning it; it is not needed for a target
+that is stationary throughout the observation and prediction interval.
 
 ## 3. Direct forward-cone velocity measurement
 
@@ -286,7 +322,9 @@ For \(y_\rho=\rho+n_\rho\), \(\|n_\rho\|\le\varepsilon_\rho\), retain
 The true last row additionally contains \(d_j\), \(\|d_j\|\le\varepsilon_j\).
 For declared scalar-acceleration and curvature rates,
 \(\varepsilon_j=\sqrt{\bar{\dot A}^{\,2}+\bar V_T^4\bar{\dot\kappa}^{\,2}}\).
-The nominal observer still uses constant acceleration and curvature.
+For a domain including rest, add `Jreg` from Section 2 to this last-row bound
+when comparing truth with the regularized observer. The nominal observer still
+uses constant acceleration and curvature.
 
 With estimate-minus-truth errors define
 \[
@@ -561,7 +599,9 @@ Core ISS requires the forward branch, bounded single-track mismatch, continuous
 sensor-error bounds, true target operating domain, positive gains and the target
 dissipation inequality. It requires neither an ego low-speed inversion condition,
 nor admissible raw arcsine, informative yaw arcs, yaw charts or yaw bandwidth.
-The positive target-speed condition for the retained NRMM extension remains.
+A positive inverse floor remains necessary for the Lipschitz extension, but a
+positive physical target speed is unnecessary when its regularization
+discrepancy is included in the last-row disturbance bound as above.
 Estimated-domain audits are diagnostics, not proof that truth obeys the premises.
 Sampled containment, floating-point qualifications and future prediction remain
 separate from the continuous theorem and from closed-loop collision avoidance.

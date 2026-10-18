@@ -114,6 +114,9 @@ function output = localPublish(output, bound, input, design)
     end
     % Global Lipschitz bounds for the saturated inverse reconstruction.
     speedFloor = domain.speedMinimum;
+    if domain.speedMinimum == 0 && isfield(domain,"regularizationSpeedMinimum")
+        speedFloor = domain.regularizationSpeedMinimum;
+    end
     yawRateRadius = min(domain.yawRateMaximum+abs(target.targetYawRate), ...
         (domain.accelerationNormBound/speedFloor^2 ...
         + 2*domain.speedMaximum*domain.accelerationNormBound/speedFloor^3)*components(2) ...
@@ -122,6 +125,12 @@ function output = localPublish(output, bound, input, design)
         domain.rearAxleDistance/cos(domain.sideslipMaximum) ...
         *(yawRateRadius/speedFloor ...
         + domain.yawRateMaximum/speedFloor^2*components(2)));
+    if domain.speedMinimum == 0 && speed-components(2) < speedFloor
+        % The inverse is regularized in this region, and body orientation is
+        % unobservable at rest. Use physical bounds, not a fictitious course.
+        yawRateRadius = domain.yawRateMaximum+abs(target.targetYawRate);
+        sideslipRadius = domain.sideslipMaximum+abs(target.targetSideslip);
+    end
     yawRadius = min(pi, bound.yaw+courseRadius+sideslipRadius);
     values = [repmat(positionRadius, 2, 1); repmat(velocityRadius, 2, 1); ...
         repmat(accelerationRadius, 2, 1); yawRadius; yawRateRadius];

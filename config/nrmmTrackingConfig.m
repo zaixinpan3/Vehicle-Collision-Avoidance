@@ -46,6 +46,8 @@ function cfg = nrmmTrackingConfig()
 
     %% Target operating domain
     cfg.target.domain.speedMinimum = 10.0;           % m/s V_{C,min}
+    % Used only when the physical speed domain starts at zero.
+    cfg.target.domain.regularizationSpeedMinimum = 5.0; % m/s inverse floor
     cfg.target.domain.speedMaximum = 20.0;           % m/s Vbar_C
     cfg.target.domain.scalarAccelerationMaximum = 2.0; % m/s^2 Abar_C
     cfg.target.domain.sideslipMaximum = 0.015;       % rad beta_max

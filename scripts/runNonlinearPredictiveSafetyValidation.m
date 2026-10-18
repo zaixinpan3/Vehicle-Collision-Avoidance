@@ -70,8 +70,13 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             estimatorConfiguration.sensor.radar.rangeMaximum=cfg.collision.encounterRangeMeters;
             % The estimator shares the controller's vehicle, limits and
             % sideslip cone; the target premises are the scenario contract.
+            % Include this encounter in the declared scenario envelope. In
+            % particular a stationary or stopping lead must not inherit the
+            % strictly moving target domain of the original seven fixtures.
+            contract=collisionThreatContract(WindowSeconds=8);
+            contract=localIncludeTargetContract(contract,initialTarget);
             estimatorConfiguration=estimatorConfigurationFromController(estimatorConfiguration,cfg, ...
-                collisionThreatContract(WindowSeconds=8));
+                contract);
             if strlength(options.ResumeFrom)==0
                 initializationTimer=tic;
                 estimatorContext=nrmmEstimatorControllerAdapter("initialize",estimatorConfiguration,ego, ...
@@ -405,6 +410,21 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         file=fopen(options.OutputFile,'w');assert(file>=0);cleanup=onCleanup(@()fclose(file));
         fprintf(file,'%s\n',jsonencode(report));
     end
+end
+
+function contract=localIncludeTargetContract(contract,initialTarget)
+    % Use the actual fixture's declared motion, including non-threat audits.
+    % This avoids constructing unrelated curved fixtures at an unsupported
+    % ego trim speed just to include a stationary or stopping target.
+    target=predictiveSafetyGeometry.predictTarget(initialTarget,0:.05:8);
+    rate=target(4,:).*sin(target(6,:))./target(7,:);widen=1.1;
+    contract.speedMinimum=min(contract.speedMinimum,min(target(4,:))/widen);
+    contract.speedMaximum=max(contract.speedMaximum,max(target(4,:))*widen);
+    contract.scalarAccelerationMaximum=max(contract.scalarAccelerationMaximum,max(abs(target(5,:)))*widen);
+    contract.sideslipMaximum=max(contract.sideslipMaximum,max(abs(target(6,:)))*widen);
+    contract.yawRateMaximum=max(contract.yawRateMaximum,max(abs(rate))*widen);
+    contract.accelerationNormBound=max(contract.accelerationNormBound, ...
+        max(hypot(target(5,:),target(4,:).*rate))*widen);
 end
 
 function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)

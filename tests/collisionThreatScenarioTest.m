@@ -14,27 +14,23 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function campaignUsesObserverAndRetainsInitializationFailures(testCase)
+        function campaignRunsStationaryAndBrakingTargetsWithTheObserver(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             campaign = runCollisionThreatValidation(Frames=40,OutputDirectory=string(fixture.Folder));
             testCase.assertNumElements(campaign.results,2);
-            failed = campaign.results(1);
-            testCase.verifyEqual(failed.scenario,"stoppedLead");
-            testCase.verifyEqual(failed.outcome,"setupError");
-            testCase.verifySubstring(failed.failure,"nrmmEstimatorControllerAdapter:invalidTargetInitialization");
-            testCase.verifyFalse(failed.completed);
-            testCase.verifyEqual(failed.executedFrames,0);
-            testCase.verifyEqual(failed.source,"");
-            ran = campaign.results(2);
-            testCase.verifyEqual(ran.scenario,"hardBrakingLead");
-            testCase.assertGreaterThan(ran.executedFrames,0);
-            report = jsondecode(fileread(ran.source));
-            result = report.results;
-            testCase.verifyEqual(string(result.observationModel),"nrmmSyntheticSensors");
-            defaults = estimatorControllerIntegrationConfig();
-            testCase.verifyEqual(result.randomSeed,defaults.randomSeed);
-            testCase.verifyGreaterThan(norm(result.trace(1).estimatedState-result.trace(1).state),0);
-            testCase.verifyGreaterThan(result.estimatorConfiguration.sensor.radar.positionNoiseMaximum,0);
+            testCase.verifyEqual([campaign.results.scenario],["stoppedLead","hardBrakingLead"]);
+            for ran=campaign.results
+                testCase.verifyNotEqual(ran.outcome,"setupError");
+                testCase.assertGreaterThan(ran.executedFrames,0);
+                report = jsondecode(fileread(ran.source));
+                result = report.results;
+                testCase.verifyEqual(string(result.observationModel),"nrmmSyntheticSensors");
+                defaults = estimatorControllerIntegrationConfig();
+                testCase.verifyEqual(result.randomSeed,defaults.randomSeed);
+                testCase.verifyGreaterThan(norm(result.trace(1).estimatedState-result.trace(1).state),0);
+                testCase.verifyGreaterThan(result.estimatorConfiguration.sensor.radar.positionNoiseMaximum,0);
+                testCase.verifyEqual(result.estimatorConfiguration.observer.target.domain.speedMinimum,0);
+            end
         end
         function everyThreatStartsSeparatedAndCollidesWithoutAvoidance(testCase,scenario,referenceSpeed)
             [~,target,road,cfg] = collisionThreatScenario(scenario,struct('referenceSpeed',referenceSpeed));

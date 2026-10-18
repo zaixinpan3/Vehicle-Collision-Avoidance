@@ -24,11 +24,13 @@ function [stateDerivative, estimate] = nrmmTargetTrackerDerivative( ...
 % assumed zero.
 %
 % Phi is evaluated through a globally Lipschitz saturation extension Phi_e
-% that equals Phi on the certified target operating set
+% that equals Phi above its positive inverse floor on the operating set
 % {speedMinimum <= |q| <= speedMaximum, |s| <= accelerationNormBound,
 % |A| <= scalarAccelerationMaximum, |Omega| <= yawRateMaximum} and is
-% bounded and Lipschitz on all of R^4, so observer peaking cannot evaluate
-% the model outside its physical domain.
+% bounded and Lipschitz on all of R^4. When speedMinimum=0, the separate
+% regularizationSpeedMinimum is positive. Below it Phi_e=(V/a)^4 Phi on
+% admissible NRMM states; synthesis charges that discrepancy to the error
+% bound. At rest the Cartesian state remains valid and yaw is unobservable.
 %
 % ego is a scalar struct with fields bodyVelocity (2-by-1, m/s) and
 % yawRate (scalar, rad/s). domain is the certified target operating domain
@@ -57,9 +59,13 @@ function [stateDerivative, estimate] = nrmmTargetTrackerDerivative( ...
     targetAcceleration = state(5:6);
 
     % Radial and scalar saturation give bounded, globally Lipschitz factors
-    % that equal the original Phi on the certified operating set.
+    % that equal the original Phi on admissible states above the inverse floor.
     targetSpeed = norm(targetVelocity);
-    speedFloor = max(targetSpeed, speedMinimum);
+    inverseSpeedMinimum = speedMinimum;
+    if speedMinimum == 0 && isfield(domain,"regularizationSpeedMinimum")
+        inverseSpeedMinimum = domain.regularizationSpeedMinimum;
+    end
+    speedFloor = max(targetSpeed, inverseSpeedMinimum);
     unitDirection = targetVelocity/speedFloor;
     speedScale = min(1.0, speedMaximum/max(targetSpeed, realmin));
     qSaturated = speedScale*targetVelocity;
@@ -128,6 +134,7 @@ function [stateDerivative, estimate] = nrmmTargetTrackerDerivative( ...
         "targetRelativeHeading", courseAngleEgoFrame-targetSideslip, ...
         "phiValue", phiValue, ...
         "speedDomainValid", speedDomainValid, ...
+        "regularizationActive", targetSpeed < inverseSpeedMinimum, ...
         "operatingDomainValid", speedDomainValid && ~saturationActive, ...
         "saturationActive", saturationActive, ...
         "saturatedQuantities", saturatedQuantities);
@@ -156,9 +163,15 @@ function [speedMinimum, speedMaximum, scalarAccelerationMaximum, ...
     accelerationNormBound = double(domain.accelerationNormBound);
     rearAxleDistance = double(domain.rearAxleDistance);
     sideslipMaximum = double(domain.sideslipMaximum);
-    if speedMinimum <= 0.0 || speedMaximum <= speedMinimum ...
+    inverseSpeedMinimum = speedMinimum;
+    if speedMinimum == 0 && isfield(domain,"regularizationSpeedMinimum")
+        inverseSpeedMinimum = domain.regularizationSpeedMinimum;
+    end
+    if speedMinimum < 0.0 || speedMaximum <= speedMinimum ...
+            || ~isscalar(inverseSpeedMinimum) || ~isfinite(inverseSpeedMinimum) ...
+            || inverseSpeedMinimum <= 0 || inverseSpeedMinimum >= speedMaximum ...
             || rearAxleDistance <= 0.0
         error("nrmmTargetTrackerDerivative:invalidDomain", ...
-            "The target speed interval and rear-axle distance must be positive.");
+            "The target speed domain must be nonnegative with a positive inverse floor below its maximum.");
     end
 end
