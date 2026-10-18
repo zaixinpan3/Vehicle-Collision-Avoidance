@@ -8,8 +8,7 @@ classdef predictiveSafetyGeometry
             target=predictiveSafetyGeometry.predictTarget(model.target,time);
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
             generator=model.uncertainty.collisionGenerator;
-            reserve=sum(vecnorm(generator(1:2,:),2,1)) ...
-                +2*(norm(shape(1:2))+norm(shape(3:4)))*sin(min(pi,sum(abs(generator(3,:))))/2);
+            reserve=sum(vecnorm(generator(1:2,:),2,1));
             % Match the runtime controller's per-hold target enclosure. A
             % separate frozen-observer, full-horizon tube would rank seeds
             % against a different problem and can swamp the actual geometry.
@@ -17,9 +16,9 @@ classdef predictiveSafetyGeometry
             starts=predictiveSafetyGeometry.predictTarget(model.target,max(0,time-holdTime));
             support=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,holdTime);
             tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,holdTime);
-            targetRadius=norm(target(8:9,1))+norm(target(10:11,1));
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
-                'support',support,'yawReserve',2*targetRadius*sin(tube.yawRadius/2));
+                'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
+                'support',support,'targetYawRadius',tube.yawRadius);
             data.parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
             context=terminalSafeSet.context(model);
             if isfield(model,'solveTimer')
@@ -38,7 +37,7 @@ classdef predictiveSafetyGeometry
                     total=total+1;diagnostics(end+1)=localCandidateSummary(candidate);
                     if localCandidateBetter(candidate,best),best=candidate;end
                 end
-                parameters=struct('direction',1,'speed',1,'inflation',reserve+support.positionRadius+data.yawReserve(1));
+                parameters=localFieldParameters(data,1,1,1);
                 [~,field]=predictiveSafetyGeometry.circulationField(model.initialState,target(:,1),cfg,parameters);
                 projection=laneGeometry.project(model.initialState(1:2),model.lane);
                 lateral=[-sin(projection.heading);cos(projection.heading)];
@@ -49,7 +48,7 @@ classdef predictiveSafetyGeometry
                     directions=model.circulationDirection;
                 end
                 budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-                radius=field.egoRadius+cfg.planner.contourOffsetFraction*cfg.vehicle.width+parameters.inflation;
+                radius=field.egoRadius+field.desiredClearance+field.inflation;
                 speed=min(max(norm(field.velocity),1),sqrt(budget*radius));
                 usable=false;
                 for fraction=cfg.planner.circulationSpeedFractions
@@ -88,9 +87,11 @@ classdef predictiveSafetyGeometry
         end
 
         function [acceleration,field] = circulationField(x,target,cfg,parameters)
-            % Ideal second-order field in the target rectangle frame. Target
-            % translation, rotation and reference-point offset are retained.
-            % Its barrier algebra is not a certificate for limited Fiala inputs.
+            % Second-order target-frame guidance with directional uncertainty.
+            % The ego disk is a smooth guide only; candidate acceptance uses
+            % the actual uncertain rectangles. Inflation is refreshed along
+            % the rollout, so the ideal constant-inflation clearance ODE is
+            % not a certificate for this guide or the limited Fiala inputs.
             j=[0,-1;1,0];angle=target(3);r=[cos(angle),-sin(angle);sin(angle),cos(angle)];
             course=predictiveSafetyGeometry.direction(angle+target(6));
             curvature=sin(target(6))/target(7);omega=curvature*target(4);omegaDot=curvature*target(5);
@@ -114,7 +115,17 @@ classdef predictiveSafetyGeometry
             tangent=j*normal;nu=normal.'*w;tau=tangent.'*w;
             corners=cfg.vehicle.rectangleOffset+[1,1,-1,-1;1,-1,1,-1].*[cfg.vehicle.length/2;cfg.vehicle.width/2];
             egoRadius=max(vecnorm(corners,2,1));
-            h=distance-egoRadius-parameters.inflation;
+            normalWorld=r*normal;targetYawRadius=0;
+            if isfield(parameters,'targetYawRadius'),targetYawRadius=parameters.targetYawRadius;end
+            [~,targetReserve]=predictiveSafetyGeometry.rotationSupport(target(8:11),target(3),targetYawRadius,normalWorld.');
+            inflation=parameters.inflation+targetReserve;
+            if isfield(parameters,'generator')
+                inflation=inflation+sum(abs(normalWorld.'*parameters.generator(1:2,:))) ...
+                    +predictiveSafetyGeometry.targetSupportFromData(parameters.support,parameters.index,normalWorld.');
+            end
+            h=distance-egoRadius-inflation;
+            % Retain a smooth, dynamically useful guide; this contour
+            % preference is not a hard distance in acceptance or in RTI.
             desired=cfg.planner.contourOffsetFraction*cfg.vehicle.width;
             rate=cfg.planner.radialRate;
             relative=(-kappa*tau^2-2*rate*nu-rate^2*(h-desired))*normal ...
@@ -123,7 +134,27 @@ classdef predictiveSafetyGeometry
             acceleration=r*(relative+transport);
             field=struct('clearance',h,'normalSpeed',nu,'tangentSpeed',tau,'curvature',kappa, ...
                 'normal',normal,'tangent',tangent,'position',q,'velocity',w,'rotation',r, ...
-                'transport',transport,'egoRadius',egoRadius,'initialBarrier',nu+rate*h);
+                'transport',transport,'egoRadius',egoRadius, ...
+                'inflation',inflation,'desiredClearance',desired,'initialBarrier',nu+rate*h);
+        end
+
+        function [support,inflation] = rotationSupport(shape,yaw,yawRadius,normal)
+            % Exact directional support of a rectangle over a yaw interval.
+            % Each offset vertex contributes a*cos(delta)+b*sin(delta).
+            % Its maximum is at an endpoint or its interior angular maximum.
+            % Includes reference-point offsets, wrapped angles and full yaw
+            % uncertainty; normal rows need not be normalized.
+            rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
+            vertices=rotation*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);
+            a=normal*vertices;nominal=max(a,[],2);
+            radius=min(pi,yawRadius);
+            if radius==0,support=nominal;inflation=zeros(size(nominal));return;end
+            b=normal*[-vertices(2,:);vertices(1,:)];
+            values=a*cos(radius)+abs(b)*sin(radius);
+            interior=abs(atan2(b,a))<=radius;
+            magnitude=hypot(a,b);values(interior)=magnitude(interior);
+            support=max(nominal,max(values,[],2));
+            inflation=max(0,support-nominal);
         end
 
         function uncertainty = observerUncertainty(ego,observation,q)
@@ -563,8 +594,7 @@ function candidate=localCirculationRollout(model,data,direction,speed,count,long
             [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
             u=[prior(1);min(upper(2),max(lower(2),b))];
         elseif active
-            parameters=struct('direction',direction,'speed',speed, ...
-                'inflation',data.reserve+data.support.positionRadius+data.yawReserve(index));
+            parameters=localFieldParameters(data,index,direction,speed);
             [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
             % Release only after a complete return-to-route rollout clears
             % the same sampled target forecast. No local moving-away rule
@@ -626,8 +656,19 @@ function [gap,nominal]=localPlannerGap(x,target,data,index)
     center=x(1:2)+re*data.shape(3:4)-target(1:2)-rt*target(10:11);
     supports=data.shape(1:2).'*abs(re.'*axes)+target(8:9).'*abs(rt.'*axes);
     rows=abs(center.'*axes)-supports;nominal=max(rows);
-    targetReserve=predictiveSafetyGeometry.targetSupportFromData(data.support,index,axes.');
-    gap=max(rows-targetReserve.'-data.reserve-data.yawReserve(index));
+    orientation=sign(center.'*axes);orientation(orientation==0)=1;
+    normal=(axes.*orientation).';
+    targetReserve=predictiveSafetyGeometry.targetSupportFromData(data.support,index,normal);
+    egoSupport=predictiveSafetyGeometry.rotationSupport(data.shape,x(3),data.egoYawRadius,-normal);
+    targetSupport=predictiveSafetyGeometry.rotationSupport(target(8:11),target(3),data.targetYawRadius(index),normal);
+    gap=max(normal*(x(1:2)-target(1:2))-egoSupport-targetSupport ...
+        -sum(abs(normal*data.generator(1:2,:)),2)-targetReserve);
+end
+
+function parameters=localFieldParameters(data,index,direction,speed)
+    parameters=struct('direction',direction,'speed',speed,'inflation',0, ...
+        'egoYawRadius',data.egoYawRadius,'targetYawRadius',data.targetYawRadius(index), ...
+        'generator',data.generator,'support',data.support,'index',index);
 end
 
 function better=localCandidateBetter(candidate,best)

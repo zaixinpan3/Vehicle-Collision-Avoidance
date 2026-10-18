@@ -8,7 +8,7 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function rotatingTargetTransportRetainsTheClearanceDynamics(testCase)
+        function rotatingFrameTransportRetainsTheRequestedFrozenGeometryAcceleration(testCase)
             model=localModel("turningCrossing",8);x=model.initialState;
             target=model.target;target(10:11)=[.4;-.2];x(2)=3;x(5)=.3;
             parameters=struct('direction',-1,'speed',4,'inflation',.15);
@@ -17,7 +17,7 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             radial=f.normal.'*relative+f.curvature*f.tangentSpeed^2;
             tangential=f.tangent.'*relative-f.curvature*f.normalSpeed*f.tangentSpeed;
             rate=model.cfg.planner.radialRate;
-            expected=-2*rate*f.normalSpeed-rate^2*(f.clearance-model.cfg.planner.contourOffsetFraction*model.cfg.vehicle.width);
+            expected=-2*rate*f.normalSpeed-rate^2*(f.clearance-f.desiredClearance);
             testCase.verifyEqual(radial,expected,AbsTol=1e-10);
             testCase.verifyEqual(tangential,model.cfg.planner.tangentialRate*(-4-f.tangentSpeed),AbsTol=1e-10);
         end
@@ -45,6 +45,16 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             model=localModel("headOn",8);model.target(1:6)=[0;2;0;8;0;0];
             guide=predictiveSafetyGeometry.avoidanceGuide(model,16,1);
             testCase.verifyEqual(guide.nominalMinimumGap,.1,AbsTol=1e-6);
+            testCase.verifyEqual(guide.directionSign,0);
+            testCase.verifyTrue(isnan(guide.conflictStartSeconds));
+        end
+        function anUnknownTargetYawDoesNotRequireTwoRotationDiameters(testCase)
+            model=localModel("headOn",8);model.target(1:6)=[0;4;0;0;0;0];
+            model.targetEpoch=model.target;
+            model.uncertainty.target=struct('positionRadius',0,'courseRadius',pi, ...
+                'speedRadius',0,'accelerationRadius',0,'curvatureRadius',0,'sideslipRadius',0);
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,16,1);
+            testCase.verifyGreaterThan(guide.minimumGap,0);
             testCase.verifyEqual(guide.directionSign,0);
             testCase.verifyTrue(isnan(guide.conflictStartSeconds));
         end

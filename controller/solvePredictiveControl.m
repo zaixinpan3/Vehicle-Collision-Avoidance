@@ -946,16 +946,18 @@ function [values,jacobian,tightening,escape]=localSafety(x,q,time,model,generato
     values=dual.value;
     jacobian=dual.jacobian;
     % Directional position support retains correlation across the affine
-    % ego dynamics. Rotation uses an exact chord bound for each rectangle.
+    % ego dynamics. Target yaw uses the exact support over its entire yaw
+    % interval, in the SAME fixed dual normal. The ego chord is retained:
+    % it remains uniform while the optimizer changes the nominal ego yaw.
     normal=jacobian(:,1:2);normalNorm=vecnorm(normal,2,2);
     tube=struct('positionRadius',model.targetTube.positionRadius(point),'yawRadius',model.targetTube.yawRadius(point));
-    targetSupport=predictiveSafetyGeometry.targetSupportFromData(model.targetSupportData,point,normal);
+    % All four vertex rows share one normal and target support.
+    targetSupport=predictiveSafetyGeometry.targetSupportFromData(model.targetSupportData,point,normal(1,:));
     egoReach=norm(shape(1:2))+norm(shape(3:4));
-    targetReach=norm(q(8:9))+norm(q(10:11));
     yawRadius=sum(abs(generator(3,:)));
-    reserve=2*egoReach*sin(min(pi,yawRadius)/2) ...
-        +2*targetReach*sin(tube.yawRadius/2);
-    tightening=sum(abs(normal*generator(1:2,:)),2)+targetSupport+normalNorm*reserve;
+    reserve=2*egoReach*sin(min(pi,yawRadius)/2);
+    [~,targetRotation]=predictiveSafetyGeometry.rotationSupport(q(8:11),q(3),tube.yawRadius,normal(1,:));
+    tightening=sum(abs(normal*generator(1:2,:)),2)+targetSupport+normalNorm*reserve+targetRotation;
     values=values-tightening;
 end
 

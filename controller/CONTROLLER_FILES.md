@@ -26,8 +26,12 @@ retries, without a preceding risk gate. Warm references first attempt RTI on
 the shifted plan. The planner evaluates cruise feedback and, when needed, a
 small bank of target-frame circulation controls, including coasting and
 field-directed speed variants and a near-rest stopping candidate. Search stops
-when a candidate passes all sampled initialization checks. Target transport terms and
-rounded-rectangle distance geometry supply the acceleration guide. The existing
+when a candidate passes all sampled initialization checks. Target transport
+terms and the ego circumdisk supply a smooth acceleration guide, while
+position and target-yaw uncertainty contribute directional supports in the
+current normal. The contour offset remains a guidance preference, not a hard
+clearance. Inflation is refreshed along the rollout, so the ideal field ODE
+with constant inflation is not a safety theorem for this guide. The existing
 yaw loop and inverse Fiala map produce inputs, and the declared nonlinear model
 produces every state. Candidate checks use body-yaw rectangles, the runtime's
 per-hold error convention, physical-state limits and terminal membership.
@@ -81,6 +85,18 @@ radii are not discarded to obtain a command. `observerPredictiveControlTest`
 and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
 and expose that limitation. Complete nonlinear robust safety remains conditional
 on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.
+
+For the horizon collision rows, target yaw uncertainty is evaluated by the
+exact directional support of the four rotated, offset vertices over the
+allowed yaw interval. Each vertex maximum occurs at an interval endpoint or
+its angular maximum. Subtracting the nominal support gives the required
+inflation in the existing fixed dual normal. This is no larger than the old
+rotation-chord enclosure for the same uncertainty set, including fully unknown
+yaw. Directional position support and common-pose cancellation are retained.
+The ego chord remains in the RTI rows because it is uniform over changes of
+the nominal ego yaw; the planner can evaluate the full ego yaw support at
+each fixed rollout pose. Terminal continuation bounds are unchanged. These
+geometric improvements do not close the nonlinear information-set proof gaps.
 
 `CLOSED_LOOP_PREDICTION_THEORY.md` develops the proposed feedback-aware policy
 prediction, varying finite-horizon tubes and policy-shift proof. Fixed-width

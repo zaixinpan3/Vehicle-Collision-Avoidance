@@ -61,16 +61,20 @@ The distance normal varies with geometry without changing that direction.
 
 The field uses a frame attached to the target rectangle, including translation,
 rotation, angular acceleration and rectangle-center offsets. It encloses the
-ego footprint in a disk only for constructing the field. With clearance h,
-normal speed nu and tangential speed tau, the ideal unconstrained field gives
+ego footprint in a disk only for constructing a smooth field. Directional
+position support and exact target-yaw support determine the uncertainty
+inflation in the current normal. With clearance h, normal speed nu and
+tangential speed tau, the ideal frozen-inflation acceleration requests
 
     h_ddot + 2 lambda h_dot + lambda^2 (h - h_star) = 0,
     tau_dot = k_t (sigma v_c - tau).
 
 The contour offset h_star is a guidance preference, not an added physical
-collision margin. Circulation speed is limited using the corner-radius and
-acceleration scales. World acceleration is converted to steering and signed
-braking ratio using the existing yaw loop and inverse Fiala force branch.
+collision margin. Directional inflation changes along the trajectory, so the
+constant-inflation ODE is not a safety theorem for this implementation.
+Circulation speed is limited using the corner-radius and acceleration scales.
+World acceleration is converted to steering and signed braking ratio using the
+existing yaw loop and inverse Fiala force branch.
 The speed-dependent yaw demand also respects the model's sideslip operating
 scale. Braking amplitude and slew are retained, and every candidate state is
 obtained from `nonlinearBicycleModel.sample`. The Fiala input map is nonlinear:
@@ -244,8 +248,14 @@ convexification choices and do not establish global feasibility.
 The observer publishes a relative position ball, course bound, and intervals for
 speed, constant acceleration and curvature. Absolute common ego pose cancels
 only from pairwise collision geometry; road and state bounds retain ego
-uncertainty. Directional supports preserve generator correlation, and rectangle
-orientation contributes the chord reserve `2*reach*sin(min(pi,b_yaw)/2)`.
+uncertainty. Directional supports preserve generator correlation. For a fixed
+normal n, target yaw contributes `max_{theta,v} n'*R(theta)*v` minus the nominal
+rectangle support, where theta ranges over the entire allowed yaw interval
+and v over its four offset vertices. Each maximum is found from interval
+endpoints and an interior angular maximum. This exact support never exceeds
+the old nominal-support-plus-chord enclosure for the same set. Ego orientation
+retains the chord reserve `2*reach*sin(min(pi,b_yaw)/2)` in RTI, uniform over
+changes of the nominal yaw; fixed rollout poses use directional ego supports.
 Target support coefficients are calculated in a batch once per frame, then
 reused for the separating normals. Their parameter-family formulas are unchanged.
 

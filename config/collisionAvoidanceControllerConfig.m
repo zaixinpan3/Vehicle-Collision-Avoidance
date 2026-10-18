@@ -42,8 +42,9 @@ function cfg=localDefaults()
     % the terminal extension has no separate duration cap.
     cfg.rti=struct('settlingSeconds',.5);
     % Second-order circulation supplies initialization controls only. Each
-    % candidate is rolled through the declared Fiala model. Contour offset
-    % is a guidance preference, never an extra collision constraint.
+    % candidate is rolled through the declared Fiala model. The field uses
+    % directional uncertainty supports; its contour offset remains a
+    % guidance preference, never an extra collision constraint.
     cfg.planner=struct('radialRate',1,'tangentialRate',2, ...
         'contourOffsetFraction',1,'circulationSpeedFractions',[1,.65], ...
         'releaseAttempts',2,'lateralAccelerationFraction',.9);
