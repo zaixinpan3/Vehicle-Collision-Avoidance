@@ -12,6 +12,17 @@ runCollisionThreatValidation(OutputDirectory=string(tempname));
 The defaults use the actual NRMM observer with synthetic noisy sensors in
 25 m/s stopped-lead and hard-braking-lead encounters. Both encounters must
 collide under unmodified cruise and immediate maximum straight braking.
+Every collision-threat fixture must also have an independent nonlinear
+bypass witness inside a road extending 9 m to either side of the nominal
+path. `bypassFeasibilityBaseline` tries prescribed offset maneuvers offline,
+then replays the selected held inputs with `ode45`. It checks positive
+rectangle clearance, complete vehicle footprints inside the road, model
+state/input limits, encounter exit and return to nominal cruise. Its states
+and inputs are exported in `baselineBypass` and never supplied to the online
+planner, controller or observer. Failure to find a witness leaves the scenario
+unqualified; it does not prove that the physical problem is impossible.
+This is nominal truth-based existence evidence, not a robust-feasibility
+certificate for the observer's full uncertainty set.
 An unsupported observer initialization is recorded as `setupError`, and the
 campaign continues with the next case. It never substitutes exact states.
 Runs continue until sustained nominal cruise recovery or failure; a finite
@@ -28,8 +39,16 @@ its road verdict does not describe this road-free campaign.
 
 The collision-threat encounters are defined in `collisionThreatScenario`
 (nine geometries; `givenPathCollisionBaseline` confirms that unmodified
-cruise collides). `runPotentialFieldCampaign(pwd,tempname)` runs the seven
-historical geometries at 8 and 15 m/s, also with the actual noisy-sensor NRMM
+cruise collides). Crossing targets decelerate to rest inside the road under
+constant tangential acceleration and sideslip until stopping; they no longer
+start outside the road or continue across its opposite edge. Head-on target
+distance scales with closing speed to preserve a 1.6 s nominal meeting time.
+The audit also checks the target's full footprint during the actual encounter;
+leaving the road is an invalid scenario, not an optimization failure. These
+scenario-road checks do not enable online road constraints or change the
+existing 10 m ego-reference-point simulation stopping threshold.
+`runPotentialFieldCampaign(pwd,tempname)` runs the seven named geometries at
+8 and 15 m/s, also with the actual noisy-sensor NRMM
 observer by default. Both campaign entry points accept a nonempty
 `EstimatorConfiguration` to change sensor/observer settings;
 `extendPotentialFieldRecovery` resumes unfinished runs using their saved settings.

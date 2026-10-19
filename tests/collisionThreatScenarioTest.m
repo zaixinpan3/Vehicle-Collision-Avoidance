@@ -19,6 +19,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             campaign = runCollisionThreatValidation(Frames=40,OutputDirectory=string(fixture.Folder));
             testCase.assertNumElements(campaign.results,2);
             testCase.verifyEqual([campaign.results.scenario],["stoppedLead","hardBrakingLead"]);
+            testCase.verifyTrue(all([campaign.results.bypassQualified]));
             for ran=campaign.results
                 testCase.verifyNotEqual(ran.outcome,"setupError");
                 testCase.assertGreaterThan(ran.executedFrames,0);
@@ -48,6 +49,46 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             future = predictiveSafetyGeometry.predictTarget(target,impactTime);
             egoPosition = laneGeometry.referencePose(baseline.initialStationMeters+referenceSpeed*impactTime,0,baseline.referenceCurve);
             testCase.verifyEqual(future(1:2),egoPosition,AbsTol=1e-11);
+        end
+        function everyThreatHasAnIndependentInRoadBypass(testCase,scenario,referenceSpeed)
+            [x,target,road,cfg]=collisionThreatScenario(scenario,struct('referenceSpeed',referenceSpeed));
+            witness=bypassFeasibilityBaseline(x,target,road,cfg);
+            testCase.assertTrue(witness.qualified,witness.reason);
+            testCase.verifyFalse(witness.robustFeasibilityClaimed);
+            testCase.verifyGreaterThan(witness.minimumClearanceMeters,0);
+            testCase.verifyGreaterThanOrEqual(witness.minimumEgoRoadMarginMeters,0);
+            testCase.verifyGreaterThanOrEqual(witness.minimumTargetRoadMarginMeters,0);
+            testCase.verifyLessThan(witness.maximumLateralDeviationMeters,9);
+            testCase.verifyGreaterThan(witness.recoverySeconds,witness.encounterExitSeconds);
+            testCase.verifyEqual(witness.states(:,1),x,AbsTol=0);
+            testCase.verifyEqual(size(witness.states,2),size(witness.inputs,2)+1);
+        end
+        function targetFootprintsOutsideTheRoadAreNotQualified(testCase)
+            [x,q,road,cfg]=collisionThreatScenario("stoppedLead");q(2)=8.5;
+            witness=bypassFeasibilityBaseline(x,q,road,cfg);
+            testCase.verifyFalse(witness.qualified);
+            testCase.verifyEqual(witness.reason,"targetOutsideRoad");
+            testCase.verifyEmpty(witness.inputs);
+        end
+        function startingInsideDoesNotExcuseLeavingDuringTheEncounter(testCase)
+            [x,q,road,cfg]=collisionThreatScenario("stoppedLead");q(1:6)=[20;0;pi/2;10;0;0];
+            witness=bypassFeasibilityBaseline(x,q,road,cfg);
+            testCase.verifyFalse(witness.qualified);
+        end
+        function invalidScenarioGeometryIsNotAControllerFailure(testCase)
+            cfg=struct('collision',struct('encounterRangeMeters',1));
+            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
+                Scenarios="stoppedLead",Frames=1,ControllerConfiguration=cfg), ...
+                'runNonlinearPredictiveSafetyValidation:unqualifiedScenario');
+        end
+        function aVehicleEdgeCannotCutThroughTheInsideOfACurvedRoad(testCase)
+            curve=struct('origin',[0;0],'heading',0,'curvature',.005,'length',200);
+            shape=[2.4;.95;0;0];pose=[0;8.055;0];
+            corners=pose(1:2)+shape(1:2).*[1,1,-1,-1;1,-1,1,-1];
+            projected=laneGeometry.projectReferenceCurve(corners,curve);
+            testCase.verifyLessThan(max(abs(projected.lateralPosition)),9);
+            margin=scenarioRoadFootprintMargin(pose,shape,curve,9);
+            testCase.verifyEqual(margin,-.005,AbsTol=1e-10);
         end
         function fastStoppedLeadRequiresMoreThanStraightMaximumBraking(testCase)
             [x,q,~,cfg]=collisionThreatScenario("stoppedLead", ...

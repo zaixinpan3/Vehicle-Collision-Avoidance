@@ -28,6 +28,7 @@ function campaign = runCollisionThreatValidation(options)
             entry = struct('referenceSpeedMetersPerSecond',speed,'scenario',name,'source',"", ...
                 'observationModel',"nrmmSyntheticSensors",'randomSeed',estimatorConfiguration.randomSeed, ...
                 'baselineCollision',NaN,'maximumBrakingCollision',NaN,'baselineFirstCollisionSeconds',NaN, ...
+                'bypassQualified',false,'bypassMinimumClearanceMeters',NaN, ...
                 'completed',false,'recovery',struct('recovered',false),'outcome',"setupError", ...
                 'executedFrames',0,'failure',"",'minimumReplayClearanceMeters',NaN, ...
                 'initializationSeconds',NaN,'maximumRunningSeconds',NaN);
@@ -40,6 +41,8 @@ function campaign = runCollisionThreatValidation(options)
                 entry.source = file;
                 entry.baselineCollision = r.baselineCruise.collisionDetected;
                 entry.maximumBrakingCollision = r.baselineMaximumBraking.collisionDetected;
+                entry.bypassQualified = r.baselineBypass.qualified;
+                entry.bypassMinimumClearanceMeters = r.baselineBypass.minimumClearanceMeters;
                 entry.baselineFirstCollisionSeconds = r.baselineCruise.firstCollisionSeconds;
                 entry.completed = r.completed;
                 entry.recovery = r.recovery;
@@ -50,7 +53,9 @@ function campaign = runCollisionThreatValidation(options)
                 entry.initializationSeconds = r.firstFrameSeconds;
                 if numel(r.trace)>1,entry.maximumRunningSeconds=max([r.trace(2:end).controllerSeconds]);end
             catch exception
-                if ~strcmp(exception.identifier,'nrmmEstimatorControllerAdapter:invalidTargetInitialization')
+                if strcmp(exception.identifier,'runNonlinearPredictiveSafetyValidation:unqualifiedScenario')
+                    entry.outcome="unqualifiedScenario";
+                elseif ~strcmp(exception.identifier,'nrmmEstimatorControllerAdapter:invalidTargetInitialization')
                     rethrow(exception);
                 end
                 % Retain unsupported target initialization as a failed case;
@@ -60,7 +65,7 @@ function campaign = runCollisionThreatValidation(options)
             if isempty(summaries),summaries=entry;else,summaries(end+1)=entry;end %#ok<AGROW>
         end
     end
-    campaign = struct('scope',"joint NRMM observer/controller; cruise and maximum-straight-braking collision counterfactuals", ...
+    campaign = struct('scope',"joint NRMM observer/controller; verified in-road bypass, cruise and maximum-straight-braking counterfactuals", ...
         'scenarioOrder',names,'speedsMetersPerSecond',options.Speeds,'frames',options.Frames, ...
         'results',summaries);
     file = fopen(fullfile(options.OutputDirectory,'campaign.json'),'w');assert(file>=0);

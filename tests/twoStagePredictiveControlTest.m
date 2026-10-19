@@ -66,11 +66,11 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,q,road]=collisionThreatScenario("crossing",cfg);
             [command,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
-            % No terminal-membership search lengthens the first seed. This
-            % fixture needs the existing longer-horizon infeasibility retry.
-            testCase.verifyEqual(problem.metadata.rtiIterations,2);
-            testCase.verifyTrue(problem.metadata.search.nominalRestarted);
-            testCase.verifyEqual(problem.metadata.search.attempts(1).stages(end).exitFlag,-2);
+            % The revised in-road crossing admits the first local solve.
+            % Initialization still precedes RTI, without a terminal search.
+            testCase.verifyEqual(problem.metadata.rtiIterations,1);
+            testCase.verifyFalse(problem.metadata.search.nominalRestarted);
+            testCase.verifyGreaterThan(problem.metadata.search.attempts(1).stages(end).exitFlag,0);
             testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             testCase.verifyTrue(problem.metadata.search.planner.used);
             testCase.verifyEqual(problem.metadata.search.planner.candidateCount,1);

@@ -7,23 +7,24 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
         controllerConfiguration (1,1) struct = struct()
     end
     cfg = collisionAvoidanceControllerConfig(controllerConfiguration);
-    % US four-lane road with 12 ft (3.6576 m) lanes and 10 ft (3.048 m) paved
-    % shoulders. The ego follows the centre of the second lane from the right,
-    % so lateralClearance = [right; left] = [1.5 lanes + shoulder; 2.5 lanes +
-    % shoulder] from the given path.
-    road = struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
+    % Scenario geometry is independent of online road-constraint enforcement.
+    % Both complete footprints must fit inside this road during the encounter.
+    road = struct('centerline',[-100,0;1000,0],'lateralClearance',[9;9], ...
+        'scenarioHalfWidthMeters',9);
     if ~cfg.controller.enforceRoadBoundaries,road.lateralClearance=[];end
     state = [0;0;0;cfg.referenceSpeed;0;0];
     lr = cfg.target.rearAxleDistance;
     impactTime = 1.6;curvature = 0;
     switch name
         case "headOn"
-            target = [24;0;pi;8;0;0;lr;2.4;.95;0;0];
-            impactTime = 24/(cfg.referenceSpeed+8);
+            distance = 1.6*(cfg.referenceSpeed+8);
+            target = [distance;0;pi;8;0;0;lr;2.4;.95;0;0];
+            impactTime = 1.6;
             return;
         case "acceleratingHeadOn"
-            target = [24;0;pi;8;1;0;lr;2.4;.95;0;0];
-            impactTime = 48/(cfg.referenceSpeed+8+sqrt((cfg.referenceSpeed+8)^2+48));
+            distance = 1.6*(cfg.referenceSpeed+8)+.5*1.6^2;
+            target = [distance;0;pi;8;1;0;lr;2.4;.95;0;0];
+            impactTime = 1.6;
             return;
         case "stoppedLead"
             % Fixed target: increasing ego speed creates a closing-speed test.
@@ -43,25 +44,30 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
             targetSpeed = cfg.referenceSpeed-.5*impactTime;
             targetAcceleration = -.5;beta = 0;relativeCourse = 0;
         case "crossing"
-            targetSpeed = 8;targetAcceleration = 0;beta = 0;relativeCourse = -pi/2;
+            targetSpeed = 2.5;targetAcceleration = -1.5;beta = 0;relativeCourse = -pi/2;
         case "turningCrossing"
-            targetSpeed = 10;targetAcceleration = 1;beta = .05;relativeCourse = -pi/2;
+            targetSpeed = 2.5;targetAcceleration = -1.5;beta = .05;relativeCourse = -pi/2;
         case "curvedHeadOn"
             curvature = .005;
             targetSpeed = 8;targetAcceleration = 0;beta = -asin(curvature*lr);relativeCourse = pi;
         case "curvedCrossing"
             curvature = .005;
-            targetSpeed = 10;targetAcceleration = .5;beta = .04;relativeCourse = -pi/2;
+            targetSpeed = 2.5;targetAcceleration = -1.5;beta = .04;relativeCourse = -pi/2;
         otherwise
             error('collisionThreatScenario:unknownScenario','Unknown collision threat %s.',name);
     end
     curve = struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200);
     if curvature~=0
-        road = struct('referenceCurve',curve,'lateralClearance',road.lateralClearance);
+        road = struct('referenceCurve',curve,'lateralClearance',road.lateralClearance, ...
+            'scenarioHalfWidthMeters',road.scenarioHalfWidthMeters);
         trim = nonlinearBicycleModel.cruise(cfg,curvature);
         state = trim.state;state(1:2) = 0;
     end
     [position,heading] = laneGeometry.referencePose(cfg.referenceSpeed*impactTime,0,curve);
     impactTarget = [position;heading+relativeCourse-beta;targetSpeed;targetAcceleration;beta;lr;2.4;.95;0;0];
+    % Crossing targets decelerate to rest inside the road. Constant A/beta
+    % apply until rest, followed by the existing stationary NRMM extension.
+    % Merely moving the old high-speed crossings inside the initial road
+    % would let them leave its opposite edge during the same encounter.
     target = predictiveSafetyGeometry.predictTarget(impactTarget,-impactTime);
 end
