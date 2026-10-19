@@ -68,7 +68,7 @@ ego rectangle corner stays inside it at every predicted node and hold midpoint, 
 hold keep the sideslip inside the estimator's cone
 `model.sideslipMaximum`. Horizon construction starts at `horizonSteps`; a shifted longer horizon shrinks
 one hold per frame until that minimum, then extends if its endpoint is nonterminal. The
-given path defines the single CLF. The planner's `guideHalfWidthMeters=10`
+given path defines the single CLF. The planner's `guideHalfWidthMeters=9`
 defines virtual parallel walls for acceleration guidance, not hard optimizer
 or terminal constraints. Set it to `Inf` to disable the wall field. The
 simulation option `LateralDeviationLimitMeters=10` independently stops and

@@ -45,7 +45,7 @@ function cfg=localDefaults()
     % The parallel-wall acceleration guide anticipates transverse momentum;
     % it is not a hard RTI/terminal constraint or an execution certificate.
     cfg.planner=struct('radialRate',1,'tangentialRate',2,'pathRate',1,'wallRate',2, ...
-        'lateralAccelerationFraction',.9,'guideHalfWidthMeters',10);
+        'lateralAccelerationFraction',.9,'guideHalfWidthMeters',9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
     % The first certified exit ends this prediction's encounter. A fresh

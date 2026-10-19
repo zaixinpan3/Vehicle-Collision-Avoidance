@@ -81,7 +81,7 @@ circulation does not slow an already sufficient tangential motion to a fixed
 orbit speed. There is no extra physical clearance or contour-offset target.
 
 The virtual parallel walls at e = +/- W, with
-`planner.guideHalfWidthMeters=10`, modify only the transverse acceleration.
+`planner.guideHalfWidthMeters=9`, modify only the transverse acceleration.
 Writing f = kappa v_t^2 / (1 - kappa e) and r = `planner.wallRate`,
 the field clips it to
 

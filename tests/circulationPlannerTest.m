@@ -26,16 +26,17 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyEqual(f.activation,0);
         end
         function parallelWallSlowsOutwardMotionBeforeReachingTheWall(testCase)
-            model=localModel("headOn",8);x=model.initialState;x(2)=8;x(5)=3;
+            model=localModel("headOn",8);width=model.cfg.planner.guideHalfWidthMeters;
+            x=model.initialState;x(2)=width-2;x(5)=3;
             [a,active]=predictiveSafetyGeometry.wallGuidance(x,[1;100],model);
             testCase.verifyTrue(active);testCase.verifyLessThan(a(2),0);
             testCase.verifyEqual(a(1),1,AbsTol=1e-12);
             % Ideal acceleration realization only: a persistent outward
             % request approaches the wall without crossing it.
-            [~,z]=ode45(@(t,z)localWallMotion(z,model),[0,6],[8;3], ...
+            [~,z]=ode45(@(t,z)localWallMotion(z,model),[0,6],[width-2;3], ...
                 odeset('RelTol',1e-9,'AbsTol',1e-11));
-            testCase.verifyLessThan(max(z(:,1)),10);
-            testCase.verifyGreaterThan(z(end,1),9.9);
+            testCase.verifyLessThan(max(z(:,1)),width);
+            testCase.verifyGreaterThan(z(end,1),width-.1);
         end
         function aWallDoesNotResistAnAlreadyInwardAcceleration(testCase)
             model=localModel("headOn",8);x=model.initialState;x(2)=8;x(5)=-1;
