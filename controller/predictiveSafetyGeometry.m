@@ -4,7 +4,8 @@ classdef predictiveSafetyGeometry
         function guide = avoidanceGuide(model,count,side)
             % One path-attracted field rollout through the actual vehicle.
             % No candidate scores or admission gate. RTI receives the states
-            % and inputs; this heuristic is not a robust safety filter.
+            % and inputs over exactly count holds. Terminal constraints
+            % belong to RTI, not this heuristic initialization.
             cfg=model.cfg;time=(0:count)*cfg.controller.sampleTime;
             target=predictiveSafetyGeometry.predictTarget(model.target,time);
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
@@ -21,11 +22,6 @@ classdef predictiveSafetyGeometry
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
             data.parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
-            context=terminalSafeSet.context(model);
-            if isfield(model,'solveTimer')
-                context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
-            end
-            data.context=context;
             % A single field rollout, with an encounter-persistent direction.
             % Geometry chooses the turn sense; no candidate bank is searched.
             parameters=localFieldParameters(data,1,1,0);
@@ -601,18 +597,16 @@ function [distance,point]=localPointSegment(vertex,first,last)
 end
 
 function candidate=localCirculationRollout(model,data,direction,speed,count,longitudinalWeight)
-    cfg=model.cfg;h=cfg.controller.sampleTime;minimumCount=count;
-    candidate=struct('states',model.initialState,'inputs',zeros(2,0), ...
-        'gaps',zeros(1,0),'nominalGaps',zeros(1,0),'directionSign',direction, ...
+    cfg=model.cfg;h=cfg.controller.sampleTime;
+    candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
+        'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1),'directionSign',direction, ...
         'circulationSpeed',speed,'longitudinalWeight',longitudinalWeight, ...
-        'releaseNode',NaN,'terminalMember',false,'stateViolation',0,'fieldActive',false, ...
-        'maximumDeviation',0,'completion',"incomplete");
-    prior=model.previousInput;encounterEnded=false;index=1;
-    while true
+        'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
+        'maximumDeviation',0,'completion',"requestedHorizon");
+    candidate.states(:,1)=model.initialState;
+    prior=model.previousInput;encounterEnded=false;
+    for index=1:count+1
         if mod(index,8)==1,localPlannerDeadline(model);end
-        if index>size(data.target,2)
-            data=localExpandPlannerData(model,data,max(index,2*(size(data.target,2)-1)));
-        end
         x=candidate.states(:,index);target=data.target(:,index);
         [gap,nominal]=localPlannerGap(x,target,data,index);
         outside=norm(x(1:2)-target(1:2))-data.reserve-data.support.ballRadius(index)>cfg.collision.encounterRangeMeters;
@@ -625,18 +619,7 @@ function candidate=localCirculationRollout(model,data,direction,speed,count,long
         candidate.stateViolation=max(candidate.stateViolation,violation);
         [pathAcceleration,projection]=predictiveSafetyGeometry.pathAttraction(x,model);
         candidate.maximumDeviation=max(candidate.maximumDeviation,abs(projection.lateralPosition));
-        if index>minimumCount
-            candidate.terminalMember=terminalSafeSet.member(data.context,x,index-1);
-            % Extend the one rollout through recovery. An outward-going
-            % endpoint is not a completed bypass even when braking is possible.
-            recovering=projection.lateralPosition*projection.lateralVelocity<=1e-6;
-            if candidate.terminalMember && recovering
-                candidate.completion="terminalRecovery";break;
-            end
-        end
-        if index>cfg.controller.maximumHorizonSteps
-            candidate.completion="configuredHorizonLimit";break;
-        end
+        if index>count,break;end
         if hypot(x(4),x(5))<=cfg.model.brakeHoldSpeed
             b=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
             change=cfg.model.brakingRatioRateMaximum*h;
@@ -666,23 +649,9 @@ function candidate=localCirculationRollout(model,data,direction,speed,count,long
         end
         candidate.inputs(:,index)=u;
         next=nonlinearBicycleModel.sample(x,u,cfg);
-        candidate.states(:,index+1)=next;prior=u;index=index+1;
-        if norm(next-x)<1e-12 && target(4)==0 && target(5)<=0
-            candidate.gaps(index)=gap;candidate.nominalGaps(index)=nominal;
-            candidate.completion="stationaryReference";break;
-        end
+        candidate.states(:,index+1)=next;prior=u;
     end
     if ~candidate.fieldActive,candidate.directionSign=0;end
-end
-
-function data=localExpandPlannerData(model,data,count)
-    h=model.cfg.controller.sampleTime;time=(0:count)*h;
-    data.target=predictiveSafetyGeometry.predictTarget(model.target,time);
-    holdTime=[0,repmat(h,1,count)];
-    starts=predictiveSafetyGeometry.predictTarget(model.target,max(0,time-holdTime));
-    data.support=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,holdTime);
-    tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,holdTime);
-    data.targetYawRadius=tube.yawRadius;
 end
 
 function violation=localPlannerStateViolation(x,model)
@@ -726,7 +695,7 @@ function summary=localCandidateSummary(candidate)
     summary=struct('direction',candidate.directionSign,'speed',candidate.circulationSpeed, ...
         'longitudinalWeight',candidate.longitudinalWeight, ...
         'minimumGap',min(candidate.gaps),'nominalMinimumGap',min(candidate.nominalGaps), ...
-        'terminalMember',candidate.terminalMember,'stateViolation',candidate.stateViolation, ...
+        'stateViolation',candidate.stateViolation, ...
         'releaseNode',candidate.releaseNode,'maximumDeviation',candidate.maximumDeviation, ...
         'completion',candidate.completion);
 end

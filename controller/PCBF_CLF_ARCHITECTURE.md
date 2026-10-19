@@ -32,8 +32,11 @@ endpoint interpolant.
 A usable previous input sequence is shifted and rolled out from the current
 measured estimate. Its absolute endpoint is retained while the horizon shrinks
 one hold per frame, down to `controller.horizonSteps`. This also applies when
-the target disappears. Missing tail holds from a terminal endpoint prefer a
-checked cruise hold, then a bounded cruise-to-braking seed search. This
+the target disappears. When a target is present, the current geometric
+encounter preview can request a longer horizon if its forecast has changed.
+This length selection does not evaluate terminal membership. Missing tail
+holds from a terminal endpoint prefer a checked cruise hold, then a bounded
+cruise-to-braking seed search. This
 initializer is distinct from the unique terminal braking law. These are
 reference construction checks, not post-solve input checks or robust terminal
 certificates. When no certificate is found, a moving endpoint uses nominal
@@ -47,8 +50,8 @@ planner, without a separate risk-screening gate. The encounter horizon starts
 at `controller.horizonSteps` and expands using measured motion and NRMM
 prediction. The initial search spans the larger of that prefix and the current
 stopping time plus settling time, avoiding distant intersections caused by
-nearly equal velocities. This is not a terminal deadline: terminal extension
-still continues until membership or the shared computation deadline.
+nearly equal velocities. This chooses a seed length without testing terminal
+membership. An infeasible fresh RTI problem may retry on a longer horizon.
 
 The planner generates one trajectory through the declared vehicle dynamics.
 There is no candidate bank, weighted score or candidate admission gate. At the
@@ -105,25 +108,29 @@ The existing yaw loop and inverse Fiala map convert the acceleration into
 steering and signed braking ratio. Every state is obtained from
 `nonlinearBicycleModel.sample`; no affine-input barrier projection is claimed.
 A near-stopped seed completes braking instead of accelerating into the
-encounter again. The single rollout extends until its endpoint is in the
-terminal set and its transverse motion is inward or negligible, subject to the shared deadline and
-any explicit horizon cap. Actual-yaw nominal and inflated rectangle gaps,
-state violations, terminal membership and maximum deviation are diagnostics;
-a deficient seed can still be passed to RTI and is never a robust certificate.
+encounter again. The single rollout returns exactly the requested number of
+holds, even when its endpoint is nonterminal or still moving outward. It does
+not evaluate a separate terminal continuation or search for a terminal
+endpoint. Actual-yaw
+nominal and inflated rectangle gaps, state violations and maximum deviation
+are diagnostics; a deficient seed can still be passed to RTI and is never a
+robust certificate.
 
 The initial trajectory is the field's output, without a global or local
-minimum-deviation claim. One forward pass costs O(N), apart from terminal
-certification and adaptive horizon extension. The states and controls supply
-the RTI linearization center; only the optimized command is executed.
+minimum-deviation claim. One forward pass costs O(N) for the requested N
+holds. The states and controls supply the RTI linearization center; only the
+optimized command is executed.
 
 A solver-reported primal-infeasible subproblem triggers at most one fresh
 reference. The failed inputs, inherited separation normals and terminal
 linearization context are discarded. The planner runs again from the current
 measured state, target forecast, observer error sets and actual held input. Whenever a target is present, the planner supplies
 the fresh reference, including a cruise rollout when no avoidance is needed.
-Without a target, nominal feedback supplies it. If the failed reference was
-already fresh, the retry adds one minimum prefix of settling holds, subject
-to an explicitly configured maximum, instead of rebuilding an identical seed.
+Without a target, nominal feedback supplies it. The retry adds one minimum
+prefix to the failed horizon, subject to an explicitly configured maximum. This also
+applies to shifted references: a retry does not reset their length to the
+minimum prefix. Horizon growth is triggered by optimization infeasibility,
+without testing the seed for terminal membership.
 The new reference uses the configured initial trust scale. Dynamics tangents,
 separating directions, dual multipliers, tightened collision rows and terminal
 rows are all rebuilt. The underlying geometry, uncertainty and physical limits
@@ -131,19 +138,16 @@ are unchanged. Numerical iteration limits, timeouts and unavailable nonlinear
 predictions do not trigger replanning. Both attempts share the original timer;
 the retry cannot reset or extend the computation budget.
 
-`controller.horizonSteps` is a minimum, not a terminal deadline. After rolling
-out any seed, a nonterminal endpoint is extended using the vehicle model and
-feedback toward the given path until terminal membership is reached. With an
-explicitly infinite lateral limit, this instead follows the endpoint tangent.
-This settling extension removes the artificial requirement to finish recovery
-within a short prefix. The cruise-path CLF is unchanged,
-and a moving terminal endpoint does not command parking. An immobile reference
-with no moving target is passed to RTI for correction rather than extended
-indefinitely. An explicitly configured finite horizon cap also ends extension;
-otherwise `maximumHorizonSteps=Inf` supplies no time-horizon cap. Geometry,
-extension, formulation and solving share the original computation deadline.
-The endpoint still carries the optimizer's terminal constraints; seed membership
-is not a robust nonlinear certificate.
+`controller.horizonSteps` is the minimum requested length. Encounter prediction,
+the shifted previous horizon, and the existing infeasibility retry can request
+more holds, subject to `maximumHorizonSteps` and the shared deadline. Neither
+the field planner nor an outer reference-extension loop requires the seed's
+endpoint to belong to the terminal set. The PCBF optimization retains its
+endpoint terminal constraints, linearized around that possibly nonterminal
+seed. A shorter reference may require a retry or remain locally infeasible;
+removing seed membership checks does not guarantee RTI success. The recursive
+feasibility assumptions concern the feasible optimized trajectory and its
+terminal continuation, not the heuristic used to initialize the solve.
 
 Road boundaries are deferred by default (`controller.enforceRoadBoundaries=false`).
 Input road metadata then supplies only the nominal path; edge inequalities are

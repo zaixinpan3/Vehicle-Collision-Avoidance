@@ -46,13 +46,31 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
         end
+        function aChangedTargetForecastCanLengthenTheShiftedSeed(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,target]=collisionThreatScenario("headOn",cfg);
+            model=problem.model;model.target=target;model.targetEpoch=target;model.targetOnset=false;
+            % Stop at the first numerical attempt so the assertion concerns
+            % forecast-driven horizon selection, not an infeasibility retry.
+            model.cfg.solver.maxIterations=1;
+            [~,search,model]=solvePredictiveControl(model,prior,tic);
+            testCase.verifyEqual(search.linearizationCount,1);
+            testCase.verifyEqual(search.initialization,"shiftedInputRollout");
+            testCase.verifyGreaterThan(size(model.linearization.inputs,2),size(prior.inputTrajectory,2));
+            testCase.verifyEqual(model.linearization.inputs(:,1:size(prior.inputTrajectory,2)-1), ...
+                prior.inputTrajectory(:,2:end),AbsTol=0);
+        end
         function coldCrossingSelectsACirculationReferenceBeforeTheRtiSolve(testCase)
             [ego,~,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=15;
             [~,q,road]=collisionThreatScenario("crossing",cfg);
             [command,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
-            testCase.verifyEqual(problem.metadata.rtiIterations,1);
-            testCase.verifyFalse(problem.metadata.search.nominalRestarted);
+            % No terminal-membership search lengthens the first seed. This
+            % fixture needs the existing longer-horizon infeasibility retry.
+            testCase.verifyEqual(problem.metadata.rtiIterations,2);
+            testCase.verifyTrue(problem.metadata.search.nominalRestarted);
+            testCase.verifyEqual(problem.metadata.search.attempts(1).stages(end).exitFlag,-2);
             testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             testCase.verifyTrue(problem.metadata.search.planner.used);
             testCase.verifyEqual(problem.metadata.search.planner.candidateCount,1);
@@ -74,7 +92,9 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             anchor=problem.model.linearization;
             testCase.verifyGreaterThan(size(anchor.inputs,2)*cfg.controller.sampleTime,2);
-            testCase.verifyTrue(terminalSafeSet.member(anchor.terminalContext,anchor.states(:,end),size(anchor.inputs,2)));
+            % A nonterminal seed is allowed; the optimized endpoint carries
+            % the terminal constraints instead.
+            testCase.verifyFalse(terminalSafeSet.member(anchor.terminalContext,anchor.states(:,end),size(anchor.inputs,2)));
             testCase.verifyEqual(search.rtiIterations,1);
             ego=localSuccessor(ego,state);q=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             [~,~,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
@@ -101,16 +121,18 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(model.linearization.inputs(2,:)),1);
             testCase.verifyTrue(all(isfinite(model.linearization.states),'all'));
         end
-        function anUnsafeColdReferenceStillGetsOnlyOneRtiModel(testCase)
+        function anUnsafeColdReferenceUsesAtMostOneInfeasibilityRetry(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,q]=collisionThreatScenario("headOn",cfg);
             model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
             [solution,search]=solvePredictiveControl(model,[],tic);
-            testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyEqual(search.rtiIterations,1);
-            testCase.verifyLessThanOrEqual(search.solverCalls,2);
-            testCase.verifyFalse(search.nominalRestarted);
+            testCase.verifyLessThanOrEqual(search.linearizationCount,2);
+            testCase.verifyEqual(search.rtiIterations,1+search.restartCount);
+            testCase.verifyLessThanOrEqual(search.solverCalls,2*search.rtiIterations);
+            if search.nominalRestarted
+                testCase.verifyEqual(search.attempts(1).stages(end).exitFlag,-2);
+            end
             testCase.verifyEqual(search.returned,~isempty(solution));
         end
         function plannedInputsRespectBrakingSlewIncludingAReplan(testCase)
@@ -187,8 +209,10 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             localVerifyRollouts(testCase,problem,cfg);
         end
         function replanningRebuildsCollisionGeometryFromTheFreshReference(testCase)
-            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
-            [~,~,fresh,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [ego,road,cfg]=localFixture();road.lateralClearance=[3;3];
+            cfg.controller.enforceRoadBoundaries=true;
+            cfg.controller.horizonSteps=32;cfg.controller.maximumHorizonSteps=32;
+            [~,~,fresh,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             prior.inputTrajectory=repmat([.25;0],1,size(prior.inputTrajectory,2));
             prior.avoidanceInitialized=true;
             prior.collisionSide=-fresh.model.collisionSide;
@@ -299,16 +323,15 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.clfInitialValue,withoutEdges.metadata.clfInitialValue);
             testCase.verifyEqual(withEdges,inputs,AbsTol=1e-10);
         end
-        function aShortPrefixExtendsUntilTheReferenceCanBrakeSafely(testCase)
+        function aShortPrefixCanGrowOnOptimizationInfeasibility(testCase)
             [ego,road,cfg]=localFixture();
             ego.position=[21.52;7.33];ego.yaw=.017;ego.speed=6.21;
             ego.lateralVelocity=-.153;ego.yawRate=-.14;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             anchor=problem.model.linearization;count=size(anchor.inputs,2);
-            testCase.verifyGreaterThan(count,cfg.controller.horizonSteps);
-            testCase.verifyGreaterThan(problem.metadata.search.appendedGuidedSteps,0);
-            testCase.verifyTrue(terminalSafeSet.member(anchor.terminalContext,anchor.states(:,end),count));
-            testCase.verifyEqual(problem.metadata.search.extensionStopped,"terminalMember");
+            testCase.verifyEqual(count,2*cfg.controller.horizonSteps);
+            testCase.verifyEqual(problem.metadata.search.restartCount,1);
+            testCase.verifyEqual(problem.metadata.search.attempts(1).stages(end).exitFlag,-2);
             testCase.verifyGreaterThan(anchor.states(4,end),5);
             localVerifyRollouts(testCase,problem,cfg);
         end

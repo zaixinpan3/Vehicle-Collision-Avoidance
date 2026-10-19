@@ -27,7 +27,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             localCheckDeadline(model);
             wall=tic;
             [anchor,source]=localRtiInitialize(model,previousState,minimumCount);
-            anchor=localExtendReference(anchor,model);
             search.initializationSeconds=toc(wall);search.initialization=source;
             model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
             [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
@@ -87,11 +86,11 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         % A failed tangent is not proof that the nonlinear problem is empty.
         % Discard its inputs, separation normals and terminal context. Plan
         % again from the same observation, error sets and actual held input.
-        % A cold reference gets more settling distance instead of repeating
-        % an identical seed; a shifted reference gets a fresh encounter plan.
-        if source~="shiftedInputRollout"
-            minimumCount=min(cfg.controller.maximumHorizonSteps,size(anchor.inputs,2)+cfg.controller.horizonSteps);
-        end
+        % Infeasibility, rather than seed terminal membership, requests a
+        % longer horizon. Also grow a failed shifted horizon: resetting it
+        % to the minimum prefix would remove time needed by the endpoint
+        % constraints. There is still only one fresh-reference retry.
+        minimumCount=min(cfg.controller.maximumHorizonSteps,size(anchor.inputs,2)+cfg.controller.horizonSteps);
         builds=model.linearizationBuilds;model=baseModel;model.linearizationBuilds=builds;
         model.trust=localTrustPrior([],cfg);model.inputTrustScale=model.trust.scale;
         model.terminalContext=[];previousState=[];anchor=[];replan=true;
@@ -110,10 +109,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     if ~isempty(anchor)
         search.appendedTerminalSteps=anchor.appendedTerminalSteps;
         search.appendedBrakingSteps=anchor.appendedBrakingSteps;search.planner=anchor.planner;
-    end
-    search.appendedGuidedSteps=0;search.extensionStopped="";
-    if ~isempty(anchor) && isfield(anchor,'extensionStopped')
-        search.appendedGuidedSteps=anchor.extensionSteps;search.extensionStopped=anchor.extensionStopped;
     end
     search.potentialFieldRestarted=false;search.initializationFailure="";
     search.attempts=history;search.selectedAttempt=numel(history)*double(search.returned);
@@ -155,8 +150,8 @@ function count=localPlanningHorizon(model,minimumCount)
     x=model.initialState;speed=hypot(x(4),x(5));beta=atan2(x(5),x(4));
     % A near-equal-speed target can put the next geometric intersection tens
     % of seconds away. Initial search need only span a physically meaningful
-    % stopping/settling maneuver; the selected reference is still extended
-    % until terminal membership, without imposing a terminal duration cap.
+    % stopping/settling maneuver. The seed need not end in the terminal set;
+    % RTI enforces endpoint constraints and may retry with a longer horizon.
     preview=max(minimumDuration,speed/cfg.terminal.brakingDecelerationMetersPerSecondSquared+cfg.rti.settlingSeconds);
     arcBeta=asin(model.nominalReference.curvature*cfg.vehicle.lr);
     egoArc=[x(1:2);x(3)+beta-arcBeta;speed;0;arcBeta;cfg.vehicle.lr; ...
@@ -223,10 +218,14 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount)
         % interior reference and recompute its complete nonlinear rollout.
         [seedLower,seedUpper]=nonlinearBicycleModel.inputBounds(cfg,true);
         old=min(seedUpper,max(seedLower,old));
-        % Keep the previous absolute endpoint until the minimum prefix is
-        % reached. Neither a disappearing target nor a rolling fixed duration
-        % may replace a valid terminal endpoint with an arbitrary cruise tail.
+        % Preserve the previous absolute endpoint unless the minimum prefix
+        % or the current encounter preview needs more holds. Disappearance
+        % alone must not replace the tail with an arbitrary cruise rollout.
         count=max(minimumCount,size(old,2));
+        % A changed target forecast can require a longer encounter horizon
+        % even while the previous input sequence remains a useful seed.
+        % Choose that length geometrically, without a terminal-state search.
+        if ~isempty(model.target),count=max(count,localPlanningHorizon(model,minimumCount));end
     end
     count=min(count,cfg.controller.maximumHorizonSteps);
     inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=model.initialState;
@@ -262,43 +261,6 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount)
         'appendedTerminalSteps',appended,'appendedBrakingSteps',braking,'planner',localPlannerMetadata());
 end
 
-function anchor=localExtendReference(anchor,model)
-    % A short prefix is not a terminal deadline. Extend the same reference
-    % toward the route until a mild, safe braking endpoint exists.
-    % This changes only the RTI seed; the optimized command is never repaired.
-    cfg=model.cfg;context=anchor.terminalContext;count=size(anchor.inputs,2);
-    initialCount=count;anchor.extensionSteps=0;anchor.extensionStopped="terminalMember";
-    x=anchor.states(:,end);prior=anchor.inputs(:,end);
-    member=terminalSafeSet.member(context,x,count);
-    anchor.planner.referenceTerminalMember=member;
-    if member,return;end
-    % Recovery guidance follows the route independently of any simulation
-    % stopping threshold. The planner's complete candidates use the same goal.
-    lane=model.lane;reference=model.nominalReference;
-    parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
-    while ~member && count<cfg.controller.maximumHorizonSteps
-        localCheckDeadline(model);
-        u=nonlinearBicycleModel.nominalFeedback(x,prior,lane,reference,cfg,parameters);
-        if hypot(x(4),x(5))<=.2*cfg.model.brakeHoldSpeed
-            u=[prior(1);min(0,prior(2))];
-        end
-        next=nonlinearBicycleModel.sample(x,u,cfg);count=count+1;
-        anchor.inputs(:,count)=u;anchor.states(:,count+1)=next;
-        % No reference progress is possible when both vehicles are parked.
-        % Still formulate the local problem so that RTI can repair the seed.
-        stationary=norm(next-x)<1e-12;
-        if stationary && ~isempty(model.target)
-            target=localTargetAt(model,count*cfg.controller.sampleTime);
-            stationary=target(4)==0 && target(5)<=0;
-        end
-        x=next;prior=u;member=terminalSafeSet.member(context,x,count);
-        if stationary && ~member,anchor.extensionStopped="stationaryReference";break;end
-    end
-    if ~member && count>=cfg.controller.maximumHorizonSteps,anchor.extensionStopped="configuredHorizonLimit";end
-    anchor.extensionSteps=count-initialCount;
-    anchor.planner.referenceTerminalMember=member;
-end
-
 function input=localTailSeed(x,prior,model,parameters)
     input=nonlinearBicycleModel.nominalFeedback(x,prior,model.lane,model.nominalReference,model.cfg,parameters);
     % An uncertified stopped tail must not restart into a positive-input
@@ -317,11 +279,10 @@ function anchor=localPlanReference(model,count)
     planner=localPlannerMetadata();planner.used=true;planner.candidateCount=guide.candidateCount;
     planner.maximumDeviationMeters=guide.maximumDeviation;
     planner.candidates=guide.candidates;planner.circulationDirection=guide.directionSign;
-    planner.referenceTerminalMember=guide.terminalMember;
     planner.referenceMinimumNodeGapMeters=guide.nominalMinimumGap;
     planner.referenceMinimumInflatedGapMeters=guide.minimumGap;
     planner.referenceStateViolation=guide.stateViolation;
-    planner.sampledNominalChecksPassed=guide.nominalMinimumGap>0 && guide.stateViolation<=1e-9 && guide.terminalMember;
+    planner.sampledNominalChecksPassed=guide.nominalMinimumGap>0 && guide.stateViolation<=1e-9;
     planner.conflictStartSeconds=guide.conflictStartSeconds;planner.conflictEndSeconds=guide.conflictEndSeconds;
     planner.releaseSeconds=guide.releaseNode*cfg.controller.sampleTime;
     planner.rolloutSeconds=toc(wall);
@@ -332,7 +293,7 @@ end
 function planner=localPlannerMetadata()
     planner=struct('used',false,'maximumDeviationMeters',NaN, ...
         'candidateCount',0,'algorithm',"pathAttractedCirculation", ...
-        'circulationDirection',0,'candidates',struct([]),'referenceTerminalMember',false, ...
+        'circulationDirection',0,'candidates',struct([]), ...
         'referenceMinimumNodeGapMeters',NaN,'referenceMinimumInflatedGapMeters',NaN, ...
         'referenceStateViolation',NaN,'sampledNominalChecksPassed',false, ...
         'conflictStartSeconds',NaN,'conflictEndSeconds',NaN,'releaseSeconds',NaN, ...

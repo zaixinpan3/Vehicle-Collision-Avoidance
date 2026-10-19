@@ -70,12 +70,34 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             model=localModel("crossing",8);model.cfg.model.brakingRatioRateMaximum=1;
             guide=predictiveSafetyGeometry.avoidanceGuide(model,50,1);
             testCase.verifyEqual(guide.candidateCount,1);
+            testCase.verifySize(guide.inputs,[2,50]);
+            testCase.verifySize(guide.states,[6,51]);
             for k=1:size(guide.inputs,2)
                 next=nonlinearBicycleModel.sample(guide.states(:,k),guide.inputs(:,k),model.cfg);
                 testCase.verifyEqual(guide.states(:,k+1),next,AbsTol=1e-12);
             end
             testCase.verifyLessThanOrEqual(max(abs(diff([model.previousInput(2),guide.inputs(2,:)]))),model.cfg.controller.sampleTime+1e-12);
             testCase.verifyTrue(all(isfinite([guide.states(:);guide.inputs(:)])));
+        end
+        function aNonterminalEndpointIsReturnedWithoutExtendingTheSeed(testCase)
+            model=localModel("headOn",8);
+            model.target(1:2)=model.initialState(1:2);model.targetEpoch=model.target;
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,1,1);
+            testCase.verifySize(guide.inputs,[2,1]);
+            testCase.verifySize(guide.states,[6,2]);
+            testCase.verifyEqual(guide.time,[0,model.cfg.controller.sampleTime]);
+            context=terminalSafeSet.context(model);
+            testCase.verifyFalse(terminalSafeSet.member(context,guide.states(:,end),1));
+            testCase.verifyTrue(all(isfinite(guide.states),'all'));
+            testCase.verifyFalse(guide.robustCertificate);
+        end
+        function aStationarySeedStillCoversTheRequestedPredictionTimes(testCase)
+            model=localModel("headOn",8);model.initialState(4:6)=0;
+            model.target(4:6)=0;model.targetEpoch=model.target;
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,8,1);
+            testCase.verifySize(guide.inputs,[2,8]);
+            testCase.verifySize(guide.target,[11,9]);
+            testCase.verifyEqual(guide.states,repmat(model.initialState,1,9),AbsTol=1e-12);
         end
         function aSmallPositiveRectangleGapDoesNotTriggerDiskAvoidance(testCase)
             model=localModel("headOn",8);model.target(1:6)=[0;2;0;8;0;0];

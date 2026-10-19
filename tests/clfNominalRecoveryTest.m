@@ -62,18 +62,24 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 testCase.verifyLessThan(nonlinearBicycleModel.nominalValue(x,road,reference),initialValue);
             end
         end
-        function aDistantReversedReferenceCanExtendPastTheShortPrefix(testCase)
+        function aDistantReversedSeedDoesNotSearchForATerminalEndpoint(testCase)
             % The recovery fixture deliberately starts 40 m from the path.
+            % The short local problem may fail; initialization must not
+            % silently integrate until its seed reaches the terminal set.
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',8), ...
                 'solver',struct('timeLimitSeconds',5)));
-            ego=struct('position',[0;-40],'yaw',2.5,'speed',6, ...
-                'lateralVelocity',.3,'yawRate',.1,'heldActuatorInput',[0;0]);
-            [command,inputs,problem]=collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]);
-            testCase.verifyGreaterThan(size(inputs,2),cfg.controller.horizonSteps);
-            testCase.verifyTrue(problem.metadata.search.planner.referenceTerminalMember);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            testCase.verifyFalse(problem.metadata.postSolveInputModification);
+            ego=struct('position',[0;0],'yaw',0,'speed',8, ...
+                'lateralVelocity',0,'yawRate',0,'heldActuatorInput',[0;0]);
+            [~,~,problem]=collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]);
+            model=problem.model;model.initialState=[0;-40;2.5;6;.3;.1];
+            [solution,search,model]=solvePredictiveControl(model,[],tic);
+            testCase.verifyEmpty(solution);
+            testCase.verifyEqual(search.restartCount,1);
+            stages=[search.attempts.stages];testCase.verifyEqual([stages.exitFlag],[-2,-2]);
+            anchor=model.linearization;count=size(anchor.inputs,2);
+            testCase.verifyEqual(count,2*cfg.controller.horizonSteps);
+            testCase.verifyFalse(terminalSafeSet.member(anchor.terminalContext,anchor.states(:,end),count));
         end
         function cruiseStaysOnTheReference(testCase,referenceSpeed,curvature)
             % Started on the reference, the cruise stays there: the plan's

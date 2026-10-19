@@ -10,6 +10,12 @@ are absent from the terminal set and its linearized constraints. Terminal
 membership concerns the declared physical-state, encounter and optional road
 conditions; the experiment independently measures actual path deviation.
 
+The endpoint constraint applies to the optimized PCBF trajectory. The heuristic
+planner returns a vehicle-model rollout of the requested length and does not
+require its endpoint to belong to this set. A nonterminal initial trajectory
+can be corrected by optimization, or the local solve can fail and request the
+existing replanning retry. No terminal-membership search extends the seed.
+
 ## State and task boundary
 
 The terminal condition belongs to the **joint encounter**, not to an ego speed

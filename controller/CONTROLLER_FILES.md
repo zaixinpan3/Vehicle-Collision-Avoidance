@@ -30,25 +30,25 @@ the obstacle adds outward normal acceleration and a passing-direction
 correction only when needed. Directional footprint and observer-error supports
 replace disk-width clearance. Virtual path-offset walls anticipate outward
 momentum. The cruise-speed loop, rather than target translation, determines
-the preferred acceleration along the ego's current velocity. Actual-yaw gaps and state/terminal checks remain diagnostics. The
+the preferred acceleration along the ego's current velocity. Actual-yaw gaps and state checks remain diagnostics. The
 existing inverse Fiala guidance produces inputs and the nonlinear model
-produces every state. The rollout extends to an inward-moving or settled
-terminal endpoint. Only RTI's optimized command is executed; the field is
+produces every state over exactly the requested number of holds, without
+checking terminal membership or waiting for recovery. Only RTI's optimized command is executed; the field is
 neither a robust safety certificate nor a minimum-deviation optimizer.
 Cold references without a target use nominal feedback.
 Warm references shift the previous inputs from the current estimate, retain
-their absolute endpoint until the minimum prefix is reached, and extend a
-terminal endpoint with a checked cruise or braking hold when available.
-A nonterminal endpoint extends with feedback toward the given path until the declared terminal
-membership holds, subject to the shared computation deadline and any explicit
-horizon cap. Thus the minimum prefix is not a fixed terminal deadline.
-Those extension checks concern the reference and the sampled declared model;
-they do not certify robust terminal invariance or veto an optimized input.
+their absolute endpoint until the minimum prefix is reached, and lengthen
+the horizon when the current geometric encounter preview requires it. Missing
+tail holds use a checked cruise or braking hold from a terminal endpoint when
+available.
+A nonterminal seed endpoint is passed directly to the optimizer's terminal
+constraints; it does not trigger an outer feedback-extension loop. The
+initializer is not required to solve the terminal problem before optimization.
 A retry discards the failed reference, old separation normals and terminal
 context. It regenerates geometry from the same observation and error sets and
-rebuilds dynamics, collision duals and terminal rows. A previously fresh
-reference gets one additional minimum prefix of settling holds, subject to an
-explicit horizon cap. No nonlinear restoration loop or previous-plan execution
+rebuilds dynamics, collision duals and terminal rows. The retry adds one minimum prefix to the failed horizon,
+subject to an explicit horizon cap, including when the failed reference was
+shifted. No nonlinear restoration loop or previous-plan execution
 fallback runs. A failed retry, unfinished solve or exhausted budget returns
 no command. The first optimized input is issued unchanged. The ideal
 mathematical recursive-feasibility theorem is independent of numerical RTI
@@ -67,7 +67,8 @@ the input reader clears edge metadata unless `controller.enforceRoadBoundaries` 
 ego rectangle corner stays inside it at every predicted node and hold midpoint, including the endpoint. Both ends of every
 hold keep the sideslip inside the estimator's cone
 `model.sideslipMaximum`. Horizon construction starts at `horizonSteps`; a shifted longer horizon shrinks
-one hold per frame until that minimum, then extends if its endpoint is nonterminal. The
+one hold per frame until that minimum. Infeasibility can request a longer
+horizon on the existing retry; seed terminal membership does not select its length. The
 given path defines the single CLF. The planner's `guideHalfWidthMeters=9`
 defines virtual parallel walls for acceleration guidance, not hard optimizer
 or terminal constraints. Set it to `Inf` to disable the wall field. The
