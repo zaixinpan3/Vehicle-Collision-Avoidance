@@ -86,8 +86,12 @@ target state and parameters for independent reconstruction; the audit's
 the revised target state require the audit source from their recorded commit.
 The optimizer uses one RTI step per attempt: one reference rollout and affine
 model, followed by PCBF and CLF objectives on that same model. When the shifted
-plan is locally infeasible, it generates one fresh avoidance path and retries
-RTI, rebuilding the dynamics and collision separation geometry. Completed
+plan is locally infeasible, it tries a fresh avoidance reference and then
+searches successively longer horizons. The previous accepted plan remains
+available for extension. Search has no fixed duration increment or number of
+attempts: completion requires the terminal-constrained optimization to solve,
+subject to the common deadline and any explicit user horizon limit. Each new
+reference rebuilds dynamics and collision geometry and receives one RTI model. Completed
 optimized inputs are returned unchanged; their nonlinear rollout is prediction,
 not nonlinear feasibility validation. The default 100 ms computation budget can
 return an explicit failure. Independent replay determines actual clearance and

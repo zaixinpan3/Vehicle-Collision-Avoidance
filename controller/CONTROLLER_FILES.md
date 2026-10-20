@@ -9,7 +9,7 @@ terminal set and recursive feasibility.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures, given-path normalization and perceived boundary chains |
-| `solvePredictiveControl.m` | RTI models from shifted, nominal or planned avoidance rollouts with one infeasibility-triggered replan; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
+| `solvePredictiveControl.m` | RTI models from shifted, nominal or planned avoidance rollouts with terminal-constrained adaptive horizon search; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
 | `terminalSafeSet.m` | Joint encounter terminal set and explicit terminal controller (`jointState`, `jointSuccessor`, `jointMember`, `control`): the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with held steering and a forward-only stop, retaining first-exit memory; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and a bounded cruise-to-braking seed search distinct from the terminal law), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
@@ -19,8 +19,9 @@ terminal set and recursive feasibility.
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
 Each reference rollout supplies one affine model and at most two native solves
-for the PCBF/CLF objectives. Local primal infeasibility permits one fresh
-reference and RTI retry, sharing the original sample deadline. Every fresh
+for the PCBF/CLF objectives. Local primal infeasibility permits fresh references and successively longer
+horizons until the terminal-constrained solve completes or the common sample
+deadline / an explicit user horizon cap stops search. Every fresh
 reference with a target invokes the circulation planner, including infeasibility
 retries, without a preceding risk gate. Warm references first attempt RTI on
 the shifted plan. The planner generates one path-attracted circulation rollout, with a persistent
@@ -72,8 +73,8 @@ chains remain available to the guide independently of that flag. With the legacy
 ego rectangle corner stays inside it at every predicted node and hold midpoint, including the endpoint. Both ends of every
 hold keep the sideslip inside the estimator's cone
 `model.sideslipMaximum`. Horizon construction starts at `horizonSteps`; a shifted longer horizon shrinks
-one hold per frame until that minimum. Infeasibility can request a longer
-horizon on the existing retry; seed terminal membership does not select its length. The
+one hold per frame until that minimum. Infeasibility can request longer
+horizons throughout the search; seed terminal membership does not select its length. The
 given path defines the single CLF. `road.boundaryObservation` supplies oriented
 world-coordinate chains with drivable space on the left and `extendStart` /
 `extendEnd` flags marking perception cuts. An explicit empty scan means no
@@ -169,7 +170,7 @@ zero multipliers and translation invariance. At overlap the trajectory rows
 use the feasible dual of the least-penetrated rectangle axis
 (`supportLinearization`), which the test checks as an escape direction.
 
-`twoStagePredictiveControlTest` checks RTI per reference, bounded replanning, both objective stages,
+`twoStagePredictiveControlTest` checks RTI per reference, adaptive horizon search, both objective stages,
 unchanged optimized inputs, measurement updates, limits and explicit failure
 after the allowed retry, without an execution fallback. `observerPredictiveControlTest` retains enclosure
 integration and directional-family containment tests, including batch/scalar

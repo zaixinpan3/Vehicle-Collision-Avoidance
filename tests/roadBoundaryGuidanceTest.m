@@ -94,6 +94,20 @@ classdef roadBoundaryGuidanceTest < matlab.unittest.TestCase
             witness=bypassFeasibilityBaseline(x,q,road,cfg);
             testCase.verifyTrue(witness.qualified,witness.reason);
         end
+        function jointHorizonSearchPassesTheFormerJunctionFailure(testCase,egoSpeed)
+            cfg=struct('referenceSpeed',egoSpeed, ...
+                'controller',struct('horizonSteps',8+8*(egoSpeed>=15)), ...
+                'solver',struct('timeLimitSeconds',5,'maxIterations',200));
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="intersectionCrossing",Frames=11, ...
+                ControllerConfiguration=cfg,EstimatorConfiguration=estimatorControllerIntegrationConfig());
+            result=report.results;
+            testCase.verifyEqual(result.failure,"");
+            testCase.verifyEqual(result.executedFrames,11);
+            testCase.verifyFalse(result.collisionDetected);
+            testCase.verifyFalse(result.roadConstraintsEnforced);
+            expanded=arrayfun(@(entry)any(diff([entry.attempts.horizonSteps])>0),result.trace);
+            testCase.verifyTrue(any(expanded));
+        end
         function aBoundaryAdjustedSeedRetainsNonlinearDynamicConsistency(testCase)
             model=localModel(perceiveRoadBoundaries(localRoad(),[0;0],30));
             x=[0;8.9;0;8;0;0];

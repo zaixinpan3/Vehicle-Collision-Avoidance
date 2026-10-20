@@ -1,5 +1,5 @@
 classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
-    % Two objectives per reference, bounded replanning and unchanged commands.
+    % Two objectives per reference, adaptive horizons and unchanged commands.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -121,13 +121,12 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(model.linearization.inputs(2,:)),1);
             testCase.verifyTrue(all(isfinite(model.linearization.states),'all'));
         end
-        function anUnsafeColdReferenceUsesAtMostOneInfeasibilityRetry(testCase)
+        function infeasibleReferencesShareOneHorizonSearchBudget(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,q]=collisionThreatScenario("headOn",cfg);
             model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
             [solution,search]=solvePredictiveControl(model,[],tic);
-            testCase.verifyLessThanOrEqual(search.linearizationCount,2);
             testCase.verifyEqual(search.rtiIterations,1+search.restartCount);
             testCase.verifyLessThanOrEqual(search.solverCalls,2*search.rtiIterations);
             if search.nominalRestarted
@@ -143,7 +142,6 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,q]=collisionThreatScenario("crossing",cfg);
             model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
             [~,search,model]=solvePredictiveControl(model,[],tic);
-            testCase.verifyLessThanOrEqual(search.rtiIterations,2);
             testCase.verifyEqual(search.rtiIterations,1+search.restartCount);
             testCase.verifyEqual(search.planner.candidateCount,1);
             inputs=model.linearization.inputs;
@@ -241,6 +239,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
         function anUncertifiedStoppedTailDoesNotRestartTheSeed(testCase)
             [ego,road,cfg]=localFixture();
+            cfg.controller.maximumHorizonSteps=16;
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             model=nominal.model;model.initialState=zeros(6,1);model.previousInput=zeros(2,1);
             % An overlapping stationary target makes membership false. The
@@ -249,7 +248,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             model.target=q;model.targetEpoch=q;model.targetOnset=false;
             prior=struct('inputTrajectory',zeros(2,cfg.controller.horizonSteps));
             [~,search,model]=solvePredictiveControl(model,prior,tic);
-            testCase.verifyEqual(search.rtiIterations,2);
+            testCase.verifyGreaterThanOrEqual(search.rtiIterations,2);
+            testCase.verifyEqual(search.stopReason,"horizonLimit");
             testCase.verifyLessThanOrEqual(model.linearization.inputs(2,end),0);
             testCase.verifyEqual(model.linearization.states(4:6,end),zeros(3,1),AbsTol=1e-12);
         end
@@ -295,16 +295,16 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
-        function anImpossibleRoadStopsAfterOneFreshReferenceRetry(testCase)
+        function anExplicitHorizonLimitStopsAnImpossibleRoadSearch(testCase)
             [ego,road,cfg]=localFixture();cfg.controller.maximumHorizonSteps=16;
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             model=nominal.model;model.road.lateralClearance=[.5;.5];timer=tic;
             [solution,search,model]=solvePredictiveControl(model,[],timer);
             testCase.verifyEmpty(solution);
-            testCase.verifyEqual(search.restartCount,1);
+            testCase.verifyGreaterThanOrEqual(search.horizonExtensions,1);
             testCase.verifyEqual(search.selectedAttempt,0);
-            testCase.verifyEqual(search.linearizationCount,2);
-            testCase.verifyEqual(numel(search.attempts),2);
+            testCase.verifyGreaterThanOrEqual(search.linearizationCount,2);
+            testCase.verifyEqual(search.stopReason,"horizonLimit");
             testCase.verifyEqual([search.stages.exitFlag],-2);
             testCase.verifyEqual(size(model.linearization.inputs,2),2*cfg.controller.horizonSteps);
             testCase.verifyEqual(model.solveTimer,timer);
@@ -329,8 +329,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             ego.lateralVelocity=-.153;ego.yawRate=-.14;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             anchor=problem.model.linearization;count=size(anchor.inputs,2);
-            testCase.verifyEqual(count,2*cfg.controller.horizonSteps);
-            testCase.verifyEqual(problem.metadata.search.restartCount,1);
+            testCase.verifyGreaterThan(count,cfg.controller.horizonSteps);
+            testCase.verifyGreaterThanOrEqual(problem.metadata.search.horizonExtensions,1);
             testCase.verifyEqual(problem.metadata.search.attempts(1).stages(end).exitFlag,-2);
             testCase.verifyGreaterThan(anchor.states(4,end),5);
             localVerifyRollouts(testCase,problem,cfg);

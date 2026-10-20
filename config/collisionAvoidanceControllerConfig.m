@@ -36,8 +36,8 @@ function cfg=localDefaults()
     cfg.nonlinear=struct('integrationStep',.05,'trustRadius',.5, ...
         'trustInnovationMeters',.02,'trustInitialScale',1, ...
         'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
-    % One RTI model per reference. Local primal infeasibility permits one
-    % fresh reference and retry, sharing the original controller deadline.
+    % One RTI model per reference. Local primal infeasibility requests fresh
+    % references and longer horizons within the original controller deadline.
     % Encounter search starts from horizonSteps and the current stopping time;
     % the terminal extension has no separate duration cap.
     cfg.rti=struct('settlingSeconds',.5);

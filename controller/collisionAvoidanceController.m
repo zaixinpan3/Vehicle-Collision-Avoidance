@@ -1,6 +1,6 @@
 function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
-%collisionAvoidanceController RTI PCBF/CLF control with bounded replanning.
+%collisionAvoidanceController RTI PCBF/CLF control with adaptive horizon search.
 % Controller state retains a target prediction and a linearization trajectory.
 % Every current target estimate updates the prediction; its A and beta are
 % held constant within this frame, independently of proof-metadata availability.
@@ -220,6 +220,11 @@ function localWarmUp(cfg,referenceRoad)
     cfg=collisionAvoidanceControllerConfig(cfg);h=cfg.controller.sampleTime;
     cfg.solver.timeLimitSeconds=max(1,cfg.solver.timeLimitSeconds);
     cfg.solver.maxIterations=max(80,cfg.solver.maxIterations);
+    % Discarded compilation probes include deliberately infeasible states.
+    % Prime their kernels on a bounded horizon instead of searching until
+    % the real encounter's deadline. This local copy never changes run-time
+    % horizon selection or the caller's configuration.
+    cfg.controller.maximumHorizonSteps=min(cfg.controller.maximumHorizonSteps,2*cfg.controller.horizonSteps);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
     % Prime the cold planner as well as nominal and bounded feedback paths.
     probe=struct('position',[0;0],'yaw',0,'speed',cfg.referenceSpeed, ...

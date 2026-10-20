@@ -1,8 +1,9 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl PCBF/CLF RTI with one infeasibility-triggered replan.
+%solvePredictiveControl PCBF/CLF RTI with terminal-feasible horizon search.
 % Each reference supplies one affine model for both convex objectives. A
-% primal-infeasible local problem permits one fresh reference and RTI retry
-% within the same deadline. No nonlinear merit loop or input repair runs.
+% primal-infeasible local problem requests another reference or a longer
+% horizon until the terminal-constrained problem solves or its budget ends.
+% There is no nonlinear merit loop or modification of optimized inputs.
     if nargin<3,timer=tic;end
     if ~isfield(model,'uncertainty')
         model.uncertainty=struct('specified',false,'egoGenerator',zeros(6), ...
@@ -16,17 +17,24 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     if isfield(model,'targetOnset') && ~model.targetOnset && isstruct(previousState) && isfield(previousState,'circulationDirection')
         model.circulationDirection=previousState.circulationDirection;
     end
-    baseModel=model;minimumCount=cfg.controller.horizonSteps;
+    baseModel=model;minimumCount=cfg.controller.horizonSteps;originalPrevious=previousState;
     history=struct([]);anchor=[];replan=false;
+    extensions=0;horizonStop="";
     rollout=struct('available',false,'reason',"noCompletedOptimization", ...
         'fullGap',NaN,'fullCorrection',NaN);
-    for attemptIndex=1:2
-        source="referenceUnavailable";
+    while true
+        source="nominalFeedbackRollout";domainFailure=false;
+        if isfield(model,'target') && ~isempty(model.target),source="plannedAvoidanceRollout";end
+        if isstruct(previousState) && isfield(previousState,'inputTrajectory') ...
+                && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all')
+            source="shiftedInputRollout";
+        end
         search=localEmptySearch(model,source,"",0);
         try
             localCheckDeadline(model);
             wall=tic;
             [anchor,source]=localRtiInitialize(model,previousState,minimumCount);
+            search.horizonSteps=size(anchor.inputs,2);
             search.initializationSeconds=toc(wall);search.initialization=source;
             model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
             [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
@@ -74,26 +82,51 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 end
             end
         catch exception
-            if ~strcmp(exception.identifier,'collisionAvoidanceController:timeBudgetExceeded'),rethrow(exception);end
-            solution=[];search.terminationReason="timeLimit";
+            if strcmp(exception.identifier,'collisionAvoidanceController:timeBudgetExceeded')
+                solution=[];search.terminationReason="timeLimit";
+            elseif any(strcmp(exception.identifier,{'collisionAvoidanceController:invalidTireOperatingPoint', ...
+                    'collisionAvoidanceController:singularTireLinearization','collisionAvoidanceController:nonlinearDomain'}))
+                % A longer shifted reference may leave the model domain.
+                % Try fresh guidance instead of issuing an invalid command.
+                solution=[];domainFailure=true;
+                search.initialization=source;search.initializationFailure=string(exception.identifier);
+                search.terminationReason="referencePredictionUnavailable";
+            else
+                rethrow(exception);
+            end
         end
-        history=[history,localAttempt(search)]; %#ok<AGROW> At most two attempts.
+        history=[history,localAttempt(search)]; %#ok<AGROW> Bounded by the shared deadline.
         infeasible=~isempty(search.stages) && search.stages(end).exitFlag==-2;
-        if ~isempty(solution) || ~infeasible || attemptIndex==2 ...
+        % Extending an unrollable fresh guide repeats the same invalid
+        % prefix; horizon growth cannot repair that initialization failure.
+        % A failed shifted prefix can still be replaced by fresh guidance.
+        recoverable=infeasible || (source=="shiftedInputRollout" ...
+            && (domainFailure || search.terminationReason=="nonlinearPredictionUnavailable"));
+        if ~isempty(solution) || ~recoverable ...
                 || toc(timer)>=model.solveTimeLimitSeconds
             break;
         end
-        % A failed tangent is not proof that the nonlinear problem is empty.
-        % Discard its inputs, separation normals and terminal context. Plan
-        % again from the same observation, error sets and actual held input.
-        % Infeasibility, rather than seed terminal membership, requests a
-        % longer horizon. Also grow a failed shifted horizon: resetting it
-        % to the minimum prefix would remove time needed by the endpoint
-        % constraints. There is still only one fresh-reference retry.
-        minimumCount=min(cfg.controller.maximumHorizonSteps,size(anchor.inputs,2)+cfg.controller.horizonSteps);
-        builds=model.linearizationBuilds;model=baseModel;model.linearizationBuilds=builds;
-        model.trust=localTrustPrior([],cfg);model.inputTrustScale=model.trust.scale;
-        model.terminalContext=[];previousState=[];anchor=[];replan=true;
+        count=minimumCount;
+        if ~isempty(anchor),count=size(anchor.inputs,2);
+        elseif source=="shiftedInputRollout",count=max(count,size(previousState.inputTrajectory,2)-1);end
+        if source=="shiftedInputRollout"
+            % Try a newly planned reference at this length before enlarging
+            % the problem. Keep the original plan available for extension;
+            % a poor fresh guide must not erase a useful old maneuver.
+            minimumCount=count;previousState=[];
+        else
+            % Geometric search has no fixed duration increment or attempt
+            % count. Terminal constraints, not a seed-membership test, decide
+            % whether a horizon is usable. A finite explicit user cap and
+            % the common computation deadline remain operational limits.
+            nextCount=min(cfg.controller.maximumHorizonSteps,max(count+1,ceil(1.5*count)));
+            if nextCount<=count,horizonStop="horizonLimit";break;end
+            minimumCount=nextCount;previousState=originalPrevious;extensions=extensions+1;
+        end
+        builds=model.linearizationBuilds;lastModel=model;model=baseModel;model.linearizationBuilds=builds;
+        if isfield(lastModel,'linearization'),model.linearization=lastModel.linearization;end
+        model.trust=localTrustPrior(previousState,cfg);model.inputTrustScale=model.trust.scale;
+        model.terminalContext=[];anchor=[];replan=true;
     end
     search.source="twoStageRealTimeIteration";search.algorithm="realTimeIteration";
     search.initialization=source;search.returned=~isempty(solution);
@@ -101,8 +134,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.convexSolveCompleted=search.clfStageCompleted;search.converged=false;
     search.linearizationCount=model.linearizationBuilds;
     search.rtiIterations=model.linearizationBuilds;
-    search.nominalRestarted=replan;search.restartCount=double(replan);
+    search.nominalRestarted=replan;search.restartCount=max(0,model.linearizationBuilds-1);
+    search.horizonExtensions=extensions;
     search.stopReason=search.terminationReason;
+    if strlength(horizonStop)>0,search.stopReason=horizonStop;end
     search.rollout=rollout;search.trust=model.trust;
     search.anchorCertified=false;search.appendedTerminalSteps=0;search.appendedBrakingSteps=0;
     search.planner=localPlannerMetadata();
@@ -413,7 +448,7 @@ function search=localEmptySearch(model,source,failure,seconds)
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
         'initializationSeconds',seconds,'initializationFailure',failure,'elapsedSeconds',seconds, ...
-        'potentialFieldRestarted',false);
+        'potentialFieldRestarted',false,'horizonSteps',0);
     search.attempts=localAttempt(search);search.selectedAttempt=0;
 end
 
@@ -424,6 +459,7 @@ function attempt=localAttempt(search)
         'slackCap',search.slackCap,'initializationSeconds',search.initializationSeconds,'formulationSeconds',search.formulationSeconds, ...
         'clfConstructionSeconds',search.clfConstructionSeconds);
     attempt.modelBuilt=search.modelBuilt;
+    attempt.horizonSteps=search.horizonSteps;
 end
 
 function search=localSearch(problem,model,initialization,formulationSeconds)
@@ -434,7 +470,8 @@ function search=localSearch(problem,model,initialization,formulationSeconds)
         'inputTrustScale',model.inputTrustScale,'primaryOptimum',NaN,'primaryLowerBound',problem.primaryLowerBound,'slackCap',NaN,'clfInitialSlack',NaN, ...
         'initializationSeconds',0, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
-        'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}));
+        'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
+        'horizonSteps',size(problem.inputIndices,2));
 end
 
 function [point,problem,search,model]=localPrimary(anchor,model,initialization,timer,problem)

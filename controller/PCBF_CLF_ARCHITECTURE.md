@@ -144,25 +144,37 @@ minimum-deviation claim. One forward pass costs O(N) for the requested N
 holds. The states and controls supply the RTI linearization center; only the
 optimized command is executed.
 
-A solver-reported primal-infeasible subproblem triggers at most one fresh
-reference. The failed inputs, inherited separation normals and terminal
-linearization context are discarded. The planner runs again from the current
-measured state, target forecast, observer error sets and actual held input. Whenever a target is present, the planner supplies
-the fresh reference, including a cruise rollout when no avoidance is needed.
-Without a target, nominal feedback supplies it. The retry adds one minimum
-prefix to the failed horizon, subject to an explicitly configured maximum. This also
-applies to shifted references: a retry does not reset their length to the
-minimum prefix. Horizon growth is triggered by optimization infeasibility,
-without testing the seed for terminal membership.
-The new reference uses the configured initial trust scale. Dynamics tangents,
-separating directions, dual multipliers, tightened collision rows and terminal
-rows are all rebuilt. The underlying geometry, uncertainty and physical limits
-are unchanged. Numerical iteration limits, timeouts and unavailable nonlinear
-predictions do not trigger replanning. Both attempts share the original timer;
-the retry cannot reset or extend the computation budget.
+A solver-reported primal-infeasible subproblem triggers terminal-constrained
+horizon search. A failed shifted reference first gets a fresh reference at the
+same length. If that also fails, the requested length grows geometrically
+(ceil(1.5 N), at least one additional hold). This is a search schedule, not a
+fixed time increment, physical terminal-time assumption or attempt limit.
+At each larger length, a previous accepted plan remains available for shifting
+and extension; a failed fresh guide does not erase it. Without a previous plan,
+each larger reference is generated from the current state. Every reference
+supplies one RTI model and the PCBF/CLF objectives on that model.
+
+The search succeeds when optimization completes with the endpoint terminal
+constraints included. It does not require the heuristic seed to be terminal,
+nor does it add a post-solve nonlinear feasibility veto or alter the optimized
+inputs. Thus the mathematical stopping condition is terminal-constrained
+feasibility; the implementation retains its existing affine RTI scope and
+makes no additional nonlinear-membership certificate. The common computation
+deadline and an explicitly configured finite `maximumHorizonSteps` can stop
+search without a solution. Numerical iteration exhaustion returns failure. An
+unavailable shifted reference or prediction requests fresh guidance within
+the same deadline. An invalid fresh reference/prediction returns a separate
+initialization or prediction failure: extending cannot repair an invalid
+reference prefix, and an invalid prediction is never issued as a command.
+
+Each reference rebuilds its dynamics tangents, separation directions, duals,
+uncertainty tightening and terminal rows. The shifted plan uses its prior trust
+estimate; fresh references use the configured initial trust scale. Model
+geometry, physical limits, observer information and the sample timer stay
+fixed throughout the search. No attempt resets the deadline.
 
 `controller.horizonSteps` is the minimum requested length. Encounter prediction,
-the shifted previous horizon, and the existing infeasibility retry can request
+the shifted previous horizon, and terminal-constrained horizon search can request
 more holds, subject to `maximumHorizonSteps` and the shared deadline. Neither
 the field planner nor an outer reference-extension loop requires the seed's
 endpoint to belong to the terminal set. The PCBF optimization retains its
@@ -239,8 +251,8 @@ ratio ten constraint tolerances inside the singular endpoints. Shifting a
 saturated previous plan rebuilds this interior seed and its complete rollout;
 this does not change a previously issued command. The 100 ms controller budget
 reserves 2 ms for completion, including any replan and retry. A successful first
-attempt needs one RTI model and at most two native solves; at most two models
-and four native solves are possible when local infeasibility triggers recovery.
+attempt needs one RTI model and at most two native solves. The number of
+reference/horizon attempts has no fixed cap; all attempts share the deadline.
 
 The main `runCollisionThreatValidation` campaign defaults to 25 m/s stopped
 and hard-braking lead scenarios with the actual NRMM observer and synthetic
@@ -355,11 +367,12 @@ separate pipeline timer; failed pipeline latency is not solver latency. A timeou
 failure, not a successful real-time control result. Raising the budget for a
 functional test does not change the bounded RTI/replanning policy.
 
-`search.rtiIterations` and `linearizationCount` are at most two; `solverCalls`
-is at most four and includes both attempts. `attempts` preserves each result;
+`search.rtiIterations` and `linearizationCount` count all reference attempts;
+`solverCalls` includes their native solves (at most two per model). `attempts`
+preserves each result and its `horizonSteps`; `horizonExtensions` counts length increases;
 `selectedAttempt` identifies the returned solution, or zero when none is returned.
-`nominalRestarted` and `restartCount` indicate the single allowed replan.
-Initialization and formulation timings sum both attempts. `convexSolveCompleted`
+`nominalRestarted` indicates reference recovery and `restartCount` counts
+additional RTI models. Initialization and formulation timings sum all attempts. `convexSolveCompleted`
 records completion of both convex objectives on the final reference.
 `optimizationConverged` is false because nonlinear convergence is not tested.
 `nonlinearValidationPerformed` is false and `nonlinearHardResidual` is unavailable.
