@@ -83,7 +83,30 @@ A receding target does not attract the ego toward a target-centred orbit, and
 circulation does not slow an already sufficient tangential motion to a fixed
 orbit speed. There is no extra physical clearance or contour-offset target.
 
-The virtual parallel walls at e = +/- W, with
+With `road.boundaryObservation`, the planner uses oriented visible polylines
+instead of path-offset walls. The drivable side is on each chain's left.
+Only endpoints marked as range cuts continue as tangent rays; visible
+junction corners and openings are retained. An explicit empty scan supplies
+no walls. All predicted nodes use the current scan, without querying a future
+map. Newly observed boundaries update both fresh and shifted reference inputs.
+The optimized command is never changed by this guidance.
+
+For the nearest feature on each chain, let d be signed inward distance,
+n its gradient, H its local Hessian, and s the ego rectangle's support toward
+the boundary at the rollout's actual body yaw. The virtual acceleration obeys
+
+    n' a >= -v' H v - 2 r n' v - r^2 (d - s).
+
+A two-dimensional halfplane projection keeps the preferred acceleration when
+it satisfies these inequalities; otherwise it checks the one- and two-active
+line intersections. Incompatible local inequalities yield a finite
+least-violation acceleration, not a certificate or an admitted feasible path.
+This is a local acceleration calculation, not a trajectory candidate bank.
+Support changes with yaw are evaluated along the rollout, not differentiated
+in this heuristic. Arbitrary nonconvex roads therefore do not acquire a road
+invariance or global reachability guarantee.
+
+For callers without a boundary scan, the virtual parallel walls at e = +/- W, with
 `planner.guideHalfWidthMeters=9`, modify only the transverse acceleration.
 Writing f = kappa v_t^2 / (1 - kappa e) and r = `planner.wallRate`,
 the field clips it to
@@ -100,8 +123,8 @@ inequalities, a special case of the high-order barrier construction in
 [Xiao and Belta (2019)](https://arxiv.org/abs/1903.04706). They anticipate
 outward velocity, unlike a position-only wall repulsion. This is guidance, not a hard RTI or terminal-set constraint. Actual
 Fiala tracking, input limits, observer error and subsequent RTI changes prevent
-claiming wall invariance from this virtual field alone. `Inf` disables wall
-guidance. The simulation separately stops at an actual deviation above its
+claiming wall invariance from this virtual field alone. `Inf` disables the
+legacy wall fallback. The simulation separately stops at an actual deviation above its
 `LateralDeviationLimitMeters` threshold (10 m by default).
 
 The existing yaw loop and inverse Fiala map convert the acceleration into
@@ -150,11 +173,13 @@ feasibility assumptions concern the feasible optimized trajectory and its
 terminal continuation, not the heuristic used to initialize the solve.
 
 Road boundaries are deferred by default (`controller.enforceRoadBoundaries=false`).
-Input road metadata then supplies only the nominal path; edge inequalities are
-absent from the horizon, terminal continuation and replay road-departure audit.
+Input road metadata supplies the nominal path and optional perceived boundary
+guidance; edge inequalities are absent from the horizon and terminal continuation.
+Offline truth replay independently audits complete footprints in the scenario
+road, including polygon unions with junctions. It does not admit or alter controls.
 An explicit opt-in retains the optional road-constrained experiment.
 The 10 m experiment threshold is absent from these optimizer rows and from
-the terminal certificate. Parallel-wall guidance shapes the initialization;
+the terminal certificate. Boundary guidance shapes the initialization;
 truth replay measures the actual reference-point deviation and stops the
 experiment if it exceeds the independently configured threshold.
 

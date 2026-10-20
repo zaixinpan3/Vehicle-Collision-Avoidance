@@ -218,6 +218,26 @@ function [lane, road] = localReadLane(rawGeometry, ego)
     end
     road=struct('lateralClearance',zeros(2,0));
     if isstruct(rawGeometry)
+        if isfield(rawGeometry,'boundaryObservation')
+            observation=rawGeometry.boundaryObservation;
+            assert(isstruct(observation) && isscalar(observation) && isfield(observation,'chains'), ...
+                'collisionAvoidanceController:invalidBoundaryObservation','Expected a road boundary scan.');
+            chains=observation.chains;
+            assert(isstruct(chains),'collisionAvoidanceController:invalidBoundaryObservation', ...
+                'Boundary chains must be a structure array.');
+            for j=1:numel(chains)
+                assert(all(isfield(chains(j),{'points','extendStart','extendEnd'})), ...
+                    'collisionAvoidanceController:invalidBoundaryObservation','A chain needs points and range-cut flags.');
+                validateattributes(chains(j).points,{'double'},{'real','finite','2d','ncols',2}, ...
+                    mfilename,'boundary points');
+                assert(size(chains(j).points,1)>=2 && all(vecnorm(diff(chains(j).points),2,2)>0), ...
+                    'collisionAvoidanceController:invalidBoundaryObservation','Boundary segments must have positive length.');
+                assert(isscalar(chains(j).extendStart) && isscalar(chains(j).extendEnd) ...
+                    && any(chains(j).extendStart==[false,true]) && any(chains(j).extendEnd==[false,true]), ...
+                    'collisionAvoidanceController:invalidBoundaryObservation','Range-cut flags must be logical scalars.');
+            end
+            road.boundaryObservation=observation;
+        end
         if isfield(rawGeometry,'boundaries') && ~isempty(rawGeometry.boundaries)
             error('collisionAvoidanceController:unsupportedRoad','Use a global lateralClearance corridor.');
         end
@@ -227,6 +247,9 @@ function [lane, road] = localReadLane(rawGeometry, ego)
                 error('collisionAvoidanceController:invalidRoadClearance','Lateral clearances must be positive.');
             end
         end
+        % A perceived arbitrary boundary is planner guidance only. Legacy
+        % path-offset rows must not silently replace a nonconvex map.
+        if isfield(road,'boundaryObservation'),road.lateralClearance=[];end
     end
 end
 

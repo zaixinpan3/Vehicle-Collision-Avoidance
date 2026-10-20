@@ -13,8 +13,9 @@ The defaults use the actual NRMM observer with synthetic noisy sensors in
 25 m/s stopped-lead and hard-braking-lead encounters. Both encounters must
 collide under unmodified cruise and immediate maximum straight braking.
 Every collision-threat fixture must also have an independent nonlinear
-bypass witness inside a road extending 9 m to either side of the nominal
-path. `bypassFeasibilityBaseline` tries prescribed offset maneuvers offline,
+bypass witness inside its declared scenario road (normally 9 m to either side
+of the nominal path; a polygon union for junctions).
+`bypassFeasibilityBaseline` tries prescribed offset maneuvers offline,
 then replays the selected held inputs with `ode45`. It checks positive
 rectangle clearance, complete vehicle footprints inside the road, model
 state/input limits, encounter exit and return to nominal cruise. Its states
@@ -32,13 +33,21 @@ Every issued control is replayed
 with tight `ode45` tolerances at 31 samples per hold on the nonlinear bicycle
 model itself; no Simulink plant is used. This offline audit reports sampled
 safety and timing; it does not authorize online execution.
-Road boundaries are disabled by default; the given path supplies the cruise
-and recovery reference. Exports record whether road constraints were enabled.
+Hard controller road constraints are disabled by default; the given path
+supplies the cruise and recovery reference. `perceiveRoadBoundaries` clips the
+scenario map to the current perception disk and sends only oriented visible
+boundary chains to the planner. Only range-cut endpoints extend along their
+tangents; the perception circle is not a wall. Visible junction openings remain
+open, and unknown junctions cannot influence the current prediction. No full
+map is supplied to the online planner. This ideal road sensor has range limits
+but no occlusion or measurement noise. Exports retain the offline truth road,
+each scan and complete-footprint replay margins. These are empirical checks,
+not hard road constraints or a road-safety certificate.
 The legacy `auditJointPredictiveSafety.py` checks a fixed 4-m half-width;
 its road verdict does not describe this road-free campaign.
 
 The collision-threat encounters are defined in `collisionThreatScenario`
-(nine geometries; `givenPathCollisionBaseline` confirms that unmodified
+(ten geometries; `givenPathCollisionBaseline` confirms that unmodified
 cruise collides). Crossing targets decelerate to rest inside the road under
 constant tangential acceleration and sideslip until stopping; they no longer
 start outside the road or continue across its opposite edge. Head-on target
@@ -47,6 +56,13 @@ The audit also checks the target's full footprint during the actual encounter;
 leaving the road is an invalid scenario, not an optimization failure. These
 scenario-road checks do not enable online road constraints or change the
 existing 10 m ego-reference-point simulation stopping threshold.
+`intersectionCrossing` uses the union of two perpendicular road rectangles;
+the target travels along the crossing road. More general scenario maps use
+`road.drivablePolygons`, a cell array of polygon vertex matrices whose union
+defines the drivable region. A matrix may use NaN-separated rings to describe
+holes such as traffic islands. The full map is available only to the synthetic
+road sensor and offline qualification/audits. The nominal route remains an
+independent cruise reference, not a definition of the road boundary.
 `runPotentialFieldCampaign(pwd,tempname)` runs the seven named geometries at
 8 and 15 m/s, also with the actual noisy-sensor NRMM
 observer by default. Both campaign entry points accept a nonempty

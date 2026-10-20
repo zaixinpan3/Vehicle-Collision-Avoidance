@@ -22,6 +22,7 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
         curve.origin=road.centerline(1,:).';curve.heading=atan2(direction(2),direction(1));
     end
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    auditRoad=curve;if isfield(road,'drivablePolygons'),auditRoad=road;end
     baseline=struct('qualified',false,'reason',"noWitnessFound", ...
         'scope',"sampled nominal nonlinear vehicle; truth-based offline scenario qualification", ...
         'robustFeasibilityClaimed',false,'halfWidthMeters',options.HalfWidthMeters, ...
@@ -30,10 +31,10 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
         'encounterExitSeconds',NaN,'recoverySeconds',NaN,'attempts',0, ...
         'initialState',initialState,'targetInitialState',target,'inputs',zeros(2,0), ...
         'states',zeros(6,0),'times',zeros(1,0),'offsetMeters',NaN,'riseSeconds',NaN);
-    if scenarioRoadFootprintMargin(target(1:3),target(8:11),curve,options.HalfWidthMeters)<0
+    if scenarioRoadFootprintMargin(target(1:3),target(8:11),auditRoad,options.HalfWidthMeters)<0
         baseline.reason="targetOutsideRoad";return;
     end
-    if scenarioRoadFootprintMargin(initialState(1:3),shape,curve,options.HalfWidthMeters)<0
+    if scenarioRoadFootprintMargin(initialState(1:3),shape,auditRoad,options.HalfWidthMeters)<0
         baseline.reason="egoOutsideRoad";return;
     end
     if predictiveSafetyGeometry.rectangle(initialState(1:3),shape,target(1:3),target(8:11))<=0
@@ -50,10 +51,10 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
             for side=[1,-1]
                 baseline.attempts=baseline.attempts+1;
                 candidate=localRollout(initialState,target,curve,shape,cfg,reference, ...
-                    side*offset,rise,options.HalfWidthMeters,[]);
+                    side*offset,rise,options.HalfWidthMeters,[],auditRoad);
                 if ~candidate.qualified,continue;end
                 verified=localRollout(initialState,target,curve,shape,cfg,reference, ...
-                    side*offset,rise,options.HalfWidthMeters,candidate.inputs);
+                    side*offset,rise,options.HalfWidthMeters,candidate.inputs,auditRoad);
                 if ~verified.qualified,continue;end
                 fields=fieldnames(verified);
                 for k=1:numel(fields),baseline.(fields{k})=verified.(fields{k});end
@@ -63,7 +64,7 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
     end
 end
 
-function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,width,replayInputs)
+function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,width,replayInputs,auditRoad)
     h=cfg.controller.sampleTime;
     % Explicit finite witness-search coverage, not a controller horizon or
     % an assumption that an unresolved encounter becomes safe at this time.
@@ -77,8 +78,8 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
     [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,false);
     for node=1:count+1
         time=(node-1)*h;x=states(:,node);
-        egoMargin=min(egoMargin,scenarioRoadFootprintMargin(x(1:3),shape,curve,width));
-        targetMargin=min(targetMargin,scenarioRoadFootprintMargin(q(1:3,node),q(8:11,node),curve,width));
+        egoMargin=min(egoMargin,scenarioRoadFootprintMargin(x(1:3),shape,auditRoad,width));
+        targetMargin=min(targetMargin,scenarioRoadFootprintMargin(q(1:3,node),q(8:11,node),auditRoad,width));
         projection=laneGeometry.projectReferenceCurve(x(1:2),curve);
         maximum=max(maximum,abs(projection.lateralPosition));
         if min(egoMargin,targetMargin)<0,reason="footprintOutsideRoad";break;end

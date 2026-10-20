@@ -101,14 +101,15 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         % Warm after estimator initialization/path setup. A bounded-input
         % probe uses the initial publication without advancing the observer
         % or RNG (initialFramePending is true); its command/state are discarded.
-        warmUpTimer=tic;collisionAvoidanceController("warmUp",cfg,road);
+        roadScan=perceiveRoadBoundaries(road,ego.position,cfg.collision.encounterRangeMeters,ego.stateTime);
+        warmUpTimer=tic;collisionAvoidanceController("warmUp",cfg,roadScan);
         if useEstimator && strlength(options.ResumeFrom)==0
             [~,probeEgo,probeTarget]=nrmmEstimatorControllerAdapter( ...
                 "sample",estimatorContext,ego.stateTime,ego,target,[]);
             probeEgo.heldActuatorInput=ego.heldActuatorInput;
             probeCfg=cfg;probeCfg.solver.timeLimitSeconds=max(1,cfg.solver.timeLimitSeconds);
             try
-                collisionAvoidanceController(probeEgo,probeTarget,road,probeCfg,[]);
+                collisionAvoidanceController(probeEgo,probeTarget,roadScan,probeCfg,[]);
             catch exception
                 if ~strcmp(exception.identifier,'collisionAvoidanceController:noOptimizationSolution'),rethrow(exception);end
             end
@@ -166,7 +167,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 'Continuation scenario, configuration and transition must match.');
             assert(isequaln(saved.recoveryOptions,recovery),'Recovery settings must match.');
             assert(isempty(r.trace) || (isfield(r.trace,'terminalDistanceMeters') ...
-                && isfield(r.trace,'postSolveFeasibilityCheck')), ...
+                && isfield(r.trace,'postSolveFeasibilityCheck') ...
+                && isfield(r.trace,'roadBoundaryObservation')), ...
                 'runNonlinearPredictiveSafetyValidation:incompatibleTraceSchema', ...
                 'Continuation trace must use the current RTI metadata schema.');
             assert(strlength(r.failure)==0 && ~r.recovery.recovered && r.executedFrames<options.Frames, ...
@@ -200,8 +202,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     q=predictiveSafetyGeometry.predictTarget(initialTarget,ego.stateTime);
                     scenarioEncounterEnded=norm(q(1:2)-ego.position)>cfg.collision.encounterRangeMeters;
                     if ~scenarioEncounterEnded
-                        margin=scenarioRoadFootprintMargin(q(1:3),q(8:11), ...
-                            baseline.referenceCurve,road.scenarioHalfWidthMeters);
+                        auditRoad=baseline.referenceCurve;
+                        if isfield(road,'drivablePolygons'),auditRoad=road;end
+                        margin=scenarioRoadFootprintMargin(q(1:3),q(8:11),auditRoad,road.scenarioHalfWidthMeters);
                         minimumTargetRoadMargin=min(minimumTargetRoadMargin,margin);
                         assert(margin>=0,'runNonlinearPredictiveSafetyValidation:unqualifiedScenario', ...
                             'The target footprint left the scenario road before encounter exit.');
@@ -223,8 +226,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                         end
                     end
                 end
+                roadScan=perceiveRoadBoundaries(road,ego.position,cfg.collision.encounterRangeMeters,ego.stateTime);
                 phase="controller";controllerTimer=tic;
-                [command,~,problem,prior]=collisionAvoidanceController(egoInput,estimate,road,cfg,prior);
+                [command,~,problem,prior]=collisionAvoidanceController(egoInput,estimate,roadScan,cfg,prior);
                 assert(problem.metadata.optimizationReturned && numel(command.actuatorInput)==2 ...
                     && all(isfinite(command.actuatorInput),'all'), ...
                     'runNonlinearPredictiveSafetyValidation:noControlOutput','No finite solved control was returned.');
@@ -264,7 +268,12 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                             collisionDetected=true;collisionTime=ego.stateTime+times(j);
                         end
                     end
-                    if cfg.controller.enforceRoadBoundaries && ~isempty(road.lateralClearance)
+                    if isfield(road,'scenarioHalfWidthMeters')
+                        auditRoad=baseline.referenceCurve;
+                        if isfield(road,'drivablePolygons'),auditRoad=road;end
+                        margin=scenarioRoadFootprintMargin(states(j,1:3).',shape,auditRoad,road.scenarioHalfWidthMeters);
+                        minimumRoadMargin=min(minimumRoadMargin,margin);
+                    elseif cfg.controller.enforceRoadBoundaries && ~isempty(road.lateralClearance)
                         rotation=[cos(states(j,3)),-sin(states(j,3));sin(states(j,3)),cos(states(j,3))];
                         vertices=states(j,1:2).'+rotation*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);
                         for vertex=1:4
@@ -290,6 +299,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     'observedTarget',~isempty(estimate),'targetSet',localTargetSetSummary(estimate), ...
                     'estimatedState',problem.model.initialState, ...
                     'estimatedTarget',problem.model.target, ...
+                    'roadBoundaryObservation',roadScan.boundaryObservation, ...
                     'horizonSteps',problem.metadata.horizonSteps,'source',search.source, ...
                     'solverCalls',search.solverCalls,'initialization',search.initialization, ...
                     'potentialFieldRestarted',search.potentialFieldRestarted,'initializationFailure',search.initializationFailure, ...
@@ -340,7 +350,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     failure="runNonlinearPredictiveSafetyValidation:collision: Ground-truth rectangles touched or overlapped.";
                     failureTime=collisionTime;
                     localSaveFailure(options.FailureFile,name,frame,egoTruth,targetTruth, ...
-                        egoInput,estimate,sensorFrame,priorAtFrame,road,cfg,estimatorConfiguration, ...
+                        egoInput,estimate,sensorFrame,priorAtFrame,roadScan,cfg,estimatorConfiguration, ...
                         failure,struct('command',command,'problem',problem,'times',times,'states',states));
                     break;
                 end
@@ -348,7 +358,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     failure="runNonlinearPredictiveSafetyValidation:lateralLimit: Ground-truth reference-point deviation exceeded the configured limit.";
                     failureTime=lateralLimitTime;
                     localSaveFailure(options.FailureFile,name,frame,egoTruth,targetTruth, ...
-                        egoInput,estimate,sensorFrame,priorAtFrame,road,cfg,estimatorConfiguration, ...
+                        egoInput,estimate,sensorFrame,priorAtFrame,roadScan,cfg,estimatorConfiguration, ...
                         failure,struct('command',command,'problem',problem,'times',times,'states',states));
                     break;
                 end
@@ -378,7 +388,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 scenarioInvalid=strcmp(exception.identifier,'runNonlinearPredictiveSafetyValidation:unqualifiedScenario');
                 failure=string(exception.identifier)+": "+string(exception.message);
                 localSaveFailure(options.FailureFile,name,frame,egoTruth,targetTruth, ...
-                    egoInput,estimate,sensorFrame,priorAtFrame,road,cfg,estimatorConfiguration,failure,[]);
+                    egoInput,estimate,sensorFrame,priorAtFrame,roadScan,cfg,estimatorConfiguration,failure,[]);
                 break;
             end
         end
@@ -413,6 +423,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'lateralLimitExceeded',lateralLimitExceeded,'lateralLimitTimeSeconds',lateralLimitTime, ...
             'roadDepartureDetected',minimumRoadMargin<0, ...
             'scenarioEncounterEnded',scenarioEncounterEnded, ...
+            'roadGeometry',road,'roadObservationModel',"rangeLimitedBoundaryChainsWithTangentExtension", ...
             'minimumTargetRoadMarginMeters',minimumTargetRoadMargin, ...
             'firstFrameSeconds',firstSeconds,'subsequentMedianSeconds',medianLater, ...
             'subsequentP95Seconds',p95Later,'deadlineMisses',nnz(seconds>cfg.controller.sampleTime) ...
@@ -494,7 +505,7 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
             q=[24;0;pi;8;1;atan(-.1*lr);lr;2.4;.95;0;0];
         case "brakingTarget"
             q=[24;6;pi;2;-1;0;lr;2.4;.95;0;0];
-        case {"headOn","acceleratingHeadOn","stoppedLead","hardBrakingLead","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"}
+        case {"headOn","acceleratingHeadOn","stoppedLead","hardBrakingLead","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing","intersectionCrossing"}
             [x,q,road,cfg]=collisionThreatScenario(name,controllerConfiguration);
         otherwise,error('runNonlinearPredictiveSafetyValidation:unknownScenario','Unknown scenario %s.',name);
     end

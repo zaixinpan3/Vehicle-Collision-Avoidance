@@ -8,7 +8,7 @@ terminal set and recursive feasibility.
 | Source | Responsibility |
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
-| `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
+| `readControllerInputs.m` | Ego, one target, timestamped error enclosures, given-path normalization and perceived boundary chains |
 | `solvePredictiveControl.m` | RTI models from shifted, nominal or planned avoidance rollouts with one infeasibility-triggered replan; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
 | `terminalSafeSet.m` | Joint encounter terminal set and explicit terminal controller (`jointState`, `jointSuccessor`, `jointMember`, `control`): the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with held steering and a forward-only stop, retaining first-exit memory; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and a bounded cruise-to-braking seed search distinct from the terminal law), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
@@ -28,14 +28,17 @@ turn sense determined from the existing target/path passing-side convention. The
 scoring or seed admission layer. The path attraction damps outward velocity;
 the obstacle adds outward normal acceleration and a passing-direction
 correction only when needed. Directional footprint and observer-error supports
-replace disk-width clearance. Virtual path-offset walls anticipate outward
-momentum. The cruise-speed loop, rather than target translation, determines
+replace disk-width clearance. Perceived boundary chains anticipate outward
+momentum in arbitrary road geometry. Only range-cut ends extend as tangent
+rays, and a scan remains frozen throughout its prediction. The cruise-speed loop, rather than target translation, determines
 the preferred acceleration along the ego's current velocity. Actual-yaw gaps and state checks remain diagnostics. The
 existing inverse Fiala guidance produces inputs and the nonlinear model
 produces every state over exactly the requested number of holds, without
 checking terminal membership or waiting for recovery. Only RTI's optimized command is executed; the field is
 neither a robust safety certificate nor a minimum-deviation optimizer.
-Cold references without a target use nominal feedback.
+Cold references without a target use nominal feedback with boundary-field
+guidance. The same guidance updates shifted seed inputs; optimized execution
+inputs remain unchanged.
 Warm references shift the previous inputs from the current estimate, retain
 their absolute endpoint until the minimum prefix is reached, and lengthen
 the horizon when the current geometric encounter preview requires it. Missing
@@ -62,16 +65,22 @@ remaining track (`terminalSafeSet`). In the convex problem its conditions are
 linearized at the anchor endpoint: collision rows at the continuation's nodes,
 midpoints and parked pose, and road rows along it. The endpoint also carries
 the collision and optional road rows. Road boundaries are disabled by default:
-the input reader clears edge metadata unless `controller.enforceRoadBoundaries` is explicitly enabled. With that opt-in,
+the input reader clears legacy lateral-clearance metadata unless
+`controller.enforceRoadBoundaries` is explicitly enabled. Perceived boundary
+chains remain available to the guide independently of that flag. With the legacy opt-in,
 `lateralClearance = [right; left]` is the only lateral road constraint: every
 ego rectangle corner stays inside it at every predicted node and hold midpoint, including the endpoint. Both ends of every
 hold keep the sideslip inside the estimator's cone
 `model.sideslipMaximum`. Horizon construction starts at `horizonSteps`; a shifted longer horizon shrinks
 one hold per frame until that minimum. Infeasibility can request a longer
 horizon on the existing retry; seed terminal membership does not select its length. The
-given path defines the single CLF. The planner's `guideHalfWidthMeters=9`
-defines virtual parallel walls for acceleration guidance, not hard optimizer
-or terminal constraints. Set it to `Inf` to disable the wall field. The
+given path defines the single CLF. `road.boundaryObservation` supplies oriented
+world-coordinate chains with drivable space on the left and `extendStart` /
+`extendEnd` flags marking perception cuts. An explicit empty scan means no
+observed boundary. This interface always clears legacy hard lateral rows.
+Without a boundary scan, `guideHalfWidthMeters=9` retains the legacy virtual
+parallel-wall field (`Inf` disables that fallback). These fields are planner
+guidance, not optimizer or terminal constraints. The
 simulation option `LateralDeviationLimitMeters=10` independently stops and
 reports a truth-replay violation. It measures the ego position reference,
 without subtracting a vehicle footprint or tightening by estimated error.

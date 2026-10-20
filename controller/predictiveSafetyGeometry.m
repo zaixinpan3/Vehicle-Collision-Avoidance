@@ -82,10 +82,13 @@ classdef predictiveSafetyGeometry
         end
 
         function [acceleration,active] = wallGuidance(x,acceleration,model)
-            % Two parallel path-offset walls for the virtual acceleration.
-            % Clip only its transverse component, anticipating outward speed.
+            % Perceived boundary guidance, with a parallel-wall fallback.
+            % The fallback clips transverse acceleration and anticipates outward speed.
             % Exact realization would enforce second-order wall inequalities;
             % Fiala tracking and RTI modification still need replay validation.
+            if isfield(model.road,'boundaryObservation')
+                [acceleration,active]=predictiveSafetyGeometry.roadBoundaryGuidance(x,acceleration,model);return;
+            end
             width=model.cfg.planner.guideHalfWidthMeters;active=false;
             if isinf(width),return;end
             [~,projection]=predictiveSafetyGeometry.pathAttraction(x,model);
@@ -100,6 +103,44 @@ classdef predictiveSafetyGeometry
             limited=min(center+rate^2*width,max(center-rate^2*width,requested));
             acceleration=acceleration+(limited-requested)*normal;
             active=limited~=requested;
+        end
+
+        function [acceleration,active,info] = roadBoundaryGuidance(x,preferred,model)
+            % Frozen visible chains, oriented with drivable space on their
+            % left. Only range-cut ends continue as tangent rays. No map
+            % query, path-offset wall, or perception-circle cap is added.
+            acceleration=preferred;active=false;
+            info=struct('normal',zeros(0,2),'lower',zeros(0,1),'distance',zeros(0,1), ...
+                'compatible',true,'maximumDeficit',0);
+            if ~isfield(model.road,'boundaryObservation'),return;end
+            chains=model.road.boundaryObservation.chains;rows=zeros(numel(chains),2);lower=zeros(numel(chains),1);
+            distances=zeros(numel(chains),1);count=0;
+            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];velocity=rotation*x(4:5);
+            cfg=model.cfg;shape=cfg.vehicle.rectangleOffset+[cfg.vehicle.length/2;cfg.vehicle.width/2].*[1,1,-1,-1;1,-1,1,-1];
+            vertices=rotation*shape;rate=cfg.planner.wallRate;
+            for j=1:numel(chains)
+                [distance,normal,hessian]=localBoundaryDistance(x(1:2),chains(j));
+                support=max(-normal.'*vertices);
+                count=count+1;rows(count,:)=normal.';distances(count)=distance-support;
+                lower(count)=-velocity.'*hessian*velocity-2*rate*(normal.'*velocity)-rate^2*distances(count);
+            end
+            [acceleration,compatible]=localAccelerationProjection(preferred,rows,lower);
+            active=norm(acceleration-preferred)>1e-10;
+            info.normal=rows;info.lower=lower;info.distance=distances;
+            info.compatible=compatible;info.maximumDeficit=max([0;lower-rows*acceleration]);
+        end
+
+        function [input,next,active] = boundaryReferenceInput(x,input,previous,model)
+            % Modify a warm/nominal seed only, never an optimized command.
+            active=false;cfg=model.cfg;
+            if isfield(model.road,'boundaryObservation')
+                derivative=nonlinearBicycleModel.derivative(x,input,cfg);
+                rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+                preferred=rotation*[derivative(4)-x(6)*x(5);derivative(5)+x(6)*x(4)];
+                [acceleration,active]=predictiveSafetyGeometry.roadBoundaryGuidance(x,preferred,model);
+                if active,input=nonlinearBicycleModel.accelerationGuidance(x,acceleration,previous,cfg);end
+            end
+            if nargout>1,next=nonlinearBicycleModel.sample(x,input,cfg);end
         end
 
         function [acceleration,field] = circulationField(x,target,cfg,parameters)
@@ -561,6 +602,61 @@ classdef predictiveSafetyGeometry
             frame=[origin;heading;k];
         end
 
+    end
+end
+
+function [distance,normal,hessian]=localBoundaryDistance(position,chain)
+    points=chain.points;starts=points(1:end-1,:);segments=diff(points);lengths=vecnorm(segments,2,2);
+    tangent=segments./lengths;projection=sum((position.'-starts).*tangent,2);
+    low=zeros(size(lengths));high=lengths;
+    if chain.extendStart,low(1)=-Inf;end
+    if chain.extendEnd,high(end)=Inf;end
+    along=min(high,max(low,projection));
+    nearest=starts+along.*tangent;delta=position.'-nearest;
+    [squared,index]=min(sum(delta.^2,2));magnitude=sqrt(squared);
+    inward=[-tangent(index,2);tangent(index,1)];
+    endpoint=abs(along(index))<1e-10 || abs(along(index)-lengths(index))<1e-10;
+    vertex=[];
+    if abs(along(index))<1e-10,vertex=index;
+    elseif abs(along(index)-lengths(index))<1e-10,vertex=index+1;end
+    adjacent=[];
+    if ~isempty(vertex) && vertex>1 && vertex<size(points,1)
+        adjacent=vertex-1:vertex;
+    elseif ~isempty(vertex) && norm(points(1,:)-points(end,:))<1e-10
+        adjacent=[size(tangent,1),1];
+    end
+    if ~isempty(adjacent)
+        inward=[-sum(tangent(adjacent,2));sum(tangent(adjacent,1))];
+        if norm(inward)>1e-10,inward=inward/norm(inward);else,inward=[-tangent(index,2);tangent(index,1)];end
+    end
+    signDistance=sign(delta(index,:)*inward);if signDistance==0,signDistance=1;end
+    distance=signDistance*magnitude;normal=inward;hessian=zeros(2);
+    if endpoint && magnitude>1e-8
+        radial=delta(index,:).'/magnitude;normal=signDistance*radial;
+        hessian=signDistance*(eye(2)-radial*radial.')/magnitude;
+    end
+end
+
+function [best,compatible]=localAccelerationProjection(preferred,normal,lower)
+    % Exact Euclidean projection onto compatible 2-D halfplanes. Enumerate
+    % zero, one or two active lines, not trajectory candidates or an NLP.
+    best=preferred;compatible=all(normal*preferred>=lower-1e-9);
+    if compatible,return;end
+    bestCost=Inf;leastDeficit=max([0;lower-normal*preferred]);least=preferred;
+    count=size(normal,1);
+    for i=1:count
+        candidate=preferred+(lower(i)-normal(i,:)*preferred)*normal(i,:).';
+        consider(candidate);
+        for j=i+1:count
+            pair=normal([i,j],:);
+            if abs(det(pair))>1e-6,consider(pair\lower([i,j]));end
+        end
+    end
+    compatible=isfinite(bestCost);if ~compatible,best=least;end
+    function consider(candidate)
+        deficit=max([0;lower-normal*candidate]);cost=sum((candidate-preferred).^2);
+        if deficit<leastDeficit,leastDeficit=deficit;least=candidate;end
+        if deficit<=1e-8 && cost<bestCost,best=candidate;bestCost=cost;end
     end
 end
 

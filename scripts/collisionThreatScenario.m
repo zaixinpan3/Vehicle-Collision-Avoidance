@@ -45,6 +45,12 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
             targetAcceleration = -.5;beta = 0;relativeCourse = 0;
         case "crossing"
             targetSpeed = 2.5;targetAcceleration = -1.5;beta = 0;relativeCourse = -pi/2;
+        case "intersectionCrossing"
+            targetSpeed=8;targetAcceleration=0;beta=0;relativeCourse=-pi/2;
+            % Unlike the stopping in-strip targets, this vehicle crosses
+            % continuously. Allow a physically witnessed bypass at both
+            % campaign ego speeds without changing either motion online.
+            impactTime=2.2;
         case "turningCrossing"
             targetSpeed = 2.5;targetAcceleration = -1.5;beta = .05;relativeCourse = -pi/2;
         case "curvedHeadOn"
@@ -64,6 +70,11 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
         state = trim.state;state(1:2) = 0;
     end
     [position,heading] = laneGeometry.referencePose(cfg.referenceSpeed*impactTime,0,curve);
+    if name=="intersectionCrossing"
+        center=position(1);width=road.scenarioHalfWidthMeters;reach=1000;
+        road.drivablePolygons={[-reach,-width;reach,-width;reach,width;-reach,width], ...
+            [center-width,-reach;center+width,-reach;center+width,reach;center-width,reach]};
+    end
     impactTarget = [position;heading+relativeCourse-beta;targetSpeed;targetAcceleration;beta;lr;2.4;.95;0;0];
     % Crossing targets decelerate to rest inside the road. Constant A/beta
     % apply until rest, followed by the existing stationary NRMM extension.

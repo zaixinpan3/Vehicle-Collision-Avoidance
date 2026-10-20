@@ -235,7 +235,7 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount)
     prior=model.previousInput;nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
     for index=1:count
         if index<=size(old,2)
-            u=old(:,index);next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
+            [u,next]=predictiveSafetyGeometry.boundaryReferenceInput(states(:,index),old(:,index),prior,model);
         elseif inherited && terminalSafeSet.member(context,states(:,index),index-1)
             [u,next,ok,~,middle]=terminalSafeSet.cruiseInput(states(:,index),model);
             ok=ok && abs(u(2)-prior(2))<=context.brakingChangeMaximum+1e-9 ...
@@ -263,6 +263,9 @@ end
 
 function input=localTailSeed(x,prior,model,parameters)
     input=nonlinearBicycleModel.nominalFeedback(x,prior,model.lane,model.nominalReference,model.cfg,parameters);
+    if isfield(model.road,'boundaryObservation') && hypot(x(4),x(5))>model.cfg.model.brakeHoldSpeed
+        input=predictiveSafetyGeometry.boundaryReferenceInput(x,input,prior,model);
+    end
     % An uncertified stopped tail must not restart into a positive-input
     % trust box. Moving tails still seek the nominal cruise equilibrium.
     if hypot(x(4),x(5))<=.2*model.cfg.model.brakeHoldSpeed
