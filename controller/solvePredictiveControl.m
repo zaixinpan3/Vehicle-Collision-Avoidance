@@ -4,6 +4,12 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % primal-infeasible local problem requests another reference or a longer
 % horizon until the terminal-constrained problem solves or its budget ends.
 % There is no nonlinear merit loop or modification of optimized inputs.
+% Research access: solvePredictiveControl("probe",request) exposes reference,
+% formulation and solve operations to the free-time experiment in scripts/.
+% It does not enable a variable grid in the online controller.
+    if (isstring(model) || ischar(model)) && string(model)=="probe"
+        [solution,search,model]=localProbe(previousState);return;
+    end
     if nargin<3,timer=tic;end
     if ~isfield(model,'uncertainty')
         model.uncertainty=struct('specified',false,'egoGenerator',zeros(6), ...
@@ -59,6 +65,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             end
             if source=="shiftedInputRollout",model=localAdaptTrust(model,previousState);end
             localCheckDeadline(model);
+            if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly
+                model.linearization=anchor;solution=[];return;
+            end
             wall=tic;[problem,model]=localFormulate(anchor,model);
             search.formulationSeconds=toc(wall);search.modelBuilt=true;
             model.linearization=anchor;problem.inheritedAnchor=source=="shiftedInputRollout";
@@ -82,6 +91,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 end
             end
         catch exception
+            if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly,rethrow(exception);end
             if strcmp(exception.identifier,'collisionAvoidanceController:timeBudgetExceeded')
                 solution=[];search.terminationReason="timeLimit";
             elseif any(strcmp(exception.identifier,{'collisionAvoidanceController:invalidTireOperatingPoint', ...
@@ -573,6 +583,10 @@ function solution=localDecode(point,problem,anchor)
         'trackingTieWeight',problem.trackingTieWeight,'inputTieWeight',problem.inputTieWeight, ...
         'affineTrackingValue',norm(problem.trackingMap*point+problem.trackingOffset)^2, ...
         'inputTieValue',norm(problem.inputTieMap*point)^2);
+    if isfield(problem,'durationIndex')
+        solution.durationChangeSeconds=point(problem.durationIndex);
+        solution.states=solution.states+problem.durationStateDerivative*solution.durationChangeSeconds;
+    end
 end
 
 function [point,flag,solverInfo]=localConicSolve(quadratic,objective,cones,a,b,equal,rhs,lower,upper,cfg,remaining,gapTolerance)
@@ -642,6 +656,7 @@ function [problem,model]=localFormulate(anchor,model)
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;finite=isfinite(rate);
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=0;encounterEnded=isempty(model.target);exitRecord=NaN;
+    fullCollisionRows=isfield(model,'durationProbe') && model.durationProbe && ~isempty(model.target);
     % Per-hold affine uncertainty. The estimator publishes a fresh
     % enclosure G0 of its estimate at every sample, and every hold of the
     % plan is issued from such an estimate. Hold i therefore starts from G0
@@ -656,9 +671,10 @@ function [problem,model]=localFormulate(anchor,model)
     stages=localLinearization(anchor,model);
     physicalInputLower=repmat(inputLower,1,count);physicalInputUpper=repmat(inputUpper,1,count);
     maximumTightening=0;
-    times=(0:2*count)*h/2;
+    [durations,times]=localTimeGrid(model,count);
     % Record time j*h/2 lies in hold ceil(j/2), which starts at (ceil(j/2)-1)*h.
-    holdStarts=max(0,ceil((0:2*count)/2)-1)*h;
+    holdStarts=times(2*max(0,ceil((0:2*count)/2)-1)+1);
+    model.recordTimes=times;
     targetTube=localTargetTube(model,times,holdStarts);
     model.targetTube=targetTube;
     starts=localTargetAt(model,holdStarts);
@@ -700,6 +716,8 @@ function [problem,model]=localFormulate(anchor,model)
         uncertaintyPrediction.egoStateRadius(:,2*index-1:2*index)=[sum(abs(generator),2),sum(abs(middleGenerator),2)];
         uncertaintyPrediction.collisionStateRadius(:,2*index-1:2*index)=[sum(abs(collisionGenerator),2),sum(abs(middleCollisionGenerator),2)];
         if any(finite)
+            elapsed=h;if index>1,elapsed=durations(index-1);end
+            rate=[Inf;cfg.model.brakingRatioRateMaximum]*elapsed;
             previous=model.previousInput;rateRows=eye(2);rateColumns=iu(:,index);
             if index>1,previous=anchor.inputs(:,index-1);rateRows=[eye(2),-eye(2)];rateColumns=[iu(:,index);iu(:,index-1)];end
             difference=input-previous;
@@ -714,14 +732,14 @@ function [problem,model]=localFormulate(anchor,model)
         end
         point=2*index-1;
         exitMovement=norm(stateBox(1:2));if index==1,exitMovement=0;end
-        if ~encounterEnded && localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg,exitMovement)
+        if ~fullCollisionRows && ~encounterEnded && localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg,exitMovement)
             encounterEnded=true;exitRecord=point;
         end
-        if ~encounterEnded && ~localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg)
+        if fullCollisionRows || (~encounterEnded && ~localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg))
             departure=index;
         end
-        if departure==index && localBinding(x,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg)
-            [g,j,tightening,escape]=localSafety(x,forecast(:,point),(index-1)*h,model,collisionGenerator);
+        if departure==index && (fullCollisionRows || localBinding(x,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg))
+            [g,j,tightening,escape]=localSafety(x,forecast(:,point),point,model,collisionGenerator);
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
             if index==1,primaryLowerBound=max(0,-min(g));end
@@ -741,14 +759,14 @@ function [problem,model]=localFormulate(anchor,model)
         end
         point=2*index;
         exitMovement=norm(abs(middleMap(1:2,:))*[stateBox;inputBox]);
-        if ~encounterEnded && localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg,exitMovement)
+        if ~fullCollisionRows && ~encounterEnded && localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg,exitMovement)
             encounterEnded=true;exitRecord=point;
         end
-        inRange=~encounterEnded && ~localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg);
+        inRange=fullCollisionRows || (~encounterEnded && ~localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg));
         if inRange,departure=index;end
         middleMovement=[1,1,reach]*abs(middleMap(1:3,:))*[stateBox;inputBox];
-        if inRange && localBinding(middle,forecast(:,point),point,middleCollisionGenerator,targetTube,middleMovement,cfg)
-            [g,j,tightening,escape]=localSafety(middle,forecast(:,point),(index-.5)*h,model,middleCollisionGenerator);
+        if inRange && (fullCollisionRows || localBinding(middle,forecast(:,point),point,middleCollisionGenerator,targetTube,middleMovement,cfg))
+            [g,j,tightening,escape]=localSafety(middle,forecast(:,point),point,model,middleCollisionGenerator);
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
             r=-j*middleMap(1:3,:);
@@ -797,15 +815,15 @@ function [problem,model]=localFormulate(anchor,model)
     % continuation, all on dx_N. The anchor endpoint meets them when it is in
     % the set, so the zero correction stays feasible.
     y=anchor.states(:,end);endColumns=ix(:,end);
-    time=count*h;point=2*count+1;
-    if ~encounterEnded && localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg,norm(stateBox(1:2)))
+    time=times(end);point=2*count+1;
+    if ~fullCollisionRows && ~encounterEnded && localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg,norm(stateBox(1:2)))
         encounterEnded=true;exitRecord=point;
     end
-    if ~encounterEnded && ~localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg)
+    if fullCollisionRows || (~encounterEnded && ~localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg))
         departure=count+1;
     end
-    if departure==count+1 && localBinding(y,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg)
-        [g,j,tightening,escape]=localSafety(y,forecast(:,point),time,model,collisionGenerator);
+    if departure==count+1 && (fullCollisionRows || localBinding(y,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg))
+        [g,j,tightening,escape]=localSafety(y,forecast(:,point),point,model,collisionGenerator);
         model.collisionEscapeNormals(:,point)=escape;
         maximumTightening=max(maximumTightening,max(tightening));
         r=[-j,zeros(4,3)];
@@ -826,10 +844,18 @@ function [problem,model]=localFormulate(anchor,model)
     % The appended terminal command starts from the final optimized input,
     % not from this frame's measured previous input.
     lastBrake=iu(2,end);entry=context.brakingRatio-anchor.inputs(2,end);
-    lower(lastBrake)=max(lower(lastBrake),entry-context.brakingChangeMaximum);
-    upper(lastBrake)=min(upper(lastBrake),entry+context.brakingChangeMaximum);
+    entryChange=context.brakingChangeMaximum;
+    if durations(end)~=h,entryChange=entryChange*durations(end)/h;end
+    lower(lastBrake)=max(lower(lastBrake),entry-entryChange);
+    upper(lastBrake)=min(upper(lastBrake),entry+entryChange);
+    if isfield(model,'durationProbe') && model.durationProbe && isfinite(entryChange)
+        % The solver refreshes input boxes between stages. Keep the probe's
+        % duration-dependent terminal slew condition as rows through that refresh.
+        blockCount=blockCount+1;blockRows{blockCount}=[1;-1];blockColumns{blockCount}=lastBrake;
+        blockBounds{blockCount}=[entry+entryChange;-entry+entryChange];
+    end
     localCheckDeadline(model);
-    [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,count,radius*[5;5;.5;5;3;1.5]);
+    [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,time/h,radius*[5;5;.5;5;3;1.5]);
     localCheckDeadline(model);
     model.terminalContext=context;model.encounterExitRecord=exitRecord;
     if ~isempty(terminalRows)
@@ -842,6 +868,11 @@ function [problem,model]=localFormulate(anchor,model)
     reachLower=lower;reachUpper=upper;
     box=cfg.nonlinear.trustMaximumScale*radius*[.15;.25];
     reachLower(iu)=max(-box,physicalInputLower-anchor.inputs);reachUpper(iu)=min(box,physicalInputUpper-anchor.inputs);
+    if isfield(model,'durationProbe') && model.durationProbe
+        % Keep redundant rows while differentiating: pruning at a bound
+        % crossing would change the finite-difference row identities.
+        reachLower(:)=-Inf;reachUpper(:)=Inf;
+    end
     [inequality,bounds]=localAssemble(blockRows,blockColumns,blockBounds,blockCount,nv,reachLower,reachUpper);
     % Tire saturation belongs to Fiala dynamics, not an extra force cone.
     objective=zeros(nv,1);objective(is)=1;
@@ -921,12 +952,11 @@ function [rows,bounds]=localRoadBlock(road,point,pose,map,generator,clearance)
     end
 end
 
-function [values,jacobian,tightening,escape]=localSafety(x,q,time,model,generator)
+function [values,jacobian,tightening,escape]=localSafety(x,q,point,model,generator)
     % Fixed-dual collision rows at a pose against the target's forecast q,
     % on the pose (jacobian, 4x3), tightened by the enclosures.
     cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     dual=predictiveSafetyGeometry.supportLinearization(x(1:3),shape,q(1:3),q(8:11));
-    point=1+round(2*time/cfg.controller.sampleTime);
     escape=model.collisionEscapeNormals(:,point);
     if ~model.retainCollisionSide,escape=zeros(2,1);end
     if norm(escape)>0
@@ -945,6 +975,14 @@ function [values,jacobian,tightening,escape]=localSafety(x,q,time,model,generato
         dual=localEscapeDual(x,q,model,dual);
         escape=dual.normal;
     end
+    if isfield(model,'probeNormals')
+        normal=model.probeNormals(:,point);
+        rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];body=rotation.'*normal;
+        [dual.value,dual.jacobian]=predictiveSafetyGeometry.fixedDualRows( ...
+            x(1:3),shape,q(1:3),q(8:11),[max(body,0);max(-body,0)]);
+        dual.normal=normal;
+    end
+    if isfield(model,'durationProbe') && model.durationProbe,escape=dual.normal;end
     values=dual.value;
     jacobian=dual.jacobian;
     % Directional position support retains correlation across the affine
@@ -1052,12 +1090,26 @@ end
 function stages=localLinearization(anchor,model)
     count=size(anchor.inputs,2);stages=repmat(struct('middle',[],'am',[],'bm',[], ...
         'next',[],'a',[],'b',[]),1,count);
+    durations=localTimeGrid(model,count);stageCfg=model.cfg;
     for index=1:count
         if mod(index,4)==1,localCheckDeadline(model);end
+        if stageCfg.controller.sampleTime~=durations(index),stageCfg.controller.sampleTime=durations(index);end
         [stages(index).middle,stages(index).am,stages(index).bm, ...
             stages(index).next,stages(index).a,stages(index).b]= ...
-            nonlinearBicycleModel.hold(anchor.states(:,index),anchor.inputs(:,index),model.cfg);
+            nonlinearBicycleModel.hold(anchor.states(:,index),anchor.inputs(:,index),stageCfg);
     end
+end
+
+function [durations,times]=localTimeGrid(model,count)
+    h=model.cfg.controller.sampleTime;
+    durations=repmat(h,1,count);times=(0:2*count)*h/2;
+    if ~isfield(model,'predictionDurations'),return;end
+    durations=reshape(model.predictionDurations,1,[]);
+    assert(numel(durations)==count && all(isfinite(durations) & durations>0), ...
+        'collisionAvoidanceController:invalidPredictionGrid','Prediction durations must be positive, one per input.');
+    if all(durations==h),return;end
+    nodes=[0,cumsum(durations)];times=zeros(1,2*count+1);
+    times(1:2:end)=nodes;times(2:2:end)=nodes(1:end-1)+durations/2;
 end
 
 function relative=localRelativeGenerator(x,generator,model,center)
@@ -1183,4 +1235,31 @@ end
 function index=localEpochIndex(model)
     % Sample index of the target epoch (0 when a model carries none).
     index=0;if isfield(model,'targetEpochIndex'),index=model.targetEpochIndex;end
+end
+
+function [result,search,model]=localProbe(request)
+    % Research-only reuse of the existing formulation and conic solver.
+    % The online entry point never supplies this request or a variable grid.
+    model=request.model;search=struct();
+    switch string(request.operation)
+        case "reference"
+            model.referenceProbeOnly=true;
+            [~,search,model]=solvePredictiveControl(model,request.previousState,tic);
+            model=rmfield(model,'referenceProbeOnly');
+            assert(isfield(model,'linearization'),'collisionAvoidanceController:noProbeReference', ...
+                'No rollable reference was constructed.');
+            result=model.linearization;
+        case "formulate"
+            model.solveTimer=tic;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
+            [result,model]=localFormulate(request.anchor,model);
+            result.inheritedAnchor=request.inherited;
+            result=localAddClf(result,request.anchor,model);
+        case "solve"
+            model.solveTimer=tic;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
+            problem=request.problem;anchor=request.anchor;
+            [point,problem,search,model]=localPrimary(anchor,model,"durationExperiment",tic,problem);
+            [result,search,model]=localSecondary(point,problem,anchor,model,search,tic);
+        otherwise
+            error('collisionAvoidanceController:invalidProbeOperation','Unknown research operation.');
+    end
 end

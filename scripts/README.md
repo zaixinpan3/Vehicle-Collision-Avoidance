@@ -100,6 +100,37 @@ The campaign entry names containing `PotentialField` are retained for callers;
 they run the current controller with second-order potential/circulation initialization and Fiala-model candidate rollouts.
 Routine outputs can use `/tmp/` instead of a persistent validation directory.
 
+`exploreFreeTimePredictiveControl` is an offline total-duration experiment.
+Pass a controller model with a previous input trajectory, or the `snapshot`
+from a joint-simulation failure MAT file. It compares the original two-stage
+objectives with and without one scalar duration correction on the same
+reference. The first `horizonSteps` holds keep the actual sample interval;
+the remaining holds share the duration change uniformly. The final intervals
+are at least one sample long. `DurationIncreaseFraction` bounds the additional
+tail duration, and there is no time penalty in either objective.
+
+The probe differentiates the nonlinear rollout, target timestamps, per-hold
+uncertainty tightening and terminal continuation. `MovingReference=true`
+moves the state reference with duration while keeping reference controls
+fixed; the alternative holds reference states fixed. Horizon collision
+normals are frozen during differentiation. For stable row assembly, every
+horizon target row is retained, even beyond perception exit, and redundant
+row pruning is disabled. This is a deliberately more restrictive diagnostic
+than the online first-exit formulation. Terminal row changes and inconsistent
+finite-difference slopes stop the experiment explicitly. A finer integration
+mesh is shared by the fixed/free comparison; its cost is not an online timing
+claim. Returned `fixed`/`free` results separate convex solver success from
+nonlinear rollout diagnostics, including exact terminal membership.
+
+`RefinementIterations>1` requests an offline SQP-style experiment and is not
+one-iteration RTI. The probe neither issues inputs nor changes online defaults.
+It retains the executable controller's current per-hold enclosure
+approximation, without assuming measurement updates inside a longer hold.
+It does not provide a robust joint observer prediction or a grid-shift proof.
+In particular, a uniform tail grid generally does not remain uniform after
+executing one fixed prefix hold and shifting the remaining policy. A variable
+duration alone therefore establishes neither recursive feasibility nor safety.
+
 `prepareCollisionAvoidanceController` warms MATLAB and the optimizer using a
 discarded call. It does not build native controller libraries:
 `buildPredictiveConicSolver` links the required Clarabel adapter, and
