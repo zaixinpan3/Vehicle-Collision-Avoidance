@@ -187,14 +187,15 @@ a robust certificate. `robustNonlinearSafetyCertified` remains false.
 
 ## RTI and implementation
 
-The prediction prefix, terminal adapter, and joint transition use the same
-first-exit convention. A prefix exit is latched only when the separation
-lower bound remains outside R after subtracting both published position
-enclosures and the position correction allowed by the RTI trust box. Thus
-an affine correction cannot undo that exit. All later collision rows for
-this encounter are absent, including terminal target rows. Physical and
-road rows remain. This is an affine exit certificate, not a guarantee about
-the nonlinear optimized rollout.
+The joint transition and terminal continuation use the first-exit convention.
+The main RTI horizon no longer declares a future exit from a bounded reference
+neighborhood: pose corrections are unbounded. It retains the active target's
+collision rows until an observed exit. Terminal rows retain all computed
+continuation collision conditions when no certified endpoint correction bound
+is supplied, including distant conditions previously omitted by a fixed band.
+Both signs of the lateral-acceleration condition are linearized for a moving
+endpoint. The terminal continuation's sampled schedule and exit branch remain
+local approximations and are not a global nonlinear exit certificate.
 
 `rows` builds the local terminal approximation once. At circular-track
 intersection, a nonconvex safe set can admit an inner or an outer local
@@ -212,12 +213,11 @@ from the unique `control` law used to define the set. It adds no optimizer
 iterations. If no certified hold is found, a moving endpoint uses the
 nominal-feedback seed; an already stopped endpoint keeps a nonpositive
 longitudinal command. This prevents an uncertified restart from creating a
-positive-input trust box while preserving ordinary cruise recovery. The
+poor accelerating reference while preserving ordinary cruise recovery. The
 optimizer still chooses and issues the final input unchanged.
 
 Tests cover subsample stopping without reversal, exact-flow agreement,
 joint target dependence, first-exit memory through predicted re-entry,
-post-stop collision before exit, fresh observed encounter epochs, prefix
-exit propagation to terminal rows, and continued cruise from a state that
+post-stop collision before exit, fresh observed encounter epochs, retention of horizon rows before an observed exit, and continued cruise from a state that
 already belongs to X_f. These are implementation checks under their stated
 models, not empirical proofs of robust recursive feasibility.

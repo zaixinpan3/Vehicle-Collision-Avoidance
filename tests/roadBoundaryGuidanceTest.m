@@ -105,8 +105,10 @@ classdef roadBoundaryGuidanceTest < matlab.unittest.TestCase
             testCase.verifyEqual(result.executedFrames,11);
             testCase.verifyFalse(result.collisionDetected);
             testCase.verifyFalse(result.roadConstraintsEnforced);
-            expanded=arrayfun(@(entry)any(diff([entry.attempts.horizonSteps])>0),result.trace);
-            testCase.verifyTrue(any(expanded));
+            % The encounter-sized horizon remains adaptive. This fixture no
+            % longer needs infeasible local boxes to trigger extra attempts.
+            testCase.verifyGreaterThan(result.trace(1).horizonSteps,cfg.controller.horizonSteps);
+            testCase.verifyLessThan(result.trace(end).horizonSteps,result.trace(1).horizonSteps);
         end
         function aBoundaryAdjustedSeedRetainsNonlinearDynamicConsistency(testCase)
             model=localModel(perceiveRoadBoundaries(localRoad(),[0;0],30));

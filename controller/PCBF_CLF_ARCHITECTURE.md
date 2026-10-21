@@ -9,7 +9,7 @@ There is no convergence-driven nonlinear iteration, elastic restoration, merit
 acceptance loop or trust-region backtracking.
 
 The optimized actuator inputs are issued unchanged. A nonlinear rollout predicts
-their effect and updates the next frame's trust scale; it does not certify the
+their effect and records the affine/nonlinear discrepancy; it does not certify the
 nonlinear constraints, accept a different iterate or repair an input. A failed
 retry, unfinished solve or exhausted call budget produces no command. No previous-plan
 execution or alternate controller substitutes for a solved command.
@@ -168,8 +168,8 @@ initialization or prediction failure: extending cannot repair an invalid
 reference prefix, and an invalid prediction is never issued as a command.
 
 Each reference rebuilds its dynamics tangents, separation directions, duals,
-uncertainty tightening and terminal rows. The shifted plan uses its prior trust
-estimate; fresh references use the configured initial trust scale. Model
+uncertainty tightening and terminal rows. No hard neighborhood is imposed around
+either shifted or fresh references. Model
 geometry, physical limits, observer information and the sample timer stay
 fixed throughout the search. No attempt resets the deadline.
 
@@ -206,10 +206,10 @@ the affine predicted states. No second model is constructed from that rollout.
 
 ## Constraints and objective hierarchy
 
-State and input increments lie in local trust boxes. Actual longitudinal-force
+State and input increments have no artificial search bounds. Actual longitudinal-force
 magnitude and optional slew limits remain hard. Steering has no artificial
 actuator magnitude or slew limit; the Fiala angle domain is enforced. State
-limits, sideslip, reference-point deviation, optional road-corner rows and terminal
+limits, sideslip, optional road-corner rows and terminal
 rows retain their existing meanings. No shared elastic variable relaxes them.
 
 Nominal collision rows in the first `controller.horizonSteps` nodes carry
@@ -229,9 +229,10 @@ numerical tie, and minimizes the target-independent soft CLF condition
 
 `V` is the single precomputed transverse quadratic at prescribed-speed/path
 trim. Only the estimate enters it; it does not ask the worst member of an
-observer enclosure to contract to zero. A bounded whole-horizon tracking and
-input-proximity tie distinguishes passing/recovery from following a slow lead
-and stabilizes otherwise free future controls. It introduces no additional
+observer enclosure to contract to zero. Soft whole-horizon tracking and
+input-proximity regularization distinguishes passing/recovery from following a slow lead
+and stabilizes otherwise free future controls. Its coefficient is not a global
+bound on the secondary cost. It introduces no additional
 avoidance controller. Both stages must complete; an unfinished secondary stage
 does not cause execution of the primary point.
 
@@ -288,10 +289,13 @@ prediction; braking ends at rest. Each current target observation refreshes its
 forecast center and parameters while retaining the input warm start. Complete
 current perception with no target clears the encounter; otherwise a missing
 observation retains the last forecast. Extrapolation is not a new certificate.
-The joint encounter flag latches the first exit. Within a prediction, an exit
-must hold for the published position enclosures and every affine trust-box
-correction before later target rows are removed, including terminal rows.
-An actual reacquisition starts a new encounter ID and target epoch.
+The observed encounter flag latches an actual exit; reacquisition starts a new
+encounter ID and target epoch. With unbounded pose corrections, the reference
+alone cannot certify a future perception exit or justify dropping distant
+collision rows. The active target therefore retains its horizon rows until an
+observed exit. Terminal continuation uses its own local first-exit model; it
+remains a local approximation, not a global guarantee under arbitrary endpoint
+corrections.
 
 Ordinary rectangle distance supplies feasible separating dual multipliers. Four
 fixed-multiplier corner rows include the yaw derivative. At overlap a nonzero

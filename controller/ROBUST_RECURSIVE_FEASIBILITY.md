@@ -330,7 +330,7 @@ relative to the exact robust problem.
 
 Implemented in this revision: direct CLF-stage inputs; no line search,
 acceptance relinearization or post-solve constraint veto; optimized affine
-slacks retained; an independent nonlinear prediction for state/trust data;
+slacks retained; an independent nonlinear prediction for state prediction and discrepancy diagnostics;
 a separate settled-terminal sideslip bound and terminal-braking rear rows.
 Uncomputed nonlinear margins are NaN and nonlinear validation is false.
 

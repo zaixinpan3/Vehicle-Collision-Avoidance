@@ -154,7 +154,7 @@ function result=localReferenceAttempt(model,previousState,options,timer,minimumC
             elapsed=sum(durations)-initialDuration;
             % The final intervals remain at least one real sample long. The
             % finite difference alone may sample just below h to find a slope.
-            free=localAugment(base,derivative,[-elapsed,maximumIncrease-elapsed],model);
+            free=localAugment(base,derivative,[-elapsed,maximumIncrease-elapsed]);
             free.durationStateDerivative=(plusAnchor.states-minusAnchor.states)/(2*step);
             result.freeProblem=free;
             formulationSeconds=toc(wall);
@@ -239,7 +239,7 @@ function value=localFiniteVector(derivative)
     for cone=derivative.cones,value=[value;cone.b;cone.gamma(:)];end %#ok<AGROW>
 end
 
-function problem=localAugment(base,derivative,limits,model)
+function problem=localAugment(base,derivative,limits)
     problem=base;n=numel(base.lower);map=[1:n-1,n+1];timeIndex=n;
     problem.clfIndex=n+1;problem.durationIndex=timeIndex;
     for field=["a","equal","trackingMap","inputTieMap","clfMap","nominalClfMap"]
@@ -252,13 +252,9 @@ function problem=localAugment(base,derivative,limits,model)
     problem.lower(timeIndex)=limits(1);problem.upper(timeIndex)=limits(2);
     problem.quadratic=sparse(n+1,n+1);problem.quadratic(map,map)=base.quadratic;
     problem.trackingMap(:,timeIndex)=derivative.trackingOffset;
-    % Include the time displacement in the original bounded tracking tie.
-    % Otherwise a long duration step could outweigh the CLF objective.
-    span=zeros(n+1,1);
-    span(problem.stateIndices(:))=repmat(model.cfg.nonlinear.trustRadius*[5;5;.5;5;3;1.5],size(problem.stateIndices,2),1);
-    span(timeIndex)=max(abs(limits));
-    trackingBound=max(eps,sum((abs(problem.trackingOffset)+abs(problem.trackingMap)*span).^2));
-    problem.trackingTieWeight=base.inputTieWeight/trackingBound;
+    % Time enters the same soft tracking objective as the state correction.
+    % Preserve its normalization when comparing fixed and free duration.
+    problem.trackingTieWeight=base.trackingTieWeight;
     problem.quadratic=2*(base.inputTieWeight*(problem.inputTieMap.'*problem.inputTieMap) ...
         +problem.trackingTieWeight*(problem.trackingMap.'*problem.trackingMap));
     problem.performanceObjective=2*problem.trackingTieWeight*problem.trackingMap.'*problem.trackingOffset;

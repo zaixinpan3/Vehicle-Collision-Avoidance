@@ -15,8 +15,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         model.uncertainty=struct('specified',false,'egoGenerator',zeros(6), ...
             'collisionGenerator',zeros(6),'target',[],'relativeFrame',false);
     end
-    cfg=model.cfg;solution=[];model.trust=localTrustPrior(previousState,cfg);
-    model.inputTrustScale=model.trust.scale;model.linearizationBuilds=0;
+    cfg=model.cfg;solution=[];model.linearizationBuilds=0;
     model.solveTimer=timer;
     model.solveTimeLimitSeconds=max(0,cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
     model.circulationDirection=0;
@@ -38,7 +37,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all')
             source="shiftedInputRollout";
         end
-        search=localEmptySearch(model,source,"",0);
+        search=localEmptySearch(source,"",0);
         try
             localCheckDeadline(model);
             wall=tic;
@@ -66,7 +65,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 count=min(size(old,2),size(model.collisionEscapeNormals,2));
                 model.collisionEscapeNormals(:,1:count)=old(:,1:count);
             end
-            if source=="shiftedInputRollout",model=localAdaptTrust(model,previousState);end
             localCheckDeadline(model);
             if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly
                 model.linearization=anchor;solution=[];return;
@@ -89,7 +87,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                     solution.collisionSide=model.collisionSide;
                     solution.circulationDirection=model.circulationDirection;
                     solution.retainCollisionSide=model.retainCollisionSide;
-                    model.trust=localTrustRecord(model.trust,solution,model,rollout);
+                    solution.linearizationGap=rollout.fullGap;
                     solution=localTerminalMetrics(solution,model);
                 end
             end
@@ -138,7 +136,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         end
         builds=model.linearizationBuilds;lastModel=model;model=baseModel;model.linearizationBuilds=builds;
         if isfield(lastModel,'linearization'),model.linearization=lastModel.linearization;end
-        model.trust=localTrustPrior(previousState,cfg);model.inputTrustScale=model.trust.scale;
         model.terminalContext=[];anchor=[];replan=true;
     end
     search.source="twoStageRealTimeIteration";search.algorithm="realTimeIteration";
@@ -151,7 +148,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.horizonExtensions=extensions;
     search.stopReason=search.terminationReason;
     if strlength(horizonStop)>0,search.stopReason=horizonStop;end
-    search.rollout=rollout;search.trust=model.trust;
+    search.rollout=rollout;
     search.anchorCertified=false;search.appendedTerminalSteps=0;search.appendedBrakingSteps=0;
     search.planner=localPlannerMetadata();
     if ~isempty(anchor)
@@ -213,7 +210,7 @@ function count=localPlanningHorizon(model,minimumCount)
         reserve=reserve+set.positionRadius ...
             +2*(norm(model.target(8:9))+norm(model.target(10:11)))*sin(min(pi,set.courseRadius+set.sideslipRadius)/2);
     end
-    exitReserve=norm(cfg.nonlinear.trustRadius*[5;5])+reserve;
+    exitReserve=reserve;
     reach=norm(shape(1:2))+norm(shape(3:4))+norm(model.target(8:9))+norm(model.target(10:11)) ...
         +reserve;
     while true
@@ -315,7 +312,7 @@ function input=localTailSeed(x,prior,model,parameters)
         input=predictiveSafetyGeometry.boundaryReferenceInput(x,input,prior,model);
     end
     % An uncertified stopped tail must not restart into a positive-input
-    % trust box. Moving tails still seek the nominal cruise equilibrium.
+    % reference. Moving tails still seek the nominal cruise equilibrium.
     if hypot(x(4),x(5))<=.2*model.cfg.model.brakeHoldSpeed
         [lower,~]=nonlinearBicycleModel.inputBounds(model.cfg,true);
         input=[prior(1);max(lower(2),min(0,prior(2)))];
@@ -351,54 +348,11 @@ function planner=localPlannerMetadata()
         'rolloutSeconds',0,'robustCertificate',false);
 end
 
-function trust=localTrustPrior(previous,cfg)
-    % Startup assigns the coefficient that makes the initial scale consistent.
-    scale=cfg.nonlinear.trustInitialScale;
-    trust=struct('scale',scale,'curvature',cfg.nonlinear.trustInnovationMeters/scale^2, ...
-        'correction',NaN,'innovation',NaN,'observationInnovation',NaN,'modelInnovation',NaN, ...
-        'updated',false);
-    if isstruct(previous) && isfield(previous,'trust') && isstruct(previous.trust)
-        trust=previous.trust;trust.updated=false;
-        trust.innovation=NaN;trust.observationInnovation=NaN;trust.modelInnovation=NaN;
-    end
-end
-
-function model=localAdaptTrust(model,previous)
-    % Departure of the present estimate from the previous plan's prediction
-    % of it (observation innovation). The prediction is a nonlinear rollout, so this
-    % is the estimator's and the plant's share; the model share is measured
-    % by the completed input's prediction (localTrustRecord).
-    trust=model.trust;
-    if ~isfield(previous,'stateTrajectory') || size(previous.stateTrajectory,2)<2,return;end
-    trust.observationInnovation=localPoseDiscrepancy(model.initialState,previous.stateTrajectory(:,2),model.cfg);
-    trust.innovation=trust.observationInnovation;
-    model.trust=trust;
-end
-
 function discrepancy=localPoseDiscrepancy(first,second,cfg)
     % Body-point pose metric of the safety rows: translation plus reach*yaw.
     reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
     difference=first-second;
     discrepancy=vecnorm(difference(1:2,:))+reach*abs(atan2(sin(difference(3,:)),cos(difference(3,:))));
-end
-
-function trust=localTrustRecord(trust,solution,model,rollout)
-    % Store the correction actually taken, in units of the unit input box,
-    % and update the error coefficient from the full affine step: its
-    % nonlinear rollout departs from the affine prediction by the
-    % second-order remainder L*s^2 (s its size in the unit box).
-    cfg=model.cfg;unit=cfg.nonlinear.trustRadius*[.15;.25];
-    anchor=model.linearization.inputs;count=min(size(anchor,2),size(solution.inputs,2));
-    trust.correction=max(abs(solution.inputs(:,1:count)-anchor(:,1:count))./unit,[],'all');
-    if ~isfinite(rollout.fullGap) || ~(rollout.fullCorrection>0),return;end
-    trust.modelInnovation=rollout.fullGap;
-    % A step far inside the box carries little information about its boundary.
-    step=max(rollout.fullCorrection,trust.scale/2);
-    curvature=max(rollout.fullGap/step^2,cfg.nonlinear.trustRetention*trust.curvature);
-    curvature=max(curvature,eps);
-    trust.scale=min(cfg.nonlinear.trustMaximumScale,max(cfg.nonlinear.trustMinimumScale, ...
-        sqrt(cfg.nonlinear.trustInnovationMeters/curvature)));
-    trust.curvature=curvature;trust.updated=true;
 end
 
 function [solution,rollout]=localPrediction(solution,anchor,model)
@@ -416,7 +370,7 @@ function [solution,rollout]=localPrediction(solution,anchor,model)
     end
     solution.affineStates=solution.states;
     solution.inputCorrection=solution.inputs-anchor.inputs;
-    unit=model.cfg.nonlinear.trustRadius*[.15;.25];
+    unit=[model.cfg.clf.certificationSteeringRadians;model.cfg.clf.certificationBrakingRatio];
     rollout.fullCorrection=max(abs(solution.inputCorrection)./unit,[],'all');
     states=zeros(size(solution.states));states(:,1)=model.initialState;
     try
@@ -453,10 +407,10 @@ function context=localTerminalContext(anchor,model)
     end
 end
 
-function search=localEmptySearch(model,source,failure,seconds)
+function search=localEmptySearch(source,failure,seconds)
     search=struct('solverCalls',0,'source',"twoStageRealTimeIteration",'modelBuilt',false, ...
         'initialization',source,'returned',false,'converged',false,'terminationReason',"anchorUnavailable", ...
-        'formulationSeconds',0,'clfConstructionSeconds',0,'inputTrustScale',model.inputTrustScale, ...
+        'formulationSeconds',0,'clfConstructionSeconds',0, ...
         'primaryOptimum',NaN,'primaryLowerBound',NaN,'slackCap',NaN,'clfInitialSlack',NaN, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
@@ -468,19 +422,19 @@ end
 function attempt=localAttempt(search)
     attempt=struct('initialization',search.initialization,'terminationReason',search.terminationReason, ...
         'solverCalls',search.solverCalls,'stages',search.stages,'primaryOptimum',search.primaryOptimum, ...
-        'primaryLowerBound',search.primaryLowerBound,'inputTrustScale',search.inputTrustScale, ...
+        'primaryLowerBound',search.primaryLowerBound, ...
         'slackCap',search.slackCap,'initializationSeconds',search.initializationSeconds,'formulationSeconds',search.formulationSeconds, ...
         'clfConstructionSeconds',search.clfConstructionSeconds);
     attempt.modelBuilt=search.modelBuilt;
     attempt.horizonSteps=search.horizonSteps;
 end
 
-function search=localSearch(problem,model,initialization,formulationSeconds)
+function search=localSearch(problem,initialization,formulationSeconds)
     search=struct('solverCalls',0,'source',"twoStageRealTimeIteration", ...
         'modelBuilt',formulationSeconds>0, ...
         'initialization',initialization,'returned',false,'converged',false,'terminationReason',"timeLimit", ...
         'formulationSeconds',formulationSeconds,'clfConstructionSeconds',0, ...
-        'inputTrustScale',model.inputTrustScale,'primaryOptimum',NaN,'primaryLowerBound',problem.primaryLowerBound,'slackCap',NaN,'clfInitialSlack',NaN, ...
+        'primaryOptimum',NaN,'primaryLowerBound',problem.primaryLowerBound,'slackCap',NaN,'clfInitialSlack',NaN, ...
         'initializationSeconds',0, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
@@ -488,9 +442,7 @@ function search=localSearch(problem,model,initialization,formulationSeconds)
 end
 
 function [point,problem,search,model]=localPrimary(anchor,model,initialization,timer,problem)
-    % Formulate the anchor's problem and solve its safety stage. A problem
-    % already formulated on this anchor (a larger trust scale) is reused:
-    % the scale changes only the input increments' bounds.
+    % Formulate the reference's problem and solve its safety stage.
     localCheckDeadline(model);
     cfg=model.cfg;point=[];formulationSeconds=0;
     if nargin<5 || isempty(problem)
@@ -499,10 +451,8 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
         % The next sample inherits this plan's later inputs only when the
         % anchor is the previous solved plan (localAddClf).
         problem.inheritedAnchor=initialization=="shiftedInputRollout";
-    else
-        problem=localInputBounds(problem,model);
     end
-    search=localSearch(problem,model,initialization,formulationSeconds);
+    search=localSearch(problem,initialization,formulationSeconds);
     remaining=model.solveTimeLimitSeconds-toc(timer);if remaining<=0,return;end
     primaryCount=problem.clfIndex-1;primaryCone=problem.cones(1:problem.primaryConeCount);wall=tic;
     coneFeasible=true;
@@ -551,9 +501,9 @@ function [solution,search,model]=localSecondary(point,problem,anchor,model,searc
     problem.a=[problem.a;problem.safetyObjective.'];problem.b=[problem.b;search.slackCap];
     remaining=model.solveTimeLimitSeconds-toc(timer);
     if remaining<=0,search.terminationReason="timeLimit";return;end
-    % The input box implies ||R*dU||^2<=1. The native quadratic is exactly
-    % the former epigraph penalty; it changes scaled CLF slack by at most
-    % clfTieTolerance and penalizes departure from the anchor, not zero.
+    % Soft input-change and route-tracking penalties regularize the CLF
+    % objective. They impose no search bounds. The primary slack cap remains
+    % hard; the secondary regularizer has no global cost bound.
     objective=problem.performanceObjective;objective(problem.clfIndex)=1;
     search.clfStageAttempted=true;wall=tic;
     [second,flag,solverInfo]=localConicSolve(problem.quadratic,objective,problem.cones,problem.a,problem.b, ...
@@ -579,7 +529,7 @@ function solution=localDecode(point,problem,anchor)
         'safety',sum(slacks),'hard',NaN,'clfSlack',rho, ...
         'clfInitialValue',problem.initialClfValue,'clfNextValue',nextValue, ...
         'clfFunction',problem.clf.function,'clfRequiredDecrease',problem.clf.requiredDecrease, ...
-        'clfTieBound',problem.clfTieBound,'clfWorstNextValue',worstNext,'clfCurrentBudget',problem.clfCurrentBudget, ...
+        'clfRegularizationCoefficient',problem.clfRegularizationCoefficient,'clfWorstNextValue',worstNext,'clfCurrentBudget',problem.clfCurrentBudget, ...
         'maximumCollisionTighteningMeters',problem.maximumCollisionTighteningMeters, ...
         'minimumCollisionMargin',NaN, ...
         'encounterExit',problem.encounterExit,'affineValidationPerformed',false,'nonlinearValidationPerformed',false, ...
@@ -650,11 +600,10 @@ function [problem,model]=localFormulate(anchor,model)
     % form cost time quadratic in the plan length.
     blockRows=cell(1,14*count+10);blockColumns=blockRows;blockBounds=blockRows;blockCount=0;
     cones=struct('A',{},'b',{},'D',{},'gamma',{},'size',{});
-    lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
-    lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
+    lower=-Inf(nv,1);upper=Inf(nv,1);
     lower([is,ic])=0;
-    % Numerical corrections are local to the one RTI reference.
-    % Steering still has no actuator magnitude or slew constraint.
+    % The reference defines derivatives and collision normals, not a hard
+    % neighborhood. Only physical/model-domain bounds restrict corrections.
     [inputLower,inputUpper]=nonlinearBicycleModel.inputBounds(cfg);
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;finite=isfinite(rate);
     [physicalLower,physicalUpper]=localStateLimits(cfg);
@@ -700,13 +649,15 @@ function [problem,model]=localFormulate(anchor,model)
         [ones(6+6*count,1);-a3(:);-b3(:)],6*(count+1),nv);
     rhs=[model.initialState-anchor.states(:,1);reshape(reshape([stages.next],6,count)-anchor.states(:,2:end),[],1)];
     tangent=tan(cfg.model.sideslipMaximum);side=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];
-    % Collision rows that cannot bind are not formed (localBinding): the
-    % pose moves at most this much over the variables' boxes (inputs at
-    % trustMaximumScale), in |dx| + |dy| + reach |dpsi| per unit of each
-    % variable's box.
-    stateBox=radius*[5;5;.5;5;3;1.5];inputBox=cfg.nonlinear.trustMaximumScale*radius*[.15;.25];
-    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];reach=norm(shape(1:2))+norm(shape(3:4));
-    nodeMovement=[1,1,reach,0,0,0]*stateBox;
+    % Without a bounded pose correction, reference distance cannot justify
+    % omitting a collision row or declaring a future perception exit. Retain
+    % the active target over this horizon; actual exit is handled at the next
+    % observation. A presently out-of-range target has no active encounter.
+    if ~fullCollisionRows && ~encounterEnded
+        currentGenerator=localRelativeGenerator(anchor.states(:,1),generator,model,holdCenter);
+        encounterEnded=localBeyond(anchor.states(:,1),forecast,1,currentGenerator,targetTube,cfg);
+        if encounterEnded,exitRecord=1;end
+    end
     for index=1:count
         if mod(index,4)==1,localCheckDeadline(model);end
         x=anchor.states(:,index);input=anchor.inputs(:,index);nextReference=anchor.states(:,index+1);
@@ -734,14 +685,8 @@ function [problem,model]=localFormulate(anchor,model)
             blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;blockBounds{blockCount}=bound;
         end
         point=2*index-1;
-        exitMovement=norm(stateBox(1:2));if index==1,exitMovement=0;end
-        if ~fullCollisionRows && ~encounterEnded && localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg,exitMovement)
-            encounterEnded=true;exitRecord=point;
-        end
-        if fullCollisionRows || (~encounterEnded && ~localBeyond(x,forecast,point,collisionGenerator,targetTube,cfg))
+        if fullCollisionRows || ~encounterEnded
             departure=index;
-        end
-        if departure==index && (fullCollisionRows || localBinding(x,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg))
             [g,j,tightening,escape]=localSafety(x,forecast(:,point),point,model,collisionGenerator);
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
@@ -761,14 +706,8 @@ function [problem,model]=localFormulate(anchor,model)
             blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=bound;
         end
         point=2*index;
-        exitMovement=norm(abs(middleMap(1:2,:))*[stateBox;inputBox]);
-        if ~fullCollisionRows && ~encounterEnded && localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg,exitMovement)
-            encounterEnded=true;exitRecord=point;
-        end
-        inRange=fullCollisionRows || (~encounterEnded && ~localBeyond(middle,forecast,point,middleCollisionGenerator,targetTube,cfg));
-        if inRange,departure=index;end
-        middleMovement=[1,1,reach]*abs(middleMap(1:3,:))*[stateBox;inputBox];
-        if inRange && (fullCollisionRows || localBinding(middle,forecast(:,point),point,middleCollisionGenerator,targetTube,middleMovement,cfg))
+        if fullCollisionRows || ~encounterEnded
+            departure=index;
             [g,j,tightening,escape]=localSafety(middle,forecast(:,point),point,model,middleCollisionGenerator);
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
@@ -819,13 +758,8 @@ function [problem,model]=localFormulate(anchor,model)
     % the set, so the zero correction stays feasible.
     y=anchor.states(:,end);endColumns=ix(:,end);
     time=times(end);point=2*count+1;
-    if ~fullCollisionRows && ~encounterEnded && localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg,norm(stateBox(1:2)))
-        encounterEnded=true;exitRecord=point;
-    end
-    if fullCollisionRows || (~encounterEnded && ~localBeyond(y,forecast,point,collisionGenerator,targetTube,cfg))
+    if fullCollisionRows || ~encounterEnded
         departure=count+1;
-    end
-    if departure==count+1 && (fullCollisionRows || localBinding(y,forecast(:,point),point,collisionGenerator,targetTube,nodeMovement,cfg))
         [g,j,tightening,escape]=localSafety(y,forecast(:,point),point,model,collisionGenerator);
         model.collisionEscapeNormals(:,point)=escape;
         maximumTightening=max(maximumTightening,max(tightening));
@@ -851,26 +785,23 @@ function [problem,model]=localFormulate(anchor,model)
     if durations(end)~=h,entryChange=entryChange*durations(end)/h;end
     lower(lastBrake)=max(lower(lastBrake),entry-entryChange);
     upper(lastBrake)=min(upper(lastBrake),entry+entryChange);
-    if isfield(model,'durationProbe') && model.durationProbe && isfinite(entryChange)
-        % The solver refreshes input boxes between stages. Keep the probe's
-        % duration-dependent terminal slew condition as rows through that refresh.
+    if isfinite(entryChange)
+        % Keep terminal input slew explicit, including its duration derivative.
         blockCount=blockCount+1;blockRows{blockCount}=[1;-1];blockColumns{blockCount}=lastBrake;
         blockBounds{blockCount}=[entry+entryChange;-entry+entryChange];
     end
     localCheckDeadline(model);
-    [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,time/h,radius*[5;5;.5;5;3;1.5]);
+    [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,time/h);
     localCheckDeadline(model);
     model.terminalContext=context;model.encounterExitRecord=exitRecord;
     if ~isempty(terminalRows)
         blockCount=blockCount+1;blockRows{blockCount}=terminalRows;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=terminalBounds;
     end
-    % Rows that every correction in the variables' boxes meets are left out:
-    % they cannot bind, so the feasible set and the optimum are unchanged.
-    % The input increments' box is taken at trustMaximumScale so retained
-    % rows serve every trial trust scale on this reference.
+    % Prune only inequalities implied by actual physical bounds. There is
+    % no pose/input trust box behind this redundancy calculation.
+    lower(iu)=max(lower(iu),physicalInputLower-anchor.inputs);
+    upper(iu)=min(upper(iu),physicalInputUpper-anchor.inputs);
     reachLower=lower;reachUpper=upper;
-    box=cfg.nonlinear.trustMaximumScale*radius*[.15;.25];
-    reachLower(iu)=max(-box,physicalInputLower-anchor.inputs);reachUpper(iu)=min(box,physicalInputUpper-anchor.inputs);
     if isfield(model,'durationProbe') && model.durationProbe
         % Keep redundant rows while differentiating: pruning at a bound
         % crossing would change the finite-difference row identities.
@@ -892,7 +823,6 @@ function [problem,model]=localFormulate(anchor,model)
     model.robustnessRelaxation=robustRelaxation;
     problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
     problem.inputIncrementLower=physicalInputLower-anchor.inputs;problem.inputIncrementUpper=physicalInputUpper-anchor.inputs;
-    problem=localInputBounds(problem,model);
 end
 
 function [matrix,vector]=localAssemble(rows,columns,bounds,count,nv,lower,upper)
@@ -1037,24 +967,6 @@ function dual=localEscapeDual(x,q,model,nearest)
     dual=struct('value',value,'jacobian',jacobian,'normal',normal);
 end
 
-function binding=localBinding(x,q,point,generator,tube,movement,cfg)
-    % Can a collision row at this pose bind within the variables' boxes?
-    % Every fixed-dual row value is at least the rectangle distance, hence at
-    % least the reference distance less both reaches; the tightening is at
-    % most the ego enclosure's position radius, the target tube's position
-    % radius and both rotation chords (localSafety); a row changes by at
-    % most 'movement' over the boxes (unit normal, yaw lever at most the
-    % reach). Rows whose bound exceeds that change cannot bind and are not
-    % formed: the problem's feasible set is the same.
-    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    egoReach=norm(shape(1:2))+norm(shape(3:4));targetReach=norm(q(8:9))+norm(q(10:11));
-    yawRadius=sum(abs(generator(3,:)));
-    tightening=sum(vecnorm(generator(1:2,:)))+tube.positionRadius(point) ...
-        +2*egoReach*sin(min(pi,yawRadius)/2)+2*targetReach*sin(tube.yawRadius(point)/2);
-    lower=norm(x(1:2)-q(1:2))-egoReach-targetReach-tightening;
-    binding=~(lower>movement);
-end
-
 function beyond=localBeyond(x,forecast,point,generator,tube,cfg,movement)
     % The target's reference point beyond the encounter range at record
     % point 'point' (no target: beyond), with the enclosures as reserve.
@@ -1080,14 +992,6 @@ function [rows,bounds]=localFrontDomain(y,input,cfg,generator)
         center=atan2(w,y(4));reserve=[max(corners)-center;center-min(corners)];
     end
     rows=[row;-row];bounds=[limit-angle;limit+angle]-reserve;
-end
-
-function problem=localInputBounds(problem,model)
-    % Bounds of the input increments: the trust box of the present scale,
-    % within the actuator limits about the anchor inputs.
-    iu=problem.inputIndices;box=model.inputTrustScale*model.cfg.nonlinear.trustRadius*[.15;.25];
-    problem.lower(iu)=max(-box,problem.inputIncrementLower);
-    problem.upper(iu)=min(box,problem.inputIncrementUpper);
 end
 
 function stages=localLinearization(anchor,model)
@@ -1138,7 +1042,7 @@ function problem=localAddClf(problem,anchor,model)
     % the CLF error scales. Only the first successor enters the CLF row, so
     % near the path the row and the constraints leave the later inputs free,
     % and the tie is what keeps them. A tie that vanished there left them
-    % anywhere in the trust box: the plan, and the next sample's anchor,
+    % arbitrary: the plan, and the next sample's anchor,
     % wandered between samples, and at 15 m/s the cruise oscillated. Every
     % RTI reference uses this floor, including the nominal starting rollout.
     lossLower=max(double(problem.inheritedAnchor),norm(e0./scales)^2);
@@ -1152,12 +1056,15 @@ function problem=localAddClf(problem,anchor,model)
     modelConstant=0;constant=currentBudget/scale;
     axis=sparse(1,nv);axis(ic)=1;
     cone=localConeBlock([2*map;axis],[-2*offset;1-constant],axis,-1-constant,6);
-    inputScale=repmat(1./(model.inputTrustScale*model.cfg.nonlinear.trustRadius*[.15;.25]*sqrt(2*count)),count,1);
+    % Use the CLF design's input units only as soft cost normalization.
+    % These magnitudes are not bounds on the optimized inputs or changes.
+    inputUnits=[model.cfg.clf.certificationSteeringRadians;model.cfg.clf.certificationBrakingRatio];
+    inputScale=repmat(1./(inputUnits*sqrt(2*count)),count,1);
     increment=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
-    problem.clfTieBound=model.cfg.solver.clfTieTolerance*lossLower;
-    % A bounded whole-horizon nominal tie distinguishes passing/recovery
-    % from a feasible plan that indefinitely follows or stops behind a lead.
-    % Its total cost plus the input tie stays below clfTieBound/scale.
+    problem.clfRegularizationCoefficient=model.cfg.solver.clfTieTolerance*lossLower;
+    % Soft whole-horizon route tracking favors passing and recovery.
+    % Normalize the CLF-scaled cost by its reference value, without
+    % inventing a bound on the state corrections or on this penalty.
     tracking=sparse(5*count,nv);trackingOffset=zeros(5*count,1);
     for index=1:count
         if mod(index,4)==1,localCheckDeadline(model);end
@@ -1166,9 +1073,8 @@ function problem=localAddClf(problem,anchor,model)
         tracking(rows,problem.stateIndices(:,index+1))=model.nominalReference.factor*futureJacobian/sqrt(count);
         trackingOffset(rows)=model.nominalReference.factor*futureError/sqrt(count);
     end
-    span=zeros(nv,1);span(problem.stateIndices(:))=repmat(model.cfg.nonlinear.trustRadius*[5;5;.5;5;3;1.5],count+1,1);
-    bound=max(eps,sum((abs(trackingOffset)+abs(tracking)*span).^2));
-    weight=problem.clfTieBound/(2*scale);
+    bound=max(1,norm(trackingOffset)^2);
+    weight=problem.clfRegularizationCoefficient/(2*scale);
     problem.quadratic=2*weight*(increment.'*increment+(tracking.'*tracking)/bound);
     problem.performanceObjective=2*weight*(tracking.'*trackingOffset)/bound;
     problem.trackingMap=tracking;problem.trackingOffset=trackingOffset;
@@ -1217,7 +1123,6 @@ function solution=localTerminalMetrics(solution,model)
     solution.terminalMarginMeters=NaN;solution.terminalRoadMarginMeters=NaN;
     solution.terminalStopSeconds=hypot(y(4),y(5))/cfg.terminal.brakingDecelerationMetersPerSecondSquared;
     solution.terminalExitSeconds=NaN;solution.terminalEnd="notValidated";
-    solution.linearizationGap=model.trust.modelInnovation;
     solution.terminalDistanceMeters=Inf;
     if ~isempty(model.target)
         q=localTargetAt(model,count*cfg.controller.sampleTime);

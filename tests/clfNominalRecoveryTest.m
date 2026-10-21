@@ -62,9 +62,9 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 testCase.verifyLessThan(nonlinearBicycleModel.nominalValue(x,road,reference),initialValue);
             end
         end
-        function aDistantReversedSeedCanSolveBeyondTheFirstHorizonExtension(testCase)
-            % Terminal feasibility is decided by optimization. A difficult
-            % cold reference must not stop after one fixed-length extension.
+        function aDistantReversedSeedCanSolveWithoutArtificialHorizonGrowth(testCase)
+            % Removing correction bounds lets this reference solve at the
+            % requested length; terminal rows still constrain its endpoint.
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',8), ...
                 'solver',struct('timeLimitSeconds',5)));
@@ -74,12 +74,11 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             model=problem.model;model.initialState=[0;-40;2.5;6;.3;.1];
             [solution,search,model]=solvePredictiveControl(model,[],tic);
             testCase.assertNotEmpty(solution);
-            testCase.verifyGreaterThan(search.horizonExtensions,1);
-            testCase.verifyGreaterThan(numel(search.attempts),2);
+            testCase.verifyEqual(search.horizonExtensions,0);
+            testCase.verifyNumElements(search.attempts,1);
             anchor=model.linearization;count=size(anchor.inputs,2);
-            testCase.verifyGreaterThan(count,2*cfg.controller.horizonSteps);
-            [rows,bounds]=terminalSafeSet.rows(model.terminalContext,anchor.states(:,end),count, ...
-                cfg.nonlinear.trustRadius*[5;5;.5;5;3;1.5]);
+            testCase.verifyEqual(count,cfg.controller.horizonSteps);
+            [rows,bounds]=terminalSafeSet.rows(model.terminalContext,anchor.states(:,end),count);
             correction=solution.affineStates(:,end)-anchor.states(:,end);
             testCase.verifyLessThanOrEqual(rows*correction,bounds+cfg.solver.reducedTolerance);
         end

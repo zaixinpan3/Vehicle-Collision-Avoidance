@@ -211,7 +211,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             cfg.controller.enforceRoadBoundaries=true;
             cfg.controller.horizonSteps=32;cfg.controller.maximumHorizonSteps=32;
             [~,~,fresh,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            prior.inputTrajectory=repmat([.25;0],1,size(prior.inputTrajectory,2));
+            prior.inputTrajectory=repmat([.35;0],1,size(prior.inputTrajectory,2));
             prior.avoidanceInitialized=true;
             prior.collisionSide=-fresh.model.collisionSide;
             prior.collisionEscapeNormals=repmat([0;-1],1,size(prior.collisionEscapeNormals,2));
@@ -253,18 +253,17 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(model.linearization.inputs(2,end),0);
             testCase.verifyEqual(model.linearization.states(4:6,end),zeros(3,1),AbsTol=1e-12);
         end
-        function aCertifiedPrefixExitAlsoEndsTheTerminalEncounter(testCase)
+        function aReferenceExitCannotEndAnUnrestrictedPredictedEncounter(testCase)
             [ego,road,cfg]=localFixture();cfg.controller.horizonSteps=40;
             beta=asin(1.6/20);
             q=[40;-20;-beta;60;0;beta;1.6;2.4;.95;0;0];
             [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
-            point=problem.model.encounterExitRecord;
-            testCase.verifyTrue(isfinite(point));
-            testCase.verifyTrue(problem.model.terminalContext.encounterEnded);
+            testCase.verifyTrue(isnan(problem.model.encounterExitRecord));
+            testCase.verifyFalse(problem.model.terminalContext.encounterEnded);
             forecast=predictiveSafetyGeometry.predictTarget(q,(0:80)*cfg.controller.sampleTime/2);
             distance=vecnorm(problem.model.sampledStates(1:2,:)-forecast(1:2,:),2,1);
-            testCase.verifyTrue(any(distance(point+1:end)<cfg.collision.encounterRangeMeters));
-            testCase.verifyEqual(problem.model.collisionEscapeNormals(:,point:end),zeros(2,81-point+1));
+            testCase.verifyTrue(any(distance>cfg.collision.encounterRangeMeters));
+            testCase.verifyEqual(problem.solution.encounterExit,41);
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
         end
         function targetRangeCannotSelectADifferentClf(testCase)
@@ -323,15 +322,15 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.clfInitialValue,withoutEdges.metadata.clfInitialValue);
             testCase.verifyEqual(withEdges,inputs,AbsTol=1e-10);
         end
-        function aShortPrefixCanGrowOnOptimizationInfeasibility(testCase)
+        function aDisplacedStateNoLongerNeedsAnExtensionToEscapeASearchBox(testCase)
             [ego,road,cfg]=localFixture();
             ego.position=[21.52;7.33];ego.yaw=.017;ego.speed=6.21;
             ego.lateralVelocity=-.153;ego.yawRate=-.14;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             anchor=problem.model.linearization;count=size(anchor.inputs,2);
-            testCase.verifyGreaterThan(count,cfg.controller.horizonSteps);
-            testCase.verifyGreaterThanOrEqual(problem.metadata.search.horizonExtensions,1);
-            testCase.verifyEqual(problem.metadata.search.attempts(1).stages(end).exitFlag,-2);
+            testCase.verifyEqual(count,cfg.controller.horizonSteps);
+            testCase.verifyEqual(problem.metadata.search.horizonExtensions,0);
+            testCase.verifyEqual(problem.metadata.search.linearizationCount,1);
             testCase.verifyGreaterThan(anchor.states(4,end),5);
             localVerifyRollouts(testCase,problem,cfg);
         end
@@ -381,11 +380,21 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
         function initialOverlapIsExposedAsPositivePcbfSlack(testCase)
             [ego,road,cfg]=localFixture();
-            target=struct('targetPositionInertial',[0;0],'targetVelocityInertial',[40;0],'targetYawInertial',0);
-            [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyGreaterThan(problem.solution.safety,0);
-            testCase.verifyFalse(problem.metadata.zeroSlack);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
+            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            model=nominal.model;
+            model.target=[0;0;0;40;0;0;1.6;2.4;.95;0;0];
+            model.targetEpoch=model.target;model.targetOnset=true;
+            [anchor,~,model]=solvePredictiveControl("probe",struct('operation',"reference", ...
+                'model',model,'previousState',[]));
+            [problem,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+                'model',model,'anchor',anchor,'inherited',false));
+            [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
+                'model',model,'anchor',anchor,'problem',problem));
+            % This is already a colliding initial state. Check the PCBF
+            % formulation, without requiring a valid nonlinear command.
+            testCase.assertNotEmpty(solution);
+            testCase.verifyGreaterThan(solution.safety,0);
+            testCase.verifyGreaterThan(search.primaryOptimum,0);
         end
         function returnedInputsRespectBrakingMagnitudeAndSlew(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.05;

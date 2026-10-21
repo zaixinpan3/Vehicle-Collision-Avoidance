@@ -81,9 +81,13 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
         end
         function anInfeasibleShiftedPathReplansAndRebuildsAtTheSameHorizon(testCase)
             model=testCase.model;cfg=model.cfg;model.cfg.controller.maximumHorizonSteps=32;
+            % Physical road limits, not an artificial trust box, make this
+            % sharply turning reference's affine subproblem infeasible.
+            model.cfg.controller.enforceRoadBoundaries=true;
+            model.road.lateralClearance=[3;3];
             model.target=[1000;0;0;4;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;model.targetOnset=true;
-            previous=struct('inputTrajectory',repmat([.25;0],1,33), ...
+            previous=struct('inputTrajectory',repmat([.35;0],1,33), ...
                 'collisionEscapeNormals',repmat([0;-1],1,67),'collisionSide',-1);
             r=exploreFreeTimePredictiveControl(model,previous);
             testCase.assertTrue(r.returned);

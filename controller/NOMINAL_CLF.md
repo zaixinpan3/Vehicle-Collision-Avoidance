@@ -123,7 +123,7 @@ tried: secant enclosure, force-level input map, saturation hull,
 poly-quadratic function, slower decay, polytope, interval certificate).
 
 **This quadratic is not a global nonlinear CLF.** Large heading errors, tire
-saturation, state-domain boundaries, braking memory and the MPC trust region
+saturation, state-domain boundaries and braking memory
 can make zero slack unavailable even without a target. For example, at a
 20-m lateral displacement the sampled tests found positive slack despite an
 actual reduction in V. The former cost-to-go argument covered a different,
@@ -149,23 +149,21 @@ is positive semidefinite, so the first-step CLF epigraph is a convex quadratic
 constraint represented by one second-order cone, so the optimization is a sparse
 conic QP/SOCP rather than a QP with exclusively affine constraints.
 
-The objective is
+The secondary objective is scaled CLF slack plus soft input-change and
+whole-horizon route-tracking penalties. The primary PCBF slack cap remains hard.
+Input changes are normalized by the CLF design's steering and braking units;
+these units impose no limit on the optimizer. Tracking uses the CLF metric,
+normalized by the larger of one and its reference value. A coefficient
+`clfTieTolerance * max(inheritedAnchor, e0'Qe0)` weights these penalties; it is
+reported as `clfRegularizationCoefficient`.
 
-    (rho + epsilon * max(lossLower,f) * R(dU)) / max(1,V(x)),
-    R(dU) = (1/(2M)) sum_i ||diag(r_delta,r_b)^(-1) dU_i||^2.
-
-The input correction box implies 0 <= R <= 1. `lossLower` is a lower bound on
-`e'Qe` over the current affine uncertainty set (exactly `e'Qe` with zero error).
-Therefore, at an exact optimum, the regularizer changes minimum physical
-CLF slack by at most `epsilon * max(lossLower,f)`, with
-`epsilon = clfTieTolerance = 1e-4`. On the previous accepted plan the floor
-`f` is one unit of the error scales, so the allowance does not vanish at
-nominal behavior; on a fresh rollout, a search seed, `f = 0`. Inputs are
-penalized relative to the linearization input, not zero. This prevents
-arbitrary future inputs from becoming poor trust centers after shifting; with
-an allowance that vanished at nominal behavior it did not near the path, and
-the 15 m/s cruise oscillated (`report/SOLVER_TOLERANCE_20261011.tex`). Solver
-tolerances add their own numerical error.
+There is no hard state/input correction neighborhood. Consequently the soft
+penalties have no global cost bound, and the coefficient is not a bound on
+how much the regularizer can change minimum CLF slack. Inputs are penalized
+relative to the reference input, not zero. The inherited-plan floor preserves
+a preference for continuity even near nominal motion. The horizon tracking
+term favors returning to the cruise route. These are performance objectives,
+not extra safety constraints or a guarantee of nonlinear CLF decrease.
 
 With an observer enclosure the row is the same, on the estimate:
 `budget = exp(-2h/T)*V(xhat)` and `lossLower = e0'Qe0` at the estimate.
@@ -204,13 +202,13 @@ CLF optimization.
 
 ## Initialization
 
-The completed CLF optimizer point is issued directly; it is not replayed through
-the nonlinear model or damped.
-A frame uses the shifted previous plan, or a potential-field rollout at
-startup; a shifted problem infeasible inside the trust region is re-solved once
-from a fresh potential-field rollout.
-A frame still without a solution reports it; no enlarged box follows. See
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
+The completed optimizer inputs are issued unchanged. A nonlinear rollout
+predicts their effect and reports departure from the affine prediction, without
+modifying the inputs or certifying their nonlinear feasibility.
+A frame uses the shifted previous plan, or a circulation rollout at startup.
+Primal infeasibility triggers fresh guidance, then terminal-constrained horizon
+extension within the shared deadline. No hard search box restricts corrections.
+See [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 
 `nominalFeedback` and `nominalGuidanceParameters` supply path guidance and a
 trim steering correction only for constructing the potential-field seed. They neither

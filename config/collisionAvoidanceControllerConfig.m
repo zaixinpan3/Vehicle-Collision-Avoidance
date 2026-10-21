@@ -26,16 +26,7 @@ function cfg=localDefaults()
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
         'enforceRoadBoundaries',false);
-    % trustRadius scales local state/input corrections about the RTI reference.
-    % The input trust scale adapts to the plan innovation: the scale whose
-    % second-order prediction error equals trustInnovationMeters [m], within
-    % [trustMinimumScale,trustMaximumScale]. trustRetention is the per-sample
-    % retention of the estimated error coefficient; the scale grows by at most
-    % 1/sqrt(trustRetention) per sample and shrinks at once.
-    % Only a completed prediction updates this scale for the next sample.
-    cfg.nonlinear=struct('integrationStep',.05,'trustRadius',.5, ...
-        'trustInnovationMeters',.02,'trustInitialScale',1, ...
-        'trustMinimumScale',1/16,'trustMaximumScale',1,'trustRetention',.5);
+    cfg.nonlinear=struct('integrationStep',.05);
     % One RTI model per reference. Local primal infeasibility requests fresh
     % references and longer horizons within the original controller deadline.
     % Encounter search starts from horizonSteps and the current stopping time;
@@ -128,6 +119,8 @@ function cfg=localDefaults()
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for prediction and output assembly. Native
     % solves also count their construction time against the remaining budget.
+    % clfTieTolerance weights soft secondary regularization; without hard
+    % correction boxes it is not an upper bound on its objective contribution.
     cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.1,'completionReserveSeconds',.002, ...
         'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
         'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
@@ -161,15 +154,7 @@ function localValidate(cfg)
     if cfg.controller.horizonSteps>cfg.controller.maximumHorizonSteps
         localInvalid('horizonSteps cannot exceed maximumHorizonSteps.');
     end
-    for name=["integrationStep","trustRadius", ...
-            "trustInnovationMeters","trustInitialScale","trustMinimumScale","trustMaximumScale"]
-        validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
-    end
-    validateattributes(cfg.nonlinear.trustRetention,{'double'},{'scalar','real','>',0,'<',1});
-    if cfg.nonlinear.trustMinimumScale>cfg.nonlinear.trustInitialScale ...
-            || cfg.nonlinear.trustInitialScale>cfg.nonlinear.trustMaximumScale
-        localInvalid('Trust scales must satisfy minimum <= initial <= maximum.');
-    end
+    validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
     for name=["radialRate","tangentialRate","pathRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});

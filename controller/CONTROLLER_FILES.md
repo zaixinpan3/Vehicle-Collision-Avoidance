@@ -9,7 +9,7 @@ terminal set and recursive feasibility.
 | --- | --- |
 | `collisionAvoidanceController.m` | Target prediction updates (and target onset), input memory, solver orchestration, uncertainty scope and first input; the `resetNominalTrajectory` and `warmUp` actions |
 | `readControllerInputs.m` | Ego, one target, timestamped error enclosures, given-path normalization and perceived boundary chains |
-| `solvePredictiveControl.m` | RTI models from shifted, nominal or planned avoidance rollouts with terminal-constrained adaptive horizon search; PCBF/CLF subproblems, shared computation budget, across-frame trust update and unchanged optimizer inputs |
+| `solvePredictiveControl.m` | RTI models from shifted, nominal or planned avoidance rollouts with terminal-constrained adaptive horizon search; PCBF/CLF subproblems, shared computation budget, affine/nonlinear discrepancy diagnostics and unchanged optimizer inputs |
 | `terminalSafeSet.m` | Joint encounter terminal set and explicit terminal controller (`jointState`, `jointSuccessor`, `jointMember`, `control`): the closed-form joint continuation under the terminal law (the ego a kinematic vehicle braking at `a_b` with held steering and a forward-only stop, retaining first-exit memory; the target on its forecast), membership (mildness, road, clearance until the exit, the parked ego against the target's remaining track in closed form), its linearized rows, the anchor's holds (the cruise hold `u = u* + K e` and a bounded cruise-to-braking seed search distinct from the terminal law), nonlinear hard-row checks, and the offline certificate's helpers (Jacobians of the sampled error map, their ray averages `rayJacobians`, the sampled check, the state-row level) |
 | `nonlinearBicycleModel.m` | The declared model (Fiala bicycle above the kinematic speed range, kinematic bicycle below it, smooth blend between; braking ends at rest) with RK4, variational tangents, road load, trim, and the single analytic quadratic CLF, whose matrix it reads from the precomputed table ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
@@ -175,7 +175,7 @@ unchanged optimized inputs, measurement updates, limits and explicit failure
 after the allowed retry, without an execution fallback. `observerPredictiveControlTest` retains enclosure
 integration and directional-family containment tests, including batch/scalar
 support equivalence. `ordinaryDistanceDualTest`, `terminalSafeSetTest`,
-`nominalClfTest`, `trustInnovationTest` and `clfNominalRecoveryTest` retain their
-geometry, terminal, CLF, trust and recovery checks. Functional tests can use an
+`nominalClfTest`, `unrestrictedPredictiveControlTest` and `clfNominalRecoveryTest` retain their
+geometry, terminal, CLF, unrestricted-search and recovery checks. Functional tests can use an
 explicit generous wall budget; scenario timing uses the real-time defaults.
 Routine numerical outputs can remain in temporary directories.

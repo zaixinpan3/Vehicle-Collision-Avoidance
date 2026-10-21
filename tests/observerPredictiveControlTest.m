@@ -96,7 +96,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
                 cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
             loss=sum((nonlinearBicycleModel.error(model.initialState,model.lane,model.nominalReference)./scales).^2);
-            testCase.verifyLessThanOrEqual(prediction.metadata.clfTieBound,cfg.solver.clfTieTolerance*max(1,loss)+1e-12);
+            testCase.verifyLessThanOrEqual(prediction.metadata.clfRegularizationCoefficient,cfg.solver.clfTieTolerance*max(1,loss)+1e-12);
         end
         function unavailableBoundsDoNotPreventASolvedControl(testCase)
             [ego,target,road,cfg]=localFixture(.01);

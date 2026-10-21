@@ -202,8 +202,8 @@ classdef terminalSafeSet
         function [rows,bounds,context,info] = rows(context,y,node,box)
             % The terminal set linearized at the anchor endpoint y on the
             % endpoint correction dz, rows*dz <= bounds:
-            % - mildness, |r V| <= the lateral acceleration maximum, where y
-            %   is within localMildBand of it, keeping up to localMildReserve
+            % - both mildness rows, |r V| <= the lateral acceleration maximum,
+            %   keeping up to localMildReserve
             %   of the margin y has (an endpoint left on the boundary takes
             %   only tiny steps: every full step leaves the set); the
             %   sideslip cone is a row of the problem at every node;
@@ -213,8 +213,8 @@ classdef terminalSafeSet
             % - corner rows on the road and reference-point corridor rows at
             %   the continuation's poses.
             % The continuation's poses are differentiated with the schedule
-            % held. Conditions whose clearance exceeds the requirement by more
-            % than localBand are left out; the exact set is used when building the anchor.
+            % held. With unbounded endpoint corrections, distant collision
+            % conditions must also be retained.
             % Each row keeps up to localReserve of the margin it has at y, so
             % that an endpoint off the boundary stays off it by that much and
             % the next sample's shift survives a small departure (the plant
@@ -227,7 +227,7 @@ classdef terminalSafeSet
             localCheckDeadline(context);
             [~,info,parts]=localDecide(context,y,node);
             info.value=nonlinearBicycleModel.nominalValue(y,context.lane,context.reference);
-            band=localBand();required=context.required;
+            required=context.required;
             path=parts.path;if isempty(path),path=terminalSafeSet.continuation(context,y);end
             jacobian=localPoseJacobian(context,y,path.steps);
             % Largest change of a fixed-dual row at each pose over the box:
@@ -243,9 +243,11 @@ classdef terminalSafeSet
                     || any(context.stateLower>0 | context.stateUpper<0)
                 rows=[rows;zeros(1,6)];bounds=[bounds;-1];
             end
-            if V>0 && abs(y(6)*V)>limit-localMildBand()
-                gradient=sign(y(6))*[0,0,0,y(6)*y(4)/V,y(6)*y(5)/V,V];
-                rows=[rows;gradient];bounds=[bounds;localKeep(limit-abs(y(6)*V),localMildReserve())];
+            if V>0
+                gradient=[0,0,0,y(6)*y(4)/V,y(6)*y(5)/V,V];
+                rows=[rows;gradient;-gradient];
+                bounds=[bounds;localKeep(limit-y(6)*V,localMildReserve()); ...
+                    localKeep(limit+y(6)*V,localMildReserve())];
             end
             if isempty(parts.road)
                 [margin,lateral,normal,local]=localRoad(context,path.pose);
@@ -255,7 +257,7 @@ classdef terminalSafeSet
             % A corner moves at most as far as the pose's movement over the
             % box (its lever is at most the reach); poses whose road margin
             % exceeds it form no rows.
-            for k=find(margin-context.inflation<min(band,localReserve()+movement))
+            for k=find(margin-context.inflation<localReserve()+movement)
                 localCheckDeadline(context);
                 c=cos(path.pose(3,k));s=sin(path.pose(3,k));
                 for corner=1:4
@@ -273,7 +275,7 @@ classdef terminalSafeSet
                 q=parts.q;gap=parts.gap;out=parts.out;
             end
             last=numel(gap);if ~isempty(out),last=out-1;end
-            for k=find(gap(1:last)<required+min(band,localReserve()+movement(1:last)))
+            for k=find(gap(1:last)<required+localReserve()+movement(1:last))
                 localCheckDeadline(context);
                 dual=localDual(path.pose(:,k),context.shape,q(:,k),[]);
                 if gap(k)<=1e-8
@@ -295,7 +297,7 @@ classdef terminalSafeSet
                 else
                     distance=parts.parked.distance;witness=parts.parked.witness;track=parts.parked.track;
                 end
-                if distance<required+min(band,localReserve()+movement(end))
+                if distance<required+localReserve()+movement(end)
                     % A witness at exact contact (a vertex path crossing an
                     % edge) has no well-defined normal; a pose 1 mm or 1 cm
                     % along the track stands for it.
@@ -684,12 +686,6 @@ function bound = localKeep(margin,reserve)
     bound=margin-min(reserve,max(margin,0));
 end
 
-function band = localMildBand()
-    % Lateral acceleration below the mild maximum [m/s^2] from which the
-    % mildness row enters the convex problem.
-    band=1;
-end
-
 function reserve = localMildReserve()
     % Lateral acceleration [m/s^2] that the mildness row keeps where the
     % anchor has it.
@@ -699,12 +695,6 @@ end
 function reserve = localReserve()
     % Margin [m] that the terminal rows keep where the anchor has it.
     reserve=.05;
-end
-
-function band = localBand()
-    % Clearance and road margin beyond the requirement [m] up to which a
-    % continuation condition enters the convex problem's terminal rows.
-    band=5;
 end
 
 function [member,info,parts] = localDecide(context,x,node)
@@ -774,8 +764,9 @@ function [gap,out] = localClearances(context,pose,q)
     % Rectangle clearance at each continuation pose until the first pose
     % whose reference point is farther than the range from the target's (out,
     % [] when none; gap is NaN from there). Where the reference distance less
-    % both reaches already exceeds the requirement by the band, that lower
-    % bound stands for the clearance.
+    % both reaches exceeds the requirement by 5 m, that lower bound stands
+    % for the clearance. This only skips an exact distance evaluation, not
+    % a terminal constraint or a region of the optimizer's search.
     n=size(pose,2);gap=nan(1,n);
     distance=vecnorm(pose(1:2,:)-q(1:2,:),2,1);
     out=find(distance>context.range,1);
@@ -783,7 +774,7 @@ function [gap,out] = localClearances(context,pose,q)
     bound=distance-context.reach-vecnorm(q(8:9,:),2,1)-vecnorm(q(10:11,:),2,1);
     for k=1:last
         if mod(k,16)==1,localCheckDeadline(context);end
-        if bound(k)>=context.required+localBand()
+        if bound(k)>=context.required+5
             gap(k)=bound(k);
         else
             gap(k)=predictiveSafetyGeometry.rectangle(pose(:,k),context.shape,q(1:3,k),q(8:11,k));
