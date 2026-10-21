@@ -1,10 +1,15 @@
 function result = exploreFreeTimePredictiveControl(sample,previousState,options)
-%exploreFreeTimePredictiveControl Compare fixed and free duration on one RTI reference.
+%exploreFreeTimePredictiveControl Explore free duration with fresh-path RTI retries.
 % Input is a controller model or a saved joint-simulation failure snapshot.
 % This research probe never issues a command or changes the online defaults.
 % The first prefix holds retain the actual sample interval. A scalar change
 % in total time is distributed uniformly over the remaining holds. The two
 % original PCBF/CLF objectives are retained without a time penalty.
+% Failed local attempts replan from the current observation and rebuild all
+% dynamics, collision normals and terminal rows. A shifted failure first
+% requests fresh guidance at the same horizon; failed fresh guidance requests
+% a longer planned horizon under one shared deadline and the explicit cap.
+% ReplanOnFailure=false retains a single-reference diagnostic comparison.
 % Future enclosures use the runtime's approximate per-hold convention, with
 % the longer hold duration propagated explicitly. Interior measurement
 % benefits are not invented. This is not a robust output-feedback certificate.
@@ -15,6 +20,7 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
         options.DifferenceSeconds (1,1) double {mustBePositive,mustBeFinite} = 1e-3
         options.IntegrationStep (1,1) double {mustBePositive,mustBeFinite} = .01
         options.FreshReference (1,1) logical = false
+        options.ReplanOnFailure (1,1) logical = true
         options.MovingReference (1,1) logical = true
         options.RefinementIterations (1,1) double {mustBeInteger,mustBePositive} = 1
     end
@@ -24,9 +30,79 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
         model=sample;
     end
     if options.FreshReference,previousState=[];end
+    % A model returned by an earlier probe may carry frozen geometry and a
+    % variable grid. Neither belongs to a newly generated reference.
+    for field=["probeNormals","predictionDurations","durationProbe","probeTimer"]
+        if isfield(model,field),model=rmfield(model,field);end
+    end
+    baseline=model;timer=tic;minimumCount=model.cfg.controller.horizonSteps;
+    attempts={};extensions=0;plannerCalls=0;stop="";
+    while true
+        inherited=isstruct(previousState) && isfield(previousState,'inputTrajectory') ...
+            && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all');
+        plannerRequested=~inherited && ~isempty(baseline.target);
+        try
+            attempt=localReferenceAttempt(baseline,previousState,options,timer,minimumCount);
+        catch exception
+            reason=string(exception.identifier);
+            if ~localExpectedFailure(exception),rethrow(exception);end
+            source="nominalFeedbackRollout";
+            if plannerRequested,source="plannedAvoidanceRollout";end
+            if inherited,source="shiftedInputRollout";end
+            count=minimumCount;
+            if inherited,count=max(count,size(previousState.inputTrajectory,2)-1);end
+            attempt=struct('status',reason,'initialization',source,'stageCount',count, ...
+                'fixed',[],'free',[],'initialAnchor',[],'model',baseline,'options',options);
+        end
+        attempt.plannerRequested=plannerRequested;
+        attempt.plannerCompleted=~isempty(attempt.initialAnchor) && attempt.initialAnchor.planner.used;
+        plannerCalls=plannerCalls+double(attempt.plannerCompleted);
+        attempts{end+1}=attempt; %#ok<AGROW> Limited by the shared deadline and explicit horizon cap.
+        result=attempt;
+        if ~isempty(attempt.free) && attempt.free.returned,stop="returned";break;end
+        if ~options.ReplanOnFailure,stop="singleReferenceDiagnostic";break;end
+        if toc(timer)>=baseline.cfg.solver.timeLimitSeconds ...
+                || attempt.status=="collisionAvoidanceController:timeBudgetExceeded"
+            stop="timeLimit";break;
+        end
+        if isempty(attempt.initialAnchor) && ~inherited
+            stop="referencePredictionUnavailable";break;
+        end
+        % Preserve only the encounter's circulation direction. Fresh guidance
+        % must not reuse the failed inputs, old duals or terminal context.
+        fresh=[];
+        if isfield(attempt.model,'circulationDirection')
+            fresh=struct('circulationDirection',attempt.model.circulationDirection);
+        elseif isstruct(previousState) && isfield(previousState,'circulationDirection')
+            fresh=struct('circulationDirection',previousState.circulationDirection);
+        end
+        if inherited
+            minimumCount=attempt.stageCount;
+        else
+            nextCount=min(baseline.cfg.controller.maximumHorizonSteps,max(attempt.stageCount+1,ceil(1.5*attempt.stageCount)));
+            if nextCount<=attempt.stageCount,stop="horizonLimit";break;end
+            minimumCount=nextCount;extensions=extensions+1;
+        end
+        previousState=fresh;
+    end
+    result.attempts=attempts;result.replanCount=max(0,numel(attempts)-1);
+    result.completedPlannerCalls=plannerCalls;result.horizonExtensions=extensions;
+    result.stopReason=stop;result.elapsedSeconds=toc(timer);
+    result.returned=~isempty(result.free) && result.free.returned;
+end
+
+function expected=localExpectedFailure(exception)
+    expected=any(string(exception.identifier)==["collisionAvoidanceController:timeBudgetExceeded", ...
+        "collisionAvoidanceController:invalidTireOperatingPoint", ...
+        "collisionAvoidanceController:singularTireLinearization","collisionAvoidanceController:nonlinearDomain"]);
+end
+
+function result=localReferenceAttempt(model,previousState,options,timer,minimumCount)
     cfg=model.cfg;wall=tic;
-    request=struct('operation',"reference",'model',model,'previousState',previousState);
+    request=struct('operation',"reference",'model',model,'previousState',previousState, ...
+        'minimumHorizonSteps',minimumCount,'timer',timer);
     [anchor,initialization,model]=solvePredictiveControl("probe",request);
+    model.probeTimer=timer;
     % Obtain guidance with its existing CLF table key. Use a finer, fixed
     % integration mesh for both comparison problems and reroll the same
     % controls; otherwise time perturbations can change the RK4 mesh at h.
@@ -49,52 +125,58 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
         'initialization',initialization.initialization,'fixed',[],'free',[], ...
         'history',[],'options',options,'scope',"researchAffineTimeLinearization", ...
         'uncertaintyScope',"existingPerHoldApproximationWithoutInteriorMeasurementBenefit");
-    for iteration=1:options.RefinementIterations
-        wall=tic;
-        [base,model]=localProblem(anchor,model,inherited);
-        model.probeNormals=model.collisionEscapeNormals;
-        step=options.DifferenceSeconds;
-        [plus,plusAnchor]=localPerturb(anchor,model,inherited,durations+weights*step,options.MovingReference);
-        [minus,minusAnchor]=localPerturb(anchor,model,inherited,durations-weights*step,options.MovingReference);
-        [halfPlus,~]=localPerturb(anchor,model,inherited,durations+weights*step/2,options.MovingReference);
-        [halfMinus,~]=localPerturb(anchor,model,inherited,durations-weights*step/2,options.MovingReference);
-        compatible=localSameRows(base,plus) && localSameRows(base,minus) ...
-            && localSameRows(base,halfPlus) && localSameRows(base,halfMinus);
-        if ~compatible
-            result.status="constraintStructureChanged";break;
+    try
+        for iteration=1:options.RefinementIterations
+            wall=tic;
+            [base,model]=localProblem(anchor,model,inherited);
+            model.probeNormals=model.collisionEscapeNormals;
+            result.fixedProblem=base;
+            if iteration==1
+                result.fixed=localSolve(base,anchor,model,inherited,weights,0);
+            end
+            step=options.DifferenceSeconds;
+            [plus,plusAnchor]=localPerturb(anchor,model,inherited,durations+weights*step,options.MovingReference);
+            [minus,minusAnchor]=localPerturb(anchor,model,inherited,durations-weights*step,options.MovingReference);
+            [halfPlus,~]=localPerturb(anchor,model,inherited,durations+weights*step/2,options.MovingReference);
+            [halfMinus,~]=localPerturb(anchor,model,inherited,durations-weights*step/2,options.MovingReference);
+            compatible=localSameRows(base,plus) && localSameRows(base,minus) ...
+                && localSameRows(base,halfPlus) && localSameRows(base,halfMinus);
+            if ~compatible
+                result.status="constraintStructureChanged";break;
+            end
+            derivative=localDifference(plus,minus,2*step);
+            fine=localDifference(halfPlus,halfMinus,step);
+            coarseVector=localFiniteVector(derivative);fineVector=localFiniteVector(fine);
+            error=max(abs(coarseVector-fineVector)./max(1,abs(fineVector)));
+            if error>1e-2 || ~isfinite(error)
+                result.status="nonsmoothTimeDerivative";result.derivativeError=error;break;
+            end
+            elapsed=sum(durations)-initialDuration;
+            % The final intervals remain at least one real sample long. The
+            % finite difference alone may sample just below h to find a slope.
+            free=localAugment(base,derivative,[-elapsed,maximumIncrease-elapsed],model);
+            free.durationStateDerivative=(plusAnchor.states-minusAnchor.states)/(2*step);
+            result.freeProblem=free;
+            formulationSeconds=toc(wall);
+            trial=localSolve(free,anchor,model,inherited,weights,0);
+            trial.formulationSeconds=formulationSeconds;trial.derivativeError=error;
+            trial.dynamicsTimeDerivativeNorm=norm(derivative.rhs,Inf);
+            trial.constraintTimeDerivativeNorm=norm(derivative.b,Inf);
+            history{iteration}=trial;result.free=trial;
+            if ~trial.returned,result.status="freeTimeSolveFailed";break;end
+            result.status="completed";
+            if iteration<options.RefinementIterations
+                if ~trial.audit.rolloutAvailable,result.status="nonlinearRolloutFailed";break;end
+                anchor.states=trial.audit.states;anchor.inputs=trial.solution.inputs;
+                durations=trial.durations;model.predictionDurations=durations;
+                % Refine around the new physical path. This is explicitly an
+                % offline SQP-style experiment, not a one-iteration RTI result.
+                model=rmfield(model,'probeNormals');
+            end
         end
-        derivative=localDifference(plus,minus,2*step);
-        fine=localDifference(halfPlus,halfMinus,step);
-        coarseVector=localFiniteVector(derivative);fineVector=localFiniteVector(fine);
-        error=max(abs(coarseVector-fineVector)./max(1,abs(fineVector)));
-        if error>1e-2 || ~isfinite(error)
-            result.status="nonsmoothTimeDerivative";result.derivativeError=error;break;
-        end
-        elapsed=sum(durations)-initialDuration;
-        % The final intervals remain at least one real sample long. The
-        % finite difference alone may sample just below h to find a slope.
-        free=localAugment(base,derivative,[-elapsed,maximumIncrease-elapsed],model);
-        free.durationStateDerivative=(plusAnchor.states-minusAnchor.states)/(2*step);
-        result.fixedProblem=base;result.freeProblem=free;
-        formulationSeconds=toc(wall);
-        if iteration==1
-            result.fixed=localSolve(base,anchor,model,inherited,weights,0);
-        end
-        trial=localSolve(free,anchor,model,inherited,weights,0);
-        trial.formulationSeconds=formulationSeconds;trial.derivativeError=error;
-        trial.dynamicsTimeDerivativeNorm=norm(derivative.rhs,Inf);
-        trial.constraintTimeDerivativeNorm=norm(derivative.b,Inf);
-        history{iteration}=trial;result.free=trial;
-        if ~trial.returned,result.status="freeTimeSolveFailed";break;end
-        result.status="completed";
-        if iteration<options.RefinementIterations
-            if ~trial.audit.rolloutAvailable,result.status="nonlinearRolloutFailed";break;end
-            anchor.states=trial.audit.states;anchor.inputs=trial.solution.inputs;
-            durations=trial.durations;model.predictionDurations=durations;
-            % Refine around the new physical path. This is explicitly an
-            % offline SQP-style experiment, not a one-iteration RTI result.
-            model=rmfield(model,'probeNormals');
-        end
+    catch exception
+        if ~localExpectedFailure(exception),rethrow(exception);end
+        result.status=string(exception.identifier);
     end
     result.history=history(~cellfun('isempty',history));
     result.initialAnchor=initialAnchor;result.model=model;
@@ -129,6 +211,7 @@ end
 
 function [problem,model]=localProblem(anchor,model,inherited)
     request=struct('operation',"formulate",'model',model,'anchor',anchor,'inherited',inherited);
+    if isfield(model,'probeTimer'),request.timer=model.probeTimer;end
     [problem,~,model]=solvePredictiveControl("probe",request);
 end
 
@@ -198,6 +281,7 @@ end
 function trial=localSolve(problem,anchor,model,inherited,weights,change)
     wall=tic;
     request=struct('operation',"solve",'model',model,'anchor',anchor,'problem',problem);
+    if isfield(model,'probeTimer'),request.timer=model.probeTimer;end
     [solution,search,~]=solvePredictiveControl("probe",request);
     seconds=toc(wall);
     trial=struct('returned',~isempty(solution),'solveSeconds',seconds,'search',search, ...
@@ -211,6 +295,8 @@ function trial=localSolve(problem,anchor,model,inherited,weights,change)
 end
 
 function audit=localAudit(solution,anchor,model,inherited,durations)
+    % Offline validation has its own timer; it never authorizes a command.
+    if isfield(model,'probeTimer'),model=rmfield(model,'probeTimer');end
     audit=struct('rolloutAvailable',false,'reason',"notRun",'states',[], ...
         'minimumRectangleGapMeters',NaN,'terminalMember',false,'terminalReason',"", ...
         'poseLinearizationGapMeters',NaN,'relinearizedViolation',NaN, ...

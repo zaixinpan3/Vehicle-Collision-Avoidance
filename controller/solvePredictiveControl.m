@@ -24,6 +24,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         model.circulationDirection=previousState.circulationDirection;
     end
     baseModel=model;minimumCount=cfg.controller.horizonSteps;originalPrevious=previousState;
+    if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly && isfield(model,'probeMinimumHorizonSteps')
+        minimumCount=max(minimumCount,model.probeMinimumHorizonSteps);
+    end
     history=struct([]);anchor=[];replan=false;
     extensions=0;horizonStop="";
     rollout=struct('available',false,'reason',"noCompletedOptimization", ...
@@ -1240,25 +1243,28 @@ end
 function [result,search,model]=localProbe(request)
     % Research-only reuse of the existing formulation and conic solver.
     % The online entry point never supplies this request or a variable grid.
-    model=request.model;search=struct();
+    model=request.model;search=struct();timer=tic;
+    if isfield(request,'timer'),timer=request.timer;end
     switch string(request.operation)
         case "reference"
             model.referenceProbeOnly=true;
-            [~,search,model]=solvePredictiveControl(model,request.previousState,tic);
+            if isfield(request,'minimumHorizonSteps'),model.probeMinimumHorizonSteps=request.minimumHorizonSteps;end
+            [~,search,model]=solvePredictiveControl(model,request.previousState,timer);
             model=rmfield(model,'referenceProbeOnly');
+            if isfield(model,'probeMinimumHorizonSteps'),model=rmfield(model,'probeMinimumHorizonSteps');end
             assert(isfield(model,'linearization'),'collisionAvoidanceController:noProbeReference', ...
                 'No rollable reference was constructed.');
             result=model.linearization;
         case "formulate"
-            model.solveTimer=tic;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
+            model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
             [result,model]=localFormulate(request.anchor,model);
             result.inheritedAnchor=request.inherited;
             result=localAddClf(result,request.anchor,model);
         case "solve"
-            model.solveTimer=tic;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
+            model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
             problem=request.problem;anchor=request.anchor;
-            [point,problem,search,model]=localPrimary(anchor,model,"durationExperiment",tic,problem);
-            [result,search,model]=localSecondary(point,problem,anchor,model,search,tic);
+            [point,problem,search,model]=localPrimary(anchor,model,"durationExperiment",timer,problem);
+            [result,search,model]=localSecondary(point,problem,anchor,model,search,timer);
         otherwise
             error('collisionAvoidanceController:invalidProbeOperation','Unknown research operation.');
     end
