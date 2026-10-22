@@ -18,8 +18,12 @@ terminal set and recursive feasibility.
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 | `../config/clfMatrices.json` | CLF matrices per operating point, written before experiments by `../scripts/synthesizeClfMatrices.m` (LMI, YALMIP/SeDuMi); the controller only reads it |
 
-Each reference rollout supplies one affine model and at most two native solves
-for the PCBF/CLF objectives. Local primal infeasibility permits fresh references and successively longer
+Each reference rollout supplies one affine model and at most two native solves.
+The first minimizes PCBF slack. With that slack capped, the second minimizes
+CLF slack plus a soft, unit-scaled state/input deviation from this reference.
+`rti.referenceDeviationWeight` controls that tradeoff without adding correction
+bounds; cruise-path recovery remains in the CLF and planner attraction.
+Local primal infeasibility permits fresh references and successively longer
 horizons until the terminal-constrained solve completes or the common sample
 deadline / an explicit user horizon cap stops search. Every fresh
 reference with a target invokes the circulation planner, including infeasibility

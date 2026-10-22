@@ -53,6 +53,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             struct("nonlinear", struct("proposalFunction", @sin))}
         invalidCrossingGap = {-0.1, Inf, NaN, [0.1, 0.2]}
         invalidActuation = {[], 1.0, struct([])}
+        invalidReferenceWeight = {-1, Inf, NaN, [1,2]}
     end
 
     methods (TestClassSetup)
@@ -66,6 +67,15 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function referenceDeviationWeightMustBeFiniteAndNonnegative(testCase,invalidReferenceWeight)
+            testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
+                struct('rti',struct('referenceDeviationWeight',invalidReferenceWeight))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
+        function referenceDeviationCanBeDisabledForAnAblation(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('rti',struct('referenceDeviationWeight',0)));
+            testCase.verifyEqual(cfg.rti.referenceDeviationWeight,0);
+        end
         function realTimeIterationCannotEnableAnOuterLoopOrRestoration(testCase)
             for retired={struct('scp',struct('maximumIterations',1)), ...
                     struct('rti',struct('maximumIterations',2)), ...

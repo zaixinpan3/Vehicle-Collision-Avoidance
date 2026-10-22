@@ -149,21 +149,23 @@ is positive semidefinite, so the first-step CLF epigraph is a convex quadratic
 constraint represented by one second-order cone, so the optimization is a sparse
 conic QP/SOCP rather than a QP with exclusively affine constraints.
 
-The secondary objective is scaled CLF slack plus soft input-change and
-whole-horizon route-tracking penalties. The primary PCBF slack cap remains hard.
-Input changes are normalized by the CLF design's steering and braking units;
-these units impose no limit on the optimizer. Tracking uses the CLF metric,
-normalized by the larger of one and its reference value. A coefficient
-`clfTieTolerance * max(inheritedAnchor, e0'Qe0)` weights these penalties; it is
-reported as `clfRegularizationCoefficient`.
+The secondary objective is CLF slack plus half
+`rti.referenceDeviationWeight` times the horizon mean of squared, unit-scaled
+state and input deviations from the current linearization reference. The
+default weight is 10, independent of cruise error and reference source; zero
+disables the penalty for ablation. Position uses the same CLF lateral-position
+unit for both inertial coordinates. Yaw, longitudinal speed, lateral velocity
+and yaw rate use the corresponding CLF error units. Inputs use the CLF
+certification steering and braking units. The entire objective is divided by
+`max(1,V(xhat_now))` in the solver. Reported component costs are unscaled.
 
-There is no hard state/input correction neighborhood. Consequently the soft
-penalties have no global cost bound, and the coefficient is not a bound on
-how much the regularizer can change minimum CLF slack. Inputs are penalized
-relative to the reference input, not zero. The inherited-plan floor preserves
-a preference for continuity even near nominal motion. The horizon tracking
-term favors returning to the cruise route. These are performance objectives,
-not extra safety constraints or a guarantee of nonlinear CLF decrease.
+The primary PCBF slack cap remains hard. There is no state/input correction
+box and no separate whole-horizon cost pulling toward the cruise path. The
+penalty is zero at the current reference, which may be a bypass trajectory.
+It remains active near nominal motion to regularize otherwise free later
+inputs. The CLF still refers to the prescribed cruise path. A larger reference
+weight can trade increased CLF slack for smaller trajectory changes; it does
+not certify nonlinear CLF decrease or prevent every large correction.
 
 With an observer enclosure the row is the same, on the estimate:
 `budget = exp(-2h/T)*V(xhat)` and `lossLower = e0'Qe0` at the estimate.

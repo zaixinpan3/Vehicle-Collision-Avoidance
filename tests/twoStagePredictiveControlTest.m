@@ -16,7 +16,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.algorithm,"realTimeIteration");
             testCase.verifyEqual(search.rtiIterations,1);
             testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyEqual([search.stages.objective],["pcbfSlack","clfSlack"]);
+            testCase.verifyEqual([search.stages.objective],["pcbfSlack","clfSlackAndReferenceDeviation"]);
             testCase.verifyLessThanOrEqual(search.solverCalls,2);
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyTrue(search.convexSolveCompleted);

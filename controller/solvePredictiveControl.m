@@ -450,8 +450,7 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
     if nargin<5 || isempty(problem)
         wall=tic;[problem,model]=localFormulate(anchor,model);formulationSeconds=toc(wall);
         model.linearization=anchor;
-        % The next sample inherits this plan's later inputs only when the
-        % anchor is the previous solved plan (localAddClf).
+        % Retain the reference source for research diagnostics.
         problem.inheritedAnchor=initialization=="shiftedInputRollout";
     end
     search=localSearch(problem,initialization,formulationSeconds);
@@ -503,19 +502,18 @@ function [solution,search,model]=localSecondary(point,problem,anchor,model,searc
     problem.a=[problem.a;problem.safetyObjective.'];problem.b=[problem.b;search.slackCap];
     remaining=model.solveTimeLimitSeconds-toc(timer);
     if remaining<=0,search.terminationReason="timeLimit";return;end
-    % Soft input-change and route-tracking penalties regularize the CLF
-    % objective. They impose no search bounds. The primary slack cap remains
-    % hard; the secondary regularizer has no global cost bound.
+    % Penalize departure from this linearization's state/input reference.
+    % This soft cost leaves the feasible set and primary slack cap unchanged.
     objective=problem.performanceObjective;objective(problem.clfIndex)=1;
     search.clfStageAttempted=true;wall=tic;
     [second,flag,solverInfo]=localConicSolve(problem.quadratic,objective,problem.cones,problem.a,problem.b, ...
         problem.equal,problem.rhs,problem.lower,problem.upper,cfg,remaining, ...
         min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
     search.solverCalls=search.solverCalls+1;
-    search.stages(2)=struct('objective',"clfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN,'numericalSolve',true,'solverInfo',solverInfo);
+    search.stages(2)=struct('objective',"clfSlackAndReferenceDeviation",'exitFlag',flag,'seconds',toc(wall),'value',NaN,'numericalSolve',true,'solverInfo',solverInfo);
     if isempty(second) || any(~isfinite(second)) || flag<=0,search.terminationReason="clfNoNumericalResult";return;end
     solution=localDecode(second,problem,anchor);
-    search.stages(2).value=solution.clfSlack;search.clfStageCompleted=true;search.returned=true;
+    search.stages(2).value=solution.secondaryObjectiveValue;search.clfStageCompleted=true;search.returned=true;
     search.convexSolveCompleted=all([search.stages([search.stages.numericalSolve]).exitFlag]>0);
     search.clfLowerBound=solution.clfSlack<=cfg.solver.feasibilityTolerance*problem.clfScale;
     search.terminationReason="twoStagesReturned";
@@ -531,13 +529,15 @@ function solution=localDecode(point,problem,anchor)
         'safety',sum(slacks),'hard',NaN,'clfSlack',rho, ...
         'clfInitialValue',problem.initialClfValue,'clfNextValue',nextValue, ...
         'clfFunction',problem.clf.function,'clfRequiredDecrease',problem.clf.requiredDecrease, ...
-        'clfRegularizationCoefficient',problem.clfRegularizationCoefficient,'clfWorstNextValue',worstNext,'clfCurrentBudget',problem.clfCurrentBudget, ...
+        'referenceDeviationWeight',problem.referenceDeviationWeight,'clfWorstNextValue',worstNext,'clfCurrentBudget',problem.clfCurrentBudget, ...
         'maximumCollisionTighteningMeters',problem.maximumCollisionTighteningMeters, ...
         'minimumCollisionMargin',NaN, ...
         'encounterExit',problem.encounterExit,'affineValidationPerformed',false,'nonlinearValidationPerformed',false, ...
-        'trackingTieWeight',problem.trackingTieWeight,'inputTieWeight',problem.inputTieWeight, ...
-        'affineTrackingValue',norm(problem.trackingMap*point+problem.trackingOffset)^2, ...
-        'inputTieValue',norm(problem.inputTieMap*point)^2);
+        'referenceStateDeviation',norm(problem.referenceStateMap*point)^2, ...
+        'referenceInputDeviation',norm(problem.referenceInputMap*point)^2);
+    solution.referenceDeviationCost=.5*problem.referenceDeviationWeight ...
+        *(solution.referenceStateDeviation+solution.referenceInputDeviation);
+    solution.secondaryObjectiveValue=solution.clfSlack+solution.referenceDeviationCost;
     if isfield(problem,'durationIndex')
         solution.durationChangeSeconds=point(problem.durationIndex);
         solution.states=solution.states+problem.durationStateDerivative*solution.durationChangeSeconds;
@@ -1037,17 +1037,6 @@ end
 function problem=localAddClf(problem,anchor,model)
     nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
     [nominalMap,nominalOffset,~,value,scale,~,clf]=localNominalClf(anchor,model,problem.stateIndices(:,2),nv);
-    e0=nonlinearBicycleModel.errorLinearization(model.initialState,model.lane,model.nominalReference);
-    scales=[model.cfg.clf.lateralPositionErrorScale;model.cfg.clf.headingErrorScale; ...
-        model.cfg.clf.speedErrorScale;model.cfg.clf.lateralVelocityErrorScale;model.cfg.clf.yawRateErrorScale];
-    % On the previous solved plan the tie's loss is at least one unit of
-    % the CLF error scales. Only the first successor enters the CLF row, so
-    % near the path the row and the constraints leave the later inputs free,
-    % and the tie is what keeps them. A tie that vanished there left them
-    % arbitrary: the plan, and the next sample's anchor,
-    % wandered between samples, and at 15 m/s the cruise oscillated. Every
-    % RTI reference uses this floor, including the nominal starting rollout.
-    lossLower=max(double(problem.inheritedAnchor),norm(e0./scales)^2);
     % The CLF is a soft performance row on the estimate: V(xhat+) <= rho
     % V(xhat). Estimation error enters it as an input (ISS); it carries no
     % observer enclosure. A worst case over the enclosure would ask for a
@@ -1058,29 +1047,24 @@ function problem=localAddClf(problem,anchor,model)
     modelConstant=0;constant=currentBudget/scale;
     axis=sparse(1,nv);axis(ic)=1;
     cone=localConeBlock([2*map;axis],[-2*offset;1-constant],axis,-1-constant,6);
-    % Use the CLF design's input units only as soft cost normalization.
-    % These magnitudes are not bounds on the optimized inputs or changes.
+    % Unit-scaled full-state/input proximity to the affine reference, not to
+    % the cruise path. Equal x/y units make position cost rotation invariant.
+    % A horizon mean prevents changing N from changing the total weight.
+    % These units impose no bounds, and the weight does not vanish at cruise.
+    stateUnits=[repmat(model.cfg.clf.lateralPositionErrorScale,2,1); ...
+        model.cfg.clf.headingErrorScale;model.cfg.clf.speedErrorScale; ...
+        model.cfg.clf.lateralVelocityErrorScale;model.cfg.clf.yawRateErrorScale];
     inputUnits=[model.cfg.clf.certificationSteeringRadians;model.cfg.clf.certificationBrakingRatio];
-    inputScale=repmat(1./(inputUnits*sqrt(2*count)),count,1);
-    increment=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
-    problem.clfRegularizationCoefficient=model.cfg.solver.clfTieTolerance*lossLower;
-    % Soft whole-horizon route tracking favors passing and recovery.
-    % Normalize the CLF-scaled cost by its reference value, without
-    % inventing a bound on the state corrections or on this penalty.
-    tracking=sparse(5*count,nv);trackingOffset=zeros(5*count,1);
-    for index=1:count
-        if mod(index,4)==1,localCheckDeadline(model);end
-        [futureError,futureJacobian]=nonlinearBicycleModel.errorLinearization(anchor.states(:,index+1),model.lane,model.nominalReference);
-        rows=5*(index-1)+(1:5);
-        tracking(rows,problem.stateIndices(:,index+1))=model.nominalReference.factor*futureJacobian/sqrt(count);
-        trackingOffset(rows)=model.nominalReference.factor*futureError/sqrt(count);
-    end
-    bound=max(1,norm(trackingOffset)^2);
-    weight=problem.clfRegularizationCoefficient/(2*scale);
-    problem.quadratic=2*weight*(increment.'*increment+(tracking.'*tracking)/bound);
-    problem.performanceObjective=2*weight*(tracking.'*trackingOffset)/bound;
-    problem.trackingMap=tracking;problem.trackingOffset=trackingOffset;
-    problem.trackingTieWeight=weight/bound;problem.inputTieWeight=weight;problem.inputTieMap=increment;
+    ix=problem.stateIndices(:,2:end);
+    stateScale=repmat(1./(stateUnits*sqrt(count)),count,1);
+    inputScale=repmat(1./(inputUnits*sqrt(count)),count,1);
+    problem.referenceStateMap=sparse(1:numel(ix),ix(:),stateScale,numel(ix),nv);
+    problem.referenceInputMap=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
+    problem.referenceDeviationWeight=model.cfg.rti.referenceDeviationWeight;
+    problem.referencePenaltyWeight=problem.referenceDeviationWeight/(2*scale);
+    problem.quadratic=2*problem.referencePenaltyWeight ...
+        *(problem.referenceStateMap.'*problem.referenceStateMap+problem.referenceInputMap.'*problem.referenceInputMap);
+    problem.performanceObjective=zeros(nv,1);
     problem.cones=[problem.cones,cone];
     problem.clfScale=scale;problem.clfMap=map;problem.clfOffset=offset;
     problem.nominalClfMap=nominalMap;problem.nominalClfOffset=nominalOffset;

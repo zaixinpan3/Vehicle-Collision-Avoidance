@@ -235,18 +235,35 @@ The primary stage minimizes `sum(xi)`. If the zero correction with zero slacks
 satisfies every primary constraint, it attains the global lower bound and no
 native primary solve is needed. Otherwise the native conic solver runs once.
 The secondary stage caps the attained primary objective, with the configured
-numerical tie, and minimizes the target-independent soft CLF condition
+numerical tie, and uses the target-independent soft CLF condition
 
     V(xhat_next) <= rho * V(xhat_now) + clfSlack,
     rho = exp(-2*h/clf.convergenceTimeConstantSeconds).
 
 `V` is the single precomputed transverse quadratic at prescribed-speed/path
 trim. Only the estimate enters it; it does not ask the worst member of an
-observer enclosure to contract to zero. Soft whole-horizon tracking and
-input-proximity regularization distinguishes passing/recovery from following a slow lead
-and stabilizes otherwise free future controls. Its coefficient is not a global
-bound on the secondary cost. It introduces no additional
-avoidance controller. Both stages must complete; an unfinished secondary stage
+observer enclosure to contract to zero. The secondary objective is
+
+    J2 = clfSlack + (lambda / (2 N)) sum_k (
+         ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2).
+
+Here xbar and ubar are this RTI reference, including a fresh planner rollout or
+the shifted previous input rollout. They are not the nominal cruise path.
+`lambda = rti.referenceDeviationWeight` defaults to 10 and remains active at
+zero cruise error; zero is an explicit ablation. Dx uses equal x/y position
+units from `clf.lateralPositionErrorScale`, followed by the CLF heading,
+speed, lateral-velocity and yaw-rate scales. Du uses the CLF certification
+steering/braking units. These are cost units, never bounds. The horizon mean
+keeps the overall weight independent of node count. The solver divides the
+entire objective by `max(1,V(xhat_now))` for numerical scaling.
+
+The old whole-horizon attraction to the cruise route is removed from this
+objective. Cruise recovery remains in the CLF and planner path field. Larger
+lambda permits more CLF slack to retain the reference, but cannot relax the
+primary PCBF cap or other constraints. This changes performance preference,
+not the feasible set or the conditional shift-candidate feasibility argument.
+It does not guarantee small nonlinear prediction error or successful RTI.
+Both stages must complete; an unfinished secondary stage
 does not cause execution of the primary point.
 
 Modified Fiala dynamics include saturation at both axles. There is no extra

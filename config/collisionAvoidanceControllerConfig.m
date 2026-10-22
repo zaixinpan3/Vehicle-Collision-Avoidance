@@ -31,7 +31,10 @@ function cfg=localDefaults()
     % references and longer horizons within the original controller deadline.
     % Encounter search starts from horizonSteps and the current stopping time;
     % the terminal extension has no separate duration cap.
-    cfg.rti=struct('settlingSeconds',.5);
+    % Secondary objective: CLF slack plus half this weight times the mean
+    % squared, unit-scaled state/input deviation from the current reference.
+    % The weight stays active on the route; zero disables it for ablation.
+    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10);
     % One path-attracted circulation rollout supplies initialization controls.
     % The parallel-wall acceleration guide anticipates transverse momentum;
     % it is not a hard RTI/terminal constraint or an execution certificate.
@@ -119,12 +122,10 @@ function cfg=localDefaults()
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for prediction and output assembly. Native
     % solves also count their construction time against the remaining budget.
-    % clfTieTolerance weights soft secondary regularization; without hard
-    % correction boxes it is not an upper bound on its objective contribution.
     cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.1,'completionReserveSeconds',.002, ...
         'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
         'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
-        'clfTieTolerance',1e-3,'reducedTolerance',1e-3);
+        'reducedTolerance',1e-3);
     cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6);
 end
 
@@ -156,6 +157,7 @@ function localValidate(cfg)
     end
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
     for name=["radialRate","tangentialRate","pathRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
@@ -222,7 +224,7 @@ function localValidate(cfg)
     validateattributes(cfg.solver.maxIterations,{'double'},{'scalar','real','finite','integer','positive'});
     validateattributes(cfg.solver.timeLimitSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.solver.completionReserveSeconds,{'double'},{'scalar','real','finite','nonnegative'});
-    for name=["feasibilityTolerance","constraintTolerance","optimalityTolerance","clfTieTolerance","reducedTolerance"]
+    for name=["feasibilityTolerance","constraintTolerance","optimalityTolerance","reducedTolerance"]
         validateattributes(cfg.solver.(name),{'double'},{'scalar','real','finite','positive'});
     end
     if cfg.solver.reducedTolerance<max(cfg.solver.feasibilityTolerance,cfg.solver.constraintTolerance)

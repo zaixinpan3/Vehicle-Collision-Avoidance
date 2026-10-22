@@ -22,6 +22,12 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function durationInducedMotionAlsoCountsAsReferenceDeviation(testCase)
+            r=testCase.result;
+            states=r.free.solution.states-r.initialAnchor.states;
+            expected=mean(sum((states(:,2:end)./[.5;.5;.1;.25;.5;.2]).^2,1));
+            testCase.verifyEqual(r.free.solution.referenceStateDeviation,expected,AbsTol=1e-10);
+        end
         function durationMovesTheTailWithoutChangingThePhysicalPrefix(testCase)
             r=testCase.result;prefix=r.model.cfg.controller.horizonSteps;
             sensitivity=r.freeProblem.durationStateDerivative;

@@ -74,7 +74,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(second.model.target,q,AbsTol=1e-12);
             testCase.verifyEqual(second.metadata.search.initialization,"shiftedInputRollout");
             testCase.verifyEqual(second.metadata.search.stages(end-1).objective,"pcbfSlack");
-            testCase.verifyEqual(second.metadata.search.stages(end).objective,"clfSlack");
+            testCase.verifyEqual(second.metadata.search.stages(end).objective,"clfSlackAndReferenceDeviation");
             testCase.verifyEqual(second.model.linearization.states(:,1),next,AbsTol=1e-12);
         end
         function theSingleClfActsOnTheEstimateWithoutAnEnclosureBudget(testCase)
@@ -92,11 +92,8 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(prediction.metadata.clfCurrentBudget,exact.metadata.clfCurrentBudget,RelTol=1e-12);
             testCase.verifyEqual(prediction.metadata.clfWorstNextValue,prediction.metadata.clfNextValue,RelTol=1e-12);
             testCase.verifyEqual(prediction.metadata.clfFunction,"quadraticTransverseError");
-            model=prediction.model;
-            scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
-                cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
-            loss=sum((nonlinearBicycleModel.error(model.initialState,model.lane,model.nominalReference)./scales).^2);
-            testCase.verifyLessThanOrEqual(prediction.metadata.clfRegularizationCoefficient,cfg.solver.clfTieTolerance*max(1,loss)+1e-12);
+            testCase.verifyEqual(prediction.metadata.referenceDeviationWeight,cfg.rti.referenceDeviationWeight);
+            testCase.verifyEqual(prediction.metadata.referenceDeviationWeight,exact.metadata.referenceDeviationWeight);
         end
         function unavailableBoundsDoNotPreventASolvedControl(testCase)
             [ego,target,road,cfg]=localFixture(.01);

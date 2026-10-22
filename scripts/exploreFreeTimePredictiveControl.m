@@ -155,8 +155,8 @@ function result=localReferenceAttempt(model,previousState,options,timer,minimumC
             elapsed=sum(durations)-initialDuration;
             % The final intervals remain at least one real sample long. The
             % finite difference alone may sample just below h to find a slope.
-            free=localAugment(base,derivative,[-elapsed,maximumIncrease-elapsed]);
-            free.durationStateDerivative=(plusAnchor.states-minusAnchor.states)/(2*step);
+            stateDerivative=(plusAnchor.states-minusAnchor.states)/(2*step);
+            free=localAugment(base,derivative,[-elapsed,maximumIncrease-elapsed],stateDerivative);
             result.freeProblem=free;
             formulationSeconds=toc(wall);
             trial=localSolve(free,anchor,model,inherited,weights,0);
@@ -224,8 +224,7 @@ end
 
 function derivative=localDifference(plus,minus,width)
     derivative=struct('b',(plus.b-minus.b)/width,'rhs',(plus.rhs-minus.rhs)/width, ...
-        'lower',zeros(size(plus.lower)),'upper',zeros(size(plus.upper)),'cones',plus.cones, ...
-        'trackingOffset',(plus.trackingOffset-minus.trackingOffset)/width);
+        'lower',zeros(size(plus.lower)),'upper',zeros(size(plus.upper)),'cones',plus.cones);
     low=isfinite(plus.lower);high=isfinite(plus.upper);
     derivative.lower(low)=(plus.lower(low)-minus.lower(low))/width;
     derivative.upper(high)=(plus.upper(high)-minus.upper(high))/width;
@@ -236,14 +235,14 @@ function derivative=localDifference(plus,minus,width)
 end
 
 function value=localFiniteVector(derivative)
-    value=[derivative.b;derivative.rhs;derivative.lower;derivative.upper;derivative.trackingOffset];
+    value=[derivative.b;derivative.rhs;derivative.lower;derivative.upper];
     for cone=derivative.cones,value=[value;cone.b;cone.gamma(:)];end %#ok<AGROW>
 end
 
-function problem=localAugment(base,derivative,limits)
+function problem=localAugment(base,derivative,limits,stateDerivative)
     problem=base;n=numel(base.lower);map=[1:n-1,n+1];timeIndex=n;
     problem.clfIndex=n+1;problem.durationIndex=timeIndex;
-    for field=["a","equal","trackingMap","inputTieMap","clfMap","nominalClfMap"]
+    for field=["a","equal","referenceStateMap","referenceInputMap","clfMap","nominalClfMap"]
         matrix=sparse(size(base.(field),1),n+1);matrix(:,map)=base.(field);problem.(field)=matrix;
     end
     problem.a(:,timeIndex)=-derivative.b;problem.equal(:,timeIndex)=-derivative.rhs;
@@ -252,13 +251,13 @@ function problem=localAugment(base,derivative,limits)
     end
     problem.lower(timeIndex)=limits(1);problem.upper(timeIndex)=limits(2);
     problem.quadratic=sparse(n+1,n+1);problem.quadratic(map,map)=base.quadratic;
-    problem.trackingMap(:,timeIndex)=derivative.trackingOffset;
-    % Time enters the same soft tracking objective as the state correction.
-    % Preserve its normalization when comparing fixed and free duration.
-    problem.trackingTieWeight=base.trackingTieWeight;
-    problem.quadratic=2*(base.inputTieWeight*(problem.inputTieMap.'*problem.inputTieMap) ...
-        +problem.trackingTieWeight*(problem.trackingMap.'*problem.trackingMap));
-    problem.performanceObjective=2*problem.trackingTieWeight*problem.trackingMap.'*problem.trackingOffset;
+    problem.durationStateDerivative=stateDerivative;
+    stateShift=zeros(n,1);stateShift(base.stateIndices)=stateDerivative;
+    % A duration change also moves the reference states. Penalize the total
+    % affine state displacement from the original fixed-time reference.
+    problem.referenceStateMap(:,timeIndex)=base.referenceStateMap*stateShift;
+    problem.quadratic=2*base.referencePenaltyWeight ...
+        *(problem.referenceInputMap.'*problem.referenceInputMap+problem.referenceStateMap.'*problem.referenceStateMap);
     for k=1:numel(base.cones)
         a=sparse(size(base.cones(k).A,1),n+1);a(:,map)=base.cones(k).A;a(:,timeIndex)=-derivative.cones(k).b;
         d=sparse(size(base.cones(k).D,1),n+1);d(:,map)=base.cones(k).D;d(:,timeIndex)=-derivative.cones(k).gamma;
