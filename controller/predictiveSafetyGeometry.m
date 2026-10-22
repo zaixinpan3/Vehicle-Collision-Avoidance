@@ -29,12 +29,9 @@ classdef predictiveSafetyGeometry
             projection=laneGeometry.project(model.initialState(1:2),model.lane);
             forward=[cos(projection.heading);sin(projection.heading)];
             lateral=[-forward(2);forward(1)];
-            if isfield(model,'avoidanceSide') && model.avoidanceSide~=0,side=model.avoidanceSide;end
-            data.preview=localEncounterPreview(model,data,side);
-            if data.preview.active,side=data.preview.side;end
-            % The predicted conflict chooses a side before the reactive
-            % circulation field takes over. Retain an existing encounter's
-            % side and circulation sense when rebuilding its reference.
+            % Use the existing target/path side convention. A small forward
+            % tangent advantage can otherwise send a curved encounter toward
+            % the wrong side of its route.
             direction=sign((field.rotation*field.tangent).'*lateral)*side;
             if direction==0,direction=1;end
             if isfield(model,'circulationDirection') && model.circulationDirection~=0
@@ -65,7 +62,6 @@ classdef predictiveSafetyGeometry
             guide.conflictStartSeconds=first;guide.conflictEndSeconds=last;
             guide.minimumGap=min(best.gaps);guide.nominalMinimumGap=min(best.nominalGaps);
             guide.initialConflict=conflict(1);guide.robustCertificate=false;
-            guide.preview=data.preview;
         end
 
         function [acceleration,projection] = pathAttraction(x,model)
@@ -701,7 +697,7 @@ function candidate=localCirculationRollout(model,data,direction,speed,count,long
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1),'directionSign',direction, ...
         'circulationSpeed',speed,'longitudinalWeight',longitudinalWeight, ...
-        'releaseNode',NaN,'stateViolation',0,'fieldActive',data.preview.active, ...
+        'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
         'maximumDeviation',0,'completion',"requestedHorizon");
     candidate.states(:,1)=model.initialState;
     prior=model.previousInput;encounterEnded=false;
@@ -718,12 +714,6 @@ function candidate=localCirculationRollout(model,data,direction,speed,count,long
         violation=localPlannerStateViolation(x,model);
         candidate.stateViolation=max(candidate.stateViolation,violation);
         [pathAcceleration,projection]=predictiveSafetyGeometry.pathAttraction(x,model);
-        if data.preview.active
-            [offset,rate,change]=localPreviewOffset(data.preview,(index-1)*h);
-            normal=[-sin(projection.heading);cos(projection.heading)];
-            gain=cfg.planner.pathRate;
-            pathAcceleration=pathAcceleration+normal*(change+2*gain*rate+gain^2*offset);
-        end
         candidate.maximumDeviation=max(candidate.maximumDeviation,abs(projection.lateralPosition));
         if index>count,break;end
         if hypot(x(4),x(5))<=cfg.model.brakeHoldSpeed
@@ -748,10 +738,7 @@ function candidate=localCirculationRollout(model,data,direction,speed,count,long
             acceleration=acceleration+(along-forward.'*acceleration)*forward;
             acceleration=predictiveSafetyGeometry.wallGuidance(x,acceleration,model);
             candidate.fieldActive=candidate.fieldActive || field.activation>0;
-            previewReleased=~data.preview.active || (index-1)*h>=data.preview.releaseSeconds;
-            if field.activation==0 && previewReleased && candidate.fieldActive && isnan(candidate.releaseNode)
-                candidate.releaseNode=index-1;
-            end
+            if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
             u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,longitudinalWeight);
         else
             u=nonlinearBicycleModel.nominalFeedback(x,prior,model.lane,model.nominalReference,cfg,data.parameters);
@@ -761,89 +748,6 @@ function candidate=localCirculationRollout(model,data,direction,speed,count,long
         candidate.states(:,index+1)=next;prior=u;
     end
     if ~candidate.fieldActive,candidate.directionSign=0;end
-end
-
-function preview=localEncounterPreview(model,data,side)
-    % Anticipate the whole predicted conflict, then hold a displaced route
-    % attractor until the nominal longitudinal overlap has ended. This is
-    % geometry for one field rollout, not a trajectory feasibility test.
-    cfg=model.cfg;count=size(data.target,2)-1;time=(0:count)*cfg.controller.sampleTime;
-    x=model.initialState;speed=hypot(x(4),x(5));beta=atan2(x(5),x(4));
-    curve=model.nominalReference.curvature;arcBeta=asin(curve*cfg.vehicle.lr);
-    arc=[x(1:2);x(3)+beta-arcBeta;speed;0;arcBeta;cfg.vehicle.lr;data.shape];
-    base=predictiveSafetyGeometry.predictTarget(arc,time);
-    base(3,:)=base(3,:)+arcBeta-beta;
-    projection=laneGeometry.project(base(1:2,:),model.lane);
-    normal=[-sin(projection.heading);cos(projection.heading)];
-    gap=inf(size(time));plus=zeros(size(time));minus=plus;
-    initiallyInside=norm(x(1:2)-model.target(1:2))<=cfg.collision.encounterRangeMeters;
-    for k=1:numel(time)
-        if mod(k,16)==1,localPlannerDeadline(model);end
-        state=[base(1:3,k);x(4:6)];target=data.target(:,k);
-        outside=norm(base(1:2,k)-target(1:2))-data.reserve-data.support.ballRadius(k)>cfg.collision.encounterRangeMeters;
-        if k>1 && initiallyInside && outside,break;end
-        gap(k)=localPlannerGap(state,target,data,k);
-        for direction=[1,-1]
-            n=direction*normal(:,k).';
-            support=predictiveSafetyGeometry.rotationSupport(data.shape,base(3,k),data.egoYawRadius,-n) ...
-                +predictiveSafetyGeometry.rotationSupport(target(8:11),target(3),data.targetYawRadius(k),n) ...
-                +sum(abs(n*data.generator(1:2,:))) ...
-                +predictiveSafetyGeometry.targetSupportFromData(data.support,k,n);
-            demand=support-n*(base(1:2,k)-target(1:2));
-            if direction==1,plus(k)=demand;else,minus(k)=demand;end
-        end
-    end
-    conflict=gap<=0;first=find(conflict,1);last=find(conflict,1,'last');
-    preview=struct('active',~isempty(first),'side',side,'offset',0, ...
-        'initialOffset',projection.lateralPosition(1),'initialRate',0,'riseSeconds',Inf,'releaseSeconds',Inf);
-    if isempty(first),return;end
-    demand=[max(plus(first:last)),max(minus(first:last))];
-    persistentSide=isfield(model,'avoidanceSide') && model.avoidanceSide~=0;
-    persistentDirection=isfield(model,'circulationDirection') && model.circulationDirection~=0;
-    if ~persistentSide && ~persistentDirection
-        [~,closest]=min(vecnorm(base(1:2,:)-data.target(1:2,:),2,1));
-        course=predictiveSafetyGeometry.direction(data.target(3,closest)+data.target(6,closest));
-        across=normal(:,closest).'*course;
-        along=[cos(projection.heading(closest)),sin(projection.heading(closest))]*course;
-        crossesThrough=(across<0 && plus(end)<0) || (across>0 && minus(end)<0);
-        if abs(across)>abs(along) && crossesThrough
-            % For a crossing target, bypass behind its motion instead of
-            % chasing it sideways. Symmetric support demands alone cannot
-            % distinguish these two very different encounter timings.
-            side=-sign(across);
-        elseif abs(diff(demand))>1e-6
-            [~,choice]=min(demand);side=3-2*choice;
-        end
-    end
-    preview.side=side;preview.offset=preview.initialOffset+side*max(0,demand(1+(side<0)));
-    rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-    preview.initialRate=normal(:,1).'*rotation*x(4:5);
-    % The inverse-Fiala guidance closes a first-order yaw-rate loop. Finish
-    % the geometric entry one loop time constant before the conflict, rather
-    % than assuming that its requested lateral acceleration is instantaneous.
-    preview.riseSeconds=max(cfg.controller.sampleTime,time(first)-1/cfg.nominalClf.yawRateGain);
-    preview.releaseSeconds=time(last)+cfg.rti.settlingSeconds;
-end
-
-function [value,rate,acceleration]=localPreviewOffset(preview,time)
-    % Hermite entry matches the measured transverse velocity. The attractor
-    % stays displaced through the whole predicted conflict before returning.
-    % Its acceleration may jump; actual inputs and states come from Fiala
-    % guidance and rollout, never from differentiating this geometric curve.
-    if time<preview.riseSeconds
-        duration=preview.riseSeconds;s=time/duration;
-        initial=preview.initialOffset;velocity=preview.initialRate;goal=preview.offset;
-    elseif time<=preview.releaseSeconds
-        value=preview.offset;rate=0;acceleration=0;return;
-    elseif time<preview.releaseSeconds+preview.riseSeconds
-        duration=preview.riseSeconds;s=(time-preview.releaseSeconds)/duration;
-        initial=preview.offset;velocity=0;goal=0;
-    else
-        value=0;rate=0;acceleration=0;return;
-    end
-    value=(2*s^3-3*s^2+1)*initial+(s^3-2*s^2+s)*duration*velocity+(-2*s^3+3*s^2)*goal;
-    rate=(6*s^2-6*s)*(initial-goal)/duration+(3*s^2-4*s+1)*velocity;
-    acceleration=(12*s-6)*(initial-goal)/duration^2+(6*s-4)*velocity/duration;
 end
 
 function violation=localPlannerStateViolation(x,model)

@@ -57,13 +57,11 @@ membership. An infeasible fresh RTI problem may retry on a longer horizon.
 
 The planner generates one trajectory through the declared vehicle dynamics.
 There is no candidate bank, weighted score or candidate admission gate. At the
-first initialization, an NRMM preview and constant-speed ego arc identify the
-entire nominal conflict interval using directional rectangle and observer
-supports. If the target crosses completely through the route, the passing side
-opposes its transverse motion, avoiding a lateral chase. Otherwise the smaller
-of the two lateral support demands chooses the side, with the existing side
-convention breaking ties. This is algebraic geometry, not a search over vehicle
-trajectories. Passing side and circulation sense persist within the encounter.
+first initialization, the circulation sense follows the existing target/path
+side convention and persists within the encounter to break symmetry and avoid
+left/right chattering. Each rollout step evaluates the NRMM target prediction
+at that step's time. The current predicted ego and target states, observer
+supports and perceived road geometry determine the acceleration field.
 
 The nominal path is an acceleration attractor. In Frenet coordinates, with
 lateral displacement e, transverse speed v_n, forward speed v_t and route
@@ -71,20 +69,14 @@ curvature kappa, the preferred transverse acceleration is
 
     a_n = kappa v_t^2 / (1 - kappa e) - 2 lambda v_n - lambda^2 e.
 
-During a predicted conflict, this attractor is temporarily displaced by d(t):
-
-    a_n += d''(t) + 2 lambda d'(t) + lambda^2 d(t).
-
-A cubic Hermite entry matches the current transverse position and velocity,
-reaches the required offset one yaw-rate-loop time constant before the first
-conflict (subject to a one-hold minimum duration), and holds it until the last
-conflict plus the existing settling time. A Hermite return then brings the
-attractor back to the route. The support demand uses the preview's body yaw;
-subsequent yaw changes, input saturation and tracking lag are handled by the
-vehicle rollout, not certified by the geometric construction. This curve is
-only an acceleration reference: every returned state still comes from the
-declared nonlinear dynamics under the returned inputs. No terminal membership
-test, fixed extra clearance, or hard correction bound is introduced.
+The attractor remains on the nominal path. No displaced waypoint, lateral
+amplitude or entry/hold/return timetable is prescribed. Obstacle circulation
+and boundary guidance modify the path acceleration according to the predicted
+state; when those corrections vanish, the path attractor continues to guide
+the vehicle toward the route. The vehicle dynamics determine the resulting
+offset and timing. Every returned state comes from the declared nonlinear
+dynamics under the returned inputs. This heuristic does not certify that a
+collision-free warm start or a feasible RTI problem will be found.
 
 The speed loop restores route progress. Before input mapping, the preferred
 acceleration along the current velocity is set by cruise-speed error. This

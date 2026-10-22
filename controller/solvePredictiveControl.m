@@ -18,12 +18,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     cfg=model.cfg;solution=[];model.linearizationBuilds=0;
     model.solveTimer=timer;
     model.solveTimeLimitSeconds=max(0,cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
-    model.circulationDirection=0;model.avoidanceSide=0;
+    model.circulationDirection=0;
     if isfield(model,'targetOnset') && ~model.targetOnset && isstruct(previousState) && isfield(previousState,'circulationDirection')
         model.circulationDirection=previousState.circulationDirection;
-        if model.circulationDirection~=0 && isfield(previousState,'collisionSide')
-            model.avoidanceSide=previousState.collisionSide;
-        end
     end
     baseModel=model;minimumCount=cfg.controller.horizonSteps;originalPrevious=previousState;
     if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly && isfield(model,'probeMinimumHorizonSteps')
