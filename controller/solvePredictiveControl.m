@@ -18,9 +18,12 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     cfg=model.cfg;solution=[];model.linearizationBuilds=0;
     model.solveTimer=timer;
     model.solveTimeLimitSeconds=max(0,cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
-    model.circulationDirection=0;
+    model.circulationDirection=0;model.avoidanceSide=0;
     if isfield(model,'targetOnset') && ~model.targetOnset && isstruct(previousState) && isfield(previousState,'circulationDirection')
         model.circulationDirection=previousState.circulationDirection;
+        if model.circulationDirection~=0 && isfield(previousState,'collisionSide')
+            model.avoidanceSide=previousState.collisionSide;
+        end
     end
     baseModel=model;minimumCount=cfg.controller.horizonSteps;originalPrevious=previousState;
     if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly && isfield(model,'probeMinimumHorizonSteps')
@@ -34,7 +37,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         source="nominalFeedbackRollout";domainFailure=false;
         if isfield(model,'target') && ~isempty(model.target),source="plannedAvoidanceRollout";end
         if isstruct(previousState) && isfield(previousState,'inputTrajectory') ...
-                && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all')
+                && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all') ...
+                && ~(isfield(model,'targetOnset') && model.targetOnset)
             source="shiftedInputRollout";
         end
         search=localEmptySearch(source,"",0);
@@ -249,7 +253,8 @@ end
 function [anchor,source]=localRtiInitialize(model,previous,minimumCount)
     cfg=model.cfg;count=minimumCount;
     inherited=isstruct(previous) && isfield(previous,'inputTrajectory') ...
-        && size(previous.inputTrajectory,2)>1 && all(isfinite(previous.inputTrajectory),'all');
+        && size(previous.inputTrajectory,2)>1 && all(isfinite(previous.inputTrajectory),'all') ...
+        && ~(isfield(model,'targetOnset') && model.targetOnset);
     plan=~isempty(model.target) && ~inherited;
     if plan
         % A bounded planner supplies the route, never an executable fallback.

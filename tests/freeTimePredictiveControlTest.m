@@ -45,7 +45,7 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             model=testCase.model;cfg=model.cfg;
             model.target=[1000;0;0;4;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
-            model.targetOnset=true;
+            model.targetOnset=false;
             r=exploreFreeTimePredictiveControl(model,testCase.previous);
             testCase.assertEqual(r.status,"completed");
             % The two straight vehicles close at 8-4 m/s. Time moves both
@@ -86,7 +86,7 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             model.cfg.controller.enforceRoadBoundaries=true;
             model.road.lateralClearance=[3;3];
             model.target=[1000;0;0;4;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
-            model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;model.targetOnset=true;
+            model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;model.targetOnset=false;
             previous=struct('inputTrajectory',repmat([.35;0],1,33), ...
                 'collisionEscapeNormals',repmat([0;-1],1,67),'collisionSide',-1);
             r=exploreFreeTimePredictiveControl(model,previous);
@@ -101,7 +101,10 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(r.completedPlannerCalls,1);
             testCase.verifyEqual(r.horizonExtensions,0);
             testCase.verifyGreaterThan(norm(fresh.initialAnchor.states-failed.initialAnchor.states,Inf),1);
-            testCase.verifyGreaterThan(norm(fresh.model.collisionEscapeNormals-failed.model.collisionEscapeNormals,Inf),.1);
+            % Both rebuilt references may share a valid far-target normal;
+            % neither may inherit the deliberately stale supplied normals.
+            stale=previous.collisionEscapeNormals(:,1:size(fresh.model.collisionEscapeNormals,2));
+            testCase.verifyGreaterThan(norm(fresh.model.collisionEscapeNormals-stale,Inf),.1);
             testCase.verifyEqual(fresh.initialAnchor.states(:,1),model.initialState,AbsTol=0);
             testCase.verifyEqual(fresh.model.uncertainty,model.uncertainty);
             testCase.verifyEqual(fresh.model.solveTimer,failed.model.solveTimer);
@@ -110,7 +113,7 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             model=testCase.model;cfg=model.cfg;
             model.cfg.model.brakingRatioRateMaximum=.01;model.cfg.controller.maximumHorizonSteps=48;
             model.target=[1000;0;0;4;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
-            model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;model.targetOnset=true;
+            model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;model.targetOnset=false;
             r=exploreFreeTimePredictiveControl(model,testCase.previous);
             testCase.verifyFalse(r.returned);
             testCase.verifyEqual(r.stopReason,"horizonLimit");

@@ -1,4 +1,7 @@
 classdef circulationPlannerTest < matlab.unittest.TestCase
+    properties (TestParameter)
+        crossingSpeed={8,15};
+    end
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -121,6 +124,36 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             guide=predictiveSafetyGeometry.avoidanceGuide(model,40,1);
             directions=[guide.candidates.direction];
             testCase.verifyTrue(all(directions==0 | directions==-1));
+        end
+        function crossingPreviewAvoidsTheTargetsFutureSide(testCase,crossingSpeed)
+            model=localModel("intersectionCrossing",crossingSpeed);
+            model.uncertainty.collisionGenerator=diag([.05,.05,.01,0,0,0]);
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,64,-1);
+            testCase.verifyTrue(guide.preview.active);
+            testCase.verifyGreaterThan(guide.preview.offset,0);
+            testCase.verifyGreaterThan(guide.minimumGap,0);
+            testCase.verifyLessThan(guide.maximumDeviation,10);
+            testCase.verifyEqual(guide.candidateCount,1);
+            testCase.verifyGreaterThan(guide.preview.releaseSeconds,guide.preview.riseSeconds);
+            testCase.verifyTrue(isnan(guide.releaseNode) ...
+                || guide.releaseNode*model.cfg.controller.sampleTime>=guide.preview.releaseSeconds);
+        end
+        function anExistingEncounterKeepsItsPassingSideDuringReplanning(testCase)
+            model=localModel("intersectionCrossing",15);
+            model.avoidanceSide=-1;model.circulationDirection=1;
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,64,1);
+            testCase.verifyTrue(guide.preview.active);
+            testCase.verifyLessThan(guide.preview.offset,0);
+            testCase.verifyEqual(guide.directionSign,1);
+        end
+        function aFastStationaryLeadHasAnAnticipatoryDynamicSeed(testCase)
+            model=localModel("stoppedLead",25);model.cfg.model.speedMaximum=30;
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,45,1);
+            testCase.verifyTrue(guide.preview.active);
+            testCase.verifyGreaterThan(guide.nominalMinimumGap,0);
+            testCase.verifyLessThan(guide.maximumDeviation,10);
+            testCase.verifyGreaterThan(abs(guide.inputs(1,1)),.01);
+            testCase.verifyFalse(guide.robustCertificate);
         end
         function anOverlappingSeedIsFiniteAndNeverCertified(testCase)
             model=localModel("headOn",8);model.target(1:2)=model.initialState(1:2);

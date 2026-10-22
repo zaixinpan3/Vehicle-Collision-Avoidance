@@ -61,6 +61,18 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(model.linearization.inputs(:,1:size(prior.inputTrajectory,2)-1), ...
                 prior.inputTrajectory(:,2:end),AbsTol=0);
         end
+        function aNewEncounterReplacesThePreviouslyUnobstructedCruiseSeed(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,target]=collisionThreatScenario("headOn",cfg);
+            model=problem.model;model.target=target;model.targetEpoch=target;model.targetOnset=true;
+            request=struct('operation',"reference",'model',model,'previousState',prior);
+            [anchor,search]=solvePredictiveControl("probe",request);
+            testCase.verifyEqual(search.initialization,"plannedAvoidanceRollout");
+            testCase.verifyTrue(anchor.planner.used);
+            testCase.verifyEqual(anchor.states(:,1),model.initialState,AbsTol=0);
+            testCase.verifyGreaterThan(max(abs(anchor.inputs(1,:))),.01);
+        end
         function coldCrossingSelectsACirculationReferenceBeforeTheRtiSolve(testCase)
             [ego,~,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=15;
             [~,q,road]=collisionThreatScenario("crossing",cfg);
@@ -92,13 +104,14 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             anchor=problem.model.linearization;
             testCase.verifyGreaterThan(size(anchor.inputs,2)*cfg.controller.sampleTime,2);
-            % A nonterminal seed is allowed; the optimized endpoint carries
-            % the terminal constraints instead.
-            testCase.verifyFalse(terminalSafeSet.member(anchor.terminalContext,anchor.states(:,end),size(anchor.inputs,2)));
+            % Preview may incidentally produce a terminal endpoint; the
+            % planner never appends a terminal extension to obtain it.
+            testCase.verifyEqual(anchor.appendedTerminalSteps,0);
+            testCase.verifyEqual(anchor.appendedBrakingSteps,0);
             testCase.verifyEqual(search.rtiIterations,1);
             ego=localSuccessor(ego,state);q=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             [~,~,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
-            testCase.verifyFalse(next.metadata.search.planner.used);
+            testCase.verifyEqual(next.metadata.search.attempts(1).initialization,"shiftedInputRollout");
         end
         function seedsStayDifferentiableWhilePhysicalInputsIncludeSaturation(testCase)
             [ego,road,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=1.8;
@@ -233,7 +246,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             ego=localSuccessor(ego,prior);
             [~,~,problem]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,prior);
             testCase.verifyTrue(problem.model.targetOnset);
-            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyFalse(problem.metadata.preplannedAvoidanceTrajectoryRequired);
         end

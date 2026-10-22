@@ -79,8 +79,8 @@ function [command,predictedInput,prediction,controllerState] = ...
     if ~isempty(observed) && ~isempty(q)
         observed(3)=q(3)+atan2(sin(observed(3)-q(3)),cos(observed(3)-q(3)));
     end
-    % Onset refreshes all collision rows. Its nominal input warm start can
-    % still be used because RTI does not require an avoidance seed.
+    % A newly observed encounter requests an avoidance reference instead of
+    % inheriting a cruise seed built while no target was present.
     targetOnset=~isempty(observed) && isstruct(previousState) && isempty(previousState.targetEpoch);
     if targetOnset,encounterId=encounterId+1;end
     if ~isempty(observed)

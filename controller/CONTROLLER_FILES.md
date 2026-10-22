@@ -23,9 +23,16 @@ for the PCBF/CLF objectives. Local primal infeasibility permits fresh references
 horizons until the terminal-constrained solve completes or the common sample
 deadline / an explicit user horizon cap stops search. Every fresh
 reference with a target invokes the circulation planner, including infeasibility
-retries, without a preceding risk gate. Warm references first attempt RTI on
-the shifted plan. The planner generates one path-attracted circulation rollout, with a persistent
-turn sense determined from the existing target/path passing-side convention. There is no candidate bank,
+retries, without a preceding risk gate. A newly observed encounter also requests
+fresh guidance instead of shifting the previous unobstructed cruise plan.
+Other warm references first attempt RTI on the shifted plan. The planner
+previews the complete nominal conflict interval using rectangular supports and
+observer margins. A crossing target that continues through the route is passed
+behind its motion; other encounters use the smaller lateral support demand.
+The route attractor enters that offset before the conflict, allowing one yaw-loop
+time constant for response, holds it through the conflict, and then returns.
+The planner generates one path-attracted circulation rollout, with a persistent
+passing side and turn sense within the encounter. There is no candidate bank,
 scoring or seed admission layer. The path attraction damps outward velocity;
 the obstacle adds outward normal acceleration and a passing-direction
 correction only when needed. Directional footprint and observer-error supports

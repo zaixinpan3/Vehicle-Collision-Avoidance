@@ -43,7 +43,9 @@ certificates. When no certificate is found, a moving endpoint uses nominal
 feedback and a stopped endpoint keeps a nonpositive longitudinal command.
 Thus the terminal certificate does not become a parking objective.
 
-With a previous trajectory, RTI first uses its shifted rollout. Every fresh
+With a previous trajectory from the same encounter, RTI first uses its shifted
+rollout. A newly observed target requests fresh guidance, replacing a cruise
+seed constructed without that target. Every fresh
 reference with a target invokes the second-order circulation planner; no
 target uses lane feedback. Local primal infeasibility also invokes this
 planner, without a separate risk-screening gate. The encounter horizon starts
@@ -55,15 +57,34 @@ membership. An infeasible fresh RTI problem may retry on a longer horizon.
 
 The planner generates one trajectory through the declared vehicle dynamics.
 There is no candidate bank, weighted score or candidate admission gate. At the
-first initialization, the circulation sense follows the existing target/path
-passing-side convention. It persists within the encounter; a small forward
-tangent advantage does not reverse the route-relative passing side.
+first initialization, an NRMM preview and constant-speed ego arc identify the
+entire nominal conflict interval using directional rectangle and observer
+supports. If the target crosses completely through the route, the passing side
+opposes its transverse motion, avoiding a lateral chase. Otherwise the smaller
+of the two lateral support demands chooses the side, with the existing side
+convention breaking ties. This is algebraic geometry, not a search over vehicle
+trajectories. Passing side and circulation sense persist within the encounter.
 
 The nominal path is an acceleration attractor. In Frenet coordinates, with
 lateral displacement e, transverse speed v_n, forward speed v_t and route
 curvature kappa, the preferred transverse acceleration is
 
     a_n = kappa v_t^2 / (1 - kappa e) - 2 lambda v_n - lambda^2 e.
+
+During a predicted conflict, this attractor is temporarily displaced by d(t):
+
+    a_n += d''(t) + 2 lambda d'(t) + lambda^2 d(t).
+
+A cubic Hermite entry matches the current transverse position and velocity,
+reaches the required offset one yaw-rate-loop time constant before the first
+conflict (subject to a one-hold minimum duration), and holds it until the last
+conflict plus the existing settling time. A Hermite return then brings the
+attractor back to the route. The support demand uses the preview's body yaw;
+subsequent yaw changes, input saturation and tracking lag are handled by the
+vehicle rollout, not certified by the geometric construction. This curve is
+only an acceleration reference: every returned state still comes from the
+declared nonlinear dynamics under the returned inputs. No terminal membership
+test, fixed extra clearance, or hard correction bound is introduced.
 
 The speed loop restores route progress. Before input mapping, the preferred
 acceleration along the current velocity is set by cruise-speed error. This
@@ -286,7 +307,8 @@ of strictly positive clearance during nonlinear replay.
 
 The target follows constant tangential acceleration and sideslip within each
 prediction; braking ends at rest. Each current target observation refreshes its
-forecast center and parameters while retaining the input warm start. Complete
+forecast center and parameters while retaining the input warm start within the
+same encounter. Complete
 current perception with no target clears the encounter; otherwise a missing
 observation retains the last forecast. Extrapolation is not a new certificate.
 The observed encounter flag latches an actual exit; reacquisition starts a new

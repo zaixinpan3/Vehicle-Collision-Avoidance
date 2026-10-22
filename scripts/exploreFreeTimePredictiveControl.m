@@ -39,7 +39,8 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
     attempts={};extensions=0;plannerCalls=0;stop="";
     while true
         inherited=isstruct(previousState) && isfield(previousState,'inputTrajectory') ...
-            && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all');
+            && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all') ...
+            && ~(isfield(baseline,'targetOnset') && baseline.targetOnset);
         plannerRequested=~inherited && ~isempty(baseline.target);
         try
             attempt=localReferenceAttempt(baseline,previousState,options,timer,minimumCount);
