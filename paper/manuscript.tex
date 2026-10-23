@@ -109,48 +109,143 @@ Integrating these behaviors requires a safety argument that accounts for
 both the available vehicle maneuvering capability and uncertainty in the
 motion of the surrounding vehicle.
 
-Collision avoidance requires admissible actions throughout the maneuver.
-Control barrier functions (CBFs) provide a framework for enforcing
-forward invariance of a prescribed safe set
-\cite{AmesXuGrizzleTabuada2017}. For a vehicle with bounded actuation,
-however, collision-free geometry alone does not establish that an
-avoidance action exists: heading, velocity and control limits determine
-whether separation can be maintained
-\cite{AmesXuGrizzleTabuada2017,XiaoBelta2022}.
-Predictive control barrier functions (PCBFs) incorporate dynamics, input
-constraints and a safe terminal continuation into a finite-horizon
-optimization \cite{WabersichZeilinger2023,HuangWangMargellosGoulart2025}.
-For an uncertain moving vehicle, the central challenge is to preserve
-feasibility of this predictive problem as new measurements revise the
-estimated state and its forecast.
+Work on this integration spans avoidance-path generation, coordinated
+vehicle control and feedback safety certification.
+Field-based methods provide a direct way to combine lane guidance and
+obstacle repulsion. Virtual fluid-flow guidance superposes lane-boundary
+and cylindrical-obstacle flows and tracks the resulting path with an
+optimal-preview steering controller \cite{ChengLiLiuLiGuo2021}.
+Risk-shaped potential fields use elliptical repulsion and virtual target
+points to address local minima \cite{WangGaoLiSunCheng2019}.
+The former leaves moving obstacles to future work, whereas the latter
+includes moving-obstacle tests under constant-velocity conditions.
+Both demonstrate useful avoidance behavior, but neither establishes
+closed-loop collision-free invariance. A collision-free reference path
+therefore leaves a separate question: whether the controlled vehicle can
+maintain separation under its dynamics, control limits and sensing errors.
 
-The prediction must also represent the physical coupling of steering and
-braking. Braking changes speed and the subsequent lateral response,
-while longitudinal and lateral tire forces share finite friction
-capacity \cite{BealBoyd2019}. A fixed-speed prediction cannot assess
-these changes, and independent force limits can admit jointly
-unattainable demands. The avoidance controller therefore needs a coupled
-vehicle model and admissible controls that respect this shared capacity,
-together with a recovery objective for lane keeping and cruise control.
+That question first requires a suitable description of maneuvering
+capability. Shared-steering model predictive control (MPC) and
+lane-deformation safety filters optimize lateral avoidance at a fixed
+longitudinal speed
+\cite{LiangYinNie2021,BruggemannSteevesKrstic2022}.
+Combined evasive maneuvers require a broader description: braking changes
+speed and the subsequent lateral response, while longitudinal and lateral
+tire forces share finite friction capacity \cite{BealBoyd2019}.
+Coordinated steering and braking have already been addressed through
+nonlinear backstepping with adaptive fuzzy sliding-mode tracking
+\cite{GuoHuWang2016}, and through joint numerical optimization on a
+four-wheel model with modified Fiala tires \cite{FahmyGhanyBaumann2018}.
+These studies establish the relevance of coupled control and tire models.
+Their tracking analysis or numerical collision-avoidance results do not,
+however, provide an invariant-set guarantee against an uncertain moving
+target. The present problem requires the collision certificate to use the
+same coupled prediction and admissible maneuvering capability as the
+controller.
 
-The state information used by the controller introduces a further
-coupling. During an evasive maneuver, the ego vehicle's own motion
-changes the relative dynamics observed by onboard sensors, motivating
-motion models that explicitly account for that motion
-\cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
-Because target tracking uses estimated ego states, upstream errors also
-propagate into the target estimate. A safety argument must account for
-these errors during the estimation transient and as measurements arrive.
-This motivates a joint design in which maneuver-compatible estimation
-supplies explicit error enclosures and the predictive controller
-preserves their validity under successive information updates.
+Control barrier functions (CBFs) address the certificate requirement by
+constraining control inputs to preserve a safe set
+\cite{AmesXuGrizzleTabuada2017}. For an acceleration- or force-controlled
+vehicle, current position separation alone cannot certify the entire
+collision-free state space: an inward-moving state at the separation
+boundary can have a negative clearance derivative that the current input
+cannot change. Higher-order CBFs expose control through successive
+derivatives and restrict the initial state to derivative-defined safe
+sets, while requiring compatibility with admissible inputs
+\cite{XiaoBelta2022}.
+Other constructions encode different aspects of avoidance geometry.
+Input-constrained lane-deformation barriers account for bounded steering,
+although their guarantee requires an additional admissibility condition
+\cite{BruggemannSteevesKrstic2022}. Collision-cone barriers incorporate
+relative velocity, but the formulation in \cite{TayalEtAl2026} assumes
+unlimited control authority and reports saturation-related failures in
+high-speed hardware cases. These results motivate matching the certified
+safe set to the actual dynamics and input domain.
 
-This paper develops such a joint estimator--controller design for
-lane keeping and cruise control with vehicle collision avoidance.
-The estimator retains the nonlinear relative motion model (NRMM) in
-\cite{SharmaAlaiRajamani2026}, treats measured ego acceleration and yaw
-rate as exogenous inputs, and publishes an error enclosure based on a
-cascade input-to-state stability (ISS) certificate.
+A further requirement is that feasible avoidance actions remain available
+as the maneuver evolves. MPC with discrete-time CBF constraints evaluates
+safety throughout a horizon
+\cite{ZengZhangSreenath2021}; future-focused barriers instead use
+predicted closest separation and relaxed virtual clearance constraints
+\cite{BlackJankovicSharmaPanagou2023}. These constructions anticipate
+conflicts, but the cited formulations leave persistent feasibility or a
+theoretical feasibility guarantee open. Thus, prediction must be accompanied
+by conditions that preserve a feasible continuation at the next update.
+
+Predictive control barrier functions (PCBFs) provide such a construction
+by deriving the barrier from the predictive optimization itself.
+An optimal relaxation cost, progressive constraint tightening and a
+terminal CBF yield a predictive certificate and a recovery mechanism on
+a declared domain \cite{WabersichZeilinger2023}.
+A subsequent formulation minimizes accumulated state-constraint slack
+with admissible inputs and a hard invariant terminal set, without the
+progressive tightening \cite{HuangWangMargellosGoulart2025}.
+Shifting the previous plan and appending a terminal action preserves
+feasibility and makes the optimal slack cost nonincreasing; its zero set
+is safe and invariant. We adopt this latter construction. Its stated
+guarantees concern a known-state system with fixed constraints and a
+fixed terminal set. Deterministic target motion can be included in a
+joint state, but online estimation introduces an additional obligation:
+revised target enclosures and forecasts must remain compatible with the
+shifted plan and its terminal continuation.
+
+The information underlying these forecasts is itself affected by the
+avoidance maneuver. Accurate, delay-free surrounding-state information
+is assumed in rule-based CBF lane-change control
+\cite{HeZengZhangSreenath2021}, and perfect position estimation is
+assumed in the racing example of \cite{ZengZhangSreenath2021}.
+Tracking from a turning or accelerating ego vehicle requires the
+relative-motion equations to account for that moving sensor frame
+\cite{AlaiSharmaAlexanderRajamani2024}.
+A nonlinear relative motion model (NRMM) and a multistage high-gain
+observer provide one such approach, validated on a full-scale vehicle
+\cite{SharmaAlaiRajamani2026}. This model supplies the target-motion
+basis used here.
+
+The observer formulation in \cite{SharmaAlaiRajamani2026} transforms
+the ego kinematics into differentiated companion coordinates and assumes
+constant body-measured acceleration and yaw rate. Those assumptions can
+be violated during combined steering and braking. The paper establishes
+nominal exponential convergence and a yaw-estimation $H_\infty$ condition,
+but these results do not supply a complete disturbed-cascade error
+enclosure for collision avoidance. Estimated ego motion drives the target
+observer, so upstream errors must enter the target uncertainty together
+with initial errors, sensor disturbances and model mismatch.
+We retain the NRMM while using maneuver-compatible ego coordinates and
+a cascade input-to-state stability (ISS) analysis to construct explicit,
+time-dependent error enclosures. The containment requirement includes
+the initial estimation transient.
+
+Robust predictive control provides relevant precedents for using such
+uncertainty descriptions. Tube-based output-feedback MPC combines an
+observer, an invariant estimation-error set and robust constraint
+tightening for constrained linear systems
+\cite{MayneRakovicFindeisenAllgower2006}.
+Safe MPC for uncertain road users combines reachable-set constraints
+with a safe terminal continuation and requires successive predictions
+to satisfy a consistency condition \cite{BatkovicGuptaZanonFalcone2023}.
+The latter explicitly treats ego sensing and localization as available.
+These results establish that estimation-error bounds, uncertainty tubes
+and prediction consistency are substantive parts of predictive safety.
+For the nonlinear ego--target system considered here, the remaining task
+is to construct them together with the observer: future measurements and
+feedback depend on the same physical trajectory, and tire-model mismatch
+can affect both the plant prediction and the model-aided measurement.
+
+The research question is therefore how to connect maneuver-compatible
+estimation, coupled vehicle dynamics and predictive safety through one
+consistent uncertainty description. This requires both a current error
+enclosure and a prediction that preserves its relationship to future
+observer updates. Replacing the target estimate and enlarging collision
+margins at each sample alone does not establish that the previous feasible
+continuation survives. Our design addresses this compatibility through
+joint nonlinear prediction, posterior intersection and retained safety
+certificates, under explicit model, sensor and terminal assumptions.
+
+The proposed system combines these elements in a joint
+estimator--controller architecture. The estimator treats measured ego
+acceleration and yaw rate as exogenous inputs and publishes an error
+enclosure from its cascade ISS certificate.
 The controller predicts with a dynamic bicycle model and modified Fiala
 tires. A PCBF stage prioritizes collision avoidance, with a terminal
 continuation combining the obstacle forecast and an ego braking law;
