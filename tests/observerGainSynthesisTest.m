@@ -14,9 +14,7 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture( ...
                 fullfile(repoRoot, "estimator")));
         end
-    end
 
-    methods (TestMethodSetup)
         function synthesizeDefaultDesign(testCase)
             testCase.Cfg = nrmmTrackingConfig();
             testCase.Design = synthesizeNrmmObserverGains(testCase.Cfg);
@@ -35,7 +33,7 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(gains, zeros(size(gains)));
             testCase.verifyEqual(design.target.shape, "lmi-solved");
             testCase.verifyEqual(design.gainSelection.method, ...
-                "structured-lipschitz-iss-minimax-synthesis");
+                "vector-jacobian-iss-minimax-synthesis");
             testCase.verifyEqual(design.gainSelection.scalarMethod, ...
                 "minimum-bandwidth-continuous-decay");
         end
@@ -95,7 +93,6 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             chainMatrix = [0.0, 1.0, 0.0; ...
                 0.0, 0.0, 1.0; 0.0, 0.0, 0.0];
             outputVector = [1.0; 0.0; 0.0];
-            unitVector = [0.0; 0.0; 1.0];
             velocitySelector = diag([0.0, 1.0, 0.0]);
             expectedMatrix = chainMatrix ...
                 - certificate.injectionVector*outputVector.';
@@ -108,16 +105,10 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
                 .*[shapeBandwidth; shapeBandwidth^2; shapeBandwidth^3];
             physicalMatrix = chainMatrix-shapeGains*outputVector.';
             designMatrix = certificate.designLyapunovMatrix;
-            multipliers = certificate.shapeLipschitzMultipliers;
-            sensitivities = [certificate.lipschitzCertificate.phiVelocity; ...
-                certificate.lipschitzCertificate.phiAcceleration];
             derivative = physicalMatrix.'*designMatrix ...
                 + designMatrix*physicalMatrix;
-            direction = designMatrix*unitVector;
-            dissipationResidual = derivative ...
-                + 2.0*certificate.minimumDecayRate*designMatrix ...
-                + diag([0.0; multipliers.*sensitivities.^2]) ...
-                + sum(1.0./multipliers)*(direction*direction.');
+            maximumResidual = localMaximumJacobianResidual(certificate.domain, ...
+                physicalMatrix,designMatrix,1,certificate.minimumDecayRate);
             gramianResidual = derivative+velocitySelector;
             gramian = reshape(-(kron(eye(3), physicalMatrix.') ...
                 + kron(physicalMatrix.', eye(3)))\velocitySelector(:), 3, 3);
@@ -132,10 +123,8 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
                 max(real(certificate.closedLoopPoles)), ...
                 -1.0*(1.0-1.0e-6));
             testCase.verifyGreaterThan(min(eig(designMatrix)), 0.0);
-            testCase.verifyGreaterThan(multipliers, zeros(2, 1));
-            testCase.verifyLessThanOrEqual(max(eig( ...
-                (dissipationResidual+dissipationResidual.')/2.0)), ...
-                1.0e-7);
+            testCase.verifyLessThan(maximumResidual,0);
+            testCase.verifyTrue(certificate.shapeJacobianCertificate.allVerticesVerified);
             testCase.verifyLessThanOrEqual( ...
                 max(eig((gramianResidual+gramianResidual.')/2.0)), ...
                 1.0e-7);
@@ -170,25 +159,20 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(certificate.lambda,certificate.minimumDecayRate);
             testCase.verifyGreaterThanOrEqual(certificate.bandwidth,certificate.bandwidthSearchBracket(1));
             testCase.verifyLessThanOrEqual(certificate.bandwidth,certificate.bandwidthSearchBracket(2));
-            testCase.verifyGreaterThanOrEqual(min(eig(certificate.lipschitzDissipationMatrix)),-1e-8);
-            testCase.verifyGreaterThan(certificate.lipschitzMultipliers,zeros(2,1));
+            testCase.verifyGreaterThanOrEqual(min(eig(certificate.jacobianDissipationMatrix)),-1e-8);
+            testCase.verifyTrue(certificate.jacobianCertificate.allVerticesVerified);
             testCase.verifyGreaterThan(certificate.transitLyapunovBound, ...
                 testCase.Design.ultimateBounds.targetLyapunov);
         end
 
-        function freeMetricCertifiesTheFullNonlinearSensitivityChannels(testCase)
+        function freeMetricCertifiesEveryFullVectorJacobian(testCase)
             target = testCase.Design.target;
-            metric = target.lyapunovMatrix;
-            direction = metric*[0;0;1];
-            sensitivities = [target.lipschitzCertificate.phiVelocity/target.bandwidth; ...
-                target.lipschitzCertificate.phiAcceleration];
-            residual = -target.bandwidth*(target.closedLoopMatrix.'*metric ...
-                +metric*target.closedLoopMatrix)-2*target.minimumDecayRate*metric ...
-                -diag([0;target.lipschitzMultipliers.*sensitivities.^2]) ...
-                -sum(1./target.lipschitzMultipliers)*(direction*direction.');
-
-            testCase.verifyGreaterThan(min(eig(metric)),0);
-            testCase.verifyGreaterThanOrEqual(min(eig((residual+residual.')/2)),-1e-8);
+            maximumResidual = localMaximumJacobianResidual(target.domain, ...
+                target.closedLoopMatrix,target.lyapunovMatrix,target.bandwidth,target.lambda);
+            testCase.verifyGreaterThan(min(eig(target.lyapunovMatrix)),0);
+            testCase.verifyLessThan(maximumResidual,0);
+            testCase.verifyEqual(maximumResidual, ...
+                target.jacobianCertificate.maximumResidualEigenvalue,AbsTol=1e-10);
         end
 
         function scalarBandwidthsMeetContinuousTransitDecay(testCase)
@@ -396,4 +380,18 @@ function constants = localDerivedConstants(cfg)
         "phiAccelerationLipschitz", phiAccelerationLipschitz, ...
         "phiLipschitz", hypot(phiVelocityLipschitz, ...
             phiAccelerationLipschitz));
+end
+
+function maximum = localMaximumJacobianResidual(domain,matrix,metric,bandwidth,lambda)
+% Assemble the full six-state dynamics independently of the synthesis residual.
+    enclosure = nrmmTargetJacobian("enclosure",domain);
+    energy = kron(metric,eye(2));
+    maximum = -Inf;
+    for index = 1:enclosure.vertexCount
+        dynamics = bandwidth*kron(matrix,eye(2));
+        dynamics(5:6,3:4) = dynamics(5:6,3:4)+enclosure.vertices(:,1:2,index)/bandwidth;
+        dynamics(5:6,5:6) = dynamics(5:6,5:6)+enclosure.vertices(:,3:4,index);
+        residual = dynamics.'*energy+energy*dynamics+2*lambda*energy;
+        maximum = max(maximum,max(eig((residual+residual.')/2)));
+    end
 end

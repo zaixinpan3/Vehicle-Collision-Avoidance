@@ -1,0 +1,17 @@
+{
+  "sameMetricOldNormLmiMinimumSlack": 1.9600192430200372,
+  "recoveredMaximumResidualEigenvalue": 1.9600192431351413,
+  "multipliers": [
+    55.062291875604814,
+    7.723422583129547
+  ],
+  "fullJacobianMaximumResidualEigenvalue": -9.999998450433752e-07,
+  "qualification": "Numerical fixed-metric surrogate comparison; not a necessity theorem or interval-arithmetic certificate",
+  "normSetViolationDirection": [
+    0.10056550253841755,
+    0.45619032089410594,
+    0.8841815259446041
+  ],
+  "normSetDerivativeExcess": 1.960019243107734,
+  "excessFormula": "v^T (w(A^T P+PA)+2 lambda P) v + 2 abs((P e3)^T v) ((Lq/w) abs(v2)+Ls abs(v3))"
+}

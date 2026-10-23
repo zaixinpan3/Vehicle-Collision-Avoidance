@@ -25,7 +25,7 @@ to Autonomous Vehicles and Robots*, International Journal of Robust and
 Nonlinear Control (2026), [DOI](https://doi.org/10.1002/rnc.70732): Lemma 1,
 Theorem 1 (13), Corollary 2 (26), and the scaling construction (33)--(35).
 We specialize their incremental analysis to the retained covariant chain.
-The regional Jacobian envelopes and the correlated NRMM gyro bound below are
+The analytic matrix enclosure and the correlated NRMM gyro bound below are
 derived here, not results asserted by that paper. They change certificates and
 synthesized gains, while preserving the observer states and vector field.
 All continuous-time error bounds apply throughout time. The separate sampled
@@ -155,7 +155,8 @@ At `q=0` the same bound follows by continuity. Thus, globally,
 A maximum over finitely many Jacobian evaluations is not used as the proof. The reconstructed
 `Omega(q,s)` is differentiated, rather than frozen as a constant in this bound.
 The legacy scalar `phi = hypot(Lq,Ls)` is only a diagnostic in numerical SI
-coordinates; the physical certificate below uses the separate channels.
+coordinates. These scalar bounds support sampled integration and radar-dropout
+growth estimates; they no longer constrain continuous gain synthesis.
 
 ### 2.1 Coupled vector-Jacobian refinement
 
@@ -212,15 +213,112 @@ almost-everywhere derivatives along segments, using continuity at crossings.
 This proves the global finite-increment inequality displayed above, including
 segments through zero and saturated estimates outside the physical domain.
 
-This is the integral-Jacobian version of the paper's incremental technique:
-\(\Delta\Phi_e=\int_0^1D\Phi_e(\hat z+t(z-\hat z))(z-\hat z)\,dt\).
-It does not assume that every partial derivative takes its intermediate value
-at one common point. The resulting two norm constraints are sufficient
-incremental quadratic constraints for Section 5. Entrywise sign and coupling
-information is used before norm reduction; a full sector-multiplier program
-could retain more information. No necessity or lossless S-procedure claim is
-made. The three regions are used in the proof only: no gain switching or
-unproved switched-system stability argument is introduced.
+The norm reduction remains useful for runtime growth estimates. Continuous gain
+synthesis instead retains the complete signed matrices, as follows.
+
+### 2.2 Global analytic enclosure of the full vector Jacobian
+
+Write \(H=[B,C]=[D_q\Phi_e,D_s\Phi_e]\) in the frame aligned with \(q\).
+The matrix \(B\) is given in Section 2.1. Before differentiating the
+acceleration projection, the other block is
+\[
+C_0=\begin{cases}
+(r/a)^2\begin{bmatrix}0&-2\eta\nu\\3\chi\nu&3\eta\alpha/a\end{bmatrix},&r<a,\\[2mm]
+\begin{bmatrix}0&-2\eta\nu\\3\chi\nu&3\eta\alpha/r\end{bmatrix},&a<r<b,\\[2mm]
+\begin{bmatrix}0&-2\eta\nu t^2\\3\chi\nu t&3\eta\alpha t^2/b\end{bmatrix},&r>b,\ t=b/r.
+\end{cases}
+\]
+For \(\|s\|<S\), \(C=C_0\). For \(\|s\|>S\), set
+\(\sigma=S/\|s\|\in(0,1)\). In this frame,
+\[
+C=\sigma C_0K,\qquad
+K=I-[x,y]^T[x,y]/S^2
+ =\frac1{S^2}\begin{bmatrix}y^2&-xy\\-xy&x^2\end{bmatrix},
+\quad x^2+y^2=S^2.
+\]
+Both blocks therefore depend on the same scalar factors, signs and clip
+branches. Replacing their entries by independent intervals would lose that
+information. `nrmmTargetJacobian("enclosure",domain)` instead constructs a
+finite convex enclosure from the following compact variables:
+
+| Region | Compact variables | Raw arguments \((u,v)\) | Feasible acceleration set | Common denominator |
+|---|---|---|---|---|
+| \(r<a\) | \(X=(r/a)x,\ Y=(r/a)y\) | \((X,Y/a)\) | \(X^2+Y^2\le S^2\) | \(1\) |
+| \(a<r<b\) | \((r,X,Y)=(r,x,y/r)\) | \((X,Y)\) | \(X^2+r^2Y^2\le S^2\) | \(r^2\) |
+| \(r>b\) | \((t,X,Y)=(b/r,x,y)\) | \((tX,t^2Y/b)\) | \(X^2+Y^2\le S^2\) | \(1\) |
+
+In the middle and outer regions, projected acceleration lies on the indicated
+ellipse or circle boundary. In the inner region even projected acceleration
+fills the disk: multiplication by \(r/a\) changes its radius. There,
+\((r/a)^2K=S^{-2}[Y^2,-XY;-XY,X^2]\). Thus the projected inner block
+is polynomial in \((X,Y)\), apart from the independent scalar
+\(\sigma\in[0,1]\). For unprojected inner acceleration the factor
+\((r/a)^2\in[0,1]\) is enclosed by its two endpoints. This endpoint
+relaxation only enlarges the admissible matrix set; it does not assert that
+these factors are physically independent.
+
+The extension is equivariant under every \(R\in O(2)\), including reflections:
+\(\Phi_e(Rq,Rs)=R\Phi_e(q,s)\). Under reflection \(\nu\) changes sign and
+\(JR=\det(R)RJ\), so the two sign changes cancel. Consequently \(Y\ge0\)
+suffices, provided the certificate uses \(P\otimes I_2\). Both signs of
+\(X\) and all three scalar-acceleration branches are retained. The yaw
+branches are unsaturated or positively saturated. They cover all smooth
+states up to an orthogonal change of frame.
+
+On each clip branch the numerator of every matrix entry is polynomial in
+these compact variables. In the middle region multiply the entire matrix by
+the positive denominator \(r^2\), retaining one common denominator for all
+eight entries. The implementation subdivides each compact coordinate into
+eight intervals, intersects boxes with the scalar-clip conditions, and removes
+boxes that cannot meet the acceleration disk or projected boundary. Every
+feasible branch point remains in at least one retained box. A retained box
+may contain infeasible points, which adds conservatism without compromising
+coverage. Its radial polynomial degree is at most five, and its other two
+degrees are at most three. No values sampled from state trajectories enter
+this construction.
+
+For completeness, let \(N(z)\) be the matrix numerator and \(D(z)>0\) its
+common denominator on a retained box. Express both in the same tensor
+Bernstein basis \(b_k(z)\ge0\), \(\sum_k b_k(z)=1\):
+\[
+N(z)=\sum_k N_k b_k(z),\qquad D(z)=\sum_k d_k b_k(z).
+\]
+The denominators are \(1\) or \(r^2\) with \(r\ge a>0\); their Bernstein
+coefficients satisfy \(d_k>0\), also after degree elevation. Hence
+\[
+\boxed{\frac{N(z)}{D(z)}=
+ \sum_k\underbrace{\frac{d_k b_k(z)}{D(z)}}_{\ge0,\ \sum_k=1}
+ \frac{N_k}{d_k}.}
+\]
+The **same weights apply to every entry** of \([B,C]\). The vertices
+\(N_k/d_k\), together with the scalar-factor endpoints, therefore enclose
+the complete coupled matrix. Bernstein coefficients can lie outside the
+image of the nonlinear map; this is a sufficient enclosure, not an exact
+convex hull or a claim of minimum conservatism. `evaluate` separately computes
+the Cartesian chain-rule Jacobian for diagnostics and testing.
+
+At \(q=0\), \(D\Phi_e=0\), which is explicitly included. Adjacent branches
+cover the generalized Jacobians at switching surfaces. For any two extended
+states, integrate along the **whole** segment:
+\[
+\Delta\Phi_e=\int_0^1D\Phi_e(\hat z+\theta(z-\hat z))(z-\hat z)\,d\theta.
+\]
+A suitable generalized derivative gives the same identity for a segment on
+a switching surface. This argument does not assume a common intermediate
+point for all partial derivatives or convexity of the physical annulus.
+The matrix inequalities in Section 5 hold for all orthogonal conjugates and
+all convex averages, so they imply a global finite-error inequality.
+
+This is a matrix-polytopic specialization of the vector incremental technique
+in Sharma et al., Lemma 1 and Theorem 1. It preserves vector directions in the
+actual SDP. It is not a reproduction of every sector multiplier in their
+Equation (13), nor a claim of equivalence to that parameterization. One metric
+and one gain cover every region; there is no switching of observer gains.
+The enclosure theorem is in real arithmetic. The implementation uses ordinary
+double precision and verifies numerical residuals; it does not provide
+interval arithmetic or directed-rounding proof certificates.
+
+### 2.3 Regularization discrepancy for domains including rest
 
 For a domain including rest, let `kappaMax = sin(betaMax)/lr`. On a smooth
 constant-acceleration, constant-curvature NRMM arc with `0 < V < a`, the physical
@@ -421,33 +519,64 @@ The invariant metric \(P\otimes I_2\) commutes with
 \(\mathcal J^T(P\otimes I_2)+(P\otimes I_2)\mathcal J=0\).
 Thus arbitrary common measured rotation contributes exactly zero to the
 quadratic derivative; its magnitude is not charged as a Lipschitz penalty.
-Applying
-Young inequalities separately to the velocity and acceleration sensitivities
-of \(\Delta\Phi_e/\omega_T^2\) yields the sufficient condition
+
+For fixed scalar-block gains, this metric symmetry has a precise justification.
+The full Jacobian uncertainty family, including all orthogonal conjugates, is
+closed under \(U=I_3\otimes R\), \(R\in O(2)\). If a common quadratic metric
+\(M_0\) certifies this family, so does every \(U^TM_0U\). Averaging over the
+compact group preserves positivity and all dissipation inequalities and gives
+\(\overline M=P\otimes I_2\). Thus imposing this symmetry loses no common
+quadratic feasibility for that fixed gain and orthogonally closed family.
+This statement does not remove conservatism from the uncertainty enclosure,
+the use of a common quadratic function, or the gain-selection objective.
+
+Let \(H_j=[B_j,C_j]\) range over all analytic vertices of Section 2.2 and
+set \(M=P\otimes I_2\), \(E=e_3\otimes I_2\), and
 \[
--\omega_T(A_\ell^TP+PA_\ell)-\tau_q(L_q/\omega_T)^2e_2e_2^T-\tau_sL_s^2e_3e_3^T
- -(\tau_q^{-1}+\tau_s^{-1})(Pe_3)(Pe_3)^T\succeq2\lambda_TP.
+D_j(\omega_T)=[0_{2\times2},B_j/\omega_T,C_j],\qquad
+F_j=\omega_T(A_\ell\otimes I_2)+ED_j(\omega_T).
 \]
-`synthesizeNrmmObserverGains.m` (its local target-tracker certificate) selects \(\ell\) with the noise-shape
-program of Section 7. For each candidate bandwidth it then solves for \(P\)
-and positive multipliers together, without fixing \(A_\ell^TP+PA_\ell=-I\).
-With \(a_q=L_q/\omega_T\), \(a_s=L_s\), the equivalent Schur condition is
+The actual, full vector-Jacobian LMIs are
 \[
-\begin{bmatrix}
-\omega_T(A_\ell^TP+PA_\ell)+2\lambda_TP
-  +\operatorname{diag}(0,\tau_q a_q^2,\tau_s a_s^2)&Pe_3&Pe_3\\
-e_3^TP&-\tau_q&0\\
-e_3^TP&0&-\tau_s
-\end{bmatrix}\preceq0.
+\boxed{F_j^TM+MF_j+2\lambda_TM\preceq0\quad\text{for every }j.}
 \]
-The program minimizes \(\operatorname{tr}(P)\) subject to \(P\succeq I\)
-and strict numerical margins. The normalization fixes the homogeneous scale;
-the metric is not asserted to minimize the physical error bound globally.
-Every recovered metric and the original dissipation inequality are checked
-algebraically. This freedom reduces the conservatism of the earlier fixed
-Lyapunov identity while preserving the same Lipschitz extension and decay floor.
-Feasibility of the returned matrix is the certificate; numerical optimization
-is not claimed globally optimal or verified with directed rounding.
+Equivalently,
+\[
+[\omega_T(A_\ell^TP+PA_\ell)+2\lambda_TP]\otimes I_2
+ +(Pe_3\otimes I_2)D_j+D_j^T(e_3^TP\otimes I_2)\preceq0.
+\]
+The signed off-diagonal entries and shared nonlinear factors of \(B_j,C_j\)
+enter these six-dimensional LMIs directly. There are no scalar Lipschitz
+multipliers in this synthesis. For any frame \(R\in O(2)\),
+\(I_3\otimes R\) leaves \(M\) and the chain unchanged. Congruence therefore
+extends each inequality to the corresponding rotated or reflected Jacobian.
+Convexity extends it to the integrated Jacobian of any finite error. This
+establishes \(\dot W_T\le-\lambda_TW_T\) for the unforced nonlinear error,
+including states outside the physical domain. The common measured rotation
+still contributes exactly zero.
+
+`synthesizeNrmmObserverGains.m` selects the gain shape with Section 7's SDP.
+For each candidate bandwidth it solves these LMIs for a free \(P\), minimizing
+\(\operatorname{tr}(P)\) subject to \(P\succeq I\) and strict numerical margins.
+This normalization fixes the homogeneous scale; it is not a globally optimal
+physical-error metric. Constraint generation starts with a subset of vertices,
+adds violated matrices, and accepts a solution only after checking **every**
+vertex of the complete analytic enclosure. Stopping the SDP iteration without
+that full check yields an unaccepted candidate, never a certificate.
+SeDuMi numerical-termination status 4 is allowed only when the recovered
+positive metric, the shape's Gramian inequality, and every Jacobian inequality
+pass the same independent strict checks as status 0. Infeasible statuses are
+rejected. The reported objective is recomputed from the recovered gains and
+metric; solver optimality is not used as a stability premise.
+Stored metadata record that status and distinguish numerical residual checks
+from directed-rounding verification. The retained worst residual matrix is a diagnostic; the theorem
+uses the verified maximum residual eigenvalue over all vertices.
+
+The previous two-channel norm LMI is sufficient for its norm uncertainty set,
+but that set ignores Jacobian signs and couplings. The present polynomial
+outer enclosure introduces a different relaxation. Neither implementation is
+asserted to dominate the other on every domain. The default-domain comparison
+is an experimental result, not a general ordering theorem.
 
 For true bounds \(\bar\rho,\bar V_T,\bar a_T\), set
 \[
@@ -558,7 +687,8 @@ follow; those are separate numerical comparisons.
 
 ## 7. Explicit gain-selection preference and position output
 
-The target shape is the solution of one semidefinite program in the physical
+The target shape is obtained from one semidefinite program, solved by constraint
+generation and full-enclosure verification, in the physical
 gains \(L\in\mathbb R^3\). With \(A_L=A-Le_1^T\) and \(Y=PL\) it minimizes
 \(\gamma\) subject to the dissipation condition of Section 5 written in
 physical coordinates (\(\omega_T=1\)) at the decay floor
@@ -569,9 +699,10 @@ A_L^TP+PA_L+e_2e_2^T\preceq0,\qquad
 \]
 The first inequality makes \(P\) an upper bound of the observability Gramian
 of \((A_L,e_2^T)\). For the linear error equation \(\dot e=A_Le-Ln\) driven by
-white output noise of unit intensity, the stationary velocity-error variance
-is therefore at most \(L^TPL\le\gamma\). All three conditions are linear in
-\((P,Y,\tau_q,\tau_s,\gamma)\). One metric serves the Gramian and the
+white output noise of unit intensity in one Cartesian component, the stationary
+velocity-error variance in that component is therefore at most \(L^TPL\le\gamma\). All conditions are linear in
+\((P,Y,\gamma)\), since \(PA_L=PA-Ye_1^T\) and the analytic
+Jacobian vertices are fixed. One metric serves the Gramian and the
 dissipation inequality, so \(\gamma\) is an upper bound of the smallest
 variance attainable among gains with a certificate, not that minimum. The
 returned gains already satisfy the dissipation inequality; they are split
@@ -588,8 +719,8 @@ local minimum of the largest ultimate physical component bound normalized by
 its operating-domain scale,
 subject to \(\lambda_T\ge1/T_{\rm domain}\), \(\omega_T>1\), where
 \(T_{\rm domain}=\bar\rho/(\overline V_E+\bar V_T)\). The search reports its
-bracket, does not claim global optimality, and rejects infeasible or numerically
-unresolved metric solves. When all disturbances vanish, minimum feasible
+bracket, does not claim global optimality, and rejects infeasible or independently
+unverified metric solves. When all disturbances vanish, minimum feasible
 bandwidth is the tie-break objective. No simulated tracking error or sensor
 sample period enters either optimization.
 The fixed velocity gain retains the declared minimum-bandwidth transit rule
