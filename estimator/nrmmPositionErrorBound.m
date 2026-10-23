@@ -245,9 +245,9 @@ function bound = localAdvance(bound,input,before,after,first,step)
     end
     range = bound.trueRangeMaximum ...
         + (domain.egoSpeedMaximum+target.domain.speedMaximum)*step;
-    h = [range;target.domain.speedMaximum/target.bandwidth; ...
-        target.domain.accelerationNormBound/target.bandwidth^2];
-    gyroCoefficient = sqrt(h.'*abs(target.lyapunovMatrix)*h);
+    gyroCertificate = nrmmObserverCertificate("targetGyro", ...
+        target.lyapunovMatrix,target.bandwidth,target.domain,range);
+    gyroCoefficient = gyroCertificate.coefficient;
     if input.radarDetectionAvailable
         matrix = zeros(3);
         matrix(1,1) = egoMatrix;

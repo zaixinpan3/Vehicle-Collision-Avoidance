@@ -1,7 +1,7 @@
 function certificate = nrmmObserverCertificate(action, varargin)
 % nrmmObserverCertificate Algebraic certificates of the cascaded observer.
 %
-% Three closed-form evaluations that the gain synthesis and the sampled
+% Closed-form evaluations that the gain synthesis and the sampled
 % bound recursion share. None of them calls a solver.
 %
 %   certificate = nrmmObserverCertificate("core", stage)
@@ -27,6 +27,11 @@ function certificate = nrmmObserverCertificate(action, varargin)
 %       The bounds are analytic over all radial and scalar saturation
 %       regions, not a sampled Jacobian maximum; the acceleration Jacobian
 %       retains its 2-by-2 directional structure. See OBSERVER_ISS_THEORY.md.
+%   certificate = nrmmObserverCertificate("targetGyro", metric, bandwidth, domain, range)
+%       Norm of the single gyro column in the target metric. The true NRMM
+%       relation q'*s = V*A is retained before maximizing over the domain.
+%       Four speed/acceleration corners suffice; no sampled maximization is
+%       used. range bounds true relative position and may vary online.
 
     switch string(action)
         case "core"
@@ -36,9 +41,11 @@ function certificate = nrmmObserverCertificate(action, varargin)
                 varargin{1}, varargin{2}, varargin{3}, varargin{4});
         case "targetLipschitz"
             certificate = localTargetLipschitz(varargin{1});
+        case "targetGyro"
+            certificate = localTargetGyro(varargin{:});
         otherwise
             error("nrmmObserverCertificate:invalidAction", ...
-                "action must be 'core', 'velocity' or 'targetLipschitz'.");
+                "action must be 'core', 'velocity', 'targetLipschitz' or 'targetGyro'.");
     end
 end
 
@@ -194,10 +201,31 @@ function certificate = localTargetLipschitz(domain)
         *max(1/minimumSpeed^2,2/maximumSpeed^2);
     weightedYawVelocity = accelerationNorm ...
         *max(1/minimumSpeed,2/maximumSpeed);
-    phiVelocity = yawRate^2+2*yawRate*weightedYawVelocity ...
+    separatedPhiVelocity = yawRate^2+2*yawRate*weightedYawVelocity ...
         +3*scalarAcceleration*yawRate/minimumSpeed ...
         +3*yawRate*accelerationVelocity ...
         +3*scalarAcceleration*yawVelocity;
+    % Differentiate the vector map in the q-aligned orthonormal frame.
+    % Its entries share the clipped factors: bound their sums before norms.
+    % The three envelopes cover r<a, a<r<b and r>b, including either scalar
+    % clip being active. Rotation conjugation preserves the spectral norm.
+    angularFactor = max(3*scalarAcceleration, ...
+        2*accelerationNorm-3*scalarAcceleration);
+    tangentialBound = @(radius) max( ...
+        yawRate^2+3*scalarAcceleration*accelerationNorm/radius^2, ...
+        3*yawRate*accelerationNorm/radius);
+    velocityJacobianEnvelopes = cat(3, ...
+        [3*yawRate^2, yawRate*angularFactor/minimumSpeed; ...
+         9*scalarAcceleration*yawRate/minimumSpeed, tangentialBound(minimumSpeed)], ...
+        [yawRate^2, yawRate*angularFactor/minimumSpeed; ...
+         3*scalarAcceleration*yawRate/minimumSpeed, tangentialBound(minimumSpeed)], ...
+        [4*yawRate^2, yawRate*angularFactor/maximumSpeed; ...
+         9*scalarAcceleration*yawRate/maximumSpeed, tangentialBound(maximumSpeed)]);
+    regionalVelocityBounds = zeros(3,1);
+    for region = 1:3
+        regionalVelocityBounds(region) = norm(velocityJacobianEnvelopes(:,:,region),2);
+    end
+    phiVelocity = min(separatedPhiVelocity,max(regionalVelocityBounds));
     accelerationJacobianEnvelope = [0,2*yawRate; ...
         3*yawRate,3*scalarAcceleration/minimumSpeed];
     phiAcceleration = norm(accelerationJacobianEnvelope,2);
@@ -208,8 +236,64 @@ function certificate = localTargetLipschitz(domain)
         "yawRateAcceleration",1/minimumSpeed, ...
         "velocityWeightedYawRateVelocity",weightedYawVelocity, ...
         "accelerationJacobianEnvelope",accelerationJacobianEnvelope, ...
+        "velocityJacobianEnvelopes",velocityJacobianEnvelopes, ...
+        "regionalVelocityBounds",regionalVelocityBounds, ...
+        "separatedPhiVelocity",separatedPhiVelocity, ...
         "phiVelocity",phiVelocity, ...
         "phiAcceleration",phiAcceleration, ...
         "phi",hypot(phiVelocity,phiAcceleration), ...
         "scope","global analytic bounds for the unchanged saturation extension");
+end
+
+%% Shared target gyro column with the NRMM velocity/acceleration correlation
+
+function certificate = localTargetGyro(metric,bandwidth,domain,range)
+    validateattributes(metric,{'double'},{'real','finite','size',[3,3]});
+    validateattributes(bandwidth,{'double'},{'real','finite','scalar','positive'});
+    validateattributes(range,{'double'},{'real','finite','scalar','nonnegative'});
+    symmetryTolerance = 128*eps(max(1,norm(metric,"fro")));
+    if norm(metric-metric.',"fro") > symmetryTolerance
+        error("nrmmObserverCertificate:invalidTargetMetric","The target metric must be symmetric.");
+    end
+    metric = (metric+metric.')/2;
+    [factor,flag] = chol(metric);
+    if flag ~= 0
+        error("nrmmObserverCertificate:invalidTargetMetric","The target metric must be positive definite.");
+    end
+    names = ["speedMinimum","speedMaximum","scalarAccelerationMaximum", ...
+        "yawRateMaximum","accelerationNormBound"];
+    for name = names
+        validateattributes(domain.(name),{'double'},{'real','finite','scalar','nonnegative'});
+    end
+    if domain.speedMinimum > domain.speedMaximum
+        error("nrmmObserverCertificate:invalidTargetSpeedInterval","The speed interval must be ordered.");
+    end
+    speeds = [domain.speedMinimum,domain.speedMaximum];
+    accelerations = [-domain.scalarAccelerationMaximum,domain.scalarAccelerationMaximum];
+    coefficient = 0;
+    maximizer = zeros(6,1);
+    for speed = speeds
+        q = [speed;0];
+        for acceleration = accelerations
+            s = [acceleration;speed*domain.yawRateMaximum];
+            cross = metric(1,2)*q/bandwidth+metric(1,3)*s/bandwidth^2;
+            rho = [range;0];
+            if norm(cross) > 0
+                rho = range*cross/norm(cross);
+            end
+            scaled = [rho,q/bandwidth,s/bandwidth^2];
+            candidate = norm(scaled*factor.',"fro");
+            if candidate >= coefficient
+                coefficient = candidate;
+                maximizer = [rho;q;s];
+            end
+        end
+    end
+    bounds = [range;domain.speedMaximum/bandwidth; ...
+        domain.accelerationNormBound/bandwidth^2];
+    separatedCoefficient = sqrt(bounds.'*abs(metric)*bounds);
+    certificate = struct("coefficient",min(coefficient,separatedCoefficient), ...
+        "geometricCoefficient",coefficient, ...
+        "separatedCoefficient",separatedCoefficient,"maximizerState",maximizer, ...
+        "scope","single shared gyro column; speed/acceleration/yaw-rate box with q'*s=V*A");
 end

@@ -1,0 +1,634 @@
+{
+  "configuration": {
+    "runtime": {
+      "samplePeriod": 0.02,
+      "integrationStepMaximum": 0.005,
+      "targetHistoryDuration": 2
+    },
+    "target": {
+      "model": {
+        "scalarAccelerationRateMaximum": 0,
+        "curvatureRateMaximum": 0
+      },
+      "domain": {
+        "speedMinimum": 10,
+        "regularizationSpeedMinimum": 5,
+        "speedMaximum": 20,
+        "scalarAccelerationMaximum": 2,
+        "sideslipMaximum": 0.015,
+        "rearAxleDistance": 1.6,
+        "relativePositionMaximum": 50
+      }
+    },
+    "ego": {
+      "domain": {
+        "speedMinimum": 5,
+        "speedMaximum": 20,
+        "yawRateMaximum": 0.3,
+        "accelerationNormMaximum": null,
+        "bodyAccelerationRateMaximum": null,
+        "yawAccelerationMaximum": null
+      },
+      "yaw": {
+        "rearAxleDistance": 1.714395,
+        "sideslipDomainMaximum": 0.05,
+        "singleTrackYawRateMismatchMaximum": 0.02
+      }
+    },
+    "measurement": {
+      "gps": {
+        "positionNoiseMaximum": 0.12,
+        "velocityNoiseMaximum": 0.02
+      },
+      "imu": {
+        "noiseMaximum": 0.05
+      },
+      "gyroscope": {
+        "noiseMaximum": 0.002
+      },
+      "radar": {
+        "noiseMaximum": 0.12
+      }
+    }
+  },
+  "method": "paired gains in the same current runtime; deterministic bounded uniform noise",
+  "geometric": {
+    "gains": [
+      6.8121589011327668,
+      23.048664058271573,
+      33.900887563943577
+    ],
+    "bandwidth": 1.9583045024751411,
+    "decayRate": 0.8,
+    "metric": [
+      [
+        47.400901158688285,
+        -24.677901219045637,
+        5.2105862594984291
+      ],
+      [
+        -24.677901219045637,
+        28.355664138051445,
+        -16.389586038371675
+      ],
+      [
+        5.2105862594984291,
+        -16.389586038371675,
+        14.617310448174784
+      ]
+    ],
+    "phiVelocity": 0.47075992826891377,
+    "phiAcceleration": 0.8708222481060468,
+    "ultimateBounds": [
+      1.6366665465898198,
+      6.8471807774033318,
+      14.090095164475278
+    ],
+    "residualMargin": 9.99999210976059E-7,
+    "gyroCoefficient": 383.57862694097224,
+    "sameMetricGeometricGyro": 383.57862694097224,
+    "sameMetricSeparatedGyro": 384.22592713001183
+  },
+  "baseline": {
+    "gains": [
+      7.297652196479163,
+      26.254049826269743,
+      40.942346479191514
+    ],
+    "bandwidth": 2.1042131192098155,
+    "decayRate": 0.8,
+    "metric": [
+      [
+        45.27906624169,
+        -23.809491747962234,
+        4.8752248401539324
+      ],
+      [
+        -23.809491747962234,
+        27.665803695888187,
+        -16.052393148885429
+      ],
+      [
+        4.8752248401539324,
+        -16.052393148885429,
+        14.548978567794187
+      ]
+    ],
+    "phiVelocity": 0.80105287671403391,
+    "phiAcceleration": 0.8708222481060468,
+    "ultimateBounds": [
+      1.7144003935494128,
+      7.5536792737974823,
+      16.518027370384583
+    ],
+    "residualMargin": 1.0000022720407018E-6,
+    "gyroCoefficient": 372.96318593991128,
+    "sameMetricGeometricGyro": 372.42782458355526,
+    "sameMetricSeparatedGyro": 372.96318593991128
+  },
+  "scenarios": [
+    {
+      "name": "retained7",
+      "seed": 7,
+      "samplePeriod": 0.02,
+      "dropoutIntervals": [],
+      "baseline": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.010892501806066131,
+        "egoVelocityRmse": 0.011399971437058308,
+        "egoAccelerationRmse": 0.029338740987976987,
+        "egoYawRmse": 0.00090479115228422587,
+        "relativePositionRmse": 0.023851524654300026,
+        "targetVelocityRmse": 0.0830458267193174,
+        "targetAccelerationRmse": 0.12427420225019505,
+        "targetHeadingRmse": 0.0040203450508460659,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.399682341212786,
+        "maximumAuditedRelativePosition": 29.529073082601066,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.8655343489840095,
+        "peakInitialAccelerationError": 3.6307558064037506,
+        "maximumPositionError": 0.048551578390973495,
+        "maximumAccelerationError": 0.37089827352105553,
+        "meanStepMilliseconds": 3.0535499999999991,
+        "maximumStepMilliseconds": 303.36,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 1.4220650875491454,
+        "meanPositionErrorBound": 1.7081820601529445,
+        "maximumPositionErrorBound": 1.7836332603767675,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetScalarAcceleration",
+          "targetYawRate"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.7144003935494128,
+          7.5536792737974823,
+          16.518027370384583
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 2.1042131192098155,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": false
+      },
+      "geometric": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.010892501806066131,
+        "egoVelocityRmse": 0.011399971437058308,
+        "egoAccelerationRmse": 0.029338740987976987,
+        "egoYawRmse": 0.00090479115228422587,
+        "relativePositionRmse": 0.023442391033653542,
+        "targetVelocityRmse": 0.077536169270723515,
+        "targetAccelerationRmse": 0.11143469529270959,
+        "targetHeadingRmse": 0.0038312434216203374,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.570435614949083,
+        "maximumAuditedRelativePosition": 29.527005640533488,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.6518882955497065,
+        "peakInitialAccelerationError": 3.1758555755600155,
+        "maximumPositionError": 0.048009091385516074,
+        "maximumAccelerationError": 0.29637537023367638,
+        "meanStepMilliseconds": 2.2889100000000004,
+        "maximumStepMilliseconds": 11.586,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 1.4204276405540373,
+        "meanPositionErrorBound": 1.7084341746809317,
+        "maximumPositionErrorBound": 1.7848627901162539,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetScalarAcceleration",
+          "targetYawRate"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.6366665465898198,
+          6.8471807774033318,
+          14.090095164475278
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 1.9583045024751411,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": false
+      }
+    },
+    {
+      "name": "retained17",
+      "seed": 17,
+      "samplePeriod": 0.02,
+      "dropoutIntervals": [],
+      "baseline": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.012987283578966563,
+        "egoVelocityRmse": 0.011643076526913694,
+        "egoAccelerationRmse": 0.030190698185663587,
+        "egoYawRmse": 0.000861101629533869,
+        "relativePositionRmse": 0.024921102723134747,
+        "targetVelocityRmse": 0.089857765450256907,
+        "targetAccelerationRmse": 0.135588668447715,
+        "targetHeadingRmse": 0.0041822768487846333,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.469229127186647,
+        "maximumAuditedRelativePosition": 29.533402314707089,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.900048893732472,
+        "peakInitialAccelerationError": 3.619516938619507,
+        "maximumPositionError": 0.055321933170585577,
+        "maximumAccelerationError": 0.37046673216311071,
+        "meanStepMilliseconds": 2.2241716666666669,
+        "maximumStepMilliseconds": 5.1640000000000006,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 1.3961782362312019,
+        "meanPositionErrorBound": 1.7076706003759927,
+        "maximumPositionErrorBound": 1.78180873662416,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetScalarAcceleration",
+          "targetYawRate"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.7144003935494128,
+          7.5536792737974823,
+          16.518027370384583
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 2.1042131192098155,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": false
+      },
+      "geometric": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.012987283578966563,
+        "egoVelocityRmse": 0.011643076526913694,
+        "egoAccelerationRmse": 0.030190698185663587,
+        "egoYawRmse": 0.000861101629533869,
+        "relativePositionRmse": 0.024015747294024638,
+        "targetVelocityRmse": 0.0822709421496057,
+        "targetAccelerationRmse": 0.11959879314221067,
+        "targetHeadingRmse": 0.0038081045401434249,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.584422076726966,
+        "maximumAuditedRelativePosition": 29.533113917417133,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.7062107906460739,
+        "peakInitialAccelerationError": 3.14597120667709,
+        "maximumPositionError": 0.05201314911652815,
+        "maximumAccelerationError": 0.3265558226106029,
+        "meanStepMilliseconds": 2.21333,
+        "maximumStepMilliseconds": 4.96,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 1.4097599128202554,
+        "meanPositionErrorBound": 1.7080990681957819,
+        "maximumPositionErrorBound": 1.781646299331229,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetYawRate",
+          "targetScalarAcceleration"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.6366665465898198,
+          6.8471807774033318,
+          14.090095164475278
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 1.9583045024751411,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": false
+      }
+    },
+    {
+      "name": "retained23",
+      "seed": 23,
+      "samplePeriod": 0.02,
+      "dropoutIntervals": [],
+      "baseline": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.011324207988703081,
+        "egoVelocityRmse": 0.011723677879408688,
+        "egoAccelerationRmse": 0.029037450228038622,
+        "egoYawRmse": 0.00086072182270424832,
+        "relativePositionRmse": 0.024289232042079417,
+        "targetVelocityRmse": 0.0856064635020662,
+        "targetAccelerationRmse": 0.13077430455881911,
+        "targetHeadingRmse": 0.0035239133397780404,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.273947619538969,
+        "maximumAuditedRelativePosition": 29.512433337503694,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.9502085956037667,
+        "peakInitialAccelerationError": 3.6767539403569653,
+        "maximumPositionError": 0.059288487284005438,
+        "maximumAccelerationError": 0.32527175556708432,
+        "meanStepMilliseconds": 2.2005349999999995,
+        "maximumStepMilliseconds": 5.1469999999999994,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 1.3839546745715396,
+        "meanPositionErrorBound": 1.7095246973983025,
+        "maximumPositionErrorBound": 1.7884404726563838,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetYawRate",
+          "targetScalarAcceleration"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.7144003935494128,
+          7.5536792737974823,
+          16.518027370384583
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 2.1042131192098155,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": false
+      },
+      "geometric": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.011324207988703081,
+        "egoVelocityRmse": 0.011723677879408688,
+        "egoAccelerationRmse": 0.029037450228038622,
+        "egoYawRmse": 0.00086072182270424832,
+        "relativePositionRmse": 0.024060741515460088,
+        "targetVelocityRmse": 0.080213897326099265,
+        "targetAccelerationRmse": 0.11748088287506415,
+        "targetHeadingRmse": 0.0033470947766341525,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.431720609506522,
+        "maximumAuditedRelativePosition": 29.511920038727691,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.7588331974107589,
+        "peakInitialAccelerationError": 3.2470253353429217,
+        "maximumPositionError": 0.056793363201770905,
+        "maximumAccelerationError": 0.31865263404359861,
+        "meanStepMilliseconds": 2.2182866666666663,
+        "maximumStepMilliseconds": 5.054,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 1.3901626411586321,
+        "meanPositionErrorBound": 1.7099630203390381,
+        "maximumPositionErrorBound": 1.7889206681621577,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetYawRate",
+          "targetScalarAcceleration"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.6366665465898198,
+          6.8471807774033318,
+          14.090095164475278
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 1.9583045024751411,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": false
+      }
+    },
+    {
+      "name": "slower23",
+      "seed": 23,
+      "samplePeriod": 0.04,
+      "dropoutIntervals": [],
+      "baseline": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.019947938672786346,
+        "egoVelocityRmse": 0.023125246464136381,
+        "egoAccelerationRmse": 0.032681941319075029,
+        "egoYawRmse": 0.0016929027414610861,
+        "relativePositionRmse": 0.031688872769752012,
+        "targetVelocityRmse": 0.11038387080243743,
+        "targetAccelerationRmse": 0.16578203604181654,
+        "targetHeadingRmse": 0.0051698006426970818,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.252639149844548,
+        "maximumAuditedRelativePosition": 29.529197819190557,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.9858078688127287,
+        "peakInitialAccelerationError": 3.720635570074573,
+        "maximumPositionError": 0.074851969792373241,
+        "maximumAccelerationError": 0.44423926945101422,
+        "meanStepMilliseconds": 3.0416600000000003,
+        "maximumStepMilliseconds": 5.885,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 2.7650183769259691,
+        "meanPositionErrorBound": 3.2373650854757008,
+        "maximumPositionErrorBound": 3.3264318181224319,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetScalarAcceleration",
+          "targetYawRate"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.7144003935494128,
+          7.5536792737974823,
+          16.518027370384583
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 2.1042131192098155,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": false
+      },
+      "geometric": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.019947938672786346,
+        "egoVelocityRmse": 0.023125246464136381,
+        "egoAccelerationRmse": 0.032681941319075029,
+        "egoYawRmse": 0.0016929027414610861,
+        "relativePositionRmse": 0.030794197365837512,
+        "targetVelocityRmse": 0.10157037669043037,
+        "targetAccelerationRmse": 0.14625874137602982,
+        "targetHeadingRmse": 0.0048137974236291941,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.435953618302554,
+        "maximumAuditedRelativePosition": 29.527512936889181,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.784320776556521,
+        "peakInitialAccelerationError": 3.2406370173364061,
+        "maximumPositionError": 0.073319233605711243,
+        "maximumAccelerationError": 0.42518861200660024,
+        "meanStepMilliseconds": 3.05689,
+        "maximumStepMilliseconds": 6.237,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 2.7735752467821682,
+        "meanPositionErrorBound": 3.2380936611307871,
+        "maximumPositionErrorBound": 3.3267345524476037,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetScalarAcceleration",
+          "targetYawRate"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.6366665465898198,
+          6.8471807774033318,
+          14.090095164475278
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 1.9583045024751411,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": false
+      }
+    },
+    {
+      "name": "dropout23",
+      "seed": 23,
+      "samplePeriod": 0.02,
+      "dropoutIntervals": [
+        4,
+        4.4
+      ],
+      "baseline": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.011324207988703081,
+        "egoVelocityRmse": 0.011723677879408688,
+        "egoAccelerationRmse": 0.029037450228038622,
+        "egoYawRmse": 0.00086072182270424832,
+        "relativePositionRmse": 0.02450737398038989,
+        "targetVelocityRmse": 0.085884613441995508,
+        "targetAccelerationRmse": 0.130777657176145,
+        "targetHeadingRmse": 0.0035049917456650937,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.273947619538969,
+        "maximumAuditedRelativePosition": 29.512433339186014,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.9502085956037667,
+        "peakInitialAccelerationError": 3.6767539403569653,
+        "maximumPositionError": 0.05928852373128192,
+        "maximumAccelerationError": 0.32527175556708432,
+        "meanStepMilliseconds": 2.2156216666666664,
+        "maximumStepMilliseconds": 5.1339999999999995,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 1.3839546745715396,
+        "meanPositionErrorBound": 2.3765998665620316,
+        "maximumPositionErrorBound": 33.955941928388292,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetYawRate",
+          "targetScalarAcceleration"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.7144003935494128,
+          7.5536792737974823,
+          16.518027370384583
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 2.1042131192098155,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": true
+      },
+      "geometric": {
+        "transientDuration": 2,
+        "egoPositionRmse": 0.011324207988703081,
+        "egoVelocityRmse": 0.011723677879408688,
+        "egoAccelerationRmse": 0.029037450228038622,
+        "egoYawRmse": 0.00086072182270424832,
+        "relativePositionRmse": 0.023977308255042719,
+        "targetVelocityRmse": 0.0797966591238359,
+        "targetAccelerationRmse": 0.11660729960820503,
+        "targetHeadingRmse": 0.0033582374629013605,
+        "allSamplesFinite": true,
+        "targetSpeedDomainValidCumulative": true,
+        "targetSpeedDomainValidFinalInterval": true,
+        "operatingDomainValidCumulative": false,
+        "operatingDomainValidFinalInterval": true,
+        "minimumReconstructedTargetSpeed": 10.431720609506522,
+        "maximumAuditedRelativePosition": 29.511920053497381,
+        "peakInitialPositionError": 1.1180339887498949,
+        "peakInitialVelocityError": 2.7588331974107589,
+        "peakInitialAccelerationError": 3.2470253353429217,
+        "maximumPositionError": 0.056794290640174806,
+        "maximumAccelerationError": 0.31865263404359861,
+        "meanStepMilliseconds": 2.219785,
+        "maximumStepMilliseconds": 5.0600000000000005,
+        "digitalErrorBoundCertified": false,
+        "positionBoundAvailableFraction": 1,
+        "positionBoundContainmentFraction": 1,
+        "minimumPositionBoundSlack": 1.3901626411586321,
+        "meanPositionErrorBound": 2.3772385434102543,
+        "maximumPositionErrorBound": 33.967485562199521,
+        "estimatedDomainValidFraction": 1,
+        "truthOperatingDomainValid": true,
+        "domainViolationQuantities": [
+          "targetYawRate",
+          "targetScalarAcceleration"
+        ],
+        "curvatureLagSeconds": null,
+        "continuousUltimateBounds": [
+          1.6366665465898198,
+          6.8471807774033318,
+          14.090095164475278
+        ],
+        "continuousTargetDecayRate": 0.8,
+        "targetBandwidth": 1.9583045024751411,
+        "declaredModelJerkCovered": true,
+        "hasRadarDropout": true
+      }
+    }
+  ]
+}

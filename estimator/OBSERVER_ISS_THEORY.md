@@ -19,6 +19,15 @@ bounding their effect.
 The claims are fewer assumptions for core stability, one fewer upstream error
 state, and smaller disturbance certificates under the comparison conditions in
 Section 8. They are not claims of uniformly better estimation trajectories.
+The vector-Jacobian refinement in Sections 2 and 5 draws on Sharma, Zemouche,
+and Rajamani, *Observer Design for Vector Nonlinear Systems With Applications
+to Autonomous Vehicles and Robots*, International Journal of Robust and
+Nonlinear Control (2026), [DOI](https://doi.org/10.1002/rnc.70732): Lemma 1,
+Theorem 1 (13), Corollary 2 (26), and the scaling construction (33)--(35).
+We specialize their incremental analysis to the retained covariant chain.
+The regional Jacobian envelopes and the correlated NRMM gyro bound below are
+derived here, not results asserted by that paper. They change certificates and
+synthesized gains, while preserving the observer states and vector field.
 All continuous-time error bounds apply throughout time. The separate sampled
 realization and its hold-error assumptions are described in
 [NRMM_IMPLEMENTATION_NOTES.md](../report/NRMM_IMPLEMENTATION_NOTES.md).
@@ -122,7 +131,7 @@ c_A=S/a,\quad c_\Omega=S\max(a^{-2},2b^{-2}),\quad
 c_{Q\Omega}=S\max(a^{-1},2b^{-1}),
 \]
 \[
-L_q=O_{\max}^2+2O_{\max}c_{Q\Omega}
+L_q^{\rm sep}=O_{\max}^2+2O_{\max}c_{Q\Omega}
  +3A_{\max}O_{\max}/a+3O_{\max}c_A+3A_{\max}c_\Omega.
 \]
 
@@ -147,6 +156,71 @@ A maximum over finitely many Jacobian evaluations is not used as the proof. The 
 `Omega(q,s)` is differentiated, rather than frozen as a constant in this bound.
 The legacy scalar `phi = hypot(Lq,Ls)` is only a diagnostic in numerical SI
 coordinates; the physical certificate below uses the separate channels.
+
+### 2.1 Coupled vector-Jacobian refinement
+
+The product bound above discards cancellations between derivatives of the
+same nonlinear factors. Retain them in the orthonormal frame
+\(Q_r=[e_r,Je_r]\), \(e_r=q/r\), for \(r>0\). Write
+\(Q_r^TS_{\rm vec}=[x,y]^T\), \(c=\min(r,b)\), \(d=\max(r,a)\), and
+\[
+u=cx/d,\quad v=cy/d^2,\quad
+\alpha=\operatorname{clip}_{A_{\max}}u,\quad
+\nu=\operatorname{clip}_{O_{\max}}v.
+\]
+Let \(\chi,\eta\in\{0,1\}\) be the respective scalar-clip derivatives at
+differentiability points. Then \(\chi u=\chi\alpha\) and
+\(\eta v=\eta\nu\). With \(B=Q_r^TD_q\Phi_e Q_r\), direct differentiation gives:
+
+| Region | \(B_{11}\) | \(B_{12}\) | \(B_{21}\) | \(B_{22}\) |
+|---|---|---|---|---|
+| \(r<a\) | \(-(1+2\eta)\nu^2\) | \(\nu(2\eta u-3\alpha)/a\) | \(3\alpha\nu(1+\chi+\eta)/a\) | \(-\nu^2+3\chi\nu v-3\eta\alpha u/a^2\) |
+| \(a<r<b\) | \((2\eta-1)\nu^2\) | \(\nu(2\eta u-3\alpha)/r\) | \(-3\eta\alpha\nu/r\) | \(-\nu^2+3\chi\nu v-3\eta\alpha u/r^2\) |
+| \(r>b,\ t=b/r\) | \(4t\eta\nu^2\) | \(\nu(2t\eta u-3\alpha)/r\) | \(-3\alpha\nu(\chi+2\eta)/r\) | \(-t\nu^2+3\chi\nu v-3\eta\alpha u/r^2\) |
+
+For brevity set \(A=A_{\max},O=O_{\max}\) in the next formulas. Since clipping
+preserves sign, \(\nu v,\alpha u\ge0\); since \(|u|\le S\),
+\[
+K=\max(3A,2S-3A),\qquad
+|2\theta u-3\operatorname{clip}_A u|\le K\quad(0\le\theta\le1).
+\]
+For fixed \(u\), the maximum is at an endpoint of \(\theta\); the remaining
+piecewise affine function has extrema at \(0,\pm A,\pm S\) when those
+points lie in the interval. Also define
+\[
+H(d)=\max\{O^2+3AS/d^2,\ 3OS/d\}.
+\]
+The negative and positive terms of \(B_{22}\) can be bounded separately,
+without summing their magnitudes. The following entrywise envelopes therefore
+cover all scalar clips and the three radial regions:
+\[
+M_1=\begin{bmatrix}3O^2&OK/a\\9AO/a&H(a)\end{bmatrix},\quad
+M_2=\begin{bmatrix}O^2&OK/a\\3AO/a&H(a)\end{bmatrix},\quad
+M_3=\begin{bmatrix}4O^2&OK/b\\9AO/b&H(b)\end{bmatrix}.
+\]
+For any vector \(z\), \(|Bz|\le M_i|z|\), hence
+\(\|D_q\Phi_e\|_2=\|B\|_2\le\|M_i\|_2\). The implemented bound is
+\[
+\boxed{L_q=\min\{L_q^{\rm sep},\max_i\|M_i\|_2\}.}
+\]
+The acceleration projection is independent of \(q\); it is already included
+through \(\sqrt{x^2+y^2}\le S\). The earlier \(L_s\) is unchanged.
+At \(q=0\) the bound follows by continuity of the extension. At switching
+surfaces generalized Jacobians are convex combinations of adjacent limiting
+Jacobians, so the same uniform norm bound applies. Equivalently, integrate
+almost-everywhere derivatives along segments, using continuity at crossings.
+This proves the global finite-increment inequality displayed above, including
+segments through zero and saturated estimates outside the physical domain.
+
+This is the integral-Jacobian version of the paper's incremental technique:
+\(\Delta\Phi_e=\int_0^1D\Phi_e(\hat z+t(z-\hat z))(z-\hat z)\,dt\).
+It does not assume that every partial derivative takes its intermediate value
+at one common point. The resulting two norm constraints are sufficient
+incremental quadratic constraints for Section 5. Entrywise sign and coupling
+information is used before norm reduction; a full sector-multiplier program
+could retain more information. No necessity or lossless S-procedure claim is
+made. The three regions are used in the proof only: no gain switching or
+unproved switched-system stability argument is introduced.
 
 For a domain including rest, let `kappaMax = sin(betaMax)/lr`. On a smooth
 constant-acceleration, constant-curvature NRMM arc with `0 < V < a`, the physical
@@ -340,7 +414,14 @@ acceleration-normalized metric, \(W_T\) and every input coefficient are divided
 by \(\omega_T^2\); physical component bounds and the structured decay condition
 are invariant under this normalization.
 
-The common rotation term contributes zero to the quadratic derivative. Applying
+Rotation equivariance gives
+\(\Phi_e(Rq,Rs)=R\Phi_e(q,s)\) for every planar rotation \(R\).
+The invariant metric \(P\otimes I_2\) commutes with
+\(\mathcal J=I_3\otimes J\), and
+\(\mathcal J^T(P\otimes I_2)+(P\otimes I_2)\mathcal J=0\).
+Thus arbitrary common measured rotation contributes exactly zero to the
+quadratic derivative; its magnitude is not charged as a Lipschitz penalty.
+Applying
 Young inequalities separately to the velocity and acceleration sensitivities
 of \(\Delta\Phi_e/\omega_T^2\) yields the sufficient condition
 \[
@@ -375,9 +456,45 @@ c_{Tv}=\sqrt{P_{11}},\quad c_{T\rho}=\omega_T\sqrt{\ell^TP\ell},
 \]
 \[
 c_{Tj}=\sqrt{P_{33}}/\omega_T^2,\quad
-c_{T\omega}=\sqrt{h_T^T|P|h_T},\quad
 \bar d_T=c_{T\omega}\varepsilon_\omega+c_{T\rho}\varepsilon_\rho+c_{Tj}\varepsilon_j.
 \]
+The separated-domain gyro bound is
+\(c_{T\omega}^{\rm sep}=\sqrt{h_T^T|P|h_T}\). It allows impossible simultaneous
+extrema of the inner products between \(\rho,q,s\). Instead use the same gyro
+error once, in the column
+\(-[J\rho,Jq/\omega_T,Js/\omega_T^2]^T\). By rotation invariance and the true
+NRMM geometry, take \(q=[V,0]^T\), \(s=[A,V\Omega]^T\). Maximizing over
+\(\|\rho\|\le R\) gives the exact squared norm
+\[
+\begin{aligned}
+F(V,A,\Omega)={}&P_{11}R^2+P_{22}V^2/\omega_T^2
+ +P_{33}(A^2+V^2\Omega^2)/\omega_T^4+2P_{23}VA/\omega_T^3\\
+ &+2R\sqrt{(P_{12}V/\omega_T+P_{13}A/\omega_T^2)^2
+                 +(P_{13}V\Omega/\omega_T^2)^2}.
+\end{aligned}
+\]
+For fixed other arguments this is convex in \(V\) and in \(A\), and
+nondecreasing in \(|\Omega|\). Therefore its maximum on the declared box is
+at \(V\in\{V_{\min},b\}\), \(A\in\{-A_{\max},A_{\max}\}\),
+\(|\Omega|=O_{\max}\). Define
+\[
+\boxed{c_{T\omega}=\min\left\{c_{T\omega}^{\rm sep},
+ \sqrt{\max_{V\in\{V_{\min},b\},\ A=\pm A_{\max}}F(V,A,O_{\max})}\right\}.}
+\]
+The box relaxes the additional sideslip relation \(|\Omega|\le
+V\sin(\beta_{\max})/l_r\); this only enlarges the set. At zero speed the
+box also permits extra acceleration directions, so it remains an outer set
+for stationary truth. The separated bound still applies if an independently
+specified acceleration-norm cap is smaller than the box norm cap; the minimum
+of the two valid bounds remains valid. The stored maximizing state pertains
+to the relaxed box, not necessarily to that intersection.
+`nrmmObserverCertificate("targetGyro", ...)` evaluates the four corners using
+a Cholesky metric norm. Gain synthesis uses \(R=\bar\rho\); sampled propagation
+uses its certified interval range bound. General initial-error and numerical
+defect vectors do not satisfy \(q^Ts=VA\), so their existing absolute-metric
+enclosures are deliberately retained. Radar noise likewise remains one shared
+two-dimensional input through the entire injection vector.
+
 Then
 \[
 D^+W_T\le-\lambda_TW_T+c_{Tv}\|e_v\|+\bar d_T,
@@ -419,8 +536,25 @@ x_T=[\rho^T,q^T,s^T]^T.
 \]
 A joint support-function or composite Lyapunov calculation must keep this
 column: its directional contribution is the absolute value of a sum, before
-any triangle inequality. The simple triangular norm certificate above exploits
-within-velocity cancellation and does not claim all cross-stage cancellations.
+any triangle inequality. For dual directions \(a_v\in\mathbb R^2\) and
+\(a_T\in\mathbb R^6\), its exact support is
+\[
+\varepsilon_\omega\left|a_v^T(k_vl_Eg(\zeta)-Jv)
+ -a_T^T(S_T\otimes J)x_T\right|.
+\]
+Separate absolute values give only an upper bound. The implemented triangular
+certificate exploits cancellation within the velocity stage and the shared
+NRMM target column of Section 5. It still separates the two stage norms and
+does not claim cross-stage cancellation. Exploiting the displayed support in
+a joint metric would require a new joint dissipation and sampled-predictor
+certificate, including the separate force-balance measurement branch.
+
+For fixed metric, gains and domains the refined \(L_q\) and gyro coefficient
+never exceed their separated predecessors. The previous dissipation inequality
+therefore remains feasible and its ultimate bound cannot increase when only
+these coefficients are substituted. After optimizing a new shape and metric,
+neither globally optimal bounds nor uniformly improved noisy trajectories
+follow; those are separate numerical comparisons.
 
 ## 7. Explicit gain-selection preference and position output
 
