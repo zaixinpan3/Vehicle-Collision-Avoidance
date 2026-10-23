@@ -174,8 +174,8 @@ uncertain branches have exited.
 
 The controller consumes the estimator's current certified enclosures. Its
 observer derivation remains in
-[OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md) and
-[MODEL_AIDED_ESTIMATION.md](../estimator/MODEL_AIDED_ESTIMATION.md).
+[OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md), including
+the shared-model force-balance measurement and its ego error bound.
 For the continuous cascade, write
 
 $$

@@ -12,39 +12,41 @@ Sharma, Alai, and Rajamani, *Simultaneous ego-vehicle state estimation and vehic
 trajectory tracking using a multistage high gain observer*, Transportation
 Research Part C 182 (2026), 105411,
 [DOI](https://doi.org/10.1016/j.trc.2025.105411). The existing NRMM coordinate
-and extension derivations are retained. The ego redesign preserves the bounded
-single-track mismatch assumption and combines repeated gyro errors before
-bounding their effect.
+and extension derivations are retained. The kinematic ego branch preserves its
+bounded single-track mismatch assumption and combines repeated gyro errors
+before bounding their effect. The shared-model branch uses force balance instead.
 
-The claims are fewer assumptions for core stability, one fewer upstream error
-state, and smaller disturbance certificates under the comparison conditions in
-Section 8. They are not claims of uniformly better estimation trajectories.
-The vector-Jacobian refinement in Sections 2 and 5 draws on Sharma, Zemouche,
-and Rajamani, *Observer Design for Vector Nonlinear Systems With Applications
-to Autonomous Vehicles and Robots*, International Journal of Robust and
-Nonlinear Control (2026), [DOI](https://doi.org/10.1002/rnc.70732): Lemma 1,
-Theorem 1 (13), Corollary 2 (26), and the scaling construction (33)--(35).
-We specialize their incremental analysis to the retained covariant chain.
-The analytic matrix enclosure and the correlated NRMM gyro bound below are
-derived here, not results asserted by that paper. They change certificates and
-synthesized gains, while preserving the observer states and vector field.
-All continuous-time error bounds apply throughout time. The separate sampled
-realization and its hold-error assumptions are described in
-[NRMM_IMPLEMENTATION_NOTES.md](../report/NRMM_IMPLEMENTATION_NOTES.md).
-With the controller's vehicle model and held input, the lateral component of
-the velocity measurement of Section 3 is replaced by a force-balance inversion
-with its own certified radius; see
-[MODEL_AIDED_ESTIMATION.md](MODEL_AIDED_ESTIMATION.md). Sections 3, 4 and 8
-describe the kinematic branch, which is used without that model.
-A paired synthetic comparison against a reproduction of the Sharma multistage
-observer (`sharmaMultistageObserver.m`: design, sampled runtime and companion-form
-map) is recorded in
-[OBSERVER_SHARMA_COMPARISON_20260924.md](../report/OBSERVER_SHARMA_COMPARISON_20260924.md);
-it measures sampled trajectories, not the certificates above, and predates
-the current target gains. The comparison with reference gains tuned per
-scenario is in
-[TARGET_NOISE_SHAPE_GAINS_20261001.tex](../report/TARGET_NOISE_SHAPE_GAINS_20261001.tex).
+The vector-Jacobian analysis draws on Sharma, Zemouche, and Rajamani,
+*Observer Design for Vector Nonlinear Systems With Applications to Autonomous
+Vehicles and Robots*, International Journal of Robust and Nonlinear Control
+(2026), [DOI](https://doi.org/10.1002/rnc.70732): Lemma 1, Theorem 1 (13),
+Corollary 2 (26), and the scaling construction (33)--(35). The analytic matrix
+enclosure and correlated NRMM gyro bounds below are project-specific
+specializations; they preserve the observer states and vector field.
 
+This is the single current observer theory document. It includes both the
+shared-model force-balance measurement used by the closed-loop adapter and
+the kinematic measurement used when that model or held input is unavailable.
+Their ego disturbance bounds differ; the target certificate and triangular
+cascade accept either valid ego bound. Smaller conditional certificates do
+not establish uniformly better noisy trajectories.
+
+The derivation follows the target model, its global extension, ego measurement
+and error dynamics, target dissipation, and the combined ISS bound. The final
+sections cover yaw/output reconstruction and the sampled realization.
+
+- [Target model and global extension](#target-model): Sections 1--2.
+- [Ego measurements and certificates](#ego-measurement): Sections 3--4;
+  the force-balance branch is in Sections 3.1 and 4.1.
+- [Target observer and ISS cascade](#target-observer): Sections 5--7.
+- [Conditional comparison](#kinematic-comparison): Section 8.
+- [Yaw and inertial outputs](#yaw-output): Section 9.
+- [Assumptions and limitations](#scope): Section 10.
+- [History, initialization and digital enclosure](#sampled-realization):
+  Sections 11--12.
+- [Implementation map and existing validation](#implementation-map): Section 13.
+
+<a id="target-model"></a>
 ## 1. Retained model and covariant chain
 
 Let `J = [0,-1;1,0]`, `R(psi)` denote a planar rotation, and
@@ -69,6 +71,17 @@ V=\|q\|,\quad A=\frac{q^Ts}{V},\quad
 \Omega=\frac{(Jq)^Ts}{V^2},\qquad
 \Phi=-\Omega^2q+3A\Omega J\frac qV.
 \]
+
+To derive the last row, let \(e=q/V\), \(\Omega=\kappa V\), and
+\(\nabla_{\omega_E}e=\Omega Je\). Constant \(A\) and \(\kappa\) give
+\(\dot V=A\), \(\dot\Omega=\kappa A=A\Omega/V\), and
+\[
+s=Ae+V\Omega Je,\qquad
+\nabla_{\omega_E}s=-V\Omega^2e+3A\Omega Je=\Phi(q,s).
+\]
+The factor three combines rotation of \(Ae\) and differentiation of
+\(V\Omega Je\). This derivation applies on a smooth positive-speed arc;
+the extension at rest is treated separately below.
 
 These are the same NRMM dynamics in physical, covariant companion coordinates.
 For example, `q = rhoDot + vE + omegaE*J*rho`. Using this chain avoids
@@ -347,7 +360,8 @@ separate hybrid transition. This finite-jerk argument does not certify that
 jump or a differentiation window spanning it; it is not needed for a target
 that is stationary throughout the observation and prediction interval.
 
-## 3. Direct forward-cone velocity measurement
+<a id="ego-measurement"></a>
+## 3. Ego velocity measurements
 
 Let
 \[
@@ -365,7 +379,7 @@ Acceleration must have the physical meaning above; compensation, calibration,
 and residual bias errors belong in its error bound. No derivative of a measured
 signal, measurement error, or kinematic mismatch is required by the core.
 
-Retain the bounded-mismatch relation and true forward cone
+The kinematic branch assumes the bounded-mismatch relation and true forward cone
 \[
 \omega_E=v_y/l_E+d_{\rm st},\quad |d_{\rm st}|\le\delta_{\rm st},\quad l_E>0,
 \]
@@ -394,7 +408,82 @@ The observer implemented by `nrmmObserverVectorField("derivative", ...)` is
 \]
 `nrmmObserverVectorField("velocityMeasurement", ...)` implements the algebraic map.
 
-## 4. Exact common-error dynamics and explicit velocity certificate
+### 3.1 Shared-model force-balance measurement
+
+The controller adapter supplies its vehicle model, the applied held steering
+\(\delta\), and signed longitudinal force ratio \(\xi\in[-1,1]\).
+`config/estimatorConfigurationFromController.m` derives the ego speed,
+yaw-rate, acceleration and sideslip domains from the controller configuration.
+The model branch applies above the controller's kinematic blending range;
+it does not certify the different low-speed blended plant equations.
+
+With fixed mass \(m\), axle distances \(l_f,l_r\), normal loads
+\(F_{zf}=mg l_r/(l_f+l_r)\), \(F_{zr}=mg l_f/(l_f+l_r)\), and
+\(v_x=\sqrt{V^2-w^2}>0\), lateral force balance is
+\[
+\begin{aligned}
+G(w;V,r,C,\mu,\delta,\xi)
+ &=\xi\mu_fF_{zf}\sin\delta
+   +F_{yf}(\alpha_f)\cos\delta+F_{yr}(\alpha_r)=m a_y,\\
+\alpha_f&=\operatorname{atan2}(w+l_fr,v_x)-\delta,\qquad
+\alpha_r=\operatorname{atan2}(w-l_rr,v_x).
+\end{aligned}
+\]
+For axle \(i\), let \(K_i=\mu_iF_{zi}\sqrt{1-\xi^2}\). The modified Fiala law is
+\[
+F_{yi}(\alpha)=
+\begin{cases}
+-C_i\tan\alpha\,(1-z+z^2/3),&K_i>0,\ |\tan\alpha|<3K_i/C_i,\\
+-K_i\operatorname{sign}(\alpha),&\text{otherwise},
+\end{cases}
+\quad z=\frac{C_i|\tan\alpha|}{3K_i}.
+\]
+This is the law used by `modifiedFialaTire.m` and the estimator's local force
+calculation. The default relative uncertainty is 5% in stiffness and friction;
+mass, inertia and geometry are fixed in this inversion.
+
+Let \(V_- = M-\varepsilon_G\), \(V_+=M+\varepsilon_G\), and assume
+\(V_->0\). At a candidate lateral speed \(w\), the forward-cone speed interval is
+\[
+V\in[\max\{V_-,|w|/\sin b\},V_+],\quad
+r\in[u-\varepsilon_\omega,u+\varepsilon_\omega],\quad
+(C_i,\mu_i)\in[(1-\eta)(C_{i0},\mu_{i0}),
+                 (1+\eta)(C_{i0},\mu_{i0})].
+\]
+Here \(\eta=0.05\) by default; at \(b=0\) the cone forces \(w=0\).
+The implementation evaluates 16 rate/speed/stiffness/friction corners per
+axle and adds the separate longitudinal-force range. Taking per-axle extrema
+separately relaxes their shared variables and therefore gives an outer bound,
+provided the corner extrema cover the admitted branch of each force map.
+Denote the resulting total force bounds by \(G_{\min},G_{\max}\). Every
+admissible lateral speed must satisfy
+\[
+G_{\min}(w)\le m(a_{m,y}+\varepsilon_a),\qquad
+G_{\max}(w)\ge m(a_{m,y}-\varepsilon_a),\qquad |w|\le V_+\sin b.
+\]
+The interval search uses monotonicity of these envelopes in \(w\). Its corner
+and bisection argument requires the corresponding force monotonicities on
+the declared steering/slip/speed domain; the Fiala formula alone is not a
+proof of those properties on arbitrary enlarged domains or across tangent
+singularities. The implementation uses ordinary floating-point bisection to
+\(10^{-5}\) m/s, without directed-rounding certification.
+
+Write the returned interval as \([w_-,w_+]\). An empty interval invalidates
+the ego enclosure. Normally the point value \(w_m\) solves nominal force
+balance using the measurements; if that solve fails or lies outside the
+interval, the code uses its midpoint. In either case it publishes
+\[
+\rho_w=\max\{w_m-w_-,w_+-w_m\},\qquad
+ y_v=[\phi(M,w_m),w_m]^T.
+\]
+Near saturation the force slope can vanish: a unique inverse is unnecessary,
+and the interval widens rather than supplying an unjustified small radius.
+If speed information is uninformative, the code retains the full cone interval
+with center zero. Without the shared model or held input, it uses Section 3's
+kinematic branch. That branch requires its own single-track mismatch bound;
+a small mismatch cannot be inferred from dynamic tire slip.
+
+## 4. Kinematic common-error dynamics and explicit velocity certificate
 
 On the unfloored branch, the derivatives of \(\phi\) are
 \((\partial_V\phi,\partial_w\phi)=(\sec\theta,-\tan\theta)\),
@@ -481,6 +570,41 @@ throughout the cone. Optional state-free scheduling
 \(k_v(t)=\max(k_{\min},y_x(t)/l_E)\) preserves uniform homogeneous decay
 without a gain-derivative bound. The implementation uses a fixed gain.
 
+### 4.1 Ego certificate for the force-balance branch
+
+Use the same observer equation, but replace \(l_Eu\) in the measurement by
+\(w_m\). For \(|w_m-v_y|\le\rho_w\), the global derivative bounds of \(\phi\)
+give, even across the floor branch,
+\[
+|y_x-v_x|\le\sec b\,\varepsilon_G+\tan b\,\rho_w,
+\quad |y_y-v_y|\le\rho_w,
+\]
+\[
+\|y_v-v\|^2\le(\sec b\,\varepsilon_G+\tan b\,\rho_w)^2+\rho_w^2
+ \le\sec^2 b\,(\varepsilon_G+\rho_w)^2.
+\]
+The last inequality uses \(\tan b\le\sec b\) and
+\(1+\tan^2b=\sec^2b\). Substitution gives
+\[
+\dot e_v=(-k_vI-uJ)e_v+n_a-n_\omega Jv+k_v(y_v-v),
+\]
+\[
+D^+\|e_v\|\le-k_v\|e_v\|+d_v^{\rm model},\qquad
+ d_v^{\rm model}=\varepsilon_a+\varepsilon_\omega\overline V_E
+              +k_v\sec b(\varepsilon_G+\rho_w).
+\]
+No independence is assumed between the force inversion and its sensor inputs.
+This bound separates their effects conservatively; Section 4's kinematic
+common-gyro cancellation and Section 8's comparison do not transfer to it.
+If \(\rho_w\le\bar\rho_w\) uniformly, its ultimate radius is
+\[
+U_v^{\rm model}=\varepsilon_a/k_v+
+ \varepsilon_\omega\overline V_E/k_v+\sec b(\varepsilon_G+\bar\rho_w).
+\]
+With a varying radius use the time-dependent comparison input instead of a
+constant ultimate value. Section 12 gives the held-measurement version.
+
+<a id="target-observer"></a>
 ## 5. Retained target observer and position-normalized certificate
 
 For \(y_\rho=\rho+n_\rho\), \(\|n_\rho\|\le\varepsilon_\rho\), retain
@@ -643,6 +767,9 @@ The complete continuous core certificate is
 H=\begin{bmatrix}-k_v&0\\c_{Tv}&-\lambda_T\end{bmatrix},\quad
  d=[d_v,\bar d_T]^T.}
 \]
+Here \(d_v\) is the forcing bound of the selected valid measurement branch
+(Section 4 or 4.1). Its corresponding ultimate radius replaces
+\(U_v^{\rm new}\) below when the force-balance branch is used.
 The Hurwitz Metzler matrix admits positive backward weights
 \(w=-H^{-T}\mathbf1\), so \(w^TH=-\mathbf1^T\). Consequently
 \(D^+(w^T\chi)\le-(w^T\chi)/\max(w)+w^Td\).
@@ -735,7 +862,8 @@ by \(\varepsilon_p+\varepsilon_G/k_p\). This choice keeps all use of the
 orientation estimate at output reconstruction. Position and sampled
 output predictors are not counted among the eight core observer states.
 
-## 8. Precise comparison with the yaw-mediated design
+<a id="kinematic-comparison"></a>
+## 8. Kinematic-branch comparison with the yaw-mediated design
 
 For \(\overline V_E>0\), \(k>0\), and \(b<\pi/2\),
 \[
@@ -788,6 +916,7 @@ actual bounds; the core theorem still applies. A smaller worst-case certificate
 does not imply better trajectories for every signal: a yaw filter can suppress
 particular noise histories.
 
+<a id="yaw-output"></a>
 ## 9. Parallel yaw observer and its orientation certificate
 
 Retain the original gyro-plus-heading observer as a parallel output estimator:
@@ -795,7 +924,8 @@ Retain the original gyro-plus-heading observer as a parallel output estimator:
 \dot{\hat\psi}_E=u+\chi_m k_\psi
  \operatorname{wrap}(h_m-\hat\psi_E),\qquad k_\psi>0.
 \]
-Here \(h_m\) is the certified kinematic course correspondence heading and
+Here \(h_m\) is the certified course correspondence heading of the selected
+measurement branch, and
 \(\chi_m=1\) only when that correspondence is informative; otherwise
 \(\chi_m=0\) and the observer propagates the measured gyro alone. The estimate
 is never reset to a measurement center or the center of an orientation set.
@@ -813,7 +943,21 @@ are separate from the body-frame core ISS theorem. The velocity innovation
 remains the direct algebraic map, and the position output still uses inertial
 GNSS velocity independently.
 
-The exact measurement consistency set is
+For the force-balance branch, enclose \(\sin\beta_E=w/V\) using all
+endpoint ratios of \([w_-,w_+]\) and \([V_-,V_+]\), then intersect with
+\([-\sin b,\sin b]\). With \(V_->0\), apply \(\arcsin\) to obtain
+\([\beta_-,\beta_+]\), set
+\[
+\hat\beta=\arcsin\!\left(\operatorname{clip}_{\sin b}(w_m/M)\right),\quad
+h_m=\arg m_I-\hat\beta,\quad
+\varepsilon_h=\arcsin(\varepsilon_G/M)
+            +\max_{\beta\in[\beta_-,\beta_+]}|\beta-\hat\beta|.
+\]
+The GNSS direction term applies when \(M>\varepsilon_G\). Inconsistent or
+uninformative inversion supplies no proper heading arc. For the kinematic
+branch, use its own course correspondence and mismatch allowance.
+
+For the kinematic branch the exact measurement consistency set is
 \[
 \mathcal Y_m=\{\psi\in S^1:\exists(v,n)\in\mathcal C_m,
 \ \|m_I-R(\psi)v\|\le\varepsilon_G\}.
@@ -858,11 +1002,15 @@ In the sampled implementation the actual RK4 yaw endpoint is used to compute
 requiring a yaw integration-defect inequality. The core has eight states; the parallel yaw observer adds one, while the independent
 position output and sampled predictors remain outside that core count.
 
+<a id="scope"></a>
 ## 10. Scope
 
-Core ISS requires the forward branch, bounded single-track mismatch, continuous
-sensor-error bounds, true target operating domain, positive gains and the target
-dissipation inequality. It requires neither an ego low-speed inversion condition,
+Core ISS requires the forward cone, continuous sensor-error bounds, the true
+target operating domain, positive gains and the target dissipation inequality.
+The kinematic measurement additionally requires its bounded single-track
+mismatch. The force-balance measurement instead requires its shared model,
+parameter bounds, applied input, applicable speed range and valid interval
+inversion, including its monotonicity premises. It requires neither an ego low-speed inversion condition,
 nor admissible raw arcsine, informative yaw arcs, yaw charts or yaw bandwidth.
 A positive inverse floor remains necessary for the Lipschitz extension, but a
 positive physical target speed is unnecessary when its regularization
@@ -871,38 +1019,166 @@ Estimated-domain audits are diagnostics, not proof that truth obeys the premises
 Sampled containment, floating-point qualifications and future prediction remain
 separate from the continuous theorem and from closed-loop collision avoidance.
 
-## 11. Measurement-history postprocessing and physical validation
+<a id="sampled-realization"></a>
+## 11. Target reconstruction, history and initialization
 
-The finite-sensing integration adds `nrmmTargetHistory` after the observer.
-Bounded-noise position secants and quadratic interpolation intersect the
-current velocity/acceleration enclosures. Gyro transport keeps the common
-absolute-heading error correlated across history samples; it does not assume
-independent deterministic sensor errors. Constant-curvature position chords
-also bound course direction by half the bounded angular sweep. The formulas
-and sampled transport allowance are in the help header of
-`nrmmTargetHistory.m`.
-All published bounds remain centered about the original NRMM point estimates.
-Neither the point-observer vector field nor its gain design changes.
+At positive admissible target speed, the observer state gives the physical
+parameters directly:
+\[
+V_T=\|q\|,\quad A_T=q^Ts/V_T,\quad
+\Omega_T=(Jq)^Ts/V_T^2,\quad
+\beta_T=\arcsin(l_{rC}\Omega_T/V_T),
+\]
+\[
+\theta_{\rm course}^I=\hat\psi_E+\arg q,\qquad
+\theta_C^I=\theta_{\rm course}^I-\beta_T.
+\]
+The implementation uses its declared inverse floor and physical clips outside
+this admissible region. A finite reconstructed value there does not establish
+observability or replace the physical domain caps of Section 1. Published
+point parameters come from the NRMM state; no separate constant-parameter
+window fit or parallel parameter-set estimator changes them.
 
-This postprocessing cannot repair a violated premise of the ego observer.
-In a dynamic bicycle, rear tire slip permits
-\(r-v_y/l_r\ne0\). A small configured mismatch is a true-motion assumption,
-not a consequence of the gyroscope or of estimated-domain consistency.
-The avoidance maneuvers violate it at 15 m/s
-(`report/ESTIMATOR_DOMAIN_20261005.tex`); the closed-loop runs therefore use
-the force-balance measurement of `MODEL_AIDED_ESTIMATION.md`.
-The simulation-only `auditNrmmTruthEnclosure` checks the true mismatch,
-speed, yaw rate, sideslip and known state-component errors at logged times.
-It never feeds truth to the observer or controller. Passing sampled checks
-does not prove continuous-time validity; a violation invalidates application
-of the corresponding conditional certificate even if all states are finite.
+`nrmmTargetHistory` intersects the component enclosures with bounded-noise
+position secants and quadratic interpolation. For example, if position
+measurements \(p_i^m\) at \(t_i<t_j\) have radii \(r_i,r_j\), acceleration is
+bounded by \(a_{\max}\), and \(\Delta=t_j-t_i\), then
+\[
+\left\|v(t_j)-\frac{p_j^m-p_i^m}{\Delta}\right\|
+ \le\frac{r_i+r_j}{\Delta}+\frac{a_{\max}\Delta}{2}.
+\]
+A later output time adds \(a_{\max}(t-t_j)\). The componentwise implementation
+also uses three-point interpolation and a physical jerk remainder. Gyro
+transport retains the common heading error across samples. Deterministic
+sensor noise is not assumed to average down. Intersections only tighten
+radii about the original NRMM point estimates; they do not reset observer
+states or alter gains. Inconsistent intersections cannot establish containment.
 
-## Scalar sampled implementation
+The adapter initializes position/velocity from the detection history and, for
+long enough windows, estimates an initial acceleration by least squares in a
+GNSS-course frame. Acquisition thresholds and fit significance rules are
+implementation choices in `scripts/`; they are not assumptions proving an
+initial small error. A valid transient certificate must use a declared initial
+prior or the full physical-domain enclosure in Section 6. An initialization
+fit alone supplies neither a deterministic radius nor a convergence theorem.
 
-The runtime has one target state `[rho; q; s]` in `R^6`, one radar-output
-predictor in `R^2`, one target comparison enclosure and one sensor-history
-record. Together with ego velocity, position, the GNSS-output predictor and
-yaw, the packed RK4 state is a fixed 15-vector. Time substeps and historical
-samples remain sequences. No target axis, count or radar association step is
-present. The controller receives one optional `targetEstimate` with its
-state-time enclosures (`nrmmControllerErrorBounds.m`).
+The simulation-only truth audit checks true motion and state errors at logged
+times. It never feeds truth to the observer or controller. Passing those
+checks does not prove continuous containment; a violated premise invalidates
+application of the corresponding conditional certificate.
+
+## 12. Sampled realization and numerical containment
+
+The runtime integrates a fixed 15-vector: ego velocity (2), target state (6),
+ego position (2), parallel yaw (1), GNSS-output predictor (2) and radar-output
+predictor (2). The continuous ISS core contains only the first eight states.
+There is one target and no radar association axis. Gain synthesis does not use
+the sample period; sampled containment needs the additional bounds below.
+
+### 12.1 Held ego measurements
+
+At age \(\tau\) after a sample, let \(a_{\rm env}\) bound true acceleration,
+\(\epsilon_\omega(\tau)\) bound held-gyro error, and
+\(\epsilon_a(\tau)\) bound held-acceleration error. The configured acceleration
+and yaw-acceleration envelopes control their growth; sensor-error bounds at
+the sample alone cannot do so. For the force-balance branch set
+\[
+\begin{aligned}
+d_S&=\min\{\overline V_E+M,\varepsilon_G+a_{\rm env}\tau\},\\
+d_W&=\rho_w+
+ [a_{\rm env}+(|u|+\epsilon_\omega(\tau))
+            \min\{\overline V_E,M+d_S\}]\tau.
+\end{aligned}
+\]
+Since \(|\dot V|\le\|a\|\) and
+\(|\dot v_y|=|a_y-\omega_Ev_x|\le\|a\|+|\omega_E|\|v\|\),
+\[
+\|y_v(t_k)-v(t)\|\le\sec b(d_S+d_W),\qquad
+ d_v=\epsilon_a(\tau)+\epsilon_\omega(\tau)\overline V_E
+        +k_v\sec b(d_S+d_W)+\delta_v.
+\]
+Here \(\delta_v\) encloses numerical defect. The kinematic branch uses the
+common-gyro certificate with the corresponding aged sensor bounds.
+
+### 12.2 Predictor, correction and dropout comparisons
+
+The radar predictor \(\hat y\) resets to a detection and between updates obeys
+\(\dot{\hat y}=\hat q-\hat v-uJ\hat y\). Its error to true \(\rho\) is
+bounded by \(B_y\), with reset \(B_y\le\varepsilon_\rho\). When correction
+is enabled, the observer injects \(\hat y-\hat\rho\). For
+\(c_q=\omega_T\sqrt{(P^{-1})_{22}}\), the implemented comparison is
+\[
+D^+\begin{bmatrix}B_v\\W_T\\B_y\end{bmatrix}\le
+\begin{bmatrix}-k_v&0&0\\c_{Tv}&-\lambda_T&c_{T\rho}\\1&c_q&0\end{bmatrix}
+\begin{bmatrix}B_v\\W_T\\B_y\end{bmatrix}
++\begin{bmatrix}d_v\\c_{T\omega}\epsilon_\omega+c_{Tj}\varepsilon_j+\delta_T\\
+ \bar\rho\epsilon_\omega+\delta_y\end{bmatrix}.
+\]
+The additional predictor state prevents interpreting the continuous two-stage
+Hurwitz comparison as an unconditional sampled stability result. The runtime
+propagates finite-time radii; it does not assert that this matrix is Hurwitz.
+
+During radar dropout the innovation is disabled. The comparison then uses
+component radii \((B_\rho,B_q,B_s)\), with no negative target decay term:
+\[
+D^+B_\rho\le B_v+B_q+\bar\rho\epsilon_\omega+\delta_\rho,\quad
+D^+B_q\le B_s+\bar V_T\epsilon_\omega+\delta_q,
+\]
+\[
+D^+B_s\le L_qB_q+L_sB_s+\bar a_T\epsilon_\omega
+                  +\varepsilon_j+\delta_s.
+\]
+The predictor retains its corresponding growth bound. Indefinite dropout
+does not inherit the continuous correction-mode convergence rate.
+
+### 12.3 Numerical defect and the controller interface
+
+For accepted RK4 endpoints \(x_0,x_1\), define the line
+\(\tilde x(t)=x_0+(t-t_0)(x_1-x_0)/h\). Its defect is
+\[
+d_{\rm num}(t)=\dot{\tilde x}(t)-f(\tilde x(t),\text{held inputs}).
+\]
+`nrmmPositionErrorBound` encloses this defect using exact affine-row variation
+and \(L_q,L_s\) for the nonlinear row. Adding its component or metric bounds
+to the comparison inputs certifies the numerical endpoints in real arithmetic,
+without assuming an unbounded-order RK4 truncation estimate. Nonnegative
+comparison systems are propagated by a matrix exponential with forcing;
+physical-domain intersections can tighten them. Ordinary floating-point
+guards do not constitute interval-arithmetic verification.
+
+`nrmmControllerErrorBounds.m` publishes state-time body/inertial enclosures
+for one optional `targetEstimate`. Future prediction additionally requires
+the target motion contract and the controller's joint uncertainty model.
+Unknown true tire parameters persist along a prediction branch; their effects
+on plant motion, measurements and observer updates share one source. Adding
+an independent observer-error disturbance after propagating those effects
+would count them twice. See
+[the joint prediction derivation](../controller/CONTROLLER_THEORY.md#joint-prediction).
+A current-state observer enclosure alone is not a collision-avoidance theorem.
+
+<a id="implementation-map"></a>
+## 13. Implementation map and existing validation
+
+| Mathematical role | Implementation |
+|---|---|
+| Ego and parallel yaw vector fields | `nrmmObserverVectorField.m` |
+| Force-balance interval and course correspondence | `nrmmEgoCourseGeometry.m` |
+| NRMM extension and physical reconstruction | `nrmmTargetTrackerDerivative.m` |
+| Analytic vector-Jacobian enclosure | `nrmmTargetJacobian.m` |
+| Lipschitz, gyro and ISS coefficients | `nrmmObserverCertificate.m` |
+| Continuous gain/metric synthesis | `synthesizeNrmmObserverGains.m` |
+| Orientation-set propagation and intersections | `nrmmYawSet.m` |
+| Sensor-history intersections | `nrmmTargetHistory.m` |
+| Sampled comparison and numerical defects | `nrmmPositionErrorBound.m` |
+| Integration and published estimates | `onlineNrmmTrackingRuntime.m` |
+| Controller-facing state enclosures | `nrmmControllerErrorBounds.m` |
+
+Existing behavior tests in `tests/` cover model-aided interval containment,
+nominal inversion, contradictory measurements and shared configuration
+(`nrmmModelAidedEstimationTest.m`), true-domain audits
+(`nrmmTruthEnclosureAuditTest.m`), and the sampled runtime
+(`onlineNrmmTrackingRuntimeTest.m`). These tests exercise specified cases;
+they do not replace the analytic premises or certify arbitrary parameter boxes.
+Dated experiments remain in `report/` and Git history, separate from this
+current derivation. This consolidation changes documentation only and adds
+no new simulation or performance result.
