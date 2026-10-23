@@ -101,208 +101,108 @@ robust model predictive control, vehicle state estimation.
 to travel within a designated lane at a prescribed speed without
 continuous steering or speed corrections by the driver
 \cite{WeiPfefferEdelmann2024,XuGrizzleTabuadaAmes2018}.
-This system alone, however, does not
-provide the evasive response needed when a nearby vehicle poses a
-collision threat, and timely driver intervention may still be required
-\cite{ChengLiLiuLiGuo2021}. Integrating this system
-with vehicle collision avoidance has therefore attracted sustained research interest.
+When a nearby vehicle poses a collision threat, the system must also
+support an evasive response \cite{ChengLiLiuLiGuo2021}. The ego vehicle
+may need to depart from its nominal lane and speed, coordinate steering
+and braking, and recover normal travel after the threat has passed.
+Integrating these behaviors requires a safety argument that accounts for
+both the available vehicle maneuvering capability and uncertainty in the
+motion of the surrounding vehicle.
 
-Extensive research has addressed vehicle collision avoidance and its
-integration with lane keeping. For example, field-based methods have
-been used to generate evasive reference trajectories. Cheng \emph{et al.}
-develop a virtual fluid-flow model that combines flow between lane
-boundaries with flow around a cylindrical obstacle, and use an
-optimal-preview steering controller to track the resulting path
-\cite{ChengLiLiuLiGuo2021}. Wang \emph{et al.} reshape obstacle repulsion
-into an ellipse using a driving-risk model and introduce virtual target
-points to escape potential-field local minima
-\cite{WangGaoLiSunCheng2019}. However, these methods do not provide
-theoretical safety guarantees. One common way to obtain such guarantees
-is through control barrier functions (CBFs), which constrain the control
-input to keep trajectories starting in a prescribed safe set inside that
-set \cite{AmesXuGrizzleTabuada2017}. This forward-invariance property
-provides a theoretical safety guarantee. A reactive constraint based
-only on present separation, however, is not automatically a valid CBF
-for a nonholonomic vehicle with bounded actuation. The geometric
-collision-free set includes states whose heading and velocity make
-collision unavoidable within the available steering and braking limits.
-For acceleration- or force-controlled vehicle models, an inward-moving
-state on the separation boundary has a negative clearance derivative
-that the current input cannot change. A position-only clearance function
-therefore fails the first-order CBF condition on that full geometric
-state set \cite{AmesXuGrizzleTabuada2017,XiaoBelta2022}.
-Higher-order CBFs expose the effect of control through successive
-separation derivatives and restrict the certified initial set accordingly,
-while still requiring
-compatibility with admissible inputs \cite{XiaoBelta2022}.
-Velocity-dependent constructions also incorporate the approach geometry:
-collision-cone barriers exclude collision-producing relative-velocity
-directions, but the construction in \cite{TayalEtAl2026} assumes
-unlimited control authority and reports saturation-related hardware
-failures in high-speed corner cases. Input-constrained CBFs explicitly
-address limited authority by further restricting the candidate safe set.
-For example, the lane-deformation design in
-\cite{BruggemannSteevesKrstic2022} adds derivative constraints that
-account for bounded steering, although their validity still requires
-an additional bounded-input admissibility condition whose verification
-the authors identify as difficult.
-These constructions make clear that the barrier must encode a set in
-which admissible avoidance actions remain available. Pointwise
-feasibility does not ensure that admissible controls will remain
-available as the maneuver evolves. Prediction offers a way to assess
-future conflicts: discrete-time CBF constraints can be
-imposed throughout a model predictive control (MPC) horizon
-\cite{ZengZhangSreenath2021}, while future-focused barriers use
-predicted closest separation and relaxed virtual clearance constraints
-\cite{BlackJankovicSharmaPanagou2023}. However, the cited formulations
-leave persistent feasibility or a theoretical feasibility guarantee open
-\cite{ZengZhangSreenath2021,BlackJankovicSharmaPanagou2023}.
-A further step is to derive the barrier from the predictive optimization
-itself, so that the dynamics, input constraints and a safe terminal
-continuation enter its construction. Wabersich and Zeilinger construct
-a predictive CBF from an optimal constraint-relaxation cost, using
-progressive constraint tightening and a terminal CBF to ensure decrease
-and recovery of a safe feasible set \cite{WabersichZeilinger2023}.
-The tightening restricts its zero-level safe set relative to the
-untightened safety filter. Huang \emph{et al.} remove this tightening
-and minimize accumulated state-constraint slack subject to admissible
-inputs and a hard invariant terminal-set constraint
-\cite{HuangWangMargellosGoulart2025}. Shifting the previous optimal
-plan and appending an admissible terminal action preserves feasibility
-and makes the optimal slack cost nonincreasing. This value function is
-a predictive control barrier function (PCBF), whose zero-level set is
-safe and invariant on the feasible domain. This construction provides
-the predictive safety framework adopted here. However, it assumes a known
-current state, fixed constraints and a fixed terminal set, and does not
-address moving vehicles whose states are estimated online. Applying it
-here requires accounting for estimation error and successive forecast
-revisions while preserving feasibility of the shifted plan and its
-terminal continuation.
+Collision avoidance requires admissible actions throughout the maneuver.
+Control barrier functions (CBFs) provide a framework for enforcing
+forward invariance of a prescribed safe set
+\cite{AmesXuGrizzleTabuada2017}. For a vehicle with bounded actuation,
+however, collision-free geometry alone does not establish that an
+avoidance action exists: heading, velocity and control limits determine
+whether separation can be maintained
+\cite{AmesXuGrizzleTabuada2017,XiaoBelta2022}.
+Predictive control barrier functions (PCBFs) incorporate dynamics, input
+constraints and a safe terminal continuation into a finite-horizon
+optimization \cite{WabersichZeilinger2023,HuangWangMargellosGoulart2025}.
+For an uncertain moving vehicle, the central challenge is to preserve
+feasibility of this predictive problem as new measurements revise the
+estimated state and its forecast.
 
-A separate modeling issue concerns the maneuvering capability represented
-by the vehicle model and its control inputs. Steering-only designs
-include the field-based tracker \cite{ChengLiLiuLiGuo2021}, shared MPC
-that balances path tracking against the driver's steering command
-\cite{LiangYinNie2021}, and the lane-deformation filter
-\cite{BruggemannSteevesKrstic2022}. The latter two designs also fix
-longitudinal speed \cite{LiangYinNie2021,BruggemannSteevesKrstic2022}.
-These restrictions leave steering--braking coordination unresolved.
-During a combined evasive maneuver, braking changes speed and the
-subsequent lateral response, while longitudinal and lateral tire forces
-share finite friction capacity \cite{GuoHuWang2016,BealBoyd2019}.
-A fixed-speed prediction cannot assess braking-induced changes in
-turning response, and independent force limits can admit jointly
-unattainable demands. Coordinated designs address this physical
-coupling through nonlinear backstepping with adaptive fuzzy sliding-mode
-control for path and speed tracking \cite{GuoHuWang2016}, or through
-numerical optimization of steering, braking ratio and sampling interval
-on a coupled four-wheel model with modified Fiala tires
-\cite{FahmyGhanyBaumann2018}. These methods also lack a theoretical
-guarantee of collision avoidance against an uncertain moving target.
-A safety guarantee for the combined evasive maneuvers considered here
-must therefore account for coupled dynamics and joint control feasibility.
+The prediction must also represent the physical coupling of steering and
+braking. Braking changes speed and the subsequent lateral response,
+while longitudinal and lateral tire forces share finite friction
+capacity \cite{BealBoyd2019}. A fixed-speed prediction cannot assess
+these changes, and independent force limits can admit jointly
+unattainable demands. The avoidance controller therefore needs a coupled
+vehicle model and admissible controls that respect this shared capacity,
+together with a recovery objective for lane keeping and cruise control.
 
-A further issue concerns the target-state information on which the
-safety constraints depend. Rule-based lane-change control combines a
-finite-state machine for changing or aborting with quadratic programs
-using time-headway and braking-distance barriers
-\cite{HeZengZhangSreenath2021}, but assumes accurate, delay-free
-surrounding-state data. Perfect vehicle-position estimates are likewise
-assumed in the racing example of \cite{ZengZhangSreenath2021}.
-These assumptions leave estimation error outside the safety argument,
-although evasive ego motion changes the relative dynamics observed by
-onboard sensors. Rajamani and co-workers showed that tracking another
-vehicle from a maneuvering car requires a relative motion model that
-accounts for the ego vehicle's own motion
-\cite{JeonZemoucheRajamani2019,AlaiZemoucheRajamani2024,
-AlaiSharmaAlexanderRajamani2024}, and Sharma \emph{et al.} built a
-multistage high-gain observer on such a nonlinear relative motion model
-(NRMM) and validated it on a full-scale vehicle
-\cite{SharmaAlaiRajamani2026}. Their observer, however, differentiates
-the ego kinematics into companion coordinates and assumes constant
-measured body acceleration and yaw rate, which an evasive maneuver can
-violate. The paper establishes nominal exponential convergence and a
-yaw-estimation $H_\infty$ condition, but does not derive an error bound
-for the complete ego--target estimation cascade under sensor and model
-errors \cite{SharmaAlaiRajamani2026}. These results do not directly
-supply the uncertainty enclosure needed for collision avoidance: the
-NRMM observer uses estimated ego motion, so upstream errors propagate
-into the target-state estimate, and safety must hold during the initial
-estimation transient as well as afterward. A cascade input-to-state
-stability (ISS) analysis offers a systematic way to derive time-dependent
-error bounds from initial errors, sensor disturbances and model mismatch.
-The predictive collision-avoidance argument
-must therefore connect maneuver-compatible target estimation and
-explicit error bounds to the coupled vehicle model, admissible controls
-and preservation of feasibility under successive information updates.
+The state information used by the controller introduces a further
+coupling. During an evasive maneuver, the ego vehicle's own motion
+changes the relative dynamics observed by onboard sensors, motivating
+motion models that explicitly account for that motion
+\cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
+Because target tracking uses estimated ego states, upstream errors also
+propagate into the target estimate. A safety argument must account for
+these errors during the estimation transient and as measurements arrive.
+This motivates a joint design in which maneuver-compatible estimation
+supplies explicit error enclosures and the predictive controller
+preserves their validity under successive information updates.
 
-This paper combines maneuver-compatible state estimation with predictive
-collision avoidance. The estimator keeps Sharma's NRMM
-but not its differentiated ego coordinates, so that measured
-acceleration and yaw rate stay exogenous inputs and nothing is
-differentiated; it remains valid during the ego's own maneuvers, carries
-a cascade ISS certificate, and publishes with
-every estimate a bound on its error. The controller is a PCBF applied to
-vehicle collision avoidance on a dynamic bicycle with modified Fiala
-tires. Safety comes first, through a terminal set built from the
-obstacle's own predicted motion and one braking maneuver of the ego: past
-the horizon the obstacle keeps its forecast and the ego brakes to rest
-with its steering held, and an endpoint is terminal when that joint
-continuation stays on the road and clears the obstacle until it has left
-the sensing range. Lane keeping, cruise control, and post-avoidance
-recovery come second, through a quadratic control Lyapunov function (CLF) certified for a
-cruise law on the sampled nonlinear model. The two parts are designed for
-each other. The estimator measures the lateral velocity through the
-lateral force balance of the controller's own tire model under the input
-the controller holds; the controller keeps the car inside the sideslip
-cone used by the inversion; saturated tire forces can widen the
-measurement interval, and the estimator's enclosure tightens the
-controller's constraints.
+This paper develops such a joint estimator--controller design for
+lane keeping and cruise control with vehicle collision avoidance.
+The estimator retains the nonlinear relative motion model (NRMM) in
+\cite{SharmaAlaiRajamani2026}, treats measured ego acceleration and yaw
+rate as exogenous inputs, and publishes an error enclosure based on a
+cascade input-to-state stability (ISS) certificate.
+The controller predicts with a dynamic bicycle model and modified Fiala
+tires. A PCBF stage prioritizes collision avoidance, with a terminal
+continuation combining the obstacle forecast and an ego braking law;
+a subsequent control Lyapunov function (CLF) stage pursues lane keeping,
+cruise control and recovery. The two components share the tire model:
+its lateral force balance provides a model-aided velocity measurement,
+and the controller enforces the domain needed for that inversion while
+using the estimator's enclosure to tighten its constraints.
 
-The mathematical link between the certificates is developed in
-Section~\ref{subsec:robust}. One joint nonlinear prediction includes the
-physical states, future measurements, observer updates and causal control
-laws, with the same model-mismatch realization entering all affected
-equations. Intersecting the next enclosure with the old reachable set
-preserves the information needed to shift the policy and retain its tube
-certificates. A common admissible zero-slack terminal continuation closes
-the proof. Under the declared uncertainty contracts and initial feasibility,
-the resulting mathematical problem is recursively feasible; executing a
-primary minimizer also makes the optimal relaxation nonincreasing and its
-zero set invariant. Tube widths may vary. This derivation temporarily
-omits road boundaries, while the numerical controller and experiments
-retain them. Its existence proof is separate from numerical solver return.
+The safety analysis links these components through a joint nonlinear
+prediction of the physical states, future measurements, observer updates
+and causal control laws. Shared model mismatch, posterior intersections
+and retained prediction certificates support policy shifting and a
+common admissible terminal continuation. Under the stated uncertainty
+contracts and initial feasibility, the mathematical problem is
+recursively feasible. Applying an attained primary minimum additionally
+makes the optimal relaxation nonincreasing and its zero set invariant;
+positive collision slack remains a relaxation of safety.
+This robust derivation omits road boundaries and proves collision
+constraints at the stated constraint instants, while the numerical
+controller retains road constraints. The mathematical guarantee is
+conditional on its premises and does not establish numerical solver
+success.
 
-The contributions are the following.
+The main contributions are as follows.
 \begin{enumerate}
-\item An estimator that retains the ego-motion-aware NRMM of
-\cite{SharmaAlaiRajamani2026} without its zero-jerk and zero-yaw-%
-acceleration assumptions, with a continuous-time cascade ISS certificate,
-target gains chosen inside that certificate by a semidefinite program,
-a model-aided lateral-velocity measurement shared with the controller,
-and a published error enclosure (Section~\ref{sec:estimator}).
-\item A PCBF controller for collision avoidance without maneuver
-templates: one nonlinear rollout per sample on the Fiala bicycle, two
-second-order cone programs in strict priority order, a terminal set
-built from the obstacle's motion model and one braking law that is
-forward invariant and makes the problem recursively feasible on the
-declared model, and one CLF for lane keeping, cruise control, and recovery
+\item A maneuver-compatible NRMM estimator with a continuous-time cascade
+ISS certificate, target gains selected by a semidefinite program,
+a model-aided lateral-velocity measurement and an explicit error
+enclosure. Measured ego acceleration and yaw rate may vary without
+requiring their derivatives (Section~\ref{sec:estimator}).
+\item A PCBF controller that coordinates steering and braking on the
+Fiala bicycle model through one nonlinear rollout per sample and two
+second-order cone programs in strict priority order. A terminal braking
+continuation supports the predictive safety construction, and one CLF
+serves lane keeping, cruise control and recovery
 (Section~\ref{sec:control}).
 \item A joint nonlinear observer--controller formulation that propagates
-future measurement feedback and shared model mismatch, with sound finite
-image enclosures, retained tube certificates and a common terminal braking
-rule. Posterior intersections and policy shifting prove recursive
-feasibility of the road-free mathematical problem and optimal-relaxation
-descent under the stated contracts (Section~\ref{subsec:robust}).
+future measurement feedback and shared model mismatch. Posterior
+intersections, sound reachable-set enclosures, retained prediction
+certificates and a common terminal braking rule establish recursive
+feasibility and optimal-relaxation descent for the road-free mathematical
+problem under the stated contracts (Section~\ref{subsec:robust}).
 \item A closed-loop evaluation in fourteen collision-threat encounters
 with exact states and with the estimator and bounded sensor noise for
-six seeds, with an audit of the published enclosures against the truth
-(Section~\ref{sec:results}).
+six seeds, including an audit of the published enclosures against the
+truth (Section~\ref{sec:results}).
 \end{enumerate}
-Section~\ref{sec:overview} states the problem, the models and the
-architecture, and lays out the safety argument as a chain of statements
-whose status the rest of the paper reports. Throughout we separate what
-is proved, under which premises, from what is measured.
+Section~\ref{sec:overview} introduces the problem, models and system
+architecture. Sections~\ref{sec:estimator} and~\ref{sec:control}
+develop the estimator and controller, and Section~\ref{sec:results}
+presents the numerical evaluation.
 
 \section{Problem, Models and System}
 \label{sec:overview}
