@@ -246,7 +246,7 @@ classdef nonlinearBicycleModel
         end
 
         function u = nominalFeedback(x,previous,lane,reference,cfg,terminal)
-            % Path guidance used only to construct an initialization (NOMINAL_CLF.md).
+            % Path guidance used only to construct an initialization (CONTROLLER_THEORY.md, Section 4).
             % Course guidance chi_d=-atan(e_y/D) toward the path, a course loop to a
             % yaw-rate demand within the lateral-friction limit, the front slip angle
             % from the inverse Fiala curve below its force peak, and a speed loop on

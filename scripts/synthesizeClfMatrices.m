@@ -15,7 +15,7 @@ function entries = synthesizeClfMatrices(operatingPoints,options)
 %                         ...SpeedMetersPerSecond, ...LateralVelocityMetersPerSecond,
 %                         ...YawRateRadiansPerSecond).
 %
-% Method (NOMINAL_CLF.md). Let g(e, du) be the
+% Method (CONTROLLER_THEORY.md, Section 4). Let g(e, du) be the
 % sampled error map of one hold from x(e) with input u* + du. The trim is a
 % fixed point, g(0, 0) = 0, so along the ray from 0 to (e, du)
 %

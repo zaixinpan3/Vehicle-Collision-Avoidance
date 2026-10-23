@@ -207,7 +207,7 @@ updates must share one uncertainty source. The observer error is not a new
 independent noise to add after those updates have already been propagated.
 The default parameter box does not cover arbitrary residual physical forces;
 admitting those requires compatible observer and plant bounds. See
-[joint mismatch propagation](../controller/CLOSED_LOOP_PREDICTION_THEORY.md).
+[joint mismatch propagation](../controller/CONTROLLER_THEORY.md#joint-prediction).
 
 The ego and target enclosures are conditional on the stated sensor bounds, the
 shared model structure with its parameter box, the sideslip cone, and the
@@ -223,4 +223,4 @@ needs only the cone. The target prediction-parameter set is still wide. Its
 per-run medians were a course of +/-0.24 to 0.53 rad and a speed of +/-1.9 to
 4.0 m/s, with the whole contract range for `A` and curvature. The controller
 therefore uses the current enclosure only for each hold (see
-`controller/PCBF_CLF_ARCHITECTURE.md`).
+`controller/CONTROLLER_THEORY.md`, Section 8).

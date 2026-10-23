@@ -46,9 +46,9 @@ requires applying an attained primary minimum; positive collision slack
 remains relaxation.
 
 The detailed derivations are maintained in
-[`CLOSED_LOOP_PREDICTION_THEORY.md`](../controller/CLOSED_LOOP_PREDICTION_THEORY.md),
-[`ROBUST_RECURSIVE_FEASIBILITY.md`](../controller/ROBUST_RECURSIVE_FEASIBILITY.md)
-and [`TERMINAL_SAFE_SET.md`](../controller/TERMINAL_SAFE_SET.md).
+[the controller mathematical theory](../controller/CONTROLLER_THEORY.md),
+particularly Sections 5--7 on the terminal set, joint prediction and recursive
+feasibility.
 Exact-arithmetic specializations are checked by
 `../scripts/checkJointMismatchDerivations.py` and
 `../tests/jointMismatchDerivationsTest.py`.

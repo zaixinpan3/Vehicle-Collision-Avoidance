@@ -95,7 +95,7 @@ reference rebuilds dynamics and collision geometry and receives one RTI model. C
 optimized inputs are returned unchanged; their nonlinear rollout is prediction,
 not nonlinear feasibility validation. The default 100 ms computation budget can
 return an explicit failure. Independent replay determines actual clearance and
-recovery. See [the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
+recovery. See [the controller architecture](../controller/CONTROLLER_THEORY.md#runtime).
 The campaign entry names containing `PotentialField` are retained for callers;
 they run the current controller with second-order potential/circulation initialization and Fiala-model candidate rollouts.
 Routine outputs can use `/tmp/` instead of a persistent validation directory.

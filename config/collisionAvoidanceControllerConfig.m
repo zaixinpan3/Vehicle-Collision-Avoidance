@@ -47,7 +47,7 @@ function cfg=localDefaults()
     % Collision rows require nonoverlap after uncertainty tightening. There
     % is no extra fixed clearance in the optimizer or geometric guide.
     cfg.collision=struct('encounterRangeMeters',50);
-    % Terminal set (controller/terminalSafeSet.m, TERMINAL_SAFE_SET.md): it
+    % Terminal set (controller/terminalSafeSet.m, CONTROLLER_THEORY.md, Section 5): it
     % holds only mild endpoints, inside the sideslip cone and with the held
     % arc's lateral acceleration |r V| at most
     % lateralAccelerationMaximumMetersPerSecondSquared [m/s^2], where the ego
@@ -101,7 +101,7 @@ function cfg=localDefaults()
     % certificationSteeringRadians and certificationBrakingRatio of the trim,
     % the largest sublevel set V <= 1 on which u = u* + K e contracts by rho
     % against every ray-averaged Jacobian of the sampled nonlinear model over
-    % the set is certified (NOMINAL_CLF.md). Nominal feedback supplies
+    % the set is certified (CONTROLLER_THEORY.md, Section 4). Nominal feedback supplies
     % the search reference; the terminal set itself does not use the CLF. The box only bounds the set;
     % its size is set by the certificate.
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...

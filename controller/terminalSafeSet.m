@@ -39,7 +39,7 @@ classdef terminalSafeSet
 % phi(z) is the remainder of the continuation of z, at the same absolute
 % times, and the exit is the same. It is the largest set that this law keeps
 % safe within the settled admissible domain. The ego enclosure, when present, widens every clearance by its
-% position radius and the chord of its yaw radius. See TERMINAL_SAFE_SET.md.
+% position radius and the chord of its yaw radius. See CONTROLLER_THEORY.md, Section 5.
 %
 % Mildness is kept along the continuation: the sideslip is held and |r V|
 % falls with the speed. Holds appended to the anchor are holds of the
@@ -48,7 +48,7 @@ classdef terminalSafeSet
 % hold nearest to it toward admissible braking with the steering held
 % (brakingInput). jacobians, rayJacobians, certificate and stateLevel belong
 % to the offline certificate of the cruise controller and the CLF
-% (NOMINAL_CLF.md).
+% (CONTROLLER_THEORY.md, Section 4).
     methods (Static)
         function context = context(model)
             % Constants of one frame.
@@ -362,7 +362,7 @@ classdef terminalSafeSet
 
         function [input,next,ok,value,middle] = cruiseInput(x,model)
             % One hold of the CLF's certified cruise controller u = u* + K e(x),
-            % the gain certified offline together with P (NOMINAL_CLF.md). On
+            % the gain certified offline together with P (CONTROLLER_THEORY.md, Section 4). On
             % the certified level set the hold satisfies V(next) <= rho V(x)
             % and the input bound. ok evaluates the decrease and the hard rows
             % on this hold. The anchor appends it while its endpoint stays in
@@ -441,7 +441,7 @@ classdef terminalSafeSet
             % the RK4 variational equations and the error chart, and plus =
             % g(e, du) itself (5xn); NaN where the model's domain is left.
             % scripts/synthesizeClfMatrices encloses their ray averages
-            % (rayJacobians) over the certified set (NOMINAL_CLF.md).
+            % (rayJacobians) over the certified set (CONTROLLER_THEORY.md, Section 4).
             if nargin<5,duration=cfg.controller.sampleTime;end
             curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);
             lane=struct('referenceCurve',curve);
@@ -472,7 +472,7 @@ classdef terminalSafeSet
             % is a fixed point of the map) that the quadrature leaves. For
             % the saturating tire the ray averages spread like the secants of
             % its curve, not like its tangents, which is why the certificate
-            % encloses them (NOMINAL_CLF.md). NaN where the model's domain is
+            % encloses them (CONTROLLER_THEORY.md, Section 4). NaN where the model's domain is
             % left.
             if nargin<5 || isempty(duration),duration=cfg.controller.sampleTime;end
             if nargin<6,nodes=8;end
@@ -502,7 +502,7 @@ classdef terminalSafeSet
             %                endpoint;
             % NaN where the model's domain is left. The certificate itself is
             % the robust LMI of scripts/synthesizeClfMatrices over the enclosure
-            % of the Jacobians (NOMINAL_CLF.md); these samples test it
+            % of the Jacobians (CONTROLLER_THEORY.md, Section 4); these samples test it
             % independently.
             if nargin<4,subdivisions=10;end
             curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);
