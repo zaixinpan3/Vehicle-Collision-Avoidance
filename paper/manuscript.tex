@@ -109,42 +109,68 @@ interest in autonomous driving systems that combine cruising within a
 designated lane with active avoidance of potential collisions with
 surrounding vehicles, without requiring driver intervention.
 
-Avoiding a collision often requires the ego vehicle to steer while
-braking or accelerating, making coordination between longitudinal and
-lateral motion essential. At the kinematic level, bicycle models capture
-how speed and steering jointly determine vehicle motion, allowing
-acceleration and steering to be planned together
-\cite{LiZhangGuoLenzoGuo2023}. At the dynamic level, coupled vehicle
-and tire models describe the interactions among longitudinal, lateral,
-and yaw motion and the friction limits on combined braking and cornering
-\cite{BealBoyd2019}. Nonlinear feedback and model predictive control
-use these models to coordinate steering and longitudinal actuation
-\cite{GuoHuWang2016,ThompsonDallasGohBalachandran2024}.
-At the planning and decision-making level, joint path and speed
-optimization is integrated with maneuver selection to coordinate braking
-and lane changes under common collision-avoidance constraints
-\cite{AmmourOrjuelaBasset2022}.
-Ego maneuvers also complicate the modeling
-of surrounding vehicles. Onboard sensors measure target positions in a
-frame that translates and rotates with the ego vehicle, so the target
-dynamics or measurement model must account for this motion. Sharma and Rajamani addressed this
-issue in predictive display for teleoperation by using an inertial target
-model and extended Kalman filtering, with ego-state estimates used to
-transform relative measurements \cite{SharmaRajamani2024}.
-Alai et al.\ formulated a nonlinear relative motion model that
-explicitly incorporates ego velocity and yaw rate, avoiding the need to
-transform target measurements into a global frame
-\cite{AlaiSharmaAlexanderRajamani2024}. Sharma et al.\ developed
-multistage high-gain observers for both inertial and nonlinear relative
-motion models, using ego-state estimates in the target-tracking stage and
-validating the approach on a full-scale vehicle
-\cite{SharmaAlaiRajamani2026}. These studies point to the need for
-collision-avoidance control that accounts for both coupled vehicle
-dynamics and uncertainty in target estimates obtained during ego
-maneuvers.
+Collision avoidance may require the ego vehicle to change its path and
+speed together when limited space or a short time to collision makes
+steering or braking alone insufficient. The resulting yaw motion couples
+longitudinal and lateral velocities, while speed changes modify tire
+slip angles and the lateral response. Longitudinal and lateral tire forces
+also share the available friction capacity
+\cite{BealBoyd2019}. Treating longitudinal and lateral motion
+independently can overlook these interactions and demand a combination
+of tire forces that cannot be realized, undermining the predicted
+avoidance maneuver. The same maneuvers complicate the description of
+surrounding vehicles. Onboard sensors observe target positions in a frame
+that translates and rotates with the ego vehicle, so the relative
+trajectory depends on ego velocity and yaw rate even if the target
+maintains constant velocity \cite{AlaiSharmaAlexanderRajamani2024}.
+Neglecting this dependence can attribute apparent motion caused by the
+ego maneuver to the target and distort the predicted collision geometry.
 
-Work on this integration spans avoidance-path generation, coordinated
-vehicle control and feedback safety certification.
+One approach to coordinating longitudinal and lateral motion is to plan
+acceleration and steering jointly with a kinematic bicycle model, which
+captures their geometric relationship when tire slip can be neglected
+\cite{LiZhangGuoLenzoGuo2023}. Another uses coupled vehicle and tire
+dynamics with nonlinear feedback laws, including backstepping and
+sliding-mode control, to coordinate steering and braking
+\cite{GuoHuWang2016}. Nonlinear model predictive control uses these
+dynamics to optimize steering and longitudinal actuation together while
+accounting for actuator limits and available friction
+\cite{ThompsonDallasGohBalachandran2024}. Joint path and speed planning
+is also combined with maneuver selection, allowing braking, lane keeping,
+and lane changes to be coordinated within a common collision-avoidance
+formulation \cite{AmmourOrjuelaBasset2022}.
+
+Sharma and Rajamani used an inertial target model and extended Kalman
+filtering for predictive teleoperation display, transforming relative
+measurements with estimated ego position and orientation
+\cite{SharmaRajamani2024}. Alai et al.\ subsequently formulated a
+nonlinear relative motion model (NRMM) that incorporates ego velocity
+and yaw rate directly, avoiding this transformation in the target tracker
+\cite{AlaiSharmaAlexanderRajamani2024}. Sharma et al.\ developed
+multistage high-gain observers (HGOs) for both formulations, using
+ego-state estimates and relative-position measurements to reconstruct
+target velocity and acceleration, with validation on a full-scale vehicle
+\cite{SharmaAlaiRajamani2026}. For our collision-avoidance controller,
+accounting for ego motion is necessary because an evasive control input
+changes both the ego trajectory and the target motion observed in the
+sensor frame. The NRMM provides a consistent model for predicting their
+relative motion during the maneuver, while the HGO recovers the
+unmeasured states needed for that prediction. However, the published observer
+construction assumes constant body-measured ego acceleration and yaw
+rate, which can be violated during combined steering and braking. Its
+nominal convergence and yaw-observer $H_\infty$ results do not provide a
+complete disturbed-cascade error bound
+\cite{SharmaAlaiRajamani2026}. Estimated ego states drive the target
+observer, so errors from the ego stage must be propagated along with
+sensor disturbances and model mismatch. We retain the NRMM and design an
+HGO-based estimator that admits time-varying measured ego inputs, and
+establish cascade input-to-state stability (ISS) under the stated model
+and disturbance bounds. The resulting time-dependent error enclosures
+include the initial estimation transient and provide the uncertainty
+bounds required by the collision constraints in our safety analysis.
+
+The control and estimation methods must be connected to a closed-loop
+collision-avoidance guarantee.
 Field-based methods provide a direct way to combine lane guidance and
 obstacle repulsion. Virtual fluid-flow guidance superposes lane-boundary
 and cylindrical-obstacle flows and tracks the resulting path with an
@@ -213,28 +239,15 @@ joint state, but online estimation introduces an additional obligation:
 revised target enclosures and forecasts must remain compatible with the
 shifted plan and its terminal continuation.
 
-The target models discussed above make clear that these forecasts depend
-on ego-motion information. Accurate, delay-free surrounding-state
-information is assumed in rule-based CBF lane-change control
+Accounting for target-state uncertainty remains necessary when these
+predictive safety constructions are used with onboard sensing.
+Accurate, delay-free surrounding-state information is assumed in
+rule-based CBF lane-change control
 \cite{HeZengZhangSreenath2021}, and perfect position estimation is
 assumed in the racing example of \cite{ZengZhangSreenath2021}.
-Here, we use the nonlinear relative motion model (NRMM) in
-\cite{SharmaAlaiRajamani2026} and explicitly account for errors passed
-from ego-state estimation to target tracking.
-
-The observer formulation in \cite{SharmaAlaiRajamani2026} transforms
-the ego kinematics into differentiated companion coordinates and assumes
-constant body-measured acceleration and yaw rate. Those assumptions can
-be violated during combined steering and braking. The paper establishes
-nominal exponential convergence and a yaw-estimation $H_\infty$ condition,
-but these results do not supply a complete disturbed-cascade error
-enclosure for collision avoidance. Estimated ego motion drives the target
-observer, so upstream errors must enter the target uncertainty together
-with initial errors, sensor disturbances and model mismatch.
-We retain the NRMM while using maneuver-compatible ego coordinates and
-a cascade input-to-state stability (ISS) analysis to construct explicit,
-time-dependent error enclosures. The containment requirement includes
-the initial estimation transient.
+In the present setting, the observer's current error enclosure must also
+be propagated into future collision constraints and remain compatible
+with subsequent measurement updates.
 
 Robust predictive control provides relevant precedents for using such
 uncertainty descriptions. Tube-based output-feedback MPC combines an
