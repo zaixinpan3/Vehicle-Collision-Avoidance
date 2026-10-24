@@ -11,21 +11,40 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function pathAttractionPullsBackAndDampsOutwardMotion(testCase)
-            model=localModel("headOn",8);x=model.initialState;x(2)=3;
-            a=predictiveSafetyGeometry.pathAttraction(x,model);
-            x(5)=2;b=predictiveSafetyGeometry.pathAttraction(x,model);
-            testCase.verifyLessThan(a(2),0);
-            testCase.verifyLessThan(b(2),a(2));
-            x(2)=0;x(5)=0;
-            c=predictiveSafetyGeometry.pathAttraction(x,model);
-            testCase.verifyEqual(c,zeros(2,1),AbsTol=1e-12);
+        function aSafetySeedDoesNotTrackTheCruiseRouteOrSpeed(testCase)
+            model=localModel("headOn",8);
+            model.road.boundaryObservation=struct('chains',struct([]));
+            original=predictiveSafetyGeometry.avoidanceGuide(model,40,1);
+            model.cfg.referenceSpeed=15;model.cfg.nominalClf.speedGain=20;
+            model=rmfield(model,'nominalReference');
+            model.lane=struct('referenceCurve',struct('origin',[0;4], ...
+                'heading',.3,'curvature',.01,'length',100));
+            changed=predictiveSafetyGeometry.avoidanceGuide(model,40,1);
+            testCase.verifyEqual(changed.inputs,original.inputs,AbsTol=0);
+            testCase.verifyEqual(changed.states,original.states,AbsTol=0);
+            testCase.verifyEqual(changed.direction,original.direction,AbsTol=0);
+        end
+        function freeMotionDoesNotRecoverCruiseSpeedOrLateralOffset(testCase)
+            model=localModel("headOn",8);model.initialState=[0;3;0;12;0;0];
+            model.target(1:6)=[-30;0;0;2;0;0];
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,16,1);
+            testCase.verifyEqual(guide.states(2,:),3*ones(1,17),AbsTol=1e-10);
+            testCase.verifyEqual(guide.states(4,:),12*ones(1,17),AbsTol=1e-10);
+            testCase.verifyEqual(guide.inputs(1,:),zeros(1,16),AbsTol=1e-10);
+            testCase.verifyEqual(guide.directionSign,0);
+        end
+        function anApproachingObstacleCanBrakeAtTheCruiseSpeed(testCase)
+            model=localModel("headOn",8);model.target(1:6)=[12;0;0;0;0;0];
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,8,1);
+            testCase.verifyLessThan(guide.inputs(2,1),-.1);
+            testCase.verifyLessThan(guide.states(4,end),model.initialState(4)-.5);
+            testCase.verifyGreaterThan(abs(guide.inputs(1,1)),1e-3);
         end
         function aRecedingTargetDoesNotPullTheVehicleIntoAnOrbit(testCase)
             model=localModel("headOn",8);target=model.target;target(1:6)=[-30;0;0;2;0;0];
-            p=struct('direction',1,'speed',4,'inflation',0,'pathAcceleration',[.2;0]);
+            p=struct('direction',1,'speed',4,'inflation',0,'preferredAcceleration',[.2;0]);
             [a,f]=predictiveSafetyGeometry.circulationField(model.initialState,target,model.cfg,p);
-            testCase.verifyEqual(a,p.pathAcceleration,AbsTol=1e-12);
+            testCase.verifyEqual(a,p.preferredAcceleration,AbsTol=1e-12);
             testCase.verifyEqual(f.activation,0);
         end
         function parallelWallSlowsOutwardMotionBeforeReachingTheWall(testCase)

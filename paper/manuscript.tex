@@ -97,17 +97,36 @@ robust model predictive control, vehicle state estimation.
 
 \section{Introduction}
 
-\IEEEPARstart{A}{} lane-keeping and cruise control system enables a vehicle
-to travel within a designated lane at a prescribed speed without
-continuous steering or speed corrections by the driver
+\IEEEPARstart{C}{ruising} within a designated lane is a common task in
+autonomous driving and is already supported by commercially available
+driver-assistance systems that combine lane keeping with adaptive cruise
+control
 \cite{WeiPfefferEdelmann2024,XuGrizzleTabuadaAmes2018}.
-When a nearby vehicle poses a collision threat, the system must also
-support an evasive response \cite{ChengLiLiuLiGuo2021}. The ego vehicle
-may need to depart from its nominal lane and speed, coordinate steering
-and braking, and recover normal travel after the threat has passed.
-Integrating these behaviors requires a safety argument that accounts for
-both the available vehicle maneuvering capability and uncertainty in the
-motion of the surrounding vehicle.
+However, these systems still rely on manual driver intervention when
+surrounding vehicles pose a collision risk to the ego vehicle
+\cite{ChengLiLiuLiGuo2021}. This has motivated considerable research
+interest in autonomous driving systems that combine cruising within a
+designated lane with active avoidance of potential collisions with
+surrounding vehicles, without requiring driver intervention.
+
+Complex collision avoidance poses two interrelated but mathematically
+distinct challenges. The first concerns coupled longitudinal--lateral
+control. During an evasive maneuver, the ego vehicle may steer while
+braking or accelerating. Its longitudinal and lateral motions are coupled
+through the body dynamics and tire-force generation, with both force
+components sharing the available friction capacity \cite{BealBoyd2019}.
+Ignoring these couplings when designing separate longitudinal and lateral
+controllers can lead to commands that do not represent jointly achievable
+maneuvers. The second concerns target-state estimation under ego motion.
+The same maneuvers change the ego vehicle's yaw and its longitudinal and
+lateral velocities. Because onboard sensors observe surrounding vehicles
+in the ego frame, the relative-motion model must account for the ego
+vehicle's translation and rotation \cite{AlaiSharmaAlexanderRajamani2024}.
+Omitting these effects introduces model mismatch and can degrade
+target-state estimates. Reliable collision avoidance therefore requires
+joint control of the ego vehicle's coupled motion, target-state estimation
+consistent with that motion, and explicit consideration of estimation
+errors in safety control.
 
 Work on this integration spans avoidance-path generation, coordinated
 vehicle control and feedback safety certification.
