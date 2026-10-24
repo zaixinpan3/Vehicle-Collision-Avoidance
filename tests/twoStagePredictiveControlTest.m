@@ -86,7 +86,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             testCase.verifyTrue(problem.metadata.search.planner.used);
             testCase.verifyEqual(problem.metadata.search.planner.candidateCount,1);
-            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"safetyCirculation");
+            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"pathAttractedCirculation");
             testCase.verifyFalse(problem.metadata.search.planner.robustCertificate);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);

@@ -199,9 +199,7 @@ function count=localPlanningHorizon(model,minimumCount)
     % stopping/settling maneuver. The seed need not end in the terminal set;
     % RTI enforces endpoint constraints and may retry with a longer horizon.
     preview=max(minimumDuration,speed/cfg.terminal.brakingDecelerationMetersPerSecondSquared+cfg.rti.settlingSeconds);
-    % Preview the measured course and yaw rate, not the desired cruise arc.
-    curvature=x(6)/max(speed,cfg.model.scheduleSpeedFloor);
-    arcBeta=asin(min(1,max(-1,curvature*cfg.vehicle.lr)));
+    arcBeta=asin(model.nominalReference.curvature*cfg.vehicle.lr);
     egoArc=[x(1:2);x(3)+beta-arcBeta;speed;0;arcBeta;cfg.vehicle.lr; ...
         cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
@@ -324,12 +322,7 @@ function input=localTailSeed(x,prior,model,parameters)
 end
 
 function anchor=localPlanReference(model,count)
-    cfg=model.cfg;wall=tic;
-    x=model.initialState;course=x(3)+atan2(x(5),x(4));
-    lateral=[-sin(course),cos(course)]*(model.target(1:2)-x(1:2));
-    tolerance=1e-6;
-    if ~isempty(model.uncertainty.target),tolerance=tolerance+model.uncertainty.target.positionRadius;end
-    side=1;if abs(lateral)>tolerance,side=-sign(lateral);end
+    cfg=model.cfg;[side,~]=localCollisionSide(model);wall=tic;
     guide=predictiveSafetyGeometry.avoidanceGuide(model,count,side);
     context=terminalSafeSet.context(model);
     context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
@@ -349,7 +342,7 @@ end
 
 function planner=localPlannerMetadata()
     planner=struct('used',false,'maximumDeviationMeters',NaN, ...
-        'candidateCount',0,'algorithm',"safetyCirculation", ...
+        'candidateCount',0,'algorithm',"pathAttractedCirculation", ...
         'circulationDirection',0,'candidates',struct([]), ...
         'referenceMinimumNodeGapMeters',NaN,'referenceMinimumInflatedGapMeters',NaN, ...
         'referenceStateViolation',NaN,'sampledNominalChecksPassed',false, ...

@@ -2,7 +2,7 @@ classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target prediction, uncertainty tubes and polygon geometry.
     methods (Static)
         function guide = avoidanceGuide(model,count,side)
-            % One safety-oriented field rollout through the actual vehicle.
+            % One path-attracted field rollout through the actual vehicle.
             % No candidate scores or admission gate. RTI receives the states
             % and inputs over exactly count holds. Terminal constraints
             % belong to RTI, not this heuristic initialization.
@@ -21,15 +21,17 @@ classdef predictiveSafetyGeometry
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
+            data.parameters=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
             % A single field rollout, with an encounter-persistent direction.
             % Geometry chooses the turn sense; no candidate bank is searched.
             parameters=localFieldParameters(data,1,1,0);
             [~,field]=predictiveSafetyGeometry.circulationField(model.initialState,target(:,1),cfg,parameters);
-            course=model.initialState(3)+atan2(model.initialState(5),model.initialState(4));
-            forward=[cos(course);sin(course)];
+            projection=laneGeometry.project(model.initialState(1:2),model.lane);
+            forward=[cos(projection.heading);sin(projection.heading)];
             lateral=[-forward(2);forward(1)];
-            % Interpret the passing side in the current motion frame. The
-            % cruise route does not choose a maneuver for this initializer.
+            % Use the existing target/path side convention. A small forward
+            % tangent advantage can otherwise send a curved encounter toward
+            % the wrong side of its route.
             direction=sign((field.rotation*field.tangent).'*lateral)*side;
             if direction==0,direction=1;end
             if isfield(model,'circulationDirection') && model.circulationDirection~=0
@@ -37,7 +39,7 @@ classdef predictiveSafetyGeometry
             end
             budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
             speed=min(max(norm(field.velocity),1),sqrt(budget*field.egoRadius));
-            best=localCirculationRollout(model,data,direction,speed,count);
+            best=localCirculationRollout(model,data,direction,speed,count,1);
             total=1;diagnostics=localCandidateSummary(best);
             time=(0:numel(best.gaps)-1)*cfg.controller.sampleTime;
             conflict=best.gaps<=0;first=NaN;last=NaN;
@@ -51,16 +53,32 @@ classdef predictiveSafetyGeometry
                 guide.velocity(:,index)=rotation*best.states(4:5,index);
             end
             guide.acceleration=[diff(guide.velocity,1,2)/cfg.controller.sampleTime,zeros(2,1)];
-            % Report the generated passing side relative to current motion,
-            % without inferring it from a displacement to the cruise route.
-            transverse=lateral.'*(guide.position-model.initialState(1:2));
-            [~,furthest]=max(abs(transverse));passingSide=side;
-            if abs(transverse(furthest))>1e-9,passingSide=sign(transverse(furthest));end
-            guide.direction=passingSide*lateral;
+            projection=laneGeometry.project(guide.position,model.lane);
+            displacement=guide.position-projection.point;
+            [~,furthest]=max(vecnorm(displacement,2,1));guide.direction=displacement(:,furthest);
+            if norm(guide.direction)>1e-9,guide.direction=guide.direction/norm(guide.direction);
+            else,guide.direction=side*[-sin(model.initialState(3));cos(model.initialState(3))];end
             guide.candidateCount=total;guide.candidates=diagnostics;
             guide.conflictStartSeconds=first;guide.conflictEndSeconds=last;
             guide.minimumGap=min(best.gaps);guide.nominalMinimumGap=min(best.nominalGaps);
             guide.initialConflict=conflict(1);guide.robustCertificate=false;
+        end
+
+        function [acceleration,projection] = pathAttraction(x,model)
+            % Frenet acceleration: damp transverse motion while approaching
+            % the route, and recover forward speed without a timed waypoint.
+            projection=laneGeometry.project(x(1:2),model.lane);
+            tangent=[cos(projection.heading);sin(projection.heading)];normal=[-tangent(2);tangent(1)];
+            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];velocity=rotation*x(4:5);
+            along=tangent.'*velocity;across=normal.'*velocity;
+            curvature=model.nominalReference.curvature;e=projection.lateralPosition;
+            stationRate=along/max(1-curvature*e,.1);
+            rate=model.cfg.planner.pathRate;
+            normalAcceleration=curvature*stationRate*along-2*rate*across-rate^2*e;
+            tangentAcceleration=model.cfg.nominalClf.speedGain*(hypot(model.nominalReference.state(4),model.nominalReference.state(5))-along) ...
+                -curvature*stationRate*across;
+            acceleration=tangentAcceleration*tangent+normalAcceleration*normal;
+            projection.lateralVelocity=across;
         end
 
         function [acceleration,active] = wallGuidance(x,acceleration,model)
@@ -73,11 +91,11 @@ classdef predictiveSafetyGeometry
             end
             width=model.cfg.planner.guideHalfWidthMeters;active=false;
             if isinf(width),return;end
-            projection=laneGeometry.project(x(1:2),model.lane);
+            [~,projection]=predictiveSafetyGeometry.pathAttraction(x,model);
             tangent=[cos(projection.heading);sin(projection.heading)];normal=[-tangent(2);tangent(1)];
             rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];velocity=rotation*x(4:5);
-            along=tangent.'*velocity;across=normal.'*velocity;e=projection.lateralPosition;
-            frame=predictiveSafetyGeometry.roadFrame(model.lane,model.road);curvature=frame(4);
+            along=tangent.'*velocity;across=projection.lateralVelocity;e=projection.lateralPosition;
+            curvature=model.nominalReference.curvature;
             feedforward=curvature*along^2/max(1-curvature*e,.1);
             rate=model.cfg.planner.wallRate;
             center=feedforward-2*rate*across-rate^2*e;
@@ -175,18 +193,18 @@ classdef predictiveSafetyGeometry
             transport=r.'*centerAcceleration+2*omega*j*w+omegaDot*j*q-omega^2*q;
             acceleration=r*(relative+transport);
             correction=0;activation=1;
-            if isfield(parameters,'preferredAcceleration')
-                % The obstacle can
+            if isfield(parameters,'pathAcceleration')
+                % The route is the preferred acceleration. The obstacle can
                 % only add outward normal acceleration; it never attracts a
                 % distant ego back to a target-centred orbit. Circulation is
                 % activated by the normal correction, not by a release timer.
-                preferred=parameters.preferredAcceleration;normalWorld=r*normal;tangentWorld=r*tangent;
-                correction=max(0,normalWorld.'*(acceleration-preferred));
+                path=parameters.pathAcceleration;normalWorld=r*normal;tangentWorld=r*tangent;
+                correction=max(0,normalWorld.'*(acceleration-path));
                 budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
                 activation=min(1,correction/budget);
                 tangentialCorrection=parameters.direction*max(0, ...
-                    parameters.direction*(tangentWorld.'*(acceleration-preferred)));
-                acceleration=preferred+correction*normalWorld ...
+                    parameters.direction*(tangentWorld.'*(acceleration-path)));
+                acceleration=path+correction*normalWorld ...
                     +activation*tangentialCorrection*tangentWorld;
             end
             field=struct('clearance',h,'normalSpeed',nu,'tangentSpeed',tau,'curvature',kappa, ...
@@ -674,11 +692,11 @@ function [distance,point]=localPointSegment(vertex,first,last)
     point=first+alpha*edge;distance=norm(vertex-point);
 end
 
-function candidate=localCirculationRollout(model,data,direction,speed,count)
+function candidate=localCirculationRollout(model,data,direction,speed,count,longitudinalWeight)
     cfg=model.cfg;h=cfg.controller.sampleTime;
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1),'directionSign',direction, ...
-        'circulationSpeed',speed, ...
+        'circulationSpeed',speed,'longitudinalWeight',longitudinalWeight, ...
         'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
         'maximumDeviation',0,'completion',"requestedHorizon");
     candidate.states(:,1)=model.initialState;
@@ -695,29 +713,35 @@ function candidate=localCirculationRollout(model,data,direction,speed,count)
         candidate.gaps(index)=gap;candidate.nominalGaps(index)=nominal;
         violation=localPlannerStateViolation(x,model);
         candidate.stateViolation=max(candidate.stateViolation,violation);
-        % Route coordinates are diagnostics only. Visible road boundaries
-        % (or the explicit legacy wall geometry) still shape the seed.
-        projection=laneGeometry.project(x(1:2),model.lane);
+        [pathAcceleration,projection]=predictiveSafetyGeometry.pathAttraction(x,model);
         candidate.maximumDeviation=max(candidate.maximumDeviation,abs(projection.lateralPosition));
         if index>count,break;end
         if hypot(x(4),x(5))<=cfg.model.brakeHoldSpeed
             b=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
             change=cfg.model.brakingRatioRateMaximum*h;
             u=[prior(1);min(prior(2)+change,max(prior(2)-change,b))];
-        else
-            % Neutral free motion requests zero Cartesian acceleration. The
-            % field may change both speed and direction to clear the target;
-            % neither cruise tracking nor return-to-route overrides it.
-            acceleration=zeros(2,1);
-            if direction~=0 && ~encounterEnded
-                parameters=localFieldParameters(data,index,direction,speed);
-                parameters.preferredAcceleration=acceleration;
-                [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
-                candidate.fieldActive=candidate.fieldActive || field.activation>0;
-                if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
-            end
+        elseif longitudinalWeight<0
+            b=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
+            rate=cfg.model.brakingRatioRateMaximum*h;
+            b=min(prior(2)+rate,max(prior(2)-rate,b));
+            [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
+            u=[prior(1);min(upper(2),max(lower(2),b))];
+        elseif direction~=0 && ~encounterEnded
+            parameters=localFieldParameters(data,index,direction,speed);
+            parameters.pathAcceleration=pathAcceleration;
+            [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
+            % Keep cruise-speed intent while circulation determines steering.
+            % World-frame target transport must not accelerate the ego into
+            % following a crossing target's translational motion.
+            velocity=norm(x(4:5));course=x(3)+atan2(x(5),x(4));forward=[cos(course);sin(course)];
+            along=cfg.nominalClf.speedGain*(norm(model.nominalReference.state(4:5))-velocity);
+            acceleration=acceleration+(along-forward.'*acceleration)*forward;
             acceleration=predictiveSafetyGeometry.wallGuidance(x,acceleration,model);
-            u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg);
+            candidate.fieldActive=candidate.fieldActive || field.activation>0;
+            if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
+            u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,longitudinalWeight);
+        else
+            u=nonlinearBicycleModel.nominalFeedback(x,prior,model.lane,model.nominalReference,cfg,data.parameters);
         end
         candidate.inputs(:,index)=u;
         next=nonlinearBicycleModel.sample(x,u,cfg);
@@ -765,6 +789,7 @@ end
 
 function summary=localCandidateSummary(candidate)
     summary=struct('direction',candidate.directionSign,'speed',candidate.circulationSpeed, ...
+        'longitudinalWeight',candidate.longitudinalWeight, ...
         'minimumGap',min(candidate.gaps),'nominalMinimumGap',min(candidate.nominalGaps), ...
         'stateViolation',candidate.stateViolation, ...
         'releaseNode',candidate.releaseNode,'maximumDeviation',candidate.maximumDeviation, ...
