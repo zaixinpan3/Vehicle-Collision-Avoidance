@@ -34,11 +34,7 @@ function cfg=localDefaults()
     % Secondary objective: CLF slack plus half this weight times the mean
     % squared, unit-scaled state/input deviation from the current reference.
     % The weight stays active on the route; zero disables it for ablation.
-    % Failed nonlinear checks can restore the reference at most this many
-    % times. Each restoration can use one auxiliary conic solve; all work
-    % shares the original controller deadline. No restored input is issued.
-    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10, ...
-        'maximumRestorations',4);
+    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10);
     % One safety-oriented circulation rollout supplies initialization controls.
     % Cruise speed and route tracking belong to the controller's CLF stage.
     % The parallel-wall acceleration guide anticipates transverse momentum;
@@ -164,7 +160,6 @@ function localValidate(cfg)
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
-    validateattributes(cfg.rti.maximumRestorations,{'double'},{'scalar','real','finite','integer','nonnegative'});
     for name=["radialRate","tangentialRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end

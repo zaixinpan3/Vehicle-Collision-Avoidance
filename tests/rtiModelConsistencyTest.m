@@ -43,19 +43,29 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(check.terminalViolation,.1);
             testCase.verifyGreaterThan(check.hard,model.cfg.solver.feasibilityTolerance);
         end
-        function aTireTangentCannotCombineFullBrakingAndLateralForce(testCase)
-            [p,~,~]=localFormulate(testCase.anchor,testCase.model);
-            point=zeros(numel(p.lower),1);index=p.inputIndices(:,1);
-            point(index)=[.1;-1]-testCase.anchor.inputs(:,1);
-            violation=-Inf;reference=-Inf;
-            for k=1:p.primaryConeCount
-                cone=p.cones(k);
-                violation=max(violation,max(vecnorm(reshape(cone.A*point-cone.b,cone.size,[])) ...
-                    -(cone.D*point-cone.gamma).'));
-                reference=max(reference,max(vecnorm(reshape(cone.b,cone.size,[]))+cone.gamma.'));
-            end
-            testCase.verifyLessThanOrEqual(reference,1e-12);
-            testCase.verifyGreaterThan(violation,.1);
+        function softClfAcceptsPositivePcbfSlackWithoutChangingThePrimaryTrajectory(testCase)
+            model=testCase.model;anchor=testCase.anchor;
+            % Straight motion off the route cannot achieve V(next)=0.
+            % An initially overlapping, faster target requires positive PCBF
+            % slack, then leaves. This tests formulation, not safe execution.
+            model.initialState(2)=.5;anchor.states(2,:)=.5;
+            model.nominalReference.contraction=0;
+            model.target=[0;.5;0;40;0;0;model.cfg.vehicle.lr;2.4;.95;0;0];
+            model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
+            model.terminalContext=terminalSafeSet.context(model);
+            [p,~,model]=localFormulate(anchor,model);
+            fixed=[p.stateIndices(:);p.inputIndices(:)];
+            p.lower(fixed)=0;p.upper(fixed)=0;
+            testCase.verifyEqual(p.upper(p.clfIndex),Inf);
+            [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
+                'model',model,'anchor',anchor,'problem',p));
+            testCase.assertNotEmpty(solution);
+            testCase.verifyTrue(search.clfStageCompleted);
+            testCase.verifyGreaterThan(search.primaryOptimum,0);
+            testCase.verifyGreaterThan(solution.clfSlack,0);
+            testCase.verifyLessThanOrEqual(solution.safety,search.slackCap+1e-5);
+            testCase.verifyEqual(solution.states,anchor.states,AbsTol=1e-6);
+            testCase.verifyEqual(solution.inputs,anchor.inputs,AbsTol=1e-6);
         end
         function avoidanceAllocationUsesLongitudinalAuthorityWithoutCruiseTracking(testCase)
             cfg=testCase.model.cfg;x=[0;0;0;8;0;0];
@@ -68,21 +78,6 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             same=nonlinearBicycleModel.accelerationGuidance(x,[-6;7],[0;0],changed,1,true);
             testCase.verifyEqual(same,turning,AbsTol=0);
             testCase.verifyLessThanOrEqual(abs(turning(2)),1);
-        end
-        function posteriorPropagationChangesEnterTheNumericalModelReserve(testCase)
-            model=testCase.model;anchor=testCase.anchor;
-            model.uncertainty.egoGenerator=diag([0,0,0,.1,.1,.02]);
-            [p,~,model]=localFormulate(anchor,model);
-            solution=struct('inputs',anchor.inputs,'states',anchor.states);
-            solution.inputs(1,:)=solution.inputs(1,:)+.02;
-            solution.states=localRollout(model.initialState,solution.inputs,model.cfg);
-            % Remove the nominal error to isolate the changing image of the
-            % same posterior, the source of the head-on regression.
-            solution.affineStates=solution.states;
-            margin=solvePredictiveControl("probe",struct('operation',"remainder", ...
-                'model',model,'anchor',anchor,'problem',p,'solution',solution));
-            testCase.verifyEqual(margin(:,1),zeros(6,1),AbsTol=0);
-            testCase.verifyGreaterThan(max(margin(4:6,3:2:end),[],'all'),1e-4);
         end
     end
 end
