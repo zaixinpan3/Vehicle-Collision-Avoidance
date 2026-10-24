@@ -110,20 +110,20 @@ designated lane with active avoidance of potential collisions with
 surrounding vehicles, without requiring driver intervention.
 
 Avoiding a collision often requires the ego vehicle to steer while
-braking or accelerating. Longitudinal--lateral coupling becomes
-particularly important during these maneuvers because speed changes
-affect the lateral response and longitudinal and lateral tire forces
-share the available friction capacity \cite{BealBoyd2019}.
-Nonlinear feedback methods address this coupling through model-based
-compensation and robust tracking laws, including backstepping and
-sliding-mode control \cite{GuoHuWang2016}. Alternatively, nonlinear
-model predictive control jointly optimizes steering and longitudinal
-actuation using coupled vehicle and tire models, while accounting for
-actuator limits and available friction
-\cite{ThompsonDallasGohBalachandran2024}. In a hierarchical
-implementation, an upper layer plans feasible accelerations and a lower
-layer coordinates steering and braking to realize them
-\cite{ForsAnistratovOlofssonNielsen2021}.
+braking or accelerating, making coordination between longitudinal and
+lateral motion essential. At the kinematic level, bicycle models capture
+how speed and steering jointly determine vehicle motion, allowing
+acceleration and steering to be planned together
+\cite{LiZhangGuoLenzoGuo2023}. At the dynamic level, coupled vehicle
+and tire models describe the interactions among longitudinal, lateral,
+and yaw motion and the friction limits on combined braking and cornering
+\cite{BealBoyd2019}. Nonlinear feedback and model predictive control
+use these models to coordinate steering and longitudinal actuation
+\cite{GuoHuWang2016,ThompsonDallasGohBalachandran2024}.
+At the planning and decision-making level, joint path and speed
+optimization is integrated with maneuver selection to coordinate braking
+and lane changes under common collision-avoidance constraints
+\cite{AmmourOrjuelaBasset2022}.
 Ego maneuvers also complicate the modeling
 of surrounding vehicles. Onboard sensors measure target positions in a
 frame that translates and rotates with the ego vehicle, so the target
