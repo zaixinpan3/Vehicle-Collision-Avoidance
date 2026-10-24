@@ -109,21 +109,25 @@ interest in autonomous driving systems that combine cruising within a
 designated lane with active avoidance of potential collisions with
 surrounding vehicles, without requiring driver intervention.
 
-Collision avoidance often requires the ego vehicle to execute complex
-maneuvers that combine steering with braking or acceleration. Such
-maneuvers introduce two closely related difficulties. First, the coupling
-between longitudinal and lateral dynamics can become pronounced: speed
-changes affect the lateral response, while longitudinal and lateral tire
-forces share the available friction capacity \cite{BealBoyd2019}.
-To address this coupling, Guo et al.\ combined nonlinear backstepping with
-adaptive fuzzy sliding-mode control to coordinate steering and braking
-\cite{GuoHuWang2016}. Fahmy et al.\ jointly optimized steering and
-braking inputs using a four-wheel vehicle model with modified Fiala tires
-\cite{FahmyGhanyBaumann2018}. Second, describing the motion of surrounding
-vehicles is nontrivial when the ego vehicle itself is maneuvering.
-Onboard sensors measure target positions in a translating and rotating
-ego frame, so this frame motion must be accounted for in the target
-dynamics or the measurement model. Sharma and Rajamani addressed this
+Avoiding a collision often requires the ego vehicle to steer while
+braking or accelerating. Longitudinal--lateral coupling becomes
+particularly important during these maneuvers because speed changes
+affect the lateral response and longitudinal and lateral tire forces
+share the available friction capacity \cite{BealBoyd2019}.
+Nonlinear feedback methods address this coupling through model-based
+compensation and robust tracking laws, including backstepping and
+sliding-mode control \cite{GuoHuWang2016}. Alternatively, nonlinear
+model predictive control jointly optimizes steering and longitudinal
+actuation using coupled vehicle and tire models, while accounting for
+actuator limits and available friction
+\cite{ThompsonDallasGohBalachandran2024}. In a hierarchical
+implementation, an upper layer plans feasible accelerations and a lower
+layer coordinates steering and braking to realize them
+\cite{ForsAnistratovOlofssonNielsen2021}.
+Ego maneuvers also complicate the modeling
+of surrounding vehicles. Onboard sensors measure target positions in a
+frame that translates and rotates with the ego vehicle, so the target
+dynamics or measurement model must account for this motion. Sharma and Rajamani addressed this
 issue in predictive display for teleoperation by using an inertial target
 model and extended Kalman filtering, with ego-state estimates used to
 transform relative measurements \cite{SharmaRajamani2024}.
@@ -134,10 +138,10 @@ transform target measurements into a global frame
 multistage high-gain observers for both inertial and nonlinear relative
 motion models, using ego-state estimates in the target-tracking stage and
 validating the approach on a full-scale vehicle
-\cite{SharmaAlaiRajamani2026}. These studies motivate coordinating the
-ego vehicle's coupled motion with target estimation that consistently
-accounts for that motion, while treating estimation errors in safety
-control.
+\cite{SharmaAlaiRajamani2026}. These studies point to the need for
+collision-avoidance control that accounts for both coupled vehicle
+dynamics and uncertainty in target estimates obtained during ego
+maneuvers.
 
 Work on this integration spans avoidance-path generation, coordinated
 vehicle control and feedback safety certification.
