@@ -109,16 +109,15 @@ interest in autonomous driving systems that combine cruising within a
 designated lane with active avoidance of potential collisions with
 surrounding vehicles, without requiring driver intervention.
 
-Collision avoidance may require the ego vehicle to change its path and
-speed together when limited space or a short time to collision makes
-steering or braking alone insufficient. The resulting yaw motion couples
-longitudinal and lateral velocities, while speed changes modify tire
-slip angles and the lateral response. Longitudinal and lateral tire forces
-also share the available friction capacity
-\cite{BealBoyd2019}. Treating longitudinal and lateral motion
-independently can overlook these interactions and demand a combination
-of tire forces that cannot be realized, undermining the predicted
-avoidance maneuver. The same maneuvers complicate the description of
+Collision avoidance may require the ego vehicle to perform complex
+maneuvers, such as braking while turning, during which
+longitudinal--lateral coupling can become pronounced. Changes in speed
+affect tire slip angles and the lateral response, while yaw motion
+couples longitudinal and lateral velocities. Longitudinal and lateral
+tire forces also share the available friction capacity
+\cite{BealBoyd2019}. The control design must therefore account for these
+coupling effects, whether longitudinal and lateral motion are controlled
+jointly or separately. The same maneuvers complicate the description of
 surrounding vehicles. Onboard sensors observe target positions in a frame
 that translates and rotates with the ego vehicle, so the relative
 trajectory depends on ego velocity and yaw rate even if the target
