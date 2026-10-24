@@ -35,7 +35,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(norm(largeInputs(:,1:count)-smallInputs(:,1:count),'fro'),1e-5);
             testCase.verifyTrue(large.metadata.uncertaintyIncluded);
             testCase.verifyFalse(large.metadata.robustNonlinearSafetyCertified);
-            testCase.verifyEqual(large.metadata.safetyScope,"affineNominalCollisionWithRelaxedObserverMargins");
+            testCase.verifyEqual(large.metadata.safetyScope,"nonlinearNominalCollisionWithRelaxedObserverMargins");
         end
         function zeroRadiusEnclosuresRecoverTheExactStateProblem(testCase)
             [ego,target,road,cfg]=localFixture(0);

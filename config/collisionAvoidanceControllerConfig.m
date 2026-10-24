@@ -34,7 +34,11 @@ function cfg=localDefaults()
     % Secondary objective: CLF slack plus half this weight times the mean
     % squared, unit-scaled state/input deviation from the current reference.
     % The weight stays active on the route; zero disables it for ablation.
-    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10);
+    % Failed nonlinear checks can restore the reference at most this many
+    % times. Each restoration can use one auxiliary conic solve; all work
+    % shares the original controller deadline. No restored input is issued.
+    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10, ...
+        'maximumRestorations',4);
     % One safety-oriented circulation rollout supplies initialization controls.
     % Cruise speed and route tracking belong to the controller's CLF stage.
     % The parallel-wall acceleration guide anticipates transverse momentum;
@@ -119,7 +123,8 @@ function cfg=localDefaults()
     % Both RTI stages share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     % constraintTolerance and optimalityTolerance are the conic solver's
-    % feasibility and gap tolerances; reducedTolerance is the precision
+    % feasibility and gap tolerances; feasibilityTolerance also bounds the
+    % sampled nonlinear primary residual. reducedTolerance is the precision
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for prediction and output assembly. Native
     % solves also count their construction time against the remaining budget.
@@ -159,6 +164,7 @@ function localValidate(cfg)
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.rti.maximumRestorations,{'double'},{'scalar','real','finite','integer','nonnegative'});
     for name=["radialRate","tangentialRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end

@@ -16,7 +16,10 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
     methods (Test)
         function campaignRunsStationaryAndBrakingTargetsWithTheObserver(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
-            campaign = runCollisionThreatValidation(Frames=40,OutputDirectory=string(fixture.Folder));
+            % This checks noisy joint execution, independently of machine
+            % load and the separate real-time deadline experiment.
+            campaign = runCollisionThreatValidation(Frames=40,OutputDirectory=string(fixture.Folder), ...
+                ControllerConfiguration=struct('solver',struct('timeLimitSeconds',5)));
             testCase.assertNumElements(campaign.results,2);
             testCase.verifyEqual([campaign.results.scenario],["stoppedLead","hardBrakingLead"]);
             testCase.verifyTrue(all([campaign.results.bypassQualified]));

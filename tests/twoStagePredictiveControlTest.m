@@ -21,16 +21,16 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyTrue(search.convexSolveCompleted);
             testCase.verifyFalse(problem.metadata.optimizationConverged);
-            testCase.verifyFalse(problem.metadata.nonlinearValidationPerformed);
-            testCase.verifyEqual(problem.metadata.safetyScope,"affineSampledConstraints");
-            testCase.verifyTrue(isnan(problem.metadata.nonlinearHardResidual));
+            testCase.verifyTrue(problem.metadata.nonlinearValidationPerformed);
+            testCase.verifyEqual(problem.metadata.safetyScope,"nonlinearSampledConstraints");
+            testCase.verifyLessThanOrEqual(problem.metadata.nonlinearHardResidual,cfg.solver.feasibilityTolerance);
             testCase.verifyLessThanOrEqual(problem.solution.safety, ...
                 search.slackCap+cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(inputs,problem.model.linearization.inputs+problem.solution.inputCorrection,AbsTol=0);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.appliedInput,inputs(:,1),AbsTol=0);
             testCase.verifyFalse(problem.metadata.postSolveInputModification);
-            testCase.verifyFalse(problem.metadata.postSolveFeasibilityCheck);
+            testCase.verifyTrue(problem.metadata.postSolveFeasibilityCheck);
             localVerifyRollouts(testCase,problem,cfg);
         end
         function shiftedReferenceUsesTheNewMeasurementInOneIteration(testCase)
@@ -213,7 +213,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.attempts(2).initialization,"plannedAvoidanceRollout");
             testCase.verifyTrue(search.planner.used);
             testCase.verifyTrue(isnan(search.planner.conflictStartSeconds));
-            testCase.verifyEqual(search.solverCalls,sum([search.attempts.solverCalls]));
+            testCase.verifyEqual(search.solverCalls,sum([search.attempts.solverCalls])+search.restorationSolverCalls);
             testCase.verifyLessThanOrEqual(search.solverCalls,4);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(problem.model.linearization.states(:,1),problem.model.initialState,AbsTol=0);
@@ -322,7 +322,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(model.solveTimer,timer);
             testCase.verifyEqual(model.solveTimeLimitSeconds, ...
                 cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
-            testCase.verifyEqual(search.solverCalls,sum([search.attempts.solverCalls]));
+            testCase.verifyEqual(search.solverCalls,sum([search.attempts.solverCalls])+search.restorationSolverCalls);
         end
         function roadEdgesAreDeferredWithoutChangingTheCruisePath(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;

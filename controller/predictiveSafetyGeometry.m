@@ -36,7 +36,12 @@ classdef predictiveSafetyGeometry
                 direction=model.circulationDirection;
             end
             budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-            speed=min(max(norm(field.velocity),1),sqrt(budget*field.egoRadius));
+            % The initial contour is far larger than the vehicle. Limiting
+            % relative circulation to a vehicle-radius turn slows head-on
+            % encounters almost to rest before they can pass. Use the current
+            % encounter scale; actual inputs still obey combined-slip Fiala.
+            contourRadius=max(field.egoRadius,norm(field.position));
+            speed=min(max(norm(field.velocity),1),sqrt(budget*contourRadius));
             best=localCirculationRollout(model,data,direction,speed,count);
             total=1;diagnostics=localCandidateSummary(best);
             time=(0:numel(best.gaps)-1)*cfg.controller.sampleTime;
@@ -717,7 +722,7 @@ function candidate=localCirculationRollout(model,data,direction,speed,count)
                 if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
             end
             acceleration=predictiveSafetyGeometry.wallGuidance(x,acceleration,model);
-            u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg);
+            u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true);
         end
         candidate.inputs(:,index)=u;
         next=nonlinearBicycleModel.sample(x,u,cfg);

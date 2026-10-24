@@ -28,6 +28,10 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
         end
         function controlsCanMoveBeyondTheFormerTrustBox(testCase)
             anchor=testCase.anchor;model=testCase.model;
+            % Keep this requested tangent force inside the model's axle
+            % capacity; the test concerns artificial input boxes, not force
+            % extrapolation past Fiala saturation.
+            model.cfg.tire.corneringStiffness=model.cfg.tire.corneringStiffness/2;
             % This first command needs more than 0.075 rad steering and
             % 0.125 braking-ratio correction, the old default hard box.
             required=anchor.inputs(:,1)+[.12;-.3];

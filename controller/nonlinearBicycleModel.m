@@ -276,11 +276,12 @@ classdef nonlinearBicycleModel
             u=[atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-slip+terminal.steeringOffset;b];
         end
 
-        function u = accelerationGuidance(x,acceleration,previous,cfg,longitudinalWeight)
+        function u = accelerationGuidance(x,acceleration,previous,cfg,longitudinalWeight,coupled)
             % Map a virtual world acceleration to initialization inputs using
             % the existing yaw-rate loop and inverse Fiala branch. This is
             % not an affine-input barrier projection or an execution filter.
             if nargin<5,longitudinalWeight=1;end
+            if nargin<6,coupled=false;end
             speed=hypot(x(4),x(5));course=x(3)+atan2(x(5),x(4));
             forward=[cos(course);sin(course)];lateral=[-forward(2);forward(1)];
             tire=modifiedFialaTire.parameters(cfg);p=cfg.nominalClf;
@@ -294,16 +295,41 @@ classdef nonlinearBicycleModel
             longitudinal=longitudinalWeight*(forward.'*acceleration);
             longitudinal=min(longitudinal,(cfg.model.speedMaximum-x(4))/cfg.controller.sampleTime);
             b=(longitudinal+nonlinearBicycleModel.roadLoad(x(4),cfg)/cfg.vehicle.m)/modifiedFialaTire.accelerationGain(cfg);
-            b=min(p.brakingRatioLimit,max(-p.brakingRatioLimit,b));
+            % Allocate braking and lateral force together. The cruise seed's
+            % brakingRatioLimit is not an avoidance actuator bound. Reserve
+            % the lateral fraction requested by the yaw loop at BOTH axles,
+            % then use the remaining Fiala capacity for longitudinal demand.
+            rearSlip=atan2(x(5)-cfg.vehicle.lr*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
+            brakingCapacity=p.brakingRatioLimit;
+            if coupled
+                rearFree=modifiedFialaTire.evaluate([0;rearSlip],0,cfg);
+                frontFree=(cfg.vehicle.Iz*p.yawRateGain*(desiredYaw-x(6))+cfg.vehicle.lr*rearFree(2))/cfg.vehicle.lf;
+                utilization=min(p.frontForceFraction,max(abs([frontFree;rearFree(2)])./tire.longitudinalForceScale));
+                brakingCapacity=sqrt(1-utilization^2);
+            end
+            b=min(brakingCapacity,max(-brakingCapacity,b));
             rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
             b=min(previous(2)+rate,max(previous(2)-rate,b));
             [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);b=min(upper(2),max(lower(2),b));
-            rear=modifiedFialaTire.evaluate([0;atan2(x(5)-cfg.vehicle.lr*x(6),max(x(4),cfg.model.scheduleSpeedFloor))],b,cfg);
+            rear=modifiedFialaTire.evaluate([0;rearSlip],b,cfg);
             front=(cfg.vehicle.Iz*p.yawRateGain*(desiredYaw-x(6))+cfg.vehicle.lr*rear(2))/cfg.vehicle.lf;
             capacity=tire.longitudinalForceScale(1)*sqrt(1-b^2);
             fraction=min(abs(front)/capacity,p.frontForceFraction);
             slip=-sign(front)*atan(3*capacity*(1-(1-fraction)^(1/3))/tire.corneringStiffness(1));
             steering=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor))-slip;
+            % The front braking force rotates with steering. Invert the
+            % body-frame lateral force, not Fy alone, with bounded scalar
+            % Newton steps on the same adhesion branch used above.
+            frontCourse=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
+            slipLimit=atan(3*capacity*(1-(1-p.frontForceFraction)^(1/3))/tire.corneringStiffness(1));
+            for iteration=1:3*double(coupled)
+                [force,slope]=modifiedFialaTire.evaluate([frontCourse-steering;rearSlip],b,cfg);
+                fx=b*tire.longitudinalForceScale(1);c=cos(steering);s=sin(steering);
+                value=fx*s+force(1)*c;
+                derivative=fx*c-slope(1)*c-force(1)*s;
+                if derivative<=eps,break;end
+                steering=min(frontCourse+slipLimit,max(frontCourse-slipLimit,steering+(front-value)/derivative));
+            end
             % The declared plant blends to a kinematic bicycle at low speed;
             % invert that branch too instead of applying a tire-force inverse
             % whose steering authority vanishes near rest.

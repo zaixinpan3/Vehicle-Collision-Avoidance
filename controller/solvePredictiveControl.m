@@ -1,9 +1,10 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl PCBF/CLF RTI with terminal-feasible horizon search.
 % Each reference supplies one affine model for both convex objectives. A
-% primal-infeasible local problem requests another reference or a longer
-% horizon until the terminal-constrained problem solves or its budget ends.
-% There is no nonlinear merit loop or modification of optimized inputs.
+% failed shifted reference requests fresh planning. Exceptional bounded
+% feasibility restoration improves subsequent references; ordinary RTI
+% still uses one model. Only unchanged, nonlinearly checked optimized inputs
+% can be returned. Restoration steps themselves are never executed.
 % Research access: solvePredictiveControl("probe",request) exposes reference,
 % formulation and solve operations to the free-time experiment in scripts/.
 % It does not enable a variable grid in the online controller.
@@ -26,12 +27,15 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly && isfield(model,'probeMinimumHorizonSteps')
         minimumCount=max(minimumCount,model.probeMinimumHorizonSteps);
     end
-    history=struct([]);anchor=[];replan=false;
-    extensions=0;horizonStop="";
+    history=struct([]);anchor=[];replan=false;restoredAnchor=[];restorations=struct([]);freshTried=false;
+    model.referencePenaltyMultiplier=1;
+    extensions=0;horizonStop="";bestNonlinearSafety=Inf;
     rollout=struct('available',false,'reason',"noCompletedOptimization", ...
         'fullGap',NaN,'fullCorrection',NaN);
     while true
-        source="nominalFeedbackRollout";domainFailure=false;
+        source="nominalFeedbackRollout";domainFailure=false;proposed=[];problem=[];
+        rollout=struct('available',false,'reason',"noCompletedOptimization", ...
+            'fullGap',NaN,'fullCorrection',NaN);
         if isfield(model,'target') && ~isempty(model.target),source="plannedAvoidanceRollout";end
         if isstruct(previousState) && isfield(previousState,'inputTrajectory') ...
                 && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all') ...
@@ -42,8 +46,13 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         try
             localCheckDeadline(model);
             wall=tic;
-            [anchor,source]=localRtiInitialize(model,previousState,minimumCount);
+            if isempty(restoredAnchor)
+                [anchor,source]=localRtiInitialize(model,previousState,minimumCount);
+            else
+                anchor=restoredAnchor;restoredAnchor=[];source="restoredNonlinearRollout";
+            end
             search.horizonSteps=size(anchor.inputs,2);
+            freshTried=freshTried || source=="plannedAvoidanceRollout";
             search.initializationSeconds=toc(wall);search.initialization=source;
             model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
             [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
@@ -60,6 +69,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             end
             anchor.terminalContext.collisionSide=model.collisionSide;
             model.terminalContext=anchor.terminalContext;
+            if source=="restoredNonlinearRollout"
+                model.fixedCollisionNormals=anchor.safetyNormals;
+            end
             if source=="shiftedInputRollout" && ~isempty(model.target) && ~model.targetOnset ...
                     && isfield(previousState,'collisionEscapeNormals') && isfield(previousState,'collisionSide')
                 old=previousState.collisionEscapeNormals(:,3:end);
@@ -71,6 +83,14 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 model.linearization=anchor;solution=[];return;
             end
             wall=tic;[problem,model]=localFormulate(anchor,model);
+            if ~isfield(model,'numericalStateMargin') && ~isfield(model,'numericalTerminalMargin')
+                anchorCheck=localPrimaryResidual(problem);
+            else
+                anchorCheck=localNonlinearCheck(anchor,model,problem.safetyNormals);
+            end
+            if anchorCheck.hard<=cfg.solver.feasibilityTolerance
+                bestNonlinearSafety=min(bestNonlinearSafety,anchorCheck.safety);
+            end
             search.formulationSeconds=toc(wall);search.modelBuilt=true;
             model.linearization=anchor;problem.inheritedAnchor=source=="shiftedInputRollout";
             initializationSeconds=search.initializationSeconds;formulationSeconds=search.formulationSeconds;
@@ -78,18 +98,41 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             search.modelBuilt=true;search.formulationSeconds=formulationSeconds;
             search.initializationSeconds=initializationSeconds;
             [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
+            search.nonlinearSlackCap=search.slackCap;
+            if isfinite(bestNonlinearSafety)
+                search.nonlinearSlackCap=min(search.slackCap,bestNonlinearSafety ...
+                    +cfg.solver.lexicographicTieTolerance*max(1,bestNonlinearSafety));
+            end
             if ~isempty(solution)
+                proposed=solution;
                 localCheckDeadline(model);
                 [solution,rollout]=localPrediction(solution,anchor,model);
                 if ~rollout.available
                     solution=[];search.terminationReason="nonlinearPredictionUnavailable";
                 else
-                    solution.collisionEscapeNormals=model.collisionEscapeNormals;
-                    solution.collisionSide=model.collisionSide;
-                    solution.circulationDirection=model.circulationDirection;
-                    solution.retainCollisionSide=model.retainCollisionSide;
-                    solution.linearizationGap=rollout.fullGap;
-                    solution=localTerminalMetrics(solution,model);
+                    actual=anchor;actual.states=solution.states;actual.inputs=solution.inputs;
+                    [check,~,~]=localNonlinearCheck(actual,model,problem.safetyNormals);
+                    rollout.hardResidual=check.hard;rollout.safety=check.safety;
+                    tolerance=cfg.solver.feasibilityTolerance;
+                    if check.hard>tolerance || check.safety>search.nonlinearSlackCap+tolerance
+                        model.numericalStateMargin=localNumericalMargin(solution,anchor,problem,model);
+                        model.lastTerminalDefect=check.terminalViolation;
+                        solution=[];search.terminationReason="nonlinearConstraintViolation";
+                        rollout.reason="nonlinearConstraintViolation";
+                    else
+                        solution.hard=check.hard;solution.nonlinearValidationPerformed=true;
+                        solution.affineSafety=solution.safety;
+                        solution.affineStageSlacks=solution.stageSlacks;
+                        solution.safety=check.safety;solution.stageSlacks=check.slacks;
+                        solution.nonlinearSafety=check.safety;solution.nonlinearStageSlacks=check.slacks;
+                        solution.collisionEscapeNormals=model.collisionEscapeNormals;
+                        solution.collisionSide=model.collisionSide;
+                        solution.circulationDirection=model.circulationDirection;
+                        solution.retainCollisionSide=model.retainCollisionSide;
+                        solution.linearizationGap=rollout.fullGap;
+                        solution=localTerminalMetrics(solution,model);
+                        rollout.reason="sampledNonlinearConstraintsPassed";
+                    end
                 end
             end
         catch exception
@@ -109,11 +152,47 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         end
         history=[history,localAttempt(search)]; %#ok<AGROW> Bounded by the shared deadline.
         infeasible=~isempty(search.stages) && search.stages(end).exitFlag==-2;
+        invalid=any(search.terminationReason==["nonlinearPredictionUnavailable","nonlinearConstraintViolation"]);
+        % Primal infeasibility of a shifted model first requests fresh
+        % planning. A solved but inaccurate model can restore its nonlinear
+        % reference first. Both paths disclose every additional model/solve.
+        if isempty(solution) && (infeasible || invalid) && (source~="shiftedInputRollout" || invalid) ...
+                && ~isempty(problem) && numel(restorations)<cfg.rti.maximumRestorations
+            try
+                [restoredAnchor,restoration]=localRestore(anchor,model,problem,proposed);
+                restorations=[restorations,restoration]; %#ok<AGROW>
+                if restoration.timedOut
+                    search.terminationReason="timeLimit";break;
+                end
+                if ~isempty(restoredAnchor)
+                    model.numericalStateMargin=restoredAnchor.numericalStateMargin;
+                    if isfield(model,'lastTerminalDefect')
+                        reserve=1.25*restoration.acceptedStep^2*model.lastTerminalDefect;
+                        if isfield(model,'numericalTerminalMargin'),reserve=max(reserve,model.numericalTerminalMargin);end
+                        model.numericalTerminalMargin=reserve;
+                    end
+                    model.referencePenaltyMultiplier=10*model.referencePenaltyMultiplier;
+                    replan=true;continue;
+                end
+            catch exception
+                if ~strcmp(exception.identifier,'collisionAvoidanceController:timeBudgetExceeded'),rethrow(exception);end
+                search.terminationReason="timeLimit";break;
+            end
+        end
         % Extending an unrollable fresh guide repeats the same invalid
         % prefix; horizon growth cannot repair that initialization failure.
         % A failed shifted prefix can still be replaced by fresh guidance.
-        recoverable=infeasible || (source=="shiftedInputRollout" ...
-            && (domainFailure || search.terminationReason=="nonlinearPredictionUnavailable"));
+        recoverable=infeasible || (source=="shiftedInputRollout" && (domainFailure || invalid));
+        if source=="restoredNonlinearRollout" && numel(restorations)>=cfg.rti.maximumRestorations && ~infeasible
+            recoverable=false;
+        end
+        if isempty(solution) && (infeasible || invalid) && ~freshTried && ~isempty(model.target)
+            % A failed restoration of the old maneuver must not consume the
+            % request to rebuild a genuinely fresh field reference.
+            minimumCount=size(anchor.inputs,2);previousState=[];
+            builds=model.linearizationBuilds;model=baseModel;model.linearizationBuilds=builds;
+            model.referencePenaltyMultiplier=1;anchor=[];replan=true;continue;
+        end
         if ~isempty(solution) || ~recoverable ...
                 || toc(timer)>=model.solveTimeLimitSeconds
             break;
@@ -134,10 +213,12 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             nextCount=min(cfg.controller.maximumHorizonSteps,max(count+1,ceil(1.5*count)));
             if nextCount<=count,horizonStop="horizonLimit";break;end
             minimumCount=nextCount;previousState=originalPrevious;extensions=extensions+1;
+            bestNonlinearSafety=Inf;
         end
         builds=model.linearizationBuilds;lastModel=model;model=baseModel;model.linearizationBuilds=builds;
         if isfield(lastModel,'linearization'),model.linearization=lastModel.linearization;end
         model.terminalContext=[];anchor=[];replan=true;
+        model.referencePenaltyMultiplier=1;
     end
     search.source="twoStageRealTimeIteration";search.algorithm="realTimeIteration";
     search.initialization=source;search.returned=~isempty(solution);
@@ -159,6 +240,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.potentialFieldRestarted=false;search.initializationFailure="";
     search.attempts=history;search.selectedAttempt=numel(history)*double(search.returned);
     search.solverCalls=sum([history.solverCalls]);
+    search.restorations=restorations;search.restorationCount=numel(restorations);
+    search.restorationSolverCalls=0;
+    if ~isempty(restorations),search.restorationSolverCalls=sum([restorations.solverCalls]);end
+    search.solverCalls=search.solverCalls+search.restorationSolverCalls;
     search.initializationSeconds=sum([history.initializationSeconds]);
     search.formulationSeconds=sum([history.formulationSeconds]);
     search.clfConstructionSeconds=sum([history.clfConstructionSeconds]);
@@ -365,8 +450,7 @@ function discrepancy=localPoseDiscrepancy(first,second,cfg)
 end
 
 function [solution,rollout]=localPrediction(solution,anchor,model)
-    % Predict the unchanged optimized inputs; this is not a feasibility test.
-    % Prediction/model-domain failures return no command, never repaired inputs.
+    % Predict unchanged optimized inputs before evaluating their constraints.
     rollout=struct('available',false,'reason',"noCompletedOptimization", ...
         'fullGap',NaN,'fullCorrection',NaN);
     if isempty(solution),return;end
@@ -401,6 +485,154 @@ function [solution,rollout]=localPrediction(solution,anchor,model)
     rollout.available=true;rollout.reason="predictionOnly";
     rollout.fullGap=max(localPoseDiscrepancy(states,solution.affineStates,model.cfg));
     solution.states=states;
+end
+
+function [check,problem,formed]=localNonlinearCheck(anchor,model,normals)
+    % At zero correction the reassembled rows evaluate the actual rollout,
+    % including its true yaw, posterior margins and terminal continuation.
+    % Keep the solve's separating normals: validation cannot select an easier
+    % collision branch. This is a sampled numerical check, not a tube proof.
+    model.fixedCollisionNormals=normals;builds=model.linearizationBuilds;
+    if isfield(model,'numericalStateMargin'),model=rmfield(model,'numericalStateMargin');end
+    if isfield(model,'numericalTerminalMargin'),model=rmfield(model,'numericalTerminalMargin');end
+    [problem,formed]=localFormulate(anchor,model);
+    formed.linearizationBuilds=builds;
+    check=localPrimaryResidual(problem);
+end
+
+function check=localPrimaryResidual(problem)
+    % Numerical reserves may restrict a new subproblem, but cannot justify
+    % losing a better already available nonlinear safety witness.
+    deficit=max(0,-problem.b);slack=problem.slackIndices;
+    soft=problem.a(:,slack);hard=~any(soft,2);
+    required=zeros(numel(slack),1);
+    for k=1:numel(slack)
+        required(k)=max([0;deficit(soft(:,k)<0)]);
+    end
+    boundViolation=max([0;problem.lower;-problem.upper]);
+    check=struct('safety',sum(required),'slacks',required.', ...
+        'hard',max([boundViolation;deficit(hard)]));
+    check.terminalViolation=max([0;-problem.terminalBounds]);
+    check.merit=1000*check.hard+check.safety/max(1,numel(slack));
+end
+
+function margin=localNumericalMargin(solution,anchor,problem,model)
+    % A posteriori model-error feedback for the NEXT numerical attempt.
+    % It is separate from observer uncertainty and is not a certified bound.
+    % Acceptance always rechecks the true constraints without this reserve.
+    count=size(solution.inputs,2);margin=zeros(6,2*count+1);
+    margin(:,1:2:end)=abs(solution.states-solution.affineStates);
+    for k=1:count
+        stage=problem.stages(k);
+        affine=stage.middle+stage.am*(solution.affineStates(:,k)-anchor.states(:,k)) ...
+            +stage.bm*(solution.inputs(:,k)-anchor.inputs(:,k));
+        [middle,am,~,~,a]=nonlinearBicycleModel.hold(solution.states(:,k),solution.inputs(:,k),model.cfg);
+        margin(:,2*k)=abs(middle-affine);
+        % The fixed posterior is used once. Changing the operating point
+        % changes its held-input image too; account for that change instead
+        % of confusing it with a second independent source of uncertainty.
+        generator=model.uncertainty.egoGenerator;
+        middleChange=sum(abs((am-stage.am)*generator),2);
+        nextChange=sum(abs((a-stage.a)*generator),2);
+        oldMiddle=localRelativeGenerator(stage.middle,stage.am*generator,model,anchor.states(:,k));
+        newMiddle=localRelativeGenerator(middle,am*generator,model,solution.states(:,k));
+        oldNext=localRelativeGenerator(anchor.states(:,k+1),stage.a*generator,model,anchor.states(:,k));
+        newNext=localRelativeGenerator(solution.states(:,k+1),a*generator,model,solution.states(:,k));
+        margin(:,2*k)=margin(:,2*k)+max(middleChange,sum(abs(newMiddle-oldMiddle),2));
+        margin(:,2*k+1)=margin(:,2*k+1)+max(nextChange,sum(abs(newNext-oldNext),2));
+    end
+    margin=1.25*margin;
+end
+
+function [next,info]=localRestore(anchor,model,problem,proposed)
+    % Feasibility restoration only creates the next reference. Its controls
+    % are never issued. It softens hard state/collision/terminal rows in one
+    % auxiliary solve, retains actuator and Fiala capacity limits, then tests
+    % a decreasing sequence of steps through the nonlinear vehicle model.
+    next=[];info=struct('solverCalls',0,'acceptedStep',0,'before',Inf,'after',Inf, ...
+        'initialFeasible',false,'timedOut',false);
+    try
+        [before,p]=localNonlinearCheck(anchor,model,problem.safetyNormals);
+        info.before=before.merit;cfg=model.cfg;nv=numel(p.lower);
+        info.initialFeasible=before.hard<=cfg.solver.feasibilityTolerance && before.safety<=cfg.solver.lexicographicTieTolerance;
+        if ~isempty(proposed)
+            [next,fraction,merit]=localRestorationStep(anchor,model,p,proposed.inputs-anchor.inputs,before);
+            if ~isempty(next)
+                info.acceptedStep=fraction;info.after=merit;return;
+            end
+        end
+        units=[cfg.clf.lateralPositionErrorScale;cfg.clf.lateralPositionErrorScale; ...
+            cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+            cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+        inputUnits=[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio];
+        diagonal=zeros(nv+1,1);n=size(anchor.inputs,2);
+        diagonal(p.stateIndices(:,2:end))=repmat(1./units.^2/n,1,n);
+        diagonal(p.inputIndices)=repmat(1./inputUnits.^2/n,1,n);
+        quadratic=spdiags(.1*diagonal,0,nv+1,nv+1);
+        objective=[p.safetyObjective/max(1,numel(p.slackIndices));1000];
+        % A single elastic variable measures the largest hard violation.
+        hard=~any(p.a(:,p.slackIndices),2);
+        inputOnly=~any(p.a(:,p.stateIndices(:)),2) & any(p.a(:,p.inputIndices(:)),2);
+        hard=hard & ~inputOnly;
+        a=[p.a,-double(hard)];b=p.b;
+        states=p.stateIndices(:);lo=isfinite(p.lower(states));hi=isfinite(p.upper(states));
+        eyeState=sparse(1:numel(states),states,1,numel(states),nv);
+        a=[a;-eyeState(lo,:),-ones(nnz(lo),1);eyeState(hi,:),-ones(nnz(hi),1)];
+        b=[b;-p.lower(states(lo));p.upper(states(hi))];
+        lower=[p.lower;0];upper=[p.upper;Inf];lower(states)=-Inf;upper(states)=Inf;
+        % The CLF is absent from restoration and cannot demand cruise here.
+        lower(p.clfIndex)=0;upper(p.clfIndex)=0;
+        cones=p.cones(1:p.primaryConeCount);
+        for k=1:numel(cones)
+            cones(k).A(:,nv+1)=0;cones(k).D(:,nv+1)=0;
+        end
+        localCheckDeadline(model);
+        remaining=model.solveTimeLimitSeconds-toc(model.solveTimer);
+        [step,flag]=localConicSolve(quadratic,objective,cones,a,b, ...
+            [p.equal,sparse(size(p.equal,1),1)],p.rhs,lower,upper,cfg,remaining,cfg.solver.optimalityTolerance);
+        info.solverCalls=1;
+        if isempty(step) || flag<=0,return;end
+        direction=reshape(step(p.inputIndices),size(anchor.inputs));
+        [next,fraction,merit]=localRestorationStep(anchor,model,p,direction,before);
+        if ~isempty(next),info.acceptedStep=fraction;info.after=merit;end
+    catch exception
+        if ~strcmp(exception.identifier,'collisionAvoidanceController:timeBudgetExceeded'),rethrow(exception);end
+        % Preserve the count of an auxiliary solve completed before a later
+        % trial ran out of time. An incomplete trial cannot become a seed.
+        next=[];info.timedOut=true;
+    end
+end
+
+function [next,fraction,merit]=localRestorationStep(anchor,model,problem,direction,before)
+    next=[];merit=Inf;cfg=model.cfg;
+    for fraction=2.^(-(0:8))
+        localCheckDeadline(model);
+        candidate=anchor;candidate.inputs=anchor.inputs+fraction*direction;
+        [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
+        % Only an initializer needs an interior tangent. This never changes
+        % the command returned by either of the two actual objective solves.
+        candidate.inputs=min(upper,max(lower,candidate.inputs));
+        affine=anchor.states;delta=model.initialState-anchor.states(:,1);
+        for k=1:size(candidate.inputs,2)
+            stage=problem.stages(k);
+            delta=stage.a*delta+stage.b*(candidate.inputs(:,k)-anchor.inputs(:,k)) ...
+                +stage.next-anchor.states(:,k+1);
+            affine(:,k+1)=anchor.states(:,k+1)+delta;
+        end
+        trial=struct('inputs',candidate.inputs,'states',affine);
+        [trial,rollout]=localPrediction(trial,anchor,model);
+        if ~rollout.available,continue;end
+        candidate.states=trial.states;
+        [after,~,~]=localNonlinearCheck(candidate,model,problem.safetyNormals);
+        improved=after.merit<before.merit-1e-6*max(1,before.merit);
+        feasible=after.hard<=cfg.solver.feasibilityTolerance ...
+            && after.safety<=cfg.solver.lexicographicTieTolerance;
+        if improved || feasible
+            candidate.safetyNormals=problem.safetyNormals;
+            candidate.numericalStateMargin=localNumericalMargin(trial,anchor,problem,model);
+            next=candidate;merit=after.merit;return;
+        end
+    end
 end
 
 function context=localTerminalContext(anchor,model)
@@ -631,7 +863,7 @@ function [problem,model]=localFormulate(anchor,model)
     holdCenter=model.initialState;h=cfg.controller.sampleTime;
     stages=localLinearization(anchor,model);
     physicalInputLower=repmat(inputLower,1,count);physicalInputUpper=repmat(inputUpper,1,count);
-    maximumTightening=0;
+    maximumTightening=0;safetyNormals=zeros(2,2*count+1);
     [durations,times]=localTimeGrid(model,count);
     % Record time j*h/2 lies in hold ceil(j/2), which starts at (ceil(j/2)-1)*h.
     holdStarts=times(2*max(0,ceil((0:2*count)/2)-1)+1);
@@ -697,6 +929,7 @@ function [problem,model]=localFormulate(anchor,model)
         if fullCollisionRows || ~encounterEnded
             departure=index;
             [g,j,tightening,escape]=localSafety(x,forecast(:,point),point,model,collisionGenerator);
+            safetyNormals(:,point)=j(1,1:2).';
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
             if index==1,primaryLowerBound=max(0,-min(g));end
@@ -718,6 +951,7 @@ function [problem,model]=localFormulate(anchor,model)
         if fullCollisionRows || ~encounterEnded
             departure=index;
             [g,j,tightening,escape]=localSafety(middle,forecast(:,point),point,model,middleCollisionGenerator);
+            safetyNormals(:,point)=j(1,1:2).';
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
             r=-j*middleMap(1:3,:);
@@ -730,6 +964,12 @@ function [problem,model]=localFormulate(anchor,model)
             blockBounds{blockCount}=g;
         end
         middleRadius=sum(abs(middleGenerator(4:6,:)),2);nextRadius=sum(abs(nextGenerator(4:6,:)),2);
+        numericalMiddle=zeros(6,1);numericalNext=zeros(6,1);
+        if isfield(model,'numericalStateMargin')
+            numericalMiddle=model.numericalStateMargin(:,2*index);
+            numericalNext=model.numericalStateMargin(:,2*index+1);
+            middleRadius=middleRadius+numericalMiddle(4:6);nextRadius=nextRadius+numericalNext(4:6);
+        end
         blockCount=blockCount+1;blockRows{blockCount}=[middleMap(4:6,:);-middleMap(4:6,:)];blockColumns{blockCount}=middleColumns;
         blockBounds{blockCount}=[physicalUpper-middle(4:6)-middleRadius;middle(4:6)-physicalLower-middleRadius];
         [r,bound]=localFrontDomain(x,input,cfg,generator);
@@ -748,7 +988,7 @@ function [problem,model]=localFormulate(anchor,model)
         % sideslip is undefined.
         if nextReference(4)>cfg.model.brakeHoldSpeed
             blockCount=blockCount+1;blockRows{blockCount}=side;blockColumns{blockCount}=jx;
-            blockBounds{blockCount}=-side*nextReference-sum(abs(side*nextGenerator),2);
+            blockBounds{blockCount}=-side*nextReference-sum(abs(side*nextGenerator),2)-abs(side)*numericalNext;
         end
         generator=nextGenerator;holdCenter=middleCenter;
     end
@@ -770,6 +1010,7 @@ function [problem,model]=localFormulate(anchor,model)
     if fullCollisionRows || ~encounterEnded
         departure=count+1;
         [g,j,tightening,escape]=localSafety(y,forecast(:,point),point,model,collisionGenerator);
+        safetyNormals(:,point)=j(1,1:2).';
         model.collisionEscapeNormals(:,point)=escape;
         maximumTightening=max(maximumTightening,max(tightening));
         r=[-j,zeros(4,3)];
@@ -801,6 +1042,12 @@ function [problem,model]=localFormulate(anchor,model)
     end
     localCheckDeadline(model);
     [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,time/h);
+    if isfield(model,'numericalStateMargin')
+        terminalBounds=terminalBounds-abs(terminalRows)*model.numericalStateMargin(:,end);
+    end
+    if isfield(model,'numericalTerminalMargin')
+        terminalBounds=terminalBounds-model.numericalTerminalMargin;
+    end
     localCheckDeadline(model);
     model.terminalContext=context;model.encounterExitRecord=exitRecord;
     if ~isempty(terminalRows)
@@ -817,21 +1064,52 @@ function [problem,model]=localFormulate(anchor,model)
         reachLower(:)=-Inf;reachUpper(:)=Inf;
     end
     [inequality,bounds]=localAssemble(blockRows,blockColumns,blockBounds,blockCount,nv,reachLower,reachUpper);
-    % Tire saturation belongs to Fiala dynamics, not an extra force cone.
+    % Carry the Fiala force capacity into its affine approximation. This
+    % uses exactly the model's axle loads and friction: an unconstrained
+    % tangent otherwise predicts lateral force even at full braking.
+    cones=localTireCapacity(cones,anchor,stages,ix,iu,nv,cfg);
     objective=zeros(nv,1);objective(is)=1;
     problem=struct('a',inequality,'b',bounds, ...
         'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',cones, ...
         'primaryConeCount',numel(cones), ...
+        'stages',stages, ...
+        'safetyNormals',safetyNormals, ...
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
         'encounterExit',departure, ...
         'maximumCollisionTighteningMeters',maximumTightening, ...
         'terminalRowCount',size(terminalRows,1),'terminalAnchorValue',terminalInfo.value, ...
+        'terminalBounds',terminalBounds, ...
         'terminalAnchorMargin',terminalInfo.margin,'terminalAnchorExitSeconds',terminalInfo.exitSeconds, ...
         'terminalAnchorReason',terminalInfo.reason);
     model.robustnessRelaxation=robustRelaxation;
     problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
     problem.inputIncrementLower=physicalInputLower-anchor.inputs;problem.inputIncrementUpper=physicalInputUpper-anchor.inputs;
+end
+
+function cones=localTireCapacity(cones,anchor,stages,ix,iu,nv,cfg)
+    scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+    count=size(iu,2);maps=cell(1,3*count);values=cell(1,3*count);used=0;
+    for k=1:count
+        poses=[anchor.states(:,k),stages(k).middle,anchor.states(:,k+1)];
+        for point=1:3
+            x=poses(:,point);
+            if x(4)<=cfg.model.kinematicSpeedRange(1),continue;end
+            map=sparse(6,nv);
+            if point==1,map(:,ix(:,k))=eye(6);
+            elseif point==3,map(:,ix(:,k+1))=eye(6);
+            else,map(:,ix(:,k))=stages(k).am;map(:,iu(:,k))=stages(k).bm;end
+            u=anchor.inputs(:,k);tire=modifiedFialaTire.affineModel(x,u,cfg);
+            force=tire.state*map;force(:,iu(:,k))=force(:,iu(:,k))+tire.input;
+            row=sparse(4,nv);row([1,3],iu(2,k))=1;
+            row([2,4],:)=force./scale;
+            used=used+1;maps{used}=row;values{used}=reshape([repmat(u(2),1,2);(tire.force./scale).'],[],1);
+        end
+    end
+    if used>0
+        cones(end+1)=struct('A',vertcat(maps{1:used}),'b',-vertcat(values{1:used}), ...
+            'D',sparse(2*used,nv),'gamma',-ones(2*used,1),'size',2);
+    end
 end
 
 function [matrix,vector]=localAssemble(rows,columns,bounds,count,nv,lower,upper)
@@ -917,8 +1195,9 @@ function [values,jacobian,tightening,escape]=localSafety(x,q,point,model,generat
         dual=localEscapeDual(x,q,model,dual);
         escape=dual.normal;
     end
-    if isfield(model,'probeNormals')
-        normal=model.probeNormals(:,point);
+    if isfield(model,'fixedCollisionNormals') || isfield(model,'probeNormals')
+        if isfield(model,'fixedCollisionNormals'),normal=model.fixedCollisionNormals(:,point);
+        else,normal=model.probeNormals(:,point);end
         rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];body=rotation.'*normal;
         [dual.value,dual.jacobian]=predictiveSafetyGeometry.fixedDualRows( ...
             x(1:3),shape,q(1:3),q(8:11),[max(body,0);max(-body,0)]);
@@ -941,6 +1220,10 @@ function [values,jacobian,tightening,escape]=localSafety(x,q,point,model,generat
     [~,targetRotation]=predictiveSafetyGeometry.rotationSupport(q(8:11),q(3),tube.yawRadius,normal(1,:));
     tightening=sum(abs(normal*generator(1:2,:)),2)+targetSupport+normalNorm*reserve+targetRotation;
     values=values-tightening;
+    if isfield(model,'numericalStateMargin')
+        remainder=model.numericalStateMargin(:,point);
+        values=values-normalNorm*(norm(remainder(1:2))+egoReach*remainder(3));
+    end
 end
 
 function dual=localEscapeDual(x,q,model,nearest)
@@ -1068,6 +1351,9 @@ function problem=localAddClf(problem,anchor,model)
     problem.referenceStateMap=sparse(1:numel(ix),ix(:),stateScale,numel(ix),nv);
     problem.referenceInputMap=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
     problem.referenceDeviationWeight=model.cfg.rti.referenceDeviationWeight;
+    if isfield(model,'referencePenaltyMultiplier')
+        problem.referenceDeviationWeight=problem.referenceDeviationWeight*model.referencePenaltyMultiplier;
+    end
     problem.referencePenaltyWeight=problem.referenceDeviationWeight/(2*scale);
     problem.quadratic=2*problem.referencePenaltyWeight ...
         *(problem.referenceStateMap.'*problem.referenceStateMap+problem.referenceInputMap.'*problem.referenceInputMap);
@@ -1110,12 +1396,12 @@ function tube=localTargetTube(model,time,holdStart)
 end
 
 function solution=localTerminalMetrics(solution,model)
-    % Simple prediction quantities; no post-solve constraint evaluation.
+    % Diagnostics of the already checked nonlinear endpoint.
     cfg=model.cfg;y=solution.states(:,end);count=size(solution.inputs,2);
     solution.terminalValue=nonlinearBicycleModel.nominalValue(y,model.lane,model.nominalReference);
     solution.terminalMarginMeters=NaN;solution.terminalRoadMarginMeters=NaN;
     solution.terminalStopSeconds=hypot(y(4),y(5))/cfg.terminal.brakingDecelerationMetersPerSecondSquared;
-    solution.terminalExitSeconds=NaN;solution.terminalEnd="notValidated";
+    solution.terminalExitSeconds=NaN;solution.terminalEnd="sampledConstraintsValidated";
     solution.terminalDistanceMeters=Inf;
     if ~isempty(model.target)
         q=localTargetAt(model,count*cfg.controller.sampleTime);
@@ -1163,6 +1449,14 @@ function [result,search,model]=localProbe(request)
             problem=request.problem;anchor=request.anchor;
             [point,problem,search,model]=localPrimary(anchor,model,"durationExperiment",timer,problem);
             [result,search,model]=localSecondary(point,problem,anchor,model,search,timer);
+        case "check"
+            model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
+            [result,search,model]=localNonlinearCheck(request.anchor,model,request.problem.safetyNormals);
+        case "restore"
+            model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
+            [result,search]=localRestore(request.anchor,model,request.problem,request.proposed);
+        case "remainder"
+            result=localNumericalMargin(request.solution,request.anchor,request.problem,model);
         otherwise
             error('collisionAvoidanceController:invalidProbeOperation','Unknown research operation.');
     end

@@ -17,7 +17,7 @@ There are two mathematical objects whose results must be distinguished:
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | One local RTI model per reference, per-hold affine uncertainty tightening, a first-successor CLF row and linearized terminal conditions; a completed solve supplies the unchanged first input. |
+| Executable controller | One local RTI model per reference, Fiala-capacity-consistent tangents, per-hold affine uncertainty tightening, a first-successor CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Failed attempts can request bounded reference restoration. |
 | Conditional nonlinear output-feedback design | Joint physical/observer information sets, persistent model uncertainty, causal future feedback, sound reachable images and a common terminal continuation; the shifted-policy proof establishes mathematical recursive feasibility under its stated premises. |
 
 The latter theorem is not a certificate for the former approximation.
@@ -378,9 +378,12 @@ $$
 The current input estimate is fixed; current state error is handled by the
 published enclosure, not a free optimizer correction. Fixed collision duals
 and terminal tangents are built once on this model. There are at most two
-native convex solves per reference, without convergence-driven nonlinear
-iterations. A later nonlinear prediction records discrepancy; it neither
-repairs nor vetoes the optimized command.
+native objective solves per reference. A later nonlinear prediction checks
+the primary constraints using the solve's fixed collision normals. A failed
+check requests reference restoration or fresh planning. Restoration can
+rebuild the model and is explicitly counted; those exceptional calls are not
+strict single-linearization RTI. No restored or clipped command is executed
+without a subsequent completed two-stage solve and nonlinear check.
 
 ### Implemented constraints and objective units
 
@@ -388,7 +391,10 @@ State and input increments have no artificial search bounds. Actual longitudinal
 magnitude and optional slew limits remain hard. Steering has no artificial
 actuator magnitude or slew limit; the Fiala angle domain is enforced. State
 limits, sideslip, optional road-corner rows and terminal
-rows retain their existing meanings. No shared elastic variable relaxes them.
+rows retain their existing meanings. No shared elastic variable relaxes the
+problem whose controls are issued. An auxiliary restoration problem can use
+an elastic variable to construct a better reference, but cannot supply an
+execution command.
 
 Nominal collision rows in the first `controller.horizonSteps` nodes carry
 nonnegative PCBF slacks. With observer uncertainty, every tightened collision
@@ -423,7 +429,7 @@ keeps the overall weight independent of node count. The solver divides the
 entire objective by `max(1,V(xhat_now))` for numerical scaling.
 
 The old whole-horizon attraction to the cruise route is removed from this
-objective. Cruise recovery remains in the CLF and planner path field. Larger
+objective. Cruise recovery remains in the CLF. Larger
 lambda permits more CLF slack to retain the reference, but cannot relax the
 primary PCBF cap or other constraints. This changes performance preference,
 not the feasible set or the conditional shift-candidate feasibility argument.
@@ -431,8 +437,22 @@ It does not guarantee small nonlinear prediction error or successful RTI.
 Both stages must complete; an unfinished secondary stage
 does not cause execution of the primary point.
 
-Modified Fiala dynamics include saturation at both axles. There is no extra
-rear-tire nonsaturation cone in the optimization or terminal membership test.
+Modified Fiala dynamics include saturation at both axles. To prevent their
+affine tangents from inventing lateral force during full braking, each
+dynamic-regime axle at a node or midpoint satisfies
+
+$$
+\left\|\begin{bmatrix}b\\ \widehat F_{y,i}/(\mu_i F_{z,i})\end{bmatrix}\right\|_2\le1.
+$$
+
+This retains the capacity already used by the nonlinear tire, without a
+smaller friction coefficient or a rear-tire nonsaturation requirement. It is
+a consistency condition on **predicted affine force**, not an exact convex
+representation of Fiala: a physically feasible large steering correction may
+need a new tangent. Zero correction at a dynamically consistent reference
+satisfies the capacity condition. It does not bound the error of rotated
+front forces, nonlinear dynamics or collision/terminal geometry, so rollout
+validation remains necessary.
 The force-balance observer encloses saturated forces too; its interval can
 widen when the measurement becomes less informative. Its separate sideslip
 premise `|vy| <= tan(model.sideslipMaximum)*vx` remains enforced, with observer
@@ -448,7 +468,10 @@ saturated previous plan rebuilds this interior seed and its complete rollout;
 this does not change a previously issued command. The 100 ms controller budget
 reserves 2 ms for completion, including any replan and retry. A successful first
 attempt needs one RTI model and at most two native solves. The number of
-reference/horizon attempts has no fixed cap; all attempts share the deadline.
+reference/horizon attempts is limited by the common deadline. Numerical
+restoration has the additional explicit bound `rti.maximumRestorations`
+(default four per call); zero disables restoration. A restoration may use
+one auxiliary convex solve and at most nine nonlinear trial steps.
 
 The executable collision deficits and finite numerical primary cap must not
 be identified with the ideal prefix-only robust value in Section 7. With
@@ -1767,13 +1790,24 @@ Route coordinates remain available for deviation diagnostics and for the
 legacy offset-wall geometry when no boundary scan is supplied. Nominal
 path and speed tracking remain the second-stage CLF objective.
 No offset waypoint, entry/hold/return schedule, trajectory candidate
-bank or seed-admission test is prescribed. Inverse Fiala guidance maps the
-acceleration to inputs; the declared nonlinear model produces all returned
+bank or seed-admission test is prescribed. The initial circulation speed uses
+the current encounter's contour scale, not a turn radius equal to the ego
+footprint radius. This avoids demanding a slow, tight orbit from the beginning
+of a distant encounter. Inverse Fiala guidance maps the acceleration to
+inputs. Its avoidance allocation reserves the requested lateral fraction at
+both axles, then uses the remaining combined-slip capacity for braking or
+acceleration; the cruise helper's 0.35 force-ratio cap does not apply. A bounded
+scalar inversion includes the rotation of front longitudinal force with
+steering. This is a heuristic input allocation, not an affine-input barrier
+certificate. The declared nonlinear model produces all returned
 states over exactly the requested number of holds. A nonterminal or deficient
 seed is allowed to enter the terminal-constrained optimizer.
 
-A failed shifted RTI reference first permits fresh guidance at the same
-length. Subsequent primal-infeasible fresh attempts request
+A primal-infeasible shifted RTI reference permits fresh guidance at the same
+length. A completed affine solve whose nonlinear prediction violates the
+constraints can first improve the existing reference using that prediction.
+An unsuccessful restoration does not suppress the fresh-planning attempt.
+Subsequent primal-infeasible fresh attempts request
 $M_{\rm next}=\max(M+1,\lceil1.5M\rceil)$, subject to an explicit horizon cap
 and the original call deadline. Every reference rebuilds dynamics, geometry,
 collision duals, tightening and terminal rows. There is no fixed attempt cap,
@@ -1781,6 +1815,56 @@ no deadline reset and no guarantee that longer horizons restore local
 feasibility. Invalid fresh predictions are failures, not executable commands.
 A terminal seed is not a prerequisite for searching a longer optimized
 horizon.
+
+### Nonlinear checks and bounded reference restoration
+
+After both objectives solve, the unchanged input sequence is rolled through
+the nonlinear vehicle. The primary rows are evaluated again at those states:
+actual yaw in the same collision normals, the held-input posterior images,
+state and actuator limits, and the endpoint's terminal continuation. The
+minimum required collision slacks are recomputed. Acceptance requires the
+hard residual to be below `solver.feasibilityTolerance` and this nonlinear
+slack sum to stay below the affine primary cap. If a hard-feasible nonlinear
+reference with a smaller slack sum has already been available in this call,
+that value plus the numerical tie also caps acceptance. Numerical reserves
+therefore cannot authorize losing a better available physical safety witness.
+This compares candidates within the current estimated problem; it does not
+establish cross-frame posterior inclusion or global nonlinear optimality.
+
+A rejected candidate can seed the next attempt through a damped nonlinear
+rollout. If it does not improve feasibility, one auxiliary convex problem
+minimizes a hard-constraint deficit, collision slacks and reference departure.
+It preserves actuator and affine force-capacity limits and has no CLF/cruise
+objective. Nonlinear trial steps must reduce the primary residual merit or
+be feasible. Only the resulting reference is retained; the original two-stage
+problem is solved again before any command can be issued. Collision normals
+remain fixed within this restoration, and each successful restoration
+multiplies the secondary proximity weight by ten for the remainder of that
+reference attempt. The next controller call starts with the configured weight.
+
+The next numerical model also receives measured approximation-error reserves.
+These include the nominal state discrepancy and the change of the image of
+the **same** posterior, for example
+
+$$
+\Delta G_{k+1}=(A_k^{\rm rollout}-A_k^{\rm reference})G_0.
+$$
+
+Componentwise supports of this difference and its common-pose-cancelled
+collision counterpart accompany the nominal discrepancy; they do not add a
+second independent model-mismatch set. The implementation uses a 1.25 factor
+on the measured discrepancy. A measured terminal residual also requests a
+step-scaled terminal reserve. These are numerical feedback heuristics, not
+certified bounds for untested steps. They vanish for an unchanged consistent
+reference and introduce no fixed physical clearance or hard path trust box.
+Acceptance is checked against the original constraints, without these
+additional numerical reserves, using freshly evaluated posterior images.
+
+The check covers the implemented nodes and approximate midpoints only. The
+observer's future enclosure assumptions, nonlinear uncertainty remainder and
+terminal modeling assumptions remain the implementation boundaries stated
+below. A passed numerical check must not be relabeled a robust nonlinear
+recursive-safety certificate.
 
 Missing tail holds from a terminal seed endpoint first try the stored
 cruise-feedback hold, then the bounded cruise-to-braking seed search.
@@ -1885,16 +1969,22 @@ failure, not a successful real-time control result. Raising the budget for a
 functional test does not change the bounded RTI/replanning policy.
 
 `search.rtiIterations` and `linearizationCount` count all reference attempts;
-`solverCalls` includes their native solves (at most two per model). `attempts`
+`solverCalls` includes their native objective solves and the separately reported
+`restorationSolverCalls`. There are at most two objective solves per model.
+`restorationCount` and `restorations` disclose the auxiliary recovery work. `attempts`
 preserves each result and its `horizonSteps`; `horizonExtensions` counts length increases;
 `selectedAttempt` identifies the returned solution, or zero when none is returned.
 `nominalRestarted` indicates reference recovery and `restartCount` counts
 additional RTI models. Initialization and formulation timings sum all attempts. `convexSolveCompleted`
 records completion of both convex objectives on the final reference.
 `optimizationConverged` is false because nonlinear convergence is not tested.
-`nonlinearValidationPerformed` is false and `nonlinearHardResidual` is unavailable.
-The reported PCBF and CLF quantities belong to the affine subproblem;
-`predictedState` is a nonlinear prediction of the unchanged optimized inputs.
+`nonlinearValidationPerformed` is true for returned controls and
+`nonlinearHardResidual` reports the sampled check. The reported PCBF value and
+stage slacks are recomputed on the nonlinear rollout; `affineSafetyValue` and
+`search.primaryOptimum` preserve the affine quantities. `search.nonlinearSlackCap`
+also includes the best available nonlinear reference witness. The CLF objective
+still belongs to the first-successor affine model. `predictedState` is the
+nonlinear prediction of the unchanged optimized inputs.
 Independent scenario replay measures clearance, road margins and nominal
 recovery throughout the observation. Current-state terminal membership does
 not stop simulation or count as task completion. The terminal set certifies
@@ -1917,7 +2007,7 @@ baseline and minimum recovery time.
 | Common robust terminal family | Center-based target geometry and ego padding under the mild terminal model; no full nonlinear parameter-family membership certificate. |
 | Exact nonlinear CLF dissipation | First-successor affine error/estimate row with soft slack and a fixed reference penalty. |
 | Whole-hold collision/observer-domain validity | Nodes and approximate midpoints do not by themselves establish continuous-time validity. |
-| Numerical success | Both objectives must complete; timeout, infeasibility or unfinished solve returns no command. |
+| Numerical success | Both objectives and the sampled nonlinear primary check must pass; bounded restoration/fresh planning may fail, and no command is returned in that case. |
 
 <a id="source-map"></a>
 ## 9. Source map and verification

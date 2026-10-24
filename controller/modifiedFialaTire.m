@@ -1,7 +1,8 @@
 classdef modifiedFialaTire
     %modifiedFialaTire Fahmy et al. (2018), Eqs. (7), (11) and (13), by axle.
     % Static loads define Fx_i = beta*mu_i*Fz_i. Both slip-angle and beta
-    % derivatives enter the local affine model, without friction-limit rows.
+    % derivatives enter the local affine model. The controller preserves
+    % this same combined-slip capacity when using the affine force tangent.
 
     methods (Static)
         function model = affineModel(state,input,cfg)
