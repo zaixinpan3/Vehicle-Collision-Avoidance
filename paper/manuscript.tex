@@ -155,19 +155,21 @@ accounting for ego motion is necessary because an evasive control input
 changes both the ego trajectory and the target motion observed in the
 sensor frame. The NRMM provides a consistent model for predicting their
 relative motion during the maneuver, while the HGO recovers the
-unmeasured states needed for that prediction. However, the published observer
-construction assumes constant body-measured ego acceleration and yaw
-rate, which can be violated during combined steering and braking. Its
-nominal convergence and yaw-observer $H_\infty$ results do not provide a
-complete disturbed-cascade error bound
-\cite{SharmaAlaiRajamani2026}. Estimated ego states drive the target
-observer, so errors from the ego stage must be propagated along with
-sensor disturbances and model mismatch. We retain the NRMM and design an
-HGO-based estimator that admits time-varying measured ego inputs, and
-establish cascade input-to-state stability (ISS) under the stated model
-and disturbance bounds. The resulting time-dependent error enclosures
-include the initial estimation transient and provide the uncertainty
-bounds required by the collision constraints in our safety analysis.
+unmeasured states needed for that prediction. However, the NRMM-based
+observer in \cite{SharmaAlaiRajamani2026} relies on a restrictive
+zero-jerk assumption, setting the time derivatives of the body-measured
+ego accelerations and yaw rate to zero. This assumption is often violated
+during evasive maneuvers, as changing steering and braking inputs produce
+time-varying acceleration and yaw rate. Its nominal convergence and
+yaw-observer $H_\infty$ results also do not provide a complete
+disturbed-cascade error bound. We retain the NRMM but formulate the
+observer without differentiating measured ego inputs. In
+Section~\ref{sec:estimator}, we establish cascade input-to-state stability
+(ISS) without requiring zero ego jerk or angular acceleration, under the
+stated model and disturbance bounds. The resulting time-dependent error
+enclosures account for propagated ego-state errors, sensor disturbances,
+model mismatch and the initial estimation transient, providing the
+uncertainty bounds required by our collision constraints.
 
 The control and estimation methods must be connected to a closed-loop
 collision-avoidance guarantee.
