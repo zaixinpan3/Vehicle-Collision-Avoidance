@@ -109,24 +109,35 @@ interest in autonomous driving systems that combine cruising within a
 designated lane with active avoidance of potential collisions with
 surrounding vehicles, without requiring driver intervention.
 
-Complex collision avoidance poses two interrelated but mathematically
-distinct challenges. The first concerns coupled longitudinal--lateral
-control. During an evasive maneuver, the ego vehicle may steer while
-braking or accelerating. Its longitudinal and lateral motions are coupled
-through the body dynamics and tire-force generation, with both force
-components sharing the available friction capacity \cite{BealBoyd2019}.
-Ignoring these couplings when designing separate longitudinal and lateral
-controllers can lead to commands that do not represent jointly achievable
-maneuvers. The second concerns target-state estimation under ego motion.
-The same maneuvers change the ego vehicle's yaw and its longitudinal and
-lateral velocities. Because onboard sensors observe surrounding vehicles
-in the ego frame, the relative-motion model must account for the ego
-vehicle's translation and rotation \cite{AlaiSharmaAlexanderRajamani2024}.
-Omitting these effects introduces model mismatch and can degrade
-target-state estimates. Reliable collision avoidance therefore requires
-joint control of the ego vehicle's coupled motion, target-state estimation
-consistent with that motion, and explicit consideration of estimation
-errors in safety control.
+Collision avoidance often requires the ego vehicle to execute complex
+maneuvers that combine steering with braking or acceleration. Such
+maneuvers introduce two closely related difficulties. First, the coupling
+between longitudinal and lateral dynamics can become pronounced: speed
+changes affect the lateral response, while longitudinal and lateral tire
+forces share the available friction capacity \cite{BealBoyd2019}.
+To address this coupling, Guo et al.\ combined nonlinear backstepping with
+adaptive fuzzy sliding-mode control to coordinate steering and braking
+\cite{GuoHuWang2016}. Fahmy et al.\ jointly optimized steering and
+braking inputs using a four-wheel vehicle model with modified Fiala tires
+\cite{FahmyGhanyBaumann2018}. Second, describing the motion of surrounding
+vehicles is nontrivial when the ego vehicle itself is maneuvering.
+Onboard sensors measure target positions in a translating and rotating
+ego frame, so this frame motion must be accounted for in the target
+dynamics or the measurement model. Sharma and Rajamani addressed this
+issue in predictive display for teleoperation by using an inertial target
+model and extended Kalman filtering, with ego-state estimates used to
+transform relative measurements \cite{SharmaRajamani2024}.
+Alai et al.\ formulated a nonlinear relative motion model that
+explicitly incorporates ego velocity and yaw rate, avoiding the need to
+transform target measurements into a global frame
+\cite{AlaiSharmaAlexanderRajamani2024}. Sharma et al.\ developed
+multistage high-gain observers for both inertial and nonlinear relative
+motion models, using ego-state estimates in the target-tracking stage and
+validating the approach on a full-scale vehicle
+\cite{SharmaAlaiRajamani2026}. These studies motivate coordinating the
+ego vehicle's coupled motion with target estimation that consistently
+accounts for that motion, while treating estimation errors in safety
+control.
 
 Work on this integration spans avoidance-path generation, coordinated
 vehicle control and feedback safety certification.
@@ -143,24 +154,14 @@ closed-loop collision-free invariance. A collision-free reference path
 therefore leaves a separate question: whether the controlled vehicle can
 maintain separation under its dynamics, control limits and sensing errors.
 
-That question first requires a suitable description of maneuvering
-capability. Shared-steering model predictive control (MPC) and
-lane-deformation safety filters optimize lateral avoidance at a fixed
-longitudinal speed
+The dynamics retained in the safety analysis also determine which
+maneuvers a controller can certify. Shared-steering model predictive
+control (MPC) and lane-deformation safety filters optimize lateral
+avoidance at a fixed longitudinal speed
 \cite{LiangYinNie2021,BruggemannSteevesKrstic2022}.
-Combined evasive maneuvers require a broader description: braking changes
-speed and the subsequent lateral response, while longitudinal and lateral
-tire forces share finite friction capacity \cite{BealBoyd2019}.
-Coordinated steering and braking have already been addressed through
-nonlinear backstepping with adaptive fuzzy sliding-mode tracking
-\cite{GuoHuWang2016}, and through joint numerical optimization on a
-four-wheel model with modified Fiala tires \cite{FahmyGhanyBaumann2018}.
-These studies establish the relevance of coupled control and tire models.
-Their tracking analysis or numerical collision-avoidance results do not,
-however, provide an invariant-set guarantee against an uncertain moving
-target. The present problem requires the collision certificate to use the
-same coupled prediction and admissible maneuvering capability as the
-controller.
+For combined steering and speed changes, the collision certificate must
+reflect the coupled prediction and admissible maneuvering capability of
+the controller.
 
 Control barrier functions (CBFs) address the certificate requirement by
 constraining control inputs to preserve a safe set
@@ -208,18 +209,14 @@ joint state, but online estimation introduces an additional obligation:
 revised target enclosures and forecasts must remain compatible with the
 shifted plan and its terminal continuation.
 
-The information underlying these forecasts is itself affected by the
-avoidance maneuver. Accurate, delay-free surrounding-state information
-is assumed in rule-based CBF lane-change control
+The target models discussed above make clear that these forecasts depend
+on ego-motion information. Accurate, delay-free surrounding-state
+information is assumed in rule-based CBF lane-change control
 \cite{HeZengZhangSreenath2021}, and perfect position estimation is
 assumed in the racing example of \cite{ZengZhangSreenath2021}.
-Tracking from a turning or accelerating ego vehicle requires the
-relative-motion equations to account for that moving sensor frame
-\cite{AlaiSharmaAlexanderRajamani2024}.
-A nonlinear relative motion model (NRMM) and a multistage high-gain
-observer provide one such approach, validated on a full-scale vehicle
-\cite{SharmaAlaiRajamani2026}. This model supplies the target-motion
-basis used here.
+Here, we use the nonlinear relative motion model (NRMM) in
+\cite{SharmaAlaiRajamani2026} and explicitly account for errors passed
+from ego-state estimation to target tracking.
 
 The observer formulation in \cite{SharmaAlaiRajamani2026} transforms
 the ego kinematics into differentiated companion coordinates and assumes
