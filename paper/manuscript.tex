@@ -137,22 +137,26 @@ compact basis for efficient optimization, but omit the tire-slip and
 force-saturation dynamics that become important near the handling limits.
 Another approach uses dynamic bicycle or higher-fidelity vehicle models
 to represent the interactions among steering, braking, and tire forces
-\cite{BealBoyd2019,ThompsonDallasGohBalachandran2024}. Nonlinear model
-predictive control can then optimize steering and braking together while
-incorporating shared tire-friction limits and lateral-stability
-constraints or penalties \cite{ThompsonDallasGohBalachandran2024}. This
-allows dynamic feasibility to be assessed within the prediction model,
-but introduces additional model parameters and optimization complexity.
-Coupling is also addressed by coordinating maneuver selection and
-trajectory generation. Hierarchical schemes coordinate braking and lane-changing decisions
-through a maneuver-selection layer that supplies the corresponding
-constraints to a trajectory planner \cite{AmmourOrjuelaBasset2022}. Joint
-spatiotemporal optimization can determine the path, speed evolution, and
-control inputs within a common collision-avoidance problem
-\cite{LiZhangGuoLenzoGuo2023,ThompsonDallasGohBalachandran2024}. These
-formulations coordinate when and how much to brake or steer, although
-nonlinear motion models and nonconvex collision constraints can make
-real-time solution demanding \cite{LiZhangGuoLenzoGuo2023}.
+\cite{BealBoyd2019,ThompsonDallasGohBalachandran2024}. Separate longitudinal
+and lateral controllers can retain speed-dependent lateral dynamics
+while following coordinated path and speed references
+\cite{ZhangEtAl2023LaneChange,LiuQiangDaiChenXia2023}. Model predictive
+control can also coordinate steering and braking while accounting for
+tire-force limits and vehicle stability
+\cite{GeZhaoMaGuo2022,WangLiuMengGuBai2021,ThompsonDallasGohBalachandran2024}.
+This allows dynamic feasibility
+to be assessed within the prediction model, but introduces additional
+model parameters and optimization complexity. Coupling is also addressed
+by coordinating avoidance decisions and trajectory generation.
+Supervisory logic can select combinations of steering and differential
+braking according to yaw-tracking errors and rollover indicators
+\cite{LiEtAl2022Emergency}. Joint trajectory optimization can coordinate
+longitudinal and lateral motion while imposing collision-avoidance and
+handling-stability constraints \cite{ChenChengLiZhaoWang2024}. These
+formulations link the choice of evasive action to the vehicle's
+maneuvering capability, although nonlinear models and nonconvex
+constraints can make real-time solution demanding
+\cite{LiZhangGuoLenzoGuo2023,ChenChengLiZhaoWang2024}.
 
 Sharma and Rajamani used an inertial target model and extended Kalman
 filtering for predictive teleoperation display, transforming relative
