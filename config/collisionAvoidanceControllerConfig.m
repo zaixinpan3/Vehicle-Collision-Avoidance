@@ -27,8 +27,8 @@ function cfg=localDefaults()
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
         'enforceRoadBoundaries',false);
     cfg.nonlinear=struct('integrationStep',.05);
-    % One RTI model per reference. Local primal infeasibility requests fresh
-    % references and longer horizons within the original controller deadline.
+    % Plan once on target acquisition; later frames shift optimized inputs.
+    % Primal infeasibility can extend that reference under the same deadline.
     % Encounter search starts from horizonSteps and the current stopping time;
     % the terminal extension has no separate duration cap.
     % Secondary objective: CLF slack plus half this weight times the mean

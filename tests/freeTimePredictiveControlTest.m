@@ -79,43 +79,27 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
         end
         function anUnreachableTerminalBrakeTransitionIsRejected(testCase)
             model=testCase.model;model.cfg.model.brakingRatioRateMaximum=.01;
-            r=exploreFreeTimePredictiveControl(model,testCase.previous,ReplanOnFailure=false);
+            r=exploreFreeTimePredictiveControl(model,testCase.previous,ExtendHorizonOnFailure=false);
             testCase.verifyEqual(r.status,"freeTimeSolveFailed");
             testCase.verifyFalse(r.fixed.returned);
             testCase.verifyFalse(r.free.returned);
             testCase.verifyEqual(r.free.search.stages(1).exitFlag,-2);
         end
-        function anInfeasibleShiftedPathReplansAndRebuildsAtTheSameHorizon(testCase)
+        function anInfeasibleShiftedPathCannotTriggerPlanning(testCase)
             model=testCase.model;cfg=model.cfg;model.cfg.controller.maximumHorizonSteps=32;
-            % Physical road limits, not an artificial trust box, make this
-            % sharply turning reference's affine subproblem infeasible.
-            model.cfg.controller.enforceRoadBoundaries=true;
-            model.road.lateralClearance=[3;3];
+            model.cfg.controller.enforceRoadBoundaries=true;model.road.lateralClearance=[3;3];
             model.target=[1000;0;0;4;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;model.targetOnset=false;
-            previous=struct('inputTrajectory',repmat([.35;0],1,33), ...
-                'collisionEscapeNormals',repmat([0;-1],1,67),'collisionSide',-1);
+            previous=struct('inputTrajectory',repmat([.35;0],1,33));
             r=exploreFreeTimePredictiveControl(model,previous);
-            testCase.assertTrue(r.returned);
-            testCase.assertNumElements(r.attempts,2);
-            failed=r.attempts{1};fresh=r.attempts{2};
-            testCase.verifyEqual(failed.initialization,"shiftedInputRollout");
-            testCase.verifyEqual(failed.free.search.stages(end).exitFlag,-2);
-            testCase.verifyEqual(fresh.initialization,"plannedAvoidanceRollout");
-            testCase.verifyTrue(fresh.plannerCompleted);
-            testCase.verifyEqual(fresh.stageCount,failed.stageCount);
-            testCase.verifyEqual(r.completedPlannerCalls,1);
-            testCase.verifyEqual(r.horizonExtensions,0);
-            testCase.verifyGreaterThan(norm(fresh.initialAnchor.states-failed.initialAnchor.states,Inf),1);
-            % Both rebuilt references may share a valid far-target normal;
-            % neither may inherit the deliberately stale supplied normals.
-            stale=previous.collisionEscapeNormals(:,1:size(fresh.model.collisionEscapeNormals,2));
-            testCase.verifyGreaterThan(norm(fresh.model.collisionEscapeNormals-stale,Inf),.1);
-            testCase.verifyEqual(fresh.initialAnchor.states(:,1),model.initialState,AbsTol=0);
-            testCase.verifyEqual(fresh.model.uncertainty,model.uncertainty);
-            testCase.verifyEqual(fresh.model.solveTimer,failed.model.solveTimer);
+            testCase.verifyFalse(r.returned);
+            testCase.verifyNumElements(r.attempts,1);
+            testCase.verifyEqual(r.attempts{1}.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(r.free.search.stages(1).exitFlag,-2);
+            testCase.verifyEqual(r.completedPlannerCalls,0);
+            testCase.verifyEqual(r.stopReason,"horizonLimit");
         end
-        function aFailedFreshPathIsReplannedWithMorePredictionSteps(testCase)
+        function aFailedReferenceIsExtendedWithoutReplanning(testCase)
             model=testCase.model;cfg=model.cfg;
             model.cfg.model.brakingRatioRateMaximum=.01;model.cfg.controller.maximumHorizonSteps=48;
             model.target=[1000;0;0;4;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
@@ -123,12 +107,13 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             r=exploreFreeTimePredictiveControl(model,testCase.previous);
             testCase.verifyFalse(r.returned);
             testCase.verifyEqual(r.stopReason,"horizonLimit");
-            testCase.assertNumElements(r.attempts,3);
-            testCase.verifyEqual(cellfun(@(a) a.stageCount,r.attempts),[32,32,48]);
-            testCase.verifyTrue(r.attempts{2}.plannerCompleted && r.attempts{3}.plannerCompleted);
-            testCase.verifyEqual(r.completedPlannerCalls,2);
+            testCase.assertNumElements(r.attempts,2);
+            testCase.verifyEqual(cellfun(@(a) a.stageCount,r.attempts),[32,48]);
+            testCase.verifyEqual(r.attempts{2}.initialization,"extendedInputRollout");
+            testCase.verifyEqual(r.attempts{2}.initialAnchor.inputs(:,1:32),r.attempts{1}.initialAnchor.inputs,AbsTol=0);
+            testCase.verifyEqual(r.completedPlannerCalls,0);
             testCase.verifyEqual(r.horizonExtensions,1);
-            testCase.verifyEqual(r.attempts{3}.model.solveTimer,r.attempts{1}.model.solveTimer);
+            testCase.verifyEqual(r.attempts{2}.model.solveTimer,r.attempts{1}.model.solveTimer);
         end
         function anExpiredSharedDeadlineDoesNotStartAnotherPlan(testCase)
             model=testCase.model;model.cfg.solver.timeLimitSeconds=1e-12;

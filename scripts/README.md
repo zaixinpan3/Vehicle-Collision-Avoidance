@@ -109,16 +109,15 @@ the remaining holds share the duration change uniformly. The final intervals
 are at least one sample long. `DurationIncreaseFraction` bounds the additional
 tail duration, and there is no time penalty in either objective.
 
-By default, a failed shifted reference triggers fresh planning at the same
-node count, followed by new dynamics, collision normals and terminal rows.
-A failed fresh reference triggers planning over a longer horizon, under the
-existing configured horizon cap and one shared computation deadline. Only
-the encounter's circulation direction is carried into fresh planning; failed
-inputs and frozen collision normals are discarded. `attempts` records each
-reference and its fixed/free results. `ReplanOnFailure=false` restores the
-single-reference diagnostic; such a failure does not establish failure of
-the complete replanning procedure. A deterministic planner can still produce
-an unsuitable reference after replanning; this is not a completeness claim.
+The avoidance planner runs only at encounter onset. Later calls inherit the
+previous optimized input sequence. Failed local attempts may extend the same
+reference under the existing horizon cap and shared computation deadline;
+they retain its input prefix and append tail holds without replanning.
+`attempts` records each fixed/free comparison, and `completedPlannerCalls`
+counts completed planner invocations. `ExtendHorizonOnFailure=false` selects
+a single-horizon diagnostic. The former `FreshReference` and
+`ReplanOnFailure` options are removed. A missing warm start during an active
+encounter cannot activate the planner.
 
 The probe differentiates the nonlinear rollout, target timestamps, per-hold
 uncertainty tightening and terminal continuation. `MovingReference=true`
@@ -128,8 +127,8 @@ normals are frozen during differentiation. For stable row assembly, every
 horizon target row is retained, even beyond perception exit, and redundant
 row pruning is disabled. This is a deliberately more restrictive diagnostic
 than the online first-exit formulation. Terminal row changes and inconsistent
-finite-difference slopes reject that reference's duration model and trigger
-replanning when enabled. A finer integration
+finite-difference slopes reject that reference's duration model and can request
+horizon extension when enabled. A finer integration
 mesh is shared by the fixed/free comparison; its cost is not an online timing
 claim. Returned `fixed`/`free` results separate convex solver success from
 nonlinear rollout diagnostics, including exact terminal membership. The final

@@ -19,6 +19,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual([search.stages.objective],["pcbfSlack","clfSlackAndReferenceDeviation"]);
             testCase.verifyLessThanOrEqual(search.solverCalls,2);
             testCase.verifyFalse(search.nominalRestarted);
+            testCase.verifyEqual(search.initializationFailure,"");
             testCase.verifyTrue(search.convexSolveCompleted);
             testCase.verifyFalse(problem.metadata.optimizationConverged);
             testCase.verifyTrue(problem.metadata.nonlinearValidationPerformed);
@@ -39,6 +40,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             ego=localSuccessor(ego,prior);ego.position(2)=ego.position(2)+.01;
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
             testCase.verifyEqual(size(inputs,2),max(cfg.controller.horizonSteps,size(prior.inputTrajectory,2)-1));
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyEqual(problem.model.linearization.states(:,1),problem.model.initialState,AbsTol=0);
@@ -78,6 +80,9 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,q,road]=collisionThreatScenario("crossing",cfg);
             [command,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
+            testCase.verifyTrue(problem.model.targetOnset);
+            testCase.verifyEqual(problem.metadata.encounterId,1);
+            testCase.verifyEqual(problem.metadata.search.plannerCalls,1);
             % The revised in-road crossing admits the first local solve.
             % Initialization still precedes RTI, without a terminal search.
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
@@ -197,48 +202,72 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.model.collisionSide,prior.collisionSide);
             testCase.verifyEqual(problem.model.linearization.terminalContext.collisionSide,prior.collisionSide);
         end
-        function anInfeasibleWarmReferenceReplansBeforeReturningAnOptimizedCommand(testCase)
-            [ego,road,cfg]=localFixture();road.lateralClearance=[3;3];
-            cfg.controller.enforceRoadBoundaries=true;cfg.controller.maximumHorizonSteps=32;
-            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            ego=localSuccessor(ego,prior);
-            prior.inputTrajectory=repmat([.25;0],1,32);
-            [command,inputs,problem]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,prior);
-            search=problem.metadata.search;
-            testCase.verifyTrue(search.nominalRestarted);
-            testCase.verifyEqual(search.restartCount,1);
-            testCase.verifyEqual(search.selectedAttempt,2);
-            testCase.verifyEqual(search.linearizationCount,2);
-            testCase.verifyEqual(search.attempts(1).stages(end).exitFlag,-2);
-            testCase.verifyEqual(search.attempts(2).initialization,"plannedAvoidanceRollout");
-            testCase.verifyTrue(search.planner.used);
-            testCase.verifyTrue(isnan(search.planner.conflictStartSeconds));
-            testCase.verifyEqual(search.solverCalls,sum([search.attempts.solverCalls]));
-            testCase.verifyLessThanOrEqual(search.solverCalls,4);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            testCase.verifyEqual(problem.model.linearization.states(:,1),problem.model.initialState,AbsTol=0);
-            localVerifyRollouts(testCase,problem,cfg);
-        end
-        function replanningRebuildsCollisionGeometryFromTheFreshReference(testCase)
+        function anInfeasibleWarmReferenceIsNotReplacedByAPlanner(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[3;3];
             cfg.controller.enforceRoadBoundaries=true;
             cfg.controller.horizonSteps=32;cfg.controller.maximumHorizonSteps=32;
-            [~,~,fresh,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
-            prior.inputTrajectory=repmat([.35;0],1,size(prior.inputTrajectory,2));
-            prior.avoidanceInitialized=true;
-            prior.collisionSide=-fresh.model.collisionSide;
-            prior.collisionEscapeNormals=repmat([0;-1],1,size(prior.collisionEscapeNormals,2));
-            [solution,search,model]=solvePredictiveControl(fresh.model,prior,tic);
-            testCase.assertNotEmpty(solution);
-            testCase.verifyEqual(search.selectedAttempt,2);
-            testCase.verifyEqual(search.attempts(1).stages(end).exitFlag,-2);
-            testCase.verifyEqual(search.initialization,"plannedAvoidanceRollout");
-            testCase.verifyEqual(model.linearization.states,fresh.model.linearization.states,AbsTol=0);
-            testCase.verifyEqual(model.collisionEscapeNormals,fresh.model.collisionEscapeNormals,AbsTol=0);
-            testCase.verifyEqual(model.collisionSide,fresh.model.collisionSide);
-            testCase.verifyEqual(model.terminalContext.collisionSide,fresh.model.collisionSide);
-            testCase.verifyEqual(model.uncertainty,fresh.model.uncertainty);
-            testCase.verifyEqual(solution.inputs,fresh.inputTrajectory,AbsTol=1e-7);
+            [~,~,first,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            prior.inputTrajectory=repmat([.35;0],1,33);
+            model=first.model;model.targetOnset=false;
+            [solution,search,model]=solvePredictiveControl(model,prior,tic);
+            testCase.verifyEmpty(solution);
+            testCase.verifyEqual(search.plannerCalls,0);
+            testCase.verifyFalse(search.nominalRestarted);
+            testCase.verifyNumElements(search.attempts,1);
+            testCase.verifyEqual(search.stages(1).exitFlag,-2);
+            testCase.verifyEqual(search.stopReason,"horizonLimit");
+            testCase.verifyFalse(search.planner.used);
+            testCase.verifyEqual(model.linearization.inputs,prior.inputTrajectory(:,2:end),AbsTol=0);
+        end
+        function anInvalidContinuationCannotSilentlyRequestPlanning(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,first,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            model=first.model;model.targetOnset=false;
+            prior.inputTrajectory(:)=NaN;
+            [solution,search]=solvePredictiveControl(model,prior,tic);
+            testCase.verifyEmpty(solution);
+            testCase.verifyEqual(search.plannerCalls,0);
+            testCase.verifyEqual(search.initializationFailure,"collisionAvoidanceController:missingWarmStart");
+            testCase.verifyEqual(search.linearizationCount,0);
+        end
+        function extendingTheInitialReferenceDoesNotInvokeThePlannerAgain(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,first]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            original=first.model.linearization;
+            request=struct('operation',"reference",'model',first.model,'previousState',[], ...
+                'reference',original,'minimumHorizonSteps',size(original.inputs,2)+4);
+            [extended,search]=solvePredictiveControl("probe",request);
+            testCase.verifyEqual(search.plannerCalls,0);
+            testCase.verifyEqual(search.initialization,"extendedInputRollout");
+            testCase.verifyEqual(extended.inputs(:,1:size(original.inputs,2)),original.inputs,AbsTol=0);
+            testCase.verifyEqual(extended.states(:,1:size(original.states,2)),original.states,AbsTol=1e-12);
+            testCase.verifyEqual(size(extended.inputs,2),size(original.inputs,2)+4);
+        end
+        function onsetHorizonRetriesShareOnePlannerInvocation(testCase)
+            [ego,road,cfg]=localFixture();cfg.controller.maximumHorizonSteps=32;
+            [~,~,first]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            model=first.model;model.road.lateralClearance=[.5;.5];
+            [solution,search]=solvePredictiveControl(model,[],tic);
+            testCase.verifyEmpty(solution);
+            testCase.verifyGreaterThan(search.horizonExtensions,0);
+            testCase.verifyEqual(search.plannerCalls,1);
+            testCase.verifyEqual(search.attempts(1).initialization,"plannedAvoidanceRollout");
+            testCase.verifyTrue(all([search.attempts(2:end).initialization]=="extendedInputRollout"));
+            testCase.verifyEqual(search.stopReason,"horizonLimit");
+        end
+        function newMeasurementsWithinAnEncounterDoNotRestartPlanning(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,first,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            ego=localSuccessor(ego,prior);
+            target=localNearTarget();target.targetPositionInertial(2)=6.1;
+            [~,~,second,next]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            testCase.verifyEqual(first.metadata.search.plannerCalls,1);
+            testCase.verifyEqual(second.metadata.search.plannerCalls,0);
+            testCase.verifyFalse(second.model.targetOnset);
+            testCase.verifyEqual(next.encounterId,prior.encounterId);
+            testCase.verifyEqual(second.model.target(2),6.1,AbsTol=1e-12);
+            testCase.verifyEqual(second.model.linearization.inputs(:,1:size(prior.inputTrajectory,2)-1), ...
+                prior.inputTrajectory(:,2:end),AbsTol=1e-12);
         end
         function targetOnsetUsesTheSameSingleIteration(testCase)
             [ego,road,cfg]=localFixture();
@@ -246,6 +275,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             ego=localSuccessor(ego,prior);
             [~,~,problem]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,prior);
             testCase.verifyTrue(problem.model.targetOnset);
+            testCase.verifyEqual(problem.metadata.search.plannerCalls,1);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyFalse(problem.metadata.preplannedAvoidanceTrajectoryRequired);
@@ -256,12 +286,13 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             model=nominal.model;model.initialState=zeros(6,1);model.previousInput=zeros(2,1);
             % An overlapping stationary target makes membership false. The
-            % diagnostic solves may fail; replanning must not move off either.
+            % diagnostic solves may fail; extending the tail must not restart motion.
             q=[3;0;0;0;0;0;1.6;2.4;.95;0;0];
             model.target=q;model.targetEpoch=q;model.targetOnset=false;
             prior=struct('inputTrajectory',zeros(2,cfg.controller.horizonSteps));
             [~,search,model]=solvePredictiveControl(model,prior,tic);
-            testCase.verifyGreaterThanOrEqual(search.rtiIterations,2);
+            testCase.verifyEqual(search.rtiIterations,1);
+            testCase.verifyEqual(search.plannerCalls,0);
             testCase.verifyEqual(search.stopReason,"horizonLimit");
             testCase.verifyLessThanOrEqual(model.linearization.inputs(2,end),0);
             testCase.verifyEqual(model.linearization.states(4:6,end),zeros(3,1),AbsTol=1e-12);

@@ -17,7 +17,7 @@ There are two mathematical objects whose results must be distinguished:
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | One local RTI model per reference, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a first-successor soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. A failed shifted reference requests fresh planning. |
+| Executable controller | One local RTI model per reference, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a first-successor soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Planning occurs only at encounter onset; later frames inherit optimized inputs and horizon retries extend the existing reference. |
 | Conditional nonlinear output-feedback design | Joint physical/observer information sets, persistent model uncertainty, causal future feedback, sound reachable images and a common terminal continuation; the shifted-policy proof establishes mathematical recursive feasibility under its stated premises. |
 
 The latter theorem is not a certificate for the former approximation.
@@ -380,7 +380,7 @@ published enclosure, not a free optimizer correction. Fixed collision duals
 and terminal tangents are built once on this model. There are at most two
 native objective solves per reference. A later nonlinear prediction checks
 the primary constraints using the solve's fixed collision normals. A failed
-shifted prediction requests fresh planning. There is no auxiliary feasibility
+nonlinear prediction returns failure without replanning. There is no auxiliary feasibility
 restoration problem, damped-step search or adaptive reference penalty.
 
 ### Implemented constraints and objective units
@@ -414,8 +414,8 @@ observer enclosure to contract to zero. The secondary objective is
     J2 = clfSlack + (lambda / (2 N)) sum_k (
          ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2).
 
-Here xbar and ubar are this RTI reference, including a fresh planner rollout or
-the shifted previous input rollout. They are not the nominal cruise path.
+Here xbar and ubar are this RTI reference: the encounter-onset planner rollout,
+the shifted previous input rollout, or an extension of that same reference. They are not the nominal cruise path.
 `lambda = rti.referenceDeviationWeight` defaults to 10 and remains active at
 zero cruise error; zero is an explicit ablation. Dx uses equal x/y position
 units from `clf.lateralPositionErrorScale`, followed by the CLF heading,
@@ -471,7 +471,7 @@ uses `nonlinearBicycleModel.inputBounds(cfg,true)`, which keeps its force
 ratio ten constraint tolerances inside the singular endpoints. Shifting a
 saturated previous plan rebuilds this interior seed and its complete rollout;
 this does not change a previously issued command. The 100 ms controller budget
-reserves 2 ms for completion, including any replan and retry. A successful first
+reserves 2 ms for completion, including any horizon extension and retry. A successful first
 attempt needs one RTI model and at most two native solves. The number of
 reference/horizon attempts is limited by the common deadline. Each attempt
 uses only the two objective stages; no auxiliary restoration solve is run.
@@ -1777,10 +1777,22 @@ relative to the exact robust problem.
 A previous accepted input sequence is shifted and rolled out from the current
 estimate. Its absolute endpoint is retained while the horizon shrinks by one
 hold per frame to `controller.horizonSteps`. Encounter preview may request a
-longer horizon. A newly observed target requests a fresh avoidance reference.
-Every fresh reference with a target uses one safety-oriented circulation
-rollout; a target-free cold reference uses nominal path feedback. The field
-constructs the reference; only the optimization supplies execution inputs.
+longer horizon, without activating the avoidance planner.
+
+The planner is invoked once on the first observation of each encounter,
+including a cold start with an observed target. A target-free cold reference
+uses nominal path feedback. Later observations update target prediction and
+uncertainty, but retain the shifted optimized input sequence. A missing or
+invalid input warm start during an active encounter is reported as failure;
+it cannot silently trigger planning. After a confirmed target exit or complete
+empty scan clears the encounter, a subsequent acquisition starts a new
+encounter and permits one new planner invocation.
+
+The field constructs the initial reference; only the optimization supplies
+execution inputs. Previously optimized input prefixes are rerolled rather
+than reshaped by the boundary guidance field. Tail construction retains the
+existing terminal/nominal seed policies. The tangent initializer's handling
+of singular force-ratio endpoints remains as described above.
 
 Directional rectangle/error supports and relative motion determine outward
 obstacle acceleration and circulation in a persistent passing direction.
@@ -1806,17 +1818,19 @@ certificate. The declared nonlinear model produces all returned
 states over exactly the requested number of holds. A nonterminal or deficient
 seed is allowed to enter the terminal-constrained optimizer.
 
-A primal-infeasible shifted RTI reference permits fresh guidance at the same
-length. A shifted reference whose completed affine solution fails nonlinear
-validation also requests fresh guidance at that length.
-Subsequent primal-infeasible fresh attempts request
+A primal-infeasible local model can request
 $M_{\rm next}=\max(M+1,\lceil1.5M\rceil)$, subject to an explicit horizon cap
-and the original call deadline. Every reference rebuilds dynamics, geometry,
-collision duals, tightening and terminal rows. There is no fixed attempt cap,
-no deadline reset and no guarantee that longer horizons restore local
-feasibility. Invalid fresh predictions are failures, not executable commands.
+and the original call deadline. This retry retains the full current input
+reference at the same time origin and appends tail holds; it neither shifts
+that reference a second time nor calls the planner again. In particular,
+horizon retries on the onset frame share the one initial planner rollout.
+The longer reference rebuilds dynamics, geometry, tightening and terminal
+rows. There is no fixed attempt cap, no deadline reset and no guarantee that
+horizon extension restores feasibility. Nonlinear rejection, an unrollable
+reference or a failed numerical solve does not request a new avoidance path.
 A terminal seed is not a prerequisite for searching a longer optimized
-horizon.
+horizon. The offline free-duration experiment follows the same planning gate
+and extends existing references; it cannot force mid-encounter replanning.
 
 ### Nonlinear rollout checks
 
@@ -1938,15 +1952,16 @@ successful and failed controller call times must both be measured from the
 same controller timer. Observer/publication preparation belongs to the
 separate pipeline timer; failed pipeline latency is not solver latency. A timeout is an allowed
 failure, not a successful real-time control result. Raising the budget for a
-functional test does not change the bounded RTI/replanning policy.
+functional test does not change the encounter-onset planning policy.
 
 `search.rtiIterations` and `linearizationCount` count all reference attempts;
 `solverCalls` sums their native objective solves. There are at most two
 objective solves per model. `attempts`
 preserves each result and its `horizonSteps`; `horizonExtensions` counts length increases;
 `selectedAttempt` identifies the returned solution, or zero when none is returned.
-`nominalRestarted` indicates reference recovery and `restartCount` counts
-additional RTI models. Initialization and formulation timings sum all attempts. `convexSolveCompleted`
+`plannerCalls` counts planner invocations: at most one on an onset call and
+zero on subsequent calls in the same encounter. `nominalRestarted` stays false;
+`restartCount` counts additional horizon models, not planner invocations. Initialization and formulation timings sum all attempts. `convexSolveCompleted`
 records completion of both convex objectives on the final reference.
 `optimizationConverged` is false because nonlinear convergence is not tested.
 `nonlinearValidationPerformed` is true for returned controls and
@@ -1978,7 +1993,7 @@ baseline and minimum recovery time.
 | Common robust terminal family | Center-based target geometry and ego padding under the mild terminal model; no full nonlinear parameter-family membership certificate. |
 | Exact nonlinear CLF dissipation | First-successor affine error/estimate row with soft slack and a fixed reference penalty. |
 | Whole-hold collision/observer-domain validity | Nodes and approximate midpoints do not by themselves establish continuous-time validity. |
-| Numerical success | Both objectives and the sampled nonlinear primary check must pass; fresh planning may fail, and no command is returned in that case. |
+| Numerical success | Both objectives and the sampled nonlinear primary check must pass; initial planning or inherited-reference optimization may fail, and no command is returned in that case. |
 
 <a id="source-map"></a>
 ## 9. Source map and verification

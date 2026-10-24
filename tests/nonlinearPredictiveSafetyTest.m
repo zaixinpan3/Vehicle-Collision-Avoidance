@@ -288,10 +288,12 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEmpty(state.targetEpoch);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
             ego=localSuccessor(ego,state);ego.stateTime=2*cfg.controller.sampleTime;
             ego.perception.time=ego.stateTime;
             [~,~,returned,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
             testCase.verifyTrue(returned.model.targetOnset);
+            testCase.verifyEqual(returned.metadata.search.plannerCalls,1);
             testCase.verifyEqual(next.encounterId,prior.encounterId+1);
             testCase.verifyEqual(next.targetEpochIndex,2);
         end

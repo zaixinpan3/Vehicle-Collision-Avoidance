@@ -81,8 +81,8 @@ function [command,predictedInput,prediction,controllerState] = ...
     end
     % A newly observed encounter requests an avoidance reference instead of
     % inheriting a cruise seed built while no target was present.
-    targetOnset=~isempty(observed) && isstruct(previousState) && isempty(previousState.targetEpoch);
-    if targetOnset,encounterId=encounterId+1;end
+    targetOnset=~isempty(observed) && (~isstruct(previousState) || isempty(previousState.targetEpoch));
+    if targetOnset && isstruct(previousState),encounterId=encounterId+1;end
     if ~isempty(observed)
         % Reanchor the prediction at the current estimate without resetting
         % the ego input warm start. Cross-frame constancy is not required.

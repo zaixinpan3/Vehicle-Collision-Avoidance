@@ -1,15 +1,13 @@
 function result = exploreFreeTimePredictiveControl(sample,previousState,options)
-%exploreFreeTimePredictiveControl Explore free duration with fresh-path RTI retries.
+%exploreFreeTimePredictiveControl Explore free duration on an inherited reference.
 % Input is a controller model or a saved joint-simulation failure snapshot.
 % This research probe never issues a command or changes the online defaults.
 % The first prefix holds retain the actual sample interval. A scalar change
 % in total time is distributed uniformly over the remaining holds. The two
 % original PCBF/CLF objectives are retained without a time penalty.
-% Failed local attempts replan from the current observation and rebuild all
-% dynamics, collision normals and terminal rows. A shifted failure first
-% requests fresh guidance at the same horizon; failed fresh guidance requests
-% a longer planned horizon under one shared deadline and the explicit cap.
-% ReplanOnFailure=false retains a single-reference diagnostic comparison.
+% Planning is restricted to encounter onset. Failed local attempts may
+% extend the same reference; they never regenerate an avoidance path.
+% ExtendHorizonOnFailure=false retains a single-horizon comparison.
 % Future enclosures use the runtime's approximate per-hold convention, with
 % the longer hold duration propagated explicitly. Interior measurement
 % benefits are not invented. This is not a robust output-feedback certificate.
@@ -19,8 +17,7 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
         options.DurationIncreaseFraction (1,1) double {mustBeNonnegative,mustBeFinite} = 1
         options.DifferenceSeconds (1,1) double {mustBePositive,mustBeFinite} = 1e-3
         options.IntegrationStep (1,1) double {mustBePositive,mustBeFinite} = .01
-        options.FreshReference (1,1) logical = false
-        options.ReplanOnFailure (1,1) logical = true
+        options.ExtendHorizonOnFailure (1,1) logical = true
         options.MovingReference (1,1) logical = true
         options.RefinementIterations (1,1) double {mustBeInteger,mustBePositive} = 1
     end
@@ -29,64 +26,54 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
     else
         model=sample;
     end
-    if options.FreshReference,previousState=[];end
     % A model returned by an earlier probe may carry frozen geometry and a
     % variable grid. Neither belongs to a newly generated reference.
     for field=["probeNormals","predictionDurations","durationProbe","probeTimer"]
         if isfield(model,field),model=rmfield(model,field);end
     end
     baseline=model;timer=tic;minimumCount=model.cfg.controller.horizonSteps;
-    attempts={};extensions=0;plannerCalls=0;stop="";
+    attempts={};extensions=0;plannerCalls=0;stop="";reference=[];
     while true
         inherited=isstruct(previousState) && isfield(previousState,'inputTrajectory') ...
-            && size(previousState.inputTrajectory,2)>1 && all(isfinite(previousState.inputTrajectory),'all') ...
+            && size(previousState.inputTrajectory,1)==2 && size(previousState.inputTrajectory,2)>=1 ...
+            && all(isfinite(previousState.inputTrajectory),'all') ...
             && ~(isfield(baseline,'targetOnset') && baseline.targetOnset);
-        plannerRequested=~inherited && ~isempty(baseline.target);
+        plannerRequested=isempty(reference) && ~isempty(baseline.target) ...
+            && isfield(baseline,'targetOnset') && baseline.targetOnset;
         try
-            attempt=localReferenceAttempt(baseline,previousState,options,timer,minimumCount);
+            attempt=localReferenceAttempt(baseline,previousState,options,timer,minimumCount,reference);
         catch exception
             reason=string(exception.identifier);
             if ~localExpectedFailure(exception),rethrow(exception);end
             source="nominalFeedbackRollout";
             if plannerRequested,source="plannedAvoidanceRollout";end
             if inherited,source="shiftedInputRollout";end
+            if ~isempty(reference),source="extendedInputRollout";end
             count=minimumCount;
             if inherited,count=max(count,size(previousState.inputTrajectory,2)-1);end
             attempt=struct('status',reason,'initialization',source,'stageCount',count, ...
                 'fixed',[],'free',[],'initialAnchor',[],'model',baseline,'options',options);
         end
         attempt.plannerRequested=plannerRequested;
-        attempt.plannerCompleted=~isempty(attempt.initialAnchor) && attempt.initialAnchor.planner.used;
+        attempt.plannerCompleted=plannerRequested && ~isempty(attempt.initialAnchor) && attempt.initialAnchor.planner.used;
         plannerCalls=plannerCalls+double(attempt.plannerCompleted);
         attempts{end+1}=attempt; %#ok<AGROW> Limited by the shared deadline and explicit horizon cap.
         result=attempt;
         if ~isempty(attempt.free) && attempt.free.returned,stop="returned";break;end
-        if ~options.ReplanOnFailure,stop="singleReferenceDiagnostic";break;end
+        if ~options.ExtendHorizonOnFailure,stop="singleReferenceDiagnostic";break;end
         if toc(timer)>=baseline.cfg.solver.timeLimitSeconds ...
                 || attempt.status=="collisionAvoidanceController:timeBudgetExceeded"
             stop="timeLimit";break;
         end
-        if isempty(attempt.initialAnchor) && ~inherited
+        if isempty(attempt.initialAnchor)
             stop="referencePredictionUnavailable";break;
         end
-        % Preserve only the encounter's circulation direction. Fresh guidance
-        % must not reuse the failed inputs, old duals or terminal context.
-        fresh=[];
-        if isfield(attempt.model,'circulationDirection')
-            fresh=struct('circulationDirection',attempt.model.circulationDirection);
-        elseif isstruct(previousState) && isfield(previousState,'circulationDirection')
-            fresh=struct('circulationDirection',previousState.circulationDirection);
-        end
-        if inherited
-            minimumCount=attempt.stageCount;
-        else
-            nextCount=min(baseline.cfg.controller.maximumHorizonSteps,max(attempt.stageCount+1,ceil(1.5*attempt.stageCount)));
-            if nextCount<=attempt.stageCount,stop="horizonLimit";break;end
-            minimumCount=nextCount;extensions=extensions+1;
-        end
-        previousState=fresh;
+        nextCount=min(baseline.cfg.controller.maximumHorizonSteps,max(attempt.stageCount+1,ceil(1.5*attempt.stageCount)));
+        if nextCount<=attempt.stageCount,stop="horizonLimit";break;end
+        minimumCount=nextCount;extensions=extensions+1;
+        reference=attempt.initialAnchor;
     end
-    result.attempts=attempts;result.replanCount=max(0,numel(attempts)-1);
+    result.attempts=attempts;result.replanCount=0;
     result.completedPlannerCalls=plannerCalls;result.horizonExtensions=extensions;
     result.stopReason=stop;result.elapsedSeconds=toc(timer);
     result.returned=~isempty(result.free) && result.free.returned;
@@ -95,13 +82,14 @@ end
 function expected=localExpectedFailure(exception)
     expected=any(string(exception.identifier)==["collisionAvoidanceController:timeBudgetExceeded", ...
         "collisionAvoidanceController:invalidTireOperatingPoint", ...
-        "collisionAvoidanceController:singularTireLinearization","collisionAvoidanceController:nonlinearDomain"]);
+        "collisionAvoidanceController:singularTireLinearization","collisionAvoidanceController:nonlinearDomain", ...
+        "collisionAvoidanceController:missingWarmStart"]);
 end
 
-function result=localReferenceAttempt(model,previousState,options,timer,minimumCount)
+function result=localReferenceAttempt(model,previousState,options,timer,minimumCount,reference)
     cfg=model.cfg;wall=tic;
     request=struct('operation',"reference",'model',model,'previousState',previousState, ...
-        'minimumHorizonSteps',minimumCount,'timer',timer);
+        'minimumHorizonSteps',minimumCount,'timer',timer,'reference',reference);
     [anchor,initialization,model]=solvePredictiveControl("probe",request);
     model.probeTimer=timer;
     % Obtain guidance with its existing CLF table key. Use a finer, fixed
@@ -192,8 +180,9 @@ function model=localSnapshotModel(snapshot)
     previous=snapshot.previousState;index=0;epoch=ego.stateTime;input=zeros(2,1);
     if isstruct(previous),index=previous.sampleIndex+1;epoch=previous.epochTime;end
     if isfield(snapshot.egoInput,'heldActuatorInput'),input=snapshot.egoInput.heldActuatorInput;end
+    onset=~isempty(q) && (~isstruct(previous) || isempty(previous.targetEpoch));
     model=struct('cfg',cfg,'initialState',ego.modelState,'previousInput',input, ...
-        'target',q,'targetEpoch',q,'targetEpochIndex',index,'targetOnset',isempty(previous), ...
+        'target',q,'targetEpoch',q,'targetEpochIndex',index,'targetOnset',onset, ...
         'sampleIndex',index,'epochTime',epoch,'lane',lane,'road',road,'frame',frame, ...
         'nominalReference',nonlinearBicycleModel.cruise(cfg,frame(4)), ...
         'stateTime',ego.stateTime,'uncertainty',uncertainty);
