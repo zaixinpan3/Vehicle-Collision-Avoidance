@@ -35,10 +35,11 @@ function cfg=localDefaults()
     % squared, unit-scaled state/input deviation from the current reference.
     % The weight stays active on the route; zero disables it for ablation.
     cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10);
-    % One path-attracted circulation rollout supplies initialization controls.
+    % One safety-oriented circulation rollout supplies initialization controls.
+    % Cruise speed and route tracking belong to the controller's CLF stage.
     % The parallel-wall acceleration guide anticipates transverse momentum;
     % it is not a hard RTI/terminal constraint or an execution certificate.
-    cfg.planner=struct('radialRate',1,'tangentialRate',2,'pathRate',1,'wallRate',2, ...
+    cfg.planner=struct('radialRate',1,'tangentialRate',2,'wallRate',2, ...
         'lateralAccelerationFraction',.9,'guideHalfWidthMeters',9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
@@ -158,7 +159,7 @@ function localValidate(cfg)
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
-    for name=["radialRate","tangentialRate","pathRate","wallRate"]
+    for name=["radialRate","tangentialRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});

@@ -1752,20 +1752,21 @@ A previous accepted input sequence is shifted and rolled out from the current
 estimate. Its absolute endpoint is retained while the horizon shrinks by one
 hold per frame to `controller.horizonSteps`. Encounter preview may request a
 longer horizon. A newly observed target requests a fresh avoidance reference.
-Every fresh reference with a target uses one path-attracted circulation
+Every fresh reference with a target uses one safety-oriented circulation
 rollout; a target-free cold reference uses nominal path feedback. The field
 constructs the reference; only the optimization supplies execution inputs.
 
-The planner's transverse route attractor is
-
-$$
-a_n=\frac{\kappa_pv_t^2}{1-\kappa_pe_y}-2\lambda_pv_n-\lambda_p^2e_y.
-$$
-
 Directional rectangle/error supports and relative motion determine outward
 obstacle acceleration and circulation in a persistent passing direction.
-Cruise-speed error determines preferred acceleration along current ego
-velocity. No offset waypoint, entry/hold/return schedule, trajectory candidate
+The free-motion acceleration is zero in world coordinates. The obstacle
+field may change both longitudinal and lateral acceleration; cruise-speed
+feedback never overwrites its longitudinal component. Neither route
+attraction nor cruise recovery shapes this safety initializer. The initial
+passing side and geometric encounter preview use the measured ego motion.
+Route coordinates remain available for deviation diagnostics and for the
+legacy offset-wall geometry when no boundary scan is supplied. Nominal
+path and speed tracking remain the second-stage CLF objective.
+No offset waypoint, entry/hold/return schedule, trajectory candidate
 bank or seed-admission test is prescribed. Inverse Fiala guidance maps the
 acceleration to inputs; the declared nonlinear model produces all returned
 states over exactly the requested number of holds. A nonterminal or deficient
