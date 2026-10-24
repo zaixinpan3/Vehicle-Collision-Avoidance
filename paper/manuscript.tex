@@ -127,36 +127,37 @@ maintains constant velocity \cite{AlaiSharmaAlexanderRajamani2024}.
 Neglecting this dependence can attribute apparent motion caused by the
 ego maneuver to the target and distort the predicted collision geometry.
 
-One approach exploits the kinematic relationship between path curvature
-and speed. Path--velocity decomposition plans a geometric path and a speed
-profile separately, coordinating them through curvature-dependent speed
-selection and acceleration bounds \cite{FanEtAl2018}. Coupled trajectory
-planning uses a kinematic bicycle model to optimize acceleration and
-steering together \cite{LiZhangGuoLenzoGuo2023}. Kinematic models offer a
-compact basis for efficient optimization, but omit the tire-slip and
-force-saturation dynamics that become important near the handling limits.
-Another approach uses dynamic bicycle or higher-fidelity vehicle models
-to represent the interactions among steering, braking, and tire forces
-\cite{BealBoyd2019,ThompsonDallasGohBalachandran2024}. Separate longitudinal
-and lateral controllers can retain speed-dependent lateral dynamics
-while following coordinated path and speed references
-\cite{ZhangEtAl2023LaneChange,LiuQiangDaiChenXia2023}. Model predictive
-control can also coordinate steering and braking while accounting for
-tire-force limits and vehicle stability
+Longitudinal--lateral coupling can be addressed by coordinating lateral
+path following with longitudinal speed regulation
+\cite{ZhangEtAl2023LaneChange,LiuQiangDaiChenXia2023}. One approach uses
+kinematic relationships, such as the lateral-acceleration relation
+$a_y=v^2\kappa$, to coordinate speed $v$ and path curvature $\kappa$ when
+tire slip is negligible. Path--velocity decomposition plans the path and
+speed profile separately, then coordinates them through curvature and
+acceleration constraints \cite{FanEtAl2018}. Coupled trajectory planning
+uses a kinematic bicycle model to optimize longitudinal and lateral
+motion together \cite{LiZhangGuoLenzoGuo2023}. These formulations can
+support efficient computation, but do not fully describe vehicle behavior
+near the handling limits. Another approach uses dynamic bicycle or
+higher-fidelity vehicle models to capture the interactions among steering,
+braking, tire forces, and vehicle stability. In particular, shared tire
+adhesion limits couple the longitudinal and lateral forces
+\cite{BealBoyd2019}. Coupled model predictive control, including nonlinear
+formulations, optimizes steering and braking together while incorporating
+tire-friction and stability constraints
 \cite{GeZhaoMaGuo2022,WangLiuMengGuBai2021,ThompsonDallasGohBalachandran2024}.
-This allows dynamic feasibility
-to be assessed within the prediction model, but introduces additional
-model parameters and optimization complexity. Coupling is also addressed
-by coordinating avoidance decisions and trajectory generation.
-Supervisory logic can select combinations of steering and differential
-braking according to yaw-tracking errors and rollover indicators
-\cite{LiEtAl2022Emergency}. Joint trajectory optimization can coordinate
-longitudinal and lateral motion while imposing collision-avoidance and
-handling-stability constraints \cite{ChenChengLiZhaoWang2024}. These
-formulations link the choice of evasive action to the vehicle's
-maneuvering capability, although nonlinear models and nonconvex
-constraints can make real-time solution demanding
-\cite{LiZhangGuoLenzoGuo2023,ChenChengLiZhaoWang2024}.
+This provides a more detailed basis for assessing dynamic feasibility,
+at the cost of greater modeling and computational complexity. A further
+approach coordinates the choice and timing of braking and steering.
+Hierarchical decision and planning selects an avoidance maneuver, with
+lower layers planning and executing the corresponding motion
+\cite{LiEtAl2022Emergency,AmmourOrjuelaBasset2022}. Joint spatiotemporal
+optimization brings longitudinal and lateral trajectories, control
+variables, and collision-avoidance constraints into a common formulation
+\cite{LiZhangGuoLenzoGuo2023,ChenChengLiZhaoWang2024}. These approaches
+coordinate braking and steering as parts of an overall avoidance
+strategy, although the resulting nonconvex optimization problems can
+pose challenges for computational efficiency and real-time operation.
 
 Sharma and Rajamani used an inertial target model and extended Kalman
 filtering for predictive teleoperation display, transforming relative
