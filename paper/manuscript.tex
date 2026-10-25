@@ -29,8 +29,8 @@
 \newcommand{\norminf}[1]{\left\lVert #1\right\rVert_\infty}
 \newcommand{\normone}[1]{\left\lVert #1\right\rVert_1}
 
-\title{Integrated Lane-Keeping and Cruise Control System With
-Vehicle Collision Avoidance}
+\title{Vehicle Collision Avoidance With Coupled Predictive Control
+and State Estimation}
 
 \author{Author Name(s)%
 \thanks{Author names, affiliations, corresponding-author information, and
@@ -38,15 +38,15 @@ funding acknowledgments must be completed before submission. This manuscript
 is a research draft based on the accompanying MATLAB repository.}}
 
 \markboth{Draft Manuscript---October 2026}%
-{Author Name(s): Lane-Keeping and Cruise Control With Collision Avoidance}
+{Author Name(s): Vehicle Collision Avoidance With Control and Estimation}
 
 \hypersetup{
-    pdftitle={Integrated Lane-Keeping and Cruise Control System With
-Vehicle Collision Avoidance},
+    pdftitle={Vehicle Collision Avoidance With Coupled Predictive Control
+and State Estimation},
     pdfauthor={Author Name(s)},
     pdfsubject={An estimator and a predictive controller designed together
-for a lane-keeping and cruise control system with vehicle collision avoidance,
-with the safety guarantee carried through the estimator's certified uncertainty},
+for vehicle collision avoidance under coupled vehicle dynamics and
+target-state uncertainty},
     pdfkeywords={autonomous vehicles, collision avoidance, control barrier
 function, control Lyapunov function, high-gain observer, input-to-state
 stability, lane keeping, cruise control, nonlinear relative motion model, predictive
@@ -58,15 +58,13 @@ control, robust model predictive control, vehicle state estimation}
 \maketitle
 
 \begin{abstract}
-A lane-keeping and cruise control system maintains a vehicle within its
-lane at a set speed. We integrate this system with vehicle collision
-avoidance: when another vehicle threatens a collision, the ego vehicle
-steers and brakes around it, stays on the road, and returns to its lane.
-The evasive maneuver is
-the moment at which the other vehicle is hardest to track from the
-moving car, and a safe action that exists now may not exist a moment
-later. We design an estimator and a predictive controller for each
-other. The estimator keeps the nonlinear relative motion model of
+We study vehicle collision avoidance under coupled longitudinal--lateral
+dynamics and uncertainty in surrounding-vehicle states. The ego vehicle
+coordinates steering and braking in response to collision threats, while
+path and speed tracking serve as nominal driving and recovery objectives.
+Evasive maneuvers complicate target-state estimation and can compromise
+the availability of subsequent avoidance actions. We jointly design a
+target-state estimator and a predictive safety controller. The estimator keeps the nonlinear relative motion model of
 Sharma et al., which accounts for the ego vehicle's own motion, without
 the differentiated coordinates that forced that observer to assume
 constant ego acceleration and yaw rate; it carries an input-to-state
@@ -97,17 +95,15 @@ robust model predictive control, vehicle state estimation.
 
 \section{Introduction}
 
-\IEEEPARstart{C}{ruising} within a designated lane is a common task in
-autonomous driving and is already supported by commercially available
-driver-assistance systems that combine lane keeping with adaptive cruise
-control
-\cite{WeiPfefferEdelmann2024,XuGrizzleTabuadaAmes2018}.
-However, these systems still rely on manual driver intervention when
-surrounding vehicles pose a collision risk to the ego vehicle
-\cite{ChengLiLiuLiGuo2021}. This has motivated considerable research
-interest in autonomous driving systems that combine cruising within a
-designated lane with active avoidance of potential collisions with
-surrounding vehicles, without requiring driver intervention.
+\IEEEPARstart{A}{voiding} collisions with surrounding vehicles is a
+fundamental requirement for autonomous driving. An evasive response may
+involve braking, steering, or a combination of the two, with its
+effectiveness constrained by available road space, tire adhesion, and
+actuator limits
+\cite{LiEtAl2022Emergency,ChenChengLiZhaoWang2024,ThompsonDallasGohBalachandran2024}.
+The resulting control problem is to prevent a collision while the ego
+vehicle maneuvers and the surrounding vehicles' states are inferred from
+onboard measurements.
 
 Collision avoidance may require the ego vehicle to perform complex
 maneuvers, such as braking while turning. These maneuvers pose two
@@ -127,37 +123,33 @@ maintains constant velocity \cite{AlaiSharmaAlexanderRajamani2024}.
 Neglecting this dependence can attribute apparent motion caused by the
 ego maneuver to the target and distort the predicted collision geometry.
 
-Longitudinal--lateral coupling can be addressed by coordinating lateral
-path following with longitudinal speed regulation
-\cite{ZhangEtAl2023LaneChange,LiuQiangDaiChenXia2023}. One approach uses
-kinematic relationships, such as the lateral-acceleration relation
-$a_y=v^2\kappa$, to coordinate speed $v$ and path curvature $\kappa$ when
-tire slip is negligible. Path--velocity decomposition plans the path and
-speed profile separately, then coordinates them through curvature and
-acceleration constraints \cite{FanEtAl2018}. Coupled trajectory planning
-uses a kinematic bicycle model to optimize longitudinal and lateral
-motion together \cite{LiZhangGuoLenzoGuo2023}. These formulations can
-support efficient computation, but do not fully describe vehicle behavior
-near the handling limits. Another approach uses dynamic bicycle or
-higher-fidelity vehicle models to capture the interactions among steering,
-braking, tire forces, and vehicle stability. In particular, shared tire
-adhesion limits couple the longitudinal and lateral forces
-\cite{BealBoyd2019}. Coupled model predictive control, including nonlinear
-formulations, optimizes steering and braking together while incorporating
-tire-friction and stability constraints
-\cite{GeZhaoMaGuo2022,WangLiuMengGuBai2021,ThompsonDallasGohBalachandran2024}.
-This provides a more detailed basis for assessing dynamic feasibility,
-at the cost of greater modeling and computational complexity. A further
-approach coordinates the choice and timing of braking and steering.
-Hierarchical decision and planning selects an avoidance maneuver, with
-lower layers planning and executing the corresponding motion
-\cite{LiEtAl2022Emergency,AmmourOrjuelaBasset2022}. Joint spatiotemporal
-optimization brings longitudinal and lateral trajectories, control
-variables, and collision-avoidance constraints into a common formulation
-\cite{LiZhangGuoLenzoGuo2023,ChenChengLiZhaoWang2024}. These approaches
-coordinate braking and steering as parts of an overall avoidance
-strategy, although the resulting nonconvex optimization problems can
-pose challenges for computational efficiency and real-time operation.
+Coordinating path tracking with speed regulation is a common starting
+point for handling longitudinal--lateral coupling
+\cite{ZhangEtAl2023LaneChange,LiuQiangDaiChenXia2023}. When tire slip is
+negligible, the relationship between speed, steering, and vehicle motion
+can be described using a compact kinematic model. A path and its speed
+profile may then be planned separately and reconciled through curvature
+and acceleration limits \cite{FanEtAl2018}, or optimized together using
+a kinematic bicycle model \cite{LiZhangGuoLenzoGuo2023}. The computational
+simplicity of these formulations makes them attractive for online
+planning, although their description of vehicle behavior becomes less
+adequate near the handling limits. Dynamic vehicle and tire models
+provide a richer description of the interaction between steering and
+braking, particularly when longitudinal and lateral forces compete for
+the available adhesion \cite{BealBoyd2019}. Incorporating these models
+into predictive control allows the two inputs to be optimized subject
+to friction and stability constraints
+\cite{GeZhaoMaGuo2022,WangLiuMengGuBai2021,ThompsonDallasGohBalachandran2024},
+with greater modeling and computational demands. Motion planning provides
+a complementary means of coordinating evasive actions. Maneuver selection
+can precede trajectory generation and tracking
+\cite{LiEtAl2022Emergency,AmmourOrjuelaBasset2022}, while unified
+optimization allows braking and steering to be chosen jointly with the
+longitudinal and lateral trajectories under collision-avoidance constraints
+\cite{LiZhangGuoLenzoGuo2023,ChenChengLiZhaoWang2024}. Such formulations
+connect the choice and timing of an evasive action to the vehicle's
+maneuvering capability, but the resulting nonconvex problems can be
+computationally demanding to solve in real time.
 
 Sharma and Rajamani used an inertial target model and extended Kalman
 filtering for predictive teleoperation display, transforming relative
@@ -286,9 +278,9 @@ is to construct them together with the observer: future measurements and
 feedback depend on the same physical trajectory, and tire-model mismatch
 can affect both the plant prediction and the model-aided measurement.
 
-The research question is therefore how to connect maneuver-compatible
-estimation, coupled vehicle dynamics and predictive safety through one
-consistent uncertainty description. This requires both a current error
+The research question is therefore how to design a vehicle
+collision-avoidance controller whose safety analysis remains consistent
+with maneuver-dependent state estimation and coupled vehicle dynamics. This requires both a current error
 enclosure and a prediction that preserves its relationship to future
 observer updates. Replacing the target estimate and enlarging collision
 margins at each sample alone does not establish that the previous feasible
@@ -303,8 +295,8 @@ enclosure from its cascade ISS certificate.
 The controller predicts with a dynamic bicycle model and modified Fiala
 tires. A PCBF stage prioritizes collision avoidance, with a terminal
 continuation combining the obstacle forecast and an ego braking law;
-a subsequent control Lyapunov function (CLF) stage pursues lane keeping,
-cruise control and recovery. The two components share the tire model:
+a subsequent control Lyapunov function (CLF) stage manages nominal path
+and speed tracking and post-avoidance recovery as secondary objectives. The two components share the tire model:
 its lateral force balance provides a model-aided velocity measurement,
 and the controller enforces the domain needed for that inversion while
 using the estimator's enclosure to tighten its constraints.
@@ -335,7 +327,7 @@ requiring their derivatives (Section~\ref{sec:estimator}).
 Fiala bicycle model through one nonlinear rollout per sample and two
 second-order cone programs in strict priority order. A terminal braking
 continuation supports the predictive safety construction, and one CLF
-serves lane keeping, cruise control and recovery
+handles secondary path-tracking, speed-regulation and recovery objectives
 (Section~\ref{sec:control}).
 \item A joint nonlinear observer--controller formulation that propagates
 future measurement feedback and shared model mismatch. Posterior
@@ -370,9 +362,10 @@ presents the numerical evaluation.
 
 \subsection{The Task}
 
-An ego vehicle drives on a road bounded by curbs, along a nominal path
-that is given as route geometry, straight or of constant curvature, at
-a prescribed speed (Fig.~\ref{fig:driving_environment}). Other vehicles
+The nominal driving task is cruising within a designated lane at a
+prescribed speed on a road bounded by curbs. A reference path specifies
+the route geometry, which is straight or of constant curvature
+(Fig.~\ref{fig:driving_environment}). Other vehicles
 travel within or enter the sensed environment. The vehicle carries a
 global navigation satellite system (GNSS) receiver that measures its
 position and velocity, an inertial unit that measures body-frame
@@ -3575,9 +3568,9 @@ describe the algorithm with instantaneous computation.
 \section{Discussion}
 \label{sec:discussion}
 
-The paper integrates a lane-keeping and cruise control system with vehicle
-collision avoidance and examines, link by link, what is proved about its safety. We
-discuss the links in the order in which they turned out to matter.
+The paper examines how target-state estimation and predictive control
+can be combined for vehicle collision avoidance, with particular
+attention to the conditions supporting the safety analysis.
 
 \subsubsection*{The estimator during the maneuver}
 The point of keeping Sharma's relative motion model while giving up its
@@ -3690,9 +3683,9 @@ before physical collision avoidance can be claimed.
 \section{Conclusion}
 \label{sec:conclusion}
 
-A lane-keeping and cruise control system was integrated with vehicle
-collision avoidance, and its estimator and controller were designed for
-each other. The estimator keeps the ego-motion-aware
+This work developed a joint estimator--controller design for vehicle
+collision avoidance under coupled vehicle dynamics and target-state
+uncertainty. The estimator keeps the ego-motion-aware
 relative motion model of Sharma \emph{et al.} but takes the measured
 acceleration and yaw rate as inputs instead of differentiating them
 away, so it needs neither zero jerk nor zero yaw acceleration; it
@@ -3704,7 +3697,7 @@ the vehicle: one nonlinear rollout per sample on a Fiala bicycle, two
 cone programs in priority order, a terminal set built from the
 obstacle's forecast and one braking law that is invariant and makes the
 problem recursively feasible on the declared model, and one quadratic
-CLF for lane keeping, cruise control, and post-avoidance recovery. The
+CLF for nominal path and speed tracking and post-avoidance recovery. The
 controller keeps the vehicle where the estimator's measurement is informative, and the enclosure
 tightens each hold.
 
