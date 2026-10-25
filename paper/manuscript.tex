@@ -29,8 +29,8 @@
 \newcommand{\norminf}[1]{\left\lVert #1\right\rVert_\infty}
 \newcommand{\normone}[1]{\left\lVert #1\right\rVert_1}
 
-\title{Vehicle Collision Avoidance With Coupled Predictive Control
-and State Estimation}
+\title{Safety-Guaranteed Output-Feedback Collision Avoidance
+Using NRMM-Based Vehicle State Estimation}
 
 \author{Author Name(s)%
 \thanks{Author names, affiliations, corresponding-author information, and
@@ -38,11 +38,11 @@ funding acknowledgments must be completed before submission. This manuscript
 is a research draft based on the accompanying MATLAB repository.}}
 
 \markboth{Draft Manuscript---October 2026}%
-{Author Name(s): Vehicle Collision Avoidance With Control and Estimation}
+{Author Name(s): Safety-Guaranteed Output-Feedback Collision Avoidance}
 
 \hypersetup{
-    pdftitle={Vehicle Collision Avoidance With Coupled Predictive Control
-and State Estimation},
+    pdftitle={Safety-Guaranteed Output-Feedback Collision Avoidance
+Using NRMM-Based Vehicle State Estimation},
     pdfauthor={Author Name(s)},
     pdfsubject={An estimator and a predictive controller designed together
 for vehicle collision avoidance under coupled vehicle dynamics and
@@ -72,18 +72,21 @@ stability certificate and publishes an error enclosure with every
 estimate. The controller is a predictive control barrier function in
 the sense of Huang et al., with a terminal set built from the obstacle's
 predicted motion and one braking maneuver of the ego, and a control
-Lyapunov function for lane keeping, cruise control, and recovery. For the
-uncertainty-aware mathematical design, we propagate the nonlinear
-plant, future observer updates and causal feedback jointly, preserving the
-same model-mismatch sources. Posterior intersections, retained prediction
-certificates and a common zero-slack terminal continuation prove recursive
-feasibility from an initially feasible problem without fixed tube width.
-This robust derivation omits road boundaries. Applying a primary minimizer
-makes relaxation nonincreasing and its zero set invariant. In the October 11
+Lyapunov function for lane keeping, cruise control, and recovery. The safety analysis uses a current pointwise observer enclosure,
+sound physical reachable sets and one signed collision margin over each
+input hold. Intersecting the retained first successor with new observer
+information preserves the inclusion needed by a single shifted-plan
+proof. With initial feasibility, compatible uncertainty contracts and a
+common admissible terminal continuation, the road-free mathematical
+design is recursively feasible. Applying a primary minimizer makes its
+relaxation nonincreasing and its zero set invariant and safe. Future
+measurement-dependent policies are an optional extension; the production
+controller remains an approximation to this certificate construction.
+In the October 11
 baseline, all fourteen
 exact-state collision-threat encounters recover cruise without collision;
 with the estimator and bounded noise, 74 of 84 recover, and none collides
-or leaves the road. The direct-execution revision is not that campaign.
+or leaves the road. These results do not evaluate the full robust construction.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -262,6 +265,18 @@ In the present setting, the observer's current error enclosure must also
 be propagated into future collision constraints and remain compatible
 with subsequent measurement updates.
 
+Observer-based barrier designs make the required error interface more
+explicit. Tezuka and Nakamura \cite{TezukaNakamura2020} compensate
+obstacle-velocity estimation error through an input-to-state constraint
+safe reciprocal barrier. Their result preserves the original safe set
+under its hypotheses; the unrestricted-input construction does not
+supply an actuator-constrained vehicle guarantee. Quan \emph{et al.}
+\cite{QuanZhouFriskChung2025} use containing sets for environment-state
+and derivative errors in robust barrier inequalities. These approaches
+motivate directional error margins. We require a transient pointwise
+containing set explicitly: an $H_\infty$ energy-gain inequality alone
+does not provide that set without initial-error and metric bounds.
+
 Robust predictive control provides relevant precedents for using such
 uncertainty descriptions. Tube-based output-feedback MPC combines an
 observer, an invariant estimation-error set and robust constraint
@@ -273,20 +288,19 @@ to satisfy a consistency condition \cite{BatkovicGuptaZanonFalcone2023}.
 The latter explicitly treats ego sensing and localization as available.
 These results establish that estimation-error bounds, uncertainty tubes
 and prediction consistency are substantive parts of predictive safety.
-For the nonlinear ego--target system considered here, the remaining task
-is to construct them together with the observer: future measurements and
-feedback depend on the same physical trajectory, and tire-model mismatch
-can affect both the plant prediction and the model-aided measurement.
+For the nonlinear ego--target system considered here, physical model
+mismatch and the observer certificate must use compatible assumptions,
+and a new estimate must preserve a feasible continuation.
 
-The research question is therefore how to design a vehicle
-collision-avoidance controller whose safety analysis remains consistent
-with maneuver-dependent state estimation and coupled vehicle dynamics. This requires both a current error
-enclosure and a prediction that preserves its relationship to future
-observer updates. Replacing the target estimate and enlarging collision
-margins at each sample alone does not establish that the previous feasible
-continuation survives. Our design addresses this compatibility through
-joint nonlinear prediction, posterior intersection and retained safety
-certificates, under explicit model, sensor and terminal assumptions.
+The research question is how to connect maneuver-dependent state
+estimation to predictive collision avoidance under coupled vehicle
+dynamics. Replacing the estimate and enlarging margins at every sample
+does not establish that the previous continuation survives. We use one
+information set: a sound current observer enclosure conditions the
+retained physical prediction. Candidate held commands propagate that
+set, and a signed geometric margin converts it into safety constraints.
+Predicting future observer states is needed only if the prediction
+policy itself uses future observations.
 
 The proposed system combines these elements in a joint
 estimator--controller architecture. The estimator treats measured ego
@@ -301,20 +315,15 @@ its lateral force balance provides a model-aided velocity measurement,
 and the controller enforces the domain needed for that inversion while
 using the estimator's enclosure to tighten its constraints.
 
-The safety analysis links these components through a joint nonlinear
-prediction of the physical states, future measurements, observer updates
-and causal control laws. Shared model mismatch, posterior intersections
-and retained prediction certificates support policy shifting and a
-common admissible terminal continuation. Under the stated uncertainty
-contracts and initial feasibility, the mathematical problem is
-recursively feasible. Applying an attained primary minimum additionally
-makes the optimal relaxation nonincreasing and its zero set invariant;
-positive collision slack remains a relaxation of safety.
-This robust derivation omits road boundaries and proves collision
-constraints at the stated constraint instants, while the numerical
-controller retains road constraints. The mathematical guarantee is
-conditional on its premises and does not establish numerical solver
-success.
+The safety analysis links current containment, signed hold margins and a
+common admissible terminal continuation through one shift theorem. Under
+initial feasibility and compatible uncertainty contracts, the mathematical
+problem is recursively feasible. Applying an attained primary minimum
+also makes the optimal relaxation nonincreasing and its zero set
+invariant; positive collision slack remains a relaxation. The main theorem
+uses whole-hold images and omits road boundaries. The numerical controller
+retains road constraints but checks sampled approximations. Its solver
+return is not a certificate for the theorem's nonlinear set construction.
 
 The main contributions are as follows.
 \begin{enumerate}
@@ -325,16 +334,16 @@ enclosure. Measured ego acceleration and yaw rate may vary without
 requiring their derivatives (Section~\ref{sec:estimator}).
 \item A PCBF controller that coordinates steering and braking on the
 Fiala bicycle model through one nonlinear rollout per sample and two
-second-order cone programs in strict priority order. A terminal braking
+convex programs in strict priority order. A terminal braking
 continuation supports the predictive safety construction, and one CLF
 handles secondary path-tracking, speed-regulation and recovery objectives
 (Section~\ref{sec:control}).
-\item A joint nonlinear observer--controller formulation that propagates
-future measurement feedback and shared model mismatch. Posterior
-intersections, sound reachable-set enclosures, retained prediction
-certificates and a common terminal braking rule establish recursive
-feasibility and optimal-relaxation descent for the road-free mathematical
-problem under the stated contracts (Section~\ref{subsec:robust}).
+\item A unified information-set formulation linking current observer
+containment to physical reachable sets, signed collision margins and a
+common terminal continuation. Conditioning and retained certificates
+establish recursive feasibility and optimal-relaxation descent for the
+road-free mathematical problem. Future measurement-dependent feedback is
+an optional extension (Section~\ref{subsec:robust}).
 \item A closed-loop evaluation in fourteen collision-threat encounters
 with exact states and with the estimator and bounded sensor noise for
 six seeds, including an audit of the published enclosures against the
@@ -617,29 +626,29 @@ plant, the estimation error lies in the published enclosure
 (Theorem~\ref{thm:cascadeISS}, Corollary~\ref{cor:enclosure}, and the
 force-balance interval of Section~\ref{subsec:modelAided}).
 \item[(iii)] Whenever a finite observer certificate is used, its
-true-motion premises hold throughout the hold. The joint mathematical
+true-motion premises hold throughout the hold. The mathematical
 constraints impose these premises on every admitted branch; the numerical
 prediction and audits check the sideslip limits
 (Section~\ref{subsec:envelope}).
-\item[(iv)] Zero-deficit universal joint collision rows separate the true
-bodies at the specified constraint instants
-(Lemma~\ref{lem:dualRows}, Theorem~\ref{thm:robust}).
-\item[(v)] A feasible mathematical policy exists at the next sample.
+\item[(iv)] Zero-deficit signed collision margins separate the true bodies
+over every certified hold (Theorem~\ref{thm:robust}); sampled rows without
+motion reserves certify only their checked instants.
+\item[(v)] A feasible mathematical plan exists at the next sample.
 Proposition~\ref{prop:recursive} addresses exact information;
-Theorem~\ref{thm:robust} includes estimation error, shared mismatch,
-future observer feedback and revised information under its stated premises.
+Theorem~\ref{thm:robust} includes estimation error and physical mismatch
+through containment, conditioning and terminal closure.
 \item[(vi)] The vehicle returns to cruise after the encounter
 (the cruise-law certificate and measured recovery of
 Section~\ref{subsec:clf}).
 \end{enumerate}
-The joint-set construction closes the conditional mathematical argument
-for (ii)--(v), with road boundaries omitted from the robust derivation.
-The continuous-time observer proof and the sampled nonlinear cruise-law
-certificate have their own stated domains. Numerical trials audit the
-implemented approximations and measure recovery; they do not replace
-universal joint-set constraints. Separation between the constrained
-instants is not proved, and the perception bound in (i) remains declared
-rather than established by the perception stage.
+The information-set construction closes the conditional mathematical
+argument for (ii)--(v), with road boundaries omitted from the robust
+derivation. The observer theorem and the cruise-law certificate retain
+their stated domains. The soft CLF feasibility result alone does not
+prove recovery in (vi). Numerical trials audit approximations and measure
+recovery; they do not replace universal set constraints. The production
+controller does not certify intersample separation, and the perception
+bound in (i) remains declared rather than established by perception.
 
 \section{Estimator Design}
 \label{sec:estimator}
@@ -1358,12 +1367,12 @@ so every radius derived from it is bounded by a constant that depends
 only on the design, the declared bounds and \(\bm z_0\).
 \end{corollary}
 
-The uniform bound \eqref{eq:uniform_bound} is elementary, since
-$e^{Ht}\to0$ and the integral in \eqref{eq:comparison_solution}
-converges to $-H^{-1}\bm d$, but it is the quantity that the robust
-argument of Section~\ref{subsec:robust} needs: the estimation error
-that the controller has to absorb from one sample to the next is bounded
-by a constant it can plan with.
+The uniform bound \eqref{eq:uniform_bound} follows from $e^{Ht}\to0$
+and convergence of the comparison integral. The safety interface uses
+the valid transient enclosure at the current time, not an assumed
+future constant radius. Section~\ref{subsec:robust} propagates physical
+uncertainty and conditions it on subsequent valid information; it does
+not require prediction of observer convergence.
 
 Inertial reconstruction of the relative vector costs one further yaw
 term,
@@ -1402,26 +1411,21 @@ the computed bounds.
 \section{Control Design}
 \label{sec:control}
 
-The controller solves, at every sample, the problem of
-\cite{HuangWangMargellosGoulart2025} for the vehicle: minimize the
-relaxation of the collision constraints over a horizon that ends in a
-terminal set, then, with that relaxation held, minimize the violation of
-a decrease condition on one CLF. Every sample builds one nonlinear
-rollout, linearizes the vehicle model along it, and solves the two
-programs on that affine model. The completed secondary input sequence is
-issued directly. A nonlinear rollout supplies prediction and trust data
-only, with no post-solve scaling or feasibility veto.
-The horizon ends in a terminal set that is forward invariant under one
-braking law, so that on the declared model with exact information the
-plan of one sample, shifted by one hold, is an acceptable plan at the
-next. No maneuver template is prescribed and no backup command exists;
-the same programs run during avoidance and during the return to cruise.
-The controller acts on the estimates of Section~\ref{sec:estimator} and
-tightens its constraints by their enclosures. Section~\ref{subsec:robust}
-defines the uncertainty-aware mathematical design with future observer
-updates and causal feedback, and proves its recursive feasibility. The
-obstacle vehicle of this section is the target of the
-previous one.
+The controller follows the two priorities of
+\cite{HuangWangMargellosGoulart2025}: minimize collision-constraint
+relaxation, then optimize a soft CLF/performance objective under that
+safety budget. The mathematical formulation in
+Section~\ref{subsec:robust} makes the observer interface explicit and
+proves recursive feasibility under its declared contracts.
+
+The numerical construction below uses an affine model about one nonlinear
+rollout and the estimator's enclosures. Its campaign-era formulas explain
+the historical results of Section~\ref{sec:results}; subsequent runtime
+changes are identified where relevant. The current implementation uses a
+continuous CLF derivative row and a primary LP followed by a secondary
+QP, and checks completed inputs by nonlinear sampled replay before
+returning them. These checks do not certify whole-hold reachable sets.
+The obstacle vehicle of this section is the target of the previous one.
 
 \subsection{Prediction Model}
 \label{subsec:predictionModel}
@@ -2090,7 +2094,7 @@ nonlinear map. A Lipschitz bound on the remainder of the trim's
 linearization would make it one but fails by two orders of magnitude on
 this tire, which saturates at slips of a few hundredths of a radian.
 
-Every sample requests
+The campaign-era controller requests
 \begin{equation}
     V\bigl(F(\bm x,\bm u_0)\bigr)\leq\rho_VV(\bm x)+\delta,
     \quad\rho_V=e^{-2T_s/T_V},\quad\delta\geq0,
@@ -2117,11 +2121,27 @@ $V$ by at least the requested factor within the input bound, and the
 extension checks the decrease and the hard rows on every hold it
 appends rather than relying on the certificate.
 
+The current runtime instead imposes the continuous derivative residual
+at the supplied estimate,
+\begin{equation}
+ \widehat{\dot V}(\hat{\bm x},\bar{\bm u}_0)
+ +D_{\bm u}\widehat{\dot V}\,\Delta\bm u_0
+ \le -\frac{2}{T_V}V(\hat{\bm x})+s_V,\qquad s_V\ge0.
+ \label{eq:current_clf}
+\end{equation}
+Only the Fiala input dependence is linearized here. The slack is
+unbounded and the objective includes a nonvanishing quadratic penalty
+on scaled state and input deviations from the reference. This gives an
+LP for primary safety and a QP for secondary performance. A finite
+residual always admits a slack, as in Corollary~\ref{cor:softClf}; neither
+zero local slack nor feasibility proves nonlinear closed-loop recovery.
+The historical measurements of \eqref{eq:clf_row} are unchanged.
+
 \subsection{Use of the Estimation Enclosure}
 \label{subsec:uncertainty}
 
 This subsection describes the numerical approximation used in the reported
-trials. The joint prediction and proof for the uncertainty-aware
+trials. The information-set formulation and proof for the uncertainty-aware
 mathematical design are given in Section~\ref{subsec:robust}.
 
 The estimator publishes at every sample the ego generator matrix $G_0$
@@ -2219,7 +2239,8 @@ can at best reach a neighborhood of the path set by that error.
 \subsection{The Two Programs and the Issued Plan}
 \label{subsec:program}
 
-Let $\mathcal A$ denote the constraints shared by both programs on
+For the campaign-era formulation, let $\mathcal A$ denote the constraints
+shared by both programs on
 $(\Delta\bm x_{0:M},\Delta\bm u_{0:M-1},\bm\xi)$: the model
 \eqref{eq:affine_model}, the force-ratio and body-velocity bounds, the
 collision rows \eqref{eq:collision_rows} with $\bm\xi\geq0$, the road
@@ -2253,7 +2274,7 @@ $\varsigma_i>0$, and
     W_u=\diag(\bm\tau_u).
     \label{eq:tie_term}
 \end{equation}
-Both are second-order cone programs. If the zero correction with zero
+These campaign-era problems have second-order cone representations. If the zero correction with zero
 slacks satisfies $\mathcal A$, it attains $J_1^\star=0$ and the primary
 program is not passed to the solver; the secondary program is always
 solved. The ordering is that of the predictive barrier of
@@ -2273,7 +2294,7 @@ $10^{-5}$\,m the zero-slack set is a slab a few micrometers thick, and
 the cone solver repeatedly stalled on the secondary program. Both
 programs are solved by an interior-point cone solver to feasibility and
 gap tolerances of $10^{-6}$, and a solve that stalls is accepted at
-$10^{-4}$. The current policy issues the completed input sequence directly;
+$10^{-4}$. The October 12 revision issued the completed input sequence directly;
 positive numerical termination is not a nonlinear safety certificate.
 
 When the solver certifies the primary program primal infeasible, the
@@ -2284,7 +2305,8 @@ anchor is still infeasible, one fresh anchor is rolled out under the
 guidance feedback and treated the same way. The secondary program is
 then solved on the selected model.
 
-The completed secondary program supplies its input sequence directly. Its
+In the October 12 revision the completed secondary program supplies its
+input sequence directly. Its
 first input is applied without clipping, post-solve scaling, or a nonlinear
 feasibility veto. A nonlinear rollout of that same sequence supplies prediction
 and the trust remainder only; it does not replace the optimized slacks or
@@ -2292,6 +2314,9 @@ objective. A rollout outside the declared model domain is reported as
 unavailable and the affine prediction is retained. A frame without a usable
 primary and secondary result reports no optimization solution. Numerical
 solver return is not part of the mathematical recursive-feasibility claim.
+The current runtime also checks nonlinear sampled constraints on the
+completed inputs and can report no usable solution when that check fails.
+It still lacks the set certificates of Section~\ref{subsec:robust}.
 A positive primary value remains a relaxation of modeled margins, not a
 statement of physical safety.
 
@@ -2341,490 +2366,329 @@ these on appended holds of the declared model. The start of an encounter
 and re-acquisition after its absorbing exit remain initial-feasibility
 questions outside the proposition.
 
-\subsection{Joint Observer--Controller Recursive Feasibility Under
-Model and Estimation Uncertainty}
+\subsection{Unified Observer-to-Safety Formulation}
 \label{subsec:robust}
 
-This subsection defines the uncertainty-aware mathematical controller and
-proves its recursive feasibility. Future observations and feedback are
-part of prediction. The result concerns this joint nonlinear design;
-numerical evaluation of its sets and solver return are separate questions.
-We omit road-boundary constraints in this theorem. State, handling,
-actuator, slew and collision conditions remain, and lane recovery remains
-a performance objective. The road constraints and trials described
-elsewhere in the paper retain their stated scope.
+The observer certifies the current physical state; the controller
+propagates that information under candidate held inputs and conditions the
+retained successor on the next observation. Future observer convergence
+is not a premise. This subsection gives the mathematical construction
+and its conditional safety theorem. Road boundaries are omitted here;
+physical, handling, actuator, slew and observer-domain constraints remain.
+The numerical controller and the historical road-constrained trials are
+approximations with the distinct scope stated below.
 
-\subsubsection{One joint model and one source of each uncertainty}
-Let $\bm\vartheta\in\Theta$ denote unknown true vehicle parameters.
-The declared box in Section~\ref{subsec:modelAided} varies the front and
-rear cornering stiffness and friction coefficients; it does not also
-certify uncertain mass, inertia or geometry. Let $\bm w_i$ denote any
-separately admitted residual plant disturbance and $\bm\nu_i$ the
-primitive sensor-noise history during hold $i$. A value box does not
-establish temporal constancy. Fixed parameters obey
-$\bm\vartheta_{i+1}=\bm\vartheta_i$; varying parameters require a declared
-transition $\bm\vartheta_{i+1}\in\Gamma(\bm\vartheta_i)$, including their
-intra-hold history. A range-only contract may use $\Gamma(\bm\vartheta)=
-\Theta$. The same parameter history is used throughout each branch.
+\subsubsection{Current containment and physical prediction}
+Let $\bm q$ contain the true ego and target states, uncertain physical
+parameters, previous applied input, and the clock and mode/encounter
+memory required for a Markov transition. Fixed parameters remain fixed
+within each branch; varying parameters need a declared transition and
+intra-hold history. The tire-parameter box of
+Section~\ref{subsec:modelAided} does not certify uncertain mass, inertia,
+geometry or arbitrary additional forces. A physical defect that changes
+the model-aided measurement must also enter its observer bound.
 
-Let $\bm q$ contain the true ego and obstacle states and parameters, the
-observer's point, bound and history state, the measurements available for
-control, previous input, and the required mode, encounter and policy
-memory. Take decision instants after the measurements used by that input
-are available. A causal rule $\pi_i$ uses the observer outputs and known
-memory, never the unknown true state or parameter. The joint map is
+The observer supplies a pointwise enclosure
 \begin{equation}
-    \begin{aligned}
-    \bm u_i&=\pi_i(\bm s_i,\bm y_i,\bm m_i),\\
-    \bm q_{i+1}&=\mathcal G_{\pi_i}
-        (\bm q_i,\bm w_i,\bm\nu_i).
-    \end{aligned}
-    \label{eq:joint_sampling}
+    \bm q_k\in\mathcal Q_k^{\rm phys}.
+    \label{eq:current_containment}
 \end{equation}
-Here $\bm s_i$ includes observer information and $\bm m_i$ includes the
-required input and reference memory. The map executes the declared plant,
-measurement generation, observer evolution, reconstruction and resets in
-their prescribed sample/hold order. Future measurements are generated
-from the same physical branch that the future feedback controls. A
-published raw gyro is a noisy measurement, not true yaw rate.
-At the root, the observer state and current measurements are known, so
-all possible physical branches receive the same definite current input.
-Future observer states and inputs can differ across measurement branches.
+Its physical projection uses the transient bounds of
+Section~\ref{subsec:enclosure}, with compatible parameter and memory
+sets. Initial error, held measurements, outages, numerical defects and
+true operating-domain conditions must be covered. An energy-gain
+inequality, covariance or steady-state radius alone is not
+\eqref{eq:current_containment}. Past estimation error initializes this
+set; it is not injected again at every predicted hold. Measurement noise
+changes the next information set and optimization, but does not move the
+physical plant under a fixed held command.
 
-The published physical enclosure includes effects of past admitted
-mismatch and noise. It initializes the state set; it is not another
-independent noise to inject after \eqref{eq:joint_sampling} propagates
-those same sources. Future mismatch still acts through the true plant.
-For a predictor-timed linear illustration, take
-\[
-    \bm x^+=A\bm x+B\bm u+P\widetilde{\bm\vartheta}+\bm w,
-    \qquad \bm y=C\bm x+\bm n,
-\]
-$\hat{\bm x}^+=A\hat{\bm x}+B\bm u+L(\bm y-C\hat{\bm x})$,
-$\bm z^+=A\bm z+B\bm v$, and
-$\bm u=\bm v+K(\hat{\bm x}-\bm z)$. With
-$\bm\eta=\bm x-\bm z$, $\bm\epsilon=\bm x-\hat{\bm x}$ and
-$\bm r=[\bm\eta^\trans,\bm\epsilon^\trans]^\trans$,
+Write $\mathcal T(\mathcal J,\bm u)$ for the exact one-hold physical
+image and $\mathcal T_\tau(\mathcal J,\bm u)$ for its image at elapsed
+time $\tau\in[0,T_s]$. These maps include all declared physical defects,
+parameter histories and modes and are monotone under set inclusion.
+A certified outer successor must contain the exact image. An affine
+prediction without a proved remainder is not such a certificate.
+
+\subsubsection{Condition the retained successor}
+Initialize $\mathcal I_0=\mathcal Q_0^{\rm phys}$ with known input and
+mode memory. Store the certified first successor $\mathcal R_{1|k}$
+when issuing the first input. At the next sample use
 \begin{equation}
-    \begin{aligned}
-    J&=\begin{bmatrix}A+BK&-BK\\0&A-LC\end{bmatrix},\\
-    \bm r^+&=J\bm r+
-        \begin{bmatrix}P\\P\end{bmatrix}\widetilde{\bm\vartheta}
-        +\begin{bmatrix}I&0\\I&-L\end{bmatrix}
-          \begin{bmatrix}\bm w\\\bm n\end{bmatrix}.
-    \end{aligned}
-    \label{eq:shared_model_error}
-\end{equation}
-The same parameter and plant-disturbance columns enter both errors.
-Their direct contributions cancel in $\bm\eta^+-\bm\epsilon^+$, as
-the nominal observer-point update requires. Independent copies would
-lose that identity. Measurement correction before control or direct
-measurement feedthrough has its corresponding immediate control path;
-\eqref{eq:joint_sampling} retains its actual timing. This illustration
-does not replace the NRMM equations.
-
-Every enclosure used below must be valid for the same parameter,
-disturbance and sensor contract as $\mathcal G_\pi$. An extra physical
-lateral force, for example, changes the force-balance measurement as well
-as the plant and must enter its interval bound. The tire-parameter box
-does not cover arbitrary additional forces. Whenever a finite observer
-certificate is used, its continuous-motion premises must hold over the
-whole hold, not just at nodes and midpoints.
-
-\subsubsection{Information sets and future feedback}
-For a fixed causal rule define the exact joint image
-\begin{equation}
-    \mathcal T_\pi(\mathcal J)
-    =\{\mathcal G_\pi(\bm q,\bm w,\bm\nu):
-       \bm q\in\mathcal J,\ (\bm w,\bm\nu)\text{ admitted}\}.
-    \label{eq:joint_image}
-\end{equation}
-The source histories and their shared parameter identities are retained.
-The image is monotone under set inclusion; $\mathcal T_{\pi,\sigma}$
-denotes its held-state image at constrained fraction $\sigma$.
-
-Initialize $\mathcal I_0$ from the published physical enclosure, the
-parameter set and the known observer, measurement and input memory.
-A product initialization is sound if only marginal information is
-available, but may lose parameter/state correlation. Let
-$\mathcal R_{1|k}$ be the old first successor, exact or a proved outer
-set. With a valid new joint enclosure $\mathcal Q_{k+1}^J$ and the set
-$\mathcal A_{k+1}$ fixing the newly known memory, update
-\begin{equation}
-    \mathcal I_{k+1}
-      =\mathcal R_{1|k}\cap\mathcal Q_{k+1}^J
-         \cap\mathcal A_{k+1}.
+    \mathcal I_{k+1}=\mathcal R_{1|k}\cap
+        \mathcal Q_{k+1}^{\rm phys}\cap\mathcal A_{k+1},
     \label{eq:information_set}
 \end{equation}
-An unavailable or invalid finite enclosure contributes an unrestrictive
-set; it cannot exclude possible truth. The absorbing encounter-ended
-flag and the obstacle's stop reset use the same convention at both
-samples. A re-acquisition is a new initial-feasibility problem.
-Reference memory of the shifted policy remains an allowed choice.
+where $\mathcal A_{k+1}$ fixes newly known input and mode memory.
 
-For exact images, let $\mathcal S_k$ be the obstacle projection of
-$\mathcal I_k$ and
-\begin{equation}
-    \mathcal F_k(t)=\varphi_{t-t_k}(\mathcal S_k),\qquad t\ge t_k.
-    \label{eq:forecast_family}
-\end{equation}
-The autonomous obstacle flow includes its rest rule. Its acceleration
-is reset at rest; intersection uses the propagated post-reset state.
-
-\begin{lemma}[Truth containment and conditioning]
+\begin{lemma}[Containment and conditioning]
 \label{lem:nested}
-Under sound initial and new enclosures and the unchanged joint
-uncertainty contract, the truth belongs to every $\mathcal I_k$, and
+Under sound initial information, successors and new enclosures for the
+same physical uncertainty contract,
 \begin{equation}
-    \mathcal I_{k+1}\subseteq\mathcal R_{1|k}.
+    \bm q_{k+1}\in\mathcal I_{k+1}\subseteq\mathcal R_{1|k}.
     \label{eq:nesting}
 \end{equation}
-For exact images under the autonomous obstacle/rest model,
-$\mathcal F_{k+1}(t)\subseteq\mathcal F_k(t)$ for $t\ge t_{k+1}$.
 \end{lemma}
 \begin{IEEEproof}
-The next true state belongs to the sound first successor, the valid
-new enclosure and its known-memory slice. Their intersection is
-nonempty and contained in the successor. Induction gives truth
-containment. For exact images,
-$\mathcal S_{k+1}\subseteq\varphi_{T_s}(\mathcal S_k)$; the semigroup
-property gives forecast nesting at the same absolute time.
+The true successor belongs to each set in
+\eqref{eq:information_set}. Their intersection is nonempty, contains the
+truth and is a subset of the retained successor. Induction completes
+the argument.
 \end{IEEEproof}
-Consecutive raw observer balls need not be nested. For conservative
-outer sets the theorem below uses retained joint successor certificates;
-it does not require a separately recomputed marginal forecast to be
-nested. Relative rectangle geometry is evaluated on coupled ego and
-obstacle branches, rather than combining unrelated marginal extremes.
+Consecutive raw observer balls need not be nested. A dropout contributes
+an unrestrictive observation set, retaining the physical prediction.
+An empty intersection signals a violated contract; replacing it with
+the latest estimate does not restore the theorem. Any outer representation
+of the posterior must still lie inside $\mathcal R_{1|k}$ and contain
+the truth. Re-acquiring a target or changing the uncertainty contract
+requires a new initial-feasibility argument.
 
-The innovation of the new center remains. Writing the sampled true
-plant as $F_{\bm\vartheta}$ and its nominal counterpart as
-$F_{\bm\vartheta_0}$ gives the identity
+The new center may nevertheless move relative to the old prediction.
+For additive sampled defect $\bm w_k$, true map $F_{\bm\vartheta}$,
+nominal map $F_{\bm\vartheta_0}$ and error
+$\bm\epsilon_k=\bm x_k-\hat{\bm x}_k$, its innovation is
 \begin{equation}
     \begin{split}
     \bm\delta_k={}&-\bm\epsilon_{k+1}
-       +F_{\bm\vartheta}(\hat{\bm x}_k+\bm\epsilon_k,\bm u_k)\\
-       &-F_{\bm\vartheta_0}(\hat{\bm x}_k,\bm u_k)+\bm w_k .
+      +F_{\bm\vartheta}(\hat{\bm x}_k+\bm\epsilon_k,\bm u_k)\\
+      &-F_{\bm\vartheta_0}(\hat{\bm x}_k,\bm u_k)+\bm w_k.
     \end{split}
     \label{eq:innovation}
 \end{equation}
-Its terms come from one joint branch, not independently chosen
-estimation and mismatch errors.
+These terms belong to one physical history; they are not independent
+copies of estimation and model error.
 
-\subsubsection{Sound nonlinear prediction and varying tube widths}
-A prediction tube consists of sets satisfying
+\subsubsection{One signed margin over the input hold}
+Let $g(\bm q)$ be a signed separation margin, including the design
+clearance $d_{\rm m}$, such that $g\ge0$ excludes interior rectangle
+overlap. A unit-normal separating-plane gap minus $d_{\rm m}$ is a
+sufficient certificate; maximizing that gap over unit normals gives an
+exact signed separation test. Ordinary distance is zero inside an
+intersection and therefore cannot certify separation when $d_{\rm m}=0$.
+At zero design clearance contact is allowed; positive clearance excludes
+contact. Define
 \begin{equation}
-    \mathcal R_{0|k}=\mathcal I_k,\qquad
-    \mathcal T_{\pi_{i|k}}(\mathcal R_{i|k})
-        \subseteq\mathcal R_{i+1|k}.
-    \label{eq:robust_image_certificate}
+    \begin{aligned}
+    m(\mathcal J,\bm u)&=\inf_{\substack{0\le\tau\le T_s\\
+          \bm q\in\mathcal T_\tau(\mathcal J,\bm u)}}g(\bm q),\\
+    C(\mathcal J,\bm u)&=\max\{0,-m(\mathcal J,\bm u)\}.
+    \end{aligned}
+    \label{eq:robust_row}
 \end{equation}
-Exact images satisfy this by definition. For outer sets, the following
-construction supplies a nonlinear reserve.
+Let $H(\mathcal J,\bm u)$ mean that all hard physical, handling,
+actuator, slew and required observer-domain conditions hold on these same
+images. Restricting $\mathcal J$ cannot increase $C$ or invalidate $H$.
+This inclusion property is the link between conditioning and feasibility.
 
-\begin{lemma}[Joint nonlinear image enclosure]
-\label{lem:jointImage}
-Fix a rule $\pi$. On a convex cell $\mathcal D$ of the combined joint
-state and primitive disturbance arguments $\bm a$, choose
-$\bm a_c\in\mathcal D$ and a matrix $L_c$. Suppose $\mathcal G_\pi$
-is continuously differentiable there and a convex matrix box
-$\mathbf M_c$ encloses $D\mathcal G_\pi(\bm a)-L_c$ throughout
-$\mathcal D$. Then
+Directional supports translate observer uncertainty into a geometric
+reserve. If, on the full error and decision domain,
+$g(\hat{\bm q}+\bm e)\ge g(\hat{\bm q})+\bm a^\trans\bm e-r$
+for $\bm e\in\mathcal E$, then
+\begin{equation}
+    g(\hat{\bm q}+\bm e)\ge
+       g(\hat{\bm q})-\sigma_{\mathcal E}(-\bm a)-r,
+    \label{eq:directional_margin}
+\end{equation}
+where $\sigma_{\mathcal E}(\bm a)=\sup_{\bm e\in\mathcal E}
+\bm a^\trans\bm e$. Common ego/target pose and parameter columns are
+kept before taking supports. Orientation, dynamics and numerical reserves
+are added only when not already covered by the image or support bound.
+This connects the observer's containing set to the constraint direction,
+without counting any uncertainty source twice.
+
+Sound nonlinear images can be constructed locally. For a continuously
+differentiable physical map $F_{\bm u}$ on a convex cell $\mathcal D$
+of state and disturbance arguments, take $\bm a_c\in\mathcal D$ and
+$L_c$, and let a convex matrix box $\mathbf M_c$ contain
+$DF_{\bm u}(\bm a)-L_c$ throughout the cell. The mean-value integral gives
 \begin{equation}
     \begin{split}
-    \mathcal G_\pi(\mathcal D)\subseteq{}&
-       \mathcal G_\pi(\bm a_c)\oplus L_c(\mathcal D-\bm a_c)\\
+    F_{\bm u}(\mathcal D)\subseteq{}&F_{\bm u}(\bm a_c)
+       \oplus L_c(\mathcal D-\bm a_c)\\
        &\oplus\mathbf M_c(\mathcal D-\bm a_c).
     \end{split}
     \label{eq:joint_nonlinear_enclosure}
 \end{equation}
-\end{lemma}
-\begin{IEEEproof}
-The mean-value integral along the segment from $\bm a_c$ to $\bm a$
-equals the average Jacobian times $\bm a-\bm a_c$.
-After subtracting $L_c(\bm a-\bm a_c)$, the average residual
-Jacobian belongs to $\mathbf M_c$ by convexity.
-\end{IEEEproof}
-If $\bm\rho$ bounds coordinate deviations and $\Delta_c$ bounds
-the absolute residual Jacobian entries, $\Delta_c\bm\rho$ is a
-coordinate reserve. A componentwise Hessian bound $H_j$ gives the
-smooth-cell reserve $\tfrac12\bm\rho^\trans H_j\bm\rho$.
-The cell includes parameter/state and policy/input interactions.
-Keep shared affine columns before adding the approximation reserve:
-model mismatch belongs inside $\mathcal G_\pi$, not in a second
-independent disturbance appended afterward.
+Switching guards must be split and all possible branches retained;
+integration defects enter the declared contract once. The same reasoning
+is needed for hold images and geometry, not just the endpoint state.
 
-Switching guards are split and all possible branch images are retained.
-This covers tire saturation, low-speed modes, stop resets, angle
-conventions and observer inversion/fallbacks. An undefined branch must
-be excluded by a valid domain condition or handled by a declared mode.
-If an exact inverse replaces the implemented bisection for analysis,
-its termination error must also be bounded. Numerical plant integration
-is either the declared sampled model or its defect from a continuous
-model enters the disturbance contract once. Input and geometry rows
-require their corresponding joint image bounds; a state enclosure alone
-does not prove actuator or rectangle constraints.
+Definition~\eqref{eq:robust_row} covers the whole hold. Alternatively,
+start, midpoint and endpoint bounds with a valid whole-hold Lipschitz
+constant $L_g$ can use a reserve $L_gT_s/4$, together with midpoint and
+integration defects. Without such a reserve the definition must be
+restricted to the checked instants, and the theorem then certifies only
+those instants. No relative-degree-one assumption on the dynamic
+bicycle's position constraint is needed.
 
-Induction on \eqref{eq:robust_image_certificate} now contains every
-admitted nonlinear trajectory over the finite horizon. It neither
-restarts the current error at each hold nor requires equal tube widths.
-For fixed parameters, a local representation with proved residuals is
-\[
-    \bm r_{i+1}=J_i\bm r_i+P_i\widetilde{\bm\vartheta}
-        +D_i\bm\nu_i+\bm c_i+\bm e_i,\qquad \bm e_i\in U_i .
-\]
-Let $\Phi(i,j)=J_{i-1}\cdots J_j$, $\Phi(j,j)=I$, and
-\begin{equation}
-    \begin{aligned}
-    H_i&=\sum_{j=0}^{i-1}\Phi(i,j+1)P_j,\\
-    \bm m_i&=\Phi(i,0)\bm m_0+
-       \sum_{j=0}^{i-1}\Phi(i,j+1)\bm c_j .
-    \end{aligned}
-    \label{eq:parameter_response}
-\end{equation}
-For independent root generators $G_0,G_\vartheta$ and normalized
-unit-box sensor variables, the absolute support in direction $\bm\ell$
-is bounded by
-\begin{equation}
-    \begin{aligned}
-    &|\bm\ell^\trans\bm m_i|
-       +\normone{\bm\ell^\trans\Phi(i,0)G_0}
-       +\normone{\bm\ell^\trans H_iG_\vartheta}\\
-    &\quad+\sum_{j=0}^{i-1}
-        \normone{\bm\ell^\trans\Phi(i,j+1)D_j}\\
-    &\quad+\sum_{j=0}^{i-1}
-        h_{\rm abs}\bigl(U_j,\Phi(i,j+1)^\trans\bm\ell\bigr),
-    \end{aligned}
-    \label{eq:feedback_finite_support}
-\end{equation}
-where $h_{\rm abs}(U,\bm a)=\sup_{\bm e\in U}|\bm a^\trans\bm e|$.
-This follows by unrolling the recursion and collecting the same
-$\widetilde{\bm\vartheta}$ before taking supports. Shared root or
-temporal noise columns are likewise combined before absolute values.
-The $U_i$ must bound the residuals on the sets where they are used.
-For varying parameters use the declared augmented transition instead
-of the constant-parameter term $H_i$.
-
-The products are those of observer and feedback dynamics, not a
-frozen-input plant. Uniformly exponentially decaying error-block
-products with bounded forcing
-provide a sufficient bounded-tail mechanism, while individual steps
-may expand. Persistent parameters have identity dynamics, so a Schur
-test on the entire parameter-augmented state is not required.
-The uncontrolled obstacle's absolute spread need not be bounded.
-Recursive feasibility requires the sound images and constraints,
-not a constant-radius or uniformly contracting nonlinear tube.
-
-\subsubsection{A common robust terminal continuation}
-Let $\mathcal B$ contain nonempty joint sets whose members are mild
-and admit one common causal braking continuation. Along that rule
-every branch satisfies the state, handling, actuator and slew rows,
-and every active collision row has zero deficit, including the
-parked phase. The family of terminal rules is closed under deleting
-its first hold. This is a mathematical continuation witness.
-
-Under the accepted mild kinematic contract of
-Assumption~\ref{asm:mild}, a common held steering/braking rule keeps
-each branch's sideslip and curvature fixed and uses a forward-only
-absorbing stop. It does not select a last command using each unknown
-true speed. If the realized braking satisfies $a(t)\ge a_{\min}>0$
-while $V>0$, for every branch with $V(0)\le\overline V$,
+\subsubsection{One common terminal continuation}
+Let $\mathcal B$ be a downward-closed family of nonempty information
+sets. Each $\mathcal J\in\mathcal B$ admits one common first terminal
+command $\bm u_f$ and a certified successor satisfying
 \begin{equation}
     \begin{gathered}
-    V(t)\le\max(0,\overline V-a_{\min}t),\\
-    t_{\rm stop}\le\frac{\overline V}{a_{\min}},\qquad
-    s_{\rm stop}\le\frac{\overline V^2}{2a_{\min}} .
+    H(\mathcal J,\bm u_f),\qquad C(\mathcal J,\bm u_f)=0,\\
+    \mathcal T(\mathcal J,\bm u_f)\subseteq
+        \mathcal R_f(\mathcal J)\in\mathcal B.
     \end{gathered}
+    \label{eq:terminal_information}
+\end{equation}
+A family of common admissible braking continuations closed under taking
+tails supplies this property: the same continuation controls every
+subset, and its tail controls the successor. Individually feasible
+commands for different unknown true states do not suffice. Input memory
+preserves the first appended slew condition.
+
+Under the mild terminal model of Assumption~\ref{asm:mild}, a continuous
+absorbing stop and a realized deceleration $a(t)\ge a_{\min}>0$ give,
+for initial speed $V(0)\le\overline V$,
+\begin{equation}
+    t_{\rm stop}\le\overline V/a_{\min},\qquad
+    s_{\rm stop}\le\overline V^2/(2a_{\min}).
     \label{eq:terminal_stop_bound}
 \end{equation}
-These inequalities follow by integrating $\dot V\le-a_{\min}$ to
-the absorbing stop and integrating the resulting speed envelope.
-Each branch also carries its first-exit flag: a target-center exit alone
-cannot end a joint information-set encounter. All active branches must
-exit before an outer-set certificate discards the target.
-The rate bound belongs to the declared terminal uncertainty contract.
-A sampled delayed stop reset requires its delay allowance.
-The fixed command of Section~\ref{subsec:terminal} is common to all
-branches; their stop times differ through the forward-only stop rule,
-not through commands selected from unknown true speeds.
+These follow by integrating $\dot V\le-a_{\min}$ to rest.
+The complete uncertain braking continuation and the parked rectangle
+family must satisfy \eqref{eq:terminal_information}. A delayed stop
+needs its own allowance. Pose uncertainty remains at rest; disturbances
+capable of moving the parked vehicle need a separate invariant parked
+set. No contraction of an unused yaw estimate is needed. Every active
+branch must exit before an encounter is discarded. The mild braking
+contract is a premise, not a maneuver-wide Fiala terminal certificate;
+the center-based numerical terminal rows are not substituted for it.
 
-Along each such branch $|\kappa|V^2$ decreases and the sideslip remains
-constant, preserving mildness under the declared terminal model.
-The terminal acceleration budget is a premise of that model, not an
-additional Fiala nonsaturation constraint. Actuator admissibility and
-the first slew from the stored prior input are checked explicitly;
-later held-command slew differences are zero.
-
-A finite membership construction checks all joint continuation sets
-through $\lceil\overline V/(a_{\min}T_s)\rceil$ holds under the
-continuous absorbing-stop contract, then checks the entire parked
-ego rectangle family against the remaining obstacle family.
-Pose uncertainty remains at rest. Measurement noise does not move
-that physical set under the held policy; a residual physical
-disturbance capable of doing so requires its own parked invariant set.
-An invalid finite low-speed observer enclosure cannot replace the
-propagated physical set, and no yaw-estimate contraction at rest is
-required.
-
-\begin{proposition}[Terminal closure on joint sets]
-\label{prop:jointTerminal}
-The exact terminal family is downward closed. For every
-$\mathcal J\in\mathcal B$ its common first rule $\pi_f$ satisfies
-all hard rows, has zero collision deficit, and
-$\mathcal T_{\pi_f}(\mathcal J)\in\mathcal B$.
-\end{proposition}
-\begin{IEEEproof}
-The same continuation controls any nonempty subset.
-Every successor branch is already covered by the old continuation,
-and its tail is an allowed rule. It certifies the successor.
-Input and terminal memory are propagated, so the first slew and
-latched steering conditions are retained.
-\end{IEEEproof}
-With outer sets, require a proved successor
-$\mathcal T_{\pi_f}(\mathcal J)\subseteq\mathcal R_f(\mathcal J)$
-with $\mathcal R_f(\mathcal J)\in\mathcal B$.
-The nominal center-based set of Section~\ref{subsec:terminal} is
-not substituted for this joint-set definition.
-
-\subsubsection{The theoretical PCBF/CLF problem}
-For $1\le N\le M\le M_{\max}$, choose causal rules
-$\pi_{0|k},\ldots,\pi_{M-1|k}$, sets satisfying
-\eqref{eq:robust_image_certificate}, and nonnegative prefix slacks.
-Impose all hard rows universally on the appropriate hold images and
+\subsubsection{Predictive barrier value and the shift theorem}
+Fix $1\le N\le M$ at encounter initialization. Choose common held inputs
+$\bm u_{0:M-1}$, nonempty sets $\mathcal R_{0:M}$, compatible image and
+row certificates, and nonnegative prefix slacks such that
 \begin{equation}
-    \begin{split}
-    &\dist\bigl(\mathcal V_E(\bm q),\mathcal V_C(\bm q)\bigr)
-        \ge d_{\rm m}-\xi_{i|k},\\
-    &\bm q\in\mathcal T_{\pi_{i|k},\sigma}(\mathcal R_{i|k}),
-      \qquad \sigma\in\{0,\tfrac12,1\}.
-    \end{split}
-    \label{eq:robust_row}
+    \begin{aligned}
+    \mathcal R_0&=\mathcal I_k,&
+    \mathcal T(\mathcal R_i,\bm u_i)&\subseteq\mathcal R_{i+1},\\
+    H(\mathcal R_i,\bm u_i),&&C(\mathcal R_i,\bm u_i)&\le\xi_i,\\
+    \xi_i&=0\ (i\ge N),&\mathcal R_M&\in\mathcal B.
+    \end{aligned}
+    \label{eq:robust_image_certificate}
 \end{equation}
-Fractions are of $T_s$ and the same slack covers a whole hold.
-Set $\xi_i=0$ for $i\ge N$ and require
-$\mathcal R_{M|k}\in\mathcal B$. The primary value is
+One slack covers an entire hold, including its endpoint. Define
 \begin{equation}
-    V^\star(\mathcal I_k)=
-       \min\sum_{i=0}^{N-1}\xi_{i|k}.
+    V_{\rm P}^\star(\mathcal I_k)=\min\sum_{i=0}^{N-1}\xi_{i|k}.
     \label{eq:joint_primary}
 \end{equation}
-The policy and certificate class is closed under shifting and terminal
-appending. For example it can contain scheduled affine output laws
-$\pi_i=\bm v_i+K_i(\hat{\bm x}^{\rm pub}_i-\bm z_i)$ and the held
-terminal rule. Nominal centers, stored gains and reference memory
-can inherit the old tail; $\bm z_0$ is not forced to equal a new
-estimate. The root physical set still uses the current information.
+After attaining the primary minimum, optimize the soft CLF/performance
+objective with the same hard rows and primary budget. Retain the old
+input tail, sets and row certificates as admissible choices; new anchors,
+trust boxes or separating charts cannot discard that witness.
 
-The current input $\pi_{0|k}$ evaluated on the known data is applied
-directly. Future rules are conditional reactions to observations,
-not commands chosen using unknown true states.
-The exact-set formulation requires no numerical enclosure constants.
-Proved outer sets give a sufficient alternative; if an approximate
-tube is prescribed, its image and row bounds must be established.
-
-\begin{theorem}[Joint nonlinear recursive feasibility]
+\begin{theorem}[Containment, recursive feasibility and safety]
 \label{thm:robust}
-Suppose the initial mathematical problem is feasible, the joint model
-and uncertainty contracts are unchanged, all used enclosures contain
-the truth, update \eqref{eq:information_set} is used, the rules and
-certificates admit shifting and terminal appending, and the terminal
-family has the closure properties of Proposition~\ref{prop:jointTerminal}.
-Applying the definite first input of any feasible plan preserves
-mathematical feasibility for every admitted model and sensor history.
-If the executed plan attains the primary minimum, then
-\[
-    V^\star(\mathcal I_{k+1})
-       \le V^\star(\mathcal I_k)-\xi_{0|k}^\star .
-\]
-The true applied hold satisfies the hard rows and has clearance at
-least $d_{\rm m}-\xi_{0|k}$ at the specified constraint instants.
-For safety-optimal plans the first-hold deficits are summable and
-the zero-slack information states are invariant until the encounter ends.
+Assume sound current enclosures and images for an unchanged physical
+uncertainty contract, an initially feasible problem
+\eqref{eq:robust_image_certificate}, conditioning by
+\eqref{eq:information_set}, terminal closure
+\eqref{eq:terminal_information}, and a plan/certificate class closed
+under shifting and terminal appending. Apply the first input of a
+feasible plan unchanged. Then the next information set contains the
+truth and the next mathematical problem is feasible. The applied hold
+satisfies the hard conditions and $g(\bm q(t))\ge-\xi_{0|k}$ at every
+time included in \eqref{eq:robust_row}. If each executed plan attains
+the primary minimum, then
+\begin{equation}
+    V_{\rm P}^\star(\mathcal I_{k+1})\le
+    V_{\rm P}^\star(\mathcal I_k)-\xi_{0|k}^\star.
+    \label{eq:information_descent}
+\end{equation}
+The zero-value information states are invariant and safe. Along an
+infinite applicable sequence the first-hold deficits are summable and
+tend to zero.
 \end{theorem}
 \begin{IEEEproof}
-Lemma~\ref{lem:nested} gives $\mathcal I_{k+1}\subseteq\mathcal R_{1|k}$.
-Shift the old rules $\pi_{1|k},\ldots,\pi_{M-1|k}$ and append a
-terminal rule for $\mathcal R_{M|k}$. Retain
-\begin{equation}
-    \widehat{\mathcal R}_0=\mathcal I_{k+1},\qquad
-    \widehat{\mathcal R}_i=\mathcal R_{i+1|k},\quad 1\le i<M .
-    \label{eq:tube_growth}
-\end{equation}
-For $M\ge2$, monotonicity of the exact image gives
-$\mathcal T_{\pi_{1|k}}(\mathcal I_{k+1})
-\subseteq\mathcal T_{\pi_{1|k}}(\mathcal R_{1|k})
-\subseteq\mathcal R_{2|k}$.
-All later old image and row certificates are unchanged.
-The terminal rule supplies the last rows and a successor in $\mathcal B$.
-For $M=1$ the new root is a subset of the old terminal set and the
-same witness applies. Input memory preserves the slew rows.
-The candidate has the same $M$, so both horizon limits hold.
+Lemma~\ref{lem:nested} gives
+$\mathcal I_{k+1}\subseteq\mathcal R_{1|k}$ with truth containment.
+Shift $\bm u_{1|k},\ldots,\bm u_{M-1|k}$, retain the old successor sets
+and certificates, and append a terminal command for $\mathcal R_{M|k}$.
+For $M\ge2$, monotonicity gives
+\[
+ \mathcal T(\mathcal I_{k+1},\bm u_{1|k})\subseteq
+ \mathcal T(\mathcal R_{1|k},\bm u_{1|k})\subseteq\mathcal R_{2|k}.
+\]
+All later old image and row certificates remain valid. Terminal closure
+supplies the final rows and a successor in $\mathcal B$. For $M=1$ the
+new root is a subset of the old terminal set and the same witness
+applies. Stored input memory preserves slew admissibility.
 
-Set $\widehat\xi_i=\xi_{i+1|k}$ for $i<N-1$ and
-$\widehat\xi_{N-1}=0$. The last prefix stage was an old hard-tail
-stage when $M>N$, or the appended terminal stage when $M=N$.
-Universal rows hold on subsets, so the candidate cost is the old
+Shift the prefix slacks to $(\xi_{1|k},\ldots,\xi_{N-1|k},0)$.
+The last zero belongs either to an old hard-tail hold or to the terminal
+append. Universal rows hold on subsets, so this candidate has the old
 cost minus $\xi_{0|k}$. Comparison with the next minimum proves
-the value inequality for a primary minimizer.
-Truth containment gives the applied-hold statement.
-Nonnegativity and telescoping give summability and zero-set invariance.
+\eqref{eq:information_descent} for a primary minimizer. Truth containment
+gives the applied-hold bound. Nonnegativity and telescoping give
+summability and zero-set invariance.
 \end{IEEEproof}
-
-This extends the shifted-candidate argument of
-\cite{HuangWangMargellosGoulart2025} to the joint information state.
-A valid old tube can be retained even if a fresh adaptive outer
-approximation is wider. Refinements may intersect sound images of
-the same shifted rule with the retained tube.
-No global monotonicity of a freshly computed numerical enclosure,
-constant tube width, exact state information or successful solver
-return is assumed. Positive collision slacks remain relaxation;
-they are not a zero-deficit safety claim.
-For an executed feasible cost $J_k$ the comparison is only
-$V^\star(\mathcal I_{k+1})\le J_k-\xi_{0|k}$;
-optimal-value descent additionally needs a primary minimizer.
+This specializes the predictive-slack shift argument of
+\cite{HuangWangMargellosGoulart2025} to sound observer information.
+Positive deficits remain relaxation; summability does not imply
+finite-time entry into the zero-value set. For an executed feasible cost
+$J_k$ the comparison is only
+$V_{\rm P}^\star(\mathcal I_{k+1})\le J_k-\xi_{0|k}$.
+A certified primary suboptimality $\eta_k$ adds $\eta_k$ to
+\eqref{eq:information_descent}; summability then needs a summable error
+budget. The numerical slack tolerance is not such an optimality bound.
 
 \begin{corollary}[Feasibility of the soft CLF stage]
 \label{cor:softClf}
-After an attained primary minimum, retain its hard rows and slack
-budget and add a CLF residual $g\le\rho_{\rm CLF}$ with
-$\rho_{\rm CLF}\ge0$ and no finite upper bound.
-If the residual is finite on a primary candidate's certified set,
-the secondary mathematical problem is feasible.
+A finite CLF residual $r_V$ with an unbounded nonnegative slack preserves
+a primary feasible candidate under the exact primary budget.
 \end{corollary}
 \begin{IEEEproof}
-Choose $\rho_{\rm CLF}=\max(0,\sup g)$ for that candidate.
-It satisfies the added row and leaves every primary constraint unchanged.
+Keep that candidate and choose $s_V=\max(0,r_V)$, or
+$s_V=\max(0,\sup r_V)$ for a bounded robust residual. No safety row
+changes.
 \end{IEEEproof}
-A hard CLF row or bounded slack needs an additional feasibility
-argument. An exact primary budget preserves the optimal-value
-statement; a numerical budget tolerance does not establish that
-exact descent.
+This proves feasibility, not CLF convergence or numerical solver success.
+A hard CLF row or an upper-bounded slack needs an additional argument.
 
-\subsubsection{Scope and numerical realization}
-Theorem~\ref{thm:robust} is a complete conditional mathematical
-statement for the defined joint-set design: its premises include
-initial feasibility and the declared model/observer contracts.
-It does not assert feasibility for every initial encounter.
-Exact images establish containment by definition; terminal closure
-and the policy shift are proved above.
-Evaluating set radii or implementing a membership test is not a
-missing step of that existence proof.
+\subsubsection{Online algorithm and optional future feedback}
+At each sample, obtain the current valid enclosure and condition the
+stored first successor. Propagate candidate physical sets, minimize
+\eqref{eq:joint_primary}, and optimize performance under the same safety
+budget. Issue the first command and store its successor, input tail,
+certificates and terminal witness. Repeat when new information arrives.
+This is an output-feedback controller because every optimization uses
+available measurements. Open-loop input sequences within each solve can
+be conservative, especially over long horizons; initial robust
+feasibility remains a premise.
 
-The executable two-program controller and the historical trials use
-the approximations stated in Section~\ref{subsec:uncertainty}.
-Their numerical outcomes do not establish or refute the theorem
-for a different problem. A convex restriction claiming this same
-guarantee must preserve the carried policy, tube and row certificates;
-arbitrary new tangents or trust regions cannot be presumed to do so.
-The consolidated theory document
-\path{controller/CONTROLLER_THEORY.md} gives the full
-construction. Independent exact-arithmetic specializations check
-the shared-source algebra, nonlinear reserve, tube reuse and
-uncertain-rate braking, without replacing the proofs above.
+If a predicted policy uses future observations, augment $\bm q$ with
+observer state, measurements and policy memory, replace held inputs by
+causal rules $\pi$, and propagate the actual measurement/observer timing:
+\begin{equation}
+    \bm u_i=\pi_i(\bm s_i,\bm y_i,\bm m_i),\qquad
+    \bm q_{i+1}=\mathcal G_{\pi_i}(\bm q_i,\bm w_i,\bm\nu_i).
+    \label{eq:joint_sampling}
+\end{equation}
+Future measurements must come from the same physical branch. Shared
+model error enters plant and model-aided observation once, with the same
+parameter history; an independent copy of the current estimation error
+is not added. The image and conditioning operators now act on this
+augmented state. With a causal policy class closed under shifting and
+the same terminal property, the proof of Theorem~\ref{thm:robust}
+applies unchanged. Future observer simulation is therefore needed for
+this extension, not for the physical held-input core.
+
+The full construction and optional shared-source formulas are given in
+\path{controller/CONTROLLER_THEORY.md}, Sections 6--7. A convex numerical
+restriction inherits the theorem only when it preserves its sound
+images, posterior inclusion, row certificates and terminal witnesses.
+The production RTI approximation does not yet implement this complete
+contract; its nonlinear robust-safety certification flag remains false.
 
 \subsection{Trust Scale from the Model Remainder}
 \label{subsec:trust}
 
-The scale $\sigma$ of the input trust box is estimated from the
+In the campaign-era trust heuristic, the scale $\sigma$ of the input
+trust box is estimated from the
 remainder of the linearization, measured in the same sample. For a
 correction of size $s$, the largest input change from the anchor in
 units of $\bm\tau_u$, the affine prediction differs from the nonlinear
@@ -2861,35 +2725,32 @@ remainder or on the separation.
 \subsection{Scope of the Guarantees}
 \label{subsec:scope}
 
-The implemented optimizer enforces affine sampled constraints and its
-linearized terminal rows. The completed inputs are applied directly; a
-nonlinear prediction is not a certificate that those exact constraints
-hold. Positive primary slack is relaxation. Zero CLF slack refers to the
-local value model, not to a nonlinear decrease of the plant.
+The production optimizer uses affine sampled constraints and approximate
+terminal rows, followed by nonlinear sampled checks. Positive primary
+slack remains relaxation. Zero CLF slack concerns a local derivative
+model and does not establish nonlinear plant decrease.
 
 Proposition~\ref{prop:invariance} concerns the declared terminal law.
 Proposition~\ref{prop:recursive} proves feasibility of an ideal
-exact-information problem under a common forecast and an admissible
-appended hold. Theorem~\ref{thm:robust} proves it for the stated
-road-free joint nonlinear problem, including shared model mismatch and
-future observer feedback, under its information-update and terminal
-contracts. Neither promises numerical solver return. The cruise-law
-certificate is conditional on its sampled enclosure hypothesis and is
-not a certificate for the input selected by the local convex programs.
+exact-information problem. Theorem~\ref{thm:robust} proves recursive
+feasibility and zero-value safety for the road-free information-set
+problem under its containment, whole-hold image and terminal contracts.
+Its optional policy lift includes future observer feedback. None of
+these statements promises numerical solver return. The cruise-law
+certificate retains its sampled-enclosure hypothesis.
 
-Collision constraints are sampled at nodes and midpoints; separation
-between them is not proved. Plant integration mismatch is measured,
-not bounded. The executable per-hold affine tightening omits nonlinear
-remainder bounds and does not implement the joint-set recursion or
-robust terminal certificate. These distinctions remain necessary when
-solver failures in an experiment are accepted. A forecast re-acquired
-after the absorbing encounter exit requires a new initial-feasibility
-problem.
+The runtime checks nodes and midpoints without a certified intersample
+reserve. Its per-hold affine tightening lacks proved nonlinear remainder
+bounds, retained posterior sets and a robust terminal witness. Consequently
+the whole-hold theorem is not a safety certificate for the current
+production optimizer or historical trials. Re-acquisition after an
+absorbing encounter exit requires a new initial-feasibility problem.
 
 \subsection{Computation}
 \label{subsec:computation}
 
-Every inequality row is a small dense block on the few variables it
+The campaign-era assembly uses small dense blocks on the few variables each
+inequality row
 involves, and the sparse matrices are assembled in one call; building
 them row by row had cost time quadratic in the plan length. A row whose
 largest value over the variables' boxes, the state box of
@@ -2899,8 +2760,9 @@ optimum unchanged; most road rows, state-limit rows and collision rows
 far from the obstacle go this way, and a collision multiplier is not
 computed where the reference distance less both reaches, the margin and
 the largest tightening exceeds the most the pose can move over the
-boxes. A larger trust scale reuses the formulated problem. The nonlinear rollout now supplies prediction data only. Exact rectangle
-checks remain in anchor construction and independent experimental replay. The cruise trim is solved by
+boxes. A larger trust scale reuses the formulated problem. In the October 12 direct-execution revision the nonlinear rollout supplied
+prediction data only. The current runtime additionally checks nonlinear
+sampled constraints on the completed plan. The cruise trim is solved by
 Newton's method with the analytic tangent. On 120 captured problems the
 block assembly reproduced the previous matrices to $4.4\cdot10^{-16}$,
 and on 2880 candidate plans the batched rule gave the same decision as a
@@ -2909,13 +2771,13 @@ start-up, so that every code path is compiled before the first sample.
 
 \section{Results}
 
-The experiments below describe the October 11 baseline at commit
+The vehicle experiments describe the October 11 baseline at commit
 \path{4ed2344}, including its nonlinear acceptance-step policy and earlier
-terminal sideslip definition. The October 12 direct-execution revision and
-its settled terminal constraints have not been rerun through that campaign;
-its bounded-error theorem is stated for the ideal problem of
-Section~\ref{subsec:robust}. No baseline number is attributed to the new
-execution policy.
+terminal sideslip definition. Subsequent runtime and theory revisions
+have not been rerun through that campaign. Its numbers are preserved and
+are not attributed to the current production algorithm or the complete
+information-set construction. Section~\ref{subsec:informationChecks}
+separately reports an October 25 longitudinal reference verification.
 
 \label{sec:results}
 
@@ -3565,6 +3427,50 @@ the 95th percentile, and cost 0.1\,s of recovery time at the median.
 Because the computation time is not applied as a delay, the outcomes
 describe the algorithm with instantaneous computation.
 
+\subsection{Verification of the Information-Set Construction}
+\label{subsec:informationChecks}
+
+A separate longitudinal reference implements the physical core of
+Section~\ref{subsec:robust} with a constant-speed moving target and
+forward-only ego braking with absorbing rest. The hold is 0.2\,s, the
+horizon has four holds with two slack holds, the braking alphabet is
+$\{0,2,4\}$\,m/s$^2$, and the slew limit is 10\,m/s$^3$. All 81 input
+sequences are enumerated, first minimizing robust deficit and then a
+speed/braking cost. Four-coordinate interval sets contain ego and target
+position and speed. Bounded observation offsets alternate deterministically;
+no simulated truth enters the optimizer. Whole-hold gaps are minimized
+analytically at endpoints and any relative-speed crossing.
+
+In twelve safe holds, all primary values remain zero, the minimum true
+gap is 0.56\,m, ten raw observation boxes are not nested in the old
+prediction, and two observations are missing. Posterior conditioning
+preserves every shifted witness. One-hold horizons and uncertain parked
+states also retain valid continuations; an input-limited case is
+infeasible. An initially overlapping example starts with a 0.4\,m robust
+deficit and a $-0.2$\,m true gap before recovering; it is not safe from
+initialization. A separate trajectory has a 4\,mm minimum gap at the
+start, midpoint and endpoint but a $-1$\,mm whole-hold minimum. It
+illustrates why sampled geometry cannot certify the continuous hold.
+
+A pointwise-bound check uses
+$P=\diag(1,4)$, $A=[-1,-20;\,5,-1]$ and zero disturbance injection.
+Although $A^\trans P+PA+I=\diag(-1,-7)\prec0$, the initial error
+$(0,1)^\trans$ evolves as
+$e^{-t}(-2\sin 10t,\cos 10t)^\trans$ and has norm 1.70927 at
+$t=\pi/20$. Thus an energy inequality with unit attenuation and a
+declared unit disturbance bound does not by itself establish a unit
+Euclidean error ball. The metric bound of radius 2 does contain this
+trajectory. This checks the inference from energy gain to pointwise
+containment, not the vehicle experiment of \cite{QuanZhouFriskChung2025}.
+
+The reference and edge cases pass eleven behavior tests; the associated
+observer-enclosure, information-set and rectangle-support suite passes
+64 tests in total. These are ordinary floating-point specializations,
+not directed-rounding certificates or new full-vehicle performance
+results. Source and settings are in
+\path{scripts/verifyUnifiedObserverSafety.m}, with compact results in
+\path{report/UNIFIED_OBSERVER_SAFETY_20261025.json}.
+
 \section{Discussion}
 \label{sec:discussion}
 
@@ -3606,9 +3512,11 @@ could not be used as a worst case throughout the horizon or in the
 decrease condition: both made the programs infeasible or the commands
 erratic. The baseline compromise tightens one affine hold and replans; it does
 not certify the nonlinear hold without remainder bounds. The theoretical
-construction of Section~\ref{subsec:robust} instead propagates the actual
-observer and future feedback jointly; it does not repeatedly propagate
-an independent estimation-error box through an open-loop plant.
+construction of Section~\ref{subsec:robust} propagates one physical
+information set and conditions its retained successor. Future observer
+simulation is optional when future controls use measurements. This
+simplifies the proof but does not remove open-loop prediction
+conservatism or guarantee feasibility for every encounter.
 
 \subsubsection*{The terminal set and the ten failures}
 The terminal set is built from the obstacle's own motion model and one
@@ -3627,20 +3535,19 @@ published parameter sets contained the truth in every audited sample;
 the controller forecasts with their centers. These historical failures concern the baseline approximation. Propagating
 the published target marginal through the full horizon recovered 31 of 84
 encounters in an earlier ablation, with one collision; that experiment
-does not test the joint future-feedback formulation.
+does not test the complete information-set formulation.
 
-Theorem~\ref{thm:robust} resolves the mathematical shift argument by
-retaining joint source identities, conditioning the next information set
-and carrying the old policy and tube certificates. The common terminal
-rule covers every admitted branch, including a nonzero parked pose set.
-Neither a fixed-width invariant tube nor a freshly recomputed monotone
-outer approximation is required. Exact reachable images give a complete
-conditional existence proof; numerical membership and image algorithms
-are a separate realization problem. Narrower valid parameter enclosures
-can enlarge the initially feasible domain, but are not an additional
-logical step in that proof. Feedback need not suppress growth of an
-uncontrolled target's absolute marginal: collision rows use the joint
-relative geometry, with all remaining spread accounted for.
+Theorem~\ref{thm:robust} closes the shift argument by conditioning the
+retained first successor and carrying the old input tail and its
+certificates. A common terminal continuation covers every admitted
+branch, including the parked pose set. Neither fixed-width tubes nor
+nested raw observer balls are needed. The two cited observer-based
+barrier designs motivate valid error compensation; they do not replace
+this predictive feasibility argument or its actuator and terminal
+premises. Exact images define a conditional mathematical construction.
+Efficient sound image and terminal-membership algorithms for the full
+Fiala/NRMM system remain implementation work. Shared relative geometry
+can reduce conservatism, but every remaining uncertainty must be covered.
 
 \subsubsection*{The CLF}
 One obstacle-independent function governs avoidance and recovery, every
@@ -3694,24 +3601,24 @@ certificate, measures the lateral velocity through the controller's
 tire model and held input, and publishes an enclosure with every
 estimate. The controller is a predictive control barrier function for
 the vehicle: one nonlinear rollout per sample on a Fiala bicycle, two
-cone programs in priority order, a terminal set built from the
+convex programs in priority order, a terminal set built from the
 obstacle's forecast and one braking law that is invariant and makes the
 problem recursively feasible on the declared model, and one quadratic
 CLF for nominal path and speed tracking and post-avoidance recovery. The
 controller keeps the vehicle where the estimator's measurement is informative, and the enclosure
 tightens each hold.
 
-Theorem~\ref{thm:robust} completes the conditional mathematical link
-for the road-free uncertainty-aware design. One nonlinear joint model
-propagates the physical vehicle, measurements, observer and causal feedback,
-with one shared model-mismatch history. Exact images, or proved nonlinear
-outer bounds, contain every admitted branch. The posterior is a subset of
-the old first successor; shifting the policy and retaining its certificates
-then gives a feasible candidate ending in the common terminal continuation.
-Nonzero estimation error and varying tube widths are allowed. A soft CLF
-stage preserves feasibility, and executing an attained primary minimum
-also gives optimal-relaxation descent. Initial feasibility and the declared
-uncertainty and terminal contracts remain explicit premises.
+Theorem~\ref{thm:robust} provides a unified conditional link from
+observer containment to safety. A pointwise current enclosure initializes
+physical prediction; the next observation conditions its retained first
+successor. One signed hold margin, sound reachable images and a common
+admissible terminal continuation give the shift proof. Nonzero estimation
+error and varying tube widths are allowed. The soft CLF stage preserves
+feasibility, and primary minimizers give optimal-relaxation descent and
+an invariant safe zero set. Future observation-dependent feedback lifts
+the same construction to a joint observer state when needed. Initial
+feasibility and compatible physical, sensor and terminal contracts remain
+explicit premises; road boundaries are omitted from this theorem.
 
 In the October 11 baseline, in fourteen collision-threat encounters with exact states every run
 ends collision-free on the road with cruise recovered and the shifted
@@ -3723,7 +3630,8 @@ its forecast meters from its motion. The published enclosures contained
 the truth in every audited sample. These are simulations on the
 prediction model itself. The reported implementation uses per-hold affine
 tightening and center-based terminal rows, so these results are evidence
-about that approximation. Implementing the joint certificate construction
+about that approximation. The longitudinal reference verifies selected
+containment and shift mechanisms separately. Implementing the full certificate construction
 and evaluating physical model, perception and intersample separation
 contracts are future engineering work. They do not leave a missing step
 in the stated mathematical recursive-feasibility proof.
@@ -3775,7 +3683,11 @@ narrative of the introduction. The quantitative values are drawn from
 the versioned experiment records and checked against their numerical
 exports. The October 13 joint-theory synchronization used Codex (OpenAI)
 for the joint-model and proof revision, manuscript consistency checks and
-LaTeX build. The authors remain responsible for verifying every equation,
+LaTeX build. The October 25 revision used Codex to incorporate the
+observer-based barrier literature, simplify the information-set theorem,
+align its scope with the runtime, document the longitudinal reference
+checks and rebuild the PDF. It did not rerun the historical vehicle
+campaign. The authors remain responsible for verifying every equation,
 proof, citation, result, interpretation, and submission declaration.
 
 \bibliographystyle{IEEEtran}

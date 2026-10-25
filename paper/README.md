@@ -1,14 +1,11 @@
 # Draft manuscript
 
 `manuscript.tex` is the IEEE Transactions-style draft titled
-"Integrated Lane-Keeping and Cruise Control System With Vehicle Collision Avoidance". A lane-keeping and cruise control system
-maintains travel within a designated lane at a prescribed speed. The
-October 14 terminology revision presents this as a single nominal system
-throughout the manuscript. The October 13, 2026
-revision synchronizes the joint
-observer--controller mathematical design with the current theory documents.
-The abstract, introduction, safety argument, robust derivation, discussion
-and conclusion use the same guarantee scope.
+"Safety-Guaranteed Output-Feedback Collision Avoidance Using NRMM-Based Vehicle
+State Estimation". The October 25, 2026 revision aligns the paper with the
+unified observer-to-safety formulation in the controller theory. The title's
+safety guarantee refers to the conditional mathematical design; the production
+Fiala controller does not yet implement the complete certificate construction.
 
 Compile from this folder:
 
@@ -19,49 +16,61 @@ latexmk -pdf -interaction=nonstopmode -halt-on-error manuscript.tex
 The derived `manuscript.pdf` is the readable draft. Remove build
 intermediates with `latexmk -c manuscript.tex`.
 
-## Joint mathematical design
+## Unified mathematical design
 
-The robust subsection defines a nonlinear joint state containing the
-physical ego and target, uncertain parameters, observer state and bounds,
-measurements, and control memory. Future measurements and causal feedback
-are propagated with the plant; their model-mismatch sources are shared.
-The published current error enclosure initializes the physical set rather
-than supplying an extra independent disturbance at every predicted step.
+The observer supplies a current pointwise physical enclosure, including the
+initial transient and applicable sensor, model and digital-realization bounds.
+Candidate held inputs propagate that set. The next observation conditions the
+retained first successor, preserving truth containment and the inclusion needed
+by the shifted-plan proof. Raw observer balls need not be nested. Dropouts keep
+the physical prediction; an empty intersection invalidates the contract.
 
-Exact reachable images, or outer images with proved nonlinear reserves,
-contain all admitted trajectories. The next posterior intersects the old
-first successor with new sound information. A shifted causal policy
-retains the old tube and row certificates and appends a common admissible
-zero-deficit terminal braking rule. The terminal family contains mild
-moving states and their continuation to a parked pose set with nonzero
-uncertainty. A soft CLF stage preserves mathematical feasibility.
+A signed geometric margin distinguishes overlap from zero-distance contact.
+Whole-hold reachable images, compatible hard constraints and one common
+admissible terminal continuation establish conditional recursive feasibility.
+Executing a primary minimizer gives optimal-relaxation descent and an invariant
+safe zero-value set. Positive slack remains relaxation. An unbounded soft CLF
+slack preserves feasibility but does not by itself prove recovery. Road
+boundaries are omitted from this robust theorem.
 
-These constructions complete the conditional recursive-feasibility proof
-for the defined mathematical design. Initial feasibility and compatible
-model, sensor, observer and terminal contracts are explicit premises.
-The derivation temporarily omits road boundaries and proves collision
-rows at the stated constraint instants. It requires neither a fixed tube
-width nor numerical solver success. Optimal-relaxation descent additionally
-requires applying an attained primary minimum; positive collision slack
-remains relaxation.
+The core is output feedback through measurement-conditioned reoptimization;
+it does not forecast future observer convergence. A predicted policy that uses
+future observations requires the optional joint observer/measurement lift.
+Both constructions use the same inclusion and shift argument. Initial
+feasibility, sound nonlinear images and terminal closure are explicit premises.
 
-The detailed derivations are maintained in
-[the controller mathematical theory](../controller/CONTROLLER_THEORY.md),
-particularly Sections 5--7 on the terminal set, joint prediction and recursive
-feasibility.
-Exact-arithmetic specializations are checked by
-`../scripts/checkJointMismatchDerivations.py` and
-`../tests/jointMismatchDerivationsTest.py`.
+Tezuka and Nakamura (2020) and Quan et al. (2025) motivate error compensation
+and containing-set interfaces. Their hypotheses are distinguished from this
+vehicle construction; an energy-gain inequality alone is not treated as a
+pointwise Euclidean error bound.
 
-## Numerical evidence
+The detailed derivation is maintained in
+[controller theory, Section 7](../controller/CONTROLLER_THEORY.md#recursive-feasibility),
+with the optional joint extension in Section 6. The executable longitudinal
+reference is [verifyUnifiedObserverSafety.m](../scripts/verifyUnifiedObserverSafety.m);
+settings, test results and limitations are in
+[the reference verification report](../report/UNIFIED_OBSERVER_SAFETY_20261025.md).
 
-The reported October 11 campaign is unchanged: fourteen exact-state
-encounters recovered cruise, and 74 of 84 noisy estimated-state runs
-recovered; none collided or left the road. The reported controller uses
-per-hold affine tightening and center-based terminal rows and retains road
-constraints. Those trials do not evaluate the full joint future-feedback
-mathematical problem or the subsequent direct-execution revision. No new
-vehicle simulation was run for this manuscript synchronization.
+## Numerical evidence and implementation scope
+
+The October 11 vehicle results are unchanged: fourteen exact-state encounters
+recovered cruise; 74 of 84 noisy estimated-state runs recovered; none collided
+or left the road. Those trials use per-hold affine tightening and center-based
+terminal rows, with road constraints. They do not evaluate the complete
+information-set algorithm or later runtime revisions.
+
+The paper separately reports the October 25 longitudinal reference, including
+moving observation boxes, dropouts, common braking, parked uncertainty and a
+between-sample collision counterexample. Eleven reference behavior tests and
+64 targeted MATLAB tests in total passed in the preceding algorithm task.
+These are floating-point specializations, not full-vehicle certification.
+No vehicle campaign was rerun for this manuscript revision.
+
+The campaign-era discrete CLF formulas are labeled as historical. The current
+runtime uses a continuous derivative CLF row, a primary LP and secondary QP,
+and nonlinear sampled checks. It still lacks validated whole-hold images,
+retained posterior sets and robust terminal witnesses. Neither solver success
+nor sampled replay closes those gaps.
 
 ## Figures and submission fields
 
