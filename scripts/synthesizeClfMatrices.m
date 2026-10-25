@@ -1,5 +1,11 @@
 function entries = synthesizeClfMatrices(operatingPoints,options)
-%synthesizeClfMatrices Certify the CLF and its cruise controller offline, before experiments.
+%synthesizeClfMatrices Design the continuous CLF and certify its sampled cruise gain.
+% The continuous trim condition is
+%   (Ac+Bc*K)'*P + P*(Ac+Bc*K) <= -(2/T)*P.
+% Strict slack gives a local nonlinear continuous-time CLF by smoothness;
+% it does not certify the entire sampled sublevel set for continuous feedback.
+% The additional sampled-model enclosure below supports the separate held
+% cruise initializer. It is not the controller's online CLF constraint.
 % The controller never computes P. For each operating point (controller
 % configuration overrides and path curvature) this script certifies, on the
 % sampled nonlinear bicycle model itself, a quadratic CLF V = e'Pe of the
@@ -147,9 +153,11 @@ function entry=localSynthesize(cfg,curvature,key,options)
     scale=struct('state',diag(box),'input',diag(ubar));
     [a0,b0]=terminalSafeSet.jacobians(reference,cfg,zeros(5,1),zeros(2,1),h);
     at=scale.state\a0*scale.state;bt=scale.state\b0*scale.input;
+    flow=struct('a',scale.state\point.continuousA*scale.state, ...
+        'b',scale.state\point.continuousB*scale.input,'decay',(2/T)*(1+options.DesignMargin));
     stream=RandStream('mt19937ar','Seed',options.CertificateSeed);
     % 1. The plain LMI inside StartFraction of the box gives the first gain and set.
-    [s,y,fill,ok]=localLmi(at,bt,zeros(5,7,0),0,design,[],options.StartFraction*ones(5,1),[]);
+    [s,y,fill,ok]=localLmi(at,bt,zeros(5,7,0),0,design,[],options.StartFraction*ones(5,1),[],flow);
     if ~ok || fill<=1e-6
         error('synthesizeClfMatrices:infeasible', ...
             'No CLF contracts with the requested time constant and input bound at speed %g, curvature %g.',cfg.referenceSpeed,curvature);
@@ -167,7 +175,7 @@ function entry=localSynthesize(cfg,curvature,key,options)
             gamma=options.Growth;
             for attempt=1:3
                 enclosure=localEnclosure(reference,cfg,gamma*s,k,scale,a0,b0,h,options,stream,band);
-                [s2,y2,fill2,ok2]=localLmi(at,bt,enclosure.directions,enclosure.residualNorm,design,gamma*s,ones(5,1),struct('k',k,'delta',band));
+                [s2,y2,fill2,ok2]=localLmi(at,bt,enclosure.directions,enclosure.residualNorm,design,gamma*s,ones(5,1),struct('k',k,'delta',band),flow);
                 if ok2 && fill2>1e-6,break;end
                 localReport(options,'  iteration %d: growth %.3f, band %.2f infeasible (bounds %s, residual %.4f)\n', ...
                     iteration,gamma,band,mat2str(enclosure.coefficientBounds.',3),enclosure.residualNorm);
@@ -215,6 +223,11 @@ function entry=localSynthesize(cfg,curvature,key,options)
         'nominalA',a0,'nominalB',b0,'certifiedContraction',certified,'requiredContraction',rho, ...
         'certifiedTimeConstantSeconds',-2*h/log(certified),'requiredTimeConstantSeconds',T, ...
         'certifiedLevel',1,'holdFactor',holdFactor,'regionFill',fill,'extents',sqrt(diag(inv(p))));
+    closed=point.continuousA+point.continuousB*gain;
+    derivative=full.factor.'\(closed.'*p+p*closed)/full.factor;
+    entry.continuousLinearDecayRate=-max(eig((derivative+derivative.')/2));
+    assert(entry.continuousLinearDecayRate>=2/T+options.DesignMargin/T, ...
+        'synthesizeClfMatrices:continuousCertificate','The continuous trim Lyapunov inequality failed.');
     entry.certificate=struct('box',box,'inputBox',ubar,'components',size(enclosure.directions,3), ...
         'directions',enclosure.basis,'coefficientBounds',enclosure.coefficientBounds,'residualNorm',enclosure.residualNorm, ...
         'residualNormWithinHold',residualHold,'quadratureNodes',options.QuadratureNodes, ...
@@ -269,7 +282,7 @@ function deviation=localScaled(a,b,a0,b0,scale)
     deviation=[scale.state\(a-a0)*scale.state,scale.state\(b-b0)*scale.input];
 end
 
-function [s,y,fill,ok]=localLmi(at,bt,directions,eps,rho,sContain,limit,previous)
+function [s,y,fill,ok]=localLmi(at,bt,directions,eps,rho,sContain,limit,previous,flow)
     % maximize t  s.t.  S >= t I, S_ii <= limit_i^2, the input rows, the
     % containment S <= sContain, the gain band |(K - K_old)_j e| <= delta on
     % the set, and the vertex inequalities with Petersen's lemma for the
@@ -277,7 +290,8 @@ function [s,y,fill,ok]=localLmi(at,bt,directions,eps,rho,sContain,limit,previous
     % input box the unit square).
     m=size(directions,3);signs=(dec2bin(0:2^m-1)-'0')*2-1;count=2^m;
     s=sdpvar(5,5);t=sdpvar(1);lambda=sdpvar(count,1);y=sdpvar(2,5,'full');
-    constraints=[s>=t*eye(5),t>=0];
+    continuous=flow.a*s+flow.b*y;
+    constraints=[s>=t*eye(5),t>=0,continuous+continuous.'+flow.decay*s<=0];
     for i=1:5,constraints=[constraints,s(i,i)<=limit(i)^2];end %#ok<AGROW>
     for j=1:2,constraints=[constraints,[1,y(j,:);y(j,:).',s]>=0];end %#ok<AGROW>
     if ~isempty(sContain),constraints=[constraints,s<=sContain];end

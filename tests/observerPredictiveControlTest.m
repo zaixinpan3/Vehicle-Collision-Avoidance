@@ -78,7 +78,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(second.model.linearization.states(:,1),next,AbsTol=1e-12);
         end
         function theSingleClfActsOnTheEstimateWithoutAnEnclosureBudget(testCase)
-            % The CLF row is V(xhat+) <= rho V(xhat) + slack with or without
+            % The CLF row is Vdot(xhat,u) <= -alpha V(xhat) + slack with or without
             % an observer enclosure: estimation error enters as an input.
             [ego,~,road,cfg]=localFixture(0);
             ego.position(2)=.1;
@@ -87,10 +87,10 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             [~,~,prediction]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,~,exact]=collisionAvoidanceController(exactEgo,[],road,cfg,[]);
             testCase.verifyTrue(prediction.metadata.uncertaintyIncluded);
-            testCase.verifyEqual(prediction.metadata.clfCurrentBudget, ...
-                prediction.metadata.clfContraction*prediction.metadata.clfInitialValue,RelTol=1e-12);
-            testCase.verifyEqual(prediction.metadata.clfCurrentBudget,exact.metadata.clfCurrentBudget,RelTol=1e-12);
-            testCase.verifyEqual(prediction.metadata.clfWorstNextValue,prediction.metadata.clfNextValue,RelTol=1e-12);
+            testCase.verifyEqual(prediction.metadata.clfDerivativeLimit, ...
+                -prediction.metadata.clfDecayRate*prediction.metadata.clfInitialValue,RelTol=1e-12);
+            testCase.verifyEqual(prediction.metadata.clfDerivativeLimit,exact.metadata.clfDerivativeLimit,RelTol=1e-12);
+            testCase.verifyEqual(prediction.metadata.clfSlackUnits,"CLF value per second");
             testCase.verifyEqual(prediction.metadata.clfFunction,"quadraticTransverseError");
             testCase.verifyEqual(prediction.metadata.referenceDeviationWeight,cfg.rti.referenceDeviationWeight);
             testCase.verifyEqual(prediction.metadata.referenceDeviationWeight,exact.metadata.referenceDeviationWeight);

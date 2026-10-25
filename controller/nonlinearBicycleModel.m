@@ -117,6 +117,20 @@ classdef nonlinearBicycleModel
             jacobian(3:5,4:6)=eye(3);
         end
 
+        function [rate,inputGradient,value] = nominalDerivative(x,u,lane,reference,cfg)
+            % Exact continuous-time derivative of V=e'Pe at the current
+            % state. Only its dependence on the actual Fiala inputs is
+            % linearized by RTI; the error chart is differentiated exactly.
+            [e,jacobian]=nonlinearBicycleModel.errorLinearization(x,lane,reference);
+            gradient=2*e.'*reference.matrix*jacobian;
+            rate=gradient*nonlinearBicycleModel.derivative(x,u,cfg);
+            if nargout>1
+                [~,b]=nonlinearBicycleModel.jacobian(x,u,cfg);
+                inputGradient=gradient*b;
+            end
+            if nargout>2,value=sum((reference.factor*e).^2);end
+        end
+
         function [a,b] = jacobian(x,u,cfg,curvature)
             % Analytic derivatives of derivative: combined-slip tire and
             % body forces above the kinematic speed range, the kinematic
@@ -180,7 +194,7 @@ classdef nonlinearBicycleModel
         end
 
         function reference = cruise(cfg,curvature)
-            % Trim, sampled local transverse model and the CLF matrix P. P is
+            % Trim, continuous CLF matrix P and sampled cruise certificate. P is
             % never computed here: it is read from config/clfMatrices.json,
             % which scripts/synthesizeClfMatrices.m writes before experiments.
             persistent savedKeys savedReferences
@@ -198,6 +212,8 @@ classdef nonlinearBicycleModel
             % (certified level, hold factor) are synthesized with P.
             reference=struct('state',point.state,'input',point.input,'curvature',curvature, ...
                 'matrix',p,'factor',chol(p),'contraction',exp(-2*cfg.controller.sampleTime/cfg.clf.convergenceTimeConstantSeconds), ...
+                'decayRate',2/cfg.clf.convergenceTimeConstantSeconds, ...
+                'continuousLinearDecayRate',entry.continuousLinearDecayRate, ...
                 'certifiedContraction',entry.certifiedContraction, ...
                 'gain',reshape(entry.gain,2,5),'certifiedLevel',entry.certifiedLevel,'holdFactor',entry.holdFactor, ...
                 'nominalA',reshape(entry.nominalA,5,5),'nominalB',reshape(entry.nominalB,5,2), ...
@@ -559,10 +575,10 @@ function entry=localClfEntry(key)
             'Run scripts/synthesizeClfMatrices before the experiment.']);
     end
     entry=table(char(key));
-    for name=["gain","certifiedLevel","holdFactor","nominalA","nominalB"]
+    for name=["gain","certifiedLevel","holdFactor","nominalA","nominalB","continuousLinearDecayRate"]
         if ~isfield(entry,name)
             error('collisionAvoidanceController:staleClfMatrix', ...
-                ['The CLF entry for this operating point predates the cruise controller''s certificate (no %s). ' ...
+                ['The CLF entry lacks a required continuous or sampled certificate field (%s). ' ...
                 'Run scripts/synthesizeClfMatrices before the experiment.'],name);
         end
     end

@@ -43,6 +43,33 @@ classdef nominalClfTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(entry.certificate.lmiMinimumEigenvalue,-1e-6);
             testCase.verifyGreaterThanOrEqual(reference.holdFactor,1);
         end
+        function theStoredMatrixIsAContinuousTimeLocalClf(testCase,referenceSpeed,curvature)
+            [cfg,~,reference]=localSetup(referenceSpeed,curvature);
+            closed=reference.continuousA+reference.continuousB*reference.gain;
+            derivative=reference.factor.'\(closed.'*reference.matrix+reference.matrix*closed)/reference.factor;
+            rate=-max(eig((derivative+derivative.')/2));
+            testCase.verifyGreaterThan(rate,2/cfg.clf.convergenceTimeConstantSeconds);
+            testCase.verifyEqual(rate,reference.continuousLinearDecayRate,AbsTol=1e-10);
+            testCase.verifyEqual(reference.decayRate,2/cfg.clf.convergenceTimeConstantSeconds);
+        end
+        function theContinuousDerivativeMatchesTheNonlinearFlow(testCase,referenceSpeed,curvature)
+            [cfg,lane,reference]=localSetup(referenceSpeed,curvature);
+            [position,heading]=laneGeometry.referencePose(12,.15,lane.referenceCurve);
+            x=[position;heading+reference.state(3)+.02;reference.state(4:6)+[-.2;.05;.01]];
+            input=reference.input+[.015;-.08];
+            [rate,gradient,value]=nonlinearBicycleModel.nominalDerivative(x,input,lane,reference,cfg);
+            flow=nonlinearBicycleModel.derivative(x,input,cfg);step=1e-6;
+            numerical=(nonlinearBicycleModel.nominalValue(x+step*flow,lane,reference) ...
+                -nonlinearBicycleModel.nominalValue(x-step*flow,lane,reference))/(2*step);
+            testCase.verifyEqual(rate,numerical,AbsTol=1e-7*max(1,abs(rate)));
+            testCase.verifyEqual(value,nonlinearBicycleModel.nominalValue(x,lane,reference),AbsTol=1e-12);
+            directions=eye(2);numericalInput=zeros(1,2);
+            for j=1:2
+                numericalInput(j)=(nonlinearBicycleModel.nominalDerivative(x,input+step*directions(:,j),lane,reference,cfg) ...
+                    -nonlinearBicycleModel.nominalDerivative(x,input-step*directions(:,j),lane,reference,cfg))/(2*step);
+            end
+            testCase.verifyEqual(gradient,numericalInput,AbsTol=1e-6*max(1,norm(gradient,inf)));
+        end
         function anOperatingPointWithoutAPrecomputedMatrixIsRejected(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',9.375));
             testCase.verifyError(@()nonlinearBicycleModel.cruise(cfg,0),'collisionAvoidanceController:missingClfMatrix');

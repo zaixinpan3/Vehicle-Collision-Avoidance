@@ -45,11 +45,10 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         end
         function softClfAcceptsPositivePcbfSlackWithoutChangingThePrimaryTrajectory(testCase)
             model=testCase.model;anchor=testCase.anchor;
-            % Straight motion off the route cannot achieve V(next)=0.
+            % Fixed straight motion off the route cannot achieve Vdot <= -alpha V.
             % An initially overlapping, faster target requires positive PCBF
             % slack, then leaves. This tests formulation, not safe execution.
             model.initialState(2)=.5;anchor.states(2,:)=.5;
-            model.nominalReference.contraction=0;
             model.target=[0;.5;0;40;0;0;model.cfg.vehicle.lr;2.4;.95;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
             model.terminalContext=terminalSafeSet.context(model);
@@ -66,6 +65,23 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(solution.safety,search.slackCap+1e-5);
             testCase.verifyEqual(solution.states,anchor.states,AbsTol=1e-6);
             testCase.verifyEqual(solution.inputs,anchor.inputs,AbsTol=1e-6);
+        end
+        function theSecondaryProblemUsesAnAffineContinuousClfRow(testCase)
+            model=testCase.model;anchor=testCase.anchor;
+            model.initialState(2)=.1;anchor.states(2,:)=.1;
+            [p,~,model]=localFormulate(anchor,model);
+            testCase.verifyEmpty(p.cones);
+            testCase.verifyEqual(p.upper(p.clfIndex),Inf);
+            point=zeros(size(p.lower));point(p.inputIndices(:,1))=[.001;-.002];
+            [rate,gradient,value]=nonlinearBicycleModel.nominalDerivative( ...
+                model.initialState,anchor.inputs(:,1),model.lane,model.nominalReference,model.cfg);
+            expected=rate+gradient*point(p.inputIndices(:,1));
+            testCase.verifyEqual((p.clfDerivativeMap*point+p.clfDerivativeOffset)*p.clfScale,expected,AbsTol=1e-12);
+            testCase.verifyEqual(p.clfDerivativeLimit,-model.nominalReference.decayRate*value,AbsTol=1e-12);
+            testCase.verifyEqual(full(p.clfDerivativeMap(p.stateIndices)),zeros(size(p.stateIndices)),AbsTol=0);
+            testCase.verifyEqual(full(p.clfDerivativeMap(p.inputIndices(:,2:end))),zeros(size(p.inputIndices(:,2:end))),AbsTol=0);
+            point(p.clfIndex)=max(0,expected-p.clfDerivativeLimit)/p.clfScale;
+            testCase.verifyLessThanOrEqual(p.a(end,:)*point-p.b(end),1e-12);
         end
         function avoidanceAllocationUsesLongitudinalAuthorityWithoutCruiseTracking(testCase)
             cfg=testCase.model.cfg;x=[0;0;0;8;0;0];

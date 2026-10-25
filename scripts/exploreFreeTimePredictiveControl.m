@@ -220,7 +220,7 @@ end
 function problem=localAugment(base,derivative,limits,stateDerivative)
     problem=base;n=numel(base.lower);map=[1:n-1,n+1];timeIndex=n;
     problem.clfIndex=n+1;problem.durationIndex=timeIndex;
-    for field=["a","equal","referenceStateMap","referenceInputMap","clfMap","nominalClfMap"]
+    for field=["a","equal","referenceStateMap","referenceInputMap","clfDerivativeMap"]
         matrix=sparse(size(base.(field),1),n+1);matrix(:,map)=base.(field);problem.(field)=matrix;
     end
     problem.a(:,timeIndex)=-derivative.b;problem.equal(:,timeIndex)=-derivative.rhs;

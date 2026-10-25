@@ -458,7 +458,8 @@
       "sampledWorstContraction": 0.94087661673297363,
       "sampledHoldFactor": 0.99790335187632317,
       "sampledRowsSatisfied": true
-    }
+    },
+    "continuousLinearDecayRate": 0.99177615456416457
   },
   {
     "key": "{\"vehicle\":{\"m\":1650,\"Iz\":1700,\"lf\":1.4,\"lr\":1.65,\"wheelbase\":3.05,\"length\":4.8,\"width\":1.9,\"rectangleOffset\":[0,0],\"gravity\":9.81},\"tire\":{\"corneringStiffness\":[96000,96000],\"frictionCoefficient\":[0.85,0.85]},\"roadLoad\":{\"airDensity\":1.225,\"dragCoefficient\":0.3,\"frontalArea\":2.2,\"rollingCoefficient\":0.01,\"rollingSpeedCoefficient\":0,\"rollingQuarticCoefficient\":0,\"rollingTransitionSpeed\":0.5},\"referenceSpeed\":8,\"sampleTime\":0.05,\"integrationStep\":0.05,\"clf\":{\"lateralPositionErrorScale\":0.5,\"headingErrorScale\":0.1,\"speedErrorScale\":0.25,\"lateralVelocityErrorScale\":0.5,\"yawRateErrorScale\":0.2,\"convergenceTimeConstantSeconds\":4,\"certificationLateralMeters\":2,\"certificationHeadingRadians\":0.2,\"certificationSpeedMetersPerSecond\":1,\"certificationLateralVelocityMetersPerSecond\":0.3,\"certificationYawRateRadiansPerSecond\":0.2,\"certificationSteeringRadians\":0.075,\"certificationBrakingRatio\":0.125},\"curvature\":0.005}",
@@ -919,7 +920,8 @@
       "sampledWorstContraction": 0.94322449701959432,
       "sampledHoldFactor": 0.99811904487838543,
       "sampledRowsSatisfied": true
-    }
+    },
+    "continuousLinearDecayRate": 0.85326824306148541
   },
   {
     "key": "{\"vehicle\":{\"m\":1650,\"Iz\":1700,\"lf\":1.4,\"lr\":1.65,\"wheelbase\":3.05,\"length\":4.8,\"width\":1.9,\"rectangleOffset\":[0,0],\"gravity\":9.81},\"tire\":{\"corneringStiffness\":[96000,96000],\"frictionCoefficient\":[0.85,0.85]},\"roadLoad\":{\"airDensity\":1.225,\"dragCoefficient\":0.3,\"frontalArea\":2.2,\"rollingCoefficient\":0.01,\"rollingSpeedCoefficient\":0,\"rollingQuarticCoefficient\":0,\"rollingTransitionSpeed\":0.5},\"referenceSpeed\":15,\"sampleTime\":0.05,\"integrationStep\":0.05,\"clf\":{\"lateralPositionErrorScale\":0.5,\"headingErrorScale\":0.1,\"speedErrorScale\":0.25,\"lateralVelocityErrorScale\":0.5,\"yawRateErrorScale\":0.2,\"convergenceTimeConstantSeconds\":4,\"certificationLateralMeters\":2,\"certificationHeadingRadians\":0.2,\"certificationSpeedMetersPerSecond\":1,\"certificationLateralVelocityMetersPerSecond\":0.3,\"certificationYawRateRadiansPerSecond\":0.2,\"certificationSteeringRadians\":0.075,\"certificationBrakingRatio\":0.125},\"curvature\":0}",
@@ -1380,7 +1382,8 @@
       "sampledWorstContraction": 0.96175763657808888,
       "sampledHoldFactor": 0.999306543615946,
       "sampledRowsSatisfied": true
-    }
+    },
+    "continuousLinearDecayRate": 0.70804004948126686
   },
   {
     "key": "{\"vehicle\":{\"m\":1650,\"Iz\":1700,\"lf\":1.4,\"lr\":1.65,\"wheelbase\":3.05,\"length\":4.8,\"width\":1.9,\"rectangleOffset\":[0,0],\"gravity\":9.81},\"tire\":{\"corneringStiffness\":[96000,96000],\"frictionCoefficient\":[0.85,0.85]},\"roadLoad\":{\"airDensity\":1.225,\"dragCoefficient\":1.2,\"frontalArea\":2.2,\"rollingCoefficient\":0.01,\"rollingSpeedCoefficient\":0,\"rollingQuarticCoefficient\":0,\"rollingTransitionSpeed\":0.5},\"referenceSpeed\":15,\"sampleTime\":0.05,\"integrationStep\":0.05,\"clf\":{\"lateralPositionErrorScale\":0.5,\"headingErrorScale\":0.1,\"speedErrorScale\":0.25,\"lateralVelocityErrorScale\":0.5,\"yawRateErrorScale\":0.2,\"convergenceTimeConstantSeconds\":4,\"certificationLateralMeters\":2,\"certificationHeadingRadians\":0.2,\"certificationSpeedMetersPerSecond\":1,\"certificationLateralVelocityMetersPerSecond\":0.3,\"certificationYawRateRadiansPerSecond\":0.2,\"certificationSteeringRadians\":0.075,\"certificationBrakingRatio\":0.125},\"curvature\":0}",
@@ -1841,7 +1844,8 @@
       "sampledWorstContraction": 0.96175018767320875,
       "sampledHoldFactor": 0.99930657758749164,
       "sampledRowsSatisfied": true
-    }
+    },
+    "continuousLinearDecayRate": 0.707834346376094
   },
   {
     "key": "{\"vehicle\":{\"m\":1650,\"Iz\":1700,\"lf\":1.4,\"lr\":1.65,\"wheelbase\":3.05,\"length\":4.8,\"width\":1.9,\"rectangleOffset\":[0,0],\"gravity\":9.81},\"tire\":{\"corneringStiffness\":[96000,96000],\"frictionCoefficient\":[0.85,0.85]},\"roadLoad\":{\"airDensity\":1.225,\"dragCoefficient\":0.3,\"frontalArea\":2.2,\"rollingCoefficient\":0.01,\"rollingSpeedCoefficient\":0,\"rollingQuarticCoefficient\":0,\"rollingTransitionSpeed\":0.5},\"referenceSpeed\":15,\"sampleTime\":0.05,\"integrationStep\":0.05,\"clf\":{\"lateralPositionErrorScale\":0.5,\"headingErrorScale\":0.1,\"speedErrorScale\":0.25,\"lateralVelocityErrorScale\":0.5,\"yawRateErrorScale\":0.2,\"convergenceTimeConstantSeconds\":4,\"certificationLateralMeters\":2,\"certificationHeadingRadians\":0.2,\"certificationSpeedMetersPerSecond\":1,\"certificationLateralVelocityMetersPerSecond\":0.3,\"certificationYawRateRadiansPerSecond\":0.2,\"certificationSteeringRadians\":0.075,\"certificationBrakingRatio\":0.125},\"curvature\":0.005}",
@@ -2302,7 +2306,8 @@
       "sampledWorstContraction": 0.96299491957119,
       "sampledHoldFactor": 0.999365703274183,
       "sampledRowsSatisfied": true
-    }
+    },
+    "continuousLinearDecayRate": 0.73746215389000169
   },
   {
     "key": "{\"vehicle\":{\"m\":1650,\"Iz\":1700,\"lf\":1.4,\"lr\":1.65,\"wheelbase\":3.05,\"length\":4.8,\"width\":1.9,\"rectangleOffset\":[0,0],\"gravity\":9.81},\"tire\":{\"corneringStiffness\":[96000,96000],\"frictionCoefficient\":[0.85,0.85]},\"roadLoad\":{\"airDensity\":1.225,\"dragCoefficient\":0.3,\"frontalArea\":2.2,\"rollingCoefficient\":0.01,\"rollingSpeedCoefficient\":0,\"rollingQuarticCoefficient\":0,\"rollingTransitionSpeed\":0.5},\"referenceSpeed\":25,\"sampleTime\":0.05,\"integrationStep\":0.05,\"clf\":{\"lateralPositionErrorScale\":0.5,\"headingErrorScale\":0.1,\"speedErrorScale\":0.25,\"lateralVelocityErrorScale\":0.5,\"yawRateErrorScale\":0.2,\"convergenceTimeConstantSeconds\":4,\"certificationLateralMeters\":2,\"certificationHeadingRadians\":0.2,\"certificationSpeedMetersPerSecond\":1,\"certificationLateralVelocityMetersPerSecond\":0.3,\"certificationYawRateRadiansPerSecond\":0.2,\"certificationSteeringRadians\":0.075,\"certificationBrakingRatio\":0.125},\"curvature\":0}",
@@ -2763,6 +2768,7 @@
       "sampledWorstContraction": 0.96409514957262721,
       "sampledHoldFactor": 0.99915154528799166,
       "sampledRowsSatisfied": true
-    }
+    },
+    "continuousLinearDecayRate": 0.63404978739952544
   }
 ]

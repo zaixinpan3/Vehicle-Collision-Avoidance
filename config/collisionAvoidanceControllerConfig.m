@@ -91,9 +91,13 @@ function cfg=localDefaults()
         'kinematicSpeedRange',[2.5,4],'kinematicLagSeconds',.1,'brakeHoldSpeed',.25, ...
         'brakingRatioRateMaximum',Inf,'lateralVelocityMaximum',12,'yawRateMaximum',5, ...
         'sideslipMaximum',.25);
-    % One quadratic CLF V = e' P e. Each sample requires
-    %   V(next) <= rho V(now),  rho = exp(-2 sampleTime / convergenceTimeConstantSeconds),
-    % so the error sqrt(V) shrinks by at least 1/e every time constant.
+    % One continuous-time quadratic CLF V = e' P e with the soft condition
+    %   Vdot <= -2 V / convergenceTimeConstantSeconds + slack.
+    % RTI linearizes Vdot in the first input at the current estimate. This
+    % gives one affine row; it does not impose discrete one-step contraction.
+    % Exact continuous enforcement with zero slack yields the stated decay.
+    % The offline design enforces the continuous trim Lyapunov inequality.
+    % A separate sampled certificate supports the cruise initializer below.
     % P and the gain K of the cruise controller u = u* + K e are synthesized offline
     % (scripts/synthesizeClfMatrices.m) and read from config/clfMatrices.json:
     % inside the certification box of transverse errors (|lateral| <=

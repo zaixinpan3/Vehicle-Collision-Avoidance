@@ -1,6 +1,6 @@
 classdef clfNominalRecoveryTest < matlab.unittest.TestCase
     % The same analytic transverse quadratic is used throughout an encounter.
-    % Test local zero-slack decrease and eventual recovery from displaced states.
+    % Test local zero-slack derivative decrease and eventual recovery from displaced states.
     properties (TestParameter)
         referenceSpeed={8,15};
         curvature={0,.005};
@@ -33,7 +33,10 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             testCase.verifyEqual(metadata.clfFunction,"quadraticTransverseError");
             testCase.verifyEqual(metadata.clfInitialValue,value,AbsTol=1e-12*max(1,value));
             testCase.verifyLessThanOrEqual(metadata.clfSlack,tol);
-            testCase.verifyLessThanOrEqual(nextValue,value-.5*metadata.clfRequiredDecrease+tol);
+            testCase.verifyLessThanOrEqual(metadata.clfDerivative,metadata.clfDerivativeLimit+tol);
+            rate=nonlinearBicycleModel.nominalDerivative(x,command.actuatorInput,lane,reference,cfg);
+            testCase.verifyEqual(metadata.clfActualDerivative,rate,AbsTol=1e-12*max(1,abs(rate)));
+            testCase.verifyLessThanOrEqual(nextValue,value+tol);
             testCase.verifyGreaterThanOrEqual(metadata.clfNextValue,0);
             testCase.verifyTrue(metadata.search.clfStageCompleted);
             testCase.verifyEqual(metadata.solverCallCount,sum([metadata.search.stages.numericalSolve]));

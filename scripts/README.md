@@ -71,7 +71,13 @@ observer by default. Both campaign entry points accept a nonempty
 `replayEstimatorValidity` audits the estimator's published bounds against the
 recorded truth of such a campaign (it replays seed 20261003).
 `synthesizeClfMatrices` writes `config/clfMatrices.json` and must be run before
-an experiment at a new operating point.
+an experiment at a new operating point. Its design includes the continuous
+trim Lyapunov inequality; the existing sampled cruise certificate is separate.
+`validateNominalClf` checks the nonlinear continuous derivative under the stored
+local gain. The online secondary stage is a QP with the soft affine row
+`Vdot(xhat,ubar) + dVdot/du * du <= -2 V(xhat)/T + slack`. Its slack is in CLF
+value per second; nonlinear derivative and successor-value diagnostics are
+reported separately.
 
 `runNonlinearPredictiveSafetyValidation` accepts `Scenarios`, `Frames`,
 `ControllerConfiguration`, `EstimatorConfiguration`, and `OutputFile` for

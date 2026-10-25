@@ -404,6 +404,14 @@ function [solution,rollout]=localPrediction(solution,anchor,model)
     rollout.available=true;rollout.reason="predictionOnly";
     rollout.fullGap=max(localPoseDiscrepancy(states,solution.affineStates,model.cfg));
     solution.states=states;
+    % Performance diagnostics only: these do not change the PCBF acceptance
+    % test or the optimized inputs. A local derivative row is not an exact
+    % nonlinear-input or a sampled one-step decrease certificate.
+    solution.clfNextValue=nonlinearBicycleModel.nominalValue(states(:,2),model.lane,model.nominalReference);
+    solution.clfActualDerivative=nonlinearBicycleModel.nominalDerivative( ...
+        model.initialState,solution.inputs(:,1),model.lane,model.nominalReference,model.cfg);
+    solution.clfActualDerivativeResidual=solution.clfActualDerivative ...
+        -solution.clfDerivativeLimit-solution.clfSlack;
 end
 
 function [check,problem,formed]=localNonlinearCheck(anchor,model,normals)
@@ -491,6 +499,11 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
     search=localSearch(problem,initialization,formulationSeconds);
     remaining=model.solveTimeLimitSeconds-toc(timer);if remaining<=0,return;end
     primaryCount=problem.clfIndex-1;primaryCone=problem.cones(1:problem.primaryConeCount);wall=tic;
+    % Research probes may supply both stages already assembled. Exclude the
+    % soft CLF row together with its slack variable from the safety LP.
+    primaryRows=true(size(problem.b));
+    if isfield(problem,'clfRowIndex'),primaryRows(problem.clfRowIndex)=false;end
+    primaryA=problem.a(primaryRows,1:primaryCount);primaryB=problem.b(primaryRows);
     coneFeasible=true;
     for index=1:numel(primaryCone)
         cone=primaryCone(index);
@@ -499,7 +512,7 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
     end
     % A feasible zero correction with zero nonnegative slacks attains the
     % global lower bound. Include every primary constraint, not just safety.
-    if all(problem.b>=0) && all(problem.rhs==0) ...
+    if all(primaryB>=0) && all(problem.rhs==0) ...
             && all(problem.lower(1:primaryCount)<=0) && all(problem.upper(1:primaryCount)>=0) ...
             && coneFeasible
         point=zeros(primaryCount,1);search.primaryOptimum=0;
@@ -510,7 +523,7 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
     end
     wall=tic;
     [point,flag,solverInfo]=localConicSolve(sparse(primaryCount,primaryCount),problem.safetyObjective(1:primaryCount),primaryCone, ...
-        problem.a(:,1:primaryCount),problem.b,problem.equal(:,1:primaryCount),problem.rhs, ...
+        primaryA,primaryB,problem.equal(:,1:primaryCount),problem.rhs, ...
         problem.lower(1:primaryCount),problem.upper(1:primaryCount),cfg,remaining,cfg.solver.optimalityTolerance);
     search.solverCalls=1;
     search.stages(1)=struct('objective',"pcbfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN,'numericalSolve',true,'solverInfo',solverInfo);
@@ -561,13 +574,12 @@ function solution=localDecode(point,problem,anchor)
     inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
     states=anchor.states+reshape(point(problem.stateIndices),size(anchor.states));
     slacks=max(0,point(problem.slackIndices));rho=problem.clfScale*max(0,point(problem.clfIndex));
-    nextValue=norm(problem.nominalClfMap*point+problem.nominalClfOffset)^2*problem.clfScale;
-    worstNext=(norm(problem.clfMap*point+problem.clfOffset)^2+problem.clfModelConstant)*problem.clfScale;
+    rate=(problem.clfDerivativeMap*point+problem.clfDerivativeOffset)*problem.clfScale;
     solution=struct('inputs',inputs,'states',states,'stageSlacks',slacks.', ...
         'safety',sum(slacks),'hard',NaN,'clfSlack',rho, ...
-        'clfInitialValue',problem.initialClfValue,'clfNextValue',nextValue, ...
-        'clfFunction',problem.clf.function,'clfRequiredDecrease',problem.clf.requiredDecrease, ...
-        'referenceDeviationWeight',problem.referenceDeviationWeight,'clfWorstNextValue',worstNext,'clfCurrentBudget',problem.clfCurrentBudget, ...
+        'clfInitialValue',problem.initialClfValue,'clfDerivative',rate, ...
+        'clfFunction',problem.clf.function,'clfRequiredDecreaseRate',problem.clf.requiredDecreaseRate, ...
+        'referenceDeviationWeight',problem.referenceDeviationWeight,'clfDerivativeLimit',problem.clfDerivativeLimit, ...
         'maximumCollisionTighteningMeters',problem.maximumCollisionTighteningMeters, ...
         'minimumCollisionMargin',NaN, ...
         'encounterExit',problem.encounterExit,'affineValidationPerformed',false,'nonlinearValidationPerformed',false, ...
@@ -894,13 +906,6 @@ function [matrix,vector]=localAssemble(rows,columns,bounds,count,nv,lower,upper)
     matrix=sparse(I,J,V,sum(m),nv);vector=vertcat(bounds{1:count});
 end
 
-function cone=localConeBlock(A,b,D,gamma,rowsPerCone)
-    % A block of second-order cones of equal dimension: cone j is
-    % ||A(rows j) z - b(rows j)|| <= D(j,:) z - gamma(j) in the solver's
-    % convention (localConicSolve), with 'size' rows of A per cone.
-    cone=struct('A',A,'b',b,'D',D,'gamma',gamma,'size',rowsPerCone);
-end
-
 function road=localRoadProjection(poses,model)
     % Lane projection of the four ego corners at every pose (columns).
     cfg=model.cfg;corners=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2.*[1,1,-1,-1;1,-1,1,-1];
@@ -1080,17 +1085,16 @@ end
 
 function problem=localAddClf(problem,anchor,model)
     nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
-    [nominalMap,nominalOffset,~,value,scale,~,clf]=localNominalClf(anchor,model,problem.stateIndices(:,2),nv);
-    % The CLF is a soft performance row on the estimate: V(xhat+) <= rho
-    % V(xhat). Estimation error enters it as an input (ISS); it carries no
-    % observer enclosure. A worst case over the enclosure would ask for a
-    % decrease below the enclosure's own size, which no input achieves near
-    % the path, and would turn this stage into a greedy one-step minimizer.
-    currentBudget=model.nominalReference.contraction*value;
-    map=nominalMap;offset=nominalOffset;
-    modelConstant=0;constant=currentBudget/scale;
-    axis=sparse(1,nv);axis(ic)=1;
-    cone=localConeBlock([2*map;axis],[-2*offset;1-constant],axis,-1-constant,6);
+    % Continuous-time CLF on the estimate, with unbounded performance
+    % slack. At the known current state only the Fiala input dependence is
+    % approximated: Vdot(u_bar)+dVdot/du*du <= -alpha*V+s.
+    [rate,inputGradient,value]=nonlinearBicycleModel.nominalDerivative( ...
+        model.initialState,anchor.inputs(:,1),model.lane,model.nominalReference,model.cfg);
+    scale=max(1,value);required=model.nominalReference.decayRate*value;
+    map=sparse(1,nv);map(iu(:,1))=inputGradient/scale;offset=rate/scale;
+    row=map;row(ic)=-1;
+    problem.a=[problem.a;row];problem.b=[problem.b;(-required-rate)/scale];
+    problem.clfRowIndex=size(problem.a,1);
     % Unit-scaled full-state/input proximity to the affine reference, not to
     % the cruise path. Equal x/y units make position cost rotation invariant.
     % A horizon mean prevents changing N from changing the total weight.
@@ -1109,26 +1113,10 @@ function problem=localAddClf(problem,anchor,model)
     problem.quadratic=2*problem.referencePenaltyWeight ...
         *(problem.referenceStateMap.'*problem.referenceStateMap+problem.referenceInputMap.'*problem.referenceInputMap);
     problem.performanceObjective=zeros(nv,1);
-    problem.cones=[problem.cones,cone];
-    problem.clfScale=scale;problem.clfMap=map;problem.clfOffset=offset;
-    problem.nominalClfMap=nominalMap;problem.nominalClfOffset=nominalOffset;
-    problem.clfCurrentBudget=currentBudget;
-    problem.clfModelConstant=modelConstant;problem.clf=clf;problem.initialClfValue=value;
-    problem.initialClfSlack=max(0,(norm(offset)^2-constant)*scale);
-end
-
-function [map,offset,constant,value,scale,modelConstant,clf]=localNominalClf(anchor,model,next,nv)
-    % One analytic transverse quadratic on the single affine state model.
-    reference=model.nominalReference;
-    [e1,jacobian]=nonlinearBicycleModel.errorLinearization(anchor.states(:,2),model.lane,reference);
-    value=nonlinearBicycleModel.nominalValue(model.initialState,model.lane,reference);scale=max(1,value);
-    % V(next) <= rho V(now): the error sqrt(V) shrinks by at least 1/e per
-    % clf.convergenceTimeConstantSeconds.
-    required=(1-reference.contraction)*value;
-    map=sparse(5,nv);map(:,next)=reference.factor*jacobian/sqrt(scale);
-    offset=reference.factor*e1/sqrt(scale);modelConstant=0;
-    constant=(value-required)/scale;
-    clf=struct('function',"quadraticTransverseError",'requiredDecrease',required);
+    problem.clfScale=scale;problem.clfDerivativeMap=map;problem.clfDerivativeOffset=offset;
+    problem.clfDerivativeLimit=-required;
+    problem.clf=struct('function',"quadraticTransverseError",'requiredDecreaseRate',required);
+    problem.initialClfValue=value;problem.initialClfSlack=max(0,rate+required);
 end
 
 function tube=localTargetTube(model,time,holdStart)

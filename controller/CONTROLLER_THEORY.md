@@ -17,7 +17,7 @@ There are two mathematical objects whose results must be distinguished:
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a first-successor soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Planning occurs only at encounter onset; later frames inherit optimized inputs. The first accepted encounter plan fixes its horizon; each later frame shifts the inputs and appends one hold. Failure never requests a longer-horizon retry. |
+| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a continuous-time derivative soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Planning occurs only at encounter onset; later frames inherit optimized inputs. The first accepted encounter plan fixes its horizon; each later frame shifts the inputs and appends one hold. Failure never requests a longer-horizon retry. |
 | Conditional nonlinear output-feedback design | Joint physical/observer information sets, persistent model uncertainty, causal future feedback, sound reachable images and a common terminal continuation; the shifted-policy proof establishes mathematical recursive feasibility under its stated premises. |
 
 The latter theorem is not a certificate for the former approximation.
@@ -513,18 +513,18 @@ kernel, or additional terminal value is used to construct the CLF.
 
 ### Requested decrease: a convergence time constant
 
-Each sample requires
+The performance design uses the continuous-time nonlinear bicycle system:
 
-    V(x_next) <= rho * V(x) + slack,   rho = exp(-2 h / T),
+    Vdot(x,u) <= -alpha V(x) + s,   alpha = 2/T,   s >= 0,
 
-with h = 0.05 s and T = `clf.convergenceTimeConstantSeconds` = 4 s. The error
-size sqrt(V) then shrinks by at least 1/e every T seconds, in every direction
-of the error as V measures it; one lane width (3.66 m) returns to within
-0.3 m in about 10 s. T replaces the former `nominalClf.decreaseFraction`
-(eta = 0.5 times e'Qe), whose speed differed between error directions by a
-factor of about 25 for the same eta.
+where T = `clf.convergenceTimeConstantSeconds` = 4 s. The slack has units of
+CLF value per second and has no upper bound. Exact continuous enforcement
+with zero slack implies `V(t) <= exp(-alpha t) V(0)` and hence a time constant
+T for sqrt(V). The online implementation evaluates the derivative at the
+current estimate and linearizes its input dependence once, as described
+below. It does not impose or claim discrete one-step contraction.
 
-### Offline certificate of P and the cruise controller
+### Continuous-time CLF matrix and separate sampled cruise certificate
 
 `scripts/synthesizeClfMatrices.m` computes P and K before experiments, for
 each operating point (vehicle parameters, speed, path curvature, sample time
@@ -535,7 +535,27 @@ entry without the certificate with `collisionAvoidanceController:staleClfMatrix`
 nothing is synthesized at run time, and the run time does not need the SDP
 solver.
 
-The synthesis targets the sampled nonlinear model through a ray-average
+The matrix and gain satisfy the continuous trim Lyapunov inequality
+
+    Ac_cl = Ac + Bc K,
+    Ac_cl' P + P Ac_cl <= -alpha P.
+
+The synthesis imposes this as `Ac S + Bc Y + (Ac S + Bc Y)' + alpha S <= 0`,
+with `S=P^-1` and `Y=K S`, in physical coordinates (scaled in code).
+The design uses a slightly faster rate via `DesignMargin` and rechecks a
+strict margin at the requested rate after synthesis.
+`continuousLinearDecayRate` records the minimum decay rate found by the
+normalized symmetric eigenvalue check. All six retained table entries pass
+strictly; their existing P and K values therefore needed no numerical change.
+Strictness and smoothness imply continuous nonlinear decrease on a sufficiently
+small neighborhood of the trim, with admissible feedback `u=u_ref+K e`.
+This argument does not identify that neighborhood with the sampled certificate's
+whole `V<=1` set and does not establish a global CLF.
+
+Separately, the held cruise initializer keeps its sampled-model certificate.
+Its purpose is to validate a possible appended cruise hold, not to define the
+online CLF row. This additional synthesis condition targets the sampled
+nonlinear model through a ray-average
 enclosure, rather than only the trim linearization. Its coverage premise is
 made explicit below. Let `g(e, du)` be the transverse error after one hold from the
 state with error `e` under the input `u_ref + du`, and `G = [dg/de, dg/d(du)]`
@@ -607,28 +627,40 @@ feedback-reachable region; it cannot be transferred to this simpler function.
 The scenario campaign and displaced-state tests therefore measure eventual
 cruise recovery separately from local zero-slack decrease.
 
-If the exact nonlinear inequality holds with zero slack on a suitable invariant
-domain, it gives exponential decay of the transverse error with time constant T. Zero slack in the
+If the exact continuous nonlinear derivative inequality holds with zero slack
+throughout a suitable invariant domain, it gives exponential decay of the transverse error with time constant T. Zero slack in the
 **affine approximation**, together with a fixed model-error tolerance, does not
 establish that exact inequality or global asymptotic convergence.
 
-### One convex first-successor constraint
+### One affine continuous-derivative constraint
 
-The trajectory is linearized once around a nonlinear rollout. At its first
-successor, use the analytic Frenet error Jacobian J:
+At the current estimate xhat, the analytic error Jacobian gives
 
-    e_aff = e(xbar_1) + J(xbar_1) * dx_1,
-    V_aff = ||chol(P) * e_aff||^2.
+    g = 2 e(xhat)' P J_e(xhat),
+    d0 = g f(xhat,ubar_0),
+    d_u = g f_u(xhat,ubar_0).
 
-The same affine dynamics relate dx_1 to the first input correction. Its Hessian
-is positive semidefinite, so the first-step CLF epigraph is a convex quadratic
-constraint represented by one second-order cone, so the optimization is a sparse
-conic QP/SOCP rather than a QP with exclusively affine constraints.
+The exact model derivative is `Vdot(xhat,u)=g f(xhat,u)`. Fiala dynamics are
+nonlinear in steering and longitudinal force ratio, so the RTI approximation is
+
+    d0 + d_u * du_0 <= -alpha V(xhat) + s.
+
+This is a single affine inequality. There is no next-state quadratic epigraph
+and no CLF second-order cone. Together with the affine primary rows and the
+positive-semidefinite quadratic reference penalty, the second stage is a QP.
+The first stage is a PCBF slack LP (a QP with zero Hessian). Solver interior
+iterations still occur inside each stage; the nonlinear model is built once.
+
+Only the first input appears in this CLF row. The current state is fixed, not
+a decision variable. No Taylor approximation of V itself is needed for this
+row, and no quadratic remainder of a next-state value is dropped. The exact
+Fiala input nonlinearity still limits the accuracy of the local derivative
+model for large input corrections.
 
 The secondary objective is CLF slack plus half
 `rti.referenceDeviationWeight` times the horizon mean of squared, unit-scaled
 state and input deviations from the current linearization reference. The
-default weight is 10, independent of cruise error and reference source; zero
+default weight is 10 in CLF-rate objective units, independent of cruise error and reference source; zero
 disables the penalty for ablation. Position uses the same CLF lateral-position
 unit for both inertial coordinates. Yaw, longitudinal speed, lateral velocity
 and yaw rate use the corresponding CLF error units. Inputs use the CLF
@@ -643,19 +675,24 @@ inputs. The CLF still refers to the prescribed cruise path. A larger reference
 weight can trade increased CLF slack for smaller trajectory changes; it does
 not certify nonlinear CLF decrease or prevent every large correction.
 
-With an observer enclosure the row is the same, on the estimate:
-`budget = exp(-2h/T)*V(xhat)` and `lossLower = e0'Qe0` at the estimate.
-Estimation error enters the decrease as an input (input-to-state), not through
-a worst case. `clfWorstNextValue` equals the modeled successor value and `clfCurrentBudget`
-the budget above.
+With an observer enclosure the row is unchanged and acts on the estimate:
+`clfDerivativeLimit = -alpha*V(xhat)`. Estimation error enters the performance
+analysis as an input, rather than as a worst-case CLF enclosure budget.
+`clfDerivative` is the local affine prediction and `clfActualDerivative` is
+the nonlinear model derivative under the unchanged optimized first input.
+`clfActualDerivativeResidual` subtracts the derivative limit and the optimized
+slack. These are performance diagnostics, not additional hard acceptance rows.
+`clfNextValue` is the value on the nonlinear first successor, for diagnostics
+only; it is not the left side of the optimized CLF condition. `clfSatisfied`
+means zero local CLF slack within solver tolerance, not exact nonlinear decay.
 
-The remaining nonlinear error-chart and dynamics remainders are not enclosed.
+The nonlinear input-linearization remainder and sampling effects are not enclosed.
 Neither zero affine slack nor this implementation proves exact asymptotic
 recovery of the nonlinear uncertain plant; with estimation error the closed
 loop can at best approach a neighborhood of the path set by that error. See the conditional theorem in
 `OBSERVER_ROBUST_PCBF_THEORY.tex` for the additional premises.
 
-This constraint controls the first successor only. Future inputs are chosen
+This constraint controls the current continuous derivative through the first input only. Future inputs are chosen
 through horizon feasibility and the input correction cost; they do not each
 receive a CLF decrease constraint. After shifting, the second planned input becomes the next first-input anchor.
 The reference penalty can therefore change later recovery behavior even when
@@ -1987,7 +2024,7 @@ zero on subsequent calls in the same encounter. `nominalRestarted` stays false.
 stage slacks are recomputed on the nonlinear rollout; `affineSafetyValue` and
 `search.primaryOptimum` preserve the affine quantities. `search.slackCap` is
 the acceptance cap for the nonlinear slack sum. The CLF objective
-still belongs to the first-successor affine model. `predictedState` is the
+belongs to the input-affine approximation of the current continuous derivative. `predictedState` is the
 nonlinear prediction of the unchanged optimized inputs.
 Independent scenario replay measures clearance, road margins and nominal
 recovery throughout the observation. Current-state terminal membership does
@@ -2009,7 +2046,7 @@ baseline and minimum recovery time.
 | Nonlinear, feedback-aware horizon images | Future holds restart current-width affine sets; full nonlinear remainders and future observer histories are not certified. |
 | Cross-sample posterior inclusion | Joint posterior intersection and retained policy/set witnesses are not implemented. |
 | Common robust terminal family | Center-based target geometry and ego padding under the mild terminal model; no full nonlinear parameter-family membership certificate. |
-| Exact nonlinear CLF dissipation | First-successor affine error/estimate row with soft slack and a fixed reference penalty. |
+| Exact nonlinear CLF dissipation | Current continuous derivative, locally affine in the first input, with soft slack and a fixed reference penalty. |
 | Whole-hold collision/observer-domain validity | Nodes and approximate midpoints do not by themselves establish continuous-time validity. |
 | Numerical success | Both objectives and the sampled nonlinear primary check must pass; initial planning or inherited-reference optimization may fail, and no command is returned in that case. |
 
