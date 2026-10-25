@@ -87,9 +87,14 @@ the revised target state require the audit source from their recorded commit.
 The optimizer builds at most one local RTI model per controller call, then
 solves the PCBF and CLF objectives on that same model. Planning occurs only
 at encounter onset. Later frames shift the previously accepted inputs and
-reroll them from the current estimate. Encounter preview may size the horizon
-before optimization, but a failed solve does not increase its node count,
-rebuild the model or call the planner. Terminal constraints remain enforced.
+reroll them from the current estimate. The first accepted encounter plan
+fixes its node count: later frames shift its remaining inputs and append one
+hold, without repeating encounter preview. Target or observer updates do not
+change that horizon. A confirmed exit or complete empty scan clears the
+encounter; reacquisition may choose another horizon. A failed solve neither
+changes the node count nor rebuilds the model or calls the planner. Terminal
+constraints remain enforced. Metadata `encounterHorizonSteps` reports the
+fixed count, or zero outside an active encounter.
 Completed optimized inputs are returned unchanged only after their nonlinear
 rollout passes the sampled primary-constraint checks. The default 100 ms
 computation budget can return an explicit failure. Independent replay checks

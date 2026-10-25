@@ -22,15 +22,17 @@ end
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
     % horizonSteps is the soft-collision prefix and the shortest horizon.
-    % Encounter preview sizes each reference before the single local solve.
+    % Encounter preview sizes the first reference; its first accepted length
+    % stays fixed throughout that encounter.
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
         'enforceRoadBoundaries',false);
     cfg.nonlinear=struct('integrationStep',.05);
     % Plan once on target acquisition; later frames shift optimized inputs.
-    % Encounter preview starts from horizonSteps and the current stopping time.
-    % Once optimization starts, its node count is fixed. A failed solve is
-    % reported without horizon extension, replanning or another local model.
+    % Initial preview starts from horizonSteps and the current stopping time.
+    % Later encounter frames shift M-1 inputs and append one hold to retain M.
+    % Failure is reported without horizon extension, replanning or another
+    % local model.
     % Secondary objective: CLF slack plus half this weight times the mean
     % squared, unit-scaled state/input deviation from the current reference.
     % The weight stays active on the route; zero disables it for ablation.

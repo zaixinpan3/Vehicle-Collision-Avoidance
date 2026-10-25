@@ -1,8 +1,9 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl One local PCBF/CLF RTI model per controller call.
 % The planner runs once at encounter onset. Later frames shift the previous
-% optimized inputs. Horizon sizing precedes optimization; a failed solve never
-% extends the horizon or rebuilds the problem. Only unchanged,
+% optimized inputs and retain their node count throughout the encounter.
+% Horizon sizing occurs only at encounter onset; a failed solve never extends
+% the horizon or rebuilds the problem. Only unchanged,
 % nonlinearly checked optimized inputs can be returned. Each reference uses
 % the same model and common constraints for both objective stages.
 % Research access: solvePredictiveControl("probe",request) exposes reference,
@@ -175,8 +176,8 @@ end
 
 function count=localPlanningHorizon(model,minimumCount)
     % Size the geometric path around the encounter from the measured motion.
-    % This preview only sizes the horizon. It cannot activate the planner
-    % after the encounter onset or replace an existing input sequence.
+    % This preview sizes the initial horizon once per encounter. Subsequent
+    % frames retain the accepted input sequence's length without previewing.
     % Doubling the geometry grid costs O(N) in its final node count. The same
     % wall-clock deadline applies during this search and the one RTI solve.
     cfg=model.cfg;h=cfg.controller.sampleTime;minimumDuration=h*minimumCount;duration=minimumDuration;
@@ -266,7 +267,12 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount,referenc
         [seedLower,seedUpper]=nonlinearBicycleModel.inputBounds(cfg,true);
         old=min(seedUpper,max(seedLower,old));
         count=max(minimumCount,size(old,2));
-        if ~isempty(model.target),count=max(count,localPlanningHorizon(model,minimumCount));end
+        if ~isempty(model.target)
+            % The first accepted sequence fixes M for this encounter. Drop
+            % its executed input and append one tail hold, retaining M even
+            % when the target forecast or observer enclosure changes.
+            count=size(previous.inputTrajectory,2);
+        end
     end
     count=min(count,cfg.controller.maximumHorizonSteps);
     inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=model.initialState;

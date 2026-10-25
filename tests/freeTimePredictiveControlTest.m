@@ -108,9 +108,9 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(r.returned);
             testCase.verifyEqual(r.stopReason,"freeTimeSolveFailed");
             testCase.assertNumElements(r.attempts,1);
-            testCase.verifyEqual(r.attempts{1}.stageCount,32);
+            testCase.verifyEqual(r.attempts{1}.stageCount,33);
             testCase.verifyEqual(r.attempts{1}.initialization,"shiftedInputRollout");
-            testCase.verifyEqual(r.initialAnchor.inputs,testCase.previous.inputTrajectory(:,2:end),AbsTol=0);
+            testCase.verifyEqual(r.initialAnchor.inputs(:,1:end-1),testCase.previous.inputTrajectory(:,2:end),AbsTol=0);
             testCase.verifyEqual(r.completedPlannerCalls,0);
             testCase.verifyEqual(r.horizonExtensions,0);
         end

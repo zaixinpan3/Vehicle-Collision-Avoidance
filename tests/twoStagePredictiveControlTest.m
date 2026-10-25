@@ -1,5 +1,5 @@
 classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
-    % Two objectives per reference, adaptive horizons and unchanged commands.
+    % Two objectives, fixed encounter horizons and unchanged commands.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -41,27 +41,58 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
             testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
-            testCase.verifyEqual(size(inputs,2),max(cfg.controller.horizonSteps,size(prior.inputTrajectory,2)-1));
+            testCase.verifyEqual(size(inputs,2),size(prior.inputTrajectory,2));
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyEqual(problem.model.linearization.states(:,1),problem.model.initialState,AbsTol=0);
             testCase.verifyNotEqual(problem.model.initialState,prior.stateTrajectory(:,2));
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRollouts(testCase,problem,cfg);
         end
-        function aChangedTargetForecastCanLengthenTheShiftedSeed(testCase)
+        function aChangedTargetForecastCannotLengthenTheEncounter(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,problem,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             [~,target]=collisionThreatScenario("headOn",cfg);
             model=problem.model;model.target=target;model.targetEpoch=target;model.targetOnset=false;
-            % Stop at the first numerical attempt so the assertion concerns
-            % forecast-driven horizon selection, not an infeasibility retry.
-            model.cfg.solver.maxIterations=1;
-            [~,search,model]=solvePredictiveControl(model,prior,tic);
-            testCase.verifyEqual(search.linearizationCount,1);
+            [anchor,search]=solvePredictiveControl("probe",struct('operation',"reference", ...
+                'model',model,'previousState',prior));
             testCase.verifyEqual(search.initialization,"shiftedInputRollout");
-            testCase.verifyGreaterThan(size(model.linearization.inputs,2),size(prior.inputTrajectory,2));
-            testCase.verifyEqual(model.linearization.inputs(:,1:size(prior.inputTrajectory,2)-1), ...
+            testCase.verifyEqual(search.plannerCalls,0);
+            testCase.verifyEqual(size(anchor.inputs,2),size(prior.inputTrajectory,2));
+            testCase.verifyEqual(anchor.inputs(:,1:size(prior.inputTrajectory,2)-1), ...
                 prior.inputTrajectory(:,2:end),AbsTol=0);
+        end
+        function aLongEncounterHorizonDoesNotShrinkAfterExecutingAHold(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,q]=collisionThreatScenario("brakingLead",cfg);
+            [~,~,first,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            testCase.assertGreaterThan(first.metadata.horizonSteps,cfg.controller.horizonSteps);
+            ego=localSuccessor(ego,prior);
+            [~,inputs,second,next]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyEqual(size(inputs,2),first.metadata.horizonSteps);
+            testCase.verifyEqual(second.metadata.horizonPolicy,"fixedWithinEncounter");
+            testCase.verifyEqual(next.encounterHorizonSteps,prior.encounterHorizonSteps);
+            testCase.verifyEqual(second.metadata.endpointIndex,first.metadata.endpointIndex+1);
+            testCase.verifyEqual(second.metadata.search.plannerCalls,0);
+            testCase.verifyEqual(second.model.linearization.inputs(:,1:end-1),prior.inputTrajectory(:,2:end),AbsTol=0);
+            localVerifyRollouts(testCase,second,cfg);
+        end
+        function aNewEncounterCanChooseADifferentHorizon(testCase)
+            [ego,road,cfg]=localFixture();ego.stateTime=0;
+            [~,q]=collisionThreatScenario("brakingLead",cfg);
+            [~,~,first,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            ego=localSuccessor(ego,prior);ego.stateTime=cfg.controller.sampleTime;
+            ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
+            [~,~,cleared,idle]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyEqual(cleared.metadata.encounterHorizonSteps,0);
+            testCase.verifyEqual(idle.encounterHorizonSteps,0);
+            ego=localSuccessor(ego,idle);ego.stateTime=2*cfg.controller.sampleTime;
+            ego.perception.time=ego.stateTime;
+            [~,~,new,next]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,idle);
+            testCase.verifyTrue(new.model.targetOnset);
+            testCase.verifyEqual(new.metadata.search.plannerCalls,1);
+            testCase.verifyEqual(next.encounterId,prior.encounterId+1);
+            testCase.verifyEqual(next.encounterHorizonSteps,new.metadata.horizonSteps);
+            testCase.verifyLessThan(new.metadata.horizonSteps,first.metadata.horizonSteps);
         end
         function aNewEncounterReplacesThePreviouslyUnobstructedCruiseSeed(testCase)
             [ego,road,cfg]=localFixture();

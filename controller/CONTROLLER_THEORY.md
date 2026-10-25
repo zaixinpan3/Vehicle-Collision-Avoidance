@@ -17,7 +17,7 @@ There are two mathematical objects whose results must be distinguished:
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a first-successor soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Planning occurs only at encounter onset; later frames inherit optimized inputs. Horizon sizing precedes the solve, and failure never requests a longer-horizon retry. |
+| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a first-successor soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Planning occurs only at encounter onset; later frames inherit optimized inputs. The first accepted encounter plan fixes its horizon; each later frame shifts the inputs and appends one hold. Failure never requests a longer-horizon retry. |
 | Conditional nonlinear output-feedback design | Joint physical/observer information sets, persistent model uncertainty, causal future feedback, sound reachable images and a common terminal continuation; the shifted-policy proof establishes mathematical recursive feasibility under its stated premises. |
 
 The latter theorem is not a certificate for the former approximation.
@@ -472,8 +472,9 @@ ratio ten constraint tolerances inside the singular endpoints. Shifting a
 saturated previous plan rebuilds this interior seed and its complete rollout;
 this does not change a previously issued command. The 100 ms controller budget
 reserves 2 ms for completion. Each controller call builds at most one RTI
-model and performs at most two native objective solves. Horizon sizing precedes
-this model; primal infeasibility, numerical failure and nonlinear rejection
+model and performs at most two native objective solves. Initial encounter
+horizon sizing precedes this model, and later encounter calls retain that
+length; primal infeasibility, numerical failure and nonlinear rejection
 are reported without increasing the node count or rebuilding the problem.
 No auxiliary restoration solve is run.
 
@@ -1604,9 +1605,13 @@ project vehicle/target parameter domain.
 ### Primary value and horizon convention
 
 Let $N$ be the fixed slack prefix and $N\le M\le M_{\max}$ the prediction
-length. Choose causal policies, their joint reachable sets, nonnegative prefix
-slacks and a terminal witness. Impose universal hard conditions on every
-hold, collision deficit at most $\xi_i$ for $i<N$, zero deficit thereafter,
+length. Choose $M$ when initializing an encounter and retain it after the
+first feasible plan until that encounter ends. A new encounter may choose a
+different $M$; the value comparison below is within one encounter, not across
+newly introduced targets or constraints. Choose causal policies, their joint
+reachable sets, nonnegative prefix slacks and a terminal witness. Impose
+universal hard conditions on every hold, collision deficit at most $\xi_i$
+for $i<N$, zero deficit thereafter,
 and endpoint membership in the terminal family. Define
 
 $$
@@ -1775,10 +1780,21 @@ relative to the exact robust problem.
 
 ### Reference construction and pre-solve horizon sizing
 
-A previous accepted input sequence is shifted and rolled out from the current
-estimate. Its absolute endpoint is retained while the horizon shrinks by one
-hold per frame to `controller.horizonSteps`. Encounter preview may request a
-longer horizon, without activating the avoidance planner.
+Encounter preview selects the first reference length. Once a plan is
+accepted, its number of input holds $M$ fixes the horizon for that encounter.
+Every later call drops the executed input, retains the remaining $M-1$
+inputs, appends one tail hold and rerolls from the current estimate. Thus the
+relative duration $M T_s$ stays fixed and the absolute endpoint advances by
+one sample. Updated target forecasts and observer bounds do not trigger
+another horizon preview, shorten the plan or add more prediction holds.
+
+The accepted input sequence stores this length directly; state and metadata
+also expose `encounterHorizonSteps` (zero when no encounter is active).
+A failed solve publishes no new controller state and cannot change the
+accepted horizon. A target-free continuation may shrink toward
+`controller.horizonSteps`. Once a confirmed exit or complete empty scan
+clears the encounter, a subsequent acquisition selects its own new horizon
+independently of the previous encounter's length.
 
 The planner is invoked once on the first observation of each encounter,
 including a cold start with an observed target. A target-free cold reference
@@ -1819,8 +1835,11 @@ certificate. The declared nonlinear model produces all returned
 states over exactly the requested number of holds. A nonterminal or deficient
 seed is allowed to enter the terminal-constrained optimizer.
 
-Each controller call fixes its node count before formulating the local
-problem. Both objective stages share that model. Primal infeasibility,
+Both objective stages share the one model and the encounter's fixed node
+count. The same-length shift matches the horizon convention of Section 7;
+it does not establish the joint-set and terminal certificates needed by
+that conditional theorem. The existing numerical tail initializer and
+nonlinear acceptance checks retain their stated scope. Primal infeasibility,
 numerical failure, nonlinear rejection or an unrollable reference returns
 failure; none requests a longer horizon, another local model or a new
 avoidance path. This does not certify that the selected horizon is sufficient
@@ -2005,7 +2024,7 @@ test limits executable source growth; this consolidation adds no runtime module.
 | --- | --- |
 | [collisionAvoidanceController.m](collisionAvoidanceController.m) | Input/target memory, encounter updates, solver orchestration, first-input output, reset and warm-up actions. |
 | [readControllerInputs.m](readControllerInputs.m) | Ego/target parsing, timestamped error sets, given path and boundary observations. |
-| [solvePredictiveControl.m](solvePredictiveControl.m) | References, affine RTI models, two objectives, pre-solve horizon sizing, tightening, shared timer and discrepancy diagnostics. |
+| [solvePredictiveControl.m](solvePredictiveControl.m) | References, affine RTI models, two objectives, encounter-onset horizon sizing and fixed-length shifts, tightening, shared timer and discrepancy diagnostics. |
 | [terminalSafeSet.m](terminalSafeSet.m) | Joint state/flow, braking continuation, membership/linearized rows, parked-track checks, seed holds and offline certificate helpers. |
 | [nonlinearBicycleModel.m](nonlinearBicycleModel.m) | Blended bicycle, road load, RK4/tangents, trim, path error and quadratic CLF. |
 | [modifiedFialaTire.m](modifiedFialaTire.m) | Combined-slip forces and analytic derivatives. |

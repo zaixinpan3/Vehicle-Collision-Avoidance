@@ -264,7 +264,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
             testCase.verifyEqual(state.targetEpoch,q,AbsTol=1e-12);
             testCase.verifyEqual(state.targetEpochIndex,0);
-            % The horizon length follows the terminal set and may differ.
+            testCase.verifyEqual(state.encounterHorizonSteps,prior.encounterHorizonSteps);
+            testCase.verifyEqual(size(state.inputTrajectory,2),size(prior.inputTrajectory,2));
+            % Shifted target nodes keep their original absolute times; the
+            % fixed-length horizon adds one new target node at its end.
             count=min(size(problem.predictedJointState,2),size(prior.predictedJointState,2)-1);
             testCase.verifyEqual(problem.predictedJointState(7:10,1:count), ...
                 prior.predictedJointState(7:10,2:count+1),AbsTol=1e-12);
@@ -287,6 +290,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEmpty(state.targetEpoch);
+            testCase.verifyEqual(state.encounterHorizonSteps,0);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
             testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
             ego=localSuccessor(ego,state);ego.stateTime=2*cfg.controller.sampleTime;
@@ -295,6 +299,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyTrue(returned.model.targetOnset);
             testCase.verifyEqual(returned.metadata.search.plannerCalls,1);
             testCase.verifyEqual(next.encounterId,prior.encounterId+1);
+            testCase.verifyEqual(next.encounterHorizonSteps,returned.metadata.horizonSteps);
             testCase.verifyEqual(next.targetEpochIndex,2);
         end
         function encounterRadiusUsesReferencePositionsRatherThanBodyClearance(testCase)
