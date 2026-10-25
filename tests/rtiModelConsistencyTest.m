@@ -1,5 +1,5 @@
 classdef rtiModelConsistencyTest < matlab.unittest.TestCase
-    % The affine solve must not stand in for nonlinear primary feasibility.
+    % RTI affine predictions and independent offline nonlinear diagnostics.
     properties (Access=private)
         model
         anchor
@@ -18,7 +18,23 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function aFiniteRolloutWithACollidingHardTailFailsValidation(testCase)
+        function theOnlineUpdateReturnsTheAffineStateDecisionWithoutReplay(testCase)
+            model=testCase.model;model.initialState(2)=.5;
+            previous=struct('inputTrajectory',testCase.anchor.inputs,'stateTrajectory',testCase.anchor.states);
+            [solution,search,formed]=solvePredictiveControl(model,previous,tic);
+            testCase.assertNotEmpty(solution);
+            reference=formed.linearization;
+            [next,a,b]=nonlinearBicycleModel.sample(reference.states(:,1),reference.inputs(:,1),model.cfg);
+            expected=next+a*(solution.states(:,1)-reference.states(:,1)) ...
+                +b*(solution.inputs(:,1)-reference.inputs(:,1));
+            actual=nonlinearBicycleModel.sample(model.initialState,solution.inputs(:,1),model.cfg);
+            testCase.verifyEqual(solution.states(:,2),expected,AbsTol=1e-5);
+            testCase.verifyGreaterThan(norm(solution.states(:,2)-actual),1e-8);
+            testCase.verifyFalse(search.rollout.available);
+            testCase.verifyEqual(search.terminationReason,"twoStagesReturned");
+            testCase.verifyEqual(solution.safety,solution.affineSafety,AbsTol=0);
+        end
+        function anOfflineProbeFindsTheCollidingHardTail(testCase)
             model=testCase.model;cfg=model.cfg;anchor=testCase.anchor;
             % Extend straight cruise through a separated, stationary target.
             anchor.inputs=repmat(anchor.inputs(:,1),1,32);
@@ -33,7 +49,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(check.hard,.1);
             testCase.verifyEqual(check.safety,0,AbsTol=1e-12);
         end
-        function terminalStateViolationIsCheckedAfterNonlinearRollout(testCase)
+        function anOfflineProbeFindsTheTerminalStateViolation(testCase)
             model=testCase.model;anchor=testCase.anchor;
             anchor.inputs=repmat([.25;0],1,8);
             anchor.states=localRollout(model.initialState,anchor.inputs,model.cfg);

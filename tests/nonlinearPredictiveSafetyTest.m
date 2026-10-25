@@ -223,17 +223,17 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
             testCase.verifySize(command.actuatorInput,[2,1]);
             testCase.verifyFalse(isfield(problem,'certificate'));
-            testCase.verifyEqual(problem.metadata.safetyScope,"nonlinearSampledConstraints");
+            testCase.verifyEqual(problem.metadata.safetyScope,"affineSubproblem");
         end
         function changedTargetForecastRetainsTheInputWarmStart(testCase)
             [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;0;1.6;2.4;.95;0;0]);
             [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            ego=localSuccessor(ego,prior);
+            ego=localSuccessor(ego,prior,cfg);
             updated=[30.4;5.01;0;6;1.02;.0005;1.6;2.4;.95;0;0];target=localTarget(updated);
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEqual(problem.model.target,updated,AbsTol=1e-12);
-            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPrimalIterate");
             expected=predictiveSafetyGeometry.predictTarget(updated,(0:size(problem.inputTrajectory,2))*cfg.controller.sampleTime);
             testCase.verifyEqual(problem.predictedJointState(7:10,:),expected(1:4,:),AbsTol=1e-11);
         end
@@ -242,7 +242,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             % this case tests angle wrapping, not maneuver feasibility.
             [ego,road,cfg]=localFixture();q=[30;-25;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
-            ego=localSuccessor(ego,prior);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
+            ego=localSuccessor(ego,prior,cfg);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
             [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
             testCase.verifyGreaterThan(next(3),pi);
             % The new estimate equals the forecast (its heading unwrapped
@@ -258,7 +258,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         function targetDropoutUsesOneFixedAbsoluteEpoch(testCase)
             [ego,road,cfg]=localFixture();q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];ego.stateTime=10;
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
-            ego=localSuccessor(ego,prior);ego.stateTime=10+cfg.controller.sampleTime;
+            ego=localSuccessor(ego,prior,cfg);ego.stateTime=10+cfg.controller.sampleTime;
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             expected=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
@@ -276,7 +276,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         function nonconsecutiveSampleTimesCannotReuseTheTrajectory(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=10;
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            ego=localSuccessor(ego,prior);ego.stateTime=10.17;
+            ego=localSuccessor(ego,prior,cfg);ego.stateTime=10.17;
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
                 'collisionAvoidanceController:invalidSampleTime');
         end
@@ -284,16 +284,16 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [ego,road,cfg]=localFixture();ego.stateTime=0;
             q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
-            ego=localSuccessor(ego,prior);ego.stateTime=cfg.controller.sampleTime;
+            ego=localSuccessor(ego,prior,cfg);ego.stateTime=cfg.controller.sampleTime;
             ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
             [command,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEmpty(state.targetEpoch);
             testCase.verifyEqual(state.encounterHorizonSteps,0);
-            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPrimalIterate");
             testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
-            ego=localSuccessor(ego,state);ego.stateTime=2*cfg.controller.sampleTime;
+            ego=localSuccessor(ego,state,cfg);ego.stateTime=2*cfg.controller.sampleTime;
             ego.perception.time=ego.stateTime;
             [~,~,returned,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
             testCase.verifyTrue(returned.model.targetOnset);
@@ -324,7 +324,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"nominalFeedbackRollout");
-            testCase.verifyEqual(state.version,92);
+            testCase.verifyEqual(state.version,93);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;1;0;1.6;2.4;.95;0;0];
@@ -367,7 +367,9 @@ function finite=localTargetTangent(q,time)
         finite(:,j)=(a(1:4)-b(1:4))/(2*h);
     end
 end
-function ego=localSuccessor(ego,prior)
-    x=prior.stateTrajectory(:,2);ego.position=x(1:2);ego.yaw=x(3);ego.speed=x(4);
+function ego=localSuccessor(ego,prior,cfg)
+    x=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];
+    x=nonlinearBicycleModel.sample(x,prior.appliedInput,cfg);
+    ego.position=x(1:2);ego.yaw=x(3);ego.speed=x(4);
     ego.lateralVelocity=x(5);ego.yawRate=x(6);ego.heldActuatorInput=prior.appliedInput;
 end

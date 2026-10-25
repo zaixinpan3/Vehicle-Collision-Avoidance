@@ -1,10 +1,11 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl One local PCBF/CLF RTI model per controller call.
 % The planner runs once at encounter onset. Later frames shift the previous
-% optimized inputs and retain their node count throughout the encounter.
+% state/input iterate and retain its node count throughout the encounter.
 % Horizon sizing occurs only at encounter onset; a failed solve never extends
-% the horizon or rebuilds the problem. Only unchanged,
-% nonlinearly checked optimized inputs can be returned. Each reference uses
+% the horizon or rebuilds the problem. The completed local update returns
+% its optimized inputs unchanged, without a post-solve nonlinear rollout.
+% Each reference uses
 % the same model and common constraints for both objective stages.
 % Research access: solvePredictiveControl("probe",request) exposes reference,
 % formulation and solve operations to the free-time experiment in scripts/.
@@ -31,11 +32,11 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     anchor=[];reference=[];plannerCalls=0;
     if isfield(model,'probeReference'),reference=model.probeReference;end
     source="nominalFeedbackRollout";
-    rollout=struct('available',false,'reason',"noCompletedOptimization", ...
+    rollout=struct('available',false,'reason',"notPerformedByRti", ...
         'fullGap',NaN,'fullCorrection',NaN);
     if ~isempty(reference),source="extendedInputRollout";
     elseif isfield(model,'targetOnset') && model.targetOnset,source="plannedAvoidanceRollout";
-    elseif localHasWarmStart(previousState),source="shiftedInputRollout";
+    elseif localHasWarmStart(previousState),source="shiftedPrimalIterate";
     elseif isfield(model,'target') && ~isempty(model.target),source="unavailableWarmStart";
     end
     search=localEmptySearch(source,"",0);
@@ -81,33 +82,13 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         search.initializationSeconds=initializationSeconds;
         [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
         if ~isempty(solution)
-            localCheckDeadline(model);
-            [solution,rollout]=localPrediction(solution,anchor,model);
-            if ~rollout.available
-                solution=[];search.terminationReason="nonlinearPredictionUnavailable";
-            else
-                actual=anchor;actual.states=solution.states;actual.inputs=solution.inputs;
-                [check,~,~]=localNonlinearCheck(actual,model,problem.safetyNormals);
-                rollout.hardResidual=check.hard;rollout.safety=check.safety;
-                tolerance=cfg.solver.feasibilityTolerance;
-                if check.hard>tolerance || check.safety>search.slackCap+tolerance
-                    solution=[];search.terminationReason="nonlinearConstraintViolation";
-                    rollout.reason="nonlinearConstraintViolation";
-                else
-                    solution.hard=check.hard;solution.nonlinearValidationPerformed=true;
-                    solution.affineSafety=solution.safety;
-                    solution.affineStageSlacks=solution.stageSlacks;
-                    solution.safety=check.safety;solution.stageSlacks=check.slacks;
-                    solution.nonlinearSafety=check.safety;solution.nonlinearStageSlacks=check.slacks;
-                    solution.collisionEscapeNormals=model.collisionEscapeNormals;
-                    solution.collisionSide=model.collisionSide;
-                    solution.circulationDirection=model.circulationDirection;
-                    solution.retainCollisionSide=model.retainCollisionSide;
-                    solution.linearizationGap=rollout.fullGap;
-                    solution=localTerminalMetrics(solution,model);
-                    rollout.reason="sampledNonlinearConstraintsPassed";
-                end
-            end
+            solution.collisionEscapeNormals=model.collisionEscapeNormals;
+            solution.collisionSide=model.collisionSide;
+            solution.circulationDirection=model.circulationDirection;
+            solution.retainCollisionSide=model.retainCollisionSide;
+            solution.clfNextValue=nonlinearBicycleModel.nominalValue( ...
+                solution.states(:,2),model.lane,model.nominalReference);
+            solution=localTerminalMetrics(solution,model);
         end
     catch exception
         if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly,rethrow(exception);end
@@ -241,7 +222,10 @@ end
 function available=localHasWarmStart(previous)
     available=isstruct(previous) && isfield(previous,'inputTrajectory') ...
         && size(previous.inputTrajectory,1)==2 && size(previous.inputTrajectory,2)>=1 ...
-        && all(isfinite(previous.inputTrajectory),'all');
+        && all(isfinite(previous.inputTrajectory),'all') ...
+        && isfield(previous,'stateTrajectory') ...
+        && isequal(size(previous.stateTrajectory),[6,size(previous.inputTrajectory,2)+1]) ...
+        && all(isfinite(previous.stateTrajectory),'all');
 end
 
 function [anchor,source]=localRtiInitialize(model,previous,minimumCount,reference)
@@ -261,9 +245,9 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount,referenc
         old=reference.inputs;source="extendedInputRollout";
         count=max(minimumCount,size(old,2));
     elseif inherited
-        old=previous.inputTrajectory(:,2:end);source="shiftedInputRollout";
+        old=previous.inputTrajectory(:,2:end);source="shiftedPrimalIterate";
         % The issued input stays unchanged; only singular endpoint references
-        % move into the differentiable interior before their new rollout.
+        % move into the differentiable interior before the next linearization.
         [seedLower,seedUpper]=nonlinearBicycleModel.inputBounds(cfg,true);
         old=min(seedUpper,max(seedLower,old));
         count=max(minimumCount,size(old,2));
@@ -282,7 +266,16 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount,referenc
     prior=model.previousInput;nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
     for index=1:count
         if index<=size(old,2)
-            u=old(:,index);next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
+            u=old(:,index);
+            if inherited
+                % Multiple-shooting warm start: retain the shifted state
+                % decision instead of replaying the whole input sequence.
+                % The measured first state and the shifted later nodes may
+                % have dynamics defects; localFormulate includes them in rhs.
+                next=previous.stateTrajectory(:,index+2);
+            else
+                next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
+            end
         elseif (inherited || reuse) && terminalSafeSet.member(context,states(:,index),index-1)
             [u,next,ok,~,middle]=terminalSafeSet.cruiseInput(states(:,index),model);
             ok=ok && abs(u(2)-prior(2))<=context.brakingChangeMaximum+1e-9 ...
@@ -361,61 +354,9 @@ function planner=localPlannerMetadata()
         'rolloutSeconds',0,'robustCertificate',false);
 end
 
-function discrepancy=localPoseDiscrepancy(first,second,cfg)
-    % Body-point pose metric of the safety rows: translation plus reach*yaw.
-    reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
-    difference=first-second;
-    discrepancy=vecnorm(difference(1:2,:))+reach*abs(atan2(sin(difference(3,:)),cos(difference(3,:))));
-end
-
-function [solution,rollout]=localPrediction(solution,anchor,model)
-    % Predict unchanged optimized inputs before evaluating their constraints.
-    rollout=struct('available',false,'reason',"noCompletedOptimization", ...
-        'fullGap',NaN,'fullCorrection',NaN);
-    if isempty(solution),return;end
-    if any(abs(solution.inputs(2,:))>1)
-        rollout.reason="actuatorDomain";return;
-    end
-    initialSlip=atan2(model.initialState(5)+model.cfg.vehicle.lf*model.initialState(6),model.initialState(4))-solution.inputs(1,1);
-    if abs(initialSlip)>=pi/2
-        rollout.reason="frontTireDomain";return;
-    end
-    solution.affineStates=solution.states;
-    solution.inputCorrection=solution.inputs-anchor.inputs;
-    unit=[model.cfg.clf.certificationSteeringRadians;model.cfg.clf.certificationBrakingRatio];
-    rollout.fullCorrection=max(abs(solution.inputCorrection)./unit,[],'all');
-    states=zeros(size(solution.states));states(:,1)=model.initialState;
-    try
-        for index=1:size(solution.inputs,2)
-            if mod(index,4)==1,localCheckDeadline(model);end
-            states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),solution.inputs(:,index),model.cfg);
-            ends=states(:,index:index+1);
-            slip=atan2(ends(5,:)+model.cfg.vehicle.lf*ends(6,:),ends(4,:))-solution.inputs(1,index);
-            if any(abs(slip)>=pi/2)
-                rollout.reason="frontTireDomain";return;
-            end
-        end
-    catch exception
-        if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
-        if strcmp(exception.identifier,'collisionAvoidanceController:timeBudgetExceeded'),rethrow(exception);end
-        % A model-domain failure makes the optimized prediction unavailable.
-        rollout.reason=string(exception.identifier);return;
-    end
-    rollout.available=true;rollout.reason="predictionOnly";
-    rollout.fullGap=max(localPoseDiscrepancy(states,solution.affineStates,model.cfg));
-    solution.states=states;
-    % Performance diagnostics only: these do not change the PCBF acceptance
-    % test or the optimized inputs. A local derivative row is not an exact
-    % nonlinear-input or a sampled one-step decrease certificate.
-    solution.clfNextValue=nonlinearBicycleModel.nominalValue(states(:,2),model.lane,model.nominalReference);
-    solution.clfActualDerivative=nonlinearBicycleModel.nominalDerivative( ...
-        model.initialState,solution.inputs(:,1),model.lane,model.nominalReference,model.cfg);
-    solution.clfActualDerivativeResidual=solution.clfActualDerivative ...
-        -solution.clfDerivativeLimit-solution.clfSlack;
-end
-
 function [check,problem,formed]=localNonlinearCheck(anchor,model,normals)
-    % At zero correction the reassembled rows evaluate the actual rollout,
+    % Offline probe only; never called by the online RTI update.
+    % At zero correction the reassembled rows evaluate the supplied rollout,
     % including its true yaw, posterior margins and terminal continuation.
     % Keep the solve's separating normals: validation cannot select an easier
     % collision branch. This is a sampled numerical check, not a tube proof.
@@ -494,7 +435,7 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
         wall=tic;[problem,model]=localFormulate(anchor,model);formulationSeconds=toc(wall);
         model.linearization=anchor;
         % Retain the reference source for research diagnostics.
-        problem.inheritedAnchor=initialization=="shiftedInputRollout";
+        problem.inheritedAnchor=initialization=="shiftedPrimalIterate";
     end
     search=localSearch(problem,initialization,formulationSeconds);
     remaining=model.solveTimeLimitSeconds-toc(timer);if remaining<=0,return;end
@@ -576,7 +517,10 @@ function solution=localDecode(point,problem,anchor)
     slacks=max(0,point(problem.slackIndices));rho=problem.clfScale*max(0,point(problem.clfIndex));
     rate=(problem.clfDerivativeMap*point+problem.clfDerivativeOffset)*problem.clfScale;
     solution=struct('inputs',inputs,'states',states,'stageSlacks',slacks.', ...
-        'safety',sum(slacks),'hard',NaN,'clfSlack',rho, ...
+        'safety',sum(slacks),'hard',max([0;problem.a*point-problem.b; ...
+            abs(problem.equal*point-problem.rhs);problem.lower-point;point-problem.upper]), ...
+        'clfSlack',rho,'linearizationGap',NaN, ...
+        'clfActualDerivative',NaN,'clfActualDerivativeResidual',NaN, ...
         'clfInitialValue',problem.initialClfValue,'clfDerivative',rate, ...
         'clfFunction',problem.clf.function,'clfRequiredDecreaseRate',problem.clf.requiredDecreaseRate, ...
         'referenceDeviationWeight',problem.referenceDeviationWeight,'clfDerivativeLimit',problem.clfDerivativeLimit, ...
@@ -592,6 +536,9 @@ function solution=localDecode(point,problem,anchor)
         solution.durationChangeSeconds=point(problem.durationIndex);
         solution.states=solution.states+problem.durationStateDerivative*solution.durationChangeSeconds;
     end
+    solution.affineStates=solution.states;
+    solution.affineSafety=solution.safety;solution.affineStageSlacks=solution.stageSlacks;
+    solution.inputCorrection=inputs-anchor.inputs;
 end
 
 function [point,flag,solverInfo]=localConicSolve(quadratic,objective,cones,a,b,equal,rhs,lower,upper,cfg,remaining,gapTolerance)
@@ -1135,12 +1082,12 @@ function tube=localTargetTube(model,time,holdStart)
 end
 
 function solution=localTerminalMetrics(solution,model)
-    % Diagnostics of the already checked nonlinear endpoint.
+    % Descriptive metrics of the local affine endpoint, not a certificate.
     cfg=model.cfg;y=solution.states(:,end);count=size(solution.inputs,2);
     solution.terminalValue=nonlinearBicycleModel.nominalValue(y,model.lane,model.nominalReference);
     solution.terminalMarginMeters=NaN;solution.terminalRoadMarginMeters=NaN;
     solution.terminalStopSeconds=hypot(y(4),y(5))/cfg.terminal.brakingDecelerationMetersPerSecondSquared;
-    solution.terminalExitSeconds=NaN;solution.terminalEnd="sampledConstraintsValidated";
+    solution.terminalExitSeconds=NaN;solution.terminalEnd="affineEndpoint";
     solution.terminalDistanceMeters=Inf;
     if ~isempty(model.target)
         q=localTargetAt(model,count*cfg.controller.sampleTime);

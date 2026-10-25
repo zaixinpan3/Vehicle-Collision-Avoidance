@@ -58,10 +58,13 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.stages(1).exitFlag,-2);
             testCase.verifyTrue(isnan(formed.encounterExitRecord));
         end
-        function aLargeRemainderIsReportedWithoutShrinkingTheNextSearch(testCase)
+        function theLocalUpdateReturnsWithoutANonlinearRemainderGate(testCase)
             [solution,search,model]=solvePredictiveControl(testCase.model,[],tic);
             testCase.assertNotEmpty(solution);
-            testCase.verifyEqual(solution.linearizationGap,search.rollout.fullGap,AbsTol=0);
+            testCase.verifyTrue(isnan(solution.linearizationGap));
+            testCase.verifyFalse(search.rollout.available);
+            testCase.verifyEqual(search.rollout.reason,"notPerformedByRti");
+            testCase.verifyEqual(solution.states,solution.affineStates,AbsTol=0);
             testCase.verifyFalse(isfield(model,'inputTrustScale'));
             testCase.verifyFalse(isfield(model.cfg.nonlinear,'trustRadius'));
         end

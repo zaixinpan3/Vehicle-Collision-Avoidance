@@ -35,7 +35,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(norm(largeInputs(:,1:count)-smallInputs(:,1:count),'fro'),1e-5);
             testCase.verifyTrue(large.metadata.uncertaintyIncluded);
             testCase.verifyFalse(large.metadata.robustNonlinearSafetyCertified);
-            testCase.verifyEqual(large.metadata.safetyScope,"nonlinearNominalCollisionWithRelaxedObserverMargins");
+            testCase.verifyEqual(large.metadata.safetyScope,"affineNominalCollisionWithRelaxedObserverMargins");
         end
         function zeroRadiusEnclosuresRecoverTheExactStateProblem(testCase)
             [ego,target,road,cfg]=localFixture(0);
@@ -72,7 +72,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             ego.heldActuatorInput=command.actuatorInput;
             [~,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
             testCase.verifyEqual(second.model.target,q,AbsTol=1e-12);
-            testCase.verifyEqual(second.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(second.metadata.search.initialization,"shiftedPrimalIterate");
             testCase.verifyEqual(second.metadata.search.stages(end-1).objective,"pcbfSlack");
             testCase.verifyEqual(second.metadata.search.stages(end).objective,"clfSlackAndReferenceDeviation");
             testCase.verifyEqual(second.model.linearization.states(:,1),next,AbsTol=1e-12);
@@ -178,7 +178,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             ego.heldActuatorInput=command.actuatorInput;
             [command,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
-            testCase.verifyEqual(second.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(second.metadata.search.initialization,"shiftedPrimalIterate");
             testCase.verifyFalse(second.metadata.robustNonlinearSafetyCertified);
         end
         function aMissingTargetPredictionSetDoesNotStopTheController(testCase)

@@ -28,9 +28,9 @@ function cfg=localDefaults()
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
         'enforceRoadBoundaries',false);
     cfg.nonlinear=struct('integrationStep',.05);
-    % Plan once on target acquisition; later frames shift optimized inputs.
+    % Plan once on target acquisition; later frames shift the state/input iterate.
     % Initial preview starts from horizonSteps and the current stopping time.
-    % Later encounter frames shift M-1 inputs and append one hold to retain M.
+    % Later frames shift M-1 state/input stages and append one hold to retain M.
     % Failure is reported without horizon extension, replanning or another
     % local model.
     % Secondary objective: CLF slack plus half this weight times the mean
@@ -125,10 +125,10 @@ function cfg=localDefaults()
     % Both RTI stages share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     % constraintTolerance and optimalityTolerance are the conic solver's
-    % feasibility and gap tolerances; feasibilityTolerance also bounds the
-    % sampled nonlinear primary residual. reducedTolerance is the precision
+    % feasibility and gap tolerances; feasibilityTolerance is also used for
+    % diagnostic interpretation. reducedTolerance is the precision
     % for an AlmostSolved result. Budget includes controller preprocessing;
-    % the reserve leaves time for prediction and output assembly. Native
+    % the reserve leaves time for output assembly. Native
     % solves also count their construction time against the remaining budget.
     cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.1,'completionReserveSeconds',.002, ...
         'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...

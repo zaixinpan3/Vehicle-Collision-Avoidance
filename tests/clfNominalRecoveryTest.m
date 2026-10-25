@@ -34,10 +34,10 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             testCase.verifyEqual(metadata.clfInitialValue,value,AbsTol=1e-12*max(1,value));
             testCase.verifyLessThanOrEqual(metadata.clfSlack,tol);
             testCase.verifyLessThanOrEqual(metadata.clfDerivative,metadata.clfDerivativeLimit+tol);
-            rate=nonlinearBicycleModel.nominalDerivative(x,command.actuatorInput,lane,reference,cfg);
-            testCase.verifyEqual(metadata.clfActualDerivative,rate,AbsTol=1e-12*max(1,abs(rate)));
+            testCase.verifyTrue(isnan(metadata.clfActualDerivative));
             testCase.verifyLessThanOrEqual(nextValue,value+tol);
             testCase.verifyGreaterThanOrEqual(metadata.clfNextValue,0);
+            testCase.verifyEqual(metadata.clfNextValueScope,"affinePredictedState");
             testCase.verifyTrue(metadata.search.clfStageCompleted);
             testCase.verifyEqual(metadata.solverCallCount,sum([metadata.search.stages.numericalSolve]));
             testCase.verifyEqual(metadata.tertiaryObjective,"none");

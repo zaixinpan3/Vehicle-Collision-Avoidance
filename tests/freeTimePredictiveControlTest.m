@@ -16,7 +16,7 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             ego=struct('position',[0;.1],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
             [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
             testCase.model=prediction.model;
-            testCase.previous=struct('inputTrajectory',repmat(prediction.model.nominalReference.input,1,33));
+            testCase.previous=localPrevious(repmat(prediction.model.nominalReference.input,1,33),testCase.model);
             testCase.result=exploreFreeTimePredictiveControl(testCase.model,testCase.previous);
             testCase.assertEqual(testCase.result.status,"completed");
         end
@@ -90,11 +90,11 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             model.cfg.controller.enforceRoadBoundaries=true;model.road.lateralClearance=[3;3];
             model.target=[1000;0;0;4;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;model.targetOnset=false;
-            previous=struct('inputTrajectory',repmat([.35;0],1,33));
+            previous=localPrevious(repmat([.35;0],1,33),model);
             r=exploreFreeTimePredictiveControl(model,previous);
             testCase.verifyFalse(r.returned);
             testCase.verifyNumElements(r.attempts,1);
-            testCase.verifyEqual(r.attempts{1}.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(r.attempts{1}.initialization,"shiftedPrimalIterate");
             testCase.verifyEqual(r.free.search.stages(1).exitFlag,-2);
             testCase.verifyEqual(r.completedPlannerCalls,0);
             testCase.verifyEqual(r.stopReason,"freeTimeSolveFailed");
@@ -109,7 +109,7 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(r.stopReason,"freeTimeSolveFailed");
             testCase.assertNumElements(r.attempts,1);
             testCase.verifyEqual(r.attempts{1}.stageCount,33);
-            testCase.verifyEqual(r.attempts{1}.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(r.attempts{1}.initialization,"shiftedPrimalIterate");
             testCase.verifyEqual(r.initialAnchor.inputs(:,1:end-1),testCase.previous.inputTrajectory(:,2:end),AbsTol=0);
             testCase.verifyEqual(r.completedPlannerCalls,0);
             testCase.verifyEqual(r.horizonExtensions,0);
@@ -124,4 +124,12 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(r.completedPlannerCalls,0);
         end
     end
+end
+
+function previous=localPrevious(inputs,model)
+    states=zeros(6,size(inputs,2)+1);states(:,1)=model.initialState;
+    for index=1:size(inputs,2)
+        states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),model.cfg);
+    end
+    previous=struct('inputTrajectory',inputs,'stateTrajectory',states);
 end

@@ -17,7 +17,7 @@ The executable approximation and the mathematical algorithm have distinct guaran
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a continuous-time derivative soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Planning occurs only at encounter onset; later frames inherit optimized inputs. The first accepted encounter plan fixes its horizon; each later frame shifts the inputs and appends one hold. Failure never requests a longer-horizon retry. |
+| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a continuous-time derivative soft CLF row and terminal tangents; the completed affine update returns its first input unchanged, without a post-solve nonlinear rollout or feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
 | Unified observer-to-safety design | Current observer containment, retained physical successor sets, signed whole-hold margins and a common terminal continuation. The information-set shift proves conditional recursive feasibility and zero-deficit safety. Future observer dynamics are needed only for the optional prediction of observation-dependent policies. |
 
 The latter theorem is not a certificate for the former approximation.
@@ -367,21 +367,30 @@ unless such whole-hold images are supplied.
 
 ### One RTI model and lexicographic objectives
 
-For a nonlinear reference $(\bar x_i,\bar u_i)$ with
-$\bar x_{i+1}=F_h(\bar x_i,\bar u_i)$, variational tangents give
+For a reference $(\bar x_i,\bar u_i)$, variational tangents give
 
 $$
 \Delta x_0=0,\qquad
-\Delta x_{i+1}=A_i\Delta x_i+B_i\Delta u_i.
+\Delta x_{i+1}=A_i\Delta x_i+B_i\Delta u_i+e_i,
+\qquad e_i=F_h(\bar x_i,\bar u_i)-\bar x_{i+1}.
 $$
+
+The onset planner supplies a nonlinear rollout, so its defects vanish. Later
+frames shift the previous affine state/input iterate, update the first state
+from the current estimate, and append a tail hold. Their defects need not
+vanish and are retained in the equality right-hand side. The inherited input
+prefix is not reintegrated from the new measurement before solving.
 
 The current input estimate is fixed; current state error is handled by the
 published enclosure, not a free optimizer correction. Fixed collision duals
 and terminal tangents are built once on this model. There are at most two
-native objective solves per reference. A later nonlinear prediction checks
-the primary constraints using the solve's fixed collision normals. A failed
-nonlinear prediction returns failure without replanning. There is no auxiliary feasibility
-restoration problem, damped-step search or adaptive reference penalty.
+native objective solves per reference. The completed update supplies the first
+optimized input directly. Its predicted states and PCBF slacks remain those
+of the affine subproblem; no post-solve nonlinear rollout replaces or rejects
+them. The initial planner rollout and stagewise variational integrations belong to
+preparation, before solving. Independent experiment replay evaluates the issued
+controls on the plant. There is no auxiliary feasibility restoration problem,
+damped-step search or adaptive reference penalty.
 
 ### Implemented constraints and objective units
 
@@ -415,7 +424,7 @@ observer enclosure to contract to zero. The secondary objective is
          ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2).
 
 Here xbar and ubar are this RTI reference: the encounter-onset planner rollout,
-the shifted previous input rollout, or an extension of that same reference. They are not the nominal cruise path.
+the shifted previous state/input iterate, or an extension of that same reference. They are not the nominal cruise path.
 `lambda = rti.referenceDeviationWeight` defaults to 10 and remains active at
 zero cruise error; zero is an explicit ablation. Dx uses equal x/y position
 units from `clf.lateralPositionErrorScale`, followed by the CLF heading,
@@ -446,9 +455,10 @@ This satisfies the secondary CLF row because $s_V$ has no upper bound. All
 common constraints and the primary cap remain satisfied. The construction
 holds for positive as well as zero PCBF slack. A finite quadratic proximity
 cost changes which feasible point is preferred, not whether a point exists.
-Numerical solver failure and rejection by the subsequent nonlinear rollout
-are separate from this feasible-set inclusion; neither proves that the soft
-CLF made the mathematical second-stage problem infeasible.
+Numerical solver failure is separate from this feasible-set inclusion and
+does not prove that the soft CLF made the mathematical second-stage problem
+infeasible. The primary cap is enforced only between the two affine stages;
+it is not imposed on an independently recomputed nonlinear slack sum.
 
 Modified Fiala dynamics include combined-slip saturation at both axles.
 The optimizer uses their local derivatives without additional tire-capacity
@@ -678,12 +688,13 @@ not certify nonlinear CLF decrease or prevent every large correction.
 With an observer enclosure the row is unchanged and acts on the estimate:
 `clfDerivativeLimit = -alpha*V(xhat)`. Estimation error enters the performance
 analysis as an input, rather than as a worst-case CLF enclosure budget.
-`clfDerivative` is the local affine prediction and `clfActualDerivative` is
-the nonlinear model derivative under the unchanged optimized first input.
-`clfActualDerivativeResidual` subtracts the derivative limit and the optimized
-slack. These are performance diagnostics, not additional hard acceptance rows.
-`clfNextValue` is the value on the nonlinear first successor, for diagnostics
-only; it is not the left side of the optimized CLF condition. `clfSatisfied`
+`clfDerivative` is the local affine prediction. The online update does not
+evaluate `clfActualDerivative` or `clfActualDerivativeResidual`; both are
+reported as NaN. Independent simulations may evaluate the actual derivative.
+`clfNextValue` is the value on the affine predicted first successor, labeled
+by `clfNextValueScope`; it is not the left side of the optimized CLF condition.
+The scenario driver records `actualNextClfValue` on its independent plant
+successor. `clfSatisfied`
 means zero local CLF slack within solver tolerance, not exact nonlinear decay.
 
 The nonlinear input-linearization remainder and sampling effects are not enclosed.
@@ -1749,8 +1760,9 @@ The production RTI remains the approximation described in Section 8.
 
 Encounter preview selects the first reference length. Once a plan is
 accepted, its number of input holds $M$ fixes the horizon for that encounter.
-Every later call drops the executed input, retains the remaining $M-1$
-inputs, appends one tail hold and rerolls from the current estimate. Thus the
+Every later call drops the executed input, shifts the remaining $M-1$ inputs
+and their state iterate, replaces the first state with the current estimate,
+and appends one tail hold. Stagewise dynamics defects enter the SQP equations. Thus the
 relative duration $M T_s$ stays fixed and the absolute endpoint advances by
 one sample. Updated target forecasts and observer bounds do not trigger
 another horizon preview, shorten the plan or add more prediction holds.
@@ -1773,8 +1785,8 @@ empty scan clears the encounter, a subsequent acquisition starts a new
 encounter and permits one new planner invocation.
 
 The field constructs the initial reference; only the optimization supplies
-execution inputs. Previously optimized input prefixes are rerolled rather
-than reshaped by the boundary guidance field. Tail construction retains the
+execution inputs. Previously optimized state/input prefixes are shifted
+without full-horizon replay or reshaping by the boundary guidance field. Tail construction retains the
 existing terminal/nominal seed policies. The tangent initializer's handling
 of singular force-ratio endpoints remains as described above.
 
@@ -1805,9 +1817,9 @@ seed is allowed to enter the terminal-constrained optimizer.
 Both objective stages share the one model and the encounter's fixed node
 count. The same-length shift matches the horizon convention of Section 7;
 it does not establish the joint-set and terminal certificates needed by
-that conditional theorem. The existing numerical tail initializer and
-nonlinear acceptance checks retain their stated scope. Primal infeasibility,
-numerical failure, nonlinear rejection or an unrollable reference returns
+that conditional theorem. The existing numerical tail initializer remains
+a preparation heuristic. Primal infeasibility,
+numerical failure or an unrollable reference returns
 failure; none requests a longer horizon, another local model or a new
 avoidance path. This does not certify that the selected horizon is sufficient
 or that a feasible first frame always exists. The terminal conditions remain
@@ -1921,8 +1933,8 @@ at most 40 native interior-point iterations per stage and a 2 ms completion
 reserve. The model sample remains 50 ms; these offline simulations do not
 inject computation latency into actuation. Preprocessing
 counts against the same timer as model construction and both solves. Reference
-rollout, tangent/constraint construction, CLF construction, terminal geometry and
-optimized-input prediction check the timer. A native termination callback includes
+rollout, tangent/constraint construction, CLF construction and terminal geometry
+check the timer. A native termination callback includes
 MEX validation and problem construction, in addition to Clarabel's iteration
 timer. Native infeasibility certificates and unfinished iterates are never inputs.
 
@@ -1957,13 +1969,16 @@ its `horizonSteps`; `horizonExtensions` and `restartCount` remain zero.
 zero on subsequent calls in the same encounter. `nominalRestarted` stays false.
 `convexSolveCompleted` records completion of both convex objectives.
 `optimizationConverged` is false because nonlinear convergence is not tested.
-`nonlinearValidationPerformed` is true for returned controls and
-`nonlinearHardResidual` reports the sampled check. The reported PCBF value and
-stage slacks are recomputed on the nonlinear rollout; `affineSafetyValue` and
-`search.primaryOptimum` preserve the affine quantities. `search.slackCap` is
-the acceptance cap for the nonlinear slack sum. The CLF objective
-belongs to the input-affine approximation of the current continuous derivative. `predictedState` is the
-nonlinear prediction of the unchanged optimized inputs.
+`nonlinearValidationPerformed`, `nonlinearPredictionEvaluated` and
+`postSolveFeasibilityCheck` are false. `nonlinearHardResidual` and
+`linearizationGapMeters` are NaN rather than uncomputed zero residuals.
+The reported PCBF value, stage slacks and `affineHardResidual` describe the
+affine subproblem. `search.slackCap` only preserves its primary objective
+in the second stage; it is not a nonlinear acceptance cap. The CLF objective
+belongs to the input-affine approximation of the current continuous derivative.
+`predictedState` is the affine SQP iterate (`predictionModel=affineSqpIterate`).
+Compatibility rollout metadata has `available=false` and
+`reason=notPerformedByRti`; it does not signal a failed rollout.
 Independent scenario replay measures clearance, road margins and nominal
 recovery throughout the observation. Current-state terminal membership does
 not stop simulation or count as task completion. The terminal set certifies
@@ -1986,7 +2001,7 @@ baseline and minimum recovery time.
 | Common robust terminal family | Center-based target geometry and ego padding under the mild terminal model; no full nonlinear parameter-family membership certificate. |
 | Exact nonlinear CLF dissipation | Current continuous derivative, locally affine in the first input, with soft slack and a fixed reference penalty. |
 | Whole-hold collision/observer-domain validity | Nodes and approximate midpoints do not by themselves establish continuous-time validity. |
-| Numerical success | Both objectives and the sampled nonlinear primary check must pass; initial planning or inherited-reference optimization may fail, and no command is returned in that case. |
+| Numerical success | Both affine objectives must complete. The optimized first input is returned without a nonlinear feasibility veto; initial planning or inherited-reference optimization may still fail. Nonlinear feasibility or safety does not follow from local solver success alone. |
 
 <a id="source-map"></a>
 ## 9. Source map and verification
