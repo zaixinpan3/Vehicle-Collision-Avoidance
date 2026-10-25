@@ -84,18 +84,17 @@ passes through zero signed velocity at 2 s. Each export records the initial
 target state and parameters for independent reconstruction; the audit's
 `--files` option selects individual JSON exports. Historical exports without
 the revised target state require the audit source from their recorded commit.
-The optimizer uses one RTI step per attempt: one reference rollout and affine
-model, followed by PCBF and CLF objectives on that same model. When the shifted
-plan is locally infeasible, it tries a fresh avoidance reference and then
-searches successively longer horizons. The previous accepted plan remains
-available for extension. Search has no fixed duration increment or number of
-attempts: completion requires the terminal-constrained optimization to solve,
-subject to the common deadline and any explicit user horizon limit. Each new
-reference rebuilds dynamics and collision geometry and receives one RTI model. Completed
-optimized inputs are returned unchanged; their nonlinear rollout is prediction,
-not nonlinear feasibility validation. The default 100 ms computation budget can
-return an explicit failure. Independent replay determines actual clearance and
-recovery. See [the controller architecture](../controller/CONTROLLER_THEORY.md#runtime).
+The optimizer builds at most one local RTI model per controller call, then
+solves the PCBF and CLF objectives on that same model. Planning occurs only
+at encounter onset. Later frames shift the previously accepted inputs and
+reroll them from the current estimate. Encounter preview may size the horizon
+before optimization, but a failed solve does not increase its node count,
+rebuild the model or call the planner. Terminal constraints remain enforced.
+Completed optimized inputs are returned unchanged only after their nonlinear
+rollout passes the sampled primary-constraint checks. The default 100 ms
+computation budget can return an explicit failure. Independent replay checks
+actual clearance and recovery. See
+[the controller architecture](../controller/CONTROLLER_THEORY.md#runtime).
 The campaign entry names containing `PotentialField` are retained for callers;
 they run the current controller with second-order potential/circulation initialization and Fiala-model candidate rollouts.
 Routine outputs can use `/tmp/` instead of a persistent validation directory.
@@ -110,13 +109,12 @@ are at least one sample long. `DurationIncreaseFraction` bounds the additional
 tail duration, and there is no time penalty in either objective.
 
 The avoidance planner runs only at encounter onset. Later calls inherit the
-previous optimized input sequence. Failed local attempts may extend the same
-reference under the existing horizon cap and shared computation deadline;
-they retain its input prefix and append tail holds without replanning.
-`attempts` records each fixed/free comparison, and `completedPlannerCalls`
-counts completed planner invocations. `ExtendHorizonOnFailure=false` selects
-a single-horizon diagnostic. The former `FreshReference` and
-`ReplanOnFailure` options are removed. A missing warm start during an active
+previous optimized input sequence. Each invocation compares fixed and free
+duration on the same reference and node count; a failed comparison is returned
+without adding nodes or replanning. `attempts` contains that one comparison,
+`completedPlannerCalls` counts completed planner invocations, and
+`horizonExtensions` remains zero. `ExtendHorizonOnFailure`, `FreshReference`
+and `ReplanOnFailure` are removed. A missing warm start during an active
 encounter cannot activate the planner.
 
 The probe differentiates the nonlinear rollout, target timestamps, per-hold
@@ -127,12 +125,11 @@ normals are frozen during differentiation. For stable row assembly, every
 horizon target row is retained, even beyond perception exit, and redundant
 row pruning is disabled. This is a deliberately more restrictive diagnostic
 than the online first-exit formulation. Terminal row changes and inconsistent
-finite-difference slopes reject that reference's duration model and can request
-horizon extension when enabled. A finer integration
+finite-difference slopes reject that reference's duration model. A finer integration
 mesh is shared by the fixed/free comparison; its cost is not an online timing
 claim. Returned `fixed`/`free` results separate convex solver success from
-nonlinear rollout diagnostics, including exact terminal membership. The final
-fixed/free pair uses the last reference; it is not a comparison of two
+nonlinear rollout diagnostics, including exact terminal membership. The
+fixed/free pair uses the same reference; it is not a comparison of two
 independent closed-loop controllers. Elapsed time includes research
 formulations and audits, so it is not an online execution-time measurement.
 

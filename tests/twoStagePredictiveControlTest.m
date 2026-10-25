@@ -139,28 +139,31 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(model.linearization.inputs(2,:)),1);
             testCase.verifyTrue(all(isfinite(model.linearization.states),'all'));
         end
-        function infeasibleReferencesShareOneHorizonSearchBudget(testCase)
+        function eachReferenceUsesAtMostOneRtiModel(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,q]=collisionThreatScenario("headOn",cfg);
             model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
             [solution,search]=solvePredictiveControl(model,[],tic);
-            testCase.verifyEqual(search.rtiIterations,1+search.restartCount);
-            testCase.verifyLessThanOrEqual(search.solverCalls,2*search.rtiIterations);
-            if search.nominalRestarted
-                testCase.verifyEqual(search.attempts(1).stages(end).exitFlag,-2);
-            end
+            testCase.verifyEqual(search.rtiIterations,1);
+            testCase.verifyEqual(search.restartCount,0);
+            testCase.verifyEqual(search.horizonExtensions,0);
+            testCase.verifyNumElements(search.attempts,1);
+            testCase.verifyLessThanOrEqual(search.solverCalls,2);
+            testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyEqual(search.returned,~isempty(solution));
         end
-        function plannedInputsRespectBrakingSlewIncludingAReplan(testCase)
-            [ego,road,cfg]=localFixture();cfg.model.brakingRatioRateMaximum=1;
-            % Isolate slew handling in the original unbounded encounter.
-            ego.heldActuatorInput=[0;0];
+        function plannedInputsRespectBrakingSlewOnTheSingleAttempt(testCase)
+            [ego,road,cfg]=localFixture();
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            % Test the planner's slew handling without requiring an unrelated
+            % short-horizon cruise solve to admit a slow actuator from rest.
+            cfg.model.brakingRatioRateMaximum=1;
             [~,q]=collisionThreatScenario("crossing",cfg);
-            model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
+            model=nominal.model;model.cfg=cfg;model.previousInput=[0;0];
+            model.target=q;model.targetEpoch=q;model.targetOnset=true;
             [~,search,model]=solvePredictiveControl(model,[],tic);
-            testCase.verifyEqual(search.rtiIterations,1+search.restartCount);
+            testCase.verifyEqual(search.rtiIterations,1);
             testCase.verifyEqual(search.planner.candidateCount,1);
             inputs=model.linearization.inputs;
             testCase.verifyLessThanOrEqual(max(abs(diff([0,inputs(2,:)]))), ...
@@ -215,7 +218,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyNumElements(search.attempts,1);
             testCase.verifyEqual(search.stages(1).exitFlag,-2);
-            testCase.verifyEqual(search.stopReason,"horizonLimit");
+            testCase.verifyEqual(search.stopReason,"pcbfNoNumericalResult");
             testCase.verifyFalse(search.planner.used);
             testCase.verifyEqual(model.linearization.inputs,prior.inputTrajectory(:,2:end),AbsTol=0);
         end
@@ -243,17 +246,19 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(extended.states(:,1:size(original.states,2)),original.states,AbsTol=1e-12);
             testCase.verifyEqual(size(extended.inputs,2),size(original.inputs,2)+4);
         end
-        function onsetHorizonRetriesShareOnePlannerInvocation(testCase)
+        function anInfeasibleOnsetDoesNotExtendItsHorizon(testCase)
             [ego,road,cfg]=localFixture();cfg.controller.maximumHorizonSteps=32;
             [~,~,first]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             model=first.model;model.road.lateralClearance=[.5;.5];
             [solution,search]=solvePredictiveControl(model,[],tic);
             testCase.verifyEmpty(solution);
-            testCase.verifyGreaterThan(search.horizonExtensions,0);
+            testCase.verifyEqual(search.horizonExtensions,0);
             testCase.verifyEqual(search.plannerCalls,1);
-            testCase.verifyEqual(search.attempts(1).initialization,"plannedAvoidanceRollout");
-            testCase.verifyTrue(all([search.attempts(2:end).initialization]=="extendedInputRollout"));
-            testCase.verifyEqual(search.stopReason,"horizonLimit");
+            testCase.verifyEqual(search.linearizationCount,1);
+            testCase.verifyNumElements(search.attempts,1);
+            testCase.verifyEqual(search.attempts.initialization,"plannedAvoidanceRollout");
+            testCase.verifyLessThan(search.horizonSteps,cfg.controller.maximumHorizonSteps);
+            testCase.verifyEqual(search.stopReason,"pcbfNoNumericalResult");
         end
         function newMeasurementsWithinAnEncounterDoNotRestartPlanning(testCase)
             [ego,road,cfg]=localFixture();
@@ -293,7 +298,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [~,search,model]=solvePredictiveControl(model,prior,tic);
             testCase.verifyEqual(search.rtiIterations,1);
             testCase.verifyEqual(search.plannerCalls,0);
-            testCase.verifyEqual(search.stopReason,"horizonLimit");
+            testCase.verifyEqual(search.stopReason,"pcbfNoNumericalResult");
             testCase.verifyLessThanOrEqual(model.linearization.inputs(2,end),0);
             testCase.verifyEqual(model.linearization.states(4:6,end),zeros(3,1),AbsTol=1e-12);
         end
@@ -338,18 +343,19 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
-        function anExplicitHorizonLimitStopsAnImpossibleRoadSearch(testCase)
-            [ego,road,cfg]=localFixture();cfg.controller.maximumHorizonSteps=16;
+        function anImpossibleProblemStopsEvenWithoutAHorizonLimit(testCase)
+            [ego,road,cfg]=localFixture();cfg.controller.maximumHorizonSteps=Inf;
             [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
             model=nominal.model;model.road.lateralClearance=[.5;.5];timer=tic;
             [solution,search,model]=solvePredictiveControl(model,[],timer);
             testCase.verifyEmpty(solution);
-            testCase.verifyGreaterThanOrEqual(search.horizonExtensions,1);
+            testCase.verifyEqual(search.horizonExtensions,0);
             testCase.verifyEqual(search.selectedAttempt,0);
-            testCase.verifyGreaterThanOrEqual(search.linearizationCount,2);
-            testCase.verifyEqual(search.stopReason,"horizonLimit");
+            testCase.verifyEqual(search.linearizationCount,1);
+            testCase.verifyNumElements(search.attempts,1);
+            testCase.verifyEqual(search.stopReason,"pcbfNoNumericalResult");
             testCase.verifyEqual([search.stages.exitFlag],-2);
-            testCase.verifyEqual(size(model.linearization.inputs,2),2*cfg.controller.horizonSteps);
+            testCase.verifyEqual(size(model.linearization.inputs,2),cfg.controller.horizonSteps);
             testCase.verifyEqual(model.solveTimer,timer);
             testCase.verifyEqual(model.solveTimeLimitSeconds, ...
                 cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);

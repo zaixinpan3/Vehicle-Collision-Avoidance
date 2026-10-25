@@ -1,7 +1,8 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl PCBF/CLF RTI with terminal-feasible horizon search.
+%solvePredictiveControl One local PCBF/CLF RTI model per controller call.
 % The planner runs once at encounter onset. Later frames shift the previous
-% optimized inputs; horizon retries extend the same reference. Only unchanged,
+% optimized inputs. Horizon sizing precedes optimization; a failed solve never
+% extends the horizon or rebuilds the problem. Only unchanged,
 % nonlinearly checked optimized inputs can be returned. Each reference uses
 % the same model and common constraints for both objective stages.
 % Research access: solvePredictiveControl("probe",request) exposes reference,
@@ -22,141 +23,118 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     if isfield(model,'targetOnset') && ~model.targetOnset && isstruct(previousState) && isfield(previousState,'circulationDirection')
         model.circulationDirection=previousState.circulationDirection;
     end
-    baseModel=model;minimumCount=cfg.controller.horizonSteps;
+    minimumCount=cfg.controller.horizonSteps;
     if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly && isfield(model,'probeMinimumHorizonSteps')
         minimumCount=max(minimumCount,model.probeMinimumHorizonSteps);
     end
-    history=struct([]);anchor=[];reference=[];plannerCalls=0;initialPlanner=localPlannerMetadata();
+    anchor=[];reference=[];plannerCalls=0;
     if isfield(model,'probeReference'),reference=model.probeReference;end
-    extensions=0;horizonStop="";
+    source="nominalFeedbackRollout";
     rollout=struct('available',false,'reason',"noCompletedOptimization", ...
         'fullGap',NaN,'fullCorrection',NaN);
-    while true
-        source="nominalFeedbackRollout";
-        rollout=struct('available',false,'reason',"noCompletedOptimization", ...
-            'fullGap',NaN,'fullCorrection',NaN);
-        if ~isempty(reference),source="extendedInputRollout";
-        elseif isfield(model,'targetOnset') && model.targetOnset,source="plannedAvoidanceRollout";
-        elseif localHasWarmStart(previousState),source="shiftedInputRollout";
-        elseif isfield(model,'target') && ~isempty(model.target),source="unavailableWarmStart";
+    if ~isempty(reference),source="extendedInputRollout";
+    elseif isfield(model,'targetOnset') && model.targetOnset,source="plannedAvoidanceRollout";
+    elseif localHasWarmStart(previousState),source="shiftedInputRollout";
+    elseif isfield(model,'target') && ~isempty(model.target),source="unavailableWarmStart";
+    end
+    search=localEmptySearch(source,"",0);
+    try
+        localCheckDeadline(model);
+        wall=tic;
+        if source=="plannedAvoidanceRollout",plannerCalls=plannerCalls+1;end
+        [anchor,source]=localRtiInitialize(model,previousState,minimumCount,reference);
+        search.horizonSteps=size(anchor.inputs,2);
+        search.initializationSeconds=toc(wall);search.initialization=source;
+        model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
+        [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
+        if anchor.planner.used
+            if anchor.planner.circulationDirection~=0,model.circulationDirection=anchor.planner.circulationDirection;end
+            projection=laneGeometry.project(model.initialState(1:2),model.lane);
+            lateral=anchor.guide.direction.'*[-sin(projection.heading);cos(projection.heading)];
+            if abs(lateral)>1e-8,model.collisionSide=sign(lateral);end
         end
-        search=localEmptySearch(source,"",0);
-        try
+        if source~="plannedAvoidanceRollout" && ~isempty(model.target) && ~model.targetOnset && isstruct(previousState) ...
+                && isfield(previousState,'collisionSide')
+            model.collisionSide=previousState.collisionSide;
+            if isfield(previousState,'retainCollisionSide'),model.retainCollisionSide=previousState.retainCollisionSide;end
+        end
+        anchor.terminalContext.collisionSide=model.collisionSide;
+        model.terminalContext=anchor.terminalContext;
+        if source~="plannedAvoidanceRollout" && ~isempty(model.target) && ~model.targetOnset ...
+                && isfield(previousState,'collisionEscapeNormals') && isfield(previousState,'collisionSide')
+            old=previousState.collisionEscapeNormals(:,3:end);
+            count=min(size(old,2),size(model.collisionEscapeNormals,2));
+            model.collisionEscapeNormals(:,1:count)=old(:,1:count);
+        end
+        localCheckDeadline(model);
+        if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly
+            search.plannerCalls=plannerCalls;
+            model.linearization=anchor;solution=[];return;
+        end
+        wall=tic;[problem,model]=localFormulate(anchor,model);
+        search.formulationSeconds=toc(wall);search.modelBuilt=true;
+        model.linearization=anchor;problem.inheritedAnchor=source~="plannedAvoidanceRollout" && localHasWarmStart(previousState);
+        initializationSeconds=search.initializationSeconds;formulationSeconds=search.formulationSeconds;
+        [point,problem,search,model]=localPrimary(anchor,model,source,timer,problem);
+        search.modelBuilt=true;search.formulationSeconds=formulationSeconds;
+        search.initializationSeconds=initializationSeconds;
+        [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
+        if ~isempty(solution)
             localCheckDeadline(model);
-            wall=tic;
-            if source=="plannedAvoidanceRollout",plannerCalls=plannerCalls+1;end
-            [anchor,source]=localRtiInitialize(model,previousState,minimumCount,reference);
-            if source=="plannedAvoidanceRollout"
-                initialPlanner=anchor.planner;
-            end
-            search.horizonSteps=size(anchor.inputs,2);
-            search.initializationSeconds=toc(wall);search.initialization=source;
-            model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
-            [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
-            if anchor.planner.used
-                if anchor.planner.circulationDirection~=0,model.circulationDirection=anchor.planner.circulationDirection;end
-                projection=laneGeometry.project(model.initialState(1:2),model.lane);
-                lateral=anchor.guide.direction.'*[-sin(projection.heading);cos(projection.heading)];
-                if abs(lateral)>1e-8,model.collisionSide=sign(lateral);end
-            end
-            if source~="plannedAvoidanceRollout" && ~isempty(model.target) && ~model.targetOnset && isstruct(previousState) ...
-                    && isfield(previousState,'collisionSide')
-                model.collisionSide=previousState.collisionSide;
-                if isfield(previousState,'retainCollisionSide'),model.retainCollisionSide=previousState.retainCollisionSide;end
-            end
-            anchor.terminalContext.collisionSide=model.collisionSide;
-            model.terminalContext=anchor.terminalContext;
-            if source~="plannedAvoidanceRollout" && ~isempty(model.target) && ~model.targetOnset ...
-                    && isfield(previousState,'collisionEscapeNormals') && isfield(previousState,'collisionSide')
-                old=previousState.collisionEscapeNormals(:,3:end);
-                count=min(size(old,2),size(model.collisionEscapeNormals,2));
-                model.collisionEscapeNormals(:,1:count)=old(:,1:count);
-            end
-            localCheckDeadline(model);
-            if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly
-                search.plannerCalls=plannerCalls;
-                model.linearization=anchor;solution=[];return;
-            end
-            wall=tic;[problem,model]=localFormulate(anchor,model);
-            search.formulationSeconds=toc(wall);search.modelBuilt=true;
-            model.linearization=anchor;problem.inheritedAnchor=source~="plannedAvoidanceRollout" && localHasWarmStart(previousState);
-            initializationSeconds=search.initializationSeconds;formulationSeconds=search.formulationSeconds;
-            [point,problem,search,model]=localPrimary(anchor,model,source,timer,problem);
-            search.modelBuilt=true;search.formulationSeconds=formulationSeconds;
-            search.initializationSeconds=initializationSeconds;
-            [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
-            if ~isempty(solution)
-                localCheckDeadline(model);
-                [solution,rollout]=localPrediction(solution,anchor,model);
-                if ~rollout.available
-                    solution=[];search.terminationReason="nonlinearPredictionUnavailable";
+            [solution,rollout]=localPrediction(solution,anchor,model);
+            if ~rollout.available
+                solution=[];search.terminationReason="nonlinearPredictionUnavailable";
+            else
+                actual=anchor;actual.states=solution.states;actual.inputs=solution.inputs;
+                [check,~,~]=localNonlinearCheck(actual,model,problem.safetyNormals);
+                rollout.hardResidual=check.hard;rollout.safety=check.safety;
+                tolerance=cfg.solver.feasibilityTolerance;
+                if check.hard>tolerance || check.safety>search.slackCap+tolerance
+                    solution=[];search.terminationReason="nonlinearConstraintViolation";
+                    rollout.reason="nonlinearConstraintViolation";
                 else
-                    actual=anchor;actual.states=solution.states;actual.inputs=solution.inputs;
-                    [check,~,~]=localNonlinearCheck(actual,model,problem.safetyNormals);
-                    rollout.hardResidual=check.hard;rollout.safety=check.safety;
-                    tolerance=cfg.solver.feasibilityTolerance;
-                    if check.hard>tolerance || check.safety>search.slackCap+tolerance
-                        solution=[];search.terminationReason="nonlinearConstraintViolation";
-                        rollout.reason="nonlinearConstraintViolation";
-                    else
-                        solution.hard=check.hard;solution.nonlinearValidationPerformed=true;
-                        solution.affineSafety=solution.safety;
-                        solution.affineStageSlacks=solution.stageSlacks;
-                        solution.safety=check.safety;solution.stageSlacks=check.slacks;
-                        solution.nonlinearSafety=check.safety;solution.nonlinearStageSlacks=check.slacks;
-                        solution.collisionEscapeNormals=model.collisionEscapeNormals;
-                        solution.collisionSide=model.collisionSide;
-                        solution.circulationDirection=model.circulationDirection;
-                        solution.retainCollisionSide=model.retainCollisionSide;
-                        solution.linearizationGap=rollout.fullGap;
-                        solution=localTerminalMetrics(solution,model);
-                        rollout.reason="sampledNonlinearConstraintsPassed";
-                    end
+                    solution.hard=check.hard;solution.nonlinearValidationPerformed=true;
+                    solution.affineSafety=solution.safety;
+                    solution.affineStageSlacks=solution.stageSlacks;
+                    solution.safety=check.safety;solution.stageSlacks=check.slacks;
+                    solution.nonlinearSafety=check.safety;solution.nonlinearStageSlacks=check.slacks;
+                    solution.collisionEscapeNormals=model.collisionEscapeNormals;
+                    solution.collisionSide=model.collisionSide;
+                    solution.circulationDirection=model.circulationDirection;
+                    solution.retainCollisionSide=model.retainCollisionSide;
+                    solution.linearizationGap=rollout.fullGap;
+                    solution=localTerminalMetrics(solution,model);
+                    rollout.reason="sampledNonlinearConstraintsPassed";
                 end
             end
-        catch exception
-            if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly,rethrow(exception);end
-            if strcmp(exception.identifier,'collisionAvoidanceController:timeBudgetExceeded')
-                solution=[];search.terminationReason="timeLimit";
-            elseif any(strcmp(exception.identifier,{'collisionAvoidanceController:invalidTireOperatingPoint', ...
-                    'collisionAvoidanceController:singularTireLinearization','collisionAvoidanceController:nonlinearDomain', ...
-                    'collisionAvoidanceController:missingWarmStart'}))
-                % A missing or unrollable continuation is a failure. Only a
-                % newly observed encounter may request avoidance planning.
-                solution=[];
-                search.initialization=source;search.initializationFailure=string(exception.identifier);
-                search.terminationReason="referencePredictionUnavailable";
-            else
-                rethrow(exception);
-            end
         end
-        history=[history,localAttempt(search)]; %#ok<AGROW> Bounded by the shared deadline.
-        infeasible=~isempty(search.stages) && search.stages(end).exitFlag==-2;
-        % Only primal infeasibility requests a longer horizon. Reuse the
-        % entire current reference: do not shift it twice or invoke planning.
-        if ~isempty(solution) || ~infeasible || isempty(anchor) ...
-                || toc(timer)>=model.solveTimeLimitSeconds
-            break;
+    catch exception
+        if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly,rethrow(exception);end
+        if strcmp(exception.identifier,'collisionAvoidanceController:timeBudgetExceeded')
+            solution=[];search.terminationReason="timeLimit";
+        elseif any(strcmp(exception.identifier,{'collisionAvoidanceController:invalidTireOperatingPoint', ...
+                'collisionAvoidanceController:singularTireLinearization','collisionAvoidanceController:nonlinearDomain', ...
+                'collisionAvoidanceController:missingWarmStart'}))
+            % A missing or unrollable continuation is a failure. Only a
+            % newly observed encounter may request avoidance planning.
+            solution=[];
+            search.initialization=source;search.initializationFailure=string(exception.identifier);
+            search.terminationReason="referencePredictionUnavailable";
+        else
+            rethrow(exception);
         end
-        count=size(anchor.inputs,2);
-        nextCount=min(cfg.controller.maximumHorizonSteps,max(count+1,ceil(1.5*count)));
-        if nextCount<=count,horizonStop="horizonLimit";break;end
-        minimumCount=nextCount;reference=anchor;extensions=extensions+1;
-        builds=model.linearizationBuilds;lastModel=model;model=baseModel;model.linearizationBuilds=builds;
-        if isfield(lastModel,'linearization'),model.linearization=lastModel.linearization;end
-        model.terminalContext=[];anchor=[];
     end
+    history=localAttempt(search);
     search.source="twoStageRealTimeIteration";search.algorithm="realTimeIteration";
     search.initialization=source;search.returned=~isempty(solution);
     % A completed convex subproblem is not nonlinear SQP convergence.
     search.convexSolveCompleted=search.clfStageCompleted;search.converged=false;
     search.linearizationCount=model.linearizationBuilds;
     search.rtiIterations=model.linearizationBuilds;
-    search.nominalRestarted=false;search.restartCount=max(0,model.linearizationBuilds-1);
+    search.nominalRestarted=false;search.restartCount=0;
     search.plannerCalls=plannerCalls;
-    search.horizonExtensions=extensions;
+    search.horizonExtensions=0;
     search.stopReason=search.terminationReason;
-    if strlength(horizonStop)>0,search.stopReason=horizonStop;end
     search.rollout=rollout;
     search.anchorCertified=false;search.appendedTerminalSteps=0;search.appendedBrakingSteps=0;
     search.planner=localPlannerMetadata();
@@ -164,7 +142,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         search.appendedTerminalSteps=anchor.appendedTerminalSteps;
         search.appendedBrakingSteps=anchor.appendedBrakingSteps;search.planner=anchor.planner;
     end
-    if plannerCalls>0,search.planner=initialPlanner;end
     search.potentialFieldRestarted=false;
     if ~isfield(search,'initializationFailure'),search.initializationFailure="";end
     search.attempts=history;search.selectedAttempt=numel(history)*double(search.returned);
@@ -206,8 +183,9 @@ function count=localPlanningHorizon(model,minimumCount)
     x=model.initialState;speed=hypot(x(4),x(5));beta=atan2(x(5),x(4));
     % A near-equal-speed target can put the next geometric intersection tens
     % of seconds away. Initial search need only span a physically meaningful
-    % stopping/settling maneuver. The seed need not end in the terminal set;
-    % RTI enforces endpoint constraints and may retry with a longer horizon.
+    % stopping/settling maneuver. The seed need not end in the terminal set.
+    % RTI enforces endpoint constraints once on the selected horizon; an
+    % infeasible result is reported without extending or rebuilding it.
     preview=max(minimumDuration,speed/cfg.terminal.brakingDecelerationMetersPerSecondSquared+cfg.rti.settlingSeconds);
     % Preview the measured course and yaw rate, not the desired cruise arc.
     curvature=x(6)/max(speed,cfg.model.scheduleSpeedFloor);

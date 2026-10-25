@@ -79,7 +79,7 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
         end
         function anUnreachableTerminalBrakeTransitionIsRejected(testCase)
             model=testCase.model;model.cfg.model.brakingRatioRateMaximum=.01;
-            r=exploreFreeTimePredictiveControl(model,testCase.previous,ExtendHorizonOnFailure=false);
+            r=exploreFreeTimePredictiveControl(model,testCase.previous);
             testCase.verifyEqual(r.status,"freeTimeSolveFailed");
             testCase.verifyFalse(r.fixed.returned);
             testCase.verifyFalse(r.free.returned);
@@ -97,23 +97,22 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(r.attempts{1}.initialization,"shiftedInputRollout");
             testCase.verifyEqual(r.free.search.stages(1).exitFlag,-2);
             testCase.verifyEqual(r.completedPlannerCalls,0);
-            testCase.verifyEqual(r.stopReason,"horizonLimit");
+            testCase.verifyEqual(r.stopReason,"freeTimeSolveFailed");
         end
-        function aFailedReferenceIsExtendedWithoutReplanning(testCase)
+        function aFailedReferenceKeepsItsNodeCountWithoutReplanning(testCase)
             model=testCase.model;cfg=model.cfg;
             model.cfg.model.brakingRatioRateMaximum=.01;model.cfg.controller.maximumHorizonSteps=48;
             model.target=[1000;0;0;4;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;model.targetOnset=false;
             r=exploreFreeTimePredictiveControl(model,testCase.previous);
             testCase.verifyFalse(r.returned);
-            testCase.verifyEqual(r.stopReason,"horizonLimit");
-            testCase.assertNumElements(r.attempts,2);
-            testCase.verifyEqual(cellfun(@(a) a.stageCount,r.attempts),[32,48]);
-            testCase.verifyEqual(r.attempts{2}.initialization,"extendedInputRollout");
-            testCase.verifyEqual(r.attempts{2}.initialAnchor.inputs(:,1:32),r.attempts{1}.initialAnchor.inputs,AbsTol=0);
+            testCase.verifyEqual(r.stopReason,"freeTimeSolveFailed");
+            testCase.assertNumElements(r.attempts,1);
+            testCase.verifyEqual(r.attempts{1}.stageCount,32);
+            testCase.verifyEqual(r.attempts{1}.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(r.initialAnchor.inputs,testCase.previous.inputTrajectory(:,2:end),AbsTol=0);
             testCase.verifyEqual(r.completedPlannerCalls,0);
-            testCase.verifyEqual(r.horizonExtensions,1);
-            testCase.verifyEqual(r.attempts{2}.model.solveTimer,r.attempts{1}.model.solveTimer);
+            testCase.verifyEqual(r.horizonExtensions,0);
         end
         function anExpiredSharedDeadlineDoesNotStartAnotherPlan(testCase)
             model=testCase.model;model.cfg.solver.timeLimitSeconds=1e-12;

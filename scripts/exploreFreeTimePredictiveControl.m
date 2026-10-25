@@ -5,9 +5,9 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
 % The first prefix holds retain the actual sample interval. A scalar change
 % in total time is distributed uniformly over the remaining holds. The two
 % original PCBF/CLF objectives are retained without a time penalty.
-% Planning is restricted to encounter onset. Failed local attempts may
-% extend the same reference; they never regenerate an avoidance path.
-% ExtendHorizonOnFailure=false retains a single-horizon comparison.
+% Planning is restricted to encounter onset. One reference and node count
+% are used for the fixed/free comparison. Failure neither adds nodes nor
+% regenerates an avoidance path.
 % Future enclosures use the runtime's approximate per-hold convention, with
 % the longer hold duration propagated explicitly. Interior measurement
 % benefits are not invented. This is not a robust output-feedback certificate.
@@ -17,7 +17,6 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
         options.DurationIncreaseFraction (1,1) double {mustBeNonnegative,mustBeFinite} = 1
         options.DifferenceSeconds (1,1) double {mustBePositive,mustBeFinite} = 1e-3
         options.IntegrationStep (1,1) double {mustBePositive,mustBeFinite} = .01
-        options.ExtendHorizonOnFailure (1,1) logical = true
         options.MovingReference (1,1) logical = true
         options.RefinementIterations (1,1) double {mustBeInteger,mustBePositive} = 1
     end
@@ -32,49 +31,39 @@ function result = exploreFreeTimePredictiveControl(sample,previousState,options)
         if isfield(model,field),model=rmfield(model,field);end
     end
     baseline=model;timer=tic;minimumCount=model.cfg.controller.horizonSteps;
-    attempts={};extensions=0;plannerCalls=0;stop="";reference=[];
-    while true
-        inherited=isstruct(previousState) && isfield(previousState,'inputTrajectory') ...
-            && size(previousState.inputTrajectory,1)==2 && size(previousState.inputTrajectory,2)>=1 ...
-            && all(isfinite(previousState.inputTrajectory),'all') ...
-            && ~(isfield(baseline,'targetOnset') && baseline.targetOnset);
-        plannerRequested=isempty(reference) && ~isempty(baseline.target) ...
-            && isfield(baseline,'targetOnset') && baseline.targetOnset;
-        try
-            attempt=localReferenceAttempt(baseline,previousState,options,timer,minimumCount,reference);
-        catch exception
-            reason=string(exception.identifier);
-            if ~localExpectedFailure(exception),rethrow(exception);end
-            source="nominalFeedbackRollout";
-            if plannerRequested,source="plannedAvoidanceRollout";end
-            if inherited,source="shiftedInputRollout";end
-            if ~isempty(reference),source="extendedInputRollout";end
-            count=minimumCount;
-            if inherited,count=max(count,size(previousState.inputTrajectory,2)-1);end
-            attempt=struct('status',reason,'initialization',source,'stageCount',count, ...
-                'fixed',[],'free',[],'initialAnchor',[],'model',baseline,'options',options);
-        end
-        attempt.plannerRequested=plannerRequested;
-        attempt.plannerCompleted=plannerRequested && ~isempty(attempt.initialAnchor) && attempt.initialAnchor.planner.used;
-        plannerCalls=plannerCalls+double(attempt.plannerCompleted);
-        attempts{end+1}=attempt; %#ok<AGROW> Limited by the shared deadline and explicit horizon cap.
-        result=attempt;
-        if ~isempty(attempt.free) && attempt.free.returned,stop="returned";break;end
-        if ~options.ExtendHorizonOnFailure,stop="singleReferenceDiagnostic";break;end
-        if toc(timer)>=baseline.cfg.solver.timeLimitSeconds ...
-                || attempt.status=="collisionAvoidanceController:timeBudgetExceeded"
-            stop="timeLimit";break;
-        end
-        if isempty(attempt.initialAnchor)
-            stop="referencePredictionUnavailable";break;
-        end
-        nextCount=min(baseline.cfg.controller.maximumHorizonSteps,max(attempt.stageCount+1,ceil(1.5*attempt.stageCount)));
-        if nextCount<=attempt.stageCount,stop="horizonLimit";break;end
-        minimumCount=nextCount;extensions=extensions+1;
-        reference=attempt.initialAnchor;
+    inherited=isstruct(previousState) && isfield(previousState,'inputTrajectory') ...
+        && size(previousState.inputTrajectory,1)==2 && size(previousState.inputTrajectory,2)>=1 ...
+        && all(isfinite(previousState.inputTrajectory),'all') ...
+        && ~(isfield(baseline,'targetOnset') && baseline.targetOnset);
+    plannerRequested=~isempty(baseline.target) ...
+        && isfield(baseline,'targetOnset') && baseline.targetOnset;
+    try
+        attempt=localReferenceAttempt(baseline,previousState,options,timer,minimumCount);
+    catch exception
+        reason=string(exception.identifier);
+        if ~localExpectedFailure(exception),rethrow(exception);end
+        source="nominalFeedbackRollout";
+        if plannerRequested,source="plannedAvoidanceRollout";end
+        if inherited,source="shiftedInputRollout";end
+        count=minimumCount;
+        if inherited,count=max(count,size(previousState.inputTrajectory,2)-1);end
+        attempt=struct('status',reason,'initialization',source,'stageCount',count, ...
+            'fixed',[],'free',[],'initialAnchor',[],'model',baseline,'options',options);
     end
-    result.attempts=attempts;result.replanCount=0;
-    result.completedPlannerCalls=plannerCalls;result.horizonExtensions=extensions;
+    attempt.plannerRequested=plannerRequested;
+    attempt.plannerCompleted=plannerRequested && ~isempty(attempt.initialAnchor) && attempt.initialAnchor.planner.used;
+    result=attempt;
+    stop=attempt.status;
+    if ~isempty(attempt.free) && attempt.free.returned
+        stop="returned";
+    elseif toc(timer)>=baseline.cfg.solver.timeLimitSeconds ...
+            || attempt.status=="collisionAvoidanceController:timeBudgetExceeded"
+        stop="timeLimit";
+    elseif isempty(attempt.initialAnchor)
+        stop="referencePredictionUnavailable";
+    end
+    result.attempts={attempt};result.replanCount=0;
+    result.completedPlannerCalls=double(attempt.plannerCompleted);result.horizonExtensions=0;
     result.stopReason=stop;result.elapsedSeconds=toc(timer);
     result.returned=~isempty(result.free) && result.free.returned;
 end
@@ -86,10 +75,10 @@ function expected=localExpectedFailure(exception)
         "collisionAvoidanceController:missingWarmStart"]);
 end
 
-function result=localReferenceAttempt(model,previousState,options,timer,minimumCount,reference)
+function result=localReferenceAttempt(model,previousState,options,timer,minimumCount)
     cfg=model.cfg;wall=tic;
     request=struct('operation',"reference",'model',model,'previousState',previousState, ...
-        'minimumHorizonSteps',minimumCount,'timer',timer,'reference',reference);
+        'minimumHorizonSteps',minimumCount,'timer',timer);
     [anchor,initialization,model]=solvePredictiveControl("probe",request);
     model.probeTimer=timer;
     % Obtain guidance with its existing CLF table key. Use a finer, fixed

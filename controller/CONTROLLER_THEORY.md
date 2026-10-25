@@ -17,7 +17,7 @@ There are two mathematical objects whose results must be distinguished:
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | One local RTI model per reference, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a first-successor soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Planning occurs only at encounter onset; later frames inherit optimized inputs and horizon retries extend the existing reference. |
+| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a first-successor soft CLF row and terminal tangents; unchanged optimized inputs are returned only after sampled nonlinear primary-constraint checks. Planning occurs only at encounter onset; later frames inherit optimized inputs. Horizon sizing precedes the solve, and failure never requests a longer-horizon retry. |
 | Conditional nonlinear output-feedback design | Joint physical/observer information sets, persistent model uncertainty, causal future feedback, sound reachable images and a common terminal continuation; the shifted-policy proof establishes mathematical recursive feasibility under its stated premises. |
 
 The latter theorem is not a certificate for the former approximation.
@@ -471,10 +471,11 @@ uses `nonlinearBicycleModel.inputBounds(cfg,true)`, which keeps its force
 ratio ten constraint tolerances inside the singular endpoints. Shifting a
 saturated previous plan rebuilds this interior seed and its complete rollout;
 this does not change a previously issued command. The 100 ms controller budget
-reserves 2 ms for completion, including any horizon extension and retry. A successful first
-attempt needs one RTI model and at most two native solves. The number of
-reference/horizon attempts is limited by the common deadline. Each attempt
-uses only the two objective stages; no auxiliary restoration solve is run.
+reserves 2 ms for completion. Each controller call builds at most one RTI
+model and performs at most two native objective solves. Horizon sizing precedes
+this model; primal infeasibility, numerical failure and nonlinear rejection
+are reported without increasing the node count or rebuilding the problem.
+No auxiliary restoration solve is run.
 
 The executable collision deficits and finite numerical primary cap must not
 be identified with the ideal prefix-only robust value in Section 7. With
@@ -1772,7 +1773,7 @@ relative to the exact robust problem.
 <a id="runtime"></a>
 ## 8. RTI references, computation and implementation boundary
 
-### Reference construction and horizon search
+### Reference construction and pre-solve horizon sizing
 
 A previous accepted input sequence is shifted and rolled out from the current
 estimate. Its absolute endpoint is retained while the horizon shrinks by one
@@ -1818,19 +1819,19 @@ certificate. The declared nonlinear model produces all returned
 states over exactly the requested number of holds. A nonterminal or deficient
 seed is allowed to enter the terminal-constrained optimizer.
 
-A primal-infeasible local model can request
-$M_{\rm next}=\max(M+1,\lceil1.5M\rceil)$, subject to an explicit horizon cap
-and the original call deadline. This retry retains the full current input
-reference at the same time origin and appends tail holds; it neither shifts
-that reference a second time nor calls the planner again. In particular,
-horizon retries on the onset frame share the one initial planner rollout.
-The longer reference rebuilds dynamics, geometry, tightening and terminal
-rows. There is no fixed attempt cap, no deadline reset and no guarantee that
-horizon extension restores feasibility. Nonlinear rejection, an unrollable
-reference or a failed numerical solve does not request a new avoidance path.
-A terminal seed is not a prerequisite for searching a longer optimized
-horizon. The offline free-duration experiment follows the same planning gate
-and extends existing references; it cannot force mid-encounter replanning.
+Each controller call fixes its node count before formulating the local
+problem. Both objective stages share that model. Primal infeasibility,
+numerical failure, nonlinear rejection or an unrollable reference returns
+failure; none requests a longer horizon, another local model or a new
+avoidance path. This does not certify that the selected horizon is sufficient
+or that a feasible first frame always exists. The terminal conditions remain
+in the optimization and are not relaxed to accept a short horizon.
+
+The offline free-duration experiment follows the same planning gate and
+compares fixed and variable duration on one reference with one node count.
+Optimizing total duration changes the existing tail intervals; failure does
+not trigger a second comparison on an enlarged grid. Explicit offline
+refinement of that fixed grid is separate from the online RTI controller.
 
 ### Nonlinear rollout checks
 
@@ -1954,15 +1955,13 @@ separate pipeline timer; failed pipeline latency is not solver latency. A timeou
 failure, not a successful real-time control result. Raising the budget for a
 functional test does not change the encounter-onset planning policy.
 
-`search.rtiIterations` and `linearizationCount` count all reference attempts;
-`solverCalls` sums their native objective solves. There are at most two
-objective solves per model. `attempts`
-preserves each result and its `horizonSteps`; `horizonExtensions` counts length increases;
-`selectedAttempt` identifies the returned solution, or zero when none is returned.
+`search.rtiIterations` and `linearizationCount` are at most one per controller
+call; `solverCalls` is at most two. `attempts` contains the single result and
+its `horizonSteps`; `horizonExtensions` and `restartCount` remain zero.
+`selectedAttempt` is one for a returned solution and zero otherwise.
 `plannerCalls` counts planner invocations: at most one on an onset call and
-zero on subsequent calls in the same encounter. `nominalRestarted` stays false;
-`restartCount` counts additional horizon models, not planner invocations. Initialization and formulation timings sum all attempts. `convexSolveCompleted`
-records completion of both convex objectives on the final reference.
+zero on subsequent calls in the same encounter. `nominalRestarted` stays false.
+`convexSolveCompleted` records completion of both convex objectives.
 `optimizationConverged` is false because nonlinear convergence is not tested.
 `nonlinearValidationPerformed` is true for returned controls and
 `nonlinearHardResidual` reports the sampled check. The reported PCBF value and
@@ -2006,7 +2005,7 @@ test limits executable source growth; this consolidation adds no runtime module.
 | --- | --- |
 | [collisionAvoidanceController.m](collisionAvoidanceController.m) | Input/target memory, encounter updates, solver orchestration, first-input output, reset and warm-up actions. |
 | [readControllerInputs.m](readControllerInputs.m) | Ego/target parsing, timestamped error sets, given path and boundary observations. |
-| [solvePredictiveControl.m](solvePredictiveControl.m) | References, affine RTI models, two objectives, adaptive horizon search, tightening, shared timer and discrepancy diagnostics. |
+| [solvePredictiveControl.m](solvePredictiveControl.m) | References, affine RTI models, two objectives, pre-solve horizon sizing, tightening, shared timer and discrepancy diagnostics. |
 | [terminalSafeSet.m](terminalSafeSet.m) | Joint state/flow, braking continuation, membership/linearized rows, parked-track checks, seed holds and offline certificate helpers. |
 | [nonlinearBicycleModel.m](nonlinearBicycleModel.m) | Blended bicycle, road load, RK4/tangents, trim, path error and quadratic CLF. |
 | [modifiedFialaTire.m](modifiedFialaTire.m) | Combined-slip forces and analytic derivatives. |
