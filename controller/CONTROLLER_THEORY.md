@@ -863,7 +863,7 @@ Then the terminal set is the fixed-policy safe set
                  at all declared constraint instants }.
 
 Here mildness requires |v_y| <= tan(beta_f)*v_x and |r|*V <= a_m, with
-beta_f = 0.05 rad and a_m = 2 m/s^2 by default. The braking ratio must satisfy
+beta_f = 0.1 rad and a_m = 2 m/s^2 by default. The braking ratio must satisfy
 actuator limits. No additional rear-tire nonsaturation condition is imposed. Since |kappa_E|*V(t)^2 decreases and beta_E
 is constant, the mild conditions persist under the declared flow. Input
 memory is part of the joint state; finite slew limits require an admissible

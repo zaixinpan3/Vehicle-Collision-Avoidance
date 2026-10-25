@@ -3,6 +3,9 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
     % invariance under the terminal law, the exact parked check against the
     % target's track, the end of an encounter, the linearized rows, and the
     % declared-model holds that extend the anchor.
+    properties (TestParameter)
+        sideslipSign = {-1,1}
+    end
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -266,6 +269,25 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
             testCase.verifyFalse(member);
             testCase.verifyEqual(info.reason,"notMild");
+        end
+        function terminalSideslipAdmitsTheExpandedBoundaryAndPreservesIt(testCase,sideslipSign)
+            x=[0;0;0;8;sideslipSign*8*tan(.1);0];
+            model=localModel(x,[]);context=terminalSafeSet.context(model);
+            testCase.verifyTrue(terminalSafeSet.member(context,x,0));
+            [~,bounds]=terminalSafeSet.rows(context,x,0);
+            testCase.verifyGreaterThanOrEqual(min(bounds),-1e-12);
+            next=terminalSafeSet.successor(context,x);
+            testCase.verifyTrue(terminalSafeSet.member(context,next,1));
+            testCase.verifyEqual(atan2(next(5),next(4)),sideslipSign*.1,AbsTol=1e-12);
+        end
+        function terminalSideslipStillRejectsBeyondTheExpandedBoundary(testCase,sideslipSign)
+            x=[0;0;0;8;sideslipSign*8*tan(.1001);0];
+            model=localModel(x,[]);context=terminalSafeSet.context(model);
+            [member,~,info]=terminalSafeSet.member(context,x,0);
+            testCase.verifyFalse(member);
+            testCase.verifyEqual(info.reason,"notMild");
+            [~,bounds]=terminalSafeSet.rows(context,x,0);
+            testCase.verifyLessThan(min(bounds),0);
         end
         function smallForwardSpeedCannotHideLargeLateralMotion(testCase)
             model=localModel([0;0;0;.1;.3;0],[]);
