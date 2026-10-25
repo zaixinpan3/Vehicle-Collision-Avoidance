@@ -1,5 +1,30 @@
 # Research entry points
 
+## Unified observer-to-safety reference
+
+`verifyUnifiedObserverSafety` executes the physical information-set algorithm
+from [controller theory, Section 7](../controller/CONTROLLER_THEORY.md#recursive-feasibility).
+It propagates a retained physical set, conditions it on current bounded
+observations, minimizes signed collision deficits and then a speed/braking
+cost, and appends a common admissible terminal continuation. Future observer
+states or measurements are not decision inputs.
+
+```matlab
+addpath('scripts');
+result = verifyUnifiedObserverSafety();
+results = runtests('tests/unifiedObserverSafetyTest.m'); assertSuccess(results)
+```
+
+The deterministic longitudinal model has a moving target, absorbing ego rest,
+a 0.2 s hold, braking levels 0/2/4 m/s^2 and a 10 m/s^3 command slew limit.
+The usual horizon is four holds with two slack holds; a one-hold case is also
+checked. Whole-hold gap minima are analytical. Optional `outputFile` writes
+compact JSON. The checks cover bounded nonnested observations, dropouts,
+positive-deficit recovery, input-limited infeasibility, parked uncertainty,
+contradictory information and collisions missed by start/midpoint/end samples.
+They validate this finite-input research specialization in floating point;
+they are not a certificate or a performance comparison for the Fiala runtime.
+
 ## PCBF / CLF controller
 
 Run the primary joint observer/controller campaign from the repository root:

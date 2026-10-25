@@ -1155,6 +1155,15 @@ an independent observer-error disturbance after propagating those effects
 would count them twice. See
 [the joint prediction derivation](../controller/CONTROLLER_THEORY.md#joint-prediction).
 A current-state observer enclosure alone is not a collision-avoidance theorem.
+It is the complete estimator interface for the physical held-input formulation
+in [the unified observer-to-safety argument](../controller/CONTROLLER_THEORY.md#recursive-feasibility).
+There the controller propagates physical sets, retains the old first successor,
+and intersects it with each new valid enclosure. Future observer contraction
+is neither assumed nor needed. Only a prediction policy that explicitly uses
+future observations requires the lifted observer/measurement dynamics.
+The implementation of that simpler algorithm is validated on the longitudinal
+research specialization `scripts/verifyUnifiedObserverSafety.m`; this does not
+certify the production NRMM/Fiala controller.
 
 <a id="implementation-map"></a>
 ## 13. Implementation map and existing validation
