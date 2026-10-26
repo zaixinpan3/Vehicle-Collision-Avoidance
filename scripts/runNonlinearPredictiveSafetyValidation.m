@@ -77,6 +77,11 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 error('runNonlinearPredictiveSafetyValidation:brakingSuffices', ...
                     'Scenario %s does not qualify: immediate maximum straight braking must collide from a separated start.',name);
             end
+            if ~maximumBraking.allLongitudinalPoliciesCertified
+                error('runNonlinearPredictiveSafetyValidation:brakingInsufficiencyUnproven', ...
+                    ['Scenario %s is not qualified as requiring steering: failure of maximum braking alone ' ...
+                    'does not exclude a different longitudinal timing.'],name);
+            end
         end
         estimatorContext=[];estimatorConfiguration=options.EstimatorConfiguration;estimatorInitializationSeconds=0;
         if useEstimator

@@ -23,6 +23,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             testCase.assertNumElements(campaign.results,2);
             testCase.verifyEqual([campaign.results.scenario],["stoppedLead","hardBrakingLead"]);
             testCase.verifyTrue(all([campaign.results.bypassQualified]));
+            testCase.verifyTrue(all([campaign.results.allLongitudinalPoliciesCertified]));
             for ran=campaign.results
                 testCase.verifyNotEqual(ran.outcome,"setupError");
                 testCase.assertGreaterThan(ran.executedFrames,0);
@@ -107,6 +108,25 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
                 Scenarios="brakingLead",RequireBrakingInsufficient=true), ...
                 'runNonlinearPredictiveSafetyValidation:brakingSuffices');
+        end
+        function aBrakingSufficientScenarioIsNotAControllerFailure(testCase)
+            fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            campaign = runCollisionThreatValidation(Scenarios="brakingLead",Speeds=8, ...
+                OutputDirectory=string(fixture.Folder));
+            testCase.verifyEqual(campaign.results.outcome,"unqualifiedScenario");
+            testCase.verifyEqual(campaign.results.executedFrames,0);
+            testCase.verifyFalse(campaign.results.allLongitudinalPoliciesCertified);
+            testCase.verifyEqual(campaign.results.source,"");
+        end
+        function oneFailedBrakingPolicyDoesNotProveSteeringIsNecessary(testCase)
+            [x,q,~,cfg] = collisionThreatScenario("curvedHeadOn",struct('referenceSpeed',8));
+            baseline = maximumBrakingCollisionBaseline(x,q,cfg);
+            testCase.assertTrue(baseline.collisionDetected);
+            testCase.verifyFalse(baseline.allLongitudinalPoliciesCertified);
+            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
+                Scenarios="curvedHeadOn",RequireBrakingInsufficient=true, ...
+                ControllerConfiguration=struct('referenceSpeed',8)), ...
+                'runNonlinearPredictiveSafetyValidation:brakingInsufficiencyUnproven');
         end
         function stoppingDoesNotDiscardAnOncomingTarget(testCase)
             [x,q,~,cfg]=collisionThreatScenario("headOn",struct('referenceSpeed',8));
