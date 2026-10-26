@@ -38,8 +38,9 @@ function cfg=localDefaults()
     % CLF slack only outside an active target encounter.
     % The weight stays active on the route; zero disables it for ablation.
     cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10);
-    % One safety-oriented circulation rollout supplies initialization controls.
-    % Cruise speed and route tracking belong to the controller's CLF stage.
+    % Route attraction supplies the planner's preferred acceleration. Keep a
+    % separated route rollout; otherwise add target circulation, including
+    % longitudinal avoidance. Cruise feedback never overwrites that correction.
     % The parallel-wall acceleration guide anticipates transverse momentum;
     % it is not a hard RTI/terminal constraint or an execution certificate.
     cfg.planner=struct('radialRate',1,'tangentialRate',2,'wallRate',2, ...

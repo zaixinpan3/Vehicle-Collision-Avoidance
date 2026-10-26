@@ -11,31 +11,50 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function aSafetySeedDoesNotTrackTheCruiseRouteOrSpeed(testCase)
+        function aSafeSeedFollowsTheChosenRoute(testCase)
             model=localModel("headOn",8);
+            model.target(1:6)=[-30;0;0;2;0;0];
             model.road.boundaryObservation=struct('chains',struct([]));
             original=predictiveSafetyGeometry.avoidanceGuide(model,40,1);
-            model.cfg.referenceSpeed=15;model.cfg.nominalClf.speedGain=20;
-            model=rmfield(model,'nominalReference');
             model.lane=struct('referenceCurve',struct('origin',[0;4], ...
-                'heading',.3,'curvature',.01,'length',100));
+                'heading',0,'curvature',0,'length',100));
             changed=predictiveSafetyGeometry.avoidanceGuide(model,40,1);
-            testCase.verifyEqual(changed.inputs,original.inputs,AbsTol=0);
-            testCase.verifyEqual(changed.states,original.states,AbsTol=0);
-            testCase.verifyEqual(changed.direction,original.direction,AbsTol=0);
+            testCase.verifyEqual(original.states(2,:),zeros(1,41),AbsTol=1e-10);
+            testCase.verifyGreaterThan(changed.states(2,end),1);
+            testCase.verifyLessThan(changed.states(2,end),4);
+            testCase.verifyTrue(changed.nominalPathClear);
+            testCase.verifyFalse(changed.fieldActive);
         end
-        function freeMotionDoesNotRecoverCruiseSpeedOrLateralOffset(testCase)
+        function freeMotionRecoversCruiseSpeedAndLateralOffset(testCase)
             model=localModel("headOn",8);model.initialState=[0;3;0;12;0;0];
             model.target(1:6)=[-30;0;0;2;0;0];
             guide=predictiveSafetyGeometry.avoidanceGuide(model,16,1);
-            testCase.verifyEqual(guide.states(2,:),3*ones(1,17),AbsTol=1e-10);
-            testCase.verifyEqual(guide.states(4,:),12*ones(1,17),AbsTol=1e-10);
-            testCase.verifyEqual(guide.inputs(1,:),zeros(1,16),AbsTol=1e-10);
+            testCase.verifyLessThan(guide.states(2,end),2.7);
+            testCase.verifyLessThan(guide.states(4,end),11);
+            testCase.verifyLessThan(guide.inputs(1,1),0);
             testCase.verifyEqual(guide.directionSign,0);
+        end
+        function aSeparatedPassDoesNotEvadeAnOffPathTarget(testCase)
+            model=localModel("headOn",8);model.target(1:6)=[15;5;0;0;0;0];
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,60,1);
+            testCase.verifyTrue(guide.nominalPathClear);
+            testCase.verifyGreaterThan(guide.nominalPathMinimumGap,0);
+            testCase.verifyEqual(guide.states(2,:),zeros(1,61),AbsTol=1e-10);
+            testCase.verifyEqual(guide.states(4,:),8*ones(1,61),AbsTol=1e-10);
+            testCase.verifyFalse(guide.fieldActive);
+        end
+        function observerUncertaintyIsIncludedInTheNominalPathCheck(testCase)
+            model=localModel("headOn",8);model.target(1:6)=[0;2;0;8;0;0];
+            model.uncertainty.collisionGenerator=diag([0,.2,0,0,0,0]);
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,16,1);
+            testCase.verifyFalse(guide.nominalPathClear);
+            testCase.verifyLessThan(guide.nominalPathMinimumGap,0);
+            testCase.verifyTrue(guide.fieldActive);
         end
         function anApproachingObstacleCanBrakeAtTheCruiseSpeed(testCase)
             model=localModel("headOn",8);model.target(1:6)=[12;0;0;0;0;0];
-            guide=predictiveSafetyGeometry.avoidanceGuide(model,8,1);
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,32,1);
+            testCase.verifyFalse(guide.nominalPathClear);
             testCase.verifyLessThan(guide.inputs(2,1),-.1);
             testCase.verifyLessThan(guide.states(4,end),model.initialState(4)-.5);
             testCase.verifyGreaterThan(abs(guide.inputs(1,1)),1e-3);
@@ -144,13 +163,15 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             directions=[guide.candidates.direction];
             testCase.verifyTrue(all(directions==0 | directions==-1));
         end
-        function aLongerRolloutExtendsTheSameFieldMotion(testCase,crossingSpeed)
+        function previewsContainingTheConflictUseTheSameFieldMotion(testCase,crossingSpeed)
             model=localModel("intersectionCrossing",crossingSpeed);
             model.uncertainty.collisionGenerator=diag([.05,.05,.01,0,0,0]);
-            short=predictiveSafetyGeometry.avoidanceGuide(model,8,-1);
+            short=predictiveSafetyGeometry.avoidanceGuide(model,48,-1);
             extended=predictiveSafetyGeometry.avoidanceGuide(model,64,-1);
-            testCase.verifyEqual(extended.states(:,1:9),short.states,AbsTol=1e-12);
-            testCase.verifyEqual(extended.inputs(:,1:8),short.inputs,AbsTol=1e-12);
+            testCase.verifyFalse(short.nominalPathClear);
+            testCase.verifyFalse(extended.nominalPathClear);
+            testCase.verifyEqual(extended.states(:,1:49),short.states,AbsTol=1e-12);
+            testCase.verifyEqual(extended.inputs(:,1:48),short.inputs,AbsTol=1e-12);
             testCase.verifyEqual(extended.candidateCount,1);
         end
         function anOverlappingSeedIsFiniteAndNeverCertified(testCase)

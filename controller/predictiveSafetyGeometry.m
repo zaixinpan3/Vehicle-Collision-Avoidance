@@ -2,7 +2,7 @@ classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target prediction, uncertainty tubes and polygon geometry.
     methods (Static)
         function guide = avoidanceGuide(model,count,side)
-            % One safety-oriented field rollout through the actual vehicle.
+            % Route-following initialization, corrected by an avoidance field.
             % No candidate scores or admission gate. RTI receives the states
             % and inputs over exactly count holds. Terminal constraints
             % belong to RTI, not this heuristic initialization.
@@ -42,7 +42,17 @@ classdef predictiveSafetyGeometry
             % encounter scale; actual inputs still obey combined-slip Fiala.
             contourRadius=max(field.egoRadius,norm(field.position));
             speed=min(max(norm(field.velocity),1),sqrt(budget*contourRadius));
-            best=localCirculationRollout(model,data,direction,speed,count);
+            % A target's presence alone does not justify an evasive maneuver.
+            % Keep the actual route-following rollout when its sampled,
+            % uncertainty-inflated rectangles are separated. This only chooses
+            % the seed: it never disables RTI collision or terminal rows.
+            nominal=localCirculationRollout(model,data,0,0,count);
+            nominalPathClear=all(nominal.gaps>0);
+            best=nominal;rolloutCount=1;
+            if ~nominalPathClear
+                best=localCirculationRollout(model,data,direction,speed,count);
+                rolloutCount=2;
+            end
             total=1;diagnostics=localCandidateSummary(best);
             time=(0:numel(best.gaps)-1)*cfg.controller.sampleTime;
             conflict=best.gaps<=0;first=NaN;last=NaN;
@@ -63,6 +73,8 @@ classdef predictiveSafetyGeometry
             if abs(transverse(furthest))>1e-9,passingSide=sign(transverse(furthest));end
             guide.direction=passingSide*lateral;
             guide.candidateCount=total;guide.candidates=diagnostics;
+            guide.nominalPathClear=nominalPathClear;
+            guide.nominalPathMinimumGap=min(nominal.gaps);guide.rolloutCount=rolloutCount;
             guide.conflictStartSeconds=first;guide.conflictEndSeconds=last;
             guide.minimumGap=min(best.gaps);guide.nominalMinimumGap=min(best.nominalGaps);
             guide.initialConflict=conflict(1);guide.robustCertificate=false;
@@ -700,8 +712,7 @@ function candidate=localCirculationRollout(model,data,direction,speed,count)
         candidate.gaps(index)=gap;candidate.nominalGaps(index)=nominal;
         violation=localPlannerStateViolation(x,model);
         candidate.stateViolation=max(candidate.stateViolation,violation);
-        % Route coordinates are diagnostics only. Visible road boundaries
-        % (or the explicit legacy wall geometry) still shape the seed.
+        % The route attracts the seed; road boundaries also shape it.
         projection=laneGeometry.project(x(1:2),model.lane);
         candidate.maximumDeviation=max(candidate.maximumDeviation,abs(projection.lateralPosition));
         if index>count,break;end
@@ -710,10 +721,10 @@ function candidate=localCirculationRollout(model,data,direction,speed,count)
             change=cfg.model.brakingRatioRateMaximum*h;
             u=[prior(1);min(prior(2)+change,max(prior(2)-change,b))];
         else
-            % Neutral free motion requests zero Cartesian acceleration. The
-            % field may change both speed and direction to clear the target;
-            % neither cruise tracking nor return-to-route overrides it.
-            acceleration=zeros(2,1);
+            % Route attraction is the preferred acceleration BEFORE obstacle
+            % and boundary correction. Never overwrite longitudinal obstacle
+            % acceleration with a cruise-speed request afterwards.
+            acceleration=localRouteAcceleration(x,projection,model);
             if direction~=0 && ~encounterEnded
                 parameters=localFieldParameters(data,index,direction,speed);
                 parameters.preferredAcceleration=acceleration;
@@ -729,6 +740,26 @@ function candidate=localCirculationRollout(model,data,direction,speed,count)
         candidate.states(:,index+1)=next;prior=u;
     end
     if ~candidate.fieldActive,candidate.directionSign=0;end
+end
+
+function acceleration=localRouteAcceleration(x,projection,model)
+    % A course field converges to the path without prescribing waypoints or
+    % an avoidance/return schedule. The existing initialization gains set its
+    % lookahead, course response and speed recovery; no CLF row is introduced.
+    cfg=model.cfg;p=cfg.nominalClf;speed=hypot(x(4),x(5));
+    course=x(3)+atan2(x(5),x(4));
+    error=atan2(sin(course-projection.heading),cos(course-projection.heading));
+    lateral=projection.lateralPosition;
+    referenceSpeed=hypot(model.nominalReference.state(4),model.nominalReference.state(5));
+    lookahead=max(p.minimumLookaheadMeters,p.lookaheadSeconds*referenceSpeed);
+    desired=-atan(lateral/lookahead);
+    desiredRate=-lookahead/(lookahead^2+lateral^2)*speed*sin(error);
+    courseError=atan2(sin(error-desired),cos(error-desired));
+    curvature=model.nominalReference.curvature;
+    courseRate=curvature*speed*cos(error)/max(1-curvature*lateral,.1) ...
+        +desiredRate-p.courseGain*courseError;
+    forward=[cos(course);sin(course)];normal=[-forward(2);forward(1)];
+    acceleration=p.speedGain*(referenceSpeed-speed)*forward+speed*courseRate*normal;
 end
 
 function violation=localPlannerStateViolation(x,model)

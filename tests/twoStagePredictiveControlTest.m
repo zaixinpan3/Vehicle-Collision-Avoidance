@@ -141,8 +141,12 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             % A successful single field need not contain colliding nodes or
             % produce a prescribed lateral offset to count as planning.
             testCase.verifyEqual(search.planner.candidateCount,1);
-            testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             anchor=problem.model.linearization;
+            testCase.verifyFalse(anchor.guide.nominalPathClear);
+            testCase.verifyTrue(anchor.guide.fieldActive);
+            % A mild early correction may be mostly longitudinal; do not
+            % require an unnecessary minimum steering amplitude.
+            testCase.verifyLessThan(min(anchor.inputs(2,:)),0);
             testCase.verifyGreaterThan(size(anchor.inputs,2)*cfg.controller.sampleTime,2);
             % Preview may incidentally produce a terminal endpoint; the
             % planner never appends a terminal extension to obtain it.

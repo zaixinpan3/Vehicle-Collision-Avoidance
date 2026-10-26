@@ -1816,14 +1816,34 @@ of singular force-ratio endpoints remains as described above.
 
 Directional rectangle/error supports and relative motion determine outward
 obstacle acceleration and circulation in a persistent passing direction.
-The free-motion acceleration is zero in world coordinates. The obstacle
-field may change both longitudinal and lateral acceleration; cruise-speed
-feedback never overwrites its longitudinal component. Neither route
-attraction nor cruise recovery shapes this safety initializer. The initial
-passing side and geometric encounter preview use the measured ego motion.
-Route coordinates remain available for deviation diagnostics and for the
-legacy offset-wall geometry when no boundary scan is supplied. Nominal
-path and speed tracking remain the second-stage CLF objective.
+The preferred free-motion acceleration follows the nominal path and speed.
+Writing lateral displacement as $e$, course relative to the path as $\chi$,
+and lookahead as $D$, the desired course is $\chi_d=-\arctan(e/D)$.
+The course-rate request combines path-curvature feedforward, $\dot\chi_d$,
+and the existing proportional course-error feedback. Multiplying it by speed
+gives the transverse acceleration; the existing speed gain supplies the
+longitudinal acceleration. This provides path attraction without waypoints
+or a prescribed return time.
+
+The initializer first rolls out this route/boundary policy through the actual
+vehicle model. If its uncertainty-inflated rectangle gaps are strictly positive
+at all active prediction nodes, it returns that rollout unchanged. Otherwise,
+it makes one field rollout with the route acceleration as its preferred input.
+The obstacle field may change both longitudinal and lateral acceleration;
+cruise-speed feedback never overwrites its longitudinal component afterwards.
+Road guidance follows this correction. This is a nominal-path conflict check
+inside initialization, not a bypass of any RTI collision or terminal constraint
+and not a robust feasibility certificate. Both passes use the same requested
+horizon and the existing encounter/perception convention. Only one trajectory
+is returned, without scoring alternative maneuvers. A longer preview that first
+reveals a conflict may therefore change the initial field activation.
+
+The initial passing side and geometric encounter preview use measured ego
+motion. Route coordinates also supply deviation diagnostics and legacy offset
+walls when no boundary scan exists. During an encounter the controller's
+second stage still penalizes departure from its RTI reference without a CLF;
+the cruise CLF resumes outside the encounter. Route attraction here belongs
+to the initializer, not to a newly imposed optimization constraint.
 No offset waypoint, entry/hold/return schedule, trajectory candidate
 bank or seed-admission test is prescribed. The initial circulation speed uses
 the current encounter's contour scale, not a turn radius equal to the ego
