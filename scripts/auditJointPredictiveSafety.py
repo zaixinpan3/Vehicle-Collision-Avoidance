@@ -64,6 +64,22 @@ def clearance_passes(minimum, margin):
 
 def feasible_hold(hold):
     """Check the declared optimization scope, separately from replay geometry."""
+    if hold.get('source') == 'switchedRealTimeIteration':
+        stages = hold.get('solverStages', [])
+        if isinstance(stages, dict):
+            stages = [stages]
+        mode = hold.get('optimizationMode')
+        expected = {'pcbf': 'pcbfSlack', 'clf': 'clfSlackAndReferenceDeviation'}.get(mode)
+        tolerance = hold.get('affineFeasibilityTolerance', 0)
+        residual = hold.get('hardResidual')
+        return (expected is not None and len(stages) == 1
+                and hold.get('clfEnabled') == (mode == 'clf')
+                and math.isfinite(tolerance) and tolerance > 0
+                and isinstance(residual, (int, float)) and 0 <= residual <= tolerance
+                and hold.get('affineSubproblemCompleted') is True
+                and hold.get('solverCalls') == int(stages[0].get('numericalSolve', True))
+                and stages[0].get('objective') == expected
+                and stages[0].get('exitFlag', 0) > 0)
     if hold.get('source') in ('twoStageConvexOptimization', 'twoStageRealTimeIteration'):
         stages = hold.get('solverStages', [])
         calls = (2, 3, 4) if hold.get('source') == 'twoStageRealTimeIteration' else (2,)
@@ -84,7 +100,8 @@ def feasible_hold(hold):
 
 def zero_slack_hold(hold):
     tolerance = (hold.get('affineFeasibilityTolerance', 0)
-                 if hold.get('source') in ('twoStageConvexOptimization', 'twoStageRealTimeIteration') else 0)
+                 if hold.get('source') in ('twoStageConvexOptimization', 'twoStageRealTimeIteration',
+                                          'switchedRealTimeIteration') else 0)
     return math.isfinite(tolerance) and 0 <= hold.get('predictiveBarrierValue', math.inf) <= tolerance
 
 

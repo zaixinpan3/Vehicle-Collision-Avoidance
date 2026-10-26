@@ -31,7 +31,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyEqual(solution.states(:,2),expected,AbsTol=1e-5);
             testCase.verifyGreaterThan(norm(solution.states(:,2)-actual),1e-8);
             testCase.verifyFalse(search.rollout.available);
-            testCase.verifyEqual(search.terminationReason,"twoStagesReturned");
+            testCase.verifyEqual(search.terminationReason,"clfReturned");
             testCase.verifyEqual(solution.safety,solution.affineSafety,AbsTol=0);
         end
         function anOfflineProbeFindsTheCollidingHardTail(testCase)
@@ -77,16 +77,18 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
                 'model',model,'anchor',anchor,'problem',p));
             testCase.assertNotEmpty(solution);
-            testCase.verifyTrue(search.secondaryStageCompleted);
+            testCase.verifyTrue(search.pcbfStageCompleted);
+            testCase.verifyFalse(search.secondaryStageAttempted);
             testCase.verifyFalse(search.clfStageAttempted);
             testCase.verifyGreaterThan(search.primaryOptimum,0);
             testCase.verifyTrue(isnan(solution.clfSlack));
-            testCase.verifyEqual(solution.secondaryObjectiveValue,solution.referenceDeviationCost,AbsTol=0);
-            testCase.verifyLessThanOrEqual(solution.safety,search.slackCap+1e-5);
+            testCase.verifyEqual(solution.objectiveValue,solution.safety,AbsTol=0);
+            testCase.verifyEqual(solution.safety,search.primaryOptimum,AbsTol=0);
+            testCase.verifyTrue(isnan(search.slackCap));
             testCase.verifyEqual(solution.states,anchor.states,AbsTol=1e-6);
             testCase.verifyEqual(solution.inputs,anchor.inputs,AbsTol=1e-6);
         end
-        function theSecondaryProblemUsesAnAffineContinuousClfRow(testCase)
+        function theCruiseProblemUsesAnAffineContinuousClfRow(testCase)
             model=testCase.model;anchor=testCase.anchor;
             model.initialState(2)=.1;anchor.states(2,:)=.1;
             [p,~,model]=localFormulate(anchor,model);

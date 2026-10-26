@@ -1,5 +1,5 @@
-classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
-    % Two objectives, fixed encounter horizons and unchanged commands.
+classdef switchedPredictiveControlTest < matlab.unittest.TestCase
+    % Target-presence objective switching with one solve and unchanged commands.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -9,15 +9,15 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function oneRtiModelServesBothObjectivesAndTheUnmodifiedCommand(testCase)
+        function cruiseUsesOneClfSolveAndTheUnmodifiedCommand(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             [command,inputs,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
             search=problem.metadata.search;
             testCase.verifyEqual(search.algorithm,"realTimeIteration");
             testCase.verifyEqual(search.rtiIterations,1);
             testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyEqual([search.stages.objective],["pcbfSlack","clfSlackAndReferenceDeviation"]);
-            testCase.verifyLessThanOrEqual(search.solverCalls,2);
+            testCase.verifyEqual([search.stages.objective],"clfSlackAndReferenceDeviation");
+            testCase.verifyLessThanOrEqual(search.solverCalls,1);
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyEqual(search.initializationFailure,"");
             testCase.verifyTrue(search.convexSolveCompleted);
@@ -28,8 +28,12 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.safetyScope,"affineSubproblem");
             testCase.verifyTrue(isnan(problem.metadata.nonlinearHardResidual));
             testCase.verifyLessThanOrEqual(problem.metadata.affineHardResidual,cfg.solver.feasibilityTolerance);
-            testCase.verifyLessThanOrEqual(problem.solution.safety, ...
-                search.slackCap+cfg.solver.feasibilityTolerance);
+            testCase.verifyEqual(problem.solution.safety,0,AbsTol=cfg.solver.feasibilityTolerance);
+            testCase.verifyTrue(isnan(search.primaryOptimum));
+            testCase.verifyTrue(isnan(search.slackCap));
+            testCase.verifyFalse(search.pcbfStageAttempted);
+            testCase.verifyFalse(search.secondaryStageAttempted);
+            testCase.verifyEqual(problem.metadata.optimizationMode,"clf");
             testCase.verifyEqual(inputs,problem.model.linearization.inputs+problem.solution.inputCorrection,AbsTol=0);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(state.appliedInput,inputs(:,1),AbsTol=0);
@@ -187,7 +191,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.restartCount,0);
             testCase.verifyEqual(search.horizonExtensions,0);
             testCase.verifyNumElements(search.attempts,1);
-            testCase.verifyLessThanOrEqual(search.solverCalls,2);
+            testCase.verifyLessThanOrEqual(search.solverCalls,1);
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyEqual(search.returned,~isempty(solution));
         end
@@ -367,8 +371,15 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 ["quadraticTransverseError","none","quadraticTransverseError"]);
             testCase.verifyEqual([absent.metadata.clfEnabled,near.metadata.clfEnabled,distant.metadata.clfEnabled], ...
                 [true,false,true]);
-            testCase.verifyEqual(near.metadata.secondaryObjective,"referenceDeviation");
+            testCase.verifyEqual(near.metadata.optimizationObjective,"pcbfSlack");
             testCase.verifyFalse(near.metadata.search.clfStageAttempted);
+            testCase.verifyFalse(near.metadata.search.secondaryStageAttempted);
+            testCase.verifyTrue(near.metadata.search.pcbfStageCompleted);
+            testCase.verifyEqual(near.metadata.optimizationMode,"pcbf");
+            testCase.verifyEqual(near.metadata.secondaryObjective,"none");
+            testCase.verifyEqual(near.metadata.referenceDeviationWeight,0);
+            testCase.verifyNumElements(near.metadata.search.stages,1);
+            testCase.verifyLessThanOrEqual(near.metadata.solverCallCount,1);
         end
         function cruiseClfResumesAfterTheEncounterClears(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=0;
@@ -384,7 +395,11 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(cleared.metadata.hasTarget);
             testCase.verifyTrue(cleared.metadata.clfEnabled);
             testCase.verifyTrue(cleared.metadata.search.clfStageCompleted);
-            testCase.verifyEqual(cleared.metadata.secondaryObjective,"clfSlackAndReferenceDeviation");
+            testCase.verifyFalse(cleared.metadata.search.pcbfStageAttempted);
+            testCase.verifyEqual(cleared.metadata.optimizationMode,"clf");
+            testCase.verifyNumElements(cleared.metadata.search.stages,1);
+            testCase.verifyEqual(cleared.metadata.solverCallCount,1);
+            testCase.verifyEqual(cleared.metadata.optimizationObjective,"clfSlackAndReferenceDeviation");
         end
         function consecutiveMeasuredSuccessorsRemainSingleIterations(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
@@ -413,7 +428,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.selectedAttempt,0);
             testCase.verifyEqual(search.linearizationCount,1);
             testCase.verifyNumElements(search.attempts,1);
-            testCase.verifyEqual(search.stopReason,"pcbfNoNumericalResult");
+            testCase.verifyEqual(search.stopReason,"clfNoNumericalResult");
             testCase.verifyEqual([search.stages.exitFlag],-2);
             testCase.verifyEqual(size(model.linearization.inputs,2),cfg.controller.horizonSteps);
             testCase.verifyEqual(model.solveTimer,timer);

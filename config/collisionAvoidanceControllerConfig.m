@@ -33,10 +33,10 @@ function cfg=localDefaults()
     % Later frames shift M-1 state/input stages and append one hold to retain M.
     % Failure is reported without horizon extension, replanning or another
     % local model.
-    % Secondary objective: half this weight times the mean squared,
-    % unit-scaled state/input deviation from the current reference. Add cruise
-    % CLF slack only outside an active target encounter.
-    % The weight stays active on the route; zero disables it for ablation.
+    % Cruise QP: CLF slack plus half this weight times the mean squared,
+    % unit-scaled state/input deviation from the current reference.
+    % PCBF mode minimizes safety slack alone and does not use this weight.
+    % In cruise the weight stays active on the route; zero disables it.
     cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10);
     % One field rollout combines route attraction with motion-dependent target
     % circulation, including longitudinal avoidance. No nominal-path forecast

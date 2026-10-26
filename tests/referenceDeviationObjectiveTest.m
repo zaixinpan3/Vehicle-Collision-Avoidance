@@ -1,5 +1,5 @@
 classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
-    % A soft reference cost preserves freedom and the primary safety priority.
+    % Reference proximity is used only by the cruise CLF optimization.
     properties (Access=private)
         model
         anchor
@@ -32,21 +32,30 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(alternative.inputs,original.inputs,AbsTol=1e-10);
             testCase.verifyEqual(alternative.states,original.states,AbsTol=1e-10);
         end
-        function referencePreferenceCannotSpendBeyondThePrimarySlackCap(testCase)
-            [solution,search]=localSolve(testCase.model,testCase.anchor,10);
-            testCase.assertNotEmpty(solution);
-            testCase.verifyLessThanOrEqual(solution.safety,search.slackCap+1e-5);
-            testCase.verifyEqual(search.stages(2).value,solution.referenceDeviationCost,AbsTol=1e-12);
-            testCase.verifyEqual(search.stages(2).objective,"referenceDeviation");
+        function avoidanceIgnoresTheCruiseReferenceWeight(testCase)
+            [original,search]=localSolve(testCase.model,testCase.anchor,10);
+            alternative=localSolve(testCase.model,testCase.anchor,1000);
+            testCase.assertNotEmpty(original);testCase.assertNotEmpty(alternative);
+            testCase.verifyEqual(original.inputs,alternative.inputs,AbsTol=1e-10);
+            testCase.verifyEqual(original.states,alternative.states,AbsTol=1e-10);
+            testCase.verifyEqual(original.referenceDeviationWeight,0);
+            testCase.verifyEqual(original.referenceDeviationCost,0);
+            testCase.verifyEqual(search.stages.objective,"pcbfSlack");
+            testCase.verifyFalse(search.secondaryStageAttempted);
+            testCase.verifyTrue(isnan(search.slackCap));
         end
         function reportedCostMeasuresStatesAndInputsRelativeToTheActualAnchor(testCase)
-            solution=localSolve(testCase.model,testCase.anchor,1);
+            model=testCase.model;model.target=[];model.targetEpoch=[];
+            model.initialState(2)=model.initialState(2)+.25;
+            model.terminalContext=terminalSafeSet.context(model);
+            solution=localSolve(model,testCase.anchor,1);
             testCase.assertNotEmpty(solution);
             cfg=testCase.model.cfg;
             stateUnits=[.5;.5;.1;.25;.5;.2];
             inputUnits=[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio];
             stateCost=mean(sum(((solution.states(:,2:end)-testCase.anchor.states(:,2:end))./stateUnits).^2,1));
             inputCost=mean(sum(((solution.inputs-testCase.anchor.inputs)./inputUnits).^2,1));
+            testCase.verifyGreaterThan(stateCost+inputCost,1e-6);
             testCase.verifyEqual(solution.referenceStateDeviation,stateCost,RelTol=1e-10);
             testCase.verifyEqual(solution.referenceInputDeviation,inputCost,RelTol=1e-10);
             testCase.verifyEqual(solution.referenceDeviationCost,.5*(stateCost+inputCost),RelTol=1e-10);
@@ -55,7 +64,8 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             solution=localSolve(testCase.model,testCase.anchor,0);
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(solution.referenceDeviationCost,0,AbsTol=0);
-            testCase.verifyEqual(solution.secondaryObjectiveValue,0,AbsTol=0);
+            testCase.verifyTrue(isnan(solution.secondaryObjectiveValue));
+            testCase.verifyEqual(solution.objectiveValue,solution.safety,AbsTol=0);
             testCase.verifyFalse(solution.clfEnabled);
         end
         function aZeroSlackCruiseReferenceNeedsNoDeparture(testCase)

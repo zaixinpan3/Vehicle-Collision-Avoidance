@@ -10,6 +10,31 @@ from auditJointPredictiveSafety import clearance_passes, distance, rectangle, ta
 
 
 class CollisionAuditTest(unittest.TestCase):
+    def test_switched_rti_accepts_only_the_selected_single_objective(self):
+        hold = affine_hold()
+        hold.update(source='switchedRealTimeIteration', optimizationMode='pcbf',
+                    clfEnabled=False, affineSubproblemCompleted=True, optimizationConverged=False,
+                    solverCalls=1, solverStages=dict(objective='pcbfSlack', exitFlag=1, numericalSolve=True))
+        self.assertTrue(feasible_hold(hold))
+        self.assertTrue(zero_slack_hold(hold))
+        hold['clfEnabled'] = True
+        self.assertFalse(feasible_hold(hold))
+        hold['optimizationMode'] = 'clf'
+        self.assertFalse(feasible_hold(hold))
+        hold['solverStages']['objective'] = 'clfSlackAndReferenceDeviation'
+        self.assertTrue(feasible_hold(hold))
+        hold['solverCalls'] = 2
+        self.assertFalse(feasible_hold(hold))
+
+    def test_zero_correction_pcbf_can_attain_its_bound_without_a_native_solve(self):
+        hold = affine_hold()
+        hold.update(source='switchedRealTimeIteration', optimizationMode='pcbf',
+                    clfEnabled=False, affineSubproblemCompleted=True, optimizationConverged=False,
+                    solverCalls=0, solverStages=[dict(objective='pcbfSlack', exitFlag=1, numericalSolve=False)])
+        self.assertTrue(feasible_hold(hold))
+        hold['affineSubproblemCompleted'] = False
+        self.assertFalse(feasible_hold(hold))
+
     def test_rti_restart_does_not_turn_missing_residual_into_a_certificate(self):
         hold = affine_hold()
         hold.update(source='twoStageRealTimeIteration', solverCalls=3)
