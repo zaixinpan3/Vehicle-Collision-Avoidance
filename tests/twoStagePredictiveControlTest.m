@@ -142,7 +142,6 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             % produce a prescribed lateral offset to count as planning.
             testCase.verifyEqual(search.planner.candidateCount,1);
             anchor=problem.model.linearization;
-            testCase.verifyFalse(anchor.guide.nominalPathClear);
             testCase.verifyTrue(anchor.guide.fieldActive);
             % A mild early correction may be mostly longitudinal; do not
             % require an unnecessary minimum steering amplitude.

@@ -1825,18 +1825,45 @@ gives the transverse acceleration; the existing speed gain supplies the
 longitudinal acceleration. This provides path attraction without waypoints
 or a prescribed return time.
 
-The initializer first rolls out this route/boundary policy through the actual
-vehicle model. If its uncertainty-inflated rectangle gaps are strictly positive
-at all active prediction nodes, it returns that rollout unchanged. Otherwise,
-it makes one field rollout with the route acceleration as its preferred input.
-The obstacle field may change both longitudinal and lateral acceleration;
-cruise-speed feedback never overwrites its longitudinal component afterwards.
-Road guidance follows this correction. This is a nominal-path conflict check
-inside initialization, not a bypass of any RTI collision or terminal constraint
-and not a robust feasibility certificate. Both passes use the same requested
-horizon and the existing encounter/perception convention. Only one trajectory
-is returned, without scoring alternative maneuvers. A longer preview that first
-reveals a conflict may therefore change the initial field activation.
+The initializer integrates one combined field through the actual vehicle model.
+There is no preliminary nominal rollout, trajectory conflict classification,
+or choice between cruising and avoiding. At each moving state, route attraction
+supplies the preferred acceleration and the obstacle field supplies a local
+correction. Road guidance follows this correction. Cruise-speed feedback never
+overwrites longitudinal obstacle acceleration afterwards.
+
+The obstacle influence includes transverse overlap relative to the instantaneous
+velocity of the two footprint centers. Let $r_c$ be their relative center
+position, $v_c$ their relative center velocity, and $n_\perp=Jv_c$ oriented toward
+$r_c$. Let $d=n_\perp^T r_c\geq0$, and let $H$ be the sum of both rectangle supports
+in this direction, including directional observer/target uncertainty. Supports
+are evaluated relative to the nominal footprint centers, including their yaw
+uncertainty and reference-point offsets. No unit-vector division is necessary.
+The local incidence factor is
+
+$$
+\eta=\left[1-(d/H)^2\right]_+.
+$$
+
+At zero relative velocity both $d$ and $H$ vanish; the implementation uses a
+numerical denominator floor, giving $\eta=1$ at that degeneracy. For nonzero
+relative velocity, an already separated transverse projection gives zero
+obstacle influence; approaching along the center line gives unit influence.
+The positive part makes the influence vanish continuously at grazing
+projection overlap while retaining first-order influence in the overlap
+deficit. A receding target also loses influence through the existing
+nonnegative outward-correction law. The raw outward
+normal acceleration deficit is multiplied by $\eta$; circulation follows this
+scaled correction. Path attraction remains present in the same field.
+
+This is instantaneous geometric shaping of a heuristic field, not a prediction
+that constant relative velocity will persist. Target acceleration and turning
+continue to evolve through NRMM at each rollout step. In particular, this
+modulation does not preserve the unmodulated ideal radial-barrier inequality
+and supplies no robust safety certificate for the nonlinear rollout. RTI
+collision/terminal constraints are unchanged. Collision and state checks on
+the generated path remain diagnostics. Since no horizon-wide decision changes
+the field, a longer requested rollout extends the same initial motion.
 
 The initial passing side and geometric encounter preview use measured ego
 motion. Route coordinates also supply deviation diagnostics and legacy offset

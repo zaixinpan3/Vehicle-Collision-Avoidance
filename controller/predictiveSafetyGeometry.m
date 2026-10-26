@@ -42,17 +42,10 @@ classdef predictiveSafetyGeometry
             % encounter scale; actual inputs still obey combined-slip Fiala.
             contourRadius=max(field.egoRadius,norm(field.position));
             speed=min(max(norm(field.velocity),1),sqrt(budget*contourRadius));
-            % A target's presence alone does not justify an evasive maneuver.
-            % Keep the actual route-following rollout when its sampled,
-            % uncertainty-inflated rectangles are separated. This only chooses
-            % the seed: it never disables RTI collision or terminal rows.
-            nominal=localCirculationRollout(model,data,0,0,count);
-            nominalPathClear=all(nominal.gaps>0);
-            best=nominal;rolloutCount=1;
-            if ~nominalPathClear
-                best=localCirculationRollout(model,data,direction,speed,count);
-                rolloutCount=2;
-            end
+            % One autonomous field, integrated once. Route attraction,
+            % obstacle circulation and road guidance act at every moving node;
+            % no separate nominal rollout classifies or selects a behavior.
+            best=localCirculationRollout(model,data,direction,speed,count);
             total=1;diagnostics=localCandidateSummary(best);
             time=(0:numel(best.gaps)-1)*cfg.controller.sampleTime;
             conflict=best.gaps<=0;first=NaN;last=NaN;
@@ -73,8 +66,6 @@ classdef predictiveSafetyGeometry
             if abs(transverse(furthest))>1e-9,passingSide=sign(transverse(furthest));end
             guide.direction=passingSide*lateral;
             guide.candidateCount=total;guide.candidates=diagnostics;
-            guide.nominalPathClear=nominalPathClear;
-            guide.nominalPathMinimumGap=min(nominal.gaps);guide.rolloutCount=rolloutCount;
             guide.conflictStartSeconds=first;guide.conflictEndSeconds=last;
             guide.minimumGap=min(best.gaps);guide.nominalMinimumGap=min(best.nominalGaps);
             guide.initialConflict=conflict(1);guide.robustCertificate=false;
@@ -191,14 +182,33 @@ classdef predictiveSafetyGeometry
                 +(kappa*nu*tau+cfg.planner.tangentialRate*(parameters.direction*parameters.speed-tau))*tangent;
             transport=r.'*centerAcceleration+2*omega*j*w+omegaDot*j*q-omega^2*q;
             acceleration=r*(relative+transport);
-            correction=0;activation=1;
+            correction=0;activation=1;incidence=1;
             if isfield(parameters,'preferredAcceleration')
                 % The obstacle can
                 % only add outward normal acceleration; it never attracts a
                 % distant ego back to a target-centred orbit. Circulation is
                 % activated by the normal correction, not by a release timer.
                 preferred=parameters.preferredAcceleration;normalWorld=r*normal;tangentWorld=r*tangent;
-                correction=max(0,normalWorld.'*(acceleration-preferred));
+                % Shape the field by transverse footprint overlap relative
+                % to the instantaneous center velocity. A clear parallel
+                % passage has zero influence even while range is shrinking.
+                % This local algebra is not a forecast/trajectory test.
+                egoOffset=re*cfg.vehicle.rectangleOffset;
+                relativeVelocity=re*x(4:5)+x(6)*j*egoOffset-centerVelocity;
+                transverse=j*relativeVelocity;centerDifference=x(1:2)+egoOffset-center;
+                orientation=sign(transverse.'*centerDifference);if orientation==0,orientation=1;end
+                transverse=orientation*transverse;
+                separation=transverse.'*centerDifference;
+                width=predictiveSafetyGeometry.rotationSupport(shape,x(3),yawRadius,-transverse.') ...
+                    +transverse.'*egoOffset ...
+                    +predictiveSafetyGeometry.rotationSupport(target(8:11),target(3),targetYawRadius,transverse.') ...
+                    -transverse.'*r*target(10:11)+parameters.inflation*norm(transverse);
+                if isfield(parameters,'generator')
+                    width=width+sum(abs(transverse.'*parameters.generator(1:2,:))) ...
+                        +predictiveSafetyGeometry.targetSupportFromData(parameters.support,parameters.index,transverse.');
+                end
+                incidence=max(0,1-(separation/max(width,eps))^2);
+                correction=incidence*max(0,normalWorld.'*(acceleration-preferred));
                 budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
                 activation=min(1,correction/budget);
                 tangentialCorrection=parameters.direction*max(0, ...
@@ -210,7 +220,7 @@ classdef predictiveSafetyGeometry
                 'normal',normal,'tangent',tangent,'position',q,'velocity',w,'rotation',r, ...
                 'transport',transport,'egoRadius',egoRadius, ...
                 'inflation',inflation,'desiredClearance',desired,'initialBarrier',nu+rate*h, ...
-                'normalCorrection',correction,'activation',activation);
+                'normalCorrection',correction,'activation',activation,'incidence',incidence);
         end
 
         function [support,inflation] = rotationSupport(shape,yaw,yawRadius,normal)
