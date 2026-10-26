@@ -4,7 +4,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % state/input iterate and retain its node count throughout the encounter.
 % Horizon sizing occurs only at encounter onset; a failed solve never extends
 % the horizon or rebuilds the problem. The completed local update returns
-% its optimized inputs unchanged, without a post-solve nonlinear rollout.
+% its optimized inputs after tolerance-sized physical-bound normalization,
+% without a post-solve nonlinear rollout.
 % An active target selects one PCBF slack LP. Otherwise one cruise CLF QP
 % is solved. The two objectives are never optimized in sequence; reference
 % proximity is a cruise-only cost and there is no cross-frame slack budget.
@@ -471,7 +472,22 @@ function [solution,search,model]=localSolve(anchor,model,initialization,timer,pr
     if isempty(point) || any(~isfinite(point)) || flag<=0
         search.terminationReason=problem.mode+"NoNumericalResult";return;
     end
-    solution=localDecode(point,problem,anchor);
+    % Solver feasibility is numerical, whereas the force model requires
+    % exact physical bounds. Project only tolerance-sized input residuals;
+    % a materially invalid solver result must not become a usable command.
+    inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
+    bounded=min(max(inputs,problem.physicalInputLower),problem.physicalInputUpper);
+    correction=bounded-inputs;boundCorrection=max(abs(correction),[],'all');
+    if boundCorrection>cfg.solver.feasibilityTolerance
+        search.terminationReason=problem.mode+"InputBoundsViolation";return;
+    end
+    changed=correction~=0;indices=problem.inputIndices(changed);
+    point(indices)=bounded(changed)-anchor.inputs(changed);
+    % Decode the exact bounded values, without round-tripping them through
+    % anchor + increment again. The affine states stay as solved; their
+    % residual against the normalized input is reported by localDecode.
+    solution=localDecode(point,problem,anchor,bounded);
+    solution.inputBoundCorrection=boundCorrection;
     search.stages(1).value=solution.objectiveValue;
     search.returned=true;search.convexSolveCompleted=true;
     search.clfStageCompleted=problem.clf.enabled;
@@ -481,8 +497,7 @@ function [solution,search,model]=localSolve(anchor,model,initialization,timer,pr
     search.terminationReason=problem.mode+"Returned";
 end
 
-function solution=localDecode(point,problem,anchor)
-    inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
+function solution=localDecode(point,problem,anchor,inputs)
     states=anchor.states+reshape(point(problem.stateIndices),size(anchor.states));
     slacks=max(0,point(problem.slackIndices));rho=NaN;rate=NaN;
     if problem.clf.enabled

@@ -124,11 +124,12 @@ function cfg=localDefaults()
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
         'speedGain',.5,'brakingRatioLimit',.35);
-    % Both RTI stages share the remaining controller-call budget.
+    % The selected RTI solve uses the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     % constraintTolerance and optimalityTolerance are the conic solver's
     % feasibility and gap tolerances; feasibilityTolerance is also used for
-    % diagnostic interpretation. reducedTolerance is the precision
+    % diagnostic interpretation and limits numerical input-bound projection.
+    % reducedTolerance is the precision
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for output assembly. Native
     % solves also count their construction time against the remaining budget.

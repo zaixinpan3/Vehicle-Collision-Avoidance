@@ -18,7 +18,7 @@ The executable approximation and the mathematical algorithm have distinct guaran
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening and terminal tangents. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The completed affine update returns its first input unchanged, without a post-solve nonlinear rollout or feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
+| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening and terminal tangents. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The completed affine update returns its first input after numerical input-bound normalization, without a post-solve nonlinear rollout or feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
 | Unified observer-to-safety design | Current observer containment, retained physical successor sets, signed whole-hold margins and a common terminal continuation. The information-set shift proves conditional recursive feasibility and zero-deficit safety. Future observer dynamics are needed only for the optional prediction of observation-dependent policies. |
 
 The latter theorem is not a certificate for the former approximation.
@@ -386,8 +386,9 @@ The current input estimate is fixed; current state error is handled by the
 published enclosure, not a free optimizer correction. Fixed collision duals
 and terminal tangents are built once on this model. There is at most one
 native objective solve per reference. The completed update supplies the first
-optimized input directly. Its predicted states and PCBF slacks remain those
-of the affine subproblem; no post-solve nonlinear rollout replaces or rejects
+optimized input, with the numerical bound normalization described below.
+Its predicted states and PCBF slacks remain those of the affine subproblem;
+no post-solve nonlinear rollout replaces or rejects
 them. The initial planner rollout and stagewise variational integrations belong to
 preparation, before solving. Independent experiment replay evaluates the issued
 controls on the plant. There is no auxiliary feasibility restoration problem,
@@ -453,7 +454,8 @@ certification steering/braking units. These are cost units, never bounds.
 The horizon mean keeps the weight independent of node count. The solver
 scales the cruise objective by `max(1,V(xhat_now))`.
 
-Each call returns the selected optimization's first input unchanged. There is
+Each call returns the selected optimization's first input, apart from
+tolerance-sized physical input-bound normalization. There is
 no second-stage rejection, no PCBF-versus-CLF weighted sum, and no inherited
 slack budget. The ideal encounter problem still minimizes its safety slack;
 its conditional shift argument remains separate from the executable affine
@@ -463,9 +465,10 @@ Modified Fiala dynamics include combined-slip saturation at both axles.
 The optimizer uses their local derivatives without additional tire-capacity
 cones or friction polygons. A tangent can overestimate the nonlinear force
 away from its expansion point; this approximation error does not indicate a
-missing capacity limit in Fiala. Independent experiments roll the unchanged optimized controls through the
-nonlinear plant; there is no online post-solve rollout or admission check. Removing the extra cones
-does not make an arbitrarily large one-step correction accurate.
+missing capacity limit in Fiala. Independent experiments roll the issued
+controls through the nonlinear plant; there is no online post-solve rollout
+or admission check. Removing the extra cones does not make an arbitrarily
+large one-step correction accurate.
 The force-balance observer encloses saturated forces too; its interval can
 widen when the measurement becomes less informative. Its separate sideslip
 premise `|vy| <= tan(model.sideslipMaximum)*vx` remains enforced, with observer
@@ -473,8 +476,17 @@ support margins. Removing that premise would require a new observer enclosure.
 The precomputed local cruise certificate may use a conservative nonsaturated
 neighborhood; that local certificate does not impose a full-horizon cone.
 
-Physical input bounds include force ratios -1 and +1. The optimizer uses
-these bounds and issued inputs are unchanged. Only the tangent reference
+Physical input bounds include force ratios -1 and +1. After solving, input
+values outside their physical bounds by at most `solver.feasibilityTolerance`
+are projected to the exact bounds. Larger residuals reject the solver result
+with `pcbfInputBoundsViolation` or `clfInputBoundsViolation`. In-bounds values
+are not changed. The issued command, stored input sequence and input
+corrections use the same normalized values. Affine states and slacks are not
+recomputed; their constraint residual is evaluated with the normalized input.
+`inputBoundCorrection` reports the largest correction, and
+`postSolveInputModification` records whether any value changed. This numerical
+interface does not relax the Fiala domain or certify nonlinear feasibility.
+Only the tangent reference
 uses `nonlinearBicycleModel.inputBounds(cfg,true)`, which keeps its force
 ratio ten constraint tolerances inside the singular endpoints. Shifting a
 saturated previous plan rebuilds this interior seed and its complete rollout;
@@ -998,7 +1010,8 @@ iterations. If no certified hold is found, a moving endpoint uses the
 nominal-feedback seed; an already stopped endpoint keeps a nonpositive
 longitudinal command. This prevents an uncertified restart from creating a
 poor accelerating reference while preserving ordinary cruise recovery. The
-optimizer still chooses and issues the final input unchanged.
+optimizer still chooses the final input, subject only to the numerical
+input-bound normalization described above.
 
 <a id="joint-prediction"></a>
 ## 6. Optional joint feedback-aware prediction

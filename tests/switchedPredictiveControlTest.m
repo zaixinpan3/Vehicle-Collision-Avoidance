@@ -1,5 +1,5 @@
 classdef switchedPredictiveControlTest < matlab.unittest.TestCase
-    % Target-presence objective switching with one solve and unchanged commands.
+    % Target-presence objective switching and consistent issued commands.
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));

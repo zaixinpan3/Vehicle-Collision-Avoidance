@@ -4,6 +4,9 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         model
         anchor
     end
+    properties (TestParameter)
+        inputBound = struct('fullBraking',-1,'fullThrottle',1,'configuredBraking',-.6,'configuredThrottle',.4);
+    end
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -18,6 +21,38 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function numericalInputExcessReturnsTheExactPhysicalBound(testCase,inputBound)
+            excess=sign(inputBound)*testCase.model.cfg.solver.feasibilityTolerance/2;
+            [request,raw]=localFixedInputResult(testCase.model,testCase.anchor,inputBound,excess);
+            [solution,search]=solvePredictiveControl("probe",request);
+            testCase.assertNotEmpty(solution);
+            testCase.verifyEqual(solution.inputs(2,:),repmat(inputBound,1,size(raw,2)),AbsTol=0);
+            testCase.verifyEqual(solution.inputs(1,:),raw(1,:),AbsTol=1e-12);
+            testCase.verifyEqual(solution.states,testCase.anchor.states,AbsTol=1e-10);
+            testCase.verifyEqual(solution.inputBoundCorrection,abs(excess),AbsTol=1e-10);
+            testCase.verifyGreaterThan(solution.hard,abs(excess)/2);
+            testCase.verifyLessThanOrEqual(solution.hard,request.model.cfg.solver.feasibilityTolerance);
+            testCase.verifyTrue(all(isfinite(nonlinearBicycleModel.derivative( ...
+                request.model.initialState,solution.inputs(:,1),request.model.cfg))));
+            testCase.verifyEqual(search.solverCalls,1);
+        end
+        function materialInputExcessCannotBecomeAnActuatorCommand(testCase,inputBound)
+            excess=sign(inputBound)*10*testCase.model.cfg.solver.feasibilityTolerance;
+            request=localFixedInputResult(testCase.model,testCase.anchor,inputBound,excess);
+            [solution,search]=solvePredictiveControl("probe",request);
+            testCase.verifyEmpty(solution);
+            testCase.verifyEqual(search.terminationReason,"clfInputBoundsViolation");
+            testCase.verifyGreaterThan(search.stages.exitFlag,0);
+            testCase.verifyEqual(search.solverCalls,1);
+        end
+        function inBoundsSolverInputsAreNotMovedToTheBoundary(testCase,inputBound)
+            excess=-sign(inputBound)*testCase.model.cfg.solver.feasibilityTolerance/2;
+            [request,raw]=localFixedInputResult(testCase.model,testCase.anchor,inputBound,excess);
+            solution=solvePredictiveControl("probe",request);
+            testCase.assertNotEmpty(solution);
+            testCase.verifyEqual(solution.inputs,raw,AbsTol=1e-12);
+            testCase.verifyEqual(solution.inputBoundCorrection,0,AbsTol=0);
+        end
         function theOnlineUpdateReturnsTheAffineStateDecisionWithoutReplay(testCase)
             model=testCase.model;model.initialState(2)=.5;
             previous=struct('inputTrajectory',testCase.anchor.inputs,'stateTrajectory',testCase.anchor.states);
@@ -118,6 +153,20 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(abs(turning(2)),1);
         end
     end
+end
+
+function [request,inputs]=localFixedInputResult(model,anchor,bound,excess)
+    if bound<0,model.cfg.actuation.brakingRatioMinimum=bound;
+    else,model.cfg.actuation.brakingRatioMaximum=bound;end
+    [problem,~,model]=localFormulate(anchor,model);
+    inputs=anchor.inputs;inputs(2,:)=bound+excess;
+    % Isolate the solver/output interface with a uniquely determined result.
+    % Physical input bounds remain available to the production decoder.
+    point=zeros(size(problem.lower));point(problem.inputIndices)=inputs-anchor.inputs;
+    count=numel(point);problem.equal=speye(count);problem.rhs=point;
+    problem.a=sparse(0,count);problem.b=zeros(0,1);problem.cones=[];
+    problem.lower(:)=-Inf;problem.upper(:)=Inf;
+    request=struct('operation',"solve",'model',model,'anchor',anchor,'problem',problem);
 end
 
 function [problem,search,model]=localFormulate(anchor,model)
