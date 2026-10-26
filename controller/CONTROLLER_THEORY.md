@@ -7,10 +7,12 @@ repository root unless linked otherwise. Historical experiment reports describe
 the versions that produced them; they are not rewritten by this consolidation.
 
 The controller seeks rectangle nonoverlap during an encounter and resumes
-prescribed-path cruise recovery afterward. Target presence selects one objective:
-an active encounter minimizes predictive collision deficits in one PCBF LP;
-without a target, one QP minimizes soft cruise CLF slack and reference deviation.
-No second solve, same-frame slack cap or cross-frame slack budget is imposed.
+prescribed-path cruise recovery afterward. An active encounter minimizes
+predictive collision deficits first, then minimizes reference deviation while
+preserving that attained optimum. Without a target, one QP minimizes soft cruise
+CLF slack and reference deviation. Avoidance uses at most two convex solves on
+one RTI model and one shared time budget; an available zero-slack affine
+candidate avoids the primary LP. No cross-frame slack budget is imposed.
 The terminal set certifies an available safe continuation at the prediction
 endpoint; it is not a command to park or a task-completion condition.
 
@@ -384,8 +386,9 @@ prefix is not reintegrated from the new measurement before solving.
 
 The current input estimate is fixed; current state error is handled by the
 published enclosure, not a free optimizer correction. Fixed collision duals
-and terminal tangents are built once on this model. There is at most one
-native objective solve per reference. The completed update supplies the first
+and terminal tangents are built once on this model. Avoidance uses at most two
+native objective solves on that same reference; cruise uses one.
+The completed update supplies the first
 optimized input, with the numerical bound normalization described below.
 Its predicted states and PCBF slacks remain those of the affine subproblem;
 no post-solve nonlinear rollout replaces or rejects
@@ -409,14 +412,37 @@ node also carries a nonnegative robustness-deficit slack; the nominal collision
 row remains hard after the prefix. These explicit collision deficits are
 separate from physical state, road, handling and terminal constraints.
 
-While `model.target` is nonempty, the sole objective is `sum(xi)`. No CLF
-row, CLF slack cost or reference-deviation cost participates in this PCBF LP.
-If the zero correction with zero slacks satisfies every constraint, it attains
-the global lower bound without a native solve. Otherwise the solver runs once.
-Positive PCBF slack remains admissible; state, input, hard-tail and terminal
-constraints retain their declared hardness. Removing the secondary proximity
-solve leaves multiple safety-optimal trajectories possible; smooth steering
-and bounded nonlinear linearization error do not follow from slack optimality.
+While `model.target` is nonempty, the first objective is `sum(xi)`. No CLF
+row or CLF slack cost participates. A zero-slack affine candidate is checked
+before solving: first zero correction, then state corrections obtained from
+the same affine dynamics with zero input correction. A feasible candidate
+attains the safety lower bound without an LP. This check uses floating-point
+roundoff tolerance and does not integrate or certify the nonlinear model.
+Otherwise one LP minimizes the safety sum.
+
+For a positive `rti.referenceDeviationWeight`, a second QP minimizes
+
+    J_ref = (lambda / (2 N)) sum_k (
+         ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2)
+
+with exactly the same dynamics and constraints, plus `sum(xi) <= Sstar`, where
+`Sstar` is the first stage's attained safety value. When `Sstar == 0`, the
+slacks are fixed to zero instead. No intentional slack allowance or weighted
+safety/performance tradeoff is used. A returned refinement must preserve the
+cap within `solver.constraintTolerance * max(1,Sstar)`. Finite solver
+precision means the implemented priority is numerical, not exact arithmetic.
+A common positive proximity weight is divided out of this secondary solve;
+it changes the reported cost scale but not the mathematical minimizer.
+
+Both stages share the remaining call budget and reuse the constructed RTI
+model. If the priority candidate already has zero proximity cost, no second
+native solve is needed. If refinement times out, fails, violates its input
+bounds or exceeds the safety cap, the completed priority solution is retained
+and `secondaryStageCompleted` remains false. No third solve or replanning is
+attempted. Positive PCBF slack remains admissible; state, input, hard-tail and
+terminal constraints retain their declared hardness. Minimizing reference
+correction does not impose a steering-rate bound or guarantee nonlinear
+model accuracy.
 
 Without an active target, collision slacks are fixed to zero and no PCBF LP
 is solved. The sole cruise QP uses the soft continuous-time CLF row
@@ -445,9 +471,9 @@ of a new target still requires a feasible initial encounter problem; a prior
 CLF solution alone cannot establish that feasibility. No common Lyapunov
 function or global switched-system safety theorem is asserted.
 
-Here xbar and ubar are the current RTI reference. In cruise mode,
-`lambda = rti.referenceDeviationWeight` defaults to 10; zero disables this
-penalty for an ablation. Its effective value is zero during PCBF operation.
+Here xbar and ubar are the current RTI reference.
+`lambda = rti.referenceDeviationWeight` defaults to 10 in both modes; zero
+disables this penalty and the avoidance refinement for an ablation.
 Dx uses equal x/y units from `clf.lateralPositionErrorScale`, followed by the
 CLF heading, speed, lateral-velocity and yaw-rate scales. Du uses the CLF
 certification steering/braking units. These are cost units, never bounds.
@@ -456,7 +482,8 @@ scales the cruise objective by `max(1,V(xhat_now))`.
 
 Each call returns the selected optimization's first input, apart from
 tolerance-sized physical input-bound normalization. There is
-no second-stage rejection, no PCBF-versus-CLF weighted sum, and no inherited
+no rejection of the priority solution due solely to refinement failure,
+no PCBF-versus-CLF weighted sum, and no inherited
 slack budget. The ideal encounter problem still minimizes its safety slack;
 its conditional shift argument remains separate from the executable affine
 RTI approximation.
@@ -492,7 +519,8 @@ ratio ten constraint tolerances inside the singular endpoints. Shifting a
 saturated previous plan rebuilds this interior seed and its complete rollout;
 this does not change a previously issued command. The 100 ms controller budget
 reserves 2 ms for completion. Each controller call builds at most one RTI
-model and performs at most one native objective solve. Initial encounter
+model and performs at most two native objective solves during avoidance,
+or one during cruise. Initial encounter
 horizon sizing precedes this model, and later encounter calls retain that
 length; primal infeasibility and numerical failure
 are reported without increasing the node count or rebuilding the problem.
@@ -1671,8 +1699,10 @@ $$
 V_{\rm P}^*(I_k)=\min\sum_{i=0}^{N-1}\xi_i.                     \tag{U9}
 $$
 
-During an active encounter the ideal controller minimizes (U9) and applies
-its first input, with no secondary objective. Once the target leaves the
+During an active encounter the ideal controller minimizes (U9), chooses a
+minimum-reference-deviation member of its optimal solution set, and applies
+its first input. This tie-breaker does not alter the optimal barrier value.
+Once the target leaves the
 perception-scoped encounter, the collision problem becomes inactive and the
 controller selects its cruise CLF objective. Section 4 gives the additional
 dissipation and recovery-domain premises; a newly detected encounter requires
@@ -2034,11 +2064,13 @@ zero on subsequent calls in the same encounter. `nominalRestarted` stays false.
 `postSolveFeasibilityCheck` are false. `nonlinearHardResidual` and
 `linearizationGapMeters` are NaN rather than uncomputed zero residuals.
 The reported PCBF value, stage slacks and `affineHardResidual` describe the
-affine subproblem. `search.slackCap` is an inactive compatibility field (NaN);
-there is no secondary solve or nonlinear acceptance cap. When no encounter
+affine subproblem. During avoidance, `search.slackCap` is the attained primary
+optimum when reference refinement is enabled. `secondaryStageCompleted` and
+`secondaryOptimumApplied` distinguish a completed refinement from a retained
+priority result. No nonlinear acceptance cap is imposed. When no encounter
 is active, the CLF objective belongs to the input-affine approximation of the
-current continuous derivative. An active encounter disables that objective
-and its inequality; only the PCBF slack LP is active.
+current continuous derivative. An active encounter disables that CLF objective
+and inequality while retaining the reference-proximity tie-breaker.
 `predictedState` is the affine SQP iterate (`predictionModel=affineSqpIterate`).
 Compatibility rollout metadata has `available=false` and
 `reason=notPerformedByRti`; it does not signal a failed rollout.

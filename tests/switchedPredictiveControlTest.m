@@ -191,7 +191,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.restartCount,0);
             testCase.verifyEqual(search.horizonExtensions,0);
             testCase.verifyNumElements(search.attempts,1);
-            testCase.verifyLessThanOrEqual(search.solverCalls,1);
+            testCase.verifyLessThanOrEqual(search.solverCalls,2);
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyEqual(search.returned,~isempty(solution));
         end
@@ -373,13 +373,13 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
                 [true,false,true]);
             testCase.verifyEqual(near.metadata.optimizationObjective,"pcbfSlack");
             testCase.verifyFalse(near.metadata.search.clfStageAttempted);
-            testCase.verifyFalse(near.metadata.search.secondaryStageAttempted);
+            testCase.verifyTrue(near.metadata.search.secondaryStageAttempted);
             testCase.verifyTrue(near.metadata.search.pcbfStageCompleted);
             testCase.verifyEqual(near.metadata.optimizationMode,"pcbf");
-            testCase.verifyEqual(near.metadata.secondaryObjective,"none");
-            testCase.verifyEqual(near.metadata.referenceDeviationWeight,0);
-            testCase.verifyNumElements(near.metadata.search.stages,1);
-            testCase.verifyLessThanOrEqual(near.metadata.solverCallCount,1);
+            testCase.verifyEqual(near.metadata.secondaryObjective,"referenceDeviation");
+            testCase.verifyEqual(near.metadata.referenceDeviationWeight,10);
+            testCase.verifyNumElements(near.metadata.search.stages,2);
+            testCase.verifyLessThanOrEqual(near.metadata.solverCallCount,2);
         end
         function cruiseClfResumesAfterTheEncounterClears(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=0;

@@ -35,6 +35,32 @@ class CollisionAuditTest(unittest.TestCase):
         hold['affineSubproblemCompleted'] = False
         self.assertFalse(feasible_hold(hold))
 
+    def test_reference_refinement_preserves_the_attained_pcbf_optimum(self):
+        hold = affine_hold()
+        hold.update(source='switchedRealTimeIteration', optimizationMode='pcbf',
+                    clfEnabled=False, affineSubproblemCompleted=True, solverCalls=2,
+                    primaryOptimum=.2, slackCap=.2, predictiveBarrierValue=.2,
+                    secondaryStageCompleted=True,
+                    solverStages=[dict(objective='pcbfSlack', exitFlag=1, numericalSolve=True),
+                                  dict(objective='referenceDeviation', exitFlag=1, numericalSolve=True)])
+        self.assertTrue(feasible_hold(hold))
+        hold['predictiveBarrierValue'] = .21
+        self.assertFalse(feasible_hold(hold))
+        hold['slackCap'] = .21
+        self.assertFalse(feasible_hold(hold))
+
+    def test_failed_refinement_can_retain_the_completed_priority_result(self):
+        hold = affine_hold()
+        hold.update(source='switchedRealTimeIteration', optimizationMode='pcbf',
+                    clfEnabled=False, affineSubproblemCompleted=True, solverCalls=2,
+                    primaryOptimum=0, slackCap=0, predictiveBarrierValue=0,
+                    secondaryStageCompleted=False,
+                    solverStages=[dict(objective='pcbfSlack', exitFlag=1, numericalSolve=True),
+                                  dict(objective='referenceDeviation', exitFlag=0, numericalSolve=True)])
+        self.assertTrue(feasible_hold(hold))
+        hold['secondaryStageCompleted'] = True
+        self.assertFalse(feasible_hold(hold))
+
     def test_rti_restart_does_not_turn_missing_residual_into_a_certificate(self):
         hold = affine_hold()
         hold.update(source='twoStageRealTimeIteration', solverCalls=3)

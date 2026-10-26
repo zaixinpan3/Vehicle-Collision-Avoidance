@@ -72,14 +72,26 @@ def feasible_hold(hold):
         expected = {'pcbf': 'pcbfSlack', 'clf': 'clfSlackAndReferenceDeviation'}.get(mode)
         tolerance = hold.get('affineFeasibilityTolerance', 0)
         residual = hold.get('hardResidual')
-        return (expected is not None and len(stages) == 1
+        primary_valid = (expected is not None and 1 <= len(stages) <= (2 if mode == 'pcbf' else 1)
                 and hold.get('clfEnabled') == (mode == 'clf')
                 and math.isfinite(tolerance) and tolerance > 0
                 and isinstance(residual, (int, float)) and 0 <= residual <= tolerance
                 and hold.get('affineSubproblemCompleted') is True
-                and hold.get('solverCalls') == int(stages[0].get('numericalSolve', True))
+                and hold.get('solverCalls') == sum(int(stage.get('numericalSolve', True)) for stage in stages)
                 and stages[0].get('objective') == expected
                 and stages[0].get('exitFlag', 0) > 0)
+        if not primary_valid or len(stages) == 1:
+            return primary_valid
+        optimum = hold.get('primaryOptimum')
+        cap = hold.get('slackCap')
+        slack = hold.get('predictiveBarrierValue')
+        completed = hold.get('secondaryStageCompleted')
+        return (stages[1].get('objective') == 'referenceDeviation'
+                and isinstance(optimum, (int, float)) and math.isfinite(optimum) and optimum >= 0
+                and isinstance(cap, (int, float)) and cap == optimum
+                and isinstance(slack, (int, float)) and 0 <= slack <= cap + tolerance
+                and completed in (True, False)
+                and (not completed or stages[1].get('exitFlag', 0) > 0))
     if hold.get('source') in ('twoStageConvexOptimization', 'twoStageRealTimeIteration'):
         stages = hold.get('solverStages', [])
         calls = (2, 3, 4) if hold.get('source') == 'twoStageRealTimeIteration' else (2,)

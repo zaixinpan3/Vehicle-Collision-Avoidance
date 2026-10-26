@@ -1,5 +1,5 @@
 classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
-    % Reference proximity is used only by the cruise CLF optimization.
+    % PCBF has priority over reference proximity; CLF is cruise-only.
     properties (Access=private)
         model
         anchor
@@ -22,6 +22,48 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aLargeProximityWeightCannotBuyAdditionalSafetySlack(testCase)
+            request=localPriorityProblem(testCase.model,testCase.anchor,1,1e8);
+            [solution,search]=solvePredictiveControl("probe",request);
+            testCase.assertNotEmpty(solution);
+            testCase.verifyTrue(search.secondaryStageCompleted);
+            testCase.verifyEqual(search.primaryOptimum,.5,AbsTol=1e-5);
+            testCase.verifyEqual(solution.safety,.5,AbsTol=1e-5);
+            testCase.verifyEqual(solution.inputCorrection(1,1),.5,AbsTol=1e-5);
+            testCase.verifyEqual(search.slackCap,search.primaryOptimum,AbsTol=0);
+        end
+        function equalZeroSlackSolutionsPreferTheSmallerReferenceCorrection(testCase)
+            request=localPriorityProblem(testCase.model,testCase.anchor,.1,10);
+            [solution,search]=solvePredictiveControl("probe",request);
+            testCase.assertNotEmpty(solution);
+            testCase.verifyTrue(search.secondaryStageCompleted);
+            testCase.verifyEqual(solution.safety,0,AbsTol=1e-5);
+            testCase.verifyEqual(solution.inputCorrection(1,1),.1,AbsTol=1e-5);
+            testCase.verifyLessThanOrEqual(search.solverCalls,2);
+        end
+        function anAffineZeroSlackWitnessAvoidsThePrimaryNumericalSolve(testCase)
+            request=localWitnessProblem(testCase.model,testCase.anchor);
+            [solution,search]=solvePredictiveControl("probe",request);
+            testCase.assertNotEmpty(solution);
+            testCase.verifyFalse(search.stages(1).numericalSolve);
+            testCase.verifyTrue(search.stages(2).numericalSolve);
+            testCase.verifyEqual(search.solverCalls,1);
+            testCase.verifyTrue(search.secondaryStageCompleted);
+            testCase.verifyEqual(solution.safety,0,AbsTol=1e-5);
+        end
+        function unfinishedRefinementRetainsTheCompletedPrioritySolution(testCase)
+            request=localWitnessProblem(testCase.model,testCase.anchor);
+            request.model.cfg.solver.maxIterations=1;
+            [solution,search]=solvePredictiveControl("probe",request);
+            testCase.assertNotEmpty(solution);
+            testCase.verifyTrue(search.pcbfStageCompleted);
+            testCase.verifyFalse(search.secondaryStageCompleted);
+            testCase.verifyEqual(search.terminationReason,"pcbfReturnedWithoutRefinement");
+            testCase.verifyEqual(solution.safety,0,AbsTol=0);
+            testCase.verifyEqual(solution.inputs,testCase.anchor.inputs,AbsTol=0);
+            testCase.verifyLessThanOrEqual(solution.hard,request.model.cfg.solver.constraintTolerance);
+            testCase.verifyEqual(search.solverCalls,1);
+        end
         function cruiseDecayCannotAlterAnAvoidanceUpdate(testCase)
             original=localSolve(testCase.model,testCase.anchor,10);
             changed=testCase.model;changed.nominalReference.decayRate=100*changed.nominalReference.decayRate;
@@ -32,17 +74,18 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(alternative.inputs,original.inputs,AbsTol=1e-10);
             testCase.verifyEqual(alternative.states,original.states,AbsTol=1e-10);
         end
-        function avoidanceIgnoresTheCruiseReferenceWeight(testCase)
+        function avoidanceUsesProximityOnlyAfterMinimizingSafetySlack(testCase)
             [original,search]=localSolve(testCase.model,testCase.anchor,10);
             alternative=localSolve(testCase.model,testCase.anchor,1000);
             testCase.assertNotEmpty(original);testCase.assertNotEmpty(alternative);
             testCase.verifyEqual(original.inputs,alternative.inputs,AbsTol=1e-10);
             testCase.verifyEqual(original.states,alternative.states,AbsTol=1e-10);
-            testCase.verifyEqual(original.referenceDeviationWeight,0);
-            testCase.verifyEqual(original.referenceDeviationCost,0);
-            testCase.verifyEqual(search.stages.objective,"pcbfSlack");
-            testCase.verifyFalse(search.secondaryStageAttempted);
-            testCase.verifyTrue(isnan(search.slackCap));
+            testCase.verifyEqual(original.referenceDeviationWeight,10);
+            testCase.verifyGreaterThan(original.referenceDeviationCost,0);
+            testCase.verifyEqual([search.stages.objective],["pcbfSlack","referenceDeviation"]);
+            testCase.verifyTrue(search.secondaryStageCompleted);
+            testCase.verifyEqual(search.slackCap,search.primaryOptimum,AbsTol=0);
+            testCase.verifyLessThanOrEqual(original.safety,search.slackCap+testCase.model.cfg.solver.constraintTolerance);
         end
         function reportedCostMeasuresStatesAndInputsRelativeToTheActualAnchor(testCase)
             model=testCase.model;model.target=[];model.targetEpoch=[];
@@ -77,6 +120,27 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(prediction.metadata.referenceDeviationWeight,10);
         end
     end
+end
+
+function request=localPriorityProblem(model,anchor,demand,weight)
+    model.cfg.rti.referenceDeviationWeight=weight;
+    [p,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+        'model',model,'anchor',anchor,'inherited',true));
+    % A small constrained choice: correction + slack >= demand. The
+    % correction is at most 0.5, so safety and proximity can conflict.
+    count=numel(p.lower);p.equal=sparse(0,count);p.rhs=zeros(0,1);p.cones=[];
+    p.lower(:)=0;p.upper(:)=0;
+    u=p.inputIndices(1,1);s=p.slackIndices(1);p.upper(u)=.5;p.upper(s)=Inf;
+    p.a=sparse([1,1],[u,s],[-1,-1],1,count);p.b=-demand;
+    request=struct('operation',"solve",'model',model,'anchor',anchor,'problem',p);
+end
+
+function request=localWitnessProblem(model,anchor)
+    request=localPriorityProblem(model,anchor,0,10);p=request.problem;
+    count=numel(p.lower);ix=p.stateIndices(:);
+    p.equal=sparse(1:numel(ix),ix,1,numel(ix),count);p.rhs=zeros(numel(ix),1);p.rhs(8)=.5;
+    p.a=sparse(0,count);p.b=zeros(0,1);p.lower(ix)=-Inf;p.upper(ix)=Inf;
+    request.problem=p;
 end
 
 function [solution,search]=localSolve(model,anchor,weight)

@@ -6,9 +6,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % the horizon or rebuilds the problem. The completed local update returns
 % its optimized inputs after tolerance-sized physical-bound normalization,
 % without a post-solve nonlinear rollout.
-% An active target selects one PCBF slack LP. Otherwise one cruise CLF QP
-% is solved. The two objectives are never optimized in sequence; reference
-% proximity is a cruise-only cost and there is no cross-frame slack budget.
+% An active target selects PCBF slack first, then reference proximity on
+% its optimal face. Both solves share the same linearization and budget.
+% Outside an encounter one cruise CLF/proximity QP is solved. There is no
+% cross-frame slack budget.
 % Research access: solvePredictiveControl("probe",request) exposes reference,
 % formulation and solve operations to the free-time experiment in scripts/.
 % It does not enable a variable grid in the online controller.
@@ -435,7 +436,8 @@ function search=localSearch(problem,initialization,formulationSeconds)
 end
 
 function [solution,search,model]=localSolve(anchor,model,initialization,timer,problem)
-    % Exactly one objective is active. No first-stage cap or second solve.
+    % One RTI model. Avoidance orders slack before reference proximity;
+    % cruise uses its continuous CLF and proximity in a single QP.
     localCheckDeadline(model);
     cfg=model.cfg;solution=[];
     search=localSearch(problem,initialization,0);
@@ -448,53 +450,126 @@ function [solution,search,model]=localSolve(anchor,model,initialization,timer,pr
     search.pcbfStageAttempted=~problem.clf.enabled;
     if problem.clf.enabled,search.primaryLowerBound=NaN;end
     remaining=model.solveTimeLimitSeconds-toc(timer);if remaining<=0,return;end
-    objective=problem.safetyObjective;
-    if problem.clf.enabled,objective=problem.performanceObjective;end
-    wall=tic;count=numel(objective);
-    % In PCBF mode a feasible zero correction with zero slack already
-    % attains the global lower bound. This is not a second optimization.
-    zeroFeasible=~problem.clf.enabled && all(problem.b>=0) && all(problem.rhs==0) ...
-        && all(problem.lower<=0) && all(problem.upper>=0);
-    for index=1:numel(problem.cones)
-        cone=problem.cones(index);
-        zeroFeasible=zeroFeasible && all(vecnorm(reshape(cone.b,cone.size,[]),2,1)<=-cone.gamma(:).');
+    objective=problem.safetyObjective;quadratic=sparse(numel(objective),numel(objective));
+    stageObjective="pcbfSlack";
+    if problem.clf.enabled
+        objective=problem.performanceObjective;quadratic=problem.quadratic;
+        stageObjective=problem.optimizationObjective;
     end
-    if zeroFeasible
-        point=zeros(count,1);flag=1;solverInfo=struct();numerical=false;
-    else
-        [point,flag,solverInfo]=localConicSolve(problem.quadratic,objective,problem.cones, ...
+    wall=tic;point=[];
+    if ~problem.clf.enabled,point=localZeroSlackCandidate(problem);end
+    numerical=isempty(point);
+    if numerical
+        [point,flag,solverInfo]=localConicSolve(quadratic,objective,problem.cones, ...
             problem.a,problem.b,problem.equal,problem.rhs,problem.lower,problem.upper,cfg,remaining, ...
             min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
-        search.solverCalls=1;numerical=true;
+        search.solverCalls=1;
+    else
+        flag=1;solverInfo=struct();
     end
-    search.stages(1)=struct('objective',problem.optimizationObjective,'exitFlag',flag, ...
+    search.stages(1)=struct('objective',stageObjective,'exitFlag',flag, ...
         'seconds',toc(wall),'value',NaN,'numericalSolve',numerical,'solverInfo',solverInfo);
     if isempty(point) || any(~isfinite(point)) || flag<=0
         search.terminationReason=problem.mode+"NoNumericalResult";return;
     end
-    % Solver feasibility is numerical, whereas the force model requires
-    % exact physical bounds. Project only tolerance-sized input residuals;
-    % a materially invalid solver result must not become a usable command.
-    inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
-    bounded=min(max(inputs,problem.physicalInputLower),problem.physicalInputUpper);
-    correction=bounded-inputs;boundCorrection=max(abs(correction),[],'all');
-    if boundCorrection>cfg.solver.feasibilityTolerance
+    solution=localBoundedDecode(point,problem,anchor,cfg);
+    if isempty(solution)
         search.terminationReason=problem.mode+"InputBoundsViolation";return;
     end
-    changed=correction~=0;indices=problem.inputIndices(changed);
-    point(indices)=bounded(changed)-anchor.inputs(changed);
-    % Decode the exact bounded values, without round-tripping them through
-    % anchor + increment again. The affine states stay as solved; their
-    % residual against the normalized input is reported by localDecode.
-    solution=localDecode(point,problem,anchor,bounded);
-    solution.inputBoundCorrection=boundCorrection;
     search.stages(1).value=solution.objectiveValue;
     search.returned=true;search.convexSolveCompleted=true;
     search.clfStageCompleted=problem.clf.enabled;
     search.pcbfStageCompleted=~problem.clf.enabled;
-    if search.pcbfStageCompleted,search.primaryOptimum=solution.safety;end
     search.clfLowerBound=problem.clf.enabled && solution.clfSlack<=cfg.solver.feasibilityTolerance*problem.clfScale;
     search.terminationReason=problem.mode+"Returned";
+    if problem.clf.enabled,return;end
+    search.primaryOptimum=solution.safety;
+    if problem.referenceDeviationWeight==0,return;end
+
+    % Preserve the attained safety optimum, without a weighted tradeoff or
+    % an intentional slack allowance. Solver tolerances remain numerical.
+    search.slackCap=search.primaryOptimum;
+    secondary=problem;
+    if search.slackCap==0
+        secondary.upper(problem.slackIndices)=0;
+    else
+        secondary.a=[problem.a;problem.safetyObjective.'];
+        secondary.b=[problem.b;search.slackCap];
+    end
+    search.secondaryStageAttempted=true;
+    wall=tic;numerical=false;flag=1;solverInfo=struct();
+    if solution.referenceDeviationCost==0
+        % Zero is also the global lower bound of the quadratic tie-breaker.
+        refined=solution;
+    else
+        remaining=model.solveTimeLimitSeconds-toc(timer);refined=[];flag=0;
+        if remaining>0
+            numerical=true;search.solverCalls=search.solverCalls+1;
+            % A common positive weight cannot change this minimizer. Remove
+            % it from the solve to avoid conditioning changes with its units.
+            [second,flag,solverInfo]=localConicSolve(problem.quadratic/problem.referenceDeviationWeight, ...
+                zeros(size(objective)),secondary.cones,secondary.a,secondary.b, ...
+                secondary.equal,secondary.rhs,secondary.lower,secondary.upper,cfg,remaining, ...
+                min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
+            if ~isempty(second) && all(isfinite(second)) && flag>0
+                refined=localBoundedDecode(second,secondary,anchor,cfg);
+            end
+        end
+    end
+    search.stages(2)=struct('objective',"referenceDeviation",'exitFlag',flag, ...
+        'seconds',toc(wall),'value',NaN,'numericalSolve',numerical,'solverInfo',solverInfo);
+    tolerance=cfg.solver.constraintTolerance*max(1,search.slackCap);
+    if ~isempty(refined) && refined.safety<=search.slackCap+tolerance
+        solution=refined;search.secondaryStageCompleted=true;
+        search.stages(2).value=solution.referenceDeviationCost;
+    else
+        % Keep the completed priority result; refinement failure does not
+        % trigger another solve or invalidate the already available input.
+        search.terminationReason="pcbfReturnedWithoutRefinement";
+    end
+    solution.secondaryObjective="referenceDeviation";
+    solution.secondaryObjectiveValue=solution.referenceDeviationCost;
+end
+
+function point=localZeroSlackCandidate(problem)
+    % A feasible affine candidate with zero slack establishes the primary
+    % lower bound without an LP. This is not nonlinear integration.
+    point=zeros(size(problem.lower));
+    if localAffineFeasible(point,problem),return;end
+    indices=problem.stateIndices(:);dynamics=problem.equal(:,indices);
+    if size(dynamics,1)~=numel(indices) || any(diag(dynamics)~=1)
+        point=[];return;
+    end
+    point(indices)=dynamics\problem.rhs;
+    if ~localAffineFeasible(point,problem),point=[];end
+end
+
+function feasible=localAffineFeasible(point,problem)
+    tolerance=100*eps(max(1,norm(point,Inf)));
+    feasible=all(isfinite(point)) && all(problem.a*point<=problem.b+tolerance) ...
+        && all(abs(problem.equal*point-problem.rhs)<=tolerance) ...
+        && all(point>=problem.lower-tolerance) && all(point<=problem.upper+tolerance);
+    for index=1:numel(problem.cones)
+        cone=problem.cones(index);
+        feasible=feasible && all(vecnorm(reshape(cone.A*point+cone.b,cone.size,[]),2,1) ...
+            <=reshape(cone.D*point-cone.gamma,1,[])+tolerance);
+    end
+end
+
+function solution=localBoundedDecode(point,problem,anchor,cfg)
+    % Solver feasibility is numerical, whereas the force model requires
+    % exact physical bounds. Project only tolerance-sized input residuals.
+    solution=[];
+    inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
+    bounded=min(max(inputs,problem.physicalInputLower),problem.physicalInputUpper);
+    correction=bounded-inputs;boundCorrection=max(abs(correction),[],'all');
+    if boundCorrection>cfg.solver.feasibilityTolerance,return;end
+    changed=correction~=0;indices=problem.inputIndices(changed);
+    point(indices)=bounded(changed)-anchor.inputs(changed);
+    % Keep the solved affine states and report their normalized-input
+    % residual. Do not round-trip an exact endpoint through anchor+increment.
+    solution=localDecode(point,problem,anchor,bounded);
+    solution.inputBoundCorrection=boundCorrection;
 end
 
 function solution=localDecode(point,problem,anchor,inputs)
@@ -1061,13 +1136,10 @@ function problem=localSelectObjective(problem,anchor,model)
     inputScale=repmat(1./(inputUnits*sqrt(count)),count,1);
     problem.referenceStateMap=sparse(1:numel(ix),ix(:),stateScale,numel(ix),nv);
     problem.referenceInputMap=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
-    problem.referenceDeviationWeight=double(enabled)*model.cfg.rti.referenceDeviationWeight;
+    problem.referenceDeviationWeight=model.cfg.rti.referenceDeviationWeight;
     problem.referencePenaltyWeight=problem.referenceDeviationWeight/(2*scale);
-    problem.quadratic=sparse(nv,nv);
-    if enabled
-        problem.quadratic=2*problem.referencePenaltyWeight ...
-            *(problem.referenceStateMap.'*problem.referenceStateMap+problem.referenceInputMap.'*problem.referenceInputMap);
-    end
+    problem.quadratic=2*problem.referencePenaltyWeight ...
+        *(problem.referenceStateMap.'*problem.referenceStateMap+problem.referenceInputMap.'*problem.referenceInputMap);
     problem.clfScale=scale;problem.clfDerivativeMap=map;problem.clfDerivativeOffset=offset;
     problem.clfDerivativeLimit=-required;
     problem.clf=struct('enabled',enabled,'function',functionName,'requiredDecreaseRate',required);

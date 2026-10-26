@@ -124,7 +124,7 @@ function cfg=localDefaults()
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
         'speedGain',.5,'brakingRatioLimit',.35);
-    % The selected RTI solve uses the remaining controller-call budget.
+    % PCBF priority and reference refinement share the remaining call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     % constraintTolerance and optimalityTolerance are the conic solver's
     % feasibility and gap tolerances; feasibilityTolerance is also used for

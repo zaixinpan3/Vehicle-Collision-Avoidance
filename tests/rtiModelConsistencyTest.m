@@ -113,13 +113,13 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
                 'model',model,'anchor',anchor,'problem',p));
             testCase.assertNotEmpty(solution);
             testCase.verifyTrue(search.pcbfStageCompleted);
-            testCase.verifyFalse(search.secondaryStageAttempted);
+            testCase.verifyTrue(search.secondaryStageAttempted);
             testCase.verifyFalse(search.clfStageAttempted);
             testCase.verifyGreaterThan(search.primaryOptimum,0);
             testCase.verifyTrue(isnan(solution.clfSlack));
             testCase.verifyEqual(solution.objectiveValue,solution.safety,AbsTol=0);
-            testCase.verifyEqual(solution.safety,search.primaryOptimum,AbsTol=0);
-            testCase.verifyTrue(isnan(search.slackCap));
+            testCase.verifyLessThanOrEqual(solution.safety,search.primaryOptimum+model.cfg.solver.constraintTolerance);
+            testCase.verifyEqual(search.slackCap,search.primaryOptimum,AbsTol=0);
             testCase.verifyEqual(solution.states,anchor.states,AbsTol=1e-6);
             testCase.verifyEqual(solution.inputs,anchor.inputs,AbsTol=1e-6);
         end
