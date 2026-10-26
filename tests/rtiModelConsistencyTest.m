@@ -59,10 +59,10 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(check.terminalViolation,.1);
             testCase.verifyGreaterThan(check.hard,model.cfg.solver.feasibilityTolerance);
         end
-        function softClfAcceptsPositivePcbfSlackWithoutChangingThePrimaryTrajectory(testCase)
+        function avoidanceAcceptsPositivePcbfSlackWithoutAClfObjective(testCase)
             model=testCase.model;anchor=testCase.anchor;
-            % Fixed straight motion off the route cannot achieve Vdot <= -alpha V.
-            % An initially overlapping, faster target requires positive PCBF
+            % Cruise performance is inactive during avoidance. An initially
+            % overlapping, faster target requires positive PCBF
             % slack, then leaves. This tests formulation, not safe execution.
             model.initialState(2)=.5;anchor.states(2,:)=.5;
             model.target=[0;.5;0;40;0;0;model.cfg.vehicle.lr;2.4;.95;0;0];
@@ -71,13 +71,17 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             [p,~,model]=localFormulate(anchor,model);
             fixed=[p.stateIndices(:);p.inputIndices(:)];
             p.lower(fixed)=0;p.upper(fixed)=0;
-            testCase.verifyEqual(p.upper(p.clfIndex),Inf);
+            testCase.verifyEqual(p.upper(p.clfIndex),0);
+            testCase.verifyEqual(p.performanceObjective(p.clfIndex),0);
+            testCase.verifyFalse(isfield(p,'clfRowIndex'));
             [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
                 'model',model,'anchor',anchor,'problem',p));
             testCase.assertNotEmpty(solution);
-            testCase.verifyTrue(search.clfStageCompleted);
+            testCase.verifyTrue(search.secondaryStageCompleted);
+            testCase.verifyFalse(search.clfStageAttempted);
             testCase.verifyGreaterThan(search.primaryOptimum,0);
-            testCase.verifyGreaterThan(solution.clfSlack,0);
+            testCase.verifyTrue(isnan(solution.clfSlack));
+            testCase.verifyEqual(solution.secondaryObjectiveValue,solution.referenceDeviationCost,AbsTol=0);
             testCase.verifyLessThanOrEqual(solution.safety,search.slackCap+1e-5);
             testCase.verifyEqual(solution.states,anchor.states,AbsTol=1e-6);
             testCase.verifyEqual(solution.inputs,anchor.inputs,AbsTol=1e-6);

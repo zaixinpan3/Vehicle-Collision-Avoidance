@@ -33,8 +33,9 @@ function cfg=localDefaults()
     % Later frames shift M-1 state/input stages and append one hold to retain M.
     % Failure is reported without horizon extension, replanning or another
     % local model.
-    % Secondary objective: CLF slack plus half this weight times the mean
-    % squared, unit-scaled state/input deviation from the current reference.
+    % Secondary objective: half this weight times the mean squared,
+    % unit-scaled state/input deviation from the current reference. Add cruise
+    % CLF slack only outside an active target encounter.
     % The weight stays active on the route; zero disables it for ablation.
     cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10);
     % One safety-oriented circulation rollout supplies initialization controls.

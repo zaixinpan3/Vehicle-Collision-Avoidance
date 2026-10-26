@@ -5,8 +5,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % Horizon sizing occurs only at encounter onset; a failed solve never extends
 % the horizon or rebuilds the problem. The completed local update returns
 % its optimized inputs unchanged, without a post-solve nonlinear rollout.
-% Each reference uses
-% the same model and common constraints for both objective stages.
+% Both stages share the same model and safety constraints. The secondary
+% cost tracks the RTI reference; a soft cruise CLF is added only when no
+% target encounter is active.
 % Research access: solvePredictiveControl("probe",request) exposes reference,
 % formulation and solve operations to the free-time experiment in scripts/.
 % It does not enable a variable grid in the online controller.
@@ -110,7 +111,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.source="twoStageRealTimeIteration";search.algorithm="realTimeIteration";
     search.initialization=source;search.returned=~isempty(solution);
     % A completed convex subproblem is not nonlinear SQP convergence.
-    search.convexSolveCompleted=search.clfStageCompleted;search.converged=false;
+    search.convexSolveCompleted=search.secondaryStageCompleted;search.converged=false;
     search.linearizationCount=model.linearizationBuilds;
     search.rtiIterations=model.linearizationBuilds;
     search.nominalRestarted=false;search.restartCount=0;
@@ -399,6 +400,7 @@ function search=localEmptySearch(source,failure,seconds)
         'formulationSeconds',0,'clfConstructionSeconds',0, ...
         'primaryOptimum',NaN,'primaryLowerBound',NaN,'slackCap',NaN,'clfInitialSlack',NaN, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
+        'secondaryStageAttempted',false,'secondaryStageCompleted',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
         'initializationSeconds',seconds,'initializationFailure',failure,'elapsedSeconds',seconds, ...
         'potentialFieldRestarted',false,'horizonSteps',0);
@@ -423,6 +425,7 @@ function search=localSearch(problem,initialization,formulationSeconds)
         'primaryOptimum',NaN,'primaryLowerBound',problem.primaryLowerBound,'slackCap',NaN,'clfInitialSlack',NaN, ...
         'initializationSeconds',0, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
+        'secondaryStageAttempted',false,'secondaryStageCompleted',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
         'horizonSteps',size(problem.inputIndices,2));
 end
@@ -484,42 +487,47 @@ function [solution,search,model]=localSecondary(point,problem,anchor,model,searc
     cfg=model.cfg;solution=[];if isempty(point),return;end
     localCheckDeadline(model);
     if ~isfield(problem,'clf')
-        wall=tic;problem=localAddClf(problem,anchor,model);search.clfConstructionSeconds=toc(wall);
+        wall=tic;problem=localAddPerformance(problem,anchor,model);search.clfConstructionSeconds=toc(wall);
         search.formulationSeconds=search.formulationSeconds+search.clfConstructionSeconds;
     end
     search.clfInitialSlack=problem.initialClfSlack;
-    % Keep the primary point and increase the unbounded CLF slack: this is
-    % always a feasible secondary candidate, even for positive PCBF slack.
-    % A failed numerical solve is not evidence against that inclusion.
+    % Preserve the primary feasible set and its attained slack sum. Outside
+    % an encounter the unbounded CLF slack can absorb the performance row;
+    % during an encounter there is no CLF row or CLF objective term.
     problem.a=[problem.a;problem.safetyObjective.'];problem.b=[problem.b;search.slackCap];
     remaining=model.solveTimeLimitSeconds-toc(timer);
     if remaining<=0,search.terminationReason="timeLimit";return;end
     % Penalize departure from this linearization's state/input reference.
     % This soft cost leaves the feasible set and primary slack cap unchanged.
-    objective=problem.performanceObjective;objective(problem.clfIndex)=1;
-    search.clfStageAttempted=true;wall=tic;
+    objective=problem.performanceObjective;
+    search.secondaryStageAttempted=true;search.clfStageAttempted=problem.clf.enabled;wall=tic;
     [second,flag,solverInfo]=localConicSolve(problem.quadratic,objective,problem.cones,problem.a,problem.b, ...
         problem.equal,problem.rhs,problem.lower,problem.upper,cfg,remaining, ...
         min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
     search.solverCalls=search.solverCalls+1;
-    search.stages(2)=struct('objective',"clfSlackAndReferenceDeviation",'exitFlag',flag,'seconds',toc(wall),'value',NaN,'numericalSolve',true,'solverInfo',solverInfo);
-    if isempty(second) || any(~isfinite(second)) || flag<=0,search.terminationReason="clfNoNumericalResult";return;end
+    search.stages(2)=struct('objective',problem.secondaryObjective,'exitFlag',flag,'seconds',toc(wall),'value',NaN,'numericalSolve',true,'solverInfo',solverInfo);
+    if isempty(second) || any(~isfinite(second)) || flag<=0,search.terminationReason="secondaryNoNumericalResult";return;end
     solution=localDecode(second,problem,anchor);
-    search.stages(2).value=solution.secondaryObjectiveValue;search.clfStageCompleted=true;search.returned=true;
+    search.stages(2).value=solution.secondaryObjectiveValue;
+    search.secondaryStageCompleted=true;search.clfStageCompleted=problem.clf.enabled;search.returned=true;
     search.convexSolveCompleted=all([search.stages([search.stages.numericalSolve]).exitFlag]>0);
-    search.clfLowerBound=solution.clfSlack<=cfg.solver.feasibilityTolerance*problem.clfScale;
+    search.clfLowerBound=problem.clf.enabled && solution.clfSlack<=cfg.solver.feasibilityTolerance*problem.clfScale;
     search.terminationReason="twoStagesReturned";
 end
 
 function solution=localDecode(point,problem,anchor)
     inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
     states=anchor.states+reshape(point(problem.stateIndices),size(anchor.states));
-    slacks=max(0,point(problem.slackIndices));rho=problem.clfScale*max(0,point(problem.clfIndex));
-    rate=(problem.clfDerivativeMap*point+problem.clfDerivativeOffset)*problem.clfScale;
+    slacks=max(0,point(problem.slackIndices));rho=NaN;rate=NaN;
+    if problem.clf.enabled
+        rho=problem.clfScale*max(0,point(problem.clfIndex));
+        rate=(problem.clfDerivativeMap*point+problem.clfDerivativeOffset)*problem.clfScale;
+    end
     solution=struct('inputs',inputs,'states',states,'stageSlacks',slacks.', ...
         'safety',sum(slacks),'hard',max([0;problem.a*point-problem.b; ...
             abs(problem.equal*point-problem.rhs);problem.lower-point;point-problem.upper]), ...
-        'clfSlack',rho,'linearizationGap',NaN, ...
+        'clfSlack',rho,'clfEnabled',problem.clf.enabled, ...
+        'secondaryObjective',problem.secondaryObjective,'linearizationGap',NaN, ...
         'clfActualDerivative',NaN,'clfActualDerivativeResidual',NaN, ...
         'clfInitialValue',problem.initialClfValue,'clfDerivative',rate, ...
         'clfFunction',problem.clf.function,'clfRequiredDecreaseRate',problem.clf.requiredDecreaseRate, ...
@@ -531,7 +539,8 @@ function solution=localDecode(point,problem,anchor)
         'referenceInputDeviation',norm(problem.referenceInputMap*point)^2);
     solution.referenceDeviationCost=.5*problem.referenceDeviationWeight ...
         *(solution.referenceStateDeviation+solution.referenceInputDeviation);
-    solution.secondaryObjectiveValue=solution.clfSlack+solution.referenceDeviationCost;
+    solution.secondaryObjectiveValue=solution.referenceDeviationCost;
+    if problem.clf.enabled,solution.secondaryObjectiveValue=solution.secondaryObjectiveValue+solution.clfSlack;end
     if isfield(problem,'durationIndex')
         solution.durationChangeSeconds=point(problem.durationIndex);
         solution.states=solution.states+problem.durationStateDerivative*solution.durationChangeSeconds;
@@ -1030,18 +1039,30 @@ function relative=localRelativeGenerator(x,generator,model,center)
 end
 
 
-function problem=localAddClf(problem,anchor,model)
+function problem=localAddPerformance(problem,anchor,model)
     nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
-    % Continuous-time CLF on the estimate, with unbounded performance
-    % slack. At the known current state only the Fiala input dependence is
-    % approximated: Vdot(u_bar)+dVdot/du*du <= -alpha*V+s.
-    [rate,inputGradient,value]=nonlinearBicycleModel.nominalDerivative( ...
-        model.initialState,anchor.inputs(:,1),model.lane,model.nominalReference,model.cfg);
-    scale=max(1,value);required=model.nominalReference.decayRate*value;
-    map=sparse(1,nv);map(iu(:,1))=inputGradient/scale;offset=rate/scale;
-    row=map;row(ic)=-1;
-    problem.a=[problem.a;row];problem.b=[problem.b;(-required-rate)/scale];
-    problem.clfRowIndex=size(problem.a,1);
+    enabled=isempty(model.target);
+    value=nonlinearBicycleModel.nominalValue(model.initialState,model.lane,model.nominalReference);
+    scale=1;required=NaN;map=sparse(1,nv);offset=NaN;initialSlack=NaN;
+    problem.performanceObjective=zeros(nv,1);
+    problem.secondaryObjective="referenceDeviation";functionName="none";
+    if enabled
+        % Cruise only: Vdot(u_bar)+dVdot/du*du <= -alpha*V+s.
+        [rate,inputGradient,value]=nonlinearBicycleModel.nominalDerivative( ...
+            model.initialState,anchor.inputs(:,1),model.lane,model.nominalReference,model.cfg);
+        scale=max(1,value);required=model.nominalReference.decayRate*value;
+        map(iu(:,1))=inputGradient/scale;offset=rate/scale;
+        row=map;row(ic)=-1;
+        problem.a=[problem.a;row];problem.b=[problem.b;(-required-rate)/scale];
+        problem.clfRowIndex=size(problem.a,1);
+        problem.performanceObjective(ic)=1;
+        problem.secondaryObjective="clfSlackAndReferenceDeviation";
+        functionName="quadraticTransverseError";initialSlack=max(0,rate+required);
+    else
+        % Reserve the existing index for probe compatibility, but fix it to
+        % zero and omit both the CLF inequality and its objective coefficient.
+        problem.lower(ic)=0;problem.upper(ic)=0;
+    end
     % Unit-scaled full-state/input proximity to the affine reference, not to
     % the cruise path. Equal x/y units make position cost rotation invariant.
     % A horizon mean prevents changing N from changing the total weight.
@@ -1059,11 +1080,10 @@ function problem=localAddClf(problem,anchor,model)
     problem.referencePenaltyWeight=problem.referenceDeviationWeight/(2*scale);
     problem.quadratic=2*problem.referencePenaltyWeight ...
         *(problem.referenceStateMap.'*problem.referenceStateMap+problem.referenceInputMap.'*problem.referenceInputMap);
-    problem.performanceObjective=zeros(nv,1);
     problem.clfScale=scale;problem.clfDerivativeMap=map;problem.clfDerivativeOffset=offset;
     problem.clfDerivativeLimit=-required;
-    problem.clf=struct('function',"quadraticTransverseError",'requiredDecreaseRate',required);
-    problem.initialClfValue=value;problem.initialClfSlack=max(0,rate+required);
+    problem.clf=struct('enabled',enabled,'function',functionName,'requiredDecreaseRate',required);
+    problem.initialClfValue=value;problem.initialClfSlack=initialSlack;
 end
 
 function tube=localTargetTube(model,time,holdStart)
@@ -1131,7 +1151,7 @@ function [result,search,model]=localProbe(request)
             model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
             [result,model]=localFormulate(request.anchor,model);
             result.inheritedAnchor=request.inherited;
-            result=localAddClf(result,request.anchor,model);
+            result=localAddPerformance(result,request.anchor,model);
         case "solve"
             model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
             problem=request.problem;anchor=request.anchor;

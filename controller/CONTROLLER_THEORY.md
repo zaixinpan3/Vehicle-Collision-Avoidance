@@ -6,10 +6,11 @@ statement of the implementation boundary. Repository paths are relative to the
 repository root unless linked otherwise. Historical experiment reports describe
 the versions that produced them; they are not rewritten by this consolidation.
 
-The controller seeks rectangle nonoverlap while returning to a prescribed path
-and cruise speed. It uses one target-independent quadratic CLF and two
-lexicographic optimization stages: minimize predictive collision deficits, then
-optimize CLF relaxation and deviation from the current trajectory reference.
+The controller seeks rectangle nonoverlap during an encounter and resumes
+prescribed-path cruise recovery afterward. Two lexicographic stages minimize
+predictive collision deficits, then deviation from the current trajectory
+reference. Only outside an active encounter does the secondary stage also
+include a soft quadratic cruise CLF.
 The terminal set certifies an available safe continuation at the prediction
 endpoint; it is not a command to park or a task-completion condition.
 
@@ -17,7 +18,7 @@ The executable approximation and the mathematical algorithm have distinct guaran
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening, a continuous-time derivative soft CLF row and terminal tangents; the completed affine update returns its first input unchanged, without a post-solve nonlinear rollout or feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
+| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening and terminal tangents. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The completed affine update returns its first input unchanged, without a post-solve nonlinear rollout or feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
 | Unified observer-to-safety design | Current observer containment, retained physical successor sets, signed whole-hold margins and a common terminal continuation. The information-set shift proves conditional recursive feasibility and zero-deficit safety. Future observer dynamics are needed only for the optional prediction of observation-dependent policies. |
 
 The latter theorem is not a certificate for the former approximation.
@@ -411,17 +412,27 @@ The primary stage minimizes `sum(xi)`. If the zero correction with zero slacks
 satisfies every primary constraint, it attains the global lower bound and no
 native primary solve is needed. Otherwise the native conic solver runs once.
 The secondary stage caps the attained primary objective, with the configured
-numerical tie, and uses the target-independent soft CLF condition
+numerical tie. During an active target encounter it minimizes only reference
+deviation. Outside an encounter it also uses the soft continuous-time CLF row
 
-    V(xhat_next) <= rho * V(xhat_now) + clfSlack,
-    rho = exp(-2*h/clf.convergenceTimeConstantSeconds).
+    Vdot_affine(xhat_now,u0) <= -alpha * V(xhat_now) + clfSlack,
+    alpha = 2/clf.convergenceTimeConstantSeconds.
 
 `V` is the single precomputed transverse quadratic at prescribed-speed/path
 trim. Only the estimate enters it; it does not ask the worst member of an
-observer enclosure to contract to zero. The secondary objective is
+observer enclosure to contract to zero. The secondary objective outside an
+encounter is
 
     J2 = clfSlack + (lambda / (2 N)) sum_k (
          ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2).
+
+While `model.target` is nonempty, the CLF row and its slack cost are absent:
+`J2` consists only of the reference-deviation term. A zero PCBF slack does not
+reactivate cruise tracking. A currently out-of-range target or a complete
+current sensor scan clearing the retained forecast ends the encounter and
+restores the CLF. Missing observations without such clearance retain the
+encounter and leave the CLF disabled. The reserved CLF variable slot is fixed
+to zero in this case; it has no inequality row or objective coefficient.
 
 Here xbar and ubar are this RTI reference: the encounter-onset planner rollout,
 the shifted previous state/input iterate, or an extension of that same reference. They are not the nominal cruise path.
@@ -431,18 +442,21 @@ units from `clf.lateralPositionErrorScale`, followed by the CLF heading,
 speed, lateral-velocity and yaw-rate scales. Du uses the CLF certification
 steering/braking units. These are cost units, never bounds. The horizon mean
 keeps the overall weight independent of node count. The solver divides the
-entire objective by `max(1,V(xhat_now))` for numerical scaling.
+entire objective by `max(1,V(xhat_now))` for numerical scaling when the CLF is
+active; the avoidance-only objective uses unit scaling.
 
 The old whole-horizon attraction to the cruise route is removed from this
-objective. Cruise recovery remains in the CLF. Larger
-lambda permits more CLF slack to retain the reference, but cannot relax the
+objective. Cruise recovery resumes in the CLF after the encounter. Outside an
+encounter, larger lambda permits more CLF slack to retain the reference, but cannot relax the
 primary PCBF cap or other constraints. This changes performance preference,
 not the feasible set or the conditional shift-candidate feasibility argument.
 It does not guarantee small nonlinear prediction error or successful RTI.
 Both stages must complete; an unfinished secondary stage
 does not cause execution of the primary point.
 
-The soft CLF cannot destroy mathematical feasibility of a feasible primary
+During avoidance, the secondary stage adds only the primary cap and a soft
+objective, so the primary point is still feasible. Outside avoidance, the
+soft CLF cannot destroy mathematical feasibility of a feasible primary
 point. Let $z_1$ be any feasible first-stage point retained under the primary
 objective cap, and let $\widehat{\dot V}(z_1)$ be its finite affine CLF
 derivative. Keeping its states, inputs and PCBF slacks unchanged, choose
@@ -644,6 +658,10 @@ establish that exact inequality or global asymptotic convergence.
 
 ### One affine continuous-derivative constraint
 
+This constraint and its slack objective are enabled only outside an active
+target encounter. The same quadratic value may be reported during avoidance
+as a diagnostic, without influencing the optimization.
+
 At the current estimate xhat, the analytic error Jacobian gives
 
     g = 2 e(xhat)' P J_e(xhat),
@@ -667,7 +685,7 @@ row, and no quadratic remainder of a next-state value is dropped. The exact
 Fiala input nonlinearity still limits the accuracy of the local derivative
 model for large input corrections.
 
-The secondary objective is CLF slack plus half
+Outside an encounter the secondary objective is CLF slack plus half
 `rti.referenceDeviationWeight` times the horizon mean of squared, unit-scaled
 state and input deviations from the current linearization reference. The
 default weight is 10 in CLF-rate objective units, independent of cruise error and reference source; zero
@@ -675,13 +693,14 @@ disables the penalty for ablation. Position uses the same CLF lateral-position
 unit for both inertial coordinates. Yaw, longitudinal speed, lateral velocity
 and yaw rate use the corresponding CLF error units. Inputs use the CLF
 certification steering and braking units. The entire objective is divided by
-`max(1,V(xhat_now))` in the solver. Reported component costs are unscaled.
+`max(1,V(xhat_now))` in the solver. During an encounter only the reference
+penalty is optimized, using unit scaling. Reported component costs are unscaled.
 
 The primary PCBF slack cap remains hard. There is no state/input correction
 box and no separate whole-horizon cost pulling toward the cruise path. The
 penalty is zero at the current reference, which may be a bypass trajectory.
 It remains active near nominal motion to regularize otherwise free later
-inputs. The CLF still refers to the prescribed cruise path. A larger reference
+inputs. When active, the CLF refers to the prescribed cruise path. A larger reference
 weight can trade increased CLF slack for smaller trajectory changes; it does
 not certify nonlinear CLF decrease or prevent every large correction.
 
@@ -696,6 +715,11 @@ by `clfNextValueScope`; it is not the left side of the optimized CLF condition.
 The scenario driver records `actualNextClfValue` on its independent plant
 successor. `clfSatisfied`
 means zero local CLF slack within solver tolerance, not exact nonlinear decay.
+During an encounter `clfEnabled` and `clfSatisfied` are false, `clfFunction`
+and `clfLocalModel` are `none`, and the uncomputed slack and derivative fields
+are NaN. `secondaryObjective=referenceDeviation` distinguishes this from a
+zero-slack cruise solve. `secondaryStageCompleted` records QP completion
+independently of the disabled `clfStageCompleted` flag.
 
 The nonlinear input-linearization remainder and sampling effects are not enclosed.
 Neither zero affine slack nor this implementation proves exact asymptotic
@@ -1974,8 +1998,10 @@ zero on subsequent calls in the same encounter. `nominalRestarted` stays false.
 `linearizationGapMeters` are NaN rather than uncomputed zero residuals.
 The reported PCBF value, stage slacks and `affineHardResidual` describe the
 affine subproblem. `search.slackCap` only preserves its primary objective
-in the second stage; it is not a nonlinear acceptance cap. The CLF objective
-belongs to the input-affine approximation of the current continuous derivative.
+in the second stage; it is not a nonlinear acceptance cap. When no encounter
+is active, the CLF objective belongs to the input-affine approximation of the
+current continuous derivative. An active encounter disables that objective
+and its inequality, while retaining the reference-deviation QP.
 `predictedState` is the affine SQP iterate (`predictionModel=affineSqpIterate`).
 Compatibility rollout metadata has `available=false` and
 `reason=notPerformedByRti`; it does not signal a failed rollout.

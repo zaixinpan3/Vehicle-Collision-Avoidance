@@ -1,5 +1,5 @@
 classdef clfNominalRecoveryTest < matlab.unittest.TestCase
-    % The same analytic transverse quadratic is used throughout an encounter.
+    % The analytic transverse quadratic acts outside active encounters.
     % Test local zero-slack derivative decrease and eventual recovery from displaced states.
     properties (TestParameter)
         referenceSpeed={8,15};

@@ -58,6 +58,8 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             % footprints, rather than moving only the ego at 8 m/s.
             testCase.verifyEqual(r.free.constraintTimeDerivativeNorm,4,AbsTol=1e-5);
             testCase.verifyGreaterThan(r.free.audit.minimumRectangleGapMeters,900);
+            testCase.verifyFalse(r.free.solution.clfEnabled);
+            testCase.verifyTrue(isfinite(r.free.audit.relinearizedViolation));
         end
         function aLongerHoldPropagatesTheCurrentSpeedEnclosureLonger(testCase)
             r=testCase.result;model=r.model;anchor=r.initialAnchor;

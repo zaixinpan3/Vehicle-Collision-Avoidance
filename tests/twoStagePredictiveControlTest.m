@@ -352,7 +352,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.solution.encounterExit,41);
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
         end
-        function targetRangeCannotSelectADifferentClf(testCase)
+        function onlyAnActiveTargetDisablesTheCruiseClf(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             target=localNearTarget();far=target;far.targetPositionInertial(1)=-60;
             [~,~,absent]=collisionAvoidanceController(ego,[],road,cfg,[]);
@@ -361,7 +361,27 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual([absent.metadata.clfInitialValue,near.metadata.clfInitialValue,distant.metadata.clfInitialValue], ...
                 repmat(absent.metadata.clfInitialValue,1,3),AbsTol=1e-12);
             testCase.verifyEqual([absent.metadata.clfFunction,near.metadata.clfFunction,distant.metadata.clfFunction], ...
-                repmat("quadraticTransverseError",1,3));
+                ["quadraticTransverseError","none","quadraticTransverseError"]);
+            testCase.verifyEqual([absent.metadata.clfEnabled,near.metadata.clfEnabled,distant.metadata.clfEnabled], ...
+                [true,false,true]);
+            testCase.verifyEqual(near.metadata.secondaryObjective,"referenceDeviation");
+            testCase.verifyFalse(near.metadata.search.clfStageAttempted);
+        end
+        function cruiseClfResumesAfterTheEncounterClears(testCase)
+            [ego,road,cfg]=localFixture();ego.stateTime=0;
+            [~,~,first,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            ego=localSuccessor(ego,prior,cfg);ego.stateTime=cfg.controller.sampleTime;
+            [~,~,coasting,prior]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyTrue(coasting.metadata.hasTarget);
+            testCase.verifyFalse(coasting.metadata.clfEnabled);
+            testCase.verifyFalse(first.metadata.clfEnabled);
+            ego=localSuccessor(ego,prior,cfg);ego.stateTime=2*cfg.controller.sampleTime;
+            ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
+            [~,~,cleared]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyFalse(cleared.metadata.hasTarget);
+            testCase.verifyTrue(cleared.metadata.clfEnabled);
+            testCase.verifyTrue(cleared.metadata.search.clfStageCompleted);
+            testCase.verifyEqual(cleared.metadata.secondaryObjective,"clfSlackAndReferenceDeviation");
         end
         function consecutiveMeasuredSuccessorsRemainSingleIterations(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;

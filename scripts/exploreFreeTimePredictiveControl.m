@@ -291,7 +291,7 @@ function audit=localAudit(solution,anchor,model,inherited,durations)
         replay=anchor;replay.states=states;replay.inputs=solution.inputs;
         [checked,model]=localProblem(replay,model,inherited);
         point=zeros(numel(checked.lower),1);point(checked.slackIndices)=solution.stageSlacks;
-        point(checked.clfIndex)=solution.clfSlack/checked.clfScale;
+        if checked.clf.enabled,point(checked.clfIndex)=solution.clfSlack/checked.clfScale;end
         audit.relinearizedViolation=max([0;checked.a*point-checked.b;checked.lower-point;point-checked.upper;abs(checked.equal*point-checked.rhs)]);
         for cone=checked.cones
             residual=vecnorm(reshape(cone.A*point-cone.b,cone.size,[]),2,1) ...

@@ -22,21 +22,22 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function aLargerWeightReducesDepartureEvenWhenStartingOnTheRoute(testCase)
-            weak=localSolve(testCase.model,testCase.anchor,.01);
-            strong=localSolve(testCase.model,testCase.anchor,10);
-            testCase.assertNotEmpty(weak);testCase.assertNotEmpty(strong);
-            testCase.verifyEqual(strong.clfInitialValue,0,AbsTol=1e-12);
-            testCase.verifyLessThan(strong.referenceStateDeviation+strong.referenceInputDeviation, ...
-                .9*(weak.referenceStateDeviation+weak.referenceInputDeviation));
-            testCase.verifyGreaterThan(strong.clfSlack,weak.clfSlack);
+        function cruiseDecayCannotAlterAnAvoidanceUpdate(testCase)
+            original=localSolve(testCase.model,testCase.anchor,10);
+            changed=testCase.model;changed.nominalReference.decayRate=100*changed.nominalReference.decayRate;
+            alternative=localSolve(changed,testCase.anchor,10);
+            testCase.assertNotEmpty(original);testCase.assertNotEmpty(alternative);
+            testCase.verifyFalse(original.clfEnabled);
+            testCase.verifyTrue(isnan(original.clfSlack));
+            testCase.verifyEqual(alternative.inputs,original.inputs,AbsTol=1e-10);
+            testCase.verifyEqual(alternative.states,original.states,AbsTol=1e-10);
         end
         function referencePreferenceCannotSpendBeyondThePrimarySlackCap(testCase)
             [solution,search]=localSolve(testCase.model,testCase.anchor,10);
             testCase.assertNotEmpty(solution);
             testCase.verifyLessThanOrEqual(solution.safety,search.slackCap+1e-5);
-            testCase.verifyEqual(search.stages(2).value,solution.clfSlack+solution.referenceDeviationCost,AbsTol=1e-12);
-            testCase.verifyEqual(search.stages(2).objective,"clfSlackAndReferenceDeviation");
+            testCase.verifyEqual(search.stages(2).value,solution.referenceDeviationCost,AbsTol=1e-12);
+            testCase.verifyEqual(search.stages(2).objective,"referenceDeviation");
         end
         function reportedCostMeasuresStatesAndInputsRelativeToTheActualAnchor(testCase)
             solution=localSolve(testCase.model,testCase.anchor,1);
@@ -50,11 +51,12 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(solution.referenceInputDeviation,inputCost,RelTol=1e-10);
             testCase.verifyEqual(solution.referenceDeviationCost,.5*(stateCost+inputCost),RelTol=1e-10);
         end
-        function zeroWeightProvidesAnExplicitClfOnlyAblation(testCase)
+        function zeroWeightDoesNotReenableClfDuringAvoidance(testCase)
             solution=localSolve(testCase.model,testCase.anchor,0);
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(solution.referenceDeviationCost,0,AbsTol=0);
-            testCase.verifyEqual(solution.secondaryObjectiveValue,solution.clfSlack,AbsTol=0);
+            testCase.verifyEqual(solution.secondaryObjectiveValue,0,AbsTol=0);
+            testCase.verifyFalse(solution.clfEnabled);
         end
         function aZeroSlackCruiseReferenceNeedsNoDeparture(testCase)
             cfg=testCase.model.cfg;
