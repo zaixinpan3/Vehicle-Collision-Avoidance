@@ -420,65 +420,78 @@ attains the safety lower bound without an LP. This check uses floating-point
 roundoff tolerance and does not integrate or certify the nonlinear model.
 Otherwise one LP minimizes the safety sum.
 
-For a positive `rti.referenceDeviationWeight`, a second QP minimizes
+A second QP chooses performance among the attained minimum-slack solutions.
+Its shared objective is
 
-    J_ref = (lambda / (2 N)) sum_k (
-         ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2)
+    J_perf = J_track + J_change + J_ref,
+    J_track = w_track/(2 N) sum_k ||De e_aff,k+1||^2,
+    J_change = w_change/2 sum_k ||Du (u_k - u_k-1)||^2,
+    J_ref = w_ref/(2 N) sum_k (
+        ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2).
 
-with exactly the same dynamics and constraints, plus `sum(xi) <= Sstar`, where
-`Sstar` is the first stage's attained safety value. When `Sstar == 0`, the
-slacks are fixed to zero instead. No intentional slack allowance or weighted
-safety/performance tradeoff is used. A returned refinement must preserve the
-cap within `solver.constraintTolerance * max(1,Sstar)`. Finite solver
-precision means the implemented priority is numerical, not exact arithmetic.
-A common positive proximity weight is divided out of this secondary solve;
-it changes the reported cost scale but not the mathematical minimizer.
+Here e contains lateral position, heading, longitudinal speed, lateral
+velocity and yaw-rate errors relative to nominal path trim. Its affine
+expansion is evaluated at each reference state; squaring that residual gives
+a positive-semidefinite Gauss--Newton objective. The reference xbar/ubar is
+the RTI linearization trajectory and is distinct from the nominal path.
+The first input difference uses the previously applied command, including
+actuator memory supplied with the estimate. J_change is a sum rather than a
+horizon mean, so extending N does not cheapen the first command jump.
 
-Both stages share the remaining call budget and reuse the constructed RTI
-model. If the priority candidate already has zero proximity cost, no second
-native solve is needed. If refinement times out, fails, violates its input
-bounds or exceeds the safety cap, the completed priority solution is retained
-and `secondaryStageCompleted` remains false. No third solve or replanning is
-attempted. Positive PCBF slack remains admissible; state, input, hard-tail and
-terminal constraints retain their declared hardness. Minimizing reference
-correction does not impose a steering-rate bound or guarantee nonlinear
-model accuracy.
+The refinement retains exactly the same constraints and dynamics and adds
+`sum(xi) <= Sstar`, where Sstar is the first stage's attained safety value.
+When Sstar is zero, the slacks are fixed to zero. No intentional slack
+allowance or safety/performance weighted tradeoff is used. A refinement must
+preserve the cap within `solver.constraintTolerance * max(1,Sstar)`; this is
+numerical priority, not exact arithmetic. Nominal speed tracking is only a
+secondary preference: braking remains allowed when needed for safety. No
+CLF inequality is activated during avoidance.
+
+Both stages reuse one RTI model and share the call budget. A zero performance
+cost attains its global lower bound without a second native solve. If
+refinement fails, exceeds the budget, violates input bounds or exceeds the
+safety cap, the completed priority candidate is retained. No third solve,
+replanning or nonlinear execution filter is introduced. Positive PCBF slack
+remains admissible; state, input, hard-tail and terminal conditions retain
+their declared hardness. Soft regularization does not impose a steering-rate
+bound or certify nonlinear model accuracy.
 
 Without an active target, collision slacks are fixed to zero and no PCBF LP
-is solved. The sole cruise QP uses the soft continuous-time CLF row
+is solved. The continuous CLF design is unchanged:
 
-    Vdot_affine(xhat_now,u0) <= -alpha * V(xhat_now) + clfSlack,
-    alpha = 2/clf.convergenceTimeConstantSeconds,
+    Vdot <= -alpha V + s,  alpha = 2/clf.convergenceTimeConstantSeconds.
 
-and minimizes
+Integrating this condition over a held-input interval h with constant slack s
+would imply
 
-    J_clf = clfSlack + (lambda / (2 N)) sum_k (
-         ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2).
+    V(x+) <= exp(-alpha h) V(xhat) + tau s,
+    tau = (1 - exp(-alpha h))/alpha.
 
-`V` is the single precomputed transverse quadratic at prescribed-speed/path
-trim. Only the estimate enters it; the worst member of an observer enclosure
-is not required to contract to zero. The unbounded nonnegative CLF slack can
-absorb any finite affine derivative residual for an otherwise feasible common
-constraint point. This does not prove nonlinear convergence or numerical
-solver success.
+The sole cruise QP imposes the affine tangent of this integrated condition
+at the first predicted reference state and minimizes `tau*s + J_perf`.
+It has no quadratic CLF constraint or second-order cone. The unbounded
+nonnegative slack absorbs any finite affine CLF residual at an otherwise
+feasible point. This approximated sampled condition does not establish the
+continuous inequality inside the hold, nonlinear descent, or solver success.
 
-The first observation of an in-range target activates PCBF and requests the
-onset planner. Its first accepted horizon remains fixed throughout that
-encounter. Zero PCBF slack does not reactivate CLF. A currently out-of-range
-target or a complete current sensor scan clearing the retained forecast
-restores CLF. Missing observations without clearance retain PCBF. Acquisition
-of a new target still requires a feasible initial encounter problem; a prior
-CLF solution alone cannot establish that feasibility. No common Lyapunov
-function or global switched-system safety theorem is asserted.
+The first in-range target observation activates PCBF and the onset planner.
+Its first accepted horizon stays fixed throughout the encounter. Zero PCBF
+slack does not reactivate CLF. An out-of-range target or a complete sensor
+scan clearing the retained forecast restores CLF; missing observations alone
+retain PCBF. A new target still requires a feasible initial encounter
+problem. No common Lyapunov function or global switched-safety theorem is
+asserted. After clearance, cruise references are rebuilt from the current
+estimate before the one RTI linearization.
 
-Here xbar and ubar are the current RTI reference.
-`lambda = rti.referenceDeviationWeight` defaults to 10 in both modes; zero
-disables this penalty and the avoidance refinement for an ablation.
-Dx uses equal x/y units from `clf.lateralPositionErrorScale`, followed by the
-CLF heading, speed, lateral-velocity and yaw-rate scales. Du uses the CLF
-certification steering/braking units. These are cost units, never bounds.
-The horizon mean keeps the weight independent of node count. The solver
-scales the cruise objective by `max(1,V(xhat_now))`.
+The weights `rti.nominalTrackingWeight`, `rti.inputVariationWeight` and
+`rti.referenceDeviationWeight` default to 1, 20 and 10. Zero disables the
+corresponding component; all three zero disable avoidance refinement.
+Dx uses equal x/y units from `clf.lateralPositionErrorScale`, followed by
+heading, speed, lateral-velocity and yaw-rate scales. De uses those five
+transverse error units; Du uses the CLF certification steering/braking units.
+These are cost units, not bounds. Tracking and reference costs are horizon
+means. The cruise objective is scaled by `max(1,V(xhat))` for the solver;
+reported component costs are unscaled.
 
 Each call returns the selected optimization's first input, apart from
 tolerance-sized physical input-bound normalization. There is
@@ -680,87 +693,67 @@ throughout a suitable invariant domain, it gives exponential decay of the transv
 **affine approximation**, together with a fixed model-error tolerance, does not
 establish that exact inequality or global asymptotic convergence.
 
-### One affine continuous-derivative constraint
+### One affine integrated continuous-CLF constraint
 
-This constraint and its slack objective are enabled only outside an active
-target encounter. The same quadratic value may be reported during avoidance
-as a diagnostic, without influencing the optimization.
+The CLF inequality and its slack cost act only outside an active encounter.
+The continuous quadratic V=e'Pe and its offline design are retained. At the
+first predicted reference state xbar_1, define
 
-At the current estimate xhat, the analytic error Jacobian gives
+    Vbar_1 = e(xbar_1)' P e(xbar_1),
+    g_1 = 2 e(xbar_1)' P J_e(xbar_1),
+    Vaff_1 = Vbar_1 + g_1 dx_1,
+    tau = (1 - exp(-alpha h))/alpha.
 
-    g = 2 e(xhat)' P J_e(xhat),
-    d0 = g f(xhat,ubar_0),
-    d_u = g f_u(xhat,ubar_0).
+The integrated condition above becomes one affine row
 
-The exact model derivative is `Vdot(xhat,u)=g f(xhat,u)`. Fiala dynamics are
-nonlinear in steering and longitudinal force ratio, so the RTI approximation is
+    (Vaff_1 - V(xhat))/tau <= -alpha V(xhat) + s.
 
-    d0 + d_u * du_0 <= -alpha V(xhat) + s.
+Its state increment dx_1 is coupled to the first input by the same affine
+held-input dynamics used by RTI. This incorporates the duration of the
+applied command instead of requesting descent only at its starting instant.
+It adds neither another model linearization nor a post-solve nonlinear
+rollout. Together with the shared positive-semidefinite performance Hessian,
+cruise remains a QP. Native solver iterations are internal to that one QP.
 
-This is a single affine inequality. There is no next-state quadratic epigraph
-and no CLF second-order cone. Together with the affine primary rows and the
-positive-semidefinite quadratic reference penalty, cruise mode is a QP.
-Encounter mode instead solves a PCBF slack LP (a QP with zero Hessian). Solver
-interior iterations still occur within the selected solve; the model is built once.
+This is a tangent approximation of the endpoint value. It is not an upper
+bound: quadratic value terms, curved-path coordinate remainders and the
+nonlinear dynamics remainder are not enclosed. Consequently, zero local
+slack is not a guarantee of exact nonlinear held-step decay. Even the exact
+endpoint inequality alone would not imply the continuous derivative condition
+at all intermediate times. The continuous design, sampled implementation
+and empirical closed-loop recovery must be distinguished.
 
-Only the first input appears in this CLF row. The current state is fixed, not
-a decision variable. No Taylor approximation of V itself is needed for this
-row, and no quadratic remainder of a next-state value is dropped. The exact
-Fiala input nonlinearity still limits the accuracy of the local derivative
-model for large input corrections.
+Both modes use J_perf from the switched-optimization section. It gives the
+controller a persistent route/speed preference and penalizes actual control
+increments, alongside the reference regularizer that favors a useful local
+linearization. It introduces no road-boundary constraint, hard correction
+box or new tire-capacity constraint. A finite weight can still admit a large
+correction. PCBF retains lexicographic priority; the new performance terms
+cannot intentionally increase its attained optimum. The feasible-set shift
+argument of the ideal PCBF problem is therefore unchanged by this tie-breaker.
 
-Outside an encounter the sole objective is CLF slack plus half
-`rti.referenceDeviationWeight` times the horizon mean of squared, unit-scaled
-state and input deviations from the current linearization reference. The
-default weight is 10 in CLF-rate objective units, independent of cruise error and reference source; zero
-disables the penalty for ablation. Position uses the same CLF lateral-position
-unit for both inertial coordinates. Yaw, longitudinal speed, lateral velocity
-and yaw rate use the corresponding CLF error units. Inputs use the CLF
-certification steering and braking units. The entire objective is divided by
-`max(1,V(xhat_now))` in the solver. During an encounter only PCBF slack is optimized, using unit scaling.
-Reported component costs are unscaled.
+The observer enclosure does not alter the performance row: it acts on the
+estimate. The compatibility field `clfDerivative` now reports
+`(Vaff_1-V(xhat))/tau`, the affine integrated-rate surrogate, and
+`clfDerivativeLimit=-alpha*V(xhat)`. The explicit label
+`clfLocalModel=integratedContinuousClfAffineInNextState` distinguishes it
+from an instantaneous model derivative. `clfActualDerivative` and its
+residual remain NaN online. `clfNextValue` evaluates V on the affine first
+successor; it need not equal the tangent Vaff_1. The independent scenario
+driver records `actualNextClfValue` on the plant successor.
 
-There is no PCBF slack cap, state/input correction
-box and no separate whole-horizon cost pulling toward the cruise path. The
-penalty is zero at the current reference, which may be a bypass trajectory.
-It remains active near nominal motion to regularize otherwise free later
-inputs. When active, the CLF refers to the prescribed cruise path. A larger reference
-weight can trade increased CLF slack for smaller trajectory changes; it does
-not certify nonlinear CLF decrease or prevent every large correction.
+`clfSatisfied` denotes zero affine slack within solver tolerance. During
+an encounter CLF fields are disabled or NaN, and `optimizationMode=pcbf`
+with `optimizationObjective=pcbfSlack`. Its second stage is labeled
+`nominalTrackingAndRegularization`, with the attained safety cap recorded.
+Cruise uses `integratedClfSlackAndTracking` in one QP and has no PCBF cap.
 
-With an observer enclosure the row is unchanged and acts on the estimate:
-`clfDerivativeLimit = -alpha*V(xhat)`. Estimation error enters the performance
-analysis as an input, rather than as a worst-case CLF enclosure budget.
-`clfDerivative` is the local affine prediction. The online update does not
-evaluate `clfActualDerivative` or `clfActualDerivativeResidual`; both are
-reported as NaN. Independent simulations may evaluate the actual derivative.
-`clfNextValue` is the value on the affine predicted first successor, labeled
-by `clfNextValueScope`; it is not the left side of the optimized CLF condition.
-The scenario driver records `actualNextClfValue` on its independent plant
-successor. `clfSatisfied`
-means zero local CLF slack within solver tolerance, not exact nonlinear decay.
-During an encounter `clfEnabled` and `clfSatisfied` are false, `clfFunction`
-and `clfLocalModel` are `none`, and the uncomputed slack and derivative fields
-are NaN. `optimizationMode=pcbf` and `optimizationObjective=pcbfSlack`
-distinguish this from cruise. `pcbfStageCompleted` and `clfStageCompleted`
-identify the selected solve. Legacy secondary-stage flags are false,
-`secondaryObjective=none`, and `slackCap` is NaN in both modes.
-
-The nonlinear input-linearization remainder and sampling effects are not enclosed.
-Neither zero affine slack nor this implementation proves exact asymptotic
-recovery of the nonlinear uncertain plant; with estimation error the closed
-loop can at best approach a neighborhood of the path set by that error. See the conditional theorem in
-`OBSERVER_ROBUST_PCBF_THEORY.tex` for the additional premises.
-
-This constraint controls the current continuous derivative through the first input only. Future inputs are chosen
-through horizon feasibility and the input correction cost; they do not each
-receive a CLF decrease constraint. After shifting, the second planned input becomes the next first-input anchor.
-The reference penalty can therefore change later recovery behavior even when
-the current minimum CLF slack changes little.
-
-CLF activation depends only on target presence. A zero PCBF value during
-an encounter does not activate cruise; outside the encounter there is no
-PCBF optimization before the CLF QP.
+Neither the affine constraint nor the regularized objective proves exact
+nonlinear or uncertain-plant convergence. The observer error, validity of
+local approximations and conditional safety assumptions remain separate;
+see `OBSERVER_ROBUST_PCBF_THEORY.tex`. Future states receive tracking costs,
+but no additional CLF descent inequalities. Target presence alone selects
+the optimization mode.
 
 ### What the offline enclosure certifies
 

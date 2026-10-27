@@ -6,9 +6,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % the horizon or rebuilds the problem. The completed local update returns
 % its optimized inputs after tolerance-sized physical-bound normalization,
 % without a post-solve nonlinear rollout.
-% An active target selects PCBF slack first, then reference proximity on
-% its optimal face. Both solves share the same linearization and budget.
-% Outside an encounter one cruise CLF/proximity QP is solved. There is no
+% An active target selects PCBF slack first, then tracking and regularization
+% on its optimal face. Both solves share the same linearization and budget.
+% Outside an encounter one integrated-CLF/performance QP is solved. There is no
 % cross-frame slack budget.
 % Outside an encounter, cruise feedback generates a dynamically consistent
 % reference from each new estimate before the single linearization.
@@ -453,8 +453,8 @@ function search=localSearch(problem,initialization,formulationSeconds)
 end
 
 function [solution,search,model]=localSolve(anchor,model,initialization,timer,problem)
-    % One RTI model. Avoidance orders slack before reference proximity;
-    % cruise uses its continuous CLF and proximity in a single QP.
+    % One RTI model. Avoidance orders slack before quadratic performance;
+    % cruise uses its integrated continuous CLF and performance in one QP.
     localCheckDeadline(model);
     cfg=model.cfg;solution=[];
     search=localSearch(problem,initialization,0);
@@ -501,7 +501,7 @@ function [solution,search,model]=localSolve(anchor,model,initialization,timer,pr
     search.terminationReason=problem.mode+"Returned";
     if problem.clf.enabled,return;end
     search.primaryOptimum=solution.safety;
-    if problem.referenceDeviationWeight==0,return;end
+    if problem.referenceDeviationWeight==0 && problem.nominalTrackingWeight==0 && problem.inputVariationWeight==0,return;end
 
     % Preserve the attained safety optimum, without a weighted tradeoff or
     % an intentional slack allowance. Solver tolerances remain numerical.
@@ -515,17 +515,15 @@ function [solution,search,model]=localSolve(anchor,model,initialization,timer,pr
     end
     search.secondaryStageAttempted=true;
     wall=tic;numerical=false;flag=1;solverInfo=struct();
-    if solution.referenceDeviationCost==0
+    if solution.performanceCost==0
         % Zero is also the global lower bound of the quadratic tie-breaker.
         refined=solution;
     else
         remaining=model.solveTimeLimitSeconds-toc(timer);refined=[];flag=0;
         if remaining>0
             numerical=true;search.solverCalls=search.solverCalls+1;
-            % A common positive weight cannot change this minimizer. Remove
-            % it from the solve to avoid conditioning changes with its units.
-            [second,flag,solverInfo]=localConicSolve(problem.quadratic/problem.referenceDeviationWeight, ...
-                zeros(size(objective)),secondary.cones,secondary.a,secondary.b, ...
+            [second,flag,solverInfo]=localConicSolve(problem.quadratic, ...
+                problem.performanceObjective,secondary.cones,secondary.a,secondary.b, ...
                 secondary.equal,secondary.rhs,secondary.lower,secondary.upper,cfg,remaining, ...
                 min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
             if ~isempty(second) && all(isfinite(second)) && flag>0
@@ -533,19 +531,19 @@ function [solution,search,model]=localSolve(anchor,model,initialization,timer,pr
             end
         end
     end
-    search.stages(2)=struct('objective',"referenceDeviation",'exitFlag',flag, ...
+    search.stages(2)=struct('objective',"nominalTrackingAndRegularization",'exitFlag',flag, ...
         'seconds',toc(wall),'value',NaN,'numericalSolve',numerical,'solverInfo',solverInfo);
     tolerance=cfg.solver.constraintTolerance*max(1,search.slackCap);
     if ~isempty(refined) && refined.safety<=search.slackCap+tolerance
         solution=refined;search.secondaryStageCompleted=true;
-        search.stages(2).value=solution.referenceDeviationCost;
+        search.stages(2).value=solution.performanceCost;
     else
         % Keep the completed priority result; refinement failure does not
         % trigger another solve or invalidate the already available input.
         search.terminationReason="pcbfReturnedWithoutRefinement";
     end
-    solution.secondaryObjective="referenceDeviation";
-    solution.secondaryObjectiveValue=solution.referenceDeviationCost;
+    solution.secondaryObjective="nominalTrackingAndRegularization";
+    solution.secondaryObjectiveValue=solution.performanceCost;
 end
 
 function point=localZeroSlackCandidate(problem)
@@ -613,8 +611,13 @@ function solution=localDecode(point,problem,anchor,inputs)
         'referenceInputDeviation',norm(problem.referenceInputMap*point)^2);
     solution.referenceDeviationCost=.5*problem.referenceDeviationWeight ...
         *(solution.referenceStateDeviation+solution.referenceInputDeviation);
+    solution.nominalTrackingCost=.5*problem.nominalTrackingWeight ...
+        *norm(problem.nominalTrackingOffset+problem.nominalTrackingMap*point)^2;
+    solution.inputVariationCost=.5*problem.inputVariationWeight ...
+        *norm(problem.inputVariationOffset+problem.inputVariationMap*point)^2;
+    solution.performanceCost=solution.referenceDeviationCost+solution.nominalTrackingCost+solution.inputVariationCost;
     solution.objectiveValue=solution.safety;
-    if problem.clf.enabled,solution.objectiveValue=solution.referenceDeviationCost+solution.clfSlack;end
+    if problem.clf.enabled,solution.objectiveValue=solution.performanceCost+problem.clfSlackDuration*solution.clfSlack;end
     if isfield(problem,'durationIndex')
         solution.durationChangeSeconds=point(problem.durationIndex);
         solution.states=solution.states+problem.durationStateDerivative*solution.durationChangeSeconds;
@@ -1117,24 +1120,31 @@ function problem=localSelectObjective(problem,anchor,model)
     nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
     enabled=isempty(model.target);
     value=nonlinearBicycleModel.nominalValue(model.initialState,model.lane,model.nominalReference);
-    scale=1;required=NaN;map=sparse(1,nv);offset=NaN;initialSlack=NaN;
+    scale=1;required=NaN;map=sparse(1,nv);offset=NaN;initialSlack=NaN;slackDuration=model.cfg.controller.sampleTime;
     problem.performanceObjective=zeros(nv,1);
     problem.mode="pcbf";problem.optimizationObjective="pcbfSlack";functionName="none";
     if enabled
-        % Cruise only: Vdot(u_bar)+dVdot/du*du <= -alpha*V+s.
-        [rate,inputGradient,value]=nonlinearBicycleModel.nominalDerivative( ...
-            model.initialState,anchor.inputs(:,1),model.lane,model.nominalReference,model.cfg);
-        scale=max(1,value);required=model.nominalReference.decayRate*value;
-        map(iu(:,1))=inputGradient/scale;offset=rate/scale;
+        % Integrate the SAME continuous CLF over one held-input interval:
+        % V(x+) <= exp(-alpha*h)*V(x) + tau*s, tau=(1-exp(-alpha*h))/alpha.
+        % RTI uses its tangent at the first predicted state, keeping a QP.
+        % This tangent is an approximation, not a nonlinear descent certificate.
+        alpha=model.nominalReference.decayRate;h=model.cfg.controller.sampleTime;
+        slackDuration=-expm1(-alpha*h)/alpha;
+        [nextError,nextJacobian]=nonlinearBicycleModel.errorLinearization( ...
+            anchor.states(:,2),model.lane,model.nominalReference);
+        nextValue=sum((model.nominalReference.factor*nextError).^2);
+        scale=max(1,value);required=alpha*value;
+        map(problem.stateIndices(:,2))=2*nextError.'*model.nominalReference.matrix*nextJacobian/(slackDuration*scale);
+        offset=(nextValue-value)/(slackDuration*scale);
         row=map;row(ic)=-1;
-        problem.a=[problem.a;row];problem.b=[problem.b;(-required-rate)/scale];
+        problem.a=[problem.a;row];problem.b=[problem.b;-required/scale-offset];
         problem.clfRowIndex=size(problem.a,1);
-        problem.performanceObjective(ic)=1;
-        problem.mode="clf";problem.optimizationObjective="clfSlackAndReferenceDeviation";
+        problem.performanceObjective(ic)=slackDuration;
+        problem.mode="clf";problem.optimizationObjective="integratedClfSlackAndTracking";
         % No active collision problem: remove the unused safety objective
         % and fix its reserved slack slots rather than running a safety LP.
         problem.safetyObjective(:)=0;problem.upper(problem.slackIndices)=0;
-        functionName="quadraticTransverseError";initialSlack=max(0,rate+required);
+        functionName="quadraticTransverseError";initialSlack=max(0,offset*scale+required);
     else
         % Reserve the existing index for probe compatibility, but fix it to
         % zero and omit both the CLF inequality and its objective coefficient.
@@ -1157,6 +1167,42 @@ function problem=localSelectObjective(problem,anchor,model)
     problem.referencePenaltyWeight=problem.referenceDeviationWeight/(2*scale);
     problem.quadratic=2*problem.referencePenaltyWeight ...
         *(problem.referenceStateMap.'*problem.referenceStateMap+problem.referenceInputMap.'*problem.referenceInputMap);
+    % A persistent path objective accompanies every RTI solve. Avoidance
+    % attracts transverse state and speed without a cruise CLF condition
+    % during avoidance. The first PCBF optimization remains unchanged.
+    components=5;
+    units=stateUnits(2:end);trackingValues=zeros(components,6,count);
+    trackingOffset=zeros(components*count,1);
+    for k=1:count
+        [error,jacobian]=nonlinearBicycleModel.errorLinearization( ...
+            anchor.states(:,k+1),model.lane,model.nominalReference);
+        rows=(k-1)*components+(1:components);
+        trackingOffset(rows)=error(1:components)./(units(1:components)*sqrt(count));
+        trackingValues(:,:,k)=jacobian(1:components,:)./(units(1:components)*sqrt(count));
+    end
+    trackingRows=repmat(reshape(1:components*count,components,1,count),1,6,1);
+    trackingColumns=repmat(reshape(ix,1,6,count),components,1,1);
+    trackingMap=sparse(trackingRows(:),trackingColumns(:),trackingValues(:),components*count,nv);
+    problem.nominalTrackingWeight=model.cfg.rti.nominalTrackingWeight;
+    problem.nominalTrackingMap=trackingMap;problem.nominalTrackingOffset=trackingOffset;
+    weight=problem.nominalTrackingWeight/scale;
+    problem.quadratic=problem.quadratic+weight*(trackingMap.'*trackingMap);
+    problem.performanceObjective=problem.performanceObjective+weight*trackingMap.'*trackingOffset;
+    % Penalize actual neighboring controls, including the already applied
+    % input. This is a soft temporal preference, not a rate constraint.
+    % Use a sum: extending the horizon must not cheapen the first jump.
+    variationRows=reshape(1:2*count,2,count);
+    previousRows=variationRows(:,2:end);previousColumns=iu(:,1:end-1);
+    variationMap=sparse([variationRows(:);previousRows(:)], ...
+        [iu(:);previousColumns(:)], ...
+        [repmat(1./inputUnits,count,1);repmat(-1./inputUnits,count-1,1)],2*count,nv);
+    variationOffset=reshape(diff([model.previousInput,anchor.inputs],1,2)./inputUnits,[],1);
+    problem.inputVariationWeight=model.cfg.rti.inputVariationWeight;
+    problem.inputVariationMap=variationMap;problem.inputVariationOffset=variationOffset;
+    weight=problem.inputVariationWeight/scale;
+    problem.quadratic=problem.quadratic+weight*(variationMap.'*variationMap);
+    problem.performanceObjective=problem.performanceObjective+weight*variationMap.'*variationOffset;
+    problem.clfSlackDuration=slackDuration;
     problem.clfScale=scale;problem.clfDerivativeMap=map;problem.clfDerivativeOffset=offset;
     problem.clfDerivativeLimit=-required;
     problem.clf=struct('enabled',enabled,'function',functionName,'requiredDecreaseRate',required);

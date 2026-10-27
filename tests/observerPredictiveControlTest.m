@@ -74,7 +74,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(second.model.target,q,AbsTol=1e-12);
             testCase.verifyEqual(second.metadata.search.initialization,"shiftedPrimalIterate");
             testCase.verifyNumElements(second.metadata.search.stages,2);
-            testCase.verifyEqual([second.metadata.search.stages.objective],["pcbfSlack","referenceDeviation"]);
+            testCase.verifyEqual([second.metadata.search.stages.objective],["pcbfSlack","nominalTrackingAndRegularization"]);
             testCase.verifyTrue(second.metadata.search.secondaryStageAttempted);
             testCase.verifyFalse(second.metadata.clfEnabled);
             testCase.verifyEqual(second.model.linearization.states(:,1),next,AbsTol=1e-12);

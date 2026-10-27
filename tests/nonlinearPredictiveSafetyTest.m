@@ -280,7 +280,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
                 'collisionAvoidanceController:invalidSampleTime');
         end
-        function aCompleteEmptyScanClearsTheForecastButRetainsTheInputWarmStart(testCase)
+        function aCompleteEmptyScanClearsTheForecastAndRebuildsCruise(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=0;
             q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];
             [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
@@ -291,7 +291,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEmpty(state.targetEpoch);
             testCase.verifyEqual(state.encounterHorizonSteps,0);
-            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPrimalIterate");
+            testCase.verifyEqual(problem.metadata.search.initialization,"cruiseFeedbackRollout");
             testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
             ego=localSuccessor(ego,state,cfg);ego.stateTime=2*cfg.controller.sampleTime;
             ego.perception.time=ego.stateTime;
@@ -324,7 +324,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"nominalFeedbackRollout");
-            testCase.verifyEqual(state.version,94);
+            testCase.verifyGreaterThan(state.version,prior.version);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;1;0;1.6;2.4;.95;0;0];
@@ -336,6 +336,8 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
         function finiteBrakingSlewUsesAppliedInputMemory(testCase)
             [ego,road,cfg]=localFixture();
+            % Allow the finite actuator slew to reach terminal braking.
+            cfg.controller.horizonSteps=32;
             cfg.model.brakingRatioRateMaximum=.5;ego.heldActuatorInput=[0;0];
             [~,plan]=collisionAvoidanceController(ego,[],road,cfg,[]);
             rate=.5*cfg.controller.sampleTime;

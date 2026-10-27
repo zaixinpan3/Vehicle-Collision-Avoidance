@@ -16,7 +16,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.algorithm,"realTimeIteration");
             testCase.verifyEqual(search.rtiIterations,1);
             testCase.verifyEqual(search.linearizationCount,1);
-            testCase.verifyEqual([search.stages.objective],"clfSlackAndReferenceDeviation");
+            testCase.verifyEqual([search.stages.objective],"integratedClfSlackAndTracking");
             testCase.verifyLessThanOrEqual(search.solverCalls,1);
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyEqual(search.initializationFailure,"");
@@ -405,7 +405,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(near.metadata.search.secondaryStageAttempted);
             testCase.verifyTrue(near.metadata.search.pcbfStageCompleted);
             testCase.verifyEqual(near.metadata.optimizationMode,"pcbf");
-            testCase.verifyEqual(near.metadata.secondaryObjective,"referenceDeviation");
+            testCase.verifyEqual(near.metadata.secondaryObjective,"nominalTrackingAndRegularization");
             testCase.verifyEqual(near.metadata.referenceDeviationWeight,10);
             testCase.verifyNumElements(near.metadata.search.stages,2);
             testCase.verifyLessThanOrEqual(near.metadata.solverCallCount,2);
@@ -428,7 +428,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(cleared.metadata.optimizationMode,"clf");
             testCase.verifyNumElements(cleared.metadata.search.stages,1);
             testCase.verifyEqual(cleared.metadata.solverCallCount,1);
-            testCase.verifyEqual(cleared.metadata.optimizationObjective,"clfSlackAndReferenceDeviation");
+            testCase.verifyEqual(cleared.metadata.optimizationObjective,"integratedClfSlackAndTracking");
         end
         function consecutiveMeasuredSuccessorsRemainSingleIterations(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;

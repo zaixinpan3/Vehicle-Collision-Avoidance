@@ -69,7 +69,8 @@ def feasible_hold(hold):
         if isinstance(stages, dict):
             stages = [stages]
         mode = hold.get('optimizationMode')
-        expected = {'pcbf': 'pcbfSlack', 'clf': 'clfSlackAndReferenceDeviation'}.get(mode)
+        expected = {'pcbf': ('pcbfSlack',), 'clf': ('clfSlackAndReferenceDeviation',
+                    'integratedClfSlackAndTracking')}.get(mode)
         tolerance = hold.get('affineFeasibilityTolerance', 0)
         residual = hold.get('hardResidual')
         primary_valid = (expected is not None and 1 <= len(stages) <= (2 if mode == 'pcbf' else 1)
@@ -78,7 +79,7 @@ def feasible_hold(hold):
                 and isinstance(residual, (int, float)) and 0 <= residual <= tolerance
                 and hold.get('affineSubproblemCompleted') is True
                 and hold.get('solverCalls') == sum(int(stage.get('numericalSolve', True)) for stage in stages)
-                and stages[0].get('objective') == expected
+                and stages[0].get('objective') in expected
                 and stages[0].get('exitFlag', 0) > 0)
         if not primary_valid or len(stages) == 1:
             return primary_valid
@@ -86,7 +87,7 @@ def feasible_hold(hold):
         cap = hold.get('slackCap')
         slack = hold.get('predictiveBarrierValue')
         completed = hold.get('secondaryStageCompleted')
-        return (stages[1].get('objective') == 'referenceDeviation'
+        return (stages[1].get('objective') in ('referenceDeviation', 'nominalTrackingAndRegularization')
                 and isinstance(optimum, (int, float)) and math.isfinite(optimum) and optimum >= 0
                 and isinstance(cap, (int, float)) and cap == optimum
                 and isinstance(slack, (int, float)) and 0 <= slack <= cap + tolerance

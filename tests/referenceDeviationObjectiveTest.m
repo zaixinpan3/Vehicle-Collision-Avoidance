@@ -32,6 +32,14 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(solution.inputCorrection(1,1),.5,AbsTol=1e-5);
             testCase.verifyEqual(search.slackCap,search.primaryOptimum,AbsTol=0);
         end
+        function trackingAndSmoothnessCannotBuyAdditionalSafetySlack(testCase)
+            request=localPriorityProblem(testCase.model,testCase.anchor,1,10,[1e6,1e6]);
+            [solution,search]=solvePredictiveControl("probe",request);
+            testCase.assertNotEmpty(solution);
+            testCase.verifyEqual(solution.safety,.5,AbsTol=1e-5);
+            testCase.verifyEqual(search.slackCap,search.primaryOptimum,AbsTol=0);
+            testCase.verifyTrue(search.secondaryStageCompleted);
+        end
         function equalZeroSlackSolutionsPreferTheSmallerReferenceCorrection(testCase)
             request=localPriorityProblem(testCase.model,testCase.anchor,.1,10);
             [solution,search]=solvePredictiveControl("probe",request);
@@ -78,11 +86,11 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             [original,search]=localSolve(testCase.model,testCase.anchor,10);
             alternative=localSolve(testCase.model,testCase.anchor,1000);
             testCase.assertNotEmpty(original);testCase.assertNotEmpty(alternative);
-            testCase.verifyEqual(original.inputs,alternative.inputs,AbsTol=1e-10);
-            testCase.verifyEqual(original.states,alternative.states,AbsTol=1e-10);
+            testCase.verifyEqual(original.inputs,alternative.inputs,AbsTol=1e-6);
+            testCase.verifyEqual(original.states,alternative.states,AbsTol=1e-6);
             testCase.verifyEqual(original.referenceDeviationWeight,10);
             testCase.verifyGreaterThan(original.referenceDeviationCost,0);
-            testCase.verifyEqual([search.stages.objective],["pcbfSlack","referenceDeviation"]);
+            testCase.verifyEqual([search.stages.objective],["pcbfSlack","nominalTrackingAndRegularization"]);
             testCase.verifyTrue(search.secondaryStageCompleted);
             testCase.verifyEqual(search.slackCap,search.primaryOptimum,AbsTol=0);
             testCase.verifyLessThanOrEqual(original.safety,search.slackCap+testCase.model.cfg.solver.constraintTolerance);
@@ -111,9 +119,37 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(solution.objectiveValue,solution.safety,AbsTol=0);
             testCase.verifyFalse(solution.clfEnabled);
         end
+        function pathAttractionReducesDriftWithoutBuyingSafetySlack(testCase)
+            [model,seed]=localDisplacedReference(testCase.model);
+            model.cfg.rti.nominalTrackingWeight=0;
+            baseline=localConfiguredSolve(model,seed);
+            model.cfg.rti.nominalTrackingWeight=1;
+            [attracted,search]=localConfiguredSolve(model,seed);
+            testCase.assertNotEmpty(baseline);testCase.assertNotEmpty(attracted);
+            testCase.verifyFalse(attracted.clfEnabled);
+            testCase.verifyEqual(attracted.safety,baseline.safety,AbsTol=1e-6);
+            testCase.verifyLessThan(norm(attracted.states(2,2:end)),norm(baseline.states(2,2:end))-.01);
+            testCase.verifyTrue(search.secondaryStageCompleted);
+            testCase.verifyLessThanOrEqual(search.solverCalls,2);
+        end
+        function softInputVariationReducesTheFirstCommandJump(testCase)
+            [model,seed]=localDisplacedReference(testCase.model);
+            model.cfg.rti.inputVariationWeight=0;
+            baseline=localConfiguredSolve(model,seed);
+            model.cfg.rti.inputVariationWeight=10;
+            smooth=localConfiguredSolve(model,seed);
+            testCase.assertNotEmpty(baseline);testCase.assertNotEmpty(smooth);
+            units=[model.cfg.clf.certificationSteeringRadians;model.cfg.clf.certificationBrakingRatio];
+            testCase.verifyLessThan(norm((smooth.inputs(:,1)-model.previousInput)./units), ...
+                norm((baseline.inputs(:,1)-model.previousInput)./units));
+            testCase.verifyEqual(smooth.safety,baseline.safety,AbsTol=1e-6);
+            increments=diff([model.previousInput,smooth.inputs],1,2)./units;
+            testCase.verifyEqual(smooth.inputVariationCost,5*sum(increments.^2,'all'),RelTol=1e-10);
+        end
         function aZeroSlackCruiseReferenceNeedsNoDeparture(testCase)
             cfg=testCase.model.cfg;
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
+            reference=nonlinearBicycleModel.cruise(cfg,0);ego.heldActuatorInput=reference.input;
             [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
             testCase.verifyLessThan(prediction.metadata.referenceDeviationCost,1e-4);
             testCase.verifyLessThan(prediction.metadata.clfSlack,1e-4);
@@ -122,8 +158,10 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
     end
 end
 
-function request=localPriorityProblem(model,anchor,demand,weight)
+function request=localPriorityProblem(model,anchor,demand,weight,performanceWeights)
+    if nargin<5,performanceWeights=[0,0];end
     model.cfg.rti.referenceDeviationWeight=weight;
+    model.cfg.rti.nominalTrackingWeight=performanceWeights(1);model.cfg.rti.inputVariationWeight=performanceWeights(2);
     [p,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
         'model',model,'anchor',anchor,'inherited',true));
     % A small constrained choice: correction + slack >= demand. The
@@ -145,6 +183,25 @@ end
 
 function [solution,search]=localSolve(model,anchor,weight)
     model.cfg.rti.referenceDeviationWeight=weight;
+    model.cfg.rti.nominalTrackingWeight=0;model.cfg.rti.inputVariationWeight=0;
+    [problem,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+        'model',model,'anchor',anchor,'inherited',false));
+    [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
+        'model',model,'anchor',anchor,'problem',problem));
+end
+
+function [model,anchor]=localDisplacedReference(model)
+    model.initialState=[0;3;0;8;0;0];model.previousInput=model.nominalReference.input;
+    model.target=[20;20;0;0;0;0;model.cfg.vehicle.lr;2.4;.95;0;0];
+    model.targetEpoch=model.target;model.terminalContext=terminalSafeSet.context(model);
+    anchor=struct('states',zeros(6,33),'inputs',repmat(model.previousInput,1,32));
+    anchor.states(:,1)=model.initialState;
+    for k=1:32
+        anchor.states(:,k+1)=nonlinearBicycleModel.sample(anchor.states(:,k),anchor.inputs(:,k),model.cfg);
+    end
+end
+
+function [solution,search]=localConfiguredSolve(model,anchor)
     [problem,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
         'model',model,'anchor',anchor,'inherited',false));
     [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...

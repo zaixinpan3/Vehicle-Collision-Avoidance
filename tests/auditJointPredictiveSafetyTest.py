@@ -21,7 +21,7 @@ class CollisionAuditTest(unittest.TestCase):
         self.assertFalse(feasible_hold(hold))
         hold['optimizationMode'] = 'clf'
         self.assertFalse(feasible_hold(hold))
-        hold['solverStages']['objective'] = 'clfSlackAndReferenceDeviation'
+        hold['solverStages']['objective'] = 'integratedClfSlackAndTracking'
         self.assertTrue(feasible_hold(hold))
         hold['solverCalls'] = 2
         self.assertFalse(feasible_hold(hold))
@@ -42,7 +42,7 @@ class CollisionAuditTest(unittest.TestCase):
                     primaryOptimum=.2, slackCap=.2, predictiveBarrierValue=.2,
                     secondaryStageCompleted=True,
                     solverStages=[dict(objective='pcbfSlack', exitFlag=1, numericalSolve=True),
-                                  dict(objective='referenceDeviation', exitFlag=1, numericalSolve=True)])
+                                  dict(objective='nominalTrackingAndRegularization', exitFlag=1, numericalSolve=True)])
         self.assertTrue(feasible_hold(hold))
         hold['predictiveBarrierValue'] = .21
         self.assertFalse(feasible_hold(hold))
@@ -56,7 +56,7 @@ class CollisionAuditTest(unittest.TestCase):
                     primaryOptimum=0, slackCap=0, predictiveBarrierValue=0,
                     secondaryStageCompleted=False,
                     solverStages=[dict(objective='pcbfSlack', exitFlag=1, numericalSolve=True),
-                                  dict(objective='referenceDeviation', exitFlag=0, numericalSolve=True)])
+                                  dict(objective='nominalTrackingAndRegularization', exitFlag=0, numericalSolve=True)])
         self.assertTrue(feasible_hold(hold))
         hold['secondaryStageCompleted'] = True
         self.assertFalse(feasible_hold(hold))

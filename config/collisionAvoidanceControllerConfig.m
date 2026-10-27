@@ -1,5 +1,5 @@
 function cfg = collisionAvoidanceControllerConfig(userCfg)
-%collisionAvoidanceControllerConfig Two-stage PCBF/CLF parameters in SI units.
+%collisionAvoidanceControllerConfig Switched PCBF/CLF parameters in SI units.
 % Unknown fields are rejected so retired algorithm settings cannot silently
 % change the interpretation of a controller run.
     if nargin<1,userCfg=[];end
@@ -33,11 +33,13 @@ function cfg=localDefaults()
     % Later frames shift M-1 state/input stages and append one hold to retain M.
     % Failure is reported without horizon extension, replanning or another
     % local model.
-    % Cruise QP: CLF slack plus half this weight times the mean squared,
-    % unit-scaled state/input deviation from the current reference.
-    % PCBF mode minimizes safety slack alone and does not use this weight.
-    % In cruise the weight stays active on the route; zero disables it.
-    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10);
+    % Shared quadratic performance: nominal transverse/speed tracking,
+    % actual input increments, and proximity to the RTI reference.
+    % PCBF minimizes safety slack first, then performance at that optimum.
+    % Cruise minimizes the integrated continuous-CLF slack plus performance.
+    % All three weights are soft costs; zero disables that component.
+    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10, ...
+        'nominalTrackingWeight',1,'inputVariationWeight',20);
     % One field rollout combines route attraction with motion-dependent target
     % circulation, including longitudinal avoidance. No nominal-path forecast
     % selects a behavior. Cruise feedback never overwrites obstacle correction.
@@ -95,9 +97,11 @@ function cfg=localDefaults()
         'sideslipMaximum',.25);
     % One continuous-time quadratic CLF V = e' P e with the soft condition
     %   Vdot <= -2 V / convergenceTimeConstantSeconds + slack.
-    % RTI linearizes Vdot in the first input at the current estimate. This
-    % gives one affine row; it does not impose discrete one-step contraction.
-    % Exact continuous enforcement with zero slack yields the stated decay.
+    % Integrate this condition over a held-input interval h, then RTI
+    % linearizes V at the first predicted state. The resulting affine row is
+    % V_aff(x+) <= exp(-alpha*h)*V(x) + (1-exp(-alpha*h))/alpha * slack.
+    % The continuous design of P is unchanged. Zero affine slack alone is
+    % not an exact nonlinear sampled or continuous stability certificate.
     % The offline design enforces the continuous trim Lyapunov inequality.
     % A separate sampled certificate supports the cruise initializer below.
     % P and the gain K of the cruise controller u = u* + K e are synthesized offline
@@ -169,6 +173,8 @@ function localValidate(cfg)
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.rti.nominalTrackingWeight,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.rti.inputVariationWeight,{'double'},{'scalar','real','finite','nonnegative'});
     for name=["radialRate","tangentialRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end

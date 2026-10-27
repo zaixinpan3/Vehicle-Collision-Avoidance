@@ -223,7 +223,8 @@ end
 function problem=localAugment(base,derivative,limits,stateDerivative)
     problem=base;n=numel(base.lower);map=[1:n-1,n+1];timeIndex=n;
     problem.clfIndex=n+1;problem.durationIndex=timeIndex;
-    for field=["a","equal","referenceStateMap","referenceInputMap","clfDerivativeMap"]
+    for field=["a","equal","referenceStateMap","referenceInputMap","nominalTrackingMap", ...
+            "inputVariationMap","clfDerivativeMap"]
         matrix=sparse(size(base.(field),1),n+1);matrix(:,map)=base.(field);problem.(field)=matrix;
     end
     problem.a(:,timeIndex)=-derivative.b;problem.equal(:,timeIndex)=-derivative.rhs;
@@ -237,8 +238,13 @@ function problem=localAugment(base,derivative,limits,stateDerivative)
     % A duration change also moves the reference states. Penalize the total
     % affine state displacement from the original fixed-time reference.
     problem.referenceStateMap(:,timeIndex)=base.referenceStateMap*stateShift;
+    problem.nominalTrackingMap(:,timeIndex)=base.nominalTrackingMap*stateShift;
     problem.quadratic=2*base.referencePenaltyWeight ...
-        *(problem.referenceInputMap.'*problem.referenceInputMap+problem.referenceStateMap.'*problem.referenceStateMap);
+        *(problem.referenceInputMap.'*problem.referenceInputMap+problem.referenceStateMap.'*problem.referenceStateMap) ...
+        +base.nominalTrackingWeight/base.clfScale*(problem.nominalTrackingMap.'*problem.nominalTrackingMap) ...
+        +base.inputVariationWeight/base.clfScale*(problem.inputVariationMap.'*problem.inputVariationMap);
+    problem.performanceObjective(timeIndex)=base.nominalTrackingWeight/base.clfScale ...
+        *(problem.nominalTrackingMap(:,timeIndex).'*base.nominalTrackingOffset);
     for k=1:numel(base.cones)
         a=sparse(size(base.cones(k).A,1),n+1);a(:,map)=base.cones(k).A;a(:,timeIndex)=-derivative.cones(k).b;
         d=sparse(size(base.cones(k).D,1),n+1);d(:,map)=base.cones(k).D;d(:,timeIndex)=-derivative.cones(k).gamma;

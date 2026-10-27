@@ -127,22 +127,28 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyEqual(solution.states,anchor.states,AbsTol=1e-6);
             testCase.verifyEqual(solution.inputs,anchor.inputs,AbsTol=1e-6);
         end
-        function theCruiseProblemUsesAnAffineContinuousClfRow(testCase)
+        function cruiseIntegratesTheContinuousClfAcrossOneHoldAsAnAffineRow(testCase)
             model=testCase.model;anchor=testCase.anchor;
             model.initialState(2)=.1;anchor.states(2,:)=.1;
             [p,~,model]=localFormulate(anchor,model);
             testCase.verifyEmpty(p.cones);
             testCase.verifyEqual(p.upper(p.clfIndex),Inf);
-            point=zeros(size(p.lower));point(p.inputIndices(:,1))=[.001;-.002];
-            [rate,gradient,value]=nonlinearBicycleModel.nominalDerivative( ...
-                model.initialState,anchor.inputs(:,1),model.lane,model.nominalReference,model.cfg);
-            expected=rate+gradient*point(p.inputIndices(:,1));
+            value=nonlinearBicycleModel.nominalValue(model.initialState,model.lane,model.nominalReference);
+            alpha=model.nominalReference.decayRate;h=model.cfg.controller.sampleTime;
+            duration=-expm1(-alpha*h)/alpha;
+            point=zeros(size(p.lower));increment=[.001;-.002;.001;0;0;0];
+            point(p.stateIndices(:,2))=increment;
+            [error,jacobian]=nonlinearBicycleModel.errorLinearization(anchor.states(:,2),model.lane,model.nominalReference);
+            nextValue=error.'*model.nominalReference.matrix*error;
+            nextTangent=nextValue+2*error.'*model.nominalReference.matrix*jacobian*increment;
+            expected=(nextTangent-value)/duration;
             testCase.verifyEqual((p.clfDerivativeMap*point+p.clfDerivativeOffset)*p.clfScale,expected,AbsTol=1e-12);
-            testCase.verifyEqual(p.clfDerivativeLimit,-model.nominalReference.decayRate*value,AbsTol=1e-12);
-            testCase.verifyEqual(full(p.clfDerivativeMap(p.stateIndices)),zeros(size(p.stateIndices)),AbsTol=0);
-            testCase.verifyEqual(full(p.clfDerivativeMap(p.inputIndices(:,2:end))),zeros(size(p.inputIndices(:,2:end))),AbsTol=0);
-            point(p.clfIndex)=max(0,expected-p.clfDerivativeLimit)/p.clfScale;
-            testCase.verifyLessThanOrEqual(p.a(end,:)*point-p.b(end),1e-12);
+            testCase.verifyEqual(p.clfDerivativeLimit,-alpha*value,AbsTol=1e-12);
+            testCase.verifyEqual(p.clfSlackDuration,duration,AbsTol=1e-15);
+            testCase.verifyEqual(full(p.clfDerivativeMap(p.inputIndices)),zeros(size(p.inputIndices)),AbsTol=0);
+            slack=max(0,(nextTangent-exp(-alpha*h)*value)/duration);
+            point(p.clfIndex)=slack/p.clfScale;
+            testCase.verifyLessThanOrEqual(p.a(p.clfRowIndex,:)*point-p.b(p.clfRowIndex),1e-12);
         end
         function avoidanceAllocationUsesLongitudinalAuthorityWithoutCruiseTracking(testCase)
             cfg=testCase.model.cfg;x=[0;0;0;8;0;0];

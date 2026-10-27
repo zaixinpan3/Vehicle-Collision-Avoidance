@@ -54,6 +54,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
         invalidCrossingGap = {-0.1, Inf, NaN, [0.1, 0.2]}
         invalidActuation = {[], 1.0, struct([])}
         invalidReferenceWeight = {-1, Inf, NaN, [1,2]}
+        performanceWeight = {"referenceDeviationWeight","nominalTrackingWeight","inputVariationWeight"}
     end
 
     methods (TestClassSetup)
@@ -67,9 +68,9 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function referenceDeviationWeightMustBeFiniteAndNonnegative(testCase,invalidReferenceWeight)
+        function performanceWeightsMustBeFiniteAndNonnegative(testCase,invalidReferenceWeight,performanceWeight)
             testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
-                struct('rti',struct('referenceDeviationWeight',invalidReferenceWeight))), ...
+                struct('rti',struct(performanceWeight,invalidReferenceWeight))), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
         function referenceDeviationCanBeDisabledForAnAblation(testCase)
