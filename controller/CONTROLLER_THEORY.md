@@ -1021,7 +1021,13 @@ Both signs of the lateral-acceleration condition are linearized for a moving
 endpoint. The terminal continuation's sampled schedule and exit branch remain
 local approximations and are not a global nonlinear exit certificate.
 
-`rows` builds the local terminal approximation once. At circular-track
+`rows` builds the local terminal approximation once. For a straight target
+track intersecting the parked footprint, its transverse support normal uses
+the sign with the larger minimum vertex gap at the parked reference pose.
+An exact tie retains the encounter passing side. A road-forward preference
+must not force the parked pose onto the opposite side from its braking
+endpoint. This changes the local representation, not the braking policy or
+the parked-track membership condition. At circular-track
 intersection, a nonconvex safe set can admit an inner or an outer local
 separation chart. The implementation selects the smaller radial/support
 escape using the actual joint geometry, independently of road-side
@@ -1836,8 +1842,16 @@ it cannot silently trigger planning. After a confirmed target exit or complete
 empty scan clears the encounter, a subsequent acquisition starts a new
 encounter and permits one new planner invocation.
 
-The field constructs the initial reference; only the optimization supplies
-execution inputs. Previously optimized state/input prefixes are shifted
+On every target-free frame, the controller builds the cruise reference from
+the current estimated state using nominal feedback and the nonlinear vehicle
+transition. The cruise derivative is linearized about this rollout instead
+of the previous avoidance/braking iterate or a large affine cruise correction.
+This uses the ordinary target-free horizon schedule, one affine model and one
+cruise QP; it is neither another avoidance-planner call nor a post-solve rollout.
+The state/input shift is retained throughout each active avoidance encounter.
+
+The field constructs the initial avoidance reference; only the optimization
+supplies execution inputs. During avoidance, optimized state/input prefixes are shifted
 without full-horizon replay or reshaping by the boundary guidance field. Tail construction retains the
 existing terminal/nominal seed policies. The tangent initializer's handling
 of singular force-ratio endpoints remains as described above.

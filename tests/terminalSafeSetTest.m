@@ -191,6 +191,19 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(rows*shift-bounds),1e-6);
             testCase.verifyEqual(context.trackSide,1);
         end
+        function crossingStopRowsPermitSeparationOnEitherGeometricSide(testCase)
+            % The braking endpoint and parked track must agree about the
+            % side of a crossing target, independently of road-forward yaw.
+            for side=[-1,1]
+                x=[2*side;0;0;1;0;0];q=[0;-1;pi/2;4;0;0;1.6;2.4;.95;0;0];
+                model=localModel(x,q);context=terminalSafeSet.context(model);
+                testCase.verifyFalse(terminalSafeSet.member(context,x,0));
+                shift=[3*side;0;0;0;0;0];
+                testCase.verifyTrue(terminalSafeSet.member(context,x+shift,0));
+                [rows,bounds]=terminalSafeSet.rows(context,x,0);
+                testCase.verifyLessThanOrEqual(max(rows*shift-bounds),1e-8);
+            end
+        end
         function positiveClearanceNeedsOnlyTheActualUncertaintyReserve(testCase)
             model=localModel([0;0;0;0;0;0],[4.9;0;0;0;0;0;1.6;2.4;.95;0;0]);
             context=terminalSafeSet.context(model);

@@ -55,6 +55,10 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         end
         function theOnlineUpdateReturnsTheAffineStateDecisionWithoutReplay(testCase)
             model=testCase.model;model.initialState(2)=.5;
+            % Supply straight cruise inputs so a correction is needed. A
+            % freshly generated path-feedback reference can already satisfy
+            % the cruise problem without any affine correction.
+            model.probeReference=testCase.anchor;
             previous=struct('inputTrajectory',testCase.anchor.inputs,'stateTrajectory',testCase.anchor.states);
             [solution,search,formed]=solvePredictiveControl(model,previous,tic);
             testCase.assertNotEmpty(solution);

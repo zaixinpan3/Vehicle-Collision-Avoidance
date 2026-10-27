@@ -10,6 +10,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % its optimal face. Both solves share the same linearization and budget.
 % Outside an encounter one cruise CLF/proximity QP is solved. There is no
 % cross-frame slack budget.
+% Outside an encounter, cruise feedback generates a dynamically consistent
+% reference from each new estimate before the single linearization.
 % Research access: solvePredictiveControl("probe",request) exposes reference,
 % formulation and solve operations to the free-time experiment in scripts/.
 % It does not enable a variable grid in the online controller.
@@ -39,6 +41,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         'fullGap',NaN,'fullCorrection',NaN);
     if ~isempty(reference),source="extendedInputRollout";
     elseif isfield(model,'targetOnset') && model.targetOnset,source="plannedAvoidanceRollout";
+    elseif localCruiseFeedback(model,previousState),source="cruiseFeedbackRollout";
     elseif localHasWarmStart(previousState),source="shiftedPrimalIterate";
     elseif isfield(model,'target') && ~isempty(model.target),source="unavailableWarmStart";
     end
@@ -78,7 +81,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         end
         wall=tic;[problem,model]=localFormulate(anchor,model);
         search.formulationSeconds=toc(wall);search.modelBuilt=true;
-        model.linearization=anchor;problem.inheritedAnchor=source~="plannedAvoidanceRollout" && localHasWarmStart(previousState);
+        model.linearization=anchor;problem.inheritedAnchor=source=="shiftedPrimalIterate";
         initializationSeconds=search.initializationSeconds;formulationSeconds=search.formulationSeconds;
         [solution,search,model]=localSolve(anchor,model,source,timer,problem);
         search.modelBuilt=true;search.formulationSeconds=formulationSeconds+search.clfConstructionSeconds;
@@ -230,10 +233,15 @@ function available=localHasWarmStart(previous)
         && all(isfinite(previous.stateTrajectory),'all');
 end
 
+function feedback=localCruiseFeedback(model,previous)
+    feedback=isfield(model,'target') && isempty(model.target) && localHasWarmStart(previous);
+end
+
 function [anchor,source]=localRtiInitialize(model,previous,minimumCount,reference)
     cfg=model.cfg;count=minimumCount;reuse=~isempty(reference);
     onset=isfield(model,'targetOnset') && model.targetOnset;
-    inherited=~reuse && ~onset && localHasWarmStart(previous);
+    feedback=~reuse && localCruiseFeedback(model,previous);
+    inherited=~reuse && ~onset && ~feedback && localHasWarmStart(previous);
     if ~reuse && onset && ~isempty(model.target)
         count=localPlanningHorizon(model,minimumCount);
         anchor=localPlanReference(model,count);source="plannedAvoidanceRollout";return;
@@ -246,6 +254,15 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount,referenc
     if reuse
         old=reference.inputs;source="extendedInputRollout";
         count=max(minimumCount,size(old,2));
+    elseif feedback
+        source="cruiseFeedbackRollout";
+        % Preserve the ordinary target-free horizon schedule, but rebuild
+        % its reference with cruise feedback from the current measurement.
+        % Repeating this in cruise prevents its next linearization from
+        % inheriting a large affine correction made on the preceding frame.
+        if localHasWarmStart(previous)
+            count=max(minimumCount,size(previous.inputTrajectory,2)-1);
+        end
     elseif inherited
         old=previous.inputTrajectory(:,2:end);source="shiftedPrimalIterate";
         % The issued input stays unchanged; only singular endpoint references

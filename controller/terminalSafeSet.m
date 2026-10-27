@@ -314,15 +314,23 @@ classdef terminalSafeSet
                             rows=[rows;r];bounds=[bounds;b];dual=[];
                         else
                             normal=[-course(2);course(1)];
-                            projection=laneGeometry.project(path.pose(1:2,end),context.lane);
-                            forward=predictiveSafetyGeometry.direction(projection.heading);
-                            preferred=forward;
-                            if abs(normal.'*forward)<sqrt(.5)
-                                preferred=context.collisionSide*[-forward(2);forward(1)];
+                            % Keep the parked pose on its geometric side of
+                            % the target track. A road-forward preference can
+                            % oppose the braking endpoint's separation rows.
+                            positive=localNormalDual(path.pose(:,end),context.shape,witness,normal);
+                            negative=localNormalDual(path.pose(:,end),context.shape,witness,-normal);
+                            dual=positive;
+                            difference=min(negative.value)-min(positive.value);
+                            if difference>1e-12
+                                dual=negative;
+                            elseif abs(difference)<=1e-12
+                                % At exact symmetry retain the encounter's
+                                % passing side rather than inventing one.
+                                projection=laneGeometry.project(path.pose(1:2,end),context.lane);
+                                side=context.collisionSide*[-sin(projection.heading);cos(projection.heading)];
+                                if normal.'*side<0,dual=negative;end
                             end
-                            if normal.'*preferred<0,normal=-normal;end
                         end
-                        if curvature==0,dual=localNormalDual(path.pose(:,end),context.shape,witness,normal);end
                     end
                     if ~isempty(dual)
                         rows=[rows;-dual.jacobian*jacobian(:,:,end)];bounds=[bounds;localKeep(dual.value-required)];

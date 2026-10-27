@@ -114,6 +114,35 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(anchor.states(:,1),model.initialState,AbsTol=0);
             testCase.verifyGreaterThan(max(abs(anchor.inputs(1,:))),.01);
         end
+        function clearingAnEncounterRebuildsCruiseBeforeOneLinearization(testCase)
+            [ego,road,cfg]=localFixture();ego.stateTime=0;
+            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            ego=localSuccessor(ego,prior,cfg);ego.stateTime=cfg.controller.sampleTime;
+            ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
+            % A stale avoidance input sequence must not be the linearization
+            % point once the complete scan releases its encounter.
+            prior.inputTrajectory(:,:)=repmat([.25;-.7],1,size(prior.inputTrajectory,2));
+            [command,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            reference=problem.model.linearization;
+            testCase.verifyEqual(problem.metadata.search.initialization,"cruiseFeedbackRollout");
+            testCase.verifyEqual(problem.metadata.optimizationMode,"clf");
+            testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
+            testCase.verifyEqual(problem.metadata.search.linearizationCount,1);
+            testCase.verifyEqual(problem.metadata.search.solverCalls,1);
+            testCase.verifyFalse(problem.metadata.postSolveFeasibilityCheck);
+            testCase.verifyGreaterThan(reference.inputs(2,1),-.7);
+            for k=1:size(reference.inputs,2)
+                expected=nonlinearBicycleModel.sample(reference.states(:,k),reference.inputs(:,k),cfg);
+                testCase.verifyEqual(reference.states(:,k+1),expected,AbsTol=1e-12);
+            end
+            testCase.verifyEqual(command.actuatorInput,problem.solution.inputs(:,1),AbsTol=0);
+            ego=localSuccessor(ego,state,cfg);ego.stateTime=2*cfg.controller.sampleTime;
+            ego.perception.time=ego.stateTime;
+            [~,~,next]=collisionAvoidanceController(ego,[],road,cfg,state);
+            testCase.verifyEqual(next.metadata.search.initialization,"cruiseFeedbackRollout");
+            testCase.verifyEqual(next.metadata.search.linearizationCount,1);
+            testCase.verifyEqual(next.metadata.search.plannerCalls,0);
+        end
         function coldCrossingSelectsACirculationReferenceBeforeTheRtiSolve(testCase)
             [ego,~,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=15;
             [~,q,road]=collisionThreatScenario("crossing",cfg);
