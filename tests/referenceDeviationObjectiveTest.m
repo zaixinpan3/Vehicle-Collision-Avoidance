@@ -153,7 +153,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
             testCase.verifyLessThan(prediction.metadata.referenceDeviationCost,1e-4);
             testCase.verifyLessThan(prediction.metadata.clfSlack,1e-4);
-            testCase.verifyEqual(prediction.metadata.referenceDeviationWeight,10);
+            testCase.verifyEqual(prediction.metadata.referenceDeviationWeight,0);
         end
     end
 end

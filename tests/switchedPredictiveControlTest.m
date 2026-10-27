@@ -406,7 +406,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(near.metadata.search.pcbfStageCompleted);
             testCase.verifyEqual(near.metadata.optimizationMode,"pcbf");
             testCase.verifyEqual(near.metadata.secondaryObjective,"nominalTrackingAndRegularization");
-            testCase.verifyEqual(near.metadata.referenceDeviationWeight,10);
+            testCase.verifyEqual(near.metadata.referenceDeviationWeight,0);
             testCase.verifyNumElements(near.metadata.search.stages,2);
             testCase.verifyLessThanOrEqual(near.metadata.solverCallCount,2);
         end
@@ -476,17 +476,16 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.clfInitialValue,withoutEdges.metadata.clfInitialValue);
             testCase.verifyEqual(withEdges,inputs,AbsTol=1e-10);
         end
-        function aDisplacedStateNoLongerNeedsAnExtensionToEscapeASearchBox(testCase)
+        function aLocallyUnreachableEndpointDoesNotTriggerHorizonGrowth(testCase)
             [ego,road,cfg]=localFixture();
-            ego.position=[21.52;7.33];ego.yaw=.017;ego.speed=6.21;
-            ego.lateralVelocity=-.153;ego.yawRate=-.14;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            anchor=problem.model.linearization;count=size(anchor.inputs,2);
-            testCase.verifyEqual(count,cfg.controller.horizonSteps);
-            testCase.verifyEqual(problem.metadata.search.horizonExtensions,0);
-            testCase.verifyEqual(problem.metadata.search.linearizationCount,1);
-            testCase.verifyGreaterThan(anchor.states(4,end),5);
-            localVerifyRtiPrediction(testCase,problem,cfg);
+            model=problem.model;model.initialState=[21.52;7.33;.017;6.21;-.153;-.14];
+            model.cfg.rti.trustRegion.errorBudget=1e-4*ones(6,1);
+            [solution,search]=solvePredictiveControl(model,[],tic);
+            testCase.verifyEmpty(solution);
+            testCase.verifyEqual(search.horizonExtensions,0);
+            testCase.verifyEqual(search.linearizationCount,1);
+            testCase.verifyEqual(search.plannerCalls,0);
         end
         function planningPreservesMeasuredVelocityAndFinishesANearStop(testCase)
             [ego,road,cfg]=localFixture();cfg.referenceSpeed=15;cfg.controller.horizonSteps=16;

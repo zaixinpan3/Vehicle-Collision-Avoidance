@@ -57,6 +57,66 @@ classdef nonlinearBicycleModel
             if variational,a=reshape(y(7:42),6,6);b=reshape(y(43:54),6,2);end
         end
 
+        function [radius,info] = trustRegion(x,u,cfg,next,a,b)
+            % Numerical, state-dependent locality estimate for the hold map.
+            % Translation is exactly affine and receives no trust bound.
+            % Finite differences estimate mixed curvature; this is not a
+            % certified supremum of the Hessian over the resulting box.
+            q=[x;u];active=3:8;
+            units=[.3;max(2,.25*abs(x(4)));1;.4;.25;.5];
+            steps=1e-3*units;
+            steps(6)=min(steps(6),max(1e-8,(1-abs(u(2)))/2));
+            jac=[a,b];curvature=zeros(6,6,6);
+            for j=1:6
+                plus=q;minus=q;plus(active(j))=plus(active(j))+steps(j);
+                minus(active(j))=minus(active(j))-steps(j);
+                [~,ap,bp]=nonlinearBicycleModel.sample(plus(1:6),plus(7:8),cfg);
+                [~,am,bm]=nonlinearBicycleModel.sample(minus(1:6),minus(7:8),cfg);
+                difference=([ap,bp]-[am,bm])/(2*steps(j));
+                curvature(:,:,j)=difference(:,active).*units.'*units(j);
+            end
+            budget=cfg.rti.trustRegion.errorBudget;
+            % For |d_i| <= r_i, sum |H_ij| r_i r_j bounds the
+            % quadratic surrogate, including mixed state/input terms.
+            curvature=(curvature+permute(curvature,[1,3,2]))/2;
+            envelope=abs(curvature)./reshape(budget,6,1,1);
+            weights=squeeze(max(sum(envelope,3),[],1));
+            scaled=min(1,sqrt(2./max(6*weights,1e-12)));
+            radii=units.*scaled(:);
+            % Probe finite displacements too: a zero local curvature can
+            % otherwise miss a nearby saturation or model transition.
+            signs=[eye(6),-eye(6),ones(6,1),-ones(6,1), ...
+                [1;-1;1;-1;1;-1],[-1;1;-1;1;-1;1]];
+            ratio=0;
+            for attempt=1:6
+                ratio=0;
+                for j=1:size(signs,2)
+                    change=zeros(8,1);change(active)=radii.*signs(:,j);
+                    trial=q+change;trial(8)=min(1,max(-1,trial(8)));
+                    change=trial-q;
+                    try
+                        actual=nonlinearBicycleModel.sample(trial(1:6),trial(7:8),cfg);
+                        ratio=max(ratio,max(abs(actual-next-jac*change)./budget));
+                    catch exception
+                        if ~ismember(string(exception.identifier),[ ...
+                                "collisionAvoidanceController:nonlinearDomain", ...
+                                "collisionAvoidanceController:invalidTireOperatingPoint"])
+                            rethrow(exception);
+                        end
+                        ratio=Inf;break;
+                    end
+                end
+                if ratio<=1,break;end
+                if attempt==6
+                    error('collisionAvoidanceController:trustRegionUnavailable', ...
+                        'No local box passed the finite-displacement model probes.');
+                end
+                radii=radii*max(.1,min(.8,.8/sqrt(ratio)));
+            end
+            radius=[Inf;Inf;radii];
+            info=struct('sampledErrorRatio',ratio,'probePasses',attempt);
+        end
+
         function [next,stopped] = sampleEndState(x,u,cfg)
             % Common discrete rest transition after prediction or plant replay.
             % Continuous integration precedes this reset. Position and heading

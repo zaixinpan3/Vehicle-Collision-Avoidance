@@ -65,7 +65,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 testCase.verifyLessThan(nonlinearBicycleModel.nominalValue(x,road,reference),initialValue);
             end
         end
-        function aDistantReversedSeedCanSolveWithoutArtificialHorizonGrowth(testCase)
+        function theUnrestrictedComparisonCanSolveADistantReversedSeed(testCase)
             % Removing correction bounds lets this reference solve at the
             % requested length; terminal rows still constrain its endpoint.
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
@@ -75,6 +75,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 'lateralVelocity',0,'yawRate',0,'heldActuatorInput',[0;0]);
             [~,~,problem]=collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]);
             model=problem.model;model.initialState=[0;-40;2.5;6;.3;.1];
+            model.cfg.rti.trustRegion.enabled=false;
             [solution,search,model]=solvePredictiveControl(model,[],tic);
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(search.horizonExtensions,0);

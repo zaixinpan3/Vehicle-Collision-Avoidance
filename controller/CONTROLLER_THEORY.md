@@ -8,9 +8,11 @@ the versions that produced them; they are not rewritten by this consolidation.
 
 The controller seeks rectangle nonoverlap during an encounter and resumes
 prescribed-path cruise recovery afterward. An active encounter minimizes
-predictive collision deficits first, then minimizes reference deviation while
-preserving that attained optimum. Without a target, one QP minimizes soft cruise
-CLF slack and reference deviation. Avoidance uses at most two convex solves on
+predictive collision deficits first, then minimizes nominal tracking and input
+variation while preserving that attained optimum. Without a target, one QP
+minimizes soft cruise CLF slack plus the same performance cost. Both modes use
+state-dependent numerical trust bounds; reference proximity is optional and off
+by default. Avoidance uses at most two convex solves on
 one RTI model and one shared time budget; an available zero-slack affine
 candidate avoids the primary LP. No cross-frame slack budget is imposed.
 The terminal set certifies an available safe continuation at the prediction
@@ -330,7 +332,8 @@ $|n^\top R(\psi)J^2v|\le\|v\|$. Nonlinear pose reconstruction and dynamics
 require additional sound enclosures. For a zonotope $G[-1,1]^m$,
 $\sigma(a)=\|a^\top G\|_1$; for an ellipsoid use Section 2. The decision
 domain must actually satisfy the bounds used for every reserve. The current
-RTI has unbounded pose corrections and does not implement this complete row;
+RTI leaves position translations unbounded, bounds local heading corrections
+through a numerical dynamics trust estimate, and does not implement this complete row;
 a local yaw tangent alone has no uniform remainder certificate.
 
 Exact angular support is another enclosure: for each offset vertex, maximize
@@ -484,7 +487,7 @@ asserted. After clearance, cruise references are rebuilt from the current
 estimate before the one RTI linearization.
 
 The weights `rti.nominalTrackingWeight`, `rti.inputVariationWeight` and
-`rti.referenceDeviationWeight` default to 1, 20 and 10. Zero disables the
+`rti.referenceDeviationWeight` default to 1, 20 and 0. Zero disables the
 corresponding component; all three zero disable avoidance refinement.
 Dx uses equal x/y units from `clf.lateralPositionErrorScale`, followed by
 heading, speed, lateral-velocity and yaw-rate scales. De uses those five
@@ -515,6 +518,74 @@ premise `|vy| <= tan(model.sideslipMaximum)*vx` remains enforced, with observer
 support margins. Removing that premise would require a new observer enclosure.
 The precomputed local cruise certificate may use a conservative nonsaturated
 neighborhood; that local certificate does not impose a full-horizon cone.
+
+### State-dependent numerical trust regions
+
+The default reference-proximity weight is zero. Nominal-path/speed tracking and
+actual input-increment regularization remain active. Before either objective
+solve, each hold receives a box around its dynamics linearization point in
+`q = [psi, vx, vy, r, delta, b]`. Global x/y translations are exactly affine in
+the transition and receive no trust bound. The box is frozen for both PCBF
+stages, and is also used by the single cruise QP. It adds only variable bounds;
+no extra cone, tire-capacity constraint, SQP iteration, replanning call,
+post-solve rejection, or horizon extension is introduced.
+
+Let F be the discrete held-input map, J its reference Jacobian, S a diagonal
+coordinate scaling, and epsilon the six-component one-hold error budget.
+Central differences of the discrete Jacobian estimate the scaled Hessians
+
+    H_l = S (d^2 F_l / dq^2) S / epsilon_l.
+
+The estimate is symmetrized. With
+
+    w_i = max_l sum_j |H_l,ij|,
+    s_i = min(1, sqrt(2 / (6 w_i))),
+    radius_i = S_ii s_i,
+
+the quadratic surrogate is at most one on the box. This follows from
+`2 |d_i d_j| <= d_i^2 + d_j^2` and the six-coordinate allocation of its
+quadratic budget. The scales are `[0.3 rad, max(2,0.25|vx|) m/s, 1 m/s,
+0.4 rad/s, 0.25 rad, 0.5]`. They cap the extent of the initial local search;
+they are numerical design choices, not physical steering or sideslip limits.
+The resulting radii vary with speed, slip, yaw rate, steering and combined-slip
+loading. Mixed derivatives account for interactions such as steering and
+braking rather than treating their independent bounds as independent forces.
+
+Because local curvature can miss a saturation transition, the implementation
+also evaluates the exact discrete map at both ends of each coordinate axis and
+four mixed-sign box directions. The actual remainder `F(q+d)-F(q)-J*d` is
+compared componentwise with epsilon. A failed probe shrinks all radii by
+`max(0.1,min(0.8,0.8/sqrt(ratio)))`; at most six probe passes are permitted.
+Failure to find a passing neighborhood is reported, not silently accepted.
+These are local preparation evaluations, not additional trajectory optimizer
+iterations. The same Fiala transition, including its low-speed branch, is used.
+
+The default budget is `[0.04 m, 0.04 m, 0.01 rad, 0.4 m/s, 0.4 m/s,
+0.2 rad/s]` per hold. It controls numerical approximation locality; it neither
+replaces nor adds another copy of the observer/model-mismatch error tube.
+Radii are intersected with existing physical/model-domain bounds. The two
+PCBF objectives share this intersection from the outset: the primary optimum
+may increase relative to an unrestricted affine problem, and performance
+still cannot buy any further PCBF slack. A CLF slack cannot relax a hard
+terminal condition or a trust bound.
+
+This is a **numerical locality estimate**, not a uniform nonlinear certificate:
+a finite Hessian stencil and finite displacement probes do not bound the
+remainder at every interior point. It also does not bound accumulation across
+the entire horizon, certify the separate collision/terminal tangents, or
+provide the accept/reject convergence theory of a full trust-region SQP
+algorithm. No such guarantee is inferred from passing simulations.
+
+Adding these hard numerical bounds restricts the executable local problem.
+A shifted nonlinear witness from the ideal recursive-feasibility theorem is
+not automatically inside the next box. The shifted multiple-shooting iterate
+can have dynamics defects after measurement updates; those equality defects
+remain explicit and are not hidden by expanding the box or adding dynamics
+slack. If it cannot satisfy the hard constraints inside the domain, the RTI
+reports failure. Applying the ideal recursive proof to this restricted online
+algorithm would additionally require an admissible shifted witness inside
+every next trust domain. The conditional information-set theorem elsewhere
+in this document remains a statement about its stated exact problem.
 
 Physical input bounds include force ratios -1 and +1. After solving, input
 values outside their physical bounds by at most `solver.feasibilityTolerance`
@@ -1006,7 +1077,8 @@ continuous-time continuation enclosure is supplied.
 
 The joint transition and terminal continuation use the first-exit convention.
 The main RTI horizon no longer declares a future exit from a bounded reference
-neighborhood: pose corrections are unbounded. It retains the active target's
+neighborhood: position translations remain unbounded; numerical trust bounds
+on heading and dynamic states do not certify a perception-exit enclosure. It retains the active target's
 collision rows until an observed exit. Terminal rows retain all computed
 continuation collision conditions when no certified endpoint correction bound
 is supplied, including distant conditions previously omitted by a fixed band.
@@ -1699,7 +1771,7 @@ V_{\rm P}^*(I_k)=\min\sum_{i=0}^{N-1}\xi_i.                     \tag{U9}
 $$
 
 During an active encounter the ideal controller minimizes (U9), chooses a
-minimum-reference-deviation member of its optimal solution set, and applies
+minimum-performance-cost member of its optimal solution set, and applies
 its first input. This tie-breaker does not alter the optimal barrier value.
 Once the target leaves the
 perception-scoped encounter, the collision problem becomes inactive and the

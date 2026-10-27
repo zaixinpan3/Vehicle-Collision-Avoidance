@@ -1,5 +1,5 @@
 classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
-    % References supply geometry and derivatives, not hard search bounds.
+    % Translations remain free; unrestricted inputs are an explicit comparison.
     properties (Access=private)
         model
         anchor
@@ -26,8 +26,8 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(solution.states(:,1),testCase.model.initialState,AbsTol=1e-7);
             testCase.verifyLessThanOrEqual(solution.states(4,:),testCase.model.cfg.model.speedMaximum+1e-5);
         end
-        function controlsCanMoveBeyondTheFormerTrustBox(testCase)
-            anchor=testCase.anchor;model=testCase.model;
+        function disablingNumericalTrustPreservesTheUnrestrictedComparison(testCase)
+            anchor=testCase.anchor;model=testCase.model;model.cfg.rti.trustRegion.enabled=false;
             % This first command needs more than 0.075 rad steering and
             % 0.125 braking-ratio correction, the old default hard box.
             required=anchor.inputs(:,1)+[.12;-.3];

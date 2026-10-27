@@ -616,6 +616,11 @@ function solution=localDecode(point,problem,anchor,inputs)
     solution.inputVariationCost=.5*problem.inputVariationWeight ...
         *norm(problem.inputVariationOffset+problem.inputVariationMap*point)^2;
     solution.performanceCost=solution.referenceDeviationCost+solution.nominalTrackingCost+solution.inputVariationCost;
+    changes=[reshape(point(problem.stateIndices(:,1:end-1)),6,[]); ...
+        reshape(point(problem.inputIndices),2,[])];
+    solution.trustMaximumScaledCorrection=max(abs(changes)./problem.trustRadii,[],'all');
+    solution.trustFirstInputRadius=problem.trustRadii(7:8,1);
+    solution.trustSampledErrorRatio=max(problem.trustSampledErrorRatio);
     solution.objectiveValue=solution.safety;
     if problem.clf.enabled,solution.objectiveValue=solution.performanceCost+problem.clfSlackDuration*solution.clfSlack;end
     if isfield(problem,'durationIndex')
@@ -687,8 +692,8 @@ function [problem,model]=localFormulate(anchor,model)
     cones=struct('A',{},'b',{},'D',{},'gamma',{},'size',{});
     lower=-Inf(nv,1);upper=Inf(nv,1);
     lower([is,ic])=0;
-    % The reference defines derivatives and collision normals, not a hard
-    % neighborhood. Only physical/model-domain bounds restrict corrections.
+    % Position translations stay unrestricted. Numerical trust bounds on the
+    % nonlinear coordinates are shared by the primary and secondary solves.
     [inputLower,inputUpper]=nonlinearBicycleModel.inputBounds(cfg);
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;finite=isfinite(rate);
     [physicalLower,physicalUpper]=localStateLimits(cfg);
@@ -885,10 +890,21 @@ function [problem,model]=localFormulate(anchor,model)
     if ~isempty(terminalRows)
         blockCount=blockCount+1;blockRows{blockCount}=terminalRows;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=terminalBounds;
     end
-    % Prune only inequalities implied by actual physical bounds. There is
-    % no pose/input trust box behind this redundancy calculation.
+    % Assemble after intersecting physical and numerical locality bounds.
     lower(iu)=max(lower(iu),physicalInputLower-anchor.inputs);
     upper(iu)=min(upper(iu),physicalInputUpper-anchor.inputs);
+    trustRadii=Inf(8,count);trustRatio=zeros(1,count);
+    if cfg.rti.trustRegion.enabled
+        for k=1:count
+            stageCfg=cfg;stageCfg.controller.sampleTime=durations(k);
+            [radius,trustInfo]=nonlinearBicycleModel.trustRegion( ...
+                anchor.states(:,k),anchor.inputs(:,k),stageCfg,stages(k).next,stages(k).a,stages(k).b);
+            columns=[ix(:,k);iu(:,k)];
+            lower(columns)=max(lower(columns),-radius);
+            upper(columns)=min(upper(columns),radius);
+            trustRadii(:,k)=radius;trustRatio(k)=trustInfo.sampledErrorRatio;
+        end
+    end
     reachLower=lower;reachUpper=upper;
     if isfield(model,'durationProbe') && model.durationProbe
         % Keep redundant rows while differentiating: pruning at a bound
@@ -912,6 +928,7 @@ function [problem,model]=localFormulate(anchor,model)
         'terminalAnchorReason',terminalInfo.reason);
     model.robustnessRelaxation=robustRelaxation;
     problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
+    problem.trustRadii=trustRadii;problem.trustSampledErrorRatio=trustRatio;
     problem.inputIncrementLower=physicalInputLower-anchor.inputs;problem.inputIncrementUpper=physicalInputUpper-anchor.inputs;
 end
 

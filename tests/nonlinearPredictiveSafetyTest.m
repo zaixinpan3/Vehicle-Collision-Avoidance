@@ -336,9 +336,9 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
         function finiteBrakingSlewUsesAppliedInputMemory(testCase)
             [ego,road,cfg]=localFixture();
-            % Allow the finite actuator slew to reach terminal braking.
-            cfg.controller.horizonSteps=32;
-            cfg.model.brakingRatioRateMaximum=.5;ego.heldActuatorInput=[0;0];
+            % Start near terminal braking so both locality and actuator slew
+            % permit its terminal-entry input; this test isolates input memory.
+            cfg.model.brakingRatioRateMaximum=.5;ego.heldActuatorInput=[0;-.48];
             [~,plan]=collisionAvoidanceController(ego,[],road,cfg,[]);
             rate=.5*cfg.controller.sampleTime;
             testCase.verifyLessThanOrEqual(abs(diff([ego.heldActuatorInput(2),plan(2,:)])),rate+cfg.solver.feasibilityTolerance);

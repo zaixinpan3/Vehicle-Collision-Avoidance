@@ -34,12 +34,15 @@ function cfg=localDefaults()
     % Failure is reported without horizon extension, replanning or another
     % local model.
     % Shared quadratic performance: nominal transverse/speed tracking,
-    % actual input increments, and proximity to the RTI reference.
+    % actual input increments, and optional reference proximity (off by default).
     % PCBF minimizes safety slack first, then performance at that optimum.
     % Cruise minimizes the integrated continuous-CLF slack plus performance.
     % All three weights are soft costs; zero disables that component.
-    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',10, ...
-        'nominalTrackingWeight',1,'inputVariationWeight',20);
+    % Trust budgets are one-hold numerical approximation tolerances in
+    % [m;m;rad;m/s;m/s;rad/s], separate from observer uncertainty.
+    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',0, ...
+        'nominalTrackingWeight',1,'inputVariationWeight',20, ...
+        'trustRegion',struct('enabled',true,'errorBudget',[.04;.04;.01;.4;.4;.2]));
     % One field rollout combines route attraction with motion-dependent target
     % circulation, including longitudinal avoidance. No nominal-path forecast
     % selects a behavior. Cruise feedback never overwrites obstacle correction.
@@ -175,6 +178,8 @@ function localValidate(cfg)
     validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.rti.nominalTrackingWeight,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.rti.inputVariationWeight,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.rti.trustRegion.enabled,{'logical'},{'scalar'});
+    validateattributes(cfg.rti.trustRegion.errorBudget,{'double'},{'size',[6,1],'real','finite','positive'});
     for name=["radialRate","tangentialRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
