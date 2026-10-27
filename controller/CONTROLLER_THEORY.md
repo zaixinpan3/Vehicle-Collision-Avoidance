@@ -2080,6 +2080,15 @@ not stop simulation or count as task completion. The terminal set certifies
 a possible safe continuation at the predicted endpoint; the controller keeps
 executing its optimized first input on each frame. Campaign recovery requires
 a sustained dwell near the prescribed path and speed after the encounter.
+Actual terminal-controller activation instead fails the driving experiment
+before that command is applied. Physical rest also fails the experiment before
+another control cycle or recovery can be credited. Rest means the physical
+motion states `(v_x,v_y,r)` are exactly zero under the shared sample-end rest
+transition; no new speed threshold is introduced. These tests use physical
+states and explicit control-mode metadata, not observer estimates, predicted
+terminal states, or the sign of an optimized braking input. The current RTI
+does not activate a terminal controller. Its terminal constraints and the
+simplified theoretical continuation remain unchanged.
 An optional finite observation cap is a diagnostic setting; by default
 `Frames=Inf` runs until recovery or failure without a simulation-time limit.
 A finite counterfactual baseline qualifies the initial encounter independently

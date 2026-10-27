@@ -9,6 +9,38 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function actualTerminalControlFailsBeforeItsInputIsExecuted(testCase)
+            moving=[12;1;.1;8;.2;.03];
+            testCase.verifyError(@()assertDrivingExperimentContinues(moving,true), ...
+                'runNonlinearPredictiveSafetyValidation:terminalControllerActivated');
+        end
+        function theSharedPlantRestTransitionFailsTheDrivingTrial(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            slow=[12;1;.1;.1*cfg.model.brakeHoldSpeed;0;0];
+            stopped=nonlinearBicycleModel.sampleEndState(slow,[0;-.5],cfg);
+            testCase.verifyError(@()assertDrivingExperimentContinues(stopped,false), ...
+                'runNonlinearPredictiveSafetyValidation:unexpectedStop');
+        end
+        function slowMotionIsNotMistakenForPhysicalRest(testCase)
+            testCase.verifyWarningFree(@()assertDrivingExperimentContinues([0;0;0;.001;0;0],false));
+            testCase.verifyWarningFree(@()assertDrivingExperimentContinues([0;0;0;0;.001;0],false));
+        end
+        function aStoppedPhysicalContinuationCannotRestartOrCountAsRecovery(testCase)
+            file=string(tempname)+".mat";testCase.addTeardown(@()delete(file));
+            first=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=1,ContinuationFile=file);
+            saved=load(file,'continuation');continuation=saved.continuation;
+            continuation.ego.speed=0;continuation.ego.longitudinalVelocity=0;
+            continuation.ego.lateralVelocity=0;continuation.ego.yawRate=0;
+            save(file,'continuation');
+            stopped=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=10,ResumeFrom=file);
+            r=stopped.results;
+            testCase.verifyEqual(r.outcome,"unexpectedStop");
+            testCase.verifyTrue(r.unexpectedStop && r.experimentFailed);
+            testCase.verifyFalse(r.completed || r.recovery.recovered || r.controlUnavailable);
+            testCase.verifyEqual(r.executedFrames,first.results.executedFrames);
+            testCase.verifyEqual(r.unexpectedStopTimeSeconds,continuation.ego.stateTime,AbsTol=0);
+            testCase.verifyEqual([r.trace.input],[first.results.trace.input],AbsTol=0);
+        end
         function defaultObservationHasNoFrameLimitAndStopsOnRecovery(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",RecoveryDwellSeconds=.1);
             r=report.results;
@@ -55,6 +87,8 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyTrue(all([r.trace.optimizationReturned]));
             testCase.verifyEqual([r.trace.absoluteSampleIndex],0:3);
             testCase.verifyGreaterThan(r.trace(end).nextState(4),cfg.referenceSpeed-.1);
+            testCase.verifyFalse(r.terminalControllerActivated || r.unexpectedStop);
+            testCase.verifyFalse(any([r.trace.terminalControllerActive]));
         end
         function aForecastTerminalEndpointDoesNotCompleteTheDrivingTask(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="crossing",Frames=1, ...
