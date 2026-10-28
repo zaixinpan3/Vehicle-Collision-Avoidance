@@ -1,12 +1,11 @@
 classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target prediction, uncertainty tubes and polygon geometry.
     methods (Static)
-        function guide = avoidanceGuide(model,count,side)
+        function guide = avoidanceGuide(model,count)
             % Route-following initialization, corrected by an avoidance field.
             % No candidate scores or admission gate. RTI receives the states
             % and inputs over exactly count holds. Terminal constraints
             % belong to RTI, not this heuristic initialization.
-            if nargin<3,side=1;end % Only an exactly symmetric encounter needs a tie break.
             cfg=model.cfg;time=(0:count)*cfg.controller.sampleTime;
             target=predictiveSafetyGeometry.predictTarget(model.target,time);
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
@@ -22,26 +21,21 @@ classdef predictiveSafetyGeometry
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
-            % The side argument resolves exact symmetry only. Predicted target
-            % transport, not its current left/right position, drives circulation.
-            parameters=localFieldParameters(data,1,1,0);
+            parameters=localFieldParameters(data,1,0);
             [~,field]=predictiveSafetyGeometry.circulationField(model.initialState,target(:,1),cfg,parameters);
             course=model.initialState(3)+atan2(model.initialState(5),model.initialState(4));
             forward=[cos(course);sin(course)];
             lateral=[-forward(2);forward(1)];
-            direction=sign((field.rotation*field.tangent).'*lateral)*side;
-            if direction==0,direction=1;end
             budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-            % The initial contour is far larger than the vehicle. Limiting
-            % relative circulation to a vehicle-radius turn slows head-on
-            % encounters almost to rest before they can pass. Use the current
-            % encounter scale; actual inputs still obey combined-slip Fiala.
+            % Convert dimensionless prediction gradients to acceleration
+            % using the encounter's relative-motion and turning scales.
+            % This positive scale sets neither a side nor a target velocity.
             contourRadius=max(field.egoRadius,norm(field.position));
             speed=min(max(norm(field.velocity),1),sqrt(budget*contourRadius));
             % One autonomous field, integrated once. Route attraction,
             % obstacle circulation and road guidance act at every moving node;
             % no separate nominal rollout classifies or selects a behavior.
-            best=localCirculationRollout(model,data,direction,speed,count);
+            best=localCirculationRollout(model,data,speed,count);
             total=1;diagnostics=localCandidateSummary(best);
             time=(0:numel(best.gaps)-1)*cfg.controller.sampleTime;
             conflict=best.gaps<=0;first=NaN;last=NaN;
@@ -55,12 +49,12 @@ classdef predictiveSafetyGeometry
                 guide.velocity(:,index)=rotation*best.states(4:5,index);
             end
             guide.acceleration=[diff(guide.velocity,1,2)/cfg.controller.sampleTime,zeros(2,1)];
-            % Report the generated passing side relative to current motion,
-            % without inferring it from a displacement to the cruise route.
+            % Record transverse excursion relative to the initial motion,
+            % independently of the displacement to the cruise route.
             transverse=lateral.'*(guide.position-model.initialState(1:2));
-            [~,furthest]=max(abs(transverse));passingSide=side;
-            if abs(transverse(furthest))>1e-9,passingSide=sign(transverse(furthest));end
-            guide.direction=passingSide*lateral;
+            [~,furthest]=max(abs(transverse));
+            % A displacement observed AFTER integration, not a turn command.
+            guide.direction=transverse(furthest)*lateral;
             guide.candidateCount=total;guide.candidates=diagnostics;
             guide.conflictStartSeconds=first;guide.conflictEndSeconds=last;
             guide.minimumGap=min(best.gaps);guide.nominalMinimumGap=min(best.nominalGaps);
@@ -150,8 +144,10 @@ classdef predictiveSafetyGeometry
             else
                 % A colliding seed still needs finite guidance. This extension
                 % has no clearance theorem and is never labelled certified.
-                [depth,axis]=min(target(8:9)-abs(q));normal=zeros(2,1);
-                normal(axis)=sign(q(axis));if normal(axis)==0,normal(axis)=1;end
+                depth=min(target(8:9)-abs(q));
+                faceGap=[q-target(8:9);-q-target(8:9)];
+                weight=exp((faceGap-max(faceGap))/min(target(8:9)));
+                weight=weight/sum(weight);normal=weight(1:2)-weight(3:4);
                 distance=-depth;kappa=0;
             end
             tangent=j*normal;nu=normal.'*w;tau=tangent.'*w;
@@ -172,41 +168,37 @@ classdef predictiveSafetyGeometry
             yawRadius=0;if isfield(parameters,'egoYawRadius'),yawRadius=parameters.egoYawRadius;end
             egoSupport=predictiveSafetyGeometry.rotationSupport(shape,x(3),yawRadius,-normalWorld.');
             h=distance-egoSupport-inflation;
-            anticipation=struct('incidence',1,'direction',parameters.direction, ...
-                'time',Inf,'transportGradient',zeros(2,1));
-            if isfield(parameters,'preferredAcceleration')
-                anticipation=localAnticipation(x,target,cfg,parameters,normalWorld);
-                parameters.direction=anticipation.direction;
-            end
+            anticipation=localAnticipation(x,target,cfg,parameters,normalWorld);
+            tangentialAcceleration=cfg.planner.tangentialRate*parameters.speed ...
+                *(anticipation.transportGradient+anticipation.separationGradient);
             desired=0;
             rate=cfg.planner.radialRate;
             relative=(-kappa*tau^2-2*rate*nu-rate^2*(h-desired))*normal ...
-                +(kappa*nu*tau+cfg.planner.tangentialRate*(parameters.direction*parameters.speed-tau))*tangent;
+                +(kappa*nu*tau)*tangent;
             transport=r.'*centerAcceleration+2*omega*j*w+omegaDot*j*q-omega^2*q;
-            acceleration=r*(relative+transport);
+            acceleration=r*(relative+transport)+tangentialAcceleration;
             correction=0;activation=1;incidence=1;
             if isfield(parameters,'preferredAcceleration')
-                % The obstacle can
-                % only add outward normal acceleration; it never attracts a
-                % distant ego back to a target-centred orbit. Circulation is
-                % activated by the normal correction, not by a release timer.
-                preferred=parameters.preferredAcceleration;normalWorld=r*normal;tangentWorld=r*tangent;
+                % Keep only the outward normal correction. Add both signed
+                % tangential vectors directly: there is no selected side,
+                % one-sided tangential clipping, or release timer.
+                preferred=parameters.preferredAcceleration;normalWorld=r*normal;
                 incidence=anticipation.incidence;
                 correction=incidence*max(0,normalWorld.'*(acceleration-preferred));
                 budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
                 activation=min(1,correction/budget);
-                tangentialCorrection=parameters.direction*max(0, ...
-                    parameters.direction*(tangentWorld.'*(acceleration-preferred)));
                 acceleration=preferred+correction*normalWorld ...
-                    +activation*tangentialCorrection*tangentWorld;
+                    +activation*tangentialAcceleration;
             end
             field=struct('clearance',h,'normalSpeed',nu,'tangentSpeed',tau,'curvature',kappa, ...
                 'normal',normal,'tangent',tangent,'position',q,'velocity',w,'rotation',r, ...
                 'transport',transport,'egoRadius',egoRadius, ...
                 'inflation',inflation,'desiredClearance',desired,'initialBarrier',nu+rate*h, ...
                 'normalCorrection',correction,'activation',activation,'incidence',incidence, ...
-                'direction',parameters.direction,'anticipationTime',anticipation.time, ...
-                'transportGradient',anticipation.transportGradient);
+                'anticipationTime',anticipation.time, ...
+                'transportGradient',anticipation.transportGradient, ...
+                'separationGradient',anticipation.separationGradient, ...
+                'tangentialAcceleration',tangentialAcceleration);
         end
 
         function [support,inflation] = rotationSupport(shape,yaw,yawRadius,normal)
@@ -617,23 +609,31 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
     targetAxes=predictiveSafetyGeometry.direction(future(3,:));
     axes=[repmat(rotation(:,1).',count,1);repmat(rotation(:,2).',count,1); ...
         targetAxes.';[-targetAxes(2,:);targetAxes(1,:)].'];
-    egoCenter=positions+rotation*cfg.vehicle.rectangleOffset;
     targetCenter=future(1:2,:)+target(10)*targetAxes+target(11)*[-targetAxes(2,:);targetAxes(1,:)];
-    orientation=sign(sum(axes.*repmat((egoCenter-targetCenter).',4,1),2));
-    orientation(orientation==0)=1;axes=axes.*orientation;
+    % Both orientations enter the same smooth distance gradient. No face,
+    % passing side or circulation sign is selected.
+    axes=[axes;-axes];
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     egoYaw=0;targetYaw=0;
     if isfield(parameters,'egoYawRadius'),egoYaw=parameters.egoYawRadius;end
     if isfield(parameters,'targetYawRadius'),targetYaw=parameters.targetYawRadius;end
     egoSupport=predictiveSafetyGeometry.rotationSupport(shape,x(3),egoYaw,-axes);
-    targetSupport=localMovingSupport(target(8:11),repmat(future(3,:).',4,1),targetYaw,axes);
+    targetSupport=localMovingSupport(target(8:11),repmat(future(3,:).',8,1),targetYaw,axes);
     inflation=parameters.inflation;
     if isfield(parameters,'generator')
         inflation=inflation+sum(abs(axes*parameters.generator(1:2,:)),2) ...
             +predictiveSafetyGeometry.targetSupportFromData(parameters.support,parameters.index,axes);
     end
-    gaps=max(reshape(sum(axes.*repmat((positions-future(1:2,:)).',4,1),2) ...
-        -egoSupport-targetSupport-inflation,count,4),[],2).';
+    faceGap=reshape(sum(axes.*repmat((positions-future(1:2,:)).',8,1),2) ...
+        -egoSupport-targetSupport-inflation,count,8);
+    gaps=max(faceGap,[],2).';
+    width=min(cfg.vehicle.width/2,target(9));
+    % Gradient of width*log(sum(exp(faceGap/width))). The subtraction of
+    % each row maximum only stabilizes evaluation. Balanced faces cancel
+    % exactly on the symmetry axis instead of choosing a default direction.
+    faceWeight=exp((faceGap-gaps.')/width);faceWeight=faceWeight./sum(faceWeight,2);
+    separationNormal=[sum(faceWeight.*reshape(axes(:,1),count,8),2), ...
+        sum(faceWeight.*reshape(axes(:,2),count,8),2)].';
     % A predicted exit ends this encounter; no distant return is penalized.
     rangeReserve=parameters.inflation;
     if isfield(parameters,'generator')
@@ -644,10 +644,10 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
     if ~outside(1)
         exit=find(outside,1);if ~isempty(exit),gaps(exit:end)=Inf;end
     end
-    depth=min(1,max(0,-gaps)/min(cfg.vehicle.width/2,target(9)));
+    depth=min(1,max(0,-gaps)/width);
     exposure=depth.*(2-depth);
-    prediction=struct('incidence',max(exposure),'direction',parameters.direction, ...
-        'time',Inf,'transportGradient',zeros(2,1));
+    prediction=struct('incidence',max(exposure), ...
+        'time',Inf,'transportGradient',zeros(2,1),'separationGradient',zeros(2,1));
     weight=exposure.*exp(-cfg.planner.radialRate*time);
     if sum(weight)<=eps,return;end
     weight=weight/sum(weight);prediction.time=sum(weight.*time);
@@ -658,19 +658,14 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
     delta=x(1:2)-targetCenter;
     q=[sum(targetAxes.*delta,1);sum([-targetAxes(2,:);targetAxes(1,:)].*delta,1)];
     residual=q-min(target(8:9),max(-target(8:9),q));
-    distance=vecnorm(residual,2,1);localNormal=residual./max(distance,eps);
+    % Gradient of sqrt(dist(q,K)^2+width^2). It remains continuous when
+    % the query crosses a future rectangle boundary or enters its interior.
+    distance=vecnorm(residual,2,1);localNormal=residual./hypot(distance,width);
     worldNormal=targetAxes.*localNormal(1,:)+[-targetAxes(2,:);targetAxes(1,:)].*localNormal(2,:);
     gradient=sum((worldNormal-normal).*weight,2);
-    tangent=[-normal(2);normal(1)];signal=tangent.'*gradient;
-    prediction.transportGradient=tangent*signal;
-    if abs(signal)>1e-8
-        prediction.direction=sign(signal);
-    else
-        % Static/collinear transport has no preferred chirality. Continue
-        % existing relative tangential motion; exact symmetry uses the tie.
-        tangential=tangent.'*(velocity-targetVelocity);
-        if abs(tangential)>1e-6,prediction.direction=sign(tangential);end
-    end
+    tangent=[-normal(2);normal(1)];projection=tangent*tangent.';
+    prediction.transportGradient=projection*gradient;
+    prediction.separationGradient=projection*sum(separationNormal.*(weight.*max(0,-gaps)/width),2);
 end
 
 function support=localMovingSupport(shape,yaw,yawRadius,normal)
@@ -774,11 +769,11 @@ function [distance,point]=localPointSegment(vertex,first,last)
     point=first+alpha*edge;distance=norm(vertex-point);
 end
 
-function candidate=localCirculationRollout(model,data,direction,speed,count)
+function candidate=localCirculationRollout(model,data,speed,count)
     cfg=model.cfg;h=cfg.controller.sampleTime;
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
-        'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1),'directionSign',direction, ...
-        'circulationSpeed',speed, ...
+        'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1), ...
+        'speedScale',speed, ...
         'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
         'maximumDeviation',0,'completion',"requestedHorizon");
     candidate.states(:,1)=model.initialState;
@@ -808,11 +803,10 @@ function candidate=localCirculationRollout(model,data,direction,speed,count)
             % and boundary correction. Never overwrite longitudinal obstacle
             % acceleration with a cruise-speed request afterwards.
             acceleration=localRouteAcceleration(x,projection,model);
-            if direction~=0 && ~encounterEnded
-                parameters=localFieldParameters(data,index,direction,speed);
+            if ~encounterEnded
+                parameters=localFieldParameters(data,index,speed);
                 parameters.preferredAcceleration=acceleration;
                 [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
-                if ~candidate.fieldActive && field.activation>0,candidate.directionSign=field.direction;end
                 candidate.fieldActive=candidate.fieldActive || field.activation>0;
                 if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
             end
@@ -823,7 +817,6 @@ function candidate=localCirculationRollout(model,data,direction,speed,count)
         next=nonlinearBicycleModel.sample(x,u,cfg);
         candidate.states(:,index+1)=next;prior=u;
     end
-    if ~candidate.fieldActive,candidate.directionSign=0;end
 end
 
 function acceleration=localRouteAcceleration(x,projection,model)
@@ -877,14 +870,14 @@ function [gap,nominal]=localPlannerGap(x,target,data,index)
         -sum(abs(normal*data.generator(1:2,:)),2)-targetReserve);
 end
 
-function parameters=localFieldParameters(data,index,direction,speed)
-    parameters=struct('direction',direction,'speed',speed,'inflation',0, ...
+function parameters=localFieldParameters(data,index,speed)
+    parameters=struct('speed',speed,'inflation',0, ...
         'egoYawRadius',data.egoYawRadius,'targetYawRadius',data.targetYawRadius(index), ...
         'generator',data.generator,'support',data.support,'index',index);
 end
 
 function summary=localCandidateSummary(candidate)
-    summary=struct('direction',candidate.directionSign,'speed',candidate.circulationSpeed, ...
+    summary=struct('speedScale',candidate.speedScale, ...
         'minimumGap',min(candidate.gaps),'nominalMinimumGap',min(candidate.nominalGaps), ...
         'stateViolation',candidate.stateViolation, ...
         'releaseNode',candidate.releaseNode,'maximumDeviation',candidate.maximumDeviation, ...

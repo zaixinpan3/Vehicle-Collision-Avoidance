@@ -43,10 +43,10 @@ function cfg=localDefaults()
     cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',0, ...
         'nominalTrackingWeight',1,'inputVariationWeight',20, ...
         'trustRegion',struct('enabled',true,'errorBudget',[.04;.04;.01;.4;.4;.2]));
-    % One field rollout combines route attraction with anticipatory target
-    % circulation. Time-aligned NRMM exposure activates the correction; the
-    % transported distance gradient supplies its passing preference. No
-    % candidate bank or nominal/avoidance switch selects a behavior.
+    % One field rollout combines route attraction with predictive obstacle
+    % gradients. Time-aligned exposure scales continuous target-transport and
+    % separation gradients, without a passing-side input or sign selection.
+    % There is no candidate bank or nominal/avoidance behavior switch.
     % Cruise feedback never overwrites longitudinal obstacle correction.
     % The parallel-wall acceleration guide anticipates transverse momentum;
     % it is not a hard RTI/terminal constraint or an execution certificate.

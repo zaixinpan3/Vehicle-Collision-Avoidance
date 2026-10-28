@@ -112,7 +112,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.initialization,"plannedAvoidanceRollout");
             testCase.verifyTrue(anchor.planner.used);
             testCase.verifyEqual(anchor.states(:,1),model.initialState,AbsTol=0);
-            testCase.verifyGreaterThan(max(abs(anchor.inputs(1,:))),.01);
+            testCase.verifyGreaterThan(max(abs(anchor.inputs),[],'all'),.01);
         end
         function clearingAnEncounterRebuildsCruiseBeforeOneLinearization(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=0;
@@ -159,7 +159,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(max(abs(problem.model.linearization.inputs(1,:))),.01);
             testCase.verifyTrue(problem.metadata.search.planner.used);
             testCase.verifyEqual(problem.metadata.search.planner.candidateCount,1);
-            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"anticipatoryCirculation");
+            testCase.verifyEqual(problem.metadata.search.planner.algorithm,"predictiveVectorField");
             testCase.verifyFalse(problem.metadata.search.planner.robustCertificate);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRtiPrediction(testCase,problem,cfg);

@@ -2009,9 +2009,10 @@ a second candidate trajectory: only the generated controls rolled through Fiala
 supply the returned state sequence. NRMM retains target acceleration, curvature,
 rectangle-reference offsets, and its existing stop-and-hold convention.
 
-Let $\mathcal A_j$ contain the two body axes of each predicted rectangle,
-oriented from target center toward ego center. Define the signed separating-axis
-quantity
+Let $\mathcal A_j$ contain both orientations of the two body axes of each
+predicted rectangle (eight rows, including any coincident axes). All orientations
+participate; none is selected as a passing decision. Define the signed
+separating-axis quantity
 
 $$
 g_j=\max_{a\in\mathcal A_j}\left[
@@ -2057,69 +2058,119 @@ poses. This auxiliary $H$ is independent of the requested seed length and does
 not change the fixed RTI optimization horizon. Extending a requested seed thus
 extends the same initial field rollout.
 
-**Transported tangential preference.** Let $d_T(p,t+\tau_j)$ be point distance to
-the predicted target rectangle, evaluated at the *current* ego reference point,
-and $n$ its current outward normal. Normalize the time-aligned exposures by
+**Continuous predictive tangential field.** At a separated current pose, let
+$n$ be the current target outward unit normal and $P=I-nn^T$. Normalize exposures:
 
 $$
  w_j={E_j e^{-\lambda\tau_j}\over\sum_i E_i e^{-\lambda\tau_i}}.
 $$
 
-If the denominator vanishes, obstacle influence is zero. Otherwise construct
+When the denominator vanishes, the obstacle correction vanishes. Otherwise two
+spatial-gradient contributions produce tangential acceleration directly.
+Neither contribution is normalized to a fixed turn direction or reduced to its
+sign. There is no side input, discrete circulation mode, preferred left/right
+velocity, or deterministic side fallback.
+
+First, define the regularized future-target distance at the *current* ego point:
 
 $$
- g_{\mathrm{tan}}=(I-nn^T)\sum_j w_j
-       [\nabla_p d_T(p,t+\tau_j)-n],\qquad \ell=Jn.
+ \bar d_T(p,t+\tau)=\sqrt{\operatorname{dist}(p,T(t+\tau))^2+b^2},\qquad
+ g_T=P\sum_j w_j\nabla_p\bar d_T(p,t+\tau_j).
 $$
 
-The future rectangle's closest-point normal supplies each gradient; when the
-query is inside it, use zero. The tangent projection removes radial effects
-already handled by the clearance field. For a straight translating target,
-the local expansion explains the bias:
+For a rectangle, its gradient is its closest-point residual divided by
+$\sqrt{d^2+b^2}$, rotated into the world frame. Unlike a normalized closest-point
+residual, it remains continuous when the query enters a future rectangle. Its
+value is zero in the interior. The positive $b$ regularizes the gradient; it is
+not an additional required clearance.
+
+For a translating point surrogate, write $r=p-p_T(t)$ and $n=r/\|r\|$. Then
 
 $$
- (I-nn^T)[\nabla d_T(p,t+\tau)-n]
- \simeq-\tau(I-nn^T)\nabla^2d_T(p,t)v_T.
+ P\nabla\bar d_T(p,t+\tau)
+ =-{\tau Pv_T\over\sqrt{\|r-\tau v_T\|^2+b^2}}.
 $$
 
-For a translating point/circular surrogate, writing $r=p-p_T(t)$ gives the
-stronger exact identity
+Thus positive weights generate a continuous tangential contribution opposite
+target motion, toward space it is vacating. For a circular obstacle outside its
+boundary, an additional nonnegative radial factor appears. Rectangle edges and
+corners, target rotation, and route attraction can change the resulting path;
+this directional interpretation is not an optimality or safety theorem.
+
+Second, target transport alone vanishes for a static obstacle. Future ego
+motion must also shape avoidance. Denote the individual support gaps in the
+maximum defining $g_j$ by $g_{ja}$. Use the gradient of a smooth support-gap
+approximation, with the same half-width scale:
 
 $$
- (I-nn^T)\nabla d_T(p,t+\tau)
- =-{\tau(I-nn^T)v_T\over\|r-\tau v_T\|},\qquad n=r/\|r\|.
+ \tilde g_j=b\log\sum_{a\in\mathcal A_j}\exp(g_{ja}/b),\qquad
+ \bar n_j=\nabla_{p_j}\tilde g_j
+ =\sum_{a\in\mathcal A_j}
+ {\exp(g_{ja}/b)\over\sum_c\exp(g_{jc}/b)}\,a.
 $$
 
-Positive exposure weights therefore point tangentially opposite target motion,
-toward space it is vacating. For rectangles this interpretation is local around
-corners; on a flat face the local Hessian can vanish. Finite prediction and
-changing nearest features still supply information. Rotating rectangles are
-evaluated at their actual predicted poses rather than through the translational
-approximation. These relations establish a directional preference, not optimal
-path deviation or a collision-avoidance certificate.
+The implementation subtracts the row maximum before exponentiation for numerical
+stability. This has no effect on the gradient. Opposite equally supported faces
+cancel instead of choosing an arbitrary escape side. Use the *original* $g_j$
+for exposure and penetration, so smoothing introduces no fictitious collision
+margin. The additional field contribution is
 
-Use $\sigma=\operatorname{sign}(\ell^Tg_{\mathrm{tan}})$ for the circulation
-request. A negligible signal preserves existing relative tangential motion;
-only remaining symmetry uses a deterministic turn hint. The hint no longer
-comes from which side of the ego the target currently occupies. This is a soft
-passing preference. It neither proves a globally better side nor guarantees
-rear passing in every encounter. The weights are evaluated as coefficients of
-this constructed vector field; the field is not claimed to be the gradient of
-one scalar space-time potential. Switching the sign within virtual seed
-construction is distinct from changing the controller's collision constraints
-mid-encounter: the planner still runs only at target acquisition.
+$$
+ g_E=P\sum_j w_j{[-g_j]_+\over b}\bar n_j.
+$$
 
-The existing moving-frame radial/tangential acceleration law supplies a raw
-request $a_{\rm raw}$ using this $\sigma$. With route acceleration $a_{\rm free}$,
-its outward correction is $c=\eta[n^T(a_{\rm raw}-a_{\rm free})]_+$.
-The same nonnegative correction activates the one-sided tangential request,
-scaled by $\min(1,c/a_{\rm budget})$. This removes the raw field's inward normal
-attraction; it does not prove goal convergence. The combined field can request both braking and
-steering, with route attraction always present. The incidence modulation,
-finite preview, held-input Fiala allocation, and road correction do not inherit
-the ideal unmodulated radial safety proof. Generated-path collision/state
-checks remain diagnostics, and `robustCertificate` remains false. PCBF,
-terminal, observer, trust-region and RTI acceptance conditions are unchanged.
+This is a penetration-weighted, regularized geometry response at corresponding
+future ego/target poses. The exposure weights, frozen headings, uncertainty
+supports, and penetration factors are evaluated as coefficients of the field;
+the combined law is not claimed to be the gradient of one scalar potential.
+
+The tangential request is simply
+
+$$
+ a_{\rm tan}=k_t v_s(g_T+g_E).
+$$
+
+Here $v_s$ is the existing positive encounter-relative speed/turning scale and
+$k_t$ is the existing tangential rate. Both dimensionless gradients use the same
+acceleration scale. In particular, $v_s$ is not a commanded tangential velocity.
+No operator extracts a sign from $g_T$, $g_E$ or their sum. Their magnitude and
+competition with path attraction remain in the actual acceleration request.
+
+The current moving-frame geometry supplies the raw radial acceleration. With
+$\nu=\dot h$, relative tangential speed $\tau$, and contour curvature $\kappa$,
+use radial component $-\kappa\tau^2-2\lambda\nu-\lambda^2h$ and geometric tangent
+component $\kappa\nu\tau$, followed by the existing rotating-frame transport.
+For route acceleration $a_{\rm free}$, retain only the outward deficit
+$c=\eta[n^T(a_{\rm raw}-a_{\rm free})]_+$. The field before road guidance is
+
+$$
+ a=a_{\rm free}+c n+\min(1,c/a_{\rm budget})a_{\rm tan}.
+$$
+
+Both tangential contributions are added without one-sided clipping. Modified
+Fiala input allocation and held-input integration generate the only returned
+trajectory. The vector `guide.direction` is the largest observed transverse
+*displacement* of that completed rollout; it is not a direction supplied to the
+field. Existing RTI separation bookkeeping reads the generated geometry after
+integration. No circulation-direction state is carried between controller calls.
+
+**Symmetry limitation.** A reflection-equivariant deterministic field with a
+unique solution cannot leave an exactly reflection-symmetric initial condition
+in an exactly symmetric environment. The lateral component is then zero. The
+planner deliberately does not add a preferred side, random dither, or discrete
+fallback to hide this fact. Measured offsets, target motion, path curvature and
+road geometry can supply asymmetry; small opposite offsets produce small
+opposite field corrections. This does not guarantee that every arbitrarily
+small asymmetry produces sufficient steering before a collision deadline. The
+finite colliding-seed extension likewise averages face contributions instead of
+choosing an arbitrary positive face.
+
+The field is a heuristic initializer, with piecewise geometry, finite temporal
+sampling and limited vehicle controls. It is not a certificate of nonlinear
+feasibility, global convergence or minimum route deviation. In particular,
+incidence modulation and road guidance do not inherit the ideal radial barrier
+proof. `robustCertificate` remains false. PCBF, terminal, observer and trust-region
+conditions remain those of the existing RTI problem.
 
 This construction draws distinct ideas from the supplied literature:
 
@@ -2154,10 +2205,8 @@ Route coordinates also supply deviation diagnostics and legacy offset walls
 when no boundary scan exists. Route attraction here belongs to initialization;
 it introduces no additional optimization constraint.
 No offset waypoint, entry/hold/return schedule, trajectory candidate
-bank or seed-admission test is prescribed. The initial circulation speed uses
-the current encounter's contour scale, not a turn radius equal to the ego
-footprint radius. This avoids demanding a slow, tight orbit from the beginning
-of a distant encounter. Inverse Fiala guidance maps the acceleration to
+bank or seed-admission test is prescribed. The acceleration gain uses the
+current encounter's contour and relative-speed scales. Inverse Fiala guidance maps the acceleration to
 inputs. Its avoidance allocation reserves the requested lateral fraction at
 both axles, then uses the remaining combined-slip capacity for braking or
 acceleration; the cruise helper's 0.35 force-ratio cap does not apply. A bounded

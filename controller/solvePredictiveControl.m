@@ -26,10 +26,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     cfg=model.cfg;model.linearizationBuilds=0;
     model.solveTimer=timer;
     model.solveTimeLimitSeconds=max(0,cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
-    model.circulationDirection=0;
-    if isfield(model,'targetOnset') && ~model.targetOnset && isstruct(previousState) && isfield(previousState,'circulationDirection')
-        model.circulationDirection=previousState.circulationDirection;
-    end
     minimumCount=cfg.controller.horizonSteps;
     if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly && isfield(model,'probeMinimumHorizonSteps')
         minimumCount=max(minimumCount,model.probeMinimumHorizonSteps);
@@ -56,7 +52,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
         [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
         if anchor.planner.used
-            if anchor.planner.circulationDirection~=0,model.circulationDirection=anchor.planner.circulationDirection;end
             projection=laneGeometry.project(model.initialState(1:2),model.lane);
             lateral=anchor.guide.direction.'*[-sin(projection.heading);cos(projection.heading)];
             if abs(lateral)>1e-8,model.collisionSide=sign(lateral);end
@@ -89,7 +84,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         if ~isempty(solution)
             solution.collisionEscapeNormals=model.collisionEscapeNormals;
             solution.collisionSide=model.collisionSide;
-            solution.circulationDirection=model.circulationDirection;
             solution.retainCollisionSide=model.retainCollisionSide;
             solution.clfNextValue=nonlinearBicycleModel.nominalValue( ...
                 solution.states(:,2),model.lane,model.nominalReference);
@@ -346,7 +340,7 @@ function anchor=localPlanReference(model,count)
     context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
     planner=localPlannerMetadata();planner.used=true;planner.candidateCount=guide.candidateCount;
     planner.maximumDeviationMeters=guide.maximumDeviation;
-    planner.candidates=guide.candidates;planner.circulationDirection=guide.directionSign;
+    planner.candidates=guide.candidates;
     planner.referenceMinimumNodeGapMeters=guide.nominalMinimumGap;
     planner.referenceMinimumInflatedGapMeters=guide.minimumGap;
     planner.referenceStateViolation=guide.stateViolation;
@@ -360,8 +354,8 @@ end
 
 function planner=localPlannerMetadata()
     planner=struct('used',false,'maximumDeviationMeters',NaN, ...
-        'candidateCount',0,'algorithm',"anticipatoryCirculation", ...
-        'circulationDirection',0,'candidates',struct([]), ...
+        'candidateCount',0,'algorithm',"predictiveVectorField", ...
+        'candidates',struct([]), ...
         'referenceMinimumNodeGapMeters',NaN,'referenceMinimumInflatedGapMeters',NaN, ...
         'referenceStateViolation',NaN,'sampledNominalChecksPassed',false, ...
         'conflictStartSeconds',NaN,'conflictEndSeconds',NaN,'releaseSeconds',NaN, ...
