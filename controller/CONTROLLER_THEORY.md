@@ -137,6 +137,16 @@ from the exact within-hold stop used by the terminal model in Section 5.
 A proof for a continuous physical plant must also enclose integration and
 reset discrepancies.
 
+The body sideslip $\beta_E=\operatorname{atan2}(v_y,v_x)$ is the angle of
+the center-of-gravity velocity, not either tire slip angle $\alpha_f,\alpha_r$.
+In low-speed turning, $v_y\simeq l_r r$ can give nonzero body sideslip while
+the rear tire slip is near zero. Consequently, a large ratio $|v_y|/v_x$ at
+low speed does not by itself establish tire sliding or physical infeasibility.
+The shared observer cone is an estimation-domain premise. Enlarging it changes
+that premise and the recomputed error bounds, rather than increasing tire
+capacity. The low-speed blend and its response lag remain model assumptions,
+not an experimental validation of the corresponding real-vehicle motion.
+
 On a curved path with phase $s_p$, lateral displacement $e_y$, heading error
 $e_\psi$ and curvature $\kappa_p$, the path chart satisfies
 
@@ -614,11 +624,17 @@ $$
 r\leftarrow r_{\min}+\gamma(r-r_{\min}),\qquad 0<\gamma<1.
 $$
 
-The reallocated box must satisfy both the estimated mixed-Hessian remainder
-budget and the finite nonlinear displacement probes. Thus a needed state
-correction can be accommodated by reducing other state/input freedom; model
-accuracy is not relaxed. If even the required correction fails these checks,
-preparation reports failure. Physical bounds are retained throughout. The
+The reference Hessian seeds the reallocated box but does not veto it: its
+absolute quadratic envelope can overpredict finite displacement errors across
+tire saturation or low-speed model transitions. For a required correction,
+the reallocated box is checked using the actual discrete-map remainder at all
+64 mixed corners and both endpoints of each of the six axes. The componentwise
+error budget is unchanged. A needed state correction can therefore be
+accommodated by reducing other state/input freedom without also requiring the
+pointwise curvature surrogate to remain below the budget. If no candidate box
+passes these finite checks, preparation reports failure. This remains a
+sampled numerical locality estimate, not an interior or uniform error bound.
+Physical bounds are retained throughout. The
 shifted reference, general equality defects and optimization objectives stay
 unchanged, and an ordinarily compatible box is retained exactly.
 

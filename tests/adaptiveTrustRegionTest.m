@@ -92,6 +92,27 @@ classdef adaptiveTrustRegionTest < matlab.unittest.TestCase
                 x,u,testCase.cfg,next,a,b,[0;0;1;0;0;0]), ...
                 'collisionAvoidanceController:trustRegionUnavailable');
         end
+        function aNearSaturatedBrakeCanAccommodateAnAccurateStateCorrection(testCase)
+            % Regression: a reference Hessian overpredicts the finite
+            % remainder when the required correction crosses tire branches.
+            x=[0;0;.248;16.406;-.194;-.0895];u=[.02324;-.9999];
+            required=[0;0;.00422;.01201;.10166;.14595];
+            [next,a,b]=nonlinearBicycleModel.sample(x,u,testCase.cfg);
+            ordinary=nonlinearBicycleModel.trustRegion(x,u,testCase.cfg,next,a,b);
+            testCase.verifyGreaterThan(required(6),ordinary(6));
+            [radius,info]=nonlinearBicycleModel.trustRegion(x,u,testCase.cfg,next,a,b,required);
+            testCase.verifyGreaterThanOrEqual(radius(1:6),required);
+            testCase.verifyLessThanOrEqual(info.sampledErrorRatio,1);
+            stream=RandStream('mt19937ar',Seed=28);
+            for k=1:24
+                change=[0;0;radius(3:8).*(2*rand(stream,6,1)-1)];
+                trialInput=min([Inf;1],max([-Inf;-1],u+change(7:8)));
+                change(7:8)=trialInput-u;
+                actual=nonlinearBicycleModel.sample(x+change(1:6),trialInput,testCase.cfg);
+                testCase.verifyLessThanOrEqual(abs(actual-next-[a,b]*change), ...
+                    testCase.cfg.rti.trustRegion.errorBudget);
+            end
+        end
         function shiftedStateDefectsCanBeRepairedInsideTheNumericalDomain(testCase)
             model=testCase.model;cfg=testCase.cfg;anchor=testCase.anchor;
             anchor.inputs=repmat([0;.9999],1,size(anchor.inputs,2));

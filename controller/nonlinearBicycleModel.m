@@ -60,8 +60,8 @@ classdef nonlinearBicycleModel
         function [radius,info] = trustRegion(x,u,cfg,next,a,b,requiredState)
             % Numerical, state-dependent locality estimate for the hold map.
             % Translation is exactly affine and receives no trust bound.
-            % Finite differences estimate mixed curvature; this is not a
-            % certified supremum of the Hessian over the resulting box.
+            % Finite differences seed the radii from mixed curvature; this
+            % is not a certified Hessian bound across model transitions.
             % An optional affine consistency correction reserves state room.
             % Reallocate the SAME error budget by shrinking the other axes;
             % the required correction is not a relaxation of model accuracy.
@@ -92,18 +92,16 @@ classdef nonlinearBicycleModel
             % otherwise miss a nearby saturation or model transition.
             signs=[eye(6),-eye(6),ones(6,1),-ones(6,1), ...
                 [1;-1;1;-1;1;-1],[-1;1;-1;1;-1;1]];
+            if any(minimum)
+                % A required correction can cross a saturation transition.
+                % Test all mixed corners instead of treating the reference
+                % Hessian's absolute envelope as a finite-region bound.
+                corners=2*(dec2bin(0:63,6)-'0')-1;
+                signs=[eye(6),-eye(6),corners.'];
+            end
             ratio=0;
             for attempt=1:6
                 ratio=0;
-                if any(minimum)
-                    % Preserve the mixed-Hessian surrogate bound after
-                    % enlarging a required state axis, as well as the finite
-                    % nonlinear probes used by the ordinary trust estimate.
-                    normalized=radii./units;
-                    for component=1:6
-                        ratio=max(ratio,.5*normalized.'*squeeze(envelope(component,:,:))*normalized);
-                    end
-                end
                 for j=1:size(signs,2)
                     change=zeros(8,1);change(active)=radii.*signs(:,j);
                     trial=q+change;trial(8)=min(1,max(-1,trial(8)));
