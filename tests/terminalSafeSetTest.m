@@ -251,7 +251,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % A target circling beside the road never comes near.
             localDecision(testCase,[0;0;0;8;0;0],[0;40;0;5;0;.05;1.6;2.4;.95;0;0],true,"parked");
         end
-        function theEndpointMustBeMildAndTheContinuationOnTheRoad(testCase)
+        function theEndpointMustRespectSideslipAndTheContinuationOnTheRoad(testCase)
             model=localModel([0;.3;0;8;0;0],[]);
             model.cfg.controller.enforceRoadBoundaries=true;
             model.road.lateralClearance=[8.5344;12.192];context=terminalSafeSet.context(model);
@@ -260,17 +260,22 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             % Heading toward the left edge: the braking arc leaves the road.
             [member,~,info]=terminalSafeSet.member(context,[0;9;.6;8;0;0],0);
             testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"continuationLeavesRoad");
-            % The held arc's lateral acceleration r V above the mild maximum
-            % (2.4 m/s^2), although well inside the tire friction; at
-            % 1.6 m/s^2 the same arc is mild.
-            [member,~,info]=terminalSafeSet.member(context,[0;0;0;8;0;.3],0);
-            testCase.verifyGreaterThan(.3*8,context.lateralMaximum);
-            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"notMild");
-            [~,~,info]=terminalSafeSet.member(context,[0;0;0;8;0;.2],0);
-            testCase.verifyNotEqual(info.reason,"notMild");
             % Outside the sideslip cone.
             [member,~,info]=terminalSafeSet.member(context,[0;0;0;8;3;0],0);
             testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"notMild");
+        end
+        function safeBrakingArcsDoNotHaveAnExtraTurnIntensityLimit(testCase,sideslipSign)
+            % Both turn directions exceed the former |r| V <= 2 cap.
+            % The declared braking model, not a combined-force certificate,
+            % determines their terminal continuation.
+            x=[0;0;0;8;0;sideslipSign*.6];
+            model=localModel(x,[]);model.road.lateralClearance=[100;100];
+            context=terminalSafeSet.context(model);
+            testCase.verifyTrue(terminalSafeSet.member(context,x,0));
+            [~,bounds]=terminalSafeSet.rows(context,x,0);
+            testCase.verifyGreaterThanOrEqual(min(bounds),-1e-12);
+            next=terminalSafeSet.successor(context,x);
+            testCase.verifyTrue(terminalSafeSet.member(context,next,1));
         end
         function terminalSideslipIsStricterThanTheEstimatorOperatingCone(testCase)
             model=localModel([0;0;0;15;2.7;0],[]);
@@ -397,10 +402,9 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
         function theBrakingRateMustLieInsideTheTireFriction(testCase)
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('terminal', ...
                 struct('brakingDecelerationMetersPerSecondSquared',9))),'collisionAvoidanceController:invalidConfiguration');
-            % Together with the mild lateral acceleration (8.34 m/s^2 here).
-            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('terminal', ...
-                struct('brakingDecelerationMetersPerSecondSquared',7,'lateralAccelerationMaximumMetersPerSecondSquared',5))), ...
-                'collisionAvoidanceController:invalidConfiguration');
+            cfg=collisionAvoidanceControllerConfig(struct('terminal', ...
+                struct('brakingDecelerationMetersPerSecondSquared',7)));
+            testCase.verifyEqual(cfg.terminal.brakingDecelerationMetersPerSecondSquared,7);
         end
     end
 end

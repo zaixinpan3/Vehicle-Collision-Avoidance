@@ -937,7 +937,7 @@ Section III, equations (8) and (10),
 
 ### One terminal controller
 
-In the accepted mild kinematic model, retain the steering and apply a fixed
+In the declared terminal kinematic model, retain the steering and apply a fixed
 braking command, with a forward-only absorbing stop:
 
     b_f = -a_b / longitudinalAccelerationGain,
@@ -958,7 +958,7 @@ flow at nodes and midpoints; the parked-track check starts at the actual
 stop instant, not at the following sample boundary. `successor` is its ego
 projection and `jointSuccessor` also advances the target and exit memory.
 
-The mild-model assumption keeps beta_E = atan2(v_y,v_x) and kappa_E = r/V
+The terminal-model assumption keeps beta_E = atan2(v_y,v_x) and kappa_E = r/V
 constant while moving. Consequently
 
     p_E(t) = p_E + s*sinc(kappa_E*s/2)
@@ -983,19 +983,25 @@ and require rectangle nonoverlap only on active branches. The extra design
 clearance is zero; uncertainty inflation remains part of the required support.
 Then the terminal set is the fixed-policy safe set
 
-    X_f = { z : x_E is mild and Phi_f(z,t) satisfies C
+    X_f = { z : x_E satisfies the terminal sideslip cone and Phi_f(z,t) satisfies C
                  at all declared constraint instants }.
 
-Here mildness requires |v_y| <= tan(beta_f)*v_x and |r|*V <= a_m, with
-beta_f = 0.1 rad and a_m = 2 m/s^2 by default. The braking ratio must satisfy
-actuator limits. No additional rear-tire nonsaturation condition is imposed. Since |kappa_E|*V(t)^2 decreases and beta_E
-is constant, the mild conditions persist under the declared flow. Input
+Here the terminal sideslip cone requires |v_y| <= tan(beta_f)*v_x, with
+beta_f = 0.1 rad by default. It is a separate design choice, stricter than
+the observer's operating cone. No additional terminal bound on |r|*V is
+imposed, either in membership or in the local optimization rows. The
+braking ratio must satisfy actuator limits, and the configured braking rate
+must lie inside the longitudinal tire capacity. These checks do not certify
+combined-force realizability in the Fiala plant: applicability of the
+simplified terminal flow remains the declared modeling assumption above.
+No additional rear-tire nonsaturation condition is imposed. Since beta_E
+is constant, the terminal sideslip cone persists under the declared flow. Input
 memory is part of the joint state; finite slew limits require an admissible
 entry command, not just a geometric certificate.
 
 The executable membership test checks:
 
-1. Mildness and terminal braking admissibility.
+1. Terminal sideslip and braking admissibility.
 2. Ego reference-point deviation, and road occupancy when enabled, at nodes,
    midpoints, and its parked pose. Absolute ego position uncertainty tightens
    the deviation bound; no footprint radius or extra physical clearance is
@@ -1012,7 +1018,7 @@ the disk contributes its stationary endpoint. If a circle stays wholly
 inside the disk, its swept track still belongs to this encounter.
 
 No integer terminal index is interpreted as an execution deadline. The
-prediction endpoint can be a moving mild state with an available braking
+prediction endpoint can be a moving state with an available braking
 continuation; the main controller need not choose that continuation.
 
 ### Shift closure and the role of uncertainty

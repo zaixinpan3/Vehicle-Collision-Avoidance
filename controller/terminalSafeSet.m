@@ -1,8 +1,8 @@
 classdef terminalSafeSet
 %terminalSafeSet Terminal set of the braking continuation, and the anchor's holds.
-% The terminal set contains only mild states, and inside it the ego is a
+% The terminal set retains its sideslip cone, and inside it the ego is a
 % kinematic vehicle under the simplest law: the steering held and a constant
-% mild braking rate to rest. In a mild state the declared model is taken to
+% mild braking rate to rest. In the terminal set the declared model is taken to
 % follow this kinematic model (the user's modeling assumption of October 11,
 % 2026; no bound on the mismatch is computed). With the steering held the
 % kinematic vehicle keeps its sideslip and its course curvature, so past the
@@ -17,9 +17,7 @@ classdef terminalSafeSet
 % J = ceil(V/(a_b h)) holds it is stationary. The joint one-step map is
 % exact and in closed form: both vehicles move on arcs of constant curvature
 % (continuation, successor). The terminal set is
-%   X_f = { z : the ego is mild at z (inside the sideslip cone, and the held
-%           arc's lateral acceleration |r V| at most
-%           terminal.lateralAccelerationMaximumMetersPerSecondSquared),
+%   X_f = { z : the ego is inside the terminal sideslip cone at z,
 %           and along phi^j(z), j >= 0,
 %           - every node, hold midpoint and the parked pose keeps the ego
 %             rectangle on the road,
@@ -41,8 +39,10 @@ classdef terminalSafeSet
 % safe within the settled admissible domain. The ego enclosure, when present, widens every clearance by its
 % position radius and the chord of its yaw radius. See CONTROLLER_THEORY.md, Section 5.
 %
-% Mildness is kept along the continuation: the sideslip is held and |r V|
-% falls with the speed. Holds appended to the anchor are holds of the
+% The sideslip cone is kept along the continuation because sideslip is held.
+% No additional bound on |r V| is imposed; realizability of the simplified
+% terminal law is a modeling assumption, not a Fiala force certificate.
+% Holds appended to the anchor are holds of the
 % declared model, kept only when their endpoint is in X_f: the hold of the
 % CLF's certified cruise controller u = u* + K e (cruiseInput), or else the
 % hold nearest to it toward admissible braking with the steering held
@@ -64,7 +64,6 @@ classdef terminalSafeSet
             here=laneGeometry.project(model.initialState(1:2),model.lane);
             context=struct('deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
                 'sampleTime',cfg.controller.sampleTime, ...
-                'lateralMaximum',cfg.terminal.lateralAccelerationMaximumMetersPerSecondSquared, ...
                 'sideslipMaximum',cfg.terminal.sideslipMaximumRadians,'holdSpeed',cfg.model.brakeHoldSpeed, ...
                 'brakingRatio',-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg), ...
                 'brakingBounds',[cfg.actuation.brakingRatioMinimum;cfg.actuation.brakingRatioMaximum], ...
@@ -106,7 +105,7 @@ classdef terminalSafeSet
 
         function control = control(context,joint)
             % One held actuator command, common to the terminal uncertainty
-            % family. The declared mild model supplies a forward-only stop;
+            % family. The declared terminal model supplies a forward-only stop;
             % the last command is not adjusted using an unknown true speed.
             control=struct('actuatorInput',[joint.heldInput(1);context.brakingRatio], ...
                 'tangentialAcceleration',-context.deceleration, ...
@@ -202,11 +201,8 @@ classdef terminalSafeSet
         function [rows,bounds,context,info] = rows(context,y,node,box)
             % The terminal set linearized at the anchor endpoint y on the
             % endpoint correction dz, rows*dz <= bounds:
-            % - both mildness rows, |r V| <= the lateral acceleration maximum,
-            %   keeping up to localMildReserve
-            %   of the margin y has (an endpoint left on the boundary takes
-            %   only tiny steps: every full step leaves the set); the
-            %   sideslip cone is a row of the problem at every node;
+            % - the terminal sideslip cone, which is stricter than the observer's
+            %   operating cone enforced at every prediction node;
             % - fixed-dual collision rows at the continuation's nodes and
             %   midpoints before the exit, and at the parked pose against the
             %   target's closest pose on its track (the minimizer's own rows);
@@ -235,19 +231,13 @@ classdef terminalSafeSet
             reach=context.reach;
             movement=reshape(sum((abs(jacobian(1,:,:))+abs(jacobian(2,:,:))+reach*abs(jacobian(3,:,:))).*box(:).',2),1,[]);
             movement(isnan(movement))=Inf;
-            V=hypot(y(4),y(5));limit=context.lateralMaximum;
+            V=hypot(y(4),y(5));
             tangent=tan(context.sideslipMaximum);
             rows=[0,0,0,-tangent,1,0;0,0,0,-tangent,-1,0];bounds=-rows*y;
             if context.brakingRatio<context.brakingBounds(1) ...
                     || context.brakingRatio>context.brakingBounds(2) ...
                     || any(context.stateLower>0 | context.stateUpper<0)
                 rows=[rows;zeros(1,6)];bounds=[bounds;-1];
-            end
-            if V>0
-                gradient=[0,0,0,y(6)*y(4)/V,y(6)*y(5)/V,V];
-                rows=[rows;gradient;-gradient];
-                bounds=[bounds;localKeep(limit-y(6)*V,localMildReserve()); ...
-                    localKeep(limit+y(6)*V,localMildReserve())];
             end
             if isempty(parts.road)
                 [margin,lateral,normal,local]=localRoad(context,path.pose);
@@ -694,12 +684,6 @@ function bound = localKeep(margin,reserve)
     bound=margin-min(reserve,max(margin,0));
 end
 
-function reserve = localMildReserve()
-    % Lateral acceleration [m/s^2] that the mildness row keeps where the
-    % anchor has it.
-    reserve=.1;
-end
-
 function reserve = localReserve()
     % Margin [m] that the terminal rows keep where the anchor has it.
     reserve=.05;
@@ -707,7 +691,7 @@ end
 
 function [member,info,parts] = localDecide(context,x,node)
     % Membership of x at plan node 'node' in X_f, evaluated in this order:
-    % mildness, the road along the continuation, the target at
+    % terminal sideslip, the road along the continuation, the target at
     % its nodes and midpoints until the exit, and the parked pose against the
     % target's remaining track. parts keeps what was computed on the way
     % (empty fields where the decision stopped earlier), for rows.
@@ -719,8 +703,7 @@ function [member,info,parts] = localDecide(context,x,node)
             || any(context.stateLower>0 | context.stateUpper<0)
         info.reason="terminalStateBounds";return;
     end
-    if V>0 && ((abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9)) ...
-            || abs(x(6)*V)>context.lateralMaximum*(1+1e-9))
+    if V>0 && abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9)
         info.reason="notMild";return;
     end
     if context.brakingRatio<context.brakingBounds(1) ...

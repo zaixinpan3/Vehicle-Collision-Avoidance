@@ -90,12 +90,16 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         end
         function anOfflineProbeFindsTheTerminalStateViolation(testCase)
             model=testCase.model;anchor=testCase.anchor;
+            % Deliberately require a nearly zero terminal sideslip. A turn
+            % alone is admissible now that the extra |r| V cap is removed.
+            model.cfg.terminal.sideslipMaximumRadians=.001;
+            model.terminalContext=terminalSafeSet.context(model);
             anchor.inputs=repmat([.25;0],1,8);
             anchor.states=localRollout(model.initialState,anchor.inputs,model.cfg);
             [p,~,model]=localFormulate(anchor,model);
             check=solvePredictiveControl("probe",struct('operation',"check", ...
                 'model',model,'anchor',anchor,'problem',p));
-            testCase.verifyGreaterThan(check.terminalViolation,.1);
+            testCase.verifyGreaterThan(check.terminalViolation,model.cfg.solver.feasibilityTolerance);
             testCase.verifyGreaterThan(check.hard,model.cfg.solver.feasibilityTolerance);
         end
         function avoidanceAcceptsPositivePcbfSlackWithoutAClfObjective(testCase)
