@@ -90,9 +90,9 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         end
         function anOfflineProbeFindsTheTerminalStateViolation(testCase)
             model=testCase.model;anchor=testCase.anchor;
-            % Deliberately require a nearly zero terminal sideslip. A turn
-            % alone is admissible now that the extra |r| V cap is removed.
-            model.cfg.terminal.sideslipMaximumRadians=.001;
+            % Deliberately narrow the shared observer domain. There is no
+            % additional terminal sideslip or turn-intensity condition.
+            model.cfg.model.sideslipMaximum=.001;
             model.terminalContext=terminalSafeSet.context(model);
             anchor.inputs=repmat([.25;0],1,8);
             anchor.states=localRollout(model.initialState,anchor.inputs,model.cfg);

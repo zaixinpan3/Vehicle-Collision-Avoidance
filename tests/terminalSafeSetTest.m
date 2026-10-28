@@ -262,7 +262,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"continuationLeavesRoad");
             % Outside the sideslip cone.
             [member,~,info]=terminalSafeSet.member(context,[0;0;0;8;3;0],0);
-            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"notMild");
+            testCase.verifyFalse(member);testCase.verifyEqual(info.reason,"observerSideslipDomain");
         end
         function safeBrakingArcsDoNotHaveAnExtraTurnIntensityLimit(testCase,sideslipSign)
             % Both turn directions exceed the former |r| V <= 2 cap.
@@ -277,33 +277,35 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             next=terminalSafeSet.successor(context,x);
             testCase.verifyTrue(terminalSafeSet.member(context,next,1));
         end
-        function terminalSideslipIsStricterThanTheEstimatorOperatingCone(testCase)
+        function terminalAdmitsSideslipInsideTheSharedObserverDomain(testCase)
             model=localModel([0;0;0;15;2.7;0],[]);
             model.road.lateralClearance=[100;100];
             context=terminalSafeSet.context(model);
             beta=atan2(model.initialState(5),model.initialState(4));
             testCase.verifyLessThan(beta,model.cfg.model.sideslipMaximum);
-            testCase.verifyGreaterThan(beta,context.sideslipMaximum);
+            testCase.verifyGreaterThan(beta,.1);
             [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
-            testCase.verifyFalse(member);
-            testCase.verifyEqual(info.reason,"notMild");
+            testCase.verifyTrue(member);
+            testCase.verifyEqual(info.reason,"noTarget");
+            [~,bounds]=terminalSafeSet.rows(context,model.initialState,0);
+            testCase.verifyGreaterThanOrEqual(min(bounds),-1e-12);
         end
-        function terminalSideslipAdmitsTheExpandedBoundaryAndPreservesIt(testCase,sideslipSign)
-            x=[0;0;0;8;sideslipSign*8*tan(.1);0];
+        function terminalUsesTheSharedBoundaryAndPreservesIt(testCase,sideslipSign)
+            x=[0;0;0;8;sideslipSign*8*tan(.25);0];
             model=localModel(x,[]);context=terminalSafeSet.context(model);
             testCase.verifyTrue(terminalSafeSet.member(context,x,0));
             [~,bounds]=terminalSafeSet.rows(context,x,0);
             testCase.verifyGreaterThanOrEqual(min(bounds),-1e-12);
             next=terminalSafeSet.successor(context,x);
             testCase.verifyTrue(terminalSafeSet.member(context,next,1));
-            testCase.verifyEqual(atan2(next(5),next(4)),sideslipSign*.1,AbsTol=1e-12);
+            testCase.verifyEqual(atan2(next(5),next(4)),sideslipSign*.25,AbsTol=1e-12);
         end
-        function terminalSideslipStillRejectsBeyondTheExpandedBoundary(testCase,sideslipSign)
-            x=[0;0;0;8;sideslipSign*8*tan(.1001);0];
+        function terminalRejectsStatesOutsideTheSharedObserverDomain(testCase,sideslipSign)
+            x=[0;0;0;8;sideslipSign*8*tan(.2501);0];
             model=localModel(x,[]);context=terminalSafeSet.context(model);
             [member,~,info]=terminalSafeSet.member(context,x,0);
             testCase.verifyFalse(member);
-            testCase.verifyEqual(info.reason,"notMild");
+            testCase.verifyEqual(info.reason,"observerSideslipDomain");
             [~,bounds]=terminalSafeSet.rows(context,x,0);
             testCase.verifyLessThan(min(bounds),0);
         end
@@ -314,15 +316,15 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(hypot(model.initialState(4),model.initialState(5)),context.holdSpeed);
             [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
             testCase.verifyFalse(member);
-            testCase.verifyEqual(info.reason,"notMild");
+            testCase.verifyEqual(info.reason,"observerSideslipDomain");
         end
-        function theSettledConeRemainsConsistentWithItsRowsNearRest(testCase)
-            model=localModel([0;0;0;.1;.02;0],[]);
+        function theSharedObserverConeRemainsConsistentWithItsRowsNearRest(testCase)
+            model=localModel([0;0;0;.1;.03;0],[]);
             context=terminalSafeSet.context(model);
-            testCase.verifyLessThan(hypot(.1,.02),context.holdSpeed);
+            testCase.verifyLessThan(hypot(.1,.03),context.holdSpeed);
             [member,~,info]=terminalSafeSet.member(context,model.initialState,0);
             testCase.verifyFalse(member);
-            testCase.verifyEqual(info.reason,"notMild");
+            testCase.verifyEqual(info.reason,"observerSideslipDomain");
             [~,bounds]=terminalSafeSet.rows(context,model.initialState,0);
             testCase.verifyLessThan(min(bounds),0);
         end

@@ -1,6 +1,6 @@
 classdef terminalSafeSet
 %terminalSafeSet Terminal set of the braking continuation, and the anchor's holds.
-% The terminal set retains its sideslip cone, and inside it the ego is a
+% The terminal set uses the shared observer operating domain, and inside it the ego is a
 % kinematic vehicle under the simplest law: the steering held and a constant
 % mild braking rate to rest. In the terminal set the declared model is taken to
 % follow this kinematic model (the user's modeling assumption of October 11,
@@ -17,7 +17,7 @@ classdef terminalSafeSet
 % J = ceil(V/(a_b h)) holds it is stationary. The joint one-step map is
 % exact and in closed form: both vehicles move on arcs of constant curvature
 % (continuation, successor). The terminal set is
-%   X_f = { z : the ego is inside the terminal sideslip cone at z,
+%   X_f = { z : the ego is inside the shared observer operating domain at z,
 %           and along phi^j(z), j >= 0,
 %           - every node, hold midpoint and the parked pose keeps the ego
 %             rectangle on the road,
@@ -39,7 +39,8 @@ classdef terminalSafeSet
 % safe within the settled admissible domain. The ego enclosure, when present, widens every clearance by its
 % position radius and the chord of its yaw radius. See CONTROLLER_THEORY.md, Section 5.
 %
-% The sideslip cone is kept along the continuation because sideslip is held.
+% The shared sideslip cone is kept along the continuation because sideslip is held.
+% There is no separate, tighter terminal sideslip condition.
 % No additional bound on |r V| is imposed; realizability of the simplified
 % terminal law is a modeling assumption, not a Fiala force certificate.
 % Holds appended to the anchor are holds of the
@@ -64,7 +65,7 @@ classdef terminalSafeSet
             here=laneGeometry.project(model.initialState(1:2),model.lane);
             context=struct('deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
                 'sampleTime',cfg.controller.sampleTime, ...
-                'sideslipMaximum',cfg.terminal.sideslipMaximumRadians,'holdSpeed',cfg.model.brakeHoldSpeed, ...
+                'sideslipMaximum',cfg.model.sideslipMaximum,'holdSpeed',cfg.model.brakeHoldSpeed, ...
                 'brakingRatio',-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg), ...
                 'brakingBounds',[cfg.actuation.brakingRatioMinimum;cfg.actuation.brakingRatioMaximum], ...
                 'rearAxleDistance',cfg.vehicle.lr, ...
@@ -201,8 +202,8 @@ classdef terminalSafeSet
         function [rows,bounds,context,info] = rows(context,y,node,box)
             % The terminal set linearized at the anchor endpoint y on the
             % endpoint correction dz, rows*dz <= bounds:
-            % - the terminal sideslip cone, which is stricter than the observer's
-            %   operating cone enforced at every prediction node;
+            % - the same observer operating cone as at every prediction node;
+            %   no additional terminal sideslip tightening is introduced;
             % - fixed-dual collision rows at the continuation's nodes and
             %   midpoints before the exit, and at the parked pose against the
             %   target's closest pose on its track (the minimizer's own rows);
@@ -691,7 +692,7 @@ end
 
 function [member,info,parts] = localDecide(context,x,node)
     % Membership of x at plan node 'node' in X_f, evaluated in this order:
-    % terminal sideslip, the road along the continuation, the target at
+    % shared observer domain, the road along the continuation, the target at
     % its nodes and midpoints until the exit, and the parked pose against the
     % target's remaining track. parts keeps what was computed on the way
     % (empty fields where the decision stopped earlier), for rows.
@@ -704,7 +705,7 @@ function [member,info,parts] = localDecide(context,x,node)
         info.reason="terminalStateBounds";return;
     end
     if V>0 && abs(x(5))>tan(context.sideslipMaximum)*x(4)*(1+1e-9)
-        info.reason="notMild";return;
+        info.reason="observerSideslipDomain";return;
     end
     if context.brakingRatio<context.brakingBounds(1) ...
             || context.brakingRatio>context.brakingBounds(2)

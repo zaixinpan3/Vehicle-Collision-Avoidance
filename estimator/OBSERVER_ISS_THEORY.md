@@ -417,6 +417,19 @@ yaw-rate, acceleration and sideslip domains from the controller configuration.
 The model branch applies above the controller's kinematic blending range;
 it does not certify the different low-speed blended plant equations.
 
+The configured sideslip cone is a premise of this force-balance interval
+inversion, not a numerical limit imposed by Sharma, Alai, and Rajamani
+(2026). Their Section 3.1, equations (19)-(33), uses an inertial position,
+velocity and acceleration chain with Assumption 1 (zero body-acceleration
+derivatives and yaw acceleration); its stated ego Lipschitz constant is the
+yaw-rate bound. That stage introduces no explicit ego sideslip cap. Their
+yaw observer, equations (34)-(38), instead switches to course as an
+approximation of body yaw when acceleration is insufficient. Since course
+minus yaw equals sideslip, this branch has a sideslip-dependent measurement
+error even with ideal sensors. Absence of an explicit angle cap therefore
+does not establish arbitrary-sideslip accuracy. The current 0.25 rad domain
+is our configured error-bound premise, not a value derived from that paper.
+
 With fixed mass \(m\), axle distances \(l_f,l_r\), normal loads
 \(F_{zf}=mg l_r/(l_f+l_r)\), \(F_{zr}=mg l_f/(l_f+l_r)\), and
 \(v_x=\sqrt{V^2-w^2}>0\), lateral force balance is

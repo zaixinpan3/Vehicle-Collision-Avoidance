@@ -58,7 +58,7 @@ function cfg=localDefaults()
     % is no extra fixed clearance in the optimizer or geometric guide.
     cfg.collision=struct('encounterRangeMeters',50);
     % Terminal set (controller/terminalSafeSet.m, CONTROLLER_THEORY.md, Section 5): it
-    % retains a terminal sideslip cone, where the ego is taken to be a
+    % uses the shared observer operating domain, where the ego is taken to be a
     % kinematic vehicle. Past the plan's endpoint the target
     % keeps its forecast and the ego brakes at
     % brakingDecelerationMetersPerSecondSquared [m/s^2] with the steering
@@ -69,10 +69,8 @@ function cfg=localDefaults()
     % lie inside the longitudinal tire capacity. There is no additional
     % terminal turn-intensity constraint or coupled-force certificate for
     % this declared kinematic continuation. No encounter duration is preset.
-    % Terminal sideslip is stricter than the estimator's operating cone:
-    % a settled endpoint, rather than a large lateral drift with small yaw.
-    cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',4, ...
-        'sideslipMaximumRadians',.1);
+    % No separate terminal sideslip bound is imposed.
+    cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',4);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -187,7 +185,6 @@ function localValidate(cfg)
     validateattributes(cfg.planner.guideHalfWidthMeters,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(cfg.terminal.sideslipMaximumRadians,{'double'},{'scalar','real','finite','positive','<',pi/2});
     for name=["m","Iz","lf","lr","wheelbase","length","width","gravity"]
         validateattributes(cfg.vehicle.(name),{'double'},{'scalar','real','finite','positive'});
     end
@@ -215,9 +212,6 @@ function localValidate(cfg)
         validateattributes(cfg.model.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.model.sideslipMaximum,{'double'},{'scalar','real','positive','<',pi/2});
-    if cfg.terminal.sideslipMaximumRadians>cfg.model.sideslipMaximum
-        localInvalid('The terminal sideslip bound must lie inside the estimator operating cone.');
-    end
     if cfg.model.speedMaximum<=max(cfg.model.speedMinimum,cfg.model.scheduleSpeedFloor)
         localInvalid('The positive-speed model domain must have positive width.');
     end

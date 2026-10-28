@@ -476,13 +476,13 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.clfInitialValue,withoutEdges.metadata.clfInitialValue);
             testCase.verifyEqual(withEdges,inputs,AbsTol=1e-10);
         end
-        function aLocallyUnreachableEndpointDoesNotTriggerHorizonGrowth(testCase)
+        function anInfeasibleLocalDomainDoesNotTriggerHorizonGrowth(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             model=problem.model;model.initialState=[21.52;7.33;.017;6.21;-.153;-.14];
-            % An intentionally tight terminal sideslip cone makes this
-            % fixture unreachable within its small numerical trust region.
-            model.cfg.terminal.sideslipMaximumRadians=.0001;
+            % The measured state lies outside this intentionally narrow
+            % shared observer domain; extra horizon nodes cannot repair it.
+            model.cfg.model.sideslipMaximum=.0001;
             model.cfg.rti.trustRegion.errorBudget=1e-4*ones(6,1);
             [solution,search]=solvePredictiveControl(model,[],tic);
             testCase.verifyEmpty(solution);

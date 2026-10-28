@@ -983,25 +983,28 @@ and require rectangle nonoverlap only on active branches. The extra design
 clearance is zero; uncertainty inflation remains part of the required support.
 Then the terminal set is the fixed-policy safe set
 
-    X_f = { z : x_E satisfies the terminal sideslip cone and Phi_f(z,t) satisfies C
+    X_f = { z : x_E is in the shared observer domain and Phi_f(z,t) satisfies C
                  at all declared constraint instants }.
 
-Here the terminal sideslip cone requires |v_y| <= tan(beta_f)*v_x, with
-beta_f = 0.1 rad by default. It is a separate design choice, stricter than
-the observer's operating cone. No additional terminal bound on |r|*V is
+The endpoint uses the same operating cone |v_y| <= tan(beta_max)*v_x as
+the other prediction nodes, with beta_max = cfg.model.sideslipMaximum
+(0.25 rad by default). There is no separate terminal sideslip parameter or
+stricter endpoint cone. This domain belongs to the current observer's
+force-balance inversion and error-bound contract; it is not a numerical
+sideslip cap specified by Sharma et al. (2026). No additional bound on |r|*V is
 imposed, either in membership or in the local optimization rows. The
 braking ratio must satisfy actuator limits, and the configured braking rate
 must lie inside the longitudinal tire capacity. These checks do not certify
 combined-force realizability in the Fiala plant: applicability of the
 simplified terminal flow remains the declared modeling assumption above.
 No additional rear-tire nonsaturation condition is imposed. Since beta_E
-is constant, the terminal sideslip cone persists under the declared flow. Input
+is constant, the shared operating cone persists under the declared flow. Input
 memory is part of the joint state; finite slew limits require an admissible
 entry command, not just a geometric certificate.
 
 The executable membership test checks:
 
-1. Terminal sideslip and braking admissibility.
+1. The shared observer operating domain and terminal braking admissibility.
 2. Ego reference-point deviation, and road occupancy when enabled, at nodes,
    midpoints, and its parked pose. Absolute ego position uncertainty tightens
    the deviation bound; no footprint radius or extra physical clearance is
