@@ -98,15 +98,14 @@ robust model predictive control, vehicle state estimation.
 
 \section{Introduction}
 
-\IEEEPARstart{A}{voiding} collisions with surrounding vehicles is a
-fundamental requirement for autonomous driving. An evasive response may
-involve braking, steering, or a combination of the two, with its
-effectiveness constrained by available road space, tire adhesion, and
-actuator limits
-\cite{LiEtAl2022Emergency,ChenChengLiZhaoWang2024,ThompsonDallasGohBalachandran2024}.
-The resulting control problem is to prevent a collision while the ego
-vehicle maneuvers and the surrounding vehicles' states are inferred from
-onboard measurements.
+\IEEEPARstart{A}{utonomous} driving has become a major area of research, and vehicle
+collision avoidance is essential to safe operation on the road. By detecting potential hazards and initiating an
+evasive response, a collision-avoidance system enables a vehicle to avoid
+obstacles without driver intervention. Among these obstacles, surrounding
+vehicles pose a particular challenge because their future motion must
+be anticipated as traffic evolves. Consequently, the design of systems that
+can actively avoid collisions with surrounding vehicles has attracted
+considerable research interest \cite{LiEtAl2022Emergency,ChenChengLiZhaoWang2024}.
 
 Collision avoidance may require the ego vehicle to perform complex
 maneuvers, such as braking while turning. These maneuvers pose two
