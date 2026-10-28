@@ -341,12 +341,7 @@ end
 
 function anchor=localPlanReference(model,count)
     cfg=model.cfg;wall=tic;
-    x=model.initialState;course=x(3)+atan2(x(5),x(4));
-    lateral=[-sin(course),cos(course)]*(model.target(1:2)-x(1:2));
-    tolerance=1e-6;
-    if ~isempty(model.uncertainty.target),tolerance=tolerance+model.uncertainty.target.positionRadius;end
-    side=1;if abs(lateral)>tolerance,side=-sign(lateral);end
-    guide=predictiveSafetyGeometry.avoidanceGuide(model,count,side);
+    guide=predictiveSafetyGeometry.avoidanceGuide(model,count);
     context=terminalSafeSet.context(model);
     context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
     planner=localPlannerMetadata();planner.used=true;planner.candidateCount=guide.candidateCount;
@@ -365,7 +360,7 @@ end
 
 function planner=localPlannerMetadata()
     planner=struct('used',false,'maximumDeviationMeters',NaN, ...
-        'candidateCount',0,'algorithm',"safetyCirculation", ...
+        'candidateCount',0,'algorithm',"anticipatoryCirculation", ...
         'circulationDirection',0,'candidates',struct([]), ...
         'referenceMinimumNodeGapMeters',NaN,'referenceMinimumInflatedGapMeters',NaN, ...
         'referenceStateViolation',NaN,'sampledNominalChecksPassed',false, ...

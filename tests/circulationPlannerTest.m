@@ -174,11 +174,65 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyEqual(guide.directionSign,0);
             testCase.verifyTrue(isnan(guide.conflictStartSeconds));
         end
-        function replanningKeepsTheSelectedCirculationDirection(testCase)
-            model=localModel("headOn",8);model.circulationDirection=-1;
-            guide=predictiveSafetyGeometry.avoidanceGuide(model,40,1);
-            directions=[guide.candidates.direction];
-            testCase.verifyTrue(all(directions==0 | directions==-1));
+        function predictedCrossingMotionOverridesTheSymmetryHint(testCase)
+            model=localModel("intersectionCrossing",8);
+            left=predictiveSafetyGeometry.avoidanceGuide(model,40,1);
+            right=predictiveSafetyGeometry.avoidanceGuide(model,40,-1);
+            testCase.verifyGreaterThan(left.inputs(1,1),0);
+            testCase.verifyEqual(left.inputs(:,1),right.inputs(:,1),AbsTol=1e-12);
+            testCase.verifyEqual(left.candidateCount,1);
+        end
+        function mirroredTargetMotionMirrorsTheAvoidanceForce(testCase)
+            model=localModel("intersectionCrossing",8);
+            p=struct('direction',1,'speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
+            left=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            mirrored=model.target;mirrored([2,3,6,11])=-mirrored([2,3,6,11]);
+            right=predictiveSafetyGeometry.circulationField(model.initialState,mirrored,model.cfg,p);
+            testCase.verifyGreaterThan(left(2),0);
+            testCase.verifyEqual(right,[left(1);-left(2)],AbsTol=1e-10);
+        end
+        function aTargetThatClearsBeforeArrivalDoesNotLeaveAVirtualWall(testCase)
+            model=localModel("intersectionCrossing",8);
+            model.target(4)=30;
+            p=struct('direction',1,'speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
+            [force,field]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            testCase.verifyEqual(force,zeros(2,1),AbsTol=1e-12);
+            testCase.verifyEqual(field.incidence,0);
+        end
+        function predictedDecelerationCanCreateAThreatWithTheSamePresentPoseAndSpeed(testCase)
+            model=localModel("intersectionCrossing",8);model.target(4)=16;
+            p=struct('direction',1,'speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
+            [free,~]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            model.target(5)=-16^2/(2*17.6);
+            [braking,field]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            testCase.verifyEqual(free,zeros(2,1),AbsTol=1e-12);
+            testCase.verifyGreaterThan(norm(braking),1);
+            testCase.verifyGreaterThan(field.incidence,.5);
+        end
+        function predictedTurningCanClearAnInitiallyHeadOnApproach(testCase)
+            model=localModel("headOn",8);
+            p=struct('direction',1,'speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
+            [straight,~]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            % Preserve position, speed and velocity course; change NRMM curvature.
+            model.target(6)=.08;model.target(3)=pi-model.target(6);
+            [turning,field]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            testCase.verifyGreaterThan(norm(straight),1);
+            testCase.verifyEqual(turning,zeros(2,1),AbsTol=1e-12);
+            testCase.verifyEqual(field.incidence,0);
+        end
+        function predictionGuidanceDoesNotDependOnTheWorldCoordinateFrame(testCase)
+            model=localModel("turningCrossing",8);
+            model.target(10:11)=[.3;-.2];model.cfg.vehicle.rectangleOffset=[.2;.1];
+            p=struct('direction',1,'speed',8,'inflation',.1,'preferredAcceleration',[.2;-.1]);
+            [original,field]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            angle=.7;rotation=[cos(angle),-sin(angle);sin(angle),cos(angle)];shift=[30;-20];
+            x=model.initialState;x(1:2)=rotation*x(1:2)+shift;x(3)=x(3)+angle;
+            target=model.target;target(1:2)=rotation*target(1:2)+shift;target(3)=target(3)+angle;
+            p.preferredAcceleration=rotation*p.preferredAcceleration;
+            [transformed,other]=predictiveSafetyGeometry.circulationField(x,target,model.cfg,p);
+            testCase.verifyEqual(transformed,rotation*original,AbsTol=1e-10);
+            testCase.verifyEqual(other.incidence,field.incidence,AbsTol=1e-10);
+            testCase.verifyEqual(other.transportGradient,rotation*field.transportGradient,AbsTol=1e-10);
         end
         function aLongerRolloutExtendsExactlyTheSameFieldMotion(testCase,crossingSpeed)
             model=localModel("intersectionCrossing",crossingSpeed);

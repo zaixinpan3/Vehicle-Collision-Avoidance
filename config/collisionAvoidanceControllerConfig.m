@@ -43,9 +43,11 @@ function cfg=localDefaults()
     cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',0, ...
         'nominalTrackingWeight',1,'inputVariationWeight',20, ...
         'trustRegion',struct('enabled',true,'errorBudget',[.04;.04;.01;.4;.4;.2]));
-    % One field rollout combines route attraction with motion-dependent target
-    % circulation, including longitudinal avoidance. No nominal-path forecast
-    % selects a behavior. Cruise feedback never overwrites obstacle correction.
+    % One field rollout combines route attraction with anticipatory target
+    % circulation. Time-aligned NRMM exposure activates the correction; the
+    % transported distance gradient supplies its passing preference. No
+    % candidate bank or nominal/avoidance switch selects a behavior.
+    % Cruise feedback never overwrites longitudinal obstacle correction.
     % The parallel-wall acceleration guide anticipates transverse momentum;
     % it is not a hard RTI/terminal constraint or an execution certificate.
     cfg.planner=struct('radialRate',1,'tangentialRate',2,'wallRate',2, ...

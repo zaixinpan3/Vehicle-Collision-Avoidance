@@ -6,6 +6,7 @@ classdef predictiveSafetyGeometry
             % No candidate scores or admission gate. RTI receives the states
             % and inputs over exactly count holds. Terminal constraints
             % belong to RTI, not this heuristic initialization.
+            if nargin<3,side=1;end % Only an exactly symmetric encounter needs a tie break.
             cfg=model.cfg;time=(0:count)*cfg.controller.sampleTime;
             target=predictiveSafetyGeometry.predictTarget(model.target,time);
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
@@ -21,20 +22,15 @@ classdef predictiveSafetyGeometry
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
-            % A single field rollout, with an encounter-persistent direction.
-            % Geometry chooses the turn sense; no candidate bank is searched.
+            % The side argument resolves exact symmetry only. Predicted target
+            % transport, not its current left/right position, drives circulation.
             parameters=localFieldParameters(data,1,1,0);
             [~,field]=predictiveSafetyGeometry.circulationField(model.initialState,target(:,1),cfg,parameters);
             course=model.initialState(3)+atan2(model.initialState(5),model.initialState(4));
             forward=[cos(course);sin(course)];
             lateral=[-forward(2);forward(1)];
-            % Interpret the passing side in the current motion frame. The
-            % cruise route does not choose a maneuver for this initializer.
             direction=sign((field.rotation*field.tangent).'*lateral)*side;
             if direction==0,direction=1;end
-            if isfield(model,'circulationDirection') && model.circulationDirection~=0
-                direction=model.circulationDirection;
-            end
             budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
             % The initial contour is far larger than the vehicle. Limiting
             % relative circulation to a vehicle-radius turn slows head-on
@@ -176,6 +172,12 @@ classdef predictiveSafetyGeometry
             yawRadius=0;if isfield(parameters,'egoYawRadius'),yawRadius=parameters.egoYawRadius;end
             egoSupport=predictiveSafetyGeometry.rotationSupport(shape,x(3),yawRadius,-normalWorld.');
             h=distance-egoSupport-inflation;
+            anticipation=struct('incidence',1,'direction',parameters.direction, ...
+                'time',Inf,'transportGradient',zeros(2,1));
+            if isfield(parameters,'preferredAcceleration')
+                anticipation=localAnticipation(x,target,cfg,parameters,normalWorld);
+                parameters.direction=anticipation.direction;
+            end
             desired=0;
             rate=cfg.planner.radialRate;
             relative=(-kappa*tau^2-2*rate*nu-rate^2*(h-desired))*normal ...
@@ -189,25 +191,7 @@ classdef predictiveSafetyGeometry
                 % distant ego back to a target-centred orbit. Circulation is
                 % activated by the normal correction, not by a release timer.
                 preferred=parameters.preferredAcceleration;normalWorld=r*normal;tangentWorld=r*tangent;
-                % Shape the field by transverse footprint overlap relative
-                % to the instantaneous center velocity. A clear parallel
-                % passage has zero influence even while range is shrinking.
-                % This local algebra is not a forecast/trajectory test.
-                egoOffset=re*cfg.vehicle.rectangleOffset;
-                relativeVelocity=re*x(4:5)+x(6)*j*egoOffset-centerVelocity;
-                transverse=j*relativeVelocity;centerDifference=x(1:2)+egoOffset-center;
-                orientation=sign(transverse.'*centerDifference);if orientation==0,orientation=1;end
-                transverse=orientation*transverse;
-                separation=transverse.'*centerDifference;
-                width=predictiveSafetyGeometry.rotationSupport(shape,x(3),yawRadius,-transverse.') ...
-                    +transverse.'*egoOffset ...
-                    +predictiveSafetyGeometry.rotationSupport(target(8:11),target(3),targetYawRadius,transverse.') ...
-                    -transverse.'*r*target(10:11)+parameters.inflation*norm(transverse);
-                if isfield(parameters,'generator')
-                    width=width+sum(abs(transverse.'*parameters.generator(1:2,:))) ...
-                        +predictiveSafetyGeometry.targetSupportFromData(parameters.support,parameters.index,transverse.');
-                end
-                incidence=max(0,1-(separation/max(width,eps))^2);
+                incidence=anticipation.incidence;
                 correction=incidence*max(0,normalWorld.'*(acceleration-preferred));
                 budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
                 activation=min(1,correction/budget);
@@ -220,7 +204,9 @@ classdef predictiveSafetyGeometry
                 'normal',normal,'tangent',tangent,'position',q,'velocity',w,'rotation',r, ...
                 'transport',transport,'egoRadius',egoRadius, ...
                 'inflation',inflation,'desiredClearance',desired,'initialBarrier',nu+rate*h, ...
-                'normalCorrection',correction,'activation',activation,'incidence',incidence);
+                'normalCorrection',correction,'activation',activation,'incidence',incidence, ...
+                'direction',parameters.direction,'anticipationTime',anticipation.time, ...
+                'transportGradient',anticipation.transportGradient);
         end
 
         function [support,inflation] = rotationSupport(shape,yaw,yawRadius,normal)
@@ -614,6 +600,93 @@ classdef predictiveSafetyGeometry
     end
 end
 
+function prediction=localAnticipation(x,target,cfg,parameters,normal)
+    % A time-aligned ballistic characteristic activates a transported field.
+    % Only this diagnostic ray is ballistic; the returned seed uses Fiala.
+    % Future target poses use the full NRMM arc, including braking to rest.
+    rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+    velocity=rotation*x(4:5);
+    targetVelocity=target(4)*predictiveSafetyGeometry.direction(target(3)+target(6));
+    relativeSpeed=norm(velocity-targetVelocity);
+    scale=hypot(cfg.vehicle.length/2,cfg.vehicle.width/2)+norm(target(8:9));
+    duration=(cfg.collision.encounterRangeMeters+norm(x(1:2)-target(1:2))) ...
+        /max(relativeSpeed,cfg.planner.radialRate*scale);
+    time=linspace(0,duration,max(2,ceil(duration/cfg.controller.sampleTime)+1));
+    future=predictiveSafetyGeometry.predictTarget(target,time);count=numel(time);
+    positions=x(1:2)+velocity*time;
+    targetAxes=predictiveSafetyGeometry.direction(future(3,:));
+    axes=[repmat(rotation(:,1).',count,1);repmat(rotation(:,2).',count,1); ...
+        targetAxes.';[-targetAxes(2,:);targetAxes(1,:)].'];
+    egoCenter=positions+rotation*cfg.vehicle.rectangleOffset;
+    targetCenter=future(1:2,:)+target(10)*targetAxes+target(11)*[-targetAxes(2,:);targetAxes(1,:)];
+    orientation=sign(sum(axes.*repmat((egoCenter-targetCenter).',4,1),2));
+    orientation(orientation==0)=1;axes=axes.*orientation;
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    egoYaw=0;targetYaw=0;
+    if isfield(parameters,'egoYawRadius'),egoYaw=parameters.egoYawRadius;end
+    if isfield(parameters,'targetYawRadius'),targetYaw=parameters.targetYawRadius;end
+    egoSupport=predictiveSafetyGeometry.rotationSupport(shape,x(3),egoYaw,-axes);
+    targetSupport=localMovingSupport(target(8:11),repmat(future(3,:).',4,1),targetYaw,axes);
+    inflation=parameters.inflation;
+    if isfield(parameters,'generator')
+        inflation=inflation+sum(abs(axes*parameters.generator(1:2,:)),2) ...
+            +predictiveSafetyGeometry.targetSupportFromData(parameters.support,parameters.index,axes);
+    end
+    gaps=max(reshape(sum(axes.*repmat((positions-future(1:2,:)).',4,1),2) ...
+        -egoSupport-targetSupport-inflation,count,4),[],2).';
+    % A predicted exit ends this encounter; no distant return is penalized.
+    rangeReserve=parameters.inflation;
+    if isfield(parameters,'generator')
+        rangeReserve=rangeReserve+sum(vecnorm(parameters.generator(1:2,:),2,1)) ...
+            +parameters.support.ballRadius(parameters.index);
+    end
+    outside=vecnorm(positions-future(1:2,:),2,1)-rangeReserve>cfg.collision.encounterRangeMeters;
+    if ~outside(1)
+        exit=find(outside,1);if ~isempty(exit),gaps(exit:end)=Inf;end
+    end
+    depth=min(1,max(0,-gaps)/min(cfg.vehicle.width/2,target(9)));
+    exposure=depth.*(2-depth);
+    prediction=struct('incidence',max(exposure),'direction',parameters.direction, ...
+        'time',Inf,'transportGradient',zeros(2,1));
+    weight=exposure.*exp(-cfg.planner.radialRate*time);
+    if sum(weight)<=eps,return;end
+    weight=weight/sum(weight);prediction.time=sum(weight.*time);
+    % Query the future obstacle's distance gradient at the CURRENT ego
+    % position. Its tangential transport favors space the target is vacating.
+    % Exposure above is time-aligned; these future positions are never made
+    % a static forbidden union. This is a passing preference, not a barrier.
+    delta=x(1:2)-targetCenter;
+    q=[sum(targetAxes.*delta,1);sum([-targetAxes(2,:);targetAxes(1,:)].*delta,1)];
+    residual=q-min(target(8:9),max(-target(8:9),q));
+    distance=vecnorm(residual,2,1);localNormal=residual./max(distance,eps);
+    worldNormal=targetAxes.*localNormal(1,:)+[-targetAxes(2,:);targetAxes(1,:)].*localNormal(2,:);
+    gradient=sum((worldNormal-normal).*weight,2);
+    tangent=[-normal(2);normal(1)];signal=tangent.'*gradient;
+    prediction.transportGradient=tangent*signal;
+    if abs(signal)>1e-8
+        prediction.direction=sign(signal);
+    else
+        % Static/collinear transport has no preferred chirality. Continue
+        % existing relative tangential motion; exact symmetry uses the tie.
+        tangential=tangent.'*(velocity-targetVelocity);
+        if abs(tangential)>1e-6,prediction.direction=sign(tangential);end
+    end
+end
+
+function support=localMovingSupport(shape,yaw,yawRadius,normal)
+    % Batched rectangle supports, one target yaw per query row.
+    c=cos(yaw);s=sin(yaw);
+    bodyNormal=[normal(:,1).*c+normal(:,2).*s,-normal(:,1).*s+normal(:,2).*c];
+    vertices=shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1];
+    a=bodyNormal*vertices;nominal=max(a,[],2);
+    radius=min(pi,yawRadius);
+    b=bodyNormal*[-vertices(2,:);vertices(1,:)];
+    values=a*cos(radius)+abs(b)*sin(radius);
+    interior=abs(atan2(b,a))<=radius;
+    magnitude=hypot(a,b);values(interior)=magnitude(interior);
+    support=max(nominal,max(values,[],2));
+end
+
 function [distance,normal,hessian]=localBoundaryDistance(position,chain)
     points=chain.points;starts=points(1:end-1,:);segments=diff(points);lengths=vecnorm(segments,2,2);
     tangent=segments./lengths;projection=sum((position.'-starts).*tangent,2);
@@ -739,6 +812,7 @@ function candidate=localCirculationRollout(model,data,direction,speed,count)
                 parameters=localFieldParameters(data,index,direction,speed);
                 parameters.preferredAcceleration=acceleration;
                 [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
+                if ~candidate.fieldActive && field.activation>0,candidate.directionSign=field.direction;end
                 candidate.fieldActive=candidate.fieldActive || field.activation>0;
                 if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
             end
