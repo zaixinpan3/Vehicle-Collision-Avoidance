@@ -893,7 +893,8 @@ function [problem,model]=localFormulate(anchor,model)
     % Assemble after intersecting physical and numerical locality bounds.
     lower(iu)=max(lower(iu),physicalInputLower-anchor.inputs);
     upper(iu)=min(upper(iu),physicalInputUpper-anchor.inputs);
-    trustRadii=Inf(8,count);trustRatio=zeros(1,count);
+    physicalLowerBounds=lower;physicalUpperBounds=upper;
+    trustRadii=Inf(8,count);trustRatio=zeros(1,count);adjusted=false;
     if cfg.rti.trustRegion.enabled
         for k=1:count
             stageCfg=cfg;stageCfg.controller.sampleTime=durations(k);
@@ -904,7 +905,41 @@ function [problem,model]=localFormulate(anchor,model)
             upper(columns)=min(upper(columns),radius);
             trustRadii(:,k)=radius;trustRatio(k)=trustInfo.sampledErrorRatio;
         end
+        % A measured initial state and shifted affine decisions need not be
+        % dynamically consistent. Detect an empty dynamics/box intersection
+        % before asking PCBF slack (which cannot relax dynamics) to fix it.
+        if ~localDynamicsBoxCompatible(stages,reshape(rhs,6,[]),ix,iu,lower,upper,cfg.solver.constraintTolerance)
+            % Particular solution of the affine equalities with unchanged
+            % inputs. This is a sensitivity propagation, not a nonlinear
+            % rollout, extra SQP solve, or replacement of the shifted plan.
+            correction=reshape(rhs,6,[]);
+            for k=1:count
+                correction(:,k+1)=correction(:,k+1)+stages(k).a*correction(:,k);
+            end
+            lastAdjusted=0;
+            for repair=1:count
+                [compatible,k]=localDynamicsBoxCompatible(stages,reshape(rhs,6,[]),ix,iu,lower,upper,cfg.solver.constraintTolerance);
+                % Enlarging an unrelated later node is unnecessary and can
+                % demand a poorly conditioned open-loop correction there.
+                % Only repair the next interval conflict. Shrinking that
+                % stage's input room affects subsequent transitions only.
+                if compatible || k<=lastAdjusted || k>count,break;end
+                required=abs(correction(:,k));
+                if ~any(required>trustRadii(1:6,k)),break;end
+                stageCfg=cfg;stageCfg.controller.sampleTime=durations(k);
+                [radius,trustInfo]=nonlinearBicycleModel.trustRegion(anchor.states(:,k),anchor.inputs(:,k), ...
+                    stageCfg,stages(k).next,stages(k).a,stages(k).b,required);
+                columns=[ix(:,k);iu(:,k)];
+                % Keep all physical bounds. The reallocated numerical box
+                % still has to pass the original nonlinear error budget.
+                lower(columns)=max(physicalLowerBounds(columns),-radius);
+                upper(columns)=min(physicalUpperBounds(columns),radius);
+                trustRadii(:,k)=radius;trustRatio(k)=trustInfo.sampledErrorRatio;adjusted=true;
+                lastAdjusted=k;
+            end
+        end
     end
+    model.trustWarmStartAdjusted=adjusted;
     reachLower=lower;reachUpper=upper;
     if isfield(model,'durationProbe') && model.durationProbe
         % Keep redundant rows while differentiating: pruning at a bound
@@ -929,6 +964,7 @@ function [problem,model]=localFormulate(anchor,model)
     model.robustnessRelaxation=robustRelaxation;
     problem.physicalInputLower=physicalInputLower;problem.physicalInputUpper=physicalInputUpper;
     problem.trustRadii=trustRadii;problem.trustSampledErrorRatio=trustRatio;
+    problem.trustWarmStartAdjusted=adjusted;
     problem.inputIncrementLower=physicalInputLower-anchor.inputs;problem.inputIncrementUpper=physicalInputUpper-anchor.inputs;
 end
 
@@ -1301,5 +1337,23 @@ function [result,search,model]=localProbe(request)
             [result,search,model]=localNonlinearCheck(request.anchor,model,request.problem.safetyNormals);
         otherwise
             error('collisionAvoidanceController:invalidProbeOperation','Unknown research operation.');
+    end
+end
+
+function [feasible,blockedStage]=localDynamicsBoxCompatible(stages,defects,ix,iu,lower,upper,tolerance)
+    % Forward interval propagation gives a necessary condition only. A
+    % nonempty interval does not certify joint feasibility or other rows.
+    % The initial correction is fixed by the first equality, not its box.
+    low=defects(:,1);high=low;feasible=true;blockedStage=0;
+    if any(low<lower(ix(:,1))-tolerance | high>upper(ix(:,1))+tolerance)
+        feasible=false;return;
+    end
+    for k=1:numel(stages)
+        if any(lower(iu(:,k))>upper(iu(:,k))+tolerance),feasible=false;return;end
+        a=stages(k).a;b=stages(k).b;
+        reachLow=defects(:,k+1)+max(a,0)*low+min(a,0)*high+max(b,0)*lower(iu(:,k))+min(b,0)*upper(iu(:,k));
+        reachHigh=defects(:,k+1)+max(a,0)*high+min(a,0)*low+max(b,0)*upper(iu(:,k))+min(b,0)*lower(iu(:,k));
+        low=max(reachLow,lower(ix(:,k+1)));high=min(reachHigh,upper(ix(:,k+1)));
+        if any(low>high+tolerance),feasible=false;blockedStage=k+1;return;end
     end
 end

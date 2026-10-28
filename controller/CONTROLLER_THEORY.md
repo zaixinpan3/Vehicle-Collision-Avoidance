@@ -579,9 +579,52 @@ algorithm. No such guarantee is inferred from passing simulations.
 Adding these hard numerical bounds restricts the executable local problem.
 A shifted nonlinear witness from the ideal recursive-feasibility theorem is
 not automatically inside the next box. The shifted multiple-shooting iterate
-can have dynamics defects after measurement updates; those equality defects
-remain explicit and are not hidden by expanding the box or adding dynamics
-slack. If it cannot satisfy the hard constraints inside the domain, the RTI
+can have dynamics defects after measurement updates. They remain explicit in
+the equalities; consistency does not require replacing the shifted trajectory
+by an open-loop nonlinear rollout.
+
+Before solving, forward interval propagation intersects the reachable
+correction intervals of these affine equalities with the current variable
+bounds, starting with the correction fixed by the initial-state equality.
+An empty intersection detects an inconsistency between the dynamics and
+boxes. A nonempty intersection is only a necessary condition, not a
+feasibility certificate for the complete problem.
+
+When this check finds an empty intersection, compute a particular affine
+consistency correction with unchanged inputs:
+
+$$
+d_0=\hat x_k-\bar x_0,\qquad
+d_{i+1}=A_i d_i+e_i,\qquad \Delta u_i=0.
+$$
+
+This forward sensitivity pass uses the existing tangents. It adds no
+optimizer call, replanning, nonlinear trajectory rollout or SQP iteration.
+Only at the next state whose incoming correction interval misses its box,
+reserve the corresponding nonlinear-state radii and recompute that box with
+the **same error budget**. Other stages retain their ordinary radii; a large
+later open-loop sensitivity alone does not cause an unrelated enlargement.
+The interval test is repeated after reallocation. Repairs advance through
+the horizon, stop at an unresolved physical bound, and never exceed the
+number of stages.
+With $r_{\min}=(|d_{i,3:6}|,0,0)$, initialization uses
+$r=\max(r_{\rm ordinary},r_{\min})$ and failed probes reduce only excess room:
+
+$$
+r\leftarrow r_{\min}+\gamma(r-r_{\min}),\qquad 0<\gamma<1.
+$$
+
+The reallocated box must satisfy both the estimated mixed-Hessian remainder
+budget and the finite nonlinear displacement probes. Thus a needed state
+correction can be accommodated by reducing other state/input freedom; model
+accuracy is not relaxed. If even the required correction fails these checks,
+preparation reports failure. Physical bounds are retained throughout. The
+shifted reference, general equality defects and optimization objectives stay
+unchanged, and an ordinarily compatible box is retained exactly.
+
+This particular correction certifies only the affine dynamics equations;
+it need not satisfy physical, collision or terminal constraints. If the
+complete hard constraints cannot be satisfied inside the final domain, RTI
 reports failure. Applying the ideal recursive proof to this restricted online
 algorithm would additionally require an admissible shifted witness inside
 every next trust domain. The conditional information-set theorem elsewhere

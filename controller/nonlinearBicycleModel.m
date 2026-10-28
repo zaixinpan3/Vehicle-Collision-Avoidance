@@ -57,11 +57,16 @@ classdef nonlinearBicycleModel
             if variational,a=reshape(y(7:42),6,6);b=reshape(y(43:54),6,2);end
         end
 
-        function [radius,info] = trustRegion(x,u,cfg,next,a,b)
+        function [radius,info] = trustRegion(x,u,cfg,next,a,b,requiredState)
             % Numerical, state-dependent locality estimate for the hold map.
             % Translation is exactly affine and receives no trust bound.
             % Finite differences estimate mixed curvature; this is not a
             % certified supremum of the Hessian over the resulting box.
+            % An optional affine consistency correction reserves state room.
+            % Reallocate the SAME error budget by shrinking the other axes;
+            % the required correction is not a relaxation of model accuracy.
+            if nargin<7,requiredState=zeros(6,1);end
+            minimum=[abs(requiredState(3:6));zeros(2,1)];
             q=[x;u];active=3:8;
             units=[.3;max(2,.25*abs(x(4)));1;.4;.25;.5];
             steps=1e-3*units;
@@ -82,7 +87,7 @@ classdef nonlinearBicycleModel
             envelope=abs(curvature)./reshape(budget,6,1,1);
             weights=squeeze(max(sum(envelope,3),[],1));
             scaled=min(1,sqrt(2./max(6*weights,1e-12)));
-            radii=units.*scaled(:);
+            radii=max(minimum,units.*scaled(:));
             % Probe finite displacements too: a zero local curvature can
             % otherwise miss a nearby saturation or model transition.
             signs=[eye(6),-eye(6),ones(6,1),-ones(6,1), ...
@@ -90,6 +95,15 @@ classdef nonlinearBicycleModel
             ratio=0;
             for attempt=1:6
                 ratio=0;
+                if any(minimum)
+                    % Preserve the mixed-Hessian surrogate bound after
+                    % enlarging a required state axis, as well as the finite
+                    % nonlinear probes used by the ordinary trust estimate.
+                    normalized=radii./units;
+                    for component=1:6
+                        ratio=max(ratio,.5*normalized.'*squeeze(envelope(component,:,:))*normalized);
+                    end
+                end
                 for j=1:size(signs,2)
                     change=zeros(8,1);change(active)=radii.*signs(:,j);
                     trial=q+change;trial(8)=min(1,max(-1,trial(8)));
@@ -111,7 +125,7 @@ classdef nonlinearBicycleModel
                     error('collisionAvoidanceController:trustRegionUnavailable', ...
                         'No local box passed the finite-displacement model probes.');
                 end
-                radii=radii*max(.1,min(.8,.8/sqrt(ratio)));
+                radii=minimum+(radii-minimum)*max(.1,min(.8,.8/sqrt(ratio)));
             end
             radius=[Inf;Inf;radii];
             info=struct('sampledErrorRatio',ratio,'probePasses',attempt);

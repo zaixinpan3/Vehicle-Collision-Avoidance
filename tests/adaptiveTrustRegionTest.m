@@ -75,6 +75,43 @@ classdef adaptiveTrustRegionTest < matlab.unittest.TestCase
             [lo,hi]=nonlinearBicycleModel.inputBounds(testCase.cfg);
             testCase.verifyEqual(lo,[-Inf;-1]);testCase.verifyEqual(hi,[Inf;1]);
         end
+        function aRequiredStateCorrectionSharesTheExistingErrorBudget(testCase)
+            x=[0;0;.1;15;.2;.05];u=[.03;.9999];
+            [next,a,b]=nonlinearBicycleModel.sample(x,u,testCase.cfg);
+            ordinary=nonlinearBicycleModel.trustRegion(x,u,testCase.cfg,next,a,b);
+            required=[0;0;0;0;.23;.13];
+            [radius,info]=nonlinearBicycleModel.trustRegion(x,u,testCase.cfg,next,a,b,required);
+            testCase.verifyGreaterThanOrEqual(radius(1:6),required);
+            testCase.verifyLessThanOrEqual(radius(7:8),ordinary(7:8));
+            testCase.verifyLessThanOrEqual(info.sampledErrorRatio,1);
+        end
+        function anInaccurateRequiredCorrectionCannotBypassTheErrorBudget(testCase)
+            x=[0;0;0;15;0;0];u=[0;0];
+            [next,a,b]=nonlinearBicycleModel.sample(x,u,testCase.cfg);
+            testCase.verifyError(@()nonlinearBicycleModel.trustRegion( ...
+                x,u,testCase.cfg,next,a,b,[0;0;1;0;0;0]), ...
+                'collisionAvoidanceController:trustRegionUnavailable');
+        end
+        function shiftedStateDefectsCanBeRepairedInsideTheNumericalDomain(testCase)
+            model=testCase.model;cfg=testCase.cfg;anchor=testCase.anchor;
+            anchor.inputs=repmat([0;.9999],1,size(anchor.inputs,2));
+            for k=1:size(anchor.inputs,2)
+                [~,anchor.states(:,k+1)]=terminalSafeSet.holdStates(anchor.states(:,k),anchor.inputs(:,k),cfg);
+            end
+            anchor.states(5:6,2)=anchor.states(5:6,2)+[-cfg.vehicle.lf*.2;.2];
+            p=solvePredictiveControl('probe',struct('operation','formulate', ...
+                'model',model,'anchor',anchor,'inherited',true));
+            testCase.verifyTrue(p.trustWarmStartAdjusted);
+            correction=reshape(p.rhs,6,[]);
+            for k=1:numel(p.stages)
+                correction(:,k+1)=correction(:,k+1)+p.stages(k).a*correction(:,k);
+            end
+            point=zeros(size(p.lower));point(p.stateIndices)=correction;
+            testCase.verifyEqual(p.equal*point,p.rhs,AbsTol=1e-10);
+            testCase.verifyGreaterThanOrEqual(point,p.lower-1e-10);
+            testCase.verifyLessThanOrEqual(point,p.upper+1e-10);
+            testCase.verifyLessThanOrEqual(p.trustSampledErrorRatio,1);
+        end
         function errorBudgetsMustBePositiveAndUseSixStateUnits(testCase)
             bad=struct('rti',struct('trustRegion',struct('errorBudget',zeros(6,1))));
             testCase.verifyError(@()collisionAvoidanceControllerConfig(bad), ...
