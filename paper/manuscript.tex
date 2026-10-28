@@ -111,7 +111,7 @@ Collision avoidance often requires the ego vehicle to perform complex
 maneuvers, such as braking while turning. Such maneuvers pose three
 closely related technical challenges \cite{TanWuLiLiuZhang2025}. First,
 the ego vehicle's longitudinal and lateral dynamics become strongly
-coupled: changes in speed alter tire slip angles and yaw response, yaw
+coupled. Changes in speed alter tire slip angles and yaw response, yaw
 motion couples longitudinal and lateral velocities, and braking and
 cornering forces share the limited tire--road friction
 \cite{BealBoyd2019,ParkGerdes2017}. Second, ego maneuvers complicate how
@@ -119,8 +119,8 @@ the motion of surrounding vehicles is described and estimated. Because
 onboard sensors measure target positions in a frame that translates and
 rotates with the ego vehicle, the observed relative trajectory depends
 on the ego vehicle's velocity, acceleration, and yaw rate even when the
-target moves at constant velocity \cite{AlaiSharmaAlexanderRajamani2024};
-ignoring this dependence can attribute apparent motion caused by the ego
+target moves at constant velocity \cite{AlaiSharmaAlexanderRajamani2024}.
+Ignoring this dependence can attribute apparent motion caused by the ego
 maneuver to the target. Third, establishing formal safety guarantees
 becomes much harder when coupled vehicle dynamics and estimation
 uncertainty act together, since the controller must respect tire and
@@ -128,7 +128,7 @@ actuator limits while keeping a collision-free continuation feasible as
 target estimates update online.
 
 When stopping distance is short, neither braking alone nor steering alone
-suffices across driving conditions: hard braking on a curve can cause
+suffices across driving conditions. Hard braking on a curve can cause
 large lateral deviations \cite{LaiYang2023}, whereas steering at high
 speed without longitudinal coordination risks saturating the lateral tire
 forces and losing stability \cite{HeLiuLvJiLiu2019}. To keep online
@@ -142,10 +142,10 @@ capture slip angles, yaw dynamics, and friction sharing directly,
 enabling nonlinear chassis controllers and model predictive control (MPC)
 schemes to coordinate steering and braking within the available adhesion
 \cite{GuoHuWang2016,ForsAnistratovOlofssonNielsen2021,GeZhaoMaGuo2022,AmmourOrjuelaBasset2022,ThompsonDallasGohBalachandran2024}.
-The main difficulty is computational: optimizing over nonlinear tire
-dynamics and nonconvex obstacle constraints in real time is demanding,
-and even full-scale limit-handling MPC implementations typically leave
-formal recursive-feasibility and safety guarantees open
+However, optimizing over nonlinear tire dynamics and nonconvex obstacle
+constraints in real time is computationally demanding, and even
+full-scale limit-handling MPC implementations typically leave formal
+recursive-feasibility and safety guarantees open
 \cite{ThompsonDallasGohBalachandran2024}.
 
 Planning an evasive maneuver also requires the surrounding vehicle's
@@ -215,11 +215,11 @@ Motivated by these challenges, this paper develops a joint NRMM-based
 state estimator and PCBF--CLF collision-avoidance controller built around
 a shared dynamic bicycle model with modified Fiala tires. Rather than
 treating estimation and control separately, the two modules share the
-tire model and operating domain: the observer supplies online error
-enclosures that remain valid during aggressive ego maneuvers, while the
-predictive controller tightens its collision constraints with those
-enclosures and coordinates steering and braking in real time.
-Specifically, the main contributions of this work are as follows:
+tire model and operating domain. The observer supplies online error
+enclosures that remain valid during aggressive ego maneuvers, and the
+predictive controller uses those enclosures to tighten its collision
+constraints while coordinating steering and braking in real time.
+Specifically, the main contributions of this work are as follows.
 \begin{enumerate}
 \item We reformulate the NRMM target observer of
 \cite{SharmaAlaiRajamani2026} in covariant coordinates so that measured
