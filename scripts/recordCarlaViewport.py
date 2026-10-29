@@ -3,6 +3,7 @@
 The screenshots are restricted to the explicitly supplied CARLA window ID.
 This bypasses camera-sensor readback; all scene pixels come from Unreal.
 """
+from carlaExperimentScene import prepare_two_vehicle_scene, assert_only_experiment_vehicles
 import argparse, json, math, subprocess, time
 from pathlib import Path
 import carla
@@ -18,6 +19,7 @@ def record(folder, port, window_id):
     chosen=next(w for w in windows if w['id']==window_id)
     assert 'carla' in (chosen.get('app_id','')+chosen.get('title','')).lower()
     old=world.get_settings();world.apply_settings(carla.WorldSettings(synchronous_mode=True,fixed_delta_seconds=.05,no_rendering_mode=False));world.set_weather(carla.WeatherParameters.ClearNoon)
+    prepare_two_vehicle_scene(world)
     font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',18);playlist=[]
     try:
         for name in ['straight','curve','intersection']:
@@ -29,6 +31,8 @@ def record(folder, port, window_id):
                         actor=world.try_spawn_actor(world.get_blueprint_library().find('vehicle.lincoln.mkz'),spawn)
                         if actor is not None:break
                     assert actor is not None;actor.set_simulate_physics(False);actors.append(actor)
+                world.tick()
+                assert_only_experiment_vehicles(world,actors)
                 ego,target=actors
                 for view in ['top','chase']:
                     path=folder/f'{name}_{view}_native.mp4';playlist.append(str(path))

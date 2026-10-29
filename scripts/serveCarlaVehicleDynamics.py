@@ -4,6 +4,7 @@ One JSON-line transaction per VDB controller sample. CARLA physics is disabled
 for the externally integrated ego. Target motion is explicitly scripted NRMM;
 this version does not claim a second 14DOF target vehicle.
 """
+from carlaExperimentScene import prepare_two_vehicle_scene, assert_only_experiment_vehicles
 import argparse, json, math, socket
 import carla
 import numpy as np
@@ -15,6 +16,7 @@ def run(port, bridge_port):
     world=client.get_world();assert 'Town10' in world.get_map().name
     original=world.get_settings();settings=carla.WorldSettings(synchronous_mode=True,fixed_delta_seconds=.05,no_rendering_mode=original.no_rendering_mode)
     world.apply_settings(settings);actors=[];records=[];initial=None
+    cleanup=prepare_two_vehicle_scene(world);print('CLEAN_SCENE',json.dumps(cleanup),flush=True)
     try:
         with socket.socket() as listener:
             listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);listener.bind(('127.0.0.1',bridge_port));listener.listen(1)
@@ -33,8 +35,11 @@ def run(port, bridge_port):
                                 if actor is not None:break
                             if actor is None:raise RuntimeError('No free vehicle spawn')
                             actors.append(actor);actor.set_simulate_physics(False)
-                        reply={'map':world.get_map().name,'ready':True}
+                        world.tick()
+                        assert_only_experiment_vehicles(world,actors)
+                        reply={'map':world.get_map().name,'ready':True,'sceneCleanup':cleanup,'vehicleCount':2}
                     elif operation=='step':
+                        assert_only_experiment_vehicles(world,actors)
                         t=request['time'];pose=np.array(request['pose']);ego,target=actors
                         flip=np.diag([1,1,-1]);expected=flip@Rotation.from_euler('xyz',pose[3:6]).as_matrix()@flip
                         choices=[]

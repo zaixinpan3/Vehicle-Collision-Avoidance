@@ -1,10 +1,12 @@
 """Render recorded VDB truth through CARLA top and attached chase cameras."""
+from carlaExperimentScene import prepare_two_vehicle_scene, assert_only_experiment_vehicles
 import carla,json,queue,subprocess,math,argparse
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy.spatial.transform import Rotation
 from pathlib import Path
 parser=argparse.ArgumentParser();parser.add_argument('--input',type=Path,required=True);parser.add_argument('--port',type=int,default=2200);parser.add_argument('--camera',choices=['rgb','semantic'],default='rgb');args=parser.parse_args();root=args.input;c=carla.Client('localhost',args.port);c.set_timeout(60);w=c.get_world();assert 'Town10' in w.get_map().name
+prepare_two_vehicle_scene(w)
 for name in ['straight','curve','intersection']:
  file=root/(name+'.json')
  if not file.exists():continue
@@ -22,6 +24,8 @@ for name in ['straight','curve','intersection']:
     if actor is not None:break
    if actor is None:raise RuntimeError('No free visualization actor spawn point')
    actors.append(actor);actor.set_simulate_physics(False)
+  w.tick()
+  assert_only_experiment_vehicles(w,actors)
   ego,target=actors
   queues=[]
   for view in ['top','chase']:
