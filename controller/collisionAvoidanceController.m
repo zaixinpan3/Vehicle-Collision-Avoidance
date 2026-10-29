@@ -198,6 +198,13 @@ function [command,predictedInput,prediction,controllerState] = ...
     metadata.commonPoseCancelled=uncertainty.relativeFrame;
     metadata.targetUncertaintyModel="constantParametersRestartedEachHoldFromCurrentObserverSet";
     metadata.egoUncertaintyModel="currentPosteriorEnclosurePropagatedThroughEachHold";
+    if isfield(model,'jointPredictionTube') && ~isempty(model.jointPredictionTube)
+        metadata.egoUncertaintyModel="jointPlantObserverFeedbackWithPersistentMismatch";
+        metadata.targetUncertaintyModel="constantParameterFamilyOverFullHorizon";
+        metadata.futureObserverDynamicsIncluded=true;
+        metadata.futurePrimitiveBudgetsAssumed=false;
+        metadata.jointTubeScope=model.jointPredictionTube.scope;
+    end
     metadata.robustNonlinearSafetyCertified=false;
     metadata.maximumCollisionTighteningMeters=solution.maximumCollisionTighteningMeters;
     metadata.clfDerivative=solution.clfDerivative;

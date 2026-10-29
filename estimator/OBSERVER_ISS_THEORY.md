@@ -1178,6 +1178,26 @@ The implementation of that simpler algorithm is validated on the longitudinal
 research specialization `scripts/verifyUnifiedObserverSafety.m`; this does not
 certify the production NRMM/Fiala controller.
 
+The optional `nrmmJointPrediction.m` extension now consumes a synchronized
+snapshot of the ego updater and propagates its future measurement-dependent
+point states together with the physical vehicle, persistent tire factors and
+held-input memory. Initial software-state uncertainty is zero; future
+software states differ through their sensor histories. Sensor noise and
+parameter effects are shared with the physical map rather than reintroduced
+as independent observer disturbances. Numerical ego updates agree with the
+runtime, including the resetting GNSS predictor. The target observer is not
+part of this ego-feedback extension; target uncertainty retains its physical
+constant-parameter family over the horizon.
+
+Its generator supports concern the joint affine map. They are not the
+deterministic nonlinear enclosures of `nrmmPositionErrorBound`: the existing
+ISS/set recursion continues to supply current-state enclosures independently.
+In particular, a point derivative cannot enclose all Fiala or low-speed
+measurement branches. The controller option `jointAffinePrediction` is
+explicitly experimental and disabled by default after nonlinear replay
+found affine undercoverage. See the implementation and missing remainder
+condition in `controller/CONTROLLER_THEORY.md`.
+
 <a id="implementation-map"></a>
 ## 13. Implementation map and existing validation
 
@@ -1194,6 +1214,7 @@ certify the production NRMM/Fiala controller.
 | Sampled comparison and numerical defects | `nrmmPositionErrorBound.m` |
 | Integration and published estimates | `onlineNrmmTrackingRuntime.m` |
 | Controller-facing state enclosures | `nrmmControllerErrorBounds.m` |
+| Experimental sampled joint ego/observer/feedback map | `nrmmJointPrediction.m` |
 
 Existing behavior tests in `tests/` cover model-aided interval containment,
 nominal inversion, contradictory measurements and shared configuration

@@ -71,6 +71,21 @@ classdef modifiedFialaTire
             force = brakingRatio*parameters.longitudinalForceScale;
         end
 
+        function gradient = parameterJacobian(slipAngle,brakingRatio,cfg)
+            % Derivatives with respect to fractional C_f,C_r,mu_f,mu_r at
+            % this physical parameter value. The saturated branch is included.
+            modifiedFialaTire.evaluate(slipAngle,brakingRatio,cfg);
+            parameters=modifiedFialaTire.parameters(cfg);
+            cornering=parameters.corneringStiffness;
+            scale=parameters.longitudinalForceScale*sqrt(1-brakingRatio^2);
+            tangent=tan(slipAngle);adhesion=scale>0 & abs(tangent)<3*scale./cornering;
+            stiffness=zeros(2,1);friction=-scale.*sign(slipAngle);
+            q=cornering(adhesion).*abs(tangent(adhesion))./(3*scale(adhesion));
+            stiffness(adhesion)=-cornering(adhesion).*tangent(adhesion).*(1-q).^2;
+            friction(adhesion)=-cornering(adhesion).*tangent(adhesion).*q.*(1-2*q/3);
+            gradient=[diag(stiffness),diag(friction)];
+        end
+
         function [force, slipSlope, ratioSlope, intercept] = evaluate(slipAngle, brakingRatio, cfg)
         %evaluate Force [N], dFy/dAlpha [N/rad], dFy/dBeta [N], intercept [N].
         % Use the symmetric |alpha| branch and Eq. (13), eta=sqrt(1-beta^2).

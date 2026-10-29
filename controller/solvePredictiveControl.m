@@ -688,7 +688,7 @@ function [problem,model]=localFormulate(anchor,model)
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=0;encounterEnded=isempty(model.target);exitRecord=NaN;
     fullCollisionRows=isfield(model,'durationProbe') && model.durationProbe && ~isempty(model.target);
-    % Per-hold affine uncertainty. The first hold uses the published current
+    % Legacy per-hold affine uncertainty. The first hold uses the published current
     % generator unchanged. Subsequent holds re-evaluate its GNSS/yaw geometry
     % at their own nominal velocity, retaining sensor and observer-residual
     % budgets. Publications without these factors retain the old generator.
@@ -702,8 +702,24 @@ function [problem,model]=localFormulate(anchor,model)
     physicalInputLower=repmat(inputLower,1,count);physicalInputUpper=repmat(inputUpper,1,count);
     maximumTightening=0;safetyNormals=zeros(2,2*count+1);
     [durations,times]=localTimeGrid(model,count);
+    jointTube=[];
+    if isfield(model,'jointPredictionTube'),model=rmfield(model,'jointPredictionTube');end
+    if cfg.controller.jointAffinePrediction && isfield(model.uncertainty,'jointPrediction')
+        jointTube=nrmmJointPrediction('propagate',anchor,cfg,initialGenerator, ...
+            model.uncertainty.jointPrediction,durations);
+        physicalInputLower=physicalInputLower+jointTube.inputRadius;
+        physicalInputUpper=physicalInputUpper-jointTube.inputRadius;
+        model.jointPredictionTube=jointTube;
+    elseif cfg.controller.jointAffinePrediction && model.uncertainty.specified
+        error('collisionAvoidanceController:missingJointPrediction', ...
+            'Joint prediction requires a synchronized observer snapshot, not only current error radii.');
+    end
     % Record time j*h/2 lies in hold ceil(j/2), which starts at (ceil(j/2)-1)*h.
     holdStarts=times(2*max(0,ceil((0:2*count)/2)-1)+1);
+    % A new future measurement changes the estimate, not the physical target
+    % family. Without a target-relative policy retain its entire elapsed-time
+    % spread instead of pretending each future observation resets that spread.
+    if ~isempty(jointTube),holdStarts=zeros(size(times));end
     model.recordTimes=times;
     targetTube=localTargetTube(model,times,holdStarts);
     model.targetTube=targetTube;
@@ -714,6 +730,16 @@ function [problem,model]=localFormulate(anchor,model)
     uncertaintyPrediction.stateDependentVelocityGeometry=isfield(model.uncertainty,'velocityGeometry');
     uncertaintyPrediction.futureObserverDynamicsIncluded=false;
     uncertaintyPrediction.futurePrimitiveBudgetsAssumed=true;
+    if ~isempty(jointTube)
+        uncertaintyPrediction.futureObserverDynamicsIncluded=true;
+        uncertaintyPrediction.futurePrimitiveBudgetsAssumed=false;
+        uncertaintyPrediction.nonlinearCertificate=false;
+        uncertaintyPrediction.observerErrorRadius=jointTube.observerErrorRadius;
+        uncertaintyPrediction.observerErrorTime=jointTube.observerErrorTime;
+        uncertaintyPrediction.inputRadius=jointTube.inputRadius;
+        uncertaintyPrediction.mixedStopBranches=jointTube.mixedStopBranches;
+        uncertaintyPrediction.lowSpeedMeasurementBranches=jointTube.lowSpeedMeasurementBranches;
+    end
     % The target forecast at every node and midpoint (record times), and
     % the lane projection of the ego corners at every node and midpoint,
     % each in one call.
@@ -749,6 +775,10 @@ function [problem,model]=localFormulate(anchor,model)
         if index>1,holdGenerator=predictiveSafetyGeometry.egoErrorGenerator(x,model.uncertainty);end
         middleGenerator=am*holdGenerator;nextGenerator=stage.a*holdGenerator;
         middleCenter=model.initialState;if index>1,middleCenter=x;end
+        if ~isempty(jointTube)
+            middleGenerator=jointTube.generator{2*index};nextGenerator=jointTube.generator{2*index+1};
+            middleCenter=model.initialState;
+        end
         middleCollisionGenerator=localRelativeGenerator(middle,middleGenerator,model,middleCenter);
         uncertaintyPrediction.egoStateRadius(:,2*index-1:2*index)=[sum(abs(generator),2),sum(abs(middleGenerator),2)];
         uncertaintyPrediction.collisionStateRadius(:,2*index-1:2*index)=[sum(abs(collisionGenerator),2),sum(abs(middleCollisionGenerator),2)];
@@ -758,8 +788,13 @@ function [problem,model]=localFormulate(anchor,model)
             previous=model.previousInput;rateRows=eye(2);rateColumns=iu(:,index);
             if index>1,previous=anchor.inputs(:,index-1);rateRows=[eye(2),-eye(2)];rateColumns=[iu(:,index);iu(:,index-1)];end
             difference=input-previous;
+            reserve=zeros(2,1);
+            if ~isempty(jointTube)
+                reserve=jointTube.inputRadius(:,index);
+                if index>1,reserve=reserve+jointTube.inputRadius(:,index-1);end
+            end
             blockCount=blockCount+1;blockRows{blockCount}=[rateRows(finite,:);-rateRows(finite,:)];blockColumns{blockCount}=rateColumns;
-            blockBounds{blockCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
+            blockBounds{blockCount}=[rate(finite)-difference(finite)-reserve(finite);rate(finite)+difference(finite)-reserve(finite)];
         end
         nodeColumns=ix(:,index);
         % The current measured node is fixed; every later node stays on the road.
@@ -820,10 +855,13 @@ function [problem,model]=localFormulate(anchor,model)
         blockCount=blockCount+1;blockRows{blockCount}=[middleMap(4:6,:);-middleMap(4:6,:)];blockColumns{blockCount}=middleColumns;
         blockBounds{blockCount}=[physicalUpper-middle(4:6)-middleRadius;middle(4:6)-physicalLower-middleLowerRadius];
         [r,bound]=localFrontDomain(x,input,cfg,generator);
+        if ~isempty(jointTube),bound=bound-jointTube.inputRadius(1,index);end
         blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=[nodeColumns;iu(:,index)];blockBounds{blockCount}=bound;
         [r,bound]=localFrontDomain(nextReference,input,cfg,nextGenerator);
+        if ~isempty(jointTube),bound=bound-jointTube.inputRadius(1,index);end
         blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=[ix(:,index+1);iu(:,index)];blockBounds{blockCount}=bound;
         [r,bound]=localFrontDomain(middle,input,cfg,middleGenerator);
+        if ~isempty(jointTube),bound=bound-jointTube.inputRadius(1,index);end
         mapped=r(:,1:6)*middleMap;mapped(:,7:8)=mapped(:,7:8)+r(:,7:8);
         blockCount=blockCount+1;blockRows{blockCount}=mapped;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=bound;
         jx=ix(:,index+1);

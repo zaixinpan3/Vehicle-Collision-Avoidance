@@ -247,6 +247,9 @@ classdef predictiveSafetyGeometry
             if isfield(ego,'velocityErrorGeometry') && ~isempty(ego.velocityErrorGeometry)
                 uncertainty.velocityGeometry=ego.velocityErrorGeometry;
             end
+            if isfield(ego,'jointPrediction') && ~isempty(ego.jointPrediction)
+                uncertainty.jointPrediction=ego.jointPrediction;
+            end
             if isempty(observation),return;end
             set=observation.predictionErrorSet;
             if isempty(set),return;end

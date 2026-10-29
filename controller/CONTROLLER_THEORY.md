@@ -2343,7 +2343,109 @@ reference-point deviation bound, if explicitly supplied to its context, is
 an additional declared terminal condition; the default experiment threshold
 must not be inferred to supply it.
 
-### Proposed implementation of the conditional design
+### Joint prediction implementation and remaining certificate requirements
+
+`estimator/nrmmJointPrediction.m` now implements a sampled joint ego map.
+The synchronized runtime publication carries its numerical ego point state,
+observer design, integration clock, actual current measurement, sensor radii,
+and the declared tire-parameter box. The current numerical observer state is
+known, so its initial generator rows are zero. Physical state error starts
+from the published correlated generator. The augmented state is
+
+$$
+\chi=[x_E\in\mathbb R^6;\ \hat p_E,\hat\psi_E,\hat v_E\in\mathbb R^5;
+\ \theta\in\mathbb R^4;\ u_{\rm previous}\in\mathbb R^2].
+$$
+
+The four tire factors change front/rear cornering stiffness and friction.
+In this prediction contract they are constant along a horizon. That is an
+explicit physical assumption, not a consequence of an observer's current
+parameter interval. Time-varying friction or other plant defects require an
+additional, justified evolution contract. The same factors generate vehicle
+motion and IMU signals; the observer retains its nominal parameters. No
+independent copy of their effect is subsequently added as observer mismatch.
+
+Each future input uses a finite-horizon ancillary gain on the numerical ego
+estimate and measured gyro. Its first command is common to every physical
+branch. Later commands use only information available at that control
+boundary. The boundary IMU sample corresponds to the previous held input;
+the newly selected command drives subsequent physical integration. Gyro
+noise used by both feedback and the observer has one shared column. The
+GNSS predictor resets and the actual ego observer RK4 update run on the
+sensor clock (four samples per default control hold). The physical map also
+resolves that clock. Its nominal integration difference from the RTI anchor
+is retained as a deterministic offset, not discarded.
+
+Analytic state/input and tire-parameter tangents are composed through the
+plant RK4 map. The course/force-balance measurement reconstruction is
+numerically differentiated; the remaining observer tangents are composed
+analytically. The affine recursion preserves signed generator columns:
+
+$$
+G_{k+1}=[D_\chi\Phi_k G_k,\ D_v\Phi_k\operatorname{diag}(\epsilon_k)].
+$$
+
+The parameter rows have identity dynamics and receive no new parameter
+columns. Initial pose columns retain their identity for relative collision
+supports. Physical error, estimation error and future-input supports are
+projections of this same object. Braking feedback is scaled to available
+actuator authority before propagation. Steering feedback is similarly
+restricted to the existing bicycle chart. This changes the declared
+ancillary policy; it does not clip the propagated error tube or add a new
+tire-capacity constraint. Input, slew and front-slip rows reserve its affine
+input support. The controller still executes its optimized first input.
+
+A nominal stop does not establish a uniform stop. When the affine pre-reset
+set straddles the stop guard, its moving and stopped images are enclosed
+together. Velocity generator rows are erased only when the whole affine
+set satisfies the guard. This encloses the reset image of that affine set;
+it does not certify the preceding nonlinear flow. Low-speed measurement
+branches are recorded separately, because an uninformative nominal course
+does not establish the same branch for all possible measurements.
+
+This extension uses the existing full elapsed-time constant-parameter
+target family. It does not reset that physical family at imagined future
+observations. The ancillary policy currently uses ego observations; future
+target-observer states and a target-relative feedback policy have not been
+lifted into it.
+
+The implementation is available to the RTI formulation through the explicit
+research option `controller.jointAffinePrediction=true`. It requires a
+synchronized observer snapshot and an even number of sensor samples per
+control hold. The default remains false. This is deliberate: nonlinear
+replay exposed a first-hold lateral-velocity error outside the affine tube
+in the kinematic-course configuration, even though the two-second
+force-balance probes were contained. A five-second braking-to-rest probe
+also exposed heading-error undercoverage near the low-speed measurement
+transition. A point Jacobian is not a nonlinear outer image.
+The module therefore publishes `nonlinearCertificate=false`; it must not be
+used as evidence that the full robust safety or recursive-feasibility theorem
+has been implemented. Nor does a successful replay establish such a theorem.
+
+The missing mathematical object is a sound remainder set on each propagated
+domain, including uncertain measurement branches:
+
+$$
+\Phi_k(\bar\chi_k+e,v)-\Phi_k(\bar\chi_k,0)
+-D_\chi\Phi_k e-D_v\Phi_k v\ \in\ \mathcal R_k
+\quad\text{for every admitted }(e,v).
+$$
+
+Adding this set to the recursion is justified only after bounding it over
+the entire incoming set. Fiala saturation, low-speed blending, numerical
+course inversion and informative/uninformative heading updates all belong
+to that task. Sample maxima, an arbitrary padding factor, or the RTI trust
+budget do not supply this bound. The declared four-parameter Fiala family
+also does not bound all residuals of a Vehicle Dynamics Blockset plant.
+Terminal-set images and retention of the shifted policy/set witness remain
+the separate requirements below.
+
+`tests/nrmmJointPredictionTest.m` checks runtime/update agreement, causality,
+shared persistent parameters, parameter tangents and mixed stop branches.
+`scripts/verifyJointPredictionTube.m` compares affine supports with nonlinear
+histories, reports the coordinate/time of any undercoverage, and returns
+results without creating a report. These are numerical research checks,
+separate from the current-state observer enclosure certificate.
 
 The core in Section 7 first needs a retained physical posterior, sound
 whole-hold nonlinear images, signed geometry margins and a common uncertain
@@ -2352,14 +2454,17 @@ The executable longitudinal reference validates this algorithm on its stated
 model; transferring it to Fiala dynamics requires those vehicle-specific
 images and certificates.
 
-For the optional prediction of observation-dependent feedback, a
+For a certified prediction of observation-dependent feedback, the
 joint-prediction integration packet needs known observer software state,
 gain/model version, sufficient predictor and bound memory, measurement timing
 and availability, primitive noise bounds, persistent parameter contract and
 joint root generators. The default 50 ms control hold includes four 12.5 ms
 sensor updates. Preserve their actual order, shared gyro feedthrough,
 force-balance reconstruction, angle conventions and stop branches.
-A current six-state radius alone cannot reconstruct that updater.
+A current six-state radius alone cannot reconstruct that updater. The
+implemented ego projection does not require the target core or bound memory
+because neither drives that projection or its selected ancillary policy.
+Lifting a target-relative policy would require their relevant memory too.
 
 Offline scheduled gains and validated nonlinear map/remainder bounds can
 support bounded generator or directional-support propagation online. Observer
@@ -2459,7 +2564,7 @@ baseline and minimum recovery time.
 | Required mathematical ingredient | Current implementation boundary |
 | --- | --- |
 | Sound current physical enclosures | Finite published enclosures are used when available; experimental execution may proceed without a supported finite certificate. |
-| Sound physical horizon images; joint images for future feedback | Future holds schedule the published velocity geometry while retaining current primitive budgets; full nonlinear remainders and future observer histories are not certified. |
+| Sound physical horizon images; joint images for future feedback | The default schedules current primitive budgets. An explicit joint-affine experiment propagates the actual ego observer, future feedback, sensor history and persistent tire factors; its nonlinear remainder is not certified and replay has exposed undercoverage. |
 | Cross-sample posterior inclusion | The production RTI does not implement retained posterior intersections or input/policy and set witnesses; the longitudinal research specialization does. |
 | Common robust terminal family | Center-based target geometry and ego padding under the mild terminal model; no full nonlinear parameter-family membership certificate. |
 | Exact nonlinear CLF dissipation | Current continuous derivative, locally affine in the first input, with soft slack and a fixed reference penalty. |

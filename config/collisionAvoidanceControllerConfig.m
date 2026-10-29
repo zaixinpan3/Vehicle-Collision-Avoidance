@@ -26,7 +26,10 @@ function cfg=localDefaults()
     % stays fixed throughout that encounter.
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
-        'enforceRoadBoundaries',false);
+        'enforceRoadBoundaries',false,'jointAffinePrediction',false);
+    % Experimental joint observer/feedback supports. Nonlinear replay has
+    % exposed undercoverage without remainder enclosures; do not silently
+    % promote this affine approximation to the default uncertainty model.
     cfg.nonlinear=struct('integrationStep',.05);
     % Plan once on target acquisition; later frames shift the state/input iterate.
     % Initial preview starts from horizonSteps and the current stopping time.
@@ -174,6 +177,7 @@ function localValidate(cfg)
         localInvalid('horizonSteps cannot exceed maximumHorizonSteps.');
     end
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.controller.jointAffinePrediction,{'logical'},{'scalar'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.rti.nominalTrackingWeight,{'double'},{'scalar','real','finite','nonnegative'});

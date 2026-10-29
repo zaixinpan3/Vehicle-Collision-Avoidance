@@ -616,6 +616,9 @@ function output = localOutput(runtime, observerInput)
     end
     output = nrmmControllerErrorBounds("publish",output, runtime.positionErrorBound, ...
         observerInput, design);
+    if output.controllerErrorBound.available && abs(runtime.currentTime-observerInput.time)<1e-9
+        output.controllerErrorBound.jointPrediction=nrmmJointPrediction('contract',runtime,observerInput);
+    end
 end
 
 function estimate = localTargetEstimate(runtime, observerInput)

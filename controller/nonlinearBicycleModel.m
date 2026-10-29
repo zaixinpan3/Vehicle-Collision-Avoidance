@@ -231,6 +231,29 @@ classdef nonlinearBicycleModel
             end
         end
 
+        function gradient = parameterJacobian(x,u,cfg)
+            % Fractional tire-parameter tangent of the SAME blended plant.
+            % Order: C_f,C_r,mu_f,mu_r. No additional tire constraint is used.
+            weight=localBlend(x(4),cfg);gradient=zeros(6,4);
+            scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+            longitudinal=[zeros(2),diag(u(2)*scale)];
+            c=cos(u(1));s=sin(u(1));body=zeros(3,4);
+            if weight>0
+                slip=atan2([x(5)+cfg.vehicle.lf*x(6);x(5)-cfg.vehicle.lr*x(6)],x(4))-[u(1);0];
+                lateral=modifiedFialaTire.parameterJacobian(slip,u(2),cfg);
+                frontX=c*longitudinal(1,:)-s*lateral(1,:);
+                frontY=s*longitudinal(1,:)+c*lateral(1,:);
+                body=weight*[(frontX+longitudinal(2,:))/cfg.vehicle.m; ...
+                    (frontY+lateral(2,:))/cfg.vehicle.m; ...
+                    (cfg.vehicle.lf*frontY-cfg.vehicle.lr*lateral(2,:))/cfg.vehicle.Iz];
+            end
+            if weight<1
+                gain=max(u(2),0)+min(u(2),0)*tanh(x(4)/cfg.model.brakeHoldSpeed);
+                body(1,3:4)=body(1,3:4)+(1-weight)*gain*[c*scale(1),scale(2)]/cfg.vehicle.m;
+            end
+            gradient(4:6,:)=body;
+        end
+
         function [force, slope, components] = roadLoad(speed, cfg)
         %nonlinearBicycleModel.roadLoad Signed passive road load and its speed derivative.
         % Flat road, still air, and a quasi-static equivalent rolling force are
