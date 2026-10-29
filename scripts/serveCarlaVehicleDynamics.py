@@ -14,7 +14,9 @@ from scipy.spatial.transform import Rotation
 def run(port, bridge_port):
     client=carla.Client('localhost',port);client.set_timeout(60)
     world=client.get_world();assert 'Town10' in world.get_map().name
-    original=world.get_settings();settings=carla.WorldSettings(synchronous_mode=True,fixed_delta_seconds=.05,no_rendering_mode=original.no_rendering_mode)
+    # The physics/observer campaign needs no GPU rendering. Native replay is
+    # a separate, explicitly requested operation after simulation.
+    original=world.get_settings();settings=carla.WorldSettings(synchronous_mode=True,fixed_delta_seconds=.05,no_rendering_mode=True)
     world.apply_settings(settings);actors=[];records=[];initial=None
     cleanup=prepare_two_vehicle_scene(world);print('CLEAN_SCENE',json.dumps(cleanup),flush=True)
     try:

@@ -171,9 +171,23 @@ $$
 For $A_C<0$, integrate only until $V_C=0$, then retain the stopped pose.
 The published acceleration state becomes zero at rest. Do not extrapolate
 negative speed or intersect this reset state as if it were an unchanged latent
-pre-stop parameter. Each actual observation refreshes the forecast center and
-parameters. The conditional theory instead retains every admitted parameter
-history consistently through propagation and posterior conditioning.
+pre-stop parameter. With available observer enclosures, the executable update
+intersects the acceleration and curvature intervals with the preceding family
+and propagates/intersects the speed interval. Possible stops propagate the
+acceleration interval through the declared reset to zero before intersection.
+An empty intersection reports an inconsistent target-model/observer contract;
+it is not silently replaced by a new family.
+
+The nominal is the closest continuation of the preceding nominal in the
+current position ball, course interval, and motion-parameter intervals. A
+point-estimate fluctuation inside those sets need not change the nominal
+motion. Position and course radii are increased by the center displacement;
+speed, acceleration, curvature and sideslip radii are recomputed from the
+retained intervals. Raw observation and selected nominal remain separately
+available in `model.targetPredictionUpdate`. Without a valid current set the
+observed point is used and the set memory is cleared. This preserves a
+current outer enclosure and constant-parameter interval consistency; it does
+not implement the complete set-valued horizon shift of the conditional theory.
 
 An encounter ends at its first exit from the perception disk, default radius
 50 m. A complete current empty scan or an observed target outside the disk
@@ -2245,6 +2259,15 @@ enclosure assumptions, nonlinear uncertainty remainders and terminal modeling
 remain the implementation boundaries stated below. A numerical diagnostic
 must not be relabeled a robust nonlinear recursive-safety certificate.
 
+When the declared rest-reset branch fixes the next longitudinal speed to zero
+and the mesh midpoint is half the start speed, its lower speed bound already
+follows from the forward-motion domain. The corresponding midpoint row keeps
+the nominal nonnegativity condition without subtracting a symmetric speed
+radius. This is an intersection with the known nonnegative reachable domain;
+the published radius and all other tightened rows are retained. It does not
+resolve the separate low-speed sideslip tightening caused by reusing a
+current observer enclosure at future hold starts.
+
 Missing tail holds from a terminal seed endpoint first try the stored
 cruise-feedback hold, then the bounded cruise-to-braking seed search.
 These initialization holds are distinct from the terminal law and are never
@@ -2254,21 +2277,28 @@ longitudinal command.
 
 ### Perceived boundaries and the independent deviation audit
 
-An oriented boundary chain has drivable space on its left. Only endpoints
+An oriented boundary chain has drivable space locally on its left. Only endpoints
 marked as perception range cuts extend as tangent rays; an explicit empty
 scan supplies no walls. The current scan is frozen throughout a prediction.
-For a local signed inward distance $d$, normal $n$, Hessian $H_d$, footprint
-support $s_B$ and wall rate $\lambda_w$, virtual acceleration guidance uses
+The field queries the nearest boundary across all observed chains at the ego
+center and its four footprint vertices. Equal-distance ties are retained.
+Individual chain interiors are not intersected: a boundary on a different
+carriageway must not declare the current carriageway outside the road. For a
+local signed inward distance $d$, normal $n$, Hessian $H_d$ and wall rate
+$\lambda_w$, virtual acceleration guidance uses
 
 $$
 n^\top a\ge-v^\top H_dv-2\lambda_wn^\top v
--\lambda_w^2(d-s_B).
+-\lambda_w^2d.
 $$
 
-This follows by applying a second-order comparison condition to $d-s_B$
-with locally fixed support. A 2D halfplane projection modifies the preferred
+This uses the translational second-order comparison condition at the queried
+footprint points, with their offsets frozen locally. A 2D halfplane projection modifies the preferred
 acceleration, with a finite least-violation result if the local inequalities
-are incompatible. Changing yaw support is not differentiated by this heuristic.
+are incompatible. Only individual-wall projections can enter that fallback;
+an infeasible intersection of nearly parallel walls cannot supply an
+arbitrarily large fallback acceleration. Footprint rotation and nonsmooth
+nearest-feature changes are not certified by this heuristic.
 Without a scan, virtual walls at $e_y=\pm W$, default $W=9$ m, bound the
 transverse acceleration around the route-curvature term. `Inf` disables that
 fallback. Boundary guidance does not certify arbitrary nonconvex-road

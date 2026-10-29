@@ -86,24 +86,41 @@ classdef predictiveSafetyGeometry
         end
 
         function [acceleration,active,info] = roadBoundaryGuidance(x,preferred,model)
-            % Frozen visible chains, oriented with drivable space on their
-            % left. Only range-cut ends continue as tangent rays. No map
-            % query, path-offset wall, or perception-circle cap is added.
+            % Local signed distance to the observed road boundary UNION.
+            % A chain's left side is only a local orientation, not a global
+            % halfspace containing every drivable component. Query the
+            % nearest boundary at the footprint points instead of requiring
+            % membership on the left of every chain (separate carriageways
+            % and islands otherwise impose contradictory conditions).
+            % Range-cut ends retain their tangent continuation. No unobserved
+            % map geometry or hard controller road constraint is introduced.
             acceleration=preferred;active=false;
             info=struct('normal',zeros(0,2),'lower',zeros(0,1),'distance',zeros(0,1), ...
                 'compatible',true,'maximumDeficit',0);
             if ~isfield(model.road,'boundaryObservation'),return;end
-            chains=model.road.boundaryObservation.chains;rows=zeros(numel(chains),2);lower=zeros(numel(chains),1);
-            distances=zeros(numel(chains),1);count=0;
+            chains=model.road.boundaryObservation.chains;
+            if isempty(chains),return;end
+            rows=zeros(5*numel(chains),2);lower=zeros(size(rows,1),1);
+            distances=zeros(size(lower));count=0;
             rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];velocity=rotation*x(4:5);
             cfg=model.cfg;shape=cfg.vehicle.rectangleOffset+[cfg.vehicle.length/2;cfg.vehicle.width/2].*[1,1,-1,-1;1,-1,1,-1];
             vertices=rotation*shape;rate=cfg.planner.wallRate;
-            for j=1:numel(chains)
-                [distance,normal,hessian]=localBoundaryDistance(x(1:2),chains(j));
-                support=max(-normal.'*vertices);
-                count=count+1;rows(count,:)=normal.';distances(count)=distance-support;
-                lower(count)=-velocity.'*hessian*velocity-2*rate*(normal.'*velocity)-rate^2*distances(count);
+            queries=x(1:2)+[zeros(2,1),vertices];
+            for point=1:size(queries,2)
+                values=zeros(numel(chains),1);normals=zeros(2,numel(chains));hessians=zeros(2,2,numel(chains));
+                for j=1:numel(chains)
+                    [values(j),normals(:,j),hessians(:,:,j)]=localBoundaryDistance(queries(:,point),chains(j));
+                end
+                nearest=min(abs(values));
+                % Retain all ties at medial axes; no arbitrary side choice.
+                selected=find(abs(values)<=nearest+1e-9*max(1,nearest));
+                for j=selected.'
+                    normal=normals(:,j);hessian=hessians(:,:,j);
+                    count=count+1;rows(count,:)=normal.';distances(count)=values(j);
+                    lower(count)=-velocity.'*hessian*velocity-2*rate*(normal.'*velocity)-rate^2*values(j);
+                end
             end
+            rows=rows(1:count,:);lower=lower(1:count);distances=distances(1:count);
             [acceleration,compatible]=localAccelerationProjection(preferred,rows,lower);
             active=norm(acceleration-preferred)>1e-10;
             info.normal=rows;info.lower=lower;info.distance=distances;
@@ -274,8 +291,75 @@ classdef predictiveSafetyGeometry
                 'accelerationRadius',max(abs(set.accelerationInterval-q(5))), ...
                 'curvatureRadius',max(abs(set.curvatureInterval-curvature)), ...
                 'sideslipRadius',max(abs(asin(set.curvatureInterval*q(7))-q(6))));
+            uncertainty.predictionSet=set;
             uncertainty.collisionGenerator(1:3,:)=0;
             uncertainty.relativeFrame=true;uncertainty.specified=true;
+        end
+
+        function [q,uncertainty,memory,info] = reconcileTarget(q,prior,uncertainty,memory,time)
+            % The observer point and a nominal predictor need not coincide.
+            % Intersect the declared constant-A/constant-curvature intervals
+            % across samples. Propagate the speed interval with that family.
+            % Select the closest continuation of the previous nominal inside
+            % the current enclosure, then recenter EVERY affected radius.
+            % There is no smoothing gain, rate cap, or hidden reduction of
+            % the observer's uncertainty. This is a box/ball outer enclosure,
+            % not a nonlinear cross-horizon recursive-safety certificate.
+            info=struct('available',false,'reason',"observerSetUnavailable", ...
+                'observed',q,'nominal',q,'parameterIntersection',false);
+            if isempty(q) || ~isfield(uncertainty,'predictionSet')
+                memory=[];return;
+            end
+            set=uncertainty.predictionSet;
+            acceleration=set.accelerationInterval;curvature=set.curvatureInterval;speed=set.speedInterval;
+            reused=~isempty(memory) && ~isempty(prior);
+            if reused
+                elapsed=time-memory.time;
+                assert(elapsed>=0,'collisionAvoidanceController:invalidTargetPredictionTime', ...
+                    'A target enclosure cannot be propagated backward.');
+                propagatedAcceleration=memory.accelerationInterval;
+                mayStop=memory.speedInterval(1)+elapsed*propagatedAcceleration(1)<=0 ...
+                    && propagatedAcceleration(1)<=0;
+                allStop=memory.speedInterval(2)+elapsed*propagatedAcceleration(2)<=0 ...
+                    && propagatedAcceleration(2)<=0;
+                if allStop
+                    propagatedAcceleration(:)=0;
+                elseif mayStop
+                    % predictTarget resets A to zero on the stopped branch.
+                    % Retain both branches in the interval hull when only
+                    % some members have stopped; this does not invent a
+                    % change of the moving target's constant acceleration.
+                    propagatedAcceleration(2)=max(0,propagatedAcceleration(2));
+                end
+                acceleration=localIntervalIntersection(acceleration,propagatedAcceleration);
+                curvature=localIntervalIntersection(curvature,memory.curvatureInterval);
+                startAcceleration=acceleration;
+                if mayStop,startAcceleration=memory.accelerationInterval;end
+                propagated=max(0,memory.speedInterval+elapsed*startAcceleration);
+                speed=localIntervalIntersection(speed,propagated);
+            end
+            observed=q;preferred=q;if ~isempty(prior),preferred=prior;end
+            q(4)=min(speed(2),max(speed(1),preferred(4)));
+            q(5)=min(acceleration(2),max(acceleration(1),preferred(5)));
+            kappa=min(curvature(2),max(curvature(1),sin(preferred(6))/preferred(7)));
+            q(6)=asin(kappa*q(7));
+            course=observed(3)+observed(6);
+            change=atan2(sin(preferred(3)+preferred(6)-course),cos(preferred(3)+preferred(6)-course));
+            change=min(set.courseRadius,max(-set.courseRadius,change));
+            q(3)=course+change-q(6);
+            offset=preferred(1:2)-observed(1:2);distance=norm(offset);
+            if distance>set.positionRadius,offset=offset*(set.positionRadius/distance);end
+            q(1:2)=observed(1:2)+offset;
+            uncertainty.target=struct('positionRadius',set.positionRadius+norm(offset), ...
+                'courseRadius',min(pi,set.courseRadius+abs(change)), ...
+                'speedRadius',max(abs(speed-q(4))), ...
+                'accelerationRadius',max(abs(acceleration-q(5))), ...
+                'curvatureRadius',max(abs(curvature-kappa)), ...
+                'sideslipRadius',max(abs(asin(curvature*q(7))-q(6))));
+            memory=struct('time',time,'speedInterval',speed, ...
+                'accelerationInterval',acceleration,'curvatureInterval',curvature);
+            info.available=true;info.reason="observerEnclosureContinuation";
+            info.nominal=q;info.parameterIntersection=reused;
         end
 
         function tube = targetErrorTube(q,errorSet,time)
@@ -682,6 +766,15 @@ function support=localMovingSupport(shape,yaw,yawRadius,normal)
     support=max(nominal,max(values,[],2));
 end
 
+function interval=localIntervalIntersection(first,second)
+    interval=[max(first(1),second(1));min(first(2),second(2))];
+    tolerance=64*eps(max(1,max(abs([first(:);second(:)]))));
+    assert(interval(1)<=interval(2)+tolerance, ...
+        'collisionAvoidanceController:inconsistentTargetPredictionSet', ...
+        'Successive observer enclosures contradict the constant-parameter target model.');
+    if interval(1)>interval(2),interval(:)=mean(interval);end
+end
+
 function [distance,normal,hessian]=localBoundaryDistance(position,chain)
     points=chain.points;starts=points(1:end-1,:);segments=diff(points);lengths=vecnorm(segments,2,2);
     tangent=segments./lengths;projection=sum((position.'-starts).*tangent,2);
@@ -723,16 +816,19 @@ function [best,compatible]=localAccelerationProjection(preferred,normal,lower)
     count=size(normal,1);
     for i=1:count
         candidate=preferred+(lower(i)-normal(i,:)*preferred)*normal(i,:).';
-        consider(candidate);
+        consider(candidate,true);
         for j=i+1:count
             pair=normal([i,j],:);
-            if abs(det(pair))>1e-6,consider(pair\lower([i,j]));end
+            if abs(det(pair))>1e-6,consider(pair\lower([i,j]),false);end
         end
     end
     compatible=isfinite(bestCost);if ~compatible,best=least;end
-    function consider(candidate)
+    function consider(candidate,individual)
         deficit=max([0;lower-normal*candidate]);cost=sum((candidate-preferred).^2);
-        if deficit<leastDeficit,leastDeficit=deficit;least=candidate;end
+        % An intersection of nearly parallel incompatible lines can be
+        % arbitrarily far away. Such a pair is useful only when it actually
+        % satisfies ALL rows; it cannot become an infeasible fallback.
+        if individual && deficit<leastDeficit,leastDeficit=deficit;least=candidate;end
         if deficit<=1e-8 && cost<bestCost,best=candidate;bestCost=cost;end
     end
 end

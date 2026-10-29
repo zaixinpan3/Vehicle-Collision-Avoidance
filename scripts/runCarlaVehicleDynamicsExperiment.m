@@ -1,8 +1,9 @@
 function runCarlaVehicleDynamicsExperiment(outputFolder,mapFile)
 %runCarlaVehicleDynamicsExperiment Run NRMM/PCBF against the installed VDB plant.
 % Map input comes from exportCarlaVehicleDynamicsMap.py. MathWorks template assets
-% and generated models stay in outputFolder. CARLA renders the resulting plant
-% poses synchronously through serveCarlaVehicleDynamics.py on localhost:2605.
+% and generated models stay in outputFolder. CARLA receives the resulting plant
+% poses synchronously through serveCarlaVehicleDynamics.py on localhost:2605,
+% with rendering disabled. Visualization is a separate replay operation.
 % The ego uses VDB dynamics; the target currently follows scripted NRMM motion.
 % Current nominal-reference interfaces support straight lines and circles;
 % curved CARLA routes use a declared local constant-curvature approximation.

@@ -6,8 +6,9 @@ function [command,predictedInput,prediction,controllerState] = ...
 % is cleared. Its remaining states and inputs are shifted and one tail hold
 % is appended. The first reference state is updated from the current estimate;
 % dynamics defects are handled in the local SQP equations.
-% Every current target estimate updates the prediction; its A and beta are
-% held constant within this frame, independently of proof-metadata availability.
+% A certified current target enclosure updates the constant-parameter family.
+% Its nominal is the closest admissible continuation, with all uncertainty
+% radii recentered. Without an available enclosure the observed point is used.
 % Passing [] as previousState starts a new problem and a new target epoch.
 % The target epoch is the latest target estimate and the sample index at
 % which it was taken (targetEpochIndex); the forecast runs forward from it,
@@ -89,9 +90,14 @@ function [command,predictedInput,prediction,controllerState] = ...
     % inheriting a cruise seed built while no target was present.
     targetOnset=~isempty(observed) && (~isstruct(previousState) || isempty(previousState.targetEpoch));
     if targetOnset && isstruct(previousState),encounterId=encounterId+1;end
+    targetPredictionMemory=[];
+    if ~targetOnset && isstruct(previousState) && isfield(previousState,'targetPredictionMemory')
+        targetPredictionMemory=previousState.targetPredictionMemory;
+    end
+    [observed,uncertainty,targetPredictionMemory,targetPredictionUpdate]= ...
+        predictiveSafetyGeometry.reconcileTarget(observed,q,uncertainty,targetPredictionMemory,ego.stateTime);
     if ~isempty(observed)
-        % Reanchor the prediction at the current estimate without resetting
-        % the ego input warm start. Cross-frame constancy is not required.
+        % Reanchor the consistent nominal; keep the ego input warm start.
         targetEpoch=observed;targetEpochIndex=index;
         q=observed;
     end
@@ -109,6 +115,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         'targetEpochIndex',targetEpochIndex,'targetOnset',targetOnset,'sampleIndex',index,'epochTime',epochTime,'lane',lane,'road',road,'frame',frame, ...
         'nominalReference',nominalReference,'stateTime',ego.stateTime, ...
         'uncertainty',uncertainty);
+    model.targetPredictionUpdate=targetPredictionUpdate;
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
     if isempty(solution)
         error('collisionAvoidanceController:noOptimizationSolution', ...
@@ -223,7 +230,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         'stageSlacks',solution.stageSlacks,'safetyBudget',solution.safety, ...
         'collisionEscapeNormals',solution.collisionEscapeNormals,'collisionSide',solution.collisionSide, ...
         'retainCollisionSide',solution.retainCollisionSide, ...
-        'target',q,'uncertaintySpecified',uncertainty.specified);
+        'target',q,'targetPredictionMemory',targetPredictionMemory,'uncertaintySpecified',uncertainty.specified);
     prediction=struct('problemClass',"jointPredictiveCbfClf",'model',model, ...
         'inputTrajectory',predictedInput,'predictedState',solution.states,'predictedJointState',predictedJointState, ...
         'solution',solution,'metadata',metadata);

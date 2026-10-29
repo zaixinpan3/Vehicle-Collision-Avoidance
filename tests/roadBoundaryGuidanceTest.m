@@ -11,6 +11,33 @@ classdef roadBoundaryGuidanceTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function anotherCarriagewayDoesNotRepelAnEgoInsideItsOwnRoad(testCase)
+            road=localRoad();
+            road.drivablePolygons{2}=[-100,13;100,13;100,20;-100,20];
+            model=localModel(perceiveRoadBoundaries(road,[0;0],30));
+            [a,active,info]=predictiveSafetyGeometry.roadBoundaryGuidance([0;0;0;8;0;0],[0;0],model);
+            testCase.verifyEqual(a,[0;0],AbsTol=1e-12);
+            testCase.verifyFalse(active);
+            testCase.verifyTrue(info.compatible);
+            testCase.verifyGreaterThan(min(info.distance),0);
+        end
+        function eitherDisconnectedRoadHasItsOwnInterior(testCase)
+            road=localRoad();
+            road.drivablePolygons{2}=[-100,13;100,13;100,20;-100,20];
+            model=localModel(perceiveRoadBoundaries(road,[0;16.5],30));
+            [a,active,info]=predictiveSafetyGeometry.roadBoundaryGuidance([0;16.5;0;8;0;0],[0;0],model);
+            testCase.verifyEqual(a,[0;0],AbsTol=1e-12);
+            testCase.verifyFalse(active);
+            testCase.verifyTrue(info.compatible);
+        end
+        function aMedianStillRepelsMotionLeavingTheCurrentRoad(testCase)
+            road=localRoad();
+            road.drivablePolygons{2}=[-100,13;100,13;100,20;-100,20];
+            model=localModel(perceiveRoadBoundaries(road,[0;0],30));
+            [a,active]=predictiveSafetyGeometry.roadBoundaryGuidance([0;8;0;8;2;0],[0;5],model);
+            testCase.verifyTrue(active);
+            testCase.verifyLessThan(a(2),0);
+        end
         function aScanExposesOnlyVisibleChainsAndMarksRangeCuts(testCase)
             scan=perceiveRoadBoundaries(localRoad(),[0;0],20,3);
             testCase.verifyFalse(isfield(scan,'drivablePolygons'));

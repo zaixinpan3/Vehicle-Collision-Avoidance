@@ -802,8 +802,19 @@ function [problem,model]=localFormulate(anchor,model)
             blockBounds{blockCount}=g;
         end
         middleRadius=sum(abs(middleGenerator(4:6,:)),2);nextRadius=sum(abs(nextGenerator(4:6,:)),2);
+        middleLowerRadius=middleRadius;
+        if stage.next(4)==0 && ~any(stage.a(4,:)) && ~any(stage.b(4,:)) ...
+                && norm(am(4,:)-[0,0,0,.5,0,0],Inf)<1e-12 && ~any(bm(4,:))
+            % The rest reset fixes the endpoint speed to zero; this mesh's
+            % midpoint is half the nonnegative start speed. Intersect its
+            % reachable set with the declared forward-motion domain instead
+            % of assigning negative speed to a symmetric error box around
+            % rest. Keep the nominal lower bound and every published error
+            % radius; only this already-implied lower tightening is redundant.
+            middleLowerRadius(1)=0;
+        end
         blockCount=blockCount+1;blockRows{blockCount}=[middleMap(4:6,:);-middleMap(4:6,:)];blockColumns{blockCount}=middleColumns;
-        blockBounds{blockCount}=[physicalUpper-middle(4:6)-middleRadius;middle(4:6)-physicalLower-middleRadius];
+        blockBounds{blockCount}=[physicalUpper-middle(4:6)-middleRadius;middle(4:6)-physicalLower-middleLowerRadius];
         [r,bound]=localFrontDomain(x,input,cfg,generator);
         blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=[nodeColumns;iu(:,index)];blockBounds{blockCount}=bound;
         [r,bound]=localFrontDomain(nextReference,input,cfg,nextGenerator);

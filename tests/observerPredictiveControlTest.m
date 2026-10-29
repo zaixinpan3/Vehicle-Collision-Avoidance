@@ -71,7 +71,9 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             target.controllerErrorBound.bounds(5:6)=.002;
             ego.heldActuatorInput=command.actuatorInput;
             [~,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
-            testCase.verifyEqual(second.model.target,q,AbsTol=1e-12);
+            testCase.verifyEqual(second.model.targetPredictionUpdate.observed,q,AbsTol=1e-12);
+            testCase.verifyEqual(second.model.target(5),first.model.target(5),AbsTol=1e-12);
+            testCase.verifyTrue(second.model.targetPredictionUpdate.parameterIntersection);
             testCase.verifyEqual(second.metadata.search.initialization,"shiftedPrimalIterate");
             testCase.verifyNumElements(second.metadata.search.stages,2);
             testCase.verifyEqual([second.metadata.search.stages.objective],["pcbfSlack","nominalTrackingAndRegularization"]);
@@ -113,6 +115,23 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyGreaterThan(prediction.model.uncertaintyPrediction.egoStateRadius(4,end),0);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
+        end
+        function aStoppedReferenceDoesNotRequireNegativeSpeedUncertainty(testCase)
+            [ego,~,road,cfg]=localFixture(0);
+            [~,~,prediction]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            model=prediction.model;anchor=model.linearization;
+            model.initialState=zeros(6,1);anchor.states(:)=0;
+            anchor.inputs=repmat([0;-.48],1,size(anchor.inputs,2));
+            model.uncertainty.egoGenerator=diag([0;0;0;.064;0;0]);
+            [p,~,updated]=solvePredictiveControl('probe',struct('operation','formulate', ...
+                'model',model,'anchor',anchor,'inherited',false));
+            point=zeros(size(p.lower));point(p.clfIndex)=1e6;
+            testCase.verifyEqual(p.equal*point,p.rhs,AbsTol=1e-12);
+            testCase.verifyLessThanOrEqual(p.a*point,p.b+1e-10);
+            testCase.verifyGreaterThanOrEqual(point,p.lower);
+            testCase.verifyLessThanOrEqual(point,p.upper);
+            testCase.verifyEqual(updated.uncertaintyPrediction.egoStateRadius(4,2),.032,AbsTol=1e-12);
+            testCase.verifyEqual(updated.uncertainty.egoGenerator,model.uncertainty.egoGenerator);
         end
         function directionalTargetSupportContainsTheConstantParameterFamily(testCase)
             q=[0;0;.2;8;.3;.02;1.6;2.4;.95;0;0];
