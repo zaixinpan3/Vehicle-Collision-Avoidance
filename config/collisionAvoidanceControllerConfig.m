@@ -26,7 +26,11 @@ function cfg=localDefaults()
     % stays fixed throughout that encounter.
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
-        'enforceRoadBoundaries',false,'jointAffinePrediction',false);
+        'enforceRoadBoundaries',false,'jointAffinePrediction',false,'jointNonlinearPrediction',false);
+    % Full-domain nonlinear outer images on the RTI decision box. This
+    % research mode fails explicitly if the admitted set cannot be enclosed;
+    % it never substitutes the affine approximation on failure. It is not
+    % an end-to-end recursive-feasibility or floating-point certificate.
     % Experimental joint observer/feedback supports. Nonlinear replay has
     % exposed undercoverage without remainder enclosures; do not silently
     % promote this affine approximation to the default uncertainty model.
@@ -178,6 +182,7 @@ function localValidate(cfg)
     end
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.jointAffinePrediction,{'logical'},{'scalar'});
+    validateattributes(cfg.controller.jointNonlinearPrediction,{'logical'},{'scalar'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.rti.nominalTrackingWeight,{'double'},{'scalar','real','finite','nonnegative'});

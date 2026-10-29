@@ -8,8 +8,10 @@ function value = nrmmJointPrediction(action,varargin)
 % A parameter column is introduced once and retained across the whole horizon.
 % Future sensor errors enter once per measurement, shared by the observer and
 % feedback. The actual current measurement and first command are conditioned
-% data. Supports are exact for the constructed joint affine maps, NOT certified
-% nonlinear reachable sets. No current observer budget is reset in the horizon.
+% data. Default supports are exact only for the constructed joint affine maps.
+% options.nonlinearEnclosure instead uses full-domain nonlinear outer images
+% of the declared sampled map (real arithmetic, not a complete safety proof).
+% No current observer budget is reset in the horizon.
     switch string(action)
         case "contract"
             value=localContract(varargin{:});
@@ -91,6 +93,7 @@ end
 
 function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,options)
     if nargin<6,options=struct();end
+    nonlinear=isfield(options,'nonlinearEnclosure') && options.nonlinearEnclosure;
     validateattributes(contract.samplePeriod,{'double'},{'scalar','finite','positive'});
     validateattributes(contract.integrationStep,{'double'},{'scalar','finite','positive'});
     validateattributes(contract.integrationSubstepCount,{'double'},{'scalar','integer','positive'});
@@ -134,12 +137,24 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
     tube.physicalRadius(:,1)=sum(abs(initialGenerator),2);
     tube.observerErrorRadius(:,1)=abs(estimation*center)+sum(abs(estimation*generators),2);
     tube.mean(:,1)=center;
+    tube.realArithmeticEnclosure=nonlinear;tube.floatingPointCertified=false;
+    if nonlinear
+        tube.kind="joint-nonlinear-outer-image-v1";
+        tube.scope="declared sampled ego/observer map on the supplied decision domain; not a complete safety certificate";
+    end
     for k=1:count
         if k>1
             estimateGenerators=generators([7:11,6],:);
             reserve=sum(abs(gains(2,:,k)*estimateGenerators))+abs(gains(2,6,k))*contract.noiseRadius(7);
             authority=min(cfg.actuation.brakingRatioMaximum-anchor.inputs(2,k), ...
                 anchor.inputs(2,k)-cfg.actuation.brakingRatioMinimum);
+            if nonlinear && isfield(options,'decisionLower')
+                authority=min(cfg.actuation.brakingRatioMaximum-anchor.inputs(2,k)-options.decisionUpper(8,k), ...
+                    anchor.inputs(2,k)+options.decisionLower(8,k)-cfg.actuation.brakingRatioMinimum);
+            end
+            % Keep computed ancillary authority just inside its boundary;
+            % never trim the physical uncertainty set to repair roundoff.
+            if nonlinear,authority=max(0,authority)*(1-32*eps);end
             if reserve>0,gains(2,:,k)=gains(2,:,k)*min(1,max(0,authority)/reserve);end
             % Ancillary steering is useful only inside the existing bicycle
             % chart. Reserve its authority before computing the tube; do not
@@ -158,12 +173,33 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
         context=struct('cfg',cfg,'contract',contract,'reference',[center(7:11);center(6)], ...
             'input',anchor.inputs(:,k),'gain',gains(:,:,k),'duration',durations(k), ...
             'first',k==1);
-        [~,matrix,noise,branch]=localLinearize(center,context);
-        beforeReset=[branch.matrix*generators,branch.noise];
-        [point,nextGenerators,mixed]=localResetEnvelope(branch.point,beforeReset,cfg);
-        if mixed
-            matrix=branch.matrix;noise=branch.noise;
-            matrix(4:6,:)=matrix(4:6,:)/2;noise(4:6,:)=noise(4:6,:)/2;
+        if nonlinear
+            domain=zeros(8,1);
+            if isfield(options,'decisionLower')
+                domain=struct('lower',options.decisionLower(:,k),'upper',options.decisionUpper(:,k));
+                stage=options.stages(k);
+                context.a=stage.a;context.b=stage.b;context.am=stage.am;context.bm=stage.bm;
+                context.defect=stage.next-anchor.states(:,k+1);
+            end
+            try
+                enclosure=nrmmJointEnclosure('hold',center,generators,context,domain);
+            catch cause
+                failure=MException('nrmmJointPrediction:uncertifiedImage', ...
+                    'Nonlinear joint enclosure failed at hold %d (%.6g s): %s', ...
+                    k,sum(durations(1:k-1)),cause.message);
+                throw(addCause(failure,cause));
+            end
+            point=enclosure.point;nextGenerators=enclosure.generator;
+            point(28:29)=point(28:29)+anchor.inputs(:,k);
+            matrix=[];noise=[];mixed=false;
+        else
+            [~,matrix,noise,branch]=localLinearize(center,context);
+            beforeReset=[branch.matrix*generators,branch.noise];
+            [point,nextGenerators,mixed]=localResetEnvelope(branch.point,beforeReset,cfg);
+            if mixed
+                matrix=branch.matrix;noise=branch.noise;
+                matrix(4:6,:)=matrix(4:6,:)/2;noise(4:6,:)=noise(4:6,:)/2;
+            end
         end
         tube.mixedStopBranches(k)=mixed;
         middle=point(22:27);next=point(1:21);input=point(28:29);
@@ -175,7 +211,7 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
         tube.observerErrorRadius(:,2*k+1)=abs(estimation*next)+sum(abs(estimation*nextGenerators(1:21,:)),2);
         tube.inputGenerator{k}=nextGenerators(28:29,:);
         tube.inputRadius(:,k)=abs(input-anchor.inputs(:,k))+sum(abs(tube.inputGenerator{k}),2);
-        tube.transition{k}=matrix(1:21,:);tube.noiseMap{k}=noise(1:21,:);
+        if ~nonlinear,tube.transition{k}=matrix(1:21,:);tube.noiseMap{k}=noise(1:21,:);end
         generators=nextGenerators(1:21,:);center=next;
         tube.mean(:,k+1)=center;
     end

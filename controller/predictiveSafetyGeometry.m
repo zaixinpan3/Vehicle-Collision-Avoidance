@@ -648,6 +648,17 @@ classdef predictiveSafetyGeometry
             jacobian=[repmat(normal.',4,1),yaw];
         end
 
+        function [rows,bounds] = conservativeRotationRows(rows,bounds,yawMap,vertexReach,yawRadius)
+            % Inner approximation for the rotating vertices. On |dpsi|<=eta,
+            % |g-g_affine| <= reach*eta*|dpsi|/2. Globally the derivative
+            % difference is <=2*reach, giving a valid unbounded-domain fall-
+            % back. Both reserves vanish at dpsi=0. No new safety distance.
+            validateattributes(yawRadius,{'double'},{'scalar','nonnegative','nonnan'});
+            slope=vertexReach(:)*min(yawRadius/2,2);
+            correction=slope*yawMap(:).';
+            rows=[rows+correction;rows-correction];bounds=[bounds;bounds];
+        end
+
         function check = intervalClearance(first,last,shape,targetEpoch,time,duration,margin)
             % Certify positive distance on a linear ego-pose interpolant.
             % The target retains its exact prescribed motion. Adaptive midpoint

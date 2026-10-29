@@ -678,6 +678,7 @@ function [problem,model]=localFormulate(anchor,model)
     % from these blocks (localAssemble). Building them row by row in sparse
     % form cost time quadratic in the plan length.
     blockRows=cell(1,14*count+10);blockColumns=blockRows;blockBounds=blockRows;blockCount=0;
+    rotationBlocks=[];rotationMaps={};
     cones=struct('A',{},'b',{},'D',{},'gamma',{},'size',{});
     lower=-Inf(nv,1);upper=Inf(nv,1);
     lower([is,ic])=0;
@@ -702,15 +703,22 @@ function [problem,model]=localFormulate(anchor,model)
     physicalInputLower=repmat(inputLower,1,count);physicalInputUpper=repmat(inputUpper,1,count);
     maximumTightening=0;safetyNormals=zeros(2,2*count+1);
     [durations,times]=localTimeGrid(model,count);
-    jointTube=[];
+    jointTube=[];enclosureDomain=[];
     if isfield(model,'jointPredictionTube'),model=rmfield(model,'jointPredictionTube');end
-    if cfg.controller.jointAffinePrediction && isfield(model.uncertainty,'jointPrediction')
+    jointRequested=cfg.controller.jointAffinePrediction || cfg.controller.jointNonlinearPrediction;
+    if jointRequested && isfield(model.uncertainty,'jointPrediction')
+        options=struct();
+        if cfg.controller.jointNonlinearPrediction
+            enclosureDomain=localEnclosureDomain(anchor,model,stages,durations);
+            options=struct('nonlinearEnclosure',true,'decisionLower',enclosureDomain.lower, ...
+                'decisionUpper',enclosureDomain.upper,'stages',stages);
+        end
         jointTube=nrmmJointPrediction('propagate',anchor,cfg,initialGenerator, ...
-            model.uncertainty.jointPrediction,durations);
+            model.uncertainty.jointPrediction,durations,options);
         physicalInputLower=physicalInputLower+jointTube.inputRadius;
         physicalInputUpper=physicalInputUpper-jointTube.inputRadius;
         model.jointPredictionTube=jointTube;
-    elseif cfg.controller.jointAffinePrediction && model.uncertainty.specified
+    elseif jointRequested
         error('collisionAvoidanceController:missingJointPrediction', ...
             'Joint prediction requires a synchronized observer snapshot, not only current error radii.');
     end
@@ -734,6 +742,7 @@ function [problem,model]=localFormulate(anchor,model)
         uncertaintyPrediction.futureObserverDynamicsIncluded=true;
         uncertaintyPrediction.futurePrimitiveBudgetsAssumed=false;
         uncertaintyPrediction.nonlinearCertificate=false;
+        uncertaintyPrediction.egoJointRealArithmeticEnclosure=jointTube.realArithmeticEnclosure;
         uncertaintyPrediction.observerErrorRadius=jointTube.observerErrorRadius;
         uncertaintyPrediction.observerErrorTime=jointTube.observerErrorTime;
         uncertaintyPrediction.inputRadius=jointTube.inputRadius;
@@ -809,14 +818,17 @@ function [problem,model]=localFormulate(anchor,model)
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
             if index==1,primaryLowerBound=max(0,-min(g));end
-            r=[-j,zeros(4,3)];
+            r=[-j,zeros(4,3)];yawMap=[0,0,1,0,0,0];
             if robustRelaxation && index>prefix
                 blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;blockBounds{blockCount}=g+tightening;
+                rotationBlocks(end+1)=blockCount;rotationMaps{end+1}=yawMap;
             end
             blockCount=blockCount+1;
             if index<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[nodeColumns;is(index)];
             else,blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;end
             blockBounds{blockCount}=g;
+            rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
+                [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
         end
         middleMap=[am,bm];middleColumns=[ix(:,index);iu(:,index)];
         if ~isempty(clearance)
@@ -830,14 +842,17 @@ function [problem,model]=localFormulate(anchor,model)
             safetyNormals(:,point)=j(1,1:2).';
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
-            r=-j*middleMap(1:3,:);
+            r=-j*middleMap(1:3,:);yawMap=middleMap(3,:);
             if robustRelaxation && index>prefix
                 blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=g+tightening;
+                rotationBlocks(end+1)=blockCount;rotationMaps{end+1}=yawMap;
             end
             blockCount=blockCount+1;
             if index<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[middleColumns;is(index)];
             else,blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;end
             blockBounds{blockCount}=g;
+            rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
+                [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
         end
         middleRadius=sum(abs(middleGenerator(4:6,:)),2);nextRadius=sum(abs(nextGenerator(4:6,:)),2);
         middleLowerRadius=middleRadius;
@@ -897,14 +912,17 @@ function [problem,model]=localFormulate(anchor,model)
         safetyNormals(:,point)=j(1,1:2).';
         model.collisionEscapeNormals(:,point)=escape;
         maximumTightening=max(maximumTightening,max(tightening));
-        r=[-j,zeros(4,3)];
+        r=[-j,zeros(4,3)];yawMap=[0,0,1,0,0,0];
         if robustRelaxation && count+1>prefix
             blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=g+tightening;
+            rotationBlocks(end+1)=blockCount;rotationMaps{end+1}=yawMap;
         end
         blockCount=blockCount+1;
         if count+1<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[endColumns;is(count+1)];
         else,blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;end
         blockBounds{blockCount}=g;
+        rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
+            [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
     end
     if ~isempty(clearance)
         [r,bound]=localRoadBlock(road,count+1,y,eye(6),generator,clearance);
@@ -980,7 +998,28 @@ function [problem,model]=localFormulate(anchor,model)
             end
         end
     end
+    if ~isempty(enclosureDomain)
+        % The nonlinear images were computed on this domain. Subsequent
+        % locality/physical bounds may intersect it, but cannot enlarge it.
+        for k=1:count
+            columns=[ix(:,k);iu(:,k)];
+            lower(columns)=max(lower(columns),enclosureDomain.lower(:,k));
+            upper(columns)=min(upper(columns),enclosureDomain.upper(:,k));
+        end
+    end
     model.trustWarmStartAdjusted=adjusted;
+    % Use the FINAL domain, including any affine warm-start consistency
+    % repair. A later domain enlargement must never reuse an old yaw bound.
+    vertices=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2 ...
+        .*[-1,1,1,-1;-1,-1,1,1];
+    vertexReach=vecnorm(vertices).';
+    for k=1:numel(rotationBlocks)
+        block=rotationBlocks(k);map=rotationMaps{k};columns=blockColumns{block};
+        coordinateRadius=max(abs(lower(columns)),abs(upper(columns)));
+        active=map~=0;yawRadius=abs(map(active))*coordinateRadius(active);
+        [blockRows{block},blockBounds{block}]=predictiveSafetyGeometry.conservativeRotationRows( ...
+            blockRows{block},blockBounds{block},map,vertexReach,yawRadius);
+    end
     reachLower=lower;reachUpper=upper;
     if isfield(model,'durationProbe') && model.durationProbe
         % Keep redundant rows while differentiating: pruning at a bound
@@ -1007,6 +1046,31 @@ function [problem,model]=localFormulate(anchor,model)
     problem.trustRadii=trustRadii;problem.trustSampledErrorRatio=trustRatio;
     problem.trustWarmStartAdjusted=adjusted;
     problem.inputIncrementLower=physicalInputLower-anchor.inputs;problem.inputIncrementUpper=physicalInputUpper-anchor.inputs;
+end
+
+function domain=localEnclosureDomain(anchor,model,stages,durations)
+    % Finite outer domain for all affine decisions admitted by the QP. The
+    % trust heuristic only chooses a box; it supplies NO remainder bound.
+    cfg=model.cfg;count=numel(stages);domain.lower=zeros(8,count);domain.upper=zeros(8,count);
+    [ul,uh]=nonlinearBicycleModel.inputBounds(cfg);
+    reachableLow=model.initialState-anchor.states(:,1);reachableHigh=reachableLow;
+    particular=reachableLow;
+    for k=1:count
+        stageCfg=cfg;stageCfg.controller.sampleTime=durations(k);
+        radius=nonlinearBicycleModel.trustRegion(anchor.states(:,k),anchor.inputs(:,k), ...
+            stageCfg,stages(k).next,stages(k).a,stages(k).b,abs(particular));
+        low=[max(reachableLow,-radius(1:6));max(ul-anchor.inputs(:,k),-radius(7:8))];
+        high=[min(reachableHigh,radius(1:6));min(uh-anchor.inputs(:,k),radius(7:8))];
+        if any(low>high) || any(~isfinite([low;high]))
+            error('collisionAvoidanceController:unenclosedDecisionDomain', ...
+                'A finite nonempty decision domain is required for nonlinear outer images.');
+        end
+        domain.lower(:,k)=low;domain.upper(:,k)=high;
+        map=[stages(k).a,stages(k).b];defect=stages(k).next-anchor.states(:,k+1);
+        reachableLow=max(map,0)*low+min(map,0)*high+defect;
+        reachableHigh=max(map,0)*high+min(map,0)*low+defect;
+        particular=stages(k).a*particular+defect;
+    end
 end
 
 function [matrix,vector]=localAssemble(rows,columns,bounds,count,nv,lower,upper)

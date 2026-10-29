@@ -204,6 +204,8 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.futureObserverDynamicsIncluded=true;
         metadata.futurePrimitiveBudgetsAssumed=false;
         metadata.jointTubeScope=model.jointPredictionTube.scope;
+        metadata.egoJointRealArithmeticEnclosure=model.jointPredictionTube.realArithmeticEnclosure;
+        metadata.jointFloatingPointCertified=model.jointPredictionTube.floatingPointCertified;
     end
     metadata.robustNonlinearSafetyCertified=false;
     metadata.maximumCollisionTighteningMeters=solution.maximumCollisionTighteningMeters;

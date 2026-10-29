@@ -30,5 +30,19 @@ classdef informationSetRecursiveFeasibilityTest < matlab.unittest.TestCase
                 relaxed.oldCostMeters-relaxed.firstDeficitMeters,AbsTol=1e-12);
             testCase.verifyGreaterThan(relaxed.candidateTerminalMarginMeters,0);
         end
+        function aUniformNewRemainderCanExcludeAFeasibleShiftedWitness(testCase)
+            % Exact scalar specialization: F(1+d)=(1+d)^2 <= 1.05.
+            % The old witness d=0 is feasible. A sound uniform remainder
+            % over |d|<=.5 nevertheless excludes it. Zero-update-compatible
+            % rows retain it, and still imply the nonlinear constraint.
+            rho=.5;limit=1.05;witness=0;
+            testCase.verifyLessThanOrEqual((1+witness)^2,limit);
+            testCase.verifyGreaterThan(1+2*witness+rho^2,limit);
+            rows=[2+rho;2-rho];bounds=(limit-1)*ones(2,1);
+            testCase.verifyLessThanOrEqual(rows*witness,bounds);
+            for d=linspace(-rho,rho,101)
+                if all(rows*d<=bounds),testCase.verifyLessThanOrEqual((1+d)^2,limit+1e-12);end
+            end
+        end
     end
 end

@@ -176,6 +176,33 @@ classdef terminalSafeSet
                 'steps',steps,'speed',V,'sideslip',beta,'curvature',kappa);
         end
 
+        function image = encloseContinuation(context,y,decisionLower,decisionUpper,generator,steps)
+            % Outer image of the SAME simplified braking law on a supplied
+            % endpoint decision box plus its uncertainty. This certifies the
+            % sampled pose map, not target prediction, first-exit selection,
+            % or membership of an entire terminal information set.
+            validateattributes(decisionLower,{'double'},{'size',[6,1],'finite'});
+            validateattributes(decisionUpper,{'double'},{'size',[6,1],'finite'});
+            assert(all(decisionLower<=decisionUpper));
+            offset=(decisionLower+decisionUpper)/2;radius=(decisionUpper-decisionLower)/2;
+            decision=nrmmSet(offset,[diag(radius),zeros(6,size(generator,2))]);
+            state=y+decision+nrmmSet(zeros(6,1),[zeros(6),generator]);
+            if nargin<6
+                [lo,hi]=bounds(state);speed=hypot(max(abs([lo(4),hi(4)])),max(abs([lo(5),hi(5)])));
+                steps=ceil(speed/(context.deceleration*context.sampleTime));
+            end
+            path=terminalSafeSet.continuation(context,y,steps);
+            jacobian=localPoseJacobian(context,y,steps);
+            image=struct('time',path.time,'referencePose',path.pose,'jacobian',jacobian, ...
+                'pose',{cell(size(path.time))},'residual',{cell(size(path.time))}, ...
+                'realArithmeticEnclosure',true,'floatingPointCertified',false,'terminalMembershipCertified',false);
+            for k=1:numel(path.time)
+                pose=nrmmJointEnclosure('terminalPose',state,context,path.time(k));
+                residual=pose-path.pose(:,k)-jacobian(:,:,k)*decision;
+                image.pose{k}=pose;image.residual{k}=residual;
+            end
+        end
+
         function clear = clears(context,x,node)
             % Does the ego rectangle at x, at plan node 'node' (a half node is
             % a hold midpoint), meet the problem's own sampled collision row:
