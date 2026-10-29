@@ -23,6 +23,9 @@ function [command,predictedInput,prediction,controllerState] = ...
 % It loads the compiled kernels and straight-road trim before timed samples.
 % Integrations with observer bounds also prime their bounded-input path.
 % Startup preparation is separate from the online computation budget.
+% With controller.retainedTube, active encounters instead retain a joint
+% nonlinear policy/terminal certificate. This opt-in research path is not
+% point-SQP-RTI and reports terminal takeover as an experiment-stop error.
     persistent lastState
     if nargin<=3 && (ischar(egoState) || isstring(egoState))
         action=string(egoState);
@@ -117,6 +120,11 @@ function [command,predictedInput,prediction,controllerState] = ...
         'uncertainty',uncertainty);
     model.targetPredictionUpdate=targetPredictionUpdate;
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
+    if ~isempty(solution) && isfield(solution,'terminalControlRequired') && solution.terminalControlRequired
+        error('collisionAvoidanceController:terminalControlRequired', ...
+            ['A feasible certified terminal continuation remains, but no driving extension was certified. ' ...
+            'The driving experiment ends before terminal takeover; this is not convex infeasibility.']);
+    end
     if isempty(solution)
         error('collisionAvoidanceController:noOptimizationSolution', ...
             'RTI could not complete its local optimization (%s; %s).', ...
@@ -240,6 +248,25 @@ function [command,predictedInput,prediction,controllerState] = ...
         'collisionEscapeNormals',solution.collisionEscapeNormals,'collisionSide',solution.collisionSide, ...
         'retainCollisionSide',solution.retainCollisionSide, ...
         'target',q,'targetPredictionMemory',targetPredictionMemory,'uncertaintySpecified',uncertainty.specified);
+    if isfield(solution,'retainedCertificate')
+        controllerState.retainedCertificate=solution.retainedCertificate;
+        metadata.solverAlgorithm="retainedJointPolicyTube";
+        metadata.predictionModel="affinePerformanceSurrogateWithNonlinearPolicyTube";
+        metadata.safetyScope="declaredSampledJointMapWithVerifiedTerminalFamily";
+        metadata.safetyValueInterpretation="sumOfRetainedTubeDeficits";
+        metadata.recursiveFeasibilityScope="retainedCertificateUnderConsistentObserverAndModelContracts";
+        metadata.zeroSlack=solution.safety==0;
+        metadata.retainedCandidateFeasible=search.retainedCandidateFeasible;
+        metadata.retainedCertificateValid=solution.retainedCertificate.valid;
+        metadata.egoJointRealArithmeticEnclosure=true;metadata.jointFloatingPointCertified=false;
+        metadata.futureObserverDynamicsIncluded=true;metadata.futurePrimitiveBudgetsAssumed=false;
+        metadata.targetUncertaintyModel="retainedConstantParameterFamily";
+        metadata.egoUncertaintyModel="retainedNonlinearPlantObserverFeedbackSets";
+        metadata.commonPoseCancelled=false;
+        metadata.optimizationProblemClass="QP";metadata.secondaryProblemClass="QP";
+        metadata.safetyObjective="sumOfCertifiedPolicyBoxDeficits";
+        metadata.prefixSteps=size(predictedInput,2)+1;metadata.completionSteps=0;
+    end
     prediction=struct('problemClass',"jointPredictiveCbfClf",'model',model, ...
         'inputTrajectory',predictedInput,'predictedState',solution.states,'predictedJointState',predictedJointState, ...
         'solution',solution,'metadata',metadata);

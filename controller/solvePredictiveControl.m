@@ -15,6 +15,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % Research access: solvePredictiveControl("probe",request) exposes reference,
 % formulation and solve operations to the free-time experiment in scripts/.
 % It does not enable a variable grid in the online controller.
+% controller.retainedTube selects a separate certificate-based formulation
+% during encounters; see CONTROLLER_THEORY.md, implemented policy-box proof.
     if (isstring(model) || ischar(model)) && string(model)=="probe"
         [solution,search,model]=localProbe(previousState);return;
     end
@@ -26,6 +28,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     cfg=model.cfg;model.linearizationBuilds=0;
     model.solveTimer=timer;
     model.solveTimeLimitSeconds=max(0,cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
+    if cfg.controller.retainedTube && ~isempty(model.target)
+        [solution,search,model]=localRetainedSolve(model,previousState,timer);return;
+    end
     minimumCount=cfg.controller.horizonSteps;
     if isfield(model,'referenceProbeOnly') && model.referenceProbeOnly && isfield(model,'probeMinimumHorizonSteps')
         minimumCount=max(minimumCount,model.probeMinimumHorizonSteps);
@@ -607,7 +612,8 @@ function solution=localDecode(point,problem,anchor,inputs)
     solution.performanceCost=solution.referenceDeviationCost+solution.nominalTrackingCost+solution.inputVariationCost;
     changes=[reshape(point(problem.stateIndices(:,1:end-1)),6,[]); ...
         reshape(point(problem.inputIndices),2,[])];
-    solution.trustMaximumScaledCorrection=max(abs(changes)./problem.trustRadii,[],'all');
+    scaled=abs(changes)./problem.trustRadii;scaled(changes==0 & problem.trustRadii==0)=0;
+    solution.trustMaximumScaledCorrection=max(scaled,[],'all');
     solution.trustFirstInputRadius=problem.trustRadii(7:8,1);
     solution.trustSampledErrorRatio=max(problem.trustSampledErrorRatio);
     solution.objectiveValue=solution.safety;
@@ -1417,6 +1423,9 @@ function [result,search,model]=localProbe(request)
     model=request.model;search=struct();timer=tic;
     if isfield(request,'timer'),timer=request.timer;end
     switch string(request.operation)
+        case "retained"
+            model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
+            [result,search,model]=localRetainedSolve(model,request.previousState,timer,request.anchor);
         case "reference"
             model.referenceProbeOnly=true;
             if isfield(request,'minimumHorizonSteps'),model.probeMinimumHorizonSteps=request.minimumHorizonSteps;end
@@ -1443,6 +1452,314 @@ function [result,search,model]=localProbe(request)
         otherwise
             error('collisionAvoidanceController:invalidProbeOperation','Unknown research operation.');
     end
+end
+
+function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
+    % A convex policy box is admitted only after its COMPLETE nonlinear
+    % joint image and terminal continuation have been enclosed. Performance
+    % states are affine surrogates, never hard safety witnesses. An existing
+    % certificate remains available when a new image/optimization fails.
+    cfg=model.cfg;
+    assert(model.uncertainty.specified && isfield(model.uncertainty,'jointPrediction'), ...
+        'collisionAvoidanceController:missingJointPrediction','Retained tubes require the synchronized observer snapshot.');
+    assert(~isempty(model.uncertainty.target), ...
+        'collisionAvoidanceController:missingTargetCertificate', ...
+        'Retained tubes require an explicit target error family; missing bounds never mean an exact target.');
+    assert(~cfg.controller.enforceRoadBoundaries && isempty(model.road.lateralClearance), ...
+        'collisionAvoidanceController:retainedRoadUnsupported','Road constraints are outside this certificate formulation.');
+    contract=model.uncertainty.jointPrediction;h=cfg.controller.sampleTime;
+    inherited=isstruct(previous) && isfield(previous,'retainedCertificate') && ~model.targetOnset;
+    assert(inherited || model.targetOnset,'collisionAvoidanceController:missingRetainedCertificate', ...
+        'An ongoing encounter must retain its admitted certificate; it cannot restart its safety budget.');
+    search=localEmptySearch("retainedPolicyTube","",0);search.planner=localPlannerMetadata();
+    search.refinementFailure="";search.posterior=[];
+    if inherited
+        old=previous.retainedCertificate;
+        assert(old.valid && old.absoluteIndex+1==model.sampleIndex, ...
+            'collisionAvoidanceController:invalidRetainedCertificate','Only the immediately preceding certificate can be shifted.');
+        certificate=old;certificate.absoluteIndex=model.sampleIndex;certificate.epochSeconds=old.epochSeconds+h;
+        certificate.slacks=[old.slacks(2:end),0];certificate.gaps=[old.gaps(2:end),Inf];
+        certificate.normals=[old.normals(:,2:end),zeros(2,1)];
+        if isempty(old.policies)
+            % The mathematical continuation uses the previously certified
+            % terminal law and its ORIGINAL entry set. Do not restart that
+            % law from a fresh estimate or resume a Fiala driving policy.
+            certificate.terminalElapsed=old.terminalElapsed+h;
+        else
+            certificate.policies=old.policies(2:end);certificate.tube.sets=old.tube.sets(2:end);
+            certificate.tube.inputs=old.tube.inputs(2:end);certificate.tube.middles=old.tube.middles(2:end);
+            search.posterior=nrmmJointPrediction('conditionRetained',certificate.tube.sets{1}, ...
+                model.initialState,model.uncertainty.egoGenerator,contract,old.contract);
+            certificate.posterior=search.posterior;
+            % The target family remains tied to its original absolute epoch.
+            predicted=predictiveSafetyGeometry.targetPoseSet(certificate.target,certificate.targetError,certificate.epochSeconds);
+            observed=predictiveSafetyGeometry.targetPoseSet(model.target,localAbsoluteTargetError(model),0);
+            [pl,ph]=bounds(predicted(1:2));[ol,oh]=bounds(observed(1:2));
+            assert(all(max(pl,ol)<=min(ph,oh)), ...
+                'collisionAvoidanceController:inconsistentTargetPosterior','Observed target position contradicts the retained family.');
+            budget=sum(certificate.slacks);
+            % Try to retain a full driving horizon. If this extension cannot be
+            % certified, the old terminal continuation remains the valid tail.
+            try
+                proposal=certificate.policies;
+                for j=1:numel(proposal)
+                    % Re-admit the selected center policy first. Optional
+                    % freedom from the old frame is not a physical disturbance
+                    % and need not enlarge a fresh candidate unnecessarily.
+                    proposal(j).lower=zeros(2,1);proposal(j).upper=zeros(2,1);
+                end
+                root=search.posterior.proposedOuter;
+                if ~predictiveSafetyGeometry.stateSetAdmissible(root(1:6),cfg)
+                    % Coordinate intersection can lose the signed velocity
+                    % correlations that established the sideslip cone.
+                    % Keep the old physical/parameter projection instead,
+                    % while conditioning known numerical observer/memory.
+                    retained=search.posterior.base;
+                    retained(7:11)=nrmmSet(root.center(7:11));
+                    retained(16:17)=nrmmSet(root.center(16:17));
+                    retained(18:21)=root(18:21);root=retained;
+                end
+                partial=nrmmJointPrediction('policyTube',root,proposal);
+                while numel(proposal)<certificate.horizonSteps
+                    set=partial.sets{end};input=nonlinearBicycleModel.nominalFeedback( ...
+                        set.center(1:6),set.center(16:17),model.lane,model.nominalReference,cfg, ...
+                        nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature));
+                    policy=localRetainedPolicy(set,input,cfg,certificate.contract,false);
+                    image=nrmmJointPrediction('policyTube',set,policy);
+                    proposal(end+1)=policy;partial.sets{end+1}=image.sets{2}; %#ok<AGROW>
+                    partial.inputs{end+1}=image.inputs{1};partial.middles{end+1}=image.middles{1};
+                end
+                candidate=localRetainedAssess(partial,proposal,certificate,model);
+                if candidate.valid && sum(candidate.slacks)<=budget
+                    certificate=candidate;
+                elseif candidate.valid
+                    search.refinementFailure="increasedCertifiedDeficit";
+                else
+                    search.refinementFailure=candidate.failureReason;
+                end
+            catch exception
+                if ~localCertificateFailure(exception),rethrow(exception);end
+                search.refinementFailure=string(exception.identifier)+": "+exception.message;
+            end
+        end
+    else
+        if nargin<4 || isempty(seed)
+            [seed,~]=localRtiInitialize(model,previous,cfg.controller.horizonSteps,[]);
+            search.planner=seed.planner;
+        end
+        root=nrmmJointPrediction('rootSet',model.initialState,model.uncertainty.egoGenerator,contract);
+        base=struct('valid',false,'absoluteIndex',model.sampleIndex,'epochSeconds',0, ...
+            'target',model.target,'targetError',localAbsoluteTargetError(model),'contract',contract, ...
+            'horizonSteps',0,'normals',zeros(2,0),'posterior',[],'terminalElapsed',0);
+        partial=struct('sets',{{root}},'inputs',{{}},'middles',{{}}, ...
+            'realArithmeticEnclosure',true,'floatingPointCertified',false);
+        proposal=struct('context',{},'lower',{},'upper',{});certificate=base;
+        % Only initial admission selects the length. Every later call keeps
+        % this N; a terminal certificate can make a short prefix sufficient.
+        for k=1:size(seed.inputs,2)
+            set=partial.sets{end};policy=localRetainedPolicy(set,seed.inputs(:,k),cfg,contract,k==1);
+            image=nrmmJointPrediction('policyTube',set,policy);
+            proposal(end+1)=policy;partial.sets{end+1}=image.sets{2}; %#ok<AGROW>
+            partial.inputs{end+1}=image.inputs{1};partial.middles{end+1}=image.middles{1};
+            base.horizonSteps=k;
+            candidate=localRetainedAssess(partial,proposal,base,model);
+            if candidate.valid,certificate=candidate;break;end
+        end
+        assert(certificate.valid,'collisionAvoidanceController:noRetainedCertificate', ...
+            'No initial joint tube with a verified terminal continuation was admitted.');
+    end
+    % Optional expansion is verified BEFORE the QP. Rejection keeps the
+    % exact saved bounds; a fresh absolute enclosure never overwrites them.
+    budget=sum(certificate.slacks);
+    if numel(certificate.policies)==certificate.horizonSteps
+        for scale=[1,.25,.0625]
+            proposal=certificate.policies;
+            for k=1:numel(proposal)
+                proposal(k).lower=min(proposal(k).lower,-scale*[.02;.05]);
+                proposal(k).upper=max(proposal(k).upper,scale*[.02;.05]);
+            end
+            try
+                tube=nrmmJointPrediction('policyTube',certificate.tube.sets{1},proposal);
+                candidate=localRetainedAssess(tube,proposal,certificate,model);
+                if candidate.valid && sum(candidate.slacks)<=budget,certificate=candidate;break;end
+            catch exception
+                if ~localCertificateFailure(exception),rethrow(exception);end
+                search.refinementFailure=string(exception.identifier)+": "+exception.message;
+            end
+        end
+    end
+    [problem,anchor,baseInputs]=localRetainedProblem(certificate,model,contract);
+    point=zeros(size(problem.lower));point(problem.slackIndices)=certificate.slacks;
+    stateColumns=problem.stateIndices(:);point(stateColumns)=problem.equal(:,stateColumns)\problem.rhs;
+    assert(localAffineFeasible(point,problem),'collisionAvoidanceController:lostRetainedCandidate', ...
+        'The saved policy must be an explicit feasible point of the new convex problem.');
+    search.retainedCandidateFeasible=true;search.primaryOptimum=sum(certificate.slacks);
+    search.primaryLowerBound=search.primaryOptimum;search.slackCap=search.primaryOptimum;
+    % The primary minimum is analytic: every slack is bounded below by the
+    % admitted tube deficit. One QP chooses performance within that level.
+    [trial,flag,~]=localConicSolve(problem.quadratic,problem.performanceObjective,[], ...
+        problem.a,problem.b,problem.equal,problem.rhs,problem.lower,problem.upper,cfg,cfg.solver.timeLimitSeconds, ...
+        min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
+    search.solverCalls=1;
+    if flag>0 && ~isempty(trial) && all(isfinite(trial))
+        % Restore EXACT certificate membership after numerical tolerances.
+        trial(problem.inputIndices)=min(problem.upper(problem.inputIndices), ...
+            max(problem.lower(problem.inputIndices),trial(problem.inputIndices)));
+        trial(problem.slackIndices)=certificate.slacks;trial(problem.clfIndex)=0;
+        trial(stateColumns)=problem.equal(:,stateColumns)\(problem.rhs-problem.equal(:,problem.inputIndices(:))*trial(problem.inputIndices(:)));
+        if localAffineFeasible(trial,problem),point=trial;end
+    end
+    correction=reshape(point(problem.inputIndices),size(baseInputs));
+    solution=localDecode(point,problem,anchor,baseInputs+correction);
+    for k=1:numel(certificate.policies)
+        certificate.policies(k).context.input=certificate.policies(k).context.input+correction(:,k);
+        certificate.policies(k).lower=certificate.policies(k).lower-correction(:,k);
+        certificate.policies(k).upper=certificate.policies(k).upper-correction(:,k);
+    end
+    certificate.executedInput=solution.inputs(:,1);
+    solution.retainedCertificate=certificate;solution.inputBoundCorrection=0;
+    solution.terminalControlRequired=isempty(certificate.policies);
+    solution.minimumCollisionMargin=min(certificate.gaps);solution.secondaryObjective="trackingWithinCertifiedPolicyBox";
+    solution.secondaryObjectiveValue=solution.performanceCost;solution.clfNextValue=NaN;
+    solution.collisionSide=0;solution.retainCollisionSide=false;solution.collisionEscapeNormals=zeros(2,2*size(baseInputs,2)+1);
+    solution=localTerminalMetrics(solution,model);solution.terminalMarginMeters=certificate.terminal.minimumGap;
+    solution.terminalEnd=certificate.terminal.endReason;
+    model.linearization=anchor;model.trustWarmStartAdjusted=false;model.encounterExitRecord=NaN;model.robustnessRelaxation=false;
+    search.returned=true;search.converged=flag>0;search.convexSolveCompleted=flag>0;
+    search.pcbfStageCompleted=true;search.secondaryStageCompleted=flag>0;search.terminationReason="retainedCertificateReturned";
+    search.stopReason="";search.anchorCertified=true;search.appendedTerminalSteps=certificate.horizonSteps-numel(certificate.policies);
+    search.appendedBrakingSteps=search.appendedTerminalSteps;search.rtiIterations=1;
+    search.rollout=struct('available',true,'reason',"wholePolicyBoxEnclosure");
+    search.horizonSteps=certificate.horizonSteps;search.elapsedSeconds=toc(timer);search.source="retainedJointPolicyTube";
+end
+
+function policy=localRetainedPolicy(set,input,cfg,contract,first)
+    reference=[set.center(7:11);set.center(6)];gain=zeros(2,6);
+    if ~first
+        anchor=struct('states',[set.center(1:6),set.center(1:6)],'inputs',input);
+        gain=nrmmJointPrediction('feedback',anchor,cfg,cfg.controller.sampleTime);
+        estimate=set([7:11,6]);reserve=sum(abs(gain*estimate.generator),2)+abs(gain)*estimate.remainder;
+        reserve=reserve+abs(gain(:,6))*contract.noiseRadius(7);
+        if reserve(2)>0
+            authority=min(cfg.actuation.brakingRatioMaximum-input(2),input(2)-cfg.actuation.brakingRatioMinimum);
+            gain(2,:)=gain(2,:)*min(1,max(0,authority)*(1-32*eps)/reserve(2));
+        end
+    end
+    context=struct('cfg',cfg,'contract',contract,'reference',reference,'input',input, ...
+        'gain',gain,'duration',cfg.controller.sampleTime,'first',first);
+    policy=struct('context',context,'lower',zeros(2,1),'upper',zeros(2,1));
+end
+
+function errorSet=localAbsoluteTargetError(model)
+    errorSet=model.uncertainty.target;
+    if model.uncertainty.relativeFrame
+        g=model.uncertainty.egoGenerator;position=sum(vecnorm(g(1:2,:),2,1));yaw=sum(abs(g(3,:)));
+        errorSet.positionRadius=errorSet.positionRadius+position ...
+            +2*norm(model.target(1:2)-model.initialState(1:2))*sin(min(pi,yaw)/2);
+        errorSet.courseRadius=errorSet.courseRadius+yaw;
+    end
+end
+
+function candidate=localRetainedAssess(tube,policies,base,model)
+    candidate=base;candidate.valid=false;candidate.failureReason="";
+    cfg=model.cfg;n=numel(policies);h=cfg.controller.sampleTime;
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    gaps=Inf(1,n+1);normals=zeros(2,n+1);
+    for k=1:n+1
+        state=tube.sets{k}(1:6);
+        if ~predictiveSafetyGeometry.stateSetAdmissible(state,cfg)
+            candidate.failureReason="stateDomainAtNode"+k;return;
+        end
+        target=predictiveSafetyGeometry.targetPoseSet(base.target,base.targetError,base.epochSeconds+(k-1)*h);
+        normal=[];
+        if k<=size(base.normals,2) && norm(base.normals(:,k))>.5,normal=base.normals(:,k);end
+        [gaps(k),normals(:,k)]=predictiveSafetyGeometry.setSeparation(state(1:3),shape,target,base.target(8:11),normal);
+        if k<=n
+            [lo,hi]=bounds(tube.inputs{k});
+            if lo(2)<cfg.actuation.brakingRatioMinimum || hi(2)>cfg.actuation.brakingRatioMaximum
+                candidate.failureReason="inputDomainAtHold"+k;return;
+            end
+            change=tube.inputs{k}(2)-tube.sets{k}(17);[lo,hi]=bounds(change);
+            if max(abs([lo,hi]))>cfg.model.brakingRatioRateMaximum*h
+                candidate.failureReason="inputSlewAtHold"+k;return;
+            end
+        end
+    end
+    context=terminalSafeSet.context(model);context.required=0;context.inflation=0;
+    context.heldInputSet=tube.sets{end}(16:17);
+    context.targetEpoch=base.target;context.targetEpochIndex=0;context.sampleIndex=0;
+    [lo,hi]=bounds(tube.sets{end}(17));
+    if max(abs(context.brakingRatio-[lo,hi]))>context.brakingChangeMaximum
+        candidate.failureReason="terminalInputSlew";return;
+    end
+    terminal=terminalSafeSet.certifySet(context,tube.sets{end}(1:6),base.target,base.targetError,base.epochSeconds+n*h);
+    if ~terminal.valid,candidate.failureReason="terminal:"+terminal.endReason;return;end
+    candidate.valid=true;candidate.tube=tube;candidate.policies=policies;candidate.terminal=terminal;
+    candidate.gaps=gaps;candidate.normals=normals;candidate.slacks=max(0,-gaps);
+end
+
+function [p,anchor,inputs]=localRetainedProblem(certificate,model,contract)
+    n=certificate.horizonSteps;m=numel(certificate.policies);cfg=model.cfg;
+    states=zeros(6,n+1);inputs=zeros(2,n);lower=zeros(2,n);upper=lower;
+    for k=1:m+1,states(:,k)=certificate.tube.sets{k}.center(1:6);end
+    if m<n
+        entry=certificate.terminal.entry.center;speed=hypot(entry(4),entry(5));
+        beta=atan2(entry(5),entry(4));curvature=entry(6)/max(speed,eps);
+        for j=double(m>0):n-m
+            time=certificate.terminalElapsed+j*cfg.controller.sampleTime;
+            pose=nrmmJointEnclosure('terminalPose',nrmmSet(entry),certificate.terminal.context,time);
+            v=max(0,speed-time*certificate.terminal.context.deceleration);
+            states(:,m+j+1)=[pose.center;v*cos(beta);v*sin(beta);v*curvature];
+        end
+    end
+    for k=1:n
+        if k<=m
+            policy=certificate.policies(k);context=policy.context;
+            observed=[certificate.tube.sets{k}.center(7:11);certificate.tube.sets{k}.center(6)];
+            if k==1,observed=[contract.point;contract.currentMeasurement.yawRate];end
+            delta=observed-context.reference;delta(3)=atan2(sin(delta(3)),cos(delta(3)));
+            inputs(:,k)=context.input+double(~context.first)*context.gain*delta;
+            lower(:,k)=policy.lower;upper(:,k)=policy.upper;
+        else
+            inputs(:,k)=[inputs(1,max(1,k-1));certificate.terminal.context.brakingRatio];
+        end
+    end
+    anchor=struct('states',states,'inputs',inputs);ix=reshape(1:6*(n+1),6,[]);
+    iu=reshape(ix(end)+(1:2*n),2,[]);is=iu(end)+(1:n+1);ic=is(end)+1;
+    equal=sparse(6*(n+1),ic);equal(1:6,ix(:,1))=eye(6);rhs=zeros(6*(n+1),1);
+    rhs(1:6)=model.initialState-states(:,1);stages=struct('a',{},'b',{});
+    for k=1:n
+        if k<=m
+            [seedLo,seedHi]=nonlinearBicycleModel.inputBounds(cfg,true);u=min(seedHi,max(seedLo,inputs(:,k)));
+            try
+                [next,a,b]=nonlinearBicycleModel.sample(states(:,k),u,cfg);next=next+b*(inputs(:,k)-u);
+            catch exception
+                if ~localCertificateFailure(exception),rethrow(exception);end
+                % A performance tangent is optional. Its failure cannot
+                % invalidate the independently certified policy family.
+                next=states(:,k+1);a=eye(6);b=zeros(6,2);
+            end
+        else
+            next=states(:,k+1);a=eye(6);b=zeros(6,2);
+        end
+        rows=6*k+(1:6);equal(rows,ix(:,k+1))=eye(6);equal(rows,ix(:,k))=-a;equal(rows,iu(:,k))=-b;
+        rhs(rows)=next-states(:,k+1);stages(k)=struct('a',a,'b',b);
+    end
+    p=struct('a',sparse(0,ic),'b',zeros(0,1),'equal',equal,'rhs',rhs,'cones',[], ...
+        'lower',-Inf(ic,1),'upper',Inf(ic,1),'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
+        'safetyObjective',zeros(ic,1),'primaryLowerBound',sum(certificate.slacks), ...
+        'maximumCollisionTighteningMeters',NaN,'encounterExit',0, ...
+        'trustRadii',[Inf(6,n);max(abs(lower),abs(upper))],'trustSampledErrorRatio',zeros(1,n),'stages',stages);
+    p.lower(iu)=lower;p.upper(iu)=upper;p.lower(is)=certificate.slacks;p.upper(is)=certificate.slacks;
+    p.safetyObjective(is)=1;p=localSelectObjective(p,anchor,model);
+end
+
+function expected=localCertificateFailure(exception)
+    id=string(exception.identifier);
+    expected=startsWith(id,"nrmmJointEnclosure:") || startsWith(id,"nrmmSet:") ...
+        || startsWith(id,"nrmmJointPrediction:uncertified") || any(id==[ ...
+        "collisionAvoidanceController:nonlinearDomain","collisionAvoidanceController:invalidTireOperatingPoint", ...
+        "collisionAvoidanceController:singularTireLinearization"]);
 end
 
 function [feasible,blockedStage]=localDynamicsBoxCompatible(stages,defects,ix,iu,lower,upper,tolerance)

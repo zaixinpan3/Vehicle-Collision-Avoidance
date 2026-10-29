@@ -1,6 +1,58 @@
 classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target prediction, uncertainty tubes and polygon geometry.
     methods (Static)
+        function pose = targetPoseSet(target,errorSet,time)
+            % One persistent NRMM family, propagated from its actual epoch.
+            % Interval arc length uses monotonicity in initial speed and A,
+            % including forward-only stopping. No future measurement reset.
+            if isempty(errorSet)
+                q=predictiveSafetyGeometry.predictTarget(target,time);pose=nrmmSet(q(1:3));return;
+            end
+            speed=max(0,target(4)+[-1,1]*errorSet.speedRadius);
+            acceleration=target(5)+[-1,1]*errorSet.accelerationRadius;
+            arc=zeros(1,2);
+            for j=1:2
+                duration=time;
+                if acceleration(j)<0,duration=min(time,-speed(j)/acceleration(j));end
+                arc(j)=speed(j)*duration+.5*acceleration(j)*duration^2;
+            end
+            q=nrmmSet([target(1:2);target(3)+target(6);sin(target(6))/target(7);target(6)], ...
+                diag([errorSet.positionRadius;errorSet.positionRadius;errorSet.courseRadius; ...
+                    errorSet.curvatureRadius;errorSet.sideslipRadius]));
+            s=nrmmSet.range(arc(1),arc(2));half=q(4)*s/2;
+            position=q(1:2)+s*sinc(half)*[cos(q(3)+half);sin(q(3)+half)];
+            pose=[position;q(3)+2*half-q(5)];
+        end
+
+        function [gap,normal] = setSeparation(ego,shapeE,target,shapeT,normal)
+            % Verified fixed-world-normal supports of uncertain rectangles.
+            if nargin<5 || isempty(normal)
+                point=predictiveSafetyGeometry.supportLinearization(ego.center,shapeE,target.center,shapeT);
+                normal=point.normal;
+            end
+            assert(abs(norm(normal)-1)<1e-8,'predictiveSafetyGeometry:invalidNormal','A unit normal is required.');
+            normal=normal(:);minimum=Inf;maximum=-Inf;
+            rE=[cos(ego(3)),-sin(ego(3));sin(ego(3)),cos(ego(3))];
+            rT=[cos(target(3)),-sin(target(3));sin(target(3)),cos(target(3))];
+            signs=[-1,1,1,-1;-1,-1,1,1];
+            for j=1:4
+                [lo,~]=bounds(normal.'*(ego(1:2)+rE*(shapeE(3:4)+shapeE(1:2).*signs(:,j))));
+                [~,hi]=bounds(normal.'*(target(1:2)+rT*(shapeT(3:4)+shapeT(1:2).*signs(:,j))));
+                minimum=min(minimum,lo);maximum=max(maximum,hi);
+            end
+            gap=minimum-maximum;
+        end
+
+        function valid = stateSetAdmissible(state,cfg)
+            [lo,hi]=bounds(state);
+            valid=lo(4)>=cfg.model.speedMinimum && hi(4)<=cfg.model.speedMaximum ...
+                && max(abs([lo(5),hi(5)]))<=cfg.model.lateralVelocityMaximum ...
+                && max(abs([lo(6),hi(6)]))<=cfg.model.yawRateMaximum;
+            tangent=tan(cfg.model.sideslipMaximum);
+            [~,one]=bounds(state(5)-tangent*state(4));[~,two]=bounds(-state(5)-tangent*state(4));
+            valid=valid && max(one,two)<=0;
+        end
+
         function guide = avoidanceGuide(model,count)
             % Route-following initialization, corrected by an avoidance field.
             % No candidate scores or admission gate. RTI receives the states

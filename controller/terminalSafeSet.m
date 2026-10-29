@@ -51,6 +51,61 @@ classdef terminalSafeSet
 % to the offline certificate of the cruise controller and the CLF
 % (CONTROLLER_THEORY.md, Section 4).
     methods (Static)
+        function certificate = certifySet(context,entry,target,errorSet,epochSeconds,maximumSteps)
+            % Whole-set admission under the declared simplified terminal law.
+            % Continue until a uniform perception exit or two stationary,
+            % separated families. A finite work cap returns uncertified;
+            % it is never interpreted as a safe finite truncation.
+            if nargin<6,maximumSteps=4096;end
+            certificate=struct('valid',false,'entry',entry,'context',context, ...
+                'epochSeconds',epochSeconds,'time',[],'poses',{{}},'normals',zeros(2,0), ...
+                'minimumGap',Inf,'endReason',"workLimit",'realArithmeticEnclosure',true, ...
+                'floatingPointCertified',false,'model',"declaredConstantDecelerationHeldCurvature");
+            [lo,hi]=bounds(entry);
+            hardLow=context.stateLower;hardHigh=context.stateUpper;
+            if any(hardLow>0 | hardHigh<0)
+                certificate.endReason="terminalDomainExcludesStop";return;
+            end
+            side=tan(context.sideslipMaximum);
+            [~,left]=bounds(entry(5)-side*entry(4));[~,right]=bounds(-entry(5)-side*entry(4));
+            if any(lo(4:6)<hardLow) || any(hi(4:6)>hardHigh) || max(left,right)>0 ...
+                    || context.brakingRatio<context.brakingBounds(1) || context.brakingRatio>context.brakingBounds(2)
+                certificate.endReason="terminalStateOrInputDomain";return;
+            end
+            held=nrmmSet(context.heldInput);
+            if isfield(context,'heldInputSet'),held=context.heldInputSet;end
+            [bl,bh]=bounds(context.brakingRatio-held(2));
+            if max(abs([bl,bh]))>context.brakingChangeMaximum
+                certificate.endReason="terminalInputSlew";return;
+            end
+            speedMaximum=hypot(max(abs([lo(4),hi(4)])),max(abs([lo(5),hi(5)])));
+            stopTime=speedMaximum/context.deceleration;
+            if isempty(target)
+                certificate.valid=true;certificate.endReason="noTarget";return;
+            end
+            speedRadius=0;accelerationRadius=0;
+            if ~isempty(errorSet),speedRadius=errorSet.speedRadius;accelerationRadius=errorSet.accelerationRadius;end
+            for k=0:maximumSteps
+                time=k*context.sampleTime;
+                ego=nrmmJointEnclosure('terminalPose',entry,context,time);
+                other=predictiveSafetyGeometry.targetPoseSet(target,errorSet,epochSeconds+time);
+                difference=ego(1:2)-other(1:2);[dl,dh]=bounds(difference);
+                lowerDistance=norm(max(0,max(dl,-dh)));
+                certificate.time(end+1)=time;certificate.poses{end+1}=ego;
+                if lowerDistance>context.range
+                    certificate.valid=true;certificate.endReason="uniformPerceptionExit";return;
+                end
+                [gap,normal]=predictiveSafetyGeometry.setSeparation(ego,context.shape,other,target(8:11));
+                certificate.normals(:,end+1)=normal;certificate.minimumGap=min(certificate.minimumGap,gap);
+                if gap<0,certificate.endReason="unprovedSeparation";return;end
+                targetStopped=target(5)+accelerationRadius<=0 ...
+                    && target(4)+speedRadius+(target(5)+accelerationRadius)*(epochSeconds+time)<=0;
+                if time>=stopTime && targetStopped
+                    certificate.valid=true;certificate.endReason="separatedStationaryFamilies";return;
+                end
+            end
+        end
+
         function context = context(model)
             % Constants of one frame.
             cfg=model.cfg;positionRadius=0;yawRadius=0;generator=zeros(6,0);

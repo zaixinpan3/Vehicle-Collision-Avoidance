@@ -26,7 +26,13 @@ function cfg=localDefaults()
     % stays fixed throughout that encounter.
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
-        'enforceRoadBoundaries',false,'jointAffinePrediction',false,'jointNonlinearPrediction',false);
+        'enforceRoadBoundaries',false,'jointAffinePrediction',false,'jointNonlinearPrediction',false, ...
+        'retainedTube',false);
+    % retainedTube selects a different, enclosure-certified policy-box
+    % formulation for active encounters. It requires explicit ego/target
+    % bounds and retains a nonlinear joint/terminal certificate. This is
+    % opt-in until its conservative admission/continuation behavior is
+    % validated on driving scenarios; it is not ordinary point-SQP-RTI.
     % Full-domain nonlinear outer images on the RTI decision box. This
     % research mode fails explicitly if the admitted set cannot be enclosed;
     % it never substitutes the affine approximation on failure. It is not
@@ -183,6 +189,7 @@ function localValidate(cfg)
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.jointAffinePrediction,{'logical'},{'scalar'});
     validateattributes(cfg.controller.jointNonlinearPrediction,{'logical'},{'scalar'});
+    validateattributes(cfg.controller.retainedTube,{'logical'},{'scalar'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.rti.nominalTrackingWeight,{'double'},{'scalar','real','finite','nonnegative'});

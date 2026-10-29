@@ -30,9 +30,96 @@ function value = nrmmJointPrediction(action,varargin)
         case "resetEnvelope"
             [point,generator,mixed]=localResetEnvelope(varargin{:});
             value=struct('point',point,'generator',generator,'mixed',mixed);
+        case "rootSet"
+            value=localRootSet(varargin{:});
+        case "feedback"
+            value=localFeedback(varargin{:});
+        case "policyTube"
+            value=localPolicyTube(varargin{:});
+        case "conditionRetained"
+            value=localConditionRetained(varargin{:});
         otherwise
             error('nrmmJointPrediction:invalidAction','Unknown joint prediction action.');
     end
+end
+
+function set=localRootSet(state,generator,contract)
+    % Absolute joint coordinates, before the observer's current RK4 hold.
+    previous=contract.currentMeasurement.heldInput;
+    assert(numel(previous)==2,'nrmmJointPrediction:missingHeldInput','A retained policy requires the actual previous input.');
+    n=size(generator,2);
+    g=[generator,zeros(6,4);zeros(5,n+4);zeros(4,n),diag(contract.parameterRadius);zeros(6,n+4)];
+    set=nrmmSet([state;contract.point;zeros(4,1);previous;contract.positionVelocity.point],g);
+end
+
+function tube=localPolicyTube(root,policies)
+    % Each stage encloses ALL feedforward choices in its convex input box.
+    % No point-dynamics equality or derivative certificate is used here.
+    % A failed new image must not replace a previously retained certificate.
+    count=numel(policies);sets=cell(1,count+1);sets{1}=root;
+    middles=cell(1,count);inputs=cell(1,count);
+    for k=1:count
+        context=policies(k).context;
+        domain=struct('lower',[zeros(6,1);policies(k).lower], ...
+            'upper',[zeros(6,1);policies(k).upper]);
+        initial=promote(sets{k});
+        image=nrmmJointEnclosure('hold',initial.center,initial.generator,context,domain);
+        set=nrmmSet(image.point,image.generator);
+        sets{k+1}=set(1:21);middles{k}=set(22:27);inputs{k}=set(16:17);
+    end
+    tube=struct('sets',{sets},'middles',{middles},'inputs',{inputs}, ...
+        'realArithmeticEnclosure',true,'floatingPointCertified',false);
+end
+
+function posterior=localConditionRetained(set,state,generator,contract,oldContract)
+    % Keep the old generators and add equations. Reboxing this intersection
+    % could destroy containment in the predicted tube. The next propagation
+    % may safely use the larger retained set without discarding this record.
+    assert(all(contract.noiseRadius<=oldContract.noiseRadius), ...
+        'nrmmJointPrediction:changedNoiseContract','New noise bounds exceed the retained contract.');
+    assert(isequal(contract.design,oldContract.design) && contract.samplePeriod==oldContract.samplePeriod ...
+        && contract.integrationStep==oldContract.integrationStep ...
+        && contract.integrationSubstepCount==oldContract.integrationSubstepCount, ...
+        'nrmmJointPrediction:changedObserverContract','The retained observer map has changed.');
+    assert(isequal(contract.positionVelocity.gain,oldContract.positionVelocity.gain), ...
+        'nrmmJointPrediction:changedObserverContract','The position frontend gain has changed.');
+    set=promote(set);n=size(set.generator,2);m=size(generator,2);
+    selector=zeros(11,21);selector(1:5,7:11)=eye(5);selector(6:7,16:17)=eye(2);
+    % The retained frontend is a PRIOR at future control boundaries. The
+    % current runtime publishes its position-measurement POSTERIOR.
+    gain=contract.positionVelocity.gain;update=[gain(1)*eye(2);gain(2)*eye(2)];
+    selector(8:11,18:21)=eye(4)-update*[eye(2),zeros(2)];
+    known=[contract.point;contract.currentMeasurement.heldInput; ...
+        contract.positionVelocity.point-update*contract.currentMeasurement.gnssPosition];
+    known(3)=set.center(9)+atan2(sin(known(3)-set.center(9)),cos(known(3)-set.center(9)));
+    state(3)=set.center(3)+atan2(sin(state(3)-set.center(3)),cos(state(3)-set.center(3)));
+    equal=[selector*set.generator,zeros(11,m);set.generator(1:6,:),-generator];
+    rhs=[known-selector*set.center;state-set.center(1:6)];
+    % Persistent physical parameters are conditioned, never independently reset.
+    a=[set.generator(12:15,:),zeros(4,m);-set.generator(12:15,:),zeros(4,m)];
+    b=[contract.parameterRadius-set.center(12:15);contract.parameterRadius+set.center(12:15)];
+    options=optimoptions('linprog','Display','none');
+    [point,~,flag]=linprog(zeros(n+m,1),a,b,equal,rhs,-ones(n+m,1),ones(n+m,1),options);
+    assert(flag>0 && ~isempty(point),'nrmmJointPrediction:inconsistentPosterior', ...
+        'Current observer/filter/input data and error set do not intersect the retained joint prediction.');
+    posterior=struct('base',set,'equal',equal,'rhs',rhs,'a',a,'b',b, ...
+        'primitiveLower',-ones(n+m,1),'primitiveUpper',ones(n+m,1), ...
+        'physicalGeneratorColumns',n,'currentGenerator',generator,'subsetByConstruction',true, ...
+        'numericalFeasibilityChecked',true,'floatingPointCertified',false);
+    % A smaller convenient OUTER image is only a proposal for a new full
+    % certificate. It is not asserted to be a subset of the old zonotope.
+    outer=localRootSet(state,generator,contract);outer.center(9)=known(3);
+    priorMap=selector(8:11,18:21);
+    if rcond(priorMap)>1e-10
+        outer.center(18:21)=priorMap\known(8:11);
+    else
+        [lo,hi]=bounds(set(18:21));outer(18:21)=nrmmSet.range(lo,hi,size(outer.generator,2));
+    end
+    % Both old prediction and current measurement enclose the true state.
+    % Their coordinate intersection is therefore another sound outer set.
+    % It is still not a subset certificate for the old signed zonotope.
+    [lo,hi]=bounds(set);outer=nrmmSet.intersectRange(outer,lo,hi);
+    posterior.proposedOuter=outer;
 end
 
 function contract=localContract(runtime,input)
