@@ -244,6 +244,9 @@ classdef predictiveSafetyGeometry
             uncertainty=struct('specified',ego.uncertaintySpecified, ...
                 'egoGenerator',ego.errorGenerator,'collisionGenerator',ego.errorGenerator, ...
                 'target',[],'relativeFrame',false);
+            if isfield(ego,'velocityErrorGeometry') && ~isempty(ego.velocityErrorGeometry)
+                uncertainty.velocityGeometry=ego.velocityErrorGeometry;
+            end
             if isempty(observation),return;end
             set=observation.predictionErrorSet;
             if isempty(set),return;end
@@ -360,6 +363,29 @@ classdef predictiveSafetyGeometry
                 'accelerationInterval',acceleration,'curvatureInterval',curvature);
             info.available=true;info.reason="observerEnclosureContinuation";
             info.nominal=q;info.parameterIntersection=reused;
+        end
+
+        function generator = egoErrorGenerator(state,uncertainty)
+            % Evaluate the published measurement geometry at this nominal
+            % velocity. Primitive sensor/residual budgets are retained;
+            % only the rotation sensitivity and its remainder change.
+            % This is a scheduled observer contract, not a certificate that
+            % unknown future innovations obey the present residual budget.
+            generator=uncertainty.egoGenerator;
+            if ~isfield(uncertainty,'velocityGeometry'),return;end
+            geometry=uncertainty.velocityGeometry;
+            if size(generator,2)~=8,return;end
+            velocity=state(4:5);
+            residual=abs(geometry.measurementOffset);
+            generator(4:5,:)=0;
+            generator(4:5,3)=[velocity(2);-velocity(1)]*geometry.yawRadius;
+            generator(4:5,4:5)=geometry.noiseRadius*eye(2);
+            % Future residual signs are unknown. Bound the rotation of
+            % their entire box, rather than reusing the present signed
+            % residual as a fictitious future measurement.
+            remainder=norm(velocity)*geometry.yawRadius^2/2 ...
+                +norm(residual)*min(geometry.yawRadius,2);
+            generator(4:5,6:7)=diag(residual+remainder);
         end
 
         function tube = targetErrorTube(q,errorSet,time)

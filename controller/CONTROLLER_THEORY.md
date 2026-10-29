@@ -1638,6 +1638,32 @@ errors too. Add a sound enclosing ball or box for this reserve while
 retaining the shared linear columns. This reserve certifies only this
 coordinate transformation, not the preceding observer/vehicle propagation.
 
+The numerical RTI implementation now retains the factors of the current
+GNSS/yaw publication instead of copying its evaluated high-speed matrix to
+every future hold. Let `a` be the published yaw radius, `epsV` the GNSS
+velocity radius and `d` the componentwise absolute difference between the
+rotated GNSS measurement and the observer velocity. At a nominal body
+velocity `v_i`, the shared yaw column is `-J*v_i*a`. The independent velocity
+columns enclose the GNSS ball and the residual box, with additional radius
+
+    0.5*norm(v_i)*a^2 + min(a,2)*norm(d).
+
+The latter term permits every residual sign in the box and includes its
+rotation product. Sensor noise and residuals are not multiplied by a speed
+ratio. The first hold retains the actual published matrix unchanged, and
+user-supplied unfactored matrices retain their existing behavior.
+
+This is a **conditional state-dependent geometry correction** to the
+existing per-hold approximation. Future yaw and residual budgets are still
+assumed equal to their present budgets; the correction does not prove that
+future observer innovations satisfy that assumption. Metadata explicitly
+reports `futurePrimitiveBudgetsAssumed=true` and
+`futureObserverDynamicsIncluded=false`. A force-balance/model-mismatch
+contribution in the current observer residual is retained, but this is not
+a bound on all future mismatch effects. The full joint propagation below
+remains necessary for such a claim. A smaller scheduled velocity radius is
+not a new robust nonlinear recursive-feasibility certificate.
+
 The integration sequence is: initialize from the published correlated set;
 execute the definite current input; propagate the plant, persistent mismatch,
 sensor samples, actual observer updates and future feedback jointly; project
@@ -2433,7 +2459,7 @@ baseline and minimum recovery time.
 | Required mathematical ingredient | Current implementation boundary |
 | --- | --- |
 | Sound current physical enclosures | Finite published enclosures are used when available; experimental execution may proceed without a supported finite certificate. |
-| Sound physical horizon images; joint images for future feedback | Future holds restart current-width affine sets; full nonlinear remainders and future observer histories are not certified. |
+| Sound physical horizon images; joint images for future feedback | Future holds schedule the published velocity geometry while retaining current primitive budgets; full nonlinear remainders and future observer histories are not certified. |
 | Cross-sample posterior inclusion | The production RTI does not implement retained posterior intersections or input/policy and set witnesses; the longitudinal research specialization does. |
 | Common robust terminal family | Center-based target geometry and ego padding under the mild terminal model; no full nonlinear parameter-family membership certificate. |
 | Exact nonlinear CLF dissipation | Current continuous derivative, locally affine in the first input, with soft slack and a fixed reference penalty. |

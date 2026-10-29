@@ -62,6 +62,16 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
                 testCase.verifyLessThanOrEqual(abs(residual),sum(abs(generator(4:5,4:end)),2)+1e-12);
             end
         end
+        function velocityGeometryKeepsNoiseAndObserverResidualSeparate(testCase)
+            [output,bound,input]=localVelocityFixture();output.egoYaw=0;
+            output.egoBodyVelocity=[9.98;.03];
+            published=nrmmControllerErrorBounds("publish",output,bound,input,testCase.Design);
+            factors=published.controllerErrorBound.velocityGeometry;
+            testCase.verifyEqual(factors.referenceVelocity,output.egoBodyVelocity);
+            testCase.verifyEqual(factors.measurementOffset,input.gnssVelocity-output.egoBodyVelocity,AbsTol=1e-12);
+            testCase.verifyEqual(factors.noiseRadius,testCase.Design.sensors.velocityNoiseMaximum);
+            testCase.verifyEqual(factors.yawRadius,bound.yaw);
+        end
         function anExactNrmmTargetPublishesTheNrmmContract(testCase)
             published = localReconstruction(testCase.Design, [1.2; 0.03; 0]);
             motion = published.targetEstimate.predictionMotion;

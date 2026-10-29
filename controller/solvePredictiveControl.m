@@ -688,15 +688,14 @@ function [problem,model]=localFormulate(anchor,model)
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=0;encounterEnded=isempty(model.target);exitRecord=NaN;
     fullCollisionRows=isfield(model,'durationProbe') && model.durationProbe && ~isempty(model.target);
-    % Per-hold affine uncertainty. The estimator publishes a fresh
-    % enclosure G0 of its estimate at every sample, and every hold of the
-    % plan is issued from such an estimate. Hold i therefore starts from G0
-    % and propagates it through that hold only: G(t_i+tau) = Phi_i(tau) G0,
-    % and the target set restarts from its predicted state at t_i. The
-    % first hold uses the present enclosure's tangent image; nonlinear
-    % remainders are not certified. Later holds assume that the estimator's
-    % enclosure at their start equals the present one. Issued inputs carry
-    % no uncertainty of their own.
+    % Per-hold affine uncertainty. The first hold uses the published current
+    % generator unchanged. Subsequent holds re-evaluate its GNSS/yaw geometry
+    % at their own nominal velocity, retaining sensor and observer-residual
+    % budgets. Publications without these factors retain the old generator.
+    % Future yaw/residual budgets remain conditional on the current ones;
+    % this scheduling is not a lifted observer/measurement prediction or a
+    % nonlinear reachable-set certificate. No future innovation is presumed
+    % to vanish. The target set retains its existing per-hold convention.
     initialGenerator=model.uncertainty.egoGenerator;generator=initialGenerator;
     holdCenter=model.initialState;h=cfg.controller.sampleTime;
     stages=localLinearization(anchor,model);
@@ -712,6 +711,9 @@ function [problem,model]=localFormulate(anchor,model)
     model.targetSupportData=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,times-holdStarts);
     uncertaintyPrediction=struct('time',times,'target',targetTube, ...
         'egoStateRadius',zeros(6,2*count+1),'collisionStateRadius',zeros(6,2*count+1));
+    uncertaintyPrediction.stateDependentVelocityGeometry=isfield(model.uncertainty,'velocityGeometry');
+    uncertaintyPrediction.futureObserverDynamicsIncluded=false;
+    uncertaintyPrediction.futurePrimitiveBudgetsAssumed=true;
     % The target forecast at every node and midpoint (record times), and
     % the lane projection of the ego corners at every node and midpoint,
     % each in one call.
@@ -743,7 +745,9 @@ function [problem,model]=localFormulate(anchor,model)
         stage=stages(index);middle=stage.middle;am=stage.am;bm=stage.bm;
         % Node index closes hold index-1 (or is the present sample).
         collisionGenerator=localRelativeGenerator(x,generator,model,holdCenter);
-        middleGenerator=am*initialGenerator;nextGenerator=stage.a*initialGenerator;
+        holdGenerator=initialGenerator;
+        if index>1,holdGenerator=predictiveSafetyGeometry.egoErrorGenerator(x,model.uncertainty);end
+        middleGenerator=am*holdGenerator;nextGenerator=stage.a*holdGenerator;
         middleCenter=model.initialState;if index>1,middleCenter=x;end
         middleCollisionGenerator=localRelativeGenerator(middle,middleGenerator,model,middleCenter);
         uncertaintyPrediction.egoStateRadius(:,2*index-1:2*index)=[sum(abs(generator),2),sum(abs(middleGenerator),2)];

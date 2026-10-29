@@ -91,6 +91,16 @@ function output = localPublish(output, bound, input, design)
             generator(4:5,6:7)=diag(offset);generator(6,8)=egoYawRate;
             output.controllerErrorBound.generator=generator;
             output.controllerErrorBound.generatorConvention="commonPoseColumnsFirst";
+            % Preserve the factors as well as their evaluation at this
+            % sample. A controller must not carry -vx*deltaYaw unchanged to
+            % a prediction node whose longitudinal velocity is different.
+            % The residual is separate from sensor noise and the Taylor
+            % remainder; none is silently scaled with vehicle speed.
+            output.controllerErrorBound.velocityGeometry=struct( ...
+                'kind',"rotatedGnssVelocity-v1",'referenceVelocity',output.egoBodyVelocity(:), ...
+                'measurementOffset',velocity-output.egoBodyVelocity(:), ...
+                'noiseRadius',noise,'yawRadius',bound.yaw, ...
+                'scope',"currentMeasurementGeometry; future residual budgets require an observer prediction");
         end
     end
 
