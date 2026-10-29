@@ -1,5 +1,6 @@
 function carlaVehicleDynamicsDriver(b)
-    b.NumDialogPrms=1;b.NumInputPorts=1;b.NumOutputPorts=1;b.SetPreCompInpPortInfoToDynamic;b.SetPreCompOutPortInfoToDynamic;
+    b.NumDialogPrms=1;b.NumInputPorts=2;b.NumOutputPorts=1;b.SetPreCompInpPortInfoToDynamic;b.SetPreCompOutPortInfoToDynamic;
+    b.InputPort(2).Dimensions=6;b.InputPort(2).DirectFeedthrough=true;
     b.InputPort(1).Dimensions=6;b.InputPort(1).DirectFeedthrough=true;b.OutputPort(1).Dimensions=12;b.SampleTimes=[.05 0];b.SimStateCompliance='DefaultSimState';b.RegBlockMethod('Outputs',@output);
 end
 function output(b)
@@ -11,7 +12,8 @@ function output(b)
     if isfield(e,'lastTime') && abs(t-e.lastTime)<1e-9,b.OutputPort(1).Data=e.command;return;end
     raw=b.InputPort(1).Data;x=raw.*[1;-1;-1;1;-1;-1];
     truth=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'longitudinalVelocity',x(4),'lateralVelocity',x(5),'yawRate',x(6),'stateTime',t,'heldActuatorInput',e.held);
-    q=predictiveSafetyGeometry.predictTarget(e.target,t);target=localTarget(q);
+    writeline(e.bridge,jsonencode(struct('operation','step','time',t,'pose',b.InputPort(2).Data)));
+    live=jsondecode(readline(e.bridge));q=live.target(:);target=localTarget(q);
     try
         if isempty(e.context)
             [e.context,~]=nrmmEstimatorControllerAdapter('initialize',e.estimator,truth,@(time,unused)localTarget(predictiveSafetyGeometry.predictTarget(e.target,time)));
@@ -28,7 +30,7 @@ function output(b)
         torque=[max(force,0)*radius/2;max(force,0)*radius/2;0;0];
         pressure=max(-force,0)*radius/4/(.2*pi*.05^2*.177*2/4);
         e.command=[angles;torque;repmat(pressure,4,1)];
-        entry=struct('time',t,'truth',x,'target',q,'input',u,'slack',prediction.metadata.predictiveBarrierValue,'enclosed',audit.truthEnclosure);
+        entry=struct('time',t,'carlaFrame',live.frame,'truth',x,'target',q,'input',u,'slack',prediction.metadata.predictiveBarrierValue,'enclosed',audit.truthEnclosure);
         e.trace=[e.trace;entry];
     catch exception
         e.failedTruth=x;e.failureTime=t;
