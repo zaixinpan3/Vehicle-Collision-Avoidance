@@ -138,6 +138,36 @@ classdef adaptiveTrustRegionTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceControllerConfig(bad), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
+        function aNonlinearContinuationIsNotAnAffineShiftCertificate(testCase)
+            % Form the ACTUAL local equalities after a small root update.
+            % No trust or collision restriction is needed to expose the
+            % distinction. This does not claim the full QP is infeasible.
+            model=testCase.model;cfg=testCase.cfg;anchor=testCase.anchor;
+            cfg.controller.horizonSteps=2;cfg.rti.trustRegion.enabled=false;
+            model.cfg=cfg;anchor.inputs=repmat([.04;-.3],1,2);
+            anchor.states=zeros(6,3);anchor.states(:,1)=[0;0;0;15;.05;.02];
+            for k=1:2
+                anchor.states(:,k+1)=nonlinearBicycleModel.sample(anchor.states(:,k),anchor.inputs(:,k),cfg);
+            end
+            model.initialState=anchor.states(:,1)+[0;0;.002;.05;.03;.005];
+            anchor.states(:,1)=model.initialState;
+            p=solvePredictiveControl('probe',struct('operation','formulate', ...
+                'model',model,'anchor',anchor,'inherited',true));
+            actual=anchor.states;
+            for k=1:2
+                actual(:,k+1)=nonlinearBicycleModel.sample(actual(:,k),anchor.inputs(:,k),cfg);
+            end
+            point=zeros(size(p.lower));point(p.stateIndices)=actual-anchor.states;
+            residual=reshape(p.equal*point-p.rhs,6,[]);
+            testCase.verifyGreaterThan(abs(residual(5,end)),1e-7);
+            correction=reshape(p.rhs,6,[]);
+            for k=1:2
+                correction(:,k+1)=correction(:,k+1)+p.stages(k).a*correction(:,k);
+            end
+            point(p.stateIndices)=correction;
+            testCase.verifyEqual(p.equal*point,p.rhs,AbsTol=1e-12);
+            testCase.verifyGreaterThan(abs(anchor.states(5,end)+correction(5,end)-actual(5,end)),1e-7);
+        end
     end
 end
 

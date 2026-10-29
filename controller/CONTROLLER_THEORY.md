@@ -2726,6 +2726,197 @@ constructions under their dynamics assumptions; those assumptions are not
 silently asserted for this output-feedback Fiala model. Koehler et al. (2021),
 Section IV, supplies the corresponding output-feedback consistency framework.
 
+### Retaining a candidate in the next convex problem: constructive audit
+
+The question here is specifically condition 4 of (R3), assuming a valid
+conditioned tail and terminal extension have already been supplied by
+conditions 1--3. It must not be answered by assuming condition 4 again.
+The current point-trajectory RTI does not provide this property. A different
+local representation can provide it under the explicit incremental bounds
+below. That representation is derived here; it is **not installed as the
+online vehicle controller**.
+
+**An exact obstruction, even with an invariant terminal set.** Consider
+the scalar system `x+ = x^2 + u`, `-0.01 <= u <= 0`, with the hard state and
+terminal interval `[0,1]`. The policy `u=0` makes this interval invariant.
+A valid old horizon-two certificate has exact sets
+
+$$
+[\sqrt{1/2},1]\longmapsto[1/2,1]\longmapsto[1/4,1]
+$$
+
+and nonlinear nominal centers `sqrt(3/4), 3/4, 9/16`. Every constraint has
+zero slack. Suppose the next measurement is exactly `x=1/2`, which belongs
+to the old one-step set. The physically valid continuation is
+`1/2 -> 1/4 -> 1/16` with zero input. Following the production initialization
+pattern, reset the new first nominal node to `1/2`, retain the old endpoint
+`9/16` as the next node, and append its zero-input image. Linearization then
+imposes, in absolute coordinates,
+
+$$
+x_1=\tfrac14+u_0,\qquad
+x_2=\tfrac98 x_1-\tfrac{81}{256}+u_1
+    =-\tfrac9{256}+\tfrac98u_0+u_1<0.
+$$
+
+The new affine problem is infeasible because `x_2 >= 0` is hard, although
+the nonlinear continuation is safe and the exact terminal set is invariant.
+Relaxing that last row instead requires slack at least `9/256`; it does not
+preserve zero slack. There is no trust region, new obstacle, target forecast
+change, numerical tolerance, or solver failure in this example. It proves
+that the point-shift/relinearize rule alone is insufficient; it does not
+assert that every vehicle encounter fails.
+
+`informationSetRecursiveFeasibilityTest` reproduces this exact calculation.
+`adaptiveTrustRegionTest.aNonlinearContinuationIsNotAnAffineShiftCertificate`
+also checks the actual Fiala formulation after a small measured-root update.
+With two 50 ms holds, inputs `[0.04 rad; -0.3]` and a 15 m/s reference, the
+nonlinear continuation does not exactly satisfy the assembled affine
+equalities. The existing affine consistency repair satisfies those
+equalities, but represents a different state sequence. This second test is
+an equality audit, not a claim of complete vehicle-QP infeasibility or of a
+robust safe Fiala witness.
+
+**A sufficient constructive replacement.** Let the retained certificate
+consist of absolute joint sets `S_i`, causal output-feedback policies `pi_i`,
+and verified inclusions
+
+$$
+\Phi_i(S_i,0,\mathcal W_i)\subseteq S_{i+1}.
+$$
+
+Here `Phi_i(chi,v,w)` is the *closed-loop augmented transition* when the
+actual input is `pi_i(available observer memory) + v`. The augmented state
+includes physical and observer states, persistent parameters, target state,
+and relevant filter/input memory. A new `v` is an admissible feedforward
+increment, not access to the unknown physical state. The old and perturbed
+images use the same primitive noise and persistent parameters. The retained
+sets need not have dynamically consistent point centers or constant width.
+
+For every `z in S_i`, `|e| <= r_i`, permitted `d_i,v_i`, and primitive `w`,
+suppose the entire intervening domain has verified componentwise bounds
+
+$$
+|D_\chi\Phi_i-A_i|\le M_{x,i},\qquad
+|D_v\Phi_i-B_i|\le M_{u,i},\qquad M_{x,i},M_{u,i}\ge0. \tag{R5}
+$$
+
+These bounds include the feedback and observer update, not just the plant.
+Define the new tube and policy by
+
+$$
+T_i=S_i\oplus\{d_i\}\oplus[-r_i,r_i],\qquad
+\pi_i^+(\cdot)=\pi_i(\cdot)+v_i.
+$$
+
+Introduce nonnegative `t_i,s_i` with `t_i >= +/-d_i` and `s_i >= +/-v_i`.
+Use the linear constraints
+
+$$
+\begin{aligned}
+d_{i+1}&=A_i d_i+B_i v_i,\\
+r_{i+1}&\ge(|A_i|+M_{x,i})r_i+M_{x,i}t_i+M_{u,i}s_i.
+\end{aligned} \tag{R6}
+$$
+
+To prove their soundness, couple a perturbed point `z+d_i+e` with its base
+point `z` and the same `w`. The integral difference formula gives
+
+$$
+|\Phi_i(z+d_i+e,v_i,w)-\Phi_i(z,0,w)-A_i d_i-B_i v_i|
+\le (|A_i|+M_{x,i})r_i+M_{x,i}|d_i|+M_{u,i}|v_i|.
+$$
+
+The retained inclusion and (R6) therefore imply
+`Phi_i(T_i,v_i,W_i) subset T_{i+1}`. No old model discrepancy or old sensor
+noise is inserted a second time as an independent incremental disturbance.
+The new `r_i` bounds only the change relative to the retained certificate;
+it does not replace the old joint observer/feedback tube by an open-loop
+uncertainty prediction.
+
+For an affine state constraint `a' chi <= b + xi_i`, the new exact support
+row is
+
+$$
+\sup_{z\in S_i}a^\top z+a^\top d_i+|a|^\top r_i\le b+\xi_i.
+$$
+
+More generally, express each input, rotating-footprint or terminal condition
+as `g_j(chi,v) <= xi_j`, with `xi_j=0` for a hard condition. Retain its old
+verified upper bound `beta_j >= sup_{z in S_i} g_j(z,0)` and require
+`beta_j <= xi_j_old`. If complete-domain derivative differences satisfy
+`|D_chi g_j-c_j'| <= m_x,j'` and `|D_v g_j-e_j'| <= m_u,j'`, impose
+
+$$
+\beta_j+c_j^\top d_i+e_j^\top v_i+
+(|c_j|+m_{x,j})^\top r_i+m_{x,j}^\top t_i+m_{u,j}^\top s_i
+\le\xi_j. \tag{R7}
+$$
+
+The same integral argument proves this affine row sufficient. Choosing
+`c_j=e_j=0` also allows valid finite Lipschitz constants to replace derivative
+differences, at the cost of losing directional improvement. Thus the
+zero-update property follows from an explicit formula, rather than being
+postulated as a new feasibility assumption. At nonsmooth transitions such
+bounds still require justification. The old support directions, absolute
+encounter times and physical parameter family are retained. A newly computed
+absolute bound cannot silently replace `beta_j` if it is looser. A terminal
+pose enclosure alone does not supply the required terminal-membership bound.
+
+After conditioning, the initial posterior is a subset of `S_0`. Set
+`d_0=r_0=0`; the base tube center need not be reset to the new point estimate.
+The known observer value enters the first policy evaluation, so this does
+not ignore the measurement or execute a stale open-loop input.
+
+Now **substitute** `d_i=r_i=t_i=s_i=v_i=0` and the shifted old slacks into
+every row: (R6) holds; all incremental reserves vanish; the current posterior
+is enclosed; and every retained state, input, collision and terminal bound
+is recovered. Trust domains must contain the zero increment. Thus this
+specific convex formulation contains the shifted candidate. If that
+candidate's slacks are zero, minimizing their nonnegative sum has optimum
+zero. The argument uses one convex model and does not require repeated SQP
+iterations to converge. The executable scalar increment test also admits
+a nonzero control update, so the illustration is not only a fixed singleton.
+
+This closes condition 4 **for (R5)--(R7)**, conditional on the valid shifted
+base certificate and the stated complete-domain bounds. It is a sufficient
+construction, not a claim that every viable alternative must use this
+parameterization. It is not a completed proof for the current runtime.
+
+**Why this is a formulation change, not a smaller trust-radius patch.**
+
+- `collisionAvoidanceController` currently retains primal states, inputs,
+  slacks and side data. It does not retain the complete joint set/policy and
+  its stage/terminal implication certificates.
+- `localRtiInitialize` replaces the first state by the new estimate while
+  retaining later affine nodes. `localFormulate` then enforces point-dynamics
+  defect equalities. Equations (R6) instead propagate increments of a retained
+  set inclusion; those two meanings are different.
+- The current nonlinear enclosure propagates a fresh absolute image over a
+  whole decision box. It supplies no uniform incremental Jacobian bounds for
+  the complete joint map, and its extra reserve need not vanish at zero.
+- Full braking permits a finite Fiala force but not a finite derivative in
+  braking ratio: for fixed nonzero saturated slip, changing `b=-1` to
+  `-1+epsilon` changes force proportionally to `sqrt(2 epsilon-epsilon^2)`.
+  No finite coefficient times `epsilon` bounds this for every small positive
+  `epsilon`. Moving the seed to `-0.9999` does not certify the allowed
+  endpoint. An exact input reparameterization, proved branch treatment, or
+  restricted increments would be needed; the tire model need not be replaced.
+- `sampleEndState` also has a discrete stopped/moving reset. A derivative
+  box across its discontinuity is invalid. Zero-update retention can still
+  be used there, but nonzero admitted increments require a separate valid
+  branch argument. A sound absolute range alone is not (R5).
+
+An old-input fallback, a new constraint `sum(xi)<=J_old`, or an affine
+consistency repair cannot supply these missing implications. Conversely,
+none of the obstacles proves recursive feasibility impossible for a
+linearization-based controller. The concrete next design decision is whether
+to replace ordinary point-SQP-RTI by the retained-certificate tube formulation,
+while keeping Fiala, fixed encounter horizons and convex local optimization.
+Conditions 2--3 and whole-model incremental bounds remain separate work.
+No runtime algorithm, physical limit, terminal vehicle model or default
+certificate flag was changed by this audit.
+
 ### Computation budget and diagnostics
 
 The current research budget is 100 ms (`solver.timeLimitSeconds=0.1`), with
