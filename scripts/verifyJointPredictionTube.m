@@ -17,7 +17,8 @@ function results=verifyJointPredictionTube(options)
         design=synthesizeNrmmObserverGains(estimator.observer);
         reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;
         initial=struct('initialTime',0,'egoInitialPosition',x(1:2),'egoInitialYaw',x(3), ...
-            'egoInitialBodyVelocity',x(4:5),'targetInitialState',[20;0;speed;0;0;0]);
+            'egoInitialBodyVelocity',x(4:5),'targetInitialState',[20;0;speed;0;0;0], ...
+            'inertialVelocityInitialization',struct('value',x(4:5),'radius',.05));
         runtime=onlineNrmmTrackingRuntime('initialize',estimator.observer,initial,design);
         frame=struct('time',0,'xGps',0,'yGps',0,'vxGps',speed,'vyGps',0, ...
             'longitudinalAcceleration',0,'lateralAcceleration',0,'yawRateMeasured',0, ...
@@ -64,7 +65,7 @@ function result=localReplay(anchor,cfg,generator,contract,tube,worldCount)
         factors=contract.parameterRadius.*(2*rand(stream,4,1)-1);
         previous=contract.currentMeasurement.heldInput;
         if isempty(previous),previous=anchor.inputs(:,1);end
-        state=[anchor.states(:,1)+generator*coefficients;contract.point;factors;previous];
+        state=[anchor.states(:,1)+generator*coefficients;contract.point;factors;previous;contract.positionVelocity.point];
         for k=1:count
             % GNSS/IMU vector errors obey Euclidean balls, enclosed by the
             % independent coordinate boxes used for the tube calculation.
@@ -78,12 +79,12 @@ function result=localReplay(anchor,cfg,generator,contract,tube,worldCount)
                 'input',anchor.inputs(:,k),'gain',tube.feedbackGain(:,:,k), ...
                 'duration',cfg.controller.sampleTime,'first',k==1);
             try
-                point=nrmmJointPrediction('hold',state,noise,context);state=point(1:17);
+                point=nrmmJointPrediction('hold',state,noise,context);state=point(1:21);
             catch exception
                 failures(end+1,1)=sprintf('world %d hold %d: %s',world,k,exception.identifier); %#ok<AGROW>
                 break;
             end
-            if k==1,currentCommands(:,world)=point(24:25);end
+            if k==1,currentCommands(:,world)=point(28:29);end
             difference=abs(state(1:6)-anchor.states(:,k+1));peak=max(peak,difference);
             [gap,coordinate]=max(difference-tube.physicalRadius(:,2*k+1));
             if gap>excess,excess=gap;worstPhysical=[world,k,coordinate,gap];end

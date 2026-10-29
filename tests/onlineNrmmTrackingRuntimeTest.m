@@ -250,13 +250,11 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "onlineNrmmTrackingRuntime:missingSynchronizedRadar");
         end
 
-        function everyFrameRequiresGnssVelocity(testCase)
+        function everyFrameNeedsOnlyGnssPosition(testCase)
             runtime = localRuntime();
-            frame = rmfield(localCruiseFrame(0.0), "vyGps");
-
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "step", runtime, frame), ...
-                "onlineNrmmTrackingRuntime:missingSynchronizedSignal");
+            frame = rmfield(localCruiseFrame(0.0), ["vxGps","vyGps"]);
+            output=onlineNrmmTrackingRuntime("output",runtime,frame);
+            testCase.verifyEqual(output.velocitySource,"position-history-and-imu");
         end
 
         function radarRowsMustMatchDetectionAvailability(testCase)
@@ -377,7 +375,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "step", runtime, localCruiseFrame(0.0));
             priorTargetState = firstOutput.targetState;
             dropoutFrame = localFrame( ...
-                runtime.samplePeriod, [0.5; 0.0], [NaN, NaN]);
+                runtime.samplePeriod, [10*runtime.samplePeriod; 0.0], [NaN, NaN]);
             dropoutFrame.radarDetectionAvailable = false;
 
             [~, output] = onlineNrmmTrackingRuntime( ...
@@ -484,7 +482,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyLessThan(finalError, initialError);
         end
 
-        function yawConvergesTowardGnssVelocityCourse(testCase)
+        function yawConvergesTowardPositionMotionCourse(testCase)
             cfg = nrmmTrackingConfig();
             design = synthesizeNrmmObserverGains(cfg);
             trueHeading = 0.4;
@@ -507,55 +505,42 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
 
             testCase.verifyEqual(output.yawCoursePseudoHeading, ...
                 trueHeading, ...
-                "Zero yaw rate makes the kinematic correction zero.", ...
-                AbsTol=1.0e-12);
+                "Position-history velocity converges to the constant motion direction.", ...
+                AbsTol=1.0e-8);
             testCase.verifyLessThan(abs(localWrapToPi( ...
                 output.egoYaw-trueHeading)), 0.02, ...
-                "The yaw estimate must converge onto the GNSS course.");
-            testCase.verifyLessThan(output.orientationSet.radius,0.02);
+                "The yaw estimate must converge onto the direction inferred from positions.");
+            testCase.verifyLessThanOrEqual(abs(localWrapToPi(output.egoYaw-trueHeading)), ...
+                output.egoYawErrorBound);
         end
 
-        function inconsistentYawIntersectionPreservesTheBodyCore(testCase)
-            cfg = nrmmTrackingConfig();
-            runtime = onlineNrmmTrackingRuntime("initialize",cfg,localHeadingOptions(0,10));
-            [runtime,~] = onlineNrmmTrackingRuntime("step",runtime,localConstantHeadingFrame(0,0,10));
-            frame = localConstantHeadingFrame(runtime.currentTime,0.3,10);
-            baselineFrame = localConstantHeadingFrame(runtime.currentTime,0,10);
-            [changed,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
-            [baseline,~] = onlineNrmmTrackingRuntime("step",runtime,baselineFrame);
+        function inconsistentYawIntersectionPreservesThePointDynamics(testCase)
+            runtime=localRuntime();baseline=runtime;
+            runtime.positionErrorBound.orientationSet=nrmmYawSet("initialize",pi,.01);
+            frame=localCruiseFrame(0);
+            [changed,output]=onlineNrmmTrackingRuntime("step",runtime,frame);
+            [reference,~]=onlineNrmmTrackingRuntime("step",baseline,frame);
             testCase.verifyFalse(output.orientationCertificateAvailable);
             testCase.verifyEmpty(output.orientationSet.intervals);
-            testCase.verifyTrue(output.positionErrorBoundAvailable);
             testCase.verifyFalse(output.controllerErrorBound.available);
-            testCase.verifyTrue(isfinite(output.egoBodyVelocityErrorBound));
-            testCase.verifyTrue(isfinite(output.egoPositionErrorBound));
-            testCase.verifyEqual(changed.bodyVelocityEstimate,baseline.bodyVelocityEstimate,AbsTol=1e-12);
-            testCase.verifyEqual(changed.targetState,baseline.targetState,AbsTol=1e-12);
+            testCase.verifyEqual(changed.bodyVelocityEstimate,reference.bodyVelocityEstimate,AbsTol=1e-12);
+            testCase.verifyEqual(changed.targetState,reference.targetState,AbsTol=1e-12);
         end
 
-        function outputProbesUpdateCourseCertificatesWithoutChangingYaw(testCase)
-            runtime = localRuntime();
-            firstFrame = localConstantHeadingFrame(0.0, 0.25, 10.0);
-            secondFrame = localConstantHeadingFrame(0.0, -0.2, 12.0);
-
-            first = onlineNrmmTrackingRuntime("output", runtime, firstFrame);
-            second = onlineNrmmTrackingRuntime("output", runtime, secondFrame);
-            repeated = onlineNrmmTrackingRuntime("output", runtime, firstFrame);
-
-            testCase.verifyEqual(first.yawCoursePseudoHeading, 0.25, AbsTol=1.0e-12);
-            testCase.verifyEqual(second.yawCoursePseudoHeading, -0.2, AbsTol=1.0e-12);
-            testCase.verifyEqual(repeated, first);
-            testCase.verifyEqual(first.egoYaw,runtime.yawEstimate,AbsTol=0);
-            testCase.verifyEqual(second.egoYaw,runtime.yawEstimate,AbsTol=0);
-            testCase.verifyEqual(second.orientationSet.heading,-0.2,AbsTol=1e-12);
-            testCase.verifyGreaterThanOrEqual(second.egoYawErrorBound,0.2);
-            testCase.verifyEqual(second.egoBodyVelocity,runtime.bodyVelocityEstimate,AbsTol=0);
+        function obsoleteVelocityFieldsDoNotChangeThePublication(testCase)
+            runtime=localRuntime();firstFrame=localCruiseFrame(0);
+            secondFrame=firstFrame;secondFrame.vxGps=-500;secondFrame.vyGps=800;
+            first=onlineNrmmTrackingRuntime("output",runtime,firstFrame);
+            second=onlineNrmmTrackingRuntime("output",runtime,secondFrame);
+            testCase.verifyEqual(first,second);
+            testCase.verifyEqual(first.egoYaw,runtime.yawEstimate);
         end
 
         function uninformativeCourseLeavesTheObserverDefined(testCase)
             runtime = localRuntime();
             [runtime,~] = onlineNrmmTrackingRuntime("step",runtime,localCruiseFrame(0));
             frame = localCruiseFrame(runtime.currentTime);
+            runtime.positionVelocity.point(3:4)=0;
             frame.vxGps = 0;
             frame.vyGps = 0;
             [changed,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
@@ -587,9 +572,9 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "step", runtime, localCruiseFrame(0.0));
 
             course = nrmmEgoCourseGeometry("kinematicCourse", ...
-                [10.0; 0.0], 0.0, ...
+                output.inertialVelocityEstimate, 0.0, ...
                 runtime.observerDesign.yaw.courseModel.rearAxleDistance, ...
-                runtime.observerDesign.sensors.velocityNoiseMaximum, ...
+                output.inertialVelocityEstimateErrorBound, ...
                 runtime.observerDesign.sensors.gyroscopeNoiseMaximum, ...
                 runtime.observerDesign.yaw.courseModel ...
                     .singleTrackYawRateMismatchMaximum, ...
@@ -615,7 +600,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
 
         function coursePseudoHeadingRemovesKinematicSideslip(testCase)
             cfg = nrmmTrackingConfig();
-            cfg.measurement.gps.velocityNoiseMaximum = 0.0;
+            cfg.measurement.gps.positionNoiseMaximum = 0.0;
             cfg.measurement.gyroscope.noiseMaximum = 0.0;
             cfg.ego.yaw.singleTrackYawRateMismatchMaximum = 0.0;
             design = synthesizeNrmmObserverGains(cfg);
@@ -632,7 +617,8 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "egoInitialYaw", trueYaw, ...
                 "egoInitialBodyVelocity", bodyVelocity, ...
                 "targetInitialState", ...
-                    [50.0; 0.0; speed; 0.0; 0.0; 0.0]);
+                    [50.0; 0.0; speed; 0.0; 0.0; 0.0], ...
+                "inertialVelocityInitialization",struct("value",speed*[cos(courseAngle);sin(courseAngle)],"radius",0));
             runtime = onlineNrmmTrackingRuntime( ...
                 "initialize", cfg, options, design);
             frame = struct( ...
@@ -692,7 +678,8 @@ end
 function options = localOptions()
     options = struct("initialTime",0,"egoInitialPosition",[0;0], ...
         "egoInitialYaw",0,"egoInitialBodyVelocity",[10;0], ...
-        "targetInitialState",[100;2;-12;0;0;0],"targetIdentifier","test-target");
+        "targetInitialState",[100;2;-12;0;0;0],"targetIdentifier","test-target", ...
+        "inertialVelocityInitialization",struct("value",[10;0],"radius",.05));
 end
 
 function output = localSynchronizedTurningOutput()

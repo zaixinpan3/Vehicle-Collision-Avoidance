@@ -174,7 +174,13 @@ function design = localDesign(cfg, options)
     %% Yaw stage (eqs. 36-39)
     yawGain = log(20.0)/domainTransitTime;
     gyroscopeNoise = cfg.measurement.gyroscope.noiseMaximum;
-    headingNoise = cfg.measurement.gps.velocityNoiseMaximum/max(cfg.ego.domain.speedMinimum, eps);
+    % This historical comparator retains its separate velocity-input
+    % contract. It is not the operational position-only project observer.
+    velocityNoise=.02;
+    if isfield(cfg.measurement.gps,"velocityNoiseMaximum")
+        velocityNoise=cfg.measurement.gps.velocityNoiseMaximum;
+    end
+    headingNoise = velocityNoise/max(cfg.ego.domain.speedMinimum, eps);
     noiseInput = [gyroscopeNoise, 0.0];                 % B in eq. (38)
     noiseOutput = [0.0, headingNoise];                  % D in eq. (38)
     hInfinity = localVerifyYawLmi(yawGain, noiseInput, noiseOutput);

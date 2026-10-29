@@ -104,6 +104,9 @@ function bound = localMeasure(bound,input,state)
             "The measurement and current bound must have the same timestamp.");
     end
     design = bound.design;
+    if isfield(input,"velocityErrorMaximum")
+        design.sensors.velocityNoiseMaximum=input.velocityErrorMaximum;
+    end
     sensors = design.sensors;
     domain = design.operatingDomain;
     % The runtime supplies the course geometry it integrates with; it holds
@@ -178,6 +181,9 @@ end
 function bound = localAdvance(bound,input,before,after,first,step)
     validateattributes(step,{'double'},{'scalar','real','finite','positive'});
     design = bound.design;
+    if isfield(input,"velocityErrorMaximum")
+        design.sensors.velocityNoiseMaximum=input.velocityErrorMaximum;
+    end
     target = design.target;
     domain = design.operatingDomain;
     age = max(0,bound.time-input.time)+step;

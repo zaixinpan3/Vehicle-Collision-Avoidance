@@ -21,8 +21,9 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
                 testCase.verifyTrue(lateral.consistent);
                 testCase.verifyGreaterThanOrEqual(x(5),lateral.lower-1e-6);
                 testCase.verifyLessThanOrEqual(x(5),lateral.upper+1e-6);
-                testCase.verifyGreaterThanOrEqual(lateral.center,lateral.lower);
-                testCase.verifyLessThanOrEqual(lateral.center,lateral.upper);
+                % The point inversion is independent of uncertainty width.
+                % The interval and its radius must contain the physical value.
+                testCase.verifyLessThanOrEqual(abs(lateral.center-x(5)),lateral.radius+1e-6);
                 testCase.verifyEqual(lateral.radius,max(lateral.center-lateral.lower,lateral.upper-lateral.center),AbsTol=1e-12);
             end
         end

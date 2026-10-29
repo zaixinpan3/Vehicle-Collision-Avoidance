@@ -234,7 +234,7 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             expectedYaw = pi;
             expectedVelocity = design.velocity.disturbanceBound/design.velocity.lambda;
             expectedPosition = cfg.measurement.gps.positionNoiseMaximum ...
-                + cfg.measurement.gps.velocityNoiseMaximum/design.position.gain;
+                + design.sensors.velocityNoiseMaximum/design.position.gain;
             expectedTarget = (design.coupling.targetVelocityCoupling ...
                     * expectedVelocity+design.target.disturbanceBound) ...
                 / design.target.lambda;
@@ -300,7 +300,6 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             cfg = testCase.Cfg;
             cfg.ego.yaw.singleTrackYawRateMismatchMaximum = 0.0;
             cfg.measurement.gps.positionNoiseMaximum = 0.0;
-            cfg.measurement.gps.velocityNoiseMaximum = 0.0;
             cfg.measurement.imu.noiseMaximum = 0.0;
             cfg.measurement.gyroscope.noiseMaximum = 0.0;
             cfg.measurement.radar.noiseMaximum = 0.0;

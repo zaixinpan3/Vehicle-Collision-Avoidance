@@ -93,6 +93,10 @@ end
 function course = localCourse(observerInput, design)
     model = design.yaw.courseModel;
     sensors = design.sensors;
+    if isfield(observerInput,"velocityErrorMaximum")
+        sensors.velocityNoiseMaximum=observerInput.velocityErrorMaximum;
+        design.sensors=sensors;
+    end
     useModel = isfield(design,"egoModel") && ~isempty(design.egoModel) ...
         && isfield(observerInput,"heldInput") && numel(observerInput.heldInput)==2 ...
         && all(isfinite(observerInput.heldInput));
@@ -109,6 +113,7 @@ function course = localCourse(observerInput, design)
         course.lateralMeasurement = struct("center",center, ...
             "lower",center-lateralError,"upper",center+lateralError,"radius",lateralError, ...
             "consistent",feasible.consistent,"informative",true,"source","kinematic");
+        course=localPointInnovation(course,observerInput,design);
         return;
     end
 
@@ -159,11 +164,24 @@ function course = localCourse(observerInput, design)
         "yawRateErrorMaximum",sensors.gyroscopeNoiseMaximum, ...
         "modelYawRateMismatchMaximum",NaN, ...
         "sideslipDomainMaximum",model.sideslipDomainMaximum);
-    lateral.consistent = consistent;
+    % A speed ball containing zero is uninformative for orientation, not an
+    % inconsistent physical measurement.
     course.lateralMeasurement = lateral;
+    course=localPointInnovation(course,observerInput,design);
 end
 
 %% Certified kinematic course correspondence
+
+function course=localPointInnovation(course,input,design)
+    lateral=course.lateralMeasurement.center;
+    if ~isfinite(lateral),lateral=0;end
+    body=nrmmObserverVectorField("velocityMeasurement",input.gnssVelocity,input.yawRate,design,lateral);
+    inertial=input.gnssVelocity;
+    scale=design.positionVelocity.bandwidth*design.sensors.positionNoiseMaximum;
+    denominator=max(norm(body)*norm(inertial)+scale^2,eps);
+    course.correspondence.rotationVector=[body.'*inertial; ...
+        body(1)*inertial(2)-body(2)*inertial(1)]/denominator;
+end
 
 function course = localKinematicCourse( ...
         gnssVelocity, yawRateMeasured, rearAxleDistance, ...
@@ -362,6 +380,8 @@ function correspondence = localRotationCorrespondence( ...
     end
 
     correspondence = struct( ...
+        "rotationVector",[rotationCosine;rotationSine] ...
+            /max(inertialMagnitude*bodyMagnitude+inertialErrorMaximum^2+bodyErrorMaximum^2,eps), ...
         "heading", heading, ...
         "radius", radius, ...
         "informative", informative, ...
@@ -402,11 +422,6 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
     lateral = struct("center",NaN,"lower",-Inf,"upper",Inf,"radius",Inf, ...
         "consistent",true,"informative",false,"source","force-balance", ...
         "measuredSpeed",speed,"trueSpeedLowerBound",speedLow);
-    if ~(speedLow > 0) || numel(heldInput) ~= 2 || any(~isfinite(heldInput)) || abs(heldInput(2)) > 1
-        lateral.lower = -speedHigh*sineDomain;lateral.upper = speedHigh*sineDomain;
-        lateral.center = 0;lateral.radius = speedHigh*sineDomain;
-        return;
-    end
     steering = heldInput(1);braking = heldInput(2);
     accelerationLow = model.mass*(bodyAcceleration(2)-sensors.accelerometerNoiseMaximum);
     accelerationHigh = model.mass*(bodyAcceleration(2)+sensors.accelerometerNoiseMaximum);
@@ -415,6 +430,14 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
     wheelbase = model.lf+model.lr;
     load = model.mass*model.gravity/wheelbase*[model.lr;model.lf];
     eta = sqrt(max(0,1-braking^2));
+    % The point inversion depends on measured values, not certificate width.
+    nominal=localNominal(-speed*sineDomain,speed*sineDomain);
+    if ~isfinite(nominal),nominal=0;end
+    if ~(speedLow > 0)
+        lateral.lower=-speedHigh*sineDomain;lateral.upper=speedHigh*sineDomain;
+        lateral.center=nominal;lateral.radius=max(abs([lateral.lower,lateral.upper]-nominal));
+        return;
+    end
     % Corner grids: rate x speed x stiffness x friction (2x2x2x2 per axle).
     [rateGrid,speedIndex,stiffnessGrid,frictionGrid] = ndgrid(rates,[1,2],spread,spread);
     rateGrid = rateGrid(:).';speedIndex = speedIndex(:).';
@@ -443,23 +466,21 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
     lateral.lower = lower;lateral.upper = upper;
     lateral.consistent = lower <= upper;
     if lateral.consistent
-        nominal = localNominal(left,right);
-        if ~(isfinite(nominal) && nominal >= lower && nominal <= upper)
-            nominal = 0.5*(lower+upper);
-        end
         lateral.center = nominal;
-        lateral.radius = max(nominal-lower,upper-nominal);
+        lateral.radius = max(abs([nominal-lower,upper-nominal]));
         lateral.informative = isfinite(lateral.radius);
     else
-        lateral.center = NaN;lateral.radius = Inf;
+        lateral.center = nominal;lateral.radius = Inf;
     end
 
     function value = localNominal(leftEnd,rightEnd)
         % Nominal parameters and measured values: G0(v) = m*am_y.
         target = model.mass*bodyAcceleration(2);
         g = @(v) localNominalForce(v);
-        if g(leftEnd) < target || g(rightEnd) > target
-            value = NaN;return;
+        if g(leftEnd) < target
+            value = leftEnd;return;
+        elseif g(rightEnd) > target
+            value = rightEnd;return;
         end
         value = localBisect(leftEnd,rightEnd,@(v) g(v) < target);
     end

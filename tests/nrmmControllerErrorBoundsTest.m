@@ -15,6 +15,9 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "config")));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "estimator")));
             testCase.Design = synthesizeNrmmObserverGains(nrmmTrackingConfig());
+            % This geometry unit fixture declares a narrow derived-velocity
+            % ball; it does not require a velocity sensor in the runtime.
+            testCase.Design.sensors.velocityNoiseMaximum=.02;
         end
     end
     methods (Test)

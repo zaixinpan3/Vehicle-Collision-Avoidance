@@ -738,7 +738,6 @@ function [problem,model]=localFormulate(anchor,model)
         uncertaintyPrediction.observerErrorTime=jointTube.observerErrorTime;
         uncertaintyPrediction.inputRadius=jointTube.inputRadius;
         uncertaintyPrediction.mixedStopBranches=jointTube.mixedStopBranches;
-        uncertaintyPrediction.lowSpeedMeasurementBranches=jointTube.lowSpeedMeasurementBranches;
     end
     % The target forecast at every node and midpoint (record times), and
     % the lane projection of the ego corners at every node and midpoint,

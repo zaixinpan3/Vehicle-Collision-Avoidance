@@ -42,7 +42,7 @@ function results = verifyJointNrmmPrediction(outputFile, options)
         assert(published.controllerErrorBound.available);
         generator = published.controllerErrorBound.generator;
         amplitude = [repmat(estimator.sensor.gnss.positionNoiseMaximum,2,1); ...
-            repmat(estimator.sensor.gnss.velocityNoiseMaximum,2,1); ...
+            zeros(2,1); ...
             repmat(estimator.sensor.imu.accelerationNoiseMaximum,2,1); ...
             estimator.sensor.gyroscope.yawRateNoiseMaximum];
         % Steps exceed the lateral inverse's 1e-5 m/s bisection resolution.
@@ -263,7 +263,7 @@ function replay = localReplay(rootRuntime,cfg,reference,gain,estimator,count,wor
     traceTimes = traceTimes(traceTimes<=count*cfg.controller.sampleTime+1e-9);
     closedTrace = zeros(6,numel(traceTimes));openTrace = closedTrace;
     amplitude = [estimator.sensor.gnss.positionNoiseMaximum; ...
-        estimator.sensor.gnss.velocityNoiseMaximum;estimator.sensor.imu.accelerationNoiseMaximum];
+        0;estimator.sensor.imu.accelerationNoiseMaximum];
     for world = 1:worldCount
         for mode = 1:2
             runtime = rootRuntime;start = runtime.currentTime;

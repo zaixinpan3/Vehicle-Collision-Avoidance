@@ -246,6 +246,9 @@ end
 
 function cfg = localConfiguration(scenario, options)
     cfg = nrmmTrackingConfig();
+    % The original Sharma reproduction explicitly uses its paper's velocity
+    % sensor. The position-only project observer ignores these extra channels.
+    cfg.measurement.gps.velocityNoiseMaximum = .02;
     cfg.runtime.samplePeriod = options.SamplePeriod;
     cfg.runtime.integrationStepMaximum = options.IntegrationStepMaximum;
     cfg.target.domain.relativePositionMaximum = scenario.relativePositionMaximum;

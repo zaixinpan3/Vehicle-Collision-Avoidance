@@ -128,7 +128,7 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
 
         function anInvalidEgoBoundCannotBeRepairedByResettingTheTarget(testCase)
             [runtime,frame] = localRuntime(testCase.Config,testCase.Design,struct());
-            frame.vxGps = 40;
+            frame.yawRateMeasured = 1;
             [changed,~] = onlineNrmmTrackingRuntime("step",runtime,frame);
             changed = onlineNrmmTrackingRuntime("resetTarget",changed,changed.targetState);
             testCase.verifyFalse(changed.positionErrorBound.egoValid);
@@ -185,7 +185,7 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
 
         function invalidEgoCertificatesAreUnavailableForControl(testCase)
             [runtime, frame] = localRuntime(testCase.Config, testCase.Design,struct());
-            frame.vxGps = 40;
+            frame.yawRateMeasured = 1;
             output = onlineNrmmTrackingRuntime("output", runtime, frame);
             testCase.verifyFalse(output.controllerErrorBound.available);
             testCase.verifyTrue(all(isinf(output.controllerStateErrorBound)));
@@ -228,7 +228,6 @@ end
 function output = localExactCase(cfg)
     cfg.ego.yaw.singleTrackYawRateMismatchMaximum = 0;
     cfg.measurement.gps.positionNoiseMaximum = 0;
-    cfg.measurement.gps.velocityNoiseMaximum = 0;
     cfg.measurement.imu.noiseMaximum = 0;
     cfg.measurement.gyroscope.noiseMaximum = 0;
     cfg.measurement.radar.noiseMaximum = 0;
@@ -249,7 +248,7 @@ function [ratios,slack,available,stateSlack,publishedBounds] = localAdapterCheck
     targetFunction = @(t,~) struct("targetPositionInertial",[25+10*t;2],"yawAngle",0, ...
         "speed",10,"yawRate",0);
     [context,~] = nrmmEstimatorControllerAdapter("initialize",cfg,ego,targetFunction);
-    ratios = zeros(20,4);
+    ratios = zeros(20,3);
     slack = zeros(20,1);
     available = false(20,1);
     stateSlack = zeros(20,14);
@@ -262,7 +261,6 @@ function [ratios,slack,available,stateSlack,publishedBounds] = localAdapterCheck
             "sample",context,time,ego,truth);
         relative = truth.targetPositionInertial-ego.position;
         ratios(index,:) = [norm([frame.xGps;frame.yGps]-ego.position)/cfg.sensor.gnss.positionNoiseMaximum, ...
-            norm([frame.vxGps;frame.vyGps]-[15;0])/cfg.sensor.gnss.velocityNoiseMaximum, ...
             norm([frame.longitudinalAcceleration;frame.lateralAcceleration])/cfg.sensor.imu.accelerationNoiseMaximum, ...
             norm(frame.radarRelativePosition.'-relative)/cfg.sensor.radar.positionNoiseMaximum];
         slack(index) = target.relativePositionErrorBound-norm(relative-target.relativePosition);

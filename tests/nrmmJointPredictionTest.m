@@ -26,6 +26,33 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             point=[actual.positionEstimate;actual.yawEstimate;actual.bodyVelocityEstimate];
             testCase.verifyEqual(predicted,point,AbsTol=1e-12);
         end
+        function futurePositionSamplesExecuteTheActualVelocityFilter(testCase)
+            f=testCase.fixture;runtime=f.runtime;x=f.state;u=[.02;-.1];
+            frame=localHeldInput(f.frame,f.input,true);
+            output=onlineNrmmTrackingRuntime('output',runtime,frame);
+            contract=output.controllerErrorBound.jointPrediction;
+            testCase.verifyEqual(contract.noiseRadius(3:4),zeros(2,1));
+            context=struct('cfg',f.cfg,'contract',contract,'reference',f.state, ...
+                'input',u,'gain',zeros(2,6),'duration',f.cfg.controller.sampleTime,'first',true);
+            count=round(context.duration/contract.samplePeriod);
+            point=nrmmJointPrediction('hold', ...
+                [x;contract.point;zeros(4,1);f.input;contract.positionVelocity.point],zeros(7,count),context);
+            for k=1:count
+                if k>1
+                    derivative=nonlinearBicycleModel.derivative(x,u,f.cfg);
+                    frame.time=runtime.currentTime;frame.xGps=x(1);frame.yGps=x(2);
+                    frame.longitudinalAcceleration=derivative(4)-x(6)*x(5);
+                    frame.lateralAcceleration=derivative(5)+x(6)*x(4);
+                    frame.yawRateMeasured=x(6);frame=localHeldInput(frame,u,true);
+                end
+                runtime=onlineNrmmTrackingRuntime('sample',runtime,frame);
+                dt=contract.samplePeriod;flow=@(state)nonlinearBicycleModel.derivative(state,u,f.cfg);
+                a=flow(x);b=flow(x+dt*a/2);c=flow(x+dt*b/2);d=flow(x+dt*c);
+                x=x+dt*(a+2*b+2*c+d)/6;
+            end
+            testCase.verifyEqual(point(7:11),[runtime.positionEstimate;runtime.yawEstimate;runtime.bodyVelocityEstimate],AbsTol=1e-11);
+            testCase.verifyEqual(point(18:21),runtime.positionVelocity.point,AbsTol=1e-11);
+        end
         function currentInputIsKnownAndPersistentMismatchIsNotReinjected(testCase)
             f=testCase.fixture;[tube,contract]=localTube(f,6,true);
             testCase.verifyEqual(tube.firstInputRadius,zeros(2,1),AbsTol=1e-12);
@@ -66,7 +93,7 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             context=struct('cfg',f.cfg,'contract',contract,'reference',f.state, ...
                 'input',f.input,'gain',[0,-.01,-.1,0,-.02,-.05;-.02,0,0,-.2,0,0], ...
                 'duration',f.cfg.controller.sampleTime,'first',false);
-            center=[f.state;contract.point;zeros(4,1);f.input];
+            center=[f.state;contract.point;zeros(4,1);f.input;contract.positionVelocity.point];
             fast=nrmmJointPrediction('linearize',center,context);
             independent=nrmmJointPrediction('finiteDifference',center,context);
             testCase.verifyEqual(fast.point,independent.point,AbsTol=1e-12);
@@ -142,7 +169,7 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             contract=output.controllerErrorBound.jointPrediction;
             context=struct('cfg',f.cfg,'contract',contract,'reference',f.state, ...
                 'input',f.input,'gain',zeros(2,6),'duration',f.cfg.controller.sampleTime,'first',false);
-            first=[f.state;contract.point;zeros(4,1);0;-.2];second=first;second(17)=.1;
+            first=[f.state;contract.point;zeros(4,1);0;-.2;contract.positionVelocity.point];second=first;second(17)=.1;
             noise=zeros(7,round(context.duration/contract.samplePeriod));
             first=nrmmJointPrediction('hold',first,noise,context);
             second=nrmmJointPrediction('hold',second,noise,context);
@@ -166,7 +193,8 @@ function f=localFixture()
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;
     options=struct('initialTime',0,'egoInitialPosition',x(1:2), ...
         'egoInitialYaw',x(3),'egoInitialBodyVelocity',x(4:5), ...
-        'targetInitialState',[20;0;8;0;0;0]);
+        'targetInitialState',[20;0;8;0;0;0], ...
+        'inertialVelocityInitialization',struct('value',x(4:5),'radius',.05));
     runtime=onlineNrmmTrackingRuntime('initialize',estimator.observer,options,design);
     frame=struct('time',0,'xGps',x(1),'yGps',x(2),'vxGps',x(4),'vyGps',x(5), ...
         'longitudinalAcceleration',0,'lateralAcceleration',0,'yawRateMeasured',0, ...

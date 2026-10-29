@@ -19,7 +19,7 @@ function [first, second] = nrmmObserverVectorField(action, varargin)
 %       kernel compiled by scripts/buildNrmmObserverKernel.m.
 %   derivative = nrmmObserverVectorField("yawDerivative", yaw, measuredRate, correspondence, design)
 %       Parallel yaw observer: gyro propagation plus a wrapped correction
-%       toward the certified course heading when it is informative. It
+%       using a continuous rotation-vector innovation. It
 %       supplies inertial outputs and never drives the body-frame core.
 %   [velocity, feasible] = nrmmObserverVectorField("velocityMeasurement", gnssVelocity, yawRate, design, lateralVelocity)
 %       Forward kinematic inverse y_v = [phi(M, l*u); l*u]. The lateral
@@ -183,13 +183,8 @@ function derivative = localYawDerivative(yaw, measuredRate, correspondence, desi
     validateattributes(measuredRate, {'double'}, {'real','finite','scalar'});
     gain = design.yaw.correctionBandwidth;
     validateattributes(gain, {'double'}, {'real','finite','scalar','positive'});
-    derivative = measuredRate;
-    if correspondence.informative
-        heading = correspondence.heading;
-        validateattributes(heading, {'double'}, {'real','finite','scalar'});
-        innovation = mod(heading-yaw+pi,2*pi)-pi;
-        derivative = derivative+gain*innovation;
-    end
+    vector=correspondence.rotationVector;
+    derivative=measuredRate+gain*(vector(2)*cos(yaw)-vector(1)*sin(yaw));
 end
 
 %% Held-measurement RK4 interval (compiled kernel)

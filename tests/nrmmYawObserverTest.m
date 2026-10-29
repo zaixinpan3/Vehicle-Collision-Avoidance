@@ -15,21 +15,21 @@ classdef nrmmYawObserverTest < matlab.unittest.TestCase
     end
     methods (Test)
         function informativeHeadingCorrectsTheGyroPropagation(testCase)
-            measurement = struct("heading",0.3,"informative",true);
+            measurement = struct("rotationVector",[cos(.3);sin(.3)]);
             derivative = nrmmObserverVectorField("yawDerivative",0.2,0.12,measurement,testCase.Design);
             testCase.verifyEqual(derivative, ...
-                0.12+0.1*testCase.Design.yaw.correctionBandwidth,AbsTol=1e-14);
+                0.12+sin(.1)*testCase.Design.yaw.correctionBandwidth,AbsTol=1e-14);
         end
 
         function headingCorrectionTakesTheShortDirectionAcrossPi(testCase)
-            measurement = struct("heading",-pi+0.02,"informative",true);
+            measurement = struct("rotationVector",[cos(-pi+.02);sin(-pi+.02)]);
             derivative = nrmmObserverVectorField("yawDerivative",pi-0.03,0,measurement,testCase.Design);
             testCase.verifyEqual(derivative, ...
-                0.05*testCase.Design.yaw.correctionBandwidth,AbsTol=1e-14);
+                sin(.05)*testCase.Design.yaw.correctionBandwidth,AbsTol=1e-14);
         end
 
         function uninformativeHeadingLeavesOnlyGyroPropagation(testCase)
-            measurement = struct("heading",NaN,"informative",false);
+            measurement = struct("rotationVector",zeros(2,1));
             derivative = nrmmObserverVectorField("yawDerivative",0.8,0.17,measurement,testCase.Design);
             testCase.verifyEqual(derivative,0.17,AbsTol=0);
         end
@@ -37,7 +37,8 @@ classdef nrmmYawObserverTest < matlab.unittest.TestCase
         function runtimeIntegratesHeadingConvergenceWithoutSnappingToTheSet(testCase)
             runtime = localRuntime(testCase.Config,testCase.Design,0.4,[15;0]);
             [changed,output] = onlineNrmmTrackingRuntime("step",runtime,localFrame(0,[15;0],0));
-            expected = 0.4*exp(-testCase.Design.yaw.correctionBandwidth*runtime.samplePeriod);
+            expected = 2*atan(tan(.4/2)*exp(-testCase.Design.yaw.correctionBandwidth*runtime.samplePeriod ...
+                *225/(225+(testCase.Design.positionVelocity.bandwidth*testCase.Design.sensors.positionNoiseMaximum)^2)));
             testCase.verifyEqual(output.egoYaw,expected,AbsTol=1e-10);
             testCase.verifyEqual(changed.yawEstimate,output.egoYaw,AbsTol=0);
             testCase.verifyGreaterThan(output.egoYaw,0.3);
@@ -90,7 +91,8 @@ classdef nrmmYawObserverTest < matlab.unittest.TestCase
             runtime = localRuntime(testCase.Config,testCase.Design,0.4,[15;0]);
             runtime.positionErrorBound.orientationSet = nrmmYawSet("initialize",pi,0.01);
             [~,output] = onlineNrmmTrackingRuntime("step",runtime,localFrame(0,[15;0],0));
-            expected = 0.4*exp(-testCase.Design.yaw.correctionBandwidth*runtime.samplePeriod);
+            expected = 2*atan(tan(.4/2)*exp(-testCase.Design.yaw.correctionBandwidth*runtime.samplePeriod ...
+                *225/(225+(testCase.Design.positionVelocity.bandwidth*testCase.Design.sensors.positionNoiseMaximum)^2)));
             testCase.verifyEqual(output.egoYaw,expected,AbsTol=1e-10);
             testCase.verifyFalse(output.orientationCertificateAvailable);
             testCase.verifyTrue(isinf(output.egoYawErrorBound));
@@ -113,7 +115,8 @@ end
 
 function runtime = localRuntime(cfg,design,yaw,velocity)
     options = struct("egoInitialPosition",[0;0],"egoInitialYaw",yaw, ...
-        "egoInitialBodyVelocity",velocity,"targetInitialState",[30;2;12;0;0;0]);
+        "egoInitialBodyVelocity",velocity,"targetInitialState",[30;2;12;0;0;0], ...
+        "inertialVelocityInitialization",struct("value",velocity,"radius",.05));
     runtime = onlineNrmmTrackingRuntime("initialize",cfg,options,design);
 end
 

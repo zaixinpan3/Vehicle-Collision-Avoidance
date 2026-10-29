@@ -99,7 +99,7 @@ end
 function noise = localNoise(estimator,index)
     phase = .37*index;noise = zeros(9,1);
     amplitude = [estimator.sensor.gnss.positionNoiseMaximum; ...
-        estimator.sensor.gnss.velocityNoiseMaximum;estimator.sensor.imu.accelerationNoiseMaximum];
+        0;estimator.sensor.imu.accelerationNoiseMaximum];
     for channel = 1:3
         noise(2*channel-1:2*channel) = amplitude(channel)*[cos(channel*phase);sin(channel*phase)];
     end

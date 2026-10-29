@@ -3,8 +3,8 @@ function design = synthesizeNrmmObserverGains(cfg)
 %
 % The core is direct kinematic body velocity followed by the retained NRMM
 % target chain. The common gyro error is combined before its norm is bounded.
-% A parallel yaw observer supplies orientation outputs. Its wrapped correction
-% uses informative course headings; a separate circle set certifies its error.
+% A parallel yaw observer supplies orientation outputs. Its continuous vector
+% correction uses position/IMU motion; a separate circle set certifies error.
 % The fixed velocity gain retains the explicit minimum-bandwidth transit-decay
 % preference. The certificate does not imply that larger gains always help;
 % gains near a representative longitudinal speed/l suppress first-order gyro
@@ -27,8 +27,10 @@ function design = synthesizeNrmmObserverGains(cfg)
     %% Sensor error bounds (Sec. 3)
     positionNoise = localNonnegative(cfg, ...
         ["measurement", "gps", "positionNoiseMaximum"]);
-    velocityNoise = localNonnegative(cfg, ...
-        ["measurement", "gps", "velocityNoiseMaximum"]);
+    % Offline gain sizing only. Online bounds use the position/IMU filter's
+    % current radius; there is no direct GNSS velocity measurement.
+    positionVelocityBandwidth = localPositive(cfg,["ego","positionVelocity","bandwidth"]);
+    velocityNoise = 2*positionNoise*positionVelocityBandwidth; % Offline gain-sizing scale only.
     accelerometerNoise = localNonnegative(cfg, ...
         ["measurement", "imu", "noiseMaximum"]);
     gyroscopeNoise = localNonnegative(cfg, ...
@@ -75,7 +77,7 @@ function design = synthesizeNrmmObserverGains(cfg)
         "gain",yawCorrectionBandwidth,"minimumDecayRate",yawCorrectionBandwidth, ...
         "transitResidualFraction",0.05,"objectiveValue",yawCorrectionBandwidth, ...
         "activeConstraint","domain-transit-decay", ...
-        "scope","continuous informative heading on a compatible innovation chart");
+        "scope","response bandwidth for the continuous vector yaw innovation; not a global contraction certificate");
 
     %% Direct body-velocity observer with a shared gyro disturbance
     sensors = struct("positionNoiseMaximum",positionNoise, ...
@@ -213,6 +215,7 @@ function design = synthesizeNrmmObserverGains(cfg)
     design.construction = "direct kinematic velocity with common gyro error, " ...
         + "retained NRMM chain, and parallel yaw observer with an orientation set";
     design.sensors = sensors;
+    design.positionVelocity = struct("bandwidth",positionVelocityBandwidth);
     design.yaw = struct("correctionBandwidth",yawCorrectionBandwidth, ...
         "gainOptimization",yawGainSolution,"courseModel",courseModel, ...
         "measurementMethod","kinematic-sideslip-corrected-certified-correspondence", ...

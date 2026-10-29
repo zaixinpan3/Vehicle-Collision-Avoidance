@@ -1,8 +1,10 @@
 function value = nrmmJointPrediction(action,varargin)
 %nrmmJointPrediction Lift the sampled plant, observer and future feedback.
 % State: [physical ego (6); numerical ego observer (5); tire factors (4);
-% previous held input (2)]. At a control boundary the IMU still measures the
+% previous held input (2); position/IMU filter prior (4)]. At a control boundary the IMU still measures the
 % previous input; the new command drives the subsequent plant integration.
+% Five real noise channels are position (2), acceleration (2), and gyro (1).
+% Slots 3:4 of the legacy seven-slot noise array are zero placeholders.
 % A parameter column is introduced once and retained across the whole horizon.
 % Future sensor errors enter once per measurement, shared by the observer and
 % feedback. The actual current measurement and first command are conditioned
@@ -38,14 +40,15 @@ function contract=localContract(runtime,input)
     if isfield(design,'egoModel') && ~isempty(design.egoModel)
         radius=design.egoModel.parameterUncertainty;
     end
-    contract=struct('kind',"sampled-nrmm-joint-v1",'time',input.time, ...
+    contract=struct('kind',"sampled-nrmm-joint-v2",'time',input.time, ...
         'point',[runtime.positionEstimate;runtime.yawEstimate;runtime.bodyVelocityEstimate], ...
         'samplePeriod',runtime.samplePeriod,'integrationStep',runtime.integrationStep, ...
         'integrationSubstepCount',runtime.integrationSubstepCount, ...
         'design',design,'currentMeasurement',input, ...
+        'positionVelocity',input.positionVelocity,'sensorContract',"position-only-GNSS", ...
         'heldInputAvailable',numel(input.heldInput)==2, ...
         'noiseRadius',[repmat(sensors.positionNoiseMaximum,2,1); ...
-            repmat(sensors.velocityNoiseMaximum,2,1); ...
+            zeros(2,1); ...
             repmat(sensors.accelerometerNoiseMaximum,2,1);sensors.gyroscopeNoiseMaximum], ...
         'parameterRadius',repmat(radius,4,1), ...
         'parameterOrder',["frontCornering";"rearCornering";"frontFriction";"rearFriction"], ...
@@ -112,13 +115,13 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
     previous=contract.currentMeasurement.heldInput;
     if isempty(previous),previous=anchor.inputs(:,1);end
     generators=[initialGenerator,zeros(6,4);zeros(5,rootColumns+4); ...
-        zeros(4,rootColumns),diag(contract.parameterRadius);zeros(2,rootColumns+4)];
-    center=[anchor.states(:,1);contract.point;zeros(4,1);previous];
-    estimation=[-eye(5),zeros(5,1),eye(5),zeros(5,6)];
+        zeros(4,rootColumns),diag(contract.parameterRadius);zeros(2,rootColumns+4);zeros(4,rootColumns+4)];
+    center=[anchor.states(:,1);contract.point;zeros(4,1);previous;contract.positionVelocity.point];
+    estimation=[-eye(5),zeros(5,1),eye(5),zeros(5,10)];
     records=2*count+1;
-    tube=struct('kind',"joint-sampled-affine-tube-v1", ...
+    tube=struct('kind',"joint-sampled-affine-tube-v2", ...
         'generator',{cell(1,records)},'observerErrorRadius',zeros(5,records), ...
-        'physicalRadius',zeros(6,records),'mean',zeros(17,count+1), ...
+        'physicalRadius',zeros(6,records),'mean',zeros(21,count+1), ...
         'inputRadius',zeros(2,count),'inputGenerator',{cell(1,count)}, ...
         'feedbackGain',gains,'transition',{cell(1,count)},'noiseMap',{cell(1,count)}, ...
         'currentInputUncertaintyRadius',zeros(2,1),'currentMeasurementConditioned',true, ...
@@ -126,7 +129,7 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
         'persistentParameterColumns',rootColumns+(1:4),'nonlinearCertificate',false, ...
         'scope',"exact supports of joint affine maps; nonlinear remainders not certified", ...
         'mode',"causalObserverFeedback",'time',[0,cumsum(durations)], ...
-        'mixedStopBranches',false(1,count),'lowSpeedMeasurementBranches',false(1,count));
+        'mixedStopBranches',false(1,count));
     tube.generator{1}=initialGenerator;
     tube.physicalRadius(:,1)=sum(abs(initialGenerator),2);
     tube.observerErrorRadius(:,1)=abs(estimation*center)+sum(abs(estimation*generators),2);
@@ -163,18 +166,17 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
             matrix(4:6,:)=matrix(4:6,:)/2;noise(4:6,:)=noise(4:6,:)/2;
         end
         tube.mixedStopBranches(k)=mixed;
-        tube.lowSpeedMeasurementBranches(k)=branch.lowSpeedMeasurement;
-        middle=point(18:23);next=point(1:17);input=point(24:25);
+        middle=point(22:27);next=point(1:21);input=point(28:29);
         middleReference=localReferenceMiddle(anchor,k,cfg,durations(k));
-        tube.generator{2*k}=[nextGenerators(18:23,:),middle-middleReference];
+        tube.generator{2*k}=[nextGenerators(22:27,:),middle-middleReference];
         tube.generator{2*k+1}=[nextGenerators(1:6,:),next(1:6)-anchor.states(:,k+1)];
         tube.physicalRadius(:,2*k:2*k+1)=[sum(abs(tube.generator{2*k}),2),sum(abs(tube.generator{2*k+1}),2)];
         tube.observerErrorRadius(:,2*k)=NaN; % No fictitious midpoint posterior.
-        tube.observerErrorRadius(:,2*k+1)=abs(estimation*next)+sum(abs(estimation*nextGenerators(1:17,:)),2);
-        tube.inputGenerator{k}=nextGenerators(24:25,:);
+        tube.observerErrorRadius(:,2*k+1)=abs(estimation*next)+sum(abs(estimation*nextGenerators(1:21,:)),2);
+        tube.inputGenerator{k}=nextGenerators(28:29,:);
         tube.inputRadius(:,k)=abs(input-anchor.inputs(:,k))+sum(abs(tube.inputGenerator{k}),2);
-        tube.transition{k}=matrix(1:17,:);tube.noiseMap{k}=noise(1:17,:);
-        generators=nextGenerators(1:17,:);center=next;
+        tube.transition{k}=matrix(1:21,:);tube.noiseMap{k}=noise(1:21,:);
+        generators=nextGenerators(1:21,:);center=next;
         tube.mean(:,k+1)=center;
     end
     tube.feedbackGain=gains;
@@ -207,12 +209,12 @@ end
 function [point,matrix,noise]=localFiniteDifference(center,context)
     samples=round(context.duration/context.contract.samplePeriod);
     zero=zeros(7,samples);point=localHold(center,zero,context);
-    matrix=zeros(numel(point),17);noise=zeros(numel(point),7*samples);
-    steps=[1e-3;1e-3;1e-4;.005;.005;.0005;1e-3;1e-3;1e-4;.005;.005;repmat(.0025,4,1);1e-4;1e-3];
-    for j=1:17
-        delta=zeros(17,1);delta(j)=steps(j);
+    matrix=zeros(numel(point),21);noise=zeros(numel(point),7*samples);
+    steps=[1e-3;1e-3;1e-4;.005;.005;.0005;1e-3;1e-3;1e-4;.005;.005;repmat(.0025,4,1);1e-4;1e-3;1e-3;1e-3;.005;.005];
+    for j=1:21
+        delta=zeros(21,1);delta(j)=steps(j);
         if ~context.first
-            selector=zeros(6,17);selector(1:5,7:11)=eye(5);selector(6,6)=1;
+            selector=zeros(6,21);selector(1:5,7:11)=eye(5);selector(6,6)=1;
             slope=abs(context.gain(2,:)*selector(:,j));
             if slope>0
                 steps(j)=min(steps(j),max(eps,.25*(1-abs(context.input(2)))/slope));delta(j)=steps(j);
@@ -235,11 +237,12 @@ function [point,matrix,noise,branch]=localLinearize(center,context)
     % measurement inverse is differentiated once per sample; do not rerun an
     % entire hold for every state and every noise coordinate.
     contract=context.contract;cfg=context.cfg;
-    samples=round(context.duration/contract.samplePeriod);dimension=17+7*samples;
-    x=center(1:6);observer=center(7:11);parameters=center(12:15);previous=center(16:17);
+    samples=round(context.duration/contract.samplePeriod);dimension=21+7*samples;
+    x=center(1:6);observer=center(7:11);parameters=center(12:15);previous=center(16:17);frontend=center(18:21);
     dx=[eye(6),zeros(6,dimension-6)];dobserver=zeros(5,dimension);dobserver(:,7:11)=eye(5);
     dp=zeros(4,dimension);dp(:,12:15)=eye(4);
     dprevious=zeros(2,dimension);dprevious(:,16:17)=eye(2);
+    dfrontend=zeros(4,dimension);dfrontend(:,18:21)=eye(4);
     plant=localPlantConfiguration(cfg,parameters);
     u=context.input;du=zeros(2,dimension);
     if ~context.first
@@ -247,30 +250,40 @@ function [point,matrix,noise,branch]=localLinearize(center,context)
         difference(3)=atan2(sin(difference(3)),cos(difference(3)));
         u=u+context.gain*difference;
         du=context.gain*[dobserver;dx(6,:)];
-        du(:,24)=du(:,24)+context.gain(:,6)*contract.noiseRadius(7);
+        du(:,28)=du(:,28)+context.gain(:,6)*contract.noiseRadius(7);
     end
-    middle=zeros(6,1);dmiddle=zeros(6,dimension);lowSpeed=false;
+    middle=zeros(6,1);dmiddle=zeros(6,dimension);
     for sample=1:samples
         dm=zeros(9,dimension);
         if context.first && sample==1
             measurement=contract.currentMeasurement;
+            frontend=contract.positionVelocity.point;dfrontend(:)=0;
         else
             measuredInput=u;dmeasuredInput=du;
             if sample==1,measuredInput=previous;dmeasuredInput=dprevious;end
             measurement=localMeasurement(x,measuredInput,zeros(7,1),plant,contract);
             [~,df]=localPlantFieldTangent(x,measuredInput,plant,cfg,dx,dmeasuredInput,dp);
-            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
             dm(1:2,:)=dx(1:2,:);
-            dm(3:4,:)=rotation*dx(4:5,:)+rotation*[-x(5);x(4)]*dx(3,:);
+
             dm(5,:)=df(4,:)-x(5)*dx(6,:)-x(6)*dx(5,:);
             dm(6,:)=df(5,:)+x(4)*dx(6,:)+x(6)*dx(4,:);
             dm(7,:)=dx(6,:);
             if contract.heldInputAvailable,dm(8:9,:)=dmeasuredInput;end
-            columns=17+(sample-1)*7+(1:7);
+            columns=21+(sample-1)*7+(1:7);
             dm(1:7,columns)=dm(1:7,columns)+diag(contract.noiseRadius);
         end
+        if ~(context.first && sample==1)
+            gain=contract.positionVelocity.gain;
+            correction=[gain(1)*eye(2);gain(2)*eye(2)];
+            dfrontend=dfrontend+correction*(dm(1:2,:)-dfrontend(1:2,:));
+            frontend=nrmmPositionVelocity('pointMeasure',frontend,measurement.gnssPosition,gain);
+            measurement.gnssVelocity=frontend(3:4);dm(3:4,:)=dfrontend(3:4,:);
+        end
+        dt=contract.samplePeriod;rotation=[cos(observer(3)),-sin(observer(3));sin(observer(3)),cos(observer(3))];
+        da=rotation*dm(5:6,:)+rotation*[-measurement.bodyAcceleration(2);measurement.bodyAcceleration(1)]*dobserver(3,:);
+        frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),dt);
+        dfrontend=[dfrontend(1:2,:)+dt*dfrontend(3:4,:)+dt^2*da/2;dfrontend(3:4,:)+dt*da];
         [observer,dobserver]=localObserverTangent(observer,dobserver,measurement,dm,contract);
-        lowSpeed=lowSpeed || norm(measurement.gnssVelocity)<=2*contract.design.sensors.velocityNoiseMaximum;
         h=contract.samplePeriod;
         [f1,d1]=localPlantFieldTangent(x,u,plant,cfg,dx,du,dp);
         [f2,d2]=localPlantFieldTangent(x+h*f1/2,u,plant,cfg,dx+h*d1/2,du,dp);
@@ -279,14 +292,14 @@ function [point,matrix,noise,branch]=localLinearize(center,context)
         x=x+h*(f1+2*f2+2*f3+f4)/6;dx=dx+h*(d1+2*d2+2*d3+d4)/6;
         if sample==samples/2,middle=x;dmiddle=dx;end
     end
-    before=[x;observer;parameters;u;middle;u];beforeGradient=[dx;dobserver;dp;du;dmiddle;du];
-    branch=struct('point',before,'matrix',beforeGradient(:,1:17), ...
-        'noise',beforeGradient(:,18:end),'lowSpeedMeasurement',lowSpeed);
+    before=[x;observer;parameters;u;frontend;middle;u];beforeGradient=[dx;dobserver;dp;du;dfrontend;dmiddle;du];
+    branch=struct('point',before,'matrix',beforeGradient(:,1:21), ...
+        'noise',beforeGradient(:,22:end));
     [x,stopped]=nonlinearBicycleModel.sampleEndState(x,u,plant);
     if stopped,dx(4:6,:)=0;end
     observer(3)=x(3)+atan2(sin(observer(3)-x(3)),cos(observer(3)-x(3)));
-    point=[x;observer;parameters;u;middle;u];gradient=[dx;dobserver;dp;du;dmiddle;du];
-    matrix=gradient(:,1:17);noise=gradient(:,18:end);
+    point=[x;observer;parameters;u;frontend;middle;u];gradient=[dx;dobserver;dp;du;dfrontend;dmiddle;du];
+    matrix=gradient(:,1:21);noise=gradient(:,22:end);
 end
 
 function [point,generator,mixed]=localResetEnvelope(point,generator,cfg)
@@ -295,8 +308,8 @@ function [point,generator,mixed]=localResetEnvelope(point,generator,cfg)
     % This certifies the reset image of this affine set, not the preceding
     % nonlinear flow. Preserve every existing common generator column.
     radius=sum(abs(generator),2);threshold=.2*cfg.model.brakeHoldSpeed;
-    allStopped=point(25)+radius(25)<=0 && point(4)+radius(4)<threshold;
-    noneStopped=point(25)-radius(25)>0 || point(4)-radius(4)>=threshold;
+    allStopped=point(end)+radius(end)<=0 && point(4)+radius(4)<threshold;
+    noneStopped=point(end)-radius(end)>0 || point(4)-radius(4)>=threshold;
     mixed=~allStopped && ~noneStopped;
     if allStopped
         point(4:6)=0;generator(4:6,:)=0;
@@ -334,8 +347,8 @@ end
 
 function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
     design=contract.design;
-    [pseudo,informative]=localPseudoMeasurement(input,design);
-    dpseudo=zeros(3,size(dm,2));
+    pseudo=localPseudoMeasurement(input,design);
+    dpseudo=zeros(4,size(dm,2));
     measurement=[input.gnssPosition;input.gnssVelocity;input.bodyAcceleration;input.yawRate;zeros(2,1)];
     if contract.heldInputAvailable,measurement(8:9)=input.heldInput;end
     steps=[0;0;.005;.005;.001;.001;.00015;.0001;.001];
@@ -346,24 +359,24 @@ function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
         delta=zeros(9,1);delta(j)=steps(j);
         plus=localPseudoMeasurement(localMeasurementVector(measurement+delta,input),design);
         minus=localPseudoMeasurement(localMeasurementVector(measurement-delta,input),design);
-        difference=plus-minus;difference(3)=atan2(sin(difference(3)),cos(difference(3)));
+        difference=plus-minus;
         dpseudo=dpseudo+difference/(2*steps(j))*dm(j,:);
     end
     state=[point(4:5);point(1:2);input.gnssPosition;point(3)];
     gradient=[dpoint(4:5,:);dpoint(1:2,:);dm(1:2,:);dpoint(3,:)];
     for j=1:contract.integrationSubstepCount
         h=contract.integrationStep;
-        [v1,d1]=localObserverFieldTangent(state,gradient,input,dm,pseudo,dpseudo,informative,design);
-        [v2,d2]=localObserverFieldTangent(state+h*v1/2,gradient+h*d1/2,input,dm,pseudo,dpseudo,informative,design);
-        [v3,d3]=localObserverFieldTangent(state+h*v2/2,gradient+h*d2/2,input,dm,pseudo,dpseudo,informative,design);
-        [v4,d4]=localObserverFieldTangent(state+h*v3,gradient+h*d3,input,dm,pseudo,dpseudo,informative,design);
+        [v1,d1]=localObserverFieldTangent(state,gradient,input,dm,pseudo,dpseudo,design);
+        [v2,d2]=localObserverFieldTangent(state+h*v1/2,gradient+h*d1/2,input,dm,pseudo,dpseudo,design);
+        [v3,d3]=localObserverFieldTangent(state+h*v2/2,gradient+h*d2/2,input,dm,pseudo,dpseudo,design);
+        [v4,d4]=localObserverFieldTangent(state+h*v3,gradient+h*d3,input,dm,pseudo,dpseudo,design);
         state=state+h*(v1+2*v2+2*v3+v4)/6;gradient=gradient+h*(d1+2*d2+2*d3+d4)/6;
         state(7)=atan2(sin(state(7)),cos(state(7)));
     end
     point=state([3,4,7,1,2]);dpoint=gradient([3,4,7,1,2],:);
 end
 
-function [value,gradient]=localObserverFieldTangent(state,gradient,input,dm,pseudo,dpseudo,informative,design)
+function [value,gradient]=localObserverFieldTangent(state,gradient,input,dm,pseudo,dpseudo,design)
     cross=[0,-1;1,0];kv=design.velocity.gain;kp=design.position.gain;
     value=zeros(7,1);
     value(1:2)=input.bodyAcceleration-input.yawRate*cross*state(1:2)+kv*(pseudo(1:2)-state(1:2));
@@ -374,23 +387,20 @@ function [value,gradient]=localObserverFieldTangent(state,gradient,input,dm,pseu
         -input.yawRate*cross*gradient(1:2,:)+kv*(dpseudo(1:2,:)-gradient(1:2,:));
     result(3:4,:)=dm(3:4,:)+kp*(gradient(5:6,:)-gradient(3:4,:));
     result(5:6,:)=dm(3:4,:);result(7,:)=dm(7,:);
-    if informative
-        innovation=atan2(sin(pseudo(3)-state(7)),cos(pseudo(3)-state(7)));
-        value(7)=value(7)+design.yaw.correctionBandwidth*innovation;
-        result(7,:)=result(7,:)+design.yaw.correctionBandwidth*(dpseudo(3,:)-gradient(7,:));
-    end
+    vector=pseudo(3:4);yaw=state(7);gain=design.yaw.correctionBandwidth;
+    value(7)=value(7)+gain*(vector(2)*cos(yaw)-vector(1)*sin(yaw));
+    result(7,:)=result(7,:)+gain*([ -sin(yaw),cos(yaw)]*dpseudo(3:4,:) ...
+        -(vector(2)*sin(yaw)+vector(1)*cos(yaw))*gradient(7,:));
     gradient=result;
 end
 
-function [value,informative]=localPseudoMeasurement(input,design)
+function value=localPseudoMeasurement(input,design)
     if isfield(input,'courseGeometry'),geometry=input.courseGeometry;
     else,geometry=nrmmEgoCourseGeometry('course',input,design);end
     lateral=geometry.lateralMeasurement.center;
     if geometry.lateralMeasurement.source=="kinematic" || ~isfinite(lateral),lateral=NaN;end
     velocity=nrmmObserverVectorField('velocityMeasurement',input.gnssVelocity,input.yawRate,design,lateral);
-    heading=geometry.correspondence.heading;
-    if ~isfinite(heading),heading=0;end
-    value=[velocity;heading];informative=geometry.correspondence.informative;
+    value=[velocity;geometry.correspondence.rotationVector];
 end
 
 function input=localMeasurementVector(values,input)
@@ -402,14 +412,14 @@ end
 
 function difference=localDifference(first,second)
     difference=first-second;
-    for j=[3,9,20]
+    for j=[3,9,numel(first)-5]
         difference(j)=atan2(sin(difference(j)),cos(difference(j)));
     end
 end
 
 function value=localHold(joint,noise,context)
     cfg=context.cfg;contract=context.contract;
-    physical=joint(1:6);observer=joint(7:11);parameters=joint(12:15);previous=joint(16:17);
+    physical=joint(1:6);observer=joint(7:11);parameters=joint(12:15);previous=joint(16:17);frontend=joint(18:21);
     plant=cfg;
     plant.tire.corneringStiffness=cfg.tire.corneringStiffness.*(1+parameters(1:2));
     plant.tire.frictionCoefficient=cfg.tire.frictionCoefficient.*(1+parameters(3:4));
@@ -426,27 +436,32 @@ function value=localHold(joint,noise,context)
     for sample=1:samples
         if context.first && sample==1
             measurement=contract.currentMeasurement;
+            frontend=contract.positionVelocity.point;
         else
             % The same physical parameters generate the state and IMU signal.
             % They are not added again as an independent observer disturbance.
             measuredInput=input;if sample==1,measuredInput=previous;end
             measurement=localMeasurement(physical,measuredInput,noise(:,sample),plant,contract);
         end
+        if ~(context.first && sample==1)
+            frontend=nrmmPositionVelocity('pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
+            measurement.gnssVelocity=frontend(3:4);
+        end
+        frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),contract.samplePeriod);
         observer=localObserverStep(observer,measurement,contract);
         physical=localPlantFlow(physical,input,plant,contract.samplePeriod);
         if sample==samples/2,middle=physical;end
     end
     physical=nonlinearBicycleModel.sampleEndState(physical,input,plant);
     observer(3)=physical(3)+atan2(sin(observer(3)-physical(3)),cos(observer(3)-physical(3)));
-    value=[physical;observer;parameters;input;middle;input];
+    value=[physical;observer;parameters;input;frontend;middle;input];
 end
 
 function input=localMeasurement(x,u,noise,cfg,contract)
-    rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
     derivative=nonlinearBicycleModel.derivative(x,u,cfg);
     held=[];if contract.heldInputAvailable,held=u;end
     input=struct('gnssPosition',x(1:2)+noise(1:2), ...
-        'gnssVelocity',rotation*x(4:5)+noise(3:4), ...
+        'velocityErrorMaximum',contract.currentMeasurement.velocityErrorMaximum, ...
         'bodyAcceleration',[derivative(4)-x(6)*x(5);derivative(5)+x(6)*x(4)]+noise(5:6), ...
         'yawRate',x(6)+noise(7),'heldInput',held);
 end

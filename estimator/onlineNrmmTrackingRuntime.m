@@ -1,42 +1,22 @@
 function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % onlineNrmmTrackingRuntime Run the cascaded measured-input NRMM observer.
 %
-% Every frame contains one externally synchronized GNSS position, GNSS
-% velocity, IMU body-acceleration, and gyroscope sample. The radar position is
-% used only when its detection-availability flag is true; an unavailable
-% detection advances prediction without radar innovation.
-%
-% The eight continuous core states are body velocity and
-% the retained NRMM [rho;q;s] chain. Velocity uses the explicit forward-cone
-% extension [sqrt(max(M^2-l^2*u^2,cos(b)^2*M^2));l*u]. No yaw estimate enters
-% either chain. A parallel yaw observer integrates the gyro and a wrapped
-% course-heading correction, adding one continuous state. Its estimate supplies
-% inertial-frame outputs. A separate propagated/intersected circle set certifies
-% the yaw error about that estimate; its center never resets the observer.
-% The independent position output uses measured inertial GNSS velocity.
-%
-% GNSS-position and radar innovations use continuous output predictors reset
-% at sample arrivals. GNSS velocity, acceleration and gyro are held over each
-% interval. Their hold errors are included in the separate sampled enclosure.
-%
-% Neither the ego jerk nor any yaw-rate derivative appears in the observer
-% equations. The target nonlinearity is evaluated through the globally
-% Lipschitz saturation extension in nrmmTargetTrackerDerivative, so the
-% runtime never rejects a sample for leaving the certified operating
-% domain; domain exits are audited and reported, not gated on. All
-% continuous stages are advanced by fixed-step RK4 substeps with the frame
-% measurements held over the interval.
-% [nextRuntime,currentOutput] = onlineNrmmTrackingRuntime('sample',runtime,frame)
-% shares measurement admission between a current output and the next interval.
-% The Lyapunov/Lipschitz theorem covers the continuous vector field. Holds,
-% output-predictor resets, dropouts and RK4 are explicitly outside that
-% exponential-stability theorem. A separate comparison recursion in
-% nrmmPositionErrorBound encloses their effects at each accepted state time.
-% targetEstimate.relativePositionErrorBound is the conditional Euclidean
-% position radius in the ego body frame; invalid bounds publish Inf. The
-% accompanying metadata states its time, assumptions and numerical scope.
-% See report/NRMM_IMPLEMENTATION_NOTES.md Section 5 for the position enclosure
-% and its floating-point and future-prediction limitations.
+% Every frame provides GNSS position, body acceleration, gyro yaw rate and
+% optional radar relative position. Direct GNSS velocity fields are ignored.
+% A four-state sampled position/IMU observer reconstructs inertial velocity;
+% its evolving error ball is supplied to the body-velocity and NRMM cascade.
+% Internal gnssVelocity fields retain the numeric kernel's historical name
+% but always contain this reconstructed estimate, never a sensed velocity.
+% The position/IMU observer couples yaw back into the ego cascade. Historical
+% cascade ISS results apply conditionally to a bounded velocity-input error;
+% they are not a stability proof of the enlarged interconnection.
+% Yaw uses a continuous vector innovation and gyro propagation. Its correction
+% does not branch on an informative-course flag. A separate circle-set audit
+% may be uninformative without disabling the numerical observer.
+% GNSS/radar predictors reset on sample arrivals. The remaining continuous
+% states use held-input RK4. Numerical defects, sampling and model uncertainty
+% enter separate conditional enclosures; no floating-point interval proof is
+% claimed. See OBSERVER_ISS_THEORY.md for the position-only sensor amendment.
 
     action = lower(string(action));
     if ~isscalar(action)
@@ -142,6 +122,22 @@ function runtime = localInitialize(cfg, options, observerDesign)
         "targetCertifiedSpeedDomainValid", true, ...
         "minimumReconstructedTargetSpeed", Inf, ...
         "lastIntervalTargetCertifiedSpeedDomainValid", true);
+    rotation=[cos(egoYaw),-sin(egoYaw);sin(egoYaw),cos(egoYaw)];
+    velocity=rotation*egoBodyVelocity;
+    velocityRadius=observerDesign.operatingDomain.egoSpeedMaximum+norm(velocity);
+    if isfield(options,"initialErrorBounds") && ~isempty(fieldnames(options.initialErrorBounds))
+        initialBound=options.initialErrorBounds;
+        velocityRadius=initialBound.bodyVelocity+2*norm(egoBodyVelocity)*sin(initialBound.yaw/2);
+    end
+    if isfield(options,"inertialVelocityInitialization")
+        initialization=options.inertialVelocityInitialization;
+        velocity=initialization.value;
+        velocityRadius=initialization.radius;
+    end
+    runtime.positionVelocity=nrmmPositionVelocity("initialize",egoPosition,velocity, ...
+        observerDesign.sensors.positionNoiseMaximum,velocityRadius,samplePeriod, ...
+        observerDesign.positionVelocity.bandwidth);
+    runtime.positionVelocity.initialPositionPending=true;
     initialAudit = localOperatingDomainAudit( ...
         localPackState(runtime), runtime, "initialization");
     runtime.estimatedDomainAudit = initialAudit;
@@ -208,6 +204,7 @@ function [runtime, output] = localStep(runtime, frame, publishCurrent)
     if nargin<3,publishCurrent = false;end
     observerInput = localSynchronizedInput(frame, runtime);
 
+    runtime.positionVelocity=observerInput.positionVelocity;
     runtime.gnssPositionPredictor = observerInput.gnssPosition;
     if observerInput.radarDetectionAvailable
         runtime.targetOutputPredictor = observerInput.radarRelativePosition;
@@ -220,6 +217,9 @@ function [runtime, output] = localStep(runtime, frame, publishCurrent)
         outputRuntime.currentTime = observerInput.time;
         output = localOutput(outputRuntime,observerInput);
     end
+    runtime.positionVelocity=nrmmPositionVelocity("predict",runtime.positionVelocity, ...
+        observerInput.bodyAcceleration,runtime.yawEstimate,runtime.positionErrorBound.yaw, ...
+        runtime.observerDesign,runtime.positionErrorBound.holdBounds);
     [state, intervalAudit, runtime.positionErrorBound] = localRungeKuttaInterval( ...
         localPackState(runtime), observerInput, runtime);
     [runtime.bodyVelocityEstimate, ...
@@ -288,10 +288,10 @@ function [nextState, intervalAudit, positionErrorBound] = localRungeKuttaInterva
     measurement = struct("yawRate",observerInput.yawRate,"gnssVelocity",observerInput.gnssVelocity, ...
         "bodyAcceleration",observerInput.bodyAcceleration, ...
         "radarDetectionAvailable",observerInput.radarDetectionAvailable, ...
-        "correspondence",struct("informative",correspondence.informative,"heading",correspondence.heading), ...
+        "correspondence",struct("rotationVector",correspondence.rotationVector), ...
         "lateralVelocity",lateralVelocity);
-    if exist("nrmmObserverIntegrationKernelMex","file")==3
-        [states,firstDerivatives] = nrmmObserverIntegrationKernelMex(state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
+    if exist("nrmmObserverIntegrationKernelV2Mex","file")==3
+        [states,firstDerivatives] = nrmmObserverIntegrationKernelV2Mex(state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
     else
         [states,firstDerivatives] = nrmmObserverVectorField("integrate",state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
     end
@@ -529,6 +529,10 @@ function output = localOutput(runtime, observerInput)
         inertialVelocity(2); inertialAcceleration(2)];
 
     output = struct( ...
+        "inertialVelocityEstimate",observerInput.gnssVelocity, ...
+        "inertialVelocityEstimateTime",observerInput.time, ...
+        "inertialVelocityEstimateErrorBound",observerInput.velocityErrorMaximum, ...
+        "velocitySource",observerInput.velocitySource, ...
         "time", runtime.currentTime, ...
         "stateTime", runtime.currentTime, ...
         "inputSampleTime", observerInput.time, ...
@@ -543,8 +547,9 @@ function output = localOutput(runtime, observerInput)
         "egoAccelerationBody", measuredBodyAcceleration, ...
         "egoAccelerationInertial", inertialAcceleration, ...
         "egoYaw", runtime.yawEstimate, ...
-        "yawEstimator", "gyro-plus-wrapped-course-observer", ...
-        "yawObserverCorrectionAvailable", yawMeasurement.informative, ...
+        "yawEstimator", "gyro-plus-continuous-position-motion-innovation", ...
+        "yawObserverCorrectionAvailable", norm(yawMeasurement.rotationVector)>0, ...
+        "yawObservationSetInformative",yawMeasurement.informative, ...
         "egoYawRate", observerInput.yawRate, ...
         "egoYawRateMeasured", observerInput.yawRate, ...
         "yawCoursePseudoHeading", courseHeading, ...
@@ -573,6 +578,7 @@ function output = localOutput(runtime, observerInput)
         "orientationCertificateAvailable", runtime.positionErrorBound.orientationSet.valid, ...
         "certificateScope",struct( ...
             "continuousVectorField",true,"sampledImplementationCertified",false, ...
+            "positionVelocityInterconnectionCertified",false, ...
             "yawAssessment","orientation set enclosed about the parallel yaw observer"), ...
         "radarDetectionAvailable", ...
             observerInput.radarDetectionAvailable, ...
@@ -706,9 +712,6 @@ function observerInput = localSynchronizedInput(frame, runtime)
         "gnssPosition", [ ...
             localRequiredFrameScalar(frame, "xGps"); ...
             localRequiredFrameScalar(frame, "yGps")], ...
-        "gnssVelocity", [ ...
-            localRequiredFrameScalar(frame, "vxGps"); ...
-            localRequiredFrameScalar(frame, "vyGps")], ...
         "bodyAcceleration", [ ...
             localRequiredFrameScalar(frame, "longitudinalAcceleration"); ...
             localRequiredFrameScalar(frame, "lateralAcceleration")], ...
@@ -732,6 +735,12 @@ function observerInput = localSynchronizedInput(frame, runtime)
     % These measurements are held over the interval. Reuse their geometry
     % in every RK4 stage, domain audit, and output reconstruction.
     design = runtime.observerDesign;
+    posterior=nrmmPositionVelocity("measure",runtime.positionVelocity, ...
+        observerInput.gnssPosition,design.sensors.positionNoiseMaximum);
+    observerInput.positionVelocity=posterior;
+    observerInput.gnssVelocity=posterior.point(3:4); % Derived estimate, not a GNSS channel.
+    observerInput.velocityErrorMaximum=posterior.velocityRadius;
+    observerInput.velocitySource="position-history-and-imu";
     observerInput.courseGeometry = nrmmEgoCourseGeometry("course",observerInput, design);
 end
 

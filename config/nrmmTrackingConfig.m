@@ -31,7 +31,7 @@ function cfg = nrmmTrackingConfig()
 
     %% Forward kinematics for velocity and the parallel yaw observer
     % The course channel estimates side slip pointwise from the measured
-    % yaw rate and GNSS speed using the kinematic single-track relation.
+    % yaw rate and reconstructed inertial speed using the kinematic single-track relation.
     % sideslipDomainMaximum only selects the invertible principal branch;
     % it is not added as a fixed course-yaw disturbance. The declared
     % yaw-rate mismatch bounds unmodeled rear-tire slip and other departures
@@ -41,7 +41,7 @@ function cfg = nrmmTrackingConfig()
     cfg.ego.yaw.rearAxleDistance = vehicle.rearAxleDistance; % m l_{r,E}
     cfg.ego.yaw.sideslipDomainMaximum = 0.05;        % rad betaDomain_E
     cfg.ego.yaw.singleTrackYawRateMismatchMaximum = 0.02; % rad/s dbar_st
-    % The direction certificate uses the measured GNSS speed directly; no
+    % The direction certificate uses the position/IMU velocity estimate and its error ball; no
     % reliability score or fixed validity threshold is configured.
 
     %% Target operating domain
@@ -54,7 +54,7 @@ function cfg = nrmmTrackingConfig()
     cfg.target.domain.rearAxleDistance = 1.6;        % m l_r
     cfg.target.domain.relativePositionMaximum = 50.0; % m rhobar
     %% Deterministic sensor error bounds
-    % Input contract: GNSS position/velocity are inertial-frame,
+    % Input contract: GNSS positions are inertial-frame,
     % center-of-mass, lever-arm-compensated samples; IMU acceleration is
     % ego-body-frame at the center of mass, gravity- and lever-arm-
     % compensated; radar relative position is ego-body-frame from the ego
@@ -62,7 +62,7 @@ function cfg = nrmmTrackingConfig()
     % compensated. Synchronization to one common sample period happens
     % upstream of the observer.
     cfg.measurement.gps.positionNoiseMaximum = 0.12; % m nbar_p
-    cfg.measurement.gps.velocityNoiseMaximum = 0.02; % m/s nbar_v
+    cfg.ego.positionVelocity.bandwidth = 8.0;       % 1/s, position/IMU fusion
     % Include residual compensation, calibration and bias errors in these
     % deterministic bounds. Neither observer carries a bias state. Acceleration
     % means R(psiE)'*pE_ddot, not the derivative of body-frame velocity.

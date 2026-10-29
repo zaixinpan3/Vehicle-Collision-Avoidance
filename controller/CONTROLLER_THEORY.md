@@ -6,6 +6,16 @@ statement of the implementation boundary. Repository paths are relative to the
 repository root unless linked otherwise. Historical experiment reports describe
 the versions that produced them; they are not rewritten by this consolidation.
 
+The current estimator contract is position-only GNSS, IMU acceleration, gyro,
+and relative radar position. Inertial velocity is reconstructed by the sampled
+position/IMU filter in `estimator/nrmmPositionVelocity.m`; its evolving error
+bound replaces a direct velocity-sensor noise budget. The optional joint tube
+lifts this filter's four states and uses the same position noise in both
+position and velocity updates. It remains an affine experimental prediction,
+not a certified nonlinear robust tube. See the position-only amendment in
+`estimator/OBSERVER_ISS_THEORY.md`; earlier velocity-sensor experiments do not
+validate this more restricted sensor contract.
+
 The controller seeks rectangle nonoverlap during an encounter and resumes
 prescribed-path cruise recovery afterward. An active encounter minimizes
 predictive collision deficits first, then minimizes nominal tracking and input

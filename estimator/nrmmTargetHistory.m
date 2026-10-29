@@ -50,6 +50,9 @@ function value = nrmmTargetHistory(action, varargin)
             value = localEnclose(varargin{:});
         case "sensor"
             value = varargin{1};input = varargin{2};design = varargin{3};
+            if isfield(input,"velocityErrorMaximum")
+                design.sensors.velocityNoiseMaximum=input.velocityErrorMaximum;
+            end
             % The runtime supplies the course geometry it integrates with; a
             % caller without it and without the shared vehicle model gets
             % the kinematic correspondence, as before.

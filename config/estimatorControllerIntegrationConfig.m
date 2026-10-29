@@ -1,7 +1,7 @@
 function cfg = estimatorControllerIntegrationConfig()
 % estimatorControllerIntegrationConfig Sensor and observer test settings.
 %
-% The synthetic sensor contract contains ego GNSS position and velocity,
+% The synthetic sensor contract contains ego GNSS position only,
 % ego center-of-mass body acceleration, ego gyroscope yaw rate, and radar
 % relative position. Vector noise maxima are Euclidean norm bounds; the
 % gyroscope maximum is an absolute scalar bound.
@@ -10,7 +10,6 @@ function cfg = estimatorControllerIntegrationConfig()
     cfg.noiseModel = "boundedUniform";
 
     cfg.sensor.gnss.positionNoiseMaximum = 0.04;       % m
-    cfg.sensor.gnss.velocityNoiseMaximum = 0.05;       % m/s
     cfg.sensor.imu.accelerationNoiseMaximum = 0.03;   % m/s^2
     cfg.sensor.gyroscope.yawRateNoiseMaximum = 0.0015; % rad/s
     cfg.sensor.radar.positionNoiseMaximum = 0.04;     % m
@@ -85,8 +84,6 @@ function cfg = estimatorControllerIntegrationConfig()
 
     observer.measurement.gps.positionNoiseMaximum = ...
         cfg.sensor.gnss.positionNoiseMaximum;
-    observer.measurement.gps.velocityNoiseMaximum = ...
-        cfg.sensor.gnss.velocityNoiseMaximum;
     observer.measurement.imu.noiseMaximum = ...
         cfg.sensor.imu.accelerationNoiseMaximum;
     observer.measurement.gyroscope.noiseMaximum = ...
