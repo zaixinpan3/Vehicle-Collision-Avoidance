@@ -3132,6 +3132,160 @@ improve before enabling this backend by default. Arithmetic is ordinary
 double precision: `floatingPointCertified` and the unconditional
 `robustNonlinearSafetyCertified` flag remain false.
 
+### Conservatism audit and a measurement-consistent tightening design
+
+`scripts/analyzeRetainedTubeConservatism.m` reproduces the preceding 0.25 s
+failure and compares alternative enclosures of that same hold. It leaves the
+online controller and observer unchanged, writes no experiment artifacts,
+and uses the same sensor bounds, persistent tire-parameter family, sample
+times and hard constraints throughout. This is a single-frame diagnostic,
+not an improved closed-loop avoidance campaign.
+
+Two information losses precede the failed propagation. First, the exact
+constrained posterior is recorded, but the next image uses an unconstrained
+outer set. If that outer set fails the state cone, the fallback restores the
+old physical projection, losing the current gyro restriction. Second, this
+posterior does not explicitly enforce consistency of the physical Fiala
+state and persistent parameters with the current measured body acceleration.
+An outer state set can therefore retain lateral velocities whose predicted
+forces contradict the measurement.
+
+At the captured failure, the gyro-compatible yaw-rate radius is 0.0015 rad/s,
+whereas the fallback physical projection has radius 0.645529 rad/s. Merely
+restoring this gyro interval does not suffice. The following table uses
+radii of outer sets, not measured estimation errors. The cone column is the
+larger upper support of `vy - tan(0.25)*vx` and `-vy - tan(0.25)*vx`, in m/s;
+it must be nonpositive.
+
+| Enclosure used for the same hold | Current lateral-velocity radius (m/s) | Next lateral-velocity radius (m/s) | Next cone upper support (m/s) |
+| --- | ---: | ---: | ---: |
+| Original fallback | 1.94337 | 2.78249 | 0.831919 |
+| Retain current gyro interval | 1.94337 | 2.51462 | 0.542909 |
+| Coordinate supports of the constrained posterior | 1.91112 | 2.48194 | 0.506160 |
+| Add current nonlinear IMU consistency and condition the known first update | 0.00839847 | 0.00595571 | -1.97900 |
+
+Conditioning the known first observer update without the IMU restriction
+still fails in each of the first three cases. Thus correct first-update
+timing alone does not explain the successful last row.
+
+The measured lateral acceleration is -0.00305632631 m/s^2 with the unchanged
+0.03 m/s^2 error allowance. The prototype covers the entire incoming `vy`
+interval by subdivision. For each cell it encloses the full nonlinear
+acceleration image over every other state and persistent tire-parameter
+interval. It discards a cell only when this entire image is disjoint from
+the measured acceleration interval. Cells that remain ambiguous at 0.0005
+m/s resolution, or at the computation cap, remain included. Taking their
+hull after 113 image evaluations gives
+
+$$
+v_y\in[-0.0083587579,\ 0.0084381806]\ \mathrm{m/s}.
+$$
+
+This is interval exclusion, not a sampled maximum or a restriction imposed
+to make the hard sideslip row feasible. The true simulation state is used
+only for a subsequent containment check. The method relies on the existing
+declared Fiala/parameter/noise contract: unmodeled force or sensor effects
+would need their own justified allowances in the measurement relation.
+Near tire saturation or full braking, lateral acceleration may constrain
+lateral velocity much less; the reduction in this fixture is not uniform.
+
+With this proposed root, both the fixed policy and the entire correction
+box `|delta steering| <= 0.02 rad`, `|delta brakingRatio| <= 0.05` pass the
+current/next state checks, input/transition checks, sampled rectangle
+separation and whole-set simplified terminal check. For the nonzero box,
+the next-node gap lower bound is 17.6931 m and the terminal minimum gap
+lower bound is 8.60492 m. These checks re-admit a new candidate; they do not
+assert that a coordinate hull is a subset of the old signed zonotope. The
+online backend remains unchanged and still requests terminal continuation
+on this fixture.
+
+**Priority 1: use the physical measurement relation in the posterior.**
+For the augmented state `z`, write the bounded-error update as
+
+$$
+\mathcal S_k^+
+=\mathcal S_k^-\cap\mathcal E_k
+ \cap\{z:y_k-\mathcal H(z,u_{k-1})\in\mathcal V\},
+$$
+
+where `E_k` includes the published observer error set and known numerical
+observer/filter/input values. `H` includes position, gyro and body
+acceleration with the held input that actually generated the measurement.
+The physical state and persistent parameters are shared with propagation;
+they are not reset or assigned independent mismatch copies. For example,
+the Fiala body acceleration can be evaluated directly as
+
+$$
+a_y=\frac{F_{yf}\cos\delta+F_{xf}\sin\delta+F_{yr}}{m},
+$$
+
+before any enclosure, avoiding separate bounds for terms that cancel in
+`dot vy + vx*r`. Exact algebraic cancellation adds no tire-force constraint.
+The current measurement is known; future measurements remain uncertain and
+must be propagated jointly with their observer updates and shared noise.
+Resetting future errors to the current posterior radius is not justified.
+
+**Priority 2: preserve the restrictions during nonlinear propagation.**
+Use a constrained representation
+
+$$
+\mathcal S=\{c+G\xi:\|\xi\|_\infty\le1,\ A\xi=b,\ H\xi\le h\}.
+$$
+
+Compute support in the directions needed by hard constraints rather than
+first maximizing every state coordinate independently. Constrained
+zonotopes retain linear intersection information [Scott et al., 2016].
+For nonlinear operations, a lifted graph with shared intermediate variables
+and verified local polyhedral relaxations can carry that information through
+both dynamics and measurement equations [Rego et al., 2025]. A repeated
+nonlinear expression should reuse the same auxiliary variable, rather than
+introducing independent remainder intervals on every occurrence. Sparse
+polynomial zonotopes provide a related way to preserve nonlinear dependence
+[Kochdumper and Althoff, 2021]. These are design directions, not implemented
+replacements for `nrmmSet` in this audit. Fiala saturation, stopping and
+low-speed blending require their actual piecewise ranges; a smooth Hessian
+bound cannot be assumed across all of them.
+
+The diagnostic's coordinate projection uses LP dual residual bounds. For
+`min c'*xi` subject to `H*xi <= h`, `A*xi = b`, `|xi| <= 1`, any `y >= 0`
+and unrestricted `z` give the real-arithmetic lower bound
+
+$$
+-h^\top y-b^\top z-\|c+H^\top y+A^\top z\|_1.
+$$
+
+This retains validity despite nonzero stationarity residuals in the solver's
+dual multipliers. It does not certify floating-point roundoff. The same
+principle can bound the actual state/collision support directions without
+the diagnostic's coordinate reboxing.
+
+**Priority 3: separate decision freedom from physical uncertainty.** The
+current admission requires safety for every correction in a box and every
+disturbance. The desired optimization only needs a chosen correction whose
+policy is safe for every disturbance. Decision-dependent envelopes or the
+retained incremental construction (R5)--(R7) can reduce this extra
+conservatism while preserving the zero-correction witness. They require new
+verified inclusion bounds, not simply treating unknown disturbances as QP
+decisions. In this diagnostic the fixed correction already fails without
+measurement conditioning; enlarging or reshaping the control box is not the
+first remedy.
+
+Finally, retain common ego/target pose and parameter variables when bounding
+relative collision geometry. Separately enclosing their world-coordinate
+supports discards common translation and other valid correlations. Use
+consistent primitive-variable identities and relative vertex differences;
+numerically aligned generator columns alone do not establish shared errors.
+
+**Compatibility with (R13).** Exact measurement conditioning is a subset
+operation and preserves the true state under the declared contract. The
+saved certificate therefore remains usable. A tighter proposed outer set
+need not itself be a subset of the old zonotope; re-admit its complete
+policy family and require its deficit sum not to exceed the shifted budget.
+Until that succeeds, retain the old certificate unchanged. This preserves
+the constructive recursive-feasibility argument while allowing more accurate
+computation. Cropping states merely because they violate a desired hard
+constraint, or reducing noise/parameter bounds without evidence, would not.
+
 ### Computation budget and diagnostics
 
 The current research budget is 100 ms (`solver.timeLimitSeconds=0.1`), with
@@ -3304,6 +3458,9 @@ implementation:
 
 - Cannon, Buerger, Kouvaritakis and Rakovic (2010), *Robust tubes in nonlinear model predictive control*: [primary manuscript](https://users.ox.ac.uk/~engs0169/pdf/cannon_nolcos10.pdf), Sections 2--4, for nonlinear remainder tubes and a retained feasible candidate.
 - Lishkova and Cannon (2025), *A successive convexification approach for robust receding horizon control*: [primary manuscript](https://arxiv.org/html/2302.07744v3), Sections IV--V, for convexification-specific feasibility arguments.
+- Scott, Raimondo, Marseglia and Braatz (2016), *Constrained zonotopes: A new tool for set-based estimation and fault detection*: [primary manuscript](https://web.mit.edu/braatzgroup/Scott_Automatica_2016.pdf), Definition 3 and Sections 3--5, for exact linear intersections and the cost of discarding generator constraints.
+- Rego, Raffo, Terra and Scott (2025), *Set-based state estimation of nonlinear discrete-time systems using constrained zonotopes and polyhedral relaxations*: [preprint](https://arxiv.org/html/2504.00130v1), Section 3 and Proposition 3, for shared nonlinear graphs, polyhedral outer relaxations and measurement conditioning. The method does not establish timing or validity for this vehicle implementation.
+- Kochdumper and Althoff (2021), *Sparse Polynomial Zonotopes: A Novel Set Representation for Reachability Analysis*: [primary manuscript](https://arxiv.org/pdf/1901.01780), for preserving dependent polynomial factors through nonlinear reachability operations.
 - Huang, Wang, Margellos and Goulart (2025), *Predictive Control Barrier
   Functions: Bridging model predictive control and control barrier functions*:
   [primary manuscript](https://arxiv.org/html/2502.08400v1), Section III and
