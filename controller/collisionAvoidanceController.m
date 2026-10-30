@@ -1,6 +1,8 @@
 function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
-%collisionAvoidanceController RTI PCBF/CLF control with one horizon per encounter.
+%collisionAvoidanceController PCBF/CLF control with one horizon per encounter.
+% Joint inputs use a retained nonlinear policy/terminal certificate. The
+% point-RTI comparison path uses the iterate described below.
 % Controller state retains a target prediction and a linearization trajectory.
 % The first accepted encounter plan fixes its node count until the encounter
 % is cleared. Its remaining states and inputs are shifted and one tail hold
@@ -23,9 +25,9 @@ function [command,predictedInput,prediction,controllerState] = ...
 % It loads the compiled kernels and straight-road trim before timed samples.
 % Integrations with observer bounds also prime their bounded-input path.
 % Startup preparation is separate from the online computation budget.
-% With controller.retainedTube, active encounters instead retain a joint
-% nonlinear policy/terminal certificate. This opt-in research path is not
-% point-SQP-RTI and reports terminal takeover as an experiment-stop error.
+% Synchronized joint-observer inputs select the retained nonlinear policy/
+% terminal certificate by default. It reports terminal takeover as an
+% experiment-stop error; point-SQP-RTI remains available for comparisons.
     persistent lastState
     if nargin<=3 && (ischar(egoState) || isstring(egoState))
         action=string(egoState);
@@ -266,6 +268,11 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.optimizationProblemClass="QP";metadata.secondaryProblemClass="QP";
         metadata.safetyObjective="sumOfCertifiedPolicyBoxDeficits";
         metadata.prefixSteps=size(predictedInput,2)+1;metadata.completionSteps=0;
+        if ~isempty(search.posterior)
+            metadata.measurementConditioning=search.posterior.measurementConditioning;
+        elseif isfield(search,'initialMeasurementConditioning')
+            metadata.measurementConditioning=search.initialMeasurementConditioning;
+        end
     end
     prediction=struct('problemClass',"jointPredictiveCbfClf",'model',model, ...
         'inputTrajectory',predictedInput,'predictedState',solution.states,'predictedJointState',predictedJointState, ...

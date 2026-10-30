@@ -118,7 +118,12 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             try
                 collisionAvoidanceController(probeEgo,probeTarget,roadScan,probeCfg,[]);
             catch exception
-                if ~strcmp(exception.identifier,'collisionAvoidanceController:noOptimizationSolution'),rethrow(exception);end
+                expected=any(string(exception.identifier)==["collisionAvoidanceController:noOptimizationSolution", ...
+                    "collisionAvoidanceController:noRetainedCertificate"]) ...
+                    || startsWith(string(exception.identifier),["nrmmJointPrediction:","nrmmJointEnclosure:"]);
+                % A discarded warm-up cannot preempt the recorded first
+                % experiment frame. Its real admission failure is rerun there.
+                if ~expected,rethrow(exception);end
             end
         end
         controllerWarmUpSeconds=toc(warmUpTimer);
@@ -561,7 +566,12 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
     end
     if ~cfg.controller.enforceRoadBoundaries,road.lateralClearance=[];end
     if ~isempty(q),target=localTarget(q);end
-    ego=localEgo(x,0,[0;0]);
+    curvature=0;
+    if isfield(road,'referenceCurve'),curvature=road.referenceCurve.curvature;end
+    trim=nonlinearBicycleModel.cruise(cfg,curvature);
+    % Initialization history is constant body velocity/rate. Publish the
+    % trim command that sustains it, including passive road-load balance.
+    ego=localEgo(x,0,trim.input);
 end
 function ego=localEgo(x,time,input)
     ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...

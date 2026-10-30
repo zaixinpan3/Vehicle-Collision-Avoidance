@@ -88,6 +88,15 @@ function [context, initialization] = localInitialize( ...
     runtime = onlineNrmmTrackingRuntime( ...
         "initialize", cfg.observer, options, observerDesign);
     currentFrame = frame{end};
+    if isfield(initialEgoTruth,'heldActuatorInput')
+        % This is known actuator history, not a truth-state measurement.
+        % The first IMU sample still belongs to the command already held.
+        held=initialEgoTruth.heldActuatorInput(:);
+        assert(numel(held)==2 && all(isfinite(held)));
+        currentFrame.heldSteeringAngle=held(1);
+        currentFrame.heldBrakingRatio=held(2);
+        frame{end}=currentFrame;
+    end
     currentOutput = onlineNrmmTrackingRuntime( ...
         "output", runtime, currentFrame);
 

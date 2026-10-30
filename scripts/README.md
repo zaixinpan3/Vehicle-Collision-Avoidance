@@ -115,8 +115,8 @@ passes through zero signed velocity at 2 s. Each export records the initial
 target state and parameters for independent reconstruction; the audit's
 `--files` option selects individual JSON exports. Historical exports without
 the revised target state require the audit source from their recorded commit.
-The optimizer builds at most one local RTI model per controller call, then
-solves the PCBF and CLF objectives on that same model. Planning occurs only
+The point-RTI comparison path builds at most one local model per controller
+call, then solves the enabled PCBF or CLF objectives on that model. Planning occurs only
 at encounter onset. Later frames shift the previously accepted inputs and
 reroll them from the current estimate. The first accepted encounter plan
 fixes its node count: later frames shift its remaining inputs and append one
@@ -126,14 +126,30 @@ encounter; reacquisition may choose another horizon. A failed solve neither
 changes the node count nor rebuilds the model or calls the planner. Terminal
 constraints remain enforced. Metadata `encounterHorizonSteps` reports the
 fixed count, or zero outside an active encounter.
-Completed optimized inputs are returned unchanged only after their nonlinear
-rollout passes the sampled primary-constraint checks. The default 100 ms
-computation budget can return an explicit failure. Independent replay checks
-actual clearance and recovery. See
+That path returns completed optimized inputs after numerical bound
+normalization, without a post-solve nonlinear-rollout veto. The default 100 ms
+computation budget can return an explicit failure.
+
+Synchronized joint-observer encounters now default to the retained nonlinear
+policy/terminal certificate (`controller.retainedTube=true`). Current raw
+measurements condition proposals before full nonlinear admission; performance
+optimization acts only inside an admitted policy box. Initial admission can
+fail before any command, while later failures retain the previous certificate.
+A request to execute its terminal law stops the driving experiment. This path
+has additional enclosure/conditioning work without a hard wall-time bound;
+the current functional tests do not establish 100 ms operation. Set
+`retainedTube=false` explicitly for point-RTI comparisons. Independent replay
+checks actual clearance and recovery. See
 [the controller architecture](../controller/CONTROLLER_THEORY.md#runtime).
 The campaign entry names containing `PotentialField` are retained for callers;
 they run the current controller with second-order potential/circulation initialization and Fiala-model candidate rollouts.
 Routine outputs can use `/tmp/` instead of a persistent validation directory.
+
+`analyzeRetainedTubeConservatism(Frames=40)` runs the online conditioned
+certificate on a bounded-noise, persistent-mismatch regression fixture. It
+returns current/next widths, containment, deficits, timing and the stop reason,
+and writes no files. This stationary-target fixture is not a must-bypass
+scenario, and reaching the observation cap is not completed avoidance.
 
 `exploreFreeTimePredictiveControl` is an offline total-duration experiment.
 Pass a controller model with a previous input trajectory, or the `snapshot`

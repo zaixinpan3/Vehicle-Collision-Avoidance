@@ -1,4 +1,8 @@
 classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
+    properties (TestParameter)
+        accelerationSpeed={.1,1.5,3.2,8,15};
+        accelerationInput={[.04;-.4],[-.025;-1]};
+    end
     methods (TestClassSetup)
         function addProjectPaths(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -8,6 +12,22 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aSaturatedFialaFractionHasNoArtificialSlipUncertainty(testCase)
+            image=fialaFraction(nrmmSet([2;-2],diag([.8;.8])));
+            testCase.verifyEqual(image.center,[1;-1],AbsTol=0);
+            testCase.verifyEqual(radius(image),zeros(2,1),AbsTol=0);
+        end
+        function bodyAccelerationMatchesTheIndependentVehicleModel(testCase,accelerationSpeed,accelerationInput)
+            cfg=collisionAvoidanceControllerConfig();x=[0;0;.2;accelerationSpeed;.01;.002];
+            factors=[.03;-.02;.01;-.04];plant=cfg;
+            plant.tire.corneringStiffness=cfg.tire.corneringStiffness.*(1+factors(1:2));
+            plant.tire.frictionCoefficient=cfg.tire.frictionCoefficient.*(1+factors(3:4));
+            field=nonlinearBicycleModel.derivative(x,accelerationInput,plant);
+            expected=[field(4)-x(5)*x(6);field(5)+x(4)*x(6)];
+            actual=nrmmJointEnclosure('acceleration',nrmmSet(x),nrmmSet(accelerationInput),nrmmSet(factors),cfg);
+            testCase.verifyEqual(actual.center,expected,AbsTol=1e-12);
+            testCase.verifyEqual(radius(actual),zeros(2,1),AbsTol=1e-12);
+        end
         function sharedSymbolsCancelBeforeNonlinearRemainders(testCase)
             a=nrmmSet([1;2],diag([.1;.2]));
             testCase.verifyEqual(radius(a-a),zeros(2,1));

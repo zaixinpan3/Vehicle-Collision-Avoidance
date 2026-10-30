@@ -38,6 +38,8 @@ function value = nrmmJointPrediction(action,varargin)
             value=localPolicyTube(varargin{:});
         case "conditionRetained"
             value=localConditionRetained(varargin{:});
+        case "conditionMeasurements"
+            value=localConditionMeasurements(varargin{:});
         otherwise
             error('nrmmJointPrediction:invalidAction','Unknown joint prediction action.');
     end
@@ -71,7 +73,7 @@ function tube=localPolicyTube(root,policies)
         'realArithmeticEnclosure',true,'floatingPointCertified',false);
 end
 
-function posterior=localConditionRetained(set,state,generator,contract,oldContract)
+function posterior=localConditionRetained(set,state,generator,contract,oldContract,cfg)
     % Keep the old generators and add equations. Reboxing this intersection
     % could destroy containment in the predicted tube. The next propagation
     % may safely use the larger retained set without discarding this record.
@@ -120,6 +122,106 @@ function posterior=localConditionRetained(set,state,generator,contract,oldContra
     % It is still not a subset certificate for the old signed zonotope.
     [lo,hi]=bounds(set);outer=nrmmSet.intersectRange(outer,lo,hi);
     posterior.proposedOuter=outer;
+    if nargin>=6
+        % Project the actual constrained intersection, rather than dropping
+        % its equalities and restoring a stale physical projection.
+        outer=localPosteriorOuter(posterior);
+        conditioned=localConditionMeasurements(outer,contract,cfg);
+        posterior.proposedOuter=conditioned.set;
+        posterior.measurementConditioning=conditioned.diagnostics;
+        posterior.currentMeasurement=contract.currentMeasurement;
+        posterior.measurementNoiseRadius=contract.noiseRadius;
+    end
+end
+
+function set=localPosteriorOuter(posterior)
+    % A coordinate outer projection is a proposal for FRESH admission. It
+    % need not be a subset of the old signed zonotope. The saved constrained
+    % posterior remains the exact subset witness for the old certificate.
+    assert(all(posterior.primitiveLower==-1) && all(posterior.primitiveUpper==1));
+    extra=size(posterior.currentGenerator,2);count=numel(posterior.base.center);
+    lo=zeros(count,1);hi=lo;options=optimoptions('linprog','Display','none');
+    for j=1:count
+        direction=[posterior.base.generator(j,:),zeros(1,extra)]';
+        lo(j)=posterior.base.center(j)+localPosteriorSupport(direction,posterior,options);
+        hi(j)=posterior.base.center(j)-localPosteriorSupport(-direction,posterior,options);
+    end
+    set=nrmmSet.range(lo,hi);
+end
+
+function lower=localPosteriorSupport(direction,p,options)
+    [~,~,flag,~,dual]=linprog(direction,p.a,p.b,p.equal,p.rhs, ...
+        p.primitiveLower,p.primitiveUpper,options);
+    assert(flag>0,'nrmmJointPrediction:posteriorSupportFailed', ...
+        'A constrained posterior support solve did not finish.');
+    inequality=max(0,dual.ineqlin);equality=dual.eqlin;
+    % Any nonnegative inequality dual is valid after accounting for its
+    % stationarity residual on |xi|<=1. A primal optimum alone is not a bound.
+    lower=-p.b'*inequality-p.rhs'*equality ...
+        -sum(abs(direction+p.a'*inequality+p.equal'*equality));
+end
+
+function result=localConditionMeasurements(set,contract,cfg)
+    % Current measurements are known data. Eliminate only states that cannot
+    % generate them for ANY admitted tire parameters and sensor errors.
+    % This contractor never cuts states merely to satisfy a hard constraint.
+    [lo,hi]=bounds(set);before=radius(set(1:6));measurement=contract.currentMeasurement;
+    lower=[measurement.gnssPosition;measurement.yawRate]-contract.noiseRadius([1,2,7]);
+    upper=[measurement.gnssPosition;measurement.yawRate]+contract.noiseRadius([1,2,7]);
+    indices=[1,2,6];lo(indices)=max(lo(indices),lower);hi(indices)=min(hi(indices),upper);
+    assert(all(lo<=hi),'nrmmJointPrediction:inconsistentMeasurement', ...
+        'Current position/gyro data contradict the retained physical family.');
+    % The numerical observer and previous actuator command are exactly known.
+    point=contract.point;point(3)=set.center(9)+atan2(sin(point(3)-set.center(9)),cos(point(3)-set.center(9)));
+    lo(7:11)=point;hi(7:11)=point;
+    lo(16:17)=measurement.heldInput;hi(16:17)=measurement.heldInput;
+    evaluations=0;unresolved=0;
+    % First constrain lateral motion through the force balance, then speed
+    % through the complete two-component IMU image. Neither scan assumes a
+    % monotone tire inverse; saturated or unresolved cells are retained.
+    for coordinate=[5,4]
+        queue=[lo(coordinate),hi(coordinate)];kept=zeros(0,2);
+        tolerance=5e-4;
+        if coordinate==4,tolerance=max(tolerance,.02*diff(queue));end
+        while ~isempty(queue) && evaluations<4096
+            interval=queue(end,:);queue(end,:)=[];
+            state=nrmmSet.range(lo(1:6),hi(1:6));
+            state(coordinate)=nrmmSet.range(interval(1),interval(2));
+            evaluations=evaluations+1;
+            try
+                acceleration=nrmmJointEnclosure('acceleration',state,nrmmSet(measurement.heldInput), ...
+                    nrmmSet.range(lo(12:15),hi(12:15)),cfg);
+                [al,ah]=bounds(acceleration);
+                disjoint=any(ah<measurement.bodyAcceleration-contract.noiseRadius(5:6) ...
+                    | al>measurement.bodyAcceleration+contract.noiseRadius(5:6));
+                contained=all(al>=measurement.bodyAcceleration-contract.noiseRadius(5:6) ...
+                    & ah<=measurement.bodyAcceleration+contract.noiseRadius(5:6));
+            catch exception
+                if ~startsWith(string(exception.identifier),["nrmmSet:","nrmmJointEnclosure:"])
+                    rethrow(exception);
+                end
+                % An unresolved image is not evidence of inconsistency.
+                kept(end+1,:)=interval;unresolved=unresolved+1;continue; %#ok<AGROW>
+            end
+            if disjoint,continue;end
+            if contained || diff(interval)<=tolerance
+                kept(end+1,:)=interval; %#ok<AGROW>
+            else
+                middle=mean(interval);queue=[queue;interval(1),middle;middle,interval(2)]; %#ok<AGROW>
+            end
+        end
+        unresolved=unresolved+size(queue,1);kept=[kept;queue]; %#ok<AGROW>
+        assert(~isempty(kept),'nrmmJointPrediction:inconsistentMeasurement', ...
+            'No state in the retained family can generate the current IMU data.');
+        lo(coordinate)=min(kept(:,1));hi(coordinate)=max(kept(:,2));
+    end
+    set=nrmmSet.range(lo,hi);
+    diagnostics=struct('method',"nonlinearCurrentMeasurementIntersection", ...
+        'priorPhysicalRadius',before,'posteriorPhysicalRadius',radius(set(1:6)), ...
+        'imageEvaluations',evaluations,'unresolvedCells',unresolved, ...
+        'noiseRadius',contract.noiseRadius,'parameterRadius',contract.parameterRadius, ...
+        'realArithmeticEnclosure',true,'floatingPointCertified',false);
+    result=struct('set',set,'diagnostics',diagnostics);
 end
 
 function contract=localContract(runtime,input)

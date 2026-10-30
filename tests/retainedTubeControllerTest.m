@@ -51,7 +51,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyTrue(solution.retainedCertificate.valid);
             testCase.verifyTrue(search.retainedCandidateFeasible);
             testCase.verifyEqual(solution.safety,0,AbsTol=0);
-            testCase.verifyGreaterThan(max(sum(abs(solution.retainedCertificate.tube.sets{1}.generator),2)),0);
+            testCase.verifyGreaterThan(max(radius(solution.retainedCertificate.tube.sets{1})),0);
             policy=solution.retainedCertificate.policies(1);
             testCase.verifyGreaterThan(max(policy.upper-policy.lower),0);
         end
@@ -118,7 +118,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             fprintf('Retained fixture: eight driving solves kept zero certified deficit.\n');
         end
         function thePublicEntryRetainsTheCertificateAndReportsItsScope(testCase)
-            f=testCase.fixture;cfg=f.cfg;cfg.controller.retainedTube=true;
+            f=testCase.fixture;cfg=f.cfg;
             target=localObservedTarget(f.output,cfg);
             lane=[-100,0;1000,0];
             [command,~,prediction,memory]=collisionAvoidanceController(f.output,target,lane,cfg,[]);
@@ -131,6 +131,42 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             [~,~,next,~]=collisionAvoidanceController(output,target,lane,cfg,memory);
             testCase.verifyTrue(next.metadata.zeroSlack);
             testCase.verifyEqual(next.metadata.horizonSteps,prediction.metadata.horizonSteps);
+        end
+        function currentImuDataRemoveInconsistentLateralVelocities(testCase)
+            f=testCase.fixture;
+            root=nrmmJointPrediction('rootSet',f.x,f.generator,f.contract);
+            root(5)=nrmmSet.range(-1.9,1.9);root(6)=nrmmSet.range(-.64,.64);
+            result=nrmmJointPrediction('conditionMeasurements',root,f.contract,f.cfg);
+            testCase.verifyLessThan(radius(result.set(5)),.02);
+            testCase.verifyEqual(radius(result.set(6)),f.contract.noiseRadius(7),AbsTol=1e-12);
+            testCase.verifyEqual(result.diagnostics.parameterRadius,f.contract.parameterRadius,AbsTol=0);
+            testCase.verifyEqual(result.diagnostics.noiseRadius,f.contract.noiseRadius,AbsTol=0);
+        end
+        function currentMeasurementContractionContainsAllowedMismatchAndNoise(testCase)
+            excess=localContractionSamples(testCase.fixture);
+            testCase.verifyLessThanOrEqual(excess,1e-10);
+        end
+        function impossibleCurrentAccelerationIsReportedAsInconsistent(testCase)
+            f=testCase.fixture;root=nrmmJointPrediction('rootSet',f.x,f.generator,f.contract);
+            contract=f.contract;contract.currentMeasurement.bodyAcceleration(2)=100;
+            testCase.verifyError(@()nrmmJointPrediction('conditionMeasurements',root,contract,f.cfg), ...
+                'nrmmJointPrediction:inconsistentMeasurement');
+        end
+        function fullBrakingDoesNotInventAnInformativeLateralMeasurement(testCase)
+            f=testCase.fixture;contract=f.contract;contract.parameterRadius(:)=0;
+            input=[0;-1];field=nonlinearBicycleModel.derivative(f.x,input,f.cfg);
+            contract.currentMeasurement.heldInput=input;
+            contract.currentMeasurement.bodyAcceleration=[field(4);field(5)];
+            root=nrmmJointPrediction('rootSet',f.x,zeros(6),contract);root(5)=nrmmSet.range(-1.9,1.9);
+            result=nrmmJointPrediction('conditionMeasurements',root,contract,f.cfg);
+            testCase.verifyEqual(radius(result.set(5)),1.9,AbsTol=1e-12);
+        end
+        function currentMeasurementsKeepDrivingBeyondTheFormerFailure(testCase)
+            result=localRepeatedConditionedDriving(testCase.fixture,20);
+            testCase.verifyEqual(result.drivingFrames,20);
+            testCase.verifyEqual(result.maximumSlack,0,AbsTol=0);
+            testCase.verifyLessThanOrEqual(result.maximumContainmentExcess,1e-9);
+            testCase.verifyLessThan(result.maximumLateralRadius,.03);
         end
         function anInconsistentMeasurementDoesNotSilentlyResetTheCertificate(testCase)
             f=testCase.fixture;root=nrmmJointPrediction('rootSet',f.x,f.generator,f.contract);
@@ -192,6 +228,46 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyFalse(result.valid);
             testCase.verifyEqual(result.endReason,"terminalDomainExcludesStop");
         end
+    end
+end
+
+function excess=localContractionSamples(f)
+    excess=-Inf;
+    for j=1:6
+        x=f.x;x(5:6)=[.05*sin(j);.02*cos(j)];input=[.02;-.3];
+        parameter=.05*[sin(j);cos(j);sin(2*j);cos(2*j)];plant=f.cfg;
+        plant.tire.corneringStiffness=f.cfg.tire.corneringStiffness.*(1+parameter(1:2));
+        plant.tire.frictionCoefficient=f.cfg.tire.frictionCoefficient.*(1+parameter(3:4));
+        field=nonlinearBicycleModel.derivative(x,input,plant);contract=f.contract;
+        contract.currentMeasurement.gnssPosition=x(1:2)+[.02;-.01];
+        contract.currentMeasurement.yawRate=x(6)+.001*sin(j);
+        contract.currentMeasurement.heldInput=input;
+        contract.currentMeasurement.bodyAcceleration=[field(4)-x(5)*x(6);field(5)+x(4)*x(6)]+[.01;-.02];
+        root=nrmmJointPrediction('rootSet',f.x,diag([.04;.04;.01;.1;.5;.1]),contract);
+        result=nrmmJointPrediction('conditionMeasurements',root,contract,f.cfg);
+        [lo,hi]=bounds(result.set([1:6,12:15]));actual=[x;parameter];
+        excess=max(excess,max([lo-actual;actual-hi]));
+    end
+end
+
+function result=localRepeatedConditionedDriving(f,count)
+    model=f.model;previous=[];runtime=f.runtime;x=f.x;held=f.u;
+    result=struct('drivingFrames',0,'maximumSlack',0,'maximumContainmentExcess',-Inf,'maximumLateralRadius',0);
+    for k=0:count-1
+        [solution,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+            'model',model,'previousState',previous,'anchor',f.anchor));
+        if solution.terminalControlRequired,return;end
+        root=solution.retainedCertificate.tube.sets{1};[lo,hi]=bounds(root(1:6));
+        result.maximumContainmentExcess=max(result.maximumContainmentExcess,max([lo-x;x-hi]));
+        result.maximumLateralRadius=max(result.maximumLateralRadius,radius(root(5)));
+        result.maximumSlack=max(result.maximumSlack,solution.safety);result.drivingFrames=k+1;
+        [runtime,x,output]=localAdvance(runtime,x,held,solution.inputs(:,1),f.cfg,k*f.cfg.controller.sampleTime);
+        [ego,~,~,observation]=readControllerInputs(output,[],[],f.cfg);
+        held=solution.inputs(:,1);model.initialState=ego.modelState;model.previousInput=held;
+        model.stateTime=output.stateTime;model.sampleIndex=k+1;model.targetOnset=false;
+        model.uncertainty=predictiveSafetyGeometry.observerUncertainty(ego,observation,model.target);
+        model.uncertainty.target=f.model.uncertainty.target;
+        previous=struct('retainedCertificate',solution.retainedCertificate);
     end
 end
 

@@ -105,7 +105,13 @@ classdef nrmmSet
             b=nrmmSet.convert(b);assert(isscalar(b.center));c=rdivide(a,b);
         end
         function c=power(a,k)
-            assert(isscalar(k)&&k>=0&&k==floor(k));c=nrmmSet(ones(size(a.center)));
+            assert(isscalar(k)&&k>=0&&k==floor(k));
+            if all(radius(a)==0,'all')
+                % Evaluate a point once. Repeated multiplication and .^ can
+                % differ by rounding and falsely give disjoint singleton ranges.
+                c=nrmmSet(a.center.^k,zeros(size(a.generator)));return;
+            end
+            c=nrmmSet(ones(size(a.center)));
             for i=1:k,c=c.*a;end
             if k>0 && mod(k,2)==0
                 [lo,hi]=bounds(a);lower=min(abs(lo),abs(hi)).^k;
@@ -148,8 +154,17 @@ classdef nrmmSet
             % without assuming a nonexistent classical Hessian at q=0.
             q=min(1,max(-1,a.center));value=3*q-3*abs(q).*q+q.^3;
             slope=3*max(0,1-abs(a.center)).^2;
-            b=nrmmSet.unary(a,value,slope,6*ones(size(a.center)));
-            b=nrmmSet.intersectRange(b,-ones(size(a.center)),ones(size(a.center)));
+            [lo,hi]=bounds(a);minimumMagnitude=min(abs(lo),abs(hi));
+            minimumMagnitude(lo<=0 & hi>=0)=0;
+            % On this complete interval, |P''| <= 6(1-min|q|)_+ a.e.
+            % A wholly saturated interval is exactly constant, with no
+            % artificial remainder or dependence on its slip variables.
+            second=6*max(0,1-minimumMagnitude);
+            b=nrmmSet.unary(a,value,slope,second);
+            lower=min(1,max(-1,lo));upper=min(1,max(-1,hi));
+            lower=3*lower-3*abs(lower).*lower+lower.^3;
+            upper=3*upper-3*abs(upper).*upper+upper.^3;
+            b=nrmmSet.intersectRange(b,lower,upper);
         end
         function b=sinc(a)
             % Unnormalized sinc = integral_0^1 cos(t*x) dt; |sinc''|<=1/3.

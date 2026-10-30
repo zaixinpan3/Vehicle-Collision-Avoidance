@@ -27,12 +27,12 @@ function cfg=localDefaults()
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
         'enforceRoadBoundaries',false,'jointAffinePrediction',false,'jointNonlinearPrediction',false, ...
-        'retainedTube',false);
+        'retainedTube',true);
     % retainedTube selects a different, enclosure-certified policy-box
     % formulation for active encounters. It requires explicit ego/target
     % bounds and retains a nonlinear joint/terminal certificate. This is
-    % opt-in until its conservative admission/continuation behavior is
-    % validated on driving scenarios; it is not ordinary point-SQP-RTI.
+    % the default for synchronized joint-observer inputs. Legacy inputs with
+    % no joint contract still use point SQP-RTI and cannot claim this certificate.
     % Full-domain nonlinear outer images on the RTI decision box. This
     % research mode fails explicitly if the admitted set cannot be enclosed;
     % it never substitutes the affine approximation on failure. It is not

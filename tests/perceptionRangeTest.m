@@ -10,9 +10,23 @@ classdef perceptionRangeTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'estimator')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
         end
     end
     methods (Test)
+        function theFirstPublicationCarriesKnownActuatorHistory(testCase)
+            vehicle=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
+            cfg=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),vehicle);
+            trim=nonlinearBicycleModel.cruise(vehicle,0);
+            ego=struct('position',[0;0],'yaw',0,'longitudinalVelocity',8, ...
+                'lateralVelocity',0,'yawRate',0,'heldActuatorInput',trim.input);
+            target=@(time,unused)struct('targetPositionInertial',[20+8*time;3]);
+            context=nrmmEstimatorControllerAdapter('initialize',cfg,ego,target);
+            [~,estimate,~,frame]=nrmmEstimatorControllerAdapter('sample',context,0,ego,target(0,ego));
+            testCase.verifyEqual([frame.heldSteeringAngle;frame.heldBrakingRatio],trim.input,AbsTol=0);
+            testCase.verifyTrue(estimate.controllerErrorBound.jointPrediction.heldInputAvailable);
+            testCase.verifyEqual(estimate.controllerErrorBound.jointPrediction.currentMeasurement.heldInput,trim.input,AbsTol=0);
+        end
         function aDiscardedStartupProbePreservesTheFirstPublicationAndRandomStream(testCase)
             cfg=estimatorControllerIntegrationConfig();
             ego=struct('position',[0;0],'yaw',0,'longitudinalVelocity',8, ...

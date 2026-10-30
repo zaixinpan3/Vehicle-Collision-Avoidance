@@ -1,5 +1,7 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl One local PCBF/CLF RTI model per controller call.
+%solvePredictiveControl Retained joint certificates or one point-RTI update.
+% Synchronized joint-observer inputs use the retained formulation by default.
+% The following iterate and solver description concerns the point-RTI path.
 % The planner runs once at encounter onset. Later frames shift the previous
 % state/input iterate and retain its node count throughout the encounter.
 % Horizon sizing occurs only at encounter onset; a failed solve never extends
@@ -15,7 +17,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % Research access: solvePredictiveControl("probe",request) exposes reference,
 % formulation and solve operations to the free-time experiment in scripts/.
 % It does not enable a variable grid in the online controller.
-% controller.retainedTube selects a separate certificate-based formulation
+% controller.retainedTube selects the certificate-based formulation
 % during encounters; see CONTROLLER_THEORY.md, implemented policy-box proof.
     if (isstring(model) || ischar(model)) && string(model)=="probe"
         [solution,search,model]=localProbe(previousState);return;
@@ -28,7 +30,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     cfg=model.cfg;model.linearizationBuilds=0;
     model.solveTimer=timer;
     model.solveTimeLimitSeconds=max(0,cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
-    if cfg.controller.retainedTube && ~isempty(model.target)
+    hasRetainedState=isstruct(previousState) && isfield(previousState,'retainedCertificate');
+    if cfg.controller.retainedTube && isfield(model,'target') && ~isempty(model.target) ...
+            && (isfield(model.uncertainty,'jointPrediction') || hasRetainedState)
         [solution,search,model]=localRetainedSolve(model,previousState,timer);return;
     end
     minimumCount=cfg.controller.horizonSteps;
@@ -1489,7 +1493,7 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
             certificate.policies=old.policies(2:end);certificate.tube.sets=old.tube.sets(2:end);
             certificate.tube.inputs=old.tube.inputs(2:end);certificate.tube.middles=old.tube.middles(2:end);
             search.posterior=nrmmJointPrediction('conditionRetained',certificate.tube.sets{1}, ...
-                model.initialState,model.uncertainty.egoGenerator,contract,old.contract);
+                model.initialState,model.uncertainty.egoGenerator,contract,old.contract,cfg);
             certificate.posterior=search.posterior;
             % The target family remains tied to its original absolute epoch.
             predicted=predictiveSafetyGeometry.targetPoseSet(certificate.target,certificate.targetError,certificate.epochSeconds);
@@ -1507,24 +1511,26 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
                     % freedom from the old frame is not a physical disturbance
                     % and need not enlarge a fresh candidate unnecessarily.
                     proposal(j).lower=zeros(2,1);proposal(j).upper=zeros(2,1);
+                    proposal(j).context.contract=contract;
                 end
                 root=search.posterior.proposedOuter;
-                if ~predictiveSafetyGeometry.stateSetAdmissible(root(1:6),cfg)
-                    % Coordinate intersection can lose the signed velocity
-                    % correlations that established the sideslip cone.
-                    % Keep the old physical/parameter projection instead,
-                    % while conditioning known numerical observer/memory.
-                    retained=search.posterior.base;
-                    retained(7:11)=nrmmSet(root.center(7:11));
-                    retained(16:17)=nrmmSet(root.center(16:17));
-                    retained(18:21)=root(18:21);root=retained;
+                if ~isempty(proposal)
+                    % The first feedback observation has now happened. Its
+                    % numerical observer state and gyro sample are known.
+                    context=proposal(1).context;
+                    observed=[contract.point;contract.currentMeasurement.yawRate];
+                    difference=observed-context.reference;
+                    difference(3)=atan2(sin(difference(3)),cos(difference(3)));
+                    context.input=context.input+context.gain*difference;
+                    context.gain=zeros(2,6);context.first=true;
+                    proposal(1).context=context;
                 end
                 partial=nrmmJointPrediction('policyTube',root,proposal);
                 while numel(proposal)<certificate.horizonSteps
                     set=partial.sets{end};input=nonlinearBicycleModel.nominalFeedback( ...
                         set.center(1:6),set.center(16:17),model.lane,model.nominalReference,cfg, ...
                         nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature));
-                    policy=localRetainedPolicy(set,input,cfg,certificate.contract,false);
+                    policy=localRetainedPolicy(set,input,cfg,contract,isempty(proposal));
                     image=nrmmJointPrediction('policyTube',set,policy);
                     proposal(end+1)=policy;partial.sets{end+1}=image.sets{2}; %#ok<AGROW>
                     partial.inputs{end+1}=image.inputs{1};partial.middles{end+1}=image.middles{1};
@@ -1548,25 +1554,42 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
             search.planner=seed.planner;
         end
         root=nrmmJointPrediction('rootSet',model.initialState,model.uncertainty.egoGenerator,contract);
+        conditioned=nrmmJointPrediction('conditionMeasurements',root,contract,cfg);
+        root=conditioned.set;search.initialMeasurementConditioning=conditioned.diagnostics;
         base=struct('valid',false,'absoluteIndex',model.sampleIndex,'epochSeconds',0, ...
             'target',model.target,'targetError',localAbsoluteTargetError(model),'contract',contract, ...
             'horizonSteps',0,'normals',zeros(2,0),'posterior',[],'terminalElapsed',0);
         partial=struct('sets',{{root}},'inputs',{{}},'middles',{{}}, ...
             'realArithmeticEnclosure',true,'floatingPointCertified',false);
         proposal=struct('context',{},'lower',{},'upper',{});certificate=base;
+        admissionFailure="noTerminalWitness";
         % Only initial admission selects the length. Every later call keeps
         % this N; a terminal certificate can make a short prefix sufficient.
         for k=1:size(seed.inputs,2)
             set=partial.sets{end};policy=localRetainedPolicy(set,seed.inputs(:,k),cfg,contract,k==1);
-            image=nrmmJointPrediction('policyTube',set,policy);
+            try
+                image=nrmmJointPrediction('policyTube',set,policy);
+            catch cause
+                if ~localCertificateFailure(cause),rethrow(cause);end
+                failure=MException('collisionAvoidanceController:noRetainedCertificate', ...
+                    'Initial nonlinear image failed at hold %d (%.3f s): %s',k,k*h,cause.message);
+                throw(addCause(failure,cause));
+            end
             proposal(end+1)=policy;partial.sets{end+1}=image.sets{2}; %#ok<AGROW>
             partial.inputs{end+1}=image.inputs{1};partial.middles{end+1}=image.middles{1};
             base.horizonSteps=k;
             candidate=localRetainedAssess(partial,proposal,base,model);
             if candidate.valid,certificate=candidate;break;end
+            admissionFailure=candidate.failureReason;
+            % A later terminal state cannot repair a hard violation already
+            % inside this same fixed driving prefix. Report that first cause
+            % instead of propagating it until a downstream chart also fails.
+            if startsWith(admissionFailure,["stateDomainAtNode","inputDomainAtHold","inputSlewAtHold"])
+                break;
+            end
         end
         assert(certificate.valid,'collisionAvoidanceController:noRetainedCertificate', ...
-            'No initial joint tube with a verified terminal continuation was admitted.');
+            'Initial joint tube rejected at hold %d (%.3f s): %s.',k,k*h,admissionFailure);
     end
     % Optional expansion is verified BEFORE the QP. Rejection keeps the
     % exact saved bounds; a fresh absolute enclosure never overwrites them.

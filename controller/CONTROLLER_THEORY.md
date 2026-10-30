@@ -24,9 +24,12 @@ predictive collision deficits first, then minimizes nominal tracking and input
 variation while preserving that attained optimum. Without a target, one QP
 minimizes soft cruise CLF slack plus the same performance cost. Both modes use
 state-dependent numerical trust bounds; reference proximity is optional and off
-by default. Avoidance uses at most two convex solves on
-one RTI model and one shared time budget; an available zero-slack affine
-candidate avoids the primary LP. No cross-frame slack budget is imposed.
+by default in the point-RTI comparison path. That path uses at most two convex
+solves on one RTI model and one shared time budget; an available zero-slack
+affine candidate avoids the primary LP. It imposes no cross-frame slack budget.
+With synchronized joint-observer inputs, active encounters instead use the
+retained nonlinear certificate described below, including its shifted deficit
+budget. This is now the default joint-controller path.
 The terminal set certifies an available safe continuation at the prediction
 endpoint; it is not a command to park or a task-completion condition.
 
@@ -34,18 +37,22 @@ The executable approximation and the mathematical algorithm have distinct guaran
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Executable controller | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening and terminal tangents. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The completed affine update returns its first input after numerical input-bound normalization, without a post-solve nonlinear rollout or feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
+| Point-RTI comparison path | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, per-hold affine uncertainty tightening and terminal tangents. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The completed affine update returns its first input after numerical input-bound normalization, without a post-solve nonlinear rollout or feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
+| Default joint encounter path | A retained nonlinear policy/terminal certificate with measurement-conditioned proposals. Performance optimization acts only inside a policy box admitted by full-domain enclosures. Failure to admit a new driving continuation retains the previous certificate; requesting actual terminal control stops the driving experiment. Initial admission may fail before any control is applied. |
 | Unified observer-to-safety design | Current observer containment, retained physical successor sets, signed whole-hold margins and a common terminal continuation. The information-set shift proves conditional recursive feasibility and zero-deficit safety. Future observer dynamics are needed only for the optional prediction of observation-dependent policies. |
 
-The optional `controller.retainedTube=true` formulation is a third executable
-path: it retains nonlinear joint sets, observation-dependent policies, and
+The default `controller.retainedTube=true` formulation retains nonlinear joint
+sets, observation-dependent policies, and
 a whole-set simplified terminal witness. It optimizes performance only over
 a policy box whose complete nonlinear image was admitted beforehand. The
 constructive shift proof and its limitations are given in Section 8 under
-"Implemented retained policy-box formulation." This mode is opt-in; it does
-not change the default RTI's safety claims.
+"Implemented retained policy-box formulation." Inputs without a synchronized
+joint snapshot, or explicit `retainedTube=false`, use the point-RTI path and
+cannot claim the retained certificate. An existing certificate cannot silently
+fall back when its required observer snapshot is missing. Enabling this path
+does not establish adequate admission performance or real-time execution.
 
-The latter theorem is not a certificate for the default RTI approximation.
+The latter theorem is not a certificate for the point-RTI approximation.
 `robustNonlinearSafetyCertified` remains false. Positive collision slack permits
 a clearance deficit. Zero affine slack does not certify nonlinear or
 continuous-time safety. Road constraints are disabled by default; the ideal
@@ -2930,8 +2937,9 @@ certificate flag was changed by this audit.
 ### Implemented retained policy-box formulation
 
 The following implementation supersedes the preceding audit's "not yet
-implemented" statements **for the opt-in retained backend only**. Enable it
-with `controller.retainedTube=true`. The default point-RTI path is unchanged.
+implemented" statements **for the retained backend only**. It is enabled by
+default for synchronized joint-observer inputs during an active encounter.
+The point-RTI comparison path remains available with `retainedTube=false`.
 This is a structural change to the optimization, not a claim that the
 ordinary RTI affine dynamics become robustly feasible by adding a slack cap.
 
@@ -3027,14 +3035,14 @@ $$
 
 Equating prior and posterior would reject legitimate observations. A linear
 feasibility check detects contradictory declarations; it is not a proof that
-the observer's current bound contains reality. A convenient outer set formed
-from current data and old coordinate bounds may be used for a **new** full
-admission check. It is never asserted to lie in the old signed zonotope.
-If its new image is too wide, the original certificate is retained.
-When coordinate boxing destroys a physical-state correlation needed by a
-hard domain row, the original physical/parameter projection can instead be
-kept while fixing the now-known observer and filter coordinates. This is
-another outer-set proposal and still requires a new complete image check.
+the observer's current bound contains reality. A coordinate outer projection
+of this constrained intersection is computed using LP dual residual bounds.
+Current raw GNSS, gyro and nonlinear IMU consistency then tighten that proposal,
+as detailed below. This outer set is used only for a **new** full admission
+check; it is never asserted to lie in the old signed zonotope. If its new image
+is too wide, the original certificate is retained. The previous fallback that
+restored a stale physical projection, discarding the current gyro restriction,
+has been removed.
 
 **Convex problem and its explicit feasible point.** For an admitted policy
 box, the local problem has input corrections `d`, affine performance states
@@ -3120,26 +3128,26 @@ actual position-only observer updates, public-entry certificate persistence,
 nontrivial admitted control boxes, explicit feasible candidates, contradictory
 posterior/noise rejection, and the retained terminal suffix. These tests
 validate implementation behavior; sampling is not the enclosure proof.
-The multi-frame fixture still reaches a point where a fresh driving outer
-image cannot establish the hard state domain, while its saved zero-deficit
-terminal certificate remains valid: at the tested 8 m/s cruise fixture it
-occurs at frame 5 (0.25 s). The plant has persistent front/rear cornering
-factors 1.01/0.99, friction factors 1.02/0.98, and bounded position, IMU and
-gyro noise. The stationary target 25 m ahead is a certificate regression
-fixture, not a braking-insufficient bypass benchmark. This is not a successful avoidance
-campaign or evidence of real-time suitability. Admission/conservatism must
-improve before enabling this backend by default. Arithmetic is ordinary
+The tests include 20 consecutive driving holds with zero certified deficit
+and physical containment under persistent front/rear cornering factors
+1.01/0.99, friction factors 1.02/0.98, and bounded position, IMU and gyro
+noise. The longer diagnostic and joint-scenario failures are reported below.
+The stationary target 25 m ahead is a certificate regression fixture, not a
+braking-insufficient bypass benchmark. Passing it does not establish successful
+avoidance campaigns or real-time suitability. Arithmetic is ordinary
 double precision: `floatingPointCertified` and the unconditional
 `robustNonlinearSafetyCertified` flag remain false.
 
 ### Conservatism audit and a measurement-consistent tightening design
 
-`scripts/analyzeRetainedTubeConservatism.m` reproduces the preceding 0.25 s
-failure and compares alternative enclosures of that same hold. It leaves the
-online controller and observer unchanged, writes no experiment artifacts,
-and uses the same sensor bounds, persistent tire-parameter family, sample
-times and hard constraints throughout. This is a single-frame diagnostic,
-not an improved closed-loop avoidance campaign.
+The following baseline audit was performed at commit
+`bf19b1e4790379f50dd14d1a551b8d4a22a311b2`. The diagnostic at that revision
+reproduced a terminal-continuation request at 0.25 s and compared alternative
+enclosures of the same hold, without changing the online algorithm, sensor
+bounds, persistent tire-parameter family, sample times or hard constraints.
+These historical numbers are a single-frame comparison. The current
+`scripts/analyzeRetainedTubeConservatism.m` instead runs the integrated online
+method across frames, writes no files, and returns its trace and failure.
 
 Two information losses precede the failed propagation. First, the exact
 constrained posterior is recorded, but the next image uses an unconstrained
@@ -3196,8 +3204,8 @@ separation and whole-set simplified terminal check. For the nonzero box,
 the next-node gap lower bound is 17.6931 m and the terminal minimum gap
 lower bound is 8.60492 m. These checks re-admit a new candidate; they do not
 assert that a coordinate hull is a subset of the old signed zonotope. The
-online backend remains unchanged and still requests terminal continuation
-on this fixture.
+online backend at that audit revision remained unchanged. The integration
+and its measured limits are described below.
 
 **Priority 1: use the physical measurement relation in the posterior.**
 For the augmented state `z`, write the bounded-error update as
@@ -3286,9 +3294,96 @@ the constructive recursive-feasibility argument while allowing more accurate
 computation. Cropping states merely because they violate a desired hard
 constraint, or reducing noise/parameter bounds without evidence, would not.
 
+### Online integration and measured admission limits
+
+The measurement-consistent update is now used on initial admission and each
+subsequent online proposal. It takes coordinate supports of the constrained
+posterior, intersects the current raw position and gyro intervals, and excludes
+lateral-velocity/speed cells only when their entire nonlinear acceleration
+image cannot explain the current IMU sample. The interval contractor keeps
+ambiguous cells at its resolution or 4096-evaluation cap. It introduces no
+new physical constraint and reduces neither noise nor persistent-parameter
+budgets. Saturated tires can provide little lateral-state information; the
+full-braking regression verifies that the contractor preserves that ambiguity.
+
+The actual first observer update and current held input are known data.
+The first proposed feedback command is therefore conditioned on them; future
+measurements, observer updates and feedback remain jointly uncertain. The
+measurement acceleration is computed directly from tire/road forces, avoiding
+separate interval copies of cancelling gyroscopic terms. For the normalized
+Fiala fraction `P(q)`, the derivative-Lipschitz bound on an entire interval
+is `6*max(0,1-min(abs(q)))`, with minimum zero on an interval crossing zero.
+A wholly saturated interval has exactly constant force fraction and no
+artificial slip remainder. These are algebraic enclosure improvements, not
+additional tire-capacity constraints.
+
+The simulation adapter now publishes the known actuator command held during
+the initial IMU measurement. Constant-speed scenario histories use the
+corresponding road-load-balancing trim command. A discarded warm-up admission
+failure no longer prevents the actual first-frame failure from being recorded.
+An invalid hard state/input prefix stops initial admission immediately: adding
+more nodes to that same prefix cannot repair its earlier violation.
+
+The original 8 m/s certificate fixture now runs 28 driving holds (1.4 s) with
+zero deficit and contained physical samples. Its maximum current/next
+lateral-velocity radii are 0.00620/0.06519 m/s. It then requests the retained
+terminal continuation because a new driving continuation cannot establish
+terminal separation. The experiment stops before executing terminal control;
+this is not completed avoidance. Median/maximum controller times in this
+diagnostic were 1.142/1.583 s, not real-time performance.
+
+A separate joint-observer campaign used position-only GNSS, the configured
+bounded sensor noise (seed 20260728), the existing 50 m encounter fixtures,
+50 ms control holds, no road optimization rows, and a 120 s solver budget to
+separate admission failure from timeout. It ran until recovery or failure,
+without an imposed simulation duration. The first six cases below passed the
+existing threat and longitudinal-only-insufficiency qualification; the curved
+and intersection cases were additional threat/geometry regressions and are
+not claimed to exclude every longitudinal-only avoidance policy.
+
+| Scenario | First rejected predicted hold | Executed driving holds |
+| --- | ---: | ---: |
+| 8 m/s head-on | 0.20 s | 0 |
+| 8 m/s accelerating head-on | 0.20 s | 0 |
+| 15 m/s head-on | 0.30 s | 0 |
+| 15 m/s accelerating head-on | 0.30 s | 0 |
+| 25 m/s stopped lead | 0.35 s | 0 |
+| 25 m/s hard-braking lead | 0.35 s | 0 |
+| 8 m/s curved head-on | 0.20 s | 0 |
+| 8 m/s intersection crossing | 0.20 s | 0 |
+| 15 m/s intersection crossing | 0.35 s | 0 |
+
+All nine fail the hard state-domain admission of the future tube during the
+first controller call. These times are prediction offsets, not elapsed
+closed-loop driving time. No minimum replay clearance or avoidance success
+can be reported for a case with zero executed holds. The result does not
+establish physical avoidance impossibility. In the 8 m/s head-on diagnostic,
+current IMU consistency reduced the initial lateral-velocity radius from
+2.781 to 0.00849 m/s, but future images became too wide within several holds.
+Disabling future feedback in a diagnostic did not remove that growth;
+the online algorithm keeps feedback enabled.
+
+The current implementation still replaces a constrained posterior by a
+coordinate outer set for fresh nonlinear propagation. It does not carry all
+measurement/state/parameter restrictions through a lifted nonlinear graph,
+and it still admits every control in a box instead of a decision-dependent
+disturbance enclosure. Thus the first tightening priority is implemented,
+with exact acceleration cancellation and local Fiala bounds, while the
+stronger dependency-preserving and decision-dependent designs remain open.
+Default enablement makes these failures visible; it is not a claim that the
+joint controller is ready for the driving campaign.
+
+The final relevant MATLAB batch passed 264 tests across retained tubes,
+nonlinear enclosures, joint prediction, configuration, perception publication,
+observer/control integration, switched optimization, terminal geometry, nominal
+recovery and the controller source budget. Code analysis found no syntax
+diagnostics; existing array-growth/sparse-index warnings and a missing local
+Code Analyzer preference file remain. Tests cover behavior and numerical
+consistency, not a replacement for whole-set inclusion arguments.
+
 ### Computation budget and diagnostics
 
-The current research budget is 100 ms (`solver.timeLimitSeconds=0.1`), with
+For the point-RTI path, the research budget is 100 ms (`solver.timeLimitSeconds=0.1`), with
 at most 40 native interior-point iterations per solve and a 2 ms completion
 reserve. The model sample remains 50 ms; these offline simulations do not
 inject computation latency into actuation. Preprocessing
@@ -3297,6 +3392,14 @@ rollout, tangent/constraint construction, CLF construction and terminal geometry
 check the timer. A native termination callback includes
 MEX validation and problem construction, in addition to Clarabel's iteration
 timer. Native infeasibility certificates and unfinished iterates are never inputs.
+
+The retained path additionally performs LP posterior supports, nonlinear
+measurement contraction and whole-policy admission. Those preprocessing
+operations do not yet have an interruptible wall-time bound. The functional
+tests above use an explicitly enlarged solver budget and do not demonstrate
+100 ms execution. The following RTI counters and affine residual descriptions
+apply to the point-RTI path; retained metadata identifies its different
+certificate-based formulation and measurement-conditioning diagnostics.
 
 Replay exports distinguish the model-sample deadline (`deadlineMisses`) from
 the configured research budget (`controllerBudgetSeconds` and
@@ -3368,13 +3471,13 @@ baseline and minimum recovery time.
 
 | Required mathematical ingredient | Current implementation boundary |
 | --- | --- |
-| Sound current physical enclosures | Finite published enclosures are used when available; experimental execution may proceed without a supported finite certificate. |
-| Sound physical horizon images; joint images for future feedback | Default scheduling and the affine experiment remain available. The explicit nonlinear mode encloses the declared sampled ego/observer map over decision plus uncertainty domains in real arithmetic; conservatism can prevent longer-horizon enclosure. It is not a complete safety certificate. |
-| Cross-sample posterior inclusion | Default point-RTI does not retain a set/policy witness. The opt-in retained backend stores joint sets and constrained posterior intersections and keeps the old certificate if a new outer image is rejected. |
-| Common robust terminal family | The opt-in backend verifies a full entry set under simplified braking until uniform perception exit or separated stationary families; a finite check limit never certifies an unresolved tail. This is an assumed terminal model, not a Fiala execution certificate. |
+| Sound current physical enclosures | The default joint path requires declared enclosures and conditions them on current raw measurements. Legacy point-RTI inputs can run without a supported finite certificate, but cannot claim the retained guarantee. |
+| Sound physical horizon images; joint images for future feedback | The retained joint path encloses the declared sampled ego/observer map over decision plus uncertainty domains in real arithmetic; conservatism currently prevents first admission in the nine tested driving cases. No floating-point certificate is claimed. |
+| Cross-sample posterior inclusion | The retained backend stores joint sets and constrained posterior intersections and keeps the old certificate if a new outer image is rejected. The comparison point-RTI path does not retain a set/policy witness. |
+| Common robust terminal family | The retained backend verifies a full entry set under simplified braking until uniform perception exit or separated stationary families; a finite check limit never certifies an unresolved tail. This is an assumed terminal model, not a Fiala execution certificate. |
 | Exact nonlinear CLF dissipation | Current continuous derivative, locally affine in the first input, with soft slack and a fixed reference penalty. |
 | Whole-hold collision/observer-domain validity | Nodes and approximate midpoints do not by themselves establish continuous-time validity. |
-| Numerical success | Default RTI requires completed affine objectives. The retained backend has an explicit feasible policy before performance optimization, but initial admission and normal driving extensions may fail. Full-domain enclosures use real-arithmetic derivations, not outward-rounded numerics. |
+| Numerical success | Point-RTI requires completed affine objectives. The retained backend has an explicit feasible policy before performance optimization, but initial admission and normal driving extensions may fail. Full-domain enclosures use real-arithmetic derivations, not outward-rounded numerics. |
 
 <a id="source-map"></a>
 ## 9. Source map and verification

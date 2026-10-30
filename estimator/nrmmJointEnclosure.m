@@ -9,6 +9,8 @@ function result=nrmmJointEnclosure(action,varargin)
             result=localPlantFlow(varargin{:});
         case "field"
             result=localPlantField(varargin{:});
+        case "acceleration"
+            [~,result]=localPlantField(varargin{:});
         case "hold"
             result=localHold(varargin{:});
         case "terminalPose"
@@ -24,7 +26,7 @@ function next=localPlantFlow(x,u,parameters,cfg,h)
     next=x+h*(a+2*b+2*c+d)/6;
 end
 
-function value=localPlantField(x,u,parameters,cfg)
+function [value,acceleration]=localPlantField(x,u,parameters,cfg)
     [xl,xh]=bounds(x);[ul,uh]=bounds(u);
     if xl(4)<-cfg.model.brakeHoldSpeed || ul(2)<-1 || uh(2)>1
         error('nrmmJointEnclosure:domain','The whole admitted set must lie in the plant domain.');
@@ -37,30 +39,37 @@ function value=localPlantField(x,u,parameters,cfg)
     stiffness=cfg.tire.corneringStiffness.*(1+parameters(1:2));
     range=cfg.model.kinematicSpeedRange;
     if xl(4)>=range(2)
-        body=localFiala(x,u,scale,stiffness,cfg);
+        [body,acceleration]=localFiala(x,u,scale,stiffness,cfg);
     elseif xh(4)<=range(1)
-        body=localKinematic(x,u,scale,cfg);
+        [body,acceleration]=localKinematic(x,u,scale,cfg);
     elseif xl(4)>cfg.model.scheduleSpeedFloor
         s=min(1,max(0,(x(4)-range(1))/(range(2)-range(1))));
         weight=nrmmSet.intersectRange(s^2*(3-2*s),0,1);
-        body=weight.*localFiala(x,u,scale,stiffness,cfg)+(1-weight).*localKinematic(x,u,scale,cfg);
+        [fiala,fialaAcceleration]=localFiala(x,u,scale,stiffness,cfg);
+        [kinematic,kinematicAcceleration]=localKinematic(x,u,scale,cfg);
+        body=weight.*fiala+(1-weight).*kinematic;
+        acceleration=weight.*fialaAcceleration+(1-weight).*kinematicAcceleration;
     else
         % Intersect the two branch domains before evaluating them. An
         % invalid Fiala branch below its floor is never evaluated or dropped.
         low=x;high=x;
         low(4)=nrmmSet.range(xl(4),min(xh(4),range(1)),size(x.generator,2));
         high(4)=nrmmSet.range(range(1),xh(4),size(x.generator,2));
-        a=localKinematic(low,u,scale,cfg);
+        [a,aa]=localKinematic(low,u,scale,cfg);
         s=min(1,(high(4)-range(1))/(range(2)-range(1)));weight=nrmmSet.intersectRange(s^2*(3-2*s),0,1);
-        b=weight.*localFiala(high,u,scale,stiffness,cfg)+(1-weight).*localKinematic(high,u,scale,cfg);
+        [fiala,fa]=localFiala(high,u,scale,stiffness,cfg);
+        [kinematic,ka]=localKinematic(high,u,scale,cfg);
+        b=weight.*fiala+(1-weight).*kinematic;ba=weight.*fa+(1-weight).*ka;
         [al,ah]=bounds(a);[bl,bh]=bounds(b);
         body=nrmmSet.range(min(al,bl),max(ah,bh),size(a.generator,2));
+        [al,ah]=bounds(aa);[bl,bh]=bounds(ba);
+        acceleration=nrmmSet.range(min(al,bl),max(ah,bh),size(aa.generator,2));
     end
     value=[x(4)*cos(x(3))-x(5)*sin(x(3)); ...
         x(4)*sin(x(3))+x(5)*cos(x(3));x(6);body];
 end
 
-function body=localFiala(x,u,scale,stiffness,cfg)
+function [body,acceleration]=localFiala(x,u,scale,stiffness,cfg)
     [lo,~]=bounds(x(4));
     if lo<=cfg.model.scheduleSpeedFloor,error('nrmmJointEnclosure:domain','Fiala speed domain is not enclosed.');end
     slip=[atan((x(5)+cfg.vehicle.lf*x(6))/x(4))-u(1);atan((x(5)-cfg.vehicle.lr*x(6))/x(4))];
@@ -69,8 +78,8 @@ function body=localFiala(x,u,scale,stiffness,cfg)
     capacity=scale.*sqrt(max(0,1-u(2)^2));
     fy=localTires(slip,stiffness,capacity);fx=u(2).*scale;
     frontX=fx(1)*cos(u(1))-fy(1)*sin(u(1));frontY=fx(1)*sin(u(1))+fy(1)*cos(u(1));
-    body=[(frontX+fx(2)-localRoadLoad(x(4),cfg))/cfg.vehicle.m+x(5)*x(6); ...
-        (frontY+fy(2))/cfg.vehicle.m-x(4)*x(6); ...
+    acceleration=[(frontX+fx(2)-localRoadLoad(x(4),cfg))/cfg.vehicle.m;(frontY+fy(2))/cfg.vehicle.m];
+    body=[acceleration(1)+x(5)*x(6);acceleration(2)-x(4)*x(6); ...
         (cfg.vehicle.lf*frontY-cfg.vehicle.lr*fy(2))/cfg.vehicle.Iz];
 end
 
@@ -96,13 +105,15 @@ function force=localTires(slip,stiffness,capacity)
     end
 end
 
-function body=localKinematic(x,u,scale,cfg)
+function [body,acceleration]=localKinematic(x,u,scale,cfg)
     wheelbase=cfg.vehicle.lf+cfg.vehicle.lr;lag=cfg.model.kinematicLagSeconds;
     force=(max(u(2),0)+min(u(2),0)*tanh(x(4)/cfg.model.brakeHoldSpeed)) ...
         *(scale(1)*cos(u(1))+scale(2));
     rate=x(4)*tan(u(1))/wheelbase;
-    body=[(force-localRoadLoad(x(4),cfg))/cfg.vehicle.m+x(5)*x(6); ...
-        (cfg.vehicle.lr*rate-x(5))/lag;(rate-x(6))/lag];
+    longitudinal=(force-localRoadLoad(x(4),cfg))/cfg.vehicle.m;
+    lateral=(cfg.vehicle.lr*rate-x(5))/lag;
+    body=[longitudinal+x(5)*x(6);lateral;(rate-x(6))/lag];
+    acceleration=[longitudinal;lateral+x(4)*x(6)];
 end
 
 function force=localRoadLoad(speed,cfg)
@@ -162,9 +173,9 @@ function result=localHold(center,generator,context,decisionRadius)
             pseudo=localKnownPseudo(m,contract.design);
         else
             measured=input;if sample==1,measured=previous;end
-            field=localPlantField(physical,measured,parameters,context.cfg);
+            [~,bodyAcceleration]=localPlantField(physical,measured,parameters,context.cfg);
             position=physical(1:2)+noise(1:2,sample);
-            acceleration=[field(4)-physical(6)*physical(5);field(5)+physical(6)*physical(4)]+noise(5:6,sample);
+            acceleration=bodyAcceleration+noise(5:6,sample);
             rate=physical(6)+noise(7,sample);held=measured;
             gain=contract.positionVelocity.gain;
             frontend=frontend+[gain(1)*eye(2);gain(2)*eye(2)]*(position-frontend(1:2));
