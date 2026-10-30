@@ -6,6 +6,41 @@ classdef nrmmTargetHistoryTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function stationaryChordsBoundSpeedWithoutAnObservableHeading(testCase)
+            history=localHistory();
+            for time=0:.025:.25
+                position=[30;2]+.04*[sin(17*time);cos(11*time)];
+                history=nrmmTargetHistory('measure',history,time,position,[.04;.04]);
+            end
+            interval=nrmmTargetHistory('speed',history,.25,2);
+            testCase.verifyEqual(interval(1),0);
+            testCase.verifyLessThan(interval(2),1.2);
+            testCase.verifyFalse(nrmmTargetHistory('enclose',history,.25).heading.available);
+        end
+        function chordSpeedBoundsContainAcceleratingAndStoppingArcs(testCase)
+            for curvature=[-.02,0,.02]
+                for acceleration=[-2,0,2]
+                    for initialSpeed=[0,1,6]
+                        history=localHistory();history.yawRateMaximum=.5;
+                        for time=0:.025:1
+                            duration=time;
+                            if acceleration<0,duration=min(time,-initialSpeed/acceleration);end
+                            arc=initialSpeed*duration+acceleration*duration^2/2;
+                            turn=curvature*arc/2;factor=1;if turn~=0,factor=sin(turn)/turn;end
+                            position=arc*factor*[cos(.7+turn);sin(.7+turn)] ...
+                                +.04*[sin(13*time);cos(7*time)];
+                            history=nrmmTargetHistory('measure',history,time,position,[.04;.04]);
+                        end
+                        for age=[0,.2]
+                            interval=nrmmTargetHistory('speed',history,1+age,2);
+                            truth=max(0,initialSpeed+acceleration*(1+age));
+                            testCase.verifyLessThanOrEqual(interval(1),truth);
+                            testCase.verifyGreaterThanOrEqual(interval(2),truth);
+                        end
+                    end
+                end
+            end
+        end
         function motionContractionKeepsBoundedNoiseTruthAndRejectsUnsupportedTurns(testCase)
             [result,truth,original]=localMotionContraction();
             testCase.verifyTrue(result.available);

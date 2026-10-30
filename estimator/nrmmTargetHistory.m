@@ -51,6 +51,8 @@ function value = nrmmTargetHistory(action, varargin)
             value = localEnclose(varargin{:});
         case "contractMotion"
             value = localContractMotion(varargin{:});
+        case "speed"
+            value = localSpeedInterval(varargin{:});
         case "sensor"
             value = varargin{1};input = varargin{2};design = varargin{3};
             if isfield(input,"velocityErrorMaximum")
@@ -98,6 +100,46 @@ function value = nrmmTargetHistory(action, varargin)
         otherwise
             error("nrmmTargetHistory:invalidAction","Unknown history action.");
     end
+end
+
+function interval=localSpeedInterval(history,time,tangentialAccelerationMaximum)
+    % A chord bounds path length independently of its absolute direction.
+    % For constant curvature, |chord|=s*sinc(turn/2). For arbitrary bounded
+    % turning, projection on the midpoint heading gives |chord|>=s*cos(turn/2).
+    % The mean path speed differs from its final value by at most A*dt/2,
+    % also when braking reaches rest. No inverse of a near-zero speed or
+    % assumed heading is needed. Sensor error is never averaged down.
+    validateattributes(tangentialAccelerationMaximum,{'double'},{'scalar','finite','nonnegative'});
+    interval=[0;history.speedMaximum];count=numel(history.time);
+    if count<2,return;end
+    age=time-history.time(end);
+    assert(age>=-128*eps(max(1,abs(time))),'nrmmTargetHistory:futureMeasurement', ...
+        'History cannot use future measurements.');
+    age=max(0,age);
+    correlated=isfinite(history.yawAccelerationMaximum) && numel(history.records)==count;
+    if correlated,transport=localTransport(history);end
+    for index=1:count-1
+        duration=history.time(end)-history.time(index);
+        halfTurn=history.yawRateMaximum*duration/2;
+        if halfTurn>=pi/2,continue;end
+        factor=cos(halfTurn);
+        if history.constantCurvature
+            factor=1;if halfTurn>0,factor=sin(halfTurn)/halfTurn;end
+        end
+        center=history.position(:,end)-history.position(:,index);
+        radius=history.radius(:,end)+history.radius(:,index);
+        for representation=1:1+double(correlated)
+            if representation==2
+                [center,radius]=localCombination(history,transport,[index,count],[-1,1]);
+            end
+            lower=norm(max(0,abs(center)-radius));upper=norm(abs(center)+radius);
+            drift=tangentialAccelerationMaximum*(duration/2+age);
+            interval=[max(interval(1),lower/duration-drift); ...
+                min(interval(2),upper/(factor*duration)+drift)];
+        end
+    end
+    guard=512*eps(max(1,max(abs(interval))));
+    interval=[max(0,interval(1)-guard);min(history.speedMaximum,interval(2)+guard)];
 end
 
 function result=localContractMotion(history,time,intervals)

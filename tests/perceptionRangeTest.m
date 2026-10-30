@@ -14,6 +14,32 @@ classdef perceptionRangeTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function delayedAcquisitionPublishesItsAlreadyMeasuredMotionHistory(testCase)
+            vehicle=collisionAvoidanceControllerConfig(struct('referenceSpeed',25, ...
+                'model',struct('speedMaximum',30)));
+            cfg=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),vehicle, ...
+                collisionThreatContract(WindowSeconds=8));
+            cfg.sensor.radar.rangeMaximum=30;
+            trim=nonlinearBicycleModel.cruise(vehicle,0);
+            ego=struct('position',[0;0],'yaw',0,'longitudinalVelocity',25, ...
+                'lateralVelocity',0,'yawRate',0,'heldActuatorInput',trim.input);
+            target=@(time,unused)struct('targetPositionInertial',[34;0]);
+            context=nrmmEstimatorControllerAdapter('initialize',cfg,ego,target);
+            published=[];
+            for time=0:.05:.6
+                ego.position=[25*time;0];
+                [context,~,published]=nrmmEstimatorControllerAdapter('sample',context,time,ego,target(time,ego));
+                if ~isempty(published),break;end
+            end
+            testCase.assertNotEmpty(published);
+            testCase.verifyGreaterThan(time,0);
+            testCase.verifyGreaterThanOrEqual(published.measurementHistoryEnclosure.samples, ...
+                cfg.initialization.minimumRadarSamples);
+            testCase.verifyTrue(published.predictionErrorSet.available);
+            testCase.verifyEqual(published.predictionErrorSet.speedInterval(1),0);
+            testCase.verifyLessThan(published.predictionErrorSet.speedInterval(2),6);
+            testCase.verifyGreaterThanOrEqual(published.targetYawErrorBound,pi-1e-12);
+        end
         function theFirstPublicationCarriesKnownActuatorHistory(testCase)
             vehicle=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
             cfg=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),vehicle);

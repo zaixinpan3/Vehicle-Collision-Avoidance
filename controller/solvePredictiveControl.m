@@ -669,6 +669,12 @@ end
 function [problem,model]=localFormulate(anchor,model)
     model.linearizationBuilds=model.linearizationBuilds+1;
     cfg=model.cfg;count=size(anchor.inputs,2);prefix=cfg.controller.horizonSteps;
+    retainedProposal=isfield(model,'retainedProposal') && model.retainedProposal;
+    % This auxiliary point problem proposes a policy for whole-set admission.
+    % Match the retained PCBF's slack on every collision node, including the
+    % tail. A hard nominal tail here would reject candidates that the actual
+    % certificate problem permits with a positive (nonincreasing) deficit.
+    if retainedProposal,prefix=count+1;end
     if ~isfield(model,'collisionEscapeNormals') || size(model.collisionEscapeNormals,2)~=2*count+1
         model.collisionEscapeNormals=zeros(2,2*count+1);
     end
@@ -957,7 +963,16 @@ function [problem,model]=localFormulate(anchor,model)
         blockBounds{blockCount}=[entry+entryChange;-entry+entryChange];
     end
     localCheckDeadline(model);
-    [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,time/h);
+    if retainedProposal
+        % The joint policy's terminal set is checked after nonlinear set
+        % propagation by localRetainedAssess. Do not constrain this optional
+        % proposal by another, locally linearized braking continuation.
+        terminalRows=zeros(0,6);terminalBounds=zeros(0,1);
+        terminalInfo=struct('value',NaN,'margin',NaN,'exitSeconds',NaN, ...
+            'reason',"deferredToWholeSetAdmission");
+    else
+        [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,time/h);
+    end
     localCheckDeadline(model);
     model.terminalContext=context;model.encounterExitRecord=exitRecord;
     if ~isempty(terminalRows)

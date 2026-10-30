@@ -12,6 +12,30 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function anAuxiliaryProposalMayUseCollisionSlackAfterTheOldPrefix(testCase)
+            f=testCase.fixture;count=20;anchor=localLongAnchor(f,count);
+            model=f.model;model.retainedProposal=true;
+            model.target(1)=anchor.states(1,end);model.targetEpoch=model.target;
+            model.uncertainty.egoGenerator=zeros(6);
+            model.uncertainty.collisionGenerator=zeros(6);
+            model.uncertainty.target=[];
+            [problem,~,model]=solvePredictiveControl('probe',struct( ...
+                'operation','formulate','model',model,'anchor',anchor,'inherited',false));
+            % Hold the nominal trajectory fixed: only PCBF slack can repair
+            % its overlap at the end, beyond the old two-node soft prefix.
+            fixed=[problem.stateIndices(:);problem.inputIndices(:)];
+            problem.lower(fixed)=0;problem.upper(fixed)=0;
+            [proposal,~]=solvePredictiveControl('probe',struct( ...
+                'operation','solve','model',model,'anchor',anchor,'problem',problem));
+            testCase.assertNotEmpty(proposal);
+            testCase.verifyGreaterThan(proposal.safety,0);
+            testCase.verifyEqual(proposal.inputs,anchor.inputs,AbsTol=1e-8);
+            % Optional point proposals are not certificates. Their actual
+            % terminal collision must still fail whole-set admission.
+            terminal=terminalSafeSet.certifySet(terminalSafeSet.context(model), ...
+                nrmmSet(anchor.states(:,end)),model.target,[],count*f.cfg.controller.sampleTime,100);
+            testCase.verifyFalse(terminal.valid);
+        end
         function projectedSupportsCoverCoupledPositionAndYaw(testCase)
             ego=nrmmSet([0;2;.4],[.1,.02;.05,.2;.25,.05]);
             target=nrmmSet([3;0;-.2],[.2,-.03;.05,.05;-.1,.2]);

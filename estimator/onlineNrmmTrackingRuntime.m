@@ -21,7 +21,7 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
     action = lower(string(action));
     if ~isscalar(action)
         error("onlineNrmmTrackingRuntime:invalidAction", ...
-            "action must be 'initialize', 'step', 'sample', 'output', or 'resetTarget'.");
+            "action must be 'initialize', 'step', 'sample', 'output', 'measurement', or 'resetTarget'.");
     end
     switch action
         case "initialize"
@@ -36,15 +36,20 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
             [varargout{1},varargout{2}] = localStep(varargin{:},true);
         case "output"
             varargout{1} = localCurrentOutput(varargin{:});
+        case "measurement"
+            % Read the same bounded sensor geometry without advancing any
+            % observer state. Track acquisition can retain this information
+            % before the target-state observer has been initialized.
+            varargout{1} = localSynchronizedInput(varargin{2},varargin{1});
         case "resettarget"
             varargout{1} = localResetTarget(varargin{:});
         otherwise
             error("onlineNrmmTrackingRuntime:invalidAction", ...
-                "action must be 'initialize', 'step', 'sample', 'output', or 'resetTarget'.");
+                "action must be 'initialize', 'step', 'sample', 'output', 'measurement', or 'resetTarget'.");
     end
 end
 
-function runtime = localResetTarget(runtime,physicalState)
+function runtime = localResetTarget(runtime,physicalState,history)
 % localResetTarget Reinitialize the acquired target without changing ego states.
     validateattributes(physicalState,{'double'},{'vector','numel',6,'finite','real'});
     physicalState = physicalState(:);
@@ -53,6 +58,11 @@ function runtime = localResetTarget(runtime,physicalState)
     runtime.lastRadarTime = NaN;
     runtime.positionErrorBound = nrmmPositionErrorBound("reset", ...
         runtime.positionErrorBound,localBoundState(localPackState(runtime)));
+    if nargin>2 && ~isempty(history)
+        assert(all(history.time<=runtime.currentTime), ...
+            'onlineNrmmTrackingRuntime:futureHistory','A target reset cannot use future observations.');
+        runtime.positionErrorBound.targetHistory=history;
+    end
     audit = localOperatingDomainAudit(localPackState(runtime),runtime,"track-reset");
     runtime.lastIntervalDomainAudit = audit;
     runtime.estimatedDomainAudit = localMergeDomainAudits( ...

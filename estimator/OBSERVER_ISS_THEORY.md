@@ -1196,6 +1196,30 @@ sensor noise is not assumed to average down. Intersections only tighten
 radii about the original NRMM point estimates; they do not reset observer
 states or alter gains. Inconsistent intersections cannot establish containment.
 
+The scalar speed enclosure also uses chord length without requiring observable
+target heading. Let a complete displacement enclosure give
+\(d_-\le\|p_j-p_i\|\le d_+\), and let
+\(a_\parallel\) and \(\Omega\) bound tangential acceleration magnitude and
+turn rate. On the constant-curvature family, for
+\(\Omega\Delta/2<\pi/2\), path length \(s\) satisfies
+\[
+ d_-\le s\le d_+/\operatorname{sinc}(\Omega\Delta/2).
+\]
+The lower bound uses chord length no greater than arc length; the upper bound
+uses the monotonicity of unnormalized sinc on this interval. Since speed is
+\(a_\parallel\)-Lipschitz, its value at an additional age \(\tau\) belongs to
+\[
+ \left[\frac{d_-}{\Delta}-a_\parallel(\Delta/2+\tau),\quad
+ \frac{d_+}{\Delta\operatorname{sinc}(\Omega\Delta/2)}
+       +a_\parallel(\Delta/2+\tau)\right]\cap[0,V_{\max}].
+\]
+This remains valid when braking reaches rest. The nonconstant-curvature
+fallback replaces sinc by cosine, using projection on the midpoint heading.
+All eligible chords and the original physical/observer interval are
+intersected; no sampled velocity, heading prior, or reduced noise budget is
+introduced. The controller receives the resulting scalar interval together
+with the unchanged NRMM point estimate.
+
 The adapter initializes position/velocity from the detection history and, for
 long enough windows, estimates an initial acceleration by least squares in a
 GNSS-course frame. Acquisition thresholds and fit significance rules are
@@ -1203,6 +1227,12 @@ implementation choices in `scripts/`; they are not assumptions proving an
 initial small error. A valid transient certificate must use a declared initial
 prior or the full physical-domain enclosure in Section 6. An initialization
 fit alone supplies neither a deterministic radius nor a convergence theorem.
+Delayed acquisition passes its already collected, bounded sensor history
+through the target reset. The reset still initializes the target-state
+observer with its physical-domain prior; the retained measurements then
+intersect that prior. Clearing these records would discard information that
+was available before the first control problem, especially for a stationary
+target whose course is unobservable.
 
 The simulation-only truth audit checks true motion and state errors at logged
 times. It never feeds truth to the observer or controller. Passing those

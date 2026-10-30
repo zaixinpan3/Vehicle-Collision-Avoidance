@@ -227,11 +227,20 @@ function output = localPublish(output, bound, input, design)
             output,target,components,parameters,domain,available,relativeCourseRadius);
         if available && isfield(bound,'targetHistory')
             family=output.targetEstimate.predictionErrorSet;
+            speedHistory=nrmmTargetHistory('speed',bound.targetHistory,output.stateTime,domain.scalarAccelerationMaximum);
+            family.speedInterval=[max(family.speedInterval(1),speedHistory(1)); ...
+                min(family.speedInterval(2),speedHistory(2))];
+            family.available=family.available && family.speedInterval(1)<=family.speedInterval(2);
+            family.historySpeedInterval=speedHistory;
             course=atan2(target.targetVelocityInertial(2),target.targetVelocityInertial(1));
             courseRadius=min(pi,family.courseRadius+bound.yaw);
             intervals=[family.speedInterval,family.accelerationInterval,family.curvatureInterval, ...
                 course+[-1;1]*courseRadius];
-            refined=nrmmTargetHistory('contractMotion',bound.targetHistory,output.stateTime,intervals);
+            if family.available
+                refined=nrmmTargetHistory('contractMotion',bound.targetHistory,output.stateTime,intervals);
+            else
+                refined=struct('intervals',intervals,'available',false,'checks',0,'usedSamples',0);
+            end
             family.available=family.available && refined.available;
             if refined.available
                 family.speedInterval=refined.intervals(:,1);

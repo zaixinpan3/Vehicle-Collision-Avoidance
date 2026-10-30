@@ -3464,6 +3464,16 @@ model-parameter premise. Every proposed policy still needs complete joint
 propagation and terminal admission under the original contract. The
 auxiliary point problem alone supplies no nonlinear safety certificate.
 
+The optional proposal now uses collision slack at every prediction node,
+matching the retained problem rather than retaining the legacy hard nominal
+tail. Its locally linearized terminal rows are deferred to the existing
+whole-set terminal admission. Input, state and locality conditions still
+guide the proposal, and terminal actuator slew remains explicit. Removing
+these duplicate proposal restrictions does not remove a terminal premise:
+`localRetainedAssess` must still certify the complete nonlinear joint image,
+its terminal continuation and the inherited deficit cap before replacing
+the saved witness. A positive-slack proposal is not a collision-free plan.
+
 New target observations can improve the supports of the unchanged saved ego
 tube without rebuilding its terminal continuation. The target information
 set is the intersection of the retained family and the recorded refinements.
