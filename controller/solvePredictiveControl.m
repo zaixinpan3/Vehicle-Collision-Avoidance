@@ -1519,7 +1519,7 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
             % the old certificate safe. Keep its original physical family
             % and epoch, and intersect it with the current observation.
             currentBase=certificate;currentBase.contract=contract;
-            currentBase.refineTargetSupports=budget==0;
+            currentBase.refineTargetSupports=true;
             record=struct('sampleIndex',model.sampleIndex,'target',model.target, ...
                 'errorSet',localAbsoluteTargetError(model),'improvedNodes',[], ...
                 'normals',zeros(2,0));
@@ -1594,7 +1594,8 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
         end
         base=struct('valid',false,'absoluteIndex',model.sampleIndex,'epochSeconds',0, ...
             'target',model.target,'targetError',localAbsoluteTargetError(model),'contract',contract, ...
-            'horizonSteps',0,'normals',zeros(2,0),'posterior',[],'terminalElapsed',0);
+            'horizonSteps',0,'normals',zeros(2,0),'posterior',[],'terminalElapsed',0, ...
+            'refineTargetSupports',true);
         certificate=base;failures=strings(1,numel(inputCandidates));
         search.initialAdmission=struct('terminalChecks',0,'checkedHorizons',[]);
         % Only initial admission selects N. Keep the complete encounter seed,
@@ -1887,6 +1888,11 @@ function certificate=localRetainedTargetUpdate(certificate,model)
         [alternative,direction]=predictiveSafetyGeometry.setSeparation( ...
             certificate.tube.sets{k}(1:3),shape,target,model.target(8:11));
         if alternative>gap,gap=alternative;normal=direction;end
+        if gap<0
+            covered=predictiveSafetyGeometry.targetFamilySeparation( ...
+                certificate.tube.sets{k}(1:3),shape,model.target,errorSet,(k-1)*model.cfg.controller.sampleTime);
+            gap=max(gap,covered);
+        end
         if gap>certificate.gaps(k),certificate.gaps(k)=gap;changed=true;end
         if gap>before(k),certificate.normals(:,k)=normal;end
     end
@@ -1992,6 +1998,10 @@ function [gap,normal]=localRetainedTargetGap(ego,shape,base,model,node,normal)
             age=(model.sampleIndex-family.sampleIndex+node-1)*h;
             target=predictiveSafetyGeometry.targetPoseSet(family.target,family.errorSet,age);
             [value,direction]=predictiveSafetyGeometry.setSeparation(ego,shape,target,family.target(8:11));
+            if value<0 && isfield(base,'refineTargetSupports') && base.refineTargetSupports
+                covered=predictiveSafetyGeometry.targetFamilySeparation(ego,shape,family.target,family.errorSet,age);
+                value=max(value,covered);
+            end
             if value>gap,gap=value;normal=direction;end
             if gap>=0,break;end
         end

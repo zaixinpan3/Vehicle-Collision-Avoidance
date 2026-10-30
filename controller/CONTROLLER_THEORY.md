@@ -3400,6 +3400,11 @@ deficit is not needed to establish the first feasible convex policy problem.
 This does not assert a global minimum of the nonlinear PCBF value. Subsequent
 renewals must still satisfy the shifted certified-deficit cap; in particular,
 zero deficit cannot be traded for a more attractive motion.
+Complete target-parameter covers are used for positive deficits as well as
+for preserving zero. Current target-information refinements use the same
+cover operation. This avoids charging the PCBF for the empty space between
+distinct possible target curves merely because their convex hull contains
+ego. All cells remain represented; a colliding cell cannot be discarded.
 The guide's acceleration-to-input map also checks its nonlinear next state
 when braking with lateral motion. If deceleration would outpace lateral
 settling, it searches toward less braking at the same steering command,
