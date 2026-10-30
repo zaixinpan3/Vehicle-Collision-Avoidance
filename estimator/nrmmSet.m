@@ -451,8 +451,61 @@ classdef nrmmSet
             low=min(residual,[],2);high=max(residual,[],2);
             midpoint=reshape((low+high)/2,size(q.center));
             error=ch.*reshape((high-low)/2,size(q.center));
-            force=-(slope/3).*stress-midpoint.*capacity ...
-                +nrmmSet.range(-error,error,size(q.generator,2));
+            a=-slope/3;b=-midpoint;
+            [residualLower,residualUpper]=nrmmSet.perspectiveResidual(stress,capacity,a,b);
+            residualLower=max(residualLower,-error);residualUpper=min(residualUpper,error);
+            force=a.*stress+b.*capacity ...
+                +nrmmSet.range(residualLower,residualUpper,size(q.generator,2));
+        end
+        function [lower,upper]=perspectiveResidual(stress,capacity,a,b)
+            % Enclose F(s,c)-a*s-b*c on the COMPLETE planar zonotope.
+            % Homogeneity makes every differentiable interior stationary
+            % value zero. On an edge, split at q=s/(3c)=-1,0,1. The residual
+            % is convex or concave on each resulting segment, so a change
+            % of derivative sign identifies its only interior extremum.
+            % Bisection supplies a bracket, not an assumed exact root:
+            % |dF/ds|<=1 and |dF/dc|<=1 bound the omitted bracket variation.
+            lower=zeros(size(a));upper=lower;
+            for row=1:numel(a)
+                g=[stress.generator(row,:),stress.remainder(row),0; ...
+                    capacity.generator(row,:),0,capacity.remainder(row)];
+                g=g(:,any(g,1));orientation=ones(1,size(g,2));
+                orientation(g(2,:)<0 | (g(2,:)==0 & g(1,:)<0))=-1;
+                g=g.*orientation;[~,order]=sort(atan2(g(2,:),g(1,:)));g=g(:,order);
+                half=[-sum(g,2),-sum(g,2)+2*cumsum(g,2)];
+                vertex=[stress.center(row);capacity.center(row)]+[half,-half];
+                vertex=[vertex,vertex(:,1)];base=vertex(:,1:end-1);edge=diff(vertex,1,2);
+                cuts=[zeros(1,size(edge,2));ones(1,size(edge,2))];
+                for q=[-1,0,1]
+                    t=(3*q*base(2,:)-base(1,:))./(edge(1,:)-3*q*edge(2,:));
+                    t(~isfinite(t))=0;cuts(end+1,:)=min(1,max(0,t));
+                end
+                cuts=sort(cuts,1);left=cuts(1:end-1,:);right=cuts(2:end,:);
+                sl=base(1,:)+edge(1,:).*left;cl=base(2,:)+edge(2,:).*left;
+                sr=base(1,:)+edge(1,:).*right;cr=base(2,:)+edge(2,:).*right;
+                vl=-cl.*nrmmSet.fialaValue(sl./(3*cl))-a(row)*sl-b(row)*cl;
+                vr=-cr.*nrmmSet.fialaValue(sr./(3*cr))-a(row)*sr-b(row)*cr;
+                low=min([vl(:);vr(:);0]);high=max([vl(:);vr(:);0]);
+                ql=sl./(3*cl);qr=sr./(3*cr);
+                pl=nrmmSet.fialaValue(ql);pr=nrmmSet.fialaValue(qr);
+                dl=3*max(0,1-abs(ql)).^2;dr=3*max(0,1-abs(qr)).^2;
+                fl=(-dl/3-a(row)).*edge(1,:)+(-pl+ql.*dl-b(row)).*edge(2,:);
+                fr=(-dr/3-a(row)).*edge(1,:)+(-pr+qr.*dr-b(row)).*edge(2,:);
+                active=fl.*fr<0 & right>left;
+                [~,column]=find(active);column=column.';
+                tl=left(active).';tr=right(active).';fs=sign(fl(active).');
+                c0=base(2,column);s0=base(1,column);dc=edge(2,column);ds=edge(1,column);
+                for iteration=1:24
+                    tm=(tl+tr)/2;cm=c0+dc.*tm;sm=s0+ds.*tm;qm=sm./(3*cm);
+                    pm=nrmmSet.fialaValue(qm);dm=3*max(0,1-abs(qm)).^2;
+                    fm=(-dm/3-a(row)).*ds+(-pm+qm.*dm-b(row)).*dc;
+                    same=sign(fm)==fs;tl(same)=tm(same);tr(~same)=tm(~same);
+                end
+                tm=(tl+tr)/2;cm=c0+dc.*tm;sm=s0+ds.*tm;
+                vm=-cm.*nrmmSet.fialaValue(sm./(3*cm))-a(row)*sm-b(row)*cm;
+                allowance=((1+abs(a(row)))*abs(ds)+(1+abs(b(row)))*abs(dc)).*(tr-tl)/2;
+                lower(row)=min([low,vm-allowance]);upper(row)=max([high,vm+allowance]);
+            end
         end
         function b=affineImage(a,fun,slope,critical)
             % Bound f(x)-f(c)-slope*(x-c) at ALL of its analytic extrema.

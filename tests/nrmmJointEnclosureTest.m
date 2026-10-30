@@ -81,6 +81,23 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
             excess=localPerspectiveDependenceExcess();
             testCase.verifyLessThanOrEqual(excess,1e-9);
         end
+        function aFialaRemainderUsesTheCoupledStressAndCapacityDomain(testCase)
+            stress=nrmmSet(6000,[4000,1000]);capacity=nrmmSet(4000,[-1500,500]);
+            image=nrmmSet.fialaForce(stress,capacity);
+            % Independent capacity-times-ratio residuals need a 1916 N
+            % radius here. The complete correlated domain permits <1700 N.
+            testCase.verifyLessThan(radius(image),1700);
+            for first=linspace(-1,1,31)
+                for second=linspace(-1,1,31)
+                    z=[first;second];s=stress.center+stress.generator*z;
+                    c=capacity.center+capacity.generator*z;
+                    value=-c*nrmmSet.fialaValue(s/(3*c));
+                    affine=image.center+image.generator(:,1:2)*z;
+                    residual=sum(abs(image.generator(:,3:end)),2)+image.remainder;
+                    testCase.verifyLessThanOrEqual(abs(value-affine),residual+1e-9);
+                end
+            end
+        end
         function aCorrelatedQuotientRetainsAnExactSharedScale(testCase)
             capacity=nrmmSet(4000,[500,-300]);
             [lower,upper]=nrmmSet.ratioRange(.3*capacity,capacity);

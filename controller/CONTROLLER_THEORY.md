@@ -3582,6 +3582,19 @@ For positive capacity this linear-fractional function attains its extrema
 at vertices of their planar zonotope. Enumerating its complete boundary,
 including the independent remainder axes, therefore avoids both an
 independent reciprocal error and iterative scalar root searches.
+The remaining force residual is further enclosed on this same planar
+zonotope, rather than multiplying a ratio residual by an independently
+maximized capacity. For `F(s,c)=-c*P(s/(3c))`, the residual
+`F(s,c)-a_s*s-a_c*c` is homogeneous of degree one. Euler's identity makes
+every differentiable interior stationary value zero. On each polygon edge,
+split at `s/(3c)=-1,0,1`. The perspective is convex or concave on each
+resulting segment; endpoints and at most one stationary point suffice.
+A stationary point is kept as a bisection bracket, with its unevaluated
+variation bounded using `|F_s|<=1`, `|F_c|<=1`. Thus numerical root accuracy
+cannot silently erase an extremum. Intersecting this complete residual
+range with the original perspective range retains both valid bounds.
+This remains a real-arithmetic inclusion argument, not directed-rounding
+certification or a change to the Fiala plant.
 The existing finite force-range enclosure remains the fallback
 when the capacity interval includes zero.
 
