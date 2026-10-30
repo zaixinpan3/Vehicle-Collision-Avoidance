@@ -161,6 +161,13 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(result.lateralRadius),.1);
             testCase.verifyLessThanOrEqual(result.containmentExcess,1e-9);
         end
+        function initialCruiseAlreadyPropagatesTheJointInformation(testCase)
+            [first,second,radius]=localInitialCruiseInformation(testCase.fixture);
+            testCase.verifyTrue(isfield(first,'egoJointPrediction'));
+            testCase.verifyTrue(isfield(second,'egoJointPrediction'));
+            testCase.verifyEqual(second.egoJointPrediction.sampleIndex,2);
+            testCase.verifyLessThan(radius,.1);
+        end
         function aRealObserverUpdateRetainsZeroSlackInTheNextConvexProblem(testCase)
             f=testCase.fixture;
             [first,~]=solvePredictiveControl('probe',struct('operation','retained', ...
@@ -544,4 +551,13 @@ function frame=localFrame(x,input,cfg,time)
         'lateralAcceleration',field(5)+x(4)*x(6)+.003*sin(19*time), ...
         'yawRateMeasured',x(6)+.0001*sin(23*time),'radarDetectionAvailable',false, ...
         'radarRelativePosition',[NaN;NaN],'heldSteeringAngle',input(1),'heldBrakingRatio',input(2));
+end
+
+function [first,second,lateralRadius]=localInitialCruiseInformation(f)
+    road=struct('centerline',[-100,0;1000,0]);
+    [command,~,~,first]=collisionAvoidanceController(f.output,[],road,f.cfg,[]);
+    [~,~,output]=localAdvance(f.runtime,f.x,f.u,command.actuatorInput,f.cfg,0);
+    output.targetEstimate=[];
+    [~,~,prediction,second]=collisionAvoidanceController(output,[],road,f.cfg,first);
+    lateralRadius=sum(abs(prediction.model.uncertainty.egoGenerator(5,:)));
 end

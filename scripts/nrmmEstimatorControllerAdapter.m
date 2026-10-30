@@ -522,7 +522,7 @@ function [targetState, acquired, acquisition] = ...
             frame, trailingDetectionIdx), ...
         "targetPositionInertial", ...
             localInitialTargetPositionRows( ...
-                frame, trailingDetectionIdx), ...
+                frame, trailingDetectionIdx, egoYaw), ...
         "velocityInitializationMethod", "", ...
         "consecutiveDetectionCount", ...
             numel(trailingDetectionIdx));
@@ -560,12 +560,11 @@ function radarPosition = localRadarRows(frame, sampleIdx)
 end
 
 function targetPosition = localInitialTargetPositionRows( ...
-        frame, sampleIdx)
-% Position-history derivatives supply the initialization direction used to
-% rotate radar rows into the inertial frame. The
-% history is a steady motion, so the course is fitted linearly in time over
-% the rows: a single noisy course sample would rotate a distant detection
-% by its full error.
+        frame, sampleIdx, currentYaw)
+% Anchor all radar poses to ONE current estimated body yaw and transport
+% it with the measured gyro history. Differentiating short GNSS position
+% windows to reconstruct each past heading amplifies position noise into
+% spurious target velocity through the radar's long position lever arm.
     if isempty(sampleIdx)
         targetPosition = zeros(0, 2);
         return;
@@ -573,28 +572,14 @@ function targetPosition = localInitialTargetPositionRows( ...
     radarPosition = localRadarRows(frame, sampleIdx);
     targetPosition = NaN(numel(sampleIdx), 2);
     times = cellfun(@(value) value.time, frame(sampleIdx));
-    % A quadratic position-history fit supplies an initialization direction.
-    % It is not an independent velocity or heading sensor.
-    positions=cellfun(@(value) [value.xGps,value.yGps],frame(sampleIdx),UniformOutput=false);
-    positions=vertcat(positions{:});
-    relativeTime=times(:)-times(end);
-    if numel(times)>=3
-        coefficients=[ones(numel(times),1),relativeTime,relativeTime.^2]\positions;
-        velocities=coefficients(2,:)+2*relativeTime*coefficients(3,:);
-    else
-        velocities=repmat((positions(end,:)-positions(1,:))/max(eps,times(end)-times(1)),numel(times),1);
-    end
-    course=unwrap(atan2(velocities(:,2),velocities(:,1)));
-    fitted = course;
-    if numel(sampleIdx) >= 2
-        fitted = [ones(numel(times),1), times(:)-times(end)] ...
-            *([ones(numel(times),1), times(:)-times(end)]\course(:));
-    end
+    rates=cellfun(@(value) value.yawRateMeasured,frame(sampleIdx));
+    increments=.5*(rates(1:end-1)+rates(2:end)).*diff(times);
+    yaw=currentYaw-[flipud(cumsum(flipud(increments(:))));0];
     for positionIdx = 1:numel(sampleIdx)
         frameIdx = sampleIdx(positionIdx);
         egoPosition = [ ...
             frame{frameIdx}.xGps; frame{frameIdx}.yGps];
-        rotation = localRotation(fitted(positionIdx));
+        rotation = localRotation(yaw(positionIdx));
         targetPosition(positionIdx, :) = ...
             (egoPosition ...
                 + rotation*radarPosition(positionIdx, :).').';

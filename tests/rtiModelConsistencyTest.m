@@ -166,6 +166,15 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyEqual(same,turning,AbsTol=0);
             testCase.verifyLessThanOrEqual(abs(turning(2)),1);
         end
+        function lowSpeedAvoidanceAccountsForTheShrinkingSideslipDomain(testCase)
+            cfg=testCase.model.cfg;x=[0;0;0;1.5;.36;.18];previous=[.35;-.8];
+            input=nonlinearBicycleModel.accelerationGuidance(x,[-8;4],previous,cfg,1,true);
+            next=nonlinearBicycleModel.sample(x,input,cfg);
+            testCase.verifyLessThanOrEqual(abs(next(5)),tan(cfg.model.sideslipMaximum)*next(4)+1e-12);
+            testCase.verifyGreaterThan(input(2),-.8);
+            testCase.verifyGreaterThan(input(1),0);
+            testCase.verifyLessThanOrEqual(abs(input(2)-previous(2)),cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime+1e-12);
+        end
     end
 end
 

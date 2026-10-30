@@ -448,6 +448,36 @@ classdef nonlinearBicycleModel
             kinematicSteering=atan((cfg.vehicle.lf+cfg.vehicle.lr)/cfg.vehicle.lr*tan(beta));
             weight=localBlend(x(4),cfg);
             u=[weight*steering+(1-weight)*kinematicSteering;b];
+            if coupled && b<0 && abs(x(5))>0
+                % The field selects the maneuver. Its input mapping must
+                % also respect the already declared observer domain: rapid
+                % braking can shrink vx faster than lateral motion decays.
+                % Search only along the same steering command toward less
+                % braking, retaining an actually checked nonlinear endpoint.
+                % This is seed construction, not an execution safety filter.
+                threshold=.8*tan(cfg.model.sideslipMaximum);
+                next=nonlinearBicycleModel.sample(x,u,cfg);
+                if abs(next(5))>threshold*next(4)
+                    trial=u;trial(2)=min(0,previous(2)+rate);
+                    next=nonlinearBicycleModel.sample(x,trial,cfg);
+                    if next(4)>0 && abs(next(5))<=tan(cfg.model.sideslipMaximum)*next(4)
+                        % Prefer the existing guidance reserve when it is
+                        % reachable, but never reject a valid endpoint merely
+                        % because this optional reserve cannot be reached.
+                        threshold=max(threshold,abs(next(5))/next(4));
+                    end
+                    if abs(next(5))<=threshold*next(4)
+                        low=b;high=trial(2);
+                        for iteration=1:12
+                            trial(2)=(low+high)/2;
+                            next=nonlinearBicycleModel.sample(x,trial,cfg);
+                            if abs(next(5))<=threshold*next(4),high=trial(2);
+                            else,low=trial(2);end
+                        end
+                        u(2)=high;
+                    end
+                end
+            end
         end
 
         function parameters = nominalGuidanceParameters(cfg,curvature)

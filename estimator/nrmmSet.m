@@ -139,13 +139,19 @@ classdef nrmmSet
         function c=times(a,b)
             [a,b]=nrmmSet.expand(a,b);
             g=b.center(:).*a.generator+a.center(:).*b.generator;
-            % Shared diagonal products are z_i^2 in [0,1], not independent
-            % signed products in [-1,1]. Keep their one-sided midpoint.
-            % Off-diagonal products are still bounded by absolute sums.
-            diagonal=a.generator.*b.generator;
-            shift=reshape(sum(diagonal,2)/2,size(a.center));
-            r=abs(b.center).*a.remainder+abs(a.center).*b.remainder ...
-                +radius(a).*radius(b)-reshape(sum(abs(diagonal),2)/2,size(a.center));
+            shift=zeros(size(a.center));
+            r=abs(b.center).*a.remainder+abs(a.center).*b.remainder;
+            % The two deviations form a TWO-dimensional zonotope even
+            % when hundreds of primitive columns are shared. The extrema
+            % of their product lie on its polygon edges. Bound this single
+            % correlated quadratic instead of adding independent |z_i z_j|
+            % terms; every primitive value remains included.
+            active=find(radius(a)>0 & radius(b)>0);
+            for k=active(:).'
+                [lo,hi]=nrmmSet.productRange(a.generator(k,:),b.generator(k,:),a.remainder(k),b.remainder(k));
+                shift(k)=(lo+hi)/2;
+                r(k)=abs(b.center(k))*a.remainder(k)+abs(a.center(k))*b.remainder(k)+(hi-lo)/2;
+            end
             c=nrmmSet(a.center.*b.center+shift,g,max(0,r));
         end
         function c=mtimes(a,b)
@@ -238,6 +244,16 @@ classdef nrmmSet
             critical=atanh(sqrt(min(1,max(0,1-slope))));
             b=nrmmSet.affineImage(a,@tanh,slope,[critical(:),-critical(:)]);
         end
+        function b=smoothstep(a)
+            % One full-domain image of the clamped cubic transition. Keeping
+            % its repeated speed argument avoids independent uncertainty in
+            % clamp(s), s^2 and 3-2s at the Fiala/kinematic transition.
+            fun=@(x)min(1,max(0,x)).^2.*(3-2*min(1,max(0,x)));
+            t=min(1,max(0,a.center));slope=nrmmSet.secantSlope(a,fun,6*t.*(1-t));
+            offset=sqrt(max(0,1-2*slope(:)/3));
+            points=[(1-offset)/2,(1+offset)/2,zeros(numel(t),1),ones(numel(t),1)];
+            b=nrmmSet.affineImage(a,fun,slope,points);
+        end
         function b=fialaFraction(a)
             % P(q)=3q-3|q|q+q^3 on [-1,1], sign(q) outside.
             % P is C1 and P' is globally 6-Lipschitz, including q=0 and
@@ -306,6 +322,24 @@ classdef nrmmSet
         function c=horzcat(varargin),c=nrmmSet.concatenate(2,varargin{:});end
     end
     methods (Static)
+        function [lo,hi]=productRange(first,second,firstRemainder,secondRemainder)
+            % Exact real-arithmetic range of x*y on the planar zonotope.
+            % Opposite edges have identical products, so one half boundary
+            % suffices. Include the stationary point on EVERY edge.
+            g=[first,firstRemainder,0;second,0,secondRemainder];
+            g=g(:,any(g,1));
+            orientation=ones(1,size(g,2));orientation(g(2,:)<0 | (g(2,:)==0 & g(1,:)<0))=-1;
+            g=g.*orientation;[~,order]=sort(atan2(g(2,:),g(1,:)));g=g(:,order);
+            vertex=[-sum(g,2),-sum(g,2)+2*cumsum(g,2)];
+            values=vertex(1,:).*vertex(2,:);
+            start=vertex(:,1:end-1);step=2*g;
+            quadratic=step(1,:).*step(2,:);
+            linear=start(1,:).*step(2,:)+start(2,:).*step(1,:);
+            t=-linear./(2*quadratic);inside=t>0 & t<1 & quadratic~=0;
+            point=start(:,inside)+step(:,inside).*t(inside);
+            values=[values,point(1,:).*point(2,:),0];
+            lo=min(values);hi=max(values);
+        end
         function result=symbolPool(action,value)
             % A hold-local pool gives each nonlinear residual ONE identity.
             % Reusing a computed force then reuses that same signed column.
@@ -351,6 +385,28 @@ classdef nrmmSet
         function value=fialaValue(q)
             q=min(1,max(-1,q));value=3*q-3*abs(q).*q+q.^3;
         end
+        function [lo,hi]=ratioRange(a,b)
+            % Range of two correlated affine forms with positive denominator.
+            % A linear-fractional function on this planar zonotope attains
+            % its extrema at vertices. Enumerate its complete boundary,
+            % including independent remainder axes; no sampling or iterative
+            % root search is needed.
+            [a,b]=nrmmSet.expand(a,b);[bl,~]=bounds(b);
+            assert(all(bl>0,'all'),'nrmmSet:singularDomain','A positive denominator is required.');
+            lo=zeros(size(a.center));hi=lo;
+            for k=1:numel(lo)
+                g=[a.generator(k,:),a.remainder(k),0;b.generator(k,:),0,b.remainder(k)];
+                g=g(:,any(g,1));
+                orientation=ones(1,size(g,2));orientation(g(2,:)<0 | (g(2,:)==0 & g(1,:)<0))=-1;
+                g=g.*orientation;[~,order]=sort(atan2(g(2,:),g(1,:)));g=g(:,order);
+                half=[-sum(g,2),-sum(g,2)+2*cumsum(g,2)];
+                vertex=[a.center(k);b.center(k)]+[half,-half];
+                values=vertex(1,:)./vertex(2,:);
+                lo(k)=min(values);hi(k)=max(values);
+            end
+            guard=64*eps(max(1,max(abs(lo),abs(hi))));
+            lo=lo-guard;hi=hi+guard;
+        end
         function force=fialaForce(stress,capacity)
             % The perspective -c*P(s/(3*c)) is affine in (s,c) except
             % for the scalar residual P(q)-a*q. Cancel c analytically
@@ -360,7 +416,11 @@ classdef nrmmSet
             [cl,ch]=bounds(capacity);
             assert(all(cl>0,'all'),'nrmmSet:singularDomain', ...
                 'The perspective enclosure needs positive tire capacity.');
-            q=stress./(3*capacity);[lo,hi]=bounds(q);
+            % Do not obtain the ratio domain from an independent reciprocal
+            % product: its artificial residual feeds back into every tire
+            % image. Correlated affine supports give a tighter full range.
+            [lo,hi]=nrmmSet.ratioRange(stress,3*capacity);
+            q=nrmmSet.range(lo,hi,size(stress.generator,2));
             slope=nrmmSet.secantSlope(q,@nrmmSet.fialaValue,3*max(0,1-abs(q.center)).^2);
             critical=1-sqrt(max(0,slope)/3);count=numel(q.center);
             points=[lo(:),hi(:),critical(:),-critical(:),zeros(count,1),ones(count,1),-ones(count,1)];

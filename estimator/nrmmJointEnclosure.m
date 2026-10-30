@@ -94,8 +94,8 @@ function [value,acceleration]=localPlantField(x,u,parameters,cfg)
     elseif xh(4)<=range(1)
         [body,acceleration]=localKinematic(x,u,scale,cfg);
     elseif xl(4)>cfg.model.scheduleSpeedFloor
-        s=min(1,max(0,(x(4)-range(1))/(range(2)-range(1))));
-        weight=nrmmSet.intersectRange(s^2*(3-2*s),0,1);
+        s=(x(4)-range(1))/(range(2)-range(1));
+        weight=smoothstep(s);
         [fiala,fialaAcceleration]=localFiala(x,u,scale,stiffness,cfg);
         [kinematic,kinematicAcceleration]=localKinematic(x,u,scale,cfg);
         body=kinematic+weight.*(fiala-kinematic);
@@ -107,7 +107,7 @@ function [value,acceleration]=localPlantField(x,u,parameters,cfg)
         low(4)=nrmmSet.range(xl(4),min(xh(4),range(1)),size(x.generator,2));
         high(4)=nrmmSet.range(range(1),xh(4),size(x.generator,2));
         [a,aa]=localKinematic(low,u,scale,cfg);
-        s=min(1,(high(4)-range(1))/(range(2)-range(1)));weight=nrmmSet.intersectRange(s^2*(3-2*s),0,1);
+        s=(high(4)-range(1))/(range(2)-range(1));weight=smoothstep(s);
         [fiala,fa]=localFiala(high,u,scale,stiffness,cfg);
         [kinematic,ka]=localKinematic(high,u,scale,cfg);
         b=kinematic+weight.*(fiala-kinematic);ba=ka+weight.*(fa-ka);
@@ -404,11 +404,16 @@ end
 
 function [force,derivative]=localInverseForce(s,speed,rate,held,design)
     model=design.egoModel;v=s*speed;vx=sqrt(1-s^2)*speed;
-    slips=[atan((v+model.lf*rate)/vx)-held(1);atan((v-model.lr*rate)/vx)];
+    % Use the SAME rational slip coordinates as the physical Fiala map.
+    % Separately enclosing atan(z) followed by tan(atan(z)-delta) creates
+    % artificial inverse-observer uncertainty even though the two functions
+    % cancel exactly. The whole slip chart is established by localInverse.
+    front=(v+model.lf*rate)/vx;cosine=cos(held(1));sine=sin(held(1));
+    tangent=[(front*cosine-sine)/(cosine+front*sine);(v-model.lr*rate)/vx];
     load=model.mass*model.gravity/(model.lf+model.lr)*[model.lr;model.lf];
     scale=model.frictionCoefficient(:).*load;
     capacity=scale.*sqrt(max(0,1-held(2)^2));
-    fy=localTires(slips,nrmmSet(model.corneringStiffness(:)),capacity);
+    fy=localTires(tangent,nrmmSet(model.corneringStiffness(:)),capacity,true);
     force=held(2)*scale(1)*sin(held(1))+fy(1)*cos(held(1))+fy(2);
     if nargout<2,return;end
     derivative=nrmmSet(0);offset=[model.lf;-model.lr]*rate;
@@ -417,8 +422,8 @@ function [force,derivative]=localInverseForce(s,speed,rate,held,design)
         if cl<=0
             derivative=nrmmSet.range(-realmax,0,size(speed.generator,2));return;
         end
-        tangent=tan(slips(axle));q=model.corneringStiffness(axle)*tangent/(3*capacity(axle));
-        tireSlope=-model.corneringStiffness(axle)*(1+tangent^2)*max(0,1-abs(q))^2;
+        q=model.corneringStiffness(axle)*tangent(axle)/(3*capacity(axle));
+        tireSlope=-model.corneringStiffness(axle)*(1+tangent(axle)^2)*max(0,1-abs(q))^2;
         c=offset(axle);
         angleSlope=speed*(speed+c*s)/(sqrt(1-s^2)*(speed^2+2*c*speed*s+c^2));
         term=tireSlope*angleSlope;if axle==1,term=term*cos(held(1));end

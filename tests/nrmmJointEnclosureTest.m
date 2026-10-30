@@ -2,7 +2,7 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
     properties (TestParameter)
         accelerationSpeed={.1,1.5,3.2,8,15};
         accelerationInput={[.04;-.4],[-.025;-1]};
-        scalarMap={"square","quartic","reciprocal","atan","asin","sqrt","fiala","sin","cos","tan","tanh","abs"};
+        scalarMap={"square","quartic","reciprocal","atan","asin","sqrt","fiala","sin","cos","tan","tanh","abs","smoothstep"};
     end
     methods (TestClassSetup)
         function addProjectPaths(testCase)
@@ -26,6 +26,14 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
             testCase.verifyEqual([lo,hi],[0,1],AbsTol=1e-15);
             [lo,hi]=bounds(a*(-a));
             testCase.verifyEqual([lo,hi],[-1,0],AbsTol=1e-15);
+        end
+        function aSharedMultivariableProductHasNoNegativeSquareTail(testCase)
+            a=nrmmSet(0,[1,1]);[lo,hi]=bounds(a*a);
+            testCase.verifyEqual([lo,hi],[0,4],AbsTol=1e-12);
+        end
+        function planarProductsContainTheirWholePrimitiveGrid(testCase)
+            excess=localPlanarProductExcess();
+            testCase.verifyLessThanOrEqual(excess,1e-12);
         end
         function orderReductionContainsTheOldFamilyAndRetainsSharedMotion(testCase)
             [original,reduced,directions]=localReducedFamily();
@@ -59,6 +67,20 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
         function aFialaPerspectiveEnclosesMixedCapacityAndSlip(testCase)
             excess=localPerspectiveDependenceExcess();
             testCase.verifyLessThanOrEqual(excess,1e-9);
+        end
+        function aCorrelatedQuotientRetainsAnExactSharedScale(testCase)
+            capacity=nrmmSet(4000,[500,-300]);
+            [lower,upper]=nrmmSet.ratioRange(.3*capacity,capacity);
+            testCase.verifyEqual([lower,upper],[.3,.3],AbsTol=1e-12);
+        end
+        function aCorrelatedQuotientEnclosesAllAffineVertices(testCase)
+            a=nrmmSet(-2,[.5,1.2]);b=nrmmSet(3,[.6,-.4]);
+            vertices=[-1,-1,1,1;-1,1,-1,1];
+            exact=(a.center+a.generator*vertices)./(b.center+b.generator*vertices);
+            [lower,upper]=nrmmSet.ratioRange(a,b);
+            testCase.verifyLessThanOrEqual(lower,min(exact));
+            testCase.verifyGreaterThanOrEqual(upper,max(exact));
+            testCase.verifyLessThan((upper-lower)-(max(exact)-min(exact)),1e-6);
         end
         function bodyAccelerationMatchesTheIndependentVehicleModel(testCase,accelerationSpeed,accelerationInput)
             cfg=collisionAvoidanceControllerConfig();x=[0;0;.2;accelerationSpeed;.01;.002];
@@ -248,9 +270,12 @@ function excess=localUnaryDependenceExcess(kind)
         case "tan",center=[-pi;0;.5;pi];width=[1;1;.5;1];fun=@tan;
         case "tanh",center=[-16;0;.5;16];width=[4;2;.7;4];fun=@tanh;
         case "abs",fun=@abs;
+        case "smoothstep",fun=@(x)min(1,max(0,x)).^2.*(3-2*min(1,max(0,x)));
     end
     input=nrmmSet(center,diag(width));
-    if kind=="fiala",image=fialaFraction(input);else,image=fun(input);end
+    if kind=="fiala",image=fialaFraction(input);
+    elseif kind=="smoothstep",image=smoothstep(input);
+    else,image=fun(input);end
     excess=-Inf;
     for z=linspace(-1,1,2001)
         symbols=z*ones(4,1);actual=fun(center+input.generator*symbols);
@@ -338,6 +363,18 @@ function excess=localPerspectiveDependenceExcess()
                 affine=force.center+force.generator(:,1:2)*primitive;
                 rest=sum(abs(force.generator(:,3:end)),2)+force.remainder;
                 excess=max(excess,abs(value-affine)-rest);
+            end
+        end
+    end
+end
+
+function excess=localPlanarProductExcess()
+    a=nrmmSet(2,[2,1,.3]);b=nrmmSet(-1,[1,-2,.6]);image=a*b;excess=-Inf;
+    for x=linspace(-1,1,31)
+        for y=linspace(-1,1,31)
+            for z=[-1,0,1]
+                primitive=[x;y;z];value=(a.center+a.generator*primitive)*(b.center+b.generator*primitive);
+                excess=max(excess,abs(value-image.center-image.generator*primitive)-image.remainder);
             end
         end
     end

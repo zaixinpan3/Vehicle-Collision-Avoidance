@@ -32,7 +32,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     model.solveTimeLimitSeconds=max(0,cfg.solver.timeLimitSeconds-cfg.solver.completionReserveSeconds);
     hasRetainedState=isstruct(previousState) && isfield(previousState,'retainedCertificate');
     if cfg.controller.retainedTube && isfield(model,'target') && ~isempty(model.target) ...
-            && (isfield(model.uncertainty,'jointPrediction') || hasRetainedState)
+            && (isfield(model.uncertainty,'jointPrediction') || hasRetainedState) ...
+            && ~(isfield(model,'referenceProbeOnly') && model.referenceProbeOnly)
         [solution,search,model]=localRetainedSolve(model,previousState,timer);return;
     end
     minimumCount=cfg.controller.horizonSteps;
@@ -1580,15 +1581,21 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
         % If the complete tube rejects both centers, retry the SAME inputs
         % with damped ancillary feedback. Bounds, models and safety tests
         % remain unchanged; no second avoidance path is planned.
-        feedbackScales=repelem([1,.5,.25,.125],numel(inputCandidates));
-        inputCandidates=repmat(inputCandidates,1,4);nominalCandidates=repmat(nominalCandidates,1,4);
-        root=nrmmJointPrediction('rootSet',model.initialState,model.uncertainty.egoGenerator,contract);
-        conditioned=nrmmJointPrediction('conditionMeasurements',root,contract,cfg);
-        root=conditioned.set;search.initialMeasurementConditioning=conditioned.diagnostics;
+        scales=2.^-(0:5);feedbackScales=repelem(scales,numel(inputCandidates));
+        inputCandidates=repmat(inputCandidates,1,numel(scales));
+        nominalCandidates=repmat(nominalCandidates,1,numel(scales));
+        if isfield(model,'initialJointSet')
+            root=model.initialJointSet;
+            search.initialMeasurementConditioning=struct('source',"conditionedCruiseInformation");
+        else
+            root=nrmmJointPrediction('rootSet',model.initialState,model.uncertainty.egoGenerator,contract);
+            conditioned=nrmmJointPrediction('conditionMeasurements',root,contract,cfg);
+            root=conditioned.set;search.initialMeasurementConditioning=conditioned.diagnostics;
+        end
         base=struct('valid',false,'absoluteIndex',model.sampleIndex,'epochSeconds',0, ...
             'target',model.target,'targetError',localAbsoluteTargetError(model),'contract',contract, ...
             'horizonSteps',0,'normals',zeros(2,0),'posterior',[],'terminalElapsed',0);
-        certificate=base;bestDeficit=Inf;failures=strings(1,numel(inputCandidates));
+        certificate=base;failures=strings(1,numel(inputCandidates));
         search.initialAdmission=struct('terminalChecks',0,'checkedHorizons',[]);
         % Only initial admission selects N. Keep the complete encounter seed,
         % then continue the existing route feedback until its endpoint has a
@@ -1601,7 +1608,6 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
                 'realArithmeticEnclosure',true,'floatingPointCertified',false);
             proposal=struct('context',{},'lower',{},'upper',{});
             k=0;nextTerminalCheck=size(inputs,2);limit=cfg.controller.maximumHorizonSteps;
-            if certificate.valid,limit=certificate.horizonSteps;nextTerminalCheck=limit;end
             while k<limit
                 k=k+1;set=partial.sets{end};
                 if k<=size(inputs,2)
@@ -1634,27 +1640,23 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
                     nextTerminalCheck=min(cfg.controller.maximumHorizonSteps,max(k+1,ceil(1.5*k)));
                 end
                 if candidate.valid
-                    admitted=true;
-                    if sum(candidate.slacks)<bestDeficit
-                        certificate=candidate;bestDeficit=sum(candidate.slacks);
-                        certificate.feedbackScale=feedbackScales(attempt);
-                        search.nominalProposal.accepted=nominalCandidates(attempt);
-                    end
+                    admitted=true;certificate=candidate;
+                    certificate.feedbackScale=feedbackScales(attempt);
+                    search.nominalProposal.accepted=nominalCandidates(attempt);
                     break;
                 end
                 admissionFailure=candidate.failureReason;
                 % A later endpoint cannot repair an earlier hard violation.
                 if startsWith(admissionFailure,["stateDomainAtNode","inputDomainAtHold","inputSlewAtHold"]),break;end
-                if ~isempty(checked) && sum(max(0,-checked.gaps))>=bestDeficit
-                    % Appending a suffix cannot erase these already certified
-                    % prefix deficits. Keep the better available witness.
-                    admissionFailure="certifiedDeficitNotImproved";break;
-                end
             end
             if ~admitted && k>=cfg.controller.maximumHorizonSteps
                 admissionFailure="initialHorizonWorkLimit: "+admissionFailure;
             end
-            if bestDeficit==0,break;end
+            % Admission asks for one complete witness. Comparing additional
+            % ancillary gains is not the online PCBF minimization and need
+            % not delay its first executable plan. Later renewals retain the
+            % shifted deficit cap, including an exact zero cap once attained.
+            if admitted,break;end
             if ~admitted
                 failures(attempt)=sprintf('candidate %d, feedback %.3g at %.3f s: %s', ...
                     attempt,feedbackScales(attempt),k*h,admissionFailure);

@@ -15,6 +15,15 @@ classdef nrmmPositionOnlyTest < matlab.unittest.TestCase
             testCase.verifyEqual(initialization.velocityInitializationEvidence.acceptedHolds, ...
                 initialization.velocityInitializationEvidence.totalHolds);
         end
+        function shortRadarHistoryDoesNotInventCrossingMotion(testCase)
+            [target,initialization]=localShortRadarHistory();
+            course=atan2(target.targetVelocityInertial(2),target.targetVelocityInertial(1));
+            testCase.verifyLessThan(abs(atan2(sin(course-pi),cos(course-pi))),.1);
+            testCase.verifyLessThan(abs(target.targetVelocityInertial(2)),.5);
+            testCase.verifyTrue(target.predictionErrorSet.available);
+            testCase.verifyLessThan(initialization.targetAcquisition.consecutiveDetectionCount, ...
+                numel(initialization.historyTime));
+        end
         function runtimeAcceptsPositionOnlyAndIgnoresFictitiousVelocityChannels(testCase)
             [runtime,frame]=localFixture();
             first=onlineNrmmTrackingRuntime('sample',runtime,frame);
@@ -79,6 +88,20 @@ classdef nrmmPositionOnlyTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(sum(abs(wide.generator(2,:))),sum(abs(narrow.generator(2,:))));
         end
     end
+end
+
+function [target,initialization]=localShortRadarHistory()
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
+        'model',struct('speedMaximum',18),'collision',struct('encounterRangeMeters',30)));
+    setup=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg, ...
+        collisionThreatContract(WindowSeconds=8));
+    setup.sensor.radar.rangeMaximum=30;
+    trim=nonlinearBicycleModel.cruise(cfg,0);
+    ego=struct('position',[0;0],'yaw',0,'longitudinalVelocity',8,'lateralVelocity',0, ...
+        'yawRate',0,'heldActuatorInput',trim.input);
+    motion=@(time,unused)struct('targetPositionInertial',[25.6-8*time;0]);
+    [context,initialization]=nrmmEstimatorControllerAdapter('initialize',setup,ego,motion);
+    target=context.currentOutput.targetEstimate;
 end
 
 function [initialization,error,prior]=localHistoryFixture()

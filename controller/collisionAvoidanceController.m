@@ -122,10 +122,11 @@ function [command,predictedInput,prediction,controllerState] = ...
         'nominalReference',nominalReference,'stateTime',ego.stateTime, ...
         'uncertainty',uncertainty);
     model.targetPredictionUpdate=targetPredictionUpdate;
-    % Target disappearance removes collision constraints, not information
-    % about the ego state and its persistent physical parameters.
+    % Target acquisition/disappearance changes the objective, not information
+    % about the ego state and its persistent physical parameters. Start this
+    % memory during cruise, before the first target has been confirmed.
     cruisePosterior=[];
-    if cfg.controller.retainedTube && isempty(q) && isfield(uncertainty,'jointPrediction')
+    if cfg.controller.retainedTube && (isempty(q) || targetOnset) && isfield(uncertainty,'jointPrediction')
         memory=[];
         if isstruct(previousState) && isfield(previousState,'egoJointPrediction')
             memory=previousState.egoJointPrediction;
@@ -140,11 +141,19 @@ function [command,predictedInput,prediction,controllerState] = ...
                 'Ego information must refer to the current control boundary.');
             cruisePosterior=nrmmJointPrediction('conditionRetained',memory.set, ...
                 model.initialState,uncertainty.egoGenerator,uncertainty.jointPrediction,memory.contract,cfg);
+        elseif isempty(q)
+            root=nrmmJointPrediction('rootSet',model.initialState,uncertainty.egoGenerator,uncertainty.jointPrediction);
+            conditioned=nrmmJointPrediction('conditionMeasurements',root,uncertainty.jointPrediction,cfg);
+            cruisePosterior=struct('proposedOuter',conditioned.set,'measurementConditioning',conditioned.diagnostics);
+        end
+        if ~isempty(cruisePosterior)
             root=cruisePosterior.proposedOuter;
             shift=root.center(1:6)-model.initialState;
             shift(3)=atan2(sin(shift(3)),cos(shift(3)));
             model.uncertainty.egoGenerator=[root.generator(1:6,:),diag(root.remainder(1:6)),shift];
             model.uncertainty.collisionGenerator=model.uncertainty.egoGenerator;
+            if uncertainty.relativeFrame,model.uncertainty.collisionGenerator(1:3,:)=0;end
+            if ~isempty(q),model.initialJointSet=root;end
         end
     end
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
@@ -160,7 +169,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     end
     predictedInput=solution.inputs;first=predictedInput(:,1);
     egoJointPrediction=[];
-    if ~isempty(cruisePosterior)
+    if ~isempty(cruisePosterior) && isempty(q)
         contract=uncertainty.jointPrediction;
         policy=struct('context',struct('cfg',cfg,'contract',contract, ...
             'reference',[contract.point;contract.currentMeasurement.yawRate], ...
@@ -342,7 +351,10 @@ function localWarmUp(cfg,referenceRoad)
     % Startup probes cover cruise and bounded low-speed feedback, including
     % a curved target. Every command and controller state is discarded.
     cfg=collisionAvoidanceControllerConfig(cfg);h=cfg.controller.sampleTime;
-    cfg.solver.timeLimitSeconds=max(1,cfg.solver.timeLimitSeconds);
+    % These discarded compilation probes do not need the research run's
+    % potentially large solve budget. This local copy never limits a real
+    % controller sample or a retained nonlinear certificate.
+    cfg.solver.timeLimitSeconds=1;
     cfg.solver.maxIterations=max(80,cfg.solver.maxIterations);
     % Discarded compilation probes include deliberately infeasible states.
     % Prime their kernels on a bounded horizon instead of searching until

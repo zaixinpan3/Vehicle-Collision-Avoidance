@@ -3393,12 +3393,22 @@ their initial vector-field rollout. This does not add a target-observer
 feedback model: the current target parameter family remains persistent.
 The original nonlinear guide, the point proposal, and their input midpoint
 are alternative centers, not separately planned passing maneuvers. Ancillary
-feedback can be retried at scales `1, 1/2, 1/4, 1/8` with exactly the same uncertainty and
-constraint contract. Among admitted centers the controller retains the
-smallest certified deficit, rather than the first positive-deficit candidate.
-The first successful admission fixes the node count for these comparisons.
-An already worse certified prefix cannot improve by appending more nodes,
-so that candidate can be pruned without another terminal proof.
+feedback can be retried at scales `1, 1/2, 1/4, 1/8, 1/16, 1/32` with exactly
+the same uncertainty and constraint contract. Initial admission retains the
+first complete feasible witness. Searching every remaining gain for a smaller
+deficit is not needed to establish the first feasible convex policy problem.
+This does not assert a global minimum of the nonlinear PCBF value. Subsequent
+renewals must still satisfy the shifted certified-deficit cap; in particular,
+zero deficit cannot be traded for a more attractive motion.
+The guide's acceleration-to-input map also checks its nonlinear next state
+when braking with lateral motion. If deceleration would outpace lateral
+settling, it searches toward less braking at the same steering command,
+within the existing actuator-rate interval. Every accepted endpoint is
+evaluated with the Fiala/low-speed model. The existing 80% guidance reserve
+is preferred when attainable; the declared sideslip domain remains the hard
+acceptance limit. This is a seed-construction heuristic, not a new tire-force
+constraint, passing-side selector, or execution safety filter. Complete
+joint-tube admission still supplies the subsequent safety test.
 On first admission, the complete proposed driving prefix is propagated.
 If its endpoint cannot be certified, the existing route-feedback law appends
 driving holds. Terminal checks use geometrically increasing node counts,
@@ -3497,13 +3507,27 @@ standalone publication at the objective switch. It is a current-information
 consistency repair; it does not turn the legacy CLF horizon approximation
 into a nonlinear robust cruise certificate.
 
+This information recursion also starts on the first target-free cruise
+sample. When a target is subsequently acquired, the initial driving
+certificate receives the conditioned joint set, including its persistent
+parameter correlations, rather than rebuilding an independent physical
+box. An acquisition delay therefore does not discard the preceding ego
+measurements and known input history.
+
 Several enclosure changes preserve algebraic dependencies. Scalar affine
 images use extrema of `f(x)-s*x` on the complete interval, including critical
-points and Fiala branch joins. Shared square terms use `zeta^2 in [0,1]`,
-rather than independent signed copies. A hold-scoped symbol pool assigns one
+points, Fiala branch joins, and both joins of the clamped cubic speed blend.
+For a product of two affine forms, their deviations lie in a planar
+zonotope, regardless of the number of shared primitive columns. Its product
+extrema occur at vertices or stationary points on edges; opposite edges
+have the same product. Enclosing this complete polygon retains cancellations
+between cross terms and gives a nonnegative remainder range for a shared
+square. It does not replace the primitive domain by a finite sample. A
+hold-scoped symbol pool assigns one
 identity to each nonlinear residual. Tire forces reused by the physical
 state and its simulated IMU therefore retain the same residual. The front
-slip tangent is evaluated by its rational trigonometric identity; the yaw
+slip tangent, in both the physical map and the nominal observer inverse,
+is evaluated by its rational trigonometric identity; the yaw
 innovation uses a shared phase difference where the complete set admits
 that chart. Outside the chart, the vector expression remains the fallback.
 Persistent tire factors remain shared between all physical updates; the
@@ -3518,7 +3542,12 @@ all stationary points determine those extrema. The identity
 `-c*P(q)=-a*s/3-m*c-c*(P(q)-a*q-m)` then retains the shared stress/capacity
 generators and adds only `[-c_max*r,c_max*r]`. This cancels the common
 capacity before enclosing it; no new tire limit or model approximation is
-introduced. The existing finite force-range enclosure remains the fallback
+introduced. The ratio domain is bounded from the shared affine forms.
+For positive capacity this linear-fractional function attains its extrema
+at vertices of their planar zonotope. Enumerating its complete boundary,
+including the independent remainder axes, therefore avoids both an
+independent reciprocal error and iterative scalar root searches.
+The existing finite force-range enclosure remains the fallback
 when the capacity interval includes zero.
 
 Nearly parallel residual directions are merged into a common signed
@@ -3562,6 +3591,16 @@ every candidate remains moving. Two consecutive chord directions also obey
 Unresolved slices are retained, and their hull is an outer approximation.
 Gyro transport uses certified hold-specific angular-acceleration bounds when
 available, retaining the declared gyro noise.
+
+The target's initial position history now uses the same relative-yaw
+transport principle. One current estimated body yaw anchors the past radar
+poses; trapezoidal integration of the measured gyro reconstructs their
+relative orientations. The nominal initializer no longer differentiates a
+short quadratic GNSS position fit to rotate each distant radar detection.
+That operation had converted position noise into apparent target lateral
+motion. GNSS still supplies position only. The uncertainty publication keeps
+its gyro/heading and parameter bounds; a better nominal simply avoids the
+additional radius needed to recenter those sets around a biased point.
 
 Terminal admission still uses the agreed simplified braking model. It now
 checks complete spatial target arcs after parking, including every possible
