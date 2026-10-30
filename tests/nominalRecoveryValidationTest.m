@@ -72,6 +72,16 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
                 Scenarios="recovery",Frames=1.5), ...
                 'runNonlinearPredictiveSafetyValidation:invalidFrameLimit');
         end
+        function aShortRecordedPrefixStillQualifiesTheCompleteThreat(testCase)
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="headOn",Frames=1, ...
+                RequireCollisionThreat=true,ControllerConfiguration=struct('referenceSpeed',8, ...
+                'controller',struct('horizonSteps',8),'solver',struct('timeLimitSeconds',5)));
+            r=report.results;
+            testCase.verifyTrue(r.baselineCruise.collisionDetected);
+            testCase.verifyGreaterThan(r.baselineCruise.durationSeconds,r.sampleTimeSeconds);
+            testCase.verifyGreaterThanOrEqual(r.recovery.minimumTimeSeconds,r.baselineCruise.lastCollisionSeconds);
+            testCase.verifyFalse(r.recovery.recovered);
+        end
         function anInitiallyTerminalCruiseStateStillRunsPredictiveControl(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=4);
             r=report.results;x=r.trace(1).estimatedState;cfg=r.configuration;

@@ -225,6 +225,24 @@ function output = localPublish(output, bound, input, design)
         end
         output.targetEstimate.predictionErrorSet = localPredictionSet( ...
             output,target,components,parameters,domain,available,relativeCourseRadius);
+        if available && isfield(bound,'targetHistory')
+            family=output.targetEstimate.predictionErrorSet;
+            course=atan2(target.targetVelocityInertial(2),target.targetVelocityInertial(1));
+            courseRadius=min(pi,family.courseRadius+bound.yaw);
+            intervals=[family.speedInterval,family.accelerationInterval,family.curvatureInterval, ...
+                course+[-1;1]*courseRadius];
+            refined=nrmmTargetHistory('contractMotion',bound.targetHistory,output.stateTime,intervals);
+            family.available=family.available && refined.available;
+            if refined.available
+                family.speedInterval=refined.intervals(:,1);
+                family.accelerationInterval=refined.intervals(:,2);
+                family.curvatureInterval=refined.intervals(:,3);
+                family.courseRadius=min(family.courseRadius, ...
+                    max(abs(refined.intervals(:,4)-course))+bound.yaw);
+            end
+            family.historyContraction=refined;
+            output.targetEstimate.predictionErrorSet=family;
+        end
         if ~available
             parameters = struct("speedErrorBound", Inf, "courseErrorBound", Inf, ...
                 "speedRateErrorBound", Inf, "curvatureInterval", [-Inf; Inf]);

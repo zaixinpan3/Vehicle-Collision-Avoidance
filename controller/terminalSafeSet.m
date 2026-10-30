@@ -52,13 +52,98 @@ classdef terminalSafeSet
 % (CONTROLLER_THEORY.md, Section 4).
     methods (Static)
         function certificate = certifySet(context,entry,target,errorSet,epochSeconds,maximumSteps)
+            if nargin<6,maximumSteps=4096;end
+            certificate=terminalSafeSet.certifyCell(context,entry,target,errorSet,epochSeconds,maximumSteps);
+            if certificate.valid || isempty(errorSet) || ~isfield(errorSet,'curvatureInterval') ...
+                    || certificate.endReason~="unprovedSeparation",return;end
+            witness=localTerminalEntryCollision(context,entry,target,errorSet,epochSeconds);
+            if ~isempty(witness)
+                certificate.endReason="entryFamilyContainsCollision";certificate.counterexample=witness;return;
+            end
+            % A union need not leave perception at one common time. Refine
+            % constant geometric parameters, retaining EVERY cell, and give
+            % each cell its own exit or stationary-continuation witness.
+            queue={struct('target',target,'error',errorSet,'depth',0)};children={};gap=Inf;evaluations=0;
+            [lower,upper]=bounds(entry);
+            speed=hypot(max(abs([lower(4),upper(4)])),max(abs([lower(5),upper(5)])));
+            count=min(maximumSteps,ceil(speed/context.deceleration/context.sampleTime));
+            images=cell(1,count+1);
+            for k=0:count
+                images{k+1}=nrmmJointEnclosure('terminalPose',entry,context,k*context.sampleTime);
+            end
+            while ~isempty(queue) && evaluations<256
+                family=queue{end};queue(end)=[];q=family.target;e=family.error;
+                evaluations=evaluations+1;
+                cellCertificate=terminalSafeSet.certifyCell(context,entry,q,e,epochSeconds,maximumSteps,images);
+                if cellCertificate.valid
+                    children{end+1}=struct('target',q,'error',e,'certificate',cellCertificate); %#ok<AGROW>
+                    gap=min(gap,cellCertificate.minimumGap);
+                    continue;
+                end
+                certificate.failedCell=struct('target',q,'error',e,'certificate',cellCertificate);
+                if cellCertificate.endReason~="unprovedSeparation" || family.depth>=16,return;end
+                % A point collision at this checked time is already a member
+                % of the entry/parameter boxes. Refining that box cannot
+                % certify all its members and need not consume the budget.
+                time=cellCertificate.time(end);
+                point=nrmmJointEnclosure('terminalPose',nrmmSet(entry.center),context,time);
+                other=predictiveSafetyGeometry.predictTarget(q,epochSeconds+time);
+                if predictiveSafetyGeometry.rectangle(point.center,context.shape,other(1:3),q(8:11))<=0 ...
+                        && ~isfinite(localHistoricalExit(context,q,[])),return;end
+                interval=e.curvatureInterval(:).';course=q(3)+q(6);
+                arc=predictiveSafetyGeometry.targetArcInterval(q,e,epochSeconds+time);
+                velocity=max(0,q(4)+[-1,1]*e.speedRadius);
+                acceleration=q(5)+[-1,1]*e.accelerationRadius;
+                if isfield(e,'speedInterval'),velocity=e.speedInterval(:).';end
+                if isfield(e,'accelerationInterval'),acceleration=e.accelerationInterval(:).';end
+                domains=[interval;course+[-1,1]*e.courseRadius;velocity;acceleration];
+                elapsed=max(context.sampleTime,epochSeconds+time);
+                % Curvature and course alone cannot distinguish a stopped
+                % member from one that has already left and later returned.
+                % Refine the constant timing parameters as well. These
+                % scores choose work order, not an exclusion or a bound.
+                scale=[max(1,arc(2)^2/2);max(1,arc(2));elapsed;elapsed^2/2];
+                [~,coordinate]=max(diff(domains,1,2).*scale);
+                edges=linspace(domains(coordinate,1),domains(coordinate,2),3);
+                if diff(edges([1,3]))<1e-12,return;end
+                for j=2:-1:1
+                    part=family;part.depth=family.depth+1;
+                    if coordinate==1
+                        part.error.curvatureInterval=edges(j:j+1).';
+                        part.error.curvatureRadius=diff(edges(j:j+1))/2;
+                        part.target(6)=asin(mean(edges(j:j+1))*q(7));
+                        part.target(3)=course-part.target(6);
+                        part.error.sideslipRadius=max(abs(asin(edges(j:j+1)*q(7))-part.target(6)));
+                    elseif coordinate==2
+                        part.error.courseRadius=diff(edges(j:j+1))/2;
+                        part.target(3)=mean(edges(j:j+1))-q(6);
+                    elseif coordinate==3
+                        part.error.speedInterval=edges(j:j+1).';
+                        part.error.speedRadius=diff(edges(j:j+1))/2;
+                        part.target(4)=mean(edges(j:j+1));
+                    else
+                        part.error.accelerationInterval=edges(j:j+1).';
+                        part.error.accelerationRadius=diff(edges(j:j+1))/2;
+                        part.target(5)=mean(edges(j:j+1));
+                    end
+                    queue{end+1}=part; %#ok<AGROW>
+                end
+            end
+            if ~isempty(queue),certificate.endReason="parameterCoverWorkLimit";return;end
+            if isfield(certificate,'failedCell'),certificate=rmfield(certificate,'failedCell');end
+            certificate.valid=true;certificate.minimumGap=gap;
+            certificate.endReason="partitionedTargetFamilies";certificate.targetCells=children;
+        end
+
+        function certificate = certifyCell(context,entry,target,errorSet,epochSeconds,maximumSteps,images)
             % Whole-set admission under the declared simplified terminal law.
             % Continue until a uniform perception exit or two stationary,
             % separated families. A finite work cap returns uncertified;
             % it is never interpreted as a safe finite truncation.
             if nargin<6,maximumSteps=4096;end
+            if nargin<7,images={};end
             certificate=struct('valid',false,'entry',entry,'context',context, ...
-                'epochSeconds',epochSeconds,'time',[],'poses',{{}},'normals',zeros(2,0), ...
+                'epochSeconds',epochSeconds,'time',[],'poseBounds',zeros(6,0),'normals',zeros(2,0), ...
                 'minimumGap',Inf,'endReason',"workLimit",'realArithmeticEnclosure',true, ...
                 'floatingPointCertified',false,'model',"declaredConstantDecelerationHeldCurvature");
             [lo,hi]=bounds(entry);
@@ -83,25 +168,67 @@ classdef terminalSafeSet
             if isempty(target)
                 certificate.valid=true;certificate.endReason="noTarget";return;
             end
+            exitTime=localHistoricalExit(context,target,errorSet);
+            if isfinite(exitTime)
+                certificate.valid=true;certificate.endReason="perceptionExitDuringDrivingPrefix";
+                certificate.exitTime=exitTime;return;
+            end
             speedRadius=0;accelerationRadius=0;
             if ~isempty(errorSet),speedRadius=errorSet.speedRadius;accelerationRadius=errorSet.accelerationRadius;end
             for k=0:maximumSteps
                 time=k*context.sampleTime;
-                ego=nrmmJointEnclosure('terminalPose',entry,context,time);
+                if k<numel(images),ego=images{k+1};
+                else,ego=nrmmJointEnclosure('terminalPose',entry,context,time);end
                 other=predictiveSafetyGeometry.targetPoseSet(target,errorSet,epochSeconds+time);
-                difference=ego(1:2)-other(1:2);[dl,dh]=bounds(difference);
-                lowerDistance=norm(max(0,max(dl,-dh)));
-                certificate.time(end+1)=time;certificate.poses{end+1}=ego;
+                lowerDistance=localIndependentDistance(ego(1:2),other(1:2));
+                certificate.time(end+1)=time;
+                [pl,ph]=bounds(ego);certificate.poseBounds(:,end+1)=[pl;ph];
                 if lowerDistance>context.range
                     certificate.valid=true;certificate.endReason="uniformPerceptionExit";return;
                 end
                 [gap,normal]=predictiveSafetyGeometry.setSeparation(ego,context.shape,other,target(8:11));
+                if gap<0 && ~isempty(errorSet)
+                    % Speed and acceleration uncertainty can put different
+                    % members at distant points on one curve. Their convex
+                    % hull may contain ego even when the curve does not.
+                    arc=predictiveSafetyGeometry.targetArcInterval(target,errorSet,epochSeconds+time);
+                    edges=linspace(arc(1),arc(2),9);pieceGap=Inf;cover=cell(1,8);
+                    for piece=1:8
+                        image=predictiveSafetyGeometry.targetArcSet(target,errorSet,edges(piece:piece+1));
+                        [g,n]=predictiveSafetyGeometry.setSeparation(ego,context.shape,image,target(8:11));
+                        cover{piece}=struct('arc',edges(piece:piece+1),'normal',n,'gap',g);
+                        pieceGap=min(pieceGap,g);
+                        if g<0,break;end
+                    end
+                    if pieceGap>=0
+                        gap=pieceGap;certificate.targetArcCovers{k+1}=cover;
+                    end
+                end
                 certificate.normals(:,end+1)=normal;certificate.minimumGap=min(certificate.minimumGap,gap);
                 if gap<0,certificate.endReason="unprovedSeparation";return;end
                 targetStopped=target(5)+accelerationRadius<=0 ...
                     && target(4)+speedRadius+(target(5)+accelerationRadius)*(epochSeconds+time)<=0;
                 if time>=stopTime && targetStopped
                     certificate.valid=true;certificate.endReason="separatedStationaryFamilies";return;
+                end
+                if time>=stopTime
+                    % After ego stops, time uncertainty only changes where
+                    % along the target's fixed curve it has reached. Verify
+                    % that spatial arc, including all possible stop points,
+                    % instead of demanding simultaneous exit of moving and
+                    % already stopped members of the family.
+                    lower=min(certificate.poseBounds(1:2,:),[],2);
+                    upper=max(certificate.poseBounds(4:5,:),[],2);
+                    % The terminal speed never exceeds its entry bound.
+                    % Padding the node hull covers every inter-node center
+                    % during braking, for the perception-exit argument.
+                    padding=speedMaximum*context.sampleTime/2;
+                    brakingPositions=nrmmSet.range(lower-padding,upper+padding);
+                    parked=localParkedArcCertificate(context,ego,target,errorSet,epochSeconds+time, ...
+                        maximumSteps,brakingPositions,epochSeconds);
+                    certificate.valid=parked.valid;certificate.parkedArc=parked;
+                    certificate.minimumGap=min(certificate.minimumGap,parked.minimumGap);
+                    certificate.endReason=parked.endReason;return;
                 end
             end
         end
@@ -655,6 +782,165 @@ classdef terminalSafeSet
             projection=laneGeometry.project(reshape(points,2,[]),model.lane);
             lateral=reshape(projection.lateralPosition,4,n);
             margin=min([clearance(2)-lateral;clearance(1)+lateral],[],1);
+        end
+    end
+end
+
+function witness=localTerminalEntryCollision(context,entry,target,errorSet,epoch)
+    % A sampled member can DISPROVE whole-set separation, never prove it.
+    % This avoids subdividing a family whose entry already contains a
+    % concrete collision. It is not a claim of physical unavoidable crash.
+    witness=[];
+    speed=target(4)+[-1,1]*errorSet.speedRadius;
+    acceleration=target(5)+[-1,1]*errorSet.accelerationRadius;
+    if isfield(errorSet,'speedInterval'),speed=errorSet.speedInterval(:).';end
+    if isfield(errorSet,'accelerationInterval'),acceleration=errorSet.accelerationInterval(:).';end
+    course=target(3)+target(6)+[-1,1]*errorSet.courseRadius;
+    curvature=errorSet.curvatureInterval(:).';
+    for v=unique([max(0,speed),max(0,mean(speed))])
+        for a=unique([acceleration,mean(acceleration)])
+            for k=unique([curvature,mean(curvature)])
+                for angle=unique([course,mean(course)])
+                    q=target;q(4:6)=[v;a;asin(k*q(7))];q(3)=angle-q(6);
+                    pose=predictiveSafetyGeometry.predictTarget(q,epoch);
+                    if predictiveSafetyGeometry.rectangle(entry.center(1:3),context.shape,pose(1:3),q(8:11))<=0 ...
+                            && ~isfinite(localHistoricalExit(context,q,[]))
+                        witness=struct('ego',entry.center,'targetParameters',q,'targetPose',pose(1:3));return;
+                    end
+                end
+            end
+        end
+    end
+end
+
+function certificate=localParkedArcCertificate(context,ego,target,errorSet,epoch,maximumSteps,brakingPositions,entryEpoch)
+    certificate=struct('valid',false,'minimumGap',Inf,'endReason',"workLimit", ...
+        'arcIntervals',zeros(0,2),'realArithmeticEnclosure',true,'floatingPointCertified',false);
+    speed=[target(4),target(4)];acceleration=[target(5),target(5)];
+    curvature=[1,1]*sin(target(6))/target(7);
+    if ~isempty(errorSet)
+        speed=max(0,target(4)+[-1,1]*errorSet.speedRadius);
+        acceleration=target(5)+[-1,1]*errorSet.accelerationRadius;
+        curvature=curvature+[-1,1]*errorSet.curvatureRadius;
+        if isfield(errorSet,'speedInterval'),speed=errorSet.speedInterval(:).';end
+        if isfield(errorSet,'accelerationInterval'),acceleration=errorSet.accelerationInterval(:).';end
+        if isfield(errorSet,'curvatureInterval'),curvature=errorSet.curvatureInterval(:).';end
+    end
+    elapsed=epoch*ones(1,2);
+    braking=acceleration<0;elapsed(braking)=min(epoch,-speed(braking)./acceleration(braking));
+    initialArc=speed.*elapsed+acceleration.*elapsed.^2/2;
+    elapsed=entryEpoch*ones(1,2);
+    elapsed(braking)=min(entryEpoch,-speed(braking)./acceleration(braking));
+    entryArc=speed.*elapsed+acceleration.*elapsed.^2/2;
+    monotone=localMonotoneParkedExit(context,ego,target,errorSet,initialArc(1),entryArc(2),brakingPositions,curvature);
+    if monotone.valid,certificate=monotone;return;end
+    limit=Inf;reason="parkedArcToPerceptionExit";
+    if acceleration(2)<0
+        limit=-speed(2)^2/(2*acceleration(2));reason="parkedAllStoppingLocations";
+    elseif speed(2)==0 && acceleration(2)==0
+        limit=0;reason="separatedStationaryFamilies";
+    end
+    if curvature(1)*curvature(2)>0
+        period=2*pi/min(abs(curvature));
+        if initialArc(1)+period<limit
+            limit=initialArc(1)+period;reason="parkedCompleteCurveFamily";
+        end
+    end
+    first=initialArc(1);queue=zeros(0,2);evaluations=0;
+    while evaluations<maximumSteps
+        if isempty(queue)
+            last=min(limit,first+1);queue=[first,last];
+        end
+        interval=queue(end,:);queue(end,:)=[];evaluations=evaluations+1;
+        other=predictiveSafetyGeometry.targetArcSet(target,errorSet,interval);
+        outside=localIndependentDistance(ego(1:2),other(1:2))>context.range;
+        % An exit before parking must hold about ALL braking centers, not
+        % just the eventual parked center. Also require the arc to lie after
+        % every member's entry arc, so no exit is inferred before this tail.
+        outsideBraking=localIndependentDistance(brakingPositions,other(1:2))>context.range;
+        if outsideBraking && interval(1)>=entryArc(2)
+            certificate.valid=true;certificate.endReason="parkedArcToPerceptionExit";return;
+        end
+        if outside,gap=Inf;
+        else,[gap,~]=predictiveSafetyGeometry.setSeparation(ego,context.shape,other,target(8:11));end
+        if gap<0
+            if diff(interval)>.015625
+                middle=mean(interval);queue=[queue;middle,interval(2);interval(1),middle]; %#ok<AGROW>
+                continue;
+            end
+            certificate.minimumGap=min(certificate.minimumGap,gap);
+            certificate.endReason="unprovedSeparation";return;
+        end
+        certificate.minimumGap=min(certificate.minimumGap,gap);
+        certificate.arcIntervals(end+1,:)=interval;
+        if isempty(queue)
+            first=interval(2);
+            if first>=limit
+                certificate.valid=true;certificate.endReason=reason;return;
+            end
+        end
+    end
+end
+
+function certificate=localMonotoneParkedExit(context,ego,target,errorSet,first,entryMaximum,brakingPositions,curvature)
+    % A projected target path that moves away from every parked footprint
+    % needs no point-by-point future collision checks. Stopping members stay
+    % separated; moving members must cross the proved perception-exit plane
+    % before a later turn can matter. This is a sufficient arc certificate.
+    certificate=struct('valid',false,'minimumGap',Inf,'endReason',"unprovedMonotoneExit", ...
+        'arcIntervals',zeros(0,2),'realArithmeticEnclosure',true,'floatingPointCertified',false);
+    if ~isfinite(context.range),return;end
+    start=predictiveSafetyGeometry.targetArcSet(target,errorSet,[first,first]);
+    normal=start.center(1:2)-ego.center(1:2);length=norm(normal);
+    if length==0,return;end
+    normal=normal/length;angle=atan2(normal(2),normal(1));
+    [~,egoSupport]=bounds(normal.'*ego(1:2));
+    egoSupport=egoSupport+norm(context.shape(1:2))+norm(context.shape(3:4));
+    [startSupport,~]=bounds(normal.'*start(1:2));
+    gap=startSupport-egoSupport-norm(target(8:9))-norm(target(10:11));
+    if gap<0,return;end
+    [~,brakingSupport]=bounds(normal.'*brakingPositions);
+    course=target(3)+target(6)+[0,0];
+    if ~isempty(errorSet),course=course+[-1,1]*errorSet.courseRadius;end
+    step=max(1,2*norm(target(8:9)));
+    for k=1:ceil(2*context.range/step)+2
+        last=max(entryMaximum,first+k*step);
+        turn=curvature(:)*[first,last];
+        heading=[course(1)+min(turn,[],'all'),course(2)+max(turn,[],'all')];
+        cosine=cos(nrmmSet.range(heading(1)-angle,heading(2)-angle));
+        if bounds(cosine)<0,return;end
+        finish=predictiveSafetyGeometry.targetArcSet(target,errorSet,[last,last]);
+        [projection,~]=bounds(normal.'*finish(1:2));
+        if projection-brakingSupport>context.range
+            certificate.valid=true;certificate.minimumGap=gap;
+            certificate.endReason="parkedMonotoneToPerceptionExit";
+            certificate.arcIntervals=[first,last];certificate.normal=normal;
+            certificate.exitProjectionLower=projection-brakingSupport;
+            certificate.minimumCourseCosine=bounds(cosine);return;
+        end
+    end
+end
+
+function distance=localIndependentDistance(first,second)
+    % These separately constructed families have independent generators.
+    % Equal column indices do not establish a shared physical uncertainty.
+    [al,ah]=bounds(first);[bl,bh]=bounds(second);
+    low=al-bh;high=ah-bl;
+    distance=norm(max(0,max(low,-high)));
+end
+
+function time=localHistoricalExit(context,target,errorSet)
+    time=Inf;if ~isfield(context,'encounterHistory'),return;end
+    history=context.encounterHistory;count=numel(history.time);
+    % Any one proven exit suffices. Coarse times are tried first; unresolved
+    % cells retain the threat, so this inexpensive test cannot invent exit.
+    selected=unique(round(linspace(1,count,min(9,count))));
+    for j=selected
+        other=predictiveSafetyGeometry.targetPoseSet(target,errorSet,history.time(j));
+        [lo,hi]=bounds(other(1:2));
+        low=history.positionLower(:,j)-hi;high=history.positionUpper(:,j)-lo;
+        if norm(max(0,max(low,-high)))>context.range
+            time=history.time(j);return;
         end
     end
 end

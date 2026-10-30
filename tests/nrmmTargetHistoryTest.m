@@ -6,6 +6,31 @@ classdef nrmmTargetHistoryTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function motionContractionKeepsBoundedNoiseTruthAndRejectsUnsupportedTurns(testCase)
+            [result,truth,original]=localMotionContraction();
+            testCase.verifyTrue(result.available);
+            testCase.verifyLessThanOrEqual(result.intervals(1,:).',truth);
+            testCase.verifyGreaterThanOrEqual(result.intervals(2,:).',truth);
+            testCase.verifyLessThan(diff(result.intervals(:,3)),.8*diff(original(:,3)));
+            testCase.verifyLessThan(diff(result.intervals(:,4)),diff(original(:,4))/2);
+        end
+        function aStationaryHistoryDoesNotInventAPreStopMotionLaw(testCase)
+            history=localHistory();history=nrmmTargetHistory('measure',history,0,[0;0],[.04;.04]);
+            history=nrmmTargetHistory('measure',history,.5,[0;0],[.04;.04]);
+            history=nrmmTargetHistory('measure',history,1,[0;0],[.04;.04]);
+            intervals=[0,-2,-.03,-.3;1,2,.03,.3];
+            result=nrmmTargetHistory('contractMotion',history,1,intervals);
+            testCase.verifyEqual(result.intervals,intervals);
+            testCase.verifyEqual(result.checks,0);
+        end
+        function holdSpecificGyroBoundsTightenWithoutChangingTheSensorNoise(testCase)
+            [tight,domain,truth]=localHoldHistory();
+            testCase.verifyTrue(tight.available);
+            testCase.verifyLessThanOrEqual(tight.lower,truth);
+            testCase.verifyGreaterThanOrEqual(tight.upper,truth);
+            testCase.verifyLessThanOrEqual(tight.upper(3:4)-tight.lower(3:4), ...
+                domain.upper(3:4)-domain.lower(3:4)+1e-10);
+        end
         function aCircularChordBoundsHeadingDespiteTangentialAcceleration(testCase)
             history = localHistory();curvature = 0.004;
             for time = 0:0.02:1
@@ -87,6 +112,41 @@ classdef nrmmTargetHistoryTest < matlab.unittest.TestCase
             testCase.verifyEqual(history.speedMaximum,20,AbsTol=0);
         end
     end
+end
+
+function [result,truth,original]=localMotionContraction()
+    history=localHistory();truth=[8;.4;.006;.1];
+    for dt=-1:.025:0
+        arc=truth(1)*dt+truth(2)*dt^2/2;turn=truth(3)*arc/2;
+        factor=1;if turn~=0,factor=sin(turn)/turn;end
+        position=arc*factor*[cos(truth(4)+turn);sin(truth(4)+turn)];
+        noise=.04*[sin(13*dt);cos(17*dt)];
+        history=nrmmTargetHistory('measure',history,dt,position+noise,[.04;.04]);
+    end
+    original=[6,-1.65,-.035,-.3;10,1.65,.035,.5];
+    result=nrmmTargetHistory('contractMotion',history,0,original);
+end
+
+function [tight,domain,truth]=localHoldHistory()
+    history=localHistory();history.yawAccelerationMaximum=.6;
+    design.sensors=struct('velocityNoiseMaximum',.05,'positionNoiseMaximum',.04, ...
+        'radarNoiseMaximum',.04,'gyroscopeNoiseMaximum',.0015);
+    design.yaw.courseModel=struct('rearAxleDistance',1.5, ...
+        'singleTrackYawRateMismatchMaximum',.1,'sideslipDomainMaximum',.12);
+    body=[10;.3];rate=.2;
+    for time=0:.02:1
+        yaw=rate*time;rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
+        position=[sin(yaw),cos(yaw)-1;1-cos(yaw),sin(yaw)]*body/rate;
+        target=[20-8*time;1+time];
+        input=struct('time',time,'gnssVelocity',rotation*body+.05*[sin(17*time);cos(17*time)], ...
+            'yawRate',rate+.0015*sin(7*time),'gnssPosition',position+.04*[cos(11*time);sin(11*time)], ...
+            'radarRelativePosition',rotation'*(target-position)+.04*[sin(13*time);cos(13*time)], ...
+            'yawAccelerationMaximum',0);
+        history=nrmmTargetHistory('sensor',history,input,design);
+    end
+    tight=nrmmTargetHistory('enclose',history,1);
+    domain=nrmmTargetHistory('enclose',rmfield(history,'holdYawAcceleration'),1);
+    truth=[12;2;-8;1;0;0];
 end
 
 function history = localHistory()

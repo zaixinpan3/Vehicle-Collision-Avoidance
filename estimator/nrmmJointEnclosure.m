@@ -11,6 +11,8 @@ function result=nrmmJointEnclosure(action,varargin)
             result=localPlantField(varargin{:});
         case "acceleration"
             [~,result]=localPlantField(varargin{:});
+        case "accelerationHold"
+            result=localAccelerationHold(varargin{:});
         case "hold"
             result=localHold(varargin{:});
         case "terminalPose"
@@ -20,9 +22,58 @@ function result=nrmmJointEnclosure(action,varargin)
     end
 end
 
-function next=localPlantFlow(x,u,parameters,cfg,h)
+function result=localAccelerationHold(state,input,parameters,cfg,duration)
+    % A Picard inclusion bounds every continuous body-state path over one
+    % known actuator hold. It is used to bound the bias of position secants,
+    % not to pretend that sampled IMU acceleration is constant in between.
+    % Failure leaves the caller's original acceleration-domain bound intact.
+    result=struct('valid',true,'normMaximum',0,'yawAccelerationMaximum',0,'iterations',0);
+    % The stiff lateral/yaw subsystem needs shorter Picard intervals than
+    % its sampled RK flow. Subdivision is for the proof, not a new sensor.
+    for substep=1:8
+        image=localAccelerationSegment(state,input,parameters,cfg,duration/8);
+        result.iterations=result.iterations+image.iterations;
+        if ~image.valid,result.valid=false;result.normMaximum=Inf;return;end
+        result.normMaximum=max(result.normMaximum,image.normMaximum);
+        result.yawAccelerationMaximum=max(result.yawAccelerationMaximum,image.yawAccelerationMaximum);
+        state(4:6)=image.endpoint;
+    end
+end
+
+function result=localAccelerationSegment(state,input,parameters,cfg,duration)
+    [initialLower,initialUpper]=bounds(state(4:6));
+    boxLower=initialLower;boxUpper=initialUpper;
+    result=struct('valid',false,'normMaximum',Inf,'iterations',0);
+    for iteration=1:20
+        box=[nrmmSet(zeros(3,1));nrmmSet.range(boxLower,boxUpper)];
+        try
+            [field,acceleration]=localPlantField(box,input,parameters,cfg);
+            [lower,upper]=bounds(field(4:6));
+            result.yawAccelerationMaximum=max(abs([lower(3),upper(3)]));
+        catch exception
+            if ~startsWith(string(exception.identifier),["nrmmSet:","nrmmJointEnclosure:"]),rethrow(exception);end
+            return;
+        end
+        imageLower=initialLower+duration*min(0,lower);
+        imageUpper=initialUpper+duration*max(0,upper);
+        result.iterations=iteration;
+        if all(imageLower>=boxLower & imageUpper<=boxUpper)
+            [lower,upper]=bounds(acceleration);
+            result.valid=true;result.normMaximum=norm(max(abs(lower),abs(upper)));
+            [lower,upper]=bounds(field(4:6));
+            result.endpoint=nrmmSet.range(initialLower+duration*lower,initialUpper+duration*upper);
+            return;
+        end
+        boxLower=min(boxLower,imageLower);boxUpper=max(boxUpper,imageUpper);
+        pad=.1*(boxUpper-boxLower)+1e-10;
+        boxLower=boxLower-pad;boxUpper=boxUpper+pad;
+    end
+end
+
+function next=localPlantFlow(x,u,parameters,cfg,h,first)
     f=@(state)localPlantField(state,u,parameters,cfg);
-    a=f(x);b=f(x+h*a/2);c=f(x+h*b/2);d=f(x+h*c);
+    if nargin<6,first=f(x);end
+    a=first;b=f(x+h*a/2);c=f(x+h*b/2);d=f(x+h*c);
     next=x+h*(a+2*b+2*c+d)/6;
 end
 
@@ -47,8 +98,8 @@ function [value,acceleration]=localPlantField(x,u,parameters,cfg)
         weight=nrmmSet.intersectRange(s^2*(3-2*s),0,1);
         [fiala,fialaAcceleration]=localFiala(x,u,scale,stiffness,cfg);
         [kinematic,kinematicAcceleration]=localKinematic(x,u,scale,cfg);
-        body=weight.*fiala+(1-weight).*kinematic;
-        acceleration=weight.*fialaAcceleration+(1-weight).*kinematicAcceleration;
+        body=kinematic+weight.*(fiala-kinematic);
+        acceleration=kinematicAcceleration+weight.*(fialaAcceleration-kinematicAcceleration);
     else
         % Intersect the two branch domains before evaluating them. An
         % invalid Fiala branch below its floor is never evaluated or dropped.
@@ -59,7 +110,7 @@ function [value,acceleration]=localPlantField(x,u,parameters,cfg)
         s=min(1,(high(4)-range(1))/(range(2)-range(1)));weight=nrmmSet.intersectRange(s^2*(3-2*s),0,1);
         [fiala,fa]=localFiala(high,u,scale,stiffness,cfg);
         [kinematic,ka]=localKinematic(high,u,scale,cfg);
-        b=weight.*fiala+(1-weight).*kinematic;ba=weight.*fa+(1-weight).*ka;
+        b=kinematic+weight.*(fiala-kinematic);ba=ka+weight.*(fa-ka);
         [al,ah]=bounds(a);[bl,bh]=bounds(b);
         body=nrmmSet.range(min(al,bl),max(ah,bh),size(a.generator,2));
         [al,ah]=bounds(aa);[bl,bh]=bounds(ba);
@@ -76,14 +127,18 @@ function [body,acceleration]=localFiala(x,u,scale,stiffness,cfg)
     [al,ah]=bounds(slip);
     if any(al<=-pi/2 | ah>=pi/2),error('nrmmJointEnclosure:domain','The slip-angle chart is not enclosed.');end
     capacity=scale.*sqrt(max(0,1-u(2)^2));
-    fy=localTires(slip,stiffness,capacity);fx=u(2).*scale;
+    lateral=(x(5)+cfg.vehicle.lf*x(6))/x(4);cosine=cos(u(1));sine=sin(u(1));
+    tangent=[(lateral*cosine-sine)/(cosine+lateral*sine); ...
+        (x(5)-cfg.vehicle.lr*x(6))/x(4)];
+    fy=localTires(tangent,stiffness,capacity,true);fx=u(2).*scale;
     frontX=fx(1)*cos(u(1))-fy(1)*sin(u(1));frontY=fx(1)*sin(u(1))+fy(1)*cos(u(1));
     acceleration=[(frontX+fx(2)-localRoadLoad(x(4),cfg))/cfg.vehicle.m;(frontY+fy(2))/cfg.vehicle.m];
     body=[acceleration(1)+x(5)*x(6);acceleration(2)-x(4)*x(6); ...
         (cfg.vehicle.lf*frontY-cfg.vehicle.lr*fy(2))/cfg.vehicle.Iz];
 end
 
-function force=localTires(slip,stiffness,capacity)
+function force=localTires(slip,stiffness,capacity,isTangent)
+    if nargin<4,isTangent=false;end
     force=nrmmSet(zeros(2,1));
     for i=1:2
         [cl,ch]=bounds(capacity(i));
@@ -95,8 +150,8 @@ function force=localTires(slip,stiffness,capacity)
             if al>=0,lo=-ch;hi=0;elseif ah<=0,lo=0;hi=ch;else,lo=-ch;hi=ch;end
             force(i)=nrmmSet.range(lo,hi,size(capacity.generator,2));
         else
-            q=stiffness(i)*tan(slip(i))/(3*capacity(i));
-            value=-capacity(i)*fialaFraction(q);
+            tangent=slip(i);if ~isTangent,tangent=tan(tangent);end
+            value=nrmmSet.fialaForce(stiffness(i)*tangent,capacity(i));
             % This is an exact range of the Fiala formula, not an added
             % tire-force constraint. It prevents polynomial interval
             % dependency from inventing forces beyond its own saturation.
@@ -137,6 +192,8 @@ function result=localHold(center,generator,context,decisionRadius)
         && abs(samples*contract.samplePeriod-context.duration)<1e-10, ...
         'nrmmJointEnclosure:unalignedSensors','A hold must contain an even positive number of sensor samples.');
     old=size(generator,2);width=old+7*samples+8;
+    symbols=nrmmSet.symbolPool('begin',width);
+    cleanup=onCleanup(@()nrmmSet.symbolPool('restore',symbols));
     g=[generator,zeros(21,width-old)];joint=nrmmSet(center,g);
     decisions=nrmmSet(decisionCenter,[zeros(8,width-8),diag(decisionRadius)]);
     % Coordinates of the uncertain joint state are relative to the current
@@ -173,20 +230,25 @@ function result=localHold(center,generator,context,decisionRadius)
             pseudo=localKnownPseudo(m,contract.design);
         else
             measured=input;if sample==1,measured=previous;end
-            [~,bodyAcceleration]=localPlantField(physical,measured,parameters,context.cfg);
+            [measuredField,bodyAcceleration]=localPlantField(physical,measured,parameters,context.cfg);
             position=physical(1:2)+noise(1:2,sample);
             acceleration=bodyAcceleration+noise(5:6,sample);
             rate=physical(6)+noise(7,sample);held=measured;
             gain=contract.positionVelocity.gain;
             frontend=frontend+[gain(1)*eye(2);gain(2)*eye(2)]*(position-frontend(1:2));
             velocity=frontend(3:4);
-            pseudo=localPseudo(velocity,acceleration,rate,held,contract);
+            pseudo=localPseudo(velocity,acceleration,rate,held,contract,physical);
         end
         dt=contract.samplePeriod;rotation=[cos(observer(3)),-sin(observer(3));sin(observer(3)),cos(observer(3))];
         inertial=rotation*acceleration;
         frontend=[frontend(1:2)+dt*frontend(3:4)+dt^2*inertial/2;frontend(3:4)+dt*inertial];
         observer=localObserver(observer,position,velocity,acceleration,rate,pseudo,contract);
-        physical=localPlantFlow(physical,input,parameters,context.cfg,dt);
+        if sample==1
+            physical=localPlantFlow(physical,input,parameters,context.cfg,dt);
+        else
+            % IMU and the first RK stage use the SAME force realization.
+            physical=localPlantFlow(physical,input,parameters,context.cfg,dt,measuredField);
+        end
         % Preserve the identity of each new residual across later sensor
         % updates. Repeatedly carrying an unsigned radius through the flow
         % would erase the stabilizing signs of the observer and vehicle.
@@ -219,20 +281,30 @@ function pseudo=localKnownPseudo(input,design)
     lateral=geometry.lateralMeasurement.center;
     if geometry.lateralMeasurement.source=="kinematic" || ~isfinite(lateral),lateral=NaN;end
     velocity=nrmmObserverVectorField('velocityMeasurement',input.gnssVelocity,input.yawRate,design,lateral);
-    pseudo=nrmmSet([velocity;geometry.correspondence.rotationVector]);
+    rotation=geometry.correspondence.rotationVector;
+    pseudo=struct('body',nrmmSet(velocity),'rotation',nrmmSet(rotation), ...
+        'phase',nrmmSet(atan2(rotation(2),rotation(1))),'magnitude',nrmmSet(norm(rotation)));
 end
 
-function pseudo=localPseudo(velocity,acceleration,rate,held,contract)
+function pseudo=localPseudo(velocity,acceleration,rate,held,contract,physical)
     design=contract.design;speed=sqrt(max(0,sum(velocity.^2)));
-    if contract.heldInputAvailable && isfield(design,'egoModel') && ~isempty(design.egoModel)
-        lateral=localInverse(speed,rate,acceleration(2),held,design);
+    forceInverse=contract.heldInputAvailable && isfield(design,'egoModel') && ~isempty(design.egoModel);
+    if forceInverse
+        lateral=localInverse(speed,rate,acceleration(2),held,design,physical);
     else
         lateral=design.yaw.courseModel.rearAxleDistance*rate;
     end
     cosine=cos(design.yaw.courseModel.sideslipDomainMaximum);
     body=[sqrt(max(speed^2-lateral^2,(cosine*speed)^2));lateral];
     scale=design.positionVelocity.bandwidth*design.sensors.positionNoiseMaximum;
-    denominator=max(sqrt(max(0,sum(body.^2)))*speed+scale^2,eps);
+    if forceInverse
+        % The runtime inverse is clamped to |v_y| <= V*sin(beta_max).
+        % Consequently ||body|| == V in real arithmetic. Reuse that
+        % identity instead of enclosing the same speed a second time.
+        denominator=max(speed^2+scale^2,eps);
+    else
+        denominator=max(sqrt(max(0,sum(body.^2)))*speed+scale^2,eps);
+    end
     [dl,~]=bounds(denominator);
     if dl<=0
         % Cauchy--Schwarz bounds the regularized correspondence even when
@@ -242,14 +314,32 @@ function pseudo=localPseudo(velocity,acceleration,rate,held,contract)
         rotation=[body(1)*velocity(1)+body(2)*velocity(2);body(1)*velocity(2)-body(2)*velocity(1)]/denominator;
         rotation=nrmmSet.intersectRange(rotation,-ones(2,1),ones(2,1));
     end
-    pseudo=[body;rotation];
+    pseudo=struct('body',body,'rotation',rotation,'phase',[],'magnitude',[]);
+    % The yaw innovation is a sine of a DIFFERENCE of directions. Computing
+    % two uncertain rotations independently loses their shared phase. The
+    % local chart below is exact wherever the complete velocity set lies in
+    % its open forward half-plane; otherwise retain the vector formula.
+    heading=atan2(velocity.center(2),velocity.center(1));
+    along=[cos(heading),sin(heading)]*velocity;
+    transverse=[-sin(heading),cos(heading)]*velocity;
+    [alongLower,~]=bounds(along);[bodyLower,~]=bounds(body(1));
+    if alongLower>0 && bodyLower>0 && dl>0
+        pseudo.phase=heading+atan(transverse/along)-atan(body(2)/body(1));
+        pseudo.magnitude=sqrt(max(0,sum(body.^2)))*speed/denominator;
+        if forceInverse,pseudo.magnitude=speed^2/denominator;end
+        pseudo.magnitude=nrmmSet.intersectRange(pseudo.magnitude,0,1);
+    end
 end
 
-function lateral=localInverse(speed,rate,ay,held,design)
+function lateral=localInverse(speed,rate,ay,held,design,physical)
     % Enclose the SAME clamped, finite-bisection nominal inverse used online.
     % Normalized lateral velocity has a fixed interval [-sin(beta),sin(beta)].
     % If a predicate is ambiguous, both branches are retained. No physical
     % parameter uncertainty is added to this nominal observer inversion.
+    % The range-only bisection discards its temporary expressions. Allocate
+    % no residual symbols for them; resume before the shared inverse image.
+    symbols=nrmmSet.symbolPool('pause');
+    cleanup=onCleanup(@()nrmmSet.symbolPool('restore',symbols));
     s=sin(design.yaw.courseModel.sideslipDomainMaximum);[vl,vh]=bounds(speed);
     if vh==0,lateral=nrmmSet(0);return;end
     if vl<=0,lateral=nrmmSet.range(-vh*s,vh*s,size(speed.generator,2));return;end
@@ -282,18 +372,25 @@ function lateral=localInverse(speed,rate,ay,held,design)
     end
     upper=high;
     root=nrmmSet.range(lower,upper,size(speed.generator,2));
+    clear cleanup
     % An interval implicit-function step retains the shared IMU/velocity
     % symbols. A box-only inverse would lose their cancellation in the next
     % observer/feedback step. Use it only for a uniformly interior root and
     % a strictly negative derivative on its whole enclosure.
     if lower>-s && upper<s
         try
-            [~,derivative]=localInverseForce(root,speed,rate,held,design);
+            % Expand about the shared physical sideslip, rather than an
+            % unrelated interval midpoint. This is an enclosure identity;
+            % the actual observer still runs its unchanged nominal inverse.
+            anchor=physical(5)/sqrt(physical(4)^2+physical(5)^2);
+            anchor=min(s,max(-s,anchor));[al,ah]=bounds(anchor);
+            domain=nrmmSet.range(min(lower,al),max(upper,ah),size(anchor.generator,2));
+            [~,derivative]=localInverseForce(domain,speed,rate,held,design);
             [dl,dh]=bounds(derivative);
             if dh<0
-                middle=(lower+upper)/2;
-                residual=localInverseForce(middle,speed,rate,held,design)-model.mass*ay;
-                root=middle-residual/nrmmSet.range(dl,dh,size(speed.generator,2));
+                residual=localInverseForce(anchor,speed,rate,held,design)-model.mass*ay;
+                root=anchor-residual/nrmmSet.range(dl,dh,size(speed.generator,2));
+                root=nrmmSet.intersectRange(root,lower,upper);
             end
         catch exception
             if ~strcmp(exception.identifier,'nrmmSet:singularDomain'),rethrow(exception);end
@@ -330,22 +427,36 @@ function [force,derivative]=localInverseForce(s,speed,rate,held,design)
 end
 
 function observer=localObserver(observer,position,velocity,acceleration,rate,pseudo,contract)
-    state=[observer(4:5);observer(1:2);position;observer(3)];
-    f=@(x)localObserverField(x,velocity,acceleration,rate,pseudo,contract.design);
+    % The packed runtime's position predictor obeys q'=velocity and the
+    % error p-q obeys e'=-Kp*e during this held measurement. Apply its EXACT
+    % RK4 polynomial rather than repeatedly enclosing cancelling q/p terms.
+    h=contract.integrationStep;gain=contract.design.position.gain;
+    if isscalar(gain),gain=gain*eye(2);end
+    a=-h*gain;transition=eye(2)+a+a^2/2+a^3/6+a^4/24;
+    observer(1:2)=position+contract.samplePeriod*velocity ...
+        +transition^contract.integrationSubstepCount*(observer(1:2)-position);
+    body=observer(4:5);yaw=observer(3);
+    gain=contract.design.velocity.gain;force=acceleration+gain*pseudo.body;
+    f=@(x)force-gain*x-rate*([0,-1;1,0]*x);
+    yawField=@(x)localObserverYaw(x,rate,pseudo,contract.design.yaw.correctionBandwidth);
     for k=1:contract.integrationSubstepCount
-        h=contract.integrationStep;a=f(state);b=f(state+h*a/2);c=f(state+h*b/2);d=f(state+h*c);
-        state=state+h*(a+2*b+2*c+d)/6;
+        a=f(body);b=f(body+h*a/2);c=f(body+h*b/2);d=f(body+h*c);
+        body=body+h*(a+2*b+2*c+d)/6;
+        a=yawField(yaw);b=yawField(yaw+h*a/2);c=yawField(yaw+h*b/2);d=yawField(yaw+h*c);
+        yaw=yaw+h*(a+2*b+2*c+d)/6;
         % Working on the continuous yaw lift is equivalent to wrapping
         % after each substep; only periodic sin/cos consume this coordinate.
     end
-    observer=state([3,4,7,1,2]);
+    observer(3)=yaw;observer(4:5)=body;
 end
 
-function field=localObserverField(x,velocity,acceleration,rate,pseudo,design)
-    cross=[0,-1;1,0];gain=design.yaw.correctionBandwidth;
-    field=[acceleration-rate*(cross*x(1:2))+design.velocity.gain*(pseudo(1:2)-x(1:2)); ...
-        velocity+design.position.gain*(x(5:6)-x(3:4));velocity; ...
-        rate+gain*(pseudo(4)*cos(x(7))-pseudo(3)*sin(x(7)))];
+function field=localObserverYaw(yaw,rate,pseudo,gain)
+    if isempty(pseudo.phase)
+        innovation=pseudo.rotation(2)*cos(yaw)-pseudo.rotation(1)*sin(yaw);
+    else
+        innovation=pseudo.magnitude*sin(pseudo.phase-yaw);
+    end
+    field=rate+gain*innovation;
 end
 
 function x=localStop(x,u,cfg)

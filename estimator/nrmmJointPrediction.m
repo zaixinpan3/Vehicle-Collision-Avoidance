@@ -59,17 +59,34 @@ function tube=localPolicyTube(root,policies)
     % No point-dynamics equality or derivative certificate is used here.
     % A failed new image must not replace a previously retained certificate.
     count=numel(policies);sets=cell(1,count+1);sets{1}=root;
-    middles=cell(1,count);inputs=cell(1,count);
+    middles=cell(1,count);inputs=cell(1,count);changes=cell(1,count);
     for k=1:count
         context=policies(k).context;
         domain=struct('lower',[zeros(6,1);policies(k).lower], ...
             'upper',[zeros(6,1);policies(k).upper]);
         initial=promote(sets{k});
         image=nrmmJointEnclosure('hold',initial.center,initial.generator,context,domain);
-        set=nrmmSet(image.point,image.generator);
+        keep=any(image.generator,1);
+        raw=nrmmSet(image.point,image.generator);
+        % The incoming actuator and the held output share primitive columns
+        % here. Compression subsequently reorders/merges those columns, so
+        % their difference must be formed BEFORE that change of coordinates.
+        change=raw(16:17)-initial(16:17);[lo,hi]=bounds(change);
+        changes{k}=nrmmSet.range(lo,hi);
+        set=nrmmSet(image.point,image.generator(:,keep));
+        % Preserve common physical/estimated motion when folding old small
+        % residuals. Boxing absolute observer coordinates independently
+        % would erase the very cancellation that makes feedback useful.
+        transform=eye(numel(set.center));
+        transform(7:11,1:5)=-eye(5);
+        transform(18:19,1:2)=-eye(2);
+        yaw=set.center(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
+        transform(20:21,4:5)=-rotation;
+        transform(22:27,1:6)=-eye(6);transform(28:29,16:17)=-eye(2);
+        set=compress(set,1e-4,transform,12:15);
         sets{k+1}=set(1:21);middles{k}=set(22:27);inputs{k}=set(16:17);
     end
-    tube=struct('sets',{sets},'middles',{middles},'inputs',{inputs}, ...
+    tube=struct('sets',{sets},'middles',{middles},'inputs',{inputs},'changes',{changes}, ...
         'realArithmeticEnclosure',true,'floatingPointCertified',false);
 end
 
@@ -180,40 +197,17 @@ function result=localConditionMeasurements(set,contract,cfg)
     % through the complete two-component IMU image. Neither scan assumes a
     % monotone tire inverse; saturated or unresolved cells are retained.
     for coordinate=[5,4]
-        queue=[lo(coordinate),hi(coordinate)];kept=zeros(0,2);
         tolerance=5e-4;
-        if coordinate==4,tolerance=max(tolerance,.02*diff(queue));end
-        while ~isempty(queue) && evaluations<4096
-            interval=queue(end,:);queue(end,:)=[];
-            state=nrmmSet.range(lo(1:6),hi(1:6));
-            state(coordinate)=nrmmSet.range(interval(1),interval(2));
-            evaluations=evaluations+1;
-            try
-                acceleration=nrmmJointEnclosure('acceleration',state,nrmmSet(measurement.heldInput), ...
-                    nrmmSet.range(lo(12:15),hi(12:15)),cfg);
-                [al,ah]=bounds(acceleration);
-                disjoint=any(ah<measurement.bodyAcceleration-contract.noiseRadius(5:6) ...
-                    | al>measurement.bodyAcceleration+contract.noiseRadius(5:6));
-                contained=all(al>=measurement.bodyAcceleration-contract.noiseRadius(5:6) ...
-                    & ah<=measurement.bodyAcceleration+contract.noiseRadius(5:6));
-            catch exception
-                if ~startsWith(string(exception.identifier),["nrmmSet:","nrmmJointEnclosure:"])
-                    rethrow(exception);
-                end
-                % An unresolved image is not evidence of inconsistency.
-                kept(end+1,:)=interval;unresolved=unresolved+1;continue; %#ok<AGROW>
-            end
-            if disjoint,continue;end
-            if contained || diff(interval)<=tolerance
-                kept(end+1,:)=interval; %#ok<AGROW>
-            else
-                middle=mean(interval);queue=[queue;interval(1),middle;middle,interval(2)]; %#ok<AGROW>
-            end
+        if coordinate==4,tolerance=max(tolerance,.02*(hi(coordinate)-lo(coordinate)));end
+        endpoints=zeros(2,1);
+        for edge=1:2
+            [endpoints(edge),used,unknown,found]=localMeasurementEdge( ...
+                lo,hi,coordinate,edge,tolerance,4096-evaluations,measurement,contract,cfg);
+            evaluations=evaluations+used;unresolved=unresolved+unknown;
+            assert(found,'nrmmJointPrediction:inconsistentMeasurement', ...
+                'No state in the retained family can generate the current IMU data.');
         end
-        unresolved=unresolved+size(queue,1);kept=[kept;queue]; %#ok<AGROW>
-        assert(~isempty(kept),'nrmmJointPrediction:inconsistentMeasurement', ...
-            'No state in the retained family can generate the current IMU data.');
-        lo(coordinate)=min(kept(:,1));hi(coordinate)=max(kept(:,2));
+        lo(coordinate)=endpoints(1);hi(coordinate)=endpoints(2);
     end
     set=nrmmSet.range(lo,hi);
     diagnostics=struct('method',"nonlinearCurrentMeasurementIntersection", ...
@@ -222,6 +216,42 @@ function result=localConditionMeasurements(set,contract,cfg)
         'noiseRadius',contract.noiseRadius,'parameterRadius',contract.parameterRadius, ...
         'realArithmeticEnclosure',true,'floatingPointCertified',false);
     result=struct('set',set,'diagnostics',diagnostics);
+end
+
+function [endpoint,evaluations,unresolved,found]=localMeasurementEdge(lo,hi,coordinate,edge,tolerance,budget,measurement,contract,cfg)
+    % Only the hull of surviving cells is used by the caller. Search its
+    % two extremal cells, keeping the entire unsearched interior. Every
+    % excluded exterior interval still has a disjoint nonlinear IMU image;
+    % no monotonicity or heuristic inversion is assumed.
+    queue=[lo(coordinate),hi(coordinate)];evaluations=0;unresolved=0;found=false;endpoint=NaN;
+    while ~isempty(queue)
+        interval=queue(end,:);queue(end,:)=[];
+        if evaluations>=budget
+            unresolved=size(queue,1)+1;found=true;endpoint=interval(edge);return;
+        end
+        state=nrmmSet.range(lo(1:6),hi(1:6));
+        state(coordinate)=nrmmSet.range(interval(1),interval(2));
+        evaluations=evaluations+1;
+        try
+            acceleration=nrmmJointEnclosure('acceleration',state,nrmmSet(measurement.heldInput), ...
+                nrmmSet.range(lo(12:15),hi(12:15)),cfg);
+            [al,ah]=bounds(acceleration);
+            disjoint=any(ah<measurement.bodyAcceleration-contract.noiseRadius(5:6) ...
+                | al>measurement.bodyAcceleration+contract.noiseRadius(5:6));
+            contained=all(al>=measurement.bodyAcceleration-contract.noiseRadius(5:6) ...
+                & ah<=measurement.bodyAcceleration+contract.noiseRadius(5:6));
+        catch exception
+            if ~startsWith(string(exception.identifier),["nrmmSet:","nrmmJointEnclosure:"]),rethrow(exception);end
+            unresolved=1;found=true;endpoint=interval(edge);return;
+        end
+        if disjoint,continue;end
+        if contained || diff(interval)<=tolerance
+            found=true;endpoint=interval(edge);return;
+        end
+        middle=mean(interval);children=[interval(1),middle;middle,interval(2)];
+        if edge==1,children=flipud(children);end
+        queue=[queue;children]; %#ok<AGROW>
+    end
 end
 
 function contract=localContract(runtime,input)

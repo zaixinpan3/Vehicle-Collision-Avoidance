@@ -110,7 +110,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         % or RNG (initialFramePending is true); its command/state are discarded.
         roadScan=perceiveRoadBoundaries(road,ego.position,cfg.collision.encounterRangeMeters,ego.stateTime);
         warmUpTimer=tic;collisionAvoidanceController("warmUp",cfg,roadScan);
-        if useEstimator && strlength(options.ResumeFrom)==0
+        if useEstimator && strlength(options.ResumeFrom)==0 && ~cfg.controller.retainedTube
+            % Do not compute and discard a complete nonlinear certificate
+            % before repeating the same admission in the recorded frame.
             [~,probeEgo,probeTarget]=nrmmEstimatorControllerAdapter( ...
                 "sample",estimatorContext,ego.stateTime,ego,target,[]);
             probeEgo.heldActuatorInput=ego.heldActuatorInput;
@@ -132,11 +134,15 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             baseline=saved.result.baselineCruise;
         else
             baselineDuration=options.Frames*cfg.controller.sampleTime;
-            if isinf(baselineDuration)
+            if isinf(baselineDuration) || options.RequireCollisionThreat
                 % Finite qualification of the initial encounter, not a cap
                 % on closed-loop execution or future observer/controller updates.
+                % A short recorded prefix must not truncate qualification
+                % before the known conflict or make recovery eligible early.
+                requestedDuration=baselineDuration;
                 baselineDuration=max(cfg.controller.horizonSteps*cfg.controller.sampleTime, ...
                     2*cfg.collision.encounterRangeMeters/cfg.referenceSpeed);
+                if isfinite(requestedDuration),baselineDuration=max(baselineDuration,requestedDuration);end
             end
             baseline=givenPathCollisionBaseline(road,initialTarget,cfg,baselineDuration);
         end
@@ -414,8 +420,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                         recovery.confirmationTimeSeconds=ego.stateTime;break;
                     end
                 end
-                if mod(frame,4)==0,fprintf('%s: %d/%d holds, last %.3f s, source %s\n', ...
-                    name,frame,options.Frames,frameSeconds,search.source);end
+                if mod(frame,4)==0,fprintf('%s: %d/%d holds, last %.3f s, J %.6g, source %s\n', ...
+                    name,frame,options.Frames,frameSeconds,problem.metadata.predictiveBarrierValue,search.source);end
                 if recovery.enabled && mod(frame,100)==0
                     fprintf('Recovery at %.2f s: e = [%s], W = %.6g\n', ...
                         ego.stateTime,num2str(finalError.',' %.6g'),lastClf);
@@ -455,6 +461,10 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         if unexpectedStop,outcome="unexpectedStop";end
         if collisionDetected,outcome="collision";end
         if scenarioInvalid,outcome="unqualifiedScenario";end
+        if frames==0
+            % No executed trajectory exists from which to measure clearance.
+            minimumClearance=NaN;minimumRoadMargin=NaN;
+        end
         results{index}=struct('scenario',name,'requestedFrames',options.Frames,'executedFrames',frames, ...
             'completed',strlength(failure)==0 && (frames==options.Frames || recovery.recovered), ...
             'recovery',recovery, ...

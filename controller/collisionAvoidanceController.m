@@ -9,8 +9,9 @@ function [command,predictedInput,prediction,controllerState] = ...
 % is appended. The first reference state is updated from the current estimate;
 % dynamics defects are handled in the local SQP equations.
 % A certified current target enclosure updates the constant-parameter family.
-% Its nominal is the closest admissible continuation, with all uncertainty
-% radii recentered. Without an available enclosure the observed point is used.
+% Its nominal is the current observer point projected into the intersected
+% parameter intervals, with all uncertainty radii recentered. Without an
+% available enclosure the observed point is used.
 % Passing [] as previousState starts a new problem and a new target epoch.
 % The target epoch is the latest target estimate and the sample index at
 % which it was taken (targetEpochIndex); the forecast runs forward from it,
@@ -121,6 +122,31 @@ function [command,predictedInput,prediction,controllerState] = ...
         'nominalReference',nominalReference,'stateTime',ego.stateTime, ...
         'uncertainty',uncertainty);
     model.targetPredictionUpdate=targetPredictionUpdate;
+    % Target disappearance removes collision constraints, not information
+    % about the ego state and its persistent physical parameters.
+    cruisePosterior=[];
+    if cfg.controller.retainedTube && isempty(q) && isfield(uncertainty,'jointPrediction')
+        memory=[];
+        if isstruct(previousState) && isfield(previousState,'egoJointPrediction')
+            memory=previousState.egoJointPrediction;
+        elseif isstruct(previousState) && isfield(previousState,'retainedCertificate') ...
+                && numel(previousState.retainedCertificate.tube.sets)>=2
+            certificate=previousState.retainedCertificate;
+            memory=struct('set',certificate.tube.sets{2},'contract',certificate.contract, ...
+                'sampleIndex',previousState.sampleIndex+1);
+        end
+        if ~isempty(memory)
+            assert(memory.sampleIndex==index,'collisionAvoidanceController:invalidEgoInformationAge', ...
+                'Ego information must refer to the current control boundary.');
+            cruisePosterior=nrmmJointPrediction('conditionRetained',memory.set, ...
+                model.initialState,uncertainty.egoGenerator,uncertainty.jointPrediction,memory.contract,cfg);
+            root=cruisePosterior.proposedOuter;
+            shift=root.center(1:6)-model.initialState;
+            shift(3)=atan2(sin(shift(3)),cos(shift(3)));
+            model.uncertainty.egoGenerator=[root.generator(1:6,:),diag(root.remainder(1:6)),shift];
+            model.uncertainty.collisionGenerator=model.uncertainty.egoGenerator;
+        end
+    end
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
     if ~isempty(solution) && isfield(solution,'terminalControlRequired') && solution.terminalControlRequired
         error('collisionAvoidanceController:terminalControlRequired', ...
@@ -133,6 +159,16 @@ function [command,predictedInput,prediction,controllerState] = ...
             search.terminationReason,search.stopReason);
     end
     predictedInput=solution.inputs;first=predictedInput(:,1);
+    egoJointPrediction=[];
+    if ~isempty(cruisePosterior)
+        contract=uncertainty.jointPrediction;
+        policy=struct('context',struct('cfg',cfg,'contract',contract, ...
+            'reference',[contract.point;contract.currentMeasurement.yawRate], ...
+            'input',first,'gain',zeros(2,6),'duration',cfg.controller.sampleTime,'first',true), ...
+            'lower',zeros(2,1),'upper',zeros(2,1));
+        image=nrmmJointPrediction('policyTube',cruisePosterior.proposedOuter,policy);
+        egoJointPrediction=struct('set',image.sets{2},'contract',contract,'sampleIndex',index+1);
+    end
     command=localCommand(first,ego.modelState,cfg);
     command.measurementTime=ego.stateTime;command.actuationTime=ego.stateTime;command.holdSeconds=cfg.controller.sampleTime;
     predictedJointState=solution.states;
@@ -250,6 +286,11 @@ function [command,predictedInput,prediction,controllerState] = ...
         'collisionEscapeNormals',solution.collisionEscapeNormals,'collisionSide',solution.collisionSide, ...
         'retainCollisionSide',solution.retainCollisionSide, ...
         'target',q,'targetPredictionMemory',targetPredictionMemory,'uncertaintySpecified',uncertainty.specified);
+    if ~isempty(egoJointPrediction)
+        controllerState.egoJointPrediction=egoJointPrediction;
+        metadata.egoInformationRetainedAcrossModeSwitch=true;
+        metadata.measurementConditioning=cruisePosterior.measurementConditioning;
+    end
     if isfield(solution,'retainedCertificate')
         controllerState.retainedCertificate=solution.retainedCertificate;
         metadata.solverAlgorithm="retainedJointPolicyTube";

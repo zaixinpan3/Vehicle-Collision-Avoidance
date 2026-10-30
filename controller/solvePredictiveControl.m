@@ -421,7 +421,8 @@ function search=localEmptySearch(source,failure,seconds)
         'mode',"", ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}), ...
         'initializationSeconds',seconds,'initializationFailure',failure,'elapsedSeconds',seconds, ...
-        'potentialFieldRestarted',false,'horizonSteps',0);
+        'potentialFieldRestarted',false,'horizonSteps',0, ...
+        'linearizationCount',0,'nominalRestarted',false,'restartCount',0);
     search.attempts=localAttempt(search);search.selectedAttempt=0;
 end
 
@@ -737,7 +738,9 @@ function [problem,model]=localFormulate(anchor,model)
     % A new future measurement changes the estimate, not the physical target
     % family. Without a target-relative policy retain its entire elapsed-time
     % spread instead of pretending each future observation resets that spread.
-    if ~isempty(jointTube),holdStarts=zeros(size(times));end
+    if ~isempty(jointTube) || (isfield(model,'retainedProposal') && model.retainedProposal)
+        holdStarts=zeros(size(times));
+    end
     model.recordTimes=times;
     targetTube=localTargetTube(model,times,holdStarts);
     model.targetTube=targetTube;
@@ -1477,6 +1480,8 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
         'An ongoing encounter must retain its admitted certificate; it cannot restart its safety budget.');
     search=localEmptySearch("retainedPolicyTube","",0);search.planner=localPlannerMetadata();
     search.refinementFailure="";search.posterior=[];
+    search.certificateReused=false;freshAdmission=~inherited;
+    search.nominalProposal=struct('available',false,'accepted',false,'solverCalls',0,'linearizationCount',0,'failure',"notRequested");
     if inherited
         old=previous.retainedCertificate;
         assert(old.valid && old.absoluteIndex+1==model.sampleIndex, ...
@@ -1492,118 +1497,189 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
         else
             certificate.policies=old.policies(2:end);certificate.tube.sets=old.tube.sets(2:end);
             certificate.tube.inputs=old.tube.inputs(2:end);certificate.tube.middles=old.tube.middles(2:end);
+            if isfield(old.tube,'changes'),certificate.tube.changes=old.tube.changes(2:end);end
             search.posterior=nrmmJointPrediction('conditionRetained',certificate.tube.sets{1}, ...
                 model.initialState,model.uncertainty.egoGenerator,contract,old.contract,cfg);
             certificate.posterior=search.posterior;
-            % The target family remains tied to its original absolute epoch.
+            % Each valid observation narrows the target information set.
+            % Improve supports without discarding the original terminal
+            % family: the actual target belongs to BOTH descriptions.
+            certificate=localRetainedTargetUpdate(certificate,model);
+            % The SAVED witness keeps its own target epoch. A fresh proposal
+            % may use the current measurement-consistent target family, but
+            % only after re-admitting its complete continuation and deficit.
             predicted=predictiveSafetyGeometry.targetPoseSet(certificate.target,certificate.targetError,certificate.epochSeconds);
             observed=predictiveSafetyGeometry.targetPoseSet(model.target,localAbsoluteTargetError(model),0);
             [pl,ph]=bounds(predicted(1:2));[ol,oh]=bounds(observed(1:2));
             assert(all(max(pl,ol)<=min(ph,oh)), ...
                 'collisionAvoidanceController:inconsistentTargetPosterior','Observed target position contradicts the retained family.');
             budget=sum(certificate.slacks);
-            % Try to retain a full driving horizon. If this extension cannot be
-            % certified, the old terminal continuation remains the valid tail.
-            try
-                proposal=certificate.policies;
-                for j=1:numel(proposal)
-                    % Re-admit the selected center policy first. Optional
-                    % freedom from the old frame is not a physical disturbance
-                    % and need not enlarge a fresh candidate unnecessarily.
-                    proposal(j).lower=zeros(2,1);proposal(j).upper=zeros(2,1);
-                    proposal(j).context.contract=contract;
+            % A new ego policy must not forget target information that made
+            % the old certificate safe. Keep its original physical family
+            % and epoch, and intersect it with the current observation.
+            currentBase=certificate;currentBase.contract=contract;
+            currentBase.refineTargetSupports=budget==0;
+            record=struct('sampleIndex',model.sampleIndex,'target',model.target, ...
+                'errorSet',localAbsoluteTargetError(model),'improvedNodes',[], ...
+                'normals',zeros(2,0));
+            if ~isfield(currentBase,'targetRefinements'),currentBase.targetRefinements=record;
+            elseif isempty(currentBase.targetRefinements) || currentBase.targetRefinements(end).sampleIndex~=model.sampleIndex
+                currentBase.targetRefinements(end+1)=record;
+            end
+            speed=norm(model.initialState(4:5));
+            braking=terminalSafeSet.context(model);
+            renewalSteps=max(cfg.controller.horizonSteps,ceil(speed/(braking.deceleration*h))+1);
+            % Positive deficit is not a safe driving plan: keep seeking
+            % an improvement every frame until its robust deficit is zero.
+            % Only a zero-deficit driving suffix can defer that search.
+            renew=budget>0 || numel(certificate.policies)<=renewalSteps;
+            search.certificateReused=~renew;
+            if renew
+                freshAdmission=true;
+                feedbackScale=1;
+                if isfield(certificate,'feedbackScale'),feedbackScale=certificate.feedbackScale;end
+                % Try to retain a full driving horizon. If this extension cannot be
+                % certified, the old terminal continuation remains the valid tail.
+                [optimized,search.nominalProposal]=localRetainedProposal(model,previous,[]);
+                fractions=0;
+                if ~isempty(optimized),fractions=[1,.5,0];end
+                failures=strings(1,numel(fractions));
+                for attempt=1:numel(fractions)
+                    try
+                        candidate=localRetainedRenewal(search.posterior.proposedOuter, ...
+                            certificate,optimized,fractions(attempt),currentBase,model,feedbackScale,budget);
+                        if candidate.valid
+                            certificate=candidate;
+                            search.nominalProposal.accepted=fractions(attempt)>0;
+                            search.refinementFailure="";break;
+                        else
+                            failures(attempt)=candidate.failureReason;
+                        end
+                    catch exception
+                        if ~localCertificateFailure(exception),rethrow(exception);end
+                        failures(attempt)=string(exception.identifier)+": "+exception.message;
+                    end
+                    search.refinementFailure=join(failures(strlength(failures)>0),"; ");
                 end
-                root=search.posterior.proposedOuter;
-                if ~isempty(proposal)
-                    % The first feedback observation has now happened. Its
-                    % numerical observer state and gyro sample are known.
-                    context=proposal(1).context;
-                    observed=[contract.point;contract.currentMeasurement.yawRate];
-                    difference=observed-context.reference;
-                    difference(3)=atan2(sin(difference(3)),cos(difference(3)));
-                    context.input=context.input+context.gain*difference;
-                    context.gain=zeros(2,6);context.first=true;
-                    proposal(1).context=context;
-                end
-                partial=nrmmJointPrediction('policyTube',root,proposal);
-                while numel(proposal)<certificate.horizonSteps
-                    set=partial.sets{end};input=nonlinearBicycleModel.nominalFeedback( ...
-                        set.center(1:6),set.center(16:17),model.lane,model.nominalReference,cfg, ...
-                        nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature));
-                    policy=localRetainedPolicy(set,input,cfg,contract,isempty(proposal));
-                    image=nrmmJointPrediction('policyTube',set,policy);
-                    proposal(end+1)=policy;partial.sets{end+1}=image.sets{2}; %#ok<AGROW>
-                    partial.inputs{end+1}=image.inputs{1};partial.middles{end+1}=image.middles{1};
-                end
-                candidate=localRetainedAssess(partial,proposal,certificate,model);
-                if candidate.valid && sum(candidate.slacks)<=budget
-                    certificate=candidate;
-                elseif candidate.valid
-                    search.refinementFailure="increasedCertifiedDeficit";
-                else
-                    search.refinementFailure=candidate.failureReason;
-                end
-            catch exception
-                if ~localCertificateFailure(exception),rethrow(exception);end
-                search.refinementFailure=string(exception.identifier)+": "+exception.message;
             end
         end
     else
+        optimized=[];
         if nargin<4 || isempty(seed)
             [seed,~]=localRtiInitialize(model,previous,cfg.controller.horizonSteps,[]);
             search.planner=seed.planner;
+            [optimized,search.nominalProposal]=localRetainedProposal(model,previous,seed);
         end
+        inputCandidates={seed.inputs};
+        if ~isempty(optimized)
+            inputCandidates=[{optimized,(optimized+seed.inputs)/2},inputCandidates];
+        end
+        nominalCandidates=false(1,numel(inputCandidates));nominalCandidates(1)=~isempty(optimized);
+        if ~isempty(optimized),nominalCandidates(2)=true;end
+        % A point-state LQR gain need not suit uncertain observer feedback.
+        % If the complete tube rejects both centers, retry the SAME inputs
+        % with damped ancillary feedback. Bounds, models and safety tests
+        % remain unchanged; no second avoidance path is planned.
+        feedbackScales=repelem([1,.5,.25,.125],numel(inputCandidates));
+        inputCandidates=repmat(inputCandidates,1,4);nominalCandidates=repmat(nominalCandidates,1,4);
         root=nrmmJointPrediction('rootSet',model.initialState,model.uncertainty.egoGenerator,contract);
         conditioned=nrmmJointPrediction('conditionMeasurements',root,contract,cfg);
         root=conditioned.set;search.initialMeasurementConditioning=conditioned.diagnostics;
         base=struct('valid',false,'absoluteIndex',model.sampleIndex,'epochSeconds',0, ...
             'target',model.target,'targetError',localAbsoluteTargetError(model),'contract',contract, ...
             'horizonSteps',0,'normals',zeros(2,0),'posterior',[],'terminalElapsed',0);
-        partial=struct('sets',{{root}},'inputs',{{}},'middles',{{}}, ...
-            'realArithmeticEnclosure',true,'floatingPointCertified',false);
-        proposal=struct('context',{},'lower',{},'upper',{});certificate=base;
-        admissionFailure="noTerminalWitness";
-        % Only initial admission selects the length. Every later call keeps
-        % this N; a terminal certificate can make a short prefix sufficient.
-        for k=1:size(seed.inputs,2)
-            set=partial.sets{end};policy=localRetainedPolicy(set,seed.inputs(:,k),cfg,contract,k==1);
-            try
-                image=nrmmJointPrediction('policyTube',set,policy);
-            catch cause
-                if ~localCertificateFailure(cause),rethrow(cause);end
-                failure=MException('collisionAvoidanceController:noRetainedCertificate', ...
-                    'Initial nonlinear image failed at hold %d (%.3f s): %s',k,k*h,cause.message);
-                throw(addCause(failure,cause));
+        certificate=base;bestDeficit=Inf;failures=strings(1,numel(inputCandidates));
+        search.initialAdmission=struct('terminalChecks',0,'checkedHorizons',[]);
+        % Only initial admission selects N. Keep the complete encounter seed,
+        % then continue the existing route feedback until its endpoint has a
+        % whole-set terminal witness. This generates no second avoidance
+        % plan and performs no additional RTI solve. Later frames keep N.
+        for attempt=1:numel(inputCandidates)
+            inputs=inputCandidates{attempt};admissionFailure="noTerminalWitness";admitted=false;
+            checked=[];
+            partial=struct('sets',{{root}},'inputs',{{}},'middles',{{}},'changes',{{}}, ...
+                'realArithmeticEnclosure',true,'floatingPointCertified',false);
+            proposal=struct('context',{},'lower',{},'upper',{});
+            k=0;nextTerminalCheck=size(inputs,2);limit=cfg.controller.maximumHorizonSteps;
+            if certificate.valid,limit=certificate.horizonSteps;nextTerminalCheck=limit;end
+            while k<limit
+                k=k+1;set=partial.sets{end};
+                if k<=size(inputs,2)
+                    input=inputs(:,k);
+                else
+                    input=nonlinearBicycleModel.nominalFeedback(set.center(1:6),set.center(16:17), ...
+                        model.lane,model.nominalReference,cfg, ...
+                        nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature));
+                end
+                policy=localRetainedPolicy(set,input,cfg,contract,k==1,feedbackScales(attempt));
+                try
+                    image=nrmmJointPrediction('policyTube',set,policy);
+                catch cause
+                    if ~localCertificateFailure(cause),rethrow(cause);end
+                    admissionFailure=string(cause.identifier)+": "+cause.message;break;
+                end
+                proposal(end+1)=policy;partial.sets{end+1}=image.sets{2}; %#ok<AGROW>
+                partial.inputs{end+1}=image.inputs{1};partial.middles{end+1}=image.middles{1};
+                partial.changes{end+1}=image.changes{1};
+                base.horizonSteps=k;
+                checkTerminal=k>=nextTerminalCheck;
+                [candidate,checked]=localRetainedAssess(partial,proposal,base,model,checked,checkTerminal);
+                if checkTerminal
+                    search.initialAdmission.terminalChecks=search.initialAdmission.terminalChecks+1;
+                    search.initialAdmission.checkedHorizons(end+1)=k;
+                    % Search for an admissible initial horizon geometrically;
+                    % do not repeat an expensive tail proof every 50 ms.
+                    % This is a search schedule, not a prescribed duration or
+                    % a change to the fixed horizon after first admission.
+                    nextTerminalCheck=min(cfg.controller.maximumHorizonSteps,max(k+1,ceil(1.5*k)));
+                end
+                if candidate.valid
+                    admitted=true;
+                    if sum(candidate.slacks)<bestDeficit
+                        certificate=candidate;bestDeficit=sum(candidate.slacks);
+                        certificate.feedbackScale=feedbackScales(attempt);
+                        search.nominalProposal.accepted=nominalCandidates(attempt);
+                    end
+                    break;
+                end
+                admissionFailure=candidate.failureReason;
+                % A later endpoint cannot repair an earlier hard violation.
+                if startsWith(admissionFailure,["stateDomainAtNode","inputDomainAtHold","inputSlewAtHold"]),break;end
+                if ~isempty(checked) && sum(max(0,-checked.gaps))>=bestDeficit
+                    % Appending a suffix cannot erase these already certified
+                    % prefix deficits. Keep the better available witness.
+                    admissionFailure="certifiedDeficitNotImproved";break;
+                end
             end
-            proposal(end+1)=policy;partial.sets{end+1}=image.sets{2}; %#ok<AGROW>
-            partial.inputs{end+1}=image.inputs{1};partial.middles{end+1}=image.middles{1};
-            base.horizonSteps=k;
-            candidate=localRetainedAssess(partial,proposal,base,model);
-            if candidate.valid,certificate=candidate;break;end
-            admissionFailure=candidate.failureReason;
-            % A later terminal state cannot repair a hard violation already
-            % inside this same fixed driving prefix. Report that first cause
-            % instead of propagating it until a downstream chart also fails.
-            if startsWith(admissionFailure,["stateDomainAtNode","inputDomainAtHold","inputSlewAtHold"])
-                break;
+            if ~admitted && k>=cfg.controller.maximumHorizonSteps
+                admissionFailure="initialHorizonWorkLimit: "+admissionFailure;
+            end
+            if bestDeficit==0,break;end
+            if ~admitted
+                failures(attempt)=sprintf('candidate %d, feedback %.3g at %.3f s: %s', ...
+                    attempt,feedbackScales(attempt),k*h,admissionFailure);
             end
         end
+        search.initialAdmission.failures=failures;
         assert(certificate.valid,'collisionAvoidanceController:noRetainedCertificate', ...
-            'Initial joint tube rejected at hold %d (%.3f s): %s.',k,k*h,admissionFailure);
+            'Initial joint tube rejected (%s).',join(failures,"; "));
     end
     % Optional expansion is verified BEFORE the QP. Rejection keeps the
     % exact saved bounds; a fresh absolute enclosure never overwrites them.
     budget=sum(certificate.slacks);
-    if numel(certificate.policies)==certificate.horizonSteps
+    % A symmetric superset cannot reduce an already positive worst-case
+    % deficit. First seek a better CENTER policy; reserve optional symmetric
+    % performance freedom for an admitted zero-deficit family.
+    if freshAdmission && budget==0 && numel(certificate.policies)==certificate.horizonSteps
         for scale=[1,.25,.0625]
             proposal=certificate.policies;
-            for k=1:numel(proposal)
-                proposal(k).lower=min(proposal(k).lower,-scale*[.02;.05]);
-                proposal(k).upper=max(proposal(k).upper,scale*[.02;.05]);
-            end
+            % Only the present feedforward correction is executed. Keep
+            % the admitted future feedback policy, rather than introducing
+            % independent arbitrary corrections at every future hold.
+            proposal(1).lower=min(proposal(1).lower,-scale*[.02;.05]);
+            proposal(1).upper=max(proposal(1).upper,scale*[.02;.05]);
             try
-                tube=nrmmJointPrediction('policyTube',certificate.tube.sets{1},proposal);
-                candidate=localRetainedAssess(tube,proposal,certificate,model);
+                candidate=localRetainedPolicyBox(certificate.tube.sets{1},proposal,certificate,model,budget);
                 if candidate.valid && sum(candidate.slacks)<=budget,certificate=candidate;break;end
             catch exception
                 if ~localCertificateFailure(exception),rethrow(exception);end
@@ -1620,10 +1696,17 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
     search.primaryLowerBound=search.primaryOptimum;search.slackCap=search.primaryOptimum;
     % The primary minimum is analytic: every slack is bounded below by the
     % admitted tube deficit. One QP chooses performance within that level.
-    [trial,flag,~]=localConicSolve(problem.quadratic,problem.performanceObjective,[], ...
-        problem.a,problem.b,problem.equal,problem.rhs,problem.lower,problem.upper,cfg,cfg.solver.timeLimitSeconds, ...
-        min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
-    search.solverCalls=1;
+    singleton=all(problem.lower(problem.inputIndices)==problem.upper(problem.inputIndices),'all');
+    if singleton
+        % States, inputs, safety deficits and the inactive CLF slot are all
+        % uniquely fixed. The already checked point is the exact optimizer.
+        trial=point;flag=1;
+    else
+        [trial,flag,~]=localConicSolve(problem.quadratic,problem.performanceObjective,[], ...
+            problem.a,problem.b,problem.equal,problem.rhs,problem.lower,problem.upper,cfg,cfg.solver.timeLimitSeconds, ...
+            min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
+    end
+    search.solverCalls=double(~singleton)+search.nominalProposal.solverCalls;
     if flag>0 && ~isempty(trial) && all(isfinite(trial))
         % Restore EXACT certificate membership after numerical tolerances.
         trial(problem.inputIndices)=min(problem.upper(problem.inputIndices), ...
@@ -1649,23 +1732,121 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
     solution.terminalEnd=certificate.terminal.endReason;
     model.linearization=anchor;model.trustWarmStartAdjusted=false;model.encounterExitRecord=NaN;model.robustnessRelaxation=false;
     search.returned=true;search.converged=flag>0;search.convexSolveCompleted=flag>0;
-    search.pcbfStageCompleted=true;search.secondaryStageCompleted=flag>0;search.terminationReason="retainedCertificateReturned";
+    search.modelBuilt=true;search.linearizationCount=1+search.nominalProposal.linearizationCount;search.mode=problem.mode;
+    search.pcbfStageAttempted=true;search.pcbfStageCompleted=true;
+    search.secondaryStageAttempted=true;search.secondaryStageCompleted=flag>0;search.terminationReason="retainedCertificateReturned";
     search.stopReason="";search.anchorCertified=true;search.appendedTerminalSteps=certificate.horizonSteps-numel(certificate.policies);
     search.appendedBrakingSteps=search.appendedTerminalSteps;search.rtiIterations=1;
     search.rollout=struct('available',true,'reason',"wholePolicyBoxEnclosure");
     search.horizonSteps=certificate.horizonSteps;search.elapsedSeconds=toc(timer);search.source="retainedJointPolicyTube";
+    search.attempts=localAttempt(search);search.selectedAttempt=1;
 end
 
-function policy=localRetainedPolicy(set,input,cfg,contract,first)
+function candidate=localRetainedPolicyBox(root,policies,base,model,budget)
+    % A rejected causal prefix cannot become admissible by propagating its
+    % suffix. This computes the same accepted image as policyTube, while
+    % avoiding growth of an already unusable optional performance box.
+    tube=struct('sets',{{root}},'inputs',{{}},'middles',{{}},'changes',{{}}, ...
+        'realArithmeticEnclosure',true,'floatingPointCertified',false);
+    checked=[];
+    for k=1:numel(policies)
+        image=nrmmJointPrediction('policyTube',tube.sets{end},policies(k));
+        tube.sets{end+1}=image.sets{2};tube.inputs{end+1}=image.inputs{1};
+        tube.middles{end+1}=image.middles{1};tube.changes{end+1}=image.changes{1};
+        [candidate,checked]=localRetainedAssess(tube,policies(1:k),base,model,checked,false);
+        if candidate.failureReason~="awaitingInitialEndpoint",return;end
+        if sum(max(0,-checked.gaps))>budget
+            candidate.failureReason="increasedCertifiedDeficit";return;
+        end
+    end
+    [candidate,~]=localRetainedAssess(tube,policies,base,model,checked,true);
+end
+
+function candidate=localRetainedRenewal(root,saved,optimized,fraction,base,model,feedbackScale,budget)
+    % Build and check causal prefixes. A hard violation, or a deficit already
+    % above the inherited total budget, cannot be repaired by any suffix.
+    % Reject immediately while retaining the old feasible witness unchanged.
+    cfg=model.cfg;contract=base.contract;checked=[];
+    tube=struct('sets',{{root}},'inputs',{{}},'middles',{{}},'changes',{{}}, ...
+        'realArithmeticEnclosure',true,'floatingPointCertified',false);
+    policies=struct('context',{},'lower',{},'upper',{});
+    candidate=base;candidate.valid=false;candidate.failureReason="unfinishedRenewal";
+    nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
+    for k=1:saved.horizonSteps
+        set=tube.sets{end};observed=[set.center(7:11);set.center(6)];
+        if k==1,observed=[contract.point;contract.currentMeasurement.yawRate];end
+        if k<=numel(saved.policies)
+            policy=saved.policies(k);context=policy.context;
+            difference=observed-context.reference;
+            difference(3)=atan2(sin(difference(3)),cos(difference(3)));
+            input=context.input+double(~context.first)*context.gain*difference;
+            context.contract=contract;
+            if k==1
+                context.input=input;context.gain=zeros(2,6);context.first=true;
+            end
+            policy.context=context;policy.lower=zeros(2,1);policy.upper=zeros(2,1);
+        else
+            input=nonlinearBicycleModel.nominalFeedback(set.center(1:6),set.center(16:17), ...
+                model.lane,model.nominalReference,cfg,nominal);
+            policy=localRetainedPolicy(set,input,cfg,contract,k==1,feedbackScale);
+        end
+        if fraction>0
+            input=(1-fraction)*input+fraction*optimized(:,k);
+            policy=localRetainedPolicy(set,input,cfg,contract,k==1,feedbackScale);
+        end
+        image=nrmmJointPrediction('policyTube',set,policy);
+        policies(end+1)=policy;tube.sets{end+1}=image.sets{2}; %#ok<AGROW>
+        tube.inputs{end+1}=image.inputs{1};tube.middles{end+1}=image.middles{1};
+        tube.changes{end+1}=image.changes{1};
+        [candidate,checked]=localRetainedAssess(tube,policies,base,model,checked,false);
+        if candidate.failureReason~="awaitingInitialEndpoint",return;end
+        if sum(max(0,-checked.gaps))>budget
+            candidate.failureReason="increasedCertifiedDeficit";return;
+        end
+    end
+    [candidate,~]=localRetainedAssess(tube,policies,base,model,checked,true);
+end
+
+function [inputs,diagnostics]=localRetainedProposal(model,previous,seed)
+    % Optimize a nominal candidate before requiring whole-set admission.
+    % The safety certificate is never inferred from this point subproblem.
+    % The planner is reused only on the first call; later RTI proposals use
+    % the ordinary shifted iterate and the already fixed horizon length.
+    inputs=[];diagnostics=struct('available',false,'accepted',false,'solverCalls',0,'linearizationCount',0,'failure',"noWarmStart");
+    if isempty(seed) && ~localHasWarmStart(previous),return;end
+    candidate=model;candidate.cfg.controller.retainedTube=false;
+    % A proposal must react to the same persistent target family that its
+    % nonlinear admission will check. The legacy per-hold reset assumes
+    % future target observations and can propose dangerously late passing.
+    candidate.retainedProposal=true;
+    if ~isempty(seed),candidate.probeReference=seed;end
+    try
+        [solution,search]=solvePredictiveControl(candidate,previous,tic);
+        diagnostics.solverCalls=search.solverCalls;
+        diagnostics.linearizationCount=search.linearizationCount;
+        if isempty(solution),diagnostics.failure=search.terminationReason;return;end
+        inputs=solution.inputs;diagnostics.available=true;diagnostics.failure="";
+    catch exception
+        if ~startsWith(string(exception.identifier),"collisionAvoidanceController:"),rethrow(exception);end
+        diagnostics.failure=string(exception.identifier)+": "+exception.message;
+    end
+end
+
+function policy=localRetainedPolicy(set,input,cfg,contract,first,feedbackScale)
+    if nargin<6,feedbackScale=1;end
     reference=[set.center(7:11);set.center(6)];gain=zeros(2,6);
     if ~first
         anchor=struct('states',[set.center(1:6),set.center(1:6)],'inputs',input);
-        gain=nrmmJointPrediction('feedback',anchor,cfg,cfg.controller.sampleTime);
+        gain=feedbackScale*nrmmJointPrediction('feedback',anchor,cfg,cfg.controller.sampleTime);
         estimate=set([7:11,6]);reserve=sum(abs(gain*estimate.generator),2)+abs(gain)*estimate.remainder;
         reserve=reserve+abs(gain(:,6))*contract.noiseRadius(7);
         if reserve(2)>0
             authority=min(cfg.actuation.brakingRatioMaximum-input(2),input(2)-cfg.actuation.brakingRatioMinimum);
-            gain(2,:)=gain(2,:)*min(1,max(0,authority)*(1-32*eps)/reserve(2));
+            % policyTube's 1e-4 support-budget reduction can enlarge a
+            % coordinate radius by at most twice that fraction. Account
+            % for this REPRESENTATION reserve before reaching an exact
+            % actuator endpoint; the physical input limits stay [-1,1].
+            gain(2,:)=gain(2,:)*min(1,max(0,authority)*(1-32*eps)/((1+2e-4)*reserve(2)));
         end
     end
     context=struct('cfg',cfg,'contract',contract,'reference',reference,'input',input, ...
@@ -1683,42 +1864,142 @@ function errorSet=localAbsoluteTargetError(model)
     end
 end
 
-function candidate=localRetainedAssess(tube,policies,base,model)
+function certificate=localRetainedTargetUpdate(certificate,model)
+    % Keep both the old target family and every information refinement that
+    % improves a retained support. Their intersection contains the physical
+    % target under the declared measurement/model contract. No new terminal
+    % claim is inferred from a re-centered target point.
+    errorSet=localAbsoluteTargetError(model);shape=[model.cfg.vehicle.length/2; ...
+        model.cfg.vehicle.width/2;model.cfg.vehicle.rectangleOffset];
+    changed=false;before=certificate.gaps;
+    for k=1:numel(certificate.tube.sets)
+        normal=certificate.normals(:,k);
+        if norm(normal)<.5,continue;end
+        target=predictiveSafetyGeometry.targetPoseSet(model.target,errorSet,(k-1)*model.cfg.controller.sampleTime);
+        gap=predictiveSafetyGeometry.setSeparation(certificate.tube.sets{k}(1:3), ...
+            shape,target,model.target(8:11),normal);
+        % The old separator remains available. A new support is admitted
+        % only when it proves a stronger bound for the SAME saved ego tube
+        % and measurement-consistent target family. Thus the certificate
+        % deficit cannot increase; no new passing maneuver is selected.
+        [alternative,direction]=predictiveSafetyGeometry.setSeparation( ...
+            certificate.tube.sets{k}(1:3),shape,target,model.target(8:11));
+        if alternative>gap,gap=alternative;normal=direction;end
+        if gap>certificate.gaps(k),certificate.gaps(k)=gap;changed=true;end
+        if gap>before(k),certificate.normals(:,k)=normal;end
+    end
+    if changed
+        record=struct('sampleIndex',model.sampleIndex,'target',model.target, ...
+            'errorSet',errorSet,'improvedNodes',find(certificate.gaps>before), ...
+            'normals',certificate.normals(:,certificate.gaps>before));
+        if ~isfield(certificate,'targetRefinements'),certificate.targetRefinements=record;
+        else,certificate.targetRefinements(end+1)=record;end
+        certificate.slacks=min(certificate.slacks,max(0,-certificate.gaps));
+    end
+end
+
+function [candidate,checked]=localRetainedAssess(tube,policies,base,model,checked,checkTerminal)
     candidate=base;candidate.valid=false;candidate.failureReason="";
     cfg=model.cfg;n=numel(policies);h=cfg.controller.sampleTime;
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     gaps=Inf(1,n+1);normals=zeros(2,n+1);
+    if nargin<5 || isempty(checked)
+        checked=struct('gaps',[],'normals',zeros(2,0),'holds',0);
+    end
+    if nargin<6,checkTerminal=true;end
+    % Initial causal construction only appends a hold. Its earlier sets,
+    % controls, target epoch and supports are unchanged, so reuse those
+    % exact checks. Every new policy proposal starts with an empty cache.
+    count=numel(checked.gaps);
+    gaps(1:count)=checked.gaps;normals(:,1:count)=checked.normals;
     for k=1:n+1
-        state=tube.sets{k}(1:6);
-        if ~predictiveSafetyGeometry.stateSetAdmissible(state,cfg)
-            candidate.failureReason="stateDomainAtNode"+k;return;
+        if k>count
+            state=tube.sets{k}(1:6);
+            if ~predictiveSafetyGeometry.stateSetAdmissible(state,cfg)
+                [lo,hi]=bounds(state(4:6));
+                side=tan(cfg.model.sideslipMaximum);
+                [~,left]=bounds(state(5)-side*state(4));[~,right]=bounds(-state(5)-side*state(4));
+                candidate.failureReason=sprintf(['stateDomainAtNode%d: vx=[%.4g,%.4g], ' ...
+                    'vy=[%.4g,%.4g], r=[%.4g,%.4g], sideslipUpper=%.4g'], ...
+                    k,lo(1),hi(1),lo(2),hi(2),lo(3),hi(3),max(left,right));return;
+            end
+            normal=[];
+            if k<=size(base.normals,2) && norm(base.normals(:,k))>.5,normal=base.normals(:,k);end
+            [gaps(k),normals(:,k)]=localRetainedTargetGap(state(1:3),shape,base,model,k,normal);
         end
-        target=predictiveSafetyGeometry.targetPoseSet(base.target,base.targetError,base.epochSeconds+(k-1)*h);
-        normal=[];
-        if k<=size(base.normals,2) && norm(base.normals(:,k))>.5,normal=base.normals(:,k);end
-        [gaps(k),normals(:,k)]=predictiveSafetyGeometry.setSeparation(state(1:3),shape,target,base.target(8:11),normal);
-        if k<=n
+        if k<=n && k>checked.holds
             [lo,hi]=bounds(tube.inputs{k});
             if lo(2)<cfg.actuation.brakingRatioMinimum || hi(2)>cfg.actuation.brakingRatioMaximum
-                candidate.failureReason="inputDomainAtHold"+k;return;
+                candidate.failureReason=sprintf('inputDomainAtHold%d: b=[%.17g,%.17g]',k,lo(2),hi(2));return;
             end
-            change=tube.inputs{k}(2)-tube.sets{k}(17);[lo,hi]=bounds(change);
+            if isfield(tube,'changes')
+                [lo,hi]=bounds(tube.changes{k}(2));
+            else
+                % Legacy stored tubes have different primitive coordinates
+                % before and after compression. Independent ranges are a
+                % sound fallback; equal column numbers imply no identity.
+                [oldLo,oldHi]=bounds(tube.sets{k}(17));
+                [newLo,newHi]=bounds(tube.inputs{k}(2));lo=newLo-oldHi;hi=newHi-oldLo;
+            end
             if max(abs([lo,hi]))>cfg.model.brakingRatioRateMaximum*h
                 candidate.failureReason="inputSlewAtHold"+k;return;
             end
         end
     end
+    checked=struct('gaps',gaps,'normals',normals,'holds',n);
+    if ~checkTerminal,candidate.failureReason="awaitingInitialEndpoint";return;end
     context=terminalSafeSet.context(model);context.required=0;context.inflation=0;
     context.heldInputSet=tube.sets{end}(16:17);
+    lower=zeros(2,n+1);upper=lower;
+    for k=1:n+1
+        [lower(:,k),upper(:,k)]=bounds(tube.sets{k}(1:2));
+    end
+    context.encounterHistory=struct('time',base.epochSeconds+(0:n)*h, ...
+        'positionLower',lower,'positionUpper',upper);
     context.targetEpoch=base.target;context.targetEpochIndex=0;context.sampleIndex=0;
     [lo,hi]=bounds(tube.sets{end}(17));
     if max(abs(context.brakingRatio-[lo,hi]))>context.brakingChangeMaximum
         candidate.failureReason="terminalInputSlew";return;
     end
     terminal=terminalSafeSet.certifySet(context,tube.sets{end}(1:6),base.target,base.targetError,base.epochSeconds+n*h);
+    if ~terminal.valid && isfield(base,'targetRefinements')
+        for j=numel(base.targetRefinements):-1:1
+            family=base.targetRefinements(j);age=(model.sampleIndex-family.sampleIndex)*h;
+            alternative=context;alternative.targetEpoch=family.target;
+            alternative.encounterHistory.time=context.encounterHistory.time+age-base.epochSeconds;
+            terminal=terminalSafeSet.certifySet(alternative,tube.sets{end}(1:6), ...
+                family.target,family.errorSet,age+n*h);
+            if terminal.valid,break;end
+        end
+    end
     if ~terminal.valid,candidate.failureReason="terminal:"+terminal.endReason;return;end
     candidate.valid=true;candidate.tube=tube;candidate.policies=policies;candidate.terminal=terminal;
     candidate.gaps=gaps;candidate.normals=normals;candidate.slacks=max(0,-gaps);
+end
+
+function [gap,normal]=localRetainedTargetGap(ego,shape,base,model,node,normal)
+    h=model.cfg.controller.sampleTime;time=base.epochSeconds+(node-1)*h;
+    target=predictiveSafetyGeometry.targetPoseSet(base.target,base.targetError,time);
+    [gap,normal]=predictiveSafetyGeometry.setSeparation(ego,shape,target,base.target(8:11),normal);
+    if gap<0 && isfield(base,'targetRefinements')
+        % Every recorded family contains the actual target at the same
+        % absolute time. The largest lower gap is valid on their intersection.
+        % Recompute the supports for the NEW ego image; do not copy old gaps.
+        for j=numel(base.targetRefinements):-1:1
+            family=base.targetRefinements(j);
+            age=(model.sampleIndex-family.sampleIndex+node-1)*h;
+            target=predictiveSafetyGeometry.targetPoseSet(family.target,family.errorSet,age);
+            [value,direction]=predictiveSafetyGeometry.setSeparation(ego,shape,target,family.target(8:11));
+            if value>gap,gap=value;normal=direction;end
+            if gap>=0,break;end
+        end
+    end
+    if gap<0 && isfield(base,'refineTargetSupports') && base.refineTargetSupports
+        % A union of support certificates is a distance lower bound for ALL
+        % target members, not a single half-space for their convex hull.
+        value=predictiveSafetyGeometry.targetFamilySeparation(ego,shape,base.target,base.targetError,time);
+        gap=max(gap,value);
+    end
 end
 
 function [p,anchor,inputs]=localRetainedProblem(certificate,model,contract)

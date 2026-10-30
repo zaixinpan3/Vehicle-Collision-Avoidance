@@ -2,6 +2,7 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
     properties (TestParameter)
         accelerationSpeed={.1,1.5,3.2,8,15};
         accelerationInput={[.04;-.4],[-.025;-1]};
+        scalarMap={"square","quartic","reciprocal","atan","asin","sqrt","fiala","sin","cos","tan","tanh","abs"};
     end
     methods (TestClassSetup)
         function addProjectPaths(testCase)
@@ -12,10 +13,52 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function analyticUnaryImagesRetainTheSharedPrimitive(testCase,scalarMap)
+            excess=localUnaryDependenceExcess(scalarMap);
+            testCase.verifyLessThanOrEqual(excess,2e-12);
+        end
+        function aSquareAcrossZeroUsesItsOneSidedRemainder(testCase)
+            image=nrmmSet(0,1)^2;[lo,hi]=bounds(image);
+            testCase.verifyEqual([lo,hi],[0,1],AbsTol=1e-15);
+        end
+        function repeatedProductsRetainTheirOneSidedSharedPrimitive(testCase)
+            a=nrmmSet(0,1);[lo,hi]=bounds(a*a);
+            testCase.verifyEqual([lo,hi],[0,1],AbsTol=1e-15);
+            [lo,hi]=bounds(a*(-a));
+            testCase.verifyEqual([lo,hi],[-1,0],AbsTol=1e-15);
+        end
+        function orderReductionContainsTheOldFamilyAndRetainsSharedMotion(testCase)
+            [original,reduced,directions]=localReducedFamily();
+            testCase.verifyLessThan(size(reduced.generator,2),size(original.generator,2));
+            testCase.verifyGreaterThanOrEqual(radius(directions*reduced),radius(directions*original)-1e-12);
+            testCase.verifyEqual(radius(reduced(2)-reduced(1)),radius(original(2)-original(1)),AbsTol=1e-12);
+            testCase.verifyEqual(radius(reduced(4)),radius(original(4)),AbsTol=1e-12);
+        end
+        function parallelResidualsCompressWithoutErasingTheirJointDirection(testCase)
+            [original,reduced,directions]=localParallelFamily();
+            testCase.verifyLessThan(size(reduced.generator,2),10);
+            testCase.verifyGreaterThanOrEqual(radius(directions*reduced),radius(directions*original)-1e-12);
+            testCase.verifyLessThan(max(radius(reduced)-radius(original)),1e-4);
+            testCase.verifyEqual(radius(reduced(4)),radius(original(4)),AbsTol=1e-12);
+        end
+        function accelerationHoldEnclosesIntersampleModelMotion(testCase)
+            [certificate,maximum]=localAccelerationHoldSamples();
+            testCase.verifyTrue(certificate.valid);
+            testCase.verifyLessThanOrEqual(maximum,certificate.normMaximum+1e-10);
+            testCase.verifyLessThan(certificate.normMaximum,1);
+        end
         function aSaturatedFialaFractionHasNoArtificialSlipUncertainty(testCase)
             image=fialaFraction(nrmmSet([2;-2],diag([.8;.8])));
             testCase.verifyEqual(image.center,[1;-1],AbsTol=0);
             testCase.verifyEqual(radius(image),zeros(2,1),AbsTol=0);
+        end
+        function aFialaPerspectiveRetainsItsSharedForceScale(testCase)
+            error=localPerspectiveIdentityError();
+            testCase.verifyLessThan(error,1e-10);
+        end
+        function aFialaPerspectiveEnclosesMixedCapacityAndSlip(testCase)
+            excess=localPerspectiveDependenceExcess();
+            testCase.verifyLessThanOrEqual(excess,1e-9);
         end
         function bodyAccelerationMatchesTheIndependentVehicleModel(testCase,accelerationSpeed,accelerationInput)
             cfg=collisionAvoidanceControllerConfig();x=[0;0;.2;accelerationSpeed;.01;.002];
@@ -190,6 +233,51 @@ function next=localFlow(x,u,cfg,h)
     f=@(z)nonlinearBicycleModel.derivative(z,u,cfg);
     a=f(x);b=f(x+h*a/2);c=f(x+h*b/2);d=f(x+h*c);next=x+h*(a+2*b+2*c+d)/6;
 end
+function excess=localUnaryDependenceExcess(kind)
+    center=[-.8;0;.6;2];width=[.7;1;.8;.3];
+    switch kind
+        case "square",fun=@(x)x.^2;
+        case "quartic",fun=@(x)x.^4;
+        case "reciprocal",center=[-2;-.5;.7;2];width=[.5;.4;.6;.3];fun=@(x)1./x;
+        case "atan",fun=@atan;
+        case "asin",center=[-.8;0;.6;.9];width=[.2;1;.3;.1];fun=@asin;
+        case "sqrt",center=[0;.5;2;5];width=[0;.5;1;3];fun=@sqrt;
+        case "fiala",fun=@nrmmSet.fialaValue;
+        case "sin",center=[-8;0;.7;15];width=[8;7;.3;9];fun=@sin;
+        case "cos",center=[-8;0;.7;15];width=[8;7;.3;9];fun=@cos;
+        case "tan",center=[-pi;0;.5;pi];width=[1;1;.5;1];fun=@tan;
+        case "tanh",center=[-16;0;.5;16];width=[4;2;.7;4];fun=@tanh;
+        case "abs",fun=@abs;
+    end
+    input=nrmmSet(center,diag(width));
+    if kind=="fiala",image=fialaFraction(input);else,image=fun(input);end
+    excess=-Inf;
+    for z=linspace(-1,1,2001)
+        symbols=z*ones(4,1);actual=fun(center+input.generator*symbols);
+        error=actual-image.center-image.generator*symbols;
+        excess=max(excess,max(abs(error)-image.remainder));
+    end
+end
+
+function [certificate,maximum]=localAccelerationHoldSamples()
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
+    trim=nonlinearBicycleModel.cruise(cfg,0);input=trim.input;
+    lower=[0;0;0;7.75;-.0045;-.0015];upper=[0;0;0;8.25;.0045;.0015];
+    state=nrmmSet.range(lower,upper);parameters=nrmmSet(zeros(4,1),.05*eye(4));
+    certificate=nrmmJointEnclosure('accelerationHold',state,nrmmSet(input),parameters,cfg,.0125);
+    random=RandStream('mt19937ar','Seed',119);maximum=0;
+    for sample=1:16
+        x=lower+(upper-lower).*rand(random,6,1);factor=.05*(2*rand(random,4,1)-1);plant=cfg;
+        plant.tire.corneringStiffness=cfg.tire.corneringStiffness.*(1+factor(1:2));
+        plant.tire.frictionCoefficient=cfg.tire.frictionCoefficient.*(1+factor(3:4));
+        [~,path]=ode45(@(t,z)nonlinearBicycleModel.derivative(z,input,plant),linspace(0,.0125,21),x);
+        for node=1:size(path,1)
+            z=path(node,:)';field=nonlinearBicycleModel.derivative(z,input,plant);
+            maximum=max(maximum,norm([field(4)-z(5)*z(6);field(5)+z(4)*z(6)]));
+        end
+    end
+end
+
 function [center,context,output]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
@@ -207,4 +295,50 @@ function [center,context,output]=localFixture()
     center=[x;contract.point;zeros(4,1);u;contract.positionVelocity.point];
     context=struct('cfg',cfg,'contract',contract,'reference',x,'input',u, ...
         'gain',zeros(2,6),'duration',cfg.controller.sampleTime,'first',false);
+end
+
+function [original,reduced,directions]=localReducedFamily()
+    stream=RandStream('mt19937ar','Seed',136);
+    generator=.01*randn(stream,4,200).*exp(-(1:200)/10);generator(2,:)=generator(1,:)+.0001*randn(stream,1,200).*exp(-(1:200)/10);
+    generator(4,:)=0;generator(4,end)=.05;
+    original=nrmmSet(zeros(4,1),generator);transform=eye(4);transform(2,1)=-1;
+    reduced=compress(original,.001,transform,4);
+    directions=[eye(4);randn(stream,40,4);-1,1,0,0];
+end
+
+function [original,reduced,directions]=localParallelFamily()
+    stream=RandStream('mt19937ar','Seed',137);
+    generator=.001*repmat([1;1;.5;0],1,600)+1e-8*randn(stream,4,600);
+    generator(4,:)=0;generator(:,end+1)=[0;0;0;.05];
+    original=nrmmSet(zeros(4,1),generator);
+    reduced=compress(original,1e-4,eye(4),4);
+    directions=[eye(4);randn(stream,50,4);-1,1,0,0];
+end
+
+function error=localPerspectiveIdentityError()
+    capacity=nrmmSet(5000,1000);error=0;
+    for q=[-2,-.5,0,.3,1.5]
+        force=nrmmSet.fialaForce((3*q)*capacity,capacity);
+        expected=-nrmmSet.fialaValue(q)*capacity;
+        error=max(error,abs(force.center-expected.center)+radius(force-expected));
+    end
+end
+
+function excess=localPerspectiveDependenceExcess()
+    excess=-Inf;
+    for center=[-12000,-5000,0,5000,12000]
+        stress=nrmmSet(center,[2500,1200]);capacity=nrmmSet(4000,[500,-300]);
+        force=nrmmSet.fialaForce(stress,capacity);
+        for a=linspace(-1,1,21)
+            for b=linspace(-1,1,21)
+                primitive=[a;b];s=stress.center+stress.generator*primitive;
+                c=capacity.center+capacity.generator*primitive;
+                value=-c*nrmmSet.fialaValue(s/(3*c));
+                % Check the same primitive, not just the output hull.
+                affine=force.center+force.generator(:,1:2)*primitive;
+                rest=sum(abs(force.generator(:,3:end)),2)+force.remainder;
+                excess=max(excess,abs(value-affine)-rest);
+            end
+        end
+    end
 end

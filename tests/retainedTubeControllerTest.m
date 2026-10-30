@@ -12,6 +12,31 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aCompleteTargetCoverCanSeparateWithoutOneCommonHalfspace(testCase)
+            [coarse,covered]=localCurvedTargetCover(false);
+            testCase.verifyLessThan(coarse,0);
+            testCase.verifyGreaterThan(covered,0);
+        end
+        function aTargetCoverRetainsEveryCollidingParameterCell(testCase)
+            [~,covered]=localCurvedTargetCover(true);
+            testCase.verifyLessThanOrEqual(covered,0);
+        end
+        function aWiderPublicationDoesNotEraseTheOldTargetInformation(testCase)
+            [old,next]=localWiderTargetContinuation(testCase.fixture);
+            testCase.verifyEqual(next.safety,0,AbsTol=1e-12);
+            testCase.verifyFalse(next.terminalControlRequired);
+            testCase.verifyEqual(numel(next.retainedCertificate.policies),old.retainedCertificate.horizonSteps);
+            testCase.verifyEqual(next.retainedCertificate.targetError,old.retainedCertificate.targetError);
+            testCase.verifyGreaterThanOrEqual(numel(next.retainedCertificate.targetRefinements),1);
+        end
+        function actuatorChangeRetainsSharedFeedbackBeforeCompression(testCase)
+            interval=localActuatorChange(testCase.fixture,1);
+            testCase.verifyEqual(interval,[-.01,.01],AbsTol=1e-12);
+        end
+        function actuatorChangeDoesNotCancelOppositeUncertainty(testCase)
+            interval=localActuatorChange(testCase.fixture,-1);
+            testCase.verifyEqual(interval,[-.11,.11],AbsTol=1e-12);
+        end
         function aWholePolicyBoxContainsNonlinearObserverFeedbackHistories(testCase)
             f=testCase.fixture;root=nrmmJointPrediction('rootSet',f.x,f.generator,f.contract);
             context=struct('cfg',f.cfg,'contract',f.contract,'reference',f.x,'input',f.u, ...
@@ -38,11 +63,75 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(result.minimumGap,0);
             testCase.verifyFalse(result.floatingPointCertified);
         end
+        function independentPositionErrorsCannotCancelToInventAPerceptionExit(testCase)
+            f=testCase.fixture;context=terminalSafeSet.context(f.model);context.range=5;
+            target=f.model.target;target(1:6)=[6;0;0;0;0;0];
+            errors=struct('positionRadius',1,'courseRadius',0,'speedRadius',0, ...
+                'accelerationRadius',0,'curvatureRadius',0,'sideslipRadius',0);
+            state=nrmmSet(zeros(6,1),[1;0;0;0;0;0]);
+            result=terminalSafeSet.certifySet(context,state,target,errors,0,20);
+            testCase.verifyFalse(result.valid);
+            testCase.verifyNotEqual(result.endReason,"uniformPerceptionExit");
+        end
+        function aProvenPrefixExitEndsThatTargetFamilyBeforeALaterReturn(testCase)
+            f=testCase.fixture;context=terminalSafeSet.context(f.model);context.range=10;
+            target=f.model.target;target(1:6)=[5;0;pi;5;0;asin(.1*target(7))];
+            target(3)=pi-target(6);period=2*pi/(.1*5);
+            context.encounterHistory=struct('time',[0,period/2,period], ...
+                'positionLower',zeros(2,3),'positionUpper',zeros(2,3));
+            result=terminalSafeSet.certifySet(context,nrmmSet(zeros(6,1)),target,[],period,100);
+            testCase.verifyTrue(result.valid);
+            testCase.verifyEqual(result.endReason,"perceptionExitDuringDrivingPrefix");
+            testCase.verifyEqual(result.exitTime,period/2,AbsTol=1e-12);
+        end
+        function parameterSubdivisionCannotTurnAnActualOverlapIntoSafety(testCase)
+            f=testCase.fixture;context=terminalSafeSet.context(f.model);
+            context.encounterHistory=struct('time',0, ...
+                'positionLower',zeros(2,1),'positionUpper',zeros(2,1));
+            target=f.model.target;target(1:6)=[5.5;0;0;0;0;0];
+            errors=struct('positionRadius',1,'courseRadius',.1,'speedRadius',0, ...
+                'accelerationRadius',0,'curvatureRadius',.01,'sideslipRadius',.02, ...
+                'speedInterval',[0;0],'accelerationInterval',[0;0],'curvatureInterval',[-.01;.01]);
+            result=terminalSafeSet.certifySet(context,nrmmSet(zeros(6,1)),target,errors,0,20);
+            testCase.verifyFalse(result.valid);
+            testCase.verifyTrue(any(result.endReason==["unprovedSeparation","entryFamilyContainsCollision"]));
+        end
         function runningOutOfTerminalChecksIsNeverACertificate(testCase)
             f=testCase.fixture;context=terminalSafeSet.context(f.model);
             result=terminalSafeSet.certifySet(context,nrmmSet(f.x,f.generator),f.model.target,[],0,0);
             testCase.verifyFalse(result.valid);
             testCase.verifyEqual(result.endReason,"workLimit");
+        end
+        function mixedStoppingAndMovingTargetsNeedNotExitSimultaneously(testCase)
+            f=testCase.fixture;context=terminalSafeSet.context(f.model);
+            target=f.model.target;target(1:6)=[20;5;pi;1;-.2;0];
+            errors=struct('positionRadius',.02,'courseRadius',0,'speedRadius',1, ...
+                'accelerationRadius',.2,'curvatureRadius',0,'sideslipRadius',0, ...
+                'speedInterval',[0;2],'accelerationInterval',[-.4;0],'curvatureInterval',[0;0]);
+            result=terminalSafeSet.certifySet(context,nrmmSet(zeros(6,1)),target,errors,0,150);
+            testCase.verifyTrue(result.valid);
+            testCase.verifyEqual(result.endReason,"parkedArcToPerceptionExit");
+            testCase.verifyGreaterThan(result.minimumGap,0);
+        end
+        function aParkedArcStillRejectsAnApproachingCollision(testCase)
+            f=testCase.fixture;context=terminalSafeSet.context(f.model);
+            target=f.model.target;target(1:6)=[20;0;pi;1;0;0];
+            result=terminalSafeSet.certifySet(context,nrmmSet(zeros(6,1)),target,[],0,150);
+            testCase.verifyFalse(result.valid);
+            testCase.verifyEqual(result.endReason,"unprovedSeparation");
+        end
+        function anOutgoingFamilyHasACompleteMonotoneExitCertificate(testCase)
+            f=testCase.fixture;context=terminalSafeSet.context(f.model);
+            target=f.model.target;target(1:6)=[20;8;0;2;-.2;0];
+            errors=struct('positionRadius',.1,'courseRadius',.02,'speedRadius',2, ...
+                'accelerationRadius',.2,'curvatureRadius',.001,'sideslipRadius',.002, ...
+                'speedInterval',[0;4],'accelerationInterval',[-.4;0],'curvatureInterval',[-.001;.001]);
+            result=terminalSafeSet.certifySet(context,nrmmSet(zeros(6,1)),target,errors,0,150);
+            testCase.verifyTrue(result.valid);
+            testCase.verifyEqual(result.endReason,"parkedMonotoneToPerceptionExit");
+            testCase.verifyGreaterThan(result.minimumGap,0);
+            testCase.verifyGreaterThan(result.parkedArc.exitProjectionLower,context.range);
+            testCase.verifyGreaterThanOrEqual(result.parkedArc.minimumCourseCosine,0);
         end
         function firstAdmissionCreatesAFeasibleNonlinearCertificate(testCase)
             f=testCase.fixture;
@@ -54,6 +143,23 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(max(radius(solution.retainedCertificate.tube.sets{1})),0);
             policy=solution.retainedCertificate.policies(1);
             testCase.verifyGreaterThan(max(policy.upper-policy.lower),0);
+        end
+        function performanceFreedomRetainsTheFutureFeedbackPolicy(testCase)
+            f=testCase.fixture;
+            [solution,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+                'model',f.model,'previousState',[],'anchor',f.anchor));
+            policies=solution.retainedCertificate.policies;
+            testCase.verifyGreaterThan(max(policies(1).upper-policies(1).lower),0);
+            testCase.verifyEqual([policies(2:end).lower],[policies(2:end).upper]);
+            testCase.verifyGreaterThan(norm(policies(2).context.gain,'fro'),0);
+            testCase.verifyFalse(policies(2).context.first);
+        end
+        function changingToCruiseKeepsTheJointStateInformation(testCase)
+            result=localCruiseInformationContinuation(testCase.fixture);
+            testCase.verifyTrue(all(result.clfEnabled));
+            testCase.verifyTrue(all(result.informationRetained));
+            testCase.verifyLessThan(max(result.lateralRadius),.1);
+            testCase.verifyLessThanOrEqual(result.containmentExcess,1e-9);
         end
         function aRealObserverUpdateRetainsZeroSlackInTheNextConvexProblem(testCase)
             f=testCase.fixture;
@@ -76,6 +182,30 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(second.retainedCertificate.target,first.retainedCertificate.target);
             testCase.verifyEqual(runtime.currentTime,model.stateTime,AbsTol=1e-12);
             testCase.verifyGreaterThan(x(1),f.x(1));
+        end
+        function aLongDrivingWitnessIsReusedWithoutRepeatingItsTerminalProof(testCase)
+            f=testCase.fixture;model=f.model;model.target(2)=15;model.targetEpoch=model.target;
+            terminal=terminalSafeSet.context(model);
+            count=ceil(norm(f.x(4:5))/(terminal.deceleration*f.cfg.controller.sampleTime))+10;
+            anchor=localLongAnchor(f,count);
+            [first,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+                'model',model,'previousState',[],'anchor',anchor));
+            [~,~,output]=localAdvance(f.runtime,f.x,f.u,first.inputs(:,1),f.cfg,0);
+            [ego,~,~,observation]=readControllerInputs(output,[],[],f.cfg);
+            model.initialState=ego.modelState;model.previousInput=first.inputs(:,1);
+            model.stateTime=output.stateTime;model.sampleIndex=1;model.targetOnset=false;
+            model.uncertainty=predictiveSafetyGeometry.observerUncertainty(ego,observation,model.target);
+            model.uncertainty.target=f.model.uncertainty.target;
+            previous=struct('retainedCertificate',first.retainedCertificate);
+            [next,search]=solvePredictiveControl('probe',struct('operation','retained', ...
+                'model',model,'previousState',previous,'anchor',anchor));
+            testCase.verifyTrue(search.certificateReused);
+            testCase.verifyTrue(search.retainedCandidateFeasible);
+            testCase.verifyFalse(search.nominalProposal.available);
+            testCase.verifyEqual(next.safety,0,AbsTol=0);
+            testCase.verifyEqual(next.retainedCertificate.terminal,first.retainedCertificate.terminal);
+            testCase.verifyEqual(next.retainedCertificate.horizonSteps,count);
+            testCase.verifyEqual(numel(next.retainedCertificate.policies),count-1);
         end
         function repeatedUpdatesRetainZeroSlackOrAnExplicitTerminalContinuation(testCase)
             f=testCase.fixture;model=f.model;previous=[];runtime=f.runtime;x=f.x;held=f.u;
@@ -126,11 +256,17 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyTrue(prediction.metadata.retainedCandidateFeasible);
             testCase.verifyEqual(prediction.metadata.solverAlgorithm,"retainedJointPolicyTube");
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
+            testCase.verifyGreaterThanOrEqual(prediction.metadata.search.linearizationCount,0);
+            testCase.verifyFalse(prediction.metadata.search.nominalRestarted);
             [~,~,output]=localAdvance(f.runtime,f.x,f.u,command.actuatorInput,cfg,0);
             target=localObservedTarget(output,cfg);
             [~,~,next,~]=collisionAvoidanceController(output,target,lane,cfg,memory);
             testCase.verifyTrue(next.metadata.zeroSlack);
             testCase.verifyEqual(next.metadata.horizonSteps,prediction.metadata.horizonSteps);
+            testCase.verifyTrue(next.metadata.search.nominalProposal.available);
+            testCase.verifyGreaterThan(next.metadata.search.solverCalls,1);
+            testCase.verifyGreaterThanOrEqual(next.metadata.search.linearizationCount,0);
+            testCase.verifyFalse(next.metadata.search.nominalRestarted);
         end
         function currentImuDataRemoveInconsistentLateralVelocities(testCase)
             f=testCase.fixture;
@@ -231,6 +367,48 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
     end
 end
 
+function interval=localActuatorChange(f,correlation)
+    root=nrmmJointPrediction('rootSet',f.x,f.generator,f.contract);
+    column=zeros(21,1);column(10)=.2;column(17)=correlation*.05;
+    root.generator(:,end+1)=column;
+    gain=zeros(2,6);gain(2,4)=.25;
+    context=struct('cfg',f.cfg,'contract',f.contract, ...
+        'reference',[root.center(7:11);root.center(6)],'input',f.u, ...
+        'gain',gain,'duration',f.cfg.controller.sampleTime,'first',false);
+    policy=struct('context',context,'lower',[0;-.01],'upper',[0;.01]);
+    tube=nrmmJointPrediction('policyTube',root,policy);
+    [lo,hi]=bounds(tube.changes{1}(2));interval=[lo,hi];
+end
+
+function [coarse,covered]=localCurvedTargetCover(overlap)
+    beta=asin(.06*1.6);target=[0;0;pi-beta;8;0;beta;1.6;2.4;.95;0;0];
+    error=struct('positionRadius',.1,'courseRadius',0,'speedRadius',4, ...
+        'accelerationRadius',0,'curvatureRadius',.04,'sideslipRadius',.07, ...
+        'curvatureInterval',[.02;.1]);
+    ego=nrmmSet([30;0;0]);
+    if overlap
+        point=predictiveSafetyGeometry.predictTarget(target,5);ego=nrmmSet(point(1:3));
+    end
+    shape=[2.4;.95;0;0];image=predictiveSafetyGeometry.targetPoseSet(target,error,5);
+    coarse=predictiveSafetyGeometry.setSeparation(ego,shape,image,target(8:11));
+    covered=predictiveSafetyGeometry.targetFamilySeparation(ego,shape,target,error,5);
+end
+
+function [first,next]=localWiderTargetContinuation(f)
+    [first,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+        'model',f.model,'previousState',[],'anchor',f.anchor));
+    [~,~,output]=localAdvance(f.runtime,f.x,f.u,first.inputs(:,1),f.cfg,0);
+    [ego,~,~,observation]=readControllerInputs(output,[],[],f.cfg);
+    model=f.model;model.initialState=ego.modelState;model.previousInput=first.inputs(:,1);
+    model.stateTime=output.stateTime;model.sampleIndex=1;model.targetOnset=false;
+    model.uncertainty=predictiveSafetyGeometry.observerUncertainty(ego,observation,model.target);
+    model.uncertainty.target=f.model.uncertainty.target;
+    model.uncertainty.target.positionRadius=40;
+    previous=struct('retainedCertificate',first.retainedCertificate);
+    [next,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+        'model',model,'previousState',previous,'anchor',f.anchor));
+end
+
 function excess=localContractionSamples(f)
     excess=-Inf;
     for j=1:6
@@ -268,6 +446,38 @@ function result=localRepeatedConditionedDriving(f,count)
         model.uncertainty=predictiveSafetyGeometry.observerUncertainty(ego,observation,model.target);
         model.uncertainty.target=f.model.uncertainty.target;
         previous=struct('retainedCertificate',solution.retainedCertificate);
+    end
+end
+
+function result=localCruiseInformationContinuation(f)
+    cfg=f.cfg;cfg.controller.retainedTube=true;
+    lane=[0,0;500,0];
+    [command,~,~,previous]=collisionAvoidanceController(f.output,localObservedTarget(f.output,cfg),lane,cfg,[]);
+    runtime=f.runtime;x=f.x;held=f.u;
+    result=struct('clfEnabled',false(1,2),'informationRetained',false(1,2), ...
+        'lateralRadius',zeros(1,2),'containmentExcess',-Inf);
+    for k=1:2
+        [runtime,x,output]=localAdvance(runtime,x,held,command.actuatorInput,cfg,(k-1)*cfg.controller.sampleTime);
+        held=command.actuatorInput;output.heldActuatorInput=held;
+        % Exercise the complete-visibility mode-switch interface and a
+        % deliberately loose, but still valid, standalone publication.
+        output.perception=struct('time',output.stateTime,'completeWithinRange',true);
+        output.controllerErrorBound.generator(:,end+1)=[0;0;0;0;4;0];
+        output.controllerErrorBound.bounds=sum(abs(output.controllerErrorBound.generator),2);
+        [command,~,prediction,previous]=collisionAvoidanceController(output,[],lane,cfg,previous);
+        result.clfEnabled(k)=prediction.metadata.clfEnabled;
+        result.informationRetained(k)=prediction.metadata.egoInformationRetainedAcrossModeSwitch;
+        result.lateralRadius(k)=sum(abs(prediction.model.uncertainty.egoGenerator(5,:)));
+        actual=nonlinearBicycleModel.sample(x,command.actuatorInput,cfg);
+        [lo,hi]=bounds(previous.egoJointPrediction.set(1:6));
+        result.containmentExcess=max(result.containmentExcess,max([lo-actual;actual-hi]));
+    end
+end
+
+function anchor=localLongAnchor(f,count)
+    anchor=struct('states',repmat(f.x,1,count+1),'inputs',repmat(f.u,1,count));
+    for k=1:count
+        anchor.states(:,k+1)=nonlinearBicycleModel.sample(anchor.states(:,k),f.u,f.cfg);
     end
 end
 

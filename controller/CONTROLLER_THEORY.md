@@ -3294,7 +3294,7 @@ the constructive recursive-feasibility argument while allowing more accurate
 computation. Cropping states merely because they violate a desired hard
 constraint, or reducing noise/parameter bounds without evidence, would not.
 
-### Online integration and measured admission limits
+### Online integration and measured admission limits (October 29 baseline)
 
 The measurement-consistent update is now used on initial admission and each
 subsequent online proposal. It takes coordinate supports of the constrained
@@ -3332,7 +3332,7 @@ terminal separation. The experiment stops before executing terminal control;
 this is not completed avoidance. Median/maximum controller times in this
 diagnostic were 1.142/1.583 s, not real-time performance.
 
-A separate joint-observer campaign used position-only GNSS, the configured
+The October 29 baseline joint-observer campaign used position-only GNSS, the configured
 bounded sensor noise (seed 20260728), the existing 50 m encounter fixtures,
 50 ms control holds, no road optimization rows, and a 120 s solver budget to
 separate admission failure from timeout. It ran until recovery or failure,
@@ -3353,7 +3353,7 @@ not claimed to exclude every longitudinal-only avoidance policy.
 | 8 m/s intersection crossing | 0.20 s | 0 |
 | 15 m/s intersection crossing | 0.35 s | 0 |
 
-All nine fail the hard state-domain admission of the future tube during the
+All nine baseline cases failed the hard state-domain admission of the future tube during the
 first controller call. These times are prediction offsets, not elapsed
 closed-loop driving time. No minimum replay clearance or avoidance success
 can be reported for a case with zero executed holds. The result does not
@@ -3380,6 +3380,232 @@ recovery and the controller source budget. Code analysis found no syntax
 diagnostics; existing array-growth/sparse-index warnings and a missing local
 Code Analyzer preference file remain. Tests cover behavior and numerical
 consistency, not a replacement for whole-set inclusion arguments.
+
+### Dependency-preserving admission refinements (October 30)
+
+The online retained backend now requests a point-RTI proposal before asking
+for a nonlinear policy certificate. The proposal is only a candidate: its
+linear constraints are not substituted for full joint propagation, hard
+state/input checks, terminal membership, or the shifted deficit budget.
+Its target family propagates over the full elapsed prediction time; the
+legacy per-hold target-error reset is used by neither retained proposals nor
+their initial vector-field rollout. This does not add a target-observer
+feedback model: the current target parameter family remains persistent.
+The original nonlinear guide, the point proposal, and their input midpoint
+are alternative centers, not separately planned passing maneuvers. Ancillary
+feedback can be retried at scales `1, 1/2, 1/4, 1/8` with exactly the same uncertainty and
+constraint contract. Among admitted centers the controller retains the
+smallest certified deficit, rather than the first positive-deficit candidate.
+The first successful admission fixes the node count for these comparisons.
+An already worse certified prefix cannot improve by appending more nodes,
+so that candidate can be pruned without another terminal proof.
+On first admission, the complete proposed driving prefix is propagated.
+If its endpoint cannot be certified, the existing route-feedback law appends
+driving holds. Terminal checks use geometrically increasing node counts,
+not a fixed extra duration. Every intervening hard-domain check remains
+mandatory. A configured maximum node count is a work limit; exhausting it
+reports `initialHorizonWorkLimit`, not physical avoidance impossibility.
+The first admitted horizon remains fixed during that encounter.
+
+Subsequent proposals retain the original target family and its epoch, as
+well as subsequent consistent observations. A wider current publication
+does not erase old information. Supports are recomputed against the NEW ego
+image and each recorded target family at the same absolute time; taking
+their largest lower bound is valid on their information-set intersection.
+Proposals replace the old witness only after complete re-admission and
+`J_new <= J_old - xi_first`. A rejected proposal leaves the saved target
+epoch, parameter family, driving policies, and terminal suffix unchanged.
+Future target measurements are not assumed to reset the physical prediction
+spread within a candidate horizon.
+Renewal also tests a half correction between the shifted policy and the
+point-RTI controls. Each causal prefix is checked before another hold is
+propagated. A hard violation, or a prefix deficit already greater than the
+inherited total budget, rejects that proposal immediately. Neither an
+untested suffix nor a clipped control is accepted as a certificate.
+
+The current IMU contractor searches the two extremal unresolved intervals
+for each coordinate, rather than subdividing the entire surviving interior.
+It returns their hull. Every removed exterior interval still requires a
+disjoint full nonlinear acceleration image; the intervening unsearched
+values are all retained. This uses no monotonicity assumption and gives the
+same hull resolution as exhaustive subdivision. At a work limit, the first
+unresolved exterior interval is retained instead of being excluded.
+
+The predictor center uses the current observer point projected into the
+intersected constant-parameter intervals. An older possible point is not
+frozen merely because the interval still contains it. Position and course
+balls remain centered on their current observations, avoiding additional
+inflation solely to preserve an old nominal. Parameter interval consistency
+and the original retained witness remain separate from this center choice.
+
+New target observations can improve the supports of the unchanged saved ego
+tube without rebuilding its terminal continuation. The target information
+set is the intersection of the retained family and the recorded refinements.
+For each node, the larger of the old support bound and a newly verified bound
+remains a valid lower gap on that information set. An alternative separating
+normal is used only when it proves this stronger bound on the same ego tube;
+this does not select a new passing maneuver. The resulting stage deficits
+cannot increase. The original terminal family still contains every member
+of the intersection, so its terminal witness remains valid.
+
+When renewal must preserve zero deficit, a failed single-support test can
+be refined by a complete target-family cover. The arc-length interval and
+constant-curvature interval are each split into eight closed intervals.
+All 64 Cartesian products are retained. Each target-cell image is separated
+from the entire ego policy image, using a support normal for that cell.
+The minimum of these 64 gap lower bounds is valid for the complete target
+family. This avoids requiring one separating half-space for the convex hull
+of distinct curved target trajectories. It selects no ego maneuver or
+target realization, and discards no cell. The retained optimization still
+uses the admitted policy-box deficits. A terminal certificate may likewise
+be established on any one recorded target family containing the actual
+target, with its own epoch and correctly translated prefix times; it must
+be recomputed for the new ego endpoint.
+
+A positive deficit always requests a new driving proposal: certificate
+reuse by itself does not prevent a collision before the deficit reaches
+zero. Only a zero-deficit driving suffix may defer full re-admission until
+its remaining driving length reaches the larger of the configured initial
+prefix and the present stopping duration plus one hold. Current measurements
+and actual feedback are processed every frame. The total horizon retains its
+original node count; its saved terminal suffix fills any shortened driving
+prefix. Optional symmetric policy-box expansion is attempted only at a fresh
+zero-deficit admission and only for the currently executed feedforward input.
+Future feedforward values remain those of the admitted plan; their feedback
+laws and all future observer/noise dependencies remain active. The separate
+nominal RTI proposal can still change the complete sequence before its whole
+policy is admitted. This avoids treating independently variable feedforward
+corrections at every future hold as additional uncertainty merely to adjust
+the current command. A singleton box has a unique feasible performance point
+and needs no numerical QP call.
+The optional box expansion also checks each causal prefix before propagating
+the next hold. A failed hard constraint or a deficit above the inherited
+budget rejects that expansion immediately. This gives the same acceptance
+condition as checking the full expanded tube, while avoiding expensive
+propagation of a prefix that no suffix can repair.
+
+An observed encounter exit switches the objective to the existing CLF QP,
+but no longer discards the ego information in the retained prediction.
+The predicted next joint set is conditioned on the current observation and
+the standalone error enclosure. Its physical projection, including any
+offset from the observer point, supplies the current optimization bound.
+After the cruise command is selected, one joint hold under that actual
+command produces the next ego-information prior. Subsequent cruise samples
+continue this conditioning/propagation, with the same persistent parameter
+and sensor contracts. This removes an artificial jump to a much wider
+standalone publication at the objective switch. It is a current-information
+consistency repair; it does not turn the legacy CLF horizon approximation
+into a nonlinear robust cruise certificate.
+
+Several enclosure changes preserve algebraic dependencies. Scalar affine
+images use extrema of `f(x)-s*x` on the complete interval, including critical
+points and Fiala branch joins. Shared square terms use `zeta^2 in [0,1]`,
+rather than independent signed copies. A hold-scoped symbol pool assigns one
+identity to each nonlinear residual. Tire forces reused by the physical
+state and its simulated IMU therefore retain the same residual. The front
+slip tangent is evaluated by its rational trigonometric identity; the yaw
+innovation uses a shared phase difference where the complete set admits
+that chart. Outside the chart, the vector expression remains the fallback.
+Persistent tire factors remain shared between all physical updates; the
+nominal observer inversion does not receive a second independent copy of
+the physical mismatch.
+
+The Fiala force uses a perspective enclosure. For positive lateral capacity
+`c`, tire stress `s=C*tan(alpha)`, and `q=s/(3*c)`, write the saturated force
+as `-c*P(q)`. Choose a scalar slope `a` and bound `P(q)-a*q` over the complete
+admitted interval by `m+[-r,r]`. Endpoints, the saturation joins, zero, and
+all stationary points determine those extrema. The identity
+`-c*P(q)=-a*s/3-m*c-c*(P(q)-a*q-m)` then retains the shared stress/capacity
+generators and adds only `[-c_max*r,c_max*r]`. This cancels the common
+capacity before enclosing it; no new tire limit or model approximation is
+introduced. The existing finite force-range enclosure remains the fallback
+when the capacity interval includes zero.
+
+Nearly parallel residual directions are merged into a common signed
+generator plus their complete discrepancy box. Small directions may also be
+combined into an outer box in coordinates containing
+observer-minus-physical errors. The total discarded support in every such
+coordinate is at most `1e-4` of its current support; persistent parameter
+columns are protected. There is no forced generator-count limit. A fixed
+256-column prototype lost too much correlation and failed a future state
+check at 1.65 s; it was not retained.
+
+Actuator increments are formed before compression changes primitive
+coordinates. Their resulting range is stored with the hold. Subtracting
+the compressed outgoing input from the incoming input by column number
+could otherwise create a false cancellation. Legacy tubes without this
+increment record use independent input ranges as an outer fallback.
+
+The observer position block is factored algebraically. With held measured
+velocity, its position-predictor error obeys `e'=-Kp e`. Each RK4 substep
+therefore has the exact polynomial `P=I-h Kp+(h Kp)^2/2-(h Kp)^3/6+(h Kp)^4/24`.
+After `n` substeps the existing sampled map is
+`p_next=y_position+Ts*y_velocity+P^n*(p-y_position)`. This removes repeated
+cancelling expressions without changing the observer integration or sensors.
+
+Position-only initialization now bounds secant bias from the known actuator
+history and the shared uncertain vehicle model. Each past hold uses
+subdivided Picard inclusions: a proposed continuous state box is accepted
+only if `X0 + [0,h] f(box)` is contained in it. The resulting acceleration
+bound is integrated with the secant's time weights. Failed inclusions keep
+the original global bound. No velocity sensor, constant-IMU assumption, or
+reduction of sensor noise is introduced. Global fallback force bounds also
+include the declared friction uncertainty. The observer's speed-norm domain
+includes the controller's allowed longitudinal and lateral components.
+
+Target history additionally contracts the constant speed/acceleration/
+curvature/course family. A parameter slice is removed only when its complete
+backward NRMM displacement image is inconsistent with a bounded past
+position difference. Backward propagation is used only over intervals where
+every candidate remains moving. Two consecutive chord directions also obey
+`angle(chord1,chord2) = kappa * totalArc / 2` on the verified angular chart.
+Unresolved slices are retained, and their hull is an outer approximation.
+Gyro transport uses certified hold-specific angular-acceleration bounds when
+available, retaining the declared gyro noise.
+
+Terminal admission still uses the agreed simplified braking model. It now
+checks complete spatial target arcs after parking, including every possible
+stopping location, rather than requiring all uncertain target members to
+stop or leave perception simultaneously. Constant course, curvature, initial
+speed and tangential-acceleration cells
+can be refined; **every** cell must be certified, or the whole result fails.
+The same ego braking images are cached across those cells. Stored coordinate
+bounds replace repeated copies of the large pose-generator arrays.
+Timing-parameter subdivision distinguishes a target that stops during the
+encounter from a faster member that has already exited perception. A score
+based on parameter widths and elapsed arc/time chooses the subdivision order;
+it is not an exclusion test or a new model constraint. Both children of every
+split remain required, including shared endpoints. The 256-cell-evaluation
+and depth-16 limits return an unproved result if any cell is unresolved.
+
+An outgoing parked-target family can be certified by a single projected arc.
+Choose a world normal `n`, an arc interval `[s0,S]`, and a positive gap between
+the ego footprint and the target reference point inflated by its circumscribed
+radius at `s0`. If every allowed target course satisfies `n' e(course)>=0`
+through that complete arc, its projected center separation is nondecreasing.
+If its lower projection at `S` exceeds every braking ego center by the
+perception radius, moving members leave perception before any later return;
+members stopping earlier remain separated. Require `S` to be beyond every
+member's terminal-entry arc. Unproved monotonicity or exit falls back to the
+complete parameter/arc cover; it is never interpreted as safety.
+
+A cell can also terminate through a first perception exit proved earlier in
+the driving prefix. That exit requires separation beyond the sensing radius
+for every ego and target position in that cell at the checked node. A later
+return cannot reactivate the same encounter. This use of prefix history does
+not certify its collision constraints: those still contribute their own
+PCBF deficits. Independent ego/target generators are never cancelled when
+proving exit. The remaining limitation is conservative independence of their
+common global pose errors, rather than a full joint ego/target information
+set. Finite cell/arc budgets return an uncertified result. All inclusions
+remain real-arithmetic derivations with ordinary floating-point evaluation;
+none is a directed-rounding numerical certificate.
+
+The improvements above do not establish convergence of a positive admitted
+deficit to zero. Nor do they establish that a feasible physical maneuver
+must be found by the finite candidate and enclosure construction. Completed
+avoidance must be measured separately from successful enclosure or terminal
+unit tests.
 
 ### Computation budget and diagnostics
 
@@ -3472,7 +3698,7 @@ baseline and minimum recovery time.
 | Required mathematical ingredient | Current implementation boundary |
 | --- | --- |
 | Sound current physical enclosures | The default joint path requires declared enclosures and conditions them on current raw measurements. Legacy point-RTI inputs can run without a supported finite certificate, but cannot claim the retained guarantee. |
-| Sound physical horizon images; joint images for future feedback | The retained joint path encloses the declared sampled ego/observer map over decision plus uncertainty domains in real arithmetic; conservatism currently prevents first admission in the nine tested driving cases. No floating-point certificate is claimed. |
+| Sound physical horizon images; joint images for future feedback | The retained joint path encloses the declared sampled ego/observer map over decision plus uncertainty domains in real arithmetic. The October 30 refinements permit driving admission and zero deficit in the 8 m/s head-on experiment; other initial tubes still fail hard-domain admission. No floating-point certificate is claimed. |
 | Cross-sample posterior inclusion | The retained backend stores joint sets and constrained posterior intersections and keeps the old certificate if a new outer image is rejected. The comparison point-RTI path does not retain a set/policy witness. |
 | Common robust terminal family | The retained backend verifies a full entry set under simplified braking until uniform perception exit or separated stationary families; a finite check limit never certifies an unresolved tail. This is an assumed terminal model, not a Fiala execution certificate. |
 | Exact nonlinear CLF dissipation | Current continuous derivative, locally affine in the first input, with soft slack and a fixed reference penalty. |

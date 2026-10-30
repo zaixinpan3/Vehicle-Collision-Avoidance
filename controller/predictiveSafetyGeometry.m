@@ -8,20 +8,102 @@ classdef predictiveSafetyGeometry
             if isempty(errorSet)
                 q=predictiveSafetyGeometry.predictTarget(target,time);pose=nrmmSet(q(1:3));return;
             end
+            arc=predictiveSafetyGeometry.targetArcInterval(target,errorSet,time);
+            pose=predictiveSafetyGeometry.targetArcSet(target,errorSet,arc);
+        end
+
+        function arc = targetArcInterval(target,errorSet,time)
             speed=max(0,target(4)+[-1,1]*errorSet.speedRadius);
             acceleration=target(5)+[-1,1]*errorSet.accelerationRadius;
+            if isfield(errorSet,'speedInterval'),speed=errorSet.speedInterval(:).';end
+            if isfield(errorSet,'accelerationInterval'),acceleration=errorSet.accelerationInterval(:).';end
             arc=zeros(1,2);
             for j=1:2
                 duration=time;
                 if acceleration(j)<0,duration=min(time,-speed(j)/acceleration(j));end
                 arc(j)=speed(j)*duration+.5*acceleration(j)*duration^2;
             end
+        end
+
+        function pose = targetArcSet(target,errorSet,arc)
+            % A spatial image of the SAME constant-curvature family. This
+            % also represents every stopping location in an arc interval.
+            assert(numel(arc)==2 && 0<=arc(1) && arc(1)<=arc(2));
+            if isempty(errorSet)
+                errorSet=struct('positionRadius',0,'courseRadius',0,'curvatureRadius',0,'sideslipRadius',0);
+            end
             q=nrmmSet([target(1:2);target(3)+target(6);sin(target(6))/target(7);target(6)], ...
                 diag([errorSet.positionRadius;errorSet.positionRadius;errorSet.courseRadius; ...
                     errorSet.curvatureRadius;errorSet.sideslipRadius]));
-            s=nrmmSet.range(arc(1),arc(2));half=q(4)*s/2;
+            if isfield(errorSet,'curvatureInterval')
+                interval=errorSet.curvatureInterval;
+                q(4)=nrmmSet(mean(interval),[zeros(1,3),diff(interval)/2,0]);
+                % Curvature and body/course offset are the SAME constant
+                % beta parameter, rather than two independent disturbances.
+                q(5)=asin(target(7)*q(4));
+            end
+            % Arc uncertainty is independent of initial position. Give it
+            % its own signed column; reusing column 1 would falsely link
+            % travelled distance to the target's initial x-position error.
+            s=nrmmSet(mean(arc),[zeros(1,size(q.generator,2)),diff(arc)/2]);half=q(4)*s/2;
             position=q(1:2)+s*sinc(half)*[cos(q(3)+half);sin(q(3)+half)];
+            % Intersect the signed affine image with a direct trigonometric
+            % range. The latter retains, for example, that an oncoming arc
+            % initially travels backwards in x; a symmetric Taylor radius
+            % can otherwise invent forward displacement at the same time.
+            [kl,kh]=bounds(q(4));turn=[kl,kh].'*arc/2;
+            turn=[min(turn,[],'all'),max(turn,[],'all')];
+            maximum=max(abs(turn));minimum=max(0,max(turn(1),-turn(2)));
+            sincRange=[-1,1];
+            if maximum<=pi
+                sincRange=[1,1];
+                if maximum>0,sincRange(1)=sin(maximum)/maximum;end
+                if minimum>0,sincRange(2)=sin(minimum)/minimum;end
+            end
+            amplitude=arc.'*sincRange;
+            amplitude=[min(amplitude,[],'all'),max(amplitude,[],'all')];
+            [cl,ch]=bounds(q(3));angle=[cl+turn(1),ch+turn(2)];
+            lower=zeros(2,1);upper=lower;
+            for coordinate=1:2
+                phase=angle-(coordinate-1)*pi/2;
+                if coordinate==1,values=cos(angle);else,values=sin(angle);end
+                if ceil(phase(1)/(2*pi))<=floor(phase(2)/(2*pi)),values(end+1)=1;end
+                if ceil((phase(1)-pi)/(2*pi))<=floor((phase(2)-pi)/(2*pi)),values(end+1)=-1;end
+                product=amplitude.'*[min(values),max(values)];
+                lower(coordinate)=target(coordinate)-errorSet.positionRadius+min(product,[],'all');
+                upper(coordinate)=target(coordinate)+errorSet.positionRadius+max(product,[],'all');
+            end
+            guard=128*eps(max(1,max(abs([lower;upper]))));
+            lower=lower-guard;upper=upper+guard;
+            position=nrmmSet.intersectRange(position,lower,upper);
             pose=[position;q(3)+2*half-q(5)];
+        end
+
+        function gap = targetFamilySeparation(ego,shape,target,errorSet,time,parts)
+            % Cover the complete persistent parameter family, rather than
+            % filling the space BETWEEN its distinct curved trajectories.
+            % Every cell must separate from the entire ego set. A different
+            % support normal per uncertainty cell does not choose a different
+            % ego maneuver: the ego policy and its complete image are fixed.
+            if nargin<6,parts=8;end
+            validateattributes(parts,{'double'},{'scalar','integer','positive','finite'});
+            if isempty(errorSet) || ~isfield(errorSet,'curvatureInterval')
+                pose=predictiveSafetyGeometry.targetPoseSet(target,errorSet,time);
+                gap=predictiveSafetyGeometry.setSeparation(ego,shape,pose,target(8:11));return;
+            end
+            arc=predictiveSafetyGeometry.targetArcInterval(target,errorSet,time);
+            arcs=linspace(arc(1),arc(2),parts+1);
+            curves=linspace(errorSet.curvatureInterval(1),errorSet.curvatureInterval(2),parts+1);
+            gap=Inf;
+            for i=1:parts
+                family=errorSet;family.curvatureInterval=curves(i:i+1).';
+                family.curvatureRadius=diff(curves(i:i+1))/2;
+                for j=1:parts
+                    pose=predictiveSafetyGeometry.targetArcSet(target,family,arcs(j:j+1));
+                    lower=predictiveSafetyGeometry.setSeparation(ego,shape,pose,target(8:11));
+                    gap=min(gap,lower);
+                end
+            end
         end
 
         function [gap,normal] = setSeparation(ego,shapeE,target,shapeT,normal)
@@ -63,16 +145,23 @@ classdef predictiveSafetyGeometry
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
             generator=model.uncertainty.collisionGenerator;
             reserve=sum(vecnorm(generator(1:2,:),2,1));
-            % Match the runtime controller's per-hold target enclosure. A
-            % separate frozen-observer, full-horizon tube would rank seeds
-            % against a different problem and can swamp the actual geometry.
+            % The retained backend carries one persistent target family.
+            % Its initializer must not reset parameter/position errors at
+            % hypothetical future measurement times. The legacy point-RTI
+            % configuration retains its distinct per-hold approximation.
             holdTime=[0,repmat(cfg.controller.sampleTime,1,count)];
+            if cfg.controller.retainedTube && isfield(model.uncertainty,'jointPrediction')
+                holdTime=time;
+            end
             starts=predictiveSafetyGeometry.predictTarget(model.target,max(0,time-holdTime));
             support=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,holdTime);
             tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,holdTime);
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
+            if cfg.controller.retainedTube && isfield(model.uncertainty,'jointPrediction')
+                data.family=struct('target',model.target,'error',model.uncertainty.target,'time',time);
+            end
             parameters=localFieldParameters(data,1,0);
             [~,field]=predictiveSafetyGeometry.circulationField(model.initialState,target(:,1),cfg,parameters);
             course=model.initialState(3)+atan2(model.initialState(5),model.initialState(4));
@@ -348,7 +437,9 @@ classdef predictiveSafetyGeometry
                 'speedRadius',max(abs(set.speedInterval-q(4))), ...
                 'accelerationRadius',max(abs(set.accelerationInterval-q(5))), ...
                 'curvatureRadius',max(abs(set.curvatureInterval-curvature)), ...
-                'sideslipRadius',max(abs(asin(set.curvatureInterval*q(7))-q(6))));
+                'sideslipRadius',max(abs(asin(set.curvatureInterval*q(7))-q(6))), ...
+                'speedInterval',set.speedInterval,'accelerationInterval',set.accelerationInterval, ...
+                'curvatureInterval',set.curvatureInterval);
             uncertainty.predictionSet=set;
             uncertainty.collisionGenerator(1:3,:)=0;
             uncertainty.relativeFrame=true;uncertainty.specified=true;
@@ -358,10 +449,11 @@ classdef predictiveSafetyGeometry
             % The observer point and a nominal predictor need not coincide.
             % Intersect the declared constant-A/constant-curvature intervals
             % across samples. Propagate the speed interval with that family.
-            % Select the closest continuation of the previous nominal inside
-            % the current enclosure, then recenter EVERY affected radius.
-            % There is no smoothing gain, rate cap, or hidden reduction of
-            % the observer's uncertainty. This is a box/ball outer enclosure,
+            % Center the predictor on the CURRENT observer point, projected
+            % into the intersected parameter intervals. Keeping an old point
+            % merely because it remains possible delays observed acceleration
+            % and unnecessarily enlarges position/course balls. This is a
+            % box/ball outer enclosure,
             % not a nonlinear cross-horizon recursive-safety certificate.
             info=struct('available',false,'reason',"observerSetUnavailable", ...
                 'observed',q,'nominal',q,'parameterIntersection',false);
@@ -396,7 +488,7 @@ classdef predictiveSafetyGeometry
                 propagated=max(0,memory.speedInterval+elapsed*startAcceleration);
                 speed=localIntervalIntersection(speed,propagated);
             end
-            observed=q;preferred=q;if ~isempty(prior),preferred=prior;end
+            observed=q;preferred=q;
             q(4)=min(speed(2),max(speed(1),preferred(4)));
             q(5)=min(acceleration(2),max(acceleration(1),preferred(5)));
             kappa=min(curvature(2),max(curvature(1),sin(preferred(6))/preferred(7)));
@@ -413,7 +505,8 @@ classdef predictiveSafetyGeometry
                 'speedRadius',max(abs(speed-q(4))), ...
                 'accelerationRadius',max(abs(acceleration-q(5))), ...
                 'curvatureRadius',max(abs(curvature-kappa)), ...
-                'sideslipRadius',max(abs(asin(curvature*q(7))-q(6))));
+                'sideslipRadius',max(abs(asin(curvature*q(7))-q(6))), ...
+                'speedInterval',speed,'accelerationInterval',acceleration,'curvatureInterval',curvature);
             memory=struct('time',time,'speedInterval',speed, ...
                 'accelerationInterval',acceleration,'curvatureInterval',curvature);
             info.available=true;info.reason="observerEnclosureContinuation";
@@ -793,12 +886,26 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
     egoYaw=0;targetYaw=0;
     if isfield(parameters,'egoYawRadius'),egoYaw=parameters.egoYawRadius;end
     if isfield(parameters,'targetYawRadius'),targetYaw=parameters.targetYawRadius;end
+    familySupport=[];
+    if isfield(parameters,'family')
+        elapsed=parameters.family.time+time;
+        familySupport=predictiveSafetyGeometry.targetSupportData(parameters.family.target,parameters.family.error,elapsed);
+        familyTube=predictiveSafetyGeometry.targetErrorTube(parameters.family.target,parameters.family.error,elapsed);
+        targetYaw=repmat(familyTube.yawRadius.',8,1);
+    end
     egoSupport=predictiveSafetyGeometry.rotationSupport(shape,x(3),egoYaw,-axes);
     targetSupport=localMovingSupport(target(8:11),repmat(future(3,:).',8,1),targetYaw,axes);
     inflation=parameters.inflation;
     if isfield(parameters,'generator')
-        inflation=inflation+sum(abs(axes*parameters.generator(1:2,:)),2) ...
-            +predictiveSafetyGeometry.targetSupportFromData(parameters.support,parameters.index,axes);
+        targetInflation=predictiveSafetyGeometry.targetSupportFromData(parameters.support,parameters.index,axes);
+        if ~isempty(familySupport)
+            targetInflation=zeros(size(axes,1),1);
+            for k=1:count
+                rows=k+(0:7)*count;
+                targetInflation(rows)=predictiveSafetyGeometry.targetSupportFromData(familySupport,k,axes(rows,:));
+            end
+        end
+        inflation=inflation+sum(abs(axes*parameters.generator(1:2,:)),2)+targetInflation;
     end
     faceGap=reshape(sum(axes.*repmat((positions-future(1:2,:)).',8,1),2) ...
         -egoSupport-targetSupport-inflation,count,8);
@@ -815,6 +922,9 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
     if isfield(parameters,'generator')
         rangeReserve=rangeReserve+sum(vecnorm(parameters.generator(1:2,:),2,1)) ...
             +parameters.support.ballRadius(parameters.index);
+        if ~isempty(familySupport)
+            rangeReserve=rangeReserve-parameters.support.ballRadius(parameters.index)+familySupport.ballRadius;
+        end
     end
     outside=vecnorm(positions-future(1:2,:),2,1)-rangeReserve>cfg.collision.encounterRangeMeters;
     if ~outside(1)
@@ -852,7 +962,7 @@ function support=localMovingSupport(shape,yaw,yawRadius,normal)
     a=bodyNormal*vertices;nominal=max(a,[],2);
     radius=min(pi,yawRadius);
     b=bodyNormal*[-vertices(2,:);vertices(1,:)];
-    values=a*cos(radius)+abs(b)*sin(radius);
+    values=a.*cos(radius)+abs(b).*sin(radius);
     interior=abs(atan2(b,a))<=radius;
     magnitude=hypot(a,b);values(interior)=magnitude(interior);
     support=max(nominal,max(values,[],2));
@@ -1062,6 +1172,9 @@ function parameters=localFieldParameters(data,index,speed)
     parameters=struct('speed',speed,'inflation',0, ...
         'egoYawRadius',data.egoYawRadius,'targetYawRadius',data.targetYawRadius(index), ...
         'generator',data.generator,'support',data.support,'index',index);
+    if isfield(data,'family')
+        parameters.family=data.family;parameters.family.time=data.family.time(index);
+    end
 end
 
 function summary=localCandidateSummary(candidate)

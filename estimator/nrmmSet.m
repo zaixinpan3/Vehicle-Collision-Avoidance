@@ -22,6 +22,13 @@ classdef nrmmSet
             assert(size(g,1)==numel(c) && isequal(size(r),size(c)) && all(r(:)>=0));
             assert(isreal(c) && isreal(g) && isreal(r) && all(isfinite([c(:);g(:);r(:)])), ...
                 'nrmmSet:unboundedImage','The enclosure must remain finite and real.');
+            if any(r(:)>0)
+                indices=find(r(:)>0);columns=nrmmSet.symbolPool('allocate',numel(indices));
+                if ~isempty(columns)
+                    g(:,end+1:columns(end))=0;
+                    g(sub2ind(size(g),indices,columns(:)))=r(indices);r(:)=0;
+                end
+            end
             a.center=c;a.generator=g;a.remainder=r;
         end
         function r=radius(a)
@@ -33,9 +40,66 @@ classdef nrmmSet
         function a=promote(a)
             % Exact reparameterization of the residual box. Its new signed
             % columns can then be contracted by later linear feedback maps.
-            keep=find(a.remainder(:)>0);extra=zeros(numel(a.center),numel(keep));
-            extra(sub2ind(size(extra),keep,(1:numel(keep)).'))=a.remainder(keep);
-            a.generator=[a.generator,extra];a.remainder(:)=0;
+            keep=find(a.remainder(:)>0);columns=nrmmSet.symbolPool('allocate',numel(keep));
+            if isempty(columns),columns=size(a.generator,2)+(1:numel(keep));end
+            if ~isempty(columns)
+                a.generator(:,end+1:columns(end))=0;
+                a.generator(sub2ind(size(a.generator),keep,columns(:)))=a.remainder(keep);
+            end
+            a.remainder(:)=0;
+        end
+        function a=compress(a,fraction,transform,protectedRows)
+            % Outer reduction of negligible residual directions. The total
+            % discarded support in EACH transformed coordinate is at most
+            % fraction of its current support; there is no forced order cap.
+            % Persistent physical-parameter columns remain explicit.
+            a=promote(a);g=a.generator;n=size(g,1);
+            if nargin<3,transform=eye(n);end
+            if nargin<4,protectedRows=[];end
+            assert(fraction>=0 && fraction<1);
+            mapped=transform*g;scale=max(sum(abs(mapped),2),realmin);
+            protected=any(g(protectedRows,:)~=0,1);
+            budget=fraction*scale;used=zeros(n,1);
+            indices=find(~protected & any(g,1));
+            if numel(indices)>n
+                % Near-parallel columns describe the same shared motion.
+                % Aggregate their signed common direction and retain the
+                % COMPLETE discrepancy as a box, instead of boxing their
+                % much larger absolute contributions independently.
+                normalized=mapped(:,indices)./scale;
+                [mass,pivot]=max(abs(normalized),[],1);
+                orientation=sign(normalized(sub2ind(size(normalized),pivot,1:numel(indices))));
+                key=round(normalized./(mass.*orientation)/.01).';
+                [~,~,group]=unique([pivot.',key],'rows');
+                count=accumarray(group,1);
+                membership=sparse(1:numel(group),group,1,numel(group),numel(count));
+                total=(mapped(:,indices).*orientation)*membership;
+                groupMass=accumarray(group,mass.');
+                discrepancy=abs(mapped(:,indices).*orientation ...
+                    -total(:,group).*(mass./groupMass(group).'))*membership;
+                score=sum(discrepancy./scale,1).'./max(1,count-1);
+                [~,order]=sort(score);order=order(count(order)>1);
+                selected=false(numel(count),1);
+                for j=order.'
+                    if all(used+discrepancy(:,j)<=budget/2)
+                        selected(j)=true;used=used+discrepancy(:,j);
+                    end
+                end
+                keep=true(1,size(g,2));keep(indices(selected(group)))=false;
+                g=[g(:,keep),transform\total(:,selected)];
+                mapped=transform*g;
+            end
+            % Spend only the remaining support budget on negligible terms.
+            protected=any(g(protectedRows,:)~=0,1);
+            weight=abs(mapped)./scale;
+            candidates=find(~protected);[~,order]=sort(sum(weight(:,candidates),1),'ascend');
+            indices=candidates(order);accumulated=cumsum(weight(:,indices),2);
+            count=find(all(accumulated<=(budget-used)./scale,1),1,'last');
+            if isempty(count) || count<=n,count=0;end
+            keep=true(1,size(g,2));keep(indices(1:count))=false;
+            box=used+sum(abs(mapped(:,~keep)),2);active=box>0;
+            remainder=diag(box);remainder=remainder(:,active);
+            a.generator=[g(:,keep),transform\remainder];
         end
         function varargout=size(a,varargin)
             [varargout{1:nargout}]=size(a.center,varargin{:});
@@ -75,8 +139,14 @@ classdef nrmmSet
         function c=times(a,b)
             [a,b]=nrmmSet.expand(a,b);
             g=b.center(:).*a.generator+a.center(:).*b.generator;
-            r=abs(b.center).*a.remainder+abs(a.center).*b.remainder+radius(a).*radius(b);
-            c=nrmmSet(a.center.*b.center,g,r);
+            % Shared diagonal products are z_i^2 in [0,1], not independent
+            % signed products in [-1,1]. Keep their one-sided midpoint.
+            % Off-diagonal products are still bounded by absolute sums.
+            diagonal=a.generator.*b.generator;
+            shift=reshape(sum(diagonal,2)/2,size(a.center));
+            r=abs(b.center).*a.remainder+abs(a.center).*b.remainder ...
+                +radius(a).*radius(b)-reshape(sum(abs(diagonal),2)/2,size(a.center));
+            c=nrmmSet(a.center.*b.center+shift,g,max(0,r));
         end
         function c=mtimes(a,b)
             a=nrmmSet.convert(a);b=nrmmSet.convert(b);
@@ -92,14 +162,20 @@ classdef nrmmSet
             end
         end
         function c=rdivide(a,b)
-            b=nrmmSet.convert(b);[lo,hi]=bounds(b);
+            [a,b]=nrmmSet.expand(a,b);[lo,hi]=bounds(b);
             if any(lo(:)<=0 & hi(:)>=0)
                 error('nrmmSet:singularDomain','A reciprocal interval contains zero.');
             end
-            second=2./min(abs(lo),abs(hi)).^3;
-            reciprocal=nrmmSet.unary(b,1./b.center,-1./b.center.^2,second);
-            reciprocal=nrmmSet.intersectRange(reciprocal,1./hi,1./lo);
+            slope=-1./(lo.*hi);
+            critical=sign(lo).*sqrt(-1./slope);
+            reciprocal=nrmmSet.affineImage(b,@(x)1./x,slope,critical(:));
             c=times(a,reciprocal);
+            % Cancel the shared part of numerator and denominator before
+            % bounding their product. Select between two sound images.
+            ratio=a.center./b.center;
+            centered=ratio+times(a-ratio.*b,reciprocal);
+            use=radius(centered)<radius(c);
+            if any(use,'all'),c=subsasgn(c,substruct('()',{use}),part(centered,use));end
         end
         function c=mrdivide(a,b)
             b=nrmmSet.convert(b);assert(isscalar(b.center));c=rdivide(a,b);
@@ -111,24 +187,28 @@ classdef nrmmSet
                 % differ by rounding and falsely give disjoint singleton ranges.
                 c=nrmmSet(a.center.^k,zeros(size(a.generator)));return;
             end
-            c=nrmmSet(ones(size(a.center)));
-            for i=1:k,c=c.*a;end
-            if k>0 && mod(k,2)==0
-                [lo,hi]=bounds(a);lower=min(abs(lo),abs(hi)).^k;
-                lower(lo<=0 & hi>=0)=0;
-                c=nrmmSet.intersectRange(c,lower,max(abs(lo),abs(hi)).^k);
-            end
+            if k==0,c=nrmmSet(ones(size(a.center)),zeros(size(a.generator)));return;end
+            if k==1,c=a;return;end
+            fun=@(x)x.^k;slope=nrmmSet.secantSlope(a,fun,k*a.center.^(k-1));
+            critical=sign(slope).*abs(slope/k).^(1/(k-1));
+            points=critical(:);
+            if mod(k,2)==1,points=[points,-points];end
+            c=nrmmSet.affineImage(a,fun,slope,points);
         end
         function c=mpower(a,k)
             assert(isscalar(a.center));c=power(a,k);
         end
         function b=sin(a)
-            b=nrmmSet.unary(a,sin(a.center),cos(a.center),ones(size(a.center)));
-            b=nrmmSet.intersectRange(b,-ones(size(a.center)),ones(size(a.center)));
+            slope=nrmmSet.secantSlope(a,@sin,cos(a.center));
+            phase=acos(min(1,max(-1,slope(:))));
+            points=nrmmSet.periodicCritical(a,[phase,-phase],2*pi);
+            b=nrmmSet.affineImage(a,@sin,slope,points);
         end
         function b=cos(a)
-            b=nrmmSet.unary(a,cos(a.center),-sin(a.center),ones(size(a.center)));
-            b=nrmmSet.intersectRange(b,-ones(size(a.center)),ones(size(a.center)));
+            slope=nrmmSet.secantSlope(a,@cos,-sin(a.center));
+            phase=asin(min(1,max(-1,-slope(:))));
+            points=nrmmSet.periodicCritical(a,[phase,pi-phase],2*pi);
+            b=nrmmSet.affineImage(a,@cos,slope,points);
         end
         function b=tan(a)
             [lo,hi]=bounds(a);
@@ -136,35 +216,41 @@ classdef nrmmSet
                     || any(mod(lo(:)+pi/2,pi)==0 | mod(hi(:)+pi/2,pi)==0)
                 error('nrmmSet:singularDomain','A tangent interval crosses a pole.');
             end
-            t=max(abs(tan(lo)),abs(tan(hi)));
-            b=nrmmSet.unary(a,tan(a.center),1+tan(a.center).^2,2*t.*(1+t.^2));
+            slope=nrmmSet.secantSlope(a,@tan,1+tan(a.center).^2);
+            phase=atan(sqrt(max(0,slope(:)-1)));
+            points=nrmmSet.periodicCritical(a,[phase,-phase],pi);
+            b=nrmmSet.affineImage(a,@tan,slope,points);
         end
         function b=atan(a)
-            b=nrmmSet.unary(a,atan(a.center),1./(1+a.center.^2),ones(size(a.center)));
-            [lo,hi]=bounds(a);b=nrmmSet.intersectRange(b,atan(lo),atan(hi));
+            slope=nrmmSet.secantSlope(a,@atan,1./(1+a.center.^2));
+            critical=sqrt(max(0,1./slope-1));
+            b=nrmmSet.affineImage(a,@atan,slope,[critical(:),-critical(:)]);
+        end
+        function b=asin(a)
+            [lo,hi]=bounds(a);
+            if any(lo(:)<-1 | hi(:)>1),error('nrmmSet:singularDomain','An arcsine interval leaves [-1,1].');end
+            slope=nrmmSet.secantSlope(a,@asin,1./sqrt(max(realmin,1-a.center.^2)));
+            critical=sqrt(max(0,1-1./slope.^2));
+            b=nrmmSet.affineImage(a,@asin,slope,[critical(:),-critical(:)]);
         end
         function b=tanh(a)
-            t=tanh(a.center);b=nrmmSet.unary(a,t,1-t.^2,2*ones(size(a.center)));
-            b=nrmmSet.intersectRange(b,-ones(size(a.center)),ones(size(a.center)));
+            slope=nrmmSet.secantSlope(a,@tanh,1-tanh(a.center).^2);
+            critical=atanh(sqrt(min(1,max(0,1-slope))));
+            b=nrmmSet.affineImage(a,@tanh,slope,[critical(:),-critical(:)]);
         end
         function b=fialaFraction(a)
             % P(q)=3q-3|q|q+q^3 on [-1,1], sign(q) outside.
             % P is C1 and P' is globally 6-Lipschitz, including q=0 and
             % both saturation transitions. Taylor's integral bound applies
             % without assuming a nonexistent classical Hessian at q=0.
-            q=min(1,max(-1,a.center));value=3*q-3*abs(q).*q+q.^3;
-            slope=3*max(0,1-abs(a.center)).^2;
-            [lo,hi]=bounds(a);minimumMagnitude=min(abs(lo),abs(hi));
-            minimumMagnitude(lo<=0 & hi>=0)=0;
-            % On this complete interval, |P''| <= 6(1-min|q|)_+ a.e.
-            % A wholly saturated interval is exactly constant, with no
-            % artificial remainder or dependence on its slip variables.
-            second=6*max(0,1-minimumMagnitude);
-            b=nrmmSet.unary(a,value,slope,second);
-            lower=min(1,max(-1,lo));upper=min(1,max(-1,hi));
-            lower=3*lower-3*abs(lower).*lower+lower.^3;
-            upper=3*upper-3*abs(upper).*upper+upper.^3;
-            b=nrmmSet.intersectRange(b,lower,upper);
+            fun=@nrmmSet.fialaValue;
+            slope=nrmmSet.secantSlope(a,fun,3*max(0,1-abs(a.center)).^2);
+            critical=1-sqrt(max(0,slope)/3);count=numel(a.center);
+            % Extremizers of P(q)-slope*q are endpoints, joins, and the
+            % roots P'(q)=slope. This covers the complete interval exactly
+            % in real arithmetic, including both saturation transitions.
+            points=[critical(:),-critical(:),zeros(count,1),ones(count,1),-ones(count,1)];
+            b=nrmmSet.affineImage(a,fun,slope,points);
         end
         function b=sinc(a)
             % Unnormalized sinc = integral_0^1 cos(t*x) dt; |sinc''|<=1/3.
@@ -184,24 +270,17 @@ classdef nrmmSet
             % Callers must establish the nonnegative domain, e.g. a square
             % or max(0,a). A Taylor radius can extend outside that domain.
             lo=max(0,lo);hi=max(0,hi);
-            if any(lo(:)==0)
+            if any(bounds(a)<0,'all')
                 b=nrmmSet.range(sqrt(lo),sqrt(hi),size(a.generator,2));return;
             end
-            b=nrmmSet.unary(a,sqrt(a.center),.5./sqrt(a.center),.25./lo.^1.5);
-            b=nrmmSet.intersectRange(b,sqrt(lo),sqrt(hi));
+            slope=zeros(size(lo));active=hi>0;
+            slope(active)=1./(sqrt(lo(active))+sqrt(hi(active)));
+            critical=zeros(size(lo));critical(active)=1./(4*slope(active).^2);
+            b=nrmmSet.affineImage(a,@sqrt,slope,critical(:));
         end
         function b=abs(a)
-            b=a;
-            for k=1:numel(a.center)
-                v=part(a,k);[lo,hi]=bounds(v);
-                if lo>=0,continue;
-                elseif hi<=0,b=subsasgn(b,substruct('()',{k}),-v);
-                elseif v.center>=0
-                    v.center=v.center-lo;v.remainder=v.remainder-lo;b=subsasgn(b,substruct('()',{k}),v);
-                else
-                    v=-v;v.center=v.center+hi;v.remainder=v.remainder+hi;b=subsasgn(b,substruct('()',{k}),v);
-                end
-            end
+            slope=nrmmSet.secantSlope(a,@abs,sign(a.center));
+            b=nrmmSet.affineImage(a,@abs,slope,zeros(numel(a.center),1));
         end
         function c=max(a,b)
             [a,b]=nrmmSet.expand(a,b);[al,ah]=bounds(a);[bl,bh]=bounds(b);
@@ -227,6 +306,24 @@ classdef nrmmSet
         function c=horzcat(varargin),c=nrmmSet.concatenate(2,varargin{:});end
     end
     methods (Static)
+        function result=symbolPool(action,value)
+            % A hold-local pool gives each nonlinear residual ONE identity.
+            % Reusing a computed force then reuses that same signed column.
+            % Explicit noise/decision columns are reserved before entry.
+            persistent state
+            if isempty(state),state=struct('enabled',false,'next',0);end
+            switch action
+                case 'begin'
+                    result=state;state=struct('enabled',true,'next',value);
+                case 'pause'
+                    result=state;state.enabled=false;
+                case 'restore'
+                    result=state;state=value;
+                case 'allocate'
+                    result=[];
+                    if state.enabled,result=state.next+(1:value);state.next=state.next+value;end
+            end
+        end
         function a=convert(a)
             if ~isa(a,'nrmmSet'),a=nrmmSet(a);end
         end
@@ -238,6 +335,54 @@ classdef nrmmSet
         function b=unary(a,value,slope,second)
             r=abs(slope).*a.remainder+.5*second.*radius(a).^2;
             b=nrmmSet(value,slope(:).*a.generator,r);
+        end
+        function slope=secantSlope(a,fun,slope)
+            [lo,hi]=bounds(a);width=hi-lo;
+            use=width>sqrt(eps)*max(1,abs(a.center));
+            slope(use)=(fun(hi(use))-fun(lo(use)))./width(use);
+        end
+        function points=periodicCritical(a,phase,period)
+            % Across periods the residual differs by -slope*period, so its
+            % first and last stationary point of each phase suffice.
+            [lo,hi]=bounds(a);
+            points=[phase+period*ceil((lo(:)-phase)/period), ...
+                phase+period*floor((hi(:)-phase)/period)];
+        end
+        function value=fialaValue(q)
+            q=min(1,max(-1,q));value=3*q-3*abs(q).*q+q.^3;
+        end
+        function force=fialaForce(stress,capacity)
+            % The perspective -c*P(s/(3*c)) is affine in (s,c) except
+            % for the scalar residual P(q)-a*q. Cancel c analytically
+            % before enclosing that residual; evaluating c, 1/c and c
+            % separately loses their shared physical realization.
+            [stress,capacity]=nrmmSet.expand(stress,capacity);
+            [cl,ch]=bounds(capacity);
+            assert(all(cl>0,'all'),'nrmmSet:singularDomain', ...
+                'The perspective enclosure needs positive tire capacity.');
+            q=stress./(3*capacity);[lo,hi]=bounds(q);
+            slope=nrmmSet.secantSlope(q,@nrmmSet.fialaValue,3*max(0,1-abs(q.center)).^2);
+            critical=1-sqrt(max(0,slope)/3);count=numel(q.center);
+            points=[lo(:),hi(:),critical(:),-critical(:),zeros(count,1),ones(count,1),-ones(count,1)];
+            points=min(hi(:),max(lo(:),points));
+            residual=nrmmSet.fialaValue(points)-slope(:).*points;
+            low=min(residual,[],2);high=max(residual,[],2);
+            midpoint=reshape((low+high)/2,size(q.center));
+            error=ch.*reshape((high-low)/2,size(q.center));
+            force=-(slope/3).*stress-midpoint.*capacity ...
+                +nrmmSet.range(-error,error,size(q.generator,2));
+        end
+        function b=affineImage(a,fun,slope,critical)
+            % Bound f(x)-f(c)-slope*(x-c) at ALL of its analytic extrema.
+            % Callers supply every interior stationary point and branch join.
+            % Keep the signed affine dependence; only the residual is new.
+            [lo,hi]=bounds(a);points=[lo(:),hi(:),a.center(:),critical];
+            points=min(hi(:),max(lo(:),points));value=fun(a.center);
+            residual=fun(points)-value(:)-slope(:).*(points-a.center(:));
+            lower=min(residual,[],2);upper=max(residual,[],2);
+            shift=reshape((lower+upper)/2,size(value));
+            rest=reshape((upper-lower)/2,size(value));
+            b=nrmmSet(value+shift,slope(:).*a.generator,abs(slope).*a.remainder+rest);
         end
         function a=intersectRange(a,lo,hi)
             % Intersection can shrink an outer interval, but a changed

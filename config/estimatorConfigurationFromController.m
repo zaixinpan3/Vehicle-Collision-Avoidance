@@ -23,16 +23,22 @@ function estimator = estimatorConfigurationFromController(estimator, controller,
     observer = estimator.observer;
     observer.ego.yaw.rearAxleDistance = vehicle.lr;
     observer.ego.domain.speedMinimum = max(controller.model.speedMinimum,controller.model.scheduleSpeedFloor);
-    observer.ego.domain.speedMaximum = controller.model.speedMaximum;
+    % The observer bounds the velocity NORM; the vehicle constraint bounds
+    % its longitudinal component. Include the allowed lateral component.
+    lateralMaximum=min(controller.model.lateralVelocityMaximum, ...
+        tan(controller.model.sideslipMaximum)*controller.model.speedMaximum);
+    observer.ego.domain.speedMaximum = hypot(controller.model.speedMaximum,lateralMaximum);
     observer.ego.domain.yawRateMaximum = controller.model.yawRateMaximum;
-    observer.ego.domain.accelerationNormMaximum = (sum(friction) ...
-        +nonlinearBicycleModel.roadLoad(controller.model.speedMaximum,controller))/vehicle.m;
-    observer.ego.domain.yawAccelerationMaximum = [vehicle.lf,vehicle.lr]*friction/vehicle.Iz;
     observer.ego.yaw.sideslipDomainMaximum = controller.model.sideslipMaximum;
     uncertainty = 0.05;
     if isfield(observer.ego,"model") && isfield(observer.ego.model,"parameterUncertainty")
         uncertainty = observer.ego.model.parameterUncertainty;
     end
+    % These global fallback bounds cover the entire declared friction
+    % parameter family, including parameters above the nominal calibration.
+    observer.ego.domain.accelerationNormMaximum = ((1+uncertainty)*sum(friction) ...
+        +nonlinearBicycleModel.roadLoad(controller.model.speedMaximum,controller))/vehicle.m;
+    observer.ego.domain.yawAccelerationMaximum = (1+uncertainty)*[vehicle.lf,vehicle.lr]*friction/vehicle.Iz;
     observer.ego.model = struct("mass",vehicle.m,"lf",vehicle.lf,"lr",vehicle.lr, ...
         "gravity",vehicle.gravity,"corneringStiffness",tire.corneringStiffness(:), ...
         "frictionCoefficient",tire.frictionCoefficient(:),"parameterUncertainty",uncertainty);
@@ -42,4 +48,7 @@ function estimator = estimatorConfigurationFromController(estimator, controller,
         end
     end
     estimator.observer = observer;
+    % Initialization may bound position-secant acceleration bias using the
+    % same plant and known actuator history. This is not a velocity sensor.
+    estimator.initialization.vehicleModel = controller;
 end

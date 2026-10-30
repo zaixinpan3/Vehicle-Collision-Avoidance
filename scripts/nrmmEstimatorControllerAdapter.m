@@ -52,10 +52,15 @@ function [context, initialization] = localInitialize( ...
         [frame{sampleIdx}, audit{sampleIdx}] = localSensorFrame( ...
             cfg, stream, historyTime(sampleIdx), ...
             egoTruth{sampleIdx}, bodyAcceleration, targetTruth);
+        if isfield(initialEgoTruth,'heldActuatorInput')
+            % The synthetic prehistory uses this same known held command.
+            frame{sampleIdx}.heldSteeringAngle=initialEgoTruth.heldActuatorInput(1);
+            frame{sampleIdx}.heldBrakingRatio=initialEgoTruth.heldActuatorInput(2);
+        end
     end
 
     observerDesign = synthesizeNrmmObserverGains(cfg.observer);
-    egoInitial = localInitialEgoEstimate(frame, observerDesign, cfg.observer);
+    egoInitial = localInitialEgoEstimate(frame, observerDesign, cfg);
     [targetInitialState, targetAcquired, targetAcquisition] = ...
         localInitialTargetEstimate( ...
             historyTime, frame, egoInitial.position, ...
@@ -77,10 +82,15 @@ function [context, initialization] = localInitialize( ...
             record = struct("time",measurement.time, ...
                 "gnssPosition",[measurement.xGps;measurement.yGps], ...
                 "gnssVelocity",egoInitial.inertialVelocity, ...
-                "velocityErrorMaximum",observerDesign.operatingDomain.egoSpeedMaximum+norm(egoInitial.inertialVelocity), ...
+                "velocityErrorMaximum",egoInitial.historyVelocityRadius(sampleIdx), ...
                 "yawRate",measurement.yawRateMeasured, ...
                 "radarRelativePosition",measurement.radarRelativePosition, ...
                 "radarDetectionAvailable",true);
+            if isfield(measurement,'heldSteeringAngle')
+                record.heldInput=[measurement.heldSteeringAngle;measurement.heldBrakingRatio];
+                record.bodyAcceleration=[measurement.longitudinalAcceleration;measurement.lateralAcceleration];
+            end
+            record.yawAccelerationMaximum=egoInitial.historyEvidence.yawAccelerationMaximum(sampleIdx);
             history = [history;record]; %#ok<AGROW>
         end
         options.targetMeasurementHistory = history;
@@ -131,6 +141,8 @@ function [context, initialization] = localInitialize( ...
         "egoInitialPosition", egoInitial.position, ...
         "egoInitialYaw", egoInitial.yaw, ...
         "egoInitialBodyVelocity", egoInitial.bodyVelocity, ...
+        "inertialVelocityRadius",egoInitial.inertialVelocityRadius, ...
+        "velocityInitializationEvidence",egoInitial.historyEvidence, ...
         "targetInitialState", targetInitialState, ...
         "targetInitiallyAcquired", targetAcquired, ...
         "targetAcquisition", targetAcquisition, ...
@@ -387,7 +399,7 @@ function egoInitial = localInitialEgoEstimate(frame, observerDesign, cfg)
     duration=latestFrame.time-firstFrame.time;
     inertialVelocity=(position-[firstFrame.xGps;firstFrame.yGps])/duration;
     radius=2*observerDesign.sensors.positionNoiseMaximum/duration ...
-        +cfg.ego.domain.accelerationNormMaximum*duration/2;
+        +cfg.observer.ego.domain.accelerationNormMaximum*duration/2;
     radius=min(radius,observerDesign.operatingDomain.egoSpeedMaximum+norm(inertialVelocity));
     % Intersect the implications of every past displacement without changing
     % the point estimate. A short interval has more position-noise error; a
@@ -396,9 +408,29 @@ function egoInitial = localInitialEgoEstimate(frame, observerDesign, cfg)
         duration=latestFrame.time-frame{index}.time;
         secant=(position-[frame{index}.xGps;frame{index}.yGps])/duration;
         candidate=norm(secant-inertialVelocity)+2*observerDesign.sensors.positionNoiseMaximum/duration ...
-            +cfg.ego.domain.accelerationNormMaximum*duration/2;
+            +cfg.observer.ego.domain.accelerationNormMaximum*duration/2;
         radius=min(radius,candidate);
     end
+    time=cellfun(@(sample)sample.time,frame);time=time(:);
+    accelerationEnvelope=repmat(cfg.observer.ego.domain.accelerationNormMaximum,numel(time)-1,1);
+    for refinement=1:3
+        [accelerationEnvelope,historyEvidence]=localHistoryAcceleration( ...
+            frame,observerDesign,cfg,inertialVelocity,radius,accelerationEnvelope);
+        previousRadius=radius;
+        for index=1:numel(frame)-1
+            duration=time(end)-time(index);
+            secant=(position-[frame{index}.xGps;frame{index}.yGps])/duration;
+            offset=time(index:end)-time(index);
+            weights=diff(offset.^2)/(2*duration);
+            bias=accelerationEnvelope(index:end)'*weights;
+            candidate=norm(secant-inertialVelocity)+2*observerDesign.sensors.positionNoiseMaximum/duration+bias;
+            radius=min(radius,candidate);
+        end
+        if previousRadius-radius<.01*max(radius,eps),break;end
+    end
+    pastDrift=flipud(cumsum(flipud(accelerationEnvelope.*diff(time))));
+    historyVelocityRadius=min(radius+[pastDrift;0], ...
+        observerDesign.operatingDomain.egoSpeedMaximum+norm(inertialVelocity));
     course=nrmmEgoCourseGeometry("kinematicCourse",inertialVelocity, ...
         latestFrame.yawRateMeasured,observerDesign.yaw.courseModel.rearAxleDistance, ...
         radius,observerDesign.sensors.gyroscopeNoiseMaximum, ...
@@ -408,7 +440,64 @@ function egoInitial = localInitialEgoEstimate(frame, observerDesign, cfg)
     bodyVelocity=nrmmObserverVectorField("velocityMeasurement", ...
         inertialVelocity,latestFrame.yawRateMeasured,observerDesign);
     egoInitial=struct("position",position,"yaw",yaw,"bodyVelocity",bodyVelocity, ...
-        "inertialVelocity",inertialVelocity,"inertialVelocityRadius",radius);
+        "inertialVelocity",inertialVelocity,"inertialVelocityRadius",radius, ...
+        "historyVelocityRadius",historyVelocityRadius,"historyEvidence",historyEvidence);
+end
+
+function [envelope,evidence]=localHistoryAcceleration(frame,design,cfg,velocity,radius,priorEnvelope)
+    count=numel(frame)-1;maximum=cfg.observer.ego.domain.accelerationNormMaximum;
+    envelope=repmat(maximum,count,1);accepted=false(count,1);
+    yawMaximum=repmat(cfg.observer.ego.domain.yawAccelerationMaximum,count+1,1);
+    evidence=struct('method',"physicalAccelerationDomain",'acceptedHolds',0,'totalHolds',count, ...
+        'yawAccelerationMaximum',yawMaximum);
+    if ~isfield(cfg.initialization,'vehicleModel') || ~isfield(design,'egoModel'),return;end
+    vehicle=cfg.initialization.vehicleModel;model=design.egoModel;
+    parameters=nrmmSet(zeros(4,1),model.parameterUncertainty*eye(4));
+    beta=design.yaw.courseModel.sideslipDomainMaximum;
+    time=cellfun(@(sample)sample.time,frame);time=time(:);duration=time(end)-time(1);
+    leftWeights=diff((time-time(1)).^2)/(2*duration);
+    rightWeights=-diff((time(end)-time).^2)/(2*duration);
+    intervalDrift=priorEnvelope.*diff(time);
+    for index=1:count
+        sample=frame{index};
+        if ~isfield(sample,'heldSteeringAngle'),continue;end
+        dt=frame{index+1}.time-sample.time;
+        sensor=design.sensors;
+        % The same complete displacement also encloses velocities inside
+        % its time interval. This is tighter than propagating an endpoint
+        % estimate backwards with the global maximum acceleration.
+        averageBias=priorEnvelope(1:index-1)'*leftWeights(1:index-1) ...
+            +priorEnvelope(index:end)'*rightWeights(index:end);
+        sensor.velocityNoiseMaximum=min(radius+sum(intervalDrift(index:end)), ...
+            2*sensor.positionNoiseMaximum/duration+averageBias);
+        input=[sample.heldSteeringAngle;sample.heldBrakingRatio];
+        acceleration=[sample.longitudinalAcceleration;sample.lateralAcceleration];
+        speedLower=max(0,norm(velocity)-sensor.velocityNoiseMaximum);
+        speedUpper=min(design.operatingDomain.egoSpeedMaximum,norm(velocity)+sensor.velocityNoiseMaximum);
+        edges=linspace(speedLower,speedUpper,max(2,1+ceil((speedUpper-speedLower)/.5)));
+        largest=0;largestYaw=0;complete=true;
+        for cellIndex=1:numel(edges)-1
+            interval=edges(cellIndex:cellIndex+1);cellSpeed=mean(interval);
+            sensor.velocityNoiseMaximum=diff(interval)/2;
+            lateral=nrmmEgoCourseGeometry('lateralVelocity',[cellSpeed;0],sample.yawRateMeasured, ...
+                acceleration,input,model,sensor,beta);
+            % Only a proven empty measurement intersection excludes a cell.
+            if ~lateral.consistent,continue;end
+            lower=[zeros(3,1);interval(1)*cos(beta);lateral.lower;sample.yawRateMeasured-sensor.gyroscopeNoiseMaximum];
+            upper=[zeros(3,1);interval(2);lateral.upper;sample.yawRateMeasured+sensor.gyroscopeNoiseMaximum];
+            image=nrmmJointEnclosure('accelerationHold',nrmmSet.range(lower,upper),nrmmSet(input),parameters,vehicle,dt);
+            if ~image.valid,complete=false;break;end
+            largest=max(largest,image.normMaximum);
+            largestYaw=max(largestYaw,image.yawAccelerationMaximum);
+        end
+        if complete && largest>0
+            envelope(index)=min(priorEnvelope(index),largest);accepted(index)=true;
+            yawMaximum(index)=min(yawMaximum(index),largestYaw);
+        end
+    end
+    evidence=struct('method',"knownHoldPicardAccelerationEnvelope",'acceptedHolds',sum(accepted), ...
+        'totalHolds',count,'accelerationNormMaximum',envelope,'yawAccelerationMaximum',yawMaximum, ...
+        'realArithmeticEnclosure',true);
 end
 
 function [targetState, acquired, acquisition] = ...

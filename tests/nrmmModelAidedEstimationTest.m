@@ -68,10 +68,13 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
             controller=collisionAvoidanceControllerConfig();
             estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),controller);
             domain=estimator.observer.ego.domain;tire=modifiedFialaTire.parameters(controller);
-            testCase.verifyEqual(domain.speedMaximum,controller.model.speedMaximum);
+            lateralMaximum=min(controller.model.lateralVelocityMaximum, ...
+                tan(controller.model.sideslipMaximum)*controller.model.speedMaximum);
+            testCase.verifyEqual(domain.speedMaximum,hypot(controller.model.speedMaximum,lateralMaximum));
             testCase.verifyEqual(domain.yawRateMaximum,controller.model.yawRateMaximum);
             testCase.verifyEqual(domain.yawAccelerationMaximum, ...
-                [controller.vehicle.lf,controller.vehicle.lr]*tire.longitudinalForceScale/controller.vehicle.Iz,RelTol=1e-12);
+                (1+estimator.observer.ego.model.parameterUncertainty) ...
+                *[controller.vehicle.lf,controller.vehicle.lr]*tire.longitudinalForceScale/controller.vehicle.Iz,RelTol=1e-12);
             testCase.verifyGreaterThan(domain.accelerationNormMaximum,min(tire.frictionCoefficient)*controller.vehicle.gravity);
             testCase.verifyEqual(estimator.observer.ego.yaw.sideslipDomainMaximum,controller.model.sideslipMaximum);
             testCase.verifyEqual(estimator.observer.ego.yaw.rearAxleDistance,controller.vehicle.lr);

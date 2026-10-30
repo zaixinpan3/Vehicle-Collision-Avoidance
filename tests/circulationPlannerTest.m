@@ -11,6 +11,19 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aRetainedInitializerDoesNotAssumeFutureTargetMeasurements(testCase)
+            model=localModel("headOn",8);model.target(1:6)=[-30;10;pi;8;0;0];
+            model.uncertainty.target=struct('positionRadius',.04,'courseRadius',.02, ...
+                'speedRadius',.2,'accelerationRadius',.2,'curvatureRadius',.002,'sideslipRadius',.01);
+            point=predictiveSafetyGeometry.avoidanceGuide(model,20);
+            model.uncertainty.jointPrediction=struct();
+            retained=predictiveSafetyGeometry.avoidanceGuide(model,20);
+            % The nonthreatening reference stays the same. Its uncertainty
+            % diagnostics must nevertheless include the full elapsed time.
+            testCase.verifyEqual(retained.states,point.states,AbsTol=1e-10);
+            testCase.verifyLessThan(retained.gaps(end),point.gaps(end));
+            testCase.verifyEqual(retained.nominalGaps,point.nominalGaps,AbsTol=1e-10);
+        end
         function aSafeSeedFollowsTheChosenRoute(testCase)
             model=localModel("headOn",8);
             model.target(1:6)=[-30;0;0;2;0;0];

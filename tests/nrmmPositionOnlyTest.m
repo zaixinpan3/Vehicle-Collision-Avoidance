@@ -8,6 +8,13 @@ classdef nrmmPositionOnlyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function knownActuatorAndImuHistoryTightenPositionOnlyInitialization(testCase)
+            [initialization,error,prior]=localHistoryFixture();
+            testCase.verifyLessThanOrEqual(error,initialization.inertialVelocityRadius);
+            testCase.verifyLessThan(initialization.inertialVelocityRadius,.5*prior);
+            testCase.verifyEqual(initialization.velocityInitializationEvidence.acceptedHolds, ...
+                initialization.velocityInitializationEvidence.totalHolds);
+        end
         function runtimeAcceptsPositionOnlyAndIgnoresFictitiousVelocityChannels(testCase)
             [runtime,frame]=localFixture();
             first=onlineNrmmTrackingRuntime('sample',runtime,frame);
@@ -72,6 +79,19 @@ classdef nrmmPositionOnlyTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(sum(abs(wide.generator(2,:))),sum(abs(narrow.generator(2,:))));
         end
     end
+end
+
+function [initialization,error,prior]=localHistoryFixture()
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
+    setup=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
+    trim=nonlinearBicycleModel.cruise(cfg,0);
+    ego=struct('position',[0;0],'yaw',0,'longitudinalVelocity',8,'lateralVelocity',0, ...
+        'yawRate',0,'heldActuatorInput',trim.input);
+    target=@(time,unused)struct('targetPositionInertial',[100;0]);
+    [context,initialization]=nrmmEstimatorControllerAdapter('initialize',setup,ego,target);
+    error=norm(context.runtime.positionVelocity.point(3:4)-[8;0]);
+    prior=2*setup.sensor.gnss.positionNoiseMaximum/setup.initialization.historyDuration ...
+        +setup.observer.ego.domain.accelerationNormMaximum*setup.initialization.historyDuration/2;
 end
 
 function [runtime,frame]=localFixture()
