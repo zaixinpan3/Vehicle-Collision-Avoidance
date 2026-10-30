@@ -1220,6 +1220,20 @@ intersected; no sampled velocity, heading prior, or reduced noise budget is
 introduced. The controller receives the resulting scalar interval together
 with the unchanged NRMM point estimate.
 
+The published family also retains these bounded sensor records. At the same
+measurement time, the controller may intersect their current ego-heading arc
+with the heading projection of its joint posterior. The past radar vectors
+are then transported again using the same gyro increments and their original
+noise and integration bounds. This is a second implication of existing data,
+not an additional independent measurement: the true heading belongs to both
+arcs, and the resulting displacement enclosure still contains the true chord.
+Only the resulting speed interval is intersected with the previously published
+target family. The target's own heading can remain completely unobservable.
+A current heading is never assigned to a stale history endpoint. Circular
+intersections that might have two components use a containing original arc,
+rather than retaining just one component. Neither the sensor noise nor the
+persistent tire-parameter uncertainty is reduced by this operation.
+
 The adapter initializes position/velocity from the detection history and, for
 long enough windows, estimates an initial acceleration by least squares in a
 GNSS-course frame. Acquisition thresholds and fit significance rules are
