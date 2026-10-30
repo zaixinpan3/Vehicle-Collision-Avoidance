@@ -12,6 +12,23 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function projectedSupportsCoverCoupledPositionAndYaw(testCase)
+            ego=nrmmSet([0;2;.4],[.1,.02;.05,.2;.25,.05]);
+            target=nrmmSet([3;0;-.2],[.2,-.03;.05,.05;-.1,.2]);
+            shape=[2.4;.95;.3;-.1];normal=[-.6;.8];
+            gap=predictiveSafetyGeometry.setSeparation(ego,shape,target,shape,normal);
+            vertices=shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1];
+            for a=linspace(-1,1,5)
+                for b=linspace(-1,1,5)
+                    e=ego.center+ego.generator*[a;b];
+                    t=target.center+target.generator*[b;-a];
+                    re=[cos(e(3)),-sin(e(3));sin(e(3)),cos(e(3))];
+                    rt=[cos(t(3)),-sin(t(3));sin(t(3)),cos(t(3))];
+                    actual=min(normal.'*(e(1:2)+re*vertices))-max(normal.'*(t(1:2)+rt*vertices));
+                    testCase.verifyLessThanOrEqual(gap,actual+1e-12);
+                end
+            end
+        end
         function aCompleteTargetCoverCanSeparateWithoutOneCommonHalfspace(testCase)
             [coarse,covered]=localCurvedTargetCover(false);
             testCase.verifyLessThan(coarse,0);
@@ -284,6 +301,20 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(radius(result.set(6)),f.contract.noiseRadius(7),AbsTol=1e-12);
             testCase.verifyEqual(result.diagnostics.parameterRadius,f.contract.parameterRadius,AbsTol=0);
             testCase.verifyEqual(result.diagnostics.noiseRadius,f.contract.noiseRadius,AbsTol=0);
+        end
+        function aBroadPublicationDoesNotUndoTheProposalsMeasurementConditioning(testCase)
+            f=testCase.fixture;lane=[-100,0;1000,0];
+            target=localObservedTarget(f.output,f.cfg);
+            [command,~,~,memory]=collisionAvoidanceController(f.output,target,lane,f.cfg,[]);
+            [~,~,output]=localAdvance(f.runtime,f.x,f.u,command.actuatorInput,f.cfg,0);
+            output.controllerErrorBound.generator=[output.controllerErrorBound.generator,[0;0;0;0;4;0]];
+            output.controllerErrorBound.bounds=sum(abs(output.controllerErrorBound.generator),2);
+            target=localObservedTarget(output,f.cfg);
+            [~,~,next]=collisionAvoidanceController(output,target,lane,f.cfg,memory);
+            testCase.verifyTrue(next.metadata.search.nominalProposal.available);
+            testCase.verifyTrue(next.metadata.retainedCertificateValid);
+            testCase.verifyTrue(next.metadata.zeroSlack);
+            testCase.verifyLessThan(next.metadata.search.nominalProposal.initialPhysicalRadius(5),.1);
         end
         function currentMeasurementContractionContainsAllowedMismatchAndNoise(testCase)
             excess=localContractionSamples(testCase.fixture);

@@ -1541,7 +1541,7 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
                 if isfield(certificate,'feedbackScale'),feedbackScale=certificate.feedbackScale;end
                 % Try to retain a full driving horizon. If this extension cannot be
                 % certified, the old terminal continuation remains the valid tail.
-                [optimized,search.nominalProposal]=localRetainedProposal(model,previous,[]);
+                [optimized,search.nominalProposal]=localRetainedProposal(model,previous,[],search.posterior.proposedOuter);
                 fractions=0;
                 if ~isempty(optimized),fractions=[1,.5,0];end
                 failures=strings(1,numel(fractions));
@@ -1565,11 +1565,19 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
             end
         end
     else
+        if isfield(model,'initialJointSet')
+            root=model.initialJointSet;
+            search.initialMeasurementConditioning=struct('source',"conditionedCruiseInformation");
+        else
+            root=nrmmJointPrediction('rootSet',model.initialState,model.uncertainty.egoGenerator,contract);
+            conditioned=nrmmJointPrediction('conditionMeasurements',root,contract,cfg);
+            root=conditioned.set;search.initialMeasurementConditioning=conditioned.diagnostics;
+        end
         optimized=[];
         if nargin<4 || isempty(seed)
             [seed,~]=localRtiInitialize(model,previous,cfg.controller.horizonSteps,[]);
             search.planner=seed.planner;
-            [optimized,search.nominalProposal]=localRetainedProposal(model,previous,seed);
+            [optimized,search.nominalProposal]=localRetainedProposal(model,previous,seed,root);
         end
         inputCandidates={seed.inputs};
         if ~isempty(optimized)
@@ -1584,14 +1592,6 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
         scales=2.^-(0:5);feedbackScales=repelem(scales,numel(inputCandidates));
         inputCandidates=repmat(inputCandidates,1,numel(scales));
         nominalCandidates=repmat(nominalCandidates,1,numel(scales));
-        if isfield(model,'initialJointSet')
-            root=model.initialJointSet;
-            search.initialMeasurementConditioning=struct('source',"conditionedCruiseInformation");
-        else
-            root=nrmmJointPrediction('rootSet',model.initialState,model.uncertainty.egoGenerator,contract);
-            conditioned=nrmmJointPrediction('conditionMeasurements',root,contract,cfg);
-            root=conditioned.set;search.initialMeasurementConditioning=conditioned.diagnostics;
-        end
         base=struct('valid',false,'absoluteIndex',model.sampleIndex,'epochSeconds',0, ...
             'target',model.target,'targetError',localAbsoluteTargetError(model),'contract',contract, ...
             'horizonSteps',0,'normals',zeros(2,0),'posterior',[],'terminalElapsed',0, ...
@@ -1810,7 +1810,7 @@ function candidate=localRetainedRenewal(root,saved,optimized,fraction,base,model
     [candidate,~]=localRetainedAssess(tube,policies,base,model,checked,true);
 end
 
-function [inputs,diagnostics]=localRetainedProposal(model,previous,seed)
+function [inputs,diagnostics]=localRetainedProposal(model,previous,seed,root)
     % Optimize a nominal candidate before requiring whole-set admission.
     % The safety certificate is never inferred from this point subproblem.
     % The planner is reused only on the first call; later RTI proposals use
@@ -1818,6 +1818,21 @@ function [inputs,diagnostics]=localRetainedProposal(model,previous,seed)
     inputs=[];diagnostics=struct('available',false,'accepted',false,'solverCalls',0,'linearizationCount',0,'failure',"noWarmStart");
     if isempty(seed) && ~localHasWarmStart(previous),return;end
     candidate=model;candidate.cfg.controller.retainedTube=false;
+    % The proposal and its admission must start with the SAME measured
+    % information. Reintroducing the standalone observer box here can make
+    % the auxiliary QP infeasible after the joint measurement intersection
+    % has already excluded its extreme lateral velocities. The bias column
+    % encloses the conditioned set about the unchanged observer estimate.
+    physical=root(1:6);
+    bias=physical.center-model.initialState;bias(3)=atan2(sin(bias(3)),cos(bias(3)));
+    generator=[physical.generator,diag(physical.remainder),bias];
+    candidate.uncertainty.egoGenerator=generator;
+    candidate.uncertainty.collisionGenerator=generator;
+    if candidate.uncertainty.relativeFrame,candidate.uncertainty.collisionGenerator(1:3,:)=0;end
+    if isfield(candidate.uncertainty,'velocityGeometry')
+        candidate.uncertainty=rmfield(candidate.uncertainty,'velocityGeometry');
+    end
+    diagnostics.initialPhysicalRadius=sum(abs(generator),2);
     % A proposal must react to the same persistent target family that its
     % nonlinear admission will check. The legacy per-hold reset assumes
     % future target observations and can propose dangerously late passing.
@@ -1827,6 +1842,7 @@ function [inputs,diagnostics]=localRetainedProposal(model,previous,seed)
         [solution,search]=solvePredictiveControl(candidate,previous,tic);
         diagnostics.solverCalls=search.solverCalls;
         diagnostics.linearizationCount=search.linearizationCount;
+        if isfield(search,'stages'),diagnostics.stages=search.stages;end
         if isempty(solution),diagnostics.failure=search.terminationReason;return;end
         inputs=solution.inputs;diagnostics.available=true;diagnostics.failure="";
     catch exception

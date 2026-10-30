@@ -13,6 +13,19 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function deterministicMatrixMapsPreserveSharedUncertainty(testCase)
+            center=[1,2;3,4];generator=[.2,.1;-.1,.3;.4,-.2;.1,.5];
+            x=nrmmSet(center,generator);left=[2,-1;-.5,3];right=[1,-2;3,.5];
+            image=left*x*right/(-2);
+            for first=linspace(-1,1,5)
+                for second=linspace(-1,1,5)
+                    primitive=[first;second];value=center+reshape(generator*primitive,2,2);
+                    reconstructed=image.center+reshape(image.generator*primitive,2,2);
+                    testCase.verifyEqual(reconstructed,left*value*right/(-2),AbsTol=1e-12);
+                end
+            end
+            testCase.verifyEqual(image.remainder,zeros(2),AbsTol=0);
+        end
         function analyticUnaryImagesRetainTheSharedPrimitive(testCase,scalarMap)
             excess=localUnaryDependenceExcess(scalarMap);
             testCase.verifyLessThanOrEqual(excess,2e-12);

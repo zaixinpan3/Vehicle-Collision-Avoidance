@@ -137,6 +137,11 @@ classdef nrmmSet
             a.center=-a.center;a.generator=-a.generator;
         end
         function c=times(a,b)
+            if ~isa(a,'nrmmSet') && isscalar(a) && isa(b,'nrmmSet')
+                c=nrmmSet(a*b.center,a*b.generator,abs(a)*b.remainder);return;
+            elseif ~isa(b,'nrmmSet') && isscalar(b) && isa(a,'nrmmSet')
+                c=nrmmSet(b*a.center,b*a.generator,abs(b)*a.remainder);return;
+            end
             [a,b]=nrmmSet.expand(a,b);
             g=b.center(:).*a.generator+a.center(:).*b.generator;
             shift=zeros(size(a.center));
@@ -155,6 +160,18 @@ classdef nrmmSet
             c=nrmmSet(a.center.*b.center+shift,g,max(0,r));
         end
         function c=mtimes(a,b)
+            % A deterministic linear map acts directly on the shared
+            % columns. Expanding it into scalar affine products adds no
+            % information and needlessly rebuilds thousands of constants.
+            if ~isa(a,'nrmmSet') && isa(b,'nrmmSet') && ~isscalar(b.center)
+                if isscalar(a),c=times(a,b);return;end
+                map=kron(eye(size(b.center,2)),a);
+                c=nrmmSet(a*b.center,map*b.generator,abs(a)*b.remainder);return;
+            elseif isa(a,'nrmmSet') && ~isa(b,'nrmmSet') && ~isscalar(a.center)
+                if isscalar(b),c=times(a,b);return;end
+                map=kron(b.',eye(size(a.center,1)));
+                c=nrmmSet(a.center*b,map*a.generator,a.remainder*abs(b));return;
+            end
             a=nrmmSet.convert(a);b=nrmmSet.convert(b);
             if isscalar(a.center)||isscalar(b.center),c=times(a,b);return;end
             assert(size(a.center,2)==size(b.center,1));
@@ -168,6 +185,10 @@ classdef nrmmSet
             end
         end
         function c=rdivide(a,b)
+            if isa(a,'nrmmSet') && ~isa(b,'nrmmSet') && isscalar(b)
+                if b==0,error('nrmmSet:singularDomain','A reciprocal interval contains zero.');end
+                c=nrmmSet(a.center/b,a.generator/b,a.remainder/abs(b));return;
+            end
             [a,b]=nrmmSet.expand(a,b);[lo,hi]=bounds(b);
             if any(lo(:)<=0 & hi(:)>=0)
                 error('nrmmSet:singularDomain','A reciprocal interval contains zero.');
@@ -184,6 +205,7 @@ classdef nrmmSet
             if any(use,'all'),c=subsasgn(c,substruct('()',{use}),part(centered,use));end
         end
         function c=mrdivide(a,b)
+            if ~isa(b,'nrmmSet'),assert(isscalar(b));c=rdivide(a,b);return;end
             b=nrmmSet.convert(b);assert(isscalar(b.center));c=rdivide(a,b);
         end
         function c=power(a,k)

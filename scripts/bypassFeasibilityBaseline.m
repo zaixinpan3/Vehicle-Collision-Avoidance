@@ -28,7 +28,7 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
         'robustFeasibilityClaimed',false,'halfWidthMeters',options.HalfWidthMeters, ...
         'minimumClearanceMeters',NaN,'minimumEgoRoadMarginMeters',NaN, ...
         'minimumTargetRoadMarginMeters',NaN,'maximumLateralDeviationMeters',NaN, ...
-        'encounterExitSeconds',NaN,'recoverySeconds',NaN,'attempts',0, ...
+        'encounterEntrySeconds',NaN,'encounterExitSeconds',NaN,'recoverySeconds',NaN,'attempts',0, ...
         'initialState',initialState,'targetInitialState',target,'inputs',zeros(2,0), ...
         'states',zeros(6,0),'times',zeros(1,0),'offsetMeters',NaN,'riseSeconds',NaN);
     if scenarioRoadFootprintMargin(target(1:3),target(8:11),auditRoad,options.HalfWidthMeters)<0
@@ -39,9 +39,6 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
     end
     if predictiveSafetyGeometry.rectangle(initialState(1:3),shape,target(1:3),target(8:11))<=0
         baseline.reason="initialCollision";return;
-    end
-    if norm(initialState(1:2)-target(1:2))>cfg.collision.encounterRangeMeters
-        baseline.reason="targetInitiallyOutsidePerception";return;
     end
     reference=nonlinearBicycleModel.cruise(cfg,curve.curvature);
     % A fixed offline family supplies existence evidence, not an online
@@ -68,12 +65,12 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
     h=cfg.controller.sampleTime;
     % Explicit finite witness-search coverage, not a controller horizon or
     % an assumption that an unresolved encounter becomes safe at this time.
-    duration=2*cfg.collision.encounterRangeMeters/max(cfg.referenceSpeed,1)+4*rise+8;
+    duration=2*max(cfg.collision.encounterRangeMeters,norm(x(1:2)-target(1:2)))/max(cfg.referenceSpeed,1)+4*rise+8;
     count=ceil(duration/h);replay=~isempty(replayInputs);
     if replay,count=size(replayInputs,2);end
     inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=x;
     q=predictiveSafetyGeometry.predictTarget(target,(0:count)*h);
-    previous=zeros(2,1);exitTime=NaN;minimum=Inf;egoMargin=Inf;targetMargin=Inf;maximum=0;
+    previous=zeros(2,1);entryTime=NaN;exitTime=NaN;minimum=Inf;egoMargin=Inf;targetMargin=Inf;maximum=0;
     qualified=false;reason="searchCoverageExhausted";
     [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,false);
     for node=1:count+1
@@ -88,7 +85,9 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
             gap=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3,node),q(8:11,node));
             minimum=min(minimum,gap);
             if gap<=0,reason="collision";break;end
-            if norm(x(1:2)-q(1:2,node))>cfg.collision.encounterRangeMeters,exitTime=time;end
+            inside=norm(x(1:2)-q(1:2,node))<=cfg.collision.encounterRangeMeters;
+            if inside && isnan(entryTime),entryTime=time;end
+            if ~inside && ~isnan(entryTime),exitTime=time;end
         end
         heading=atan2(sin(x(3)-projection.heading-reference.state(3)),cos(x(3)-projection.heading-reference.state(3)));
         recovered=~isnan(exitTime) && time>exitTime+rise && abs(projection.lateralPosition)<.1 ...
@@ -99,7 +98,11 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
         if replay
             u=replayInputs(:,node);
         else
-            [b,db,ddb]=localShape(time/rise);
+            % Before first perception entry the witness only follows the
+            % route. Initial absence is not an encounter exit, and cannot
+            % authorize an anticipatory bypass or a false recovery result.
+            if isnan(entryTime),b=0;db=0;ddb=0;
+            else,[b,db,ddb]=localShape((time-entryTime)/rise);end
             if ~isnan(exitTime)
                 [s,ds,dds]=localShape((time-exitTime)/rise);b=1-s;db=-ds;ddb=-dds;
             end
@@ -127,7 +130,7 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
     end
     result=struct('qualified',qualified,'reason',reason,'minimumClearanceMeters',minimum, ...
         'minimumEgoRoadMarginMeters',egoMargin,'minimumTargetRoadMarginMeters',targetMargin, ...
-        'maximumLateralDeviationMeters',maximum,'encounterExitSeconds',exitTime, ...
+        'maximumLateralDeviationMeters',maximum,'encounterEntrySeconds',entryTime,'encounterExitSeconds',exitTime, ...
         'recoverySeconds',(node-1)*h,'inputs',inputs(:,1:node-1), ...
         'states',states(:,1:node),'times',(0:node-1)*h);
 end

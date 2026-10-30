@@ -94,15 +94,24 @@ classdef predictiveSafetyGeometry
             arc=predictiveSafetyGeometry.targetArcInterval(target,errorSet,time);
             arcs=linspace(arc(1),arc(2),parts+1);
             curves=linspace(errorSet.curvatureInterval(1),errorSet.curvatureInterval(2),parts+1);
-            gap=Inf;
-            for i=1:parts
-                family=errorSet;family.curvatureInterval=curves(i:i+1).';
-                family.curvatureRadius=diff(curves(i:i+1))/2;
-                for j=1:parts
-                    pose=predictiveSafetyGeometry.targetArcSet(target,family,arcs(j:j+1));
-                    lower=predictiveSafetyGeometry.setSeparation(ego,shape,pose,target(8:11));
-                    gap=min(gap,lower);
+            gap=Inf;queue=[1,parts+1,1,parts+1,-Inf];
+            while ~isempty(queue)
+                cell=queue(end,:);queue(end,:)=[];
+                family=errorSet;family.curvatureInterval=curves(cell(1:2)).';
+                family.curvatureRadius=diff(family.curvatureInterval)/2;
+                pose=predictiveSafetyGeometry.targetArcSet(target,family,arcs(cell(3:4)));
+                lower=max(cell(5),predictiveSafetyGeometry.setSeparation(ego,shape,pose,target(8:11)));
+                width=[cell(2)-cell(1),cell(4)-cell(3)];
+                if lower>=0 || lower>=gap || all(width==1)
+                    % A whole parent cell is still in the cover. A valid
+                    % positive support needs no finer split, and a cell
+                    % above an already retained lower gap cannot lower it.
+                    gap=min(gap,lower);continue;
                 end
+                [~,axis]=max(width);indices=2*axis+[-1,0];middle=floor(mean(cell(indices)));
+                first=cell;second=cell;first(indices(2))=middle;second(indices(1))=middle;
+                first(5)=lower;second(5)=lower;
+                queue=[queue;second;first]; %#ok<AGROW>
             end
         end
 
@@ -113,16 +122,20 @@ classdef predictiveSafetyGeometry
                 normal=point.normal;
             end
             assert(abs(norm(normal)-1)<1e-8,'predictiveSafetyGeometry:invalidNormal','A unit normal is required.');
-            normal=normal(:);minimum=Inf;maximum=-Inf;
-            rE=[cos(ego(3)),-sin(ego(3));sin(ego(3)),cos(ego(3))];
-            rT=[cos(target(3)),-sin(target(3));sin(target(3)),cos(target(3))];
+            normal=normal(:);angle=atan2(normal(2),normal(1));
             signs=[-1,1,1,-1;-1,-1,1,1];
-            for j=1:4
-                [lo,~]=bounds(normal.'*(ego(1:2)+rE*(shapeE(3:4)+shapeE(1:2).*signs(:,j))));
-                [~,hi]=bounds(normal.'*(target(1:2)+rT*(shapeT(3:4)+shapeT(1:2).*signs(:,j))));
-                minimum=min(minimum,lo);maximum=max(maximum,hi);
-            end
-            gap=minimum-maximum;
+            vertices=shapeE(3:4)+shapeE(1:2).*signs;
+            % Project each rotated vertex BEFORE enclosing its angle. One
+            % cosine retains the shared yaw/position dependence and avoids
+            % separately bounding two components of the same rotation.
+            offsets=atan2(vertices(2,:),vertices(1,:)).'-angle;
+            values=normal.'*ego(1:2)+vecnorm(vertices).'.*cos(ego(3)+offsets);
+            [lo,~]=bounds(values);
+            vertices=shapeT(3:4)+shapeT(1:2).*signs;
+            offsets=atan2(vertices(2,:),vertices(1,:)).'-angle;
+            values=normal.'*target(1:2)+vecnorm(vertices).'.*cos(target(3)+offsets);
+            [~,hi]=bounds(values);
+            gap=min(lo)-max(hi);
         end
 
         function valid = stateSetAdmissible(state,cfg)

@@ -14,6 +14,20 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function anApproachingTargetCanEnterTheThirtyMetreSensorLater(testCase)
+            [x,q,road,cfg]=collisionThreatScenario("stoppedLead",struct('referenceSpeed',25, ...
+                'model',struct('speedMaximum',30),'collision',struct('encounterRangeMeters',30)));
+            testCase.assertGreaterThan(norm(q(1:2)-x(1:2)),30);
+            bypass=bypassFeasibilityBaseline(x,q,road,cfg);
+            testCase.assertTrue(bypass.qualified,bypass.reason);
+            testCase.verifyGreaterThan(bypass.encounterEntrySeconds,0);
+            testCase.verifyEqual(bypass.states(2,bypass.times<=bypass.encounterEntrySeconds), ...
+                zeros(1,nnz(bypass.times<=bypass.encounterEntrySeconds)),AbsTol=1e-10);
+            testCase.verifyGreaterThan(bypass.minimumClearanceMeters,0);
+            braking=maximumBrakingCollisionBaseline(x,q,cfg);
+            testCase.verifyTrue(braking.collisionDetected);
+            testCase.verifyTrue(braking.allLongitudinalPoliciesCertified);
+        end
         function campaignRunsStationaryAndBrakingTargetsWithTheObserver(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             % This checks noisy joint execution, independently of machine

@@ -19,6 +19,7 @@ function baseline = maximumBrakingCollisionBaseline(initialState,target,cfg)
     x=initialState;time=0;distance=0;firstCollision=NaN;minimum=Inf;initialGap=Inf;
     phase="";ending="noTarget";
     if ~isempty(target)
+        entered=norm(x(1:2)-target(1:2))<=cfg.collision.encounterRangeMeters;
         initialGap=predictiveSafetyGeometry.rectangle(x(1:3),shape,target(1:3),target(8:11));
         minimum=initialGap;
         if initialGap<=0,firstCollision=0;phase="initial";end
@@ -28,7 +29,9 @@ function baseline = maximumBrakingCollisionBaseline(initialState,target,cfg)
                 linspace(0,h,31),x,odeset('RelTol',1e-9,'AbsTol',1e-11));
             q=predictiveSafetyGeometry.predictTarget(target,time+t.');
             for node=1:numel(t)
-                if norm(z(node,1:2).'-q(1:2,node))>cfg.collision.encounterRangeMeters
+                inside=norm(z(node,1:2).'-q(1:2,node))<=cfg.collision.encounterRangeMeters;
+                if inside,entered=true;end
+                if ~inside && entered
                     ending="exit";break;
                 end
                 gap=predictiveSafetyGeometry.rectangle(z(node,1:3).',shape,q(1:3,node),q(8:11,node));

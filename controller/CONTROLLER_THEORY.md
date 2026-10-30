@@ -3453,6 +3453,17 @@ balls remain centered on their current observations, avoiding additional
 inflation solely to preserve an old nominal. Parameter interval consistency
 and the original retained witness remain separate from this center choice.
 
+The auxiliary RTI proposal uses the same current measurement-conditioned
+joint set as nonlinear admission. Its physical projection is expressed about
+the published observer estimate, retaining a column for the center offset.
+The independent observer publication and its per-hold velocity reboxing are
+not reinstated after that intersection. They can otherwise reject a nominal
+proposal using lateral velocities already excluded by the actual IMU data.
+This is an information-consistency change, not a smaller sensor-noise or
+model-parameter premise. Every proposed policy still needs complete joint
+propagation and terminal admission under the original contract. The
+auxiliary point problem alone supplies no nonlinear safety certificate.
+
 New target observations can improve the supports of the unchanged saved ego
 tube without rebuilding its terminal continuation. The target information
 set is the intersection of the retained family and the recorded refinements.
@@ -3465,10 +3476,13 @@ of the intersection, so its terminal witness remains valid.
 
 When renewal must preserve zero deficit, a failed single-support test can
 be refined by a complete target-family cover. The arc-length interval and
-constant-curvature interval are each split into eight closed intervals.
-All 64 Cartesian products are retained. Each target-cell image is separated
+constant-curvature interval each admit a grid of eight closed intervals.
+Hierarchical subdivision retains a parent whenever its complete support is
+nonnegative or already exceeds the cover's retained minimum. Other cells
+are refined down to that grid; no parameter region is dropped. A parent
+support also remains a valid lower bound on every child. Each target-cell image is separated
 from the entire ego policy image, using a support normal for that cell.
-The minimum of these 64 gap lower bounds is valid for the complete target
+The minimum of the retained gap lower bounds is valid for the complete target
 family. This avoids requiring one separating half-space for the convex hull
 of distinct curved target trajectories. It selects no ego maneuver or
 target realization, and discards no cell. The retained optimization still
@@ -3493,6 +3507,12 @@ policy is admitted. This avoids treating independently variable feedforward
 corrections at every future hold as additional uncertainty merely to adjust
 the current command. A singleton box has a unique feasible performance point
 and needs no numerical QP call.
+For a fixed world normal, each rotated footprint vertex is projected before
+enclosure: `n' R(psi) v = norm(v) cos(psi + angle(v) - angle(n))`.
+The affine image of this single cosine retains its shared position/yaw
+generators. It avoids independently enclosing the two components of one
+rotation, while still covering the complete allowed yaw interval. Linear
+maps act directly on generator matrices, preserving the same dependencies.
 The optional box expansion also checks each causal prefix before propagating
 the next hold. A failed hard constraint or a deficit above the inherited
 budget rejects that expansion immediately. This gives the same acceptance

@@ -358,14 +358,17 @@ function lateral=localInverse(speed,rate,ay,held,design,physical)
         % even where a sharper inverse/monotonicity certificate is absent.
         lateral=nrmmSet.range(-vh*s,vh*s,size(speed.generator,2));return;
     end
+    % Resolve each OUTER endpoint to the runtime inverse's physical
+    % velocity tolerance. Further bisection would refine a bound far below
+    % that existing 1e-5 m/s error without reducing the actual inverse error.
     low=-s;high=s;
-    for j=1:28
+    while (high-low)*vh>1e-5
         mid=(low+high)/2;balance=localInverseForce(mid,speed,rate,held,design)-design.egoModel.mass*ay;
         [lo,~]=bounds(balance);
         if lo>0,low=mid;else,high=mid;end
     end
     lower=low;low=-s;high=s;
-    for j=1:28
+    while (high-low)*vh>1e-5
         mid=(low+high)/2;balance=localInverseForce(mid,speed,rate,held,design)-design.egoModel.mass*ay;
         [~,hi]=bounds(balance);
         if hi<0,high=mid;else,low=mid;end
