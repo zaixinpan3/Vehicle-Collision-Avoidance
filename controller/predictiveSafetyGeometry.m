@@ -458,6 +458,26 @@ classdef predictiveSafetyGeometry
             uncertainty.relativeFrame=true;uncertainty.specified=true;
         end
 
+        function uncertainty = conditionTargetHistory(uncertainty,physical,time,target)
+            % Reuse the SAME radar/gyro observations with the current joint
+            % ego heading enclosure. No future measurement or known target
+            % heading is presumed, and the original parameter family is kept
+            % by intersection. A stale record is left unchanged.
+            if isempty(uncertainty.target) || ~isfield(uncertainty,'predictionSet') ...
+                    || ~isfield(uncertainty.predictionSet,'measurementHistory'),return;end
+            history=uncertainty.predictionSet.measurementHistory;
+            if isempty(history.time) || abs(history.time(end)-time)>128*eps(max(1,abs(time))),return;end
+            prior=uncertainty.target.speedInterval;
+            maximum=max(abs(uncertainty.target.accelerationInterval));
+            heading=[physical.center(3);radius(physical(3))];
+            interval=nrmmTargetHistory('speed',history,time,maximum,heading);
+            interval=localIntervalIntersection(prior,interval);
+            uncertainty.target.speedInterval=interval;
+            uncertainty.target.speedRadius=max(abs(interval-target(4)));
+            uncertainty.targetHistoryConditioning=struct('priorSpeedInterval',prior, ...
+                'speedInterval',interval,'egoHeading',heading,'time',time);
+        end
+
         function [q,uncertainty,memory,info] = reconcileTarget(q,prior,uncertainty,memory,time)
             % The observer point and a nominal predictor need not coincide.
             % Intersect the declared constant-A/constant-curvature intervals

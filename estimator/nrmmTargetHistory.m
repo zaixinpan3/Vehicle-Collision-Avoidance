@@ -102,7 +102,7 @@ function value = nrmmTargetHistory(action, varargin)
     end
 end
 
-function interval=localSpeedInterval(history,time,tangentialAccelerationMaximum)
+function interval=localSpeedInterval(history,time,tangentialAccelerationMaximum,heading)
     % A chord bounds path length independently of its absolute direction.
     % For constant curvature, |chord|=s*sinc(turn/2). For arbitrary bounded
     % turning, projection on the midpoint heading gives |chord|>=s*cos(turn/2).
@@ -112,6 +112,27 @@ function interval=localSpeedInterval(history,time,tangentialAccelerationMaximum)
     validateattributes(tangentialAccelerationMaximum,{'double'},{'scalar','finite','nonnegative'});
     interval=[0;history.speedMaximum];count=numel(history.time);
     if count<2,return;end
+    if nargin>=4 && numel(history.records)==count ...
+            && abs(history.time(end)-time)<=128*eps(max(1,abs(time)))
+        validateattributes(heading,{'double'},{'size',[2,1],'finite','real'});
+        assert(heading(2)>=0,'nrmmTargetHistory:invalidHeading','Heading radius must be nonnegative.');
+        last=history.records(end);center=last.heading ...
+            +atan2(sin(heading(1)-last.heading),cos(heading(1)-last.heading));
+        if last.headingRadius+heading(2)<pi
+            lower=max(last.heading-last.headingRadius,center-heading(2));
+            upper=min(last.heading+last.headingRadius,center+heading(2));
+            assert(lower<=upper,'nrmmTargetHistory:inconsistentHeading', ...
+                'The supplied current heading contradicts the sensor history.');
+            history.records(end).heading=(lower+upper)/2;
+            history.records(end).headingRadius=(upper-lower)/2;
+        elseif heading(2)<last.headingRadius
+            % A circular intersection may have two components in this chart.
+            % Either original arc is still a valid outer bound; keep the
+            % tighter one instead of discarding a wrap-around component.
+            history.records(end).heading=center;
+            history.records(end).headingRadius=heading(2);
+        end
+    end
     age=time-history.time(end);
     assert(age>=-128*eps(max(1,abs(time))),'nrmmTargetHistory:futureMeasurement', ...
         'History cannot use future measurements.');

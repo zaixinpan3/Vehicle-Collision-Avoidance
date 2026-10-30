@@ -1517,6 +1517,8 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
             search.posterior=nrmmJointPrediction('conditionRetained',certificate.tube.sets{1}, ...
                 model.initialState,model.uncertainty.egoGenerator,contract,old.contract,cfg);
             certificate.posterior=search.posterior;
+            model.uncertainty=predictiveSafetyGeometry.conditionTargetHistory( ...
+                model.uncertainty,search.posterior.proposedOuter(1:6),model.stateTime,model.target);
             % Each valid observation narrows the target information set.
             % Improve supports without discarding the original terminal
             % family: the actual target belongs to BOTH descriptions.
@@ -1588,6 +1590,8 @@ function [solution,search,model]=localRetainedSolve(model,previous,timer,seed)
             conditioned=nrmmJointPrediction('conditionMeasurements',root,contract,cfg);
             root=conditioned.set;search.initialMeasurementConditioning=conditioned.diagnostics;
         end
+        model.uncertainty=predictiveSafetyGeometry.conditionTargetHistory( ...
+            model.uncertainty,root(1:6),model.stateTime,model.target);
         optimized=[];
         if nargin<4 || isempty(seed)
             [seed,~]=localRtiInitialize(model,previous,cfg.controller.horizonSteps,[]);

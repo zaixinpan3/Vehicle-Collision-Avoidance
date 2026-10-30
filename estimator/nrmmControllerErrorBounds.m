@@ -250,6 +250,10 @@ function output = localPublish(output, bound, input, design)
                     max(abs(refined.intervals(:,4)-course))+bound.yaw);
             end
             family.historyContraction=refined;
+            % A controller with a tighter joint ego-pose posterior may
+            % condition the same bounded radar/gyro history again. Retain
+            % sensor records, rather than only the standalone heading hull.
+            family.measurementHistory=bound.targetHistory;
             output.targetEstimate.predictionErrorSet=family;
         end
         if ~available

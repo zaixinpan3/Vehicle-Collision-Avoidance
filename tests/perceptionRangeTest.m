@@ -36,6 +36,7 @@ classdef perceptionRangeTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(published.measurementHistoryEnclosure.samples, ...
                 cfg.initialization.minimumRadarSamples);
             testCase.verifyTrue(published.predictionErrorSet.available);
+            testCase.verifyEqual(published.predictionErrorSet.measurementHistory.time(end),time,AbsTol=1e-12);
             testCase.verifyEqual(published.predictionErrorSet.speedInterval(1),0);
             testCase.verifyLessThan(published.predictionErrorSet.speedInterval(2),6);
             testCase.verifyGreaterThanOrEqual(published.targetYawErrorBound,pi-1e-12);

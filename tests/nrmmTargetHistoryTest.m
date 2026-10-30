@@ -6,6 +6,29 @@ classdef nrmmTargetHistoryTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aJointHeadingTightensSpeedWithoutAssumingTheTargetHeading(testCase)
+            for yaw=[-.21,0,.21]
+                history=localHistory();history.yawAccelerationMaximum=0;
+                history.positionNoise=.08;history.gyroscopeNoise=.0015;
+                rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
+                for time=0:.0125:.25
+                    ego=[25*time;0];relative=rotation.'*([34;0]-ego);
+                    history=nrmmTargetHistory('measure',history,time,ego+relative,[8;8]);
+                    history.records(end+1)=struct('time',time,'relativePosition',relative, ...
+                        'egoPosition',ego,'yawRate',0,'heading',0,'headingRadius',.22);
+                end
+                prior=nrmmTargetHistory('speed',history,.25,1.65);
+                conditioned=nrmmTargetHistory('speed',history,.25,1.65,[yaw;.008]);
+                testCase.verifyEqual(conditioned(1),0);
+                testCase.verifyLessThan(conditioned(2),1.5);
+                testCase.verifyLessThan(conditioned(2),prior(2)/2);
+                wrapped=nrmmTargetHistory('speed',history,.25,1.65,[yaw+2*pi;.008]);
+                testCase.verifyEqual(wrapped,conditioned,AbsTol=1e-12);
+                % A present heading is not silently assigned to a past record.
+                stale=nrmmTargetHistory('speed',history,.3,1.65,[yaw;.008]);
+                testCase.verifyEqual(stale,nrmmTargetHistory('speed',history,.3,1.65));
+            end
+        end
         function stationaryChordsBoundSpeedWithoutAnObservableHeading(testCase)
             history=localHistory();
             for time=0:.025:.25
