@@ -21,25 +21,26 @@ end
 
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
-    % horizonSteps is the soft-collision prefix and the shortest horizon.
+    % horizonSteps is the shortest horizon. Every collision stage has slack.
     % Encounter preview sizes the first reference; its first accepted length
     % stays fixed throughout that encounter.
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
-        'enforceRoadBoundaries',false,'jointAffinePrediction',false,'jointNonlinearPrediction',false, ...
-        'retainedTube',true);
+        'enforceRoadBoundaries',false,'jointAffinePrediction',true,'jointNonlinearPrediction',false, ...
+        'retainedTube',false);
     % retainedTube selects a different, enclosure-certified policy-box
     % formulation for active encounters. It requires explicit ego/target
     % bounds and retains a nonlinear joint/terminal certificate. This is
-    % the default for synchronized joint-observer inputs. Legacy inputs with
-    % no joint contract still use point SQP-RTI and cannot claim this certificate.
+    % an explicit verification mode, not the online experiment default.
     % Full-domain nonlinear outer images on the RTI decision box. This
     % research mode fails explicitly if the admitted set cannot be enclosed;
     % it never substitutes the affine approximation on failure. It is not
     % an end-to-end recursive-feasibility or floating-point certificate.
-    % Experimental joint observer/feedback supports. Nonlinear replay has
-    % exposed undercoverage without remainder enclosures; do not silently
-    % promote this affine approximation to the default uncertainty model.
+    % Online experiments use joint affine observer/feedback supports when a
+    % synchronized observer contract is available. Persistent mismatch and
+    % future sensor updates remain in prediction. This engineering
+    % approximation does not certify nonlinear containment or recursion.
+    % Legacy inputs without that contract retain their published margins.
     cfg.nonlinear=struct('integrationStep',.05);
     % Plan once on target acquisition; later frames shift the state/input iterate.
     % Initial preview starts from horizonSteps and the current stopping time.

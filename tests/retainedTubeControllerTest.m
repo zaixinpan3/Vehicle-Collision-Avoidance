@@ -12,6 +12,24 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function pointRtiCanRelaxALateCollisionWhileKeepingItsTerminalRows(testCase)
+            f=testCase.fixture;anchor=localLongAnchor(f,35);model=f.model;
+            model.cfg.controller.retainedTube=false;
+            model.target(1)=anchor.states(1,18);model.targetEpoch=model.target;
+            model.uncertainty.egoGenerator=zeros(6);
+            model.uncertainty.collisionGenerator=zeros(6);model.uncertainty.target=[];
+            [problem,~,model]=solvePredictiveControl('probe',struct( ...
+                'operation','formulate','model',model,'anchor',anchor,'inherited',false));
+            fixed=[problem.stateIndices(:);problem.inputIndices(:)];
+            problem.lower(fixed)=0;problem.upper(fixed)=0;
+            [proposal,~]=solvePredictiveControl('probe',struct( ...
+                'operation','solve','model',model,'anchor',anchor,'problem',problem));
+            testCase.assertNotEmpty(proposal);
+            testCase.verifyGreaterThan(proposal.safety,0);
+            testCase.verifyEqual(proposal.inputs,anchor.inputs,AbsTol=1e-8);
+            testCase.verifyNotEqual(problem.terminalAnchorReason,"deferredToWholeSetAdmission");
+            testCase.verifyFalse(isfield(proposal,'retainedCertificate'));
+        end
         function anAuxiliaryProposalMayUseCollisionSlackAfterTheOldPrefix(testCase)
             f=testCase.fixture;count=20;anchor=localLongAnchor(f,count);
             model=f.model;model.retainedProposal=true;
@@ -545,7 +563,8 @@ end
 
 function f=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-        'controller',struct('horizonSteps',2),'solver',struct('timeLimitSeconds',120)));
+        'controller',struct('horizonSteps',2,'retainedTube',true,'jointAffinePrediction',false), ...
+        'solver',struct('timeLimitSeconds',120)));
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
     design=synthesizeNrmmObserverGains(estimator.observer);
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;

@@ -158,12 +158,13 @@ classdef predictiveSafetyGeometry
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
             generator=model.uncertainty.collisionGenerator;
             reserve=sum(vecnorm(generator(1:2,:),2,1));
-            % The retained backend carries one persistent target family.
-            % Its initializer must not reset parameter/position errors at
-            % hypothetical future measurement times. The legacy point-RTI
-            % configuration retains its distinct per-hold approximation.
+            % Guide and optimizer must use the same persistent target family
+            % whenever joint prediction is selected. Only legacy per-hold
+            % prediction uses its distinct conditional approximation.
             holdTime=[0,repmat(cfg.controller.sampleTime,1,count)];
-            if cfg.controller.retainedTube && isfield(model.uncertainty,'jointPrediction')
+            jointTarget=isfield(model.uncertainty,'jointPrediction') ...
+                && (cfg.controller.retainedTube || cfg.controller.jointAffinePrediction || cfg.controller.jointNonlinearPrediction);
+            if jointTarget
                 holdTime=time;
             end
             starts=predictiveSafetyGeometry.predictTarget(model.target,max(0,time-holdTime));
@@ -172,7 +173,7 @@ classdef predictiveSafetyGeometry
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
-            if cfg.controller.retainedTube && isfield(model.uncertainty,'jointPrediction')
+            if jointTarget
                 data.family=struct('target',model.target,'error',model.uncertainty.target,'time',time);
             end
             parameters=localFieldParameters(data,1,0);

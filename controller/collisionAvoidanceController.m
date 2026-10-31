@@ -126,7 +126,10 @@ function [command,predictedInput,prediction,controllerState] = ...
     % about the ego state and its persistent physical parameters. Start this
     % memory during cruise, before the first target has been confirmed.
     cruisePosterior=[];
-    if cfg.controller.retainedTube && (isempty(q) || targetOnset) && isfield(uncertainty,'jointPrediction')
+    retainCurrentInformation=(cfg.controller.retainedTube && (isempty(q) || targetOnset)) ...
+        || (~cfg.controller.retainedTube && cfg.controller.jointAffinePrediction);
+    if retainCurrentInformation && isfield(uncertainty,'jointPrediction') ...
+            && (cfg.controller.retainedTube || numel(uncertainty.jointPrediction.currentMeasurement.heldInput)==2)
         memory=[];
         if isstruct(previousState) && isfield(previousState,'egoJointPrediction')
             memory=previousState.egoJointPrediction;
@@ -141,7 +144,7 @@ function [command,predictedInput,prediction,controllerState] = ...
                 'Ego information must refer to the current control boundary.');
             cruisePosterior=nrmmJointPrediction('conditionRetained',memory.set, ...
                 model.initialState,uncertainty.egoGenerator,uncertainty.jointPrediction,memory.contract,cfg);
-        elseif isempty(q)
+        elseif isempty(q) || ~cfg.controller.retainedTube
             root=nrmmJointPrediction('rootSet',model.initialState,uncertainty.egoGenerator,uncertainty.jointPrediction);
             conditioned=nrmmJointPrediction('conditionMeasurements',root,uncertainty.jointPrediction,cfg);
             cruisePosterior=struct('proposedOuter',conditioned.set,'measurementConditioning',conditioned.diagnostics);
@@ -156,6 +159,10 @@ function [command,predictedInput,prediction,controllerState] = ...
             if ~isempty(q),model.initialJointSet=root;end
         end
     end
+    if ~cfg.controller.retainedTube && ~isempty(cruisePosterior) && ~isempty(q)
+        model.uncertainty=predictiveSafetyGeometry.conditionTargetHistory( ...
+            model.uncertainty,cruisePosterior.proposedOuter(1:6),model.stateTime,model.target);
+    end
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
     if ~isempty(solution) && isfield(solution,'terminalControlRequired') && solution.terminalControlRequired
         error('collisionAvoidanceController:terminalControlRequired', ...
@@ -169,14 +176,26 @@ function [command,predictedInput,prediction,controllerState] = ...
     end
     predictedInput=solution.inputs;first=predictedInput(:,1);
     egoJointPrediction=[];
-    if ~isempty(cruisePosterior) && isempty(q)
+    informationPredictionFailure="";
+    if ~isempty(cruisePosterior) && (isempty(q) || ~cfg.controller.retainedTube)
         contract=uncertainty.jointPrediction;
         policy=struct('context',struct('cfg',cfg,'contract',contract, ...
             'reference',[contract.point;contract.currentMeasurement.yawRate], ...
             'input',first,'gain',zeros(2,6),'duration',cfg.controller.sampleTime,'first',true), ...
             'lower',zeros(2,1),'upper',zeros(2,1));
-        image=nrmmJointPrediction('policyTube',cruisePosterior.proposedOuter,policy);
-        egoJointPrediction=struct('set',image.sets{2},'contract',contract,'sampleIndex',index+1);
+        try
+            % One executed hold updates the information prior. This is not
+            % full-horizon admission of the proposed RTI trajectory.
+            image=nrmmJointPrediction('policyTube',cruisePosterior.proposedOuter,policy);
+            egoJointPrediction=struct('set',image.sets{2},'contract',contract,'sampleIndex',index+1);
+        catch exception
+            expected=startsWith(string(exception.identifier),["nrmmJointEnclosure:", ...
+                "nrmmSet:","collisionAvoidanceController:"]);
+            if cfg.controller.retainedTube || ~any(expected),rethrow(exception);end
+            % No unverified prior is published. The next frame will use its
+            % standalone observer bound and current measurement intersection.
+            informationPredictionFailure=string(exception.identifier)+": "+exception.message;
+        end
     end
     command=localCommand(first,ego.modelState,cfg);
     command.measurementTime=ego.stateTime;command.actuationTime=ego.stateTime;command.holdSeconds=cfg.controller.sampleTime;
@@ -194,7 +213,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         'recursiveFeasibilityScope',"idealMathematicalProblemOnly", ...
         'hasTarget',~isempty(q),'targetMotionModel',"constantTangentialAccelerationAndSideslip", ...
         'jointStateDimension',numel(jointState), ...
-        'safetyObjective',"sumOfPrefixSafetySlacks",'primaryOptimumComputed',search.pcbfStageCompleted, ...
+        'safetyObjective',"sumOfHorizonSafetySlacks",'primaryOptimumComputed',search.pcbfStageCompleted, ...
         'safetyValueInterpretation',"affineSlackSum", ...
         'secondaryObjective',solution.secondaryObjective, ...
         'secondaryOptimumApplied',search.secondaryStageCompleted, ...
@@ -263,6 +282,8 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.jointFloatingPointCertified=model.jointPredictionTube.floatingPointCertified;
     end
     metadata.robustNonlinearSafetyCertified=false;
+    metadata.informationPredictionFailure=informationPredictionFailure;
+    if ~isempty(cruisePosterior),metadata.measurementConditioning=cruisePosterior.measurementConditioning;end
     metadata.maximumCollisionTighteningMeters=solution.maximumCollisionTighteningMeters;
     metadata.clfDerivative=solution.clfDerivative;
     metadata.clfDerivativeLimit=solution.clfDerivativeLimit;
@@ -279,8 +300,8 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.safetyScope="affineSubproblemWithObserverMargins";
     end
     if model.robustnessRelaxation && ~solution.clfEnabled
-        metadata.safetyObjective="sumOfRobustnessDeficitsWithHardNominalCollisionRows";
-        metadata.safetyScope="affineNominalCollisionWithRelaxedObserverMargins";
+        metadata.safetyObjective="sumOfHorizonSafetySlacks";
+        metadata.safetyScope="affineCollisionWithRelaxedObserverMargins";
     end
     avoidanceInitialized=search.planner.used;
     if ~model.targetOnset && isstruct(previousState) && isfield(previousState,'avoidanceInitialized')

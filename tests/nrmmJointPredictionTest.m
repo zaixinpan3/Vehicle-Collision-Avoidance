@@ -70,19 +70,37 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(norm(tube.observerErrorRadius(:,end)),0);
             testCase.verifyNotEqual(tube.observerErrorRadius(:,end),tube.observerErrorRadius(:,1));
         end
+        function aKnownShootingDefectDoesNotBecomeRandomPhysicalError(testCase)
+            f=testCase.fixture;output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);
+            contract=output.controllerErrorBound.jointPrediction;
+            contract.noiseRadius(:)=0;contract.parameterRadius(:)=0;
+            anchor=struct('states',repmat(f.state,1,5),'inputs',repmat(f.input,1,4));
+            anchor.states(1,2:end)=1:4;anchor.states(2,2:end)=3;
+            tube=nrmmJointPrediction('propagate',anchor,f.cfg,zeros(6,0),contract,repmat(.05,1,4));
+            testCase.verifyEqual(tube.physicalRadius,zeros(6,9),AbsTol=1e-12);
+            testCase.verifyEqual(tube.mean(1:6,:),anchor.states,AbsTol=1e-12);
+            testCase.verifyFalse(tube.nonlinearCertificate);
+        end
         function controllerUsesTheJointTubeAndReservesFutureFeedbackAuthority(testCase)
             f=testCase.fixture;f.cfg.controller.horizonSteps=6;f.cfg.controller.jointAffinePrediction=true;
+            f.frame=localHeldInput(f.frame,f.input,true);
             output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);
             output.targetEstimate=[];
-            [~,~,prediction]=collisionAvoidanceController(output,[],[],f.cfg,[]);
+            [~,~,prediction,state]=collisionAvoidanceController(output,[],[],f.cfg,[]);
             tube=prediction.model.jointPredictionTube;
             testCase.verifyTrue(prediction.model.uncertaintyPrediction.futureObserverDynamicsIncluded);
             testCase.verifyFalse(prediction.model.uncertaintyPrediction.futurePrimitiveBudgetsAssumed);
             testCase.verifyGreaterThan(norm(tube.inputRadius(:,end)),0);
             testCase.verifyEqual(tube.firstInputRadius,zeros(2,1),AbsTol=1e-12);
+            testCase.verifyFalse(isfield(state,'retainedCertificate'));
+            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
+            testCase.verifyFalse(prediction.metadata.egoJointRealArithmeticEnclosure);
+            testCase.verifyEqual(prediction.metadata.measurementConditioning.method, ...
+                "nonlinearCurrentMeasurementIntersection");
         end
-        function affinePredictionIsAnExplicitExperimentRatherThanANonlinearCertificate(testCase)
-            testCase.verifyFalse(testCase.fixture.cfg.controller.jointAffinePrediction);
+        function onlinePredictionKeepsJointFeedbackWithoutClaimingANonlinearCertificate(testCase)
+            testCase.verifyTrue(testCase.fixture.cfg.controller.jointAffinePrediction);
+            testCase.verifyFalse(testCase.fixture.cfg.controller.retainedTube);
             [tube,~]=localTube(testCase.fixture,4,true);
             testCase.verifyFalse(tube.nonlinearCertificate);
         end

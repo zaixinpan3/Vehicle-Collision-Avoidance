@@ -1,7 +1,8 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl Retained joint certificates or one point-RTI update.
-% Synchronized joint-observer inputs use the retained formulation by default.
-% The following iterate and solver description concerns the point-RTI path.
+% Online experiments use point RTI with joint affine observer/feedback
+% prediction. Retained nonlinear certificates are an explicit verification
+% mode. The following iterate and solver description concerns point RTI.
 % The planner runs once at encounter onset. Later frames shift the previous
 % state/input iterate and retain its node count throughout the encounter.
 % Horizon sizing occurs only at encounter onset; a failed solve never extends
@@ -668,13 +669,11 @@ end
 
 function [problem,model]=localFormulate(anchor,model)
     model.linearizationBuilds=model.linearizationBuilds+1;
-    cfg=model.cfg;count=size(anchor.inputs,2);prefix=cfg.controller.horizonSteps;
+    cfg=model.cfg;count=size(anchor.inputs,2);
     retainedProposal=isfield(model,'retainedProposal') && model.retainedProposal;
-    % This auxiliary point problem proposes a policy for whole-set admission.
-    % Match the retained PCBF's slack on every collision node, including the
-    % tail. A hard nominal tail here would reject candidates that the actual
-    % certificate problem permits with a positive (nonincreasing) deficit.
-    if retainedProposal,prefix=count+1;end
+    % Every collision stage has a PCBF deficit, including the endpoint.
+    % Horizon sizing must not create an unrelated hard collision tail.
+    % Input, model-domain and terminal requirements remain hard.
     if ~isfield(model,'collisionEscapeNormals') || size(model.collisionEscapeNormals,2)~=2*count+1
         model.collisionEscapeNormals=zeros(2,2*count+1);
     end
@@ -682,12 +681,9 @@ function [problem,model]=localFormulate(anchor,model)
     if ~isempty(model.uncertainty.target)
         robustRelaxation=robustRelaxation || any(structfun(@(value)any(value(:)>0),model.uncertainty.target));
     end
-    % Collision rows of the first horizonSteps nodes carry slack. With an
-    % observer enclosure every node also has a slack on its tightened row;
-    % the untightened row stays hard after the prefix, so the formulation
-    % reduces to the certainty-equivalent one as the enclosure vanishes.
-    slackCount=prefix;
-    if robustRelaxation,slackCount=count+1;end
+    % Nominal and observer-tightened collisions share the stage slack. A
+    % positive optimum is an allowed safety deficit, not an avoidance claim.
+    slackCount=count+1;
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
     is=iu(end)+(1:slackCount);ic=is(end)+1;nv=ic;
     % Every inequality row is a small dense block on the few variables it
@@ -736,7 +732,7 @@ function [problem,model]=localFormulate(anchor,model)
         physicalInputLower=physicalInputLower+jointTube.inputRadius;
         physicalInputUpper=physicalInputUpper-jointTube.inputRadius;
         model.jointPredictionTube=jointTube;
-    elseif jointRequested
+    elseif cfg.controller.jointNonlinearPrediction
         error('collisionAvoidanceController:missingJointPrediction', ...
             'Joint prediction requires a synchronized observer snapshot, not only current error radii.');
     end
@@ -839,13 +835,8 @@ function [problem,model]=localFormulate(anchor,model)
             maximumTightening=max(maximumTightening,max(tightening));
             if index==1,primaryLowerBound=max(0,-min(g));end
             r=[-j,zeros(4,3)];yawMap=[0,0,1,0,0,0];
-            if robustRelaxation && index>prefix
-                blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;blockBounds{blockCount}=g+tightening;
-                rotationBlocks(end+1)=blockCount;rotationMaps{end+1}=yawMap;
-            end
             blockCount=blockCount+1;
-            if index<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[nodeColumns;is(index)];
-            else,blockRows{blockCount}=r;blockColumns{blockCount}=nodeColumns;end
+            blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[nodeColumns;is(index)];
             blockBounds{blockCount}=g;
             rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
                 [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
@@ -863,13 +854,8 @@ function [problem,model]=localFormulate(anchor,model)
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
             r=-j*middleMap(1:3,:);yawMap=middleMap(3,:);
-            if robustRelaxation && index>prefix
-                blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;blockBounds{blockCount}=g+tightening;
-                rotationBlocks(end+1)=blockCount;rotationMaps{end+1}=yawMap;
-            end
             blockCount=blockCount+1;
-            if index<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[middleColumns;is(index)];
-            else,blockRows{blockCount}=r;blockColumns{blockCount}=middleColumns;end
+            blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[middleColumns;is(index)];
             blockBounds{blockCount}=g;
             rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
                 [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
@@ -933,13 +919,8 @@ function [problem,model]=localFormulate(anchor,model)
         model.collisionEscapeNormals(:,point)=escape;
         maximumTightening=max(maximumTightening,max(tightening));
         r=[-j,zeros(4,3)];yawMap=[0,0,1,0,0,0];
-        if robustRelaxation && count+1>prefix
-            blockCount=blockCount+1;blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;blockBounds{blockCount}=g+tightening;
-            rotationBlocks(end+1)=blockCount;rotationMaps{end+1}=yawMap;
-        end
         blockCount=blockCount+1;
-        if count+1<=slackCount,blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[endColumns;is(count+1)];
-        else,blockRows{blockCount}=r;blockColumns{blockCount}=endColumns;end
+        blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[endColumns;is(count+1)];
         blockBounds{blockCount}=g;
         rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
             [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
@@ -1837,6 +1818,10 @@ function [inputs,diagnostics]=localRetainedProposal(model,previous,seed,root)
     inputs=[];diagnostics=struct('available',false,'accepted',false,'solverCalls',0,'linearizationCount',0,'failure',"noWarmStart");
     if isempty(seed) && ~localHasWarmStart(previous),return;end
     candidate=model;candidate.cfg.controller.retainedTube=false;
+    % This auxiliary proposal is still admitted by the complete nonlinear
+    % certificate below. Preserve its inexpensive per-hold initialization.
+    candidate.cfg.controller.jointAffinePrediction=false;
+    candidate.cfg.controller.jointNonlinearPrediction=false;
     % The proposal and its admission must start with the SAME measured
     % information. Reintroducing the standalone observer box here can make
     % the auxiliary QP infeasible after the joint measurement intersection

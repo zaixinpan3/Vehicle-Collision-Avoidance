@@ -73,7 +73,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.terminationReason,"clfReturned");
             testCase.verifyEqual(solution.safety,solution.affineSafety,AbsTol=0);
         end
-        function anOfflineProbeFindsTheCollidingHardTail(testCase)
+        function anOfflineProbeCountsLateCollisionSlacksAndKeepsTheTerminalHard(testCase)
             model=testCase.model;cfg=model.cfg;anchor=testCase.anchor;
             % Extend straight cruise through a separated, stationary target.
             anchor.inputs=repmat(anchor.inputs(:,1),1,32);
@@ -86,7 +86,11 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
                 'model',model,'anchor',anchor,'problem',p));
             testCase.verifyTrue(all(isfinite(anchor.states),'all'));
             testCase.verifyGreaterThan(check.hard,.1);
-            testCase.verifyEqual(check.safety,0,AbsTol=1e-12);
+            testCase.verifyGreaterThan(check.terminalViolation,.1);
+            testCase.verifyEqual(check.slacks(1:cfg.controller.horizonSteps), ...
+                zeros(1,cfg.controller.horizonSteps),AbsTol=1e-12);
+            testCase.verifyGreaterThan(sum(check.slacks(cfg.controller.horizonSteps+1:end)),.1);
+            testCase.verifyGreaterThan(check.safety,.1);
         end
         function anOfflineProbeFindsTheTerminalStateViolation(testCase)
             model=testCase.model;anchor=testCase.anchor;

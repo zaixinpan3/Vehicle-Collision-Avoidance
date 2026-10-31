@@ -341,7 +341,7 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
     center=[anchor.states(:,1);contract.point;zeros(4,1);previous;contract.positionVelocity.point];
     estimation=[-eye(5),zeros(5,1),eye(5),zeros(5,10)];
     records=2*count+1;
-    tube=struct('kind',"joint-sampled-affine-tube-v2", ...
+    tube=struct('kind',"joint-sampled-affine-tube-v3", ...
         'generator',{cell(1,records)},'observerErrorRadius',zeros(5,records), ...
         'physicalRadius',zeros(6,records),'mean',zeros(21,count+1), ...
         'inputRadius',zeros(2,count),'inputGenerator',{cell(1,count)}, ...
@@ -349,7 +349,7 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
         'currentInputUncertaintyRadius',zeros(2,1),'currentMeasurementConditioned',true, ...
         'futureObserverDynamicsIncluded',true,'futurePrimitiveBudgetsAssumed',false, ...
         'persistentParameterColumns',rootColumns+(1:4),'nonlinearCertificate',false, ...
-        'scope',"exact supports of joint affine maps; nonlinear remainders not certified", ...
+        'scope',"joint affine maps along the RTI shooting reference; nonlinear remainders not certified", ...
         'mode',"causalObserverFeedback",'time',[0,cumsum(durations)], ...
         'mixedStopBranches',false(1,count));
     tube.generator{1}=initialGenerator;
@@ -422,9 +422,20 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
         end
         tube.mixedStopBranches(k)=mixed;
         middle=point(22:27);next=point(1:21);input=point(28:29);
-        middleReference=localReferenceMiddle(anchor,k,cfg,durations(k));
-        tube.generator{2*k}=[nextGenerators(22:27,:),middle-middleReference];
-        tube.generator{2*k+1}=[nextGenerators(1:6,:),next(1:6)-anchor.states(:,k+1)];
+        if nonlinear
+            middleReference=localReferenceMiddle(anchor,k,cfg,durations(k));
+            tube.generator{2*k}=[nextGenerators(22:27,:),middle-middleReference];
+            tube.generator{2*k+1}=[nextGenerators(1:6,:),next(1:6)-anchor.states(:,k+1)];
+        else
+            % RTI already carries F(xbar,ubar)-xbar_next in its dynamics
+            % equality. It is a known shooting defect, not an independent
+            % uncertain disturbance. Linearize every future joint hold at
+            % the SAME shooting reference instead of accumulating a separate
+            % open-loop nominal rollout and enclosing its drift as error.
+            tube.generator{2*k}=nextGenerators(22:27,:);
+            tube.generator{2*k+1}=nextGenerators(1:6,:);
+            next=localReanchorJointMean(next,anchor.states(:,k+1));
+        end
         tube.physicalRadius(:,2*k:2*k+1)=[sum(abs(tube.generator{2*k}),2),sum(abs(tube.generator{2*k+1}),2)];
         tube.observerErrorRadius(:,2*k)=NaN; % No fictitious midpoint posterior.
         tube.observerErrorRadius(:,2*k+1)=abs(estimation*next)+sum(abs(estimation*nextGenerators(1:21,:)),2);
@@ -440,6 +451,19 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
     tube.egoStateRadius=tube.physicalRadius;
     tube.observerErrorTime=tube.time;
     tube.observerErrorRadius=tube.observerErrorRadius(:,1:2:end);
+end
+
+function joint=localReanchorJointMean(joint,reference)
+    % Preserve nominal observer bias and frontend error in the new local
+    % chart. Only the expansion point moves; shared uncertainty columns stay.
+    old=joint(1:6);change=reference-old;
+    change(3)=atan2(sin(change(3)),cos(change(3)));
+    oldRotation=[cos(old(3)),-sin(old(3));sin(old(3)),cos(old(3))];
+    newRotation=[cos(reference(3)),-sin(reference(3));sin(reference(3)),cos(reference(3))];
+    joint(1:6)=reference;
+    joint(7:11)=joint(7:11)+change(1:5);
+    joint(18:19)=joint(18:19)+change(1:2);
+    joint(20:21)=joint(20:21)+newRotation*reference(4:5)-oldRotation*old(4:5);
 end
 
 function middle=localReferenceMiddle(anchor,k,cfg,duration)
