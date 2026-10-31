@@ -9,7 +9,8 @@ function runCarlaVehicleDynamicsExperiment(outputFolder,mapFile)
 % curved CARLA routes use a declared local constant-curvature approximation.
 % Road-boundary polygons retain actual map geometry, including interior holes.
 % Exploratory solver limit is 5 s, not a real-time qualification. Synthetic
-% target positions are range-limited to 30 m with the adapter default 4 cm
+% target positions use the controller's perception radius (50 m by default)
+% with the adapter default 4 cm
 % bounded noise. A fixed 5 m/s initialization prior is independent of truth;
 % the acquired target state comes from measured relative-position history.
     arguments
@@ -25,7 +26,7 @@ function runCarlaVehicleDynamicsExperiment(outputFolder,mapFile)
     end
     addpath(genpath(fullfile(p,'vendor')));
     data=jsondecode(fileread(mapFile));
-    load_system('PassVeh14DOF');m=get_param('PassVeh14DOF','ModelWorkspace');v=getVariable(m,'VEH');cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'collision',struct('encounterRangeMeters',30),'solver',struct('timeLimitSeconds',5)));
+    load_system('PassVeh14DOF');m=get_param('PassVeh14DOF','ModelWorkspace');v=getVariable(m,'VEH');cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('timeLimitSeconds',5)));
     v.Mass=cfg.vehicle.m;v.SprungMass=v.Mass-260;v.YawMomentInertia=cfg.vehicle.Iz;v.FrontAxlePositionfromCG=cfg.vehicle.lf;v.RearAxlePositionfromCG=cfg.vehicle.lr;v.WheelBase=cfg.vehicle.wheelbase;v.InitialLongVel=8;v.InitialLatVel=0;assignin(m,'VEH',v);
     set_param('PassVeh14DOF/Suspension','LabelModeActiveChoice','6');set_param('PassVeh14DOF/Suspension/Kinematics and Compliance Independent Suspension/Independent K and C Suspension','IdealSuspEn','off');
     tire='PassVeh14DOF/Wheels and Tires/VDBS/Tires';set_param(tire,'LabelModeActiveChoice','0');
@@ -68,7 +69,7 @@ function runCarlaVehicleDynamicsExperiment(outputFolder,mapFile)
         q=[route(13,1:2).';yaw+pi;4;0;0;L;2.4;.95;0;0];
         if strcmp(name,'intersection'),q=data.intersectionTarget(:);end
         if strcmp(name,'curve'),curv=atan2(sin(route(6,3)-route(1,3)),cos(route(6,3)-route(1,3)))/10;q(6)=asin(max(-1,min(1,-curv*L)));end
-        ec=estimatorControllerIntegrationConfig();ec.sensor.radar.rangeMaximum=30;ec.initialization.targetSpeedPrior=5;contract=struct('speedMinimum',0,'speedMaximum',15,'scalarAccelerationMaximum',2,'sideslipMaximum',.5,'yawRateMaximum',1,'accelerationNormBound',15);ec=estimatorConfigurationFromController(ec,cfg,contract);
+        ec=estimatorControllerIntegrationConfig();ec.sensor.radar.rangeMaximum=cfg.collision.encounterRangeMeters;ec.initialization.targetSpeedPrior=5;contract=struct('speedMinimum',0,'speedMaximum',15,'scalarAccelerationMaximum',2,'sideslipMaximum',.5,'yawRateMaximum',1,'accelerationNormBound',15);ec=estimatorConfigurationFromController(ec,cfg,contract);
         kappa=0;if strcmp(name,'curve'),kappa=atan2(sin(route(11,3)-route(1,3)),cos(route(11,3)-route(1,3)))/20;end
         curve=struct('origin',route(1,1:2).','heading',route(1,3),'curvature',kappa,'length',500);
         road=struct('referenceCurve',curve,'drivablePolygons',{polys});

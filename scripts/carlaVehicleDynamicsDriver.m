@@ -21,7 +21,7 @@ function output(b)
         end
         [e.context,ego,estimate,~,audit]=nrmmEstimatorControllerAdapter('sample',e.context,t,truth,target);
         ego.heldActuatorInput=e.held;
-        road=perceiveRoadBoundaries(e.road,x(1:2),30,t);
+        road=perceiveRoadBoundaries(e.road,x(1:2),e.cfg.collision.encounterRangeMeters,t);
         e.lastEgo=ego;e.lastEstimate=estimate;e.lastRoad=road;
         [command,~,prediction,e.previous]=collisionAvoidanceController(ego,estimate,road,e.cfg,e.previous);
         u=command.actuatorInput;e.held=u;
