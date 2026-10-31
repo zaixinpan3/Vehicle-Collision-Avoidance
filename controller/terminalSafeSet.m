@@ -539,6 +539,36 @@ classdef terminalSafeSet
             end
         end
 
+        function value = nonlinearValue(context,x,node)
+            % Signed constraint value of the SAME braking/parked geometry.
+            % Do not reuse rows(): its local side choices are unsuitable as
+            % a nonlinear function when the optimization iterate changes.
+            side=abs(x(5))-tan(context.sideslipMaximum)*x(4);
+            value=max([side;context.stateLower-x(4:6);x(4:6)-context.stateUpper]);
+            if any(context.stateLower>0 | context.stateUpper<0)
+                value=max([value;context.stateLower;-context.stateUpper]);
+            end
+            if context.brakingRatio<context.brakingBounds(1) || context.brakingRatio>context.brakingBounds(2)
+                value=max(value,1);
+            end
+            path=terminalSafeSet.continuation(context,x);
+            road=localRoad(context,path.pose);value=max(value,context.inflation-min(road));
+            if ~context.hasTarget || context.encounterEnded,return;end
+            q=localTarget(context,node,path.time);
+            out=find(vecnorm(path.pose(1:2,:)-q(1:2,:))>context.range,1);
+            if ~isempty(out) && path.time(out)>path.speed/context.deceleration,out=[];end
+            last=size(q,2);if ~isempty(out),last=out-1;end
+            gap=Inf;
+            for k=1:last
+                gap=min(gap,localSignedRectangle(path.pose(:,k),context.shape,q(:,k)));
+            end
+            if isempty(out)
+                parkedTarget=localTarget(context,node,path.speed/context.deceleration);
+                gap=min(gap,localSignedParked(context,path.pose(:,end),parkedTarget));
+            end
+            value=max(value,context.required-gap);
+        end
+
         function [distance,witness,track] = parkedClearance(context,pose,q)
             % Least distance between the ego rectangle parked at 'pose' and the
             % target rectangle over the target's remaining track from its
@@ -783,6 +813,44 @@ classdef terminalSafeSet
             lateral=reshape(projection.lateralPosition,4,n);
             margin=min([clearance(2)-lateral;clearance(1)+lateral],[],1);
         end
+    end
+end
+
+function gap=localSignedRectangle(pose,shape,q)
+    [gap,~]=predictiveSafetyGeometry.rectangle(pose,shape,q(1:3),q(8:11));
+    if gap>0,return;end
+    re=[cos(pose(3)),-sin(pose(3));sin(pose(3)),cos(pose(3))];
+    rt=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];axes=[re,rt];
+    relative=pose(1:2)+re*shape(3:4)-q(1:2)-rt*q(10:11);
+    gap=max(abs(relative.'*axes)-shape(1:2).'*abs(re.'*axes)-q(8:9).'*abs(rt.'*axes));
+end
+
+function gap=localSignedParked(context,pose,q)
+    [gap,witness,track]=terminalSafeSet.parkedClearance(context,pose,q);
+    if gap>0,return;end
+    if track.lower==track.upper,gap=localSignedRectangle(pose,context.shape,q);return;end
+    curvature=sin(q(6))/q(7);
+    if curvature==0
+        % A translating rectangle sweeps a convex polygon. Its edge normals
+        % are the vehicle axes and the transverse travel direction.
+        re=[cos(pose(3)),-sin(pose(3));sin(pose(3)),cos(pose(3))];
+        rt=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+        direction=predictiveSafetyGeometry.direction(q(3)+q(6));
+        axes=[re,rt,[-direction(2);direction(1)]];axes=[axes,-axes];
+        relative=pose(1:2)+re*context.shape(3:4)-q(1:2)-rt*q(10:11);
+        displacement=direction.'*axes;
+        support=max(track.lower*displacement,track.upper*displacement);
+        gap=max(relative.'*axes-context.shape(1:2).'*abs(re.'*axes) ...
+            -q(8:9).'*abs(rt.'*axes)-support);
+    else
+        % The exact positive-distance test above decides separation. Inside
+        % a curved swept footprint, sampled penetrations only supply a
+        % negative restoration value; they never certify a positive gap.
+        high=track.upper;
+        if track.fullCircle,high=track.lower+2*pi/abs(curvature);end
+        arc=linspace(track.lower,high,65);gap=localSignedRectangle(pose,context.shape,witness);
+        for s=arc,gap=min(gap,localSignedRectangle(pose,context.shape,localAlong(q,s)));end
+        gap=min(0,gap);
     end
 end
 

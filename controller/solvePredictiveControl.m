@@ -85,6 +85,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             search.plannerCalls=plannerCalls;
             model.linearization=anchor;solution=[];return;
         end
+        if string(cfg.solver.method)=="nonlinear"
+            [solution,search,model]=localNonlinearSolve(anchor,model,source,timer,search.initializationSeconds);
+            return;
+        end
         wall=tic;[problem,model]=localFormulate(anchor,model);
         search.formulationSeconds=toc(wall);search.modelBuilt=true;
         model.linearization=anchor;problem.inheritedAnchor=source=="shiftedPrimalIterate";
@@ -1453,8 +1457,349 @@ function [result,search,model]=localProbe(request)
         case "check"
             model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
             [result,search,model]=localNonlinearCheck(request.anchor,model,request.problem.safetyNormals);
+        case "nonlinearProblem"
+            model.solveTimer=timer;model.solveTimeLimitSeconds=model.cfg.solver.timeLimitSeconds;
+            model.cfg.rti.trustRegion.enabled=false;
+            [problem,model]=localFormulate(request.anchor,model);
+            problem=localSelectObjective(problem,request.anchor,model);
+            data=localNonlinearData(request.anchor,model,problem);
+            result=struct('constraint',@(z)localNonlinearConstraints(z,data), ...
+                'performance',@(z)localNonlinearObjective(z,data,false), ...
+                'safety',@(z)localNonlinearObjective(z,data,true), ...
+                'point',zeros(data.nv,1),'lower',data.lower,'upper',data.upper, ...
+                'stateIndices',problem.stateIndices,'inputIndices',problem.inputIndices, ...
+                'slackIndices',problem.slackIndices,'clfIndex',problem.clfIndex);
         otherwise
             error('collisionAvoidanceController:invalidProbeOperation','Unknown research operation.');
+    end
+end
+
+function [solution,search,model]=localNonlinearSolve(anchor,model,source,timer,initializationSeconds)
+    % Direct multiple shooting: exact RK4 equalities and rotating vertices.
+    % Observer/feedback supports and input reserves are computed once at the
+    % frame's reference, as in RTI, and frozen during the NLP. This isolates
+    % nominal nonlinear optimization; it is NOT the robust certificate backend.
+    cfg=model.cfg;model.cfg.rti.trustRegion.enabled=false;
+    assert(~cfg.controller.jointNonlinearPrediction, ...
+        'collisionAvoidanceController:unsupportedNonlinearBaseline', ...
+        'The NLP baseline uses frozen engineering margins, not a certified decision box.');
+    assert(isempty(model.road.lateralClearance), ...
+        'collisionAvoidanceController:unsupportedNonlinearBaseline','The NLP baseline has no hard road constraints.');
+    wall=tic;[problem,model]=localFormulate(anchor,model);
+    problem=localSelectObjective(problem,anchor,model);
+    data=localNonlinearData(anchor,model,problem);
+    search=localEmptySearch(source,"",initializationSeconds);
+    search.source="nonlinearMultipleShooting";search.algorithm="fminconSqp";
+    search.mode=problem.mode;search.modelBuilt=true;search.formulationSeconds=toc(wall);
+    search.horizonSteps=size(anchor.inputs,2);search.planner=anchor.planner;
+    search.plannerCalls=double(anchor.planner.used);search.rtiIterations=0;
+    search.linearizationCount=0;search.horizonExtensions=0;
+    search.anchorCertified=false;search.appendedTerminalSteps=anchor.appendedTerminalSteps;
+    search.appendedBrakingSteps=anchor.appendedBrakingSteps;
+    search.rollout=struct('available',true,'reason',"nonlinearMultipleShootingConstraints", ...
+        'fullGap',NaN,'fullCorrection',NaN);
+    search.clfInitialSlack=problem.initialClfSlack;search.clfStageAttempted=problem.clf.enabled;
+    search.pcbfStageAttempted=~problem.clf.enabled;
+    solution=[];point=zeros(size(problem.lower));
+    if any(data.lower>data.upper)
+        search.terminationReason="nonlinearFrozenBoundsInconsistent";
+    else
+        point=min(data.upper,max(data.lower,point));
+        [c,~]=localNonlinearConstraints(point,data);
+        if ~problem.clf.enabled
+            for k=1:numel(problem.slackIndices)
+                rows=data.collisionRowSlack==k;
+                point(problem.slackIndices(k))=max([0;c(rows)]);
+            end
+        else
+            point(problem.clfIndex)=max(0,c(end))/problem.clfSlackDuration;
+        end
+        options=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
+            'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true, ...
+            'MaxIterations',cfg.solver.maxIterations, ...
+            'MaxFunctionEvaluations',100*cfg.solver.maxIterations, ...
+            'ConstraintTolerance',cfg.solver.constraintTolerance, ...
+            'OptimalityTolerance',cfg.solver.optimalityTolerance,'StepTolerance',1e-10, ...
+            'OutputFcn',@(x,v,state)toc(timer)>=model.solveTimeLimitSeconds);
+        [c,eq]=localNonlinearConstraints(point,data);
+        initialFeasible=all(isfinite([c;eq])) && max([0;c;abs(eq)])<=cfg.solver.constraintTolerance;
+        numerical=problem.clf.enabled || ~initialFeasible || any(point(problem.slackIndices)>0);
+        wall=tic;flag=1;output=struct('iterations',0,'funcCount',0,'constrviolation',0);
+        primary=~problem.clf.enabled;
+        if numerical
+            [point,~,flag,output]=fmincon(@(z)localNonlinearObjective(z,data,primary), ...
+                point,[],[],[],[],data.lower,data.upper,@(z)localNonlinearConstraints(z,data),options);
+            search.solverCalls=1;
+        end
+        [c,eq]=localNonlinearConstraints(point,data);
+        hard=max([0;c;abs(eq);data.lower-point;point-data.upper]);
+        if any(~isfinite([point;c;eq])),hard=Inf;end
+        search.stages(1)=struct('objective',problem.optimizationObjective,'exitFlag',flag, ...
+            'seconds',toc(wall),'value',localNonlinearObjective(point,data,primary), ...
+            'numericalSolve',numerical,'solverInfo',output);
+        search.converged=flag>0;search.nonlinearIterations=output.iterations;
+        search.terminationReason="nonlinearConstraintsNotSatisfied";
+        search.finalConstraintViolation=hard;
+        search.constraintResiduals=struct('inequality',max([0;c]), ...
+            'dynamics',max(abs(eq)),'bounds',max([0;data.lower-point;point-data.upper]), ...
+            'terminal',c(end-double(problem.clf.enabled)));
+        if hard<=cfg.solver.constraintTolerance
+            search.returned=true;search.terminationReason="nonlinearFeasibleReturned";
+            search.clfStageCompleted=problem.clf.enabled;search.pcbfStageCompleted=~problem.clf.enabled;
+            if primary
+                search.primaryOptimum=sum(point(problem.slackIndices));
+                search.primaryLowerBound=0;search.slackCap=search.primaryOptimum;
+                search.secondaryStageAttempted=true;search.solverCalls=search.solverCalls+1;
+                a=problem.safetyObjective.';b=search.slackCap;
+                upper=data.upper;
+                if b==0,upper(problem.slackIndices)=0;a=[];b=[];end
+                wall=tic;
+                [refined,~,secondFlag,secondOutput]=fmincon(@(z)localNonlinearObjective(z,data,false), ...
+                    point,a,b,[],[],data.lower,upper,@(z)localNonlinearConstraints(z,data),options);
+                [cc,ee]=localNonlinearConstraints(refined,data);
+                violation=max([0;cc;abs(ee);data.lower-refined;refined-upper; ...
+                    sum(refined(problem.slackIndices))-search.slackCap]);
+                if any(~isfinite([refined;cc;ee])),violation=Inf;end
+                search.stages(2)=struct('objective',"nonlinearTrackingAndRegularization", ...
+                    'exitFlag',secondFlag,'seconds',toc(wall), ...
+                    'value',localNonlinearObjective(refined,data,false),'numericalSolve',true,'solverInfo',secondOutput);
+                search.nonlinearIterations=search.nonlinearIterations+secondOutput.iterations;
+                search.converged=search.converged && secondFlag>0 && violation<=cfg.solver.constraintTolerance;
+                if violation<=cfg.solver.constraintTolerance
+                    point=refined;hard=violation;search.secondaryStageCompleted=true;
+                end
+            end
+            inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
+            solution=localDecode(point,problem,anchor,inputs);
+            solution.hard=hard;solution.nonlinearValidationPerformed=true;
+            search.finalConstraintViolation=hard;
+            solution.affineSafety=NaN;solution.affineStates=[];solution.affineStageSlacks=[];
+            solution.inputBoundCorrection=0;solution.trustMaximumScaledCorrection=NaN;
+            solution.trustFirstInputRadius=[Inf;Inf];solution.trustSampledErrorRatio=NaN;
+            solution.collisionEscapeNormals=model.collisionEscapeNormals;
+            solution.collisionSide=model.collisionSide;solution.retainCollisionSide=model.retainCollisionSide;
+            solution.clfNextValue=nonlinearBicycleModel.nominalValue(solution.states(:,2),model.lane,model.nominalReference);
+            [~,~,costs]=localNonlinearObjective(point,data,false);
+            names=fieldnames(costs);
+            for k=1:numel(names),solution.(names{k})=costs.(names{k});end
+            solution.objectiveValue=solution.safety;
+            if problem.clf.enabled,solution.objectiveValue=localNonlinearObjective(point,data,false);end
+            if primary
+                solution.secondaryObjective="nonlinearTrackingAndRegularization";
+                solution.secondaryObjectiveValue=solution.performanceCost;
+            else
+                solution.clfDerivative=(solution.clfNextValue-solution.clfInitialValue)/problem.clfSlackDuration;
+                solution.clfActualDerivative=nonlinearBicycleModel.nominalDerivative( ...
+                    model.initialState,inputs(:,1),model.lane,model.nominalReference,cfg);
+                solution.clfActualDerivativeResidual=solution.clfActualDerivative ...
+                    +model.nominalReference.decayRate*solution.clfInitialValue-solution.clfSlack;
+            end
+            solution=localTerminalMetrics(solution,model);
+            solution.terminalEnd="nonlinearEndpoint";
+            [member,~,info]=terminalSafeSet.member(data.terminalContext,solution.states(:,end),search.horizonSteps);
+            solution.terminalMarginMeters=info.margin;solution.terminalExitSeconds=info.exitSeconds;
+            solution.terminalEnd=info.end;search.nonlinearTerminalMember=member;
+            if ~member
+                solution=[];search.returned=false;search.terminationReason="nonlinearTerminalMembershipFailed";
+            end
+        end
+    end
+    model.linearization=anchor;model.trustWarmStartAdjusted=false;
+    search.stopReason=search.terminationReason;
+    if isfield(search,'finalConstraintViolation')
+        search.stopReason=search.stopReason+sprintf( ...
+            ' (residual %.6g, %d nonlinear iterations; inequality %.6g, dynamics %.6g, terminal %.6g)', ...
+            search.finalConstraintViolation,search.nonlinearIterations, ...
+            search.constraintResiduals.inequality,search.constraintResiduals.dynamics,search.constraintResiduals.terminal);
+    end
+    search.elapsedSeconds=toc(timer);
+    search.attempts=localAttempt(search);search.selectedAttempt=double(search.returned);
+end
+
+function data=localNonlinearData(anchor,model,problem)
+    cfg=model.cfg;count=size(anchor.inputs,2);nv=numel(problem.lower);
+    data=struct('anchor',anchor,'model',model,'problem',problem,'count',count,'nv',nv);
+    data.lower=problem.lower;data.upper=problem.upper;
+    data.stateRadius=model.uncertaintyPrediction.egoStateRadius;
+    data.sideReserve=zeros(2,count);data.frontReserve=zeros(2,2*count+1);
+    data.collisionReserve=zeros(4,2*count+1);data.dual=zeros(4,2*count+1);
+    data.forecast=localTargetAt(model,(0:2*count)*cfg.controller.sampleTime/2);
+    data.shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    data.terminalContext=model.terminalContext;
+    data.terminalContext.solveTimeLimitSeconds=Inf;
+    model.fixedCollisionNormals=problem.safetyNormals;
+    side=[0,0,0,-tan(cfg.model.sideslipMaximum),1,0;0,0,0,-tan(cfg.model.sideslipMaximum),-1,0];
+    for p=1:2*count+1
+        x=model.sampledStates(:,p);generator=diag(data.stateRadius(:,p));
+        if isfield(model,'jointPredictionTube') && ~isempty(model.jointPredictionTube)
+            generator=model.jointPredictionTube.generator{p};
+        elseif p==1
+            generator=model.uncertainty.egoGenerator;
+        end
+        if p>1 && mod(p,2)==1,data.sideReserve(:,(p-1)/2)=sum(abs(side*generator),2);end
+        [~,bounds]=localFrontDomain(x,[0;0],cfg,generator);
+        angle=atan2(x(5)+cfg.vehicle.lf*x(6),x(4));limit=pi/2-10*cfg.solver.constraintTolerance;
+        data.frontReserve(:,p)=[limit-angle;limit+angle]-bounds;
+        if ~isempty(model.target) && norm(problem.safetyNormals(:,p))>0
+            relative=localRelativeGenerator(x,generator,model,model.initialState);
+            [~,~,data.collisionReserve(:,p)]=localSafety(x,data.forecast(:,p),p,model,relative);
+            q=data.forecast(:,p);rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+            normal=rotation.'*problem.safetyNormals(:,p);
+            data.dual(:,p)=[max(normal,0);max(-normal,0)];
+        end
+    end
+    % Rows have a fixed identity even when a terminal closest feature changes.
+    % One scalar evaluates the terminal continuation directly.
+    data.collisionRowSlack=zeros(40*count+20,1);row=0;
+    for k=1:count
+        if ~isempty(model.target)
+            data.collisionRowSlack(row+(1:8))=k;row=row+8;
+        end
+        row=row+6+6+2; % midpoint bounds, three front domains, next sideslip
+        if isfinite(cfg.model.brakingRatioRateMaximum),row=row+2;end
+    end
+    if ~isempty(model.target),data.collisionRowSlack(row+(1:4))=count+1;row=row+4;end
+    row=row+1+double(problem.clf.enabled);
+    data.collisionRowSlack=data.collisionRowSlack(1:row);
+end
+
+function [c,ceq,gc,gceq]=localNonlinearConstraints(point,data)
+    % SQP line search may try points outside the Fiala function domain.
+    % A nonfinite evaluation requests backtracking; it must not alter the
+    % tire model or turn a rejected trial into an applied vehicle command.
+    try
+        if nargout>2
+            [c,ceq,gc,gceq]=localNonlinearConstraintValues(point,data);
+        else
+            [c,ceq]=localNonlinearConstraintValues(point,data);
+        end
+    catch exception
+        if ~any(string(exception.identifier)==["collisionAvoidanceController:nonlinearDomain", ...
+                "collisionAvoidanceController:invalidTireOperatingPoint", ...
+                "collisionAvoidanceController:singularTireLinearization"])
+            rethrow(exception);
+        end
+        c=nan(numel(data.collisionRowSlack),1);ceq=nan(6*(data.count+1),1);
+        gc=zeros(data.nv,numel(c));gceq=zeros(data.nv,numel(ceq));
+    end
+end
+
+function [c,ceq,gc,gceq]=localNonlinearConstraintValues(point,data)
+    p=data.problem;m=data.model;cfg=m.cfg;n=data.count;nv=data.nv;
+    x=data.anchor.states+reshape(point(p.stateIndices),size(data.anchor.states));
+    u=data.anchor.inputs+reshape(point(p.inputIndices),size(data.anchor.inputs));
+    c=zeros(numel(data.collisionRowSlack),1);jac=zeros(numel(c),nv);row=0;
+    ceq=zeros(6*(n+1),1);jeq=zeros(numel(ceq),nv);
+    ceq(1:6)=x(:,1)-m.initialState;jeq(1:6,p.stateIndices(:,1))=eye(6);
+    low=[cfg.model.speedMinimum;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
+    high=[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
+    side=[0,0,0,-tan(cfg.model.sideslipMaximum),1,0;0,0,0,-tan(cfg.model.sideslipMaximum),-1,0];
+    for k=1:n
+        [middle,am,bm,next,a,b]=nonlinearBicycleModel.hold(x(:,k),u(:,k),cfg);
+        cols=[p.stateIndices(:,k);p.inputIndices(:,k)];map=[am,bm];
+        rows=6*k+(1:6);ceq(rows)=x(:,k+1)-next;
+        jeq(rows,cols)=-[a,b];jeq(rows,p.stateIndices(:,k+1))=eye(6);
+        if ~isempty(m.target)
+            collision(x(:,k),2*k-1,p.stateIndices(:,k),eye(6),k);
+            collision(middle,2*k,cols,map,k);
+        end
+        radius=data.stateRadius(4:6,2*k);
+        push([middle(4:6)-high+radius;low-middle(4:6)+radius], ...
+            [map(4:6,:);-map(4:6,:)],cols);
+        front(x(:,k),u(:,k),2*k-1,[p.stateIndices(:,k);p.inputIndices(:,k)],eye(6,8),k);
+        front(x(:,k+1),u(:,k),2*k+1,[p.stateIndices(:,k+1);p.inputIndices(:,k)],eye(6,8),k);
+        front(middle,u(:,k),2*k,cols,map,k);
+        value=side*x(:,k+1)+data.sideReserve(:,k);derivative=side;
+        if x(4,k+1)<=cfg.model.brakeHoldSpeed,value(:)=-1;derivative(:)=0;end
+        push(value,derivative,p.stateIndices(:,k+1));
+        if isfinite(cfg.model.brakingRatioRateMaximum)
+            previous=m.previousInput;columns=p.inputIndices(2,k);gradient=1;
+            if k>1,previous=u(:,k-1);columns=[columns,p.inputIndices(2,k-1)];gradient=[1,-1];end
+            rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
+            push([u(2,k)-previous(2)-rate;previous(2)-u(2,k)-rate],[gradient;-gradient],columns);
+        end
+    end
+    if ~isempty(m.target),collision(x(:,end),2*n+1,p.stateIndices(:,end),eye(6),n+1);end
+    [terminal,terminalGradient]=localNonlinearTerminal(x(:,end),data,nargout>2);
+    push(terminal,terminalGradient,p.stateIndices(:,end));
+    if p.clf.enabled
+        [e,j]=nonlinearBicycleModel.errorLinearization(x(:,2),m.lane,m.nominalReference);
+        value=e.'*m.nominalReference.matrix*e;
+        alpha=m.nominalReference.decayRate;
+        residual=(value-exp(-alpha*cfg.controller.sampleTime)*p.initialClfValue)/p.clfScale ...
+            -p.clfSlackDuration*point(p.clfIndex);
+        gradient=[2*e.'*m.nominalReference.matrix*j/p.clfScale,-p.clfSlackDuration];
+        push(residual,gradient,[p.stateIndices(:,2);p.clfIndex]);
+    end
+    assert(row==numel(c));gc=sparse(jac.');gceq=sparse(jeq.');
+    function push(value,gradient,columns)
+        rows=row+(1:numel(value));c(rows)=value;jac(rows,columns)=gradient;row=row+numel(value);
+    end
+    function collision(y,index,columns,map,slack)
+        if norm(data.dual(:,index))==0
+            push(-ones(4,1),zeros(4,numel(columns)+1),[columns(:);p.slackIndices(slack)]);return;
+        end
+        q=data.forecast(:,index);
+        [gap,j]=predictiveSafetyGeometry.fixedDualRows(y(1:3),data.shape,q(1:3),q(8:11),data.dual(:,index));
+        push(data.collisionReserve(:,index)-gap-point(p.slackIndices(slack)), ...
+            [-j*map(1:3,:),-ones(4,1)],[columns(:);p.slackIndices(slack)]);
+    end
+    function front(y,input,index,columns,map,stage)
+        [r,bound]=localFrontDomain(y,input,cfg,zeros(6,0));
+        gradient=r(:,1:6)*map;gradient(:,end-1:end)=gradient(:,end-1:end)+r(:,7:8);
+        reserve=data.frontReserve(:,index);
+        if isfield(m,'jointPredictionTube') && ~isempty(m.jointPredictionTube)
+            reserve=reserve+m.jointPredictionTube.inputRadius(1,stage);
+        end
+        push(-bound+reserve,gradient,columns);
+    end
+end
+
+function [value,gradient]=localNonlinearTerminal(y,data,wantGradient)
+    % Re-evaluate the declared braking continuation, never its old tangent.
+    % Signed geometry keeps the row count fixed across closest-feature changes.
+    value=terminalSafeSet.nonlinearValue(data.terminalContext,y,data.count);gradient=zeros(1,6);
+    if ~wantGradient,return;end
+    delta=1e-5*max(1,abs(y));
+    for j=1:6
+        step=zeros(6,1);step(j)=delta(j);
+        plus=terminalSafeSet.nonlinearValue(data.terminalContext,y+step,data.count);
+        minus=terminalSafeSet.nonlinearValue(data.terminalContext,y-step,data.count);
+        gradient(j)=(plus-minus)/(2*delta(j));
+    end
+end
+
+function [value,gradient,costs]=localNonlinearObjective(point,data,primary)
+    p=data.problem;m=data.model;cfg=m.cfg;n=data.count;
+    gradient=zeros(data.nv,1);
+    if primary,value=sum(point(p.slackIndices));gradient(p.slackIndices)=1;return;end
+    x=data.anchor.states+reshape(point(p.stateIndices),size(data.anchor.states));
+    u=data.anchor.inputs+reshape(point(p.inputIndices),size(data.anchor.inputs));
+    stateUnits=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+        cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+    inputUnits=[cfg.clf.certificationSteeringRadians;cfg.clf.certificationBrakingRatio];
+    tracking=0;variation=0;
+    for k=1:n
+        [error,j]=nonlinearBicycleModel.errorLinearization(x(:,k+1),m.lane,m.nominalReference);
+        tracking=tracking+.5*cfg.rti.nominalTrackingWeight*sum((error./stateUnits).^2)/n;
+        gradient(p.stateIndices(:,k+1))=cfg.rti.nominalTrackingWeight*j.'*(error./stateUnits.^2)/n;
+        previous=m.previousInput;if k>1,previous=u(:,k-1);end
+        difference=u(:,k)-previous;
+        variation=variation+.5*cfg.rti.inputVariationWeight*sum((difference./inputUnits).^2);
+        g=cfg.rti.inputVariationWeight*difference./inputUnits.^2;
+        gradient(p.inputIndices(:,k))=gradient(p.inputIndices(:,k))+g;
+        if k>1,gradient(p.inputIndices(:,k-1))=gradient(p.inputIndices(:,k-1))-g;end
+    end
+    refMap=p.referenceStateMap.'*p.referenceStateMap+p.referenceInputMap.'*p.referenceInputMap;
+    reference=.5*cfg.rti.referenceDeviationWeight*(point.'*refMap*point);
+    gradient=gradient+cfg.rti.referenceDeviationWeight*refMap*point;
+    value=tracking+variation+reference;
+    costs=struct('nominalTrackingCost',tracking,'inputVariationCost',variation, ...
+        'referenceDeviationCost',reference,'performanceCost',value);
+    value=value/p.clfScale;gradient=gradient/p.clfScale;
+    if p.clf.enabled
+        value=value+p.clfSlackDuration*point(p.clfIndex);
+        gradient(p.clfIndex)=p.clfSlackDuration;
     end
 end
 

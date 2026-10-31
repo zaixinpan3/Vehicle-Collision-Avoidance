@@ -1,8 +1,10 @@
 function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
 %collisionAvoidanceController PCBF/CLF control with one horizon per encounter.
-% Joint inputs use a retained nonlinear policy/terminal certificate. The
-% point-RTI comparison path uses the iterate described below.
+% The default point-SQP-RTI path uses the iterate described below.
+% solver.method="nonlinear" selects an iterated nonlinear shooting solve;
+% its observer margins remain engineering approximations. retainedTube is a
+% separate, optional nonlinear policy/terminal certification backend.
 % Controller state retains a target prediction and a linearization trajectory.
 % The first accepted encounter plan fixes its node count until the encounter
 % is cleared. Its remaining states and inputs are shifted and one tail hold
@@ -26,9 +28,7 @@ function [command,predictedInput,prediction,controllerState] = ...
 % It loads the compiled kernels and straight-road trim before timed samples.
 % Integrations with observer bounds also prime their bounded-input path.
 % Startup preparation is separate from the online computation budget.
-% Synchronized joint-observer inputs select the retained nonlinear policy/
-% terminal certificate by default. It reports terminal takeover as an
-% experiment-stop error; point-SQP-RTI remains available for comparisons.
+% The retained backend reports terminal takeover as an experiment-stop error.
     persistent lastState
     if nargin<=3 && (ischar(egoState) || isstring(egoState))
         action=string(egoState);
@@ -171,8 +171,8 @@ function [command,predictedInput,prediction,controllerState] = ...
     end
     if isempty(solution)
         error('collisionAvoidanceController:noOptimizationSolution', ...
-            'RTI could not complete its local optimization (%s; %s).', ...
-            search.terminationReason,search.stopReason);
+            '%s could not complete its optimization (%s; %s).', ...
+            cfg.solver.method,search.terminationReason,search.stopReason);
     end
     predictedInput=solution.inputs;first=predictedInput(:,1);
     egoJointPrediction=[];
@@ -302,6 +302,24 @@ function [command,predictedInput,prediction,controllerState] = ...
     if model.robustnessRelaxation && ~solution.clfEnabled
         metadata.safetyObjective="sumOfHorizonSafetySlacks";
         metadata.safetyScope="affineCollisionWithRelaxedObserverMargins";
+    end
+    if string(cfg.solver.method)=="nonlinear"
+        metadata.predictionModel="nonlinearMultipleShooting";
+        metadata.safetyScope="nonlinearSampledConstraintsWithFrozenObserverMargins";
+        metadata.safetyValueInterpretation="nonlinearSlackSum";
+        metadata.solverAlgorithm="fminconSqp";
+        metadata.optimizationProblemClass="NLP";
+        if search.secondaryStageAttempted,metadata.secondaryProblemClass="NLP";end
+        metadata.primaryOptimumComputed=search.pcbfStageCompleted ...
+            && solution.safety<=cfg.solver.constraintTolerance;
+        metadata.primaryOptimalityScope="zeroSlackLowerBoundOrLocalNlpCandidate";
+        metadata.nonlinearValidationPerformed=true;
+        metadata.nonlinearHardResidual=solution.hard;metadata.affineHardResidual=NaN;
+        metadata.clfNextValueScope="nonlinearPredictedState";
+        metadata.trustRegionEnabled=false;metadata.postSolveFeasibilityCheck=true;
+        metadata.nonlinearIterations=search.nonlinearIterations;
+        metadata.uncertaintyFrozenWithinSolve=true;
+        if solution.clfEnabled,metadata.clfLocalModel="integratedContinuousClfNonlinearInNextState";end
     end
     avoidanceInitialized=search.planner.used;
     if ~model.targetOnset && isstruct(previousState) && isfield(previousState,'avoidanceInitialized')

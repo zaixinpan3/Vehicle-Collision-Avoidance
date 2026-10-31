@@ -40,6 +40,7 @@ The executable approximation and the mathematical algorithm have distinct guaran
 | Object | Prediction and conclusion |
 | --- | --- |
 | Default online experiment | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, joint affine uncertainty prediction when a synchronized observer snapshot exists, and terminal tangents. Legacy inputs retain their published margins. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The affine update returns its first input after numerical input-bound normalization, without a post-solve nonlinear feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
+| Nonlinear optimization baseline | `solver.method="nonlinear"` uses direct multiple shooting with nonlinear RK4 equalities, exact rotating-vertex support gaps in the reference's separation directions, and a re-evaluated simplified terminal continuation. MATLAB `fmincon` performs multiple SQP iterations with line search. Observer/feedback supports and input reserves are frozen at the frame's reference. This isolates nonlinear nominal optimization from one-step RTI; it does not implement the complete robust information-set theorem. |
 | Retained-certificate verification mode | A retained nonlinear policy/terminal certificate with measurement-conditioned proposals. Performance optimization acts only inside a policy box admitted by full-domain enclosures. Failure to admit a new driving continuation retains the previous certificate; requesting actual terminal control stops the driving experiment. Initial admission may fail before any control is applied. |
 | Unified observer-to-safety design | Current observer containment, retained physical successor sets, signed whole-hold margins and a common terminal continuation. The information-set shift proves conditional recursive feasibility and zero-deficit safety. Future observer dynamics are needed only for the optional prediction of observation-dependent policies. |
 
@@ -84,6 +85,22 @@ a clearance deficit. Zero affine slack does not certify nonlinear or
 continuous-time safety. Road constraints are disabled by default; the ideal
 information-set proof below also omits road boundaries. Optional road rows require their
 own compatible images and terminal checks.
+
+The nonlinear baseline keeps the same PCBF-first objective and a secondary
+tracking/input-variation objective under the attained primary budget. Outside
+an encounter it imposes the integrated continuous-CLF inequality on the actual
+nonlinear first predicted state. It omits RTI's numerical trust box. Nonlinear
+constraint residuals are checked before returning a command, including direct
+terminal membership; an iteration limit with feasible residuals is explicitly
+reported as an unconverged feasible return. A local solver termination does not
+establish the globally minimum PCBF value. Out-of-domain Fiala trial evaluations
+return nonfinite constraint values to request line-search backtracking; they do
+not change the plant model. `scripts/runNonlinearControllerExperiment.m` runs
+the position-only GNSS/IMU/gyro/radar estimator and nonlinear plant to recovery
+or a recorded failure. It records deadlines and failure outcomes without
+assuming that nonlinear optimization succeeds or meets real-time requirements.
+Its diagnostic wall limit is checked by the solver iteration callback; internal
+QP work and line searches can overrun that limit.
 
 ## Contents
 

@@ -15,6 +15,25 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function nonlinearTerminalValueRejectsAnUnsafeParkedTrack(testCase)
+            q=[20;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            model=localModel([0;0;0;8;0;0],q);context=terminalSafeSet.context(model);
+            testCase.verifyGreaterThan(terminalSafeSet.nonlinearValue(context,model.initialState,0),0);
+            model.initialState(2)=6;context=terminalSafeSet.context(model);
+            testCase.verifyLessThanOrEqual(terminalSafeSet.nonlinearValue(context,model.initialState,0),0);
+            testCase.verifyTrue(terminalSafeSet.member(context,model.initialState,0));
+        end
+        function nonlinearTerminalValueRejectsOverlapEvenWithZeroInflation(testCase)
+            q=[0;0;0;0;0;0;1.6;2.4;.95;0;0];
+            model=localModel(zeros(6,1),q);context=terminalSafeSet.context(model);
+            testCase.verifyEqual(context.required,0);
+            testCase.verifyGreaterThan(terminalSafeSet.nonlinearValue(context,model.initialState,0),0);
+        end
+        function nonlinearTerminalValueIncludesRestAdmissibility(testCase)
+            model=localModel([0;0;0;8;0;0],[]);model.cfg.model.speedMinimum=1;
+            context=terminalSafeSet.context(model);
+            testCase.verifyGreaterThan(terminalSafeSet.nonlinearValue(context,model.initialState,0),0);
+        end
         function jointMembershipChecksTheTerminalEntrySlew(testCase)
             model=localModel([0;0;0;8;0;0],[]);
             model.cfg.model.brakingRatioRateMaximum=1;

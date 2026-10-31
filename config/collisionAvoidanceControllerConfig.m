@@ -154,7 +154,7 @@ function cfg=localDefaults()
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for output assembly. Native
     % solves also count their construction time against the remaining budget.
-    cfg.solver=struct('maxIterations',40,'timeLimitSeconds',.1,'completionReserveSeconds',.002, ...
+    cfg.solver=struct('method',"rti",'maxIterations',40,'timeLimitSeconds',.1,'completionReserveSeconds',.002, ...
         'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
         'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
         'reducedTolerance',1e-3);
@@ -176,6 +176,10 @@ function base=localMerge(base,overrides)
 end
 
 function localValidate(cfg)
+    assert(any(string(cfg.solver.method)==["rti","nonlinear"]), ...
+        'collisionAvoidanceController:invalidConfiguration','solver.method must be rti or nonlinear.');
+    assert(~(string(cfg.solver.method)=="nonlinear" && cfg.controller.retainedTube), ...
+        'collisionAvoidanceController:invalidConfiguration','Nonlinear optimization and retainedTube are separate backends.');
     validateattributes(cfg.referenceSpeed,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.horizonSteps,{'double'},{'scalar','real','finite','integer','positive'});
