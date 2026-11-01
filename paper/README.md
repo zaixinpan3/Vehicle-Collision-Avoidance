@@ -87,7 +87,7 @@ nor sampled replay closes those gaps.
 ## Figures and submission fields
 
 The generated figure outputs are not tracked. Compilation uses
-`driving_environment_junction_v05.pdf`, `ego_obstacle_dynamics_v02.pdf`,
+`driving_environment_junction_v06.pdf`, `ego_obstacle_dynamics_v02.pdf`,
 `system_architecture_v12.pdf`, and `closed_loop_results_v03.pdf`.
 The generated manuscript PDF and these figure dependencies are excluded
 from the source commit.
@@ -96,7 +96,7 @@ The current system architecture source is
 `figures/system_architecture_v12.tex`. Compile it with `pdflatex` in the
 `figures/` directory before building the manuscript when its PDF is absent.
 The driving-environment figure is generated in the same way from
-`figures/driving_environment_junction_v05.tex`.
+`figures/driving_environment_junction_v06.tex`.
 
 Before submission, complete the author, affiliation, funding,
 competing-interest, contribution and repository-release declarations.
