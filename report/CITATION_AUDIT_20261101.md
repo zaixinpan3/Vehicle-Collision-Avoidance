@@ -1,12 +1,12 @@
 # Citation audit: work in progress
 
-This is a partial audit of the 47 citation keys present when this review began; the eight sources not yet located are deferred at the user’s request. Source availability does not mean that every citation context or every bibliographic field has been verified. The manuscript and bibliography contained pre-existing uncommitted edits.
+This is a partial audit of the 47 citation keys present when this review began; Petersen (1987) remains unavailable and is deferred at the user’s request. Source availability does not mean that every citation context or every bibliographic field has been verified. The manuscript and bibliography contained pre-existing uncommitted edits.
 
-The table records local PDF locations and the status of claim checking. Original PDFs were read in place. Bibliographic fields have been compared automatically with Zotero metadata where available; an independent full bibliographic verification remains pending. Eight entries have not yet been located in the searched Zotero library or project reference directory.
+The table records local PDF locations and the status of claim checking. Original PDFs were read in place. Bibliographic fields have been compared automatically with Zotero metadata where available; an independent full bibliographic verification remains pending. Seven previously missing PDFs were supplied in Zotero on November 1; Petersen (1987) remains unlocated.
 
 | Citation key | Citation lines in current draft | Local source | Claim-check status |
 |---|---|---|---|
-| `LiEtAl2022Emergency` | 108 | Not located in searched local sources | Pending source and claim verification. |
+| `LiEtAl2022Emergency` | 108 | Zotero attachment `ZKJIRRP5` | Abstract: integrated steering and differential braking provides an example of emergency avoidance research; the introduction citation is appropriate. |
 | `ChenChengLiZhaoWang2024` | 108 | `/home/zai/Zotero/storage/55MM4VEQ/Chen et al. - 2024 - Lateral and Longitudinal Integrated Emergency Collision Avoidance System With Handling Stability Gua.pdf` | Abstract: integrated lateral and longitudinal collision avoidance with handling stability is a relevant example. |
 | `TanWuLiLiuZhang2025` | 111 | `/home/zai/Zotero/storage/GD4E5NAP/Tan et al. - 2025 - Autonomous Emergency Collision Avoidance and Collaborative Stability Control Technologies for Intell.pdf` | Abstract: survey covers emergency collision avoidance and coordinated stability control. |
 | `BealBoyd2019` | 117 | `/home/zai/Zotero/storage/LXFID7F7/Beal and Boyd - 2019 - Coupled lateral-longitudinal vehicle dynamics and control design with three-dimensional state portra.pdf` | Abstract and vehicle model: coupled longitudinal and lateral nonlinear dynamics and tire forces are central to the study. |
@@ -45,13 +45,13 @@ The table records local PDF locations and the status of claim checking. Original
 | `TezukaNakamura2020` | 221 | `/home/zai/Zotero/storage/JPS5JKLV/Tezuka and Nakamura - 2020 - Time-varying Obstacle Avoidance by Using High-gain Observer and Input-to-State Constraint Safe Contr.pdf` | Abstract and Sections 4–6: a high-gain observer is combined with an input-to-state constraint safety CBF for a moving obstacle. |
 | `QuanZhouFriskChung2025` | 222, 3416 | `/home/zai/Zotero/storage/UUL9BKYD/Quan et al. - 2025 - Observer-Based Environment Robust Control Barrier Functions for Safety-Critical Control With Dynamic.pdf` | Section III: obstacle observer and time-varying error sets enter the robust CBF. The manuscript example at the later citation is its own mathematical counterexample, not an experiment attributed to Quan et al. |
 | `BatkovicGuptaZanonFalcone2023` | 224 | `../reference/Batkovic et al. - 2023 - Experimental Validation of Safe MPC for Autonomous Driving in Uncertain Environments.pdf` | Abstract and Section III: uncertainty handling, recursive feasibility and terminal construction; detailed sensor-model attribution remains to be checked. |
-| `RedmonDivvalaGirshickFarhadi2016` | 480 | Not located in searched local sources | Pending source and claim verification. |
-| `BoydElGhaouiFeronBalakrishnan1994` | 1229 | Not located in searched local sources | Pending source and claim verification. |
-| `Lofberg2004` | 1266 | Not located in searched local sources | Pending source and claim verification. |
-| `Sturm1999` | 1266 | Not located in searched local sources | Pending source and claim verification. |
+| `RedmonDivvalaGirshickFarhadi2016` | 480 | Zotero attachment `FVPVX56A` | Abstract and Section 2: YOLO jointly predicts bounding boxes and class probabilities. This is the foundational YOLO paper, not a source for every detail of the implemented detector version. |
+| `BoydElGhaouiFeronBalakrishnan1994` | 1229 | Zotero attachment `C45M4ZJR` | Chapter 6, Section 6.2.2: an observability Gramian solves a Lyapunov equation and yields an output-energy bound. The manuscript specializes this to a linear noise-to-output variance bound. The PDF title page lists four authors; Zotero incorrectly lists editor fields, while references.bib correctly lists the four authors. |
+| `Lofberg2004` | 1266 | Zotero attachment `VT8R2H6Z` | Abstract and introduction: YALMIP models optimization problems and interfaces to solvers including SeDuMi. PDF identifies the 2004 IEEE International Symposium on Computer Aided Control Systems Design; references.bib agrees, whereas the Zotero proceedings-title field incorrectly names ICRA. |
+| `Sturm1999` | 1266 | Zotero attachment `9YAV5DPQ` | Title and abstract: SeDuMi is a MATLAB toolbox for optimization over symmetric cones. The manuscript cites it as the SDP solver; its use must also match the actual implementation and experiment version. |
 | `ZhaiEtAl2024` | 1588 | `/home/zai/Zotero/storage/KSKBCNF8/Zhai et al. - 2024 - Local Trajectory Planning for Obstacle Avoidance of Unmanned Tracked Vehicles Based on Artificial Po.pdf` | Abstract and methods: APF with directional static and motion-dependent dynamic obstacle effects and speed planning; manuscript presents an adaptation rather than an identical method. |
-| `ZhangLinigerBorrelli2021` | 1643 | Not located in searched local sources | Pending source and claim verification. |
-| `ChenJankovicSantilloAmes2021` | 1919 | Not located in searched local sources | Pending source and claim verification. |
+| `ZhangLinigerBorrelli2021` | 1643 | Zotero attachment `DIPZYV4U` | Abstract and Sections III–IV: strong duality reformulates convex-set distance and signed distance constraints. The manuscript presents a specialized rectangle/vertex dual formula and must support that specialization with its own derivation. |
+| `ChenJankovicSantilloAmes2021` | 1919 | Zotero attachment `WNZ82776` | Abstract and Section II: a fixed backup policy and its flow define a control-invariant safe set. The manuscript terminal construction is related in principle; it is not identical to the cited paper’s backup-CBF implementation. |
 | `Petersen1987` | 2008 | Not located in searched local sources | Pending source and claim verification. |
 
 ## Corrections made
@@ -60,12 +60,14 @@ The table records local PDF locations and the status of claim checking. Original
 - The Introduction describes the cited planning and chassis-control layers as different without asserting model mismatch.
 - The control design attributes primary slack minimization to Huang et al. and the related two-step safety-filter structure to Wabersich and Zeilinger; the latter uses stagewise slacks.
 - IEEE-style citation compression was disabled in the manuscript; the working PDF compiled successfully.
+- After reading Chen et al. (2021), describe the terminal construction as following the backup-policy idea instead of equating it with their backup-CBF formulation.
 
 ## Remaining work
 
 - Finish the specifically flagged model and experiment details, and independently recheck repeated occurrences against the relevant full-text sections.
-- Locate the eight missing full texts and verify bibliographic metadata and citation meaning from the actual editions.
+- Locate Petersen (1987) and verify the stated lemma and its exact assumptions from the original source.
 - Verify complete authors, venue, year, volume, issue, pages and DOI independently against the publication records or original PDFs. Zotero agreement alone is not independent verification.
 - Review all edits against the user’s preferred Introduction style and recompile after changes.
+- Correct the Boyd author roles and YALMIP proceedings-title metadata in Zotero only if a library edit is requested; the manuscript bibliography already has the correct information.
 
 This report records progress only and does not certify the references or the paper as submission-ready.
