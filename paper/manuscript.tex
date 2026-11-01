@@ -212,15 +212,38 @@ estimation, simply refreshing the estimate and re-tightening constraints
 at each sample can invalidate the previous step's backup plan unless
 successive uncertainty sets remain compatible.
 
-Motivated by these challenges, this paper develops a joint NRMM-based
-state estimator and PCBF--CLF collision-avoidance controller built around
-a shared dynamic bicycle model with modified Fiala tires. Rather than
-treating estimation and control separately, the two modules share the
-tire model and operating domain. The observer supplies online error
-enclosures that remain valid during aggressive ego maneuvers, and the
-predictive controller uses those enclosures to tighten its collision
-constraints while coordinating steering and braking in real time.
-Specifically, the main contributions of this work are as follows.
+To address these challenges, this paper develops a joint NRMM-based
+state estimator and PCBF--CLF controller built around a shared dynamic
+bicycle model with modified Fiala tires. As shown in
+Fig.~\ref{fig:architecture}, the system consists of perception, state
+estimation, and predictive control. The perception stage uses camera and
+LiDAR data to obtain the relative position of a surrounding vehicle. The
+estimator combines this position with GNSS position, body-frame
+acceleration, and yaw-rate measurements to estimate the motion of the
+ego vehicle and one target vehicle. It also supplies error enclosures
+to the controller under the stated sensor and model assumptions.
+
+The controller uses the estimates, their enclosures, and a reference path
+to coordinate steering and longitudinal actuation. It gives priority to
+collision avoidance while pursuing nominal driving objectives through a
+control Lyapunov function. The controller's held input is also supplied
+to the ego-vehicle estimator, which uses the shared tire model to infer
+lateral velocity. The design and evaluation of the perception pipeline are
+not the focus of this paper. The camera--LiDAR pipeline has been tested
+offline, whereas the closed-loop experiments use synthetic relative-position
+measurements. The main contributions of this work are as follows.
+
+\begin{figure*}[!t]
+    \centering
+    \includegraphics[width=0.96\textwidth]{system_architecture_v12.pdf}
+    \caption{Overall architecture of the collision-avoidance system.
+    The estimator supplies ego and target estimates to the predictive
+    controller, and the controller returns its held input to the ego
+    observer. The perception pipeline is evaluated offline; the
+    closed-loop experiments use synthetic target-position measurements.}
+    \label{fig:architecture}
+\end{figure*}
+
 \begin{enumerate}
 \item We reformulate the NRMM target observer of
 \cite{SharmaAlaiRajamani2026} in covariant coordinates so that measured
@@ -255,35 +278,6 @@ collision-threat encounters under both exact states and bounded sensor
 noise over six random seeds, including an audit of truth containment for
 the published enclosures (Section~\ref{sec:results}).
 \end{enumerate}
-The collision-avoidance system consists of perception, state estimation,
-and predictive control, as shown in Fig.~\ref{fig:architecture}. The
-perception stage uses camera and LiDAR data to obtain the relative
-position of a surrounding vehicle. The estimator combines this position
-with GNSS position, body-frame acceleration, and yaw-rate measurements
-to estimate the motion of the ego vehicle and one target vehicle. It also
-provides error enclosures for use in the controller.
-
-The controller uses the estimated states, their enclosures, and a
-reference path to coordinate steering and longitudinal actuation. During
-an encounter, it gives priority to collision avoidance while pursuing
-nominal driving objectives through a control Lyapunov function. The input
-held by the controller is supplied to the ego-vehicle estimator, which
-uses the vehicle model to infer lateral velocity. The camera--LiDAR
-perception pipeline has been evaluated offline; the closed-loop
-experiments in Section~\ref{sec:results} use synthetic relative-position
-measurements.
-
-\begin{figure*}[!t]
-    \centering
-    \includegraphics[width=0.96\textwidth]{system_architecture_v12.pdf}
-    \caption{Overall architecture of the collision-avoidance system.
-    The estimator supplies ego and target estimates to the predictive
-    controller, and the controller returns its held input to the ego
-    observer. The perception pipeline is evaluated offline; the
-    closed-loop experiments use synthetic target-position measurements.}
-    \label{fig:architecture}
-\end{figure*}
-
 The remainder of this paper is organized as follows.
 Sections~\ref{sec:estimator} and~\ref{sec:control} develop the state
 estimator and the predictive controller, respectively. Section~\ref{sec:results} presents the
