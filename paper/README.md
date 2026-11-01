@@ -87,8 +87,8 @@ nor sampled replay closes those gaps.
 ## Figures and submission fields
 
 The generated figure outputs are not tracked. Compilation uses
-`ego_obstacle_dynamics_v02.pdf`, `system_architecture_v12.pdf`, and
-`closed_loop_results_v03.pdf`.
+`driving_environment_curved_v08.pdf`, `ego_obstacle_dynamics_v02.pdf`,
+`system_architecture_v12.pdf`, and `closed_loop_results_v03.pdf`.
 The generated manuscript PDF and these figure dependencies are excluded
 from the source commit.
 
