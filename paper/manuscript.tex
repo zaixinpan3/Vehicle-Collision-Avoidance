@@ -296,27 +296,6 @@ measurements.
     \label{fig:architecture}
 \end{figure*}
 
-\subsection{The Task}
-
-The nominal driving task is cruising within a designated lane at a
-prescribed speed on a road bounded by curbs. A reference path specifies
-the route geometry, which is straight or of constant curvature. Other vehicles
-travel within or enter the sensed environment. The vehicle carries a
-global navigation satellite system (GNSS) receiver that measures its
-position, an inertial unit that measures body-frame
-acceleration and yaw rate, and a LiDAR and a camera that together
-measure the relative position of one obstacle vehicle. We want the
-following. While no collision is predicted, the ego follows the path at
-the prescribed speed. When continuing to do so would lead to a
-collision, it coordinates steering and longitudinal actuation so that
-the two bodies stay apart and its own body stays on the paved road; it
-may leave its lane for that. Once the risk is resolved it returns to the
-path and the speed. The road edge is a physical constraint; the path and
-the speed are objectives to be recovered. In the experiments of
-Section~\ref{sec:results} the road edges enter as declared lateral
-clearances on either side of the path, and the maneuvers leave the lane
-but stay on the road.
-
 \begin{figure*}[!t]
     \centering
     \includegraphics[width=0.92\textwidth]
