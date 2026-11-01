@@ -287,7 +287,7 @@ the route geometry, which is straight or of constant curvature
 (Fig.~\ref{fig:driving_environment}). Other vehicles
 travel within or enter the sensed environment. The vehicle carries a
 global navigation satellite system (GNSS) receiver that measures its
-position and velocity, an inertial unit that measures body-frame
+position, an inertial unit that measures body-frame
 acceleration and yaw rate, and a LiDAR and a camera that together
 measure the relative position of one obstacle vehicle. We want the
 following. While no collision is predicted, the ego follows the path at
@@ -575,19 +575,20 @@ differentiated. Their yaw stage switches between a heading inferred from
 the acceleration direction and the course angle; reading the course as
 the yaw is exact only at \(\beta_E=0\), since
 \(\gamma_E=\psi_E+\beta_E\). Here the same relation supplies a direct
-body-velocity measurement and, when it is informative, a certified
-heading correspondence for a parallel yaw observer. The second is a
-matter of certificates. The ego body-velocity observer and the target
-tracker form a two-stage cascade whose error obeys a positive comparison
-system; the comparison solution is the enclosure the controller
-receives.
+body-velocity pseudo-measurement and a heading correspondence for a
+parallel yaw observer. In the current implementation, inertial velocity
+is reconstructed from GNSS position and inertial measurements; its error
+enclosure enters the body-velocity and target-tracking bounds. The
+continuous-time body-velocity and target stages admit a two-stage ISS
+comparison under a declared velocity-input error bound. This conditional
+result does not by itself prove stability of the complete sampled
+position--velocity, yaw, and target-observer interconnection.
 
 The measurements are
 \begin{equation}
     \begin{aligned}
     \bm y_p&=\bm p_E+\bm n_p, &\quad
-    \bm v_m&=\bm v_E+\bm n_v,\\
-    \bm a_m&=\bm a_E+\bm n_a, &\quad
+    \bm a_m&=\bm a_E+\bm n_a,\\
     u_3&=\dot\psi_E+d_\omega,\\
     \bm y_R&=\bm\rho+\bm n_R,
     \end{aligned}
@@ -598,9 +599,48 @@ the ego frame, \(\bm\rho\) the relative position
 \eqref{eq:target_coordinates}, whose measurement \(\bm y_R\) is the
 perception output \eqref{eq:perception_relative_position}, and uniform
 bounds \(\normtwo{\bm n_p}\leq\bar n_p\),
-\(\normtwo{\bm n_v}\leq\bar n_v\), \(\normtwo{\bm n_a}\leq\bar n_a\),
+\(\normtwo{\bm n_a}\leq\bar n_a\),
 \(|d_\omega|\leq\bar n_g\), \(\normtwo{\bm n_R}\leq\bar n_R\). Inertial
 biases are compensated upstream; no observer carries a bias state.
+
+
+\subsection{Position--IMU Velocity Reconstruction}
+\label{subsec:positionVelocity}
+
+The GNSS receiver supplies position rather than a direct velocity
+measurement. At each sensor sample, a four-state filter corrects its
+inertial position and velocity predictions using the new GNSS position.
+For sample period $h$, bandwidth $\omega_f$, and predicted state
+$(\bm p_f^-,\bm v_f^-)$, define
+\begin{equation}
+    \begin{gathered}
+    q_f=e^{-\omega_f h},\quad \alpha_f=1-q_f^2,\quad
+    \beta_f=(1-q_f)^2/h,\\
+    \bm r_p=\bm y_p-\bm p_f^-,\quad
+    \bm p_f^+=\bm p_f^-+\alpha_f\bm r_p,\quad
+    \bm v_f^+=\bm v_f^-+\beta_f\bm r_p,\\
+    \bm p_{f,k+1}^-=\bm p_{f,k}^++h\bm v_{f,k}^+
+        +\tfrac12h^2\hat{\bm a}_{I,k},\quad
+    \bm v_{f,k+1}^-=\bm v_{f,k}^++h\hat{\bm a}_{I,k},\\
+    \hat{\bm a}_{I,k}=R(\hat\psi_{E,k})\bm a_{m,k}.
+    \end{gathered}
+    \label{eq:position_velocity_filter}
+\end{equation}
+Both posterior error poles equal $q_f$. Initialization uses earlier
+position measurements and a declared acceleration bound; it does not
+use true velocity or future measurements. The filter propagates signed
+error generators through its correction and prediction steps, including
+position noise, yaw uncertainty and acceleration mismatch. Bounded-noise
+position secants may further tighten the velocity enclosure without
+changing the numerical estimate. These are conditional containment bounds
+in real arithmetic, not a floating-point interval certificate.
+
+Write $\bm v_m$ for the reconstructed inertial velocity supplied to the
+remaining observer stages and $\bm n_v=\bm v_m-\bm v_E$ for its error.
+The continuous analysis below assumes a valid bound
+$\normtwo{\bm n_v}\leq\bar n_v$ over the interval being analyzed. In the
+sampled runtime the corresponding radius evolves with the measurements,
+motion and yaw bounds; it is not a GNSS velocity-sensor noise constant.
 
 \begin{assumption}
 \label{asm:ego}
@@ -764,31 +804,41 @@ remaining terms give \eqref{eq:ego_rows}.
 
 The same gyro error enters the measurement and the propagation, and
 bounding the two separately would throw away their cancellation; no
-statistical independence is used anywhere in the lemma, and the yaw
-error does not enter the velocity comparison at all.
+statistical independence is used anywhere in the lemma, and yaw error
+does not enter this conditional velocity comparison directly.
+In the sampled position--IMU filter, yaw uncertainty does affect the
+reconstructed velocity enclosure.
 
-Yaw and inertial position are estimated in parallel,
+Yaw and inertial position are estimated in parallel. Let $\bm v_B$
+denote the body-frame velocity pseudo-measurement, $\bm v_I=\bm v_m$ the
+reconstructed inertial velocity, and $s_f=\omega_f\bar n_p$. The yaw
+innovation uses the regularized direction correspondence
 \begin{equation}
-    \begin{aligned}
-    \dot{\hat\psi}_E&=u_3+\chi_m k_\psi
-        \operatorname{wrap}(y_F-\hat\psi_E),\\
-    \dot{\hat{\bm p}}_E&=\bm v_m+k_p(\bm y_p-\hat{\bm p}_E),
-    \end{aligned}
+    \begin{gathered}
+    c_f=\frac{\bm v_B^{\trans}\bm v_I}
+        {\normtwo{\bm v_B}\normtwo{\bm v_I}+s_f^2},\quad
+    s_f^{\psi}=\frac{v_{B,x}v_{I,y}-v_{B,y}v_{I,x}}
+        {\normtwo{\bm v_B}\normtwo{\bm v_I}+s_f^2},\\
+    \dot{\hat\psi}_E=u_3+k_\psi
+        (s_f^{\psi}\cos\hat\psi_E-c_f\sin\hat\psi_E),\\
+    \dot{\hat{\bm p}}_E=\bm v_m+k_p(\bm y_p-\hat{\bm p}_E).
+    \end{gathered}
     \label{eq:parallel_outputs}
 \end{equation}
-where $\chi_m=1$ only when the course correspondence is informative.
-While the innovation stays on one branch of the wrap the yaw error
-\(e_\psi=\hat\psi_E-\psi_E\) obeys
-\(\dot e_\psi=-k_\psi e_\psi+d_\omega+k_\psi(y_F-\psi_E)\) with
-\(|y_F-\psi_E|\leq B_F\); during uninformative intervals only the gyro
-propagates it. An orientation set $\Psi$ is propagated independently
-with the integral of the gyro error bound and intersected with each
-informative arc of Lemma~\ref{lem:course}. Disconnected components are
-kept, and the published bound is
-$B_\psi=\sup_{\theta\in\Psi}d_{S^1}(\hat\psi_E,\theta)$ about the actual
-estimate. An empty intersection invalidates the orientation outputs; it
-does not reset the observer. The position error
-\(\bm e_p=\hat{\bm p}_E-\bm p_E\) satisfies
+A numerical guard covers a zero denominator. The yaw correction varies
+continuously with the direction information and does not switch off
+according to the informative-arc flag. An orientation set $\Psi$ is
+propagated separately using the gyro error bound and intersected with
+valid measurement-consistent arcs. If the velocity information cannot
+constrain direction, its contribution is the whole circle. Disconnected
+components are kept, and the published radius is
+$B_\psi=\sup_{\theta\in\Psi}d_{S^1}(\hat\psi_E,\theta)$ about the
+numerical estimate. An empty intersection invalidates orientation
+outputs. Heading convergence from rest is not claimed.
+
+For the continuous position equation with a continuously available
+position signal and a uniform velocity-input error bound, the position
+error $\bm e_p=\hat{\bm p}_E-\bm p_E$ satisfies
 \begin{equation}
     \begin{gathered}
     D^+\normtwo{\bm e_p}\leq-k_p\normtwo{\bm e_p}+\bar n_v+k_p\bar n_p,\\
@@ -796,6 +846,9 @@ does not reset the observer. The position error
     \end{gathered}
     \label{eq:position_error_bound}
 \end{equation}
+This continuous comparison is conditional on its input bounds. The
+sampled realization separately accounts for held measurements and
+numerical defects; the comparison alone is not a sampled-system proof.
 
 \subsection{Model-Aided Lateral Velocity}
 \label{subsec:modelAided}
@@ -827,10 +880,20 @@ with $v_{y,E}$ and both lateral forces are non-increasing in their slip
 angle, so $G$ is non-increasing, and the measured $a_y$ determines
 $v_{y,E}$ wherever $G$ is strictly decreasing.
 
-The measurement $c$ solves \eqref{eq:force_balance} with the nominal
-parameters and the measured $a_{m,y}$, $u_3$ and $V_m$, by bisection on
-the cone $|v_{y,E}|\leq V\sin\beta_{\rm dom}$, and its radius is
-computed alongside. Let the cornering stiffnesses and friction
+The numerical pseudo-measurement $c$ is obtained from the nominal
+force balance with a proximal regularization. Let $G_0$ denote the
+nominal force function and let
+$\epsilon_F=m_E\bar n_a+\epsilon_{\rm par}\sum_j\mu_jF_{zj}$.
+On $|c|\leq V_m\sin\beta_{\rm dom}$, the point solution satisfies
+\begin{equation}
+    G_0(c)-\frac{\epsilon_F}{\max(V_m\sin\beta_{\rm dom},\epsilon_{\rm mach})}c
+    =m_Ea_{m,y},
+    \label{eq:regularized_force_inverse}
+\end{equation}
+with clamping at the cone endpoints when no root lies inside. The added
+slope regularizes the point inversion when tire force is saturated; it is
+not an additional physical tire force. A separate feasible interval is
+computed alongside the point estimate. Let the cornering stiffnesses and friction
 coefficients lie within a relative uncertainty $\epsilon_{\rm par}$ of
 their model values, and let $G_{\min}$ and $G_{\max}$ be the sums of the
 per-axle extremes of the force over the sensor bounds on $u_3$ and $V_m$
@@ -1076,7 +1139,10 @@ Subtracting the true chain from \eqref{eq:target_observer},
     \end{aligned}
     \label{eq:target_error_dynamics}
 \end{equation}
-All core couplings run forward, from the ego stage into the tracker.
+With the reconstructed-velocity error treated as a bounded input, the
+core couplings run forward from the ego stage into the tracker. The
+position--IMU filter depends on the yaw estimate, so this triangular
+comparison does not establish ISS of the enlarged interconnection.
 Cauchy--Schwarz in the metric \eqref{eq:target_metric} bounds the four
 input channels by
 \begin{equation}
@@ -1304,7 +1370,7 @@ zonotope
 \end{equation}
 about the estimated controller state, whose generator matrix $G_0$
 keeps the correlation between the yaw error and the body velocity
-inferred from the GNSS velocity. The target set $\mathcal Q_k$ consists
+inferred from reconstructed inertial velocity. The target set $\mathcal Q_k$ consists
 of a ball of radius $B_\rho$ for the relative position (an inertial
 ball once \eqref{eq:inertial_relative_bound} and the ego position radius
 are added), an interval for the course, and intervals for the speed, the
@@ -2722,7 +2788,9 @@ start-up, so that every code path is compiled before the first sample.
 The vehicle experiments describe the October 11 baseline at commit
 \path{4ed2344}, including its nonlinear acceptance-step policy and earlier
 terminal sideslip definition. Subsequent runtime and theory revisions
-have not been rerun through that campaign. Its numbers are preserved and
+have not been rerun through that campaign. In particular, those trials
+used direct GNSS velocity measurements and do not validate the present
+position-only GNSS interface. Its numbers are preserved and
 are not attributed to the current production algorithm or the complete
 information-set construction. Section~\ref{subsec:informationChecks}
 separately reports an October 25 longitudinal reference verification.
@@ -2733,8 +2801,8 @@ All results are synthetic. Sections~\ref{subsec:designResults} and
 \ref{subsec:estimatorResults} evaluate the estimator on its own, on
 prescribed kinematic motions and with the kinematic measurement of
 Section~\ref{subsec:egoObserver}; these trials predate the model-aided
-measurement and were not repeated after it was added, which leaves
-that branch of the estimator unchanged. The remaining sections evaluate
+measurement and the position-only GNSS update. They were not repeated
+after those changes. The remaining sections evaluate
 the controller with exact states and with the estimator in the loop.
 
 \subsection{Synthesized Estimator Design}
