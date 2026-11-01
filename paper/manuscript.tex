@@ -3,7 +3,7 @@
 \usepackage{amsmath,amssymb,bm}
 \usepackage{array}
 \usepackage{booktabs}
-\usepackage{cite}
+\usepackage[nocompress]{cite}
 \usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{url}
@@ -1321,10 +1321,11 @@ the computed bounds.
 \section{Control Design}
 \label{sec:control}
 
-The controller follows the two priorities of
-\cite{HuangWangMargellosGoulart2025}: minimize collision-constraint
-relaxation, then optimize a soft CLF/performance objective under that
-safety budget. The mathematical formulation in
+The controller first minimizes collision-constraint relaxation, following
+the predictive barrier formulation of \cite{HuangWangMargellosGoulart2025}.
+Its implementation then optimizes a soft CLF/performance objective under the
+attained safety budget, an ordering related to the predictive safety filter
+of \cite{WabersichZeilinger2023}. The mathematical formulation in
 Section~\ref{subsec:robust} makes the observer interface explicit and
 proves recursive feasibility under its declared contracts.
 
@@ -2192,10 +2193,11 @@ $\varsigma_i>0$, and
 These campaign-era problems have second-order cone representations. If the zero correction with zero
 slacks satisfies $\mathcal A$, it attains $J_1^\star=0$ and the primary
 program is not passed to the solver; the secondary program is always
-solved. The ordering is that of the predictive barrier of
-\cite{HuangWangMargellosGoulart2025}: the minimal relaxation of the
-safety problem is computed first and then imposed as a budget on the
-performance problem, as in \cite{WabersichZeilinger2023}.
+solved. The primary objective follows the predictive barrier formulation of
+\cite{HuangWangMargellosGoulart2025}. The subsequent performance refinement
+under an attained safety budget is related to the two-step safety filter of
+\cite{WabersichZeilinger2023}, which uses the previously computed stagewise
+slacks in its performance problem.
 
 Minimizing a first-step slack alone leaves the later inputs
 undetermined, and the next anchor inherits them. The term
