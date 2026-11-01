@@ -255,18 +255,6 @@ collision-threat encounters under both exact states and bounded sensor
 noise over six random seeds, including an audit of truth containment for
 the published enclosures (Section~\ref{sec:results}).
 \end{enumerate}
-The remainder of this paper is organized as follows.
-Section~\ref{sec:overview} introduces the driving task, vehicle models,
-and system architecture. Sections~\ref{sec:estimator}
-and~\ref{sec:control} develop the state estimator and the predictive
-controller, respectively. Section~\ref{sec:results} presents the
-numerical evaluation, and Sections~\ref{sec:discussion}
-and~\ref{sec:conclusion} discuss implementation limitations and conclude
-the paper.
-
-\section{System Overview}
-\label{sec:overview}
-
 The collision-avoidance system consists of perception, state estimation,
 and predictive control, as shown in Fig.~\ref{fig:architecture}. The
 perception stage uses camera and LiDAR data to obtain the relative
@@ -296,228 +284,21 @@ measurements.
     \label{fig:architecture}
 \end{figure*}
 
-\begin{figure*}[!t]
-    \centering
-    \includegraphics[width=0.92\textwidth]
-        {ego_obstacle_dynamics_v02.pdf}
-    \caption{Ego and obstacle kinematics. The ego vehicle (blue) and the
-    obstacle vehicle (orange) travel on courses that may meet. The body
-    frames sit at the centers of mass, the yaw angles \(\psi_E\) and
-    \(\psi_C\) orient them relative to the inertial \(X_I\) axis, the
-    sideslip angles \(\beta_E\) and \(\beta_C\) separate the velocities
-    \(V_E\) and \(V_C\) from the body axes, and the course angles
-    \(\gamma_E\) and \(\gamma_C\) orient the velocities in the inertial
-    frame.}
-    \label{fig:ego_obstacle_frames}
-\end{figure*}
-
-\subsection{Vehicle Models}
-\label{subsec:models}
-
-Fig.~\ref{fig:ego_obstacle_frames} fixes the notation. The ego vehicle
-has speed \(V_E\) and yaw \(\psi_E\), the obstacle speed \(V_C\) and yaw
-\(\psi_C\). One ego model serves the whole system, a dynamic bicycle
-with modified Fiala tires: the controller predicts with it, and the
-estimator inverts its lateral force balance to measure the lateral
-velocity (Section~\ref{subsec:modelAided}). With \(\bm p_E\in\R^2\) and
-\(\bm v_E\in\R^2\) the inertial position and velocity,
-\(\bm v^E=[v_{x,E}\;\;v_{y,E}]^{\trans}=R(\psi_E)^{\trans}\bm v_E\)
-the body velocity, and
-\begin{equation}
-    R(\psi_E)=\begin{bmatrix}
-        \cos\psi_E&-\sin\psi_E\\
-        \sin\psi_E&\cos\psi_E
-    \end{bmatrix}
-    \label{eq:planar_rotation}
-\end{equation}
-the body-to-inertial rotation, the position kinematics are
-\begin{equation}
-    \dot{\bm p}_E=\bm v_E=R(\psi_E)\bm v^E .
-    \label{eq:position_kinematics}
-\end{equation}
-The force and moment balances in the body frame read
-\begin{equation}
-    \begin{aligned}
-    m_E\dot v_{x,E}&=F_{xf}^{b}+F_{xr}-F_R(v_{x,E})
-        +m_Ev_{y,E}\dot\psi_E,\\
-    m_E\dot v_{y,E}&=F_{yf}^{b}+F_{yr}-m_Ev_{x,E}\dot\psi_E,\\
-    I_{z,E}\ddot\psi_E&=l_{f,E}F_{yf}^{b}-l_{r,E}F_{yr},
-    \end{aligned}
-    \label{eq:bicycle_model}
-\end{equation}
-where $[F_{xf}^{b},F_{yf}^{b}]^{\trans}
-=R(\delta_F)[F_{xf},F_{yf}]^{\trans}$ rotates the front wheel forces into
-the body frame and $F_R$ is the passive road load
-\eqref{eq:road_load}. The slip angles and lateral forces are
-\begin{equation}
-    \begin{gathered}
-    \alpha_f=\operatorname{atan2}(v_{y,E}+l_{f,E}\dot\psi_E,\,v_{x,E})
-        -\delta_F,\\
-    \alpha_r=\operatorname{atan2}(v_{y,E}-l_{r,E}\dot\psi_E,\,v_{x,E}),\\
-    F_{yf}=\Phi_f(\alpha_f;Q_f),\qquad F_{yr}=\Phi_r(\alpha_r;Q_r).
-    \end{gathered}
-    \label{eq:tire_forces}
-\end{equation}
-For axle \(i\in\{f,r\}\), with \(t=\tan\alpha\), \(C_i>0\) the
-nominal cornering stiffness and \(Q_i=\eta_i\mu_iF_{zi}\), the modified
-Fiala law of \cite[Sec.~II-A, eqs.~(7), (11) and (13)]{FahmyGhanyBaumann2018}
-is
-\begin{equation}
-    \Phi_i(\alpha;Q_i)=
-    \begin{cases}
-    -C_it+\dfrac{C_i^2}{3Q_i}|t|t-\dfrac{C_i^3}{27Q_i^2}t^3,
-       & |\alpha|<\alpha_{{\rm sl},i},\\[3pt]
-    -Q_i\operatorname{sgn}(\alpha), & |\alpha|\geq\alpha_{{\rm sl},i},
-    \end{cases}
-    \label{eq:fiala_force}
-\end{equation}
-with \(\alpha_{{\rm sl},i}=\arctan(3Q_i/C_i)\),
-\(\eta_i=\sqrt{1-\beta^2}\) and \(F_{xi}=\beta\mu_iF_{zi}\) for
-\(|\beta|<1\). One signed input \(\beta\) acts on both axles: negative
-values brake, positive values drive. The static loads are
-\(F_{zf}=m_Egl_{r,E}/L\) and \(F_{zr}=m_Egl_{f,E}/L\) with
-\(L=l_{f,E}+l_{r,E}\), each axle stands for a wheel pair, \(m_E\) and
-\(I_{z,E}\) are the mass and yaw inertia, \(l_{f,E}\) and \(l_{r,E}\) the
-lever arms, and \(\delta_F\) the front steering angle. We use the
-symmetric branch condition and \cite[eq.~(13)]{FahmyGhanyBaumann2018};
-the additional arctangent printed in \cite[eq.~(12)]{FahmyGhanyBaumann2018}
-is inconsistent with it. At \(|\beta|=1\) the force is defined by
-\(Q_i=0\), \(\Phi_i=0\), without evaluating the singular polynomial;
-the derivatives of \(\Phi_i\) are unbounded there, and every
-linearization point is kept strictly inside the input interval. The
-physical optimization bounds include $\beta=\pm1$; only the tangent
-seed has an interior numerical reserve. A shifted saturated plan is
-rerolled from an interior seed without modifying the issued input. The tire
-model is used above 4\,m/s. Below that speed the prediction model blends
-into a kinematic bicycle so that the vehicle can come to rest
-(Section~\ref{subsec:predictionModel}). The saturation branch bounds the
-lateral force at both axles without an additional nonsaturation
-constraint (Section~\ref{subsec:envelope}). Speed, sideslip and course are
-\begin{equation}
-    V_E=\normtwo{\bm v_E},
-    \qquad
-    \beta_E=\arctan\frac{v_{y,E}}{v_{x,E}},
-    \qquad
-    \gamma_E=\psi_E+\beta_E .
-    \label{eq:yaw_from_course}
-\end{equation}
-
-The obstacle vehicle has inputs we do not observe. Following
-\cite{SharmaAlaiRajamani2026}, it is modeled with constant scalar
-acceleration and constant sideslip, hence constant course curvature.
-The tracker of Section~\ref{subsec:targetTracker} estimates its state in
-that model, and the controller forecasts it in the same model with one
-addition: braking ends at rest and never reverses the vehicle
-(Section~\ref{subsec:predictionModel}).
-
-\subsection{Relative-Position Perception}
-\label{subsec:architecture}
-
-The relative-position measurement is produced as follows. A YOLO
-detector \cite{RedmonDivvalaGirshickFarhadi2016} returns a bounding box
-for each vehicle in the camera image; the LiDAR points are projected
-into the image through the extrinsic calibration $(\bm R_{CL},\bm t_{CL})$
-and the pinhole model,
-\begin{equation}
-    \begin{gathered}
-    \begin{bmatrix}X&Y&Z\end{bmatrix}^{\trans}
-    =\bm R_{CL}\,\bm q+\bm t_{CL},\\
-    \begin{bmatrix}u\\v\end{bmatrix}
-    =\frac{f}{Z}
-    \begin{bmatrix}X\\Y\end{bmatrix}
-    +\begin{bmatrix}W/2\\H/2\end{bmatrix},
-    \end{gathered}
-    \label{eq:lidar_camera_projection}
-\end{equation}
-with $f$ the focal length and $W\times H$ the image size; the points
-whose pixel coordinates fall inside a box, less ground and stray
-returns, are the points reflected from that vehicle
-(Fig.~\ref{fig:obstacle_perception}(a)). The vehicle's outline is a
-rectangle of known length and width in the top view, and its planar pose
-is fitted to the retained points by a damped Gauss--Newton iteration
-whose objective penalizes the distance of lower-body points to the
-rectangle edges and the distance of every point that falls outside the
-rectangle; roof and trunk returns, which lie inside the footprint, would
-otherwise be pulled onto the edges and rotate the fit
-(Fig.~\ref{fig:obstacle_perception}(b)). The iteration starts from the
-relative pose that the estimator predicts for the same instant. The
-prediction is only a starting point: it does not enter the objective,
-and a frame without a fit is passed on as a missing measurement, never
-as the prediction itself. The center of the fitted rectangle is the
-measured relative position
-\begin{equation}
-    \bm\rho=\begin{bmatrix}\rho_x&\rho_y\end{bmatrix}^{\trans}\in\R^2
-    \label{eq:perception_relative_position}
-\end{equation}
-in the ego frame. This stage has been developed and tested on simulated
-camera and LiDAR captures. It is not in the closed loop of
-Section~\ref{sec:results}, where the relative position is synthetic with
-bounded noise, and its measured errors on those captures exceed the
-bound that the estimator trials assume; we return to this in
-Section~\ref{sec:discussion}.
-
-\begin{figure*}[!t]
-    \centering
-    \begin{minipage}[t]{0.605\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{yolo_lidar_projection_v01.png}\\[2pt]
-        (a)
-    \end{minipage}\hfill
-    \begin{minipage}[t]{0.34\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{obstacle_rectangle_fit_topdown_v01.png}\\[2pt]
-        (b)
-    \end{minipage}
-    \caption{The relative-position measurement. (a) The LiDAR point
-    cloud projected into the scene: the points associated with the YOLO
-    detection of the obstacle vehicle in yellow, the curb points of the
-    frame in red, the tracked curb quadratics in orange, and the nominal
-    route as the green dashed line; the inset shows the front-camera
-    image with the detected bounding box. (b) Top view of the points
-    reflected from the obstacle vehicle and the rectangle fitted to
-    them, whose center is the measured relative position.}
-    \label{fig:obstacle_perception}
-\end{figure*}
-
-\subsection{The Safety Argument}
-\label{subsec:argument}
-
-The safety argument connects the interfaces of
-Fig.~\ref{fig:architecture} through the following statements.
-\begin{enumerate}
-\item[(i)] The perception output lies within a declared bound of the
-true relative position.
-\item[(ii)] Under the same sensor and model-uncertainty contract as the
-plant, the estimation error lies in the published enclosure
-(Theorem~\ref{thm:cascadeISS}, Corollary~\ref{cor:enclosure}, and the
-force-balance interval of Section~\ref{subsec:modelAided}).
-\item[(iii)] Whenever a finite observer certificate is used, its
-true-motion premises hold throughout the hold. The mathematical
-constraints impose these premises on every admitted branch; the numerical
-prediction and audits check the sideslip limits
-(Section~\ref{subsec:envelope}).
-\item[(iv)] Zero-deficit signed collision margins separate the true bodies
-over every certified hold (Theorem~\ref{thm:robust}); sampled rows without
-motion reserves certify only their checked instants.
-\item[(v)] A feasible mathematical plan exists at the next sample.
-Proposition~\ref{prop:recursive} addresses exact information;
-Theorem~\ref{thm:robust} includes estimation error and physical mismatch
-through containment, conditioning and terminal closure.
-\item[(vi)] The vehicle returns to cruise after the encounter
-(the cruise-law certificate and measured recovery of
-Section~\ref{subsec:clf}).
-\end{enumerate}
-The information-set construction closes the conditional mathematical
-argument for (ii)--(v), with road boundaries omitted from the robust
-derivation. The observer theorem and the cruise-law certificate retain
-their stated domains. The soft CLF feasibility result alone does not
-prove recovery in (vi). Numerical trials audit approximations and measure
-recovery; they do not replace universal set constraints. The production
-controller does not certify intersample separation, and the perception
-bound in (i) remains declared rather than established by perception.
+The remainder of this paper is organized as follows.
+Sections~\ref{sec:estimator} and~\ref{sec:control} develop the state
+estimator and the predictive controller, respectively. Section~\ref{sec:results} presents the
+numerical evaluation, and Sections~\ref{sec:discussion}
+and~\ref{sec:conclusion} discuss implementation limitations and conclude
+the paper.
 
 \section{Estimator Design}
 \label{sec:estimator}
+
+Let $\bm p_E$ and $\bm v_E$ denote the ego vehicle's inertial
+position and velocity, $\psi_E$ its yaw, $\beta_E$ its sideslip, and
+$\gamma_E=\psi_E+\beta_E$ its course angle. The body-to-inertial rotation
+$R(\psi_E)$ and the shared vehicle model are defined in
+Section~\ref{subsec:predictionModel}.
 
 The estimator has to do two things that the observer of
 \cite{SharmaAlaiRajamani2026} does not: stay valid while the ego vehicle
@@ -552,8 +333,7 @@ The measurements are
 \end{equation}
 with \(\bm a_E=R(\psi_E)^{\trans}\ddot{\bm p}_E\) the acceleration in
 the ego frame, \(\bm\rho\) the relative position
-\eqref{eq:target_coordinates}, whose measurement \(\bm y_R\) is the
-perception output \eqref{eq:perception_relative_position}, and uniform
+\eqref{eq:target_coordinates}, and \(\bm y_R\) its measurement. The noise satisfies uniform
 bounds \(\normtwo{\bm n_p}\leq\bar n_p\),
 \(\normtwo{\bm n_a}\leq\bar n_a\),
 \(|d_\omega|\leq\bar n_g\), \(\normtwo{\bm n_R}\leq\bar n_R\). Inertial
@@ -1362,6 +1142,117 @@ The obstacle vehicle of this section is the target of the previous one.
 
 \subsection{Prediction Model}
 \label{subsec:predictionModel}
+
+\begin{figure*}[!t]
+    \centering
+    \includegraphics[width=0.92\textwidth]
+        {ego_obstacle_dynamics_v02.pdf}
+    \caption{Ego and obstacle kinematics. The ego vehicle (blue) and the
+    obstacle vehicle (orange) travel on courses that may meet. The body
+    frames sit at the centers of mass, the yaw angles \(\psi_E\) and
+    \(\psi_C\) orient them relative to the inertial \(X_I\) axis, the
+    sideslip angles \(\beta_E\) and \(\beta_C\) separate the velocities
+    \(V_E\) and \(V_C\) from the body axes, and the course angles
+    \(\gamma_E\) and \(\gamma_C\) orient the velocities in the inertial
+    frame.}
+    \label{fig:ego_obstacle_frames}
+\end{figure*}
+
+Fig.~\ref{fig:ego_obstacle_frames} fixes the notation. The ego vehicle
+has speed \(V_E\) and yaw \(\psi_E\), the obstacle speed \(V_C\) and yaw
+\(\psi_C\). One ego model serves the whole system, a dynamic bicycle
+with modified Fiala tires: the controller predicts with it, and the
+estimator inverts its lateral force balance to measure the lateral
+velocity (Section~\ref{subsec:modelAided}). With \(\bm p_E\in\R^2\) and
+\(\bm v_E\in\R^2\) the inertial position and velocity,
+\(\bm v^E=[v_{x,E}\;\;v_{y,E}]^{\trans}=R(\psi_E)^{\trans}\bm v_E\)
+the body velocity, and
+\begin{equation}
+    R(\psi_E)=\begin{bmatrix}
+        \cos\psi_E&-\sin\psi_E\\
+        \sin\psi_E&\cos\psi_E
+    \end{bmatrix}
+    \label{eq:planar_rotation}
+\end{equation}
+the body-to-inertial rotation, the position kinematics are
+\begin{equation}
+    \dot{\bm p}_E=\bm v_E=R(\psi_E)\bm v^E .
+    \label{eq:position_kinematics}
+\end{equation}
+The force and moment balances in the body frame read
+\begin{equation}
+    \begin{aligned}
+    m_E\dot v_{x,E}&=F_{xf}^{b}+F_{xr}-F_R(v_{x,E})
+        +m_Ev_{y,E}\dot\psi_E,\\
+    m_E\dot v_{y,E}&=F_{yf}^{b}+F_{yr}-m_Ev_{x,E}\dot\psi_E,\\
+    I_{z,E}\ddot\psi_E&=l_{f,E}F_{yf}^{b}-l_{r,E}F_{yr},
+    \end{aligned}
+    \label{eq:bicycle_model}
+\end{equation}
+where $[F_{xf}^{b},F_{yf}^{b}]^{\trans}
+=R(\delta_F)[F_{xf},F_{yf}]^{\trans}$ rotates the front wheel forces into
+the body frame and $F_R$ is the passive road load
+\eqref{eq:road_load}. The slip angles and lateral forces are
+\begin{equation}
+    \begin{gathered}
+    \alpha_f=\operatorname{atan2}(v_{y,E}+l_{f,E}\dot\psi_E,\,v_{x,E})
+        -\delta_F,\\
+    \alpha_r=\operatorname{atan2}(v_{y,E}-l_{r,E}\dot\psi_E,\,v_{x,E}),\\
+    F_{yf}=\Phi_f(\alpha_f;Q_f),\qquad F_{yr}=\Phi_r(\alpha_r;Q_r).
+    \end{gathered}
+    \label{eq:tire_forces}
+\end{equation}
+For axle \(i\in\{f,r\}\), with \(t=\tan\alpha\), \(C_i>0\) the
+nominal cornering stiffness and \(Q_i=\eta_i\mu_iF_{zi}\), the modified
+Fiala law of \cite[Sec.~II-A, eqs.~(7), (11) and (13)]{FahmyGhanyBaumann2018}
+is
+\begin{equation}
+    \Phi_i(\alpha;Q_i)=
+    \begin{cases}
+    -C_it+\dfrac{C_i^2}{3Q_i}|t|t-\dfrac{C_i^3}{27Q_i^2}t^3,
+       & |\alpha|<\alpha_{{\rm sl},i},\\[3pt]
+    -Q_i\operatorname{sgn}(\alpha), & |\alpha|\geq\alpha_{{\rm sl},i},
+    \end{cases}
+    \label{eq:fiala_force}
+\end{equation}
+with \(\alpha_{{\rm sl},i}=\arctan(3Q_i/C_i)\),
+\(\eta_i=\sqrt{1-\beta^2}\) and \(F_{xi}=\beta\mu_iF_{zi}\) for
+\(|\beta|<1\). One signed input \(\beta\) acts on both axles: negative
+values brake, positive values drive. The static loads are
+\(F_{zf}=m_Egl_{r,E}/L\) and \(F_{zr}=m_Egl_{f,E}/L\) with
+\(L=l_{f,E}+l_{r,E}\), each axle stands for a wheel pair, \(m_E\) and
+\(I_{z,E}\) are the mass and yaw inertia, \(l_{f,E}\) and \(l_{r,E}\) the
+lever arms, and \(\delta_F\) the front steering angle. We use the
+symmetric branch condition and \cite[eq.~(13)]{FahmyGhanyBaumann2018};
+the additional arctangent printed in \cite[eq.~(12)]{FahmyGhanyBaumann2018}
+is inconsistent with it. At \(|\beta|=1\) the force is defined by
+\(Q_i=0\), \(\Phi_i=0\), without evaluating the singular polynomial;
+the derivatives of \(\Phi_i\) are unbounded there, and every
+linearization point is kept strictly inside the input interval. The
+physical optimization bounds include $\beta=\pm1$; only the tangent
+seed has an interior numerical reserve. A shifted saturated plan is
+rerolled from an interior seed without modifying the issued input. The tire
+model is used above 4\,m/s. Below that speed the prediction model blends
+into a kinematic bicycle so that the vehicle can come to rest
+(Section~\ref{subsec:predictionModel}). The saturation branch bounds the
+lateral force at both axles without an additional nonsaturation
+constraint (Section~\ref{subsec:envelope}). Speed, sideslip and course are
+\begin{equation}
+    V_E=\normtwo{\bm v_E},
+    \qquad
+    \beta_E=\arctan\frac{v_{y,E}}{v_{x,E}},
+    \qquad
+    \gamma_E=\psi_E+\beta_E .
+    \label{eq:yaw_from_course}
+\end{equation}
+
+The obstacle vehicle has inputs we do not observe. Following
+\cite{SharmaAlaiRajamani2026}, it is modeled with constant scalar
+acceleration and constant sideslip, hence constant course curvature.
+The tracker of Section~\ref{subsec:targetTracker} estimates its state in
+that model, and the controller forecasts it in the same model with one
+addition: braking ends at rest and never reverses the vehicle
+(Section~\ref{subsec:predictionModel}).
 
 The subscript $E$ is dropped from the ego variables in this section.
 The controller state and input are
@@ -2773,7 +2664,7 @@ $\bar n_p=0.12$\,m, $\bar n_v=0.02$\,m/s,
 $\bar n_a=0.05$\,m/s$^2$, $\bar n_g=0.002$\,rad/s and
 $\bar n_R=0.12$\,m, with no declared model rates ($\bar\nu_\Phi=0$).
 The noise bounds are declared values; in particular $\bar n_R$ is not
-derived from the perception stage of Section~\ref{subsec:architecture}.
+derived from the camera--LiDAR perception stage.
 The ego rear-axle distance $l_{r,E}=1.714$\,m is the stock curb-weight
 value of a 2021 Chrysler Pacifica Hybrid; it is the only ego-vehicle
 parameter the estimator uses, and no real-vehicle result is implied.
@@ -3549,8 +3440,8 @@ to 2\% of the calls exceed the hold. The steering angle is unbounded in
 magnitude and rate, and the estimated-state runs use up to 1.04\,rad.
 The road edges are declared, not perceived, and the relative-position
 measurement is synthetic with a noise bound of 0.04\,m; on simulated
-camera and LiDAR captures the perception stage of
-Section~\ref{subsec:architecture} has so far produced position errors
+camera and LiDAR captures the perception pipeline has so far produced
+position errors
 above the 0.12\,m bound assumed in Section~\ref{subsec:designResults} on
 most frames, and it has not been run in the loop.
 Assumption~\ref{asm:mild} carries no mismatch bound, and the braking
@@ -3613,9 +3504,8 @@ in the stated mathematical recursive-feasibility proof.
 No external recorded dataset was used. The numerical results of
 Section~\ref{sec:results} were generated by deterministic or seeded
 synthetic MATLAB runs of the accompanying repository and summarized with
-Python scripts, and the illustration of
-Section~\ref{subsec:architecture} uses simulated camera and LiDAR
-captures. The raw per-sample traces of the closed-loop campaign are kept
+Python scripts. The separate perception experiments use simulated camera
+and LiDAR captures. The raw per-sample traces of the closed-loop campaign are kept
 outside the repository; the summary tables derived from them, the
 scripts that derive the statistics and Fig.~\ref{fig:closedLoop}, the
 estimator audit, and the hashes of the sources that produced the runs
