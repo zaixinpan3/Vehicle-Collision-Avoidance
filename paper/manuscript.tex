@@ -155,10 +155,11 @@ relative-position sensors and must be estimated online
 to transform relative-position measurements into an inertial frame using
 estimated ego pose \cite{SharmaRajamani2024}, but ego localization and
 heading errors then feed directly into the target track. Working in the
-ego sensor frame avoids this global transformation, yet conventional
-relative-motion models neglect ego rotation and lateral motion, causing
-large velocity-estimation errors whenever the ego vehicle turns or
-changes lanes \cite{AlaiSharmaAlexanderRajamani2024}. To resolve this
+ego sensor frame avoids this global transformation, yet some relative-motion
+observers do not account for ego rotation
+\cite{JeonZemoucheRajamani2019,AlaiZemoucheRajamani2024}. This omission can
+introduce errors in the estimated target motion during evasive maneuvers that
+involve ego rotation \cite{SharmaAlaiRajamani2026}. To resolve this
 issue, Alai \emph{et al.} \cite{AlaiSharmaAlexanderRajamani2024}
 formulated a nonlinear relative motion model (NRMM) that incorporates ego
 velocity and yaw rate explicitly, and Sharma \emph{et al.}
