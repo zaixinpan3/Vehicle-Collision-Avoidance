@@ -54,6 +54,6 @@ end
 function value=localSolverDefault(name)
     root=fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'config'));
-    cfg=collisionAvoidanceControllerConfig();
+    cfg=collisionAvoidanceControllerConfig(struct('solver',struct('method',"nonlinear")));
     value=cfg.solver.(name);
 end

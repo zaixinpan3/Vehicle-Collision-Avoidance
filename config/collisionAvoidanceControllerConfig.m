@@ -4,13 +4,13 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
 % change the interpretation of a controller run.
     if nargin<1,userCfg=[];end
     cfg=localDefaults();
-    % Nonlinear shooting is the operational experiment path. The explicit
-    % RTI comparator retains its historical soft wall-clock budget.
+    % Online execution takes one SQP-RTI update. Iterated nonlinear shooting
+    % is an explicitly requested diagnostic of the same constraint family.
     if isstruct(userCfg) && isscalar(userCfg) && isfield(userCfg,'solver') ...
             && isstruct(userCfg.solver) && isscalar(userCfg.solver) && isfield(userCfg.solver,'method') ...
             && (ischar(userCfg.solver.method) || isstring(userCfg.solver.method)) ...
-            && isequal(string(userCfg.solver.method),"rti")
-        cfg.solver.timeLimitSeconds=.1;
+            && isequal(string(userCfg.solver.method),"nonlinear")
+        cfg.solver.timeLimitSeconds=1000;
     end
     if ~isempty(userCfg)
         if ~isstruct(userCfg) || ~isscalar(userCfg)
@@ -163,7 +163,7 @@ function cfg=localDefaults()
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for output assembly. Native
     % solves also count their construction time against the remaining budget.
-    cfg.solver=struct('method',"nonlinear",'maxIterations',40,'timeLimitSeconds',1000,'completionReserveSeconds',.002, ...
+    cfg.solver=struct('method',"rti",'maxIterations',40,'timeLimitSeconds',.1,'completionReserveSeconds',.002, ...
         'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
         'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
         'reducedTolerance',1e-3);

@@ -6,141 +6,71 @@ statement of the implementation boundary. Repository paths are relative to the
 repository root unless linked otherwise. Historical experiment reports describe
 the versions that produced them; they are not rewritten by this consolidation.
 
-The operational default is now the direct nonlinear shooting backend
-(`solver.method="nonlinear"`). It propagates the modified Fiala model inside
-each optimization evaluation, restores hard feasibility before reducing
-PCBF deficits, and re-evaluates the joint affine observer/feedback margins
-on accepted nonlinear trajectories. Safety slack remains the primary
-objective; the secondary objective cannot spend the attained slack budget.
-The explicit `solver.method="rti"` comparator and retained-certificate
-research backend remain available for their respective tests. Descriptions
-of a single RTI linearization below refer to that comparator, not the default.
-The nonlinear solver may return a feasible local or iteration-limited
-candidate; neither global optimality nor full nonlinear error containment
-follows from satisfying its sampled nominal constraints.
+The design has one nonlinear mathematical problem and a local numerical
+implementation of that problem. The online default is `solver.method="rti"`.
+An explicitly selected `solver.method="nonlinear"` is an iterated shooting
+diagnostic, not a second safety definition. Both use the same continuous
+separating-plane witnesses, modified Fiala transition, simplified terminal
+function and lexicographic performance objective. No world-angle grid defines
+collision avoidance. The geometric and recursive-feasibility derivations are
+in Sections 3 and 7; numerical approximations are identified separately.
 
-The current estimator contract is position-only GNSS, IMU acceleration, gyro,
-and relative radar position. Inertial velocity is reconstructed by the sampled
-position/IMU filter in `estimator/nrmmPositionVelocity.m`; its evolving error
-bound replaces a direct velocity-sensor noise budget. The joint prediction
-lifts this filter's four states and uses the same position noise in both
-position and velocity updates. An affine experiment, a full-domain nonlinear
-enclosure experiment, and the retained-certificate formulation described
-below have different scopes. None is a floating-point or unmodeled-plant
-safety certificate. See the position-only amendment in
-`estimator/OBSERVER_ISS_THEORY.md`; earlier velocity-sensor experiments do not
-validate this more restricted sensor contract.
+The physical sensor contract remains position-only GNSS, IMU acceleration,
+gyro and relative radar position. The observer and future feedback are part of
+the joint prediction, with one copy of each persistent model parameter and
+measurement-noise primitive. Bounded current error alone is not a proof of
+sound future prediction or measurement-consistent shifting.
 
-The controller seeks rectangle nonoverlap during an encounter and resumes
-prescribed-path cruise recovery afterward. An active encounter minimizes
-predictive collision deficits first, then minimizes nominal tracking and input
-variation while preserving that attained optimum. Without a target, a single
-nonlinear problem minimizes soft cruise CLF slack plus the same performance
-cost. The explicit RTI comparator instead uses convex subproblems and
-state-dependent numerical trust bounds; reference proximity is optional and off
-by default in that comparator. That path uses at most two convex
-solves on one RTI model and one shared time budget; an available zero-slack
-affine candidate avoids the primary LP. It imposes no cross-frame slack budget.
-Synchronized observer inputs enable joint affine plant/observer/feedback
-prediction with persistent tire parameters and future measurement noise.
-Its supports are exact for the affine approximation, not for the nonlinear
-system. The retained nonlinear certificate, including its shifted deficit
-budget, remains an explicitly selected verification mode.
-The terminal set certifies an available safe continuation at the prediction
-endpoint; it is not a command to park or a task-completion condition.
+An active encounter minimizes the sum of collision slacks first, then tracking
+and input variation without spending the attained primary budget. Without a
+target, the integrated continuous-time CLF supplies a soft cruise condition.
+The planner initializes the state, input and geometry at encounter onset. It
+does not define the safety function or restrict the optimizer to its passing
+side. The accepted horizon stays fixed throughout the encounter. Later calls
+shift both the trajectory and its continuous plane witnesses. There is no
+within-frame replanning, horizon-extension retry, or post-solve nonlinear
+execution veto in RTI.
 
-The executable approximation and the mathematical algorithm have distinct guarantees:
-
-| Object | Prediction and conclusion |
+| Layer | Mathematical object and scope |
 | --- | --- |
-| Explicit RTI comparator | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, joint affine uncertainty prediction when a synchronized observer snapshot exists, and terminal tangents. Legacy inputs retain their published margins. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The affine update returns its first input after numerical input-bound normalization, without a post-solve nonlinear feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
-| Default nonlinear experiment | `solver.method="nonlinear"` uses exact nonlinear single shooting: controls are decisions and RK4 propagates all states, with chain-rule derivatives of that complete rollout. A fixed max-of-support-gaps function permits separation in any of 32 world directions; it does not inherit the reference's collision corridor. The simplified terminal continuation is evaluated directly. A minimum-control-change phase I repairs hard-constraint initialization, re-evaluating its observer/feedback tube. PCBF slack is optimized before performance. Each accepted numerical update rebuilds the joint affine tube; control backtracking retains a feasible candidate when the updated margins invalidate a larger step. All original sensor and persistent parameter budgets remain. The target support also intersects the previous bound with a complete interval-cell cover of the shared NRMM position/yaw family. This is a nonlinear nominal controller with engineering affine error predictions, not the complete robust information-set theorem. |
-| Retained-certificate verification mode | A retained nonlinear policy/terminal certificate with measurement-conditioned proposals. Performance optimization acts only inside a policy box admitted by full-domain enclosures. Failure to admit a new driving continuation retains the previous certificate; requesting actual terminal control stops the driving experiment. Initial admission may fail before any control is applied. |
-| Unified observer-to-safety design | Current observer containment, retained physical successor sets, signed whole-hold margins and a common terminal continuation. The information-set shift proves conditional recursive feasibility and zero-deficit safety. Future observer dynamics are needed only for the optional prediction of observation-dependent policies. |
+| Nonlinear design | A causal joint observer/controller policy, sound reachable information sets, continuous separating witnesses, hard admissibility and a shift-compatible terminal family. Theorem U gives conditional recursive feasibility and zero-deficit invariance. |
+| Engineering nonlinear transcription | Nonlinear Fiala motion and plane/terminal constraints with a frame-frozen joint affine uncertainty prediction. Accepted shooting updates may refresh that prediction. These margins are not certified nonlinear reachable sets. |
+| Online SQP-RTI | One linearization of that transcription, including its plane variables and terminal function, with a Gauss--Newton performance Hessian. One primary LP and at most one secondary QP share the same local model. Convex solver iterations are not additional SQP linearizations. |
+| Optional retained-certificate research mode | Full-domain joint enclosures and retained policy-box/terminal certificates. Its admission restrictions and historical measurements in Section 8 are not premises silently attributed to ordinary RTI. |
 
-The optional `controller.retainedTube=true` formulation retains nonlinear joint
-sets, observation-dependent policies, and
-a whole-set simplified terminal witness. It optimizes performance only over
-a policy box whose complete nonlinear image was admitted beforehand. The
-constructive shift proof and its limitations are given in Section 8 under
-"Implemented retained policy-box formulation." Inputs without a synchronized
-joint snapshot, or the default `retainedTube=false`, cannot claim the retained
-certificate. The selected nominal solver is nonlinear shooting by default or
-RTI when explicitly requested. An existing certificate cannot silently
-fall back when its required observer snapshot is missing. Enabling this path
-does not establish adequate admission performance or real-time execution.
+The defaults are `retainedTube=false`, `jointAffinePrediction=true` and
+`jointNonlinearPrediction=false`. `robustNonlinearSafetyCertified` remains
+false in both ordinary numerical backends. The strict theorem is conditional
+on sound nonlinear joint images, consistent conditioning, a compatible
+terminal append and the prescribed solution selection. Neither an NLP solver
+return nor an affine zero slack establishes these conditions.
 
-The online defaults are `solver.method="nonlinear"`, `retainedTube=false`, `jointAffinePrediction=true`,
-and `jointNonlinearPrediction=false`. Full nonlinear enclosure admission is
-not an execution gate for this experimental approximation. Noise and mismatch
-bounds are not reduced by this choice. An affine zero deficit must not be
-reported as the zero robust deficit in the retained-certificate theorem.
+Geometry needs only two witness variables per checked instant: an angle
+$\theta$ and a plane offset $b$. The exact parametrization
+$n(\theta)=(\cos\theta,\sin\theta)$ prevents the zero-normal degeneracy at zero
+physical clearance. Four ego-vertex and four target-vertex inequalities replace
+the sampled directional maximum. Their derivatives are shared by shooting
+and RTI. The nominal vertex inequalities are smooth. The engineering
+uncertainty support oracle and terminal maximum are piecewise differentiable;
+at feature changes the implementation uses selected/generalized derivatives.
+A smooth RTI convergence theorem does not automatically apply at such ties.
 
-Current information remains distinct from full-horizon admission. When the
-held input is known, both paths intersect the current observer set with the
-available position, gyro and IMU measurements. The online path retains a
-nonlinear one-hold prediction of the issued input as the next information
-prior. If that optional prediction cannot be enclosed, it records the failure
-and publishes no prior; the next frame uses its standalone observer bound.
-It does not discard a solved command because a complete future certificate is
-unavailable. Target history and the guide use the same current information.
+Tracking and applied-input variation are both horizon sums in both backends;
+optional reference proximity remains a horizon mean and defaults to zero.
+There is no large penalty weight trading safety for tracking. The nonlinear
+diagnostic additionally uses feasibility restoration, line search and margin
+refresh, whereas RTI takes a single local update. These numerical differences
+must remain visible in comparisons.
 
-In engineering affine prediction, each joint tangent is evaluated on the
-same multiple-shooting reference as RTI. The known defect
-`F(xbar_k,ubar_k)-xbar_(k+1)` stays in the dynamics equality. It is not added
-again as a random error generator. The joint expansion mean is reanchored
-at each node, preserving the nominal observer bias and frontend error, while
-shared parameter/noise columns propagate through the local joint map. This
-is a local engineering approximation; full nonlinear propagation in the
-retained verification backend is unchanged.
-
-The latter theorem is not a certificate for the point-RTI approximation.
-`robustNonlinearSafetyCertified` remains false. Positive collision slack permits
-a clearance deficit. Zero affine slack does not certify nonlinear or
-continuous-time safety. Road constraints are disabled by default; the ideal
-information-set proof below also omits road boundaries. Optional road rows require their
-own compatible images and terminal checks.
-
-The default nonlinear backend keeps the same PCBF-first objective and a secondary
-tracking/input-variation objective under the attained primary budget. Outside
-an encounter it imposes the integrated continuous-CLF inequality on the actual
-nonlinear first predicted state. It omits RTI's numerical trust box. Nonlinear
-constraint residuals are checked before returning a command, including direct
-terminal membership; an iteration limit with feasible residuals is explicitly
-reported as an unconverged feasible return. A local solver termination does not
-establish the globally minimum PCBF value. Out-of-domain Fiala trial evaluations
-return nonfinite constraint values to request line-search backtracking; they do
-not change the plant model. `scripts/runNonlinearControllerExperiment.m` runs
-the position-only GNSS/IMU/gyro/radar estimator and nonlinear plant to recovery
-or a recorded failure. It records deadlines and failure outcomes without
-assuming that nonlinear optimization succeeds or meets real-time requirements.
-Its diagnostic wall limit is checked by the solver iteration callback; internal
-QP work and line searches can overrun that limit.
-
-For the nonlinear backend, let `D` contain the 32 fixed world normals
-`n_j = [cos(2*pi*j/32); sin(2*pi*j/32)]`. At a prediction sample, let `U_j`
-be the target's upper support, including the directional target and ego error
-allowances. The nonlinear clearance is
-
-    h(p,psi) = max_j { min_i n_j' (p + R(psi) v_i) - U_j }.
-
-The collision row is `-h <= xi`. Nonnegative h supplies a separating plane;
-a finite direction grid is conservative relative to all possible planes.
-This is one fixed nonlinear function, not a sequence of left/right decisions
-or a barrier redefined whenever a local solve fails. Both the active vertex
-and the active normal can change as the optimizer moves the vehicle. Their
-piecewise derivatives are used away from ties; nonsmooth ties and local NLP
-termination do not imply global optimality. Observer allowances retain the
-engineering affine scope stated above. Simplified terminal safety is still
-evaluated directly, with no replacement of its declared braking model.
-
-The nonlinear secondary objective sums both normalized state-error costs and
-normalized applied-input-increment costs over the horizon. Averaging only the
-state term would strengthen input smoothing by N relative to route recovery.
-The historical RTI comparator below retains its previous mean-tracking cost;
-its numerical weights therefore must be matched before a cost-controlled
-NLP/RTI comparison. Neither performance objective can increase the attained
-PCBF slack budget within the declared numerical tolerance.
+All safety statements below concern the declared checked instants unless an
+explicit whole-hold enclosure is supplied. Zero signed clearance permits
+contact and excludes interior overlap; strictly positive clearance is a
+stronger statement. No fixed 0.2 m design buffer is introduced. Roads remain
+a heuristic planner input, not a constraint in the default optimization.
+The terminal set represents an available continuation, not the desired normal
+driving state. The simplified braking model is retained as a declared
+terminal contract; its compatibility with the transition used in a shift is
+a theorem premise, not an automatic consequence of checking a stopping path.
 
 ## Contents
 
@@ -149,7 +79,7 @@ PCBF slack budget within the declared numerical tolerance.
 3. [Collision constraints and the switched problem](#optimization)
 4. [One nominal CLF and recovery](#nominal-clf)
 5. [Joint terminal set and braking continuation](#terminal-set)
-6. [Optional joint feedback-aware prediction](#joint-prediction)
+6. [Joint feedback-aware prediction](#joint-prediction)
 7. [Unified observer-to-safety formulation](#recursive-feasibility)
 8. [RTI references, computation and implementation boundary](#runtime)
 9. [Source map and verification](#source-map)
@@ -429,61 +359,127 @@ is therefore insufficient to certify nonoverlap.
 <a id="optimization"></a>
 ## 3. Collision constraints and the switched problem
 
-### Separating planes, supports and nonlinear reserves
+### One nonlinear geometry and its continuous witnesses
 
-For a unit normal $n$ pointing from ego toward target, a sufficient separation
-condition is
-
-$$
-\min_j n^\top(\rho+R(\psi_R)v_{C,j})-h_{B_E}(n)\ge d_0,
-\qquad h_{B_E}(n)=\max_{v\in B_E}n^\top v.
-$$
-
-Every ego point lies on one side of this plane and every target point at
-least $d_0$ beyond it. Cauchy--Schwarz gives Euclidean separation for $d_0>0$;
-at $d_0=0$ the nonzero normal excludes interior overlap and allows contact.
-The implementation uses zero extra physical clearance. Observer inflation
-is separate from a design buffer.
-
-At anchor $\bar p_r=(\bar\rho,\bar\psi_R)$, define
+Let $v_{E,a}$ and $v_{C,b}$, $a,b=1,\ldots,4$, be body vertices measured from
+the respective dynamics reference points, including rectangle offsets. Write
+$e_a=p_E+R(\psi_E)v_{E,a}$ and $c_b=p_C+R(\psi_C)v_{C,b}$. Define one signed
+clearance function, independent of the planner or numerical reference:
 
 $$
-g_j^0=n^\top(\bar\rho+R(\bar\psi_R)v_{C,j})-h_{B_E}(n),\quad
-a_j^\top=[n^\top,\ n^\top R(\bar\psi_R)Jv_{C,j}].
+ d_s(E,C)=\max_{\|n\|_2=1}\{\min_a n^Te_a-\max_b n^Tc_b\}.       \tag{G1}
 $$
 
-For an affine pose correction $\Delta p_r$, pose-error set $E_r$ and bounds
-$|\Delta\psi_R|\le t_\psi$, $|e_{\psi_R}|\le b_\psi$, a sound sufficient row is
+For disjoint convex rectangles this is Euclidean separation; for overlapping
+interiors it is the negative minimum translational penetration depth. This is
+the signed-distance support/dual construction of Zhang, Liniger and Borrelli,
+Theorem 2, specialized to rectangle vertices. Ordinary unsigned distance
+would be zero even for overlap and cannot represent the desired soft deficit.
+
+Introduce $n(\theta)=(\cos\theta,\sin\theta)$ and a plane offset $b$ measured
+relative to $p_C$. The nonlinear collision inequalities are
 
 $$
-g_j^0+a_j^\top\Delta p_r-\sigma_{E_r}(-a_j)
--\tfrac12\|v_{C,j}\|(t_\psi+b_\psi)^2
--\epsilon^{\rm hold}-\epsilon^{\rm num}\ge d_0-\xi_i.
+\begin{aligned}
+ n(\theta)^T[p_E-p_C+R(\psi_E)v_{E,a}]-b+\xi&\ge0,&&a=1,\ldots,4,\\
+ b-n(\theta)^TR(\psi_C)v_{C,b'}&\ge0,&&b'=1,\ldots,4,\\
+ \xi&\ge0. &&
+\end{aligned}                                                    \tag{G2}
 $$
 
-The quadratic reserve follows from
-$|n^\top R(\psi)J^2v|\le\|v\|$. Nonlinear pose reconstruction and dynamics
-require additional sound enclosures. For a zonotope $G[-1,1]^m$,
-$\sigma(a)=\|a^\top G\|_1$; for an ellipsoid use Section 2. The decision
-domain must actually satisfy the bounds used for every reserve. The current
-RTI leaves position translations unbounded, bounds local heading corrections
-through a numerical dynamics trust estimate, and does not implement this complete row;
-a local yaw tangent alone has no uniform remainder certificate.
+Eliminating $b$ and $\theta$ gives exactly $d_s(E,C)\ge-\xi$. At zero slack,
+the first four rows put every ego vertex on one side and the other four put
+every target vertex on the other. With positive slack, the maximum permitted
+penetration along the chosen unit direction is explicit. A normal constrained
+only by $\|n\|\le1$ would admit $n=0,b=0,\xi=0$ at overlap: the equality
+normalization is essential here. The angle is a periodic coordinate on the
+unit circle, not a discrete maneuver label. A complete $[-\pi,\pi]$ angle increment
+chart excludes no orientation from the nonlinear problem. RTI uses its local
+tangent coordinates and the retraction below, not a global angular search.
 
-Exact angular support is another enclosure: for each offset vertex, maximize
-$n^\top R(\theta)v$ over the allowed interval by checking its endpoints and
-interior angular maxima, then maximize over the four vertices. The runtime
-uses this directional target-yaw support minus its nominal support. Its ego
-yaw reserve remains the uniform chord
-$2\,\mathrm{reach}\sin(\min(\pi,b_\psi)/2)$ in RTI; the guide may use exact
-ego support at a fixed pose. These orientation bounds do not certify the
-remaining nonlinear decision corrections.
+For uncertain joint state $q\in R_i$, require (G2) for every member with a
+common witness $(\theta_i,b_i)$. This common-plane robust condition is
+sufficient, and can be more conservative than requiring physical nonoverlap
+with a different witness for every unknown member. That quantifier order is
+part of the design, not hidden inside a distance calculation. Shrinking $R_i$
+retains every previously valid witness. Relative position must be formed
+before projecting shared uncertainty, so common ego/target errors cancel
+when the joint model actually permits their cancellation.
 
-Ordinary-distance dual multipliers use the exact closest-feature normal when
-separated. At overlap, a nonzero support escape direction replaces the zero
-distance dual. The fixed-multiplier corner rows include yaw derivatives.
-Encounter-side persistence prevents left/right chattering; these are local
-convexification choices, not a proof that a feasible separating chart exists.
+The online frozen-enclosure transcription uses a directional allowance
+$\varepsilon_i(\theta)$ in the first four rows:
+
+$$
+ g_{E,a}=n^T[p_E-p_C+R_Ev_{E,a}]-b-\varepsilon_i(\theta),\qquad
+ g_{C,b'}=b-n^TR_Cv_{C,b'}.                                    \tag{G3}
+$$
+
+It combines the relative affine position support, target-family support and
+ego-yaw chord reserve. The target bound intersects the existing support
+bound with a complete NRMM parameter-cell cover, retaining shared
+position/yaw dependence. Both backends call the same allowance function.
+This is sound with respect to its stated outer sets, but the ordinary joint
+affine prediction has not established their containment of all nonlinear
+future errors. No new sensor or model-mismatch budget is invented or reduced.
+
+At a regular reference, set $t=Jn$. The derivatives of the first four rows
+with respect to $(p_E,\psi_E,\theta,b)$ are
+
+$$
+ [n^T,\ n^TR_EJv_{E,a},\
+ t^T(p_E-p_C+R_Ev_{E,a})-\varepsilon_i'(\theta),\ -1].           \tag{G4}
+$$
+
+For each target row they are $[0,0,0,-t^TR_Cv_{C,b'},1]$. Thus the RTI rows
+are precisely $g(\bar z)+Dg(\bar z)\Delta z+\xi\ge0$, with slack only on
+the ego rows. `separationWitnessRows` evaluates (G3)--(G4); `localPlaneRows`
+adds the shared uncertainty oracle. Target vertices are retained as separate
+inequalities rather than selecting a nonsmooth nominal support vertex.
+
+Changing a witness does **not** change (G1) or the predictive barrier value:
+it changes an auxiliary optimizer variable in the same fixed definition.
+Freezing a path-dependent witness forever would instead restrict the
+feasible set. Initialization supplies a useful witness, not a new safety
+function. Warm starts shift the previously optimized witnesses; newly
+appended samples obtain a geometric witness without a world-angle grid or
+an explicit left/right maneuver bank.
+
+A plane update has a useful exact geometric normalization. With RTI tangent
+step $(a,d)$, form $\widetilde n=n+aJn$ and $\widetilde b=b+d$, and store
+
+$$
+ \theta^+=\theta+\arctan(a),\qquad
+ b^+={b+d\over\sqrt{1+a^2}}.                                  \tag{G5}
+$$
+
+This is a retraction whose first derivative is the identity on the tangent
+coordinates. For fixed vehicle poses and zero uncertainty, all eight exact
+unrelaxed plane gaps after (G5) equal their linearized gaps divided by
+$\sqrt{1+a^2}$. Since this scale is at least one, an unchanged nonnegative
+slack also remains sufficient at fixed poses when the linearized gaps meet
+that slack. It therefore preserves the represented halfspaces instead of
+interpreting a large tangent increment as an equally large angle rotation.
+It updates only the stored geometric witness, not the issued control. Moving
+vehicle poses, uncertainty supports and dynamics still incur linearization
+error, so this identity is not a nonlinear trajectory certificate. Shooting
+uses direct angle coordinates; both have the same first-order plane rows.
+
+The nominal rows are smooth, but uncertainty supports and the terminal
+maximum can have feature ties. The present support derivative uses symmetric
+finite differences of the same directional allowance in both backends.
+This is a numerical derivative convention, not a differentiability theorem.
+A fully smooth polytope realization can retain support-dual variables instead
+of eliminating the maximum. The exact theoretical formulation (G2) needs no
+such differentiation assumption for the shift proof.
+
+A first-order row is not a nonlinear safety certificate for a finite step.
+If the witness is fixed, the familiar rotation remainder is bounded by
+$\|v\|(\Delta\psi)^2/2$. If the normal moves as well, mixed normal/pose terms
+also require bounds; compensating only ego yaw is insufficient. Ordinary RTI
+therefore makes no conservative-inner-approximation claim. The optional
+whole-domain enclosure path freezes witness angles and retains its existing
+rotation reserves, and must be interpreted as a separate restricted
+verification experiment.
 
 ### Constraint instants and a continuous-time extension
 
@@ -522,8 +518,8 @@ vanish and are retained in the equality right-hand side. The inherited input
 prefix is not reintegrated from the new measurement before solving.
 
 The current input estimate is fixed; current state error is handled by the
-published enclosure, not a free optimizer correction. Fixed collision duals
-and terminal tangents are built once on this model. Avoidance uses at most two
+published enclosure, not a free optimizer correction. Continuous plane-variable
+rows and the tangent of the shared nonlinear terminal function are built once on this model. Avoidance uses at most two
 native objective solves on that same reference; cruise uses one.
 The completed update supplies the first
 optimized input, with the numerical bound normalization described below.
@@ -560,7 +556,7 @@ A second QP chooses performance among the attained minimum-slack solutions.
 Its shared objective is
 
     J_perf = J_track + J_change + J_ref,
-    J_track = w_track/(2 N) sum_k ||De e_aff,k+1||^2,
+    J_track = w_track/2 sum_k ||De e_aff,k+1||^2,
     J_change = w_change/2 sum_k ||Du (u_k - u_k-1)||^2,
     J_ref = w_ref/(2 N) sum_k (
         ||Dx (x_aff,k+1 - xbar_k+1)||^2 + ||Du (u_k - ubar_k)||^2).
@@ -588,7 +584,7 @@ cost attains its global lower bound without a second native solve. If
 refinement fails, exceeds the budget, violates input bounds or exceeds the
 safety cap, the completed priority candidate is retained. No third solve,
 replanning or nonlinear execution filter is introduced. Positive PCBF slack
-remains admissible; state, input, hard-tail and terminal conditions retain
+remains admissible; state, input and terminal conditions retain
 their declared hardness. Soft regularization does not impose a steering-rate
 bound or certify nonlinear model accuracy.
 
@@ -625,8 +621,8 @@ corresponding component; all three zero disable avoidance refinement.
 Dx uses equal x/y units from `clf.lateralPositionErrorScale`, followed by
 heading, speed, lateral-velocity and yaw-rate scales. De uses those five
 transverse error units; Du uses the CLF certification steering/braking units.
-These are cost units, not bounds. Tracking and reference costs are horizon
-means. The cruise objective is scaled by `max(1,V(xhat))` for the solver;
+These are cost units, not bounds. Tracking and input variation are sums;
+only optional reference proximity is a horizon mean. The cruise objective is scaled by `max(1,V(xhat))` for the solver;
 reported component costs are unscaled.
 
 Each call returns the selected optimization's first input, apart from
@@ -833,9 +829,9 @@ The performance design uses the continuous-time nonlinear bicycle system:
 where T = `clf.convergenceTimeConstantSeconds` = 4 s. The slack has units of
 CLF value per second and has no upper bound. Exact continuous enforcement
 with zero slack implies `V(t) <= exp(-alpha t) V(0)` and hence a time constant
-T for sqrt(V). The online implementation evaluates the derivative at the
-current estimate and linearizes its input dependence once, as described
-below. It does not impose or claim discrete one-step contraction.
+T for sqrt(V). The online implementation uses a single tangent of the corresponding
+integrated held-step condition, as described below. Its affine slack does
+not certify the exact nonlinear derivative or held-step contraction.
 
 ### Continuous-time CLF matrix and separate sampled cruise certificate
 
@@ -1214,7 +1210,8 @@ by the same elapsed time, and input/encounter memory are retained. Every
 active successor row is therefore an old certified row. Once the encounter
 ends, no future prediction can reactivate it. Hence Phi_f(z,h) is in X_f.
 Appending this rule to a shifted feasible plan supplies the usual
-recursive-feasibility witness. A soft performance objective does not remove
+recursive-feasibility witness **only when the optimization transition and
+policy class admit that same terminal rule**, as required in (U4). A soft performance objective does not remove
 that candidate. This is an existence statement for the ideal problem;
 local RTI solution accuracy and deadlines are separate.
 
@@ -1232,7 +1229,7 @@ target only after every remaining active branch has exited. An unknown
 parameter remains the same along each branch. Model mismatch already
 represented in the current observer enclosure is not added again as an
 independent initial error. Future physical model defects remain in the
-physical images; the optional future-feedback extension propagates their
+physical images; the joint future-feedback model propagates their
 shared effects on observer and controller as well.
 
 For a common held braking rule with guaranteed realized deceleration
@@ -1269,26 +1266,19 @@ The joint transition and terminal continuation use the first-exit convention.
 The main RTI horizon no longer declares a future exit from a bounded reference
 neighborhood: position translations remain unbounded; numerical trust bounds
 on heading and dynamic states do not certify a perception-exit enclosure. It retains the active target's
-collision rows until an observed exit. Terminal rows retain all computed
-continuation collision conditions when no certified endpoint correction bound
-is supplied, including distant conditions previously omitted by a fixed band.
-Both signs of the lateral-acceleration condition are linearized for a moving
-endpoint. The terminal continuation's sampled schedule and exit branch remain
-local approximations and are not a global nonlinear exit certificate.
+collision rows until an observed exit.
 
-`rows` builds the local terminal approximation once. For a straight target
-track intersecting the parked footprint, its transverse support normal uses
-the sign with the larger minimum vertex gap at the parked reference pose.
-An exact tie retains the encounter passing side. A road-forward preference
-must not force the parked pose onto the opposite side from its braking
-endpoint. This changes the local representation, not the braking policy or
-the parked-track membership condition. At circular-track
-intersection, a nonconvex safe set can admit an inner or an outer local
-separation chart. The implementation selects the smaller radial/support
-escape using the actual joint geometry, independently of road-side
-preferences. These are two local descriptions of the same set under the
-same terminal policy; they are not two driving controllers or extra RTI
-iterations. Neither chart nor its linearization is a global certificate.
+Both ordinary numerical backends now use the same signed terminal function
+`terminalSafeSet.nonlinearValue`. It evaluates the declared simplified braking
+and parked-encounter continuation, together with the common operating-domain
+conditions. Shooting imposes this function directly; RTI imposes its tangent
+from `nonlinearTangent`, differentiating the same active branch. No additional
+terminal turn-intensity or terminal-specific sideslip bound is introduced.
+The finite continuation schedule, active feature and exit branch make this
+an engineering local approximation, not a global nonlinear terminal
+certificate. The older `rows` helper remains for standalone geometry and
+certificate research probes; its separate fixed-side charts no longer define
+the ordinary online terminal constraint.
 
 An inherited RTI tail whose endpoint is terminal first tries the certified
 cruise-feedback hold. The existing `brakingInput` helper then uses a bounded
@@ -1303,10 +1293,10 @@ optimizer still chooses the final input, subject only to the numerical
 input-bound normalization described above.
 
 <a id="joint-prediction"></a>
-## 6. Optional joint feedback-aware prediction
+## 6. Joint feedback-aware prediction
 
-This extends the physical information-set core of Section 7 to predictions
-whose inputs depend on future observations. It is distinct from the runtime's
+This supplies the causal observer/plant prediction used in Section 7.
+Its held-input specialization recovers the physical information-set case. It is distinct from the runtime's
 per-hold enclosure restart. Future measurements are unknown bounded variables.
 Tube widths may vary, expand temporarily and retain a noise floor; a
 constant-width invariant tube is optional. The model, observer, sensor and
@@ -1819,278 +1809,246 @@ terminal certificates. [Primary source](https://arxiv.org/html/2105.03427v1).
 <a id="recursive-feasibility"></a>
 ## 7. Unified observer-to-safety formulation
 
-The core algorithm uses one deterministic information set. The observer
-certifies the current physical state; the controller propagates that set under
-candidate held inputs and conditions the retained successor on the next valid
-observation. This closes the estimation-to-safety argument without forecasting
-future observer convergence. Predicting future observation-dependent policies
-is an optional extension, described at the end of this section and in Section 6.
-The target-presence PCBF/CLF modes and the physical vehicle model are retained.
+The theoretical object is a nonlinear output-feedback predictive barrier.
+It uses the joint future observer/plant evolution from the beginning; it does
+not first replace future feedback by open-loop error propagation. Exact-state
+MPC is the singleton-information special case. This section specializes the
+shift construction in Huang et al., problem (8) and Lemma III.5, while making
+its additional observer, moving-target and terminal assumptions explicit.
 
-This formulation specializes the predictive-slack shift argument to sound
-observer information. It is not a new claim of general MPC novelty, and it does
-not convert the present RTI approximation into a nonlinear safety certificate.
+### Joint information and one copy of uncertainty
 
-### Current containment is the observer interface
+Let $q$ contain the true ego and target state, observer internal state,
+position-filter memory, persistent uncertain parameters, previous input and
+encounter/terminal memory. A future command has the causal form
+$u_i=\pi_i(o_i)$, where $o_i$ consists only of information available to the
+controller at that future instant. In particular, it cannot depend on the
+unknown true error or future measurement noise. Affine feedback about a
+nominal plan is one possible policy class, but the class must allow the shift
+and terminal append used below.
 
-Let q contain the true ego and target states, persistent uncertain parameters,
-previous applied input and the mode/encounter memory needed to make the physical
-transition Markov. Fixed parameters remain fixed within each branch. Any
-additional plant defect has its own declared history; it must also be covered
-by the observer certificate when it changes the measurements or observer model.
-
-At time k the observer supplies a set Q_k with
-
-$$
-q_k\in Q_k.                                                     \tag{U1}
-$$
-
-Its physical projection can use the transient comparison and correlated
-relative enclosures of Section 2. No covariance, RMS error or energy-gain
-inequality is substituted for pointwise containment. The initial transient,
-held measurements, numerical defects, outages and applicable true operating
-domain must be covered. A steady-state radius alone does not establish (U1).
-
-The controller need not know the observer's internal state in the core
-formulation: future inputs are common held commands. Past estimation error
-initializes Q_k. It is not injected again as an independent physical disturbance
-at every horizon step. Future physical mismatch still acts through the physical
-model. Measurement noise enters new Q sets and the resulting reoptimization;
-it does not move the plant under a fixed held command.
-
-### Propagate first, then condition on observations
-
-Let T(J,u) be the exact physical one-hold image and T_tau(J,u) its image at
-elapsed time tau in [0,h]. These maps include the declared plant/target modes,
-parameter histories and defects. They are monotone under set inclusion.
-A certified outer successor R satisfies T(J,u) subset R; ordinary local
-affine prediction without a remainder is not such a certificate.
-
-Initialize I_0=Q_0, with compatible known input and mode memory. Store the first
-certified successor R_(1|k) when issuing u_k. At the next sample use
+Write the complete sampled transition, including the actual sensor and
+observer update, as
 
 $$
-I_{k+1}=R_{1|k}\cap Q_{k+1}\cap A_{k+1},\qquad
-q_{k+1}\in I_{k+1}\subseteq R_{1|k},                              \tag{U2}
+ q^+=\mathcal F(q,\pi(o),\omega),\quad \omega\in\Omega,
+ \qquad \vartheta^+=\vartheta.                                 \tag{U1}
 $$
 
-where A fixes newly known input/mode memory if it is not already fixed in Q.
-Both sets contain the same truth, so the intersection is nonempty. Raw
-observer balls may move and need not be nested. A dropout contributes the
-unrestrictive observation set; the physical prediction remains. An empty
-intersection is a violated containment/model contract, not permission to
-replace the set by the latest point estimate. A genuinely new target or model
-contract starts a new initial-feasibility problem.
+The same $\vartheta$ influences the plant and observer residual. A measurement
+primitive appears once and is shared between every update using that sensor.
+The initial estimation error belongs to the initial information set; it is
+not reinjected independently at every future step. Future physical mismatch
+still acts through (U1). These distinctions prevent double counting without
+pretending that mismatch disappears after estimation.
 
-The posterior may be represented by an outer set only if that representation
-still contains the truth and lies inside the retained successor. Arbitrary
-reboxing or recentering must not destroy this inclusion.
+Let $\mathcal T(R,\pi)$ be the exact image under (U1), and let
+$\mathcal T_\tau(R,\pi)$ include a declared checked instant within a hold.
+These maps are monotone in $R$ for a fixed policy. The theory uses sound outer
+images $\mathcal T(R_i,\pi_i)\subseteq R_{i+1}$, with stored proofs or exact
+sets. It neither assumes constant tube width nor requires contraction at every
+step. Joint affine propagation without a full-domain remainder is an
+engineering approximation of this object.
 
-### One signed margin connects geometry and prediction
+### Prediction and measurement conditioning must agree
 
-Choose a signed geometric margin g(q) whose nonnegative values imply the
-required rectangle nonoverlap. A fixed separating-plane certificate from
-Section 3 is sufficient. Ordinary distance, which is zero even inside an
-intersection, cannot establish nonoverlap at the default zero design clearance.
-Define the robust whole-hold margin and deficit by
-
-$$
-\begin{aligned}
-m(J,u)&=\inf_{0\le\tau\le h}\ \inf_{q\in T_\tau(J,u)} g(q),\\
-C(J,u)&=\max\{0,-m(J,u)\}.                                      \tag{U3}
-\end{aligned}
-$$
-
-Let H(J,u) mean that all physical, handling, actuator, slew and required
-observer-domain conditions hold on the same hold images. Therefore
+Let $Q_{k+1}$ be the sound current observer enclosure, including the known
+observer internal state. Retain the previous first successor and form
 
 $$
-J'\subseteq J\ \Longrightarrow\
-\begin{cases}
-C(J',u)\le C(J,u),\\
-H(J,u)\Longrightarrow H(J',u).
-\end{cases}                                                       \tag{U4}
+ I_{k+1}=R_{1|k}\cap Q_{k+1}\cap A_{k+1},\qquad
+ q_{k+1}\in I_{k+1}\subseteq R_{1|k},                            \tag{U2}
 $$
 
-An implementation may certify a lower bound on m using retained
-separating normals, supports and validated reserves. For a local row
-$g(q)\ge g(\hat q)+a^Te-r$ on its entire error/decision domain,
+where $A_{k+1}$ records newly known input, mode or measurement facts. At
+initialization $I_0=Q_0$. A raw new observer ball need not be contained in the
+previous one; the intersection with the **predicted successor**, not a
+recentered ball, gives the inclusion needed for shifting. Any outer numerical
+representation of the posterior must still lie inside that successor.
+A measurement outage imposes no new measurement restriction. An empty
+intersection violates the declared model/information contract and cannot be
+silently repaired by discarding the old information.
+
+A new target, a changed uncertainty contract, or a genuinely new encounter
+requires a new initial-feasibility argument. During an encounter the target's
+motion parameters are propagated and conditioned, not independently reset.
+An actual, or robustly established, perception exit ends this encounter;
+nominal predicted exit alone cannot remove constraints for uncertain members
+that remain nearby. Subsequent reentry is a new encounter. None of the
+following assertions covers arbitrary unmodeled later encounters.
+
+### One downward-closed constraint and terminal family
+
+Let $H(R_i,\pi_i)$ express the hard input, input-memory and model-domain
+conditions for all members at the declared checked instants. No road boundary
+is included in the present theoretical task. Define $C(R_i,\pi_i;w_i)$ as the
+least nonnegative slack for (G2) at those instants, with witnesses $w_i$ and
+the target inactive only under the encounter contract. Endpoint clearance
+uses $C_N(R_N;w_N)$. Retaining a witness gives
 
 $$
-g(q)\ge g(\hat q)-\sigma_E(-a)-r,\qquad e\in E.                  \tag{U5}
+ R'\subseteq R\ \Longrightarrow\
+ C(R',\pi;w)\le C(R,\pi;w),\quad
+ H(R,\pi)\Longrightarrow H(R',\pi).                            \tag{U3}
 $$
 
-This is the observer-to-safety interface: the estimator controls the set E,
-and geometry determines the direction a in which its support matters.
-Common ego/target pose and parameter columns are kept before taking support.
-Orientation, nonlinear dynamics and numerical error enter r only to the
-extent that the image or exact support has not already included them.
-No uncertainty source is added twice.
-
-Whole-hold images give continuous-time clearance directly. Alternatively,
-valid start/midpoint/end bounds with a true whole-hold Lipschitz constant L_g
-can use the reserve L_g*h/4, plus the midpoint/integration defects. Without
-such an extension, (U3) must explicitly be restricted to the checked instants,
-and the theorem below guarantees only those instants. The executable RTI
-currently has that limitation. Prediction also avoids requiring that a
-position-only first-order CBF have direct steering/braking authority in the
-dynamic bicycle model; no artificial relative-degree-one assumption is added.
-
-### A terminal family with one common continuation
-
-Let B be a downward-closed family of nonempty physical information sets. Each
-J in B must admit a common admissible first terminal command u_f and a
-certified outer successor R_f in B such that
+A downward-closed terminal family $\mathfrak B$ supplies a **common causal**
+continuation, not a different unknowable input for every possible true state.
+For every admitted $R_f\in\mathfrak B$, require a policy $\pi_f$, zero-deficit
+witnesses and a successor $R_f^+\in\mathfrak B$ satisfying
 
 $$
-H(J,u_f),\quad C(J,u_f)=0,\quad T(J,u_f)\subseteq R_f\in B.         \tag{U6}
+ H(R_f,\pi_f),\quad C(R_f,\pi_f;w_f)=0,\quad
+ \mathcal T(R_f,\pi_f)\subseteq R_f^+,\quad C_N(R_f^+;w_f^+)=0.  \tag{U4}
 $$
 
-A common braking continuation and its allowed tails supply this property.
-Individually feasible braking inputs for different unknown states do not.
-Input memory is part of q, so the first appended slew condition remains.
-For the mild terminal contract of Section 5, a lower realized braking bound
-$a_{\min}>0$ gives
+The previously accepted simplified braking/encounter continuation in Section 5
+remains the proposed terminal contract. Its entry data and elapsed progress
+are retained when the continuation is shifted. Checking a nominal stopping
+path alone does not establish (U4) for uncertain states. In particular, a
+simplified braking transition cannot be appended to a problem that permits
+only an incompatible Fiala transition. Either its realization under the
+problem's transition must be justified, or the declared terminal mode must
+be included consistently in that transition and policy class. This is an
+explicit compatibility premise; this revision does not silently replace the
+simplified model or claim to have proved its physical realization. Actual
+terminal takeover or ego rest remains an experiment failure, not an event
+needed for the ordinary driving objective.
 
-$$
-t_{\rm stop}\le\overline V/a_{\min},\qquad
-s_{\rm stop}\le\overline V^2/(2a_{\min}).                         \tag{U7}
-$$
+### A single nonlinear lexicographic problem
 
-Verify the complete uncertain continuation to this time and the parked
-rectangle family afterward. A continuous absorbing stop is assumed here;
-a delayed stop reset needs its own allowance. Nonzero pose uncertainty remains
-at rest. No yaw-estimate contraction is required when the terminal command
-uses no yaw measurement. Defects capable of moving a parked vehicle require
-a separately invariant parked set. The mild continuation is a declared model
-contract, not a proven maneuver-wide Fiala terminal certificate.
-
-### The same two optimization priorities
-
-Fix 1<=N<=M at encounter initialization. Choose held inputs u_0,...,u_(M-1),
-nonempty sets R_0,...,R_M, compatible image/row certificates and nonnegative
-prefix slacks. The admissible plans satisfy
+Fix a finite $N$ at encounter initialization and use the same stage timing on
+successive shifts. A plan consists of causal policies, nonempty joint sets,
+continuous geometric witnesses and nonnegative slacks. Its conditions are
 
 $$
 \begin{aligned}
-R_0&=I_k,& T(R_i,u_i)&\subseteq R_{i+1},\\
-H(R_i,u_i)&,& C(R_i,u_i)&\le\xi_i,\\
-\xi_i&=0\quad(i\ge N),& R_M&\in B.                             \tag{U8}
+ R_0&=I_k,& \mathcal T(R_i,\pi_i)&\subseteq R_{i+1},\\
+ H(R_i,\pi_i)&,& C(R_i,\pi_i;w_i)&\le\xi_i,
+             && i=0,\ldots,N-1,\\
+ C_N(R_N;w_N)&\le\xi_N,& R_N&\in\mathfrak B,
+             &\xi_i&\ge0.                                    \tag{U5}
 \end{aligned}
 $$
 
-One slack covers each entire hold including its endpoint. Define the
-information-state predictive barrier value
+The endpoint slack matches the executable indexing. Under (U4) it is
+redundant in the exact zero-deficit terminal family and can be chosen zero.
+For sampled-only statements, each hold checks its start and selected
+interior instants, with the endpoint checked separately. This schedule is
+shift invariant. Whole-hold versions replace these finite sets by all
+$\tau\in[0,h]$; no intersample assertion is implied here without that change.
+
+Define $J_P=\sum_{i=0}^N\xi_i$ and minimize
 
 $$
-V_{\rm P}^*(I_k)=\min\sum_{i=0}^{N-1}\xi_i.                     \tag{U9}
+ \underset{\Pi,R,w,\xi}{\operatorname{lexmin}}\quad
+       (J_P,\ J_{\mathrm{perf}}),\qquad\text{subject to (U5)}.  \tag{U6}
 $$
 
-During an active encounter the ideal controller minimizes (U9), chooses a
-minimum-performance-cost member of its optimal solution set, and applies
-its first input. This tie-breaker does not alter the optimal barrier value.
-Once the target leaves the
-perception-scoped encounter, the collision problem becomes inactive and the
-controller selects its cruise CLF objective. Section 4 gives the additional
-dissipation and recovery-domain premises; a newly detected encounter requires
-its own initial feasible plan. This mode rule adds no cross-frame slack budget.
+Lexicographic priority is one mathematical problem. It does not require a
+large weighting constant, and it does not imply two successive nonlinear
+linearizations. Numerically its primary and secondary local subproblems can
+share one Jacobian. Outside an encounter, a soft cruise CLF and performance
+replace the PCBF objective; newly acquired targets require fresh feasibility.
 
-The feasible representation must allow the old input tail, its retained sets,
-row certificates and terminal append. Fresh anchors, arbitrary trust boxes or
-new separating charts cannot discard this witness. An exact physical image
-is monotone, but an arbitrary adaptive outer approximation need not be;
-retaining the old outer certificates avoids requiring that extra property.
+The optimal primary value $V_P(I)$ eliminates all policy, set and plane
+variables. It is therefore independent of any particular plane orientation
+or initialization path. Changing a plane witness while solving (U6) does not
+redefine this predictive barrier function.
 
-### Unified containment and safety theorem
+### Theorem U: recursive feasibility and zero-deficit invariance
 
-Assume (U1), a sound initial feasible plan, the same physical uncertainty
-contract throughout the encounter, sound images/rows in (U8), the conditioning
-rule (U2), and terminal closure (U6). Assume the plan/certificate class permits
-shifting and terminal appending. Issue the definite first input of a feasible
-plan unchanged.
+Assume initial feasibility, true-state containment, sound joint images,
+conditioning (U2), unchanged encounter/model contracts, terminal closure
+(U4), and a policy/set/certificate representation closed under shifting.
+The controller issues the first command of an attained primary minimizer;
+performance selection stays on its primary optimal face. Then
 
-1. The next information set contains the truth and the next mathematical
-   optimization problem is feasible.
-2. The executed hold satisfies the hard conditions and g(q(t))>=-xi_0
-   at every instant included in (U3).
-3. If each executed plan attains the primary minimum, then
+$$
+ V_P(I_{k+1})\le V_P(I_k)-\xi_{0|k}^*\le V_P(I_k).              \tag{U7}
+$$
 
-   $$
-   V_{\rm P}^*(I_{k+1})\le V_{\rm P}^*(I_k)-\xi_{0|k}^*.        \tag{U10}
-   $$
+The next mathematical problem is feasible. If $V_P(I_{k_0})=0$, all subsequent
+values and checked-instant collision deficits stay zero for this encounter.
+Consequently vehicle interiors do not overlap at those instants for any
+allowed joint realization. This does not assert a positive physical margin.
 
-   Consequently the zero-value information sets are invariant and safe.
-   Along an infinite applicable sequence, the first-hold deficits are
-   summable and tend to zero. Positive deficits are relaxation; summability
-   does not imply finite-time entry into the zero-value set.
+**Proof.** By (U2), the new root is a subset of the old first successor.
+Restrict the old remaining causal policies to histories reachable from this
+root. Keep the old outer successor sets, geometric witnesses and validity
+certificates; by (U3) they remain admissible. Append the common terminal
+policy, successor and zero-deficit witnesses from (U4). The new slack sequence
+$(\xi_1^*,\ldots,\xi_N^*,0)$ is feasible. Its sum is
+$V_P(I_k)-\xi_{0|k}^*$. Comparing the new minimum with this candidate gives
+(U7). All first-command realizations belong to the certified first images,
+so zero slack excludes interior collision at the checked instants. Induction
+proves the claimed invariance. For $N=1$ the same terminal restriction handles
+the shifted root. QED.
 
-**Proof.** Truth containment and I_(k+1) subset R_(1|k) follow from (U2).
-Shift u_1,...,u_(M-1), retain the old successor sets and their row certificates,
-and append a terminal command/witness from R_M. By monotonicity, the shifted
-first image of the new root lies in the old R_2. All later old images and rows
-remain unchanged. The terminal append satisfies (U6). If M=1, the new root
-is a subset of R_M, so the same terminal command applies by downward closure.
-Shift prefix slacks to (xi_1,...,xi_(N-1),0); the final zero was either an old
-hard-tail hold or the terminal append. This is a feasible candidate of cost
-sum(xi_i)-xi_0. Comparing the next minimum with that candidate proves (U10)
-when the old plan attained its minimum. The true first hold belongs to the
-certified images, giving assertion 2. Nonnegative values telescope; initial
-zero implies all subsequent deficits and values are zero. QED.
+The sum, not each individual predicted slack, is nonincreasing. First-stage
+slack can redistribute while the sum falls. Telescoping (U7) makes the
+executed first-stage deficits summable on an infinite applicable sequence;
+it does not by itself prove finite-time recovery or Huang's stronger invariant
+set convergence conclusions without their additional compactness/regularity
+hypotheses. Positive slack is an admitted collision deficit, not safety.
+Hard input/domain/terminal inconsistency can still make initialization
+infeasible even when collision slack is unrestricted.
 
-With a merely feasible executed plan of cost J_k the valid comparison is
-V_P^*(I_(k+1))<=J_k-xi_0. A certified primary suboptimality eta_k adds eta_k
-to (U10); summability then needs a summable error budget. The executable
-affine optimum is not a certified gap to this nonlinear optimum.
+### Feasible improvement can replace global optimization
 
-### Online algorithm and the optional feedback extension
+The shift argument also gives a useful stronger algorithmic statement that
+does not demand a globally solved nonlinear program on every sample. Store
+an actually feasible plan of cost $J_k$ and its shift. Accept any **nonlinearly
+certified feasible** replacement with
 
-The core algorithm has five operations:
+$$
+ J_{k+1}\le J_k-\xi_{0|k}.                                     \tag{U8}
+$$
 
-1. Obtain the current sound observer enclosure and condition the retained
-   first successor using (U2); initialize directly only for a new problem.
-2. Propagate candidate physical sets and enforce (U3), (U6) and (U8).
-3. Minimize the predictive deficit (U9), then optimize performance under the
-   same safety budget and common hard conditions.
-4. Issue the optimized first command unchanged and store its certified first
-   successor, remaining input sequence, sets and terminal witness.
-5. Repeat after the next observation. Missing information does not reset the
-   prediction width or create an assumed future posterior contraction.
+The retained shift always meets this bound, so feasibility and zero-deficit
+invariance follow even if an improvement search fails or is stopped early.
+This proves a statement about the stored plan cost, not equality to the
+optimal value $V_P$. Under exact optimization (U8) is redundant. It is a
+sufficient suboptimal implementation contract, not a property bestowed on
+ordinary RTI by a small QP residual. This online RTI implementation deliberately
+does not add a nonlinear acceptance filter or retained backup execution and
+therefore does not claim (U8).
 
-This controller is output feedback: every optimization uses the information
-conditioned on the available measurements. Its predicted input sequences are
-open loop within each solve. That restriction can be conservative, especially
-for long horizons and large model uncertainty; initial robust feasibility is
-still a premise, not a universal outcome for every safe-looking encounter.
+### The explicit route from theory to SQP-RTI
 
-When the prediction explicitly uses future measurements, replace q by the
-joint physical/observer state of Section 6 and replace u_i by a causal rule
-pi_i. The exact transition includes the real observer updates, shared noise,
-input timing and reconstruction. The same definitions (U2)--(U10) and the same
-shift proof apply to that lifted state, provided the policy class is closed
-under shifting. No second safety theorem is needed. Only this extension needs
-future observer/measurement propagation; current observer containment suffices
-for the physical held-input core. Neither representation permits restarting
-current-width error sets at future nominal centers without a sound image.
+For fixed frame-level uncertainty data, transcribe the nominal nonlinear
+problem with decisions $z=(X,U,\theta,b,\xi,s)$. It has vehicle equalities
+$X_{i+1}=F_h(X_i,U_i)$, the plane rows (G3), physical/domain inequalities,
+the shared terminal function $\Phi_f(X_N)\le0$, and the applicable CLF row.
+The optional nonlinear diagnostic solves these equations using shooting.
+RTI performs the following approximation of this same transcription:
 
-### Executable research specialization
+1. Shift the previous states, inputs and continuous witnesses; replace the
+   measured root and retain its dynamics defects. Plan only at acquisition.
+2. Propagate the engineering joint affine observer/feedback tube at that
+   reference. Freeze its data for this local solve; its directional supports
+   still depend on the plane variable.
+3. Linearize **all optimized nonlinear coordinates**, including $\theta$ and
+   $b$, using (G4). Use the same terminal function and the same objective units
+   as shooting. Build a positive-semidefinite Gauss--Newton performance cost.
+4. Minimize local PCBF slack, then performance under the attained slack cap,
+   on this single local model. Issue the first input and retain the iterate.
 
-`scripts/verifyUnifiedObserverSafety.m` implements the core with longitudinal
-forward-only motion, a constant-speed moving target, absorbing ego rest,
-bounded braking and slew, and current bounded-observation boxes. It exhausts
-a finite input alphabet, computes the signed minimum gap analytically over
-each whole hold, and appends a common braking continuation. A retained box
-operator is monotone; no future observer dynamics or assumed measurements
-enter the search. Boxes can lose correlations and remain conservative.
+Thus the QP/LP solves are numerical approximations, not a redefinition of
+collision safety. The approximation has two separate gaps: an affine joint
+uncertainty prediction need not enclose nonlinear errors, and one finite SQP
+step need not satisfy nonlinear constraints or retain the shifted robust
+witness. Numerical trust regions help local accuracy but do not prove either
+premise. Feature ties and Fiala mode transitions additionally fall outside
+ordinary smooth local RTI convergence assumptions. A successful numerical
+campaign supports performance on its tested cases, not Theorem U for RTI.
 
-The checks include nonnested observations, dropout, positive-deficit recovery,
-a one-hold horizon, a parked uncertain state, input-limited infeasibility,
-empty-intersection rejection and interior overlap at zero design clearance.
-A constructed trajectory has a 4 mm positive gap at start/midpoint/end but a
-1 mm overlap between them, which the analytic hold minimum detects.
-The tests also distinguish quadratic energy dissipation from pointwise
-Euclidean observer containment. These are deterministic analytic-model
-checks in ordinary floating point, not a universal NRMM/Fiala certificate.
-The production RTI remains the approximation described in Section 8.
+The existing `verifyUnifiedObserverSafety` specialization and tests exercise
+the shift argument on an analytic longitudinal model with exact held-input
+images. It is a special case of (U1)--(U8), not verification of the full
+NRMM/Fiala model. The retained policy-box research mode explores sufficient
+nonlinear certificates separately. Neither should be conflated with the
+ordinary online implementation.
 
 <a id="runtime"></a>
 ## 8. RTI references, computation and implementation boundary
@@ -2727,7 +2685,8 @@ law. It covers endpoint decision corrections plus physical endpoint error,
 including states that stop at different times. Its residual is the enclosed
 pose minus the affine terminal-pose map. The worst-case speed determines a
 schedule long enough to include every stop. This establishes a pose-map
-building block only. It does not certify the current `terminalSafeSet.rows`:
+building block only. It did not certify the former `terminalSafeSet.rows`
+local approximation, and does not certify the current `nonlinearTangent`:
 its closest parked-target witness and first-exit selection must still be
 uniform over the entire joint information set. Therefore the new API returns
 `terminalMembershipCertified=false`; it does not replace the simplified
@@ -3885,7 +3844,7 @@ baseline and minimum recovery time.
 | Sound physical horizon images; joint images for future feedback | The retained joint path encloses the declared sampled ego/observer map over decision plus uncertainty domains in real arithmetic. The October 30 refinements permit driving admission and zero deficit in the 8 m/s head-on experiment; other initial tubes still fail hard-domain admission. No floating-point certificate is claimed. |
 | Cross-sample posterior inclusion | The retained backend stores joint sets and constrained posterior intersections and keeps the old certificate if a new outer image is rejected. The shooting and point-RTI experiments do not retain that set/policy witness. |
 | Common robust terminal family | The retained backend verifies a full entry set under simplified braking until uniform perception exit or separated stationary families; a finite check limit never certifies an unresolved tail. This is an assumed terminal model, not a Fiala execution certificate. |
-| Nonlinear CLF dissipation | Shooting evaluates the integrated continuous-CLF condition at its nonlinear next state, with soft slack. The RTI comparator locally approximates this condition. Both retain performance costs during cruise. |
+| Nonlinear CLF dissipation | Shooting evaluates the integrated continuous-CLF condition at its nonlinear next state, with soft slack. Online RTI locally approximates this condition. Both retain performance costs during cruise. |
 | Whole-hold collision/observer-domain validity | Nodes and approximate midpoints do not by themselves establish continuous-time validity. |
 | Numerical success | Shooting retains feasible local candidates, including iteration-limited returns; sampled feasibility is checked against refreshed engineering margins. Point-RTI requires completed affine objectives. The retained backend has an explicit feasible policy before performance optimization, but initial admission and normal driving extensions may fail. Full-domain enclosures use real-arithmetic derivations, not outward-rounded numerics. |
 
@@ -3900,7 +3859,7 @@ test limits executable source growth; this consolidation adds no runtime module.
 | --- | --- |
 | [collisionAvoidanceController.m](collisionAvoidanceController.m) | Input/target memory, encounter updates, solver orchestration, first-input output, reset and warm-up actions. |
 | [readControllerInputs.m](readControllerInputs.m) | Ego/target parsing, timestamped error sets, given path and boundary observations. |
-| [solvePredictiveControl.m](solvePredictiveControl.m) | Nonlinear shooting and feasibility restoration, joint-margin refresh, explicit affine RTI comparator, lexicographic objectives, encounter-onset horizon sizing and fixed-length shifts. |
+| [solvePredictiveControl.m](solvePredictiveControl.m) | Shared nonlinear plane/terminal transcription, online SQP-RTI, optional shooting and joint-margin refresh, lexicographic objectives and fixed encounter shifts. |
 | [terminalSafeSet.m](terminalSafeSet.m) | Joint state/flow, braking continuation, membership/linearized rows, parked-track checks, seed holds and offline certificate helpers. |
 | [nonlinearBicycleModel.m](nonlinearBicycleModel.m) | Blended bicycle, road load, RK4/tangents, trim, path error and quadratic CLF. |
 | [modifiedFialaTire.m](modifiedFialaTire.m) | Combined-slip forces and analytic derivatives. |
@@ -3969,6 +3928,8 @@ primary sources establish the general PCBF, output-feedback MPC and
 high-order barrier constructions; they do not certify this NRMM/Fiala
 implementation:
 
+- Zhang, Liniger and Borrelli (2018), *Optimization-Based Collision Avoidance*: [primary manuscript](https://arxiv.org/html/1711.03449v3), Section 4 and Theorem 2, for exact signed-distance dual geometry and unit-normal normalization with negative permitted clearance. Equations (G1)--(G4) use its rectangle vertex specialization.
+- Diehl, Bock and Schloeder (2005), *A Real-Time Iteration Scheme for Nonlinear Optimization in Optimal Feedback Control*: [original article](https://doi.org/10.1137/S0363012902400713), and [author-hosted overview](https://cdn.syscop.de/publications/Diehl2005c.pdf), for one Newton-type update per sample and its local regularity/initialization requirements. These results do not certify this nonsmooth engineering transcription.
 - Cannon, Buerger, Kouvaritakis and Rakovic (2010), *Robust tubes in nonlinear model predictive control*: [primary manuscript](https://users.ox.ac.uk/~engs0169/pdf/cannon_nolcos10.pdf), Sections 2--4, for nonlinear remainder tubes and a retained feasible candidate.
 - Lishkova and Cannon (2025), *A successive convexification approach for robust receding horizon control*: [primary manuscript](https://arxiv.org/html/2302.07744v3), Sections IV--V, for convexification-specific feasibility arguments.
 - Scott, Raimondo, Marseglia and Braatz (2016), *Constrained zonotopes: A new tool for set-based estimation and fault detection*: [primary manuscript](https://web.mit.edu/braatzgroup/Scott_Automatica_2016.pdf), Definition 3 and Sections 3--5, for exact linear intersections and the cost of discarding generator constraints.
@@ -3990,7 +3951,7 @@ implementation:
   Control Barrier Functions for Safety-Critical Control With Dynamic Obstacles*:
   [publication](https://doi.org/10.1109/LCSYS.2025.3581497), Section III, for
   distinct environment-state and velocity-error compensation. Their general
-  bounded-error interface motivates (U1); an energy-gain LMI alone is not
+  bounded-error interface motivates the containment premise of Theorem U; an energy-gain LMI alone is not
   adopted as a pointwise Euclidean radius.
 - Xiao and Belta (2019), *Control Barrier Functions for Systems with High
   Relative Degree*: [primary manuscript](https://arxiv.org/abs/1903.04706),

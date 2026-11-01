@@ -1,9 +1,9 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl Nonlinear shooting, explicit RTI, or retained certificates.
-% The default nonlinear backend optimizes exact vehicle rollouts with joint
-% affine observer/feedback margins re-evaluated on accepted trajectories.
-% Retained nonlinear certificates are an explicit verification mode. The
-% following single-linearization description concerns only solver.method="rti".
+%solvePredictiveControl SQP-RTI of the nonlinear predictive barrier problem.
+% Both numerical backends use continuous separating-plane witnesses and the
+% same nonlinear vehicle, terminal function, and lexicographic objectives.
+% The online default performs one local model update. Iterated nonlinear
+% shooting and retained nonlinear certificates are explicit research modes.
 % The planner runs once at encounter onset. Later frames shift the previous
 % state/input iterate and retain its node count throughout the encounter.
 % Horizon sizing occurs only at encounter onset; a failed solve never extends
@@ -328,6 +328,12 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount,referenc
     end
     anchor=struct('inputs',inputs,'states',states,'terminalContext',context, ...
         'appendedTerminalSteps',appended,'appendedBrakingSteps',braking,'planner',localPlannerMetadata());
+    if inherited && isfield(previous,'collisionWitnesses') && ~isempty(previous.collisionWitnesses)
+        anchor.collisionWitnesses=nan(2,2*count+1);
+        oldWitness=previous.collisionWitnesses(:,3:end);
+        kept=min(size(oldWitness,2),2*count+1);
+        anchor.collisionWitnesses(:,1:kept)=oldWitness(:,1:kept);
+    end
     if reuse
         anchor.appendedTerminalSteps=anchor.appendedTerminalSteps+reference.appendedTerminalSteps;
         anchor.appendedBrakingSteps=anchor.appendedBrakingSteps+reference.appendedBrakingSteps;
@@ -634,6 +640,15 @@ function solution=localDecode(point,problem,anchor,inputs)
         solution.durationChangeSeconds=point(problem.durationIndex);
         solution.states=solution.states+problem.durationStateDerivative*solution.durationChangeSeconds;
     end
+    solution.collisionWitnesses=zeros(2,0);
+    if isfield(problem,'witnessIndices') && ~isempty(problem.witnessIndices)
+        witnessStep=reshape(point(problem.witnessIndices),size(problem.witnessIndices));
+        if problem.retractWitnesses
+            solution.collisionWitnesses=predictiveSafetyGeometry.retractSeparationWitness(problem.collisionWitnesses,witnessStep);
+        else
+            solution.collisionWitnesses=problem.collisionWitnesses+witnessStep;
+        end
+    end
     solution.affineStates=solution.states;
     solution.affineSafety=solution.safety;solution.affineStageSlacks=solution.stageSlacks;
     solution.inputCorrection=inputs-anchor.inputs;
@@ -691,6 +706,15 @@ function [problem,model]=localFormulate(anchor,model)
     slackCount=count+1;
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
     is=iu(end)+(1:slackCount);ic=is(end)+1;nv=ic;
+    iw=zeros(2,0);witnesses=zeros(2,0);collisionData=cell(1,2*count+1);
+    if ~isempty(model.target)
+        iw=reshape(ic+(1:2*(2*count+1)),2,[]);nv=iw(end);
+        witnesses=nan(size(iw));
+    end
+    model.referenceWitnesses=witnesses;
+    if isfield(anchor,'collisionWitnesses') && isequal(size(anchor.collisionWitnesses),size(witnesses))
+        model.referenceWitnesses=anchor.collisionWitnesses;
+    end
     % Every inequality row is a small dense block on the few variables it
     % involves (a node's state, or a hold's start state and input, and its
     % slack), in the order of the rows; the sparse matrices are built once
@@ -701,6 +725,9 @@ function [problem,model]=localFormulate(anchor,model)
     cones=struct('A',{},'b',{},'D',{},'gamma',{},'size',{});
     lower=-Inf(nv,1);upper=Inf(nv,1);
     lower([is,ic])=0;
+    % One complete angular chart covers every unit normal, including negative
+    % signed clearance. Zero normal is impossible, even with zero clearance.
+    lower(iw(1,:))=-pi;upper(iw(1,:))=pi;
     % Position translations stay unrestricted. Numerical trust bounds on the
     % nonlinear coordinates are shared by the primary and secondary solves.
     [inputLower,inputUpper]=nonlinearBicycleModel.inputBounds(cfg);
@@ -834,14 +861,15 @@ function [problem,model]=localFormulate(anchor,model)
         point=2*index-1;
         if fullCollisionRows || ~encounterEnded
             departure=index;
-            [g,j,tightening,escape]=localSafety(x,forecast(:,point),point,model,collisionGenerator);
+            [g,j,tightening,escape,jw,witnesses(:,point),collisionData{point}]=localSafety(x,forecast(:,point),point,model,collisionGenerator);
             safetyNormals(:,point)=j(1,1:2).';
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
-            if index==1,primaryLowerBound=max(0,-min(g));end
-            r=[-j,zeros(4,3)];yawMap=[0,0,1,0,0,0];
+            % A movable witness can improve this support gap; zero remains
+            % the valid primary lower bound, independently of its initialization.
+            r=[-j,zeros(8,3)];yawMap=[0,0,1,0,0,0];
             blockCount=blockCount+1;
-            blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[nodeColumns;is(index)];
+            blockRows{blockCount}=[r,-jw,-[ones(4,1);zeros(4,1)]];blockColumns{blockCount}=[nodeColumns;iw(:,point);is(index)];
             blockBounds{blockCount}=g;
             rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
                 [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
@@ -854,13 +882,13 @@ function [problem,model]=localFormulate(anchor,model)
         point=2*index;
         if fullCollisionRows || ~encounterEnded
             departure=index;
-            [g,j,tightening,escape]=localSafety(middle,forecast(:,point),point,model,middleCollisionGenerator);
+            [g,j,tightening,escape,jw,witnesses(:,point),collisionData{point}]=localSafety(middle,forecast(:,point),point,model,middleCollisionGenerator);
             safetyNormals(:,point)=j(1,1:2).';
             model.collisionEscapeNormals(:,point)=escape;
             maximumTightening=max(maximumTightening,max(tightening));
             r=-j*middleMap(1:3,:);yawMap=middleMap(3,:);
             blockCount=blockCount+1;
-            blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[middleColumns;is(index)];
+            blockRows{blockCount}=[r,-jw,-[ones(4,1);zeros(4,1)]];blockColumns{blockCount}=[middleColumns;iw(:,point);is(index)];
             blockBounds{blockCount}=g;
             rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
                 [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
@@ -908,24 +936,21 @@ function [problem,model]=localFormulate(anchor,model)
     model.uncertaintyPrediction=uncertaintyPrediction;
     model.sampledStates=zeros(6,2*count+1);
     model.sampledStates(:,1:2:end)=anchor.states;model.sampledStates(:,2:2:end)=middles;
-    % Terminal node: the collision rows of every node inside the range, the
-    % road, and the terminal set's conditions linearized at the anchor
-    % endpoint y (terminalSafeSet.rows): collision rows at the continuation's
-    % nodes and midpoints before the target's exit and at the parked pose
-    % against the target's closest track pose, and road rows along the
-    % continuation, all on dx_N. The anchor endpoint meets them when it is in
-    % the set, so the zero correction stays feasible.
+    % Endpoint collision rows share the ordinary plane formulation. The
+    % terminal row below is the tangent of the SAME signed continuation
+    % function evaluated by shooting, with its active feature retained only
+    % while taking the derivative. This is not a nonlinear safety certificate.
     y=anchor.states(:,end);endColumns=ix(:,end);
     time=times(end);point=2*count+1;
     if fullCollisionRows || ~encounterEnded
         departure=count+1;
-        [g,j,tightening,escape]=localSafety(y,forecast(:,point),point,model,collisionGenerator);
+        [g,j,tightening,escape,jw,witnesses(:,point),collisionData{point}]=localSafety(y,forecast(:,point),point,model,collisionGenerator);
         safetyNormals(:,point)=j(1,1:2).';
         model.collisionEscapeNormals(:,point)=escape;
         maximumTightening=max(maximumTightening,max(tightening));
-        r=[-j,zeros(4,3)];yawMap=[0,0,1,0,0,0];
+        r=[-j,zeros(8,3)];yawMap=[0,0,1,0,0,0];
         blockCount=blockCount+1;
-        blockRows{blockCount}=[r,-ones(4,1)];blockColumns{blockCount}=[endColumns;is(count+1)];
+        blockRows{blockCount}=[r,-jw,-[ones(4,1);zeros(4,1)]];blockColumns{blockCount}=[endColumns;iw(:,point);is(count+1)];
         blockBounds{blockCount}=g;
         rotationBlocks(end+1)=blockCount;rotationMaps{end+1}= ...
             [yawMap,zeros(1,size(blockRows{blockCount},2)-numel(yawMap))];
@@ -957,7 +982,10 @@ function [problem,model]=localFormulate(anchor,model)
         terminalInfo=struct('value',NaN,'margin',NaN,'exitSeconds',NaN, ...
             'reason',"deferredToWholeSetAdmission");
     else
-        [terminalRows,terminalBounds,context,terminalInfo]=terminalSafeSet.rows(context,y,time/h);
+        [terminalValue,terminalRows]=terminalSafeSet.nonlinearTangent(context,y,time/h);
+        terminalBounds=-terminalValue;
+        terminalInfo=struct('value',terminalValue,'margin',-terminalValue, ...
+            'exitSeconds',NaN,'reason',"signedBrakingContinuation");
     end
     localCheckDeadline(model);
     model.terminalContext=context;model.encounterExitRecord=exitRecord;
@@ -967,6 +995,15 @@ function [problem,model]=localFormulate(anchor,model)
     % Assemble after intersecting physical and numerical locality bounds.
     lower(iu)=max(lower(iu),physicalInputLower-anchor.inputs);
     upper(iu)=min(upper(iu),physicalInputUpper-anchor.inputs);
+    inactive=cellfun(@isempty,collisionData);
+    if ~isempty(iw)
+        lower(iw(:,inactive))=0;upper(iw(:,inactive))=0;witnesses(:,inactive)=0;
+        if cfg.controller.jointNonlinearPrediction
+            % The retained whole-domain rotation reserve certifies a fixed
+            % normal only. This optional enclosure experiment freezes it.
+            lower(iw(1,:))=0;upper(iw(1,:))=0;
+        end
+    end
     physicalLowerBounds=lower;physicalUpperBounds=upper;
     trustRadii=Inf(8,count);trustRatio=zeros(1,count);adjusted=false;
     if cfg.rti.trustRegion.enabled
@@ -1027,7 +1064,8 @@ function [problem,model]=localFormulate(anchor,model)
     % repair. A later domain enlargement must never reuse an old yaw bound.
     vertices=cfg.vehicle.rectangleOffset+[cfg.vehicle.length;cfg.vehicle.width]/2 ...
         .*[-1,1,1,-1;-1,-1,1,1];
-    vertexReach=vecnorm(vertices).';
+    vertexReach=[vecnorm(vertices).';zeros(4,1)];
+    if ~cfg.controller.jointNonlinearPrediction,rotationBlocks=[];end
     for k=1:numel(rotationBlocks)
         block=rotationBlocks(k);map=rotationMaps{k};columns=blockColumns{block};
         coordinateRadius=max(abs(lower(columns)),abs(upper(columns)));
@@ -1047,7 +1085,9 @@ function [problem,model]=localFormulate(anchor,model)
         'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',cones, ...
         'primaryConeCount',numel(cones), ...
         'stages',stages, ...
-        'safetyNormals',safetyNormals, ...
+        'safetyNormals',safetyNormals,'witnessIndices',iw,'collisionWitnesses',witnesses, ...
+        'collisionData',{collisionData}, ...
+        'retractWitnesses',string(cfg.solver.method)=="rti", ...
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
         'encounterExit',departure, ...
@@ -1141,93 +1181,57 @@ function [rows,bounds]=localRoadBlock(road,point,pose,map,generator,clearance)
     end
 end
 
-function [values,jacobian,tightening,escape]=localSafety(x,q,point,model,generator)
-    % Fixed-dual collision rows at a pose against the target's forecast q,
-    % on the pose (jacobian, 4x3), tightened by the enclosures.
+function [values,jacobian,tightening,normal,witnessJacobian,witness,data]=localSafety(x,q,point,model,generator)
+    % The same nonlinear plane rows feed both shooting and SQP-RTI.
     cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     dual=predictiveSafetyGeometry.supportLinearization(x(1:3),shape,q(1:3),q(8:11));
-    escape=model.collisionEscapeNormals(:,point);
-    if ~model.retainCollisionSide,escape=zeros(2,1);end
-    if norm(escape)>0
-        projection=laneGeometry.project(x(1:2),model.lane);
-        forward=[cos(projection.heading);sin(projection.heading)];
-        tube=struct('positionRadius',model.targetTube.positionRadius(point),'yawRadius',model.targetTube.yawRadius(point));
-        reserve=sum(vecnorm(generator(1:2,:)))+tube.positionRadius ...
-            +2*norm(shape(1:2))*sin(min(pi,sum(abs(generator(3,:))))/2) ...
-            +2*norm(q(8:9))*sin(tube.yawRadius/2);
-        passed=forward.'*(x(1:2)-q(1:2))>norm(shape(1:2))+norm(q(8:9)) ...
-            +norm(shape(3:4))+norm(q(10:11))+reserve;
-        if passed,escape=zeros(2,1);end
+    normal=dual.normal;
+    if isfield(model,'fixedCollisionNormals') && norm(model.fixedCollisionNormals(:,point))>0
+        normal=model.fixedCollisionNormals(:,point);
+    elseif isfield(model,'probeNormals') && norm(model.probeNormals(:,point))>0
+        normal=model.probeNormals(:,point);
     end
-    active=norm(escape)>0 || dual.distance<=1e-8;
-    if active
-        dual=localEscapeDual(x,q,model,dual);
-        escape=dual.normal;
+    angle=atan2(normal(2),normal(1));
+    rt=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+    vertices=q(10:11)+q(8:9).*[-1,1,1,-1;-1,-1,1,1];
+    witness=[angle;max(normal.'*rt*vertices)];
+    if isfield(model,'referenceWitnesses') && all(isfinite(model.referenceWitnesses(:,point)))
+        witness=model.referenceWitnesses(:,point);
+        normal=[cos(witness(1));sin(witness(1))];
     end
-    if isfield(model,'fixedCollisionNormals') || isfield(model,'probeNormals')
-        if isfield(model,'fixedCollisionNormals'),normal=model.fixedCollisionNormals(:,point);
-        else,normal=model.probeNormals(:,point);end
-        rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];body=rotation.'*normal;
-        [dual.value,dual.jacobian]=predictiveSafetyGeometry.fixedDualRows( ...
-            x(1:3),shape,q(1:3),q(8:11),[max(body,0);max(-body,0)]);
-        dual.normal=normal;
-    end
-    if isfield(model,'durationProbe') && model.durationProbe,escape=dual.normal;end
-    values=dual.value;
-    jacobian=dual.jacobian;
-    % Directional position support retains correlation across the affine
-    % ego dynamics. Target yaw uses the exact support over its entire yaw
-    % interval, in the SAME fixed dual normal. The ego chord is retained:
-    % it remains uniform while the optimizer changes the nominal ego yaw.
-    normal=jacobian(:,1:2);normalNorm=vecnorm(normal,2,2);
-    tube=struct('positionRadius',model.targetTube.positionRadius(point),'yawRadius',model.targetTube.yawRadius(point));
-    % All four vertex rows share one normal and target support.
-    targetSupport=predictiveSafetyGeometry.targetSupportFromData(model.targetSupportData,point,normal(1,:));
-    egoReach=norm(shape(1:2))+norm(shape(3:4));
-    yawRadius=sum(abs(generator(3,:)));
-    reserve=2*egoReach*sin(min(pi,yawRadius)/2);
-    [~,targetRotation]=predictiveSafetyGeometry.rotationSupport(q(8:11),q(3),tube.yawRadius,normal(1,:));
-    if string(cfg.solver.method)=="nonlinear" && ~isempty(model.uncertainty.target)
-        upper=predictiveSafetyGeometry.targetDirectionalSupport( ...
-            model.target,model.uncertainty.target,model.recordTimes(point),normal(1,:));
-        nominal=predictiveSafetyGeometry.targetDirectionalSupport(q,[],0,normal(1,:));
-        targetSupport=min(targetSupport+targetRotation,max(0,upper-nominal));targetRotation=0;
-    end
-    tightening=sum(abs(normal*generator(1:2,:)),2)+targetSupport+normalNorm*reserve+targetRotation;
-    values=values-tightening;
+    data=struct('shape',shape,'target',q,'generator',generator, ...
+        'targetSupportData',model.targetSupportData,'point',point, ...
+        'targetYawRadius',model.targetTube.yawRadius(point),'epoch',model.target, ...
+        'error',model.uncertainty.target,'time',model.recordTimes(point));
+    [values,jacobianFull,tightening]=localPlaneRows(x,witness,data);
+    jacobian=jacobianFull(:,1:3);witnessJacobian=jacobianFull(:,4:5);
 end
 
-function dual=localEscapeDual(x,q,model,nearest)
-    shape=[model.cfg.vehicle.length/2;model.cfg.vehicle.width/2;model.cfg.vehicle.rectangleOffset];
-    projection=laneGeometry.project(x(1:2),model.lane);
-    forward=predictiveSafetyGeometry.direction(projection.heading);
-    side=model.collisionSide*[-forward(2);forward(1)];
-    if nearest.distance>1e-8 && nearest.normal.'*side>.01
-        dual=nearest;return;
+function [values,jacobian,tightening]=localPlaneRows(x,witness,data)
+    reserve=localPlaneReserve(witness(1),data);
+    % The engineering support oracle is piecewise differentiable. Both
+    % backends use the same symmetric derivative at support-feature ties.
+    % It is not a smoothness or nonlinear-enclosure certificate at those ties.
+    step=1e-6;
+    derivative=(localPlaneReserve(witness(1)+step,data)-localPlaneReserve(witness(1)-step,data))/(2*step);
+    [values,jacobian]=predictiveSafetyGeometry.separationWitnessRows( ...
+        x(1:3),data.shape,data.target(1:3),data.target(8:11),witness,reserve,derivative);
+    tightening=reserve;
+end
+
+function reserve=localPlaneReserve(angle,data)
+    normal=[cos(angle),sin(angle)];q=data.target;shape=data.shape;
+    position=predictiveSafetyGeometry.targetSupportFromData(data.targetSupportData,data.point,normal);
+    [~,rotation]=predictiveSafetyGeometry.rotationSupport(q(8:11),q(3),data.targetYawRadius,normal);
+    target=position+rotation;
+    if ~isempty(data.error)
+        upper=predictiveSafetyGeometry.targetDirectionalSupport(data.epoch,data.error,data.time,normal);
+        nominal=predictiveSafetyGeometry.targetDirectionalSupport(q,[],0,normal);
+        target=min(target,max(0,upper-nominal));
     end
-    egoRotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-    targetRotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
-    centers=x(1:2)+egoRotation*shape(3:4)-q(1:2)-targetRotation*q(10:11);
-    longitudinal=forward.'*centers;orientation=1;
-    if longitudinal<0,orientation=-1;end
-    first=orientation*forward;second=side;
-    rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
-    body=rotation.'*[first,second];lambda=[max(body,0);max(-body,0)];
-    [v1,~]=predictiveSafetyGeometry.fixedDualRows(x(1:3),shape,q(1:3),q(8:11),lambda(:,1));
-    [v2,~]=predictiveSafetyGeometry.fixedDualRows(x(1:3),shape,q(1:3),q(8:11),lambda(:,2));
-    gap=[min(v1);min(v2)];temperature=min(shape(2),q(9))/2;
-    logWeight=(gap-max(gap))/temperature;
-    sideSupport=second.'*centers-min(v2);
-    if longitudinal==0,logWeight(1)=-Inf;
-    else,logWeight(1)=logWeight(1)+log(abs(longitudinal)/(abs(longitudinal)+sideSupport));end
-    weight=exp(logWeight-max(logWeight));weight=weight/sum(weight);
-    % A small lateral component gives an intersecting straight reference an
-    % escape derivative before pure lateral separation is physically possible.
-    % Once separated, the exact closest-feature normal can turn diagonally.
-    normal=weight(1)*first+weight(2)*second;normal=normal/norm(normal);
-    body=rotation.'*normal;lambda=[max(body,0);max(-body,0)];
-    [value,jacobian]=predictiveSafetyGeometry.fixedDualRows(x(1:3),shape,q(1:3),q(8:11),lambda);
-    dual=struct('value',value,'jacobian',jacobian,'normal',normal);
+    yaw=sum(abs(data.generator(3,:)));
+    reserve=sum(abs(normal*data.generator(1:2,:)))+target ...
+        +2*(norm(shape(1:2))+norm(shape(3:4)))*sin(min(pi,yaw)/2);
 end
 
 function beyond=localBeyond(x,forecast,point,generator,tube,cfg,movement)
@@ -1356,8 +1360,8 @@ function problem=localSelectObjective(problem,anchor,model)
         [error,jacobian]=nonlinearBicycleModel.errorLinearization( ...
             anchor.states(:,k+1),model.lane,model.nominalReference);
         rows=(k-1)*components+(1:components);
-        trackingOffset(rows)=error(1:components)./(units(1:components)*sqrt(count));
-        trackingValues(:,:,k)=jacobian(1:components,:)./(units(1:components)*sqrt(count));
+        trackingOffset(rows)=error(1:components)./units(1:components);
+        trackingValues(:,:,k)=jacobian(1:components,:)./units(1:components);
     end
     trackingRows=repmat(reshape(1:components*count,components,1,count),1,6,1);
     trackingColumns=repmat(reshape(ix,1,6,count),components,1,1);
@@ -1475,7 +1479,9 @@ function [result,search,model]=localProbe(request)
                 'safety',@(z)localNonlinearObjective(z,data,true), ...
                 'point',zeros(data.nv,1),'lower',data.lower,'upper',data.upper, ...
                 'stateIndices',problem.stateIndices,'inputIndices',problem.inputIndices, ...
-                'slackIndices',problem.slackIndices,'clfIndex',problem.clfIndex);
+                'slackIndices',problem.slackIndices,'clfIndex',problem.clfIndex, ...
+                'witnessIndices',problem.witnessIndices,'collisionWitnesses',problem.collisionWitnesses, ...
+                'affineProblem',problem);
         otherwise
             error('collisionAvoidanceController:invalidProbeOperation','Unknown research operation.');
     end
@@ -1516,6 +1522,7 @@ function [solution,search,model]=localNonlinearSolve(anchor,model,source,timer,i
             iterations=iterations+output.iterations;calls=calls+1;
             anchor.inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
             anchor.states=anchor.states+reshape(point(problem.stateIndices),size(anchor.states));
+            anchor.collisionWitnesses=problem.collisionWitnesses+reshape(point(problem.witnessIndices),size(problem.witnessIndices));
         end
     end
     [solution,search,model]=localNonlinearIteration(anchor,model,source,timer,initializationSeconds);
@@ -1697,7 +1704,9 @@ function [point,anchor,problem,data,model,info]=localNonlinearRefresh(point,anch
     % This is a numerical globalization of the NLP, not a new maneuver or a
     % frozen tube certificate. Never return a step using stale supports.
     base=anchor;proposal=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
-    fixed=model;fixed.fixedCollisionNormals=problem.safetyNormals;
+    fixed=model;
+    baseWitness=problem.collisionWitnesses;
+    witnessStep=reshape(point(problem.witnessIndices),size(problem.witnessIndices));
     info=struct('accepted',false,'step',NaN,'evaluations',0,'initialSlack',NaN,'returnedSlack',NaN, ...
         'trials',zeros(0,4));
     best=Inf;chosen=[];steps=[1,.5,.25,.125,.0625,0];
@@ -1705,6 +1714,7 @@ function [point,anchor,problem,data,model,info]=localNonlinearRefresh(point,anch
     if unchanged,steps=1;end
     for alpha=steps
         trial=base;trial.inputs=base.inputs+alpha*(proposal-base.inputs);
+        trial.collisionWitnesses=baseWitness+alpha*witnessStep;
         trial.states(:,1)=model.initialState;info.evaluations=info.evaluations+1;
         try
             for k=1:size(trial.inputs,2)
@@ -1750,9 +1760,9 @@ function [point,flag,output]=localNonlinearOptimize(point,data,options,primary,s
     % Exact nonlinear single shooting eliminates dependent state variables.
     % The chain rule below is the derivative of the complete nonlinear
     % rollout, not an affine prediction used in place of that rollout.
-    p=data.problem;indices=[p.inputIndices(:);p.slackIndices(:);p.clfIndex];
+    p=data.problem;indices=[p.inputIndices(:);p.slackIndices(:);p.clfIndex;p.witnessIndices(:)];
     units=[data.model.cfg.clf.certificationSteeringRadians;data.model.cfg.clf.certificationBrakingRatio];
-    scale=[repmat(units,data.count,1);ones(numel(p.slackIndices)+1,1)];
+    scale=[repmat(units,data.count,1);ones(numel(p.slackIndices)+1+numel(p.witnessIndices),1)];
     lower=data.lower(indices)./scale;upper=data.upper(indices)./scale;
     a=[];b=[];
     if isfinite(slackCap)
@@ -1873,10 +1883,7 @@ function data=localNonlinearData(anchor,model,problem)
     data.lower=problem.lower;data.upper=problem.upper;
     data.stateRadius=model.uncertaintyPrediction.egoStateRadius;
     data.sideReserve=zeros(2,count);data.frontReserve=zeros(2,2*count+1);
-    % One fixed nonlinear max-of-support-gaps function. The direction grid
-    % does not change with the warm start, the selected path, or the frame.
-    angles=(0:31)*2*pi/32;data.collisionNormals=[cos(angles);sin(angles)];
-    data.collisionSupport=-Inf(32,2*count+1);
+    data.collisionData=problem.collisionData;
     data.forecast=localTargetAt(model,(0:2*count)*cfg.controller.sampleTime/2);
     data.shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     data.terminalContext=model.terminalContext;
@@ -1894,39 +1901,19 @@ function data=localNonlinearData(anchor,model,problem)
         [~,bounds]=localFrontDomain(x,[0;0],cfg,generator);
         angle=atan2(x(5)+cfg.vehicle.lf*x(6),x(4));limit=pi/2-10*cfg.solver.constraintTolerance;
         data.frontReserve(:,p)=[limit-angle;limit+angle]-bounds;
-        if ~isempty(model.target) && norm(problem.safetyNormals(:,p))>0
-            relative=localRelativeGenerator(x,generator,model,model.initialState);
-            q=data.forecast(:,p);normals=data.collisionNormals;
-            signs=[-1,1,1,-1;-1,-1,1,1];vertices=q(10:11)+q(8:9).*signs;
-            rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
-            nominal=max(normals.'*(q(1:2)+rotation*vertices),[],2);
-            reserve=sum(abs(normals.'*relative(1:2,:)),2) ...
-                +2*(norm(data.shape(1:2))+norm(data.shape(3:4)))*sin(min(pi,sum(abs(relative(3,:))))/2);
-            for direction=1:size(normals,2)
-                normal=normals(:,direction);
-                targetSupport=predictiveSafetyGeometry.targetSupportFromData(model.targetSupportData,p,normal.');
-                [~,targetRotation]=predictiveSafetyGeometry.rotationSupport(q(8:11),q(3),model.targetTube.yawRadius(p),normal.');
-                upper=nominal(direction)+targetSupport+targetRotation;
-                if ~isempty(model.uncertainty.target)
-                    candidate=predictiveSafetyGeometry.targetDirectionalSupport( ...
-                        model.target,model.uncertainty.target,model.recordTimes(p),normal);
-                    upper=min(upper,max(nominal(direction),candidate));
-                end
-                data.collisionSupport(direction,p)=upper+reserve(direction);
-            end
-        end
     end
     % Rows have a fixed identity even when a terminal closest feature changes.
     % One scalar evaluates the terminal continuation directly.
-    data.collisionRowSlack=zeros(40*count+20,1);row=0;
+    data.collisionRowSlack=zeros(60*count+20,1);row=0;
     for k=1:count
         if ~isempty(model.target)
-            data.collisionRowSlack(row+(1:2))=k;row=row+2;
+            data.collisionRowSlack(row+(1:4))=k;
+            data.collisionRowSlack(row+8+(1:4))=k;row=row+16;
         end
         row=row+6+6+2; % midpoint bounds, three front domains, next sideslip
         if isfinite(cfg.model.brakingRatioRateMaximum),row=row+2;end
     end
-    if ~isempty(model.target),data.collisionRowSlack(row+1)=count+1;row=row+1;end
+    if ~isempty(model.target),data.collisionRowSlack(row+(1:4))=count+1;row=row+8;end
     row=row+1+double(problem.clf.enabled);
     data.collisionRowSlack=data.collisionRowSlack(1:row);
 end
@@ -2010,18 +1997,15 @@ function [c,ceq,gc,gceq]=localNonlinearConstraintValues(point,data)
         rows=row+(1:numel(value));c(rows)=value;jac(rows,columns)=gradient;row=row+numel(value);
     end
     function collision(y,index,columns,map,slack)
-        if all(isinf(data.collisionSupport(:,index)))
-            push(-1,zeros(1,numel(columns)+1),[columns(:);p.slackIndices(slack)]);return;
+        planeColumns=[columns(:);p.witnessIndices(:,index);p.slackIndices(slack)];
+        if isempty(data.collisionData{index})
+            push(-ones(8,1),zeros(8,numel(planeColumns)),planeColumns);return;
         end
-        signs=[-1,1,1,-1;-1,-1,1,1];vertices=data.shape(3:4)+data.shape(1:2).*signs;
-        rotation=[cos(y(3)),-sin(y(3));sin(y(3)),cos(y(3))];
-        projection=data.collisionNormals.'*(y(1:2)+rotation*vertices);
-        [egoSupport,vertex]=min(projection,[],2);
-        [value,direction]=min(data.collisionSupport(:,index)-egoSupport);
-        normal=data.collisionNormals(:,direction);body=vertices(:,vertex(direction));
-        jacobian=-[normal.',normal.'*rotation*[0,-1;1,0]*body];
-        push(value-point(p.slackIndices(slack)), ...
-            [jacobian*map(1:3,:),-1],[columns(:);p.slackIndices(slack)]);
+        witness=p.collisionWitnesses(:,index)+point(p.witnessIndices(:,index));
+        [gap,j]=localPlaneRows(y,witness,data.collisionData{index});
+        relaxed=[ones(4,1);zeros(4,1)];
+        push(-gap-relaxed*point(p.slackIndices(slack)), ...
+            [-j(:,1:3)*map(1:3,:),-j(:,4:5),-relaxed],planeColumns);
     end
     function front(y,input,index,columns,map,stage)
         [r,bound]=localFrontDomain(y,input,cfg,zeros(6,0));
@@ -2037,14 +2021,10 @@ end
 function [value,gradient]=localNonlinearTerminal(y,data,wantGradient)
     % Re-evaluate the declared braking continuation, never its old tangent.
     % Signed geometry keeps the row count fixed across closest-feature changes.
-    [value,active]=terminalSafeSet.nonlinearValue(data.terminalContext,y,data.count);gradient=zeros(1,6);
-    if ~wantGradient,return;end
-    delta=1e-5*max(1,abs(y));
-    for j=1:6
-        step=zeros(6,1);step(j)=delta(j);
-        plus=terminalSafeSet.nonlinearValue(data.terminalContext,y+step,data.count,active);
-        minus=terminalSafeSet.nonlinearValue(data.terminalContext,y-step,data.count,active);
-        gradient(j)=(plus-minus)/(2*delta(j));
+    if wantGradient
+        [value,gradient]=terminalSafeSet.nonlinearTangent(data.terminalContext,y,data.count);
+    else
+        value=terminalSafeSet.nonlinearValue(data.terminalContext,y,data.count);gradient=zeros(1,6);
     end
 end
 

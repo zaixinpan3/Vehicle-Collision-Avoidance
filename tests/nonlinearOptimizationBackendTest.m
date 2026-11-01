@@ -34,12 +34,15 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
             % pose changes. No new corridor or barrier definition is built.
             point=problem.point;
             point(problem.stateIndices(1:3,1))=[center+separatingPosition;0]-anchor.states(1:3,1);
+            normal=separatingPosition/norm(separatingPosition);
+            angle=atan2(normal(2),normal(1));
+            point(problem.witnessIndices(:,1))=[angle;2.4*abs(normal(1))+.95*abs(normal(2))]-problem.collisionWitnesses(:,1);
             constraint=problem.constraint(point);
-            testCase.verifyLessThan(constraint(1),0);
+            testCase.verifyLessThanOrEqual(max(constraint(1:8)),1e-10);
             point=problem.point;
             point(problem.stateIndices(1:3,1))=[center;0]-anchor.states(1:3,1);
             constraint=problem.constraint(point);
-            testCase.verifyGreaterThan(constraint(1),0);
+            testCase.verifyGreaterThan(max(constraint(1:4)),0);
         end
         function optimizedNodesSatisfyTheNonlinearTransition(testCase)
             p=testCase.prediction;
@@ -64,8 +67,9 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
                 'solver',struct('method',"nonlinear"),'controller',struct('retainedTube',true))), ...
                 'collisionAvoidanceController:invalidConfiguration');
             cfg=collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.solver.method,"nonlinear");
-            testCase.verifyGreaterThan(cfg.solver.timeLimitSeconds,cfg.controller.sampleTime);
+            testCase.verifyEqual(cfg.solver.method,"rti");
+            diagnostic=collisionAvoidanceControllerConfig(struct('solver',struct('method',"nonlinear")));
+            testCase.verifyEqual(diagnostic.solver.timeLimitSeconds,1000);
         end
         function constraintDerivativesMatchNonlinearPerturbations(testCase)
             model=testCase.prediction.model;anchor=model.linearization;
@@ -77,7 +81,7 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
                 'model',model,'anchor',anchor));
             point=problem.point;point(problem.stateIndices(5,end))=.02;
             [~,~,gc,ge]=problem.constraint(point);[~,g]=problem.performance(point);
-            columns=unique([problem.stateIndices(:,end);problem.inputIndices(:,1);problem.stateIndices(:,1)]);
+            columns=unique([problem.stateIndices(:,end);problem.inputIndices(:,1);problem.stateIndices(:,1);problem.witnessIndices(:,1)]);
             for index=columns.'
                 delta=zeros(size(point));delta(index)=1e-6;
                 [cp,ep]=problem.constraint(point+delta);[cm,em]=problem.constraint(point-delta);
@@ -86,6 +90,20 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
                 derivative=(problem.performance(point+delta)-problem.performance(point-delta))/2e-6;
                 testCase.verifyEqual(derivative,g(index),AbsTol=2e-4);
             end
+        end
+        function rtiRowsAreTangentsOfTheSameNonlinearPlane(testCase)
+            model=testCase.prediction.model;anchor=model.linearization;
+            model.solveTimeLimitSeconds=Inf;model.durationProbe=true;
+            model.target=[10;2;.37;8;0;0;1.6;2.4;.95;0;0];
+            model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
+            model.terminalContext=terminalSafeSet.context(model);
+            problem=solvePredictiveControl('probe',struct('operation','nonlinearProblem', ...
+                'model',model,'anchor',anchor));
+            [c,~,g]=problem.constraint(problem.point);affine=problem.affineProblem;
+            testCase.verifyEqual(full(affine.a(1:16,:)),full(g(:,1:16).'),AbsTol=2e-9);
+            testCase.verifyEqual(affine.b(1:16),-c(1:16),AbsTol=2e-9);
+            [~,gradient]=problem.performance(problem.point);
+            testCase.verifyEqual(affine.performanceObjective,gradient,AbsTol=2e-9);
         end
         function positiveSafetySlackPermitsAFeasibleNonlinearPlan(testCase)
             model=testCase.prediction.model;anchor=model.linearization;

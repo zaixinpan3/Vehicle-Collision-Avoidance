@@ -842,6 +842,41 @@ classdef predictiveSafetyGeometry
                 'lambda',certificate.lambda,'distance',min(values),'exitFlag',1,'dualityGap',gap);
         end
 
+        function witness = retractSeparationWitness(reference,increment)
+            % Normalize the tangent-plane update, including its offset.
+            % At a fixed pose and zero uncertainty this preserves every
+            % linearized separating halfspace exactly up to positive scale.
+            % Its derivative at zero is the angle/offset identity, so it is
+            % a retraction for the same SQP tangent, not another optimization.
+            scale=hypot(1,increment(1,:));
+            witness=[reference(1,:)+atan(increment(1,:)); ...
+                (reference(2,:)+increment(2,:))./scale];
+        end
+
+        function [value,jacobian] = separationWitnessRows(poseE,shapeE,poseT,shapeT,witness,reserve,reserveDerivative)
+            % A continuous unit normal and a relative plane offset describe
+            % ONE nonlinear separating-plane constraint, without angle bins.
+            % Columns: ego X, Y, yaw, normal angle, plane offset. The first
+            % four rows admit collision slack; the target support rows do not.
+            if nargin<6,reserve=0;end
+            if nargin<7,reserveDerivative=0;end
+            normal=[cos(witness(1));sin(witness(1))];tangent=[-normal(2);normal(1)];
+            signs=[-1,1,1,-1;-1,-1,1,1];
+            re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
+            rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
+            body=shapeE(3:4)+shapeE(1:2).*signs;
+            ego=poseE(1:2)-poseT(1:2)+re*body;
+            target=rt*(shapeT(3:4)+shapeT(1:2).*signs);
+            value=[(normal.'*ego-witness(2)-reserve).'; ...
+                (witness(2)-normal.'*target).'];
+            jacobian=zeros(8,5);
+            jacobian(1:4,1:2)=repmat(normal.',4,1);
+            jacobian(1:4,3)=(normal.'*re*[0,-1;1,0]*body).';
+            jacobian(1:4,4)=(tangent.'*ego-reserveDerivative).';
+            jacobian(1:4,5)=-1;
+            jacobian(5:8,4)=-(tangent.'*target).';jacobian(5:8,5)=1;
+        end
+
         function rows = supportLinearization(poseE,shapeE,poseT,shapeT)
             rows=predictiveSafetyGeometry.dualLinearization(poseE,shapeE,poseT,shapeT);
             if norm(rows.normal)>0,return;end

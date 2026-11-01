@@ -1,8 +1,8 @@
 function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
 %collisionAvoidanceController PCBF/CLF control with one horizon per encounter.
-% The default is an iterated nonlinear shooting solve. solver.method="rti"
-% explicitly selects the affine comparator. The nonlinear backend refreshes
+% The default is one SQP-RTI update. solver.method="nonlinear"
+% selects an iterated shooting diagnostic. The nonlinear backend refreshes
 % observer margins on its accepted trajectories; these remain engineering
 % approximations. retainedTube is a
 % separate, optional nonlinear policy/terminal certification backend.
@@ -11,7 +11,7 @@ function [command,predictedInput,prediction,controllerState] = ...
 % is cleared. Its remaining states and inputs are shifted and one tail hold
 % is appended. The first reference state is updated from the current estimate;
 % the nonlinear backend rolls out the shifted inputs from that estimate.
-% The RTI comparator handles dynamics defects in its local SQP equations.
+% SQP-RTI handles dynamics defects in its local equations.
 % A certified current target enclosure updates the constant-parameter family.
 % Its nominal is the current observer point projected into the intersected
 % parameter intervals, with all uncertainty radii recentered. Without an
@@ -46,7 +46,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     end
     explicitState=nargin>=5;
     if ~explicitState,previousState=lastState;end
-    if isstruct(previousState) && (~isfield(previousState,'version') || previousState.version~=96),previousState=[];end
+    if isstruct(previousState) && (~isfield(previousState,'version') || previousState.version~=97),previousState=[];end
     if nargin<4,cfg=[];end
     if nargin<3,laneCenterline=[];end
     if nargin<2,targetEstimate=[];end
@@ -305,9 +305,11 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.safetyObjective="sumOfHorizonSafetySlacks";
         metadata.safetyScope="affineCollisionWithRelaxedObserverMargins";
     end
+    metadata.collisionGeometry="continuousSeparatingPlaneWitness";
+    metadata.collisionNormalIsDecision=~cfg.controller.retainedTube ...
+        && ~cfg.controller.jointNonlinearPrediction && ~isempty(q);
     if string(cfg.solver.method)=="nonlinear"
         metadata.predictionModel="nonlinearSingleShooting";
-        metadata.collisionGeometry="nonlinearSupportGapEnvelope";
         metadata.safetyScope="nonlinearSampledConstraintsWithReevaluatedAffineObserverMargins";
         metadata.safetyValueInterpretation="nonlinearSlackSum";
         metadata.solverAlgorithm="fminconSqp";
@@ -330,7 +332,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     if ~model.targetOnset && isstruct(previousState) && isfield(previousState,'avoidanceInitialized')
         avoidanceInitialized=avoidanceInitialized || previousState.avoidanceInitialized;
     end
-    controllerState=struct('avoidanceInitialized',avoidanceInitialized,'version',96,'encounterId',encounterId, ...
+    controllerState=struct('avoidanceInitialized',avoidanceInitialized,'version',97,'encounterId',encounterId, ...
         'encounterHorizonSteps',encounterHorizonSteps,'stateTime',ego.stateTime,'sampleTime',cfg.controller.sampleTime, ...
         'sampleIndex',index,'epochTime',epochTime,'targetEpoch',targetEpoch,'targetEpochIndex',targetEpochIndex,'context',{context}, ...
         'jointState',jointState,'predictedJointState',predictedJointState, ...
@@ -339,6 +341,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         'collisionEscapeNormals',solution.collisionEscapeNormals,'collisionSide',solution.collisionSide, ...
         'retainCollisionSide',solution.retainCollisionSide, ...
         'target',q,'targetPredictionMemory',targetPredictionMemory,'uncertaintySpecified',uncertainty.specified);
+    if isfield(solution,'collisionWitnesses'),controllerState.collisionWitnesses=solution.collisionWitnesses;end
     if ~isempty(egoJointPrediction)
         controllerState.egoJointPrediction=egoJointPrediction;
         metadata.egoInformationRetainedAcrossModeSwitch=true;

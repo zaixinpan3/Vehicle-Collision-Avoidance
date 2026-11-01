@@ -539,6 +539,19 @@ classdef terminalSafeSet
             end
         end
 
+        function [value,gradient] = nonlinearTangent(context,x,node)
+            % Both shooting and RTI differentiate this declared terminal
+            % function; neither introduces a second terminal passing side.
+            [value,active]=terminalSafeSet.nonlinearValue(context,x,node);
+            gradient=zeros(1,6);delta=1e-5*max(1,abs(x));
+            for j=1:6
+                step=zeros(6,1);step(j)=delta(j);
+                plus=terminalSafeSet.nonlinearValue(context,x+step,node,active);
+                minus=terminalSafeSet.nonlinearValue(context,x-step,node,active);
+                gradient(j)=(plus-minus)/(2*delta(j));
+            end
+        end
+
         function [value,active] = nonlinearValue(context,x,node,active)
             % Signed constraint value of the SAME braking/parked geometry.
             % Do not reuse rows(): its local side choices are unsuitable as
