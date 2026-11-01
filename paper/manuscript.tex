@@ -2145,8 +2145,13 @@ minimized the next value greedily, the force ratio chattered, and a
 the decrease as a disturbance instead, and recovery of the true state
 can at best reach a neighborhood of the path set by that error.
 
-\subsection{The Two Programs and the Issued Plan}
+\subsection{Implementation Refinement and the Issued Plan}
 \label{subsec:program}
+
+The theoretical encounter controller in Section~\ref{subsec:robust}
+executes the first input of an attained PCBF minimizer. The secondary
+performance program below is an implementation choice; neither its
+objective nor its successful solution is required by the safety theorem.
 
 For the campaign-era formulation, let $\mathcal A$ denote the constraints
 shared by both programs on
@@ -2485,10 +2490,12 @@ One slack covers an entire hold, including its endpoint. Define
     V_{\rm P}^\star(\mathcal I_k)=\min\sum_{i=0}^{N-1}\xi_{i|k}.
     \label{eq:joint_primary}
 \end{equation}
-After attaining the primary minimum, optimize the soft CLF/performance
-objective with the same hard rows and primary budget. Retain the old
-input tail, sets and row certificates as admissible choices; new anchors,
-trust boxes or separating charts cannot discard that witness.
+The theoretical control law selects any attained minimizer of
+\eqref{eq:joint_primary} and applies its first input. No secondary
+objective, uniqueness requirement or performance solve is part of this
+law. Retain the old input tail, sets and row certificates as admissible
+choices; new anchors, trust boxes or separating charts cannot discard
+that witness.
 
 \begin{theorem}[Containment, recursive feasibility and safety]
 \label{thm:robust}
@@ -2498,7 +2505,8 @@ uncertainty contract, an initially feasible problem
 \eqref{eq:information_set}, terminal closure
 \eqref{eq:terminal_information}, and a plan/certificate class closed
 under shifting and terminal appending. Apply the first input of a
-feasible plan unchanged. Then the next information set contains the
+feasible plan unchanged, with no secondary performance requirement.
+Then the next information set contains the
 truth and the next mathematical problem is feasible. The applied hold
 satisfies the hard conditions and $g(\bm q(t))\ge-\xi_{0|k}$ at every
 time included in \eqref{eq:robust_row}. If each executed plan attains
@@ -2557,12 +2565,25 @@ changes.
 \end{IEEEproof}
 This proves feasibility, not CLF convergence or numerical solver success.
 A hard CLF row or an upper-bounded slack needs an additional argument.
+The CLF stage is an optional performance construction, not a component
+or a premise of Theorem~\ref{thm:robust}.
+
+\noindent\emph{Optional implementation refinement.}
+After the primary solve, an implementation may minimize tracking and
+input-variation costs over the same feasible set with the additional
+cap $\sum_i\xi_i\le V_{\rm P}^\star(\mathcal I_k)$. Any feasible plan
+under this exact cap is also a primary minimizer, so its first input
+satisfies the same theorem. If the refinement is omitted or fails, the
+primary plan is sufficient. Numerical slack tolerances and a cap on an
+affine SQP--RTI subproblem do not establish feasibility or optimality
+for the exact nonlinear problem. The refinement weights and convergence
+of its solver therefore belong to implementation evaluation.
 
 \subsubsection{Online algorithm and optional future feedback}
 At each sample, obtain the current valid enclosure and condition the
 stored first successor. Propagate candidate physical sets, minimize
-\eqref{eq:joint_primary}, and optimize performance under the same safety
-budget. Issue the first command and store its successor, input tail,
+\eqref{eq:joint_primary}, select any attained minimizer, and issue its
+first command. Store its successor, input tail,
 certificates and terminal witness. Repeat when new information arrives.
 This is an output-feedback controller because every optimization uses
 available measurements. Open-loop input sequences within each solve can

@@ -1,7 +1,9 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl SQP-RTI of the nonlinear predictive barrier problem.
 % Both numerical backends use continuous separating-plane witnesses and the
-% same nonlinear vehicle, terminal function, and lexicographic objectives.
+% same nonlinear vehicle, terminal function, and primary safety objective.
+% Theory executes any primary minimizer's first command. The optional second
+% objective is implementation performance refinement, not a theorem premise.
 % The online default performs one local model update. Iterated nonlinear
 % shooting and retained nonlinear certificates are explicit research modes.
 % The planner runs once at encounter onset. Later frames shift the previous
@@ -465,7 +467,9 @@ function search=localSearch(problem,initialization,formulationSeconds)
 end
 
 function [solution,search,model]=localSolve(anchor,model,initialization,timer,problem)
-    % One RTI model. Avoidance orders slack before quadratic performance;
+    % One RTI model. The second avoidance solve is implementation refinement;
+    % the theoretical PCBF control law needs only a primary minimizer.
+    % Avoidance orders slack before quadratic performance;
     % cruise uses its integrated continuous CLF and performance in one QP.
     localCheckDeadline(model);
     cfg=model.cfg;solution=[];

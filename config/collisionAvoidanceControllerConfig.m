@@ -55,6 +55,8 @@ function cfg=localDefaults()
     % Later frames shift M-1 state/input stages and append one hold to retain M.
     % Failure is reported without horizon extension, replanning or another
     % local model.
+    % Optional implementation refinement, separate from the theoretical PCBF
+    % control law that executes a primary minimizer's first command.
     % Shared quadratic performance: nominal transverse/speed tracking,
     % actual input increments, and optional reference proximity (off by default).
     % PCBF minimizes safety slack first, then performance at that optimum.

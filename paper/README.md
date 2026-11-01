@@ -28,10 +28,16 @@ the physical prediction; an empty intersection invalidates the contract.
 A signed geometric margin distinguishes overlap from zero-distance contact.
 Whole-hold reachable images, compatible hard constraints and one common
 admissible terminal continuation establish conditional recursive feasibility.
-Executing a primary minimizer gives optimal-relaxation descent and an invariant
-safe zero-value set. Positive slack remains relaxation. An unbounded soft CLF
-slack preserves feasibility but does not by itself prove recovery. Road
-boundaries are omitted from this robust theorem.
+The theoretical encounter controller minimizes PCBF slack and executes the
+first command of any attained primary minimizer. This gives conditional
+optimal-relaxation descent and an invariant safe zero-value set. No secondary
+performance optimization is part of that control law or required by its proof.
+The implementation optionally refines tracking and input smoothness under the
+attained primary cap; in exact arithmetic a feasible refinement under the exact
+optimum is still a primary minimizer. An affine RTI cap alone does not certify
+this property for the nonlinear problem. Positive slack remains relaxation.
+An unbounded soft CLF slack preserves feasibility but does not by itself prove
+recovery. Road boundaries are omitted from this robust theorem.
 
 The core is output feedback through measurement-conditioned reoptimization;
 it does not forecast future observer convergence. A predicted policy that uses

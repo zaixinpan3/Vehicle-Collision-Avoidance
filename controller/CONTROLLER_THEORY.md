@@ -10,10 +10,14 @@ The design has one nonlinear mathematical problem and a local numerical
 implementation of that problem. The online default is `solver.method="rti"`.
 An explicitly selected `solver.method="nonlinear"` is an iterated shooting
 diagnostic, not a second safety definition. Both use the same continuous
-separating-plane witnesses, modified Fiala transition, simplified terminal
-function and lexicographic performance objective. No world-angle grid defines
-collision avoidance. The geometric and recursive-feasibility derivations are
-in Sections 3 and 7; numerical approximations are identified separately.
+separating-plane witnesses, modified Fiala transition and simplified terminal
+function. The theoretical encounter controller minimizes only PCBF slack and
+executes the first command of any attained minimizer. Both numerical backends
+add an optional performance refinement under the attained safety cap; this
+second solve belongs to implementation, not to the theoretical control law.
+No world-angle grid defines collision avoidance. The geometric and
+recursive-feasibility derivations are in Sections 3 and 7; numerical
+approximations are identified separately.
 
 The physical sensor contract remains position-only GNSS, IMU acceleration,
 gyro and relative radar position. The observer and future feedback are part of
@@ -21,9 +25,9 @@ the joint prediction, with one copy of each persistent model parameter and
 measurement-noise primitive. Bounded current error alone is not a proof of
 sound future prediction or measurement-consistent shifting.
 
-An active encounter minimizes the sum of collision slacks first, then tracking
-and input variation without spending the attained primary budget. Without a
-target, the integrated continuous-time CLF supplies a soft cruise condition.
+The implemented active encounter minimizes the sum of collision slacks first,
+then tracking and input variation without spending the attained primary budget.
+Without a target, the integrated continuous-time CLF supplies a soft cruise condition.
 The planner initializes the state, input and geometry at encounter onset. It
 does not define the safety function or restrict the optimizer to its passing
 side. The accepted horizon stays fixed throughout the encounter. Later calls
@@ -33,7 +37,7 @@ execution veto in RTI.
 
 | Layer | Mathematical object and scope |
 | --- | --- |
-| Nonlinear design | A causal joint observer/controller policy, sound reachable information sets, continuous separating witnesses, hard admissibility and a shift-compatible terminal family. Theorem U gives conditional recursive feasibility and zero-deficit invariance. |
+| Nonlinear design | PCBF slack minimization and execution of any attained minimizer's first command, with causal joint observer/controller policies, sound reachable information sets, continuous separating witnesses, hard admissibility and a shift-compatible terminal family. Theorem U gives conditional recursive feasibility and zero-deficit invariance without a secondary optimization. |
 | Engineering nonlinear transcription | Nonlinear Fiala motion and plane/terminal constraints with a frame-frozen joint affine uncertainty prediction. Accepted shooting updates may refresh that prediction. These margins are not certified nonlinear reachable sets. |
 | Online SQP-RTI | One linearization of that transcription, including its plane variables and terminal function, with a Gauss--Newton performance Hessian. One primary LP and at most one secondary QP share the same local model. Convex solver iterations are not additional SQP linearizations. |
 | Optional retained-certificate research mode | Full-domain joint enclosures and retained policy-box/terminal certificates. Its admission restrictions and historical measurements in Section 8 are not premises silently attributed to ordinary RTI. |
@@ -552,7 +556,11 @@ attains the safety lower bound without an LP. This check uses floating-point
 roundoff tolerance and does not integrate or certify the nonlinear model.
 Otherwise one LP minimizes the safety sum.
 
-A second QP chooses performance among the attained minimum-slack solutions.
+A second QP is an optional implementation refinement among the attained
+minimum-slack solutions. It is not part of the theoretical safety problem
+(U6) and its completion is not a premise of Theorem U. Its removal leaves
+the primary plan available for execution. The implementation retains it to
+improve route following and input smoothness.
 Its shared objective is
 
     J_perf = J_track + J_change + J_ref,
@@ -1915,7 +1923,7 @@ simplified model or claim to have proved its physical realization. Actual
 terminal takeover or ego rest remains an experiment failure, not an event
 needed for the ordinary driving objective.
 
-### A single nonlinear lexicographic problem
+### The theoretical nonlinear PCBF problem and control law
 
 Fix a finite $N$ at encounter initialization and use the same stage timing on
 successive shifts. A plan consists of causal policies, nonempty joint sets,
@@ -1938,18 +1946,26 @@ interior instants, with the endpoint checked separately. This schedule is
 shift invariant. Whole-hold versions replace these finite sets by all
 $\tau\in[0,h]$; no intersample assertion is implied here without that change.
 
-Define $J_P=\sum_{i=0}^N\xi_i$ and minimize
+Define $J_P=\sum_{i=0}^N\xi_i$. The theoretical encounter problem is
 
 $$
- \underset{\Pi,R,w,\xi}{\operatorname{lexmin}}\quad
-       (J_P,\ J_{\mathrm{perf}}),\qquad\text{subject to (U5)}.  \tag{U6}
+ V_P(I_k)=\min_{\Pi,R,w,\xi} J_P,\qquad\text{subject to (U5)}.  \tag{U6}
 $$
 
-Lexicographic priority is one mathematical problem. It does not require a
-large weighting constant, and it does not imply two successive nonlinear
-linearizations. Numerically its primary and secondary local subproblems can
-share one Jacobian. Outside an encounter, a soft cruise CLF and performance
-replace the PCBF objective; newly acquired targets require fresh feasibility.
+Choose any attained minimizer $P_k^*=(\Pi_k^*,R_k^*,w_k^*,\xi_k^*)$
+and issue its first causal command $\pi_{0|k}^*$. No performance objective,
+CLF slack, uniqueness assumption or second optimization is required by this
+control law or its safety theorem. The result below holds for every attained
+primary minimizer. Newly acquired targets require fresh initial feasibility.
+
+The numerical implementation may refine performance over the same feasible
+set with $J_P\le V_P(I_k)$. In exact arithmetic, any feasible refined plan
+then also attains (U6), so its first command remains covered by the same
+theorem. This observation permits an implementation choice; it does not add
+that choice to the theoretical algorithm or require refinement to succeed.
+Ordinary RTI instead caps the attained *local affine* slack. That numerical
+cap does not establish exact primary optimality or nonlinear feasibility.
+Outside an encounter, a soft cruise CLF supplies the separate cruise design.
 
 The optimal primary value $V_P(I)$ eliminates all policy, set and plane
 variables. It is therefore independent of any particular plane orientation
@@ -1961,8 +1977,8 @@ redefine this predictive barrier function.
 Assume initial feasibility, true-state containment, sound joint images,
 conditioning (U2), unchanged encounter/model contracts, terminal closure
 (U4), and a policy/set/certificate representation closed under shifting.
-The controller issues the first command of an attained primary minimizer;
-performance selection stays on its primary optimal face. Then
+The controller issues the first command of any attained minimizer of (U6).
+There is no assumption on a secondary objective or secondary solver. Then
 
 $$
  V_P(I_{k+1})\le V_P(I_k)-\xi_{0|k}^*\le V_P(I_k).              \tag{U7}
@@ -2033,6 +2049,11 @@ RTI performs the following approximation of this same transcription:
    as shooting. Build a positive-semidefinite Gauss--Newton performance cost.
 4. Minimize local PCBF slack, then performance under the attained slack cap,
    on this single local model. Issue the first input and retain the iterate.
+
+Step 4 adds the optional implementation performance refinement to the
+theoretical control law. Both solves share one local model; they are not two
+SQP updates. If refinement fails, the implementation keeps the completed
+primary result. The safety theorem does not depend on this extra solve.
 
 Thus the QP/LP solves are numerical approximations, not a redefinition of
 collision safety. The approximation has two separate gaps: an affine joint
