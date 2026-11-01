@@ -50,7 +50,7 @@ classdef predictiveVelocityGeometryTest < matlab.unittest.TestCase
         function predictionRetainsTheCurrentHoldAndSchedulesTheSlowerTail(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',40,'sampleTime',.05), ...
-                'solver',struct('timeLimitSeconds',10)));
+                'solver',struct('method',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
             [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
             model=prediction.model;anchor=model.linearization;

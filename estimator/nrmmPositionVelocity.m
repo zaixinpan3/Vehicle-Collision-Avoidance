@@ -32,10 +32,20 @@ function filter=localInitialize(position,velocity,positionRadius,velocityRadius,
     filter=struct('point',[position(:);velocity(:)],'gain',gain, ...
         'generator',diag([positionRadius,velocityRadius]), ...
         'samplePeriod',dt,'bandwidth',bandwidth, ...
+        'time',0,'historyTime',zeros(1,0),'historyPosition',zeros(2,0), ...
+        'historyRadius',zeros(1,0),'historyAcceleration',zeros(1,0), ...
         'kind',"position-only-imu-velocity-v1");
 end
 
 function filter=localMeasure(filter,position,positionRadius)
+    % Position secants are an independent, bounded-noise velocity enclosure.
+    % They remain informative when a global intersample jerk bound is loose.
+    % Retain actual GNSS samples; deterministic noise is never averaged down.
+    keep=filter.historyTime<filter.time & filter.historyTime>=filter.time-4/filter.bandwidth;
+    filter.historyTime=[filter.historyTime(keep),filter.time];
+    filter.historyPosition=[filter.historyPosition(:,keep),position(:)];
+    filter.historyRadius=[filter.historyRadius(keep),positionRadius];
+    filter.historyAcceleration=[filter.historyAcceleration(keep),Inf];
     if isfield(filter,'initialPositionPending') && filter.initialPositionPending
         % The runtime's initial position is only a numerical guess. Anchor
         % this new filter to the first actual GNSS sample before correcting
@@ -53,12 +63,29 @@ function filter=localMeasure(filter,position,positionRadius)
     filter.generator=[correction*filter.generator,filter.gain*positionRadius];
     radius=sum(abs(filter.generator),2);
     filter.positionRadius=radius(1);filter.velocityRadius=radius(2);
+    available=filter.velocityRadius;maximum=0;
+    for k=numel(filter.historyTime)-1:-1:1
+        maximum=max(maximum,filter.historyAcceleration(k));
+        age=filter.time-filter.historyTime(k);
+        center=(position(:)-filter.historyPosition(:,k))/age;
+        bound=(positionRadius+filter.historyRadius(k))/age+maximum*age/2;
+        available=min(available,norm(center-filter.point(3:4))+bound);
+    end
+    if available<filter.velocityRadius
+        % An intersection cannot be represented by scaling old signed
+        % columns. Keep the position projection and take its Cartesian
+        % product with the new velocity ball; this encloses the intersection.
+        filter.generator(2,:)=0;filter.generator=[filter.generator,[0;available]];
+        filter.velocityRadius=available;
+    end
 end
 
 function filter=localPredict(filter,acceleration,yaw,yawRadius,design,holdBounds)
     dt=filter.samplePeriod;
     filter.point=localPointPredict(filter.point,acceleration,yaw,dt);
     amax=holdBounds.acceleration;
+    if ~isempty(filter.historyAcceleration),filter.historyAcceleration(end)=amax;end
+    filter.time=filter.time+dt;
     % Compare the held world acceleration with the actual interval. IMU
     % noise, yaw uncertainty and intersample acceleration variation are all
     % included. Without a jerk envelope use the declared acceleration domain.

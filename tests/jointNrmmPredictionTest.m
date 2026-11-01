@@ -20,7 +20,12 @@ classdef jointNrmmPredictionTest < matlab.unittest.TestCase
                 row.finiteHorizonTube.coordinateRadius(1,1));
             testCase.verifyLessThan(row.finiteHorizonTube.coordinateRadius(1:2,end), ...
                 row.openLoopInitialRadius(1:2,end));
-            testCase.verifyLessThan(row.maximumAbsoluteInputFromFiniteHorizonTube(2),1);
+            % Tube containment does not certify the unconstrained probe
+            % feedback's input authority. A negative reserve must be exposed.
+            testCase.verifyEqual(row.linearFeedbackBrakingMargin, ...
+                1-row.maximumAbsoluteInputFromFiniteHorizonTube(2),AbsTol=1e-12);
+            testCase.verifyEqual(row.linearFeedbackBrakingAuthorityContained, ...
+                row.linearFeedbackBrakingMargin>=0);
         end
         function terminalSupportsAreAttainedByAdmittedLinearNoiseHistories(testCase)
             tube = testCase.joint.cases.finiteHorizonTube;

@@ -33,7 +33,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             % This checks noisy joint execution, independently of machine
             % load and the separate real-time deadline experiment.
             campaign = runCollisionThreatValidation(Frames=40,OutputDirectory=string(fixture.Folder), ...
-                ControllerConfiguration=struct('solver',struct('timeLimitSeconds',5)));
+                ControllerConfiguration=struct('solver',struct('method',"rti",'timeLimitSeconds',5)));
             testCase.assertNumElements(campaign.results,2);
             testCase.verifyEqual([campaign.results.scenario],["stoppedLead","hardBrakingLead"]);
             testCase.verifyTrue(all([campaign.results.bypassQualified]));

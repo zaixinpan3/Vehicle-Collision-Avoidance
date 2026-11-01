@@ -17,7 +17,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
         function targetFreeFrameMeetsTheNominalClfWithZeroSlack(testCase,referenceSpeed,curvature,lateralError)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
                 'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
-                'solver',struct('timeLimitSeconds',5)));
+                'solver',struct('method',"rti",'timeLimitSeconds',5)));
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
             [position,heading]=laneGeometry.referencePose(0,lateralError,road.referenceCurve);
@@ -45,7 +45,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
         function moderatelyDisplacedStatesReturnToCruiseWithOneStepPerFrame(testCase,referenceSpeed,curvature)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
                 'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
-                'solver',struct('timeLimitSeconds',5)));
+                'solver',struct('method',"rti",'timeLimitSeconds',5)));
             % RTI recovery fixtures remain near an admissible local reference.
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);tolerance=[.1;pi/180;.1;.05;.01];
@@ -70,7 +70,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             % requested length; terminal rows still constrain its endpoint.
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',8), ...
-                'solver',struct('timeLimitSeconds',5)));
+                'solver',struct('method',"rti",'timeLimitSeconds',5)));
             ego=struct('position',[0;0],'yaw',0,'speed',8, ...
                 'lateralVelocity',0,'yawRate',0,'heldActuatorInput',[0;0]);
             [~,~,problem]=collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]);
@@ -92,7 +92,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             % between samples (they did at 15 m/s while the tie vanished).
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
                 'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
-                'solver',struct('timeLimitSeconds',5)));
+                'solver',struct('method',"rti",'timeLimitSeconds',5)));
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',600));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
             [position,heading]=laneGeometry.referencePose(0,0,road.referenceCurve);

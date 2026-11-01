@@ -10,7 +10,7 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',32),'solver',struct('timeLimitSeconds',10)));
+                'controller',struct('horizonSteps',32),'solver',struct('method',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;.1],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
             [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
             testCase.model=prediction.model;testCase.anchor=prediction.model.linearization;
@@ -54,8 +54,12 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
             % need not. Keep target geometry until actual observed exit.
             testCase.verifyEqual(problem.encounterExit,size(anchor.states,2));
             [solution,search]=localSolve(anchor,model,[]);
-            testCase.verifyEmpty(solution);
-            testCase.verifyEqual(search.stages(1).exitFlag,-2);
+            % Collision rows remain active but may consume PCBF slack.
+            % An active obstacle does not require the soft problem to fail.
+            testCase.assertNotEmpty(solution);
+            testCase.verifyTrue(search.pcbfStageCompleted);
+            testCase.verifyGreaterThan(solution.safety,0);
+            testCase.verifyGreaterThan(max(solution.stageSlacks),0);
             testCase.verifyTrue(isnan(formed.encounterExitRecord));
         end
         function theLocalUpdateReturnsWithoutANonlinearRemainderGate(testCase)

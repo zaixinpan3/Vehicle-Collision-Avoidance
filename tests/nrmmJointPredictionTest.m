@@ -98,6 +98,21 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             testCase.verifyEqual(prediction.metadata.measurementConditioning.method, ...
                 "nonlinearCurrentMeasurementIntersection");
         end
+        function nonlinearSolveRefreshesMarginsOnItsReturnedVehicleTrajectory(testCase)
+            f=testCase.fixture;f.cfg.controller.horizonSteps=6;
+            f.cfg.solver.method="nonlinear";f.cfg.solver.timeLimitSeconds=120;
+            f.frame=localHeldInput(f.frame,f.input,true);
+            output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);output.targetEstimate=[];
+            [~,~,prediction]=collisionAvoidanceController(output,[],[],f.cfg,[]);
+            testCase.verifyTrue(prediction.metadata.marginRefreshPerformed);
+            testCase.verifyFalse(prediction.metadata.uncertaintyFrozenWithinSolve);
+            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
+            states=prediction.solution.states;inputs=prediction.solution.inputs;
+            for k=1:size(inputs,2)
+                testCase.verifyEqual(states(:,k+1), ...
+                    nonlinearBicycleModel.sample(states(:,k),inputs(:,k),f.cfg),AbsTol=1e-10);
+            end
+        end
         function onlinePredictionKeepsJointFeedbackWithoutClaimingANonlinearCertificate(testCase)
             testCase.verifyTrue(testCase.fixture.cfg.controller.jointAffinePrediction);
             testCase.verifyFalse(testCase.fixture.cfg.controller.retainedTube);

@@ -124,7 +124,7 @@ end
 
 function [command, problem, cfg] = localProblem(speed)
     cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps",16,"sampleTime",0.05), ...
-        "solver",struct("timeLimitSeconds",5)));
+        "solver",struct("method","rti","timeLimitSeconds",5)));
     ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
     ego.stateTime = 0;
 

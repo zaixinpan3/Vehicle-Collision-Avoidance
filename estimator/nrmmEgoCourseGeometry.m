@@ -12,6 +12,9 @@ function value = nrmmEgoCourseGeometry(action, varargin)
 %       Both branches return the course fields consumed by the runtime and the
 %       bound recursion, plus lateralMeasurement = [center, lower, upper,
 %       radius, consistent, source] for the body-velocity observer.
+%   point = nrmmEgoCourseGeometry("pointCourse", observerInput, design)
+%       The identical numerical lateral measurement and rotation innovation,
+%       without interval calculations. This supplies no certificate fields.
 %
 %   course = nrmmEgoCourseGeometry("kinematicCourse", gnssVelocity, yawRateMeasured, ...
 %       rearAxleDistance, velocityErrorMaximum, yawRateErrorMaximum, ...
@@ -65,8 +68,8 @@ function value = nrmmEgoCourseGeometry(action, varargin)
 %       per-axle sums, every admissible v_y satisfies Gmin(v_y) <= m*(am_y +
 %       epsA) and Gmax(v_y) >= m*(am_y - epsA), an interval [lower, upper]
 %       found by bisection (empty when the measurements contradict the model
-%       or the cone). The returned center solves the balance with the nominal
-%       parameters and the measured values; radius = max(center-lower,
+%       or the cone). The returned center solves the regularized nominal
+%       force inversion; radius = max(center-lower,
 %       upper-center) certifies it. The midpoint is not used: near saturation
 %       the interval is wide and asymmetric and its midpoint is biased. model
 %       carries mass, lf, lr, gravity, corneringStiffness, frictionCoefficient
@@ -76,6 +79,8 @@ function value = nrmmEgoCourseGeometry(action, varargin)
     switch string(action)
         case "course"
             value = localCourse(varargin{1}, varargin{2});
+        case "pointCourse"
+            value = localPointCourse(varargin{1},varargin{2});
         case "kinematicCourse"
             value = localKinematicCourse(varargin{:});
         case "rotation"
@@ -84,11 +89,28 @@ function value = nrmmEgoCourseGeometry(action, varargin)
             value = localModelLateralVelocity(varargin{:});
         otherwise
             error("nrmmEgoCourseGeometry:invalidAction", ...
-                "action must be 'course', 'kinematicCourse', 'rotation' or 'lateralVelocity'.");
+                "action must be 'course', 'pointCourse', 'kinematicCourse', 'rotation' or 'lateralVelocity'.");
     end
 end
 
 %% Course geometry with or without the shared vehicle model
+
+function course=localPointCourse(input,design)
+    % The numerical observer map needs no inverse-interval or angle bounds.
+    % Use exactly the full course map's point inversion and innovation. This
+    % result deliberately omits certificate fields: it is not an enclosure.
+    model=design.yaw.courseModel;
+    useModel=isfield(design,'egoModel') && ~isempty(design.egoModel) ...
+        && isfield(input,'heldInput') && numel(input.heldInput)==2 && all(isfinite(input.heldInput));
+    if useModel
+        lateral=localModelLateralVelocity(input.gnssVelocity,input.yawRate,input.bodyAcceleration, ...
+            input.heldInput,design.egoModel,design.sensors,model.sideslipDomainMaximum,true);
+    else
+        lateral=struct('center',model.rearAxleDistance*input.yawRate,'source',"kinematic");
+    end
+    course=struct('lateralMeasurement',lateral,'correspondence',struct());
+    course=localPointInnovation(course,input,design);
+end
 
 function course = localCourse(observerInput, design)
     model = design.yaw.courseModel;
@@ -414,7 +436,8 @@ end
 
 %% Force-balance lateral velocity with the shared vehicle model
 
-function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAcceleration, heldInput, model, sensors, sideslipDomainMaximum)
+function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAcceleration, heldInput, model, sensors, sideslipDomainMaximum,pointOnly)
+    if nargin<8,pointOnly=false;end
     speed = norm(gnssVelocity);
     speedLow = speed-sensors.velocityNoiseMaximum;
     speedHigh = speed+sensors.velocityNoiseMaximum;
@@ -433,6 +456,9 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
     % The point inversion depends on measured values, not certificate width.
     nominal=localNominal(-speed*sineDomain,speed*sineDomain);
     if ~isfinite(nominal),nominal=0;end
+    if pointOnly
+        lateral=struct('center',nominal,'source',"force-balance");return;
+    end
     if ~(speedLow > 0)
         lateral.lower=-speedHigh*sineDomain;lateral.upper=speedHigh*sineDomain;
         lateral.center=nominal;lateral.radius=max(abs([lateral.lower,lateral.upper]-nominal));
@@ -474,9 +500,17 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
     end
 
     function value = localNominal(leftEnd,rightEnd)
-        % Nominal parameters and measured values: G0(v) = m*am_y.
+        % A saturated force map has no unique inverse. A monotone proximal
+        % term gives the point reconstruction a finite slope, calibrated by
+        % the declared IMU noise across the slip domain. This does not change
+        % the vehicle force or the enclosing inverse interval above. Unlike
+        % its interval midpoint, this point does not depend on the evolving
+        % velocity certificate, so runtime and future observer updates agree.
         target = model.mass*bodyAcceleration(2);
-        g = @(v) localNominalForce(v);
+        forceResolution=model.mass*sensors.accelerometerNoiseMaximum ...
+            +model.parameterUncertainty*sum(model.frictionCoefficient(:).*load);
+        regularization=forceResolution/max(speed*sineDomain,eps);
+        g = @(v) localNominalForce(v)-regularization*v;
         if g(leftEnd) < target
             value = leftEnd;return;
         elseif g(rightEnd) > target

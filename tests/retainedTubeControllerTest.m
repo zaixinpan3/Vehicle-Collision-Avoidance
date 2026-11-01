@@ -564,7 +564,7 @@ end
 function f=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
         'controller',struct('horizonSteps',2,'retainedTube',true,'jointAffinePrediction',false), ...
-        'solver',struct('timeLimitSeconds',120)));
+        'solver',struct('method',"rti",'timeLimitSeconds',120)));
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
     design=synthesizeNrmmObserverGains(estimator.observer);
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;

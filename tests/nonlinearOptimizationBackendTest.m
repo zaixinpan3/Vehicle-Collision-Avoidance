@@ -4,6 +4,10 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
         prediction
         config
     end
+    properties (TestParameter)
+        separatingPosition=struct('behind',[-10;0],'ahead',[10;0], ...
+            'right',[0;-10],'left',[0;10])
+    end
     methods (TestClassSetup)
         function solveNontrivialCruise(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -18,11 +22,30 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function oneCollisionFunctionAllowsSeparationOnEverySide(testCase,separatingPosition)
+            model=testCase.prediction.model;anchor=model.linearization;
+            center=anchor.states(1:2,1)+[1.37;.41];
+            model.target=[center;0;0;0;0;1.6;2.4;.95;0;0];
+            model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
+            model.terminalContext=terminalSafeSet.context(model);
+            problem=solvePredictiveControl('probe',struct('operation','nonlinearProblem', ...
+                'model',model,'anchor',anchor));
+            % Evaluate the SAME first-node collision constraint after large
+            % pose changes. No new corridor or barrier definition is built.
+            point=problem.point;
+            point(problem.stateIndices(1:3,1))=[center+separatingPosition;0]-anchor.states(1:3,1);
+            constraint=problem.constraint(point);
+            testCase.verifyLessThan(constraint(1),0);
+            point=problem.point;
+            point(problem.stateIndices(1:3,1))=[center;0]-anchor.states(1:3,1);
+            constraint=problem.constraint(point);
+            testCase.verifyGreaterThan(constraint(1),0);
+        end
         function optimizedNodesSatisfyTheNonlinearTransition(testCase)
             p=testCase.prediction;
             residual=localDynamicsResidual(p.solution.states,p.solution.inputs,testCase.config);
             testCase.verifyLessThanOrEqual(residual,testCase.config.solver.constraintTolerance);
-            testCase.verifyEqual(p.metadata.predictionModel,"nonlinearMultipleShooting");
+            testCase.verifyEqual(p.metadata.predictionModel,"nonlinearSingleShooting");
             testCase.verifyEqual(p.metadata.rtiIterations,0);
             testCase.verifyTrue(p.metadata.nonlinearValidationPerformed);
             testCase.verifyFalse(p.metadata.robustNonlinearSafetyCertified);
@@ -41,7 +64,8 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
                 'solver',struct('method',"nonlinear"),'controller',struct('retainedTube',true))), ...
                 'collisionAvoidanceController:invalidConfiguration');
             cfg=collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.solver.method,"rti");
+            testCase.verifyEqual(cfg.solver.method,"nonlinear");
+            testCase.verifyGreaterThan(cfg.solver.timeLimitSeconds,cfg.controller.sampleTime);
         end
         function constraintDerivativesMatchNonlinearPerturbations(testCase)
             model=testCase.prediction.model;anchor=model.linearization;

@@ -418,12 +418,17 @@ function [force,derivative]=localInverseForce(s,speed,rate,held,design)
     capacity=scale.*sqrt(max(0,1-held(2)^2));
     fy=localTires(tangent,nrmmSet(model.corneringStiffness(:)),capacity,true);
     force=held(2)*scale(1)*sin(held(1))+fy(1)*cos(held(1))+fy(2);
+    resolution=model.mass*design.sensors.accelerometerNoiseMaximum ...
+        +model.parameterUncertainty*sum(scale);
+    proximal=resolution*speed/max(speed*sin(design.yaw.courseModel.sideslipDomainMaximum),eps);
+    force=force-proximal*s;
     if nargout<2,return;end
-    derivative=nrmmSet(0);offset=[model.lf;-model.lr]*rate;
+    derivative=-proximal;offset=[model.lf;-model.lr]*rate;
     for axle=1:2
         [cl,~]=bounds(capacity(axle));
         if cl<=0
-            derivative=nrmmSet.range(-realmax,0,size(speed.generator,2));return;
+            [~,hi]=bounds(derivative);
+            derivative=nrmmSet.range(-realmax,hi,size(speed.generator,2));return;
         end
         q=model.corneringStiffness(axle)*tangent(axle)/(3*capacity(axle));
         tireSlope=-model.corneringStiffness(axle)*(1+tangent(axle)^2)*max(0,1-abs(q))^2;

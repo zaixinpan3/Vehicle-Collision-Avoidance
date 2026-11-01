@@ -218,7 +218,7 @@ function [ego,target,road,cfg]=localFixture(radius,gap)
     [x,q,road,cfg]=collisionThreatScenario("headOn",struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
     % A near-grazing opposing pass admits a single RTI step. Full cold
     % head-on restoration is separately expected to fail in the RTI tests.
-    q(2)=2.05;cfg.solver.timeLimitSeconds=5;
+    q(2)=2.05;cfg.solver.method="rti";cfg.solver.timeLimitSeconds=5;
     if nargin>1,q(1)=x(1)+gap;end
     [ego,target]=localPublication(x,q,0,radius,zeros(6,1));
 end

@@ -351,7 +351,7 @@ end
 
 function [ego,road,cfg]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8), ...
-        'solver',struct('timeLimitSeconds',5)));
+        'solver',struct('method',"rti",'timeLimitSeconds',5)));
     ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
 end

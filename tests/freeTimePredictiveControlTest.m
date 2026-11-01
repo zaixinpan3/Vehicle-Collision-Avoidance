@@ -11,7 +11,7 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
-            cfg=collisionAvoidanceControllerConfig();cfg.referenceSpeed=8;
+            cfg=collisionAvoidanceControllerConfig(struct('solver',struct('method',"rti")));cfg.referenceSpeed=8;
             cfg.controller.horizonSteps=8;cfg.solver.timeLimitSeconds=30;
             ego=struct('position',[0;.1],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
             [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);

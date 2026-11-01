@@ -1,15 +1,17 @@
 function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
 %collisionAvoidanceController PCBF/CLF control with one horizon per encounter.
-% The default point-SQP-RTI path uses the iterate described below.
-% solver.method="nonlinear" selects an iterated nonlinear shooting solve;
-% its observer margins remain engineering approximations. retainedTube is a
+% The default is an iterated nonlinear shooting solve. solver.method="rti"
+% explicitly selects the affine comparator. The nonlinear backend refreshes
+% observer margins on its accepted trajectories; these remain engineering
+% approximations. retainedTube is a
 % separate, optional nonlinear policy/terminal certification backend.
 % Controller state retains a target prediction and a linearization trajectory.
 % The first accepted encounter plan fixes its node count until the encounter
 % is cleared. Its remaining states and inputs are shifted and one tail hold
 % is appended. The first reference state is updated from the current estimate;
-% dynamics defects are handled in the local SQP equations.
+% the nonlinear backend rolls out the shifted inputs from that estimate.
+% The RTI comparator handles dynamics defects in its local SQP equations.
 % A certified current target enclosure updates the constant-parameter family.
 % Its nominal is the current observer point projected into the intersected
 % parameter intervals, with all uncertainty radii recentered. Without an
@@ -304,8 +306,9 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.safetyScope="affineCollisionWithRelaxedObserverMargins";
     end
     if string(cfg.solver.method)=="nonlinear"
-        metadata.predictionModel="nonlinearMultipleShooting";
-        metadata.safetyScope="nonlinearSampledConstraintsWithFrozenObserverMargins";
+        metadata.predictionModel="nonlinearSingleShooting";
+        metadata.collisionGeometry="nonlinearSupportGapEnvelope";
+        metadata.safetyScope="nonlinearSampledConstraintsWithReevaluatedAffineObserverMargins";
         metadata.safetyValueInterpretation="nonlinearSlackSum";
         metadata.solverAlgorithm="fminconSqp";
         metadata.optimizationProblemClass="NLP";
@@ -318,7 +321,9 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.clfNextValueScope="nonlinearPredictedState";
         metadata.trustRegionEnabled=false;metadata.postSolveFeasibilityCheck=true;
         metadata.nonlinearIterations=search.nonlinearIterations;
-        metadata.uncertaintyFrozenWithinSolve=true;
+        metadata.marginRefreshPerformed=isfield(search,'marginRefresh') && search.marginRefresh.accepted;
+        metadata.uncertaintyFrozenWithinSolve=~metadata.marginRefreshPerformed;
+        metadata.uncertaintyFrozenWithinSubproblem=true;
         if solution.clfEnabled,metadata.clfLocalModel="integratedContinuousClfNonlinearInNextState";end
     end
     avoidanceInitialized=search.planner.used;

@@ -11,7 +11,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',32),'solver',struct('timeLimitSeconds',10)));
+                'controller',struct('horizonSteps',32),'solver',struct('method',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
             [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
             model=prediction.model;
@@ -73,9 +73,11 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.solverCalls,1);
         end
         function cruiseDecayCannotAlterAnAvoidanceUpdate(testCase)
-            original=localSolve(testCase.model,testCase.anchor,10);
+            % Use a known-feasible priority problem. Feasibility of a
+            % particular planner seed is separate from this objective test.
+            original=solvePredictiveControl("probe",localPriorityProblem(testCase.model,testCase.anchor,1,10));
             changed=testCase.model;changed.nominalReference.decayRate=100*changed.nominalReference.decayRate;
-            alternative=localSolve(changed,testCase.anchor,10);
+            alternative=solvePredictiveControl("probe",localPriorityProblem(changed,testCase.anchor,1,10));
             testCase.assertNotEmpty(original);testCase.assertNotEmpty(alternative);
             testCase.verifyFalse(original.clfEnabled);
             testCase.verifyTrue(isnan(original.clfSlack));
@@ -83,8 +85,8 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(alternative.states,original.states,AbsTol=1e-10);
         end
         function avoidanceUsesProximityOnlyAfterMinimizingSafetySlack(testCase)
-            [original,search]=localSolve(testCase.model,testCase.anchor,10);
-            alternative=localSolve(testCase.model,testCase.anchor,1000);
+            [original,search]=solvePredictiveControl("probe",localPriorityProblem(testCase.model,testCase.anchor,1,10));
+            alternative=solvePredictiveControl("probe",localPriorityProblem(testCase.model,testCase.anchor,1,1000));
             testCase.assertNotEmpty(original);testCase.assertNotEmpty(alternative);
             testCase.verifyEqual(original.inputs,alternative.inputs,AbsTol=1e-6);
             testCase.verifyEqual(original.states,alternative.states,AbsTol=1e-6);
@@ -112,7 +114,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(solution.referenceDeviationCost,.5*(stateCost+inputCost),RelTol=1e-10);
         end
         function zeroWeightDoesNotReenableClfDuringAvoidance(testCase)
-            solution=localSolve(testCase.model,testCase.anchor,0);
+            solution=solvePredictiveControl("probe",localPriorityProblem(testCase.model,testCase.anchor,1,0));
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(solution.referenceDeviationCost,0,AbsTol=0);
             testCase.verifyTrue(isnan(solution.secondaryObjectiveValue));

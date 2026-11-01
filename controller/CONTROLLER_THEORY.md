@@ -6,6 +6,19 @@ statement of the implementation boundary. Repository paths are relative to the
 repository root unless linked otherwise. Historical experiment reports describe
 the versions that produced them; they are not rewritten by this consolidation.
 
+The operational default is now the direct nonlinear shooting backend
+(`solver.method="nonlinear"`). It propagates the modified Fiala model inside
+each optimization evaluation, restores hard feasibility before reducing
+PCBF deficits, and re-evaluates the joint affine observer/feedback margins
+on accepted nonlinear trajectories. Safety slack remains the primary
+objective; the secondary objective cannot spend the attained slack budget.
+The explicit `solver.method="rti"` comparator and retained-certificate
+research backend remain available for their respective tests. Descriptions
+of a single RTI linearization below refer to that comparator, not the default.
+The nonlinear solver may return a feasible local or iteration-limited
+candidate; neither global optimality nor full nonlinear error containment
+follows from satisfying its sampled nominal constraints.
+
 The current estimator contract is position-only GNSS, IMU acceleration, gyro,
 and relative radar position. Inertial velocity is reconstructed by the sampled
 position/IMU filter in `estimator/nrmmPositionVelocity.m`; its evolving error
@@ -21,10 +34,11 @@ validate this more restricted sensor contract.
 The controller seeks rectangle nonoverlap during an encounter and resumes
 prescribed-path cruise recovery afterward. An active encounter minimizes
 predictive collision deficits first, then minimizes nominal tracking and input
-variation while preserving that attained optimum. Without a target, one QP
-minimizes soft cruise CLF slack plus the same performance cost. Both modes use
+variation while preserving that attained optimum. Without a target, a single
+nonlinear problem minimizes soft cruise CLF slack plus the same performance
+cost. The explicit RTI comparator instead uses convex subproblems and
 state-dependent numerical trust bounds; reference proximity is optional and off
-by default in the online point-RTI path. That path uses at most two convex
+by default in that comparator. That path uses at most two convex
 solves on one RTI model and one shared time budget; an available zero-slack
 affine candidate avoids the primary LP. It imposes no cross-frame slack budget.
 Synchronized observer inputs enable joint affine plant/observer/feedback
@@ -39,8 +53,8 @@ The executable approximation and the mathematical algorithm have distinct guaran
 
 | Object | Prediction and conclusion |
 | --- | --- |
-| Default online experiment | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, joint affine uncertainty prediction when a synchronized observer snapshot exists, and terminal tangents. Legacy inputs retain their published margins. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The affine update returns its first input after numerical input-bound normalization, without a post-solve nonlinear feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
-| Nonlinear optimization baseline | `solver.method="nonlinear"` uses direct multiple shooting with nonlinear RK4 equalities, exact rotating-vertex support gaps in the reference's separation directions, and a re-evaluated simplified terminal continuation. MATLAB `fmincon` performs multiple SQP iterations with line search. Observer/feedback supports and input reserves are frozen at the frame's reference. This isolates nonlinear nominal optimization from one-step RTI; it does not implement the complete robust information-set theorem. |
+| Explicit RTI comparator | At most one local RTI model per controller call, nonlinear Fiala tire dynamics, joint affine uncertainty prediction when a synchronized observer snapshot exists, and terminal tangents. Legacy inputs retain their published margins. A continuous-time derivative soft CLF row is enabled only outside an active encounter. The affine update returns its first input after numerical input-bound normalization, without a post-solve nonlinear feasibility veto. Planning occurs only at encounter onset; later frames shift the previous state/input iterate and append one hold. The first accepted encounter plan fixes its horizon. Failure never requests a longer-horizon retry. |
+| Default nonlinear experiment | `solver.method="nonlinear"` uses exact nonlinear single shooting: controls are decisions and RK4 propagates all states, with chain-rule derivatives of that complete rollout. A fixed max-of-support-gaps function permits separation in any of 32 world directions; it does not inherit the reference's collision corridor. The simplified terminal continuation is evaluated directly. A minimum-control-change phase I repairs hard-constraint initialization, re-evaluating its observer/feedback tube. PCBF slack is optimized before performance. Each accepted numerical update rebuilds the joint affine tube; control backtracking retains a feasible candidate when the updated margins invalidate a larger step. All original sensor and persistent parameter budgets remain. The target support also intersects the previous bound with a complete interval-cell cover of the shared NRMM position/yaw family. This is a nonlinear nominal controller with engineering affine error predictions, not the complete robust information-set theorem. |
 | Retained-certificate verification mode | A retained nonlinear policy/terminal certificate with measurement-conditioned proposals. Performance optimization acts only inside a policy box admitted by full-domain enclosures. Failure to admit a new driving continuation retains the previous certificate; requesting actual terminal control stops the driving experiment. Initial admission may fail before any control is applied. |
 | Unified observer-to-safety design | Current observer containment, retained physical successor sets, signed whole-hold margins and a common terminal continuation. The information-set shift proves conditional recursive feasibility and zero-deficit safety. Future observer dynamics are needed only for the optional prediction of observation-dependent policies. |
 
@@ -50,12 +64,13 @@ a whole-set simplified terminal witness. It optimizes performance only over
 a policy box whose complete nonlinear image was admitted beforehand. The
 constructive shift proof and its limitations are given in Section 8 under
 "Implemented retained policy-box formulation." Inputs without a synchronized
-joint snapshot, or the default `retainedTube=false`, use the point-RTI path and
-cannot claim the retained certificate. An existing certificate cannot silently
+joint snapshot, or the default `retainedTube=false`, cannot claim the retained
+certificate. The selected nominal solver is nonlinear shooting by default or
+RTI when explicitly requested. An existing certificate cannot silently
 fall back when its required observer snapshot is missing. Enabling this path
 does not establish adequate admission performance or real-time execution.
 
-The online defaults are `retainedTube=false`, `jointAffinePrediction=true`,
+The online defaults are `solver.method="nonlinear"`, `retainedTube=false`, `jointAffinePrediction=true`,
 and `jointNonlinearPrediction=false`. Full nonlinear enclosure admission is
 not an execution gate for this experimental approximation. Noise and mismatch
 bounds are not reduced by this choice. An affine zero deficit must not be
@@ -86,7 +101,7 @@ continuous-time safety. Road constraints are disabled by default; the ideal
 information-set proof below also omits road boundaries. Optional road rows require their
 own compatible images and terminal checks.
 
-The nonlinear baseline keeps the same PCBF-first objective and a secondary
+The default nonlinear backend keeps the same PCBF-first objective and a secondary
 tracking/input-variation objective under the attained primary budget. Outside
 an encounter it imposes the integrated continuous-CLF inequality on the actual
 nonlinear first predicted state. It omits RTI's numerical trust box. Nonlinear
@@ -101,6 +116,31 @@ or a recorded failure. It records deadlines and failure outcomes without
 assuming that nonlinear optimization succeeds or meets real-time requirements.
 Its diagnostic wall limit is checked by the solver iteration callback; internal
 QP work and line searches can overrun that limit.
+
+For the nonlinear backend, let `D` contain the 32 fixed world normals
+`n_j = [cos(2*pi*j/32); sin(2*pi*j/32)]`. At a prediction sample, let `U_j`
+be the target's upper support, including the directional target and ego error
+allowances. The nonlinear clearance is
+
+    h(p,psi) = max_j { min_i n_j' (p + R(psi) v_i) - U_j }.
+
+The collision row is `-h <= xi`. Nonnegative h supplies a separating plane;
+a finite direction grid is conservative relative to all possible planes.
+This is one fixed nonlinear function, not a sequence of left/right decisions
+or a barrier redefined whenever a local solve fails. Both the active vertex
+and the active normal can change as the optimizer moves the vehicle. Their
+piecewise derivatives are used away from ties; nonsmooth ties and local NLP
+termination do not imply global optimality. Observer allowances retain the
+engineering affine scope stated above. Simplified terminal safety is still
+evaluated directly, with no replacement of its declared braking model.
+
+The nonlinear secondary objective sums both normalized state-error costs and
+normalized applied-input-increment costs over the horizon. Averaging only the
+state term would strengthen input smoothing by N relative to route recovery.
+The historical RTI comparator below retains its previous mean-tracking cost;
+its numerical weights therefore must be matched before a cost-controlled
+NLP/RTI comparison. Neither performance objective can increase the attained
+PCBF slack budget within the declared numerical tolerance.
 
 ## Contents
 
@@ -3495,6 +3535,21 @@ balls remain centered on their current observations, avoiding additional
 inflation solely to preserve an old nominal. Parameter interval consistency
 and the original retained witness remain separate from this center choice.
 
+The engineering predictor also retains the target course interval relative
+to ego. It transports this interval between observations using
+`courseRate = targetCurvature * targetSpeed - egoYawRate`, then intersects it
+with the new published course interval. The target turn is enclosed using
+the retained speed/acceleration intervals and the intersected curvature
+interval. Actual gyro samples supply ego rotation: on each sensor interval
+of length `dt`, the trapezoidal integral error is bounded by
+`gyroNoise * dt + yawAccelerationMaximum * dt^2 / 4`. The second term is a
+Lipschitz bound, not an assumed quadrature accuracy. When that history or
+its finite motion bound is unavailable, this contraction is not used.
+The common absolute heading error cancels in this relative-coordinate
+transport. A temporarily weaker new course observation therefore cannot
+erase all earlier directional information. This intersection preserves the
+stated bounded family; it does not certify the subsequent affine ego tube.
+
 The auxiliary RTI proposal uses the same current measurement-conditioned
 joint set as nonlinear admission. Its physical projection is expressed about
 the published observer estimate, retaining a column for the center offset.
@@ -3826,13 +3881,13 @@ baseline and minimum recovery time.
 
 | Required mathematical ingredient | Current implementation boundary |
 | --- | --- |
-| Sound current physical enclosures | The retained verification path requires declared enclosures and conditions them on current raw measurements. Online point RTI uses the same current measurement intersection when a joint snapshot is available, but its future affine tube cannot claim the retained guarantee. |
+| Sound current physical enclosures | The retained verification path requires declared enclosures and conditions them on current raw measurements. The nonlinear shooting and point-RTI experiments use the current measurement intersection when a joint snapshot is available, but their future affine tubes cannot claim the retained guarantee. |
 | Sound physical horizon images; joint images for future feedback | The retained joint path encloses the declared sampled ego/observer map over decision plus uncertainty domains in real arithmetic. The October 30 refinements permit driving admission and zero deficit in the 8 m/s head-on experiment; other initial tubes still fail hard-domain admission. No floating-point certificate is claimed. |
-| Cross-sample posterior inclusion | The retained backend stores joint sets and constrained posterior intersections and keeps the old certificate if a new outer image is rejected. The comparison point-RTI path does not retain a set/policy witness. |
+| Cross-sample posterior inclusion | The retained backend stores joint sets and constrained posterior intersections and keeps the old certificate if a new outer image is rejected. The shooting and point-RTI experiments do not retain that set/policy witness. |
 | Common robust terminal family | The retained backend verifies a full entry set under simplified braking until uniform perception exit or separated stationary families; a finite check limit never certifies an unresolved tail. This is an assumed terminal model, not a Fiala execution certificate. |
-| Exact nonlinear CLF dissipation | Current continuous derivative, locally affine in the first input, with soft slack and a fixed reference penalty. |
+| Nonlinear CLF dissipation | Shooting evaluates the integrated continuous-CLF condition at its nonlinear next state, with soft slack. The RTI comparator locally approximates this condition. Both retain performance costs during cruise. |
 | Whole-hold collision/observer-domain validity | Nodes and approximate midpoints do not by themselves establish continuous-time validity. |
-| Numerical success | Point-RTI requires completed affine objectives. The retained backend has an explicit feasible policy before performance optimization, but initial admission and normal driving extensions may fail. Full-domain enclosures use real-arithmetic derivations, not outward-rounded numerics. |
+| Numerical success | Shooting retains feasible local candidates, including iteration-limited returns; sampled feasibility is checked against refreshed engineering margins. Point-RTI requires completed affine objectives. The retained backend has an explicit feasible policy before performance optimization, but initial admission and normal driving extensions may fail. Full-domain enclosures use real-arithmetic derivations, not outward-rounded numerics. |
 
 <a id="source-map"></a>
 ## 9. Source map and verification
@@ -3845,7 +3900,7 @@ test limits executable source growth; this consolidation adds no runtime module.
 | --- | --- |
 | [collisionAvoidanceController.m](collisionAvoidanceController.m) | Input/target memory, encounter updates, solver orchestration, first-input output, reset and warm-up actions. |
 | [readControllerInputs.m](readControllerInputs.m) | Ego/target parsing, timestamped error sets, given path and boundary observations. |
-| [solvePredictiveControl.m](solvePredictiveControl.m) | References, affine RTI models, two objectives, encounter-onset horizon sizing and fixed-length shifts, tightening, shared timer and discrepancy diagnostics. |
+| [solvePredictiveControl.m](solvePredictiveControl.m) | Nonlinear shooting and feasibility restoration, joint-margin refresh, explicit affine RTI comparator, lexicographic objectives, encounter-onset horizon sizing and fixed-length shifts. |
 | [terminalSafeSet.m](terminalSafeSet.m) | Joint state/flow, braking continuation, membership/linearized rows, parked-track checks, seed holds and offline certificate helpers. |
 | [nonlinearBicycleModel.m](nonlinearBicycleModel.m) | Blended bicycle, road load, RK4/tangents, trim, path error and quadratic CLF. |
 | [modifiedFialaTire.m](modifiedFialaTire.m) | Combined-slip forces and analytic derivatives. |

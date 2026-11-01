@@ -10,7 +10,7 @@ classdef adaptiveTrustRegionTest < matlab.unittest.TestCase
             root=fileparts(fileparts(mfilename('fullpath')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
-            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('timeLimitSeconds',10)));
+            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('method',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
             [~,~,p]=collisionAvoidanceController(ego,[],[],cfg,[]);
             testCase.cfg=cfg;testCase.model=p.model;testCase.anchor=p.model.linearization;

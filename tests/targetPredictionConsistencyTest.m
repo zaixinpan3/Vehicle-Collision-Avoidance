@@ -7,6 +7,28 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function directionalTargetSupportContainsCurvedAndStoppedParameterFamilies(testCase)
+            q=[3;-2;.4;8;-1;.02;1.6;2.4;.95;.2;-.1];
+            error=struct('positionRadius',.04,'courseRadius',.2,'speedRadius',1, ...
+                'accelerationRadius',2,'curvatureRadius',.03,'sideslipRadius',.06, ...
+                'speedInterval',[7;9],'accelerationInterval',[-3;1],'curvatureInterval',[-.02;.04]);
+            stream=RandStream('mt19937ar',Seed=34);
+            for time=[0,.1,2,5]
+                for angle=linspace(-pi,pi,9)
+                    n=[cos(angle);sin(angle)];
+                    bound=predictiveSafetyGeometry.targetDirectionalSupport(q,error,time,n);
+                    for sample=1:30
+                        a=2*rand(stream,6,1)-1;trial=q;
+                        trial(1:2)=q(1:2)+error.positionRadius*a(1:2)/max(1,norm(a(1:2)));
+                        trial(4)=8+a(3);trial(5)=-1+2*a(4);
+                        trial(6)=asin(q(7)*(.01+.03*a(5)));
+                        trial(3)=q(3)+q(6)+error.courseRadius*a(6)-trial(6);
+                        actual=predictiveSafetyGeometry.targetDirectionalSupport(trial,[],time,n);
+                        testCase.verifyLessThanOrEqual(actual,bound+1e-12);
+                    end
+                end
+            end
+        end
         function targetPositionAndTravelErrorsRemainIndependent(testCase)
             target=[10;0;pi;1;0;0;1.6;2.4;.95;0;0];
             error=struct('positionRadius',1,'courseRadius',0,'curvatureRadius',0,'sideslipRadius',0);
@@ -38,6 +60,21 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
             testCase.verifyTrue(info.parameterIntersection);
             testCase.verifyEqual(info.observed,q);
             testCase.verifyEqual(next.accelerationInterval,[-.1;.1]);
+        end
+        function gyroTransportKeepsEarlierCourseInformationWhenANewSetWidens(testCase)
+            [q,prior,u,memory]=localFixture();
+            memory.relativeCourseInterval=[.01;.03];memory.curvatureInterval=[0;0];
+            u.predictionSet.courseRadius=.8;
+            records=struct('time',{0,.025,.05},'yawRate',{.2,.2,.2});
+            u.predictionSet.measurementHistory=struct('records',records, ...
+                'gyroscopeNoise',.001,'yawAccelerationMaximum',.1);
+            [selected,bound,next,info]=predictiveSafetyGeometry.reconcileTarget(q,prior,u,memory,.05);
+            testCase.verifyTrue(info.courseIntersection);
+            testCase.verifyLessThan(bound.target.courseRadius,.021);
+            expected=memory.relativeCourseInterval-.01+[-1;1]*(.001*.05+2*.1*.025^2/4);
+            testCase.verifyEqual(next.relativeCourseInterval,expected,AbsTol=1e-12);
+            testCase.verifyGreaterThanOrEqual(selected(3)+selected(6),expected(1));
+            testCase.verifyLessThanOrEqual(selected(3)+selected(6),expected(2));
         end
         function recenteringRetainsTheCurrentPositionAndCourseEnclosure(testCase)
             [q,prior,u,memory]=localFixture();
@@ -102,7 +139,8 @@ function [q,prior,u,memory]=localFixture()
     prior=[0;0;0;4;0;0;1.6;2.4;.95;0;0];
     q=prior;q(1:6)=[.03;.02;-.03;4.03;.08;.05];
     set=struct('positionRadius',.1,'courseRadius',.1,'speedInterval',[3.8;4.2], ...
-        'accelerationInterval',[-.2;.2],'curvatureInterval',[-.1;.1]);
+        'accelerationInterval',[-.2;.2],'curvatureInterval',[-.1;.1], ...
+        'courseCenter',sum(q([3,6])),'referenceEgoPose',[0;0;0]);
     u=struct('predictionSet',set);
     memory=struct('time',0,'speedInterval',[3.9;4.1], ...
         'accelerationInterval',[-.1;.1],'curvatureInterval',[-.1;.1]);

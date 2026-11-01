@@ -9,6 +9,24 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function predictionPointMapEqualsTheCertifiedObserverPointMap(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            setup=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
+            design=synthesizeNrmmObserverGains(setup.observer);
+            for speed=[0,.5,8,25]
+                for brake=[-1,-.5,0,1]
+                    for held={[],[.2;brake]}
+                        input=struct('gnssVelocity',[speed;.05*speed],'yawRate',.12, ...
+                            'bodyAcceleration',[-2;.4],'heldInput',held{1},'velocityErrorMaximum',1.2);
+                        full=nrmmEgoCourseGeometry('course',input,design);
+                        point=nrmmEgoCourseGeometry('pointCourse',input,design);
+                        testCase.verifyEqual(point.lateralMeasurement.center,full.lateralMeasurement.center,AbsTol=0);
+                        testCase.verifyEqual(point.correspondence.rotationVector,full.correspondence.rotationVector,AbsTol=0);
+                        testCase.verifyFalse(isfield(point.correspondence,'radius'));
+                    end
+                end
+            end
+        end
         function forceBalanceIntervalContainsTheTrueLateralVelocity(testCase)
             [model,sensors,cfg]=localModel(0.05);
             stream=RandStream("mt19937ar",Seed=11);
@@ -21,27 +39,43 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
                 testCase.verifyTrue(lateral.consistent);
                 testCase.verifyGreaterThanOrEqual(x(5),lateral.lower-1e-6);
                 testCase.verifyLessThanOrEqual(x(5),lateral.upper+1e-6);
-                % The point inversion is independent of uncertainty width.
-                % The interval and its radius must contain the physical value.
+                % Both the center and its radius describe the full inverse.
                 testCase.verifyLessThanOrEqual(abs(lateral.center-x(5)),lateral.radius+1e-6);
                 testCase.verifyEqual(lateral.radius,max(lateral.center-lateral.lower,lateral.upper-lateral.center),AbsTol=1e-12);
             end
         end
-        function nominalSolutionIsExactWithoutNoiseEvenWhenTheIntervalIsWide(testCase)
-            % Near rear saturation the parameter box widens the interval
-            % asymmetrically; the published point is the nominal solution.
+        function exactObservableInversionIsRecoveredWhenAllUncertaintyVanishes(testCase)
+            % A parameter-uncertain inverse retains its whole interval. The
+            % proximal term vanishes only with zero IMU and parameter errors.
             [model,~,cfg]=localModel(0.05);
             exact=struct('velocityNoiseMaximum',0,'gyroscopeNoiseMaximum',0,'accelerometerNoiseMaximum',0);
             x=[0;0;0;14.5;-0.3084;0.602];input=[0.2172;-0.345];
             d=nonlinearBicycleModel.derivative(x,input,cfg);acceleration=[d(4)-x(6)*x(5);d(5)+x(6)*x(4)];
             lateral=nrmmEgoCourseGeometry("lateralVelocity",x(4:5),x(6),acceleration,input,model,exact,0.3);
-            testCase.verifyEqual(lateral.center,x(5),AbsTol=2e-5);
+            testCase.verifyLessThanOrEqual(abs(lateral.center-x(5)),lateral.radius+1e-6);
             testCase.verifyLessThanOrEqual(lateral.lower,x(5)+1e-6);
             testCase.verifyGreaterThanOrEqual(lateral.upper,x(5)-1e-6);
             testCase.verifyGreaterThan(lateral.radius,0.05);
             model.parameterUncertainty=0;
             narrow=nrmmEgoCourseGeometry("lateralVelocity",x(4:5),x(6),acceleration,input,model,exact,0.3);
             testCase.verifyLessThan(narrow.radius,1e-4);
+            testCase.verifyEqual(narrow.center,x(5),AbsTol=2e-5);
+        end
+        function tinyImuChangesDoNotSelectOppositeSlipEdgesAtFullBraking(testCase)
+            [model,sensors,cfg]=localModel(0.05);
+            x=[0;0;0;8;0;0];input=[.2;-1];
+            d=nonlinearBicycleModel.derivative(x,input,cfg);a=d(4:5);
+            centers=zeros(1,3);
+            for k=1:3
+                measured=a+[0;(k-2)*1e-6];
+                inverse=nrmmEgoCourseGeometry("lateralVelocity",x(4:5),0,measured,input,model,sensors,.3);
+                testCase.verifyTrue(inverse.consistent);
+                testCase.verifyLessThanOrEqual(inverse.lower,0);
+                testCase.verifyGreaterThanOrEqual(inverse.upper,0);
+                testCase.verifyGreaterThan(inverse.radius,2);
+                centers(k)=inverse.center;
+            end
+            testCase.verifyLessThan(max(centers)-min(centers),5e-4);
         end
         function saturatedRearForceStillProducesAnEnclosingInterval(testCase)
             [model,sensors,cfg]=localModel(0.05);

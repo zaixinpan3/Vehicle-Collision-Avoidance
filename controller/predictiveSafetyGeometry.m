@@ -490,7 +490,7 @@ classdef predictiveSafetyGeometry
             % box/ball outer enclosure,
             % not a nonlinear cross-horizon recursive-safety certificate.
             info=struct('available',false,'reason',"observerSetUnavailable", ...
-                'observed',q,'nominal',q,'parameterIntersection',false);
+                'observed',q,'nominal',q,'parameterIntersection',false,'courseIntersection',false);
             if isempty(q) || ~isfield(uncertainty,'predictionSet')
                 memory=[];return;
             end
@@ -523,26 +523,37 @@ classdef predictiveSafetyGeometry
                 speed=localIntervalIntersection(speed,propagated);
             end
             observed=q;preferred=q;
+            relativeCourse=set.courseCenter+[-1;1]*set.courseRadius;
+            if reused && isfield(memory,'relativeCourseInterval') && isfield(set,'measurementHistory')
+                [transported,available]=localCourseContinuation(memory,set.measurementHistory,time,curvature);
+                if available
+                    center=mean(transported);
+                    measured=center+atan2(sin(set.courseCenter-center),cos(set.courseCenter-center));
+                    relativeCourse=localIntervalIntersection(transported,measured+[-1;1]*set.courseRadius);
+                    info.courseIntersection=true;
+                end
+            end
             q(4)=min(speed(2),max(speed(1),preferred(4)));
             q(5)=min(acceleration(2),max(acceleration(1),preferred(5)));
             kappa=min(curvature(2),max(curvature(1),sin(preferred(6))/preferred(7)));
             q(6)=asin(kappa*q(7));
-            course=observed(3)+observed(6);
-            change=atan2(sin(preferred(3)+preferred(6)-course),cos(preferred(3)+preferred(6)-course));
-            change=min(set.courseRadius,max(-set.courseRadius,change));
-            q(3)=course+change-q(6);
+            center=mean(relativeCourse);
+            measured=center+atan2(sin(set.courseCenter-center),cos(set.courseCenter-center));
+            selected=min(relativeCourse(2),max(relativeCourse(1),measured));
+            q(3)=set.referenceEgoPose(3)+selected-q(6);
             offset=preferred(1:2)-observed(1:2);distance=norm(offset);
             if distance>set.positionRadius,offset=offset*(set.positionRadius/distance);end
             q(1:2)=observed(1:2)+offset;
             uncertainty.target=struct('positionRadius',set.positionRadius+norm(offset), ...
-                'courseRadius',min(pi,set.courseRadius+abs(change)), ...
+                'courseRadius',min(pi,max(abs(relativeCourse-selected))), ...
                 'speedRadius',max(abs(speed-q(4))), ...
                 'accelerationRadius',max(abs(acceleration-q(5))), ...
                 'curvatureRadius',max(abs(curvature-kappa)), ...
                 'sideslipRadius',max(abs(asin(curvature*q(7))-q(6))), ...
                 'speedInterval',speed,'accelerationInterval',acceleration,'curvatureInterval',curvature);
             memory=struct('time',time,'speedInterval',speed, ...
-                'accelerationInterval',acceleration,'curvatureInterval',curvature);
+                'accelerationInterval',acceleration,'curvatureInterval',curvature, ...
+                'relativeCourseInterval',relativeCourse);
             info.available=true;info.reason="observerEnclosureContinuation";
             info.nominal=q;info.parameterIntersection=reused;
         end
@@ -599,6 +610,53 @@ classdef predictiveSafetyGeometry
             % would incorrectly charge its full size in every normal.
             data=predictiveSafetyGeometry.targetSupportData(q,errorSet,time);
             support=predictiveSafetyGeometry.targetSupportFromData(data,1,normal);
+        end
+
+        function support = targetDirectionalSupport(q,errorSet,time,normal)
+            % Upper support of the complete constant-NRMM target family.
+            % Small interval cells retain the dependence of position and yaw
+            % on the same arc, course and curvature. Splitting the uncertainty
+            % family does not select an ego passing side or discard a case.
+            normal=normal(:);magnitude=norm(normal);angle=atan2(normal(2),normal(1));
+            signs=[-1,1,1,-1;-1,-1,1,1];vertices=q(10:11)+q(8:9).*signs;
+            if isempty(errorSet)
+                pose=predictiveSafetyGeometry.predictTarget(q,time);
+                support=normal.'*pose(1:2)+max(magnitude*vecnorm(vertices).* ...
+                    cos(pose(3)+atan2(vertices(2,:),vertices(1,:))-angle));return;
+            end
+            arc=predictiveSafetyGeometry.targetArcInterval(q,errorSet,time);
+            curve=sin(q(6))/q(7)+[-1,1]*errorSet.curvatureRadius;
+            if isfield(errorSet,'curvatureInterval'),curve=errorSet.curvatureInterval(:).';end
+            course=q(3)+q(6)+[-1,1]*errorSet.courseRadius;
+            curves=linspace(curve(1),curve(2),5);arcs=linspace(arc(1),arc(2),5);
+            courses=linspace(course(1),course(2),5);
+            [ik,is,ic]=ndgrid(1:4,1:4,1:4);ik=ik(:);is=is(:);ic=ic(:);
+            kl=curves(ik).';kh=curves(ik+1).';sl=arcs(is).';sh=arcs(is+1).';
+            cl=courses(ic).';ch=courses(ic+1).';
+            product=[kl.*sl,kl.*sh,kh.*sl,kh.*sh]/2;
+            hl=min(product,[],2);hh=max(product,[],2);
+            far=max(abs([hl,hh]),[],2);near=max(0,max(hl,-hh));
+            sincLow=-ones(size(far));sincHigh=ones(size(far));inside=far<=pi;
+            sincLow(inside)=1;nonzero=inside & far>0;sincLow(nonzero)=sin(far(nonzero))./far(nonzero);
+            nonzero=inside & near>0;sincHigh(nonzero)=sin(near(nonzero))./near(nonzero);
+            product=[sl.*sincLow,sl.*sincHigh,sh.*sincLow,sh.*sincHigh];
+            al=min(product,[],2);ah=max(product,[],2);
+            [lo,hi]=localCosRange(cl+hl-angle,ch+hh-angle);
+            displacement=max([al.*lo,al.*hi,ah.*lo,ah.*hi],[],2);
+            if isfield(errorSet,'curvatureInterval')
+                betaLow=asin(max(-1,min(1,q(7)*kl)));betaHigh=asin(max(-1,min(1,q(7)*kh)));
+            else
+                betaLow=q(6)-errorSet.sideslipRadius;betaHigh=q(6)+errorSet.sideslipRadius;
+            end
+            yawLow=cl+2*hl-betaHigh;yawHigh=ch+2*hh-betaLow;
+            vertexUpper=-Inf(size(displacement));
+            for k=1:4
+                offset=atan2(vertices(2,k),vertices(1,k))-angle;
+                [~,hi]=localCosRange(yawLow+offset,yawHigh+offset);
+                vertexUpper=max(vertexUpper,norm(vertices(:,k))*hi);
+            end
+            support=normal.'*q(1:2)+magnitude*(errorSet.positionRadius+max(displacement+vertexUpper));
+            support=support+256*eps(max(1,abs(support)));
         end
 
         function data = targetSupportData(q,errorSet,time)
@@ -1000,6 +1058,41 @@ function support=localMovingSupport(shape,yaw,yawRadius,normal)
     interior=abs(atan2(b,a))<=radius;
     magnitude=hypot(a,b);values(interior)=magnitude(interior);
     support=max(nominal,max(values,[],2));
+end
+
+function [lo,hi]=localCosRange(a,b)
+    lo=min(cos(a),cos(b));hi=max(cos(a),cos(b));
+    hi(ceil(a/(2*pi))<=floor(b/(2*pi)))=1;
+    lo(ceil((a-pi)/(2*pi))<=floor((b-pi)/(2*pi)))=-1;
+end
+
+function [interval,available]=localCourseContinuation(memory,history,time,curvature)
+    % Transport target course in the EGO frame with measured gyro increments.
+    % The common absolute heading error cancels. Intersecting this prediction
+    % with the new observer set prevents a weaker fresh orientation estimate
+    % from discarding valid information retained from earlier measurements.
+    interval=[];available=false;
+    required={'records','gyroscopeNoise','yawAccelerationMaximum'};
+    if ~all(isfield(history,required)) || isempty(history.records),return;end
+    times=[history.records.time];guard=128*eps(max(1,abs(time)));
+    first=find(abs(times-memory.time)<=guard,1);last=find(abs(times-time)<=guard,1);
+    if isempty(first) || isempty(last) || first>=last,return;end
+    indices=first:last;dt=diff(times(indices));gyro=[history.records(indices).yawRate];
+    turn=sum((gyro(1:end-1)+gyro(2:end)).*dt/2);
+    acceleration=repmat(history.yawAccelerationMaximum,size(dt));
+    if isfield(history,'holdYawAcceleration') && numel(history.holdYawAcceleration)==numel(times)
+        acceleration=min(acceleration,history.holdYawAcceleration(indices(1:end-1)));
+    end
+    radius=history.gyroscopeNoise*sum(dt)+sum(acceleration.*dt.^2/4);
+    if ~isfinite(radius),return;end
+    elapsed=time-memory.time;arc=zeros(2,1);
+    for k=1:2
+        v=memory.speedInterval(k);a=memory.accelerationInterval(k);duration=elapsed;
+        if a<0,duration=min(duration,-v/a);end
+        arc(k)=v*duration+.5*a*duration^2;
+    end
+    turns=curvature(:)*arc(:).';target=[min(turns,[],'all');max(turns,[],'all')];
+    interval=memory.relativeCourseInterval+target-turn+[-radius;radius];available=true;
 end
 
 function interval=localIntervalIntersection(first,second)

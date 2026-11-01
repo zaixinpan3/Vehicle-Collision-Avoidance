@@ -91,7 +91,10 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
                     'collisionAvoidanceController:invalidConfiguration');
             end
             cfg=collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.solver.timeLimitSeconds,.1);
+            testCase.verifyEqual(cfg.solver.method,"nonlinear");
+            testCase.verifyEqual(cfg.solver.timeLimitSeconds,1000);
+            comparator=collisionAvoidanceControllerConfig(struct('solver',struct('method',"rti")));
+            testCase.verifyEqual(comparator.solver.timeLimitSeconds,.1);
             testCase.verifyEqual(cfg.controller.sampleTime,.05);
             testCase.verifyLessThan(cfg.solver.completionReserveSeconds,cfg.solver.timeLimitSeconds);
         end

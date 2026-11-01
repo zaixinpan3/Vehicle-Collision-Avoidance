@@ -79,6 +79,26 @@ course geometry, the current NRMM comparison bound, target measurement history,
 and controller publication. Correlation is conservatively enlarged, never
 used to claim independence or to reduce the bound without proof.
 
+The online update also retains recent actual position samples. For an old
+sample at time `t-H`, the velocity at `t` belongs to the ball centered at
+`(y(t)-y(t-H))/H`, with radius
+
+\[
+ r_{\mathrm{sec}}=(\epsilon_p(t)+\epsilon_p(t-H))/H+A_{\max}H/2.
+\]
+
+Here `Amax` bounds inertial acceleration over the entire intervening interval.
+This follows by integrating the difference between endpoint velocity and
+average velocity. It requires no jerk bound and never averages deterministic
+measurement noise down as if it were independent random noise. The triangle
+inequality expresses this ball about the existing numerical velocity estimate;
+the smallest of these bounds and the filter bound encloses their intersection.
+When a secant tightens the enclosure, the implementation preserves the old
+position projection and replaces the velocity projection by an independent
+ball. Their Cartesian product contains the intersection. Scaling old signed
+generators would incorrectly shrink retained position/velocity correlations.
+The numerical filter update and its future-observer prediction are unchanged.
+
 This is conditional deterministic containment in real arithmetic. It requires
 valid initial, sensor, motion-domain, and yaw enclosures. It is not an interval
 floating-point certificate. Stable error poles and bounded disturbances imply
@@ -102,8 +122,14 @@ s_c=\frac{v_{Bx}v_{Iy}-v_{By}v_{Ix}}{\|v_B\|\|v_I\|+s^2},
 A machine-epsilon denominator guard handles the exactly noiseless zero-vector
 case. The correction tends to zero with vanishing motion information; no
 course angle is divided by speed or enabled at a speed threshold. The
-force-balance point inversion also uses nominal values independently of its
-uncertainty interval. Its error radius encloses the entire feasible interval
+force-balance point inversion uses nominal parameters and a continuous proximal
+regularization, independently of the evolving velocity interval. With force
+resolution \(\epsilon_F=m\epsilon_a+\rho_p\sum_j\mu_jF_{zj}\), its scalar equation is
+\(G_0(w)-\epsilon_F w/\max(M\sin b,\epsilon_{\rm mach})=m a_{y,m}\), clamped to
+\([-M\sin b,M\sin b]\). The extra slope regularizes an unobservable saturated
+force inverse; it is not an additional vehicle force or tire constraint.
+Both runtime and predicted observer use the same equation and fixed sensor/
+parameter budgets. Its error radius encloses the entire feasible interval
 about that point even if the point lies outside the interval.
 
 `informative` remains a statement about a *set*: when a velocity ball contains
@@ -611,9 +637,9 @@ singularities. The implementation uses ordinary floating-point bisection to
 \(10^{-5}\) m/s, without directed-rounding certification.
 
 Write the returned interval as \([w_-,w_+]\). An empty interval invalidates
-the ego enclosure. Normally the point value \(w_m\) solves nominal force
-balance using the measurements; if that solve fails or lies outside the
-interval, the code uses its midpoint. In either case it publishes
+the ego enclosure. The point value \(w_m\) solves the regularized nominal
+force equation above using the measurements. The original feasible inverse
+interval is unchanged, even if this point lies outside it. The code publishes
 \[
 \rho_w=\max\{w_m-w_-,w_+-w_m\},\qquad
  y_v=[\phi(M,w_m),w_m]^T.
@@ -621,7 +647,7 @@ interval, the code uses its midpoint. In either case it publishes
 Near saturation the force slope can vanish: a unique inverse is unnecessary,
 and the interval widens rather than supplying an unjustified small radius.
 If speed information is uninformative, the code retains the full cone interval
-with center zero. Without the shared model or held input, it uses Section 3's
+about that numerical point. Without the shared model or held input, it uses Section 3's
 kinematic branch. That branch requires its own single-track mismatch bound;
 a small mismatch cannot be inferred from dynamic tire slip.
 

@@ -255,7 +255,7 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
         function nonlinearModeRequiresAnObserverSnapshot(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',2,'jointNonlinearPrediction',true), ...
-                'solver',struct('timeLimitSeconds',30)));
+                'solver',struct('method',"rti",'timeLimitSeconds',30)));
             x=nonlinearBicycleModel.cruise(cfg,0).state;
             ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
             testCase.verifyError(@()collisionAvoidanceController(ego,[],[],cfg,[]), ...
@@ -315,7 +315,7 @@ function excess=localUnaryDependenceExcess(kind)
 end
 
 function [certificate,maximum]=localAccelerationHoldSamples()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('method',"rti")));
     trim=nonlinearBicycleModel.cruise(cfg,0);input=trim.input;
     lower=[0;0;0;7.75;-.0045;-.0015];upper=[0;0;0;8.25;.0045;.0015];
     state=nrmmSet.range(lower,upper);parameters=nrmmSet(zeros(4,1),.05*eye(4));
@@ -334,7 +334,7 @@ function [certificate,maximum]=localAccelerationHoldSamples()
 end
 
 function [center,context,output]=localFixture()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('method',"rti")));
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
     design=synthesizeNrmmObserverGains(estimator.observer);
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;

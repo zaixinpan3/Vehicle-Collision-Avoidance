@@ -282,7 +282,7 @@ function point=localObserverStep(point,input,contract)
     % states do not drive this projection. Retain the resetting GNSS predictor.
     design=contract.design;
     if ~isfield(input,'courseGeometry')
-        input.courseGeometry=nrmmEgoCourseGeometry('course',input,design);
+        input.courseGeometry=nrmmEgoCourseGeometry('pointCourse',input,design);
     end
     geometry=input.courseGeometry;correspondence=geometry.correspondence;
     lateral=geometry.lateralMeasurement.center;
@@ -675,7 +675,7 @@ end
 
 function value=localPseudoMeasurement(input,design)
     if isfield(input,'courseGeometry'),geometry=input.courseGeometry;
-    else,geometry=nrmmEgoCourseGeometry('course',input,design);end
+    else,geometry=nrmmEgoCourseGeometry('pointCourse',input,design);end
     lateral=geometry.lateralMeasurement.center;
     if geometry.lateralMeasurement.source=="kinematic" || ~isfinite(lateral),lateral=NaN;end
     velocity=nrmmObserverVectorField('velocityMeasurement',input.gnssVelocity,input.yawRate,design,lateral);

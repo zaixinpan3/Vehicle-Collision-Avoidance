@@ -2,8 +2,8 @@ function summaries = runNonlinearControllerExperiment(outputDirectory,options)
 %runNonlinearControllerExperiment Direct NLP with the actual noisy observer.
 % The plant and controller both use modified Fiala. The optimizer evaluates
 % nonlinear shooting equations, rectangle rotations and the declared terminal
-% continuation. Joint observer/feedback margins are frozen at each frame's
-% reference. This is a numerical nonlinear baseline, not a robust certificate.
+% continuation. Accepted updates re-evaluate the joint observer/feedback
+% margins. These affine error predictions are not a robust nonlinear certificate.
 % An unlimited observation length ends only on recovery or a recorded failure.
 % FrameBudgetSeconds is checked between SQP iterations; an internal QP or
 % line search can overrun it. It is not a hard real-time execution deadline.
@@ -12,8 +12,8 @@ function summaries = runNonlinearControllerExperiment(outputDirectory,options)
         options.Scenarios (1,:) string = ["headOn","stoppedLead","intersectionCrossing","curvedCrossing"]
         options.Speeds (1,:) double = [8,25,8,8]
         options.Frames (1,1) double {mustBePositive} = Inf
-        options.MaximumIterations (1,1) double {mustBePositive,mustBeInteger} = 200
-        options.FrameBudgetSeconds (1,1) double {mustBePositive} = 300
+        options.MaximumIterations (1,1) double {mustBePositive,mustBeInteger} = localSolverDefault('maxIterations')
+        options.FrameBudgetSeconds (1,1) double {mustBePositive} = localSolverDefault('timeLimitSeconds')
     end
     assert(numel(options.Scenarios)==numel(options.Speeds));
     root=fileparts(fileparts(mfilename('fullpath')));
@@ -49,4 +49,11 @@ function summaries = runNonlinearControllerExperiment(outputDirectory,options)
         fprintf('RESULT nonlinear %g %s holds=%d gap=%.7g recovery=%d max=%.7g failure=%s\n', ...
             speed,name,r.executedFrames,r.minimumReplayClearanceMeters,r.recovery.recovered,r.maximumFrameSeconds,r.failure);
     end
+end
+
+function value=localSolverDefault(name)
+    root=fileparts(fileparts(mfilename('fullpath')));
+    addpath(fullfile(root,'config'));
+    cfg=collisionAvoidanceControllerConfig();
+    value=cfg.solver.(name);
 end

@@ -50,10 +50,11 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyEqual(r.outcome,"recovered");
             testCase.verifyTrue(isfinite(r.baselineCruise.durationSeconds));
             testCase.verifyFalse(r.roadConstraintsEnforced);
-            testCase.verifyEqual(r.controllerBudgetSeconds,.1);
+            cfg=collisionAvoidanceControllerConfig();
+            testCase.verifyEqual(r.controllerBudgetSeconds,cfg.solver.timeLimitSeconds);
             testCase.verifyEqual(r.sampleTimeSeconds,.05);
             seconds=[r.trace.controllerSeconds,r.failedFrameSeconds];
-            testCase.verifyEqual(r.controllerBudgetExceededCalls,nnz(seconds>.1));
+            testCase.verifyEqual(r.controllerBudgetExceededCalls,nnz(seconds>r.controllerBudgetSeconds));
         end
         function aLimitedObservationCanContinueWithoutAFrameLimit(testCase)
             file=string(tempname)+".mat";testCase.addTeardown(@()delete(file));
@@ -75,7 +76,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         function aShortRecordedPrefixStillQualifiesTheCompleteThreat(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="headOn",Frames=1, ...
                 RequireCollisionThreat=true,ControllerConfiguration=struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',8),'solver',struct('timeLimitSeconds',5)));
+                'controller',struct('horizonSteps',8),'solver',struct('method',"rti",'timeLimitSeconds',5)));
             r=report.results;
             testCase.verifyTrue(r.baselineCruise.collisionDetected);
             testCase.verifyGreaterThan(r.baselineCruise.durationSeconds,r.sampleTimeSeconds);
@@ -102,7 +103,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
         function aForecastTerminalEndpointDoesNotCompleteTheDrivingTask(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="crossing",Frames=1, ...
-                ControllerConfiguration=struct('solver',struct('timeLimitSeconds',5), ...
+                ControllerConfiguration=struct('solver',struct('method',"rti",'timeLimitSeconds',5), ...
                 'controller',struct()));
             testCase.verifyEqual(report.results.executedFrames,1);
             testCase.verifyEqual(report.results.outcome,"observationLimit");
@@ -210,6 +211,7 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
         function failedControllerTimeExcludesEarlierPipelineWork(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=1, ...
+                ControllerConfiguration=struct('solver',struct('method',"rti")), ...
                 TargetEstimateFunction=@localDelayedImpossibleTarget);
             result=report.results;
             testCase.verifyTrue(result.controlUnavailable);
@@ -218,7 +220,8 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
             testCase.verifyEqual(result.pipelineDeadlineMisses,double(result.failedPipelineSeconds>.05));
         end
         function anActualOptimizationFailureRemainsAnExperimentalFailure(testCase)
-            cfg=struct('referenceSpeed',15,'controller',struct('horizonSteps',16));
+            cfg=struct('referenceSpeed',15,'controller',struct('horizonSteps',16), ...
+                'solver',struct('method',"rti"));
             report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=1, ...
                 ControllerConfiguration=cfg,TargetEstimateFunction=@localImpossibleTarget);
             testCase.verifyTrue(report.results.controlUnavailable);

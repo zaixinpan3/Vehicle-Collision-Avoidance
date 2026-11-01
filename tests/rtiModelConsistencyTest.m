@@ -14,7 +14,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
                 testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,directory)));
             end
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',8),'solver',struct('timeLimitSeconds',10)));
+                'controller',struct('horizonSteps',8),'solver',struct('method',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
             [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
             testCase.model=prediction.model;testCase.anchor=prediction.model.linearization;

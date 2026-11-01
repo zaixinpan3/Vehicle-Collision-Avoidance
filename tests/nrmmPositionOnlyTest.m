@@ -87,6 +87,18 @@ classdef nrmmPositionOnlyTest < matlab.unittest.TestCase
             wide=nrmmPositionVelocity('predict',f,[1;0],0,.5,d,h);
             testCase.verifyGreaterThan(sum(abs(wide.generator(2,:))),sum(abs(narrow.generator(2,:))));
         end
+        function positionSecantsRetainVelocityInformationWithALooseJerkBound(testCase)
+            [runtime,~]=localFixture();design=runtime.observerDesign;dt=.0125;
+            filter=nrmmPositionVelocity('initialize',[0;0],[8;0],.04,.2,dt,8);
+            hold=struct('acceleration',10,'bodyAccelerationRate',Inf,'yawAcceleration',5);
+            for k=0:159
+                time=k*dt;position=[8*time;0]+.04*[cos(1.7*k);sin(1.7*k)];
+                filter=nrmmPositionVelocity('measure',filter,position,.04);
+                testCase.verifyLessThanOrEqual(norm(filter.point(3:4)-[8;0]),filter.velocityRadius+1e-12);
+                if k>40,testCase.verifyLessThan(filter.velocityRadius,2);end
+                filter=nrmmPositionVelocity('predict',filter,[0;0],0,.1,design,hold);
+            end
+        end
     end
 end
 

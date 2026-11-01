@@ -60,11 +60,22 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     for index=1:numel(options.Scenarios)
         name=options.Scenarios(index);
         [ego,target,road,cfg,initialTarget]=localFixture(name,options.ControllerConfiguration);prior=[];
+        saved=[];
+        if strlength(options.ResumeFrom)>0
+            saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;
+            assert(isequaln(saved.result.configuration,cfg) && saved.result.scenario==name ...
+                && isequaln(saved.result.targetInitialState,initialTarget), ...
+                'Continuation scenario and configuration must match before reusing qualification.');
+        end
         bypass=struct([]);
         if isfield(road,'scenarioHalfWidthMeters')
-            x=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];
-            bypass=bypassFeasibilityBaseline(x,initialTarget,road,cfg, ...
-                HalfWidthMeters=road.scenarioHalfWidthMeters);
+            if isempty(saved)
+                x=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];
+                bypass=bypassFeasibilityBaseline(x,initialTarget,road,cfg, ...
+                    HalfWidthMeters=road.scenarioHalfWidthMeters);
+            else
+                bypass=saved.result.baselineBypass;
+            end
             if ~bypass.qualified
                 error('runNonlinearPredictiveSafetyValidation:unqualifiedScenario', ...
                     'Scenario %s has no verified in-road bypass witness (%s); do not count it as a controller failure.', ...
@@ -73,8 +84,12 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         end
         maximumBraking=struct([]);
         if options.RequireBrakingInsufficient
-            state=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];
-            maximumBraking=maximumBrakingCollisionBaseline(state,initialTarget,cfg);
+            if isempty(saved)
+                state=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];
+                maximumBraking=maximumBrakingCollisionBaseline(state,initialTarget,cfg);
+            else
+                maximumBraking=saved.result.baselineMaximumBraking;
+            end
             if maximumBraking.initialClearanceMeters<=0 || ~maximumBraking.collisionDetected
                 error('runNonlinearPredictiveSafetyValidation:brakingSuffices', ...
                     'Scenario %s does not qualify: immediate maximum straight braking must collide from a separated start.',name);
@@ -109,7 +124,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         % probe uses the initial publication without advancing the observer
         % or RNG (initialFramePending is true); its command/state are discarded.
         roadScan=perceiveRoadBoundaries(road,ego.position,cfg.collision.encounterRangeMeters,ego.stateTime);
-        warmUpTimer=tic;collisionAvoidanceController("warmUp",cfg,roadScan);
+        warmUpTimer=tic;
+        if isempty(saved),collisionAvoidanceController("warmUp",cfg,roadScan);end
         if useEstimator && strlength(options.ResumeFrom)==0 && ~cfg.controller.retainedTube ...
                 && string(cfg.solver.method)=="rti"
             % Do not compute and discard a complete nonlinear certificate
@@ -131,7 +147,6 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         end
         controllerWarmUpSeconds=toc(warmUpTimer);
         if strlength(options.ResumeFrom)>0
-            saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;
             baseline=saved.result.baselineCruise;
         else
             baselineDuration=options.Frames*cfg.controller.sampleTime;
@@ -213,6 +228,28 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             if isfield(r,'minimumTargetRoadMarginMeters'),minimumTargetRoadMargin=r.minimumTargetRoadMarginMeters;end
         end
         recoveryOptions=recovery;truthPath=[];
+        if ~isempty(saved) && useEstimator
+            if isfield(saved,'truthPath')
+                truthPath=saved.truthPath;
+            elseif ~isempty(saved.result.trace)
+                % Older checkpoints omitted the continuous sensor history.
+                % Reproduce the last known hold with the SAME plant, input,
+                % ODE tolerances, sensor times and sample-end reset. Never
+                % silently replace its IMU data by endpoint interpolation.
+                last=saved.result.trace(end);h=cfg.controller.sampleTime;
+                held=last.input(:);start=last.state(:);
+                trajectory=ode45(@(~,state)nonlinearBicycleModel.derivative(state,held,cfg), ...
+                    [0,h],start,odeset('RelTol',1e-11,'AbsTol',1e-12));
+                dt=estimatorConfiguration.observer.runtime.samplePeriod;times=(1:round(h/dt))*dt;
+                states=deval(trajectory,times);states(:,end)=nonlinearBicycleModel.sampleEndState(states(:,end),held,cfg);
+                acceleration=zeros(2,numel(times));
+                for j=1:numel(times)
+                    d=nonlinearBicycleModel.derivative(states(:,j),held,cfg);
+                    acceleration(:,j)=[d(4)-states(6,j)*states(5,j);d(5)+states(6,j)*states(4,j)];
+                end
+                truthPath=struct('times',last.time+times,'states',states,'accelerations',acceleration,'input',held);
+            end
+        end
         frame=frames;
         while frame<options.Frames
             frame=frame+1;
@@ -388,7 +425,10 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 entry.solverAlgorithm=problem.metadata.solverAlgorithm;
                 entry.nonlinearIterations=0;
                 if isfield(search,'nonlinearIterations'),entry.nonlinearIterations=search.nonlinearIterations;end
-                entry.uncertaintyFrozenWithinSolve=string(cfg.solver.method)=="nonlinear";
+                entry.uncertaintyFrozenWithinSolve=false;
+                if isfield(problem.metadata,'uncertaintyFrozenWithinSolve')
+                    entry.uncertaintyFrozenWithinSolve=problem.metadata.uncertaintyFrozenWithinSolve;
+                end
                 if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 if ~isempty(target)
                     q=predictiveSafetyGeometry.predictTarget(initialTarget,ego.stateTime);
@@ -428,7 +468,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 end
                 if string(cfg.solver.method)=="nonlinear" || mod(frame,4)==0
                     fprintf('%s: %d/%d holds, last %.3f s, J %.6g, source %s\n', ...
-                    name,frame,options.Frames,frameSeconds,problem.metadata.predictiveBarrierValue,search.source);end
+                        name,frame,options.Frames,frameSeconds,problem.metadata.predictiveBarrierValue,search.source);
+                end
                 if recovery.enabled && mod(frame,100)==0
                     fprintf('Recovery at %.2f s: e = [%s], W = %.6g\n', ...
                         ego.stateTime,num2str(finalError.',' %.6g'),lastClf);
@@ -519,6 +560,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 'stateTransition',options.StateTransition, ...
                 'sampleEndReset',"brakedSpeedBelowOneFifthHoldSpeed-v1", ...
                 'observationModel',observationModel, ...
+                'truthPath',truthPath, ...
                 'estimatorConfiguration',estimatorConfiguration,'estimatorContext',estimatorContext, ...
                 'recoveryOptions',recoveryOptions,'recoveryStart',recoveryStart);
             save(options.ContinuationFile,'continuation','-v7.3');

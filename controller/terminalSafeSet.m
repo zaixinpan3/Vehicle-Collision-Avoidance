@@ -539,34 +539,62 @@ classdef terminalSafeSet
             end
         end
 
-        function value = nonlinearValue(context,x,node)
+        function [value,active] = nonlinearValue(context,x,node,active)
             % Signed constraint value of the SAME braking/parked geometry.
             % Do not reuse rows(): its local side choices are unsuitable as
             % a nonlinear function when the optimization iterate changes.
             side=abs(x(5))-tan(context.sideslipMaximum)*x(4);
-            value=max([side;context.stateLower-x(4:6);x(4:6)-context.stateUpper]);
+            entry=[side;context.stateLower-x(4:6);x(4:6)-context.stateUpper];
+            if nargin>3
+                % Differentiate the active branch of this maximum. Holding
+                % the feature and braking sample fixed is the envelope
+                % derivative at regular points, without rescanning the whole
+                % continuation for every state-coordinate perturbation.
+                switch active.kind
+                    case "entry",value=entry(active.index);return;
+                    case "constant",value=active.value;return;
+                end
+                path=terminalSafeSet.continuation(context,x,active.steps);
+                if active.kind=="road"
+                    value=context.inflation-min(localRoad(context,path.pose));
+                elseif active.kind=="collision"
+                    q=localTarget(context,node,path.time(active.index));
+                    value=context.required-localSignedRectangle(path.pose(:,active.index),context.shape,q);
+                else
+                    q=localTarget(context,node,path.speed/context.deceleration);
+                    value=context.required-localSignedParked(context,path.pose(:,end),q);
+                end
+                return;
+            end
+            [value,index]=max(entry);active=struct('kind',"entry",'index',index,'steps',0,'value',value);
             if any(context.stateLower>0 | context.stateUpper<0)
-                value=max([value;context.stateLower;-context.stateUpper]);
+                constant=max([context.stateLower;-context.stateUpper]);
+                if constant>value,value=constant;active.kind="constant";active.value=value;end
             end
             if context.brakingRatio<context.brakingBounds(1) || context.brakingRatio>context.brakingBounds(2)
-                value=max(value,1);
+                if 1>value,value=1;active.kind="constant";active.value=value;end
             end
             path=terminalSafeSet.continuation(context,x);
-            road=localRoad(context,path.pose);value=max(value,context.inflation-min(road));
+            active.steps=path.steps;road=localRoad(context,path.pose);roadValue=context.inflation-min(road);
+            if roadValue>value,value=roadValue;active.kind="road";end
             if ~context.hasTarget || context.encounterEnded,return;end
             q=localTarget(context,node,path.time);
             out=find(vecnorm(path.pose(1:2,:)-q(1:2,:))>context.range,1);
             if ~isempty(out) && path.time(out)>path.speed/context.deceleration,out=[];end
             last=size(q,2);if ~isempty(out),last=out-1;end
-            gap=Inf;
+            gap=Inf;gapIndex=1;kind="collision";
             for k=1:last
-                gap=min(gap,localSignedRectangle(path.pose(:,k),context.shape,q(:,k)));
+                candidate=localSignedRectangle(path.pose(:,k),context.shape,q(:,k));
+                if candidate<gap,gap=candidate;gapIndex=k;end
             end
             if isempty(out)
                 parkedTarget=localTarget(context,node,path.speed/context.deceleration);
-                gap=min(gap,localSignedParked(context,path.pose(:,end),parkedTarget));
+                candidate=localSignedParked(context,path.pose(:,end),parkedTarget);
+                if candidate<gap,gap=candidate;kind="parked";end
             end
-            value=max(value,context.required-gap);
+            if context.required-gap>value
+                value=context.required-gap;active.kind=kind;active.index=gapIndex;
+            end
         end
 
         function [distance,witness,track] = parkedClearance(context,pose,q)

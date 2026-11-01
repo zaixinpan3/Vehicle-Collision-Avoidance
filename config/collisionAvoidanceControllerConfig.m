@@ -4,6 +4,14 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
 % change the interpretation of a controller run.
     if nargin<1,userCfg=[];end
     cfg=localDefaults();
+    % Nonlinear shooting is the operational experiment path. The explicit
+    % RTI comparator retains its historical soft wall-clock budget.
+    if isstruct(userCfg) && isscalar(userCfg) && isfield(userCfg,'solver') ...
+            && isstruct(userCfg.solver) && isscalar(userCfg.solver) && isfield(userCfg.solver,'method') ...
+            && (ischar(userCfg.solver.method) || isstring(userCfg.solver.method)) ...
+            && isequal(string(userCfg.solver.method),"rti")
+        cfg.solver.timeLimitSeconds=.1;
+    end
     if ~isempty(userCfg)
         if ~isstruct(userCfg) || ~isscalar(userCfg)
             localInvalid('The override must be a scalar structure.');
@@ -147,14 +155,15 @@ function cfg=localDefaults()
         'speedGain',.5,'brakingRatioLimit',.35);
     % PCBF priority and reference refinement share the remaining call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
-    % constraintTolerance and optimalityTolerance are the conic solver's
-    % feasibility and gap tolerances; feasibilityTolerance is also used for
+    % constraintTolerance and optimalityTolerance govern NLP feasibility and
+    % local optimality, or the explicit conic comparator's feasibility/gap.
+    % feasibilityTolerance is also used for
     % diagnostic interpretation and limits numerical input-bound projection.
     % reducedTolerance is the precision
     % for an AlmostSolved result. Budget includes controller preprocessing;
     % the reserve leaves time for output assembly. Native
     % solves also count their construction time against the remaining budget.
-    cfg.solver=struct('method',"rti",'maxIterations',40,'timeLimitSeconds',.1,'completionReserveSeconds',.002, ...
+    cfg.solver=struct('method',"nonlinear",'maxIterations',40,'timeLimitSeconds',1000,'completionReserveSeconds',.002, ...
         'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
         'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
         'reducedTolerance',1e-3);
