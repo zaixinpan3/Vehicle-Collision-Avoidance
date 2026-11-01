@@ -86,12 +86,16 @@ nor sampled replay closes those gaps.
 
 ## Figures and submission fields
 
-`figures/` is not tracked. Compilation uses
-`driving_environment_curved_v08.pdf`, `ego_obstacle_dynamics_v02.pdf`,
-`system_architecture_v11.pdf`, `yolo_lidar_projection_v01.png`,
+The generated figure outputs are not tracked. Compilation uses
+`ego_obstacle_dynamics_v02.pdf`, `system_architecture_v12.pdf`,
+`yolo_lidar_projection_v01.png`,
 `obstacle_rectangle_fit_topdown_v01.png` and `closed_loop_results_v03.pdf`.
 The generated manuscript PDF and these figure dependencies are excluded
 from the source commit.
+
+The current system architecture source is
+`figures/system_architecture_v12.tex`. Compile it with `pdflatex` in the
+`figures/` directory before building the manuscript when its PDF is absent.
 
 Before submission, complete the author, affiliation, funding,
 competing-interest, contribution and repository-release declarations.

@@ -264,27 +264,43 @@ numerical evaluation, and Sections~\ref{sec:discussion}
 and~\ref{sec:conclusion} discuss implementation limitations and conclude
 the paper.
 
-\section{Problem, Models and System}
+\section{System Overview}
 \label{sec:overview}
 
-\begin{figure}[!t]
+The collision-avoidance system consists of perception, state estimation,
+and predictive control, as shown in Fig.~\ref{fig:architecture}. The
+perception stage uses camera and LiDAR data to obtain the relative
+position of a surrounding vehicle. The estimator combines this position
+with GNSS position, body-frame acceleration, and yaw-rate measurements
+to estimate the motion of the ego vehicle and one target vehicle. It also
+provides error enclosures for use in the controller.
+
+The controller uses the estimated states, their enclosures, and a
+reference path to coordinate steering and longitudinal actuation. During
+an encounter, it gives priority to collision avoidance while pursuing
+nominal driving objectives through a control Lyapunov function. The input
+held by the controller is supplied to the ego-vehicle estimator, which
+uses the vehicle model to infer lateral velocity. The camera--LiDAR
+perception pipeline has been evaluated offline; the closed-loop
+experiments in Section~\ref{sec:results} use synthetic relative-position
+measurements.
+
+\begin{figure*}[!t]
     \centering
-    \includegraphics[width=0.94\columnwidth]
-        {driving_environment_curved_v08.pdf}
-    \caption{The driving environment considered. The road-edge lines
-    separate the travel lanes from the curb-side emergency lanes, each
-    wide enough for a vehicle, and the road centerline lies midway
-    between the curbs. The ego vehicle follows its nominal path while
-    an obstacle vehicle cuts into its lane from the adjacent lane.}
-    \label{fig:driving_environment}
-\end{figure}
+    \includegraphics[width=0.96\textwidth]{system_architecture_v12.pdf}
+    \caption{Overall architecture of the collision-avoidance system.
+    The estimator supplies ego and target estimates to the predictive
+    controller, and the controller returns its held input to the ego
+    observer. The perception pipeline is evaluated offline; the
+    closed-loop experiments use synthetic target-position measurements.}
+    \label{fig:architecture}
+\end{figure*}
 
 \subsection{The Task}
 
 The nominal driving task is cruising within a designated lane at a
 prescribed speed on a road bounded by curbs. A reference path specifies
-the route geometry, which is straight or of constant curvature
-(Fig.~\ref{fig:driving_environment}). Other vehicles
+the route geometry, which is straight or of constant curvature. Other vehicles
 travel within or enter the sensed environment. The vehicle carries a
 global navigation satellite system (GNSS) receiver that measures its
 position, an inertial unit that measures body-frame
@@ -415,47 +431,8 @@ that model, and the controller forecasts it in the same model with one
 addition: braking ends at rest and never reverses the vehicle
 (Section~\ref{subsec:predictionModel}).
 
-\begin{figure*}[!t]
-    \centering
-    \includegraphics[width=0.96\textwidth]{system_architecture_v11.pdf}
-    \caption{Information flow. Camera and LiDAR data are processed
-    jointly for obstacle detection and relative localization, and the
-    LiDAR data also feed a road-curb branch. The estimator combines the
-    relative position with the GNSS, accelerometer and gyroscope signals
-    and produces the ego and obstacle estimates with their error
-    enclosures. The obstacle estimate defines the collision constraints
-    and the terminal set; the nominal path, taken from a route map,
-    defines the control Lyapunov function of the two-stage predictive
-    controller. The controller returns the input it holds to the
-    estimator (not drawn). The dashed road-curb branch is not used in
-    the experiments: the road edges of Section~\ref{sec:results} are
-    declared scenario data, and the relative-position measurement of
-    those trials is synthetic.}
-    \label{fig:architecture}
-\end{figure*}
-
-\subsection{Architecture}
+\subsection{Relative-Position Perception}
 \label{subsec:architecture}
-
-Fig.~\ref{fig:architecture} shows how the parts are connected. A
-perception stage turns camera and LiDAR data into the relative position
-of the obstacle vehicle. The estimator fuses that measurement with the
-GNSS, accelerometer and gyroscope signals into the motion states of the
-ego and of one obstacle, and attaches to each estimate an error
-enclosure that is valid for the continuous-time observer under declared
-sensor, model and operating-domain bounds. The controller runs at 20\,Hz
-on these estimates. At every sample it linearizes the vehicle model
-along one nonlinear rollout, builds the collision constraints from the
-obstacle estimate and the CLF from the path and the prescribed speed,
-solves two convex programs in strict priority order, rolls their
-solution out through the nonlinear model, and issues the first steering
-and force-ratio command of that rollout. Three signals close the design
-between the two parts. The controller passes the input it holds back to
-the estimator, which inverts the tire model under it. The estimator's
-operating domain is derived from the controller's state limits, and the
-controller enforces the estimator's sideslip cone. Saturation may reduce
-measurement information; the observer then reports a wider interval.
-The estimator's enclosure tightens the controller's constraints.
 
 The relative-position measurement is produced as follows. A YOLO
 detector \cite{RedmonDivvalaGirshickFarhadi2016} returns a bounding box
