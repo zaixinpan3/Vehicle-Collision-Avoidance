@@ -71,10 +71,13 @@ explicit whole-hold enclosure is supplied. Zero signed clearance permits
 contact and excludes interior overlap; strictly positive clearance is a
 stronger statement. No fixed 0.2 m design buffer is introduced. Roads remain
 a heuristic planner input, not a constraint in the default optimization.
-The terminal set represents an available continuation, not the desired normal
-driving state. The simplified braking model is retained as a declared
-terminal contract; its compatibility with the transition used in a shift is
-a theorem premise, not an automatic consequence of checking a stopping path.
+The theoretical terminal assumption is the existence of an admissible,
+zero-deficit, shift-closed terminal family and causal controller for the same
+joint dynamics and constraints. The core proof does not construct this pair.
+The simplified braking model in Section 5 is an implementation candidate;
+its design and validation are separate from the abstract assumption (U4).
+Terminal membership represents an available continuation, not a normal
+driving objective.
 
 ## Contents
 
@@ -1081,6 +1084,14 @@ soft. The runtime also does not certify the exact nonlinear dissipation row.
 <a id="terminal-set"></a>
 ## 5. Joint terminal set and braking continuation
 
+This section describes the implementation's simplified braking candidate and
+the conditions needed to instantiate a terminal certificate with it. The
+core theoretical algorithm does not prescribe braking, parking, a curvature
+law or a numerical terminal-set construction. It assumes a terminal pair
+with the properties in (U4). Verifying this particular candidate against
+those properties is implementation validation, not an unfinished step of
+the conditional recursive-feasibility proof.
+
 ### State and task boundary
 
 The terminal condition belongs to the **joint encounter**, not to an ego speed
@@ -1900,28 +1911,36 @@ $$
  H(R,\pi)\Longrightarrow H(R',\pi).                            \tag{U3}
 $$
 
-A downward-closed terminal family $\mathfrak B$ supplies a **common causal**
-continuation, not a different unknowable input for every possible true state.
-For every admitted $R_f\in\mathfrak B$, require a policy $\pi_f$, zero-deficit
-witnesses and a successor $R_f^+\in\mathfrak B$ satisfying
+**Abstract terminal-pair assumption.** There exists a nonempty,
+downward-closed terminal family $\mathfrak B$ of nonempty joint information
+sets, with an admissible causal terminal controller. For every
+$R_f\in\mathfrak B$, this controller supplies a **common causal** policy
+$\pi_f$, zero-deficit witnesses and a successor $R_f^+\in\mathfrak B$
+satisfying
 
 $$
  H(R_f,\pi_f),\quad C(R_f,\pi_f;w_f)=0,\quad
  \mathcal T(R_f,\pi_f)\subseteq R_f^+,\quad C_N(R_f^+;w_f^+)=0.  \tag{U4}
 $$
 
-The previously accepted simplified braking/encounter continuation in Section 5
-remains the proposed terminal contract. Its entry data and elapsed progress
-are retained when the continuation is shifted. Checking a nominal stopping
-path alone does not establish (U4) for uncertain states. In particular, a
-simplified braking transition cannot be appended to a problem that permits
-only an incompatible Fiala transition. Either its realization under the
-problem's transition must be justified, or the declared terminal mode must
-be included consistently in that transition and policy class. This is an
-explicit compatibility premise; this revision does not silently replace the
-simplified model or claim to have proved its physical realization. Actual
-terminal takeover or ego rest remains an experiment failure, not an event
-needed for the ordinary driving objective.
+The symbols $\mathcal T$, $H$ and $C$ in (U4) are exactly those used in the
+prediction problem. Thus the assumption includes the same uncertainty,
+geometry and admissibility requirements, including common separating
+witnesses when (G2) is used. The policy cannot select an input from an
+unknown true state; its information and memory follow the same causal rules
+as the predicted policies. Restricting a certified set retains the policy
+and witnesses, and terminal appending retains the required memory.
+
+Existence with these properties is a premise of the core theorem, not a
+construction that the theorem promises to deliver. No particular braking
+model, stopping distance, terminal shape or terminal-mode switch is required
+by the proof. Section 5 is one concrete implementation candidate. Whether
+that candidate realizes (U4), including its transition and geometric
+witnesses, is a separate implementation-validation question. A pointwise
+collision-free braking family is not automatically the abstract
+$\mathfrak B$ when the optimization requires a common separating plane.
+An unverified candidate does not invalidate the conditional theorem; it
+does not establish that this implementation satisfies the theorem's premise.
 
 ### The theoretical nonlinear PCBF problem and control law
 
@@ -1975,8 +1994,9 @@ redefine this predictive barrier function.
 ### Theorem U: recursive feasibility and zero-deficit invariance
 
 Assume initial feasibility, true-state containment, sound joint images,
-conditioning (U2), unchanged encounter/model contracts, terminal closure
-(U4), and a policy/set/certificate representation closed under shifting.
+conditioning (U2), unchanged encounter/model contracts, existence of the
+abstract terminal pair (U4), and a policy/set/certificate representation
+closed under shifting.
 The controller issues the first command of any attained minimizer of (U6).
 There is no assumption on a secondary objective or secondary solver. Then
 

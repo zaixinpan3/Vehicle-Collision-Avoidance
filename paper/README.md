@@ -44,6 +44,12 @@ it does not forecast future observer convergence. A predicted policy that uses
 future observations requires the optional joint observer/measurement lift.
 Both constructions use the same inclusion and shift argument. Initial
 feasibility, sound nonlinear images and terminal closure are explicit premises.
+In particular, the core theorem assumes that a nonempty terminal information
+family and a causal controller exist with zero safety deficit, admissible
+inputs and successors in that same family under the prediction dynamics.
+It does not derive a concrete terminal pair. The simplified braking design
+and verification of that candidate belong to implementation; they are not
+additional proof obligations inside the conditional theorem.
 
 Tezuka and Nakamura (2020) and Quan et al. (2025) motivate error compensation
 and containing-set interfaces. Their hypotheses are distinguished from this

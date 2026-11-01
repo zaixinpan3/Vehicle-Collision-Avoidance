@@ -1755,8 +1755,14 @@ the saturated branch and widens when that branch loses information.
 The local cruise certificate may retain a conservative nonsaturated
 neighborhood without imposing it on the entire avoidance horizon.
 
-\subsection{Terminal Set}
+\subsection{Terminal-Set Implementation Candidate}
 \label{subsec:terminal}
+
+This subsection describes the concrete terminal construction used in the
+reported implementation. The core theory assumes the existence of a
+terminal family and controller with the properties stated in
+\eqref{eq:terminal_information}; it does not require the braking law or
+terminal-set shape below.
 
 The horizon ends where a simple continuation of both vehicles is known
 to be safe for the rest of the encounter. Past the endpoint
@@ -1814,12 +1820,29 @@ Section~\ref{subsec:predictionModel} follows the kinematic vehicle under
 the terminal law. No bound on the mismatch is computed.
 \end{assumption}
 
-This is a modeling assumption of the design, not a derived bound. It
-enters only the recursive-feasibility statements of
-Sections~\ref{subsec:recursive} and \ref{subsec:robust}: every hold the
-controller appends to a plan is a hold of the prediction model whose
-endpoint is checked in the terminal set, so the implementation does not
-rely on it.
+This is a modeling assumption for this implementation candidate, not a
+derived mismatch bound. Applying the general safety theorem to this
+candidate requires the candidate to satisfy the abstract terminal
+condition \eqref{eq:terminal_information} under the same prediction
+dynamics and constraints. The general theorem itself assumes that a
+terminal pair with those properties exists and does not depend on
+Assumption~\ref{asm:mild}.
+
+For a braking realization with an absorbing stop and realized
+deceleration $a(t)\ge a_{\min}>0$, an initial speed
+$V(0)\le\overline V$ gives
+\begin{equation}
+    t_{\rm stop}\le\overline V/a_{\min},\qquad
+    s_{\rm stop}\le\overline V^2/(2a_{\min}).
+    \label{eq:terminal_stop_bound}
+\end{equation}
+These implementation bounds follow by integrating $\dot V\le-a_{\min}$
+to rest. To validate this candidate, its complete uncertain braking and
+parked continuations must satisfy \eqref{eq:terminal_information}.
+Pose uncertainty remains at rest; a disturbance capable of moving a
+parked vehicle needs a compatible parked invariant set. Every active
+branch must exit before the encounter is discarded. Nominal stopping
+bounds alone do not verify the abstract terminal condition.
 
 Let $\phi^j(\bm z)$, $j\geq0$, be the joint continuation at the nodes
 and mid-hold points after $t_M$, $t_e(\bm z)$ the first of these
@@ -2439,10 +2462,11 @@ restricted to the checked instants, and the theorem then certifies only
 those instants. No relative-degree-one assumption on the dynamic
 bicycle's position constraint is needed.
 
-\subsubsection{One common terminal continuation}
-Let $\mathcal B$ be a downward-closed family of nonempty information
-sets. Each $\mathcal J\in\mathcal B$ admits one common first terminal
-command $\bm u_f$ and a certified successor satisfying
+\subsubsection{Abstract terminal-pair assumption}
+Assume there exists a nonempty, downward-closed family $\mathcal B$ of
+nonempty information sets and an admissible causal terminal controller.
+For each $\mathcal J\in\mathcal B$, this controller supplies one common
+first terminal command $\bm u_f$ and a successor satisfying
 \begin{equation}
     \begin{gathered}
     H(\mathcal J,\bm u_f),\qquad C(\mathcal J,\bm u_f)=0,\\
@@ -2451,29 +2475,20 @@ command $\bm u_f$ and a certified successor satisfying
     \end{gathered}
     \label{eq:terminal_information}
 \end{equation}
-A family of common admissible braking continuations closed under taking
-tails supplies this property: the same continuation controls every
-subset, and its tail controls the successor. Individually feasible
-commands for different unknown true states do not suffice. Input memory
-preserves the first appended slew condition.
+Here $\mathcal T$, $H$ and $C$ are the same transition and constraints
+used by the predictive problem, including its uncertainty and collision
+certificate requirements. If common separating witnesses are required,
+their existence on the terminal continuation is included in this
+assumption. Individually feasible commands selected using an unknown
+true state do not suffice. Input and policy memory preserve the
+admissibility of the appended command and subsequent tails.
 
-Under the mild terminal model of Assumption~\ref{asm:mild}, a continuous
-absorbing stop and a realized deceleration $a(t)\ge a_{\min}>0$ give,
-for initial speed $V(0)\le\overline V$,
-\begin{equation}
-    t_{\rm stop}\le\overline V/a_{\min},\qquad
-    s_{\rm stop}\le\overline V^2/(2a_{\min}).
-    \label{eq:terminal_stop_bound}
-\end{equation}
-These follow by integrating $\dot V\le-a_{\min}$ to rest.
-The complete uncertain braking continuation and the parked rectangle
-family must satisfy \eqref{eq:terminal_information}. A delayed stop
-needs its own allowance. Pose uncertainty remains at rest; disturbances
-capable of moving the parked vehicle need a separate invariant parked
-set. No contraction of an unused yaw estimate is needed. Every active
-branch must exit before an encounter is discarded. The mild braking
-contract is a premise, not a maneuver-wide Fiala terminal certificate;
-the center-based numerical terminal rows are not substituted for it.
+This is an existence and closure assumption, not a requirement to
+construct a particular terminal pair in the core proof. The theorem
+does not prescribe braking, parking, constant curvature or a terminal
+shape. Their selection and verification for the implementation candidate
+in Section~\ref{subsec:terminal} are separate from the conditional
+theoretical result.
 
 \subsubsection{Predictive barrier value and the shift theorem}
 Fix $1\le N\le M$ at encounter initialization. Choose common held inputs
@@ -2505,7 +2520,7 @@ that witness.
 Assume sound current enclosures and images for an unchanged physical
 uncertainty contract, an initially feasible problem
 \eqref{eq:robust_image_certificate}, conditioning by
-\eqref{eq:information_set}, terminal closure
+\eqref{eq:information_set}, existence of the abstract terminal pair
 \eqref{eq:terminal_information}, and a plan/certificate class closed
 under shifting and terminal appending. Apply the first input of a
 feasible plan unchanged, with no secondary performance requirement.
