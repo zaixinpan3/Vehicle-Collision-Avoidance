@@ -288,6 +288,24 @@ the paper.
 \section{Estimator Design}
 \label{sec:estimator}
 
+The ego and target vehicle coordinate frames are shown in
+Fig.~\ref{fig:ego_obstacle_frames}.
+
+\begin{figure*}[!t]
+    \centering
+    \includegraphics[width=0.92\textwidth]
+        {ego_obstacle_dynamics_v02.pdf}
+    \caption{Ego and obstacle kinematics. The ego vehicle (blue) and the
+    obstacle vehicle (orange) travel on courses that may meet. The body
+    frames sit at the centers of mass, the yaw angles \(\psi_E\) and
+    \(\psi_C\) orient them relative to the inertial \(X_I\) axis, the
+    sideslip angles \(\beta_E\) and \(\beta_C\) separate the velocities
+    \(V_E\) and \(V_C\) from the body axes, and the course angles
+    \(\gamma_E\) and \(\gamma_C\) orient the velocities in the inertial
+    frame.}
+    \label{fig:ego_obstacle_frames}
+\end{figure*}
+
 Let $\bm p_E$ and $\bm v_E$ denote the ego vehicle's inertial
 position and velocity, $\psi_E$ its yaw, $\beta_E$ its sideslip, and
 $\gamma_E=\psi_E+\beta_E$ its course angle. The body-to-inertial rotation
@@ -1137,23 +1155,7 @@ The obstacle vehicle of this section is the target of the previous one.
 \subsection{Prediction Model}
 \label{subsec:predictionModel}
 
-\begin{figure*}[!t]
-    \centering
-    \includegraphics[width=0.92\textwidth]
-        {ego_obstacle_dynamics_v02.pdf}
-    \caption{Ego and obstacle kinematics. The ego vehicle (blue) and the
-    obstacle vehicle (orange) travel on courses that may meet. The body
-    frames sit at the centers of mass, the yaw angles \(\psi_E\) and
-    \(\psi_C\) orient them relative to the inertial \(X_I\) axis, the
-    sideslip angles \(\beta_E\) and \(\beta_C\) separate the velocities
-    \(V_E\) and \(V_C\) from the body axes, and the course angles
-    \(\gamma_E\) and \(\gamma_C\) orient the velocities in the inertial
-    frame.}
-    \label{fig:ego_obstacle_frames}
-\end{figure*}
-
-Fig.~\ref{fig:ego_obstacle_frames} fixes the notation. The ego vehicle
-has speed \(V_E\) and yaw \(\psi_E\), the obstacle speed \(V_C\) and yaw
+The ego vehicle has speed \(V_E\) and yaw \(\psi_E\), the obstacle speed \(V_C\) and yaw
 \(\psi_C\). One ego model serves the whole system, a dynamic bicycle
 with modified Fiala tires: the controller predicts with it, and the
 estimator inverts its lateral force balance to measure the lateral
