@@ -1,8 +1,8 @@
 # Citation audit: work in progress
 
-This is a partial audit of the 47 citation keys present when this review began; Petersen (1987) remains unavailable and is deferred at the user’s request. Source availability does not mean that every citation context or every bibliographic field has been verified. The manuscript and bibliography contained pre-existing uncommitted edits.
+This is a partial audit of the 47 citation keys present when this review began; Petersen (1987) was removed from the manuscript and bibliography at the user’s request. Source availability does not mean that every citation context or every bibliographic field has been verified. The manuscript and bibliography contained pre-existing uncommitted edits.
 
-The table records local PDF locations and the status of claim checking. Original PDFs were read in place. Bibliographic fields have been compared automatically with Zotero metadata where available; an independent full bibliographic verification remains pending. Seven previously missing PDFs were supplied in Zotero on November 1; Petersen (1987) remains unlocated.
+The table records local PDF locations and the status of claim checking. Original PDFs were read in place. Bibliographic fields have been compared automatically with Zotero metadata where available; an independent full bibliographic verification remains pending. Seven previously missing PDFs were supplied in Zotero on November 1; the unavailable Petersen (1987) reference was removed at the user’s request.
 
 | Citation key | Citation lines in current draft | Local source | Claim-check status |
 |---|---|---|---|
@@ -52,7 +52,7 @@ The table records local PDF locations and the status of claim checking. Original
 | `ZhaiEtAl2024` | 1588 | `/home/zai/Zotero/storage/KSKBCNF8/Zhai et al. - 2024 - Local Trajectory Planning for Obstacle Avoidance of Unmanned Tracked Vehicles Based on Artificial Po.pdf` | Abstract and methods: APF with directional static and motion-dependent dynamic obstacle effects and speed planning; manuscript presents an adaptation rather than an identical method. |
 | `ZhangLinigerBorrelli2021` | 1643 | Zotero attachment `DIPZYV4U` | Abstract and Sections III–IV: strong duality reformulates convex-set distance and signed distance constraints. The manuscript presents a specialized rectangle/vertex dual formula and must support that specialization with its own derivation. |
 | `ChenJankovicSantilloAmes2021` | 1919 | Zotero attachment `WNZ82776` | Abstract and Section II: a fixed backup policy and its flow define a control-invariant safe set. The manuscript terminal construction is related in principle; it is not identical to the cited paper’s backup-CBF implementation. |
-| `Petersen1987` | 2008 | Not located in searched local sources | Pending source and claim verification. |
+| `Petersen1987` | Removed | Not located in searched local sources | Citation and bibliography entry removed at the user’s request. The resulting LMI inequality still requires mathematical verification independently of the removed citation. |
 
 ## Corrections made
 
@@ -65,7 +65,7 @@ The table records local PDF locations and the status of claim checking. Original
 ## Remaining work
 
 - Finish the specifically flagged model and experiment details, and independently recheck repeated occurrences against the relevant full-text sections.
-- Locate Petersen (1987) and verify the stated lemma and its exact assumptions from the original source.
+- Independently verify the norm-bounded uncertainty inequality and its assumptions in the CLF synthesis; removing a citation does not establish the inequality.
 - Verify complete authors, venue, year, volume, issue, pages and DOI independently against the publication records or original PDFs. Zotero agreement alone is not independent verification.
 - Review all edits against the user’s preferred Introduction style and recompile after changes.
 - Correct the Boyd author roles and YALMIP proceedings-title metadata in Zotero only if a library edit is requested; the manuscript bibliography already has the correct information.
