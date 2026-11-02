@@ -330,7 +330,7 @@ velocity. Sections~\ref{sec:estimator} and~\ref{sec:control} develop the
 estimator and controller, respectively, including the assumptions and
 implementation approximations.
 
-\section{Estimator Design}
+\subsection{Estimator Design}
 \label{sec:estimator}
 
 The ego and target vehicle coordinate frames are shown in
@@ -397,7 +397,7 @@ bounds \(\normtwo{\bm n_p}\leq\bar n_p\),
 biases are compensated upstream; no observer carries a bias state.
 
 
-\subsection{Position--IMU Velocity Reconstruction}
+\subsubsection{Position--IMU Velocity Reconstruction}
 \label{subsec:positionVelocity}
 
 The GNSS receiver supplies position rather than a direct velocity
@@ -461,7 +461,7 @@ closed loop the relation is replaced by the tire model; the assumption
 is kept for the kinematic branch, which is what the open-loop trials of
 Section~\ref{subsec:estimatorResults} use.
 
-\subsection{Certified Course--Yaw Correspondence}
+\subsubsection{Certified Course--Yaw Correspondence}
 \label{subsec:courseCertificate}
 
 \begin{lemma}
@@ -521,7 +521,7 @@ it contributes the whole circle to the yaw enclosure. Neither case
 touches the body-velocity innovation, which is defined at standstill as
 well.
 
-\subsection{Ego Observers}
+\subsubsection{Ego Observers}
 \label{subsec:egoObserver}
 
 With $J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$,
@@ -643,7 +643,7 @@ This continuous comparison is conditional on its input bounds. The
 sampled realization separately accounts for held measurements and
 numerical defects; the comparison alone is not a sampled-system proof.
 
-\subsection{Model-Aided Lateral Velocity}
+\subsubsection{Model-Aided Lateral Velocity}
 \label{subsec:modelAided}
 
 Assumption~\ref{asm:singleTrack} is a statement about the true motion.
@@ -736,7 +736,7 @@ toward a kinematic bicycle below, where the inversion is only an
 approximate model of the vehicle; ten of the 84 estimated-state runs
 slow into that range, to 3.2\,m/s at the least.
 
-\subsection{Covariant Target Tracker}
+\subsubsection{Covariant Target Tracker}
 \label{subsec:targetTracker}
 
 The target model of \cite{SharmaAlaiRajamani2026}, constant scalar
@@ -908,7 +908,7 @@ per channel gives
 including $W_T=0$ by continuity of the homogeneous error dynamics.
 \end{IEEEproof}
 
-\subsection{Cascade ISS}
+\subsubsection{Cascade ISS}
 \label{subsec:cascade}
 
 Let $\bm\nu_\Phi$ be the model residual in the true last row,
@@ -1025,7 +1025,7 @@ innovation chart. The shared gyro couples the two core stages as well;
 claim every cross-stage cancellation. Orientation and position remain
 separately certified outputs.
 
-\subsection{Gain Selection}
+\subsubsection{Gain Selection}
 \label{subsec:gainSelection}
 
 With $T_{\rm dom}=\rho_{\max}/(V_E|_{\max}+V_C|_{\max})$, the scalar
@@ -1106,7 +1106,7 @@ variance bound $\gamma$ applies to the gains of
 solved with YALMIP \cite{Lofberg2004} and SeDuMi \cite{Sturm1999}.
 Neither simulated errors nor the sensor sample period enter the design.
 
-\subsection{Error Enclosure and the Published Sets}
+\subsubsection{Error Enclosure and the Published Sets}
 \label{subsec:enclosure}
 
 A controller that tightens its constraints needs an error radius at
@@ -1177,7 +1177,7 @@ not establish exponential stability of the sampled fourth-order
 Runge--Kutta (RK4) realization, nor a directed-rounding certificate for
 the computed bounds.
 
-\section{Control Design}
+\subsection{Control Design}
 \label{sec:control}
 
 The controller first minimizes collision-constraint relaxation, following
@@ -1197,7 +1197,7 @@ QP, and checks completed inputs by nonlinear sampled replay before
 returning them. These checks do not certify whole-hold reachable sets.
 The obstacle vehicle of this section is the target of the previous one.
 
-\subsection{Prediction Model}
+\subsubsection{Prediction Model}
 \label{subsec:predictionModel}
 
 The ego vehicle has speed \(V_E\) and yaw \(\psi_E\), the obstacle speed \(V_C\) and yaw
@@ -1442,7 +1442,7 @@ extended until it lies in the terminal set $\mathcal X_f$ of
 Section~\ref{subsec:terminal}. An explicit finite $M_{\max}$ may cap extension;
 the default has no such cap. Computation remains subject to the sample deadline.
 
-\subsection{The Anchor}
+\subsubsection{The Anchor}
 \label{subsec:initialization}
 
 Without a previous plan, a target invokes one analytic geometric planner;
@@ -1565,7 +1565,7 @@ trajectory locally and do not revisit that choice. A fresh anchor is a
 search initialization and nothing more: it can itself overlap the
 obstacle or leave the road.
 
-\subsection{Collision Constraints}
+\subsubsection{Collision Constraints}
 \label{subsec:geometry}
 
 Both vehicles are rectangles. Let
@@ -1676,7 +1676,7 @@ post-solve input substitution. Independent scenario replay checks its
 rectangle distances; the affine rows alone do not certify the nonlinear
 trajectory.
 
-\subsection{Road, Handling Envelope and Estimator Domain}
+\subsubsection{Road, Handling Envelope and Estimator Domain}
 \label{subsec:envelope}
 
 The ego drives on the road: at every predicted node after the current
@@ -1709,7 +1709,7 @@ the saturated branch and widens when that branch loses information.
 The local cruise certificate may retain a conservative nonsaturated
 neighborhood without imposing it on the entire avoidance horizon.
 
-\subsection{Terminal-Set Implementation Candidate}
+\subsubsection{Terminal-Set Implementation Candidate}
 \label{subsec:terminal}
 
 This subsection describes the concrete terminal construction used in the
@@ -1904,7 +1904,7 @@ road-side preference. Both charts describe the same terminal controller;
 no additional nonlinear iteration is introduced. The current direct-execution
 policy does not apply a post-solve terminal membership test to issued inputs.
 
-\subsection{Quadratic Control-Lyapunov Function and Cruise Law}
+\subsubsection{Quadratic Control-Lyapunov Function and Cruise Law}
 \label{subsec:clf}
 
 One obstacle-independent function measures the distance from cruise at
@@ -2025,7 +2025,7 @@ residual always admits a slack, as in Corollary~\ref{cor:softClf}; neither
 zero local slack nor feasibility proves nonlinear closed-loop recovery.
 The historical measurements of \eqref{eq:clf_row} are unchanged.
 
-\subsection{Use of the Estimation Enclosure}
+\subsubsection{Use of the Estimation Enclosure}
 \label{subsec:uncertainty}
 
 This subsection describes the numerical approximation used in the reported
@@ -2124,7 +2124,7 @@ minimized the next value greedily, the force ratio chattered, and a
 the decrease as a disturbance instead, and recovery of the true state
 can at best reach a neighborhood of the path set by that error.
 
-\subsection{Implementation Refinement and the Issued Plan}
+\subsubsection{Implementation Refinement and the Issued Plan}
 \label{subsec:program}
 
 The theoretical encounter controller in Section~\ref{subsec:robust}
@@ -2214,7 +2214,7 @@ It still lacks the set certificates of Section~\ref{subsec:robust}.
 A positive primary value remains a relaxation of modeled margins, not a
 statement of physical safety.
 
-\subsection{Recursive Feasibility With Exact Information}
+\subsubsection{Recursive Feasibility With Exact Information}
 \label{subsec:recursive}
 
 Call a plan \emph{accepted} when it is the rollout of its inputs through
@@ -2260,7 +2260,7 @@ these on appended holds of the declared model. The start of an encounter
 and re-acquisition after its absorbing exit remain initial-feasibility
 questions outside the proposition.
 
-\subsection{Unified Observer-to-Safety Formulation}
+\subsubsection{Unified Observer-to-Safety Formulation}
 \label{subsec:robust}
 
 The observer certifies the current physical state; the controller
@@ -2272,7 +2272,7 @@ physical, handling, actuator, slew and observer-domain constraints remain.
 The numerical controller and the historical road-constrained trials are
 approximations with the distinct scope stated below.
 
-\subsubsection{Current containment and physical prediction}
+\paragraph{Current containment and physical prediction}
 Let $\bm q$ contain the true ego and target states, uncertain physical
 parameters, previous applied input, and the clock and mode/encounter
 memory required for a Markov transition. Fixed parameters remain fixed
@@ -2304,7 +2304,7 @@ parameter histories and modes and are monotone under set inclusion.
 A certified outer successor must contain the exact image. An affine
 prediction without a proved remainder is not such a certificate.
 
-\subsubsection{Condition the retained successor}
+\paragraph{Condition the retained successor}
 Initialize $\mathcal I_0=\mathcal Q_0^{\rm phys}$ with known input and
 mode memory. Store the certified first successor $\mathcal R_{1|k}$
 when issuing the first input. At the next sample use
@@ -2353,7 +2353,7 @@ $\bm\epsilon_k=\bm x_k-\hat{\bm x}_k$, its innovation is
 These terms belong to one physical history; they are not independent
 copies of estimation and model error.
 
-\subsubsection{One signed margin over the input hold}
+\paragraph{One signed margin over the input hold}
 Let $g(\bm q)$ be a signed separation margin, including the design
 clearance $d_{\rm m}$, such that $g\ge0$ excludes interior rectangle
 overlap. A unit-normal separating-plane gap minus $d_{\rm m}$ is a
@@ -2416,7 +2416,7 @@ restricted to the checked instants, and the theorem then certifies only
 those instants. No relative-degree-one assumption on the dynamic
 bicycle's position constraint is needed.
 
-\subsubsection{Abstract terminal-pair assumption}
+\paragraph{Abstract terminal-pair assumption}
 Assume there exists a nonempty, downward-closed family $\mathcal B$ of
 nonempty information sets and an admissible causal terminal controller.
 For each $\mathcal J\in\mathcal B$, this controller supplies one common
@@ -2444,7 +2444,7 @@ shape. Their selection and verification for the implementation candidate
 in Section~\ref{subsec:terminal} are separate from the conditional
 theoretical result.
 
-\subsubsection{Predictive barrier value and the shift theorem}
+\paragraph{Predictive barrier value and the shift theorem}
 Fix $1\le N\le M$ at encounter initialization. Choose common held inputs
 $\bm u_{0:M-1}$, nonempty sets $\mathcal R_{0:M}$, compatible image and
 row certificates, and nonnegative prefix slacks such that
@@ -2551,7 +2551,7 @@ affine SQP--RTI subproblem do not establish feasibility or optimality
 for the exact nonlinear problem. The refinement weights and convergence
 of its solver therefore belong to implementation evaluation.
 
-\subsubsection{Online algorithm and optional future feedback}
+\paragraph{Online algorithm and optional future feedback}
 At each sample, obtain the current valid enclosure and condition the
 stored first successor. Propagate candidate physical sets, minimize
 \eqref{eq:joint_primary}, select any attained minimizer, and issue its
@@ -2586,7 +2586,7 @@ images, posterior inclusion, row certificates and terminal witnesses.
 The production RTI approximation does not yet implement this complete
 contract; its nonlinear robust-safety certification flag remains false.
 
-\subsection{Trust Scale from the Model Remainder}
+\subsubsection{Trust Scale from the Model Remainder}
 \label{subsec:trust}
 
 In the campaign-era trust heuristic, the scale $\sigma$ of the input
@@ -2624,7 +2624,7 @@ became infeasible. The update is not a check of the issued solution,
 and $\tau_e$ is an empirical consistency target, not a bound on the
 remainder or on the separation.
 
-\subsection{Scope of the Guarantees}
+\subsubsection{Scope of the Guarantees}
 \label{subsec:scope}
 
 The production optimizer uses affine sampled constraints and approximate
@@ -2648,7 +2648,7 @@ the whole-hold theorem is not a safety certificate for the current
 production optimizer or historical trials. Re-acquisition after an
 absorbing encounter exit requires a new initial-feasibility problem.
 
-\subsection{Computation}
+\subsubsection{Computation}
 \label{subsec:computation}
 
 The campaign-era assembly uses small dense blocks on the few variables each
