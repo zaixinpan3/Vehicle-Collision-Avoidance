@@ -1222,6 +1222,32 @@ sensor noise is not assumed to average down. Intersections only tighten
 radii about the original NRMM point estimates; they do not reset observer
 states or alter gains. Inconsistent intersections cannot establish containment.
 
+The controller additionally retains a joint parameter cover from the first
+valid observation of an encounter. `nrmmConstantMotionFamily` represents
+\(\theta=(V_0,A,\kappa,\chi_0)\), where the epoch is fixed and
+\(\kappa=\sin\beta/l_r\). It splits parameter boxes and discards a box only
+when an outer image of its displacement contradicts a bounded-noise historical
+displacement, or its speed, moving-branch acceleration, or curvature interval
+is disjoint from the published enclosure. Unresolved boxes remain. Refinement limits
+therefore affect tightness, not the real-arithmetic outer-cover property.
+The stopping extension retains ambiguous stopped prehistories instead of
+inventing a backward trajectory. A contradictory history produces an error;
+it is never replaced by zero uncertainty.
+
+The retained cover is not replaced by the product of its coordinate hulls.
+For example, a displacement can constrain \(V_0+A\Delta/2\) without tightly
+identifying either parameter alone. All future positions and footprint
+orientations use those same retained parameter combinations. Online planner
+and collision supports take the smaller of the existing valid bound and the
+history-conditioned bound, including the original sensor and heading radii.
+This does not change the NRMM point observer, supply unobserved future
+measurements, or establish a nonexpanding future position tube. Distinct
+constant parameters can still generate diverging physical paths. Future
+target-observer feedback is not implemented by this contraction; the
+ego-only joint-prediction scope stated below remains in force. Analytic
+interval images include roundoff padding but are not certified interval
+arithmetic.
+
 The scalar speed enclosure also uses chord length without requiring observable
 target heading. Let a complete displacement enclosure give
 \(d_-\le\|p_j-p_i\|\le d_+\), and let
@@ -1410,6 +1436,7 @@ condition in `controller/CONTROLLER_THEORY.md`.
 | Continuous gain/metric synthesis | `synthesizeNrmmObserverGains.m` |
 | Orientation-set propagation and intersections | `nrmmYawSet.m` |
 | Sensor-history intersections | `nrmmTargetHistory.m` |
+| Persistent constant-motion parameter cover | `nrmmConstantMotionFamily.m` |
 | Sampled comparison and numerical defects | `nrmmPositionErrorBound.m` |
 | Integration and published estimates | `onlineNrmmTrackingRuntime.m` |
 | Controller-facing state enclosures | `nrmmControllerErrorBounds.m` |

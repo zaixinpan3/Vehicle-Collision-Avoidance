@@ -164,6 +164,7 @@ classdef predictiveSafetyGeometry
             holdTime=[0,repmat(cfg.controller.sampleTime,1,count)];
             jointTarget=isfield(model.uncertainty,'jointPrediction') ...
                 && (cfg.controller.retainedTube || cfg.controller.jointAffinePrediction || cfg.controller.jointNonlinearPrediction);
+            jointTarget=jointTarget || (~isempty(model.uncertainty.target) && isfield(model.uncertainty.target,'family'));
             if jointTarget
                 holdTime=time;
             end
@@ -477,6 +478,14 @@ classdef predictiveSafetyGeometry
             uncertainty.target.speedRadius=max(abs(interval-target(4)));
             uncertainty.targetHistoryConditioning=struct('priorSpeedInterval',prior, ...
                 'speedInterval',interval,'egoHeading',heading,'time',time);
+            if isfield(uncertainty.target,'family')
+                family=uncertainty.target.family;
+                intervals=[interval,uncertainty.target.accelerationInterval, ...
+                    uncertainty.target.curvatureInterval, ...
+                    sum(target([3,6]))+[-1;1]*(uncertainty.target.courseRadius+heading(2))];
+                uncertainty.target.family=nrmmTargetHistory('constantFamily',history,time,intervals,family,heading);
+                uncertainty.target.familyYawRadius=heading(2);
+            end
         end
 
         function [q,uncertainty,memory,info] = reconcileTarget(q,prior,uncertainty,memory,time)
@@ -551,9 +560,21 @@ classdef predictiveSafetyGeometry
                 'curvatureRadius',max(abs(curvature-kappa)), ...
                 'sideslipRadius',max(abs(asin(curvature*q(7))-q(6))), ...
                 'speedInterval',speed,'accelerationInterval',acceleration,'curvatureInterval',curvature);
+            family=[];
+            if reused && isfield(memory,'family'),family=memory.family;end
+            if isfield(set,'measurementHistory') && isfield(set.measurementHistory,'time') ...
+                    && ~isempty(set.measurementHistory.time) && set.measurementHistory.constantCurvature
+                yawRadius=sum(abs(uncertainty.egoGenerator(3,:)));
+                intervals=[speed,acceleration,curvature, ...
+                    set.referenceEgoPose(3)+relativeCourse+[-1;1]*yawRadius];
+                family=nrmmTargetHistory('constantFamily',set.measurementHistory,time,intervals,family);
+                uncertainty.target.family=family;
+                uncertainty.target.familyTime=time;uncertainty.target.familyYawRadius=yawRadius;
+            end
             memory=struct('time',time,'speedInterval',speed, ...
                 'accelerationInterval',acceleration,'curvatureInterval',curvature, ...
                 'relativeCourseInterval',relativeCourse);
+            if ~isempty(family),memory.family=family;end
             info.available=true;info.reason="observerEnclosureContinuation";
             info.nominal=q;info.parameterIntersection=reused;
         end
@@ -602,6 +623,17 @@ classdef predictiveSafetyGeometry
                 +(curvature+errorSet.curvatureRadius).*arcError);
             tube.yawRadius=min(pi,tube.courseRadius+errorSet.sideslipRadius);
             tube.speedRadius=errorSet.speedRadius+errorSet.accelerationRadius*abs(time);
+            if isfield(errorSet,'family')
+                for k=1:numel(time)
+                    image=nrmmConstantMotionFamily('image',errorSet.family,errorSet.familyTime, ...
+                        errorSet.familyTime+time(k),errorSet.familyYawRadius);
+                    nominal=predictiveSafetyGeometry.predictTarget(q(:,min(k,size(q,2))),time(k));
+                    displacement=nominal(1:2)-q(1:2,min(k,size(q,2)));
+                    extent=max(abs(image.lower-displacement),abs(image.upper-displacement));
+                    tube.positionRadius(k)=min(tube.positionRadius(k), ...
+                        errorSet.positionRadius+max(vecnorm(extent)));
+                end
+            end
         end
 
         function support = targetPositionSupport(q,errorSet,time,normal)
@@ -656,6 +688,21 @@ classdef predictiveSafetyGeometry
                 vertexUpper=max(vertexUpper,norm(vertices(:,k))*hi);
             end
             support=normal.'*q(1:2)+magnitude*(errorSet.positionRadius+max(displacement+vertexUpper));
+            if isfield(errorSet,'family')
+                image=nrmmConstantMotionFamily('image',errorSet.family,errorSet.familyTime, ...
+                    errorSet.familyTime+time,errorSet.familyYawRadius);
+                position=sum(max(normal.*image.lower,normal.*image.upper),1);
+                yawLow=image.courseLower-asin(max(-1,min(1,q(7)*image.curvatureUpper)));
+                yawHigh=image.courseUpper-asin(max(-1,min(1,q(7)*image.curvatureLower)));
+                footprint=-Inf(size(position));
+                for k=1:4
+                    offset=atan2(vertices(2,k),vertices(1,k))-angle;
+                    [~,hi]=localCosRange(yawLow+offset,yawHigh+offset);
+                    footprint=max(footprint,magnitude*norm(vertices(:,k))*hi);
+                end
+                conditioned=normal.'*q(1:2)+magnitude*errorSet.positionRadius+max(position+footprint);
+                support=min(support,conditioned);
+            end
             support=support+256*eps(max(1,abs(support)));
         end
 

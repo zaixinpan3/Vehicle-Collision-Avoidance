@@ -164,6 +164,9 @@ function [command,predictedInput,prediction,controllerState] = ...
     if ~cfg.controller.retainedTube && ~isempty(cruisePosterior) && ~isempty(q)
         model.uncertainty=predictiveSafetyGeometry.conditionTargetHistory( ...
             model.uncertainty,cruisePosterior.proposedOuter(1:6),model.stateTime,model.target);
+        if ~isempty(model.uncertainty.target) && isfield(model.uncertainty.target,'family')
+            targetPredictionMemory.family=model.uncertainty.target.family;
+        end
     end
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
     if ~isempty(solution) && isfield(solution,'terminalControlRequired') && solution.terminalControlRequired

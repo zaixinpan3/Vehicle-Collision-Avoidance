@@ -703,7 +703,7 @@ function [problem,model]=localFormulate(anchor,model)
     end
     robustRelaxation=any(model.uncertainty.egoGenerator(:));
     if ~isempty(model.uncertainty.target)
-        robustRelaxation=robustRelaxation || any(structfun(@(value)any(value(:)>0),model.uncertainty.target));
+        robustRelaxation=robustRelaxation || any(structfun(@(value)isnumeric(value) && any(value(:)>0),model.uncertainty.target));
     end
     % Nominal and observer-tightened collisions share the stage slack. A
     % positive optimum is an allowed safety deficit, not an avoidance claim.
@@ -777,7 +777,8 @@ function [problem,model]=localFormulate(anchor,model)
     % A new future measurement changes the estimate, not the physical target
     % family. Without a target-relative policy retain its entire elapsed-time
     % spread instead of pretending each future observation resets that spread.
-    if ~isempty(jointTube) || (isfield(model,'retainedProposal') && model.retainedProposal)
+    if ~isempty(jointTube) || (isfield(model,'retainedProposal') && model.retainedProposal) ...
+            || (~isempty(model.uncertainty.target) && isfield(model.uncertainty.target,'family'))
         holdStarts=zeros(size(times));
     end
     model.recordTimes=times;

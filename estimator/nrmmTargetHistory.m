@@ -51,6 +51,8 @@ function value = nrmmTargetHistory(action, varargin)
             value = localEnclose(varargin{:});
         case "contractMotion"
             value = localContractMotion(varargin{:});
+        case "constantFamily"
+            value = localConstantFamily(varargin{:});
         case "speed"
             value = localSpeedInterval(varargin{:});
         case "sensor"
@@ -100,6 +102,34 @@ function value = nrmmTargetHistory(action, varargin)
         otherwise
             error("nrmmTargetHistory:invalidAction","Unknown history action.");
     end
+end
+
+function family=localConstantFamily(history,time,intervals,family,heading)
+    if nargin<4,family=[];end
+    count=numel(history.time);
+    if nargin>=5 && numel(history.records)==count && count>0
+        last=history.records(end);center=last.heading ...
+            +atan2(sin(heading(1)-last.heading),cos(heading(1)-last.heading));
+        % Either heading bound suffices; use the tighter valid posterior.
+        if heading(2)<last.headingRadius
+            history.records(end).heading=center;history.records(end).headingRadius=heading(2);
+        end
+    end
+    times=[];centers=zeros(2,0);radii=zeros(2,0);
+    if count>=2 && history.constantCurvature && abs(history.time(end)-time)<1e-9
+        selected=unique(round(linspace(1,count-1,min(16,count-1))));
+        correlated=isfinite(history.yawAccelerationMaximum) && numel(history.records)==count;
+        if correlated,transport=localTransport(history);end
+        for j=1:numel(selected)
+            index=selected(j);times(j)=history.time(index); %#ok<AGROW>
+            centers(:,j)=history.position(:,end)-history.position(:,index); %#ok<AGROW>
+            radii(:,j)=history.radius(:,end)+history.radius(:,index); %#ok<AGROW>
+            if correlated
+                [centers(:,j),radii(:,j)]=localCombination(history,transport,[index,count],[-1,1]);
+            end
+        end
+    end
+    family=nrmmConstantMotionFamily('condition',family,time,intervals,times,centers,radii);
 end
 
 function interval=localSpeedInterval(history,time,tangentialAccelerationMaximum,heading)

@@ -7,6 +7,35 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function conditionedFamilySupportsContainMovingAndStoppedTargets(testCase)
+            q=[3;-2;.4;8;-1;.02;1.6;2.4;.95;.2;-.1];
+            kappa=sin(q(6))/q(7);course=q(3)+q(6);
+            intervals=[7,-3,kappa-.025,course-.15;9,1,kappa+.025,course+.15];
+            family=nrmmConstantMotionFamily('condition',[],0,intervals,[],zeros(2,0),zeros(2,0));
+            uncertainty=struct('positionRadius',.04,'courseRadius',.15,'speedRadius',1, ...
+                'accelerationRadius',2,'curvatureRadius',.025,'sideslipRadius',.05, ...
+                'speedInterval',intervals(:,1),'accelerationInterval',intervals(:,2), ...
+                'curvatureInterval',intervals(:,3),'family',family,'familyTime',0,'familyYawRadius',0);
+            stream=RandStream('mt19937ar',Seed=35);
+            for time=[0,.1,2,5]
+                data=predictiveSafetyGeometry.targetSupportData(q,uncertainty,time);
+                nominal=predictiveSafetyGeometry.predictTarget(q,time);
+                for angle=linspace(-pi,pi,9)
+                    n=1.7*[cos(angle);sin(angle)];
+                    bound=predictiveSafetyGeometry.targetDirectionalSupport(q,uncertainty,time,n);
+                    positionBound=predictiveSafetyGeometry.targetSupportFromData(data,1,n.');
+                    for sample=1:20
+                        parameter=intervals(1,:).'+diff(intervals,1,1).'.*rand(stream,4,1);
+                        trial=q;trial(4:5)=parameter(1:2);trial(6)=asin(q(7)*parameter(3));
+                        trial(3)=parameter(4)-trial(6);
+                        actual=predictiveSafetyGeometry.targetDirectionalSupport(trial,[],time,n);
+                        pose=predictiveSafetyGeometry.predictTarget(trial,time);
+                        testCase.verifyLessThanOrEqual(actual,bound+1e-11);
+                        testCase.verifyLessThanOrEqual(n.'*(pose(1:2)-nominal(1:2)),positionBound+1e-11);
+                    end
+                end
+            end
+        end
         function directionalTargetSupportContainsCurvedAndStoppedParameterFamilies(testCase)
             q=[3;-2;.4;8;-1;.02;1.6;2.4;.95;.2;-.1];
             error=struct('positionRadius',.04,'courseRadius',.2,'speedRadius',1, ...
