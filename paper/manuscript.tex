@@ -266,16 +266,17 @@ the paper.
 \section{System Design}
 \label{sec:systemDesign}
 
-The proposed system is not restricted to a particular road layout. For
-concreteness, consider the junction in Fig.~\ref{fig:driving_environment}.
+Although the proposed system is not restricted to a particular road
+scenario, we consider the junction scenario illustrated in
+Fig.~\ref{fig:driving_environment}.
 The ego vehicle initially cruises at a constant speed along a prescribed
 path. A target vehicle emerges from the side road and is detected upon
 entering the ego vehicle's perception range as it attempts to merge into
 the ego lane. In the encounter considered here, maintaining
 the prescribed path and cruising speed would lead to a collision with the
-target. The collision-avoidance system must therefore coordinate steering
-and longitudinal actuation to temporarily depart from this cruising
-condition, avoid the target, and then return to the prescribed path and
+target. The collision-avoidance system must therefore enable the ego vehicle
+to temporarily depart from this cruising condition, avoid the target,
+and then return to the prescribed path and
 cruising speed once the threat has passed.
 
 \begin{figure}[!b]
@@ -290,9 +291,6 @@ cruising speed once the threat has passed.
     \label{fig:driving_environment}
 \end{figure}
 
-The system consists of perception, estimation, and control, as shown in
-Fig.~\ref{fig:architecture}.
-
 \begin{figure*}[!t]
     \centering
     \includegraphics[width=0.96\textwidth]{system_architecture_v12.pdf}
@@ -305,21 +303,20 @@ Fig.~\ref{fig:architecture}.
 \end{figure*}
 
 
-The perception module uses a camera and LiDAR to measure the position
-of one target vehicle relative to the ego vehicle. A camera-based
-detector identifies the vehicle, and the associated LiDAR points are
-used to fit a rectangle with known dimensions. The fitted rectangle
-center provides the relative-position measurement. The estimator
-combines this measurement with GNSS position, body-frame acceleration,
-and yaw rate to estimate the ego and target states. A position--IMU
+This section presents the design of a collision-avoidance system for this
+task, with the overall architecture shown in Fig.~\ref{fig:architecture}.
+The perception module provides position measurements of surrounding
+vehicles relative to the ego vehicle. The algorithms used to obtain
+these measurements depend on the sensing modality and are not the focus
+of this paper. Section~\ref{sec:results} briefly describes the perception
+implementation used in the simulation environment. The estimator
+combines the target vehicle's relative-position measurement with GNSS
+position, body-frame acceleration, and yaw rate to estimate the ego and target states. A position--IMU
 filter reconstructs inertial velocity, and a body-velocity observer and a
 parallel yaw observer estimate the ego motion. A nonlinear relative
 motion model accounts for the effect of that motion on target tracking.
 The estimator also provides error enclosures under the specified sensor,
-model, and operating-domain assumptions. The perception pipeline has
-been evaluated offline; its design is not the focus of this paper. The
-closed-loop experiments use synthetic relative-position measurements
-with declared error bounds.
+model, and operating-domain assumptions.
 
 The controller uses the state estimates, their error enclosures, and a
 nominal path and speed to coordinate steering and longitudinal actuation.
@@ -2777,6 +2774,14 @@ Section~\ref{subsec:egoObserver}; these trials predate the model-aided
 measurement and the position-only GNSS update. They were not repeated
 after those changes. The remaining sections evaluate
 the controller with exact states and with the estimator in the loop.
+
+The perception implementation is evaluated separately on simulated
+camera and LiDAR captures. A camera-based detector identifies the target
+vehicle, and the associated LiDAR points are fitted to a rectangle of
+known dimensions. The fitted center provides the target-position
+measurement relative to the ego vehicle. This pipeline is evaluated
+offline; the closed-loop experiments instead use synthetic
+relative-position measurements with declared error bounds.
 
 \subsection{Synthesized Estimator Design}
 \label{subsec:designResults}
