@@ -20,15 +20,15 @@ Please construct this connection mathematically, derive a sound joint uncertaint
 
 > If the nonlinear PCBF problem is feasible at one decision instant, a feasible continuation exists at the next instant and its optimal slack sum does not increase. Once that sum is zero, it remains zero throughout the encounter, under explicitly stated assumptions.
 
-This is entirely a question about nonlinear dynamics, nonlinear observation, causal nonlinear control, and set-valued information. Computational speed and numerical optimization methods are outside its scope. All definitions and assumptions needed to understand the request are stated below; any further assumption must be identified explicitly.
+This is entirely a question about nonlinear dynamics, nonlinear observation, causal nonlinear control, and set-valued information. Every model parameter, uncertainty bound, and observation period is symbolic. The requested conclusions must follow from explicitly stated mathematical assumptions. Any additional assumption must be identified and justified.
 
 ## 2. Scope and premises
 
 - There is one ego vehicle and one target during an encounter.
 - The target has constant tangential acceleration and constant sideslip during forward motion in that encounter. These values are uncertain, not exactly known. A stopping continuation is specified below.
 - GNSS measures **position only**. Body acceleration, yaw rate, and target relative position are also measured. There is no independent measured velocity or heading.
-- Sensor measurements arrive every $h_s=0.0125\,\mathrm{s}$. Control decisions occur every $h=4h_s=0.05\,\mathrm{s}$, with the input held between decisions. General commensurate periods are acceptable.
-- Relative-position detection is available whenever the target reference point is within a radius of $50\,\mathrm{m}$, with full angular coverage and no missed detections there. A different detection contract requires different assumptions.
+- Sensor measurements arrive with period $h_s>0$. Control decisions have period $h=Mh_s$, where $M\in\mathbb N_{>0}$, and the input is held between decisions. The clocks share an initial epoch. Any restrictions on $h_s$, $h$, or $M$ needed by the theorem must be derived or stated as assumptions.
+- Relative-position detection is available whenever $\|p_T-p_E\|\le R_{\mathrm{sen}}$, where $R_{\mathrm{sen}}>0$ is a symbolic sensing radius. Assume full angular coverage and no missed detections within that set.
 - The analysis concerns one encounter until an observed or robustly established perception exit. Reentry starts a new encounter. A nominal forecast of exit cannot remove constraints for admissible branches that remain nearby.
 - Collision safety is required at the declared discrete constraint instants. An intersample collision theorem is not requested.
 - Road constraints are outside this problem.
@@ -139,16 +139,18 @@ $$
 The gravity-compensated IMU measures body-frame acceleration at the ego center of mass:
 $a_E^B=\dot v_E+r_EJv_E$, where $v_E=(v_x,v_y)^\top$. At a control boundary, $u^-$ is the previously held input; the new command acts after sampling.
 
-The deterministic noise bounds are
+Let the measurement noise satisfy the symbolic deterministic bounds
 
-| Primitive | Bound |
-|---|---:|
-| GNSS position $\|n_{p,j}\|_2$ | $0.04\,\mathrm{m}$ |
-| Body acceleration $\|n_{a,j}\|_2$ | $0.03\,\mathrm{m/s^2}$ |
-| Yaw rate $|n_{r,j}|$ | $0.0015\,\mathrm{rad/s}$ |
-| Relative position $\|n_{\rho,j}\|_2$ | $0.04\,\mathrm{m}$ |
+$$
+\|n_{p,j}\|_2\le\bar n_p,\qquad
+\|n_{a,j}\|_2\le\bar n_a,\qquad
+|n_{r,j}|\le\bar n_r,\qquad
+\|n_{\rho,j}\|_2\le\bar n_\rho,
+$$
 
-These are not standard deviations. Allow all sequences obeying these bounds unless extra temporal structure is explicitly assumed. Within a sample, the same noise realization is used wherever that measurement enters observation or control. Likewise, the same physical parameter $\theta_E$ affects the vehicle and its resulting sensor readings.
+where $\bar n_p,\bar n_a,\bar n_r,\bar n_\rho$ are finite nonnegative parameters. More generally, the primitive noise vector may belong to a given compact joint set $\mathcal N$, retaining any known dependence between its components. All sequences allowed by the declared set are admissible unless additional temporal structure is assumed.
+
+Within a sample, the same noise realization is used wherever that measurement enters observation or control. Likewise, the same physical parameter $\theta_E$ affects the vehicle and its resulting sensor readings. The bounds are deterministic set-membership premises, not probabilistic confidence statements.
 
 ## 4. Observer dynamics and the ego-estimator interface
 
@@ -361,7 +363,7 @@ The normal is a continuous geometric witness, not a direction chosen from a fini
 
 Use the joint relative-pose set to bound (21). Independent worst-case ego and target position radii can discard useful shared-pose dependence. Require every command generated by the policy to satisfy the input constraints, together with any separately declared state or input-memory conditions.
 
-At zero slack, nonnegative gap excludes interior overlap but permits contact at equality. Strict positive clearance requires a strictness premise. Do not introduce an arbitrary physical buffer such as $0.2\,\mathrm{m}$.
+At zero slack, nonnegative gap excludes interior overlap but permits contact at equality. Strict positive clearance requires an explicit strictness premise; it does not follow from a nonnegative gap alone.
 
 ## 10. Required construction E: the PCBF recursive-feasibility theorem
 
@@ -401,7 +403,7 @@ The monotonic quantity is the slack **sum**, not each future slack individually.
 
 If exact global minimization is unnecessary for a weaker retained-feasible-plan theorem, state it separately using a feasible cost $J_{k+1}\le J_k-\xi_{0|k}$. Do not identify such a stored cost with the optimal value function.
 
-## 11. Requested answer and boundary cases
+## 11. Requested derivation and mathematical counterexamples
 
 Please provide:
 
@@ -414,7 +416,7 @@ Please provide:
 7. A step-by-step mathematical procedure for initialization, prediction, conditioning, and policy shifting.
 8. Any obstruction and the weakest additional assumption needed if the requested result cannot be established.
 
-Check at least these conceptual cases: two initially indistinguishable constant-speed target motions; an opposing target; a crossing target; target braking to rest; and insufficient ego control authority. In the two-world case, the first command is identical and later commands may differ only after the observation histories do. Growing absolute separation between worlds need not imply growing relative collision error.
+Use analytical examples or counterexamples to expose any necessary assumptions, particularly indistinguishable target motions, loss of observability at rest, and insufficient ego control authority. For two initially indistinguishable admissible motions, the first command must be identical and later commands may differ only after the observation histories do. Growing absolute separation between worlds need not imply growing relative collision error. Such examples should support the theorem or delineate its scope.
 
 Please do not replace the requested derivation with a covariance prediction, an unexplained future measurement reset, an assumed uniformly narrow tube, or a generic recommendation to use output-feedback MPC. The central task is to establish the missing **nonlinear target-observer and ego-feedback coupling**, then prove that its information updates preserve the PCBF shifted candidate.
 
