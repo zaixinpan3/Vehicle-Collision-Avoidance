@@ -289,12 +289,7 @@ this particular encounter geometry.
 \end{figure}
 
 The system consists of perception, estimation, and control, as shown in
-Fig.~\ref{fig:architecture}. The perception module provides a target
-relative-position measurement. The estimator combines that measurement
-with the ego-vehicle sensor signals and supplies state estimates and
-error enclosures to the controller. The controller uses these estimates
-to determine the vehicle inputs and returns the held input to the
-estimator. The three modules are described below.
+Fig.~\ref{fig:architecture}.
 
 \begin{figure*}[!t]
     \centering
@@ -308,40 +303,32 @@ estimator. The three modules are described below.
 \end{figure*}
 
 
-\subsection{Perception}
+The perception module uses a camera and LiDAR to measure the position
+of one target vehicle relative to the ego vehicle. A camera-based
+detector identifies the vehicle, and the associated LiDAR points are
+used to fit a rectangle with known dimensions. The fitted rectangle
+center provides the relative-position measurement. The estimator
+combines this measurement with GNSS position, body-frame acceleration,
+and yaw rate to estimate the ego and target states. A position--IMU
+filter reconstructs inertial velocity, and a body-velocity observer and a
+parallel yaw observer estimate the ego motion. A nonlinear relative
+motion model accounts for the effect of that motion on target tracking.
+The estimator also provides error enclosures under the specified sensor,
+model, and operating-domain assumptions. The perception pipeline has
+been evaluated offline; its design is not the focus of this paper. The
+closed-loop experiments use synthetic relative-position measurements
+with declared error bounds.
 
-The perception module uses a camera and LiDAR to obtain the position of
-one target vehicle relative to the ego vehicle. A camera-based detector
-identifies the vehicle, and the associated LiDAR points are used to fit a
-rectangle with known dimensions. The fitted rectangle center provides the
-relative-position measurement. This pipeline has been evaluated offline;
-its design is not the focus of this paper. The closed-loop experiments
-use synthetic relative-position measurements with declared error bounds.
-
-\subsection{Estimation}
-
-The estimator uses GNSS position, body-frame acceleration, yaw rate, and
-target relative position to estimate the ego and target states. A
-position--IMU filter reconstructs inertial velocity, while a body-velocity
-observer and a parallel yaw observer estimate the ego motion. The target
-tracker uses a nonlinear relative motion model that accounts for the ego
-vehicle's motion. The estimator also provides error enclosures under the
-specified sensor, model, and operating-domain assumptions. The held
-controller input and the shared vehicle model assist the lateral-velocity
-estimate. Section~\ref{sec:estimator} develops the estimator and its
-conditional bounds.
-
-\subsection{Control}
-
-The controller receives the state estimates, their error enclosures, and
-a nominal path and speed. It predicts the motion of the ego and target
-vehicles and coordinates steering and longitudinal actuation. During an
-encounter, the primary optimization minimizes collision-constraint
-relaxation; a secondary optimization refines performance under the
+The controller uses the state estimates, their error enclosures, and a
+nominal path and speed to coordinate steering and longitudinal actuation.
+During an encounter, its primary optimization minimizes collision-constraint
+relaxation, and a secondary optimization refines performance under the
 attained safety budget. A control Lyapunov function represents the
-nominal driving objectives. The mathematical safety formulation and the
-approximations used by the numerical implementation are presented in
-Section~\ref{sec:control}.
+nominal driving objectives. The controller also returns its held input to
+the estimator, which uses the shared vehicle model to infer lateral
+velocity. Sections~\ref{sec:estimator} and~\ref{sec:control} develop the
+estimator and controller, respectively, including the assumptions and
+implementation approximations.
 
 \section{Estimator Design}
 \label{sec:estimator}
