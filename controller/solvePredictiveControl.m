@@ -753,7 +753,7 @@ function [problem,model]=localFormulate(anchor,model)
     physicalInputLower=repmat(inputLower,1,count);physicalInputUpper=repmat(inputUpper,1,count);
     maximumTightening=0;safetyNormals=zeros(2,2*count+1);
     [durations,times]=localTimeGrid(model,count);
-    jointTube=[];enclosureDomain=[];
+    jointTube=[];enclosureDomain=[];preparedTrust=[];preparedTrustRatio=[];
     if isfield(model,'jointPredictionTube'),model=rmfield(model,'jointPredictionTube');end
     jointRequested=cfg.controller.jointAffinePrediction || cfg.controller.jointNonlinearPrediction;
     if jointRequested && isfield(model.uncertainty,'jointPrediction')
@@ -763,8 +763,28 @@ function [problem,model]=localFormulate(anchor,model)
             options=struct('nonlinearEnclosure',true,'decisionLower',enclosureDomain.lower, ...
                 'decisionUpper',enclosureDomain.upper,'stages',stages);
         end
-        jointTube=nrmmJointPrediction('propagate',anchor,cfg,initialGenerator, ...
-            model.uncertainty.jointPrediction,durations,options);
+        contract=model.uncertainty.jointPrediction;
+        coupled=~cfg.controller.jointNonlinearPrediction && ~isempty(model.target) ...
+            && ~isempty(model.uncertainty.target) && isfield(contract,'targetObserver') ...
+            && contract.currentMeasurement.radarDetectionAvailable;
+        if coupled
+            root=[];if isfield(model,'coupledPosterior'),root=model.coupledPosterior;end
+            if cfg.rti.trustRegion.enabled
+                preparedTrust=Inf(8,count);preparedTrustRatio=zeros(1,count);
+                for k=1:count
+                    stageCfg=cfg;stageCfg.controller.sampleTime=durations(k);
+                    [preparedTrust(:,k),info]=nonlinearBicycleModel.trustRegion( ...
+                        anchor.states(:,k),anchor.inputs(:,k),stageCfg,stages(k).next,stages(k).a,stages(k).b);
+                    preparedTrustRatio(k)=info.sampledErrorRatio;
+                end
+                options.feedbackInputRadius=preparedTrust(7:8,:);
+            end
+            jointTube=nrmmJointPrediction('coupledPropagate',anchor,cfg,initialGenerator, ...
+                contract,durations,model.target,model.uncertainty.target,root,options);
+        else
+            jointTube=nrmmJointPrediction('propagate',anchor,cfg,initialGenerator, ...
+                contract,durations,options);
+        end
         physicalInputLower=physicalInputLower+jointTube.inputRadius;
         physicalInputUpper=physicalInputUpper-jointTube.inputRadius;
         model.jointPredictionTube=jointTube;
@@ -800,6 +820,12 @@ function [problem,model]=localFormulate(anchor,model)
         uncertaintyPrediction.observerErrorTime=jointTube.observerErrorTime;
         uncertaintyPrediction.inputRadius=jointTube.inputRadius;
         uncertaintyPrediction.mixedStopBranches=jointTube.mixedStopBranches;
+        uncertaintyPrediction.futureTargetObserverDynamicsIncluded=isfield(jointTube,'futureTargetObserverDynamicsIncluded') ...
+            && jointTube.futureTargetObserverDynamicsIncluded;
+        uncertaintyPrediction.targetFeedbackIncluded=isfield(jointTube,'targetFeedbackIncluded') && jointTube.targetFeedbackIncluded;
+        if uncertaintyPrediction.futureTargetObserverDynamicsIncluded
+            uncertaintyPrediction.targetObserverErrorRadius=jointTube.targetObserverErrorRadius;
+        end
     end
     % The target forecast at every node and midpoint (record times), and
     % the lane projection of the ego corners at every node and midpoint,
@@ -1014,8 +1040,12 @@ function [problem,model]=localFormulate(anchor,model)
     if cfg.rti.trustRegion.enabled
         for k=1:count
             stageCfg=cfg;stageCfg.controller.sampleTime=durations(k);
-            [radius,trustInfo]=nonlinearBicycleModel.trustRegion( ...
-                anchor.states(:,k),anchor.inputs(:,k),stageCfg,stages(k).next,stages(k).a,stages(k).b);
+            if isempty(preparedTrust)
+                [radius,trustInfo]=nonlinearBicycleModel.trustRegion( ...
+                    anchor.states(:,k),anchor.inputs(:,k),stageCfg,stages(k).next,stages(k).a,stages(k).b);
+            else
+                radius=preparedTrust(:,k);trustInfo=struct('sampledErrorRatio',preparedTrustRatio(k));
+            end
             columns=[ix(:,k);iu(:,k)];
             lower(columns)=max(lower(columns),-radius);
             upper(columns)=min(upper(columns),radius);
@@ -1208,11 +1238,15 @@ function [values,jacobian,tightening,normal,witnessJacobian,witness,data]=localS
         'targetSupportData',model.targetSupportData,'point',point, ...
         'targetYawRadius',model.targetTube.yawRadius(point),'epoch',model.target, ...
         'error',model.uncertainty.target,'time',model.recordTimes(point));
+    if isfield(model,'jointPredictionTube') && isfield(model.jointPredictionTube,'jointPoseGenerator')
+        data.jointPoseGenerator=model.jointPredictionTube.jointPoseGenerator{point};
+    end
     [values,jacobianFull,tightening]=localPlaneRows(x,witness,data);
     jacobian=jacobianFull(:,1:3);witnessJacobian=jacobianFull(:,4:5);
 end
 
 function [values,jacobian,tightening]=localPlaneRows(x,witness,data)
+    data.egoYaw=x(3);
     reserve=localPlaneReserve(witness(1),data);
     % The engineering support oracle is piecewise differentiable. Both
     % backends use the same symmetric derivative at support-feature ties.
@@ -1221,11 +1255,22 @@ function [values,jacobian,tightening]=localPlaneRows(x,witness,data)
     derivative=(localPlaneReserve(witness(1)+step,data)-localPlaneReserve(witness(1)-step,data))/(2*step);
     [values,jacobian]=predictiveSafetyGeometry.separationWitnessRows( ...
         x(1:3),data.shape,data.target(1:3),data.target(8:11),witness,reserve,derivative);
+    if isfield(data,'jointPoseGenerator')
+        plus=data;minus=data;plus.egoYaw=data.egoYaw+step;minus.egoYaw=data.egoYaw-step;
+        yawDerivative=(localPlaneReserve(witness(1),plus)-localPlaneReserve(witness(1),minus))/(2*step);
+        jacobian(1:4,3)=jacobian(1:4,3)-yawDerivative;
+    end
     tightening=reserve;
 end
 
 function reserve=localPlaneReserve(angle,data)
     normal=[cos(angle),sin(angle)];q=data.target;shape=data.shape;
+    if isfield(data,'jointPoseGenerator')
+        reserve=predictiveSafetyGeometry.jointPoseSupport(normal,[0;0;data.egoYaw],shape, ...
+            q(1:3),q(8:11),data.jointPoseGenerator);
+        return;
+    end
+
     position=predictiveSafetyGeometry.targetSupportFromData(data.targetSupportData,data.point,normal);
     [~,rotation]=predictiveSafetyGeometry.rotationSupport(q(8:11),q(3),data.targetYawRadius,normal);
     target=position+rotation;
@@ -1294,6 +1339,12 @@ end
 function relative=localRelativeGenerator(x,generator,model,center)
     relative=generator;
     if ~model.uncertainty.relativeFrame,return;end
+    if isfield(model,'jointPredictionTube') && isfield(model.jointPredictionTube,'jointPoseGenerator')
+        % Joint pairwise rows use their shared ego/target generators directly.
+        % The terminal module still uses an absolute ego outer set plus the
+        % target family; do not assume compressed columns are initial poses.
+        return;
+    end
     % The target is measured relative to the ego, so the pose error of the
     % estimate that starts a hold moves both rigidly about the ego position
     % at that hold start (center). Keep those columns through the hold map

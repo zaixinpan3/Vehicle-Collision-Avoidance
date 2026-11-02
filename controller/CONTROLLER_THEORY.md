@@ -2804,11 +2804,66 @@ it does not certify the preceding nonlinear flow. The position-only point observ
 Its force-balance inverse, saturation, angle chart and the physical stop
 guard still require whole-set treatment; those are distinct operations.
 
-This extension uses the existing full elapsed-time constant-parameter
-target family. It does not reset that physical family at imagined future
-observations. The ancillary policy currently uses ego observations; future
-target-observer states and a target-relative feedback policy have not been
-lifted into it.
+When a synchronized target observer is available, the online affine path
+also lifts the physical target, its six-state observer and radar predictor.
+The joint numerical state has 35 coordinates: the existing 21 ego/observer/
+parameter/input/frontend coordinates, six physical target coordinates,
+six target-observer coordinates and two radar-predictor coordinates.
+The target's constant acceleration and sideslip persist across the horizon;
+target motion uses the analytic NRMM arc and its declared stop extension.
+A retained parameter cover initializes a correlated outer generator rather
+than resetting independent motion errors at future samples. Its world-course
+bound must not receive another copy of the ego heading error.
+
+Both observers execute the same held-measurement RK4 updates as the online
+runtime. Each future radar sample is generated from the same physical ego
+and target branch; its noise is introduced once and then shared by the
+observer and future controls. Position-only GNSS, IMU and gyro follow the
+same chronology. No measured GNSS velocity or future measurement value is
+invented. The force-balance point inverse is resolved below the derivative
+perturbation scale; its enclosing interval inversion is unchanged.
+
+The declared ancillary policy preserves ego stabilization and adds a
+bounded target-dependent response:
+
+    delta_u = K_E delta_hat_x_E
+              + K_T (delta_hat_x_relative - delta_hat_x_E).
+
+Relative position is expressed in world coordinates. Target velocity is
+transported to the fixed reference frame before forming the relative
+velocity feature; otherwise body-frame rotation can masquerade as target
+motion. K_E is the existing finite-horizon ego feedback. K_T uses its
+direction but only the remaining physical input authority and the RTI local
+input-correction budget. Gains are scaled BEFORE propagation. Published
+state/measurement radii are never clipped to force feasibility. In particular,
+large target uncertainty must not suppress the stabilizing ego feedback.
+This is a declared candidate future policy, not a proof that subsequent RTI
+solutions realize its exact derivative.
+
+The joint ego and target pose generators use the same primitive columns.
+Collision support is formed from their relative displacement and both
+rotated footprints before absolute values are taken. Shared translation can
+therefore cancel. Rotation remainders enclose the affine pose uncertainty;
+they do not enclose the preceding nonlinear dynamics. The existing terminal
+module still uses absolute ego padding and the target's physical family.
+It is not replaced by a certified nonlinear joint terminal image.
+
+After issuing a command, the controller stores that command's first joint
+successor, rather than the pre-solve anchor's successor. The runtime records
+all intermediate raw sensor samples. At the next decision the numerical
+contractor uses the entire sensor block and verifies the observer/filter
+states through their deterministic nonlinear update on that received block.
+It does not equate an affine observer prediction with the exact known
+software state. Physical/measurement tangents supply an explicit constrained
+affine history. An affine observation projection retains the equalities
+between shared primitive columns before outer compression; contracting
+coefficient intervals alone would lose that cancellation. The resulting
+outer proposal supplies fresh prediction. Missing samples, changed
+contracts, mixed stop measurement branches, or an inconsistent affine
+history cause a reported fallback to the current observer/target enclosure.
+This fallback is not the exact nonlinear posterior-subset construction in
+(J8), and the compressed proposal is not a retained nonlinear shift witness.
+The diagnostic `jointSensorBlockConditioning` exposes this distinction.
 
 The implementation is used by the online RTI experiment through
 `controller.jointAffinePrediction=true`. It requires a
@@ -2845,6 +2900,9 @@ the separate requirements below.
 
 `tests/nrmmJointPredictionTest.m` checks runtime/update agreement, causality,
 shared persistent parameters, parameter tangents and mixed stop branches.
+`tests/coupledObserverPredictionTest.m` additionally checks the joint runtime
+update, target-to-control causality, coordinate consistency, whole-block
+conditioning and retention of the actual issued command.
 `scripts/verifyJointPredictionTube.m` compares affine supports with nonlinear
 histories, reports the coordinate/time of any undercoverage, and returns
 results without creating a report. These are numerical research checks,
@@ -2865,9 +2923,12 @@ joint root generators. The default 50 ms control hold includes four 12.5 ms
 sensor updates. Preserve their actual order, shared gyro feedthrough,
 force-balance reconstruction, angle conventions and stop branches.
 A current six-state radius alone cannot reconstruct that updater. The
-implemented ego projection does not require the target core or bound memory
-because neither drives that projection or its selected ancillary policy.
-Lifting a target-relative policy would require their relevant memory too.
+legacy ego projection needs no target core because the target does not drive
+that projection. The coupled affine path additionally carries the actual
+target-observer/predictor state and raw sensor history. Its target-dependent
+policy uses those point states, not future bound-memory outputs; the current
+ISS bounds still initialize the root. A policy using future bound outputs
+would also have to propagate their update memory.
 
 Offline scheduled gains and validated nonlinear map/remainder bounds can
 support bounded generator or directional-support propagation online. Observer

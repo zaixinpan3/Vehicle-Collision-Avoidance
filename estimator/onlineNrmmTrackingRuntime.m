@@ -707,6 +707,21 @@ function estimate = localTargetEstimate(runtime, observerInput)
 end
 
 function runtime = localRecordMeasurementTimes(runtime, observerInput)
+    % Retain every received sensor sample, including between control decisions.
+    % These are measurements, not reconstructed GNSS velocity observations.
+    value=[observerInput.gnssPosition;observerInput.bodyAcceleration;observerInput.yawRate; ...
+        observerInput.radarRelativePosition];
+    if ~observerInput.radarDetectionAvailable,value(6:7)=NaN;end
+    if ~isfield(runtime,'measurementHistory')
+        runtime.measurementHistory=struct('time',zeros(1,0),'value',zeros(7,0));
+    end
+    history=runtime.measurementHistory;
+    if ~isempty(history.time) && abs(history.time(end)-observerInput.time)<1e-10
+        history.value(:,end)=value;
+    else
+        history.time(end+1)=observerInput.time;history.value(:,end+1)=value;
+    end
+    runtime.measurementHistory=history;
     runtime.lastInputSampleTime = observerInput.time;
     runtime.lastGnssTime = observerInput.time;
     runtime.lastImuTime = observerInput.time;

@@ -516,7 +516,9 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
         elseif g(rightEnd) > target
             value = rightEnd;return;
         end
-        value = localBisect(leftEnd,rightEnd,@(v) g(v) < target);
+        % Resolve the POINT inverse below the tangent perturbation scale.
+        % The enclosing interval inverse keeps its coarser outward brackets.
+        value = localBisect(leftEnd,rightEnd,@(v) g(v) < target,1e-10);
     end
     function force = localNominalForce(v)
         longitudinalSpeed = sqrt(max(speed^2-v^2,(speed*cos(sideslipDomainMaximum))^2));
@@ -559,10 +561,11 @@ function force = localFiala(slip,stiffness,capacity)
     force(adhesion) = -stiffness(adhesion).*tangent(adhesion).*(1-q+q.^2/3);
 end
 
-function value = localBisect(left,right,predicate)
-% First point of [left,right] where the monotone predicate becomes true,
-% to 1e-5 m/s; predicate(left) is false and predicate(right) is true.
-    while right-left > 1e-5
+function value = localBisect(left,right,predicate,tolerance)
+% First point of the bracket where the monotone predicate becomes true.
+% The default 1e-5 m/s bracket is retained for interval inversion.
+    if nargin<4,tolerance=1e-5;end
+    while right-left > tolerance
         middle = 0.5*(left+right);
         if predicate(middle),right = middle;else,left = middle;end
     end

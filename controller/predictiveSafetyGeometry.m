@@ -900,6 +900,24 @@ classdef predictiveSafetyGeometry
                 (reference(2,:)+increment(2,:))./scale];
         end
 
+        function reserve = jointPoseSupport(normal,poseE,shapeE,poseT,shapeT,generator)
+            % Shared affine pose primitives, with exact-rotation remainder
+            % bounds. Common translation cancels before taking any support.
+            normal=normal(:).';signs=[-1,1,1,-1;-1,-1,1,1];cross=[0,-1;1,0];
+            re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
+            rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
+            ve=shapeE(3:4)+shapeE(1:2).*signs;vt=shapeT(3:4)+shapeT(1:2).*signs;
+            g=generator;position=normal*(g(1:2,:)-g(4:5,:));
+            ego=(normal*re*cross*ve)'*g(3,:);target=(normal*rt*cross*vt)'*g(6,:);
+            pairs=reshape(position,1,1,[])+reshape(ego,4,1,[])-reshape(target,1,4,[]);
+            support=max(sum(abs(pairs),3),[],'all');
+            ye=sum(abs(g(3,:)));yt=sum(abs(g(6,:)));
+            coupled=support+.5*max(vecnorm(ve))*ye^2+.5*max(vecnorm(vt))*yt^2;
+            separate=sum(abs(position))+2*max(vecnorm(ve))*sin(min(pi,ye)/2) ...
+                +2*max(vecnorm(vt))*sin(min(pi,yt)/2);
+            reserve=min(coupled,separate);
+        end
+
         function [value,jacobian] = separationWitnessRows(poseE,shapeE,poseT,shapeT,witness,reserve,reserveDerivative)
             % A continuous unit normal and a relative plane offset describe
             % ONE nonlinear separating-plane constraint, without angle bins.

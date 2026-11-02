@@ -1,7 +1,9 @@
 function value = nrmmJointPrediction(action,varargin)
 %nrmmJointPrediction Lift the sampled plant, observer and future feedback.
-% State: [physical ego (6); numerical ego observer (5); tire factors (4);
-% previous held input (2); position/IMU filter prior (4)]. At a control boundary the IMU still measures the
+% Ego lift: [physical ego (6); numerical ego observer (5); tire factors (4);
+% previous held input (2); position/IMU filter prior (4)]. The coupled lift
+% appends physical target (6), target observer (6), and radar predictor (2).
+% Its sensor block includes radar noise as well. At a control boundary the IMU measures the
 % previous input; the new command drives the subsequent plant integration.
 % Five real noise channels are position (2), acceleration (2), and gyro (1).
 % Slots 3:4 of the legacy seven-slot noise array are zero placeholders.
@@ -15,6 +17,15 @@ function value = nrmmJointPrediction(action,varargin)
     switch string(action)
         case "contract"
             value=localContract(varargin{:});
+        case "conditionCoupled"
+            value=localConditionCoupled(varargin{:});
+        case "coupledRoot"
+            value=localCoupledRoot(varargin{:});
+        case "coupledPropagate"
+            value=localCoupledPropagate(varargin{:});
+        case "coupledLinearize"
+            [point,matrix,noise,branch]=localCoupledLinearize(varargin{:});
+            value=struct('point',point,'matrix',matrix,'noise',noise,'branch',branch);
         case "observerStep"
             value=localObserverStep(varargin{:});
         case "propagate"
@@ -266,6 +277,7 @@ function contract=localContract(runtime,input)
         'samplePeriod',runtime.samplePeriod,'integrationStep',runtime.integrationStep, ...
         'integrationSubstepCount',runtime.integrationSubstepCount, ...
         'design',design,'currentMeasurement',input, ...
+        'measurementHistory',runtime.measurementHistory, ...
         'positionVelocity',input.positionVelocity,'sensorContract',"position-only-GNSS", ...
         'heldInputAvailable',numel(input.heldInput)==2, ...
         'noiseRadius',[repmat(sensors.positionNoiseMaximum,2,1); ...
@@ -273,6 +285,9 @@ function contract=localContract(runtime,input)
             repmat(sensors.accelerometerNoiseMaximum,2,1);sensors.gyroscopeNoiseMaximum], ...
         'parameterRadius',repmat(radius,4,1), ...
         'parameterOrder',["frontCornering";"rearCornering";"frontFriction";"rearFriction"], ...
+         'targetObserver',struct('state',runtime.targetState, ...
+            'predictor',runtime.targetOutputPredictor,'identifier',runtime.targetIdentifier, ...
+            'noiseRadius',design.sensors.radarNoiseMaximum), ...
         'physicalModel',"declaredFialaWithPersistentTireParameters", ...
         'nonlinearCertificate',false);
 end
@@ -630,7 +645,7 @@ function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
     dpseudo=zeros(4,size(dm,2));
     measurement=[input.gnssPosition;input.gnssVelocity;input.bodyAcceleration;input.yawRate;zeros(2,1)];
     if contract.heldInputAvailable,measurement(8:9)=input.heldInput;end
-    steps=[0;0;.005;.005;.001;.001;.00015;.0001;.001];
+    steps=[0;0;1e-4;1e-4;1e-5;1e-5;1e-6;1e-5;1e-4];
     if ~contract.heldInputAvailable,steps(8:9)=0;end
     if contract.heldInputAvailable,steps(9)=min(steps(9),max(eps,(1-abs(measurement(9)))/4));end
     for j=3:9
@@ -642,7 +657,16 @@ function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
         dpseudo=dpseudo+difference/(2*steps(j))*dm(j,:);
     end
     state=[point(4:5);point(1:2);input.gnssPosition;point(3)];
+    if numel(point)>5
+        predictor=point(12:13);dpredictor=dpoint(12:13,:);
+        if input.radarDetectionAvailable
+            predictor=input.radarRelativePosition;dpredictor=dm(10:11,:);
+        end
+        state=[state;point(6:11);predictor];
+        extra=[dpoint(6:11,:);dpredictor];
+    end
     gradient=[dpoint(4:5,:);dpoint(1:2,:);dm(1:2,:);dpoint(3,:)];
+    if numel(point)>5,gradient=[gradient;extra];end
     for j=1:contract.integrationSubstepCount
         h=contract.integrationStep;
         [v1,d1]=localObserverFieldTangent(state,gradient,input,dm,pseudo,dpseudo,design);
@@ -652,12 +676,14 @@ function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
         state=state+h*(v1+2*v2+2*v3+v4)/6;gradient=gradient+h*(d1+2*d2+2*d3+d4)/6;
         state(7)=atan2(sin(state(7)),cos(state(7)));
     end
-    point=state([3,4,7,1,2]);dpoint=gradient([3,4,7,1,2],:);
+    indices=[3,4,7,1,2];
+    if numel(state)>7,indices=[indices,8:15];end
+    point=state(indices);dpoint=gradient(indices,:);
 end
 
 function [value,gradient]=localObserverFieldTangent(state,gradient,input,dm,pseudo,dpseudo,design)
     cross=[0,-1;1,0];kv=design.velocity.gain;kp=design.position.gain;
-    value=zeros(7,1);
+    value=zeros(size(state));
     value(1:2)=input.bodyAcceleration-input.yawRate*cross*state(1:2)+kv*(pseudo(1:2)-state(1:2));
     value(3:4)=input.gnssVelocity+kp*(state(5:6)-state(3:4));
     value(5:6)=input.gnssVelocity;value(7)=input.yawRate;
@@ -670,6 +696,26 @@ function [value,gradient]=localObserverFieldTangent(state,gradient,input,dm,pseu
     value(7)=value(7)+gain*(vector(2)*cos(yaw)-vector(1)*sin(yaw));
     result(7,:)=result(7,:)+gain*([ -sin(yaw),cos(yaw)]*dpseudo(3:4,:) ...
         -(vector(2)*sin(yaw)+vector(1)*cos(yaw))*gradient(7,:));
+    if numel(state)>7
+        target=state(8:13);predictor=state(14:15);
+        dt=gradient(8:13,:);dy=gradient(14:15,:);
+        ego=struct('bodyVelocity',state(1:2),'yawRate',input.yawRate);
+        targetField=nrmmTargetTrackerDerivative(target,ego,design.target.domain);
+        jac=nrmmTargetJacobian('evaluate',target(3:4),target(5:6),design.target.domain);
+        a=[-input.yawRate*cross,eye(2),zeros(2); ...
+            zeros(2),-input.yawRate*cross,eye(2); ...
+            zeros(2),jac(:,1:2),jac(:,3:4)-input.yawRate*cross];
+        dtField=a*dt-[gradient(1:2,:);zeros(4,size(dm,2))] ...
+            -[cross*target(1:2);cross*target(3:4);cross*target(5:6)]*dm(7,:);
+        if input.radarDetectionAvailable
+            gains=kron(design.target.innovationGains(:),eye(2));
+            targetField=targetField+gains*(predictor-target(1:2));
+            dtField=dtField+gains*(dy-dt(1:2,:));
+        end
+        value(8:13)=targetField;result(8:13,:)=dtField;
+        value(14:15)=target(3:4)-state(1:2)-input.yawRate*cross*predictor;
+        result(14:15,:)=dt(3:4,:)-gradient(1:2,:)-input.yawRate*cross*dy-cross*predictor*dm(7,:);
+    end
     gradient=result;
 end
 
@@ -751,4 +797,472 @@ function x=localPlantFlow(x,u,cfg,h)
     f=@(z)nonlinearBicycleModel.derivative(z,u,cfg);
     first=f(x);second=f(x+h*first/2);third=f(x+h*second/2);fourth=f(x+h*third);
     x=x+h*(first+2*second+2*third+fourth)/6;
+end
+
+function root=localCoupledRoot(state,generator,contract,target,errorSet)
+    % [ego/observer/parameters/input/frontend (21); physical target (6);
+    % target observer rho,q,s (6); radar predictor (2)].
+    assert(isfield(contract,'targetObserver'),'nrmmJointPrediction:missingTargetObserver', ...
+        'Coupled prediction needs the actual target observer state and predictor.');
+    n=size(generator,2);g=zeros(35,n+10);
+    g(1:6,1:n)=generator;g(12:15,n+(1:4))=diag(contract.parameterRadius);
+    r=[cos(state(3)),-sin(state(3));sin(state(3)),cos(state(3))];
+    relative=r'*(target(1:2)-state(1:2));
+    g(22:23,1:n)=generator(1:2,:)+r*[-relative(2);relative(1)]*generator(3,:);
+    g(24,1:n)=generator(3,:);
+    g(22:23,n+(5:6))=errorSet.positionRadius*r;
+    g(24,n+7)=errorSet.courseRadius;
+    g(25,n+8)=errorSet.speedRadius;g(26,n+9)=errorSet.accelerationRadius;
+    g(27,n+10)=errorSet.sideslipRadius;g(24,n+10)=-errorSet.sideslipRadius;
+    familyUsed=false;
+    if isfield(errorSet,'family') && errorSet.family.available
+        % Preserve the retained constant-parameter cover instead of expanding
+        % it back into independent speed, acceleration and course balls.
+        family=errorSet.family;age=contract.time-family.epochTime;
+        padding=0;if isfield(errorSet,'familyYawRadius'),padding=errorSet.familyYawRadius;end
+        image=nrmmConstantMotionFamily('image',family,contract.time,contract.time,padding);
+        low=[max(0,family.lower(1,:)+age*family.lower(2,:));family.lower(2,:); ...
+            asin(target(7)*family.lower(3,:));image.courseLower];
+        high=[max(0,family.upper(1,:)+age*family.upper(2,:));family.upper(2,:); ...
+            asin(target(7)*family.upper(3,:));image.courseUpper];
+        if isfield(errorSet,'speedInterval')
+            low(1,:)=max(low(1,:),errorSet.speedInterval(1));
+            high(1,:)=min(high(1,:),errorSet.speedInterval(2));
+        end
+        keep=all(low<=high,1);low=low(:,keep);high=high(:,keep);
+        assert(~isempty(low),'nrmmJointPrediction:emptyTargetFamily','No current target parameter cell remains.');
+        midpoint=(low+high)/2;width=(high-low)/2;
+        nominal=[target(4:6);target(3)+target(6)];
+        scale=max(max(high,[],2)-min(low,[],2),1e-10);
+        normalized=(midpoint-nominal)./scale;
+        covariance=normalized*normalized'/size(normalized,2)+diag(mean((width./scale).^2,2)/3);
+        [basis,~]=eig((covariance+covariance')/2);
+        lower=min(basis'*normalized-abs(basis')*(width./scale),[],2);
+        upper=max(basis'*normalized+abs(basis')*(width./scale),[],2);
+        map=zeros(6,4);map(4,1)=1;map(5,2)=1;map(6,3)=1;map(3,3:4)=[-1,1];
+        shape=map*(scale.*basis);offset=shape*((lower+upper)/2);
+        % This cover is in WORLD course coordinates. Do not add the current
+        % ego yaw again to the target's world-course uncertainty.
+        g(24,1:n)=0;g(24:27,n+(7:10))=0;
+        g(22:27,n+(7:10))=shape.*((upper-lower)/2)';
+        if any(offset),g(:,end+1)=0;g(22:27,end)=offset;end
+        familyUsed=true;
+    end
+    predictor=contract.targetObserver.predictor;
+    if contract.currentMeasurement.radarDetectionAvailable
+        predictor=contract.currentMeasurement.radarRelativePosition;
+    end
+    previous=contract.currentMeasurement.heldInput;
+    assert(numel(previous)==2,'nrmmJointPrediction:missingHeldInput','Coupled prediction needs the applied input.');
+    root=struct('center',[state;contract.point;zeros(4,1);previous;contract.positionVelocity.point; ...
+        target(1:6);contract.targetObserver.state;predictor], ...
+        'generator',g,'parameterColumns',n+(1:4),'targetParameterColumns',n+(7:10), ...
+        'posteriorAvailable',false,'targetFamilyRetained',familyUsed,'nonlinearCertificate',false);
+end
+
+function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,durations,target,errorSet,root,options)
+    if nargin<8 || isempty(root)
+        root=localCoupledRoot(anchor.states(:,1),initialGenerator,contract,target,errorSet);
+    end
+    count=size(anchor.inputs,2);center=root.center;generator=root.generator;
+    inputRoom=inf(2,count);
+    if nargin>=9 && isfield(options,'feedbackInputRadius'),inputRoom=options.feedbackInputRadius;end
+    gains=localFeedback(anchor,cfg,durations);targetGains=zeros(size(gains));records=2*count+1;
+    tube=struct('kind',"joint-ego-target-observer-affine-v1", ...
+        'generator',{cell(1,records)},'relativeGenerator',{cell(1,records)}, ...
+        'targetYawRadius',zeros(1,records),'targetGenerator',{cell(1,records)}, ...
+        'jointPoseGenerator',{cell(1,records)}, ...
+        'observerErrorRadius',zeros(5,count+1),'targetObserverErrorRadius',zeros(6,count+1), ...
+        'physicalRadius',zeros(6,records),'mean',zeros(35,count+1), ...
+        'inputRadius',zeros(2,count),'inputGenerator',{cell(1,count)}, ...
+        'transition',{cell(1,count)},'noiseMap',{cell(1,count)}, ...
+        'feedbackGain',gains,'feedbackInputRadius',inputRoom,'futureObserverDynamicsIncluded',true, ...
+        'futureTargetObserverDynamicsIncluded',true,'targetFeedbackIncluded',true, ...
+        'futurePrimitiveBudgetsAssumed',false,'nonlinearCertificate',false, ...
+        'realArithmeticEnclosure',false,'floatingPointCertified',false, ...
+        'persistentParameterColumns',root.parameterColumns,'mixedStopBranches',false(1,count), ...
+        'time',[0,cumsum(durations)],'root',root, ...
+        'scope',"shared nonlinear joint rollout and local tangents; no certified nonlinear remainder");
+    tube=localCoupledRecord(tube,1,center(1:6),center(22:27),generator(1:6,:),generator(22:27,:));
+    tube.mean(:,1)=center;
+    tube.observerErrorRadius(:,1)=localEgoError(center,generator);
+    tube.targetObserverErrorRadius(:,1)=localTargetError(center,generator,target(7));
+    for k=1:count
+        [reference,policyMap]=localRelativeFeedback(center,anchor.states(3,k));
+        gain=gains(:,:,k);targetGain=gain;
+        egoMap=zeros(6,35);egoMap(1:5,7:11)=eye(5);egoMap(6,6)=1;
+        if k>1
+            reserve=sum(abs(gain*egoMap*generator),2)+abs(gain(:,6))*contract.noiseRadius(7);
+            physicalRadius=sum(abs(generator(1:6,:)),2);
+            course=atan2(abs(center(5)+cfg.vehicle.lf*center(6))+physicalRadius(5)+cfg.vehicle.lf*physicalRadius(6), ...
+                max(0,center(4)-physicalRadius(4)));
+            authority=[max(0,pi/2-course-abs(anchor.inputs(1,k))-cfg.solver.constraintTolerance); ...
+                max(0,min(cfg.actuation.brakingRatioMaximum-anchor.inputs(2,k), ...
+                anchor.inputs(2,k)-cfg.actuation.brakingRatioMinimum))];
+            % Preserve the existing stabilizing ego feedback first. The
+            % additional target response uses the remaining actuator room
+            % and RTI's local correction budget. Scaling the entire ego gain
+            % by target uncertainty would remove its stabilization.
+            gain=gain.*min(1,authority./max(reserve,realmin));
+            baseReserve=sum(abs(gain*egoMap*generator),2)+abs(gain(:,6))*contract.noiseRadius(7);
+            targetReserve=sum(abs(gain*(policyMap-egoMap)*generator),2);
+            targetRoom=min(inputRoom(:,k),max(0,authority-baseReserve));
+            targetGain=gain.*min(1,targetRoom./max(targetReserve,realmin));
+        end
+        context=struct('cfg',cfg,'contract',contract,'input',anchor.inputs(:,k), ...
+            'gain',gain,'targetGain',targetGain,'reference',reference, ...
+            'egoReference',[center(7:11);center(6)],'referenceYaw',anchor.states(3,k), ...
+            'duration',durations(k),'first',k==1, ...
+            'targetRearAxleDistance',target(7));
+        [~,matrix,noise,branch]=localCoupledLinearize(center,context);
+        raw=[branch.beforeResetMatrix*generator,branch.beforeResetNoise];
+        [point,propagated,mixed]=localResetEnvelope(branch.beforeResetPoint,raw,cfg);
+        tube.mixedStopBranches(k)=mixed;
+        tube.transition{k}=matrix(1:35,:);tube.noiseMap{k}=noise(1:35,:);
+        tube.inputGenerator{k}=propagated(48:49,:);
+        tube.inputRadius(:,k)=sum(abs(tube.inputGenerator{k}),2);
+        tube=localCoupledRecord(tube,2*k,point(36:41),point(42:47), ...
+            propagated(36:41,:),propagated(42:47,:));
+        tube=localCoupledRecord(tube,2*k+1,point(1:6),point(22:27), ...
+            propagated(1:6,:),propagated(22:27,:));
+        if k==1
+            tube.firstSuccessor=struct('center',point(1:35),'generator',propagated(1:35,:), ...
+                'measurementCenter',branch.measurementCenter, ...
+                'measurementGenerator',[[branch.measurementMatrix*generator,branch.measurementNoise], ...
+                    zeros(numel(branch.measurementCenter),size(propagated,2)-size(raw,2))], ...
+                'mixedStopBranch',mixed, ...
+                'time',contract.time+durations(k),'sampleTimes',contract.time+branch.sampleTimes, ...
+                'contract',contract,'appliedInput',anchor.inputs(:,1), ...
+                'parameterColumns',root.parameterColumns,'nonlinearCertificate',false);
+        end
+        % Transport the expansion point, not physical uncertainty, to the
+        % RTI shooting reference. Keep target world motion and observer bias.
+        next=point(1:35);
+        [next,transport]=localCoupledReanchor(next,anchor.states(:,k+1));
+        generator=transport*propagated(1:35,:);center=next;
+        tube.mean(:,k+1)=center;gains(:,:,k)=gain;targetGains(:,:,k)=targetGain;
+        tube.observerErrorRadius(:,k+1)=localEgoError(center,generator);
+        tube.targetObserverErrorRadius(:,k+1)=localTargetError(center,generator,target(7));
+    end
+    tube.feedbackGain=gains;tube.targetFeedbackGain=targetGains;tube.finalJointGenerator=generator;
+    tube.firstInputRadius=tube.inputRadius(:,1);tube.egoStateRadius=tube.physicalRadius;
+    tube.observerErrorTime=tube.time;
+end
+
+function tube=localCoupledRecord(tube,index,~,~,ge,gt)
+    % The same primitive columns drive both vehicles. Form the relative
+    % displacement before taking absolute supports; retain yaw correlation.
+    relative=[ge(1:2,:)-gt(1:2,:);ge(3,:)];
+    tube.generator{index}=ge;tube.relativeGenerator{index}=relative;
+    tube.jointPoseGenerator{index}=[ge(1:3,:);gt(1:3,:)];
+    tube.targetGenerator{index}=gt;
+    tube.targetYawRadius(index)=sum(abs(gt(3,:)));
+    tube.physicalRadius(:,index)=sum(abs(ge),2);
+end
+
+function radius=localEgoError(center,generator)
+    rows=7:11;e=center(rows)-center(1:5);e(3)=atan2(sin(e(3)),cos(e(3)));
+    radius=abs(e)+sum(abs(generator(rows,:)-generator(1:5,:)),2);
+end
+
+function radius=localTargetError(center,generator,lr)
+    [value,jac]=localPhysicalTargetCore(center,lr);
+    radius=abs(center(28:33)-value)+sum(abs(generator(28:33,:)-jac*generator),2);
+end
+
+function [value,jac]=localPhysicalTargetCore(center,lr)
+    yaw=center(3);r=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];j=[0,-1;1,0];
+    t=center(22:27);angle=t(3)+t(6);e=[cos(angle);sin(angle)];
+    k=sin(t(6))/lr;v=t(4)*e;a=t(5)*e+k*t(4)^2*j*e;
+    value=[r'*(t(1:2)-center(1:2));r'*v;r'*a];jac=zeros(6,35);
+    jac(1:2,1:2)=-r';jac(1:2,22:23)=r';jac(:,3)=-kron(eye(3),j)*value;
+    jac(3:4,24)=r'*j*v;jac(3:4,25)=r'*e;jac(3:4,27)=r'*j*v;
+    jac(5:6,24)=r'*j*a;jac(5:6,25)=r'*(2*k*t(4)*j*e);
+    jac(5:6,26)=r'*e;jac(5:6,27)=r'*(j*a+cos(t(6))/lr*t(4)^2*j*e);
+    if t(4)<=0 && t(5)<0
+        value(3:6)=0;jac(3:6,:)=0;
+    end
+end
+
+function [value,jac]=localRelativeFeedback(center,referenceYaw)
+    % Track the nominal ego motion RELATIVE to the estimated target.
+    % Target-dependent feedforward arises from the same state-feedback law.
+    yaw=center(9);r=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];j=[0,-1;1,0];
+    rho=center(28:29);q=center(30:31);
+    referenceRotation=[cos(referenceYaw),-sin(referenceYaw);sin(referenceYaw),cos(referenceYaw)];
+    transport=referenceRotation'*r;
+    % Target velocity is expressed in the FROZEN reference frame. Subtracting
+    % raw body-frame q instead would turn an ego yaw perturbation into a
+    % fictitious target lateral acceleration and can reverse yaw feedback.
+    value=[-r*rho;yaw;center(10:11)-transport*q;center(6)];
+    jac=zeros(6,35);jac(1:2,9)=-r*j*rho;jac(1:2,28:29)=-r;
+    jac(3,9)=1;jac(4:5,10:11)=eye(2);jac(4:5,30:31)=-transport;
+    jac(4:5,9)=-transport*j*q;jac(6,6)=1;
+end
+
+function [joint,transport]=localCoupledReanchor(joint,reference)
+    before=joint(1:6);r0=[cos(before(3)),-sin(before(3));sin(before(3)),cos(before(3))];
+    d=reference(3)-before(3);rotation=[cos(d),sin(d);-sin(d),cos(d)];
+    joint(1:21)=localReanchorJointMean(joint(1:21),reference);
+    offset=r0'*(reference(1:2)-before(1:2));
+    joint(28:29)=rotation*(joint(28:29)-offset);
+    joint(30:31)=rotation*joint(30:31);joint(32:33)=rotation*joint(32:33);
+    joint(34:35)=rotation*(joint(34:35)-offset);
+    transport=eye(35);transport(28:35,28:35)=kron(eye(4),rotation);
+end
+
+function [point,matrix,noise,branch]=localCoupledLinearize(center,context,sensorNoise)
+    contract=context.contract;cfg=context.cfg;n=35;
+    samples=round(context.duration/contract.samplePeriod);channels=9;
+    assert(samples>=2 && mod(samples,2)==0 && ...
+        abs(samples*contract.samplePeriod-context.duration)<1e-10, ...
+        'nrmmJointPrediction:unalignedSensors','A joint hold must resolve the sensor clock and midpoint.');
+    if nargin<3,sensorNoise=zeros(channels,samples+1);end
+    amplitude=[contract.noiseRadius;repmat(contract.targetObserver.noiseRadius,2,1)];
+    dimension=n+channels*(samples+1);
+    gradient=[eye(n),zeros(n,dimension-n)];
+    physical=center(1:6);dx=gradient(1:6,:);target=center(22:27);dt=gradient(22:27,:);
+    observer=[center(7:11);center(28:35)];dobserver=[gradient(7:11,:);gradient(28:35,:)];
+    parameters=center(12:15);dp=gradient(12:15,:);previous=center(16:17);dprevious=gradient(16:17,:);
+    frontend=center(18:21);dfrontend=gradient(18:21,:);
+    plant=localPlantConfiguration(cfg,parameters);input=context.input;du=zeros(2,dimension);
+    if ~context.first
+        [feature,map]=localRelativeFeedback(center,context.referenceYaw);delta=feature-context.reference;
+        delta(3)=atan2(sin(delta(3)),cos(delta(3)));
+        targetGain=context.gain;if isfield(context,'targetGain'),targetGain=context.targetGain;end
+        egoReference=zeros(6,1);if isfield(context,'egoReference'),egoReference=context.egoReference;end
+        egoDelta=[center(7:11);center(6)]-egoReference;
+        egoDelta(3)=atan2(sin(egoDelta(3)),cos(egoDelta(3)));
+        egoMap=zeros(6,n);egoMap(1:5,7:11)=eye(5);egoMap(6,6)=1;
+        input=input+context.gain*(egoDelta+[zeros(5,1);sensorNoise(7,1)]) ...
+            +targetGain*(delta-egoDelta);
+        du=(context.gain*egoMap+targetGain*(map-egoMap))*gradient;
+        du(:,n+7)=du(:,n+7)+context.gain(:,6)*amplitude(7);
+    end
+    assert(abs(input(2))<=1,'nrmmJointPrediction:inputDomain','The future feedback exceeds the Fiala input domain.');
+    middle=zeros(12,1);dmiddle=zeros(12,dimension);preReset=zeros(6,1);dpreReset=zeros(6,dimension);
+    measured=zeros(7,samples+1);dmeasured=zeros(7*(samples+1),dimension);
+    for sample=1:samples+1
+        dm=zeros(11,dimension);
+        if context.first && sample==1
+            measurement=contract.currentMeasurement;frontend=contract.positionVelocity.point;dfrontend(:)=0;
+        else
+            measuredInput=input;dmeasuredInput=du;
+            if sample==1,measuredInput=previous;dmeasuredInput=dprevious;end
+            measurement=localMeasurement(physical,measuredInput,sensorNoise(1:7,sample),plant,contract);
+            [~,df]=localPlantFieldTangent(physical,measuredInput,plant,cfg,dx,dmeasuredInput,dp);
+            dm(1:2,:)=dx(1:2,:);dm(5,:)=df(4,:)-physical(5)*dx(6,:)-physical(6)*dx(5,:);
+            dm(6,:)=df(5,:)+physical(4)*dx(6,:)+physical(6)*dx(4,:);dm(7,:)=dx(6,:);
+            if contract.heldInputAvailable,dm(8:9,:)=dmeasuredInput;end
+            r=[cos(physical(3)),-sin(physical(3));sin(physical(3)),cos(physical(3))];
+            relative=r'*(target(1:2)-physical(1:2));
+            measurement.radarRelativePosition=relative+sensorNoise(8:9,sample);
+            measurement.radarDetectionAvailable=norm(relative)<=cfg.collision.encounterRangeMeters;
+            dm(10:11,:)=r'*(dt(1:2,:)-dx(1:2,:))-[-relative(2);relative(1)]*dx(3,:);
+            columns=n+(sample-1)*channels+(1:channels);
+            dm([1:7,10:11],columns)=dm([1:7,10:11],columns)+diag(amplitude);
+        end
+        if measurement.radarDetectionAvailable,radar=measurement.radarRelativePosition;else,radar=NaN(2,1);end
+        measured(:,sample)=[measurement.gnssPosition;measurement.bodyAcceleration;measurement.yawRate;radar];
+        dmeasured(7*(sample-1)+(1:7),:)=dm([1,2,5,6,7,10,11],:);
+        if sample>samples,break;end
+        if ~(context.first && sample==1)
+            update=[contract.positionVelocity.gain(1)*eye(2);contract.positionVelocity.gain(2)*eye(2)];
+            dfrontend=dfrontend+update*(dm(1:2,:)-dfrontend(1:2,:));
+            frontend=nrmmPositionVelocity('pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
+            measurement.gnssVelocity=frontend(3:4);dm(3:4,:)=dfrontend(3:4,:);
+        end
+        h=contract.samplePeriod;r=[cos(observer(3)),-sin(observer(3));sin(observer(3)),cos(observer(3))];
+        da=r*dm(5:6,:)+r*[-measurement.bodyAcceleration(2);measurement.bodyAcceleration(1)]*dobserver(3,:);
+        frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),h);
+        dfrontend=[dfrontend(1:2,:)+h*dfrontend(3:4,:)+h^2*da/2;dfrontend(3:4,:)+h*da];
+        [observer,dobserver]=localObserverTangent(observer,dobserver,measurement,dm,contract);
+        [f1,d1]=localPlantFieldTangent(physical,input,plant,cfg,dx,du,dp);
+        [f2,d2]=localPlantFieldTangent(physical+h*f1/2,input,plant,cfg,dx+h*d1/2,du,dp);
+        [f3,d3]=localPlantFieldTangent(physical+h*f2/2,input,plant,cfg,dx+h*d2/2,du,dp);
+        [f4,d4]=localPlantFieldTangent(physical+h*f3,input,plant,cfg,dx+h*d3,du,dp);
+        physical=physical+h*(f1+2*f2+2*f3+f4)/6;dx=dx+h*(d1+2*d2+2*d3+d4)/6;
+        [target,a]=localTargetTransition(target,h,context.targetRearAxleDistance);dt=a*dt;
+        if sample==samples/2,middle=[physical;target];dmiddle=[dx;dt];end
+        if sample==samples
+            preReset=physical;dpreReset=dx;
+            [physical,stopped]=nonlinearBicycleModel.sampleEndState(physical,input,plant);
+            if stopped,dx(4:6,:)=0;end
+        end
+    end
+    joint=[physical;observer(1:5);parameters;input;frontend;target;observer(6:13)];
+    gradient=[dx;dobserver(1:5,:);dp;du;dfrontend;dt;dobserver(6:13,:)];
+    point=[joint;middle;input];gradient=[gradient;dmiddle;du];
+    matrix=gradient(:,1:n);noise=gradient(:,n+1:end);
+    before=point;before(1:6)=preReset;derivative=gradient;derivative(1:6,:)=dpreReset;
+    branch=struct('measurementCenter',measured,'measurementMatrix',dmeasured(:,1:n), ...
+        'measurementNoise',dmeasured(:,n+1:end),'sampleTimes',(0:samples)*contract.samplePeriod, ...
+        'beforeResetPoint',before,'beforeResetMatrix',derivative(:,1:n), ...
+        'beforeResetNoise',derivative(:,n+1:end));
+end
+
+function [target,a]=localTargetTransition(initial,h,lr)
+    % Differentiate only the cheap analytic NRMM arc, keeping persistent A
+    % and beta. A braking target stays parked after reaching zero speed.
+    step=[1e-4;1e-4;1e-5;1e-3;1e-3;1e-5];a=eye(6);
+    target=localTargetPoint(initial,h,lr);
+    for j=1:6
+        d=zeros(6,1);d(j)=step(j);
+        if j==4 && initial(4)<step(j)
+            % Differentiate the declared forward-motion side at rest; a
+            % negative-speed perturbation would introduce a reverse target.
+            a(:,j)=(localTargetPoint(initial+d,h,lr)-target)/step(j);
+        else
+            a(:,j)=(localTargetPoint(initial+d,h,lr)-localTargetPoint(initial-d,h,lr))/(2*step(j));
+        end
+    end
+end
+
+function target=localTargetPoint(initial,h,lr)
+    q=[initial;lr;zeros(4,1)];
+    result=predictiveSafetyGeometry.predictTarget(q,h);
+    target=result(1:6);
+    % Keep the latent acceleration parameter: zero speed plus A<0 is the
+    % stopped mode; it must not be independently reinitialized next sample.
+    target(5)=initial(5);
+end
+
+function result=localConditionCoupled(prior,current,contract)
+    % Restrict the affine first-successor history with the ENTIRE sensor block.
+    % The constrained primitive set is retained explicitly. Its compressed
+    % outer proposal is numerical: no nonlinear containment is claimed.
+    diagnostic=struct('method',"completeSensorBlockAffineIntersection", ...
+        'accepted',false,'sampleCount',0,'usedAllSamples',false, ...
+        'nonlinearCertificate',false,'reason',"missingPrior");
+    result=struct('root',current,'diagnostics',diagnostic,'posterior',[]);
+    if isempty(prior),return;end
+    if ~isequaln(prior.contract.targetObserver.identifier,contract.targetObserver.identifier)
+        result.diagnostics.reason="targetIdentityChanged";return;
+    end
+    if ~isequaln(prior.contract.design,contract.design) || prior.contract.samplePeriod~=contract.samplePeriod
+        result.diagnostics.reason="observerContractChanged";return;
+    end
+    if prior.mixedStopBranch
+        result.diagnostics.reason="mixedStopMeasurementMapUnavailable";return;
+    end
+    if abs(prior.time-contract.time)>1e-9 || ...
+            ~isequal(prior.appliedInput,contract.currentMeasurement.heldInput)
+        result.diagnostics.reason="timeOrAppliedInputChanged";return;
+    end
+    history=contract.measurementHistory;times=prior.sampleTimes(2:end);
+    observations=zeros(7,numel(times));
+    for k=1:numel(times)
+        index=find(abs(history.time-times(k))<1e-9,1,'last');
+        if isempty(index),result.diagnostics.reason="incompleteSensorBlock";return;end
+        observations(:,k)=history.value(:,index);
+    end
+    result.diagnostics.sampleCount=numel(times);result.diagnostics.usedAllSamples=true;
+    expected=prior.measurementCenter(:,2:end);
+    if ~isequal(isfinite(expected),isfinite(observations))
+        result.diagnostics.reason="detectionBranchChanged";return;
+    end
+    take=isfinite(observations(:));rows=reshape(8:numel(prior.measurementCenter),[],1);rows=rows(take);
+    equal=prior.measurementGenerator(rows,:);rhs=observations(take)-expected(take);
+    % Once the entire measured block is known, observer software is a
+    % deterministic NONLINEAR update, not an uncertain affine variable.
+    % Equating its tangent prediction to its exact update would reject valid
+    % histories because of the observer's Taylor remainder alone.
+    [knownObserver,knownFrontend]=localObservedBlock(prior,observations);
+    received=[contract.point;contract.targetObserver.state];
+    difference=knownObserver(1:11)-received;
+    difference(3)=atan2(sin(difference(3)),cos(difference(3)));
+    residual=max(abs([difference;knownFrontend-contract.positionVelocity.point]));
+    result.diagnostics.observerReplayResidual=residual;
+    if residual>1e-8
+        result.diagnostics.reason="observerHistoryInconsistent";return;
+    end
+    n=size(prior.generator,2);lower=-ones(n,1);upper=ones(n,1);
+    % A small arithmetic tolerance is not a model-error allowance.
+    tolerance=1e-9;
+    options=optimoptions('linprog','Display','none');
+    scaling=max(1,max(abs(equal),[],2));scaled=equal./scaling;right=rhs./scaling;
+    candidate=lsqminnorm(scaled,right,1e-12);
+    flag=double(all(abs(scaled*candidate-right)<=tolerance) && all(abs(candidate)<=1));
+    if ~flag
+        try
+            [~,~,flag]=linprog(zeros(n,1),[scaled;-scaled],[right;-right]+tolerance, ...
+                [],[],lower,upper,options);
+        catch exception
+            if ~startsWith(string(exception.identifier),"optim:linprog:"),rethrow(exception);end
+            result.diagnostics.reason="affineHistorySolverFailure";
+            result.diagnostics.solverFailure=string(exception.identifier);return;
+        end
+    end
+    if flag<=0
+        result.diagnostics.reason="affineHistoryInconsistent";return;
+    end
+    for pass=1:4
+        for row=1:size(equal,1)
+            a=equal(row,:);middle=(lower+upper)/2;radius=(upper-lower)/2;
+            residual=rhs(row)-a*middle;support=abs(a)*radius+tolerance*scaling(row);
+            active=find(abs(a)>1e-12);
+            other=max(0,support-abs(a(active)).*radius(active)');
+            first=(residual-other)./a(active);second=(residual+other)./a(active);
+            lower(active)=max(lower(active),middle(active)+min(first,second)');
+            upper(active)=min(upper(active),middle(active)+max(first,second)');
+        end
+    end
+    if any(lower>upper)
+        result.diagnostics.reason="affineContractionInconsistent";return;
+    end
+    posterior=struct('baseCenter',prior.center,'baseGenerator',prior.generator, ...
+        'measurementMatrix',equal,'measurementRhs',rhs,'arithmeticTolerance',tolerance*scaling, ...
+        'primitiveLower',lower,'primitiveUpper',upper,'scope',"affineJointHistoryOnly");
+    middle=(lower+upper)/2;radius=(upper-lower)/2;
+    center=prior.center+prior.generator*middle;
+    generator=prior.generator.*radius';
+    conditionedMap=scaled.*radius';residual=right-scaled*middle;
+    % Retain cancellation created by the observed block. Coefficient-wise
+    % interval contraction alone forgets equalities between primitive columns.
+    % On C*eta=b, c+G*eta == c+L*b+(G-L*C)*eta for ANY L. This outer image
+    % keeps those relations cheaply, without introducing a new disturbance.
+    gain=(generator*conditionedMap')*pinv(conditionedMap*conditionedMap');
+    center=center+gain*residual;
+    generator=[generator-gain*conditionedMap,tolerance*gain];
+    % Express the physical proposal about the controller's current nominal.
+    % Known software states are replaced after their deterministic history check.
+    indices=[1:11,16:35];shift=zeros(35,1);
+    shift([1:6,22:27])=center([1:6,22:27])-current.center([1:6,22:27]);
+    for j=[3,24],shift(j)=atan2(sin(shift(j)),cos(shift(j)));end
+    center(indices)=current.center(indices);
+    generator([7:11,16:21,28:35],:)=0;
+    generator=[generator,shift];
+    % Compress tiny directions in relative coordinates, preserving shared
+    % translation and the same persistent physical-parameter variables.
+    transform=eye(35);transform(22:24,1:3)=-eye(3);
+    outer=compress(nrmmSet(center,generator),.01,transform,[12:15,26:27]);
+    root=current;root.center=outer.center;root.generator=outer.generator;
+    root.parameterColumns=find(any(root.generator(12:15,:),1));
+    root.targetParameterColumns=find(any(root.generator(26:27,:),1));
+    root.posteriorAvailable=true;
+    result.root=root;result.posterior=posterior;result.diagnostics.accepted=true;
+    result.diagnostics.reason="affineHistoryConditioned";
+end
+
+function [observer,frontend]=localObservedBlock(prior,observations)
+    contract=prior.contract;measurement=contract.currentMeasurement;
+    predictor=contract.targetObserver.predictor;
+    if measurement.radarDetectionAvailable,predictor=measurement.radarRelativePosition;end
+    observer=[contract.point;contract.targetObserver.state;predictor];
+    frontend=contract.positionVelocity.point;
+    for k=1:size(observations,2)
+        if k>1
+            sample=observations(:,k-1);
+            measurement.gnssPosition=sample(1:2);measurement.bodyAcceleration=sample(3:4);
+            measurement.yawRate=sample(5);measurement.radarRelativePosition=sample(6:7);
+            measurement.radarDetectionAvailable=all(isfinite(sample(6:7)));
+            measurement.heldInput=prior.appliedInput;
+            if isfield(measurement,'courseGeometry'),measurement=rmfield(measurement,'courseGeometry');end
+            frontend=nrmmPositionVelocity('pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
+            measurement.gnssVelocity=frontend(3:4);
+        end
+        frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),contract.samplePeriod);
+        observer=localObserverTangent(observer,zeros(13,1),measurement,zeros(11,1),contract);
+    end
+    frontend=nrmmPositionVelocity('pointMeasure',frontend,observations(1:2,end),contract.positionVelocity.gain);
 end

@@ -1243,8 +1243,9 @@ history-conditioned bound, including the original sensor and heading radii.
 This does not change the NRMM point observer, supply unobserved future
 measurements, or establish a nonexpanding future position tube. Distinct
 constant parameters can still generate diverging physical paths. Future
-target-observer feedback is not implemented by this contraction; the
-ego-only joint-prediction scope stated below remains in force. Analytic
+target-observer feedback is not implemented by this history contraction
+itself; the coupled numerical joint prediction described below carries it
+separately. Analytic
 interval images include roundoff padding but are not certified interval
 arithmetic.
 
@@ -1408,25 +1409,37 @@ asserted. The longitudinal specialization
 simpler held-input construction; it does not implement or certify this full
 joint construction or the production NRMM/Fiala controller.
 
-The optional `nrmmJointPrediction.m` extension now consumes a synchronized
-snapshot of the ego updater and propagates its future measurement-dependent
-point states together with the physical vehicle, persistent tire factors and
-held-input memory. Initial software-state uncertainty is zero; future
-software states differ through their sensor histories. Sensor noise and
-parameter effects are shared with the physical map rather than reintroduced
-as independent observer disturbances. Numerical ego updates agree with the
-runtime, including the resetting GNSS predictor. The target observer is not
-part of this ego-feedback extension; target uncertainty retains its physical
-constant-parameter family over the horizon.
+The experimental `nrmmJointPrediction.m` extension consumes synchronized
+ego and target observer snapshots. With an active radar target its 35-state
+numerical lift carries both physical vehicles, both observers, the radar
+predictor, persistent tire/target parameters, input memory and the
+position/IMU frontend. The target observer and its predictor reset are
+integrated on the same sensor clock as the runtime. Their estimates affect
+future ego inputs through a declared relative-tracking ancillary response;
+the original ego-stabilizing feedback is retained and the extra response
+uses remaining input authority. The first input is common to all branches.
 
-Its generator supports concern the joint affine map. They are not the
+Initial software states are known. Future software states differ through
+shared sensor histories. Sensor noise and parameter effects are introduced
+once on each branch, rather than added again as independent observer
+uncertainties. Target and ego pose columns remain shared when computing
+relative collision supports. Constant target parameters are not reset at
+imagined future observations. Full raw sensor blocks are recorded; their
+numerical affine intersection and its explicit fallback status are exposed
+at the next controller decision. The stored first successor corresponds to
+the command actually issued.
+
+These generator supports concern joint affine maps. They are not the
 deterministic nonlinear enclosures of `nrmmPositionErrorBound`: the existing
 ISS/set recursion continues to supply current-state enclosures independently.
-In particular, a point derivative cannot enclose all Fiala or low-speed
-measurement branches. The controller option `jointAffinePrediction` is
-explicitly experimental and disabled by default after nonlinear replay
-found affine undercoverage. See the implementation and missing remainder
-condition in `controller/CONTROLLER_THEORY.md`.
+A point derivative does not enclose every nonlinear or measurement branch;
+affine history intersection and outer compression do not establish the
+exact nonlinear posterior-subset property. The default online option
+`jointAffinePrediction` remains an engineering approximation with
+`nonlinearCertificate=false`. The older nonlinear enclosure research mode
+still concerns the ego-only lift; this change does not extend its certificate
+to the target-feedback construction. See the implementation and remainder
+conditions in `controller/CONTROLLER_THEORY.md`.
 
 <a id="implementation-map"></a>
 ## 13. Implementation map and existing validation

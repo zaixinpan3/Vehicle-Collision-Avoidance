@@ -168,6 +168,23 @@ function [command,predictedInput,prediction,controllerState] = ...
             targetPredictionMemory.family=model.uncertainty.target.family;
         end
     end
+    coupledUpdate=[];
+    coupledEnabled=cfg.controller.jointAffinePrediction && ~cfg.controller.jointNonlinearPrediction ...
+        && ~cfg.controller.retainedTube && ~isempty(q) && ~isempty(model.uncertainty.target) ...
+        && isfield(model.uncertainty,'jointPrediction') ...
+        && isfield(model.uncertainty.jointPrediction,'targetObserver') ...
+        && model.uncertainty.jointPrediction.currentMeasurement.radarDetectionAvailable;
+    if coupledEnabled
+        contract=model.uncertainty.jointPrediction;
+        root=nrmmJointPrediction('coupledRoot',model.initialState,model.uncertainty.egoGenerator, ...
+            contract,q,model.uncertainty.target);
+        memory=[];
+        if ~targetOnset && isstruct(previousState) && isfield(previousState,'coupledJointPrediction')
+            memory=previousState.coupledJointPrediction;
+        end
+        coupledUpdate=nrmmJointPrediction('conditionCoupled',memory,root,contract);
+        model.coupledPosterior=coupledUpdate.root;
+    end
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
     if ~isempty(solution) && isfield(solution,'terminalControlRequired') && solution.terminalControlRequired
         error('collisionAvoidanceController:terminalControlRequired', ...
@@ -200,6 +217,24 @@ function [command,predictedInput,prediction,controllerState] = ...
             % No unverified prior is published. The next frame will use its
             % standalone observer bound and current measurement intersection.
             informationPredictionFailure=string(exception.identifier)+": "+exception.message;
+        end
+    end
+    coupledJointPrediction=[];
+    if coupledEnabled
+        try
+            % Retain the successor of the command ACTUALLY issued, not the
+            % pre-solve anchor command. This does not admit/veto RTI controls.
+            appliedAnchor=struct('states',[model.initialState,model.initialState], ...
+                'inputs',first);
+            appliedTube=nrmmJointPrediction('coupledPropagate',appliedAnchor,cfg, ...
+                model.uncertainty.egoGenerator,model.uncertainty.jointPrediction, ...
+                cfg.controller.sampleTime,q,model.uncertainty.target,model.coupledPosterior);
+            coupledJointPrediction=appliedTube.firstSuccessor;
+        catch exception
+            expected=startsWith(string(exception.identifier),["nrmmJointPrediction:", ...
+                "nonlinearBicycleModel:","modifiedFialaTire:","collisionAvoidanceController:"]);
+            if ~any(expected),rethrow(exception);end
+            informationPredictionFailure=informationPredictionFailure+" "+exception.identifier+": "+exception.message;
         end
     end
     command=localCommand(first,ego.modelState,cfg);
@@ -286,6 +321,15 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.egoJointRealArithmeticEnclosure=model.jointPredictionTube.realArithmeticEnclosure;
         metadata.jointFloatingPointCertified=model.jointPredictionTube.floatingPointCertified;
     end
+    metadata.futureTargetObserverDynamicsIncluded=false;metadata.targetFeedbackIncluded=false;
+    if isfield(model,'jointPredictionTube') && ...
+            isfield(model.jointPredictionTube,'futureTargetObserverDynamicsIncluded')
+        metadata.futureTargetObserverDynamicsIncluded=true;metadata.targetFeedbackIncluded=true;
+        metadata.targetUncertaintyModel="sharedJointTargetObserverAndCausalFeedback";
+    end
+    metadata.jointSensorBlockConditioning=struct('accepted',false,'sampleCount',0, ...
+        'usedAllSamples',false,'reason',"inactive",'nonlinearCertificate',false);
+    if ~isempty(coupledUpdate),metadata.jointSensorBlockConditioning=coupledUpdate.diagnostics;end
     metadata.robustNonlinearSafetyCertified=false;
     metadata.informationPredictionFailure=informationPredictionFailure;
     if ~isempty(cruisePosterior),metadata.measurementConditioning=cruisePosterior.measurementConditioning;end
@@ -345,6 +389,8 @@ function [command,predictedInput,prediction,controllerState] = ...
         'retainCollisionSide',solution.retainCollisionSide, ...
         'target',q,'targetPredictionMemory',targetPredictionMemory,'uncertaintySpecified',uncertainty.specified);
     if isfield(solution,'collisionWitnesses'),controllerState.collisionWitnesses=solution.collisionWitnesses;end
+    if ~isempty(coupledJointPrediction),controllerState.coupledJointPrediction=coupledJointPrediction;end
+
     if ~isempty(egoJointPrediction)
         controllerState.egoJointPrediction=egoJointPrediction;
         metadata.egoInformationRetainedAcrossModeSwitch=true;
