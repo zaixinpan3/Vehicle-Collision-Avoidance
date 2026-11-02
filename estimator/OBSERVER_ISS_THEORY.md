@@ -1441,6 +1441,67 @@ still concerns the ego-only lift; this change does not extend its certificate
 to the target-feedback construction. See the implementation and remainder
 conditions in `controller/CONTROLLER_THEORY.md`.
 
+The numerical joint predictor computes the force-balance sensitivity without
+repeating its point inverse for every perturbed measurement. Write the
+existing scalar point equation as
+
+\[
+ F(v;m)=G(v;V,r,\delta,b)-\rho(V)v-m_E a_y=0,
+ \qquad
+ \rho(V)=\frac{Q}{\max(V\sin\beta_{\max},\epsilon)},
+\]
+
+where \(V\) is the norm of the position/IMU frontend velocity, not a GNSS
+velocity observation, and \(Q\) is the existing force-resolution budget.
+The point inverse still uses the same bracket and bisection tolerance. At a
+smooth interior root with \(F_v\ne0\), the implicit function theorem gives
+
+\[
+ D_m v=-\frac{D_mF}{F_v},\qquad F_v=G_v-\rho.
+\]
+
+This differentiates the implicit root at the numerically computed point,
+not the discrete branching decisions of the bisection program. The retained
+root tolerance and floating-point evaluation still incur numerical error.
+
+The derivative includes \(\rho_V\), the moving clip endpoints
+\(\pm V\sin\beta_{\max}\), the forward-cone velocity reconstruction and
+the normalized rotation innovation. For a tire with capacity \(K>0\),
+stiffness \(C\), and \(q=C|\tan\alpha|/(3K)<1\), its partial derivatives are
+
+\[
+ F_{y,\alpha}=-C\sec^2\alpha(1-q)^2,\qquad
+ F_{y,K}=-\frac{C\tan\alpha}{K}q(1-2q/3).
+\]
+
+On the saturated branch they are \(0\) and \(-\operatorname{sign}\alpha\).
+They join continuously at the adhesion boundary on the principal slip chart.
+Physical tire-parameter uncertainty still reaches this point observer through
+the shared measurements; the point inverse uses its fixed design parameters.
+It does not receive another independent copy of model mismatch.
+
+This construction only requires a nonsingular *local* root for its smooth
+derivative. It does not prove global monotonicity of every composed inverse.
+For example, a sufficient decreasing-force condition in the interior is
+\(|\delta|<\pi/2\) and
+\(V>|r|\max(l_f,l_r)\sin\beta_{\max}\): these make both axle slip angles
+increase with \(v\), and positive \(\rho\) then makes \(F_v<0\).
+The current point algorithm is preserved outside this sufficient domain;
+its existing interval-certificate assumptions are not strengthened by this
+derivative calculation.
+
+At strict clipping the selected endpoint derivative is used; at a switching
+equality it is a branch derivative, not a classical two-sided derivative.
+At zero speed, a singular inverse, or \(|b|=1\) on an interior force branch,
+ordinary derivatives need not exist. In particular,
+\(d\sqrt{1-b^2}/db\) is singular at full braking. The numerical interface
+reports exceptional `secantColumns` and evaluates finite-step differences
+only for those columns, using an inward step at the braking boundary.
+These secants are not generalized-derivative or nonlinear enclosure proofs.
+The Jacobian is multiplied by the existing shared primitive matrix and
+propagated through the same RK4 stages. This preserves the causal update
+structure without adding or independently duplicating noise sources.
+
 <a id="implementation-map"></a>
 ## 13. Implementation map and existing validation
 

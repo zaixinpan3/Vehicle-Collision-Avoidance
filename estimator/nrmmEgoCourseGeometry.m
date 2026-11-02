@@ -1,4 +1,4 @@
-function value = nrmmEgoCourseGeometry(action, varargin)
+function [value,jacobian,info] = nrmmEgoCourseGeometry(action, varargin)
 % nrmmEgoCourseGeometry Ego lateral-velocity measurement and course-heading correspondence.
 %
 %   course = nrmmEgoCourseGeometry("course", observerInput, design)
@@ -15,6 +15,11 @@ function value = nrmmEgoCourseGeometry(action, varargin)
 %   point = nrmmEgoCourseGeometry("pointCourse", observerInput, design)
 %       The identical numerical lateral measurement and rotation innovation,
 %       without interval calculations. This supplies no certificate fields.
+%   [value,J,info] = nrmmEgoCourseGeometry("pointMeasurement", input, design)
+%       Body velocity and rotation innovation, with their 4-by-9 Jacobian in
+%       [position(2), reconstructed velocity(2), acceleration(2), gyro,
+%       steering, braking]. One point inverse supplies all smooth derivatives.
+%       Singular branches use reported finite-step secants, not certificates.
 %
 %   course = nrmmEgoCourseGeometry("kinematicCourse", gnssVelocity, yawRateMeasured, ...
 %       rearAxleDistance, velocityErrorMaximum, yawRateErrorMaximum, ...
@@ -81,6 +86,8 @@ function value = nrmmEgoCourseGeometry(action, varargin)
             value = localCourse(varargin{1}, varargin{2});
         case "pointCourse"
             value = localPointCourse(varargin{1},varargin{2});
+        case "pointMeasurement"
+            [value,jacobian,info] = localPointMeasurement(varargin{1},varargin{2});
         case "kinematicCourse"
             value = localKinematicCourse(varargin{:});
         case "rotation"
@@ -89,11 +96,115 @@ function value = nrmmEgoCourseGeometry(action, varargin)
             value = localModelLateralVelocity(varargin{:});
         otherwise
             error("nrmmEgoCourseGeometry:invalidAction", ...
-                "action must be 'course', 'pointCourse', 'kinematicCourse', 'rotation' or 'lateralVelocity'.");
+                "Use 'course', 'pointCourse', 'pointMeasurement', 'kinematicCourse', 'rotation' or 'lateralVelocity'.");
     end
 end
 
 %% Course geometry with or without the shared vehicle model
+
+function [value,jacobian,info]=localPointMeasurement(input,design)
+    if isfield(input,'courseGeometry'),course=input.courseGeometry;
+    else,course=localPointCourse(input,design);end
+    lateral=course.lateralMeasurement.center;
+    useModel=course.lateralMeasurement.source~="kinematic" && isfinite(lateral);
+    if ~useModel,lateral=design.yaw.courseModel.rearAxleDistance*input.yawRate;end
+    inertial=input.gnssVelocity;
+    body=nrmmObserverVectorField('velocityMeasurement',inertial,input.yawRate,design,lateral);
+    value=[body;course.correspondence.rotationVector];
+    if nargout==1,return;end
+    speed=norm(inertial);beta=design.yaw.courseModel.sideslipDomainMaximum;
+    ds=zeros(1,9);dy=zeros(1,9);jacobian=zeros(4,9);fallback=false(1,9);
+    info=struct('method',"implicitPointInverse",'branch',"kinematic", ...
+        'secantColumns',false(1,9),'nonlinearCertificate',false,'inverseSlope',NaN);
+    if speed==0
+        % The norm and forward speed do not have a classical derivative here.
+        fallback(3:9)=true;
+    else
+        ds(3:4)=inertial'/speed;
+        if useModel
+            model=design.egoModel;sensors=design.sensors;
+            load=model.mass*model.gravity/(model.lf+model.lr)*[model.lr;model.lf];
+            forceResolution=model.mass*sensors.accelerometerNoiseMaximum ...
+                +model.parameterUncertainty*sum(model.frictionCoefficient(:).*load);
+            denominator=max(speed*sin(beta),eps);regularization=forceResolution/denominator;
+            if lateral<=-speed*sin(beta) || lateral>=speed*sin(beta)
+                dy=sign(lateral)*sin(beta)*ds;info.branch="selectedClipEndpoint";
+            else
+                [~,gradient]=localNominalForceGradient(lateral,speed,input.yawRate, ...
+                    input.heldInput,model,load,beta);
+                slope=gradient(1)-regularization;info.inverseSlope=slope;
+                if isfinite(slope) && abs(slope)>64*eps(max(model.corneringStiffness))
+                    regularizationSpeed=0;
+                    if speed*sin(beta)>eps,regularizationSpeed=-regularization/speed;end
+                    dy=-(gradient(2)-regularizationSpeed*lateral)/slope*ds;
+                    dy(6)=model.mass/slope;dy(7)=-gradient(3)/slope;
+                    dy(8)=-gradient(4)/slope;dy(9)=-gradient(5)/slope;
+                    info.branch="implicitInterior";
+                    if ~isfinite(dy(9)),dy(9)=0;fallback(9)=true;end
+                else
+                    fallback(3:9)=true;info.branch="singularInverse";
+                end
+            end
+        else
+            dy(7)=design.yaw.courseModel.rearAxleDistance;
+        end
+        % Chain the forward-cone velocity map and normalized rotation vector.
+        if speed^2-lateral^2>(cos(beta)*speed)^2
+            db=[(speed*ds-lateral*dy)/body(1);dy];
+        else
+            db=[cos(beta)*ds;dy];
+        end
+        di=zeros(2,9);di(:,3:4)=eye(2);j=[0,-1;1,0];
+        numerator=[body'*inertial;(j*body)'*inertial];
+        dn=[inertial'*db+body'*di;inertial'*j*db+(j*body)'*di];
+        scale=design.positionVelocity.bandwidth*design.sensors.positionNoiseMaximum;
+        denominator=max(norm(body)*speed+scale^2,eps);dd=zeros(1,9);
+        if norm(body)*speed+scale^2>eps
+            dd=speed*(body'/norm(body))*db+norm(body)*ds;
+        end
+        jacobian=[db;dn/denominator-numerator*dd/denominator^2];
+    end
+    % Only exceptional coordinates need a secant. At |b|=1 use the physical
+    % one-sided interval. sqrt(1-b^2) need not have a finite endpoint slope.
+    steps=[0,0,1e-4,1e-4,1e-5,1e-5,1e-6,1e-5,1e-4];
+    measurement=[input.gnssPosition;inertial;input.bodyAcceleration;input.yawRate;zeros(2,1)];
+    if isfield(input,'heldInput') && numel(input.heldInput)==2,measurement(8:9)=input.heldInput;end
+    for k=find(fallback)
+        plus=measurement;minus=measurement;plus(k)=plus(k)+steps(k);minus(k)=minus(k)-steps(k);
+        if k==9,plus(k)=min(1,plus(k));minus(k)=max(-1,minus(k));end
+        jacobian(:,k)=(localPointMeasurement(localPerturbedInput(input,plus),design) ...
+            -localPointMeasurement(localPerturbedInput(input,minus),design))/(plus(k)-minus(k));
+    end
+    info.secantColumns=fallback;
+end
+
+function input=localPerturbedInput(input,values)
+    input.gnssPosition=values(1:2);input.gnssVelocity=values(3:4);
+    input.bodyAcceleration=values(5:6);input.yawRate=values(7);
+    if isfield(input,'heldInput') && numel(input.heldInput)==2,input.heldInput=values(8:9);end
+    if isfield(input,'courseGeometry'),input=rmfield(input,'courseGeometry');end
+end
+
+function [force,gradient]=localNominalForceGradient(v,speed,rate,input,model,load,beta)
+    % Partial derivatives at fixed v: columns [v,speed,rate,steering,braking].
+    steering=input(1);braking=input(2);eta=sqrt(max(0,1-braking^2));
+    vx=sqrt(max(speed^2-v^2,(speed*cos(beta))^2));
+    dx=[-v/vx,speed/vx,0,0,0];
+    if speed^2-v^2<=(speed*cos(beta))^2,dx=[0,cos(beta),0,0,0];end
+    offsets=[model.lf;-model.lr];y=v+offsets*rate;
+    dy=[ones(2,1),zeros(2,1),offsets,zeros(2,2)];
+    slip=atan2(y,vx)-[steering;0];
+    da=(vx*dy-y*dx)./(vx^2+y.^2);da(1,4)=da(1,4)-1;
+    capacity=model.frictionCoefficient(:).*load;
+    [fy,fa,fk]=localFiala(slip,model.corneringStiffness(:),capacity*eta);
+    df=fa.*da;
+    if eta>0,df(:,5)=df(:,5)-fk.*capacity*braking/eta;
+    else,df(:,5)=NaN;end
+    force=braking*capacity(1)*sin(steering)+fy(1)*cos(steering)+fy(2);
+    gradient=cos(steering)*df(1,:)+df(2,:);
+    gradient(4)=gradient(4)+braking*capacity(1)*cos(steering)-fy(1)*sin(steering);
+    gradient(5)=gradient(5)+capacity(1)*sin(steering);
+end
 
 function course=localPointCourse(input,design)
     % The numerical observer map needs no inverse-interval or angle bounds.
@@ -552,13 +663,19 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
     end
 end
 
-function force = localFiala(slip,stiffness,capacity)
+function [force,angleSlope,capacitySlope] = localFiala(slip,stiffness,capacity)
 % Modified Fiala lateral force, identical to modifiedFialaTire.evaluate.
     tangent = tan(slip);
     force = -capacity.*sign(slip);
     adhesion = capacity > 0 & abs(tangent) < 3*capacity./stiffness;
     q = stiffness(adhesion).*abs(tangent(adhesion))./(3*capacity(adhesion));
     force(adhesion) = -stiffness(adhesion).*tangent(adhesion).*(1-q+q.^2/3);
+    if nargout>1
+        angleSlope=zeros(size(slip));capacitySlope=-sign(slip);
+        angleSlope(adhesion)=-stiffness(adhesion).*(1+tangent(adhesion).^2).*(1-q).^2;
+        capacitySlope(adhesion)=-stiffness(adhesion).*tangent(adhesion).*q ...
+            .*(1-2*q/3)./capacity(adhesion);
+    end
 end
 
 function value = localBisect(left,right,predicate,tolerance)

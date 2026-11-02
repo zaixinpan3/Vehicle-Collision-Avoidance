@@ -641,20 +641,11 @@ end
 
 function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
     design=contract.design;
-    pseudo=localPseudoMeasurement(input,design);
-    dpseudo=zeros(4,size(dm,2));
-    measurement=[input.gnssPosition;input.gnssVelocity;input.bodyAcceleration;input.yawRate;zeros(2,1)];
-    if contract.heldInputAvailable,measurement(8:9)=input.heldInput;end
-    steps=[0;0;1e-4;1e-4;1e-5;1e-5;1e-6;1e-5;1e-4];
-    if ~contract.heldInputAvailable,steps(8:9)=0;end
-    if contract.heldInputAvailable,steps(9)=min(steps(9),max(eps,(1-abs(measurement(9)))/4));end
-    for j=3:9
-        if steps(j)==0 || ~any(dm(j,:)),continue;end
-        delta=zeros(9,1);delta(j)=steps(j);
-        plus=localPseudoMeasurement(localMeasurementVector(measurement+delta,input),design);
-        minus=localPseudoMeasurement(localMeasurementVector(measurement-delta,input),design);
-        difference=plus-minus;
-        dpseudo=dpseudo+difference/(2*steps(j))*dm(j,:);
+    if any(dm(3:9,:),'all')
+        [pseudo,jacobian]=nrmmEgoCourseGeometry('pointMeasurement',input,design);
+        dpseudo=jacobian*dm(1:9,:);
+    else
+        pseudo=localPseudoMeasurement(input,design);dpseudo=zeros(4,size(dm,2));
     end
     state=[point(4:5);point(1:2);input.gnssPosition;point(3)];
     if numel(point)>5
@@ -726,13 +717,6 @@ function value=localPseudoMeasurement(input,design)
     if geometry.lateralMeasurement.source=="kinematic" || ~isfinite(lateral),lateral=NaN;end
     velocity=nrmmObserverVectorField('velocityMeasurement',input.gnssVelocity,input.yawRate,design,lateral);
     value=[velocity;geometry.correspondence.rotationVector];
-end
-
-function input=localMeasurementVector(values,input)
-    input.gnssPosition=values(1:2);input.gnssVelocity=values(3:4);
-    input.bodyAcceleration=values(5:6);input.yawRate=values(7);
-    if ~isempty(input.heldInput),input.heldInput=values(8:9);end
-    if isfield(input,'courseGeometry'),input=rmfield(input,'courseGeometry');end
 end
 
 function difference=localDifference(first,second)

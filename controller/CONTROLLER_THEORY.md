@@ -2820,8 +2820,10 @@ runtime. Each future radar sample is generated from the same physical ego
 and target branch; its noise is introduced once and then shared by the
 observer and future controls. Position-only GNSS, IMU and gyro follow the
 same chronology. No measured GNSS velocity or future measurement value is
-invented. The force-balance point inverse is resolved below the derivative
-perturbation scale; its enclosing interval inversion is unchanged.
+invented. The force-balance point inverse is solved once per sensor update;
+its implicit derivative supplies the smooth pseudomeasurement Jacobian.
+Its enclosing interval inversion is unchanged. The derivative construction
+and exceptional finite-step branches are described in the observer theory.
 
 The declared ancillary policy preserves ego stabilization and adds a
 bounded target-dependent response:
