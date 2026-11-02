@@ -10,18 +10,16 @@
         % Four separate tires; the front pair follows the steering angle.
         \foreach \wheelY in {-0.515,0.515} {
             \begin{scope}[shift={(-0.515,\wheelY)}]
-                \path[fill=black!82,draw=black!90,line width=0.25pt,
+                \path[fill=black,draw=black,line width=0.25pt,
                     rounded corners=0.5pt] (-0.215,-0.085) rectangle (0.215,0.085);
-                \draw[white!50,line width=0.24pt] (-0.14,0) -- (0.14,0);
             \end{scope}
             \begin{scope}[shift={(0.515,\wheelY)},rotate=#4]
-                \path[fill=black!82,draw=black!90,line width=0.25pt,
+                \path[fill=black,draw=black,line width=0.25pt,
                     rounded corners=0.5pt] (-0.215,-0.085) rectangle (0.215,0.085);
-                \draw[white!50,line width=0.24pt] (-0.14,0) -- (0.14,0);
             \end{scope}
         }
         % Rounded bumper ends and gently tapered front/rear quarters.
-        \path[carOutline,fill=white!70!#3]
+        \path[carOutline,fill=white!40!#3]
             (-1.05,-0.28) .. controls (-1.05,-0.40) and (-0.94,-0.46) .. (-0.79,-0.47)
             .. controls (-0.30,-0.48) and (0.45,-0.48) .. (0.79,-0.45)
             .. controls (0.98,-0.43) and (1.05,-0.32) .. (1.05,-0.18)
@@ -42,7 +40,7 @@
             -- (0.44,0.36) .. controls (0.57,0.18) and (0.57,-0.18) .. (0.44,-0.36) -- cycle;
         \path[carGlass] (-0.45,-0.29) -- (-0.45,0.29) -- (-0.69,0.35)
             .. controls (-0.77,0.16) and (-0.77,-0.16) .. (-0.69,-0.35) -- cycle;
-        \path[carDetail,fill=white!84!#3,rounded corners=0.8pt]
+        \path[carDetail,fill=white!60!#3,rounded corners=0.8pt]
             (-0.43,-0.28) -- (0.17,-0.28) -- (0.17,0.28) -- (-0.43,0.28) -- cycle;
         % Side glazing, pillars, door seams, mirrors and lights are symmetric.
         \foreach \side in {-1,1} {
