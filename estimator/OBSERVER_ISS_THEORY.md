@@ -1393,15 +1393,20 @@ an independent observer-error disturbance after propagating those effects
 would count them twice. See
 [the joint prediction derivation](../controller/CONTROLLER_THEORY.md#joint-prediction).
 A current-state observer enclosure alone is not a collision-avoidance theorem.
-It is the complete estimator interface for the physical held-input formulation
-in [the unified observer-to-safety argument](../controller/CONTROLLER_THEORY.md#recursive-feasibility).
-There the controller propagates physical sets, retains the old first successor,
-and intersects it with each new valid enclosure. Future observer contraction
-is neither assumed nor needed. Only a prediction policy that explicitly uses
-future observations requires the lifted observer/measurement dynamics.
-The implementation of that simpler algorithm is validated on the longitudinal
-research specialization `scripts/verifyUnifiedObserverSafety.m`; this does not
-certify the production NRMM/Fiala controller.
+It initializes the exact nonlinear joint construction in
+[the observer-to-safety argument](../controller/CONTROLLER_THEORY.md#recursive-feasibility).
+That construction carries both physical vehicles and both observers, held
+sensor readings, radar resets and target-estimate-dependent ego controls on
+the same branch. Equations (J3)--(J6) retain the common ego velocity and gyro
+errors: their cancellation in the predictor innovation does not imply
+contraction of the complete estimation error. At the next decision, the
+entire received sensor block conditions the retained first successor;
+restricting the old causal policy tail then supplies the shift candidate.
+Future observer convergence is not a premise, and no fixed tube width is
+asserted. The longitudinal specialization
+`scripts/verifyUnifiedObserverSafety.m` validates selected mechanisms of the
+simpler held-input construction; it does not implement or certify this full
+joint construction or the production NRMM/Fiala controller.
 
 The optional `nrmmJointPrediction.m` extension now consumes a synchronized
 snapshot of the ego updater and propagates its future measurement-dependent

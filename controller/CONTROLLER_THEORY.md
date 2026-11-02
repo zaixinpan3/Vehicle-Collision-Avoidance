@@ -1319,9 +1319,277 @@ Its held-input specialization recovers the physical information-set case. It is 
 per-hold enclosure restart. Future measurements are unknown bounded variables.
 Tube widths may vary, expand temporarily and retain a noise floor; a
 constant-width invariant tube is optional. The model, observer, sensor and
-terminal contracts must cover the same uncertainty family.
+terminal contracts must cover the same uncertainty family. Equations
+(J1)--(J11) give the exact nonlinear construction, including target observation
+and target-dependent ego control, before any supplementary representation.
 
-### Predict a control rule that uses future observations
+### Exact nonlinear joint construction
+
+The core theory uses exact nonlinear flows, a fixed decision horizon and
+symbolic sensor/model bounds. Let sensor times be t_j=j*h_s and control
+times t_(kL), with h=L*h_s and L a positive integer. The analysis has no
+extra residual disturbance (d=0); uncertain tire stiffness and friction
+remain persistent physical parameters. Additional disturbances require the
+same extension in the vehicle, sensor, observer and terminal contracts.
+
+Retain the augmented state
+
+$$
+ z=(x_E,x_T^{\rm phys},\vartheta_E,\zeta_E,\hat X_T,\hat y,m,u^-,\mathcal H).
+ \tag{J1}
+$$
+
+Here x_T^phys includes target pose, speed, constant acceleration/curvature
+parameters and stopping mode. The ego estimator state zeta_E contains its
+position/velocity filters, heading and measurement memory. The target
+estimate is Xhat_T=(rhohat,qhat,shat); yhat is its radar predictor; m contains
+held sensor values; H contains the absolute observable history, clock and
+policy memory. Physical parameters and their current states remain linked
+by their physical evolution. They are not independent uncertainties.
+
+A decision state is posterior to the measurements at that boundary. Its
+current estimator states, measurement record and observable history are
+known; physical quantities remain uncertain. A decision rule u=pi(H) is
+constant on all tuples with the same H. At later decisions, different
+measurement histories can generate different controls. This is an
+optimization over causal rules, not just one future input sequence.
+
+**Well-posedness premise.** Every admitted vehicle/observer flow and reset
+must exist uniquely over every sensor interval, including terminal
+continuations. A sufficient moving-vehicle domain has v_x bounded away
+from zero, tire slip angles bounded away from their tangent singularities,
+positive compact tire parameters, bounded velocities/yaw rate and locally
+Lipschitz resistance. Matched Fiala saturation pieces are retained. A
+low-speed/stopped extension, if used, must have a declared transition and
+sensor law. No invalid branch may be dropped to obtain a smaller set.
+No observation-error contraction or measured GNSS velocity is presumed.
+
+### Sensor-period flow and causal target correction
+
+The body-frame physical target coordinates are
+
+$$
+ \rho=R_E^\top(p_T-p_E),\quad q=R_E^\top\dot p_T,\quad
+ s=R_E^\top\ddot p_T.
+$$
+
+For forward target motion, set t=R_E^T e(chi_T). Then
+q=V*t, s=A*t+kappa*V^2*J*t and
+j_phys=-kappa^2*V^3*t+3*A*kappa*V*J*t. Consequently,
+
+$$
+ \dot\rho=q-v_E-r_EJ\rho,\quad
+ \dot q=s-r_EJq,\quad \dot s=j_{\rm phys}-r_EJs.               \tag{J2}
+$$
+
+The target course is chi_T=psi_T+beta_T, with constant
+kappa=sin(beta_T)/l_rT. At a deceleration-to-rest event the physical pose
+and course freeze, q^+=s^+=0, and the latent constant parameters remain
+stored. Target yaw is retained at rest rather than reconstructed from
+zero velocity.
+
+Let a_1,a_2,a_3 be the target observer's effective innovation gains; for
+the high-gain notation in the estimator theory, a_i=l_i*omega^i.
+On a sensor interval the held gyro sample is omega_j=y_(r,j). The exact
+observer flow and radar-predictor reset are
+
+$$
+\begin{aligned}
+ \dot{\hat\rho}&=\hat q-\hat v_E-\omega_jJ\hat\rho
+                       +a_1(\hat y-\hat\rho),\\
+ \dot{\hat q}&=\hat s-\omega_jJ\hat q+a_2(\hat y-\hat\rho),\\
+ \dot{\hat s}&=\Phi_e(\hat q,\hat s)-\omega_jJ\hat s
+                       +a_3(\hat y-\hat\rho),\\
+ \dot{\hat y}&=\hat q-\hat v_E-\omega_jJ\hat y,\qquad
+ \hat y(t_j^+)=y_{\rho,j}.                                    \tag{J3}
+\end{aligned}
+$$
+
+The estimated target state is continuous at a radar reset. The ego observer
+has a deterministic sensor reset P_E, intersample flow f_O and outputs
+H_E(zeta_E)=(phat_E,psihat_E,vhat_E), using position-only GNSS, IMU,
+gyro and known inputs. These maps retain their internal memory and use
+the same held sensor record as (J3).
+
+One control transition is defined chronologically:
+
+1. At the current posterior, select the common input u=pi(H). The IMU
+   sample at this boundary was generated with the previous held input.
+2. Flow both physical vehicles and both observers for h_s, holding u and
+   the current sensor record. Include any declared target stop event.
+3. Generate the endpoint measurements from these physical states and one
+   shared noise vector. Apply the ego reset, reset yhat on detection, and
+   append the complete readings and detection flag to H. Set u^-=u.
+4. Repeat steps 2--3 L times without changing u. Stop just after the last
+   reset, before selecting the next command.
+
+With F^u the joint sensor-period flow and P^u_(nu,d) the endpoint
+measurement/reset map, this defines
+
+$$
+ \mathcal G_h(z,\nu;\pi)=
+ (P^u_{\nu_L,d_L}\circ F^u)\circ\cdots\circ
+ (P^u_{\nu_1,d_1}\circ F^u)(z),\qquad u=\pi(\mathcal H).
+ \tag{J4}
+$$
+
+The noise block contains fresh measurement primitives only. Physical
+parameters are propagated unchanged, and each boundary sample is used once.
+Detection is compulsory inside the symbolic sensing radius. With that
+contract a missed detection certifies exit at its sample; otherwise exit
+requires all states consistent with the history to be outside. The same
+observable exit rule is retained under shifting. Ended histories have
+vacuous collision obligations; reentry requires new initial feasibility.
+
+### Exact nonlinear estimation and relative-tracking identities
+
+Use estimate-minus-truth errors e_rho,e_q,e_s, e_y=yhat-rho and
+e_v=vhat_E-v_E. Let w=omega_j-r_E(t) and lambda=e_y-e_rho.
+Subtracting (J2) from (J3) gives
+
+$$
+\begin{aligned}
+ \dot e_\rho&=e_q-e_v-\omega_jJe_\rho-wJ\rho+a_1\lambda,\\
+ \dot e_q&=e_s-\omega_jJe_q-wJq+a_2\lambda,\\
+ \dot e_s&=\Phi_e(\hat q,\hat s)-j_{\rm phys}
+                       -\omega_jJe_s-wJs+a_3\lambda,\\
+ \dot e_y&=e_q-e_v-\omega_jJe_y-wJ\rho.                         \tag{J5}
+\end{aligned}
+$$
+
+The same gyro and ego-velocity errors enter the first and last rows.
+Their cancellation implies, for 0<=tau<h_s following a detection,
+
+$$
+ \dot\lambda=-(a_1I+\omega_jJ)\lambda,\qquad
+ \lambda(t_j+\tau)=e^{-a_1\tau}R(-\omega_j\tau)
+                     [n_{\rho,j}-e_\rho(t_j)].                \tag{J6}
+$$
+
+This is the decay of the predictor innovation within a hold, not a claim
+that the entire target estimation error contracts. The held-gyro difference
+also contains true yaw-rate change:
+w=n_(r,j)+r_E(t_j)-r_E(t). At target stopping,
+e_s^+=e_s^-+s^- while e_rho and e_q remain continuous.
+
+On a compact declared domain, the existing Lipschitz extension gives
+
+$$
+ \|\Phi_e(\hat q,\hat s)-j_{\rm phys}\|
+ \le L_q\|e_q\|+L_s\|e_s\|+
+                 \|\Phi_e(q,s)-j_{\rm phys}\|.                \tag{J7}
+$$
+
+The last term is zero only where the extension agrees with the physical
+law. It and the stopping jump are part of the joint propagation.
+For the ego output error e_E=H_E(zeta_E)-W(x_E), W=(p_E,psi_E,v_E),
+the exact sensor reset is H_E(P_E(zeta_E^-,y,u^-))-W(x_E).
+Its flow increment is the difference of the two exact output increments;
+where differentiable, dot(e_E)=D H_E*f_O-D W*f_E. Thus e_v in (J5)
+is generated by the same uncertain physical/measurement branch.
+
+For a dynamically consistent comparison branch, write Delta for the
+difference of corresponding quantities and alpha=psi_T-psi_E. Then
+
+$$
+\begin{aligned}
+ \Delta\dot x_E&=f_E(x_E,u;\vartheta_E)
+                    -f_E(\bar x_E,\bar u;\bar\vartheta_E),\\
+ \Delta\dot\rho&=\Delta q-\Delta v_E-r_EJ\Delta\rho
+                                      -\Delta r_EJ\bar\rho,\\
+ \Delta\dot\alpha&=\Delta(\kappa_TV_T)-\Delta r_E.              \tag{J8}
+\end{aligned}
+$$
+
+For a causal law u=K_i(c), c consists of available target/ego estimates and
+memory. Its input difference is K_i(c)-K_i(cbar), with
+Delta(rhohat)=Delta(rho)+Delta(e_rho), and similarly for q,s,v_E.
+Equation (J5) therefore connects future target observations to (J8) through
+the actual nonlinear force law. The first input difference is zero when
+histories are indistinguishable.
+
+### Joint reachable sets, posterior fibres and feedback benefit
+
+For an admissible fixed rule define the exact successor
+
+$$
+ T_\pi(S)=\{\mathcal G_h(z,\nu;\pi):z\in S,\ \nu\in{\rm Adm}(z)\},
+ \quad \mathcal R_0=I_k,\quad
+ \mathcal R_{i+1}=T_{\pi_i}(\mathcal R_i).                      \tag{J9}
+$$
+
+Adm includes the observation modes and any noise-continuation memory.
+A rule is admissible only if every branch has a well-defined flow and
+satisfies its hard constraints. Sets retain history tags. A fibre
+R_i^eta contains the tuples with one particular observed history eta;
+the union over histories is the unconditional prediction. Each fibre
+receives one common command.
+
+For any defined relative-error projection D_i, its exact error set is
+D_i(R_i). Component bounds can be defined by
+
+$$
+ B_{i+1,a}=\sup_{z\in R_i,\nu\in{\rm Adm}(z)}
+       \|D_{i+1,a}(\mathcal G_h(z,\nu;\pi_i))\|.               \tag{J10}
+$$
+
+On a declared bounded finite-horizon domain these bounds are finite.
+This is a sound theoretical construction, not a general theorem that a
+small B exists. On a fibre with reading y_rho, true relative position has
+diameter at most 2*nbar_rho, but different fibres can have different centers.
+Small conditional estimation error does not shrink physical target
+dispersion about one frozen forecast.
+
+A checkable mathematical feedback criterion is obtained by grouping states
+with the same observable statistic c into S_c. Let L_c(u) be the supremum of
+the next relative-position error under a held u, taking the exact joint image,
+and exclude commands violating any hard condition. Define
+
+$$
+ U_c(B)=\{u\in\mathcal U:\text{hard conditions on }S_c,\
+                         L_c(u)\le B\}.                      \tag{J11}
+$$
+
+An admissible selector K(c) in U_c(B) guarantees that one-step relative
+bound. If every fibre admits such a selector but the intersection of
+all U_c(B) is empty, observation-dependent feedback achieves a bound that
+no common command achieves. Nonemptiness and any required regularity of
+the selector are substantive conditions, not consequences of bounded
+sensor noise. The finite-horizon successor/terminal constraints enforce
+their compatibility across later decisions.
+
+A symbolic strict-improvement example stays within the Fiala model.
+In straight motion with zero resistance and steering, the exact acceleration
+is gamma*b, with |gamma/gamma_0-1|<=epsilon<1. Two target hypotheses start
+with the same speed v and headway, zero curvature, and A=+a or -a.
+Set h=2*h_s and apply b=0 during the first hold. Initialize both hypotheses
+with the same exact relative position and velocity, shat=0 and yhat=rho,
+and an exact ego estimate. Use zero sensor noise and choose the moving domain
+so that the observer extension agrees with the straight-motion law.
+With tau=h_s, the intermediate radar reset gives
+
+$$
+ \hat s_x(h)=\sigma\,\frac{a_3a\tau^2}{2a_1}
+                         (1-e^{-a_1\tau}),\qquad \sigma\in\{-1,1\}.
+$$
+
+The causal next command b=sign(shat_x(h))*4*a/gamma_0 is admissible if
+4*a<gamma_0 and the trajectories remain in the moving/sensing domain.
+At 2*h, the target deviation from constant-speed motion is sigma*D,
+D=2*a*h^2, while the ego correction is sigma*(gamma/gamma_0)*D.
+The relative-error bound is epsilon*D. Any common ego endpoint has
+worst-case error at least D against the two target endpoints. Small
+nonzero noise and parameter perturbations preserve the strict inequality
+by continuity while the observer estimate keeps its sign margin.
+This proves existence of a strict information benefit, not a uniform
+small-tube claim for arbitrary encounters.
+
+The complete posterior construction and shift proof follow in Section 7.
+The representations below are supplementary comparisons and enclosure
+methods; they are not additional premises of the exact construction
+(J1)--(J11).
+
+### Supplementary feedback-rule representations
 
 An open-loop plan fixes u_0,...,u_(M-1). A feedback plan fixes causal rules
 pi_0,...,pi_(M-1). Each future rule maps the information available at that
@@ -1387,7 +1655,7 @@ feedback policy's input variation must therefore be part of G_i. Replanning
 in experiments alone does not specify that prediction policy. Unknown future
 measurements remain bounded variables, not known or noise-free values.
 
-The remaining nonlinear work is to construct sound finite-horizon images,
+For finite outer representations, the remaining certification work is to construct sound finite-horizon images,
 admit their policy-generated inputs and constraints, and connect the endpoint
 set to the robust terminal continuation. Once entering the mild terminal
 model, braking and a fixed physical parked pose set may be certified without
@@ -1837,17 +2105,18 @@ its additional observer, moving-target and terminal assumptions explicit.
 
 ### Joint information and one copy of uncertainty
 
-Let $q$ contain the true ego and target state, observer internal state,
-position-filter memory, persistent uncertain parameters, previous input and
-encounter/terminal memory. A future command has the causal form
+Let $q$ be the history-tagged augmented state (J1): true ego and target
+states, observer internal states, held sensor records, persistent uncertain
+parameters, previous input, absolute observable history and policy memory. A future command has the causal form
 $u_i=\pi_i(o_i)$, where $o_i$ consists only of information available to the
 controller at that future instant. In particular, it cannot depend on the
 unknown true error or future measurement noise. Affine feedback about a
 nominal plan is one possible policy class, but the class must allow the shift
 and terminal append used below.
 
-Write the complete sampled transition, including the actual sensor and
-observer update, as
+Use the exact sensor-period flow/reset composition (J4), including all
+intermediate readings and observer updates. Write its complete control-period
+transition as
 
 $$
  q^+=\mathcal F(q,\pi(o),\omega),\quad \omega\in\Omega,
@@ -1879,13 +2148,19 @@ $$
  q_{k+1}\in I_{k+1}\subseteq R_{1|k},                            \tag{U2}
 $$
 
-where $A_{k+1}$ records newly known input, mode or measurement facts. At
-initialization $I_0=Q_0$. A raw new observer ball need not be contained in the
+where $A_{k+1}$ selects the **entire received sensor block**: intermediate
+readings, detection flags, resulting known observer states and input history.
+Induction through the physical flows and resets of (J4) keeps the true branch
+in $R_{1|k}$; that branch also satisfies these observed facts and any valid
+additional enclosure $Q_{k+1}$. This establishes both inclusions in (U2).
+At initialization $I_0=Q_0$. A raw new observer ball need not be contained in the
 previous one; the intersection with the **predicted successor**, not a
 recentered ball, gives the inclusion needed for shifting. Any outer numerical
 representation of the posterior must still lie inside that successor.
-A measurement outage imposes no new measurement restriction. An empty
-intersection violates the declared model/information contract and cannot be
+A missing reading imposes no numerical measurement restriction, but its
+detection flag still conveys any information specified by the sensor contract.
+In particular, guaranteed in-range detection makes a miss an exit certificate
+at that sample. An empty intersection violates the declared model/information contract and cannot be
 silently repaired by discarding the old information.
 
 A new target, a changed uncertainty contract, or a genuinely new encounter
@@ -1945,7 +2220,7 @@ does not establish that this implementation satisfies the theorem's premise.
 ### The theoretical nonlinear PCBF problem and control law
 
 Fix a finite $N$ at encounter initialization and use the same stage timing on
-successive shifts. A plan consists of causal policies, nonempty joint sets,
+successive shifts. The baseline checks collision at decision instants. A plan consists of causal policies, nonempty joint sets,
 continuous geometric witnesses and nonnegative slacks. Its conditions are
 
 $$
@@ -1958,12 +2233,13 @@ $$
 \end{aligned}
 $$
 
-The endpoint slack matches the executable indexing. Under (U4) it is
-redundant in the exact zero-deficit terminal family and can be chosen zero.
-For sampled-only statements, each hold checks its start and selected
-interior instants, with the endpoint checked separately. This schedule is
-shift invariant. Whole-hold versions replace these finite sets by all
-$\tau\in[0,h]$; no intersample assertion is implied here without that change.
+Under (U4) the endpoint slack is redundant and can be chosen zero.
+Decision instants, including the endpoint, define the present baseline.
+Additional interior checks must use a shift-invariant schedule; whole-hold
+versions require all $\tau\in[0,h]$. Neither extension is presumed here.
+The paper permits a soft prefix of length $N_\xi\le N$ followed by a
+zero-slack hard tail. Its shift also removes the first slack and appends zero,
+so the same proof applies; $N_\xi=N$ gives (U5)--(U6).
 
 Define $J_P=\sum_{i=0}^N\xi_i$. The theoretical encounter problem is
 
@@ -1985,6 +2261,15 @@ that choice to the theoretical algorithm or require refinement to succeed.
 Ordinary RTI instead caps the attained *local affine* slack. That numerical
 cap does not establish exact primary optimality or nonlinear feasibility.
 Outside an encounter, a soft cruise CLF supplies the separate cruise design.
+
+Assume each encountered feasible problem attains its primary minimum.
+A compact nonempty feasible sublevel, closed feasibility and
+lower-semicontinuous cost suffice; merely allowing arbitrary history-dependent
+policies does not establish these properties. The admissible policy class
+must permit restriction to surviving absolute histories and terminal
+concatenation. Retain all observer, reference and prefix memory needed to
+evaluate the old tail. If coordinates are recentered, transport the policies
+and witnesses by an invertible relabeling rather than resetting their meaning.
 
 The optimal primary value $V_P(I)$ eliminates all policy, set and plane
 variables. It is therefore independent of any particular plane orientation
@@ -2009,17 +2294,26 @@ values and checked-instant collision deficits stay zero for this encounter.
 Consequently vehicle interiors do not overlap at those instants for any
 allowed joint realization. This does not assert a positive physical margin.
 
-**Proof.** By (U2), the new root is a subset of the old first successor.
-Restrict the old remaining causal policies to histories reachable from this
-root. Keep the old outer successor sets, geometric witnesses and validity
-certificates; by (U3) they remain admissible. Append the common terminal
-policy, successor and zero-deficit witnesses from (U4). The new slack sequence
-$(\xi_1^*,\ldots,\xi_N^*,0)$ is feasible. Its sum is
-$V_P(I_k)-\xi_{0|k}^*$. Comparing the new minimum with this candidate gives
-(U7). All first-command realizations belong to the certified first images,
-so zero slack excludes interior collision at the checked instants. Induction
-proves the claimed invariance. For $N=1$ the same terminal restriction handles
-the shifted root. QED.
+**Proof.** Whole-block conditioning (U2) gives
+$S_0=I_{k+1}\subseteq R_{1|k}^*$. Restrict the old remaining policies to
+the surviving histories; this retains one command on every indistinguishable
+history fibre. Exact images are inclusion-monotone for a fixed policy, hence
+induction gives
+\[
+ S_j\subseteq R_{j+1|k}^*,\qquad 0\le j<N.
+\]
+For outer-set representations, the stored old sets may instead be retained
+where they give the required certified inclusions. By (U3), the old hard
+constraints, plane witnesses and slacks remain valid. Downward terminal
+closure gives $S_{N-1}\in\mathfrak B$. Append its admissible causal terminal
+rule and a successor $S_N\in\mathfrak B$ with zero-deficit witnesses.
+
+The shifted sequence $(\xi_1^*,\ldots,\xi_N^*,0)$ is feasible and has sum
+$V_P(I_k)-\xi_{0|k}^*$. Comparing the next attained minimum with this candidate
+gives (U7). The true current tuple is retained in the conditioned root, so
+zero slack separates its footprint interiors at the checked instants.
+Nonnegativity and induction preserve zero. For $N=1$, the terminal
+restriction applies directly to $S_0\subseteq R_{1|k}^*$. QED.
 
 The sum, not each individual predicted slack, is nonincreasing. First-stage
 slack can redistribute while the sum falls. Telescoping (U7) makes the
@@ -2556,12 +2850,12 @@ histories, reports the coordinate/time of any undercoverage, and returns
 results without creating a report. These are numerical research checks,
 separate from the current-state observer enclosure certificate.
 
-The core in Section 7 first needs a retained physical posterior, sound
-whole-hold nonlinear images, signed geometry margins and a common uncertain
-terminal witness. It does not need to predict future observer software state.
-The executable longitudinal reference validates this algorithm on its stated
-model; transferring it to Fiala dynamics requires those vehicle-specific
-images and certificates.
+The core in Sections 6--7 retains a joint posterior and predicts both
+physical vehicles, both observers and their causal control responses. Its
+exact sensor-period images, signed decision-node geometry and common
+terminal witness support the shift proof. The executable longitudinal
+reference validates selected mechanisms of a simpler held-input
+specialization; it does not validate the full joint Fiala construction.
 
 For a certified prediction of observation-dependent feedback, the
 joint-prediction integration packet needs known observer software state,
@@ -3936,7 +4230,7 @@ addpath('scripts'); result = verifyUnifiedObserverSafety();
 results = runtests('tests/unifiedObserverSafetyTest.m'); assertSuccess(results)
 ```
 
-Independent algebra checks for the optional joint extension are available through
+Independent algebra checks for the numerical joint prototypes are available through
 
 ```bash
 python scripts/checkJointMismatchDerivations.py

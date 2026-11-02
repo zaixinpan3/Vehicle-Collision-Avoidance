@@ -2,8 +2,8 @@
 
 `manuscript.tex` is the IEEE Transactions-style draft titled
 "Safety-Guaranteed Output-Feedback Collision Avoidance Using NRMM-Based Vehicle
-State Estimation". The October 25, 2026 revision aligns the paper with the
-unified observer-to-safety formulation in the controller theory. The title's
+State Estimation". The current revision integrates the exact nonlinear
+joint observer--feedback construction and its conditional shift proof. The title's
 safety guarantee refers to the conditional mathematical design; the production
 Fiala controller does not yet implement the complete certificate construction.
 
@@ -18,50 +18,59 @@ intermediates with `latexmk -c manuscript.tex`.
 
 ## Unified mathematical design
 
-The observer supplies a current pointwise physical enclosure, including the
-initial transient and applicable sensor, model and digital-realization bounds.
-Candidate held inputs propagate that set. The next observation conditions the
-retained first successor, preserving truth containment and the inclusion needed
-by the shifted-plan proof. Raw observer balls need not be nested. Dropouts keep
-the physical prediction; an empty intersection invalidates the contract.
+The observer supplies a valid current enclosure, including the initial
+transient and applicable sensor and model uncertainty. Prediction carries
+both physical vehicles, both observers, held sensor records, persistent tire
+parameters and observable histories under causal control policies. Future
+target observations can therefore change future ego inputs. Each physical
+parameter and sensor realization is shared by all affected equations.
 
-A signed geometric margin distinguishes overlap from zero-distance contact.
-Whole-hold reachable images, compatible hard constraints and one common
-admissible terminal continuation establish conditional recursive feasibility.
+Exact sensor-period flows and resets define the nonlinear successor. At the
+next decision, conditioning on the entire received sensor block retains a
+subset of the old first successor. Raw observer balls need not be nested.
+The predictor-innovation decay identity does not claim contraction of the
+full estimation error. Neither constant tube width nor a uniformly small
+tube is assumed.
+
 The theoretical encounter controller minimizes PCBF slack and executes the
-first command of any attained primary minimizer. This gives conditional
-optimal-relaxation descent and an invariant safe zero-value set. No secondary
-performance optimization is part of that control law or required by its proof.
-The implementation optionally refines tracking and input smoothness under the
-attained primary cap; in exact arithmetic a feasible refinement under the exact
-optimum is still a primary minimizer. An affine RTI cap alone does not certify
-this property for the nonlinear problem. Positive slack remains relaxation.
-An unbounded soft CLF slack preserves feasibility but does not by itself prove
-recovery. Road boundaries are omitted from this robust theorem.
+first common command of an attained primary minimizer. Restricting the old
+tail to surviving histories and appending a compatible terminal rule proves
+recursive feasibility and nonincreasing optimal slack sum. Zero remains zero
+and excludes interior collision at decision instants. Contact is allowed at
+equality; positive slack is relaxation, and finite-time arrival at zero is
+not proved. Road boundaries and intersample collision are outside this theorem.
 
-The core is output feedback through measurement-conditioned reoptimization;
-it does not forecast future observer convergence. A predicted policy that uses
-future observations requires the optional joint observer/measurement lift.
-Both constructions use the same inclusion and shift argument. Initial
-feasibility, sound nonlinear images and terminal closure are explicit premises.
-In particular, the core theorem assumes that a nonempty terminal information
-family and a causal controller exist with zero safety deficit, admissible
-inputs and successors in that same family under the prediction dynamics.
-It does not derive a concrete terminal pair. The simplified braking design
-and verification of that candidate belong to implementation; they are not
-additional proof obligations inside the conditional theorem.
+Initial feasibility, truth containment, well-posed joint flows, primary
+attainment, policy/certificate closure and a nonempty downward-closed terminal
+family remain explicit premises. The terminal family must admit a common
+causal zero-slack continuation under the same model and uncertainty contract.
+Its existence is assumed; the simplified braking candidate is an
+implementation choice, not a terminal construction supplied by the theorem.
+
+No performance optimization is required by the theoretical control law.
+A feasible secondary refinement under the exact attained primary cap is
+still a primary minimizer. An affine RTI cap alone does not establish this
+nonlinear property. An unbounded soft CLF slack preserves feasibility for
+finite residuals but does not prove recovery.
+
+The detailed derivation is maintained in
+[controller theory, Section 6](../controller/CONTROLLER_THEORY.md#joint-prediction)
+and [the shift proof in Section 7](../controller/CONTROLLER_THEORY.md#recursive-feasibility).
+It includes exact target-error identities, history-conditioned error sets,
+and a symbolic Fiala special case in which future target observations permit
+a strictly tighter relative-position bound than any prescribed ego trajectory.
+That example is not a universal small-tube result.
 
 Tezuka and Nakamura (2020) and Quan et al. (2025) motivate error compensation
 and containing-set interfaces. Their hypotheses are distinguished from this
 vehicle construction; an energy-gain inequality alone is not treated as a
 pointwise Euclidean error bound.
 
-The detailed derivation is maintained in
-[controller theory, Section 7](../controller/CONTROLLER_THEORY.md#recursive-feasibility),
-with the optional joint extension in Section 6. The executable longitudinal
-reference is [verifyUnifiedObserverSafety.m](../scripts/verifyUnifiedObserverSafety.m);
-settings, test results and limitations are in
-[the reference verification report](../report/UNIFIED_OBSERVER_SAFETY_20261025.md).
+The longitudinal reference
+[verifyUnifiedObserverSafety.m](../scripts/verifyUnifiedObserverSafety.m)
+checks selected containment and shift mechanisms of the simpler held-input
+specialization. It does not implement the full joint observer/policy
+construction.
 
 ## Numerical evidence and implementation scope
 
