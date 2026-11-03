@@ -52,7 +52,10 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.rtiIterations,1);
             testCase.verifyEqual(problem.model.linearization.states(:,1),problem.model.initialState,AbsTol=0);
             testCase.verifyNotEqual(problem.model.initialState,prior.stateTrajectory(:,2));
-            testCase.verifyEqual(problem.model.linearization.states(:,2:end-1),prior.stateTrajectory(:,3:end),AbsTol=0);
+            anchor=problem.model.linearization;
+            testCase.verifyEqual(anchor.inputs(:,1:end-1),prior.inputTrajectory(:,2:end),AbsTol=0);
+            expected=localTrajectory(problem.model.initialState,anchor.inputs,cfg);
+            testCase.verifyEqual(anchor.states,expected,AbsTol=1e-12);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyRtiPrediction(testCase,problem,cfg);
         end
@@ -292,7 +295,9 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.stages(1).exitFlag,-2);
             testCase.verifyEqual(search.stopReason,"pcbfNoNumericalResult");
             testCase.verifyFalse(search.planner.used);
-            testCase.verifyEqual(model.linearization.inputs,prior.inputTrajectory(:,2:end),AbsTol=0);
+            testCase.verifyEqual(model.linearization.inputs(2,:),prior.inputTrajectory(2,2:end),AbsTol=0);
+            testCase.verifyEqual(model.linearization.states, ...
+                localTrajectory(model.initialState,model.linearization.inputs,cfg),AbsTol=1e-12);
         end
         function anInvalidContinuationCannotSilentlyRequestPlanning(testCase)
             [ego,road,cfg]=localFixture();
@@ -374,6 +379,62 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(search.stopReason,"pcbfNoNumericalResult");
             testCase.verifyLessThanOrEqual(model.linearization.inputs(2,end),0);
             testCase.verifyEqual(model.linearization.states(4:6,end),zeros(3,1),AbsTol=1e-12);
+        end
+        function aRemoteTailDoesNotExtrapolateTheLocalCruiseGain(testCase)
+            [ego,road,cfg]=localFixture();cfg.referenceSpeed=8;ego.speed=8;
+            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            model=nominal.model;
+            model.target=[24;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            model.targetEpoch=model.target;model.targetOnset=false;
+            % A shifted iterate can end far from the cruise equilibrium.
+            % Appending a seed must not use the local cruise gain there to
+            % create a front-slip angle at the Fiala domain boundary.
+            x=[22.181597;-23.527152;-.56095539;16.293711;-3.2906;-.28363864];
+            u=[1.262529;-.99901623];n=1;
+            model.initialState=x;model.previousInput=u;
+            prior=struct('inputTrajectory',repmat(u,1,n), ...
+                'stateTrajectory',repmat(x,1,n+1));
+            [anchor,search]=solvePredictiveControl('probe',struct( ...
+                'operation',"reference",'model',model,'previousState',prior));
+            testCase.verifyEqual(search.plannerCalls,0);
+            testCase.verifySize(anchor.inputs,[2,n]);
+            input=anchor.inputs(:,end);
+            slip=atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-input(1);
+            testCase.verifyLessThan(abs(slip),pi/6);
+            testCase.verifyEqual(anchor.states(:,end), ...
+                nonlinearBicycleModel.sample(x,input,model.cfg),AbsTol=1e-12);
+            testCase.verifyEqual(anchor.appendedTerminalSteps,0);
+        end
+        function saturatedWarmStartKeepsLateralForceOnTheSmallSlipBranch(testCase)
+            [ego,road,cfg]=localFixture();cfg.referenceSpeed=8;ego.speed=8;
+            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            model=nominal.model;
+            model.target=[4;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            model.targetEpoch=model.target;model.targetOnset=false;
+            x=[8;-4;-.9;7;.8;-.4];u=[-.74;-.55];
+            model.initialState=x;model.previousInput=u;
+            prior=struct('inputTrajectory',repmat(u,1,2),'stateTrajectory',repmat(x,1,3),'safetyBudget',0);
+            anchor=solvePredictiveControl('probe',struct('operation',"reference", ...
+                'model',model,'previousState',prior));
+            seed=anchor.inputs(:,1);course=atan2(x(5)+cfg.vehicle.lf*x(6),x(4));
+            rear=atan2(x(5)-cfg.vehicle.lr*x(6),x(4));
+            [before,oldSlope]=nonlinearBicycleModel.tireForces([course-u(1);rear],u(2),cfg);
+            [after,newSlope]=nonlinearBicycleModel.tireForces([course-seed(1);rear],seed(2),cfg);
+            tire=nonlinearBicycleModel.tireParameters(cfg);fx=u(2)*tire.longitudinalForceScale(1);
+            testCase.verifyEqual(oldSlope(1),0);
+            testCase.verifyLessThan(newSlope(1),0);
+            testCase.verifyLessThan(abs(course-seed(1)),abs(course-u(1)));
+            testCase.verifyEqual(seed(2),u(2),AbsTol=0);
+            testCase.verifyEqual(fx*sin(seed(1))+after(1)*cos(seed(1)), ...
+                fx*sin(u(1))+before(1)*cos(u(1)),AbsTol=1e-4);
+            testCase.verifyEqual(anchor.states(:,2), ...
+                nonlinearBicycleModel.sample(x,seed,cfg),AbsTol=1e-12);
+            % While a positive safety deficit remains, retain the old
+            % controls' encounter timing instead of changing frontX.
+            prior.safetyBudget=1;
+            unresolved=solvePredictiveControl('probe',struct('operation',"reference", ...
+                'model',model,'previousState',prior));
+            testCase.verifyEqual(unresolved.inputs(:,1),u,AbsTol=0);
         end
         function aReferenceExitCannotEndAnUnrestrictedPredictedEncounter(testCase)
             [ego,road,cfg]=localFixture();cfg.controller.horizonSteps=40;

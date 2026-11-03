@@ -7,7 +7,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % The online default performs one local model update. Iterated nonlinear
 % shooting and retained nonlinear certificates are explicit research modes.
 % The planner runs once at encounter onset. Later frames shift the previous
-% state/input iterate and retain its node count throughout the encounter.
+% inputs and roll them out from the current estimate before linearization,
+% retaining the node count throughout the encounter.
 % Horizon sizing occurs only at encounter onset; a failed solve never extends
 % the horizon or rebuilds the problem. The completed local update returns
 % its optimized inputs after tolerance-sized physical-bound normalization,
@@ -295,33 +296,25 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount,referenc
     context.solveTimer=model.solveTimer;context.solveTimeLimitSeconds=model.solveTimeLimitSeconds;
     appended=0;braking=0;
     prior=model.previousInput;nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,model.nominalReference.curvature);
+    % Do not change longitudinal encounter timing while the old plan is
+    % still reducing a positive safety deficit. Retract only after zero.
+    retract=inherited && isfield(previous,'safetyBudget') ...
+        && previous.safetyBudget<=cfg.solver.constraintTolerance;
     for index=1:count
         if index<=size(old,2)
             u=old(:,index);
-            if inherited
-                % Multiple-shooting warm start: retain the shifted state
-                % decision instead of replaying the whole input sequence.
-                % The measured first state and the shifted later nodes may
-                % have dynamics defects; localFormulate includes them in rhs.
-                next=previous.stateTrajectory(:,index+2);
-            else
-                next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
-            end
-        elseif (inherited || reuse) && terminalSafeSet.member(context,states(:,index),index-1)
-            [u,next,ok,~,middle]=terminalSafeSet.cruiseInput(states(:,index),model);
-            ok=ok && abs(u(2)-prior(2))<=context.brakingChangeMaximum+1e-9 ...
-                && terminalSafeSet.clears(context,middle,index-.5) ...
-                && terminalSafeSet.member(context,next,index);
-            if ~ok
-                [u,next,ok]=terminalSafeSet.brakingInput(states(:,index),prior,u,model,context,index-1);
-                braking=braking+double(ok);
-            end
-            if ~ok
-                u=localTailSeed(states(:,index),prior,model,nominal);
-                next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
-            end
-            appended=appended+double(ok);
+            if retract,u=localWarmStartInput(states(:,index),u,cfg);end
+            % Re-anchor the shifted controls to the new measured state.
+            % The nonlinear rollout prepares the next linearization; it does
+            % not modify or veto the optimizer's subsequently issued command.
+            next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
         else
+            % This is a numerical linearization seed, not the theorem's
+            % certified terminal extension. Use the bounded nonlinear path
+            % guidance also when the endpoint belongs to the terminal set.
+            % Extrapolating the local cruise gain at a remote endpoint can
+            % put front slip near pi/2 before robust tightening is applied.
+            % Terminal feasibility remains a constraint of the optimization.
             u=localTailSeed(states(:,index),prior,model,nominal);
             next=nonlinearBicycleModel.sample(states(:,index),u,cfg);
         end
@@ -341,6 +334,35 @@ function [anchor,source]=localRtiInitialize(model,previous,minimumCount,referenc
         anchor.appendedBrakingSteps=anchor.appendedBrakingSteps+reference.appendedBrakingSteps;
         anchor.planner=reference.planner;
         if isfield(reference,'guide'),anchor.guide=reference.guide;end
+    end
+end
+
+function input=localWarmStartInput(x,input,cfg)
+    % Retract a saturated steering seed to the small-slip branch when the
+    % SAME body-frame front lateral force can be realized there. The signed
+    % longitudinal ratio stays fixed. Only the initialization changes: the
+    % QP retains its full physical input bounds and original Fiala model.
+    if x(4)<=cfg.model.kinematicSpeedRange(2),return;end
+    course=atan2(x(5)+cfg.vehicle.lf*x(6),x(4));
+    rear=atan2(x(5)-cfg.vehicle.lr*x(6),x(4));
+    [force,slope]=nonlinearBicycleModel.tireForces([course-input(1);rear],input(2),cfg);
+    if slope(1)<0,return;end
+    tire=nonlinearBicycleModel.tireParameters(cfg);fx=input(2)*tire.longitudinalForceScale(1);
+    desired=fx*sin(input(1))+force(1)*cos(input(1));
+    limit=atan(3*tire.longitudinalForceScale(1)*sqrt(1-input(2)^2)/tire.corneringStiffness(1));
+    [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
+    low=max(lower(1),course-limit);high=min(upper(1),course+limit);
+    steering=min(high,max(low,course));
+    for iteration=1:8
+        [force,slope]=nonlinearBicycleModel.tireForces([course-steering;rear],input(2),cfg);
+        value=fx*sin(steering)+force(1)*cos(steering);
+        if abs(value-desired)<=1e-8*max(1,tire.longitudinalForceScale(1))
+            if slope(1)<0 && abs(course-steering)<abs(course-input(1)),input(1)=steering;end
+            return;
+        end
+        derivative=(fx-slope(1))*cos(steering)-force(1)*sin(steering);
+        if derivative<=eps,return;end
+        steering=min(high,max(low,steering+(desired-value)/derivative));
     end
 end
 

@@ -43,11 +43,10 @@ classdef terminalSafeSet
 % There is no separate, tighter terminal sideslip condition.
 % No additional bound on |r V| is imposed; realizability of the simplified
 % terminal law is a modeling assumption, not a Fiala force certificate.
-% Holds appended to the anchor are holds of the
-% declared model, kept only when their endpoint is in X_f: the hold of the
-% CLF's certified cruise controller u = u* + K e (cruiseInput), or else the
-% hold nearest to it toward admissible braking with the steering held
-% (brakingInput). jacobians, rayJacobians, certificate and stateLevel belong
+% cruiseInput and brakingInput expose pointwise continuation probes of the
+% declared model. They do not certify a joint uncertainty tube and do not
+% construct ordinary RTI tails; those use nonlinear path guidance instead.
+% jacobians, rayJacobians, certificate and stateLevel belong
 % to the offline certificate of the cruise controller and the CLF
 % (CONTROLLER_THEORY.md, Section 4).
     methods (Static)

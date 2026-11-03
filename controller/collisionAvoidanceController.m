@@ -8,10 +8,10 @@ function [command,predictedInput,prediction,controllerState] = ...
 % separate, optional nonlinear policy/terminal certification backend.
 % Controller state retains a target prediction and a linearization trajectory.
 % The first accepted encounter plan fixes its node count until the encounter
-% is cleared. Its remaining states and inputs are shifted and one tail hold
-% is appended. The first reference state is updated from the current estimate;
-% the nonlinear backend rolls out the shifted inputs from that estimate.
-% SQP-RTI handles dynamics defects in its local equations.
+% is cleared. Its remaining inputs are shifted and one tail hold is appended.
+% Both numerical backends roll these inputs out from the current estimate
+% before solving. SQP-RTI retains general dynamics-defect equations, but its
+% ordinary prepared nominal follows the nonlinear prediction model.
 % A certified current target enclosure updates the constant-parameter family.
 % Its nominal is the current observer point projected into the intersected
 % parameter intervals, with all uncertainty radii recentered. Without an

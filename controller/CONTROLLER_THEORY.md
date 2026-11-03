@@ -518,10 +518,39 @@ $$
 $$
 
 The onset planner supplies a nonlinear rollout, so its defects vanish. Later
-frames shift the previous affine state/input iterate, update the first state
-from the current estimate, and append a tail hold. Their defects need not
-vanish and are retained in the equality right-hand side. The inherited input
-prefix is not reintegrated from the new measurement before solving.
+frames shift the previous input sequence and reintegrate it from the current
+estimate before appending a tail hold. This preparation removes accumulated
+affine state defects before constructing trust regions and uncertainty
+tangents. It changes neither the already issued input nor the fixed encounter
+horizon, and it does not invoke the planner again. The general defect term
+remains in the equations for supplied research references. The tail
+uses nonlinear path guidance with inverse-Fiala force allocation, even when
+its entry belongs to the terminal set. It is a numerical seed, not an
+uncertainty-certified terminal extension. The local cruise gain is not
+extrapolated at a remote endpoint to construct this hold.
+
+A saturated shifted steering seed can be retracted to the adhesion branch
+before this rollout once the preceding solve has attained zero safety
+deficit within `solver.constraintTolerance`. While its deficit is positive,
+the old controls are retained: force retraction changes longitudinal timing
+and can disrupt a maneuver still reducing its collision deficit. At the
+current reference state, hold the longitudinal
+ratio fixed and solve the scalar equation
+
+    Fx_front sin(delta_new) + Fy_front(alpha_new) cos(delta_new)
+      = Fx_front sin(delta_old) + Fy_front(alpha_old) cos(delta_old),
+    alpha = atan2(vy + lf*r, vx) - delta.
+
+The bounded Newton inversion starts at zero front slip and is used only
+when it converges to a smaller-slip point with nonzero tire-force slope.
+Otherwise the old seed is retained. Thus the instantaneous front lateral
+force in body coordinates is preserved; its longitudinal component and
+the subsequent trajectory need not be preserved and are recomputed by the
+nonlinear rollout. This avoids centering RTI on a saturated branch where
+further steering mainly rotates already saturated tire forces. It imposes
+no additional force-capacity inequality and does not change physical input
+bounds or the command returned by the optimizer. It is a numerical
+initialization choice, not a retained feasible-policy certificate.
 
 The current input estimate is fixed; current state error is handled by the
 published enclosure, not a free optimizer correction. Continuous plane-variable
@@ -531,8 +560,11 @@ The completed update supplies the first
 optimized input, with the numerical bound normalization described below.
 Its predicted states and PCBF slacks remain those of the affine subproblem;
 no post-solve nonlinear rollout replaces or rejects
-them. The initial planner rollout and stagewise variational integrations belong to
-preparation, before solving. Independent experiment replay evaluates the issued
+them. The planner, warm-start rollout and stagewise variational integrations
+belong to preparation, before solving. The uncertainty prediction still uses
+future observer updates and causal feedback; reintegrating the nominal does
+not replace that joint tube by open-loop error propagation. Independent
+experiment replay evaluates the issued
 controls on the plant. There is no auxiliary feasibility restoration problem,
 damped-step search or adaptive reference penalty.
 
@@ -717,10 +749,12 @@ algorithm. No such guarantee is inferred from passing simulations.
 
 Adding these hard numerical bounds restricts the executable local problem.
 A shifted nonlinear witness from the ideal recursive-feasibility theorem is
-not automatically inside the next box. The shifted multiple-shooting iterate
-can have dynamics defects after measurement updates. They remain explicit in
-the equalities; consistency does not require replacing the shifted trajectory
-by an open-loop nonlinear rollout.
+not automatically inside the next box. Ordinary warm starts now reintegrate
+the shifted controls from the current estimate, removing the nominal dynamics
+defect. Supplied research references can still have defects; these remain
+explicit in the equalities and in the consistency procedure below. A
+consistent nominal alone does not certify robust hard-constraint feasibility
+or retention of a shifted causal policy.
 
 Before solving, forward interval propagation intersects the reachable
 correction intervals of these affine equalities with the current variable
@@ -823,11 +857,12 @@ For the given path and desired cruise trim, define
 Longitudinal path phase is free. `nonlinearBicycleModel.cruise` computes the trim
 and reads P, the gain K of the cruise controller and their certificate from
 `config/clfMatrices.json`; it never computes them. `nominalValue` evaluates
-this quadratic directly. There is no LQR design; the gain K is used only by
-the cruise controller `u = u* + K e`, whose hold extends the anchor while it
-keeps the endpoint in the terminal set (`terminalSafeSet.cruiseInput`;
-[the terminal-set initialization discussion](#terminal-set)), never by the
-optimizer. The terminal set itself does not use the CLF. No nominal-policy rollout, finite-difference Hessian, cost-to-go
+this quadratic directly. There is no online LQR design. The gain K defines
+the local cruise controller `u = u* + K e` and its offline certificate;
+`terminalSafeSet.cruiseInput` exposes a numerical hold probe. Ordinary
+initialization instead uses nonlinear path guidance, avoiding extrapolation
+of that local gain far from its equilibrium. The terminal set itself does
+not use the CLF. No nominal-policy rollout, finite-difference Hessian, cost-to-go
 kernel, or additional terminal value is used to construct the CLF.
 
 ### Requested decrease: a convergence time constant
@@ -1298,17 +1333,21 @@ certificate. The older `rows` helper remains for standalone geometry and
 certificate research probes; its separate fixed-side charts no longer define
 the ordinary online terminal constraint.
 
-An inherited RTI tail whose endpoint is terminal first tries the certified
-cruise-feedback hold. The existing `brakingInput` helper then uses a bounded
-set of declared-model holds and five scalar halvings to find a less
-restrictive terminal-preserving seed. This numerical initializer is distinct
-from the unique `control` law used to define the set. It adds no optimizer
-iterations. If no certified hold is found, a moving endpoint uses the
-nominal-feedback seed; an already stopped endpoint keeps a nonpositive
-longitudinal command. This prevents an uncertified restart from creating a
-poor accelerating reference while preserving ordinary cruise recovery. The
-optimizer still chooses the final input, subject only to the numerical
-input-bound normalization described above.
+The ordinary numerical tail uses the same nonlinear nominal-feedback seed
+at moving endpoints, independently of terminal membership. Course and yaw
+demands are limited before inverse-Fiala input construction; a large path
+error therefore does not directly become a large linear steering demand.
+An already stopped endpoint keeps a nonpositive longitudinal command.
+The initializer does not mark this hold as a certified terminal extension:
+the complete joint uncertainty tightening and terminal tangent remain part
+of the subsequent optimization. In particular, pointwise membership alone
+does not certify the front-tire domain for all future state/input errors.
+This construction adds no optimizer iteration and does not change the
+abstract terminal assumption or the separately retained certificate mode.
+The optimizer still chooses the final input, subject only to the numerical
+input-bound normalization described above. The `cruiseInput` and
+`brakingInput` helpers remain available as standalone continuation probes;
+they no longer construct ordinary online warm-start tails.
 
 <a id="joint-prediction"></a>
 ## 6. Joint feedback-aware prediction
