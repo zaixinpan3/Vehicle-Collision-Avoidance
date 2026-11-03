@@ -23,6 +23,17 @@ classdef nrmmPointSensitivityTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function virtualInverseToleranceBoundsItsPointError(testCase,operatingPoint)
+            input=localInput(operatingPoint);
+            exact=nrmmEgoCourseGeometry('pointCourse',input,testCase.design);
+            input.predictionInverseTolerance=.005;
+            coarse=nrmmEgoCourseGeometry('pointCourse',input,testCase.design);
+            testCase.verifyLessThanOrEqual(abs(coarse.lateralMeasurement.center ...
+                -exact.lateralMeasurement.center),input.predictionInverseTolerance);
+            % A prediction-only option must not change the actual observer.
+            actual=nrmmEgoCourseGeometry('course',input,testCase.design);
+            testCase.verifyEqual(actual.lateralMeasurement.center,exact.lateralMeasurement.center);
+        end
         function pointValuesAreUnchanged(testCase,operatingPoint)
             input=localInput(operatingPoint);
             [value,jac,info]=nrmmEgoCourseGeometry('pointMeasurement',input,testCase.design);

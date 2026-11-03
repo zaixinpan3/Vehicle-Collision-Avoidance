@@ -208,14 +208,17 @@ end
 
 function course=localPointCourse(input,design)
     % The numerical observer map needs no inverse-interval or angle bounds.
-    % Use exactly the full course map's point inversion and innovation. This
-    % result deliberately omits certificate fields: it is not an enclosure.
+    % By default its point inversion and innovation match the full map.
+    % Virtual predictions can request a coarser point-inverse tolerance.
+    % This result omits certificate fields: it is not an enclosure.
     model=design.yaw.courseModel;
     useModel=isfield(design,'egoModel') && ~isempty(design.egoModel) ...
         && isfield(input,'heldInput') && numel(input.heldInput)==2 && all(isfinite(input.heldInput));
     if useModel
+        tolerance=1e-10;
+        if isfield(input,'predictionInverseTolerance'),tolerance=input.predictionInverseTolerance;end
         lateral=localModelLateralVelocity(input.gnssVelocity,input.yawRate,input.bodyAcceleration, ...
-            input.heldInput,design.egoModel,design.sensors,model.sideslipDomainMaximum,true);
+            input.heldInput,design.egoModel,design.sensors,model.sideslipDomainMaximum,true,tolerance);
     else
         lateral=struct('center',model.rearAxleDistance*input.yawRate,'source',"kinematic");
     end
@@ -547,8 +550,9 @@ end
 
 %% Force-balance lateral velocity with the shared vehicle model
 
-function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAcceleration, heldInput, model, sensors, sideslipDomainMaximum,pointOnly)
+function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAcceleration, heldInput, model, sensors, sideslipDomainMaximum,pointOnly,pointTolerance)
     if nargin<8,pointOnly=false;end
+    if nargin<9,pointTolerance=1e-10;end
     speed = norm(gnssVelocity);
     speedLow = speed-sensors.velocityNoiseMaximum;
     speedHigh = speed+sensors.velocityNoiseMaximum;
@@ -627,9 +631,10 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
         elseif g(rightEnd) > target
             value = rightEnd;return;
         end
-        % Resolve the POINT inverse below the tangent perturbation scale.
-        % The enclosing interval inverse keeps its coarser outward brackets.
-        value = localBisect(leftEnd,rightEnd,@(v) g(v) < target,1e-10);
+        % The actual observer resolves the point below the tangent step.
+        % Virtual predictions may use a coarser tolerance. The enclosing
+        % interval inverse retains its independent outward brackets.
+        value = localBisect(leftEnd,rightEnd,@(v) g(v) < target,pointTolerance);
     end
     function force = localNominalForce(v)
         longitudinalSpeed = sqrt(max(speed^2-v^2,(speed*cos(sideslipDomainMaximum))^2));

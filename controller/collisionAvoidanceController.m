@@ -318,6 +318,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     metadata.commonPoseCancelled=uncertainty.relativeFrame;
     metadata.targetUncertaintyModel="constantParametersRestartedEachHoldFromCurrentObserverSet";
     metadata.egoUncertaintyModel="currentPosteriorEnclosurePropagatedThroughEachHold";
+    metadata.jointPredictionSensorSamples=[];
     if isfield(model,'jointPredictionTube') && ~isempty(model.jointPredictionTube)
         metadata.egoUncertaintyModel="jointPlantObserverFeedbackWithPersistentMismatch";
         metadata.targetUncertaintyModel="constantParameterFamilyOverFullHorizon";
@@ -326,6 +327,9 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.jointTubeScope=model.jointPredictionTube.scope;
         metadata.egoJointRealArithmeticEnclosure=model.jointPredictionTube.realArithmeticEnclosure;
         metadata.jointFloatingPointCertified=model.jointPredictionTube.floatingPointCertified;
+        if isfield(model.jointPredictionTube,'predictionSensorSamples')
+            metadata.jointPredictionSensorSamples=model.jointPredictionTube.predictionSensorSamples;
+        end
     end
     metadata.futureTargetObserverDynamicsIncluded=false;metadata.targetFeedbackIncluded=false;
     if isfield(model,'jointPredictionTube') && ...

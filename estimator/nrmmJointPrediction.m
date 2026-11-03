@@ -423,6 +423,7 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
         'persistentParameterColumns',rootColumns+(1:4),'nonlinearCertificate',false, ...
         'scope',"joint affine maps along the RTI shooting reference; nonlinear remainders not certified", ...
         'mode',"causalObserverFeedback",'time',[0,cumsum(durations)], ...
+        'predictionSensorSamples',round(durations/contract.samplePeriod), ...
         'mixedStopBranches',false(1,count));
     tube.generator{1}=initialGenerator;
     tube.physicalRadius(:,1)=sum(abs(initialGenerator),2);
@@ -484,6 +485,8 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
             point(28:29)=point(28:29)+anchor.inputs(:,k);
             matrix=[];noise=[];mixed=false;
         else
+            context.contract=localPredictionContract(contract,cfg,durations(k),k==1);
+            tube.predictionSensorSamples(k)=round(durations(k)/context.contract.samplePeriod);
             [~,matrix,noise,branch]=localLinearize(center,context);
             beforeReset=[branch.matrix*generators,branch.noise];
             [point,nextGenerators,mixed]=localResetEnvelope(branch.point,beforeReset,cfg);
@@ -718,6 +721,9 @@ end
 
 function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
     design=contract.design;
+    if isfield(contract,'predictionInverseTolerance')
+        input.predictionInverseTolerance=contract.predictionInverseTolerance;
+    end
     if any(dm(3:9,:),'all')
         [pseudo,jacobian]=nrmmEgoCourseGeometry('pointMeasurement',input,design);
         dpseudo=jacobian*dm(1:9,:);
@@ -969,6 +975,7 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
         'realArithmeticEnclosure',false,'floatingPointCertified',false, ...
         'persistentParameterColumns',root.parameterColumns,'mixedStopBranches',false(1,count), ...
         'time',[0,cumsum(durations)],'root',root, ...
+        'predictionSensorSamples',round(durations/contract.samplePeriod), ...
         'scope',"shared nonlinear joint rollout and local tangents; no certified nonlinear remainder");
     tube=localCoupledRecord(tube,1,center(1:6),center(22:27),generator(1:6,:),generator(22:27,:));
     tube.mean(:,1)=center;
@@ -1001,6 +1008,8 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
             'egoReference',[center(7:11);center(6)],'referenceYaw',anchor.states(3,k), ...
             'duration',durations(k),'first',k==1, ...
             'targetRearAxleDistance',target(7));
+        context.contract=localPredictionContract(contract,cfg,durations(k),k==1);
+        tube.predictionSensorSamples(k)=round(durations(k)/context.contract.samplePeriod);
         [~,matrix,noise,branch]=localCoupledLinearize(center,context);
         raw=[branch.beforeResetMatrix*generator,branch.beforeResetNoise];
         [point,propagated,mixed]=localResetEnvelope(branch.beforeResetPoint,raw,cfg);
@@ -1034,6 +1043,23 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
     tube.feedbackGain=gains;tube.targetFeedbackGain=targetGains;tube.finalJointGenerator=generator;
     tube.firstInputRadius=tube.inputRadius(:,1);tube.egoStateRadius=tube.physicalRadius;
     tube.observerErrorTime=tube.time;
+end
+
+function prediction=localPredictionContract(contract,cfg,duration,first)
+    % The issued-command successor keeps the complete actual sensor block.
+    % Only later engineering RTI holds use fewer virtual measurements. Keep
+    % the stable internal observer integration step and all noise amplitudes.
+    prediction=contract;
+    requested=cfg.controller.jointPredictionSamplesPerHold;
+    if first || requested==0 || string(cfg.solver.method)~="rti" ...
+            || cfg.controller.retainedTube || cfg.controller.jointNonlinearPrediction
+        return
+    end
+    samples=min(requested,round(duration/contract.samplePeriod));
+    prediction.samplePeriod=duration/samples;
+    prediction.integrationSubstepCount=ceil(prediction.samplePeriod/contract.integrationStep);
+    prediction.integrationStep=prediction.samplePeriod/prediction.integrationSubstepCount;
+    prediction.predictionInverseTolerance=cfg.controller.jointPredictionInverseTolerance;
 end
 
 function tube=localCoupledRecord(tube,index,~,~,ge,gt)
@@ -1193,10 +1219,36 @@ function [point,matrix,noise,branch]=localCoupledLinearize(center,context,sensor
 end
 
 function [target,a]=localTargetTransition(initial,h,lr)
-    % Differentiate only the cheap analytic NRMM arc, keeping persistent A
-    % and beta. A braking target stays parked after reaching zero speed.
-    step=[1e-4;1e-4;1e-5;1e-3;1e-3;1e-5];a=eye(6);
+    % Differentiate the constant-curvature arc analytically, including the
+    % stopping distance. Keep the previous directional secants at guards.
     target=localTargetPoint(initial,h,lr);
+    if abs(initial(4)+h*initial(5))>1e-9
+        [arc,~,rest]=predictiveSafetyGeometry.targetArc(initial,h);
+        ds=[h,h^2/2];speedGradient=[1,h];
+        if rest
+            ds=[0,0];speedGradient=[0,0];
+            if initial(4)*initial(5)<0
+                ds=[-initial(4)/initial(5),initial(4)^2/(2*initial(5)^2)];
+            end
+        end
+        curvature=sin(initial(6))/lr;dk=cos(initial(6))/lr;
+        angle=curvature*arc/2;
+        if abs(angle)<1e-4
+            scale=1-angle^2/6+angle^4/120;
+            slope=-angle/3+angle^3/30-angle^5/840;
+        else
+            scale=sin(angle)/angle;slope=(angle*cos(angle)-sin(angle))/angle^2;
+        end
+        direction=predictiveSafetyGeometry.direction(initial(3)+initial(6)+angle);
+        tangent=[-direction(2);direction(1)];
+        finish=predictiveSafetyGeometry.direction(target(3)+target(6));
+        a=eye(6);a(1:2,3)=arc*scale*tangent;a(1:2,4:5)=finish*ds;
+        a(1:2,6)=arc*scale*tangent+arc^2*dk/2*(slope*direction+scale*tangent);
+        a(3,4:5)=curvature*ds;a(3,6)=dk*arc;
+        a(4,4:5)=speedGradient;
+        return
+    end
+    step=[1e-4;1e-4;1e-5;1e-3;1e-3;1e-5];a=eye(6);
     for j=1:6
         d=zeros(6,1);d(j)=step(j);
         if j==4 && initial(4)<step(j)

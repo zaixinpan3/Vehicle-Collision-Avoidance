@@ -5,6 +5,8 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
     properties (TestParameter)
         coordinate={1,3,5,12,16,22,24,25,26,27,28,30,32}
         retainedValue=struct('lowerSpeed',[5;1],'upperSpeed',[7;-1])
+        targetMotion=struct('straight',[6;.2;0],'curved',[6;.2;.1], ...
+            'stopping',[.01;-1;.05],'stationary',[0;-1;0])
     end
     methods (TestClassSetup)
         function prepare(testCase)
@@ -16,6 +18,46 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function targetArcSensitivitiesCoverTurningAndStopping(testCase,targetMotion)
+            f=testCase.fixture;context=localContext(f,f.input);center=f.root.center;
+            center(25:27)=targetMotion;
+            result=nrmmJointPrediction('coupledLinearize',center,context);
+            step=1e-6;
+            for j=25:27
+                delta=zeros(35,1);delta(j)=step;
+                plus=nrmmJointPrediction('coupledLinearize',center+delta,context);
+                if j==25 && center(j)==0
+                    numerical=(plus.point(22:27)-result.point(22:27))/step;
+                else
+                    minus=nrmmJointPrediction('coupledLinearize',center-delta,context);
+                    numerical=(plus.point(22:27)-minus.point(22:27))/(2*step);
+                end
+                testCase.verifyEqual(result.matrix(22:27,j),numerical,AbsTol=5e-6);
+            end
+        end
+        function coarseFutureUpdatesPreserveTheCompleteAppliedCommandBlock(testCase)
+            f=testCase.fixture;anchor=localAnchor(f,4);cfg=f.cfg;
+            cfg.controller.jointPredictionSamplesPerHold=0;
+            full=nrmmJointPrediction('coupledPropagate',anchor,cfg,f.generator, ...
+                f.contract,repmat(.05,1,4),f.target,f.error);
+            cfg.controller.jointPredictionSamplesPerHold=2;
+            coarse=nrmmJointPrediction('coupledPropagate',anchor,cfg,f.generator, ...
+                f.contract,repmat(.05,1,4),f.target,f.error);
+            testCase.verifyEqual(coarse.firstSuccessor,full.firstSuccessor);
+            native=round(.05/f.contract.samplePeriod);
+            testCase.verifyEqual(coarse.predictionSensorSamples,[native,2,2,2]);
+            testCase.verifyEqual(full.predictionSensorSamples,repmat(native,1,4));
+            testCase.verifyLessThan(size(coarse.finalJointGenerator,2),size(full.finalJointGenerator,2));
+            testCase.verifyGreaterThan(norm(coarse.inputRadius(:,2:end)),0);
+            testCase.verifyFalse(coarse.nonlinearCertificate);
+        end
+        function nonlinearModeIgnoresTheCoarseFutureClock(testCase)
+            f=testCase.fixture;f.cfg.solver.method="nonlinear";
+            f.cfg.controller.jointPredictionSamplesPerHold=2;
+            tube=nrmmJointPrediction('coupledPropagate',localAnchor(f,3),f.cfg,f.generator, ...
+                f.contract,repmat(.05,1,3),f.target,f.error);
+            testCase.verifyEqual(tube.predictionSensorSamples,repmat(round(.05/f.contract.samplePeriod),1,3));
+        end
         function predictedJointObserversMatchTheSensorClockRuntime(testCase)
             f=testCase.fixture;u=[.02;-.1];context=localContext(f,u);
             prediction=nrmmJointPrediction('coupledLinearize',f.root.center,context);

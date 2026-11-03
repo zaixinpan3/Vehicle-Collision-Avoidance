@@ -2880,6 +2880,32 @@ The metadata explicitly report that scope. The coupled affine-history
 conditioning likewise retains its existing non-certification status; neither
 operation establishes the nonlinear recursive-feasibility theorem.
 
+The engineering predictor also uses a separate virtual sensor clock.
+`controller.jointPredictionSamplesPerHold=2` retains the midpoint and end
+of each future control hold. The first hold still processes every actual
+sensor sample, including its full measurement-history map, so the issued
+command's successor can be conditioned on the complete received block.
+Later holds use two virtual measurement updates, retaining the same sensor
+noise amplitudes, persistent physical parameters, and causal ego/target
+feedback. Observer RK4 integration keeps its original maximum substep;
+coarsening does not enlarge the high-gain observer's integration step.
+The future plant tangents use the coarser grid as well; the optimizer's
+vehicle integration and collision-node grid remain unchanged.
+`controller.jointPredictionInverseTolerance=0.005` specifies the lateral
+velocity point-inverse tolerance in m/s for those virtual updates. The actual
+observer and the first-hold prediction retain their original point inverse.
+Set the sample count to zero to disable both future approximations. Nonlinear
+and retained-certificate modes ignore these engineering settings.
+
+This is an approximation of the future sampled observer, not an exact
+aggregation of its original measurement stream. It reduces independent
+future noise columns and nonlinear measurement evaluations. It does not
+provide an enclosure of the omitted updates or of their nonlinear remainder,
+and therefore carries no additional recursive-feasibility guarantee. The
+trace records the virtual sample counts for every prediction hold. Target
+arc sensitivities are evaluated analytically in smooth regions, with the
+existing directional secants retained at stopping guards.
+
 The declared ancillary policy preserves ego stabilization and adds a
 bounded target-dependent response:
 

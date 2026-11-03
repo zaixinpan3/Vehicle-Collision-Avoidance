@@ -35,7 +35,8 @@ function cfg=localDefaults()
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
         'enforceRoadBoundaries',false,'jointAffinePrediction',true,'jointNonlinearPrediction',false, ...
-        'retainedTube',false,'reducedJointInformation',true);
+        'retainedTube',false,'reducedJointInformation',true, ...
+        'jointPredictionSamplesPerHold',2,'jointPredictionInverseTolerance',.005);
     % Engineering RTI retains one joint affine sensor-block history and uses
     % the actual observer for current ego information. Strict modes ignore this.
     % retainedTube selects a different, enclosure-certified policy-box
@@ -207,6 +208,11 @@ function localValidate(cfg)
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.jointAffinePrediction,{'logical'},{'scalar'});
     validateattributes(cfg.controller.reducedJointInformation,{'logical'},{'scalar'});
+    validateattributes(cfg.controller.jointPredictionSamplesPerHold,{'double'},{'scalar','integer','nonnegative','finite'});
+    assert(mod(cfg.controller.jointPredictionSamplesPerHold,2)==0, ...
+        'collisionAvoidanceControllerConfig:invalidPredictionSamples', ...
+        'Use zero for the sensor clock, or an even count resolving the hold midpoint.');
+    validateattributes(cfg.controller.jointPredictionInverseTolerance,{'double'},{'scalar','positive','finite'});
     validateattributes(cfg.controller.jointNonlinearPrediction,{'logical'},{'scalar'});
     validateattributes(cfg.controller.retainedTube,{'logical'},{'scalar'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
