@@ -1,0 +1,154 @@
+\documentclass[tikz,border=3pt]{standalone}
+\usepackage{amsmath,bm}
+\usepackage{tikz}
+\usetikzlibrary{angles,arrows.meta,calc,quotes}
+
+\definecolor{egocolor}{RGB}{65,145,162}
+\definecolor{obstaclecolor}{RGB}{232,112,58}
+\definecolor{velocitycolor}{RGB}{50,91,143}
+\definecolor{relativecolor}{RGB}{31,122,114}
+\definecolor{coursecolor}{RGB}{106,130,158}
+
+\def\vehicleDrawingScale{1}
+\input{vehicle_top_view_v01.tex}
+
+% Design critique: keep. Math/diagram logic: schematic; original centers,
+% frames, angles and steering are unchanged. Manual visual review confirms
+% the inherited angle labels remain separate despite crowding warnings.
+\begin{document}
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    >=Latex,
+    inertialAxis/.style={
+        -{Latex[length=2.2mm,width=1.5mm]},
+        draw=black,
+        line width=0.85pt
+    },
+    bodyAxis/.style={
+        -{Latex[length=2.0mm,width=1.4mm]},
+        draw=black!78,
+        line width=0.72pt
+    },
+    relativeVector/.style={
+        -{Latex[length=2.2mm,width=1.5mm]},
+        draw=relativecolor,
+        line width=1.15pt
+    },
+    velocityVector/.style={
+        -{Latex[length=2.2mm,width=1.5mm]},
+        draw=velocitycolor,
+        line width=1.05pt
+    },
+    yawArc/.style={
+        -{Latex[length=1.6mm,width=1.1mm]},
+        draw=black!62,
+        line width=0.65pt
+    },
+    slipArc/.style={
+        -{Latex[length=1.6mm,width=1.1mm]},
+        draw=velocitycolor!78,
+        line width=0.65pt
+    },
+    courseArc/.style={
+        -{Latex[length=1.6mm,width=1.1mm]},
+        draw=coursecolor,
+        line width=0.65pt
+    },
+    mathLabel/.style={
+        font=\sffamily\small,
+        inner sep=1.2pt,
+        text=black
+    },
+    yawLabel/.style={
+        mathLabel,
+        text=black!68
+    },
+    slipLabel/.style={
+        mathLabel,
+        text=velocitycolor!85
+    },
+    courseLabel/.style={
+        mathLabel,
+        text=coursecolor!90!black
+    }
+]
+
+\path[use as bounding box] (0.20,0.10) rectangle (9.80,7.10);
+
+\coordinate (inertialOrigin) at (0.72,0.62);
+\coordinate (egoOrigin) at (3.75,1.35);
+\coordinate (obstacleOrigin) at (6.40,5.40);
+\def\egoHeading{14}
+\def\egoCourse{28}
+\def\obstacleHeading{-16}
+\def\obstacleCourse{-30}
+\def\egoSteer{15}
+\def\obstacleSteer{-15}
+
+\drawvehicle{egoOrigin}{\egoHeading}{egocolor}{\egoSteer}
+\drawvehicle{obstacleOrigin}{\obstacleHeading}{obstaclecolor}{\obstacleSteer}
+
+% Relative position of the obstacle vehicle in the ego frame.
+\draw[relativeVector] (egoOrigin) -- (obstacleOrigin)
+    node[mathLabel,pos=0.52,above=1.4mm,sloped,
+         text=relativecolor!85!black]
+    {$\bm r$};
+
+% ---- Ego vehicle -------------------------------------------------------
+\path[fill=black] (egoOrigin) circle (1.35pt);
+
+\draw[bodyAxis] (egoOrigin) -- ++(\egoHeading:1.85)
+    node[mathLabel,below right=-0.9mm] {$X_E$};
+\draw[bodyAxis] (egoOrigin) -- ++(\egoHeading+90:1.40)
+    node[mathLabel,above left=-0.6mm] {$Y_E$};
+\draw[black,dash pattern=on 1.5mm off 1.0mm]
+    (egoOrigin) -- ++(0:2.75);
+\draw[yawArc]
+    ($(egoOrigin)+(0:1.15)$)
+    arc[start angle=0,end angle=\egoHeading,radius=1.15];
+\node[yawLabel] at ($(egoOrigin)+(7:1.55)$) {$\psi_E$};
+\draw[courseArc]
+    ($(egoOrigin)+(0:2.55)$)
+    arc[start angle=0,end angle=\egoCourse,radius=2.55];
+\node[courseLabel] at ($(egoOrigin)+(12:2.95)$) {$\gamma_E$};
+\draw[slipArc]
+    ($(egoOrigin)+(\egoHeading:1.95)$)
+    arc[start angle=\egoHeading,end angle=\egoCourse,radius=1.95];
+\node[slipLabel] at ($(egoOrigin)+(21:2.30)$) {$\beta_E$};
+\draw[velocityVector] (egoOrigin) -- ++(\egoCourse:2.80)
+    node[mathLabel,above right=-0.9mm,text=velocitycolor!85!black]
+    {$V_E$};
+
+% ---- Obstacle vehicle --------------------------------------------------
+\path[fill=black] (obstacleOrigin) circle (1.35pt);
+
+\draw[bodyAxis] (obstacleOrigin) -- ++(\obstacleHeading:1.85)
+    node[mathLabel,above right=-0.9mm] {$X_C$};
+\draw[bodyAxis] (obstacleOrigin) -- ++(\obstacleHeading+90:1.40)
+    node[mathLabel,above right=-0.6mm] {$Y_C$};
+\draw[black,dash pattern=on 1.5mm off 1.0mm]
+    (obstacleOrigin) -- ++(0:2.75);
+\draw[yawArc]
+    ($(obstacleOrigin)+(0:1.15)$)
+    arc[start angle=0,end angle=\obstacleHeading,radius=1.15];
+\node[yawLabel] at ($(obstacleOrigin)+(-7:1.55)$) {$\psi_C$};
+\draw[courseArc]
+    ($(obstacleOrigin)+(0:2.55)$)
+    arc[start angle=0,end angle=\obstacleCourse,radius=2.55];
+\node[courseLabel] at ($(obstacleOrigin)+(-12:2.95)$) {$\gamma_C$};
+\draw[slipArc]
+    ($(obstacleOrigin)+(\obstacleHeading:1.95)$)
+    arc[start angle=\obstacleHeading,end angle=\obstacleCourse,radius=1.95];
+\node[slipLabel] at ($(obstacleOrigin)+(-23:2.30)$) {$\beta_C$};
+\draw[velocityVector] (obstacleOrigin) -- ++(\obstacleCourse:2.80)
+    node[mathLabel,below right=-0.9mm,text=velocitycolor!85!black]
+    {$V_C$};
+
+% ---- Inertial frame ----------------------------------------------------
+\draw[inertialAxis] (inertialOrigin) -- ++(1.45,0)
+    node[mathLabel,below right=-0.2mm] {$X_I$};
+\draw[inertialAxis] (inertialOrigin) -- ++(0,1.45)
+    node[mathLabel,above left=-0.4mm] {$Y_I$};
+
+\end{tikzpicture}
+\end{document}

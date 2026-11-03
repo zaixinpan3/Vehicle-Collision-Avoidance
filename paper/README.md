@@ -96,7 +96,7 @@ nor sampled replay closes those gaps.
 ## Figures and submission fields
 
 The generated figure outputs are not tracked. Compilation uses
-`driving_environment_junction_v20.pdf`, `ego_obstacle_dynamics_v03.pdf`,
+`driving_environment_junction_v20.pdf`, `ego_obstacle_dynamics_v04.pdf`,
 `system_architecture_v12.pdf`, and `closed_loop_results_v03.pdf`.
 The generated manuscript PDF and these figure dependencies are excluded
 from the source commit.
@@ -108,7 +108,7 @@ The driving-environment figure is generated in the same way from
 `figures/driving_environment_junction_v20.tex`. Both vehicle figures share
 `figures/vehicle_top_view_v01.tex`, which draws the contoured sedan body,
 glazing, mirrors and four tires with independently steered front wheels.
-The kinematics figure source is `figures/ego_obstacle_dynamics_v03.tex`.
+The kinematics figure source is `figures/ego_obstacle_dynamics_v04.tex`.
 
 Before submission, complete the author, affiliation, funding,
 competing-interest, contribution and repository-release declarations.
