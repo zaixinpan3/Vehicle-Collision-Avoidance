@@ -77,7 +77,7 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
         time=(node-1)*h;x=states(:,node);
         egoMargin=min(egoMargin,scenarioRoadFootprintMargin(x(1:3),shape,auditRoad,width));
         targetMargin=min(targetMargin,scenarioRoadFootprintMargin(q(1:3,node),q(8:11,node),auditRoad,width));
-        projection=laneGeometry.projectReferenceCurve(x(1:2),curve);
+        projection=predictiveSafetyGeometry.projectReferenceCurve(x(1:2),curve);
         maximum=max(maximum,abs(projection.lateralPosition));
         if min(egoMargin,targetMargin)<0,reason="footprintOutsideRoad";break;end
         if localStateViolation(x,cfg)>1e-9,reason="stateLimit";break;end

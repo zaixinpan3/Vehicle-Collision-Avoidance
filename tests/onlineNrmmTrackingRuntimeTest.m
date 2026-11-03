@@ -516,7 +516,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
 
         function inconsistentYawIntersectionPreservesThePointDynamics(testCase)
             runtime=localRuntime();baseline=runtime;
-            runtime.positionErrorBound.orientationSet=nrmmYawSet("initialize",pi,.01);
+            runtime.positionErrorBound.orientationSet=nrmmSet.yaw("initialize",pi,.01);
             frame=localCruiseFrame(0);
             [changed,output]=onlineNrmmTrackingRuntime("step",runtime,frame);
             [reference,~]=onlineNrmmTrackingRuntime("step",baseline,frame);
@@ -899,12 +899,12 @@ end
 function state = localTargetRk4(state, ego, domain, stepSize, substepCount)
 % Pure RK4 flow of the target model, matching the runtime substeps.
     for substepIdx = 1:substepCount
-        first = nrmmTargetTrackerDerivative(state, ego, domain);
-        second = nrmmTargetTrackerDerivative( ...
+        first = nrmmObserverVectorField("targetDerivative", state, ego, domain);
+        second = nrmmObserverVectorField("targetDerivative",  ...
             state+0.5*stepSize*first, ego, domain);
-        third = nrmmTargetTrackerDerivative( ...
+        third = nrmmObserverVectorField("targetDerivative",  ...
             state+0.5*stepSize*second, ego, domain);
-        fourth = nrmmTargetTrackerDerivative( ...
+        fourth = nrmmObserverVectorField("targetDerivative",  ...
             state+stepSize*third, ego, domain);
         state = state+(stepSize/6.0) ...
             * (first+2.0*second+2.0*third+fourth);

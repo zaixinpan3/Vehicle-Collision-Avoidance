@@ -69,7 +69,7 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
         trim = nonlinearBicycleModel.cruise(cfg,curvature);
         state = trim.state;state(1:2) = 0;
     end
-    [position,heading] = laneGeometry.referencePose(cfg.referenceSpeed*impactTime,0,curve);
+    [position,heading] = predictiveSafetyGeometry.referencePose(cfg.referenceSpeed*impactTime,0,curve);
     if name=="intersectionCrossing"
         center=position(1);width=road.scenarioHalfWidthMeters;reach=1000;
         road.drivablePolygons={[-reach,-width;reach,-width;reach,width;-reach,width], ...

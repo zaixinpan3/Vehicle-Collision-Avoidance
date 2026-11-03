@@ -383,7 +383,7 @@ end
 
 function maximum = localMaximumJacobianResidual(domain,matrix,metric,bandwidth,lambda)
 % Assemble the full six-state dynamics independently of the synthesis residual.
-    enclosure = nrmmTargetJacobian("enclosure",domain);
+    enclosure = nrmmObserverVectorField("targetJacobian", "enclosure",domain);
     energy = kron(metric,eye(2));
     maximum = -Inf;
     for index = 1:enclosure.vertexCount

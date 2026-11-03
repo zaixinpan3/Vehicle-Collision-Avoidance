@@ -345,12 +345,12 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                         rotation=[cos(states(j,3)),-sin(states(j,3));sin(states(j,3)),cos(states(j,3))];
                         vertices=states(j,1:2).'+rotation*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);
                         for vertex=1:4
-                            projection=laneGeometry.project(vertices(:,vertex),problem.model.lane);
+                            projection=predictiveSafetyGeometry.project(vertices(:,vertex),problem.model.lane);
                             minimumRoadMargin=min([minimumRoadMargin;projection.lateralPosition+road.lateralClearance(1);road.lateralClearance(2)-projection.lateralPosition]);
                         end
                     end
                 end
-                centerProjection=laneGeometry.project(states(:,1:2).',problem.model.lane);
+                centerProjection=predictiveSafetyGeometry.project(states(:,1:2).',problem.model.lane);
                 maximumDeviation=max(maximumDeviation,max(abs(centerProjection.lateralPosition)));
                 outside=find(abs(centerProjection.lateralPosition)>options.LateralDeviationLimitMeters+1e-6,1);
                 if ~isempty(outside),lateralLimitExceeded=true;lateralLimitTime=ego.stateTime+times(outside);end

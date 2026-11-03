@@ -51,7 +51,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
         function coastingDeceleratesAndBalancedForceHoldsCruise(testCase)
             cfg = collisionAvoidanceControllerConfig();
             initial = [0; 0; 0; 15; 0; 0];
-            balance = nonlinearBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
+            balance = nonlinearBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*nonlinearBicycleModel.tireAccelerationGain(cfg));
             coasting = nonlinearBicycleModel.sample(initial,[0;0],cfg);
             cruise = nonlinearBicycleModel.sample(initial,[0;balance],cfg);
 
@@ -73,7 +73,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             coriolis=problem.model.initialState(6)*problem.model.initialState(5);
             testCase.verifyEqual(derivative(4),forceDerivative+steeringCorrection+coriolis,AbsTol=1e-12);
             testCase.verifyEqual(command.totalLongitudinalActuatorForce, ...
-                cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg)*command.actuatorInput(2), AbsTol=1.0e-10);
+                cfg.vehicle.m*nonlinearBicycleModel.tireAccelerationGain(cfg)*command.actuatorInput(2), AbsTol=1.0e-10);
             testCase.verifyEqual(forceDerivative, (command.totalLongitudinalTireForce ...
                 -command.aerodynamicResistanceForce)/cfg.vehicle.m, AbsTol=1.0e-12);
             testCase.verifyEqual(sum(command.axleNormalLoad), cfg.vehicle.m*cfg.vehicle.gravity, AbsTol=1.0e-10);
@@ -81,7 +81,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
 
         function theCruiseEquilibriumAccountsForPassiveForces(testCase)
             [~, problem, cfg] = localProblem(15);
-            requiredInput = nonlinearBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
+            requiredInput = nonlinearBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*nonlinearBicycleModel.tireAccelerationGain(cfg));
 
             testCase.verifyEqual(problem.metadata.clfOperatingInput, [0;requiredInput], AbsTol=1.0e-12);
             testCase.verifyGreaterThan(requiredInput, 0.0);

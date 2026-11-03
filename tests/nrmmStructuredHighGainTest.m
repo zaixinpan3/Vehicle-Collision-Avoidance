@@ -171,7 +171,7 @@ classdef nrmmStructuredHighGainTest < matlab.unittest.TestCase
 end
 
 function phi = localPhi(q,s,domain)
-    derivative = nrmmTargetTrackerDerivative([zeros(2,1);q;s], ...
+    derivative = nrmmObserverVectorField("targetDerivative", [zeros(2,1);q;s], ...
         struct("bodyVelocity",zeros(2,1),"yawRate",0),domain);
     phi = derivative(5:6);
 end

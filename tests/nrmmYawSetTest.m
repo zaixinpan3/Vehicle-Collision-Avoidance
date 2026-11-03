@@ -7,70 +7,70 @@ classdef nrmmYawSetTest < matlab.unittest.TestCase
     end
     methods (Test)
         function radiusAboutAnObserverIncludesItsOffsetFromTheArcCenter(testCase)
-            set = nrmmYawSet("initialize",0.2,0.1);
-            radius = nrmmYawSet("radiusAbout",set,-0.4);
+            set = nrmmSet.yaw("initialize",0.2,0.1);
+            radius = nrmmSet.yaw("radiusAbout",set,-0.4);
             testCase.verifyEqual(radius,0.7,AbsTol=1e-12);
         end
 
         function interiorAntipodeSetsTheMaximumCircularDistance(testCase)
-            set = nrmmYawSet("initialize",pi,0.2);
-            radius = nrmmYawSet("radiusAbout",set,0);
+            set = nrmmSet.yaw("initialize",pi,0.2);
+            radius = nrmmSet.yaw("radiusAbout",set,0);
             testCase.verifyEqual(radius,pi,AbsTol=0);
         end
 
         function disconnectedComponentsAreAllIncludedAboutTheObserver(testCase)
-            first = nrmmYawSet("initialize",0,2.5);
-            second = nrmmYawSet("initialize",pi,2.5);
-            set = nrmmYawSet("intersect",first,second);
-            radius = nrmmYawSet("radiusAbout",set,0);
+            first = nrmmSet.yaw("initialize",0,2.5);
+            second = nrmmSet.yaw("initialize",pi,2.5);
+            set = nrmmSet.yaw("intersect",first,second);
+            radius = nrmmSet.yaw("radiusAbout",set,0);
             testCase.verifyEqual(radius,2.5,AbsTol=1e-12);
         end
 
         function invalidAndFullSetsHaveTheDeclaredObserverRadii(testCase)
-            first = nrmmYawSet("initialize",0,0.1);
-            second = nrmmYawSet("initialize",pi,0.1);
-            empty = nrmmYawSet("intersect",first,second);
-            full = nrmmYawSet("initialize",0,pi);
-            testCase.verifyTrue(isinf(nrmmYawSet("radiusAbout",empty,0.8)));
-            testCase.verifyEqual(nrmmYawSet("radiusAbout",full,0.8),pi,AbsTol=0);
+            first = nrmmSet.yaw("initialize",0,0.1);
+            second = nrmmSet.yaw("initialize",pi,0.1);
+            empty = nrmmSet.yaw("intersect",first,second);
+            full = nrmmSet.yaw("initialize",0,pi);
+            testCase.verifyTrue(isinf(nrmmSet.yaw("radiusAbout",empty,0.8)));
+            testCase.verifyEqual(nrmmSet.yaw("radiusAbout",full,0.8),pi,AbsTol=0);
         end
 
         function observerRadiusRespectsTheCircleCut(testCase)
-            set = nrmmYawSet("initialize",pi-0.02,0.1);
-            radius = nrmmYawSet("radiusAbout",set,-pi+0.03);
+            set = nrmmSet.yaw("initialize",pi-0.02,0.1);
+            radius = nrmmSet.yaw("radiusAbout",set,-pi+0.03);
             testCase.verifyEqual(radius,0.15,AbsTol=1e-12);
         end
 
         function wrappingRetainsOnePhysicalArc(testCase)
-            set = nrmmYawSet("initialize",pi-0.01,0.1);
-            set = nrmmYawSet("propagate",set,0.03,0.02);
+            set = nrmmSet.yaw("initialize",pi-0.01,0.1);
+            set = nrmmSet.yaw("propagate",set,0.03,0.02);
             testCase.verifyEqual(set.heading,-pi+0.02,AbsTol=1e-13);
             testCase.verifyEqual(set.radius,0.12,AbsTol=1e-13);
         end
 
         function uninformativeMeasurementPreservesThePrior(testCase)
-            prior = nrmmYawSet("initialize",-0.4,0.2);
-            full = nrmmYawSet("initialize",1.1,Inf);
-            next = nrmmYawSet("intersect",prior,full);
+            prior = nrmmSet.yaw("initialize",-0.4,0.2);
+            full = nrmmSet.yaw("initialize",1.1,Inf);
+            next = nrmmSet.yaw("intersect",prior,full);
             testCase.verifyEqual(next,prior,AbsTol=1e-13);
             testCase.verifyEqual(full.radius,pi,AbsTol=0);
         end
 
         function disjointMeasurementsRemainInvalidThroughPropagation(testCase)
-            first = nrmmYawSet("initialize",0,0.1);
-            second = nrmmYawSet("initialize",pi,0.1);
-            empty = nrmmYawSet("intersect",first,second);
-            propagated = nrmmYawSet("propagate",empty,0.4,1);
-            retried = nrmmYawSet("intersect",propagated,first);
+            first = nrmmSet.yaw("initialize",0,0.1);
+            second = nrmmSet.yaw("initialize",pi,0.1);
+            empty = nrmmSet.yaw("intersect",first,second);
+            propagated = nrmmSet.yaw("propagate",empty,0.4,1);
+            retried = nrmmSet.yaw("intersect",propagated,first);
             testCase.verifyFalse(retried.valid);
             testCase.verifyEmpty(retried.intervals);
             testCase.verifyTrue(isinf(retried.radius));
         end
 
         function largeArcIntersectionRetainsDisconnectedComponents(testCase)
-            first = nrmmYawSet("initialize",0,2.5);
-            second = nrmmYawSet("initialize",pi,2.5);
-            result = nrmmYawSet("intersect",first,second);
+            first = nrmmSet.yaw("initialize",0,2.5);
+            second = nrmmSet.yaw("initialize",pi,2.5);
+            result = nrmmSet.yaw("intersect",first,second);
             testCase.verifySize(result.intervals,[2,2]);
             testCase.verifyEqual(result.intervals, ...
                 [pi-2.5,2.5;2*pi-2.5,pi+2.5],AbsTol=1e-13);
@@ -78,17 +78,17 @@ classdef nrmmYawSetTest < matlab.unittest.TestCase
         end
 
         function sharedEndpointsAreTheSamePointAcrossTheCircleCut(testCase)
-            first = nrmmYawSet("initialize",0.1,0.1);
-            second = nrmmYawSet("initialize",-0.1,0.1);
-            result = nrmmYawSet("intersect",first,second);
+            first = nrmmSet.yaw("initialize",0.1,0.1);
+            second = nrmmSet.yaw("initialize",-0.1,0.1);
+            result = nrmmSet.yaw("intersect",first,second);
             testCase.verifyTrue(result.valid);
             testCase.verifyEqual(result.heading,0,AbsTol=1e-13);
             testCase.verifyEqual(result.radius,0,AbsTol=1e-13);
         end
 
         function uncertaintyGrowthCanReachTheWholeCircle(testCase)
-            first = nrmmYawSet("initialize",0.8,0.2);
-            result = nrmmYawSet("propagate",first,0.3,pi);
+            first = nrmmSet.yaw("initialize",0.8,0.2);
+            result = nrmmSet.yaw("propagate",first,0.3,pi);
             testCase.verifyEqual(result.intervals,[0,2*pi],AbsTol=0);
             testCase.verifyEqual(result.radius,pi,AbsTol=0);
         end

@@ -12,11 +12,11 @@ classdef controllerInputGeometryTest < matlab.unittest.TestCase
     end
     methods (Test)
         function referenceProjectionRecoversLaneCoordinates(testCase,curvature)
-            curve=laneGeometry.validateReferenceCurve(struct('origin',[2;3], ...
+            curve=predictiveSafetyGeometry.validateReferenceCurve(struct('origin',[2;3], ...
                 'heading',.4,'curvature',curvature,'length',200));
             station=[-10,0,40,210];lateral=[.2,-.5,1,0];
-            position=laneGeometry.referencePose(station,lateral,curve);
-            projection=laneGeometry.projectReferenceCurve(position,curve,station);
+            position=predictiveSafetyGeometry.referencePose(station,lateral,curve);
+            projection=predictiveSafetyGeometry.projectReferenceCurve(position,curve,station);
             testCase.verifyEqual(projection.station,station,AbsTol=1e-11);
             testCase.verifyEqual(projection.lateralPosition,lateral,AbsTol=1e-11);
         end
@@ -53,7 +53,7 @@ classdef controllerInputGeometryTest < matlab.unittest.TestCase
             domain.yawRateMaximum=domain.speedMaximum*sin(domain.sideslipMaximum)/domain.rearAxleDistance;
             domain.accelerationNormBound=hypot(domain.scalarAccelerationMaximum,domain.speedMaximum*domain.yawRateMaximum);
             v=6*[cos(.38);sin(.38)];acceleration=1.2*v/6+6*sin(.08)/1.8*[-v(2);v(1)];
-            [~,estimate]=nrmmTargetTrackerDerivative([20;1;v;acceleration], ...
+            [~,estimate]=nrmmObserverVectorField("targetDerivative", [20;1;v;acceleration], ...
                 struct('bodyVelocity',[8;0],'yawRate',0),domain);
             testCase.verifyEqual(estimate.targetRearAxleDistance,1.8);
             testCase.verifyEqual(estimate.targetScalarAcceleration,1.2,AbsTol=1e-14);
@@ -102,7 +102,7 @@ classdef controllerInputGeometryTest < matlab.unittest.TestCase
         function varyingCurvatureIsOutsideTheCurrentReferenceModel(testCase)
             curve=struct('origin',[0;0],'heading',0,'curvature',0, ...
                 'length',100,'curvatureProfile',[0,0;100,.01]);
-            testCase.verifyError(@()laneGeometry.validateReferenceCurve(curve), ...
+            testCase.verifyError(@()predictiveSafetyGeometry.validateReferenceCurve(curve), ...
                 'collisionAvoidanceController:unsupportedReference');
         end
     end

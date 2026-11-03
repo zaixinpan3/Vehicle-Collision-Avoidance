@@ -37,7 +37,7 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(published.egoBodyVelocity, output.egoBodyVelocity);
             testCase.verifyEqual(published.egoBodyVelocityErrorBound, bound.bodyVelocity);
             for center = [0, 3.13, -1.2]
-                bound.orientationSet = nrmmYawSet("initialize", center, 0.05);
+                bound.orientationSet = nrmmSet.yaw("initialize", center, 0.05);
                 input.gnssVelocity = localRotation(center)*[10;0];
                 published = nrmmControllerErrorBounds("publish",output, bound, input, testCase.Design);
                 for heading = center+linspace(-0.05, 0.05, 21)
@@ -171,7 +171,7 @@ function [output, bound, input] = localVelocityFixture()
         "egoBodyVelocity",[10;0],"targetEstimate",struct.empty);
     bound = struct("yaw",0.05,"bodyVelocity",0.8,"egoValid",true, ...
         "holdBounds",struct("yawAcceleration",0,"acceleration",Inf), ...
-        "orientationSet",nrmmYawSet("initialize",0,0.05),"scope","test enclosure");
+        "orientationSet",nrmmSet.yaw("initialize",0,0.05),"scope","test enclosure");
     input = struct("time",0,"yawRate",0,"gnssPosition",[0;0],"gnssVelocity",[10;0]);
 end
 
@@ -205,7 +205,7 @@ function [published, actualError, truth, output, bound, input] = localReconstruc
         case 2
             estimated(3:4) = [1e-6; -1e-6];
     end
-    [~, target] = nrmmTargetTrackerDerivative(estimated, ...
+    [~, target] = nrmmObserverVectorField("targetDerivative", estimated, ...
         struct("bodyVelocity", estimatedEgoVelocity, "yawRate", 0), domain);
     target.targetPositionInertial = estimatedPosition+estimatedRotation*estimated(1:2);
     target.targetVelocityInertial = estimatedRotation*estimated(3:4);
@@ -218,7 +218,7 @@ function [published, actualError, truth, output, bound, input] = localReconstruc
         "targetComponents", components, "trueRangeMaximum", norm(actual(1:2)), ...
         "egoValid", true, "valid", true, "scope", "declared test enclosure", ...
         "holdBounds", struct("yawAcceleration", 0), ...
-        "orientationSet",nrmmYawSet("initialize",estimatedYaw,abs(geometry(2))));
+        "orientationSet",nrmmSet.yaw("initialize",estimatedYaw,abs(geometry(2))));
     input = struct("time", 0, "yawRate", 0, "gnssPosition", ...
         position+design.sensors.positionNoiseMaximum*[1; 1]/sqrt(2));
     published = nrmmControllerErrorBounds("publish",output, bound, input, design);

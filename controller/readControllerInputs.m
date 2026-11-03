@@ -253,13 +253,13 @@ function [lane, road] = localReadLane(rawGeometry, ego)
     end
     if isempty(rawLane) && isstruct(rawGeometry) && isfield(rawGeometry,"referenceCurve") ...
             && ~isempty(rawGeometry.referenceCurve)
-        curve=laneGeometry.validateReferenceCurve(rawGeometry.referenceCurve);
-        rawLane=laneGeometry.referencePose(linspace(0,curve.length,max(2,ceil(curve.length/2)+1)),0,curve).';
+        curve=predictiveSafetyGeometry.validateReferenceCurve(rawGeometry.referenceCurve);
+        rawLane=predictiveSafetyGeometry.referencePose(linspace(0,curve.length,max(2,ceil(curve.length/2)+1)),0,curve).';
     end
     lane = localReadCenterline(rawLane, ego);
     if isstruct(rawGeometry) && isfield(rawGeometry, "referenceCurve") ...
             && ~isempty(rawGeometry.referenceCurve)
-        lane.referenceCurve = laneGeometry.validateReferenceCurve(rawGeometry.referenceCurve);
+        lane.referenceCurve = predictiveSafetyGeometry.validateReferenceCurve(rawGeometry.referenceCurve);
     end
     road=struct('lateralClearance',zeros(2,0));
     if isstruct(rawGeometry)

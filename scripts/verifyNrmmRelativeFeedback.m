@@ -27,7 +27,7 @@ function result = verifyNrmmRelativeFeedback(outputFile, horizonSteps)
     end
     [~,a,b] = nonlinearBicycleModel.sample(reference.state,reference.input,cfg);
     gain = -dlqr(a,b,diag([1 4 20 1 1 2]),diag([20 1]));
-    tire = modifiedFialaTire.parameters(cfg);shape = [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    tire = nonlinearBicycleModel.tireParameters(cfg);shape = [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     offset = [-.1,.1];finalEgo = zeros(1,2);finalTarget = zeros(1,2);
     peak = zeros(1,2);firstInputs = zeros(2,2);maximumInput = zeros(2,1);
     clearance = Inf;targetPositionError = 0;targetSpeedError = 0;

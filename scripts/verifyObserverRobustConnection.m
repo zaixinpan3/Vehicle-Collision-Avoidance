@@ -1,7 +1,7 @@
 function results = verifyObserverRobustConnection(outputPath)
 %verifyObserverRobustConnection Check the observer-to-PCBF derivation.
 % Finite algebraic examples, exact extremizers and counterexamples support
-% OBSERVER_ROBUST_PCBF_THEORY.tex. They are not a vehicle safety certificate,
+% controller/CONTROLLER_THEORY.md. They are not a vehicle safety certificate,
 % a validated interval proof, or a closed-loop scenario campaign.
 
     arguments

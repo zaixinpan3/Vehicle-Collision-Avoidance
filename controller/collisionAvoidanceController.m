@@ -443,14 +443,14 @@ function [command,predictedInput,prediction,controllerState] = ...
 end
 
 function command=localCommand(input,state,cfg)
-    tire=modifiedFialaTire.parameters(cfg);force=modifiedFialaTire.longitudinalForce(input(2),cfg);
+    tire=nonlinearBicycleModel.tireParameters(cfg);force=nonlinearBicycleModel.tireLongitudinalForce(input(2),cfg);
     slip=atan2([state(5)+cfg.vehicle.lf*state(6);state(5)-cfg.vehicle.lr*state(6)],state(4))-[input(1);0];
-    lateral=modifiedFialaTire.evaluate(slip,input(2),cfg);dx=nonlinearBicycleModel.derivative(state,input,cfg);
+    lateral=nonlinearBicycleModel.tireForces(slip,input(2),cfg);dx=nonlinearBicycleModel.derivative(state,input,cfg);
     [road,~,components]=nonlinearBicycleModel.roadLoad(state(4),cfg);
     rolling=components.rollingResistanceForce*tire.staticNormalLoad/(cfg.vehicle.m*cfg.vehicle.gravity);
     command=struct('actuatorInput',input,'frontWheelSteeringAngle',input(1),'brakingRatio',input(2), ...
         'actuatorInputOrder',["frontWheelSteeringAngle","brakingRatio"], ...
-        'longitudinalAcceleration',modifiedFialaTire.accelerationGain(cfg)*input(2), ...
+        'longitudinalAcceleration',nonlinearBicycleModel.tireAccelerationGain(cfg)*input(2), ...
         'bodyLongitudinalVelocityDerivative',dx(4),'lateralAcceleration',dx(5),'yawAcceleration',dx(6), ...
         'totalLongitudinalActuatorForce',sum(force),'totalLongitudinalTireForce',sum(force-rolling), ...
         'axleLongitudinalTireForce',force-rolling,'axleLongitudinalForce',force, ...
@@ -529,10 +529,10 @@ function localWarmUp(cfg,referenceRoad)
     if isstruct(referenceRoad) && isfield(referenceRoad,'referenceCurve')
         % Prepare the supplied road outside the online budget. The opposing
         % target meets path cruise after 1.6 s; every probe output is discarded.
-        curve=laneGeometry.validateReferenceCurve(referenceRoad.referenceCurve);
+        curve=predictiveSafetyGeometry.validateReferenceCurve(referenceRoad.referenceCurve);
         reference=nonlinearBicycleModel.cruise(cfg,curve.curvature);
         x=reference.state;x(1:2)=curve.origin;x(3)=x(3)+curve.heading;
-        [position,heading]=laneGeometry.referencePose(cfg.referenceSpeed*1.6,0,curve);
+        [position,heading]=predictiveSafetyGeometry.referencePose(cfg.referenceSpeed*1.6,0,curve);
         beta=asin(-curve.curvature*cfg.target.rearAxleDistance);
         impact=[position;heading+pi-beta;8;0;beta;cfg.target.rearAxleDistance; ...
             cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];

@@ -52,7 +52,7 @@ function results = verifyFeedbackAwarePrediction(outputFile)
 end
 
 function result=localRelativeTube(cfg,reference,a,b,gain,generator,closed)
-    tire=modifiedFialaTire.parameters(cfg);
+    tire=nonlinearBicycleModel.tireParameters(cfg);
     [~,slope]=nonlinearBicycleModel.roadLoad(reference.state(4),cfg);
     feedforward=[0;slope/sum(tire.longitudinalForceScale)];
     velocity=[0;0;0;1;0;0];position=[1;0;0;0;0;0];
@@ -163,7 +163,7 @@ end
 function result=localTargetRelative(cfg,reference,gain,count)
     h=cfg.controller.sampleTime;separation=6;offset=[-.1,.1];
     finalEgo=zeros(1,2);finalTarget=zeros(1,2);relative=zeros(1,2);
-    peak=zeros(1,2);first=zeros(2,2);tire=modifiedFialaTire.parameters(cfg);
+    peak=zeros(1,2);first=zeros(2,2);tire=nonlinearBicycleModel.tireParameters(cfg);
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     minimumDistance=Inf;
     for world=1:2

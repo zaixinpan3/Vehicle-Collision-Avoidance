@@ -89,7 +89,7 @@ classdef nrmmYawObserverTest < matlab.unittest.TestCase
 
         function inconsistentYawSetNeverResetsTheContinuousObserver(testCase)
             runtime = localRuntime(testCase.Config,testCase.Design,0.4,[15;0]);
-            runtime.positionErrorBound.orientationSet = nrmmYawSet("initialize",pi,0.01);
+            runtime.positionErrorBound.orientationSet = nrmmSet.yaw("initialize",pi,0.01);
             [~,output] = onlineNrmmTrackingRuntime("step",runtime,localFrame(0,[15;0],0));
             expected = 2*atan(tan(.4/2)*exp(-testCase.Design.yaw.correctionBandwidth*runtime.samplePeriod ...
                 *225/(225+(testCase.Design.positionVelocity.bandwidth*testCase.Design.sensors.positionNoiseMaximum)^2)));

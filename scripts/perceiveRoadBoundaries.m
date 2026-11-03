@@ -77,8 +77,8 @@ function map=localMap(road)
     if isscalar(width),width=[width;width];end
     if isfield(road,'referenceCurve')
         curve=road.referenceCurve;station=-100:.5:curve.length+200;
-        [upper,~]=laneGeometry.referencePose(station,width(2),curve);
-        [lower,~]=laneGeometry.referencePose(station,-width(1),curve);
+        [upper,~]=predictiveSafetyGeometry.referencePose(station,width(2),curve);
+        [lower,~]=predictiveSafetyGeometry.referencePose(station,-width(1),curve);
         vertices=[upper,fliplr(lower)].';
     else
         points=road.centerline;direction=points(end,:)-points(1,:);direction=direction/norm(direction);

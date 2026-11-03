@@ -64,39 +64,39 @@ classdef nrmmPositionOnlyTest < matlab.unittest.TestCase
         function accelerationAndPositionNoiseRemainInsideTheVelocityEnclosure(testCase)
             [runtime,~]=localFixture();design=runtime.observerDesign;dt=.0125;
             hold=struct('acceleration',2,'bodyAccelerationRate',2,'yawAcceleration',0);
-            filter=nrmmPositionVelocity('initialize',[.04;0],[7;0],.04,1,dt,8);
+            filter=nrmmObserverVectorField("positionVelocity", 'initialize',[.04;0],[7;0],.04,1,dt,8);
             largest=0;
             for k=0:399
                 t=k*dt;truthP=[8*t+1-cos(t);0];truthV=[8+sin(t);0];
                 position=truthP+.04*[cos(1.7*k);sin(1.7*k)];
-                filter=nrmmPositionVelocity('measure',filter,position,.04);
+                filter=nrmmObserverVectorField("positionVelocity", 'measure',filter,position,.04);
                 error=norm(filter.point(3:4)-truthV);
                 testCase.verifyLessThanOrEqual(error,filter.velocityRadius+1e-12);
                 largest=max(largest,error);
                 acceleration=[cos(t);0]+.03*[cos(.8*k);sin(.8*k)];
-                filter=nrmmPositionVelocity('predict',filter,acceleration,0,0,design,hold);
+                filter=nrmmObserverVectorField("positionVelocity", 'predict',filter,acceleration,0,0,design,hold);
             end
             testCase.verifyGreaterThan(largest,.1);
             testCase.verifyLessThan(filter.velocityRadius,1);
         end
         function yawUncertaintyEnlargesTheImuPredictionBound(testCase)
             [runtime,~]=localFixture();d=runtime.observerDesign;
-            f=nrmmPositionVelocity('initialize',[0;0],[8;0],.04,.2,.0125,8);
+            f=nrmmObserverVectorField("positionVelocity", 'initialize',[0;0],[8;0],.04,.2,.0125,8);
             h=struct('acceleration',10,'bodyAccelerationRate',0,'yawAcceleration',0);
-            narrow=nrmmPositionVelocity('predict',f,[1;0],0,0,d,h);
-            wide=nrmmPositionVelocity('predict',f,[1;0],0,.5,d,h);
+            narrow=nrmmObserverVectorField("positionVelocity", 'predict',f,[1;0],0,0,d,h);
+            wide=nrmmObserverVectorField("positionVelocity", 'predict',f,[1;0],0,.5,d,h);
             testCase.verifyGreaterThan(sum(abs(wide.generator(2,:))),sum(abs(narrow.generator(2,:))));
         end
         function positionSecantsRetainVelocityInformationWithALooseJerkBound(testCase)
             [runtime,~]=localFixture();design=runtime.observerDesign;dt=.0125;
-            filter=nrmmPositionVelocity('initialize',[0;0],[8;0],.04,.2,dt,8);
+            filter=nrmmObserverVectorField("positionVelocity", 'initialize',[0;0],[8;0],.04,.2,dt,8);
             hold=struct('acceleration',10,'bodyAccelerationRate',Inf,'yawAcceleration',5);
             for k=0:159
                 time=k*dt;position=[8*time;0]+.04*[cos(1.7*k);sin(1.7*k)];
-                filter=nrmmPositionVelocity('measure',filter,position,.04);
+                filter=nrmmObserverVectorField("positionVelocity", 'measure',filter,position,.04);
                 testCase.verifyLessThanOrEqual(norm(filter.point(3:4)-[8;0]),filter.velocityRadius+1e-12);
                 if k>40,testCase.verifyLessThan(filter.velocityRadius,2);end
-                filter=nrmmPositionVelocity('predict',filter,[0;0],0,.1,design,hold);
+                filter=nrmmObserverVectorField("positionVelocity", 'predict',filter,[0;0],0,.1,design,hold);
             end
         end
     end

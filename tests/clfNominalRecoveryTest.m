@@ -20,7 +20,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 'solver',struct('method',"rti",'timeLimitSeconds',5)));
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
-            [position,heading]=laneGeometry.referencePose(0,lateralError,road.referenceCurve);
+            [position,heading]=predictiveSafetyGeometry.referencePose(0,lateralError,road.referenceCurve);
             x=[position;heading+reference.state(3)+.2*(lateralError<0);reference.state(4:6)];
             ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5), ...
                 'yawRate',x(6),'heldActuatorInput',reference.input);
@@ -95,7 +95,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 'solver',struct('method',"rti",'timeLimitSeconds',5)));
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',600));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
-            [position,heading]=laneGeometry.referencePose(0,0,road.referenceCurve);
+            [position,heading]=predictiveSafetyGeometry.referencePose(0,0,road.referenceCurve);
             x=[position;heading+reference.state(3);reference.state(4:6)];
             prior=[];input=reference.input;worst=zeros(5,1);slack=0;
             for frame=1:300

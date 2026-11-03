@@ -80,7 +80,7 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
         function saturatedRearForceStillProducesAnEnclosingInterval(testCase)
             [model,sensors,cfg]=localModel(0.05);
             x=[0;0;0;15;2;0];input=[0;.8];
-            tire=modifiedFialaTire.parameters(cfg);
+            tire=nonlinearBicycleModel.tireParameters(cfg);
             saturationTangent=3*tire.longitudinalForceScale(2)*sqrt(1-input(2)^2)/tire.corneringStiffness(2);
             testCase.verifyGreaterThan(x(5)/x(4),saturationTangent);
             d=nonlinearBicycleModel.derivative(x,input,cfg);
@@ -101,7 +101,7 @@ classdef nrmmModelAidedEstimationTest < matlab.unittest.TestCase
         function estimatorDomainIsComputedFromTheController(testCase)
             controller=collisionAvoidanceControllerConfig();
             estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),controller);
-            domain=estimator.observer.ego.domain;tire=modifiedFialaTire.parameters(controller);
+            domain=estimator.observer.ego.domain;tire=nonlinearBicycleModel.tireParameters(controller);
             lateralMaximum=min(controller.model.lateralVelocityMaximum, ...
                 tan(controller.model.sideslipMaximum)*controller.model.speedMaximum);
             testCase.verifyEqual(domain.speedMaximum,hypot(controller.model.speedMaximum,lateralMaximum));

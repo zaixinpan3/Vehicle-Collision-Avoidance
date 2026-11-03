@@ -22,7 +22,7 @@ function certificate = nrmmObserverCertificate(action, varargin)
 %       held-input error bounds. Returns disturbanceBound and ultimateBound.
 %   certificate = nrmmObserverCertificate("targetLipschitz", domain)
 %       Global Lipschitz bounds of the unchanged saturated NRMM map: for all
-%       q1,q2,s1,s2 in R^2 the extension in nrmmTargetTrackerDerivative
+%       q1,q2,s1,s2 in R^2 the extension in nrmmObserverVectorField targetDerivative
 %       satisfies |Phi_e(q1,s1)-Phi_e(q2,s2)| <= Lq*|q1-q2|+Ls*|s1-s2|.
 %       The bounds are analytic over all radial and scalar saturation
 %       regions, not a sampled Jacobian maximum; the acceleration Jacobian

@@ -244,11 +244,11 @@ classdef terminalSafeSet
             reach=norm(shape(1:2))+norm(shape(3:4));
             clearance=[Inf;Inf];
             if ~isempty(model.road.lateralClearance),clearance=model.road.lateralClearance;end
-            here=laneGeometry.project(model.initialState(1:2),model.lane);
+            here=predictiveSafetyGeometry.project(model.initialState(1:2),model.lane);
             context=struct('deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
                 'sampleTime',cfg.controller.sampleTime, ...
                 'sideslipMaximum',cfg.model.sideslipMaximum,'holdSpeed',cfg.model.brakeHoldSpeed, ...
-                'brakingRatio',-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg), ...
+                'brakingRatio',-cfg.terminal.brakingDecelerationMetersPerSecondSquared/nonlinearBicycleModel.tireAccelerationGain(cfg), ...
                 'brakingBounds',[cfg.actuation.brakingRatioMinimum;cfg.actuation.brakingRatioMaximum], ...
                 'rearAxleDistance',cfg.vehicle.lr, ...
                 'shape',shape,'reach',reach, ...
@@ -479,7 +479,7 @@ classdef terminalSafeSet
                 localCheckDeadline(context);
                 dual=localDual(path.pose(:,k),context.shape,q(:,k),[]);
                 if gap(k)<=1e-8
-                    projection=laneGeometry.project(path.pose(1:2,k),context.lane);
+                    projection=predictiveSafetyGeometry.project(path.pose(1:2,k),context.lane);
                     forward=predictiveSafetyGeometry.direction(projection.heading);
                     course=predictiveSafetyGeometry.direction(q(3,k)+q(6,k));
                     if abs(forward.'*course)>=sqrt(.5)
@@ -526,7 +526,7 @@ classdef terminalSafeSet
                             elseif abs(difference)<=1e-12
                                 % At exact symmetry retain the encounter's
                                 % passing side rather than inventing one.
-                                projection=laneGeometry.project(path.pose(1:2,end),context.lane);
+                                projection=predictiveSafetyGeometry.project(path.pose(1:2,end),context.lane);
                                 side=context.collisionSide*[-sin(projection.heading);cos(projection.heading)];
                                 if normal.'*side<0,dual=negative;end
                             end
@@ -670,7 +670,7 @@ classdef terminalSafeSet
             % These fixed-cost seed checks add no optimizer iterations.
             cfg=model.cfg;
             [lower,~]=nonlinearBicycleModel.inputBounds(cfg,true);low=lower(2);
-            law=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg);
+            law=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/nonlinearBicycleModel.tireAccelerationGain(cfg);
             fraction=1;ok=false;
             for braking=[cruise(2),max(low,law),max(low,-.95)]
                 input=[previous(1);braking];
@@ -695,7 +695,7 @@ classdef terminalSafeSet
         function level = stateLevel(reference,cfg)
             % Largest c with {e : e'Pe <= c} inside the linear state rows g'e <= b:
             % c = min b^2/(g' inv(P) g). Part of the cruise controller's certificate.
-            x=reference.state;tire=modifiedFialaTire.parameters(cfg);
+            x=reference.state;tire=nonlinearBicycleModel.tireParameters(cfg);
             k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
             t=tan(cfg.model.sideslipMaximum);lr=cfg.vehicle.lr;
             low=max(cfg.model.speedMinimum,cfg.model.scheduleSpeedFloor+1e-4);
@@ -724,12 +724,12 @@ classdef terminalSafeSet
             if nargin<5,duration=cfg.controller.sampleTime;end
             curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);
             lane=struct('referenceCurve',curve);
-            [~,heading]=laneGeometry.referencePose(50,0,curve);
+            [~,heading]=predictiveSafetyGeometry.referencePose(50,0,curve);
             chart=[[-sin(heading);cos(heading)],zeros(2,4);zeros(4,1),eye(4)];
             n=size(errors,2);a=nan(5,5,n);b=nan(5,2,n);plus=nan(5,n);
             for j=1:n
                 e=errors(:,j);
-                [position,yaw]=laneGeometry.referencePose(50,e(1),curve);
+                [position,yaw]=predictiveSafetyGeometry.referencePose(50,e(1),curve);
                 x=[position;yaw+reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
                 try
                     [next,ax,bx]=nonlinearBicycleModel.sample(x,reference.input+inputs(:,j),cfg,[],duration);
@@ -793,7 +793,7 @@ classdef terminalSafeSet
                 'rows',false(1,n),'input',nan(2,n));
             for j=1:n
                 e=errors(:,j);value=sum((f*e).^2);
-                [position,heading]=laneGeometry.referencePose(50,e(1),curve);
+                [position,heading]=predictiveSafetyGeometry.referencePose(50,e(1),curve);
                 x=[position;heading+reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
                 u=reference.input+reference.gain*e;result.input(:,j)=u;
                 try
@@ -850,7 +850,7 @@ classdef terminalSafeSet
                 points(:,corner,:)=reshape(x(1:2,:)+[c*corners(1,corner)-s*corners(2,corner); ...
                     s*corners(1,corner)+c*corners(2,corner)],2,1,n);
             end
-            projection=laneGeometry.project(reshape(points,2,[]),model.lane);
+            projection=predictiveSafetyGeometry.project(reshape(points,2,[]),model.lane);
             lateral=reshape(projection.lateralPosition,4,n);
             margin=min([clearance(2)-lateral;clearance(1)+lateral],[],1);
         end
@@ -1264,7 +1264,7 @@ function [margin,lateral,normal,local] = localRoad(context,pose)
         points(:,corner,:)=reshape(pose(1:2,:)+[c*local(1,corner)-s*local(2,corner); ...
             s*local(1,corner)+c*local(2,corner)],2,1,n);
     end
-    projection=laneGeometry.project(reshape(points,2,[]),context.lane,context.stationNow);
+    projection=predictiveSafetyGeometry.project(reshape(points,2,[]),context.lane,context.stationNow);
     lateral=reshape(projection.lateralPosition,4,n);
     heading=reshape(projection.heading,1,4,n);
     normal=[-sin(heading);cos(heading)];

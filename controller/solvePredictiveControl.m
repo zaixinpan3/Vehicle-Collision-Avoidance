@@ -66,7 +66,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         model.collisionEscapeNormals=zeros(2,2*size(anchor.inputs,2)+1);
         [model.collisionSide,model.retainCollisionSide]=localCollisionSide(model);
         if anchor.planner.used
-            projection=laneGeometry.project(model.initialState(1:2),model.lane);
+            projection=predictiveSafetyGeometry.project(model.initialState(1:2),model.lane);
             lateral=anchor.guide.direction.'*[-sin(projection.heading);cos(projection.heading)];
             if abs(lateral)>1e-8,model.collisionSide=sign(lateral);end
         end
@@ -159,7 +159,7 @@ end
 
 function [side,retain]=localCollisionSide(model)
     side=1;retain=false;if isempty(model.target),return;end
-    projection=laneGeometry.project(model.target(1:2),model.lane);
+    projection=predictiveSafetyGeometry.project(model.target(1:2),model.lane);
     forward=[cos(projection.heading);sin(projection.heading)];
     course=predictiveSafetyGeometry.direction(model.target(3)+model.target(6));
     retain=abs(forward.'*course)>=sqrt(.5);
@@ -1195,7 +1195,7 @@ function road=localRoadProjection(poses,model)
         points(:,corner,:)=reshape(poses(1:2,:)+[c*corners(1,corner)-s*corners(2,corner); ...
             s*corners(1,corner)+c*corners(2,corner)],2,1,n);
     end
-    projection=laneGeometry.project(reshape(points,2,[]),model.lane);
+    projection=predictiveSafetyGeometry.project(reshape(points,2,[]),model.lane);
     road=struct('lateral',reshape(projection.lateralPosition,4,n),'heading',reshape(projection.heading,4,n),'corners',corners);
 end
 

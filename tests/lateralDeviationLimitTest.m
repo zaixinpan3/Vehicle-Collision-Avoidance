@@ -20,8 +20,8 @@ classdef lateralDeviationLimitTest < matlab.unittest.TestCase
         end
         function measuredDeviationFollowsTheRotatedOrCurvedPath(testCase,curvature,side)
             curve=struct('origin',[20;-30],'heading',.7,'curvature',curvature,'length',100);
-            p=laneGeometry.referencePose(40,side*10,curve);
-            projection=laneGeometry.project(p,struct('referenceCurve',curve));
+            p=predictiveSafetyGeometry.referencePose(40,side*10,curve);
+            projection=predictiveSafetyGeometry.project(p,struct('referenceCurve',curve));
             testCase.verifyEqual(projection.lateralPosition,side*10,AbsTol=1e-11);
         end
         function terminalContinuationCanCrossTheExperimentThreshold(testCase)

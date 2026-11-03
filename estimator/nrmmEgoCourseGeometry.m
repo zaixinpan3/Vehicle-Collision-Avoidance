@@ -669,7 +669,7 @@ function lateral = localModelLateralVelocity(gnssVelocity, yawRate, bodyAccelera
 end
 
 function [force,angleSlope,capacitySlope] = localFiala(slip,stiffness,capacity)
-% Modified Fiala lateral force, identical to modifiedFialaTire.evaluate.
+% Modified Fiala lateral force, identical to nonlinearBicycleModel.tireForces.
     tangent = tan(slip);
     force = -capacity.*sign(slip);
     adhesion = capacity > 0 & abs(tangent) < 3*capacity./stiffness;

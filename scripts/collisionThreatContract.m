@@ -27,7 +27,7 @@ function contract = collisionThreatContract(names, speeds, options)
             if isfield(road,'referenceCurve'),curve = road.referenceCurve;curve.length = 1e4;end
             for t = 0:0.05:options.WindowSeconds
                 q = predictiveSafetyGeometry.predictTarget(q0,t);
-                position = laneGeometry.referencePose(x0(4)*t,0,curve);
+                position = predictiveSafetyGeometry.referencePose(x0(4)*t,0,curve);
                 if norm(q(1:2)-position(:)) > options.Range,continue;end
                 omega = q(4)*sin(q(6))/q(7);
                 speedLow = min(speedLow,q(4));speedHigh = max(speedHigh,q(4));

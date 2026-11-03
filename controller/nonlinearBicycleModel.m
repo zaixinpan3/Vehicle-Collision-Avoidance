@@ -235,12 +235,12 @@ classdef nonlinearBicycleModel
             % Fractional tire-parameter tangent of the SAME blended plant.
             % Order: C_f,C_r,mu_f,mu_r. No additional tire constraint is used.
             weight=localBlend(x(4),cfg);gradient=zeros(6,4);
-            scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+            scale=nonlinearBicycleModel.tireParameters(cfg).longitudinalForceScale;
             longitudinal=[zeros(2),diag(u(2)*scale)];
             c=cos(u(1));s=sin(u(1));body=zeros(3,4);
             if weight>0
                 slip=atan2([x(5)+cfg.vehicle.lf*x(6);x(5)-cfg.vehicle.lr*x(6)],x(4))-[u(1);0];
-                lateral=modifiedFialaTire.parameterJacobian(slip,u(2),cfg);
+                lateral=nonlinearBicycleModel.tireParameterJacobian(slip,u(2),cfg);
                 frontX=c*longitudinal(1,:)-s*lateral(1,:);
                 frontY=s*longitudinal(1,:)+c*lateral(1,:);
                 body=weight*[(frontX+longitudinal(2,:))/cfg.vehicle.m; ...
@@ -350,7 +350,7 @@ classdef nonlinearBicycleModel
         end
 
         function [error,projection] = error(x,lane,reference)
-            projection=laneGeometry.project(x(1:2),lane);
+            projection=predictiveSafetyGeometry.project(x(1:2),lane);
             angle=atan2(sin(x(3)-projection.heading-reference.state(3)), ...
                 cos(x(3)-projection.heading-reference.state(3)));
             error=[projection.lateralPosition;angle;x(4:6)-reference.state(4:6)];
@@ -363,14 +363,14 @@ classdef nonlinearBicycleModel
             % from the inverse Fiala curve below its force peak, and a speed loop on
             % the braking ratio. terminal.steeringOffset makes the trim an exact
             % equilibrium (the inverse neglects the front longitudinal force).
-            p=cfg.nominalClf;projection=laneGeometry.project(x(1:2),lane);
+            p=cfg.nominalClf;projection=predictiveSafetyGeometry.project(x(1:2),lane);
             lateral=projection.lateralPosition;curvature=reference.curvature;
             speed=hypot(x(4),x(5));course=localWrap(x(3)+atan2(x(5),x(4))-projection.heading);
             lookahead=max(p.minimumLookaheadMeters,p.lookaheadSeconds*hypot(reference.state(4),reference.state(5)));
             desired=-atan(lateral/lookahead);desiredRate=-lookahead/(lookahead^2+lateral^2)*speed*sin(course);
             yawRate=curvature*speed*cos(course)/max(1-curvature*lateral,.1)+desiredRate ...
                 -p.courseGain*localWrap(course-desired);
-            tire=modifiedFialaTire.parameters(cfg);
+            tire=nonlinearBicycleModel.tireParameters(cfg);
             limit=p.lateralAccelerationFraction*min(tire.frictionCoefficient)*cfg.vehicle.gravity/max(speed,1);
             yawRate=min(limit,max(-limit,yawRate));
             b=reference.input(2)+p.speedGain*(reference.state(4)-x(4));
@@ -379,7 +379,7 @@ classdef nonlinearBicycleModel
             if isfinite(rate),b=min(previous(2)+rate,max(previous(2)-rate,b));end
             [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
             b=min(upper(2),max(lower(2),b));
-            rear=modifiedFialaTire.evaluate([0;atan2(x(5)-cfg.vehicle.lr*x(6),x(4))],b,cfg);
+            rear=nonlinearBicycleModel.tireForces([0;atan2(x(5)-cfg.vehicle.lr*x(6),x(4))],b,cfg);
             front=(cfg.vehicle.Iz*p.yawRateGain*(yawRate-x(6))+cfg.vehicle.lr*rear(2))/cfg.vehicle.lf;
             capacity=tire.longitudinalForceScale(1)*sqrt(1-b^2);
             fraction=min(abs(front)/capacity,p.frontForceFraction);
@@ -395,7 +395,7 @@ classdef nonlinearBicycleModel
             if nargin<6,coupled=false;end
             speed=hypot(x(4),x(5));course=x(3)+atan2(x(5),x(4));
             forward=[cos(course);sin(course)];lateral=[-forward(2);forward(1)];
-            tire=modifiedFialaTire.parameters(cfg);p=cfg.nominalClf;
+            tire=nonlinearBicycleModel.tireParameters(cfg);p=cfg.nominalClf;
             desiredYaw=(lateral.'*acceleration)/max(speed,1);
             limit=cfg.planner.lateralAccelerationFraction*min(tire.frictionCoefficient)*cfg.vehicle.gravity/max(speed,1);
             % Slow turns must remain reachable in the same sideslip domain as
@@ -405,7 +405,7 @@ classdef nonlinearBicycleModel
             desiredYaw=min(limit,max(-limit,desiredYaw));
             longitudinal=longitudinalWeight*(forward.'*acceleration);
             longitudinal=min(longitudinal,(cfg.model.speedMaximum-x(4))/cfg.controller.sampleTime);
-            b=(longitudinal+nonlinearBicycleModel.roadLoad(x(4),cfg)/cfg.vehicle.m)/modifiedFialaTire.accelerationGain(cfg);
+            b=(longitudinal+nonlinearBicycleModel.roadLoad(x(4),cfg)/cfg.vehicle.m)/nonlinearBicycleModel.tireAccelerationGain(cfg);
             % Allocate braking and lateral force together. The cruise seed's
             % brakingRatioLimit is not an avoidance actuator bound. Reserve
             % the lateral fraction requested by the yaw loop at BOTH axles,
@@ -413,7 +413,7 @@ classdef nonlinearBicycleModel
             rearSlip=atan2(x(5)-cfg.vehicle.lr*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
             brakingCapacity=p.brakingRatioLimit;
             if coupled
-                rearFree=modifiedFialaTire.evaluate([0;rearSlip],0,cfg);
+                rearFree=nonlinearBicycleModel.tireForces([0;rearSlip],0,cfg);
                 frontFree=(cfg.vehicle.Iz*p.yawRateGain*(desiredYaw-x(6))+cfg.vehicle.lr*rearFree(2))/cfg.vehicle.lf;
                 utilization=min(p.frontForceFraction,max(abs([frontFree;rearFree(2)])./tire.longitudinalForceScale));
                 brakingCapacity=sqrt(1-utilization^2);
@@ -422,7 +422,7 @@ classdef nonlinearBicycleModel
             rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
             b=min(previous(2)+rate,max(previous(2)-rate,b));
             [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);b=min(upper(2),max(lower(2),b));
-            rear=modifiedFialaTire.evaluate([0;rearSlip],b,cfg);
+            rear=nonlinearBicycleModel.tireForces([0;rearSlip],b,cfg);
             front=(cfg.vehicle.Iz*p.yawRateGain*(desiredYaw-x(6))+cfg.vehicle.lr*rear(2))/cfg.vehicle.lf;
             capacity=tire.longitudinalForceScale(1)*sqrt(1-b^2);
             fraction=min(abs(front)/capacity,p.frontForceFraction);
@@ -434,7 +434,7 @@ classdef nonlinearBicycleModel
             frontCourse=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
             slipLimit=atan(3*capacity*(1-(1-p.frontForceFraction)^(1/3))/tire.corneringStiffness(1));
             for iteration=1:3*double(coupled)
-                [force,slope]=modifiedFialaTire.evaluate([frontCourse-steering;rearSlip],b,cfg);
+                [force,slope]=nonlinearBicycleModel.tireForces([frontCourse-steering;rearSlip],b,cfg);
                 fx=b*tire.longitudinalForceScale(1);c=cos(steering);s=sin(steering);
                 value=fx*s+force(1)*c;
                 derivative=fx*c-slope(1)*c-force(1)*s;
@@ -499,6 +499,150 @@ classdef nonlinearBicycleModel
             e=nonlinearBicycleModel.error(x,lane,reference);
             value=sum((reference.factor*e).^2);
         end
+        function model = tireAffineModel(state,input,cfg)
+        % Joint tire tangent at the current slip and signed braking ratio.
+            speed = max(state(4),cfg.model.scheduleSpeedFloor);
+            lever = [cfg.vehicle.lf;-cfg.vehicle.lr];
+            lateral = state(5)+lever*state(6);
+            slip = atan2(lateral,speed)-[input(1);0];
+            denominator = speed^2+lateral.^2;
+            slipState = zeros(2,6);
+            slipState(:,4) = -lateral./denominator*double(state(4)>cfg.model.scheduleSpeedFloor);
+            slipState(:,5) = speed./denominator;
+            slipState(:,6) = speed*lever./denominator;
+            slipInput = [-1,0;0,0];
+            ratio = min(max(input(2),-1+sqrt(eps)),1-sqrt(eps));
+            point = [input(1);ratio];
+            [force,slope,ratioSlope] = nonlinearBicycleModel.tireForces(slip,ratio,cfg);
+            forceState = slope.*slipState;
+            forceInput = slope.*slipInput+[zeros(2,1),ratioSlope];
+            model = struct("state",forceState,"input",forceInput, ...
+                "constant",force-forceState*state-forceInput*point, ...
+                "force",force,"operatingInput",point,"operatingState",state);
+        end
+        function parameters = tireParameters(cfg)
+            if ~coder.target('MATLAB')
+                % Generated code evaluates the constants of a validated configuration.
+                normalLoad = cfg.vehicle.m*cfg.vehicle.gravity/(cfg.vehicle.lf+cfg.vehicle.lr) ...
+                    *[cfg.vehicle.lr;cfg.vehicle.lf];
+                forceScale = cfg.tire.frictionCoefficient.*normalLoad;
+                parameters = struct("corneringStiffness", cfg.tire.corneringStiffness, ...
+                    "frictionCoefficient", cfg.tire.frictionCoefficient, ...
+                    "staticNormalLoad", normalLoad,"longitudinalForceScale", forceScale, ...
+                    "brakingRatioAccelerationGain", sum(forceScale)/cfg.vehicle.m);
+                return;
+            end
+            persistent priorKey priorParameters
+            key = [cfg.vehicle.m;cfg.vehicle.gravity;cfg.vehicle.lf;cfg.vehicle.lr; ...
+                cfg.tire.corneringStiffness(:);cfg.tire.frictionCoefficient(:)];
+            if isequal(key,priorKey),parameters=priorParameters;return;end
+            mass = localPositiveScalar(cfg.vehicle.m, "vehicle.m");
+            gravity = localPositiveScalar(cfg.vehicle.gravity, "vehicle.gravity");
+            lf = localPositiveScalar(cfg.vehicle.lf, "vehicle.lf");
+            lr = localPositiveScalar(cfg.vehicle.lr, "vehicle.lr");
+            cornering = localAxleVector(cfg.tire.corneringStiffness, "tire.corneringStiffness");
+            friction = localAxleVector(cfg.tire.frictionCoefficient, "tire.frictionCoefficient");
+            normalLoad = mass*gravity/(lf+lr)*[lr; lf];
+            forceScale = friction.*normalLoad;
+            parameters = struct("corneringStiffness", cornering, ...
+                "frictionCoefficient", friction, "staticNormalLoad", normalLoad, ...
+                "longitudinalForceScale", forceScale, ...
+                "brakingRatioAccelerationGain", sum(forceScale)/mass);
+            priorKey=key;priorParameters=parameters;
+        end
+
+        function gain = tireAccelerationGain(cfg)
+            parameters = nonlinearBicycleModel.tireParameters(cfg);
+            gain = parameters.brakingRatioAccelerationGain;
+        end
+
+        function force = tireLongitudinalForce(brakingRatio, cfg)
+            arguments
+                brakingRatio (1,1) double {mustBeReal, mustBeFinite}
+                cfg (1,1) struct
+            end
+            parameters = nonlinearBicycleModel.tireParameters(cfg);
+            force = brakingRatio*parameters.longitudinalForceScale;
+        end
+
+        function gradient = tireParameterJacobian(slipAngle,brakingRatio,cfg)
+            % Derivatives with respect to fractional C_f,C_r,mu_f,mu_r at
+            % this physical parameter value. The saturated branch is included.
+            nonlinearBicycleModel.tireForces(slipAngle,brakingRatio,cfg);
+            parameters=nonlinearBicycleModel.tireParameters(cfg);
+            cornering=parameters.corneringStiffness;
+            scale=parameters.longitudinalForceScale*sqrt(1-brakingRatio^2);
+            tangent=tan(slipAngle);adhesion=scale>0 & abs(tangent)<3*scale./cornering;
+            stiffness=zeros(2,1);friction=-scale.*sign(slipAngle);
+            q=cornering(adhesion).*abs(tangent(adhesion))./(3*scale(adhesion));
+            stiffness(adhesion)=-cornering(adhesion).*tangent(adhesion).*(1-q).^2;
+            friction(adhesion)=-cornering(adhesion).*tangent(adhesion).*q.*(1-2*q/3);
+            gradient=[diag(stiffness),diag(friction)];
+        end
+
+        function [force, slipSlope, ratioSlope, intercept] = tireForces(slipAngle, brakingRatio, cfg)
+        %evaluate Force [N], dFy/dAlpha [N/rad], dFy/dBeta [N], intercept [N].
+        % Use the symmetric |alpha| branch and Eq. (13), eta=sqrt(1-beta^2).
+        % Force is defined at beta=+/-1, but no finite joint tangent exists
+        % there. Derivative requests require an interior operating point.
+            arguments
+                slipAngle (2,1) double {mustBeReal, mustBeFinite}
+                brakingRatio (1,1) double {mustBeReal, mustBeFinite}
+                cfg (1,1) struct
+            end
+            if any(abs(slipAngle) >= pi/2) || abs(brakingRatio) > 1.0
+                error("collisionAvoidanceController:invalidTireOperatingPoint", ...
+                    "Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.");
+            end
+            if nargout > 1 && abs(brakingRatio) == 1.0
+                error("collisionAvoidanceController:singularTireLinearization", ...
+                    "A Fiala tangent requires abs(beta)<1; the endpoint force is still defined.");
+            end
+            parameters = nonlinearBicycleModel.tireParameters(cfg);
+            cornering = parameters.corneringStiffness;
+            capacity = parameters.longitudinalForceScale;
+            eta = sqrt(1.0-brakingRatio^2);
+            lateralScale = capacity*eta;
+            tangent = tan(slipAngle);
+            force = -lateralScale.*sign(slipAngle);
+            slipSlope = zeros(2, 1);
+            ratioSlope = zeros(2, 1);
+            adhesion = lateralScale > 0.0 & abs(tangent) < 3*lateralScale./cornering;
+            q = cornering(adhesion).*abs(tangent(adhesion))./(3*lateralScale(adhesion));
+            force(adhesion) = -cornering(adhesion).*tangent(adhesion) ...
+                .* (1.0-q+q.^2/3.0);
+            if nargout > 1
+                slipSlope(adhesion) = -cornering(adhesion).*(1.0-q).^2 ...
+                    .* (1.0+tangent(adhesion).^2);
+                ratioSlope = capacity*(brakingRatio/eta).*sign(slipAngle);
+                ratioSlope(adhesion) = cornering(adhesion).*tangent(adhesion) ...
+                    .*q.*(1.0-2.0*q/3.0)*(brakingRatio/eta^2);
+            end
+            intercept = force-slipSlope.*slipAngle-ratioSlope*brakingRatio;
+        end
+    end
+end
+
+function value = localPositiveScalar(value, name)
+    if ~isnumeric(value) || ~isreal(value) || ~isscalar(value) ...
+            || ~isfinite(value) || value <= 0.0
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "%s must be a positive finite scalar.", name);
+    end
+    value = double(value);
+end
+
+function value = localAxleVector(value, name)
+    if ~isnumeric(value) || ~isreal(value) || ~isvector(value) ...
+            || ~ismember(numel(value), [1, 2]) ...
+            || any(~isfinite(value), "all") || any(value <= 0.0, "all")
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "%s must be positive and scalar or contain [front; rear] values.", name);
+    end
+    value = double(value(:));
+    if isscalar(value)
+        value = repmat(value, 2, 1);
+
     end
 end
 
@@ -527,9 +671,9 @@ function body=localFialaBody(x,u,cfg)
         error('collisionAvoidanceController:nonlinearDomain', ...
             'Positive-speed Fiala dynamics require vx above the declared domain floor.');
     end
-    tire=modifiedFialaTire.parameters(cfg);
+    tire=nonlinearBicycleModel.tireParameters(cfg);
     slip=atan2([x(5)+cfg.vehicle.lf*x(6);x(5)-cfg.vehicle.lr*x(6)],x(4))-[u(1);0];
-    fy=modifiedFialaTire.evaluate(slip,u(2),cfg);
+    fy=nonlinearBicycleModel.tireForces(slip,u(2),cfg);
     fx=u(2)*tire.longitudinalForceScale;
     c=cos(u(1));s=sin(u(1));frontX=fx(1)*c-fy(1)*s;frontY=fx(1)*s+fy(1)*c;
     v=x(4);load=nonlinearBicycleModel.roadLoad(v,cfg);
@@ -545,7 +689,7 @@ function body=localKinematicBody(x,u,cfg)
     % the braking ratio times the axles' force scales (no lateral tire
     % force), and braking fades below model.brakeHoldSpeed, so that it ends
     % at rest and never reverses the vehicle.
-    scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+    scale=nonlinearBicycleModel.tireParameters(cfg).longitudinalForceScale;
     wheelbase=cfg.vehicle.lf+cfg.vehicle.lr;lag=cfg.model.kinematicLagSeconds;
     hold=tanh(x(4)/cfg.model.brakeHoldSpeed);
     force=(max(u(2),0)+min(u(2),0)*hold)*(scale(1)*cos(u(1))+scale(2));
@@ -556,8 +700,8 @@ end
 
 function [a,b]=localFialaJacobian(x,u,cfg)
     % Analytic combined-slip tire and body-force derivatives.
-    tire=modifiedFialaTire.affineModel(x,u,cfg);
-    scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+    tire=nonlinearBicycleModel.tireAffineModel(x,u,cfg);
+    scale=nonlinearBicycleModel.tireParameters(cfg).longitudinalForceScale;
     fx=u(2)*scale;c=cos(u(1));s=sin(u(1));
     frontX=fx(1)*c-tire.force(1)*s;frontY=fx(1)*s+tire.force(1)*c;
     forceX=-s*tire.state(1,:);
@@ -581,7 +725,7 @@ end
 function [a,b]=localKinematicJacobian(x,u,cfg)
     % Derivatives of localKinematicBody with the position rows. At b = 0 the
     % braking-ratio derivative is that of braking.
-    scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+    scale=nonlinearBicycleModel.tireParameters(cfg).longitudinalForceScale;
     wheelbase=cfg.vehicle.lf+cfg.vehicle.lr;lag=cfg.model.kinematicLagSeconds;
     holdSpeed=cfg.model.brakeHoldSpeed;hold=tanh(x(4)/holdSpeed);
     traction=scale(1)*cos(u(1))+scale(2);gain=max(u(2),0)+min(u(2),0)*hold;

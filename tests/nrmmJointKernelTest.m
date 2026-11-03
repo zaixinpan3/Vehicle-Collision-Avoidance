@@ -28,8 +28,8 @@ classdef nrmmJointKernelTest < matlab.unittest.TestCase
             domain.rearAxleDistance=1.6;domain.sideslipMaximum=.2;
             ego=struct('bodyVelocity',[6;.1],'yawRate',.03);
             state=[20;2;targetPoint];
-            [~,phi]=nrmmTargetJacobian('evaluate',targetPoint(1:2),targetPoint(3:4),domain);
-            reference=nrmmTargetTrackerDerivative(state,ego,domain);
+            [~,phi]=nrmmObserverVectorField("targetJacobian", 'evaluate',targetPoint(1:2),targetPoint(3:4),domain);
+            reference=nrmmObserverVectorField("targetDerivative", state,ego,domain);
             testCase.verifyEqual(phi-ego.yawRate*[-state(6);state(5)],reference(5:6),AbsTol=1e-12);
         end
         function compiledIntegrationPreservesTheJointStateAndAllSharedTangents(testCase,observerSize,radarAvailable,columnCount)

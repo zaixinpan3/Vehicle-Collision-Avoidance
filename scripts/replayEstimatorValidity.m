@@ -39,7 +39,7 @@ for name=nameList
   c.observer=localMerge(c.observer,observerOverride);
   h=cfgC.controller.sampleTime;sensorPeriod=c.observer.runtime.samplePeriod;
   pathTimes=(1:round(h/sensorPeriod))*sensorPeriod;
-  tire=modifiedFialaTire.parameters(cfgC);k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
+  tire=nonlinearBicycleModel.tireParameters(cfgC);k=3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2);
   mk=@(x,t,u)struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6),'longitudinalVelocity',x(4),'stateTime',t,'heldActuatorInput',u);
   tgt=@(t,~)localTarget(predictiveSafetyGeometry.predictTarget(q0,t));
   ctx=nrmmEstimatorControllerAdapter("initialize",c,mk(tr(1).state(:),0,[0;0]),tgt);

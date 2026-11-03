@@ -27,7 +27,7 @@ classdef nrmmStationaryTargetTest < matlab.unittest.TestCase
             velocity=speed*tangent;
             targetAcceleration=acceleration*tangent+curvature*speed^2*normal;
             trueJerk=-curvature^2*speed^3*tangent+3*acceleration*curvature*speed*normal;
-            [derivative,estimate]=nrmmTargetTrackerDerivative([30;2;velocity;targetAcceleration], ...
+            [derivative,estimate]=nrmmObserverVectorField("targetDerivative", [30;2;velocity;targetAcceleration], ...
                 struct('bodyVelocity',[15;0],'yawRate',0),domain);
             testCase.verifyTrue(estimate.speedDomainValid);
             testCase.verifyEqual(estimate.targetVelocity,velocity,AbsTol=1e-12);

@@ -407,7 +407,7 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(fraction,0);testCase.verifyLessThanOrEqual(fraction,1);
             policy=terminalSafeSet.control(context,struct('heldInput',[.01;0],'active',true));
             testCase.verifyEqual(policy.actuatorInput,[.01;context.brakingRatio]);
-            braking=-model.cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(model.cfg);
+            braking=-model.cfg.terminal.brakingDecelerationMetersPerSecondSquared/nonlinearBicycleModel.tireAccelerationGain(model.cfg);
             [~,next]=terminalSafeSet.holdStates(x,[.01;braking],model.cfg);
             deceleration=(x(4)-next(4))/model.cfg.controller.sampleTime;
             testCase.verifyEqual(deceleration,model.cfg.terminal.brakingDecelerationMetersPerSecondSquared,RelTol=.1);

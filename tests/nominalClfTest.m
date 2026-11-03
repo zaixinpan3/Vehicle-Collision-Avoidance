@@ -54,7 +54,7 @@ classdef nominalClfTest < matlab.unittest.TestCase
         end
         function theContinuousDerivativeMatchesTheNonlinearFlow(testCase,referenceSpeed,curvature)
             [cfg,lane,reference]=localSetup(referenceSpeed,curvature);
-            [position,heading]=laneGeometry.referencePose(12,.15,lane.referenceCurve);
+            [position,heading]=predictiveSafetyGeometry.referencePose(12,.15,lane.referenceCurve);
             x=[position;heading+reference.state(3)+.02;reference.state(4:6)+[-.2;.05;.01]];
             input=reference.input+[.015;-.08];
             [rate,gradient,value]=nonlinearBicycleModel.nominalDerivative(x,input,lane,reference,cfg);
@@ -145,7 +145,7 @@ classdef nominalClfTest < matlab.unittest.TestCase
             [~,lane,reference]=localSetup(referenceSpeed,curvature);
             values=zeros(1,3);stations=[0,47,-23];
             for index=1:numel(stations)
-                [position,heading]=laneGeometry.referencePose(stations(index),.8,lane.referenceCurve);
+                [position,heading]=predictiveSafetyGeometry.referencePose(stations(index),.8,lane.referenceCurve);
                 x=[position;heading+reference.state(3)+.2;reference.state(4:6)+[-.7;.1;.05]];
                 values(index)=nonlinearBicycleModel.nominalValue(x,lane,reference);
             end

@@ -15,10 +15,10 @@ function baseline = givenPathCollisionBaseline(road, target, cfg, durationSecond
         curve = struct('origin',road.centerline(1,:).', ...
             'heading',atan2(tangent(2),tangent(1)),'curvature',0,'length',norm(tangent));
     end
-    start = laneGeometry.projectReferenceCurve([0;0],curve);
+    start = predictiveSafetyGeometry.projectReferenceCurve([0;0],curve);
     sampleIntervalSeconds = cfg.controller.sampleTime/30;
     times = unique([0:sampleIntervalSeconds:durationSeconds,durationSeconds]);
-    [position,heading] = laneGeometry.referencePose(start.station+cfg.referenceSpeed*times,0,curve);
+    [position,heading] = predictiveSafetyGeometry.referencePose(start.station+cfg.referenceSpeed*times,0,curve);
     egoPoses = [position;heading];
     overlapDepth = zeros(size(times));
     signedGap = inf(size(times));

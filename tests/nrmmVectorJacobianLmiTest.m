@@ -23,7 +23,7 @@ classdef nrmmVectorJacobianLmiTest < matlab.unittest.TestCase
             maximum = 0;
             for sample = 1:150
                 [q,s] = localState(stream,domain,radialRegion,projected);
-                jacobian = nrmmTargetJacobian("evaluate",q,s,domain);
+                jacobian = nrmmObserverVectorField("targetJacobian", "evaluate",q,s,domain);
                 state = [q;s];
                 difference = zeros(2,4);
                 for index = 1:4
@@ -42,8 +42,8 @@ classdef nrmmVectorJacobianLmiTest < matlab.unittest.TestCase
             angle = 0.73;
             transform = [cos(angle),-sin(angle);sin(angle),cos(angle)]*diag([1,reflection]);
             q = [14;2]; s = [1;2.2];
-            reference = nrmmTargetJacobian("evaluate",q,s,target.domain);
-            rotated = nrmmTargetJacobian("evaluate",transform*q,transform*s,target.domain);
+            reference = nrmmObserverVectorField("targetJacobian", "evaluate",q,s,target.domain);
+            rotated = nrmmObserverVectorField("targetJacobian", "evaluate",transform*q,transform*s,target.domain);
             testCase.verifyEqual(rotated,transform*reference*kron(eye(2),transform.'),AbsTol=1e-12);
             metric = kron(target.lyapunovMatrix,eye(2));
             frame = kron(eye(3),transform);
@@ -59,7 +59,7 @@ classdef nrmmVectorJacobianLmiTest < matlab.unittest.TestCase
                 for accelerationProjected = [false,true]
                     for sample = 1:200
                         [q,s] = localState(stream,target.domain,region,accelerationProjected);
-                        jacobian = nrmmTargetJacobian("evaluate",q,s,target.domain);
+                        jacobian = nrmmObserverVectorField("targetJacobian", "evaluate",q,s,target.domain);
                         dynamics = target.bandwidth*kron(target.closedLoopMatrix,eye(2));
                         dynamics(5:6,3:6) = dynamics(5:6,3:6) ...
                             +[jacobian(:,1:2)/target.bandwidth,jacobian(:,3:4)];
@@ -98,13 +98,13 @@ classdef nrmmVectorJacobianLmiTest < matlab.unittest.TestCase
             domain = testCase.Design.target.domain;
             domain.regularizationSpeedMinimum = domain.speedMinimum;
             domain.speedMinimum = 0;
-            jacobian = nrmmTargetJacobian("evaluate",zeros(2,1),[20;-30],domain);
+            jacobian = nrmmObserverVectorField("targetJacobian", "evaluate",zeros(2,1),[20;-30],domain);
             testCase.verifyEqual(jacobian,zeros(2,4),AbsTol=0);
         end
 
         function enclosurePreservesSignedCoupledDerivativeDirections(testCase)
             target = testCase.Design.target;
-            enclosure = nrmmTargetJacobian("enclosure",target.domain);
+            enclosure = nrmmObserverVectorField("targetJacobian", "enclosure",target.domain);
             stream = RandStream("mt19937ar","Seed",913);
             directions = randn(stream,8,100);
             vertices = reshape(enclosure.vertices,8,[]);
@@ -115,7 +115,7 @@ classdef nrmmVectorJacobianLmiTest < matlab.unittest.TestCase
                 frame = [q/norm(q),[0,-1;1,0]*q/norm(q)];
                 alignedS = frame.'*s;
                 if alignedS(2)<0, frame(:,2)=-frame(:,2); end
-                jacobian = frame.'*nrmmTargetJacobian("evaluate",q,s,target.domain)*kron(eye(2),frame);
+                jacobian = frame.'*nrmmObserverVectorField("targetJacobian", "evaluate",q,s,target.domain)*kron(eye(2),frame);
                 maximum = max(maximum,max(directions.'*jacobian(:)-support));
             end
             testCase.verifyLessThanOrEqual(maximum,1e-10);
@@ -142,7 +142,7 @@ function [q,s] = localState(stream,domain,region,projected)
 end
 
 function value = localPhi(state,domain)
-    derivative = nrmmTargetTrackerDerivative([zeros(2,1);state], ...
+    derivative = nrmmObserverVectorField("targetDerivative", [zeros(2,1);state], ...
         struct("bodyVelocity",zeros(2,1),"yawRate",0),domain);
     value = derivative(5:6);
 end

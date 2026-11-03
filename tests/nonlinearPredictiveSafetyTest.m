@@ -147,7 +147,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             % Braking at the terminal law's ratio with the steering held ends
             % at rest, never in reverse, with the handling rows met.
             [~,~,cfg]=localFixture();
-            u=[.05;-cfg.terminal.brakingDecelerationMetersPerSecondSquared/modifiedFialaTire.accelerationGain(cfg)];
+            u=[.05;-cfg.terminal.brakingDecelerationMetersPerSecondSquared/nonlinearBicycleModel.tireAccelerationGain(cfg)];
             x=[0;0;0;6;0;0];
             for k=1:60
                 x=nonlinearBicycleModel.sample(x,u,cfg);

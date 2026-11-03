@@ -45,7 +45,7 @@ function bound = localInitialize(design,cfg,state,time,prior)
         "trueRangeMaximum",design.target.domain.relativePositionMaximum, ...
         "egoValid",true,"valid",true,"reason","declared-domain-prior", ...
         "lastRadarTime",NaN, ...
-        "orientationSet",nrmmYawSet("initialize",initialYaw,pi), ...
+        "orientationSet",nrmmSet.yaw("initialize",initialYaw,pi), ...
         "lastDefect",struct(),"lastComparison",struct([]), ...
         "integrationErrorIncluded",true,"floatingPointVerified",false, ...
         "scope","conditional deterministic containment; no sampled exponential stability claim");
@@ -71,7 +71,7 @@ function bound = localInitialize(design,cfg,state,time,prior)
             norm(state.targetState(1:2))+bound.targetComponents(1));
         bound.reason = "declared-initial-error-prior";
     end
-    bound.orientationSet = nrmmYawSet("initialize",initialYaw,bound.yaw);
+    bound.orientationSet = nrmmSet.yaw("initialize",initialYaw,bound.yaw);
 end
 
 function bound = localReset(bound,state)
@@ -131,13 +131,13 @@ function bound = localMeasure(bound,input,state)
     end
     % A failed yaw intersection invalidates only orientation-based outputs.
     % An uninformative correspondence contributes S^1 and never a false center.
-    measurementSet = nrmmYawSet("initialize",course.correspondence.heading, ...
+    measurementSet = nrmmSet.yaw("initialize",course.correspondence.heading, ...
         course.correspondence.radius);
     if ~sensorConsistent
         measurementSet.intervals = zeros(0,2);
     end
-    bound.orientationSet = nrmmYawSet("intersect",bound.orientationSet,measurementSet);
-    bound.yaw = nrmmYawSet("radiusAbout",bound.orientationSet,state.yaw);
+    bound.orientationSet = nrmmSet.yaw("intersect",bound.orientationSet,measurementSet);
+    bound.yaw = nrmmSet.yaw("radiusAbout",bound.orientationSet,state.yaw);
     model = design.yaw.courseModel;
     % ||y_v - v|| <= (epsG + rho)/cos(b), with rho the certified lateral
     % radius: l*(epsW + dSt) for the kinematic relation, the force-balance
@@ -195,7 +195,7 @@ function bound = localAdvance(bound,input,before,after,first,step)
     defect = localDefect(before,after,first,input,design,step);
     velocityCap = domain.egoSpeedMaximum ...
         + max(norm(before.bodyVelocity),norm(after.bodyVelocity));
-    bound.orientationSet = nrmmYawSet("propagate",bound.orientationSet, ...
+    bound.orientationSet = nrmmSet.yaw("propagate",bound.orientationSet, ...
         input.yawRate*step,gyroError*step);
     egoMatrix = 0;
     egoInput = 0;
@@ -309,7 +309,7 @@ function bound = localAdvance(bound,input,before,after,first,step)
     record = struct("matrix",matrix,"input",forcing,"initial",initial, ...
         "final",next,"step",step,"mode",mode);
     comparison = record;
-    bound.yaw = nrmmYawSet("radiusAbout",bound.orientationSet,after.yaw);
+    bound.yaw = nrmmSet.yaw("radiusAbout",bound.orientationSet,after.yaw);
     bound.bodyVelocity = min(next(1),localGuard(domain.egoSpeedMaximum+norm(after.bodyVelocity)));
     bound.time = bound.time+step;
     bound.lastDefect = defect;

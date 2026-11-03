@@ -251,7 +251,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
                 [x,q,road]=collisionThreatScenario("curvedHeadOn",cfg);
                 ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
                 [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
-                projection=laneGeometry.project(x(1:2),problem.model.lane);
+                projection=predictiveSafetyGeometry.project(x(1:2),problem.model.lane);
                 lateral=[-sin(projection.heading);cos(projection.heading)];
                 chosen=sign(problem.model.linearization.guide.direction.'*lateral);
                 testCase.verifyNotEqual(chosen,0);

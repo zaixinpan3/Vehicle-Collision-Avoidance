@@ -65,7 +65,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             [~,target,road,cfg,impactTime] = collisionThreatScenario(scenario,struct('referenceSpeed',referenceSpeed));
             baseline = givenPathCollisionBaseline(road,target,cfg,8);
             future = predictiveSafetyGeometry.predictTarget(target,impactTime);
-            egoPosition = laneGeometry.referencePose(baseline.initialStationMeters+referenceSpeed*impactTime,0,baseline.referenceCurve);
+            egoPosition = predictiveSafetyGeometry.referencePose(baseline.initialStationMeters+referenceSpeed*impactTime,0,baseline.referenceCurve);
             testCase.verifyEqual(future(1:2),egoPosition,AbsTol=1e-11);
         end
         function everyThreatHasAnIndependentInRoadBypass(testCase,scenario,referenceSpeed)
@@ -103,7 +103,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             curve=struct('origin',[0;0],'heading',0,'curvature',.005,'length',200);
             shape=[2.4;.95;0;0];pose=[0;8.055;0];
             corners=pose(1:2)+shape(1:2).*[1,1,-1,-1;1,-1,1,-1];
-            projected=laneGeometry.projectReferenceCurve(corners,curve);
+            projected=predictiveSafetyGeometry.projectReferenceCurve(corners,curve);
             testCase.verifyLessThan(max(abs(projected.lateralPosition)),9);
             margin=scenarioRoadFootprintMargin(pose,shape,curve,9);
             testCase.verifyEqual(margin,-.005,AbsTol=1e-10);

@@ -630,12 +630,12 @@ function [point,matrix,noise,branch]=localLinearize(center,context)
             gain=contract.positionVelocity.gain;
             correction=[gain(1)*eye(2);gain(2)*eye(2)];
             dfrontend=dfrontend+correction*(dm(1:2,:)-dfrontend(1:2,:));
-            frontend=nrmmPositionVelocity('pointMeasure',frontend,measurement.gnssPosition,gain);
+            frontend=nrmmObserverVectorField("positionVelocity", 'pointMeasure',frontend,measurement.gnssPosition,gain);
             measurement.gnssVelocity=frontend(3:4);dm(3:4,:)=dfrontend(3:4,:);
         end
         dt=contract.samplePeriod;rotation=[cos(observer(3)),-sin(observer(3));sin(observer(3)),cos(observer(3))];
         da=rotation*dm(5:6,:)+rotation*[-measurement.bodyAcceleration(2);measurement.bodyAcceleration(1)]*dobserver(3,:);
-        frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),dt);
+        frontend=nrmmObserverVectorField("positionVelocity", 'pointPredict',frontend,measurement.bodyAcceleration,observer(3),dt);
         dfrontend=[dfrontend(1:2,:)+dt*dfrontend(3:4,:)+dt^2*da/2;dfrontend(3:4,:)+dt*da];
         [observer,dobserver]=localObserverTangent(observer,dobserver,measurement,dm,contract);
         h=contract.samplePeriod;
@@ -799,7 +799,7 @@ function [value,gradient]=localObserverFieldTangent(state,gradient,input,dm,pseu
     if numel(state)>7
         target=state(8:13);predictor=state(14:15);
         dt=gradient(8:13,:);dy=gradient(14:15,:);
-        [jac,phi]=nrmmTargetJacobian('evaluate',target(3:4),target(5:6),design.target.domain);
+        [jac,phi]=nrmmObserverVectorField("targetJacobian", 'evaluate',target(3:4),target(5:6),design.target.domain);
         targetField=[target(3:4)-state(1:2)-input.yawRate*cross*target(1:2); ...
             target(5:6)-input.yawRate*cross*target(3:4);phi-input.yawRate*cross*target(5:6)];
         a=[-input.yawRate*cross,eye(2),zeros(2); ...
@@ -862,10 +862,10 @@ function value=localHold(joint,noise,context)
             measurement=localMeasurement(physical,measuredInput,noise(:,sample),plant,contract);
         end
         if ~(context.first && sample==1)
-            frontend=nrmmPositionVelocity('pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
+            frontend=nrmmObserverVectorField("positionVelocity", 'pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
             measurement.gnssVelocity=frontend(3:4);
         end
-        frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),contract.samplePeriod);
+        frontend=nrmmObserverVectorField("positionVelocity", 'pointPredict',frontend,measurement.bodyAcceleration,observer(3),contract.samplePeriod);
         observer=localObserverStep(observer,measurement,contract);
         physical=localPlantFlow(physical,input,plant,contract.samplePeriod);
         if sample==samples/2,middle=physical;end
@@ -913,7 +913,7 @@ function root=localCoupledRoot(state,generator,contract,target,errorSet)
         % it back into independent speed, acceleration and course balls.
         family=errorSet.family;age=contract.time-family.epochTime;
         padding=0;if isfield(errorSet,'familyYawRadius'),padding=errorSet.familyYawRadius;end
-        image=nrmmConstantMotionFamily('image',family,contract.time,contract.time,padding);
+        image=nrmmTargetHistory("constantMotion", 'image',family,contract.time,contract.time,padding);
         low=[max(0,family.lower(1,:)+age*family.lower(2,:));family.lower(2,:); ...
             asin(target(7)*family.lower(3,:));image.courseLower];
         high=[max(0,family.upper(1,:)+age*family.upper(2,:));family.upper(2,:); ...
@@ -1242,12 +1242,12 @@ function [point,matrix,noise,branch]=localCoupledLinearize(center,context,sensor
         if ~(context.first && sample==1)
             update=[contract.positionVelocity.gain(1)*eye(2);contract.positionVelocity.gain(2)*eye(2)];
             dfrontend=dfrontend+update*(dm(1:2,:)-dfrontend(1:2,:));
-            frontend=nrmmPositionVelocity('pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
+            frontend=nrmmObserverVectorField("positionVelocity", 'pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
             measurement.gnssVelocity=frontend(3:4);dm(3:4,:)=dfrontend(3:4,:);
         end
         h=contract.samplePeriod;r=[cos(observer(3)),-sin(observer(3));sin(observer(3)),cos(observer(3))];
         da=r*dm(5:6,:)+r*[-measurement.bodyAcceleration(2);measurement.bodyAcceleration(1)]*dobserver(3,:);
-        frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),h);
+        frontend=nrmmObserverVectorField("positionVelocity", 'pointPredict',frontend,measurement.bodyAcceleration,observer(3),h);
         dfrontend=[dfrontend(1:2,:)+h*dfrontend(3:4,:)+h^2*da/2;dfrontend(3:4,:)+h*da];
         [observer,dobserver]=localObserverTangent(observer,dobserver,measurement,dm,contract);
         if sample==1
@@ -1462,11 +1462,11 @@ function [observer,frontend]=localObservedBlock(prior,observations)
             measurement.radarDetectionAvailable=all(isfinite(sample(6:7)));
             measurement.heldInput=prior.appliedInput;
             if isfield(measurement,'courseGeometry'),measurement=rmfield(measurement,'courseGeometry');end
-            frontend=nrmmPositionVelocity('pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
+            frontend=nrmmObserverVectorField("positionVelocity", 'pointMeasure',frontend,measurement.gnssPosition,contract.positionVelocity.gain);
             measurement.gnssVelocity=frontend(3:4);
         end
-        frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),contract.samplePeriod);
+        frontend=nrmmObserverVectorField("positionVelocity", 'pointPredict',frontend,measurement.bodyAcceleration,observer(3),contract.samplePeriod);
         observer=localObserverTangent(observer,zeros(13,1),measurement,zeros(11,1),contract);
     end
-    frontend=nrmmPositionVelocity('pointMeasure',frontend,observations(1:2,end),contract.positionVelocity.gain);
+    frontend=nrmmObserverVectorField("positionVelocity", 'pointMeasure',frontend,observations(1:2,end),contract.positionVelocity.gain);
 end
