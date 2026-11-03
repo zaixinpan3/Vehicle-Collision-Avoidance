@@ -319,6 +319,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     metadata.targetUncertaintyModel="constantParametersRestartedEachHoldFromCurrentObserverSet";
     metadata.egoUncertaintyModel="currentPosteriorEnclosurePropagatedThroughEachHold";
     metadata.jointPredictionSensorSamples=[];
+    metadata.jointPredictionModelRefresh=[];
     if isfield(model,'jointPredictionTube') && ~isempty(model.jointPredictionTube)
         metadata.egoUncertaintyModel="jointPlantObserverFeedbackWithPersistentMismatch";
         metadata.targetUncertaintyModel="constantParameterFamilyOverFullHorizon";
@@ -329,6 +330,9 @@ function [command,predictedInput,prediction,controllerState] = ...
         metadata.jointFloatingPointCertified=model.jointPredictionTube.floatingPointCertified;
         if isfield(model.jointPredictionTube,'predictionSensorSamples')
             metadata.jointPredictionSensorSamples=model.jointPredictionTube.predictionSensorSamples;
+        end
+        if isfield(model.jointPredictionTube,'refreshedJointModel')
+            metadata.jointPredictionModelRefresh=model.jointPredictionTube.refreshedJointModel;
         end
     end
     metadata.futureTargetObserverDynamicsIncluded=false;metadata.targetFeedbackIncluded=false;

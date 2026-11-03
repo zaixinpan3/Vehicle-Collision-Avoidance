@@ -981,6 +981,7 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
     tube.mean(:,1)=center;
     tube.observerErrorRadius(:,1)=localEgoError(center,generator);
     tube.targetObserverErrorRadius(:,1)=localTargetError(center,generator,target(7));
+    cache=[];tube.refreshedJointModel=false(1,count);
     for k=1:count
         [reference,policyMap]=localRelativeFeedback(center,anchor.states(3,k));
         gain=gains(:,:,k);targetGain=gain;
@@ -1010,7 +1011,15 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
             'targetRearAxleDistance',target(7));
         context.contract=localPredictionContract(contract,cfg,durations(k),k==1);
         tube.predictionSensorSamples(k)=round(durations(k)/context.contract.samplePeriod);
-        [~,matrix,noise,branch]=localCoupledLinearize(center,context);
+        reuse=localReuseJointModel(cache,center,context,k);
+        if reuse
+            [matrix,noise,branch]=localCachedJointModel(cache,center,context);
+        else
+            [~,matrix,noise,branch]=localCoupledLinearize(center,context);
+            cache=struct('center',center,'context',context,'step',k,'branch',branch, ...
+                'matrix',matrix,'noise',noise,'policy',localPolicyJacobian(center,context));
+            tube.refreshedJointModel(k)=true;
+        end
         raw=[branch.beforeResetMatrix*generator,branch.beforeResetNoise];
         [point,propagated,mixed]=localResetEnvelope(branch.beforeResetPoint,raw,cfg);
         tube.mixedStopBranches(k)=mixed;
@@ -1043,6 +1052,56 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
     tube.feedbackGain=gains;tube.targetFeedbackGain=targetGains;tube.finalJointGenerator=generator;
     tube.firstInputRadius=tube.inputRadius(:,1);tube.egoStateRadius=tube.physicalRadius;
     tube.observerErrorTime=tube.time;
+    if any(~tube.refreshedJointModel)
+        tube.scope="scheduled joint affine prediction with current causal feedback; no certified nonlinear remainder";
+    end
+end
+
+function reuse=localReuseJointModel(cache,center,context,k)
+    cfg=context.cfg;
+    reuse=~isempty(cache) && k>2 && string(cfg.solver.method)=="rti" ...
+        && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction;
+    if ~reuse,return;end
+    old=cache.center;
+    % Refresh across changes of vehicle regime or substantial maneuver/pose
+    % changes. These are engineering scheduling thresholds, not error bounds.
+    limits=[.35;max(1,.35*abs(old(4)));1;.6;.35;max(1,.35*abs(old(25)))];
+    change=abs(center([3:6,24:25])-old([3:6,24:25]));
+    speedChart=sum(center(4)>cfg.model.kinematicSpeedRange);
+    oldChart=sum(old(4)>cfg.model.kinematicSpeedRange);
+    oldRadar=norm(old(22:23)-old(1:2))<=cfg.collision.encounterRangeMeters;
+    radar=norm(center(22:23)-center(1:2))<=cfg.collision.encounterRangeMeters;
+    reuse=k-cache.step<cfg.controller.jointPredictionRefreshSteps ...
+        && context.duration==cache.context.duration && speedChart==oldChart && radar==oldRadar ...
+        && all(change<=limits) && all(abs(context.input-cache.context.input)<=[.25;.4]) ...
+        && ((center(25)>0)==(old(25)>0));
+end
+
+function policy=localPolicyJacobian(center,context)
+    policy=zeros(2,35);
+    if context.first,return;end
+    [~,map]=localRelativeFeedback(center,context.referenceYaw);
+    ego=zeros(6,35);ego(1:5,7:11)=eye(5);ego(6,6)=1;
+    policy=context.gain*ego+context.targetGain*(map-ego);
+end
+
+function [matrix,noise,branch]=localCachedJointModel(cache,center,context)
+    % Remove the old feedback derivative and insert the current causal law.
+    % The nominal command is recentered, so it uses the open-loop derivative.
+    policy=localPolicyJacobian(center,context);delta=center-cache.center;
+    inputDelta=context.input-cache.context.input;
+    branch=cache.branch;
+    b=branch.beforeResetInputMatrix;
+    open=branch.beforeResetMatrix-b*cache.policy;
+    branch.beforeResetPoint=branch.beforeResetPoint+open*delta+b*inputDelta;
+    branch.beforeResetMatrix=open+b*policy;
+    gyro=(context.gain(:,6)-cache.context.gain(:,6))*context.contract.noiseRadius(7);
+    branch.beforeResetNoise(:,7)=branch.beforeResetNoise(:,7)+b*gyro;
+    b=branch.inputMatrix;matrix=cache.matrix+b*(policy-cache.policy);
+    noise=cache.noise;noise(:,7)=noise(:,7)+b*gyro;
+    % Autonomous target motion stays analytic even between model refreshes.
+    branch.beforeResetPoint(22:27)=localTargetPoint(center(22:27),context.duration,context.targetRearAxleDistance);
+    branch.beforeResetPoint(42:47)=localTargetPoint(center(22:27),context.duration/2,context.targetRearAxleDistance);
 end
 
 function prediction=localPredictionContract(contract,cfg,duration,first)
@@ -1132,7 +1191,7 @@ function [point,matrix,noise,branch]=localCoupledLinearize(center,context,sensor
         'nrmmJointPrediction:unalignedSensors','A joint hold must resolve the sensor clock and midpoint.');
     if nargin<3,sensorNoise=zeros(channels,samples+1);end
     amplitude=[contract.noiseRadius;repmat(contract.targetObserver.noiseRadius,2,1)];
-    dimension=n+channels*(samples+1);
+    dimension=n+channels*(samples+1)+2;inputColumns=dimension-1:dimension;
     gradient=[eye(n),zeros(n,dimension-n)];
     physical=center(1:6);dx=gradient(1:6,:);target=center(22:27);dt=gradient(22:27,:);
     observer=[center(7:11);center(28:35)];dobserver=[gradient(7:11,:);gradient(28:35,:)];
@@ -1152,6 +1211,7 @@ function [point,matrix,noise,branch]=localCoupledLinearize(center,context,sensor
         du=(context.gain*egoMap+targetGain*(map-egoMap))*gradient;
         du(:,n+7)=du(:,n+7)+context.gain(:,6)*amplitude(7);
     end
+    du(:,inputColumns)=eye(2);
     assert(abs(input(2))<=1,'nrmmJointPrediction:inputDomain','The future feedback exceeds the Fiala input domain.');
     middle=zeros(12,1);dmiddle=zeros(12,dimension);preReset=zeros(6,1);dpreReset=zeros(6,dimension);
     measured=zeros(7,samples+1);dmeasured=zeros(7*(samples+1),dimension);
@@ -1210,12 +1270,13 @@ function [point,matrix,noise,branch]=localCoupledLinearize(center,context,sensor
     joint=[physical;observer(1:5);parameters;input;frontend;target;observer(6:13)];
     gradient=[dx;dobserver(1:5,:);dp;du;dfrontend;dt;dobserver(6:13,:)];
     point=[joint;middle;input];gradient=[gradient;dmiddle;du];
-    matrix=gradient(:,1:n);noise=gradient(:,n+1:end);
+    matrix=gradient(:,1:n);noise=gradient(:,n+1:end-2);
     before=point;before(1:6)=preReset;derivative=gradient;derivative(1:6,:)=dpreReset;
     branch=struct('measurementCenter',measured,'measurementMatrix',dmeasured(:,1:n), ...
-        'measurementNoise',dmeasured(:,n+1:end),'sampleTimes',(0:samples)*contract.samplePeriod, ...
+        'measurementNoise',dmeasured(:,n+1:end-2),'sampleTimes',(0:samples)*contract.samplePeriod, ...
         'beforeResetPoint',before,'beforeResetMatrix',derivative(:,1:n), ...
-        'beforeResetNoise',derivative(:,n+1:end));
+        'beforeResetNoise',derivative(:,n+1:end-2), ...
+        'inputMatrix',gradient(:,inputColumns),'beforeResetInputMatrix',derivative(:,inputColumns));
 end
 
 function [target,a]=localTargetTransition(initial,h,lr)

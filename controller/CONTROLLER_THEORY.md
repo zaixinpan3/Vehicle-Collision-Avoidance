@@ -2906,6 +2906,33 @@ trace records the virtual sample counts for every prediction hold. Target
 arc sensitivities are evaluated analytically in smooth regions, with the
 existing directional secants retained at stopping guards.
 
+`controller.jointPredictionRefreshSteps=2` also schedules the expensive
+coupled linearization along the engineering prediction horizon. The first
+two holds are always refreshed. Later holds reuse a local map for at most
+two consecutive stages, refreshing earlier when the duration, low-speed
+chart, radar availability, target stop branch, or nominal maneuver changes
+substantially. These scheduling thresholds are computational heuristics,
+not bounds on a nonlinear Taylor remainder. Set the value to one to refresh
+every hold. Nonlinear and retained-certificate modes always refresh.
+
+The reuse retains causal feedback. If the cached closed-loop tangent is
+\(A_c=A_o+BK_c\), two additional forward sensitivities give \(B\), the
+joint hold's derivative with respect to its nominal command. At a reused
+stage, form \(A_o=A_c-BK_c\) and use \(A_o+BK_k\), with the feedback
+gain and feature derivative recomputed from the current predicted state
+and available actuator authority. Recenter the nominal point using
+\(A_o\delta c+B\delta u\); do not count the old policy response a second
+time. The initial gyro-noise map receives the corresponding feedback
+correction. The physical target's nominal arc remains analytic. Future
+noise columns and persistent parameter columns remain intact.
+
+This approximates both the future joint mean and its sensitivities between
+refreshes. The first issued-command successor and its complete sensor-block
+map are still freshly evaluated. The trace reports which horizon stages
+were refreshed, and the reported scope explicitly identifies scheduled
+affine prediction. No nonlinear enclosure or recursive-feasibility guarantee
+is inferred from this reuse.
+
 The declared ancillary policy preserves ego stabilization and adds a
 bounded target-dependent response:
 

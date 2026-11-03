@@ -98,6 +98,15 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             testCase.verifyEqual(cfg.controller.sampleTime,.05);
             testCase.verifyLessThan(cfg.solver.completionReserveSeconds,cfg.solver.timeLimitSeconds);
         end
+        function jointModelSchedulingCanBeDisabledAndRequiresAFiniteStepCount(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('controller',struct('jointPredictionRefreshSteps',1)));
+            testCase.verifyEqual(cfg.controller.jointPredictionRefreshSteps,1);
+            for invalid=[0,-1,1.5,Inf,NaN]
+                testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
+                    struct('controller',struct('jointPredictionRefreshSteps',invalid))), ...
+                    'collisionAvoidanceController:invalidConfiguration');
+            end
+        end
         function targetRearAxleDistanceIsPositiveAndIndependentOfEgoGeometry(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('target',struct('rearAxleDistance',1.8)));
             testCase.verifyEqual(cfg.target.rearAxleDistance,1.8);

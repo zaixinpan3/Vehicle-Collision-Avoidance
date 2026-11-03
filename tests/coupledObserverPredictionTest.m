@@ -57,6 +57,38 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
             tube=nrmmJointPrediction('coupledPropagate',localAnchor(f,3),f.cfg,f.generator, ...
                 f.contract,repmat(.05,1,3),f.target,f.error);
             testCase.verifyEqual(tube.predictionSensorSamples,repmat(round(.05/f.contract.samplePeriod),1,3));
+            testCase.verifyTrue(all(tube.refreshedJointModel));
+        end
+        function feedforwardTangentsPredictBothControlsThroughTheJointHold(testCase)
+            f=testCase.fixture;context=localContext(f,[.02;-.1]);
+            prediction=nrmmJointPrediction('coupledLinearize',f.root.center,context);
+            step=1e-5;
+            for j=1:2
+                plusContext=context;minusContext=context;
+                plusContext.input(j)=context.input(j)+step;
+                minusContext.input(j)=context.input(j)-step;
+                plus=nrmmJointPrediction('coupledLinearize',f.root.center,plusContext);
+                minus=nrmmJointPrediction('coupledLinearize',f.root.center,minusContext);
+                expected=(plus.point-minus.point)/(2*step);
+                testCase.verifyEqual(prediction.branch.inputMatrix(:,j),expected,AbsTol=1e-4);
+                expected=(plus.branch.beforeResetPoint-minus.branch.beforeResetPoint)/(2*step);
+                testCase.verifyEqual(prediction.branch.beforeResetInputMatrix(:,j),expected,AbsTol=1e-4);
+            end
+        end
+        function modelReusePreservesTheAppliedCommandAndFutureFeedback(testCase)
+            f=testCase.fixture;anchor=localAnchor(f,10);cfg=f.cfg;
+            cfg.controller.jointPredictionRefreshSteps=1;
+            full=nrmmJointPrediction('coupledPropagate',anchor,cfg,f.generator, ...
+                f.contract,repmat(.05,1,10),f.target,f.error);
+            cfg.controller.jointPredictionRefreshSteps=8;
+            reused=nrmmJointPrediction('coupledPropagate',anchor,cfg,f.generator, ...
+                f.contract,repmat(.05,1,10),f.target,f.error);
+            testCase.verifyEqual(reused.firstSuccessor,full.firstSuccessor);
+            testCase.verifyLessThan(nnz(reused.refreshedJointModel),10);
+            testCase.verifyEqual(reused.refreshedJointModel(1:2),[true,true]);
+            testCase.verifyGreaterThan(norm(reused.inputRadius(:,3:end),'fro'),0);
+            testCase.verifyGreaterThan(norm(reused.targetFeedbackGain(:)),0);
+            testCase.verifyFalse(reused.nonlinearCertificate);
         end
         function predictedJointObserversMatchTheSensorClockRuntime(testCase)
             f=testCase.fixture;u=[.02;-.1];context=localContext(f,u);
