@@ -28,6 +28,17 @@ function value = nrmmJointPrediction(action,varargin)
             value=struct('point',point,'matrix',matrix,'noise',noise,'branch',branch);
         case "observerStep"
             value=localObserverStep(varargin{:});
+        case "observerRk4"
+            % Numeric core shared by MATLAB and the optional generated MEX.
+            [point,gradient]=localObserverRk4(varargin{:});
+            value=struct('point',point,'gradient',gradient);
+        case "posteriorOuter"
+            value=localPosteriorOuter(varargin{:});
+        case "plantConfiguration"
+            value=localPlantConfiguration(varargin{:});
+        case "plantField"
+            [point,gradient]=localPlantFieldCore(varargin{:});
+            value=struct('point',point,'gradient',gradient);
         case "propagate"
             value=localPropagate(varargin{:});
         case "hold"
@@ -169,10 +180,23 @@ function set=localPosteriorOuter(posterior)
     assert(all(posterior.primitiveLower==-1) && all(posterior.primitiveUpper==1));
     extra=size(posterior.currentGenerator,2);count=numel(posterior.base.center);
     lo=zeros(count,1);hi=lo;options=optimoptions('linprog','Display','none');
+    directions=[posterior.base.generator,zeros(count,extra)]';
+    % E*xi=rhs fixes every direction in row(E). Compute all such projections
+    % together, retaining the residual on |xi|<=1 instead of snapping it to
+    % zero. Thus a nearly dependent direction still has a valid outer bound.
+    multipliers=lsqminnorm(posterior.equal',directions);
+    residual=sum(abs(directions-posterior.equal'*multipliers),1)';
+    fixed=residual<=64*eps*max(1,sum(abs(directions),1)');
+    projected=multipliers'*posterior.rhs;
     for j=1:count
-        direction=[posterior.base.generator(j,:),zeros(1,extra)]';
-        lo(j)=posterior.base.center(j)+localPosteriorSupport(direction,posterior,options);
-        hi(j)=posterior.base.center(j)-localPosteriorSupport(-direction,posterior,options);
+        if fixed(j)
+            lo(j)=posterior.base.center(j)+projected(j)-residual(j);
+            hi(j)=posterior.base.center(j)+projected(j)+residual(j);
+        else
+            direction=directions(:,j);
+            lo(j)=posterior.base.center(j)+localPosteriorSupport(direction,posterior,options);
+            hi(j)=posterior.base.center(j)-localPosteriorSupport(-direction,posterior,options);
+        end
     end
     set=nrmmSet.range(lo,hi);
 end
@@ -555,8 +579,8 @@ function [point,matrix,noise,branch]=localLinearize(center,context)
         else
             measuredInput=u;dmeasuredInput=du;
             if sample==1,measuredInput=previous;dmeasuredInput=dprevious;end
-            measurement=localMeasurement(x,measuredInput,zeros(7,1),plant,contract);
-            [~,df]=localPlantFieldTangent(x,measuredInput,plant,cfg,dx,dmeasuredInput,dp);
+            [field,df]=localPlantFieldTangent(x,measuredInput,plant,cfg,dx,dmeasuredInput,dp);
+            measurement=localMeasurement(x,measuredInput,zeros(7,1),plant,contract,field);
             dm(1:2,:)=dx(1:2,:);
 
             dm(5,:)=df(4,:)-x(5)*dx(6,:)-x(6)*dx(5,:);
@@ -579,7 +603,11 @@ function [point,matrix,noise,branch]=localLinearize(center,context)
         dfrontend=[dfrontend(1:2,:)+dt*dfrontend(3:4,:)+dt^2*da/2;dfrontend(3:4,:)+dt*da];
         [observer,dobserver]=localObserverTangent(observer,dobserver,measurement,dm,contract);
         h=contract.samplePeriod;
-        [f1,d1]=localPlantFieldTangent(x,u,plant,cfg,dx,du,dp);
+        if sample==1
+            [f1,d1]=localPlantFieldTangent(x,u,plant,cfg,dx,du,dp);
+        else
+            f1=field;d1=df;
+        end
         [f2,d2]=localPlantFieldTangent(x+h*f1/2,u,plant,cfg,dx+h*d1/2,du,dp);
         [f3,d3]=localPlantFieldTangent(x+h*f2/2,u,plant,cfg,dx+h*d2/2,du,dp);
         [f4,d4]=localPlantFieldTangent(x+h*f3,u,plant,cfg,dx+h*d3,du,dp);
@@ -623,18 +651,34 @@ function [point,generator,mixed]=localResetEnvelope(point,generator,cfg)
     point(9)=point(3)+atan2(sin(point(9)-point(3)),cos(point(9)-point(3)));
 end
 
-function cfg=localPlantConfiguration(cfg,parameters)
-    cfg.tire.corneringStiffness=cfg.tire.corneringStiffness.*(1+parameters(1:2));
-    cfg.tire.frictionCoefficient=cfg.tire.frictionCoefficient.*(1+parameters(3:4));
+function plant=localPlantConfiguration(cfg,parameters)
+    % Only numerical model parameters cross the generated-kernel boundary.
+    plant=struct('model',struct('scheduleSpeedFloor',cfg.model.scheduleSpeedFloor, ...
+        'kinematicSpeedRange',cfg.model.kinematicSpeedRange, ...
+        'kinematicLagSeconds',cfg.model.kinematicLagSeconds,'brakeHoldSpeed',cfg.model.brakeHoldSpeed), ...
+        'vehicle',struct('m',cfg.vehicle.m,'Iz',cfg.vehicle.Iz,'lf',cfg.vehicle.lf, ...
+        'lr',cfg.vehicle.lr,'gravity',cfg.vehicle.gravity), ...
+        'tire',struct('corneringStiffness',cfg.tire.corneringStiffness.*(1+parameters(1:2)), ...
+        'frictionCoefficient',cfg.tire.frictionCoefficient.*(1+parameters(3:4))), ...
+        'roadLoad',cfg.roadLoad);
 end
 
 function [value,gradient]=localPlantFieldTangent(x,u,plant,nominal,dx,du,dp)
-    value=nonlinearBicycleModel.derivative(x,u,plant);
-    [a,b]=nonlinearBicycleModel.jacobian(x,u,plant);
     % Fractional factors are relative to the root nominal parameters, even
     % when the mean parameter changes. Retain their identity at later times.
     ratio=[nominal.tire.corneringStiffness./plant.tire.corneringStiffness; ...
         nominal.tire.frictionCoefficient./plant.tire.frictionCoefficient];
+    if exist('nrmmJointPlantKernelMex','file')==3
+        result=nrmmJointPlantKernelMex(x,u,plant,ratio,dx,du,dp);
+        value=result.point;gradient=result.gradient;
+    else
+        [value,gradient]=localPlantFieldCore(x,u,plant,ratio,dx,du,dp);
+    end
+end
+
+function [value,gradient]=localPlantFieldCore(x,u,plant,ratio,dx,du,dp)
+    value=nonlinearBicycleModel.derivative(x,u,plant);
+    [a,b]=nonlinearBicycleModel.jacobian(x,u,plant);
     c=nonlinearBicycleModel.parameterJacobian(x,u,plant).*ratio.';
     gradient=a*dx+b*du+c*dp;
 end
@@ -658,8 +702,37 @@ function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
     end
     gradient=[dpoint(4:5,:);dpoint(1:2,:);dm(1:2,:);dpoint(3,:)];
     if numel(point)>5,gradient=[gradient;extra];end
-    for j=1:contract.integrationSubstepCount
-        h=contract.integrationStep;
+    % A narrow numeric interface avoids marshalling the complete observer
+    % design at every sensor hold. Parameters remain runtime inputs.
+    domain=design.target.domain;
+    minimum=domain.speedMinimum;
+    if minimum==0,minimum=domain.regularizationSpeedMinimum;end
+    kernelDesign=struct('velocity',struct('gain',design.velocity.gain), ...
+        'position',struct('gain',design.position.gain), ...
+        'yaw',struct('correctionBandwidth',design.yaw.correctionBandwidth), ...
+        'target',struct('innovationGains',design.target.innovationGains(:), ...
+        'domain',struct('speedMinimum',minimum,'speedMaximum',domain.speedMaximum, ...
+        'scalarAccelerationMaximum',domain.scalarAccelerationMaximum, ...
+        'yawRateMaximum',domain.yawRateMaximum,'accelerationNormBound',domain.accelerationNormBound, ...
+        'regularizationSpeedMinimum',minimum)));
+    measurement=struct('bodyAcceleration',input.bodyAcceleration,'yawRate',input.yawRate, ...
+        'gnssVelocity',input.gnssVelocity,'radarDetectionAvailable',false);
+    if numel(point)>5,measurement.radarDetectionAvailable=input.radarDetectionAvailable;end
+    if exist('nrmmJointObserverKernelMex','file')==3
+        result=nrmmJointObserverKernelMex(state,gradient,measurement,dm,pseudo,dpseudo, ...
+            kernelDesign,contract.integrationStep,contract.integrationSubstepCount);
+        state=result.point;gradient=result.gradient;
+    else
+        [state,gradient]=localObserverRk4(state,gradient,measurement,dm,pseudo,dpseudo, ...
+            kernelDesign,contract.integrationStep,contract.integrationSubstepCount);
+    end
+    indices=[3,4,7,1,2];
+    if numel(state)>7,indices=[indices,8:15];end
+    point=state(indices);dpoint=gradient(indices,:);
+end
+
+function [state,gradient]=localObserverRk4(state,gradient,input,dm,pseudo,dpseudo,design,h,count)
+    for j=1:count
         [v1,d1]=localObserverFieldTangent(state,gradient,input,dm,pseudo,dpseudo,design);
         [v2,d2]=localObserverFieldTangent(state+h*v1/2,gradient+h*d1/2,input,dm,pseudo,dpseudo,design);
         [v3,d3]=localObserverFieldTangent(state+h*v2/2,gradient+h*d2/2,input,dm,pseudo,dpseudo,design);
@@ -667,9 +740,6 @@ function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
         state=state+h*(v1+2*v2+2*v3+v4)/6;gradient=gradient+h*(d1+2*d2+2*d3+d4)/6;
         state(7)=atan2(sin(state(7)),cos(state(7)));
     end
-    indices=[3,4,7,1,2];
-    if numel(state)>7,indices=[indices,8:15];end
-    point=state(indices);dpoint=gradient(indices,:);
 end
 
 function [value,gradient]=localObserverFieldTangent(state,gradient,input,dm,pseudo,dpseudo,design)
@@ -690,9 +760,9 @@ function [value,gradient]=localObserverFieldTangent(state,gradient,input,dm,pseu
     if numel(state)>7
         target=state(8:13);predictor=state(14:15);
         dt=gradient(8:13,:);dy=gradient(14:15,:);
-        ego=struct('bodyVelocity',state(1:2),'yawRate',input.yawRate);
-        targetField=nrmmTargetTrackerDerivative(target,ego,design.target.domain);
-        jac=nrmmTargetJacobian('evaluate',target(3:4),target(5:6),design.target.domain);
+        [jac,phi]=nrmmTargetJacobian('evaluate',target(3:4),target(5:6),design.target.domain);
+        targetField=[target(3:4)-state(1:2)-input.yawRate*cross*target(1:2); ...
+            target(5:6)-input.yawRate*cross*target(3:4);phi-input.yawRate*cross*target(5:6)];
         a=[-input.yawRate*cross,eye(2),zeros(2); ...
             zeros(2),-input.yawRate*cross,eye(2); ...
             zeros(2),jac(:,1:2),jac(:,3:4)-input.yawRate*cross];
@@ -766,8 +836,8 @@ function value=localHold(joint,noise,context)
     value=[physical;observer;parameters;input;frontend;middle;input];
 end
 
-function input=localMeasurement(x,u,noise,cfg,contract)
-    derivative=nonlinearBicycleModel.derivative(x,u,cfg);
+function input=localMeasurement(x,u,noise,cfg,contract,derivative)
+    if nargin<6,derivative=nonlinearBicycleModel.derivative(x,u,cfg);end
     held=[];if contract.heldInputAvailable,held=u;end
     input=struct('gnssPosition',x(1:2)+noise(1:2), ...
         'velocityErrorMaximum',contract.currentMeasurement.velocityErrorMaximum, ...
@@ -1033,8 +1103,8 @@ function [point,matrix,noise,branch]=localCoupledLinearize(center,context,sensor
         else
             measuredInput=input;dmeasuredInput=du;
             if sample==1,measuredInput=previous;dmeasuredInput=dprevious;end
-            measurement=localMeasurement(physical,measuredInput,sensorNoise(1:7,sample),plant,contract);
-            [~,df]=localPlantFieldTangent(physical,measuredInput,plant,cfg,dx,dmeasuredInput,dp);
+            [field,df]=localPlantFieldTangent(physical,measuredInput,plant,cfg,dx,dmeasuredInput,dp);
+            measurement=localMeasurement(physical,measuredInput,sensorNoise(1:7,sample),plant,contract,field);
             dm(1:2,:)=dx(1:2,:);dm(5,:)=df(4,:)-physical(5)*dx(6,:)-physical(6)*dx(5,:);
             dm(6,:)=df(5,:)+physical(4)*dx(6,:)+physical(6)*dx(4,:);dm(7,:)=dx(6,:);
             if contract.heldInputAvailable,dm(8:9,:)=dmeasuredInput;end
@@ -1061,7 +1131,11 @@ function [point,matrix,noise,branch]=localCoupledLinearize(center,context,sensor
         frontend=nrmmPositionVelocity('pointPredict',frontend,measurement.bodyAcceleration,observer(3),h);
         dfrontend=[dfrontend(1:2,:)+h*dfrontend(3:4,:)+h^2*da/2;dfrontend(3:4,:)+h*da];
         [observer,dobserver]=localObserverTangent(observer,dobserver,measurement,dm,contract);
-        [f1,d1]=localPlantFieldTangent(physical,input,plant,cfg,dx,du,dp);
+        if sample==1
+            [f1,d1]=localPlantFieldTangent(physical,input,plant,cfg,dx,du,dp);
+        else
+            f1=field;d1=df;
+        end
         [f2,d2]=localPlantFieldTangent(physical+h*f1/2,input,plant,cfg,dx+h*d1/2,du,dp);
         [f3,d3]=localPlantFieldTangent(physical+h*f2/2,input,plant,cfg,dx+h*d2/2,du,dp);
         [f4,d4]=localPlantFieldTangent(physical+h*f3,input,plant,cfg,dx+h*d3,du,dp);

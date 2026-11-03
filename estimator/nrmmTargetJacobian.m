@@ -1,18 +1,21 @@
-function result = nrmmTargetJacobian(action,varargin)
+function [result,field] = nrmmTargetJacobian(action,varargin)
 % nrmmTargetJacobian Full vector Jacobians of the retained NRMM extension.
 % enclosure(domain) returns a finite analytic convex enclosure of [DqPhi,DsPhi]
 % in the q-aligned frame, covering every radial/scalar/acceleration saturation.
 % Orthogonal equivariance and P kron I2 make it sufficient for all headings.
 % The vertices are polynomial/rational Bernstein coefficients, not samples.
 % evaluate(q,s,domain) returns the Cartesian Jacobian on a smooth branch.
+% Its optional second output is Phi at the same point, reusing the clipped
+% velocity, acceleration, and inverse-speed factors of the Jacobian.
 % At a switching surface it selects a neighboring branch for diagnostics.
 % See OBSERVER_ISS_THEORY.md for the global incremental matrix-LMI proof.
 
+    field = zeros(2,1);
     switch string(action)
         case "enclosure"
             result = localEnclosure(localDomain(varargin{1}));
         case "evaluate"
-            result = localJacobian(varargin{1},varargin{2},localDomain(varargin{3}));
+            [result,field] = localJacobian(varargin{1},varargin{2},localDomain(varargin{3}));
         otherwise
             error("nrmmTargetJacobian:invalidAction","Use 'enclosure' or 'evaluate'.");
     end
@@ -243,12 +246,13 @@ function vertices = localBernstein(polynomial,box)
     vertices = coefficients(1:8,:)./coefficients(9,:);
 end
 
-function jacobian = localJacobian(q,s,domain)
+function [jacobian,field] = localJacobian(q,s,domain)
     validateattributes(q,{'double'},{'real','finite','size',[2,1]});
     validateattributes(s,{'double'},{'real','finite','size',[2,1]});
     r = norm(q);
     if r == 0
         jacobian = zeros(2,4);
+        field = zeros(2,1);
         return
     end
     a = domain(1); b = domain(2); acceleration = domain(3); yaw = domain(4); cap = domain(5);
@@ -282,6 +286,7 @@ function jacobian = localJacobian(q,s,domain)
         projected.'*cross*velocityDerivative/denominator^2-2*rawNu*denominatorDerivative/denominator, ...
         (cross*velocity).'*accelerationDerivative/denominator^2];
     crossDirection = cross*q/denominator;
+    field = -nu^2*velocity+3*alpha*nu*crossDirection;
     jacobian = -nu^2*[velocityDerivative,zeros(2)] ...
         +(-2*nu*velocity+3*alpha*crossDirection)*nuDerivative ...
         +3*nu*crossDirection*alphaDerivative ...
