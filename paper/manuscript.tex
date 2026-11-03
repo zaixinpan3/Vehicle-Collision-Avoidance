@@ -384,12 +384,8 @@ Its relative-motion state is
     \bm X_{vn}=[r_x,\,r_y,\,V_C,\,A_C,\,\psi_R,\,\beta_C]^{\trans}.
     \label{eq:target_physical_state}
 \end{equation}
-The target is modeled by a kinematic single-track relation with constant
-$A_C$ and $\beta_C$, so its path curvature is
-$\kappa=\sin\beta_C/l_{r,C}$, where $l_{r,C}$ is the distance from its
-center of mass to its rear axle. For observer design, let
-$\bm a_C=\dot{\bm v}_C$ and express the target velocity and acceleration
-in the ego frame as
+For observer design, let $\bm a_C=\dot{\bm v}_C$ and express the target
+velocity and acceleration in the ego frame as
 \begin{equation}
     \begin{gathered}
     \bm r=R_E^{\trans}(\bm p_C-\bm p_E),\qquad
@@ -399,15 +395,13 @@ in the ego frame as
     \end{gathered}
     \label{eq:target_coordinates}
 \end{equation}
-For positive target speed and sideslip in the declared principal-branch
-domain, $\bm x_T$ is an alternative representation of $\bm X_{vn}$,
-with heading angles understood modulo $2\pi$.
-The target dynamics in these coordinates are
+For positive target speed, the target dynamics in these coordinates can
+be written as
 \begin{equation}
     \begin{gathered}
     \nabla_{\omega_E}\bm r=\bm q-\bm v^E,\quad
     \nabla_{\omega_E}\bm q=\bm s,\quad
-    \nabla_{\omega_E}\bm s=\Phi(\bm q,\bm s),\\
+    \nabla_{\omega_E}\bm s=\Phi(\bm q,\bm s)+\bm\nu_\Phi,\\
     \Phi=-\omega_C^2\bm q+3A_C\omega_C J\frac{\bm q}{V_C},\\
     V_C=\normtwo{\bm q},\quad
     A_C=\frac{\bm q^{\trans}\bm s}{V_C},\quad
@@ -415,14 +409,14 @@ The target dynamics in these coordinates are
     \end{gathered}
     \label{eq:target_chain}
 \end{equation}
-where $\omega_C=\dot\gamma_C$ is the target course rate and equals
-$\dot\psi_C$ under the constant-sideslip model; these expressions are
-defined for $V_C>0$. The
-relative-position dynamics therefore account for the ego velocity and
-yaw rate while retaining the target motion in
-the ego frame. Departures from the constant-acceleration and
-constant-sideslip model are represented by a model residual, whose bound
-depends on declared rates of change of acceleration and curvature.
+where $\omega_C=\dot\gamma_C$ is the target course rate and
+$\bm\nu_\Phi$ is the difference between the actual acceleration dynamics
+and the nominal vector field $\Phi$. The relative-position dynamics
+account for the ego velocity and yaw rate while retaining the target
+motion in the ego frame. The target velocity and acceleration determine
+its speed and course, while recovery of its body yaw also requires
+information about its sideslip. The bound on $\bm\nu_\Phi$ is specified
+in the observer error analysis.
 
 The measurements are
 \begin{equation}
@@ -815,7 +809,10 @@ The declared operating set is
     \label{eq:target_domain}
 \end{equation}
 with \(a\) and \(b\) the target speed bounds \(V_C|_{\min}\) and
-\(V_C|_{\max}\), $0<a<b$. Estimates may leave
+\(V_C|_{\max}\), $0<a<b$, and $l_{r,C}$ the distance from the target
+center of mass to its rear axle. The course-rate limit $\Omega_{\max}$ is
+imposed on the target motion and parameterized by $\beta_{\max}$.
+Estimates may leave
 \eqref{eq:target_domain} during a transient, so the observer evaluates
 an extension. With $\Pi_r$ the Euclidean projection onto the ball of
 radius $r$ and $\operatorname{clip}_r$ the clip to $[-r,r]$,
@@ -945,16 +942,14 @@ including $W_T=0$ by continuity of the homogeneous error dynamics.
 \subsubsection{Cascade ISS}
 \label{subsec:cascade}
 
-Let $\bm\nu_\Phi$ be the model residual in the true last row,
-$\nabla_{\omega_E}\bm s=\Phi(\bm q,\bm s)+\bm\nu_\Phi$, with
-$\normtwo{\bm\nu_\Phi}\leq\bar\nu_\Phi$. For a target whose motion
-varies, write the course curvature as $\kappa=\omega_C/V_C$, which equals
-$\sin\beta_C/l_{r,C}$ in the constant-sideslip model; differentiating
-the target velocity gives
+For a target with time-varying motion, write the course curvature as
+$\kappa=\omega_C/V_C$. Differentiating the target velocity gives the
+residual in \eqref{eq:target_chain} as
 $\bm\nu_\Phi=\dot A_C\bm q/V_C+V_C^2\dot\kappa J\bm q/V_C$. If
 $|\dot A_C|\leq\overline{\dot A}_C$ and
 $|\dot\kappa|\leq\overline{\dot\kappa}$, then
-$\bar\nu_\Phi=(\overline{\dot A}_C^2+b^4\overline{\dot\kappa}^2)^{1/2}$.
+$\normtwo{\bm\nu_\Phi}\leq\bar\nu_\Phi
+=(\overline{\dot A}_C^2+b^4\overline{\dot\kappa}^2)^{1/2}$.
 Subtracting the true chain from \eqref{eq:target_observer},
 \begin{equation}
     \begin{aligned}
@@ -1186,8 +1181,11 @@ term,
 \(\bar R=\min(r_{\max},\normtwo{\hat{\bm r}})\), and the analogous
 rotation bounds convert the remaining components of
 \eqref{eq:component_extraction} into the componentwise ego and target
-enclosures \(\bm b_E(t)\), \(\bm b_T(t)\). These certify the current
-estimate; they are not predictions of future observer output. When the
+position, velocity and acceleration enclosures \(\bm b_E(t)\),
+\(\bm b_T(t)\). A target body-yaw enclosure additionally requires a
+valid relation between its sideslip and course curvature. These bounds
+certify the current estimate; they are not predictions of future observer
+output. When the
 required bounds are valid, the controller receives ego and target sets
 at each sample $k$. The ego set is a
 zonotope
@@ -1306,12 +1304,14 @@ constraint (Section~\ref{subsec:envelope}). Speed, sideslip and course are
     \label{eq:yaw_from_course}
 \end{equation}
 
-The obstacle vehicle has inputs we do not observe. Following
-\cite{SharmaAlaiRajamani2026}, it is modeled with constant scalar
-acceleration and constant sideslip, hence constant course curvature.
-The tracker of Section~\ref{subsec:targetTracker} estimates its state in
-that model, and the controller forecasts it in the same model with one
-addition: braking ends at rest and never reverses the vehicle
+The obstacle vehicle has inputs we do not observe. For the joint
+estimator--controller design, we model its motion with constant scalar
+acceleration and constant sideslip during forward motion, hence constant
+course curvature \cite{SharmaAlaiRajamani2026}. This relation also permits
+the target body yaw to be reconstructed from its estimated course and
+curvature. The tracker supplies the target estimates and their error
+bounds, and the controller forecasts the target motion with braking that
+ends at rest and never reverses the vehicle
 (Section~\ref{subsec:predictionModel}).
 
 For the controller, write $\psi=\psi_E$ and
@@ -1399,9 +1399,9 @@ behavior is the set of all phases of cruise on the path. The road is the
 strip $-c_{\rm R}\leq e_y\leq c_{\rm L}$ with declared clearances
 $c_{\rm R},c_{\rm L}>0$ to the right and left of the path.
 
-The obstacle keeps the constant scalar acceleration $A_C$ and constant
-sideslip $\beta_C$ of the tracker model, written in inertial
-coordinates, with braking that ends at rest. With the curvature
+The obstacle motion used for joint prediction has constant scalar
+acceleration $A_C$ and constant sideslip $\beta_C$ during forward motion,
+with braking that ends at rest. With the curvature
 $\kappa_C=\sin\beta_C/l_{r,C}$, the speed $V_C(t)=\max(0,V_{C,0}+A_Ct)$,
 the arc length $s(t)$ its integral and $\vartheta(t)=\tfrac12\kappa_Cs(t)$,
 \begin{equation}
