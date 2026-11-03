@@ -332,12 +332,13 @@ implementation approximations.
 \subsection{Estimator Design}
 \label{sec:estimator}
 
-The ego and target vehicle coordinate frames are shown in
-Fig.~\ref{fig:ego_obstacle_frames}.
+To analyze the poses of the ego and target vehicles in
+Fig.~\ref{fig:driving_environment}, we illustrate the two vehicles
+separately in Fig.~\ref{fig:ego_obstacle_frames}.
 
 \begin{figure*}[!t]
     \centering
-    \includegraphics[width=0.92\textwidth]
+    \includegraphics[width=0.86\textwidth]
         {ego_obstacle_dynamics_v03.pdf}
     \caption{Ego and obstacle kinematics. The ego vehicle (blue) and the
     obstacle vehicle (orange) travel on courses that may meet. The body
@@ -350,32 +351,58 @@ Fig.~\ref{fig:ego_obstacle_frames}.
     \label{fig:ego_obstacle_frames}
 \end{figure*}
 
-Let $\bm p_E$ and $\bm v_E$ denote the ego vehicle's inertial
-position and velocity, $\psi_E$ its yaw, $\beta_E$ its sideslip, and
-$\gamma_E=\psi_E+\beta_E$ its course angle. The body-to-inertial rotation
-$R(\psi_E)$ and the shared vehicle model are defined in
-Section~\ref{subsec:predictionModel}.
+Let $\bm p_i$ and $\bm v_i$ denote the inertial position and velocity of
+vehicle $i\in\{E,C\}$, where $E$ and $C$ identify the ego and target
+vehicles, respectively, and let $V_i=\normtwo{\bm v_i}$ be its speed.
+Let $\psi_i$, $\beta_i$ and
+$\gamma_i=\psi_i+\beta_i$ denote its yaw, sideslip and course angles,
+and let $R(\psi_E)$ be the rotation from the ego frame to the inertial
+frame. The ego-frame velocity is
+$\bm v^E=[v_{x,E},v_{y,E}]^{\trans}=R(\psi_E)^{\trans}\bm v_E$.
+With $J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$
+and $\nabla_\omega\bm z=\dot{\bm z}+\omega J\bm z$, the ego kinematics are
+\begin{equation}
+    \dot{\bm p}_E=\bm v_E,\qquad
+    \nabla_{\omega_E}\bm v^E=\bm a_E,\qquad
+    \omega_E=\dot\psi_E,
+    \label{eq:estimator_ego_kinematics}
+\end{equation}
+where $\bm a_E=R(\psi_E)^{\trans}\dot{\bm v}_E$ is the ego acceleration
+expressed in the ego frame.
 
-The estimator has to do two things that the observer of
-\cite{SharmaAlaiRajamani2026} does not: stay valid while the ego vehicle
-swerves and brakes, and tell the controller how wrong it may be. The
-first is a matter of coordinates. Their translational observer
-differentiates the ego kinematics into third-order companion chains,
-which calls for \(\dot{\bm a}_E\) and \(\ddot\psi_E\) and therefore
-assumes both are zero. Here the measured acceleration \(\bm a_m\) and
-yaw rate \(u_3\) remain exogenous inputs of every stage and nothing is
-differentiated. Their yaw stage switches between a heading inferred from
-the acceleration direction and the course angle; reading the course as
-the yaw is exact only at \(\beta_E=0\), since
-\(\gamma_E=\psi_E+\beta_E\). Here the same relation supplies a direct
-body-velocity pseudo-measurement and a heading correspondence for a
-parallel yaw observer. In the current implementation, inertial velocity
-is reconstructed from GNSS position and inertial measurements; its error
-enclosure enters the body-velocity and target-tracking bounds. The
-continuous-time body-velocity and target stages admit a two-stage ISS
-comparison under a declared velocity-input error bound. This conditional
-result does not by itself prove stability of the complete sampled
-position--velocity, yaw, and target-observer interconnection.
+For the target vehicle, let $\bm a_C=\dot{\bm v}_C$ and define the
+relative position and the target velocity and acceleration expressed in
+the ego frame as
+\begin{equation}
+    \bm\rho=R_E^{\trans}(\bm p_C-\bm p_E),\quad
+    \bm q=R_E^{\trans}\bm v_C,\quad
+    \bm s=R_E^{\trans}\bm a_C,
+    \label{eq:target_coordinates}
+\end{equation}
+where $R_E=R(\psi_E)$. The target is modeled by a kinematic single-track
+relation with constant scalar acceleration and sideslip, so its path
+curvature is $\kappa=\sin\beta_C/l_{r,C}$, where $l_{r,C}$ is the
+distance from its center of mass to its rear axle. In these coordinates,
+the target dynamics are
+\begin{equation}
+    \begin{gathered}
+    \nabla_{\omega_E}\bm\rho=\bm q-\bm v^E,\quad
+    \nabla_{\omega_E}\bm q=\bm s,\quad
+    \nabla_{\omega_E}\bm s=\Phi(\bm q,\bm s),\\
+    \Phi=-\Omega^2\bm q+3A\Omega J\frac{\bm q}{V},\\
+    V=\normtwo{\bm q},\quad
+    A=\frac{\bm q^{\trans}\bm s}{V},\quad
+    \Omega=\frac{(J\bm q)^{\trans}\bm s}{V^2}.
+    \end{gathered}
+    \label{eq:target_chain}
+\end{equation}
+where $V$, $A$ and $\Omega$ are the target speed, scalar acceleration and
+yaw rate, respectively; these expressions are defined for $V>0$. The
+relative-position dynamics therefore account for the ego velocity and
+yaw rate while retaining the target motion in
+the ego frame. Departures from the constant-acceleration and
+constant-sideslip model are represented by a model residual, whose bound
+depends on declared rates of change of acceleration and curvature.
 
 The measurements are
 \begin{equation}
@@ -387,14 +414,16 @@ The measurements are
     \end{aligned}
     \label{eq:ego_measurements}
 \end{equation}
-with \(\bm a_E=R(\psi_E)^{\trans}\ddot{\bm p}_E\) the acceleration in
-the ego frame, \(\bm\rho\) the relative position
-\eqref{eq:target_coordinates}, and \(\bm y_R\) its measurement. The noise satisfies uniform
+where $\bm y_p$ is the GNSS position, $\bm a_m$ and $u_3$ are the
+IMU acceleration and yaw-rate measurements, and $\bm y_R$ is the
+relative-position measurement. The noise satisfies uniform
 bounds \(\normtwo{\bm n_p}\leq\bar n_p\),
 \(\normtwo{\bm n_a}\leq\bar n_a\),
 \(|d_\omega|\leq\bar n_g\), \(\normtwo{\bm n_R}\leq\bar n_R\). Inertial
-biases are compensated upstream; no observer carries a bias state.
-
+biases are compensated upstream; no observer carries a bias state. The
+estimator uses the ego measurements to estimate ego motion and combines
+these estimates with the relative-position measurement to track the
+target vehicle.
 
 \subsubsection{Position--IMU Velocity Reconstruction}
 \label{subsec:positionVelocity}
@@ -406,11 +435,11 @@ For sample period $h$, bandwidth $\omega_f$, and predicted state
 $(\bm p_f^-,\bm v_f^-)$, define
 \begin{equation}
     \begin{gathered}
-    q_f=e^{-\omega_f h},\quad \alpha_f=1-q_f^2,\quad
-    \beta_f=(1-q_f)^2/h,\\
+    q_f=e^{-\omega_f h},\quad \alpha_{pv}=1-q_f^2,\quad
+    \beta_{pv}=(1-q_f)^2/h,\\
     \bm r_p=\bm y_p-\bm p_f^-,\quad
-    \bm p_f^+=\bm p_f^-+\alpha_f\bm r_p,\quad
-    \bm v_f^+=\bm v_f^-+\beta_f\bm r_p,\\
+    \bm p_f^+=\bm p_f^-+\alpha_{pv}\bm r_p,\quad
+    \bm v_f^+=\bm v_f^-+\beta_{pv}\bm r_p,\\
     \bm p_{f,k+1}^-=\bm p_{f,k}^++h\bm v_{f,k}^+
         +\tfrac12h^2\hat{\bm a}_{I,k},\quad
     \bm v_{f,k+1}^-=\bm v_{f,k}^++h\hat{\bm a}_{I,k},\\
@@ -418,9 +447,9 @@ $(\bm p_f^-,\bm v_f^-)$, define
     \end{gathered}
     \label{eq:position_velocity_filter}
 \end{equation}
-Both posterior error poles equal $q_f$. Initialization uses earlier
-position measurements and a declared acceleration bound; it does not
-use true velocity or future measurements. The filter propagates signed
+Both posterior error poles equal $q_f$. The filter is initialized from
+available prior information, and the initialization uncertainty is
+included in its error enclosure. The filter propagates signed
 error generators through its correction and prediction steps, including
 position noise, yaw uncertainty and acceleration mismatch. Bounded-noise
 position secants may further tighten the velocity enclosure without
@@ -428,7 +457,8 @@ changing the numerical estimate. These are conditional containment bounds
 in real arithmetic, not a floating-point interval certificate.
 
 Write $\bm v_m$ for the reconstructed inertial velocity supplied to the
-remaining observer stages and $\bm n_v=\bm v_m-\bm v_E$ for its error.
+remaining observer stages, $V_m=\normtwo{\bm v_m}$ for its magnitude,
+and $\bm n_v=\bm v_m-\bm v_E$ for its error.
 The continuous analysis below assumes a valid bound
 $\normtwo{\bm n_v}\leq\bar n_v$ over the interval being analyzed. In the
 sampled runtime the corresponding radius evolves with the measurements,
@@ -441,6 +471,9 @@ $v_{x,E}\geq V_E\cos\beta_{\rm dom}$, and
 \(|\dot\psi_E|\leq\bar\omega_E\).
 \end{assumption}
 
+Let $l_{r,E}$ be the distance from the ego center of mass to its rear
+axle. The kinematic branch uses the following relation.
+
 \begin{assumption}
 \label{asm:singleTrack}
 The kinematic single-track relation holds up to a bounded mismatch,
@@ -452,13 +485,241 @@ The kinematic single-track relation holds up to a bounded mismatch,
 and \(|\beta_E|\leq\beta_{\rm dom}<\pi/2\).
 \end{assumption}
 
-Assumption~\ref{asm:singleTrack} bounds the unmodeled slip of the rear
-axle. The identification of course and yaw that it replaces is the
-case \(\beta_E\equiv0\). As Section~\ref{subsec:modelAided} explains, the
-avoidance maneuvers violate a small \(\bar d_{\rm st}\), and in the
-closed loop the relation is replaced by the tire model; the assumption
-is kept for the kinematic branch, which is what the open-loop trials of
-Section~\ref{subsec:estimatorResults} use.
+Assumption~\ref{asm:singleTrack} bounds the unmodeled rear-axle slip
+in the kinematic branch. A model-aided measurement is introduced below
+to account for larger slip during avoidance maneuvers.
+
+\subsubsection{Ego Observers}
+\label{subsec:egoObserver}
+
+Using the reconstructed inertial velocity and measured yaw rate, define
+\begin{equation}
+    \begin{gathered}
+    \phi(V,w)=\sqrt{\max\{V^2-w^2,V^2\cos^2\beta_{\rm dom}\}},\\
+    \bm y_v=[\phi(V_m,c),\ c]^{\trans},\\
+    \nabla_{u_3}\hat{\bm v}^E=\bm a_m+k_v(\bm y_v-\hat{\bm v}^E).
+    \end{gathered}
+    \label{eq:ego_observer}
+\end{equation}
+Here $c$ is a lateral-velocity pseudo-measurement obtained from the
+model-aided force balance developed below; when that model or the held
+input is unavailable, the kinematic branch uses $c=l_{r,E}u_3$. On the
+true forward cone, $\phi(V_E,v_{y,E})=v_{x,E}$, and the extension remains
+defined for every measured speed. For the kinematic branch, the lateral
+component is not clipped, giving
+$y_{v,2}-v_{y,E}=l_{r,E}(d_\omega+d_{\rm st})$.
+
+\begin{lemma}
+\label{lem:egoRows}
+For the kinematic measurement $c=l_{r,E}u_3$, let
+$\bm e_v=\hat{\bm v}^E-\bm v^E$, $k_v>0$, and
+\begin{equation}
+    \begin{split}
+    C_\omega(k)=\max_{V\in\{V_E|_{\min},V_E|_{\max}\}}
+    \Bigl[(V\sin\beta_{\rm dom}+kl_{r,E}\tan\beta_{\rm dom})^2\\
+        +(kl_{r,E}-V\cos\beta_{\rm dom})^2\Bigr]^{1/2}.
+    \end{split}
+    \label{eq:common_gyro_bound}
+\end{equation}
+Under Assumptions~\ref{asm:ego}--\ref{asm:singleTrack},
+\begin{equation}
+    \begin{gathered}
+    D^+\normtwo{\bm e_v}\leq-k_v\normtwo{\bm e_v}+\bar\delta_v,\\
+    \bar\delta_v=\bar n_a+k_v\sec\beta_{\rm dom}\,\bar n_v
+      +C_\omega(k_v)\bar n_g
+      +k_vl_{r,E}\sec\beta_{\rm dom}\,\bar d_{\rm st}.
+    \end{gathered}
+    \label{eq:ego_rows}
+\end{equation}
+\end{lemma}
+
+\begin{IEEEproof}
+Put $\nu=V_m-V_E$, so $|\nu|\leq\bar n_v$. Integrating the piecewise
+derivatives of $\phi$ along the segment between $(V_E,v_{y,E})$ and
+$(V_m,l_{r,E}u_3)$ gives
+\begin{equation}
+    \begin{gathered}
+    \bm y_v-\bm v^E=\alpha\bm e_1\nu
+        +l_{r,E}\bm g(\zeta)(d_\omega+d_{\rm st}),\\
+    \bm g(\zeta)=[-\zeta,1]^{\trans},\\
+    \cos\beta_{\rm dom}\leq\alpha\leq\sec\beta_{\rm dom},\qquad
+    |\zeta|\leq\tan\beta_{\rm dom}.
+    \end{gathered}
+    \label{eq:velocity_measurement_error}
+\end{equation}
+Continuity covers branch crossings and the origin. Substituting before
+taking norms,
+\begin{equation}
+    \begin{split}
+    \dot{\bm e}_v={}&(-k_vI-u_3J)\bm e_v+\bm n_a+k_v\alpha\bm e_1\nu\\
+        &+(k_vl_{r,E}\bm g(\zeta)-J\bm v^E)d_\omega
+          +k_vl_{r,E}\bm g(\zeta)d_{\rm st}.
+    \end{split}
+    \label{eq:velocity_error_derivation}
+\end{equation}
+The common gyro column has components
+$[v_{y,E}-k_vl_{r,E}\zeta,\ k_vl_{r,E}-v_{x,E}]^{\trans}$. Maximizing
+its norm over $\zeta$ and the forward cone, then using the convexity of
+its squared bound in the speed, gives \eqref{eq:common_gyro_bound}. The
+rotation is skew and contributes nothing to the norm derivative. The
+remaining terms give \eqref{eq:ego_rows}.
+\end{IEEEproof}
+
+The same gyro error enters both the measurement and the propagation;
+bounding these contributions independently would discard their
+cancellation. The lemma does not assume statistical independence, and
+yaw error does not enter the conditional velocity comparison directly.
+In the sampled position--IMU filter, yaw uncertainty does affect the
+reconstructed velocity enclosure.
+
+Yaw and inertial position are estimated in parallel. Let $\bm v_B$
+denote the body-frame velocity pseudo-measurement, $\bm v_I=\bm v_m$ the
+reconstructed inertial velocity, and $s_f=\omega_f\bar n_p$. The yaw
+innovation uses the regularized direction correspondence
+\begin{equation}
+    \begin{gathered}
+    c_f=\frac{\bm v_B^{\trans}\bm v_I}
+        {\normtwo{\bm v_B}\normtwo{\bm v_I}+s_f^2},\quad
+    s_f^{\psi}=\frac{v_{B,x}v_{I,y}-v_{B,y}v_{I,x}}
+        {\normtwo{\bm v_B}\normtwo{\bm v_I}+s_f^2},\\
+    \dot{\hat\psi}_E=u_3+k_\psi
+        (s_f^{\psi}\cos\hat\psi_E-c_f\sin\hat\psi_E),\\
+    \dot{\hat{\bm p}}_E=\bm v_m+k_p(\bm y_p-\hat{\bm p}_E).
+    \end{gathered}
+    \label{eq:parallel_outputs}
+\end{equation}
+A numerical guard covers a zero denominator. The yaw correction varies
+continuously with the direction information and does not switch off
+according to the informative-arc flag. An orientation set $\Psi$ is
+propagated separately using the gyro error bound and intersected with
+valid measurement-consistent arcs. If the velocity information cannot
+constrain direction, its contribution is the whole circle. Disconnected
+components are kept, and the published radius is
+$B_\psi=\sup_{\theta\in\Psi}d_{S^1}(\hat\psi_E,\theta)$ about the
+numerical estimate. An empty intersection invalidates orientation
+outputs. Heading convergence from rest is not claimed.
+
+For the continuous position equation with a continuously available
+position signal and a uniform velocity-input error bound, the position
+error $\bm e_p=\hat{\bm p}_E-\bm p_E$ satisfies
+\begin{equation}
+    \begin{gathered}
+    D^+\normtwo{\bm e_p}\leq-k_p\normtwo{\bm e_p}+\bar n_v+k_p\bar n_p,\\
+    \limsup_{t\to\infty}\normtwo{\bm e_p}\leq\bar n_p+\bar n_v/k_p.
+    \end{gathered}
+    \label{eq:position_error_bound}
+\end{equation}
+This continuous comparison is conditional on its input bounds. The
+sampled realization separately accounts for held measurements and
+numerical defects; the comparison alone is not a sampled-system proof.
+
+\subsubsection{Model-Aided Lateral Velocity}
+\label{subsec:modelAided}
+
+The kinematic measurement in \eqref{eq:ego_observer} depends on the
+single-track relation in Assumption~\ref{asm:singleTrack}, whose mismatch
+can increase when the rear tire develops lateral slip. To account for
+this slip, the estimator uses the ego vehicle's dynamic bicycle model
+and the control input $\bm u=[\delta_F,\beta]^{\trans}$ held by the
+controller, where $\delta_F$ is the front steering angle and $\beta$ is
+the longitudinal-force ratio. Let $m_E$ be the vehicle mass, $l_{f,E}$
+and $l_{r,E}$ the distances from its center of mass to the front and
+rear axles, and $F_{zi}$ and $\mu_i$ the normal load and friction
+coefficient at axle $i\in\{f,r\}$. The slip angles and lateral tire
+forces are
+\begin{equation}
+    \begin{gathered}
+    \alpha_f=\operatorname{atan2}(v_{y,E}+l_{f,E}\dot\psi_E,\,v_{x,E})
+        -\delta_F,\\
+    \alpha_r=\operatorname{atan2}(v_{y,E}-l_{r,E}\dot\psi_E,\,v_{x,E}),\\
+    F_{yf}=\Phi_f(\alpha_f;Q_f),\qquad F_{yr}=\Phi_r(\alpha_r;Q_r).
+    \end{gathered}
+    \label{eq:tire_forces}
+\end{equation}
+For axle \(i\in\{f,r\}\), with \(t=\tan\alpha\), \(C_i>0\) the
+nominal cornering stiffness and \(Q_i=\eta_i\mu_iF_{zi}\), the modified
+Fiala law of \cite[Sec.~II-A, eqs.~(7), (11) and (13)]{FahmyGhanyBaumann2018}
+is
+\begin{equation}
+    \Phi_i(\alpha;Q_i)=
+    \begin{cases}
+    -C_it+\dfrac{C_i^2}{3Q_i}|t|t-\dfrac{C_i^3}{27Q_i^2}t^3,
+       & |\alpha|<\alpha_{{\rm sl},i},\\[3pt]
+    -Q_i\operatorname{sgn}(\alpha), & |\alpha|\geq\alpha_{{\rm sl},i},
+    \end{cases}
+    \label{eq:fiala_force}
+\end{equation}
+with \(\alpha_{{\rm sl},i}=\arctan(3Q_i/C_i)\),
+\(\eta_i=\sqrt{1-\beta^2}\) and \(F_{xi}=\beta\mu_iF_{zi}\) for
+\(|\beta|<1\). The lateral force balance at the center of mass is
+\begin{equation}
+    m_Ea_{y}=G(v_{y,E}):=F_{xf}\sin\delta_F
+        +F_{yf}(\alpha_f)\cos\delta_F+F_{yr}(\alpha_r),
+    \label{eq:force_balance}
+\end{equation}
+where $a_y$ is the lateral component of the body-frame acceleration
+$\bm a_E$. The inversion assumes that $G$ is non-increasing in
+$v_{y,E}$ on the declared operating domain; wherever $G$ is strictly
+decreasing, the lateral force balance determines $v_{y,E}$.
+
+The numerical pseudo-measurement $c$ is obtained from the nominal
+force balance with a proximal regularization. Let $G_0$ denote the
+nominal force function and let
+$\epsilon_F=m_E\bar n_a+\epsilon_{\rm par}\sum_j\mu_jF_{zj}$.
+On $|c|\leq V_m\sin\beta_{\rm dom}$, the point solution satisfies
+\begin{equation}
+    G_0(c)-\frac{\epsilon_F}{\max(V_m\sin\beta_{\rm dom},\epsilon_{\rm mach})}c
+    =m_Ea_{m,y},
+    \label{eq:regularized_force_inverse}
+\end{equation}
+with clamping at the cone endpoints when no root lies inside. The added
+slope regularizes the point inversion when tire force is saturated; it is
+not an additional physical tire force. A separate feasible interval is
+computed alongside the point estimate. Let the cornering stiffnesses and friction
+coefficients lie within a relative uncertainty $\epsilon_{\rm par}$ of
+their model values, and let $G_{\min}$ and $G_{\max}$ be the sums of the
+per-axle extremes of the force over the sensor bounds on $u_3$ and $V_m$
+and over this parameter box. The implementation evaluates parameter and
+measurement corners to bound the axle forces. This construction
+requires the relevant force monotonicity and non-increasing force envelopes to hold on the declared
+operating domain. Under these conditions, every admissible lateral
+velocity satisfies
+\begin{equation}
+    \begin{gathered}
+    G_{\min}(v_{y,E})\leq m_E(a_{m,y}+\bar n_a),\\
+    G_{\max}(v_{y,E})\geq m_E(a_{m,y}-\bar n_a),
+    \end{gathered}
+    \label{eq:force_interval}
+\end{equation}
+which is an interval $[\underline c,\overline c]$, and
+$\rho_c=\max(c-\underline c,\overline c-c)$ bounds $|c-v_{y,E}|$. An
+empty interval means that the measurements contradict the model or the
+cone, and the ego enclosure is declared invalid. With
+$\bm y_v=[\phi(V_m,c),\,c]^{\trans}$ in \eqref{eq:ego_observer}, the
+mean-value argument of Lemma~\ref{lem:egoRows} gives
+$\normtwo{\bm y_v-\bm v^E}\leq\sec\beta_{\rm dom}(\bar n_v+\rho_c)$ on
+the cone, and the velocity row of the comparison becomes
+\begin{equation}
+    \begin{split}
+    D^+\normtwo{\bm e_v}\leq{}&-k_v\normtwo{\bm e_v}+\bar n_a
+        +\bar n_gV_E|_{\max}\\
+        &+k_v\sec\beta_{\rm dom}\,(\bar n_v+\rho_c(t)).
+    \end{split}
+    \label{eq:model_aided_row}
+\end{equation}
+The model-aided bound replaces the kinematic mismatch premise with the
+force-model structure, parameter box and operating cone. The gyro
+cancellation of Lemma~\ref{lem:egoRows} is not retained in
+\eqref{eq:model_aided_row}. The radius $\rho_c$ is computed online;
+near tire saturation, the force balance becomes less informative and
+the interval can widen and become asymmetric. The controller retains
+the operating-cone premise, but does not prohibit rear-tire saturation.
+Dividing this interval by the speed interval gives a sideslip interval
+for the yaw correspondence developed below. Without the model or a held
+input, the kinematic measurement of Section~\ref{subsec:egoObserver} is
+used unchanged. The force-balance bound is conditional on the model and
+uncertainty assumptions and does not certify a plant with different
+low-speed dynamics.
 
 \subsubsection{Certified Course--Yaw Correspondence}
 \label{subsec:courseCertificate}
@@ -520,253 +781,10 @@ it contributes the whole circle to the yaw enclosure. Neither case
 touches the body-velocity innovation, which is defined at standstill as
 well.
 
-\subsubsection{Ego Observers}
-\label{subsec:egoObserver}
-
-With $J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$,
-$\nabla_u\bm z=\dot{\bm z}+uJ\bm z$ and
-$\bm v^E=R(\psi_E)^{\trans}\bm v_E$, define
-\begin{equation}
-    \begin{gathered}
-    \phi(V,w)=\sqrt{\max\{V^2-w^2,V^2\cos^2\beta_{\rm dom}\}},\\
-    \bm y_v=[\phi(V_m,l_{r,E}u_3),\ l_{r,E}u_3]^{\trans},\\
-    \nabla_{u_3}\hat{\bm v}^E=\bm a_m+k_v(\bm y_v-\hat{\bm v}^E).
-    \end{gathered}
-    \label{eq:ego_observer}
-\end{equation}
-On the true forward cone $\phi(V_E,v_{y,E})=v_{x,E}$. The extension is
-defined for every measured speed, including zero, and its lateral
-component is never clipped, so that
-$y_{v,2}-v_{y,E}=l_{r,E}(d_\omega+d_{\rm st})$.
-
-\begin{lemma}
-\label{lem:egoRows}
-Let $\bm e_v=\hat{\bm v}^E-\bm v^E$, $k_v>0$, and
-\begin{equation}
-    \begin{split}
-    C_\omega(k)=\max_{V\in\{V_E|_{\min},V_E|_{\max}\}}
-    \Bigl[(V\sin\beta_{\rm dom}+kl_{r,E}\tan\beta_{\rm dom})^2\\
-        +(kl_{r,E}-V\cos\beta_{\rm dom})^2\Bigr]^{1/2}.
-    \end{split}
-    \label{eq:common_gyro_bound}
-\end{equation}
-Under Assumptions~\ref{asm:ego}--\ref{asm:singleTrack},
-\begin{equation}
-    \begin{gathered}
-    D^+\normtwo{\bm e_v}\leq-k_v\normtwo{\bm e_v}+\bar\delta_v,\\
-    \bar\delta_v=\bar n_a+k_v\sec\beta_{\rm dom}\,\bar n_v
-      +C_\omega(k_v)\bar n_g
-      +k_vl_{r,E}\sec\beta_{\rm dom}\,\bar d_{\rm st}.
-    \end{gathered}
-    \label{eq:ego_rows}
-\end{equation}
-\end{lemma}
-
-\begin{IEEEproof}
-Put $\nu=V_m-V_E$, so $|\nu|\leq\bar n_v$. Integrating the piecewise
-derivatives of $\phi$ along the segment between $(V_E,v_{y,E})$ and
-$(V_m,l_{r,E}u_3)$ gives
-\begin{equation}
-    \begin{gathered}
-    \bm y_v-\bm v^E=\alpha\bm e_1\nu
-        +l_{r,E}\bm g(\zeta)(d_\omega+d_{\rm st}),\\
-    \bm g(\zeta)=[-\zeta,1]^{\trans},\\
-    \cos\beta_{\rm dom}\leq\alpha\leq\sec\beta_{\rm dom},\qquad
-    |\zeta|\leq\tan\beta_{\rm dom}.
-    \end{gathered}
-    \label{eq:velocity_measurement_error}
-\end{equation}
-Continuity covers branch crossings and the origin. Substituting before
-taking norms,
-\begin{equation}
-    \begin{split}
-    \dot{\bm e}_v={}&(-k_vI-u_3J)\bm e_v+\bm n_a+k_v\alpha\bm e_1\nu\\
-        &+(k_vl_{r,E}\bm g(\zeta)-J\bm v^E)d_\omega
-          +k_vl_{r,E}\bm g(\zeta)d_{\rm st}.
-    \end{split}
-    \label{eq:velocity_error_derivation}
-\end{equation}
-The common gyro column has components
-$[v_{y,E}-k_vl_{r,E}\zeta,\ k_vl_{r,E}-v_{x,E}]^{\trans}$. Maximizing
-its norm over $\zeta$ and the forward cone, then using the convexity of
-its squared bound in the speed, gives \eqref{eq:common_gyro_bound}. The
-rotation is skew and contributes nothing to the norm derivative. The
-remaining terms give \eqref{eq:ego_rows}.
-\end{IEEEproof}
-
-The same gyro error enters the measurement and the propagation, and
-bounding the two separately would throw away their cancellation; no
-statistical independence is used anywhere in the lemma, and yaw error
-does not enter this conditional velocity comparison directly.
-In the sampled position--IMU filter, yaw uncertainty does affect the
-reconstructed velocity enclosure.
-
-Yaw and inertial position are estimated in parallel. Let $\bm v_B$
-denote the body-frame velocity pseudo-measurement, $\bm v_I=\bm v_m$ the
-reconstructed inertial velocity, and $s_f=\omega_f\bar n_p$. The yaw
-innovation uses the regularized direction correspondence
-\begin{equation}
-    \begin{gathered}
-    c_f=\frac{\bm v_B^{\trans}\bm v_I}
-        {\normtwo{\bm v_B}\normtwo{\bm v_I}+s_f^2},\quad
-    s_f^{\psi}=\frac{v_{B,x}v_{I,y}-v_{B,y}v_{I,x}}
-        {\normtwo{\bm v_B}\normtwo{\bm v_I}+s_f^2},\\
-    \dot{\hat\psi}_E=u_3+k_\psi
-        (s_f^{\psi}\cos\hat\psi_E-c_f\sin\hat\psi_E),\\
-    \dot{\hat{\bm p}}_E=\bm v_m+k_p(\bm y_p-\hat{\bm p}_E).
-    \end{gathered}
-    \label{eq:parallel_outputs}
-\end{equation}
-A numerical guard covers a zero denominator. The yaw correction varies
-continuously with the direction information and does not switch off
-according to the informative-arc flag. An orientation set $\Psi$ is
-propagated separately using the gyro error bound and intersected with
-valid measurement-consistent arcs. If the velocity information cannot
-constrain direction, its contribution is the whole circle. Disconnected
-components are kept, and the published radius is
-$B_\psi=\sup_{\theta\in\Psi}d_{S^1}(\hat\psi_E,\theta)$ about the
-numerical estimate. An empty intersection invalidates orientation
-outputs. Heading convergence from rest is not claimed.
-
-For the continuous position equation with a continuously available
-position signal and a uniform velocity-input error bound, the position
-error $\bm e_p=\hat{\bm p}_E-\bm p_E$ satisfies
-\begin{equation}
-    \begin{gathered}
-    D^+\normtwo{\bm e_p}\leq-k_p\normtwo{\bm e_p}+\bar n_v+k_p\bar n_p,\\
-    \limsup_{t\to\infty}\normtwo{\bm e_p}\leq\bar n_p+\bar n_v/k_p.
-    \end{gathered}
-    \label{eq:position_error_bound}
-\end{equation}
-This continuous comparison is conditional on its input bounds. The
-sampled realization separately accounts for held measurements and
-numerical defects; the comparison alone is not a sampled-system proof.
-
-\subsubsection{Model-Aided Lateral Velocity}
-\label{subsec:modelAided}
-
-Assumption~\ref{asm:singleTrack} is a statement about the true motion.
-With $l_{r,E}$ the rear-axle distance, $l_{r,E}d_{\rm st}$ is, up to
-sign, the lateral slip speed of the rear tire, so a small
-$\bar d_{\rm st}$ says that the rear tire barely slips. The avoidance
-maneuvers of Section~\ref{sec:results} do not respect that: at 15\,m/s
-the rear slip speed reached 0.9 to 4.3\,m/s, and bounds published under
-$\bar d_{\rm st}$ failed to contain the truth. Enlarging
-$\bar d_{\rm st}$ to the saturation slip of the tire makes every bound
-five to seven times larger. The remedy is to use the model the
-controller already has. When the estimator knows the ego model
-\eqref{eq:bicycle_model}--\eqref{eq:fiala_force} and the input
-$\bm u=[\delta_F,\beta]^{\trans}$ that the controller holds, the lateral
-component of \eqref{eq:ego_observer} is taken from the lateral force
-balance at the center of mass,
-\begin{equation}
-    m_Ea_{y}=G(v_{y,E}):=F_{xf}\sin\delta_F
-        +F_{yf}(\alpha_f)\cos\delta_F+F_{yr}(\alpha_r),
-    \label{eq:force_balance}
-\end{equation}
-where $a_y$ is the lateral component of $\bm a_E$, which the
-accelerometer measures, and the slip angles \eqref{eq:tire_forces}
-depend on $v_{y,E}$, on the yaw rate and, through $v_{x,E}$, on the
-speed. For $v_{x,E}>0$ and $|\delta_F|<\pi/2$ both slip angles increase
-with $v_{y,E}$ and both lateral forces are non-increasing in their slip
-angle, so $G$ is non-increasing, and the measured $a_y$ determines
-$v_{y,E}$ wherever $G$ is strictly decreasing.
-
-The numerical pseudo-measurement $c$ is obtained from the nominal
-force balance with a proximal regularization. Let $G_0$ denote the
-nominal force function and let
-$\epsilon_F=m_E\bar n_a+\epsilon_{\rm par}\sum_j\mu_jF_{zj}$.
-On $|c|\leq V_m\sin\beta_{\rm dom}$, the point solution satisfies
-\begin{equation}
-    G_0(c)-\frac{\epsilon_F}{\max(V_m\sin\beta_{\rm dom},\epsilon_{\rm mach})}c
-    =m_Ea_{m,y},
-    \label{eq:regularized_force_inverse}
-\end{equation}
-with clamping at the cone endpoints when no root lies inside. The added
-slope regularizes the point inversion when tire force is saturated; it is
-not an additional physical tire force. A separate feasible interval is
-computed alongside the point estimate. Let the cornering stiffnesses and friction
-coefficients lie within a relative uncertainty $\epsilon_{\rm par}$ of
-their model values, and let $G_{\min}$ and $G_{\max}$ be the sums of the
-per-axle extremes of the force over the sensor bounds on $u_3$ and $V_m$
-and over this parameter box. Each axle force is monotone in each of
-these quantities, so the extremes sit at the corners of the box, and
-$G_{\min}$ and $G_{\max}$ are again non-increasing in $v_{y,E}$. Every
-admissible lateral velocity then satisfies
-\begin{equation}
-    \begin{gathered}
-    G_{\min}(v_{y,E})\leq m_E(a_{m,y}+\bar n_a),\\
-    G_{\max}(v_{y,E})\geq m_E(a_{m,y}-\bar n_a),
-    \end{gathered}
-    \label{eq:force_interval}
-\end{equation}
-which is an interval $[\underline c,\overline c]$, and
-$\rho_c=\max(c-\underline c,\overline c-c)$ bounds $|c-v_{y,E}|$. An
-empty interval means that the measurements contradict the model or the
-cone, and the ego enclosure is declared invalid. With
-$\bm y_v=[\phi(V_m,c),\,c]^{\trans}$ in \eqref{eq:ego_observer}, the
-mean-value argument of Lemma~\ref{lem:egoRows} gives
-$\normtwo{\bm y_v-\bm v^E}\leq\sec\beta_{\rm dom}(\bar n_v+\rho_c)$ on
-the cone, and the velocity row of the comparison becomes
-\begin{equation}
-    \begin{split}
-    D^+\normtwo{\bm e_v}\leq{}&-k_v\normtwo{\bm e_v}+\bar n_a
-        +\bar n_gV_E|_{\max}\\
-        &+k_v\sec\beta_{\rm dom}\,(\bar n_v+\rho_c(t)).
-    \end{split}
-    \label{eq:model_aided_row}
-\end{equation}
-The kinematic mismatch $\bar d_{\rm st}$ is gone; the premises are now
-the model structure, the parameter box and the cone. The gyro
-cancellation of Lemma~\ref{lem:egoRows} is not retained in
-\eqref{eq:model_aided_row}. The radius $\rho_c$ is computed online and is
-not uniform: near saturation the force no longer determines the slip and
-the interval widens, to about 3\,m/s for $\epsilon_{\rm par}=0.05$, and
-becomes asymmetric, which is why its midpoint is not used as the
-measurement. The controller retains the cone premise
-(Section~\ref{subsec:envelope}), but does not prohibit rear-tire
-saturation. The interval accounts for the corresponding loss of information. The same interval, divided by the speed
-interval, replaces $\hat\beta\pm\bar e_\beta$ in the course
-correspondence of Lemma~\ref{lem:course}. Without the model or a held
-input, the kinematic measurement of Section~\ref{subsec:egoObserver} is
-used unchanged. The premise is the Fiala model itself: the plant of
-Section~\ref{sec:results} follows it exactly above 4\,m/s and blends
-toward a kinematic bicycle below, where the inversion is only an
-approximate model of the vehicle; ten of the 84 estimated-state runs
-slow into that range, to 3.2\,m/s at the least.
-
-\subsubsection{Covariant Target Tracker}
+\subsubsection{Target-Vehicle Observer}
 \label{subsec:targetTracker}
 
-The target model of \cite{SharmaAlaiRajamani2026}, constant scalar
-acceleration and constant sideslip, hence constant curvature
-\(\kappa=\sin\beta_C/l_{r,C}\), is kept, but written in covariant
-companion coordinates
-\begin{equation}
-    \bm\rho=R_E^{\trans}(\bm p_C-\bm p_E),\quad
-    \bm q=R_E^{\trans}\bm v_C,\quad
-    \bm s=R_E^{\trans}\bm a_C,
-    \label{eq:target_coordinates}
-\end{equation}
-with \(R_E=R(\psi_E)\). With \(\omega_E=\dot\psi_E\), the exact
-dynamics in these coordinates form the third-order chain
-\begin{equation}
-    \begin{gathered}
-    \nabla_{\omega_E}\bm\rho=\bm q-\bm v^E,\quad
-    \nabla_{\omega_E}\bm q=\bm s,\quad
-    \nabla_{\omega_E}\bm s=\Phi(\bm q,\bm s),\\
-    \Phi=-\Omega^2\bm q+3A\Omega J\frac{\bm q}{V},\\
-    V=\normtwo{\bm q},\quad
-    A=\frac{\bm q^{\trans}\bm s}{V},\quad
-    \Omega=\frac{(J\bm q)^{\trans}\bm s}{V^2}.
-    \end{gathered}
-    \label{eq:target_chain}
-\end{equation}
-Only \(\bm v^E\) and \(\omega_E\) enter, and the only extra terms are
-those of the rotating frame; \(A\) and \(\Omega\) are reconstructions,
-not states. This is where the ego's own maneuver enters the tracker, as
-a measured input rather than through differentiated coordinates. The
-declared operating set is
+The declared operating set is
 \begin{equation}
     \begin{gathered}
     a\leq\normtwo{\bm q}\leq b,\quad
@@ -797,6 +815,32 @@ radius $r$ and $\operatorname{clip}_r$ the clip to $[-r,r]$,
 \end{equation}
 which agrees with $\Phi$ on \eqref{eq:target_domain} and is defined on
 $\R^4$.
+
+The tracker is the covariant high-gain chain
+\begin{equation}
+    \begin{aligned}
+    \nabla_{u_3}\hat{\bm\rho}&=\hat{\bm q}-\hat{\bm v}^E
+        +l_1\omega\,(\bm y_R-\hat{\bm\rho}),\\
+    \nabla_{u_3}\hat{\bm q}&=\hat{\bm s}
+        +l_2\omega^2(\bm y_R-\hat{\bm\rho}),\\
+    \nabla_{u_3}\hat{\bm s}&=\Phi_e(\hat{\bm q},\hat{\bm s})
+        +l_3\omega^3(\bm y_R-\hat{\bm\rho}).
+    \end{aligned}
+    \label{eq:target_observer}
+\end{equation}
+Let \(A_c\) be the integrator-chain matrix, \(C=\bm e_1^{\trans}\) and
+\(A_l=A_c-\bm lC\). The shape $\bm l$ and the bandwidth $\omega>0$ are
+chosen to satisfy the dissipation condition developed below. For
+$\bm x_T=[\bm\rho^{\trans},\bm q^{\trans},\bm s^{\trans}]^{\trans}$ and
+$\bm e_T=\hat{\bm x}_T-\bm x_T$, put $D=\diag(1,\omega^{-1},\omega^{-2})$
+and, for $P\succ0$, define
+\begin{equation}
+    \bm\epsilon=(D\otimes I_2)\bm e_T,
+    \qquad
+    W_T=\sqrt{\bm\epsilon^{\trans}(P\otimes I_2)\bm\epsilon}.
+    \label{eq:target_metric}
+\end{equation}
+Write $\Delta\Phi_e=\Phi_e(\hat{\bm q},\hat{\bm s})-\Phi_e(\bm q,\bm s)$.
 
 \begin{lemma}
 \label{lem:lipschitz}
@@ -844,33 +888,6 @@ at most $L_s$; composing with $\tilde{\bm s}=\Pi_S(\bm s)$ preserves the
 bound because $\|D_s\Pi_S\|_2\leq1$ almost everywhere, and continuity
 covers $\bm q=0$.
 \end{IEEEproof}
-
-The tracker is the covariant high-gain chain
-\begin{equation}
-    \begin{aligned}
-    \nabla_{u_3}\hat{\bm\rho}&=\hat{\bm q}-\hat{\bm v}^E
-        +l_1\omega\,(\bm y_R-\hat{\bm\rho}),\\
-    \nabla_{u_3}\hat{\bm q}&=\hat{\bm s}
-        +l_2\omega^2(\bm y_R-\hat{\bm\rho}),\\
-    \nabla_{u_3}\hat{\bm s}&=\Phi_e(\hat{\bm q},\hat{\bm s})
-        +l_3\omega^3(\bm y_R-\hat{\bm\rho}).
-    \end{aligned}
-    \label{eq:target_observer}
-\end{equation}
-Let \(A_c\) be the integrator-chain matrix, \(C=\bm e_1^{\trans}\) and
-\(A_l=A_c-\bm lC\). The shape $\bm l$ and the bandwidth $\omega>0$ are
-selected in Section~\ref{subsec:gainSelection}; the certificate below
-holds for every pair that satisfies its matrix inequality. For
-$\bm x_T=[\bm\rho^{\trans},\bm q^{\trans},\bm s^{\trans}]^{\trans}$ and
-$\bm e_T=\hat{\bm x}_T-\bm x_T$, put $D=\diag(1,\omega^{-1},\omega^{-2})$
-and
-\begin{equation}
-    \bm\epsilon=(D\otimes I_2)\bm e_T,
-    \qquad
-    W_T=\sqrt{\bm\epsilon^{\trans}(P\otimes I_2)\bm\epsilon}.
-    \label{eq:target_metric}
-\end{equation}
-Write $\Delta\Phi_e=\Phi_e(\hat{\bm q},\hat{\bm s})-\Phi_e(\bm q,\bm s)$.
 
 \begin{lemma}
 \label{lem:dissipation}
@@ -1108,10 +1125,9 @@ Neither simulated errors nor the sensor sample period enter the design.
 \subsubsection{Error Enclosure and the Published Sets}
 \label{subsec:enclosure}
 
-A controller that tightens its constraints needs an error radius at
-every sample, during the transient as well as at steady state. The
-comparison system supplies one, because \eqref{eq:comparison_solution}
-holds for all \(t\).
+The controller requires an error enclosure at each sample, including
+the transient. The comparison solution in
+\eqref{eq:comparison_solution} provides a bound for all \(t\).
 
 \begin{corollary}
 \label{cor:enclosure}
@@ -1137,11 +1153,8 @@ only on the design, the declared bounds and \(\bm z_0\).
 
 The uniform bound \eqref{eq:uniform_bound} follows from $e^{Ht}\to0$
 and convergence of the comparison integral. The safety interface uses
-the valid transient enclosure at the current time, not an assumed
-future constant radius. Section~\ref{subsec:robust} propagates the joint
-physical, observer and measurement state under causal feedback and
-conditions it on the received sensor block. It does not assume
-convergence of the future observer error.
+the valid transient enclosure at the current time, without assuming a constant future radius or convergence of future
+observer errors.
 
 Inertial reconstruction of the relative vector costs one further yaw
 term,
@@ -1154,8 +1167,9 @@ term,
 rotation bounds convert the remaining components of
 \eqref{eq:component_extraction} into the componentwise ego and target
 enclosures \(\bm b_E(t)\), \(\bm b_T(t)\). These certify the current
-estimate; they are not predictions of future observer output. Two sets
-are published to the controller at every sample $k$. The ego set is a
+estimate; they are not predictions of future observer output. When the
+required bounds are valid, the controller receives ego and target sets
+at each sample $k$. The ego set is a
 zonotope
 \begin{equation}
     \mathcal E_k=\{G_0\bm\zeta:\norminf{\bm\zeta}\leq1\}
@@ -1170,9 +1184,18 @@ are added), an interval for the course, and intervals for the speed, the
 scalar acceleration $A_C$ and the curvature $\kappa_C$, each intersected
 with the declared domain \eqref{eq:target_domain}. The last two follow
 from the reconstructions $A$ and $\Omega/V$ of \eqref{eq:target_chain}
-and the component bounds \eqref{eq:component_extraction}. The digital
-runtime accounts for held measurements, relative-position prediction and
-outages in a separate finite-time enclosure. The continuous theorem does
+and the component bounds \eqref{eq:component_extraction}. When prior
+measurements are available, the target enclosures can be tightened by
+intersecting them with bounds obtained from bounded-noise position
+secants and interpolation. Under the constant-acceleration and
+constant-curvature model, the controller can also retain a
+history-conditioned joint parameter set for target speed, scalar
+acceleration, curvature and course, preserving their dependence rather
+than replacing it with independent intervals. These refinements do not
+change the observer's point estimate and remain conditional on the
+specified sensor and motion bounds. The digital runtime accounts for
+held measurements, relative-position prediction and outages in a
+separate finite-time enclosure. The continuous theorem does
 not establish exponential stability of the sampled fourth-order
 Runge--Kutta (RK4) realization, nor a directed-rounding certificate for
 the computed bounds.
@@ -1233,33 +1256,9 @@ The force and moment balances in the body frame read
 where $[F_{xf}^{b},F_{yf}^{b}]^{\trans}
 =R(\delta_F)[F_{xf},F_{yf}]^{\trans}$ rotates the front wheel forces into
 the body frame and $F_R$ is the passive road load
-\eqref{eq:road_load}. The slip angles and lateral forces are
-\begin{equation}
-    \begin{gathered}
-    \alpha_f=\operatorname{atan2}(v_{y,E}+l_{f,E}\dot\psi_E,\,v_{x,E})
-        -\delta_F,\\
-    \alpha_r=\operatorname{atan2}(v_{y,E}-l_{r,E}\dot\psi_E,\,v_{x,E}),\\
-    F_{yf}=\Phi_f(\alpha_f;Q_f),\qquad F_{yr}=\Phi_r(\alpha_r;Q_r).
-    \end{gathered}
-    \label{eq:tire_forces}
-\end{equation}
-For axle \(i\in\{f,r\}\), with \(t=\tan\alpha\), \(C_i>0\) the
-nominal cornering stiffness and \(Q_i=\eta_i\mu_iF_{zi}\), the modified
-Fiala law of \cite[Sec.~II-A, eqs.~(7), (11) and (13)]{FahmyGhanyBaumann2018}
-is
-\begin{equation}
-    \Phi_i(\alpha;Q_i)=
-    \begin{cases}
-    -C_it+\dfrac{C_i^2}{3Q_i}|t|t-\dfrac{C_i^3}{27Q_i^2}t^3,
-       & |\alpha|<\alpha_{{\rm sl},i},\\[3pt]
-    -Q_i\operatorname{sgn}(\alpha), & |\alpha|\geq\alpha_{{\rm sl},i},
-    \end{cases}
-    \label{eq:fiala_force}
-\end{equation}
-with \(\alpha_{{\rm sl},i}=\arctan(3Q_i/C_i)\),
-\(\eta_i=\sqrt{1-\beta^2}\) and \(F_{xi}=\beta\mu_iF_{zi}\) for
-\(|\beta|<1\). One signed input \(\beta\) acts on both axles: negative
-values brake, positive values drive. The static loads are
+\eqref{eq:road_load}. The slip angles and lateral tire forces are given by
+\eqref{eq:tire_forces} and \eqref{eq:fiala_force}. One signed input
+\(\beta\) acts on both axles: negative values brake, positive values drive. The static loads are
 \(F_{zf}=m_Egl_{r,E}/L\) and \(F_{zr}=m_Egl_{f,E}/L\) with
 \(L=l_{f,E}+l_{r,E}\), each axle stands for a wheel pair, \(m_E\) and
 \(I_{z,E}\) are the mass and yaw inertia, \(l_{f,E}\) and \(l_{r,E}\) the
@@ -1304,7 +1303,8 @@ The controller state and input are
 \end{equation}
 the inertial pose, the body velocities and the yaw rate $r=\dot\psi$,
 and the front steering angle and the signed longitudinal force ratio.
-Equations \eqref{eq:position_kinematics}--\eqref{eq:fiala_force} define
+Equations \eqref{eq:position_kinematics}, \eqref{eq:bicycle_model},
+\eqref{eq:tire_forces} and \eqref{eq:fiala_force} define
 $\dot{\bm x}=f(\bm x,\bm u)$ above the speed $v_2=4$\,m/s. Below
 $v_1=2.5$\,m/s the body accelerations are those of a kinematic bicycle,
 \begin{equation}
