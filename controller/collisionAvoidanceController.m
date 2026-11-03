@@ -128,6 +128,8 @@ function [command,predictedInput,prediction,controllerState] = ...
     % about the ego state and its persistent physical parameters. Start this
     % memory during cruise, before the first target has been confirmed.
     cruisePosterior=[];
+    reducedInformation=cfg.controller.reducedJointInformation && string(cfg.solver.method)=="rti" ...
+        && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction;
     retainCurrentInformation=(cfg.controller.retainedTube && (isempty(q) || targetOnset)) ...
         || (~cfg.controller.retainedTube && cfg.controller.jointAffinePrediction);
     if retainCurrentInformation && isfield(uncertainty,'jointPrediction') ...
@@ -141,6 +143,10 @@ function [command,predictedInput,prediction,controllerState] = ...
             memory=struct('set',certificate.tube.sets{2},'contract',certificate.contract, ...
                 'sampleIndex',previousState.sampleIndex+1);
         end
+        % Engineering RTI keeps one coupled affine sensor-block memory.
+        % Ego-only current information comes from the actual observer and IMU;
+        % a second old ego/observer history is not independently intersected.
+        if reducedInformation,memory=[];end
         if ~isempty(memory)
             assert(memory.sampleIndex==index,'collisionAvoidanceController:invalidEgoInformationAge', ...
                 'Ego information must refer to the current control boundary.');
@@ -199,7 +205,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     predictedInput=solution.inputs;first=predictedInput(:,1);
     egoJointPrediction=[];
     informationPredictionFailure="";
-    if ~isempty(cruisePosterior) && (isempty(q) || ~cfg.controller.retainedTube)
+    if ~isempty(cruisePosterior) && (isempty(q) || ~cfg.controller.retainedTube) && ~reducedInformation
         contract=uncertainty.jointPrediction;
         policy=struct('context',struct('cfg',cfg,'contract',contract, ...
             'reference',[contract.point;contract.currentMeasurement.yawRate], ...
@@ -331,7 +337,9 @@ function [command,predictedInput,prediction,controllerState] = ...
         'usedAllSamples',false,'reason',"inactive",'nonlinearCertificate',false);
     if ~isempty(coupledUpdate),metadata.jointSensorBlockConditioning=coupledUpdate.diagnostics;end
     metadata.robustNonlinearSafetyCertified=false;
+    metadata.egoInformationRetainedAcrossModeSwitch=false;
     metadata.informationPredictionFailure=informationPredictionFailure;
+    metadata.reducedJointInformation=reducedInformation;
     if ~isempty(cruisePosterior),metadata.measurementConditioning=cruisePosterior.measurementConditioning;end
     metadata.maximumCollisionTighteningMeters=solution.maximumCollisionTighteningMeters;
     metadata.clfDerivative=solution.clfDerivative;

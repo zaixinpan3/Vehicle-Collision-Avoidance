@@ -2849,6 +2849,37 @@ including its residual; other directions retain the LP dual support bound.
 This reduces repeated solves without discarding measurement equations,
 independent constraints, or shared physical parameters.
 
+The default engineering RTI implementation sets
+`controller.reducedJointInformation=true`. It keeps the coupled affine
+sensor-block memory, but omits the parallel ego-only nonlinear prior and its
+constrained support LPs. Current ego information is supplied by the actual
+observer, position/gyro bounds, and a single affine IMU update. The physical
+model, future observer sampling, causal target-dependent feedback, input
+optimization, and encounter horizon are unchanged. The nonlinear optimizer,
+`retainedTube`, and `jointNonlinearPrediction` modes ignore this shortcut;
+setting the option to false restores the more expensive information update.
+
+For a current family \(x=c+G\xi\), \(\|\xi\|_\infty\le1\), linearize
+the two-axis IMU map using the same state and persistent parameter columns:
+\(y=a(c)+H\xi+D\nu\), \(\|\nu\|_\infty\le1\). Here \(D\) contains
+the existing sensor bounds. With \(d=y-a(c)\), any matrix \(L\) gives
+the outer image of this **affine** measurement intersection
+
+\[
+ c^+=c+Ld,\qquad G^+=[G-LH,\ LD].
+\]
+
+Use \(L=GH^\top(HH^\top+DD^\top)^\dagger\), requiring only a two-by-two
+pseudoinverse, and intersect the resulting coordinate ranges with the
+current publication. This is a bounded-set construction, not a Gaussian
+covariance update. If the proposed ranges are disjoint, keep the publication
+and mark the contraction unresolved. No configured measurement noise or
+parameter radius is reduced. However, the IMU Taylor remainder is omitted: this update
+is an engineering approximation and **not** a nonlinear posterior enclosure.
+The metadata explicitly report that scope. The coupled affine-history
+conditioning likewise retains its existing non-certification status; neither
+operation establishes the nonlinear recursive-feasibility theorem.
+
 The declared ancillary policy preserves ego stabilization and adds a
 bounded target-dependent response:
 

@@ -4,6 +4,7 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
     end
     properties (TestParameter)
         modelAided=struct('kinematic',false,'forceBalance',true)
+        reducedInformation={false,true}
     end
     methods (TestClassSetup)
         function prepare(testCase)
@@ -96,7 +97,18 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
             testCase.verifyFalse(prediction.metadata.egoJointRealArithmeticEnclosure);
             testCase.verifyEqual(prediction.metadata.measurementConditioning.method, ...
-                "nonlinearCurrentMeasurementIntersection");
+                "affineCurrentMeasurementIntersection");
+        end
+        function reducedInformationUsesTheObserverWithoutASecondEgoPrior(testCase,reducedInformation)
+            f=testCase.fixture;f.cfg.controller.horizonSteps=6;
+            f.cfg.controller.reducedJointInformation=reducedInformation;
+            f.frame=localHeldInput(f.frame,f.input,true);
+            output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);output.targetEstimate=[];
+            [~,~,prediction,state]=collisionAvoidanceController(output,[],[],f.cfg,[]);
+            testCase.verifyEqual(prediction.metadata.reducedJointInformation,reducedInformation);
+            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
+            testCase.verifyEqual(isfield(state,'egoJointPrediction'),~reducedInformation);
+            testCase.verifyTrue(prediction.metadata.futureObserverDynamicsIncluded);
         end
         function nonlinearSolveRefreshesMarginsOnItsReturnedVehicleTrajectory(testCase)
             f=testCase.fixture;f.cfg.controller.horizonSteps=6;
@@ -104,6 +116,7 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             f.frame=localHeldInput(f.frame,f.input,true);
             output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);output.targetEstimate=[];
             [~,~,prediction]=collisionAvoidanceController(output,[],[],f.cfg,[]);
+            testCase.verifyFalse(prediction.metadata.reducedJointInformation);
             testCase.verifyTrue(prediction.metadata.marginRefreshPerformed);
             testCase.verifyFalse(prediction.metadata.uncertaintyFrozenWithinSolve);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
@@ -112,6 +125,24 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
                 testCase.verifyEqual(states(:,k+1), ...
                     nonlinearBicycleModel.sample(states(:,k),inputs(:,k),f.cfg),AbsTol=1e-10);
             end
+        end
+        function affineImuUpdateContainsAConsistentSharedFrictionRealization(testCase)
+            f=testCase.fixture;frame=localHeldInput(f.frame,f.input,true);
+            output=onlineNrmmTrackingRuntime('output',f.runtime,frame);
+            contract=output.controllerErrorBound.jointPrediction;
+            u=[0;-.3];contract.currentMeasurement.heldInput=u;
+            root=nrmmJointPrediction('rootSet',f.state,zeros(6,0),contract);
+            actual=[0;0;.5;-.5].*contract.parameterRadius;
+            plant=nrmmJointPrediction('plantConfiguration',f.cfg,actual);
+            field=nonlinearBicycleModel.derivative(f.state,u,plant);
+            contract.currentMeasurement.bodyAcceleration=field(4:5)+.5*contract.noiseRadius(5:6);
+            result=nrmmJointPrediction('conditionMeasurements',root,contract,f.cfg);
+            [lower,upper]=bounds(result.set(12:15));
+            testCase.verifyLessThanOrEqual(max(lower-actual),1e-12);
+            testCase.verifyLessThanOrEqual(max(actual-upper),1e-12);
+            testCase.verifyTrue(result.diagnostics.contractionAccepted);
+            testCase.verifyFalse(result.diagnostics.realArithmeticEnclosure);
+            testCase.verifyEqual(result.diagnostics.imageEvaluations,1);
         end
         function onlinePredictionKeepsJointFeedbackWithoutClaimingANonlinearCertificate(testCase)
             testCase.verifyTrue(testCase.fixture.cfg.controller.jointAffinePrediction);

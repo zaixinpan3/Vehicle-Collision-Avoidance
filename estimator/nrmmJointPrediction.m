@@ -214,9 +214,9 @@ function lower=localPosteriorSupport(direction,p,options)
 end
 
 function result=localConditionMeasurements(set,contract,cfg)
-    % Current measurements are known data. Eliminate only states that cannot
-    % generate them for ANY admitted tire parameters and sensor errors.
-    % This contractor never cuts states merely to satisfy a hard constraint.
+    % Full-mode conditioning excludes states inconsistent with every allowed
+    % tire parameter and sensor error. The engineering branch below uses an
+    % affine IMU approximation and explicitly reports its narrower scope.
     [lo,hi]=bounds(set);before=radius(set(1:6));measurement=contract.currentMeasurement;
     lower=[measurement.gnssPosition;measurement.yawRate]-contract.noiseRadius([1,2,7]);
     upper=[measurement.gnssPosition;measurement.yawRate]+contract.noiseRadius([1,2,7]);
@@ -227,6 +227,11 @@ function result=localConditionMeasurements(set,contract,cfg)
     point=contract.point;point(3)=set.center(9)+atan2(sin(point(3)-set.center(9)),cos(point(3)-set.center(9)));
     lo(7:11)=point;hi(7:11)=point;
     lo(16:17)=measurement.heldInput;hi(16:17)=measurement.heldInput;
+    if cfg.controller.reducedJointInformation && string(cfg.solver.method)=="rti" ...
+            && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction
+        result=localAffineMeasurementConditioning(nrmmSet.range(lo,hi),contract,cfg,before);
+        return
+    end
     evaluations=0;unresolved=0;
     % First constrain lateral motion through the force balance, then speed
     % through the complete two-component IMU image. Neither scan assumes a
@@ -250,6 +255,34 @@ function result=localConditionMeasurements(set,contract,cfg)
         'imageEvaluations',evaluations,'unresolvedCells',unresolved, ...
         'noiseRadius',contract.noiseRadius,'parameterRadius',contract.parameterRadius, ...
         'realArithmeticEnclosure',true,'floatingPointCertified',false);
+    result=struct('set',set,'diagnostics',diagnostics);
+end
+
+function result=localAffineMeasurementConditioning(set,contract,cfg,before)
+    % Engineering measurement update: enclose the intersection of the current
+    % publication and the AFFINE two-axis IMU strip in one matrix operation.
+    % No statistical noise interpretation and no nonlinear remainder claim.
+    set=promote(set);
+    x=set.center(1:6);u=contract.currentMeasurement.heldInput;
+    parameters=set.center(12:15);plant=localPlantConfiguration(cfg,parameters);
+    ratio=1./(1+parameters);g=set.generator;
+    [field,df]=localPlantFieldCore(x,u,plant,ratio,g(1:6,:),zeros(2,size(g,2)),g(12:15,:));
+    value=[field(4)-x(6)*x(5);field(5)+x(6)*x(4)];
+    h=[df(4,:)-x(5)*g(6,:)-x(6)*g(5,:); ...
+        df(5,:)+x(4)*g(6,:)+x(6)*g(4,:)];
+    noise=diag(contract.noiseRadius(5:6));
+    gain=(g*h')*pinv(h*h'+noise*noise');
+    innovation=contract.currentMeasurement.bodyAcceleration-value;
+    proposal=nrmmSet(set.center+gain*innovation,[g-gain*h,gain*noise]);
+    [lo,hi]=bounds(set);[pl,ph]=bounds(proposal);
+    accepted=all(max(lo,pl)<=min(hi,ph));
+    if accepted,set=nrmmSet.intersectRange(proposal,lo,hi);end
+    diagnostics=struct('method',"affineCurrentMeasurementIntersection", ...
+        'priorPhysicalRadius',before,'posteriorPhysicalRadius',radius(set(1:6)), ...
+        'imageEvaluations',1,'unresolvedCells',double(~accepted), ...
+        'noiseRadius',contract.noiseRadius,'parameterRadius',contract.parameterRadius, ...
+        'realArithmeticEnclosure',false,'floatingPointCertified',false, ...
+        'contractionAccepted',accepted,'scope',"affine IMU strip only; nonlinear remainder omitted");
     result=struct('set',set,'diagnostics',diagnostics);
 end
 

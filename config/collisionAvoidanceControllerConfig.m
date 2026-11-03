@@ -35,7 +35,9 @@ function cfg=localDefaults()
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
         'enforceRoadBoundaries',false,'jointAffinePrediction',true,'jointNonlinearPrediction',false, ...
-        'retainedTube',false);
+        'retainedTube',false,'reducedJointInformation',true);
+    % Engineering RTI retains one joint affine sensor-block history and uses
+    % the actual observer for current ego information. Strict modes ignore this.
     % retainedTube selects a different, enclosure-certified policy-box
     % formulation for active encounters. It requires explicit ego/target
     % bounds and retains a nonlinear joint/terminal certificate. This is
@@ -204,6 +206,7 @@ function localValidate(cfg)
     end
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.jointAffinePrediction,{'logical'},{'scalar'});
+    validateattributes(cfg.controller.reducedJointInformation,{'logical'},{'scalar'});
     validateattributes(cfg.controller.jointNonlinearPrediction,{'logical'},{'scalar'});
     validateattributes(cfg.controller.retainedTube,{'logical'},{'scalar'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
