@@ -1,0 +1,7 @@
+Final diagnostic run:
+matlab -batch "addpath('scripts'); analyzeOutputFeedbackQpFailures('report/QP_FAILURE_DIAGNOSIS_20261104');"
+
+Behavior regression, run after adding the read-only diagnostic export:
+matlab -batch "results=runtests('tests/dynamicOutputFeedbackTest.m'); writetable(table(results),'report/QP_FAILURE_DIAGNOSIS_20261104/tests.csv'); assertSuccess(results);"
+
+The source script documents all LP group removals, coefficient-box removals, horizon and steering-seed alternatives, and nonlinear checks. Initial exploratory execution hit a filename concatenation error after calculations; the diagnostic script was corrected and the full run completed. No online policy or constraint was changed.

@@ -2839,7 +2839,7 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
             else
                 result=problem.nominalTrajectories;
             end
-        case "step"
+        case {"step","linearizeStep"}
             [result,diagnostics,problem]=localOfStep(request,cfg);
         otherwise
             error('collisionAvoidanceController:invalidOutputFeedbackOperation','Unknown joint operation.');
@@ -2898,6 +2898,11 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
     preparationTimer=tic;
     problem=localOfProblem(hypotheses,memory,block.heldInput,policies,request.reference,cfg);
     preparationSeconds=toc(preparationTimer);
+    if string(request.operation)=="linearizeStep"
+        problem.prepareOnly=true;
+        [~,result]=localOfOptimize(problem,initial,timer);
+        diagnostics=[];return;
+    end
     [point,diagnostics,trajectory]=localOfOptimize(problem,initial,timer);
     diagnostics.informationUpdateSeconds=inferenceSeconds;
     diagnostics.predictionPreparationSeconds=preparationSeconds;
@@ -3306,9 +3311,14 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
     hessian=j.'*j+1e-7*speye(nv);gradient=j.'*r;
     linearizationSeconds=toc(linearTimer);
     if isfield(problem,'prepareOnly') && problem.prepareOnly
+        freeLower=lower;freeUpper=upper;
+        freeLower(1:np)=problem.lower-point;freeUpper(1:np)=problem.upper-point;
         info=struct('equality',e,'inequality',a,'bounds',allowance-c,'hessian',hessian, ...
+            'gradient',gradient,'lower',lower,'upper',upper, ...
+            'lowerWithoutTrust',freeLower,'upperWithoutTrust',freeUpper, ...
+            'activeRows',find(active),'nominalConstraints',vertcat(constraint{:}), ...
             'stateIndices',ix,'policyIndices',problem.policyIndices, ...
-            'nominal', {trajectory},'policyCount',problem.policyCount);
+            'initialPoint',point,'nominal', {trajectory},'policies',policies,'policyCount',problem.policyCount);
         return;
     end
     qpTimer=tic;

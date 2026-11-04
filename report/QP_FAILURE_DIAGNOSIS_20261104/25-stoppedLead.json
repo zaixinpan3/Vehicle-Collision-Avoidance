@@ -1,0 +1,277 @@
+{
+  "source": "report/SPARSE_RTI_20261104/high-speed/25-stoppedLead.json",
+  "timeSeconds": 0,
+  "ego": [
+    -0.005,
+    -0.005,
+    0,
+    24.995,
+    0,
+    0
+  ],
+  "target": [
+    33.995,
+    -0.005,
+    0,
+    0,
+    0,
+    0,
+    1.6,
+    2.4,
+    0.95,
+    0,
+    0
+  ],
+  "previousInput": [
+    0,
+    0
+  ],
+  "retainedHypotheses": 3,
+  "maximumReplayCommandError": 0,
+  "variables": 222,
+  "inequalities": 558,
+  "equalities": 108,
+  "nominalInputs": [
+    [
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      -0.6,
+      -0.6,
+      -0.6,
+      -0.6
+    ]
+  ],
+  "nominalTerminalEgo": [
+    4.8894994850474767,
+    -0.005,
+    0,
+    23.950412391051088,
+    0,
+    0
+  ],
+  "nominalTerminalTarget": [
+    33.995,
+    -0.005,
+    0,
+    0,
+    0,
+    0,
+    1.6,
+    2.4,
+    0.95,
+    0,
+    0
+  ],
+  "targetPreview": [],
+  "maximumNominalConstraint": 45.437182066665045,
+  "ablations": {
+    "full": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "terminalSlackMeters": null
+    },
+    "withoutTerminal": {
+      "exitFlag": 1,
+      "maximumResidual": 1.9236512383002946E-10,
+      "terminalSlackMeters": null
+    },
+    "withoutCollision": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "terminalSlackMeters": null
+    },
+    "withoutCommand": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "terminalSlackMeters": null
+    },
+    "withoutState": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "terminalSlackMeters": null
+    },
+    "withoutTrustBox": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "terminalSlackMeters": null
+    },
+    "withoutBrakeCoefficientTrust": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "terminalSlackMeters": null
+    },
+    "terminalSlack": {
+      "exitFlag": 1,
+      "maximumResidual": 6.5745957289475854E-11,
+      "terminalSlackMeters": 43.726164136375353
+    },
+    "terminalSlackWithoutTrust": {
+      "exitFlag": 1,
+      "maximumResidual": 6.5745957289475854E-11,
+      "terminalSlackMeters": 42.71614848858777
+    }
+  },
+  "variants": [
+    {
+      "horizon": 4,
+      "steeringSeedDirection": 0,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -2,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 6.5745957289475854E-11,
+        "terminalSlackMeters": 43.726164136375353
+      },
+      "error": ""
+    },
+    {
+      "horizon": 4,
+      "steeringSeedDirection": -1,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -2,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 1.1102230246251565E-16,
+        "terminalSlackMeters": 43.675081255874851
+      },
+      "error": ""
+    },
+    {
+      "horizon": 4,
+      "steeringSeedDirection": 1,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -2,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 1.1102230246251565E-16,
+        "terminalSlackMeters": 43.675081532963311
+      },
+      "error": ""
+    },
+    {
+      "horizon": 8,
+      "steeringSeedDirection": 0,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -2,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 1.7945847585743024E-10,
+        "terminalSlackMeters": 40.79999255354808
+      },
+      "error": ""
+    },
+    {
+      "horizon": 8,
+      "steeringSeedDirection": -1,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -2,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 7.1054273576010019E-15,
+        "terminalSlackMeters": 40.321638836546519
+      },
+      "error": ""
+    },
+    {
+      "horizon": 8,
+      "steeringSeedDirection": 1,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -2,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 1.1102230246251565E-16,
+        "terminalSlackMeters": 40.321642920425035
+      },
+      "error": ""
+    },
+    {
+      "horizon": 16,
+      "steeringSeedDirection": 0,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -9,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 4.2946762812690054E-10,
+        "terminalSlackMeters": 35.289365130585644
+      },
+      "error": ""
+    },
+    {
+      "horizon": 16,
+      "steeringSeedDirection": -1,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -2,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 2.2204460492503131E-16,
+        "terminalSlackMeters": 33.997497916245109
+      },
+      "error": ""
+    },
+    {
+      "horizon": 16,
+      "steeringSeedDirection": 1,
+      "seedShape": "shiftOrTriangularSteering",
+      "feasibility": {
+        "exitFlag": -2,
+        "maximumResidual": null,
+        "terminalSlackMeters": null
+      },
+      "minimumTerminalSlack": {
+        "exitFlag": 1,
+        "maximumResidual": 2.2204460492503131E-16,
+        "terminalSlackMeters": 33.997516139112363
+      },
+      "error": ""
+    }
+  ],
+  "trialWithoutTrust": {
+    "exitFlag": -2,
+    "maximumLinearViolation": null,
+    "maximumCoefficientStep": null,
+    "nominalBrakeCoefficients": [
+      -0.6,
+      -0.6,
+      -0.6,
+      -0.6
+    ],
+    "trialBrakeCoefficients": [],
+    "nonlinearChecks": []
+  }
+}

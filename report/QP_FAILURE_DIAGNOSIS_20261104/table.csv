@@ -1,0 +1,6 @@
+case,time_s,replay_command_error,terminal_slack_m,without_terminal_flag,without_brake_trust_flag
+8-headOn,0.65,0,0.007986679385437826,1,1
+8-acceleratingHeadOn,0.6000000000000001,0,0.03362937949893164,1,1
+8-curvedHeadOn,0.65,0,0.0065972364579007705,1,1
+25-stoppedLead,0,0,43.72616413637535,1,-2
+25-hardBrakingLead,0,0,52.05616413637535,1,-2

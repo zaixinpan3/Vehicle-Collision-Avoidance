@@ -1,0 +1,51 @@
+{
+  "scope": "Offline counterfactual diagnosis; deployed controller behavior unchanged.",
+  "cases": [
+    {
+      "case": "8-headOn",
+      "time_s": 0.65,
+      "replay_command_error": 0,
+      "terminal_slack_m": 0.007986679385437826,
+      "without_terminal_flag": 1,
+      "without_brake_trust_flag": 1
+    },
+    {
+      "case": "8-acceleratingHeadOn",
+      "time_s": 0.6000000000000001,
+      "replay_command_error": 0,
+      "terminal_slack_m": 0.03362937949893164,
+      "without_terminal_flag": 1,
+      "without_brake_trust_flag": 1
+    },
+    {
+      "case": "8-curvedHeadOn",
+      "time_s": 0.65,
+      "replay_command_error": 0,
+      "terminal_slack_m": 0.0065972364579007705,
+      "without_terminal_flag": 1,
+      "without_brake_trust_flag": 1
+    },
+    {
+      "case": "25-stoppedLead",
+      "time_s": 0,
+      "replay_command_error": 0,
+      "terminal_slack_m": 43.72616413637535,
+      "without_terminal_flag": 1,
+      "without_brake_trust_flag": -2
+    },
+    {
+      "case": "25-hardBrakingLead",
+      "time_s": 0,
+      "replay_command_error": 0,
+      "terminal_slack_m": 52.05616413637535,
+      "without_terminal_flag": 1,
+      "without_brake_trust_flag": -2
+    }
+  ],
+  "direct_cause_at_8_mps": "Terminal inequalities conflict with the uniform +/-0.25 coefficient increment box. Releasing only brake feedforward coefficient increment bounds restores LP feasibility while preserving physical command and other inequalities.",
+  "direct_cause_at_25_mps": "The hard braking terminal reserve dominates; removing the numeric trust box still leaves terminal-only elastic deficits of 42.716 and 51.046 m.",
+  "nonlinear_limit": "No-trust QP trials have terminal nonlinear violations 0.00362249, 0.00490512 and 0.00364624 m, despite linear feasibility. All their checked collision, command and state inequalities are feasible to numerical precision.",
+  "horizon_limit": "Increasing 4 stages to 8 or 16 with shifted or triangular steering seeds did not produce a feasible LP. Negative -9 solver outcomes are inconclusive, not infeasibility certificates.",
+  "proof_scope": "Positive terminal-only phase-I LP optima and successful group-removal solutions diagnose the local transcription. They do not prove physical collision inevitability or full nonlinear feasibility.",
+  "checks": "27 dynamic output-feedback tests pass; full repository suite not run."
+}
