@@ -1,0 +1,32 @@
+{
+  "scope": "joint dynamic output feedback with finite uncertainty scenarios",
+  "pipeline": "dynamicOutputFeedback",
+  "results": [
+    {
+      "scenario": "stoppedLead",
+      "referenceSpeedMetersPerSecond": 25,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "failed",
+      "executedFrames": 0,
+      "failure": "collisionAvoidanceController:noOutputFeedbackPlan: No finite-scenario plan passed nonlinear hard constraints (maximum violation 2.56521). No input was committed.",
+      "minimumReplayClearanceMeters": null,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/UNIFIED_OUTPUT_FEEDBACK_20261104/high-speed-admission/25-stoppedLead.json"
+    },
+    {
+      "scenario": "hardBrakingLead",
+      "referenceSpeedMetersPerSecond": 25,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "failed",
+      "executedFrames": 0,
+      "failure": "collisionAvoidanceController:noOutputFeedbackPlan: No finite-scenario plan passed nonlinear hard constraints (maximum violation 2.59021). No input was committed.",
+      "minimumReplayClearanceMeters": null,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/UNIFIED_OUTPUT_FEEDBACK_20261104/high-speed-admission/25-hardBrakingLead.json"
+    }
+  ]
+}

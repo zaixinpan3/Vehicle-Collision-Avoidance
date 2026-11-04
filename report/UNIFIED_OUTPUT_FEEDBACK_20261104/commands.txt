@@ -1,0 +1,21 @@
+Repository root: /home/zai/Downloads/ResearchProjects/collisionAvoidance
+MATLAB: 26.1.0.3276743 (R2026a) Update 3; Optimization Toolbox license available.
+
+Focused regression:
+matlab -batch "files={'tests/dynamicOutputFeedbackTest.m','tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m','tests/modifiedFialaTireTest.m','tests/longitudinalRoadLoadTest.m','tests/rtiModelConsistencyTest.m','tests/terminalSafeSetTest.m','tests/controllerInputGeometryTest.m'}; results=runtests(files); writetable(table(results),'report/UNIFIED_OUTPUT_FEEDBACK_20261104/tests.csv'); assertSuccess(results)"
+Outcome: 223 passed, 0 failed, 0 incomplete.
+
+Low-speed stopped/braking leads:
+matlab -batch "addpath('scripts'); cfg=struct('controller',struct('horizonSteps',4),'outputFeedback',struct('maximumSolveSeconds',120)); campaign=runJointOutputFeedbackScenario(Frames=8,ControllerConfiguration=cfg,OutputDirectory='report/UNIFIED_OUTPUT_FEEDBACK_20261104/low-speed'); disp(campaign.results);"
+
+Moving ego:
+matlab -batch "addpath('scripts'); cfg=struct('controller',struct('sampleTime',.1,'horizonSteps',4),'outputFeedback',struct('sensorPeriod',.025,'noiseDirections',zeros(7,1),'maximumSolveSeconds',60)); campaign=runJointOutputFeedbackScenario(Scenarios='stoppedLead',Speeds=8,Frames=3,ControllerConfiguration=cfg,OutputDirectory='report/UNIFIED_OUTPUT_FEEDBACK_20261104/moving-ego'); disp(campaign.results);"
+
+Radar dropout:
+matlab -batch "addpath('scripts'); cfg=struct('controller',struct('horizonSteps',4),'outputFeedback',struct('maximumSolveSeconds',120)); runJointOutputFeedbackScenario(Scenarios='stoppedLead',Frames=6,DropoutHolds=[2,3],ControllerConfiguration=cfg,OutputDirectory='report/UNIFIED_OUTPUT_FEEDBACK_20261104/dropout');"
+
+High-speed admission diagnostic:
+matlab -batch "addpath('scripts'); cfg=struct('outputFeedback',struct('maximumSolveSeconds',5)); runCollisionThreatValidation(Frames=1,ControllerConfiguration=cfg,OutputDirectory='report/UNIFIED_OUTPUT_FEEDBACK_20261104/high-speed-admission');"
+Outcome: both 25 m/s cases failed admission and issued no command.
+
+MATLAB Code Analyzer: checkcode(file,'-id') on the five modified controller/configuration files, three pipeline drivers, and dynamicOutputFeedbackTest.m. Output: code-analysis.json. The configured R2025b settings file was unavailable, so MATLAB used default analyzer settings; diagnostics contain performance/style suggestions and no parse errors.

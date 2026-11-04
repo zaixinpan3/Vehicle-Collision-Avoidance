@@ -1,5 +1,9 @@
 # Observer design and error-bound theory
 
+These separately designed observers remain research comparators. The primary
+raw-sensor dynamic output-feedback pipeline jointly optimizes controller memory
+and actuation and does not invoke this observer or its gain synthesis.
+
 This document defines the position-only GNSS/IMU filter, body-velocity and
 NRMM target observers, continuous vector yaw innovation, and their error
 bounds. The sensor contract consists of GNSS position, body-frame inertial

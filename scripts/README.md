@@ -1,7 +1,7 @@
 # Research entry points
 
 The controller has six MATLAB sources and one current derivation:
-[CONTROLLER_THEORY.md](../controller/CONTROLLER_THEORY.md#source-map).
+[CONTROLLER_THEORY.md](../controller/CONTROLLER_THEORY.md).
 Fiala forces belong to `nonlinearBicycleModel`; lane charts belong to
 `predictiveSafetyGeometry`. The observer has twelve MATLAB sources and one
 current derivation: [OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md).
@@ -9,10 +9,34 @@ Its target equations, Jacobian enclosure and position/IMU filter are actions
 of `nrmmObserverVectorField`; orientation sets use `nrmmSet.yaw`, and retained
 motion-parameter covers use `nrmmTargetHistory("constantMotion",...)`.
 
-## Unified observer-to-safety reference
+## Primary raw-sensor output-feedback pipeline
+
+`runJointOutputFeedbackScenario` drives the jointly optimized memory/control
+maps using complete raw GNSS-position, body-IMU, gyro and radar blocks. It uses
+an explicit finite initial information contract and an independent `ode45`
+plant. No NRMM gains or point observer are constructed. `runCollisionThreatValidation`
+and `runNonlinearControllerExperiment` select this pipeline by default.
+
+```matlab
+addpath('scripts');
+runJointOutputFeedbackScenario(Frames=8, ...
+    ControllerConfiguration=struct('controller',struct('horizonSteps',4)), ...
+    OutputDirectory=string(tempname));
+```
+
+Finite scenarios and numerical integration are deployment approximations;
+nonlinear acceptance does not establish a universal safety theorem. The
+[interface](../README.md#controller-interface),
+[theory](../controller/CONTROLLER_THEORY.md), and
+[measurements](../report/UNIFIED_OUTPUT_FEEDBACK_20261104.tex) state the supported
+contract and limits. The initial terminal component admits stopped or braking
+targets. Inference failure or failure to find a hard-feasible plan issues no
+command. Scenario files record such failures explicitly.
+
+## Finite-input information-state reference
 
 `verifyUnifiedObserverSafety` executes the physical information-set algorithm
-from [controller theory, Section 7](../controller/CONTROLLER_THEORY.md#recursive-feasibility).
+from [controller theory, Section 7](../controller/CONTROLLER_THEORY.md).
 It propagates a retained physical set, conditions it on current bounded
 observations, minimizes signed collision deficits and then a speed/braking
 cost, and appends a common admissible terminal continuation. Future observer
@@ -34,13 +58,13 @@ contradictory information and collisions missed by start/midpoint/end samples.
 They validate this finite-input research specialization in floating point;
 they are not a certificate or a performance comparison for the Fiala runtime.
 
-## PCBF / CLF controller
+## Separate-observer PCBF / CLF comparator
 
-Run the primary joint observer/controller campaign from the repository root:
+Run the separate-observer comparator campaign from the repository root:
 
 ```matlab
 addpath('scripts');
-runCollisionThreatValidation(OutputDirectory=string(tempname));
+runCollisionThreatValidation(Pipeline="nrmmComparator", OutputDirectory=string(tempname));
 ```
 
 The defaults use the actual NRMM observer with synthetic noisy sensors in

@@ -1,0 +1,17 @@
+{
+  "scope": "joint dynamic output feedback with finite uncertainty scenarios",
+  "pipeline": "dynamicOutputFeedback",
+  "results": {
+    "scenario": "stoppedLead",
+    "referenceSpeedMetersPerSecond": 1.5,
+    "observationModel": "rawSensorJointDynamicOutputFeedback",
+    "randomSeed": 2.0261104E+7,
+    "outcome": "completed",
+    "executedFrames": 6,
+    "failure": "",
+    "minimumReplayClearanceMeters": 28.831108491688518,
+    "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+    "robustSafetyCertified": false,
+    "source": "report/UNIFIED_OUTPUT_FEEDBACK_20261104/dropout/1.5-stoppedLead.json"
+  }
+}

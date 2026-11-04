@@ -1,6 +1,8 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl SQP-RTI of the nonlinear predictive barrier problem.
-% Both numerical backends use continuous separating-plane witnesses and the
+%solvePredictiveControl Joint output-feedback SQP and state-input comparisons.
+% The outputFeedback action owns complete-block consistency, shared dynamic
+% policies, nonlinear scenario acceptance and the retained memory map.
+% The state-input comparison backends use separating-plane witnesses and the
 % same nonlinear vehicle, terminal function, and primary safety objective.
 % Theory executes any primary minimizer's first command. The optional second
 % objective is implementation performance refinement, not a theorem premise.
@@ -24,6 +26,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % It does not enable a variable grid in the online controller.
 % controller.retainedTube selects the certificate-based formulation
 % during encounters; see CONTROLLER_THEORY.md, implemented policy-box proof.
+    if (isstring(model) || ischar(model)) && string(model)=="outputFeedback"
+        [solution,search,model]=localOutputFeedback(previousState);return;
+    end
     if (isstring(model) || ischar(model)) && string(model)=="probe"
         [solution,search,model]=localProbe(previousState);return;
     end
@@ -2807,4 +2812,523 @@ function [feasible,blockedStage]=localDynamicsBoxCompatible(stages,defects,ix,iu
         low=max(reachLow,lower(ix(:,k+1)));high=min(reachHigh,upper(ix(:,k+1)));
         if any(low>high+tolerance),feasible=false;blockedStage=k+1;return;end
     end
+end
+
+function [result,diagnostics,problem] = localOutputFeedback(request)
+    % One joint inference/control runtime; the state-input solver above is
+    % retained as a research comparator. No NRMM routine is called here.
+    cfg=collisionAvoidanceControllerConfig(request.cfg);
+    diagnostics=[];problem=[];
+    switch string(request.operation)
+        case "features"
+            result=localOfFeatures(request.samples,cfg);
+        case "memory"
+            result=localOfMemory(request.policy,request.memory,request.samples,cfg);
+        case "sensor"
+            result=localOfSensor(request.hypothesis,request.input,cfg,request.time);
+        case "advance"
+            result=localOfAdvance(request.hypothesis,request.input,cfg,request.duration,request.endOfHold);
+        case "condition"
+            [result,diagnostics]=localOfCondition(request.hypotheses,request.block,cfg,request.initial);
+        case "predict"
+            problem=localOfProblem(request.hypotheses,request.memory,request.input, ...
+                request.policies,request.reference,cfg);
+            [~,~,result]=localOfEvaluate(problem.initial,problem);
+        case "step"
+            [result,diagnostics,problem]=localOfStep(request,cfg);
+        otherwise
+            error('collisionAvoidanceController:invalidOutputFeedbackOperation','Unknown joint operation.');
+    end
+end
+
+function [result,diagnostics,problem] = localOfStep(request,cfg)
+    timer=tic;block=request.block;prior=request.previousState;
+    if isempty(request.reference),request.reference=[-1000,0;1000,0];end
+    localOfValidateBlock(block,cfg);
+    assert(~cfg.controller.enforceRoadBoundaries, ...
+        'collisionAvoidanceController:unsupportedJointRoadConstraint', ...
+        'The current joint terminal component does not certify road boundaries.');
+    assert(cfg.controller.horizonSteps>=2,'collisionAvoidanceController:invalidJointHorizon', ...
+        'At least two holds are required, including the fixed backup tail.');
+    count=cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod;
+    assert(abs(count-round(count))<1e-10 && count>=2 && mod(round(count),2)==0, ...
+        'collisionAvoidanceController:invalidSensorGrid', ...
+        'A control hold must contain an even, positive number of sensor periods.');
+    initial=isempty(prior);
+    if initial
+        assert(isfield(block,'initialHypotheses') && ~isempty(block.initialHypotheses), ...
+            'collisionAvoidanceController:missingInitialInformation', ...
+            'An explicit joint initial hypothesis contract is required; a single sensor block cannot identify it.');
+        hypotheses=localOfValidateHypotheses(block.initialHypotheses,cfg);
+        assert(numel(block.samples)==1 && block.samples.time==block.time, ...
+            'collisionAvoidanceController:invalidInitialBlock','Initialization uses one current-boundary reading.');
+        memory=zeros(cfg.outputFeedback.memoryDimension,1);
+        if isfield(block,'initialMemory'),memory=block.initialMemory;end
+        validateattributes(memory,{'double'},{'size',[cfg.outputFeedback.memoryDimension,1],'finite','real'});
+        assert(all(abs(memory)<=1),'collisionAvoidanceController:invalidMemory','Memory must belong to its invariant cube.');
+        if isfield(block,'initialPolicies'),policies=block.initialPolicies;
+        else,policies=localOfInitialPolicies(cfg,hypotheses,request.reference,block.heldInput);end
+    else
+        assert(isstruct(prior) && isfield(prior,'kind') && prior.kind=="jointOutputFeedback-v1", ...
+            'collisionAvoidanceController:incompatibleContinuation','Expected a joint output-feedback continuation.');
+        assert(isequaln(prior.configuration,cfg) && isequaln(prior.reference,request.reference), ...
+            'collisionAvoidanceController:changedContinuationProblem', ...
+            'Continuation must retain its model, uncertainty contract, memory coordinates, and reference.');
+        assert(~isfield(block,'initialHypotheses') && ~isfield(block,'initialMemory') ...
+            && ~isfield(block,'initialPolicies'), ...
+            'collisionAvoidanceController:informationReset','A continuation cannot reset its information or memory.');
+        times=prior.time+(1:round(count))*cfg.outputFeedback.sensorPeriod;
+        assert(numel(block.samples)==round(count) && ...
+            max(abs([block.samples.time]-times))<1e-9 && abs(block.time-times(end))<1e-9, ...
+            'collisionAvoidanceController:invalidSensorGrid','Receive the complete consecutive sensor block.');
+        assert(norm(block.heldInput-prior.appliedInput,Inf)<1e-12, ...
+            'collisionAvoidanceController:actuationMismatch','The received block must use the previously committed actuator command.');
+        hypotheses=prior.hypotheses;
+        memory=localOfMemory(prior.committedPolicy,prior.memory,block.samples,cfg);
+        policies=[prior.policies(2:end),localOfBackup(cfg)];
+    end
+    [hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
+    for j=1:numel(hypotheses)
+        q=hypotheses(j).target;
+        assert(isempty(q) || q(4)==0 || q(5)<=-cfg.outputFeedback.minimumTargetDeceleration, ...
+            'collisionAvoidanceController:unsupportedTerminalMode', ...
+            'The current terminal component requires an absorbed target or a declared braking-to-stop target.');
+    end
+    problem=localOfProblem(hypotheses,memory,block.heldInput,policies,request.reference,cfg);
+    [point,diagnostics,trajectory]=localOfOptimize(problem,initial,timer);
+    accepted=localOfUnpackPlan(point,problem);input=accepted(1).v+accepted(1).K*memory;
+    % Commit the full first controller, including its next-block memory map.
+    state=struct('kind',"jointOutputFeedback-v1",'time',block.time, ...
+        'memory',memory,'hypotheses',hypotheses,'appliedInput',input, ...
+        'committedPolicy',accepted(1),'policies',accepted,'configuration',cfg, ...
+        'reference',request.reference,'conditioning',conditioning);
+    diagnostics.conditioning=conditioning;diagnostics.elapsedSeconds=toc(timer);
+    diagnostics.memoryDimension=numel(memory);diagnostics.hypothesisCount=numel(hypotheses);
+    diagnostics.scenarioCount=numel(problem.scenarios);
+    diagnostics.safetyScope="finiteJointScenariosWithNonlinearAcceptance";
+    diagnostics.robustNonlinearSafetyCertified=false;
+    diagnostics.recursiveFeasibilityCertified=false;
+    diagnostics.optimizationReturned=true;
+    diagnostics.wholeHoldReserveScope="conditionalOnDeclaredSpeedAndRateCaps";
+    diagnostics.predictionModel="jointDynamicOutputFeedbackSingleShooting";
+    diagnostics.sensorContract="positionOnlyGnssBodyImuGyroRelativeRadar";
+    diagnostics.previousInputUsedForMeasurements=block.heldInput;
+    command=struct('actuatorInput',input,'steeringAngle',input(1),'brakingRatio',input(2));
+    prediction=struct('metadata',diagnostics,'scenarios',{trajectory}, ...
+        'policies',accepted,'memory',memory,'information',hypotheses);
+    result=struct('command',command,'inputs',trajectory{1}.inputs, ...
+        'prediction',prediction,'state',state);
+end
+
+function localOfValidateBlock(block,cfg)
+    assert(isstruct(block) && isscalar(block) && ...
+        all(isfield(block,{'kind','time','heldInput','samples'})), ...
+        'collisionAvoidanceController:invalidSensorBlock','A timestamped raw block and previous input are required.');
+    validateattributes(block.time,{'double'},{'scalar','real','finite'});
+    validateattributes(block.heldInput,{'double'},{'size',[2,1],'real','finite'});
+    assert(abs(block.heldInput(2))<=1,'collisionAvoidanceController:invalidSensorBlock','Invalid previous force ratio.');
+    assert(isstruct(block.samples) && ~isempty(block.samples), ...
+        'collisionAvoidanceController:invalidSensorBlock','The sensor block cannot be empty.');
+    for j=1:numel(block.samples)
+        y=block.samples(j);
+        assert(all(isfield(y,{'time','position','acceleration','yawRate','relativePosition','radarAvailable'})), ...
+            'collisionAvoidanceController:invalidSensorBlock','Every raw reading must include its detection flag.');
+        validateattributes(y.time,{'double'},{'scalar','real','finite'});
+        validateattributes(y.position,{'double'},{'size',[2,1],'real','finite'});
+        validateattributes(y.acceleration,{'double'},{'size',[2,1],'real','finite'});
+        validateattributes(y.yawRate,{'double'},{'scalar','real','finite'});
+        validateattributes(y.radarAvailable,{'logical'},{'scalar'});
+        if y.radarAvailable
+            validateattributes(y.relativePosition,{'double'},{'size',[2,1],'real','finite'});
+        end
+    end
+    assert(cfg.model.speedMinimum==0,'collisionAvoidanceController:terminalRestExcluded', ...
+        'The physical domain must admit rest for the current terminal component.');
+end
+
+function hypotheses = localOfValidateHypotheses(hypotheses,cfg)
+    assert(isstruct(hypotheses) && ~isempty(hypotheses) ...
+        && numel(hypotheses)<=cfg.outputFeedback.maximumHypotheses, ...
+        'collisionAvoidanceController:invalidInitialInformation','Supply a nonempty bounded-size joint ensemble.');
+    hasTarget=false(1,numel(hypotheses));
+    for j=1:numel(hypotheses)
+        assert(all(isfield(hypotheses(j),{'ego','target','parameters','sensorBias'})), ...
+            'collisionAvoidanceController:invalidInitialInformation', ...
+            'Each hypothesis needs ego, target, persistent parameter scales, and persistent sensor bias.');
+        validateattributes(hypotheses(j).ego,{'double'},{'size',[6,1],'real','finite'});
+        validateattributes(hypotheses(j).parameters,{'double'},{'size',[4,1],'real','finite','positive'});
+        validateattributes(hypotheses(j).sensorBias,{'double'},{'size',[7,1],'real','finite'});
+        q=hypotheses(j).target;hasTarget(j)=~isempty(q);
+        if hasTarget(j)
+            validateattributes(q,{'double'},{'size',[11,1],'real','finite'});
+            assert(q(4)>=0 && q(7)>0 && all(q(8:9)>0), ...
+                'collisionAvoidanceController:invalidInitialInformation','Invalid target speed or footprint.');
+        end
+    end
+    assert(all(hasTarget==hasTarget(1)), ...
+        'collisionAvoidanceController:unsupportedTargetExistenceMixture', ...
+        'This finite transcription requires a common target-existence mode.');
+end
+
+function cfg = localOfPhysicalConfiguration(hypothesis,cfg)
+    % Scales remain attached to their physical hypothesis for its lifetime.
+    cfg.tire.corneringStiffness=cfg.tire.corneringStiffness.*hypothesis.parameters(1:2);
+    cfg.tire.frictionCoefficient=cfg.tire.frictionCoefficient.*hypothesis.parameters(3:4);
+end
+
+function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold)
+    physical=localOfPhysicalConfiguration(hypothesis,cfg);next=hypothesis;
+    next.ego=nonlinearBicycleModel.sensorFlow(hypothesis.ego,input,physical,duration,endOfHold);
+    if ~isempty(hypothesis.target) && hypothesis.target(4)>0
+        next.target=predictiveSafetyGeometry.predictTarget(hypothesis.target,duration);
+    end
+    % V=0 is an absorbing mode, including when latent A was nonzero.
+end
+
+function y = localOfSensor(hypothesis,input,cfg,time)
+    physical=localOfPhysicalConfiguration(hypothesis,cfg);x=hypothesis.ego;
+    dx=nonlinearBicycleModel.derivative(x,input,physical);
+    a=[dx(4)-x(6)*x(5);dx(5)+x(6)*x(4)];
+    relative=zeros(2,1);detected=false;
+    if ~isempty(hypothesis.target)
+        rotation=[cos(x(3)),sin(x(3));-sin(x(3)),cos(x(3))];
+        relative=rotation*(hypothesis.target(1:2)-x(1:2));
+        detected=norm(relative)<=cfg.collision.encounterRangeMeters;
+    end
+    bias=hypothesis.sensorBias;
+    y=struct('time',time,'position',x(1:2)+bias(1:2), ...
+        'acceleration',a+bias(3:4),'yawRate',x(6)+bias(5), ...
+        'relativePosition',relative+bias(6:7),'radarAvailable',detected);
+end
+
+function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
+    hypotheses=localOfValidateHypotheses(hypotheses,cfg);
+    keep=false(1,numel(hypotheses));residual=Inf(numel(hypotheses),1);
+    next=hypotheses;bounds=cfg.outputFeedback.noiseBounds;
+    tolerance=1e-9; % Numerical measurement comparison only; not extra noise.
+    for s=1:numel(hypotheses)
+        item=hypotheses(s);excess=-Inf;
+        for j=1:numel(block.samples)
+            if ~initial
+                item=localOfAdvance(item,block.heldInput,cfg,cfg.outputFeedback.sensorPeriod,j==numel(block.samples));
+            end
+            measured=block.samples(j);
+            expected=localOfSensor(item,block.heldInput,cfg,measured.time);
+            errors=[norm(measured.position-expected.position); ...
+                norm(measured.acceleration-expected.acceleration);abs(measured.yawRate-expected.yawRate)];
+            excess=max(excess,max(errors-bounds(1:3)));
+            if measured.radarAvailable
+                if isempty(item.target) || ~expected.radarAvailable,excess=Inf;
+                else,excess=max(excess,norm(measured.relativePosition-expected.relativePosition)-bounds(4));end
+            end
+            % No return is compatible with a dropout: it never deletes a
+            % physical target or clears its future collision obligations.
+        end
+        next(s)=item;residual(s)=excess;keep(s)=excess<=tolerance;
+    end
+    assert(any(keep),'collisionAvoidanceController:emptyJointInformation', ...
+        'No retained physical hypothesis explains the complete raw block. No command or memory reset is authorized.');
+    posterior=next(keep);
+    info=struct('priorCount',numel(hypotheses),'posteriorCount',nnz(keep), ...
+        'retainedIndices',find(keep),'maximumNoiseExcess',residual, ...
+        'rawReadingsConditioned',numel(block.samples),'representation',"finiteConsistentHypotheses");
+end
+
+function feature = localOfFeatures(samples,cfg)
+    values=zeros(8,numel(samples));
+    for j=1:numel(samples)
+        y=samples(j);relative=zeros(2,1);
+        if y.radarAvailable,relative=y.relativePosition;end
+        values(:,j)=[[y.position;y.acceleration;y.yawRate;relative]./cfg.outputFeedback.featureScale; ...
+            double(y.radarAvailable)];
+    end
+    feature=mean(values,2);
+end
+
+function memory = localOfMemory(policy,memory,samples,cfg)
+    memory=tanh(policy.A*memory+policy.B*localOfFeatures(samples,cfg)+policy.c);
+end
+
+function policy = localOfBackup(cfg)
+    n=cfg.outputFeedback.memoryDimension;
+    policy=struct('v',[0;-cfg.outputFeedback.backupBrakingRatio], ...
+        'K',zeros(2,n),'A',zeros(n),'B',zeros(n,8),'c',zeros(n,1));
+end
+
+function policies = localOfInitialPolicies(cfg,hypotheses,reference,previousInput)
+    % Size the initial horizon once to allow entry to the low-speed backup.
+    % This is a numerical seed calculation, not an admission certificate.
+    speed=max(arrayfun(@(s)norm(s.ego(4:5)),hypotheses));
+    friction=min(arrayfun(@(s)min(cfg.tire.frictionCoefficient.*s.parameters(3:4)),hypotheses));
+    deceleration=.8*cfg.outputFeedback.backupBrakingRatio*friction*cfg.vehicle.gravity;
+    duration=max(0,speed-cfg.model.kinematicSpeedRange(1))/deceleration;
+    count=max(cfg.controller.horizonSteps,ceil(duration/cfg.controller.sampleTime)+3);
+    count=min(count,cfg.controller.maximumHorizonSteps);
+    policy=localOfBackup(cfg);n=cfg.outputFeedback.memoryDimension;
+    policy.A=.25*eye(n);policy.B=.1*eye(n,8);
+    policies=repmat(policy,1,count);
+    % A smooth avoidance rollout provides only a starting policy. It uses a
+    % representative retained hypothesis and is checked against every finite
+    % scenario by the optimizer. It is never executed without acceptance.
+    representative=hypotheses(ceil(numel(hypotheses)/2));
+    if speed>cfg.model.kinematicSpeedRange(1) && ~isempty(representative.target)
+        x=representative.ego;q=representative.target;
+        stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
+        [~,lane,road]=readControllerInputs(stub,[],reference,cfg);
+        frame=predictiveSafetyGeometry.roadFrame(lane,road);
+        nominal=struct('state',[0;0;0;cfg.referenceSpeed;0;0],'curvature',frame(4));
+        model=struct('cfg',cfg,'initialState',x,'previousInput',previousInput, ...
+            'target',q,'lane',lane,'road',road,'frame',frame, ...
+            'nominalReference',nominal, ...
+            'uncertainty',struct('collisionGenerator',zeros(6,0),'target',[]));
+        guide=predictiveSafetyGeometry.avoidanceGuide(model,count);
+        for i=1:count-1
+            policies(i).v=[max(-cfg.outputFeedback.steeringMaximum,min(cfg.outputFeedback.steeringMaximum,guide.inputs(1,i))); ...
+                -cfg.outputFeedback.backupBrakingRatio];
+        end
+    end
+    policies(end)=localOfBackup(cfg);
+end
+
+function vector = localOfPack(policy)
+    vector=[policy.v(:);policy.K(:);policy.A(:);policy.B(:);policy.c(:)];
+end
+
+function policy = localOfUnpack(vector,cfg)
+    n=cfg.outputFeedback.memoryDimension;a=2;b=a+2*n;c=b+n*n;d=c+8*n;
+    policy=struct('v',vector(1:a),'K',reshape(vector(a+1:b),2,n), ...
+        'A',reshape(vector(b+1:c),n,n),'B',reshape(vector(c+1:d),n,8),'c',vector(d+1:end));
+end
+
+function policies = localOfUnpackPlan(point,problem)
+    policies=repmat(localOfBackup(problem.cfg),1,problem.horizon);
+    for i=1:problem.horizon-1
+        policies(i)=localOfUnpack(point(problem.policyIndices(:,i)),problem.cfg);
+    end
+end
+
+function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg)
+    n=numel(policies);dimension=numel(localOfPack(localOfBackup(cfg)));
+    assert(isstruct(policies) && n>=2 && n<=cfg.controller.maximumHorizonSteps, ...
+        'collisionAvoidanceController:invalidPolicySeed','The seed must have one complete policy per hold.');
+    indices=reshape(1:dimension*(n-1),dimension,n-1);point=zeros(dimension*(n-1),1);
+    for i=1:n-1
+        vector=localOfPack(policies(i));
+        assert(numel(vector)==dimension && all(isfinite(vector)), ...
+            'collisionAvoidanceController:invalidPolicySeed','Invalid policy dimensions or coefficients.');
+        point(indices(:,i))=vector;
+    end
+    scenarios=struct([]);noise=cfg.outputFeedback.noiseDirections;
+    radii=cfg.outputFeedback.noiseBounds([1;1;2;2;3;4;4]);
+    for s=1:numel(hypotheses)
+        for j=1:size(noise,2)
+            scenario=struct('initial',hypotheses(s),'noise',radii.*noise(:,j),'rootIndex',s);
+            if isempty(scenarios),scenarios=scenario;else,scenarios(end+1)=scenario;end %#ok<AGROW>
+        end
+    end
+    x=hypotheses(1).ego;
+    stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
+    [~,lane]=readControllerInputs(stub,[],reference,cfg);
+    hasTarget=~isempty(hypotheses(1).target);policyCount=numel(point);
+    witnessIndices=zeros(2,3,n,numel(scenarios));
+    if hasTarget
+        witnessIndices=reshape(policyCount+(1:numel(witnessIndices)),size(witnessIndices));
+        point=[point;zeros(numel(witnessIndices),1)];
+    end
+    lower=-cfg.outputFeedback.coefficientMaximum*ones(size(point));upper=-lower;
+    for i=1:n-1
+        gain=indices(3:2+2*cfg.outputFeedback.memoryDimension,i);
+        lower(gain)=-cfg.outputFeedback.gainMaximum;upper(gain)=cfg.outputFeedback.gainMaximum;
+    end
+    if hasTarget,lower(policyCount+1:end)=-Inf;upper(policyCount+1:end)=Inf;end
+    assert(all(point(1:policyCount)>=lower(1:policyCount)) && all(point(1:policyCount)<=upper(1:policyCount)), ...
+        'collisionAvoidanceController:invalidPolicySeed','Policy seed exceeds the coefficient contract.');
+    problem=struct('cfg',cfg,'scenarios',scenarios,'memory',memory,'previousInput',input, ...
+        'horizon',n,'lane',lane,'policyIndices',indices,'policyCount',policyCount, ...
+        'witnessIndices',witnessIndices,'hasTarget',hasTarget,'lower',lower,'upper',upper, ...
+        'initial',point,'regularizationAnchor',point(1:policyCount));
+    if hasTarget
+        trajectories=localOfRollout(point,problem);
+        for s=1:numel(scenarios)
+            for i=1:n
+                for j=1:3
+                    x=trajectories{s}.checks(:,j,i);q=trajectories{s}.targetChecks(:,j,i);
+                    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+                    witness=predictiveSafetyGeometry.supportLinearization(x(1:3),shape,q(1:3),q(8:11));
+                    normal=witness.normal;rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+                    offset=normal.'*rotation*q(10:11)+abs(normal.'*rotation)*q(8:9);
+                    point(witnessIndices(:,j,i,s))=[atan2(normal(2),normal(1));offset];
+                end
+            end
+        end
+        problem.initial=point;
+    end
+end
+
+function trajectories = localOfRollout(point,problem)
+    cfg=problem.cfg;n=problem.horizon;l=round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod);
+    policies=localOfUnpackPlan(point,problem);trajectories=cell(1,numel(problem.scenarios));
+    for s=1:numel(problem.scenarios)
+        scenario=problem.scenarios(s);item=scenario.initial;m=problem.memory;
+        trace=struct('ego',zeros(6,n+1),'memory',zeros(numel(m),n+1), ...
+            'inputs',zeros(2,n),'targets',zeros(11,n+1),'checks',zeros(6,3,n), ...
+            'targetChecks',zeros(11,3,n),'physicalNodes',zeros(6,l+1,n), ...
+            'sensorBlocks',{cell(1,n)},'rootIndex',scenario.rootIndex);
+        trace.ego(:,1)=item.ego;trace.memory(:,1)=m;
+        if problem.hasTarget,trace.targets(:,1)=item.target;end
+        for i=1:n
+            policy=policies(i);u=policy.v+policy.K*m;trace.inputs(:,i)=u;
+            assert(abs(u(2))<=1+1e-12,'collisionAvoidanceController:jointTrialDomain', ...
+                'A trial force ratio left the physical model domain.');
+            trace.checks(:,1,i)=item.ego;trace.physicalNodes(:,1,i)=item.ego;
+            if problem.hasTarget,trace.targetChecks(:,1,i)=item.target;end
+            readings=struct([]);
+            for j=1:l
+                item=localOfAdvance(item,u,cfg,cfg.outputFeedback.sensorPeriod,j==l);
+                y=localOfSensor(item,u,cfg,(i-1)*cfg.controller.sampleTime+j*cfg.outputFeedback.sensorPeriod);
+                y.position=y.position+scenario.noise(1:2);y.acceleration=y.acceleration+scenario.noise(3:4);
+                y.yawRate=y.yawRate+scenario.noise(5);y.relativePosition=y.relativePosition+scenario.noise(6:7);
+                if isempty(readings),readings=y;else,readings(end+1)=y;end %#ok<AGROW>
+                trace.physicalNodes(:,j+1,i)=item.ego;
+                if j==l/2 || j==l
+                    slot=1+round(2*j/l);trace.checks(:,slot,i)=item.ego;
+                    if problem.hasTarget,trace.targetChecks(:,slot,i)=item.target;end
+                end
+            end
+            m=localOfMemory(policy,m,readings,cfg);
+            trace.ego(:,i+1)=item.ego;trace.memory(:,i+1)=m;trace.sensorBlocks{i}=readings;
+            if problem.hasTarget,trace.targets(:,i+1)=item.target;end
+        end
+        trajectories{s}=trace;
+    end
+end
+
+function [residual,constraint,trajectories] = localOfEvaluate(point,problem,trajectories)
+    if nargin<3,trajectories=localOfRollout(point,problem);end
+    cfg=problem.cfg;of=cfg.outputFeedback;h=cfg.controller.sampleTime;
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    egoRadius=norm(shape(1:2)+abs(shape(3:4)));residual=[];constraint=[];
+    scenarioWeight=1/sqrt(numel(trajectories));
+    for s=1:numel(trajectories)
+        trace=trajectories{s};previous=problem.previousInput;
+        for i=1:problem.horizon
+            u=trace.inputs(:,i);
+            constraint=[constraint;u(1)-of.steeringMaximum;-u(1)-of.steeringMaximum; ...
+                u(2)-cfg.actuation.brakingRatioMaximum;cfg.actuation.brakingRatioMinimum-u(2); ...
+                u(1)-previous(1)-h*of.steeringRateMaximum;previous(1)-u(1)-h*of.steeringRateMaximum]; %#ok<AGROW>
+            if isfinite(cfg.model.brakingRatioRateMaximum)
+                change=h*cfg.model.brakingRatioRateMaximum;
+                constraint=[constraint;u(2)-previous(2)-change;previous(2)-u(2)-change]; %#ok<AGROW>
+            end
+            states=trace.physicalNodes(:,:,i);
+            constraint=[constraint;reshape([-states(4,:);states(4,:)-cfg.model.speedMaximum; ...
+                states(5,:)-cfg.model.lateralVelocityMaximum;-states(5,:)-cfg.model.lateralVelocityMaximum; ...
+                states(6,:)-cfg.model.yawRateMaximum;-states(6,:)-cfg.model.yawRateMaximum],[],1)]; %#ok<AGROW>
+            x=trace.ego(:,i+1);projection=predictiveSafetyGeometry.project(x(1:2),problem.lane);
+            error=[projection.lateralPosition;atan2(sin(x(3)-projection.heading),cos(x(3)-projection.heading)); ...
+                x(4)-cfg.referenceSpeed;x(5);x(6)];
+            residual=[residual;scenarioWeight*[sqrt(h*of.trackingWeights).*error; ...
+                sqrt(of.inputWeight)*(u-previous)]]; %#ok<AGROW>
+            previous=u;
+            if problem.hasTarget
+                q=trace.targets(:,i);targetSpeed=max(q(4),q(4)+h*q(5));
+                targetRadius=norm(q(8:9)+abs(q(10:11)));
+                rate=abs(sin(q(6))/q(7))*targetSpeed;
+                reserve=of.clearanceMeters+h/4*(hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum) ...
+                    +targetSpeed+egoRadius*cfg.model.yawRateMaximum+targetRadius*rate);
+                for j=1:3
+                    x=trace.checks(:,j,i);q=trace.targetChecks(:,j,i);
+                    rows=predictiveSafetyGeometry.separationWitnessRows(x(1:3),shape,q(1:3),q(8:11), ...
+                        point(problem.witnessIndices(:,j,i,s)),reserve);
+                    constraint=[constraint;-rows]; %#ok<AGROW>
+                end
+            end
+        end
+        target=[];if problem.hasTarget,target=trace.targets(:,end);end
+        physical=localOfPhysicalConfiguration(problem.scenarios(s).initial,cfg);
+        margins=terminalSafeSet.lowSpeedReserve(trace.ego(:,end),target,physical,previous,true);
+        constraint=[constraint;-margins]; %#ok<AGROW>
+    end
+    residual=[residual;sqrt(of.regularization)*(point(1:problem.policyCount)-problem.regularizationAnchor)];
+end
+
+function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
+    cfg=problem.cfg;of=cfg.outputFeedback;point=problem.initial;
+    [residual,constraint,trajectory]=localOfEvaluate(point,problem);
+    tolerance=cfg.solver.constraintTolerance;violation=max([0;constraint]);
+    initiallyFeasible=violation<=tolerance;acceptedSteps=0;iterations=0;exitFlag=NaN;
+    limit=1;if initial && ~initiallyFeasible,limit=of.initializationIterations;end
+    for iteration=1:limit
+        if toc(timer)>of.maximumSolveSeconds,break;end
+        iterations=iteration;variables=numel(point);
+        jr=zeros(numel(residual),variables);jc=zeros(numel(constraint),variables);
+        linearizationValid=true;
+        for j=1:variables
+            if mod(j,8)==0 && toc(timer)>of.maximumSolveSeconds
+                linearizationValid=false;break;
+            end
+            delta=of.finiteDifferenceStep*max(1,abs(point(j)));trial=point;trial(j)=trial(j)+delta;
+            try
+                if j<=problem.policyCount
+                    [r,c]=localOfEvaluate(trial,problem);
+                else
+                    [r,c]=localOfEvaluate(trial,problem,trajectory);
+                end
+            catch exception
+                if any(string(exception.identifier)==["collisionAvoidanceController:jointTrialDomain", ...
+                        "collisionAvoidanceController:nonlinearDomain","collisionAvoidanceController:invalidTireOperatingPoint"])
+                    linearizationValid=false;break;
+                end
+                rethrow(exception);
+            end
+            jr(:,j)=(r-residual)/delta;jc(:,j)=(c-constraint)/delta;
+        end
+        if ~linearizationValid,break;end
+        hessian=jr.'*jr+of.regularization*eye(variables);gradient=jr.'*residual;
+        lower=problem.lower-point;upper=problem.upper-point;
+        % Bound the local change, including geometric witness angles. These
+        % are numerical locality bounds, not a nonlinear safety certificate.
+        lower=max(lower,-.5);upper=min(upper,.5);
+        elastic=violation>tolerance;
+        if elastic
+            hessian=blkdiag(hessian,1e4);gradient=[gradient;1e4];
+            jc=[jc,-ones(size(jc,1),1)];lower=[lower;0];upper=[upper;Inf];
+        end
+        options=optimoptions('quadprog','Display','off','Algorithm','interior-point-convex', ...
+            'ConstraintTolerance',min(1e-8,tolerance),'MaxIterations',200);
+        [step,~,exitFlag]=quadprog(hessian,gradient,jc,-constraint,[],[],lower,upper,[],options);
+        if isempty(step) || exitFlag<=0,break;end
+        step=step(1:variables);accepted=false;
+        for backtrack=0:of.lineSearchSteps-1
+            trial=point+2^(-backtrack)*step;
+            try
+                [r,c,t]=localOfEvaluate(trial,problem);
+            catch exception
+                if any(string(exception.identifier)==["collisionAvoidanceController:jointTrialDomain", ...
+                        "collisionAvoidanceController:nonlinearDomain","collisionAvoidanceController:invalidTireOperatingPoint"])
+                    continue;
+                end
+                rethrow(exception);
+            end
+            nextViolation=max([0;c]);
+            if (violation<=tolerance && nextViolation<=tolerance && r.'*r<=residual.'*residual+1e-10) ...
+                    || (violation>tolerance && nextViolation<violation-1e-8)
+                point=trial;residual=r;constraint=c;trajectory=t;violation=nextViolation;
+                accepted=true;acceptedSteps=acceptedSteps+1;break;
+            end
+        end
+        if ~accepted || violation<=tolerance,break;end
+    end
+    assert(violation<=tolerance,'collisionAvoidanceController:noOutputFeedbackPlan', ...
+        'No finite-scenario plan passed nonlinear hard constraints (maximum violation %.6g). No input was committed.',violation);
+    % Acceptance always checks the actual nonlinear finite transcription.
+    [residual,constraint,trajectory]=localOfEvaluate(point,problem);
+    assert(max([0;constraint])<=tolerance,'collisionAvoidanceController:noOutputFeedbackPlan', ...
+        'The final nonlinear verification rejected the candidate.');
+    info=struct('sqpIterations',iterations,'acceptedSteps',acceptedSteps,'qpExitFlag',exitFlag, ...
+        'maximumConstraintViolation',max([0;constraint]),'objective',.5*(residual.'*residual), ...
+        'shiftedPlanRevalidated',~initial && initiallyFeasible, ...
+        'usedRevalidatedFallback',~initial && acceptedSteps==0 && initiallyFeasible, ...
+        'nonlinearValidationPerformed',true,'horizonSteps',problem.horizon, ...
+        'hardCollisionConstraints',true,'terminalControllerActive',false);
 end

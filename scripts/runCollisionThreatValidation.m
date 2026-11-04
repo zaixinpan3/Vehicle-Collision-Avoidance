@@ -1,11 +1,12 @@
 function campaign = runCollisionThreatValidation(options)
 %runCollisionThreatValidation Test encounters that require a steering maneuver.
-% Use the actual NRMM observer with synthetic noisy sensors by default.
-% Historical benign and exact-state fixtures remain separate diagnostics.
+% Dynamic output feedback consumes raw synthetic sensor blocks by default.
+% Pipeline="nrmmComparator" explicitly selects the independent-observer
+% comparator and its original qualification experiment.
 % Qualification requires an in-road bypass and a longitudinal-order argument,
 % not just a collision under one maximum-braking input history.
     arguments
-        options.Frames (1,1) double {mustBePositive} = Inf
+        options.Frames (1,1) double {mustBePositive} = 100
         options.Speeds (1,:) double {mustBePositive,mustBeFinite} = 25
         options.Scenarios (1,:) string = ["stoppedLead","hardBrakingLead"]
         options.OutputDirectory (1,1) string = string(tempname)
@@ -13,10 +14,20 @@ function campaign = runCollisionThreatValidation(options)
         options.EstimatorConfiguration (1,1) struct = struct()
         options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 1
         options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
+        options.Pipeline (1,1) string {mustBeMember(options.Pipeline,["dynamicOutputFeedback","nrmmComparator"])} = "dynamicOutputFeedback"
     end
     names = options.Scenarios;
     root = fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'));
+    if options.Pipeline=="dynamicOutputFeedback"
+        assert(isempty(fieldnames(options.EstimatorConfiguration)), ...
+            'runCollisionThreatValidation:independentObserverConfiguration', ...
+            'The joint pipeline uses outputFeedback sensor/uncertainty settings in ControllerConfiguration.');
+        campaign=runJointOutputFeedbackScenario(Scenarios=names,Speeds=options.Speeds, ...
+            Frames=options.Frames,ControllerConfiguration=options.ControllerConfiguration, ...
+            OutputDirectory=options.OutputDirectory);
+        return;
+    end
     estimatorConfiguration = options.EstimatorConfiguration;
     if isempty(fieldnames(estimatorConfiguration))
         estimatorConfiguration = estimatorControllerIntegrationConfig();

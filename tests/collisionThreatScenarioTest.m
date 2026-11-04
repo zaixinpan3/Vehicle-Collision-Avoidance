@@ -32,7 +32,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             % This checks noisy joint execution, independently of machine
             % load and the separate real-time deadline experiment.
-            campaign = runCollisionThreatValidation(Frames=40,OutputDirectory=string(fixture.Folder), ...
+            campaign = runCollisionThreatValidation(Pipeline="nrmmComparator",Frames=40,OutputDirectory=string(fixture.Folder), ...
                 ControllerConfiguration=struct('solver',struct('method',"rti",'timeLimitSeconds',5)));
             testCase.assertNumElements(campaign.results,2);
             testCase.verifyEqual([campaign.results.scenario],["stoppedLead","hardBrakingLead"]);
@@ -125,7 +125,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         end
         function aBrakingSufficientScenarioIsNotAControllerFailure(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
-            campaign = runCollisionThreatValidation(Scenarios="brakingLead",Speeds=8, ...
+            campaign = runCollisionThreatValidation(Pipeline="nrmmComparator",Scenarios="brakingLead",Speeds=8, ...
                 OutputDirectory=string(fixture.Folder));
             testCase.verifyEqual(campaign.results.outcome,"unqualifiedScenario");
             testCase.verifyEqual(campaign.results.executedFrames,0);

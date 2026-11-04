@@ -1,7 +1,10 @@
 function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
-%collisionAvoidanceController PCBF/CLF control with one horizon per encounter.
-% The default is one SQP-RTI update. solver.method="nonlinear"
+%collisionAvoidanceController Joint raw-sensor output feedback and comparisons.
+% A jointSensorBlock-v1 input selects the primary joint inference/control
+% pipeline: optimize both actuator and memory maps, and commit both together.
+% The state-estimate overload below is the separate-observer comparator.
+% Its default is one SQP-RTI update. solver.method="nonlinear"
 % selects an iterated shooting diagnostic. The nonlinear backend refreshes
 % observer margins on its accepted trajectories; these remain engineering
 % approximations. retainedTube is a
@@ -32,6 +35,24 @@ function [command,predictedInput,prediction,controllerState] = ...
 % Startup preparation is separate from the online computation budget.
 % The retained backend reports terminal takeover as an experiment-stop error.
     persistent lastState
+    % The raw-block interface owns inference and control jointly. No observer
+    % point estimate or independently designed observer update enters it.
+    if isstruct(egoState) && isfield(egoState,'kind') ...
+            && string(egoState.kind)=="jointSensorBlock-v1"
+        if nargin<2,targetEstimate=[];end
+        if nargin<3,laneCenterline=[];end
+        if nargin<4,cfg=[];end
+        if nargin<5,previousState=lastState;end
+        assert(isempty(targetEstimate),'collisionAvoidanceController:independentEstimate', ...
+            'The joint raw-sensor interface does not accept an independent target estimate.');
+        cfg=collisionAvoidanceControllerConfig(cfg);
+        request=struct('operation',"step",'block',egoState,'cfg',cfg, ...
+            'reference',laneCenterline,'previousState',previousState);
+        [result,~,~]=solvePredictiveControl("outputFeedback",request);
+        command=result.command;predictedInput=result.inputs;
+        prediction=result.prediction;controllerState=result.state;
+        lastState=controllerState;return;
+    end
     if nargin<=3 && (ischar(egoState) || isstring(egoState))
         action=string(egoState);
         if ~isscalar(action) || ~any(action==["resetNominalTrajectory","warmUp"])

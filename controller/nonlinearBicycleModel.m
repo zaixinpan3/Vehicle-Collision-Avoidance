@@ -129,6 +129,13 @@ classdef nonlinearBicycleModel
             info=struct('sampledErrorRatio',ratio,'probePasses',attempt);
         end
 
+        function next = sensorFlow(x,u,cfg,duration,endOfHold)
+            % Sensor-only boundaries do not trigger the sampled rest reset.
+            % This uses the same RK4 body model; no validated error bound is
+            % claimed. The physical reset occurs only at the control boundary.
+            next=localIntegrate(x,u,cfg,[],duration,false,endOfHold);
+        end
+
         function [next,stopped] = sampleEndState(x,u,cfg)
             % Common discrete rest transition after prediction or plant replay.
             % Continuous integration precedes this reset. Position and heading
@@ -688,7 +695,9 @@ function body=localKinematicBody(x,u,cfg)
     % to l_r times it (no slip at the rear axle); the longitudinal force is
     % the braking ratio times the axles' force scales (no lateral tire
     % force), and braking fades below model.brakeHoldSpeed, so that it ends
-    % at rest and never reverses the vehicle.
+    % at rest. Forward invariance additionally requires compatible lateral
+    % motion: at vx=0 the longitudinal derivative is vy*r, which can be
+    % negative. The joint backup certificate explicitly requires vy*r>=0.
     scale=nonlinearBicycleModel.tireParameters(cfg).longitudinalForceScale;
     wheelbase=cfg.vehicle.lf+cfg.vehicle.lr;lag=cfg.model.kinematicLagSeconds;
     hold=tanh(x(4)/cfg.model.brakeHoldSpeed);
@@ -743,7 +752,8 @@ function [a,b]=localKinematicJacobian(x,u,cfg)
     b(6,1)=x(4)*(1+t^2)/(wheelbase*lag);
 end
 
-function y=localIntegrate(x,u,cfg,curvature,duration,variational)
+function y=localIntegrate(x,u,cfg,curvature,duration,variational,resetAtEnd)
+    if nargin<7,resetAtEnd=true;end
     % One even integration mesh for full holds and their midpoints.
     count=max(1,round(nonlinearBicycleModel.meshCount(cfg)*duration/cfg.controller.sampleTime));
     h=duration/count;
@@ -761,7 +771,8 @@ function y=localIntegrate(x,u,cfg,curvature,duration,variational)
     % brake, whose coefficients of 1e-4 to 1e-7 left the convex problem
     % ill-conditioned while the vehicle crept to a stop. Under light braking
     % the tail would still cover about 1.5 cm.
-    [next,stopped]=nonlinearBicycleModel.sampleEndState(y(1:6),u,cfg);
+    next=y(1:6);stopped=false;
+    if resetAtEnd,[next,stopped]=nonlinearBicycleModel.sampleEndState(next,u,cfg);end
     y(1:6)=next;
     if stopped
         if variational

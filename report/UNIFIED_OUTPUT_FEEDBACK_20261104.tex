@@ -1,0 +1,159 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,array,xurl,hyperref}
+\hypersetup{hidelinks}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\title{Joint Dynamic Output-Feedback Pipeline}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{November 4, 2026}
+\begin{document}
+\maketitle
+
+\section*{Implemented behavior}
+The primary campaign entry points now run raw-sensor dynamic output feedback.
+The controller conditions joint physical hypotheses on complete GNSS-position,
+body-acceleration, gyro and radar blocks, then optimizes both actuator and
+memory maps:
+\[
+ u_i=v_i+K_i m_i,\qquad m_{i+1}=\tanh(A_i m_i+B_i\varphi(Y_{i+1})+c_i).
+\]
+Every scenario shares the stage coefficients and the current known memory.
+The selected first memory map is stored with its command and applied exactly
+once to the next complete sensor block. Persistent tire/friction scales and
+sensor biases remain attached to their physical hypotheses. The primary path
+calls no NRMM runtime, observer gain synthesis, force inversion or CLF table.
+The state-input API and separate observers remain explicit research comparators.
+
+The actual implementation eliminates shooting states by nonlinear numerical
+rollout. All finite scenarios receive hard actuator, command-increment,
+physical-domain, rectangle-separation and terminal constraints. The last stage
+is fixed to the physical fading-brake backup. A regularized Gauss--Newton QP
+proposes one online SQP update. Nonlinear reevaluation and backtracking govern
+acceptance. Initial feasibility search may use elastic QP rows, but a command
+is committed only after the original finite hard constraints pass. A shifted
+plan is rechecked after conditioning; it is never presumed feasible from a
+newly fitted or changed information representation.
+
+\section*{Theory and physical-model corrections}
+The rewritten \path{controller/CONTROLLER_THEORY.md} states the exact joint
+transition, complete-block posterior, hard predictive problem, and conditional
+recursive-feasibility proof. That proof requires sound uncertainty coverage,
+whole-hold verification, nested posterior containment, and policy/set/certificate
+classes capable of retaining the shift. Finite scenarios do not meet these
+universal requirements.
+
+The terminal component uses $u_f=(0,-b_0)$ and, on the pure low-speed branch,
+\[
+ s_E=|v_x|+\tfrac{\tau_\ell}{2}|v_y r|,\qquad
+ D_E=s_E/\lambda+\tau_\ell|v_y|.
+\]
+Its dissipation bounds remaining reference-point travel. The forward-domain
+restrictions $v_x\ge0$ and $v_y r\ge0$ prevent reverse forcing at zero speed.
+A pose-preserving control-boundary rest reset reduces $D_E$ and preserves the
+separation reserve. Sensor-only boundaries do not apply that reset.
+For persistent constant target acceleration $A_T<0$, the sharper travel term
+$D_T=V_T^2/(-2A_T)$ replaces the unnecessary global lower-bound denominator;
+absorbed targets have $D_T=0$ and cannot restart from latent acceleration.
+
+The terminal component does not support continuing targets, restart,
+persistent residual forces, multiple targets, or hard road constraints.
+The smoothed absolute-value entry inequalities are sufficient for entry to the
+exact terminal set, but their own representation is not asserted invariant.
+The exact theorem does not automatically transfer to this smoothed, sampled,
+finite-scenario implementation.
+
+\section*{Validation results}
+MATLAB R2026a Update 3 and Optimization Toolbox were used. The focused suite
+passed all 223 tests, with zero failures and zero incomplete tests. It covers
+the new raw-block behaviors and existing configuration, source-budget,
+Fiala-tire, road-load, RTI-model, terminal-set and input-geometry behavior.
+Twenty new behavior tests include shared root actions, observation-dependent
+future commands, exact committed memory, full-block consistency despite equal
+compressed features, previous-input acceleration, dropout retention, persistent
+parameters/bias, absorbing target stop, control-only rest reset, empty-information
+failure, unverified-plan rejection, revalidated fallback, and the default
+campaign routing. An independent tight-tolerance \texttt{ode45} calculation
+checks the low-speed travel and separation-reserve inequalities.
+
+The closed-loop runs used seed 20261104. Sensor noise was bounded, sampled
+within half of the declared sensor radii, with no GNSS velocity measurement.
+The three-member initial experimental information contract includes the actual
+initial member by construction. It is not an enclosure inferred from raw data.
+Subsequent truth states are used only for sensor synthesis and offline replay.
+Forty-one replay instants per hold provide empirical clearance checks.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Case & Speed & Holds & Min. gap & Median call \\
+ & m/s & executed & m & s \\
+\midrule
+Stopped lead & 1.5 & 8 & 28.7431 & 1.642 \\
+Braking lead & 1.5 & 8 & 25.2000 & 1.552 \\
+Stopped lead, dropout & 1.5 & 6 & 28.8311 & 1.550 \\
+Stopped lead, moving ego & 8 & 3 & 26.9349 & 9.515 \\
+Stopped lead, admission & 25 & 0 & --- & --- \\
+Braking lead, admission & 25 & 0 & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The 1.5 m/s runs use four 0.05 s holds, two memory coordinates, three current
+hypotheses and three fixed future noise directions. Dropouts occur on holds
+2 and 3. The 8 m/s run uses a 0.1 s hold, 0.025 s sensor period, one future noise
+direction, and 17 stages selected once at initialization. All accepted recorded
+plans have zero maximum positive inequality violation in the stored numerical
+evaluation. Maximum measured calls are 2.580 s for the low-speed stopped lead,
+2.247 s for the low-speed braking lead, 2.065 s for dropout and 10.001 s for the
+8 m/s run. These are short functional checks, not encounter completion,
+cruise recovery, or robust-safety evidence.
+
+Both 25 m/s primary challenge cases failed initial admission with a five-second
+search budget. The reported maximum remaining hard-constraint violations are
+2.56521 and 2.59021 respectively; neither case issued an actuator command.
+They establish failure of this initialization/search configuration, not physical
+infeasibility. The finite-difference dense SQP solver is substantially slower
+than the control hold. Budget checks between operations cannot interrupt a
+running QP. No real-time-performance claim is made.
+
+\section*{Reproduction and artifacts}
+Run from the repository root. Raw results and settings are retained under
+\path{report/UNIFIED_OUTPUT_FEEDBACK_20261104/}. Each run stores its configuration,
+explicit initial hypotheses, seed, raw blocks, applied commands, memory, survivor
+counts, constraint checks, timing and offline clearance. Successful runs are
+\path{low-speed/}, \path{dropout/}, and \path{moving-ego/}; the failed initial
+admissions are in \path{high-speed-admission/}. The complete focused test list
+and actual outcomes are in \path{tests.csv}. Exact executed commands are in
+\path{commands.txt}.
+
+The principal source changes are in \path{controller/solvePredictiveControl.m},
+\path{controller/collisionAvoidanceController.m},
+\path{controller/nonlinearBicycleModel.m},
+\path{controller/terminalSafeSet.m}, and
+\path{config/collisionAvoidanceControllerConfig.m}.
+The raw interface and limits are documented in \path{README.md}; the independent
+plant/sensor driver is \path{scripts/runJointOutputFeedbackScenario.m}.
+
+The earlier probe's missing CLF-table dependency was removed from joint
+initialization: its geometric seed now needs only route/speed data. The first
+braking-target probe exposed an excessively loose global target-deceleration
+floor; using the persistent acceleration coordinate corrected that bound.
+Neither preliminary failure is represented as a successful run.
+
+\section*{Limits and next engineering work}
+Finite hypotheses can lose all members even when an unrepresented physical
+state satisfies the bounded-noise contract. Fixed future noise directions do
+not cover all measurement histories. The RK4 flow and sampled speed/rate checks
+are not validated continuous enclosures. The intersample reserve is conditional
+on valid continuous speed/rate caps. These limitations remain after nonlinear
+finite-scenario acceptance. No deterministic or probabilistic collision-safety
+claim follows from this implementation.
+
+The next work is to improve feasible initialization for the 25 m/s steering
+challenge, replace dense finite differences with sparse joint sensitivities,
+and add a sound information representation and verifier if a universal
+certificate is required. Continuing-target and road-safe terminal components
+need separate proofs. The mathematical formulation and implementation do not
+claim global optimality, observer convergence, or tracking convergence.
+\end{document}

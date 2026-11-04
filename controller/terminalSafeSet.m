@@ -50,6 +50,50 @@ classdef terminalSafeSet
 % to the offline certificate of the cruise controller and the CLF
 % (CONTROLLER_THEORY.md, Section 4).
     methods (Static)
+        function [margins,info] = lowSpeedReserve(ego,target,cfg,previousInput,smooth)
+            % Physical fading-brake terminal component for dynamic output
+            % feedback. Positive margins mean membership. The target is
+            % absorbed at rest or has constant A <= -a0 until absorption.
+            % vx >= 0 and vy*r >= 0 preserve the forward-only model domain.
+            if nargin<5,smooth=false;end
+            of=cfg.outputFeedback;tau=cfg.model.kinematicLagSeconds;
+            limit=cfg.model.kinematicSpeedRange(1);
+            scale=nonlinearBicycleModel.tireParameters(cfg).longitudinalForceScale;
+            lambda=of.backupBrakingRatio*sum(scale)/cfg.vehicle.m ...
+                *tanh(limit/cfg.model.brakeHoldSpeed)/limit;
+            absolute=@abs;
+            if smooth,absolute=@(x)sqrt(x.^2+of.smoothAbsoluteValue^2);end
+            speedReserve=absolute(ego(4))+tau/2*absolute(ego(5)*ego(6));
+            egoTravel=speedReserve/lambda+tau*absolute(ego(5));
+            targetTravel=0;modeValid=true;separation=Inf;
+            egoRadius=norm([cfg.vehicle.length;cfg.vehicle.width]/2+abs(cfg.vehicle.rectangleOffset));
+            if ~isempty(target)
+                modeValid=target(4)==0 || target(5)<=-of.minimumTargetDeceleration;
+                % A is a persistent coordinate of each physical hypothesis.
+                % Using its actual negative value is valid for this constant-A
+                % contract and avoids replacing it by a looser global floor.
+                if target(4)>0 && modeValid,targetTravel=target(4)^2/(-2*target(5));end
+                targetRadius=norm(target(8:9)+abs(target(10:11)));
+                separation=norm(target(1:2)-ego(1:2))-egoRadius-targetRadius ...
+                    -of.clearanceMeters-egoTravel-targetTravel;
+            end
+            backup=[0;-of.backupBrakingRatio];
+            margins=[limit-speedReserve;ego(4);ego(5)*ego(6); ...
+                cfg.model.speedMaximum-speedReserve; ...
+                cfg.model.lateralVelocityMaximum-absolute(ego(5)); ...
+                cfg.model.yawRateMaximum-absolute(ego(6)); ...
+                -cfg.model.speedMinimum;backup(2)-cfg.actuation.brakingRatioMinimum; ...
+                cfg.actuation.brakingRatioMaximum-backup(2);double(modeValid)-1; ...
+                -abs(previousInput(:)-backup)];
+            if ~isempty(target),margins=[margins;separation];end
+            % A false mode must be a strict violation, not a zero margin.
+            if ~modeValid,margins(10)=-1;end
+            info=struct('lambdaPerSecond',lambda,'speedReserveMetersPerSecond',speedReserve, ...
+                'egoTravelMeters',egoTravel,'targetTravelMeters',targetTravel, ...
+                'separationReserveMeters',separation,'targetModeValid',modeValid, ...
+                'backupInput',backup,'member',all(margins>=-1e-12));
+        end
+
         function certificate = certifySet(context,entry,target,errorSet,epochSeconds,maximumSteps)
             if nargin<6,maximumSteps=4096;end
             certificate=terminalSafeSet.certifyCell(context,entry,target,errorSet,epochSeconds,maximumSteps);

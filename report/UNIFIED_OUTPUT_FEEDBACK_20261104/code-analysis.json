@@ -1,0 +1,615 @@
+[
+  {
+    "file": "config/collisionAvoidanceControllerConfig.m",
+    "messages": {
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+      "fix": 0,
+      "line": 0,
+      "column": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "file": "controller/collisionAvoidanceController.m",
+    "messages": {
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+      "fix": 0,
+      "line": 0,
+      "column": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "file": "controller/solvePredictiveControl.m",
+    "messages": [
+      {
+        "id": "CFERR",
+        "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+        "fix": 0,
+        "line": 0,
+        "column": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 932,
+        "column": [
+          13,
+          26
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 932,
+        "column": [
+          46,
+          57
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 951,
+        "column": [
+          13,
+          26
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 951,
+        "column": [
+          46,
+          57
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 2061,
+        "column": [
+          38,
+          44
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 2779,
+        "column": [
+          24,
+          28
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 2779,
+        "column": [
+          53,
+          57
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 2779,
+        "column": [
+          76,
+          80
+        ]
+      },
+      {
+        "id": "ISCL",
+        "message": "To improve performance, use 'isscalar' instead of length comparison.",
+        "fix": 1,
+        "line": 2863,
+        "column": [
+          16,
+          38
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 3294,
+        "column": [
+          42,
+          49
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 3295,
+        "column": [
+          13,
+          14
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 3295,
+        "column": [
+          41,
+          45
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 3295,
+        "column": [
+          57,
+          61
+        ]
+      }
+    ]
+  },
+  {
+    "file": "controller/nonlinearBicycleModel.m",
+    "messages": {
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+      "fix": 0,
+      "line": 0,
+      "column": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "file": "controller/terminalSafeSet.m",
+    "messages": [
+      {
+        "id": "CFERR",
+        "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+        "fix": 0,
+        "line": 0,
+        "column": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "PREALL",
+        "message": "The preallocated value assigned to variable might be unused.",
+        "fix": 0,
+        "line": 281,
+        "column": [
+          56,
+          64
+        ]
+      }
+    ]
+  },
+  {
+    "file": "scripts/runJointOutputFeedbackScenario.m",
+    "messages": {
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+      "fix": 0,
+      "line": 0,
+      "column": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "file": "scripts/runCollisionThreatValidation.m",
+    "messages": {
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+      "fix": 0,
+      "line": 0,
+      "column": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "file": "scripts/runNonlinearControllerExperiment.m",
+    "messages": {
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+      "fix": 0,
+      "line": 0,
+      "column": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "file": "tests/dynamicOutputFeedbackTest.m",
+    "messages": [
+      {
+        "id": "CFERR",
+        "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+        "fix": 0,
+        "line": 0,
+        "column": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 35,
+        "column": [
+          13,
+          17
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 38,
+        "column": [
+          58,
+          62
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'prediction' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 39,
+        "column": [
+          24,
+          33
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'state' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 39,
+        "column": [
+          35,
+          39
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 39,
+        "column": [
+          71,
+          75
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'state' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 40,
+        "column": [
+          34,
+          38
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'state' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 41,
+        "column": [
+          56,
+          60
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'state' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 41,
+        "column": [
+          80,
+          84
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'prediction' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 42,
+        "column": [
+          33,
+          42
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'state' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 43,
+        "column": [
+          48,
+          52
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 46,
+        "column": [
+          13,
+          17
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 46,
+        "column": [
+          67,
+          71
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 49,
+        "column": [
+          77,
+          81
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'cfg' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 99,
+        "column": [
+          14,
+          16
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'hypothesis' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 99,
+        "column": [
+          18,
+          27
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 99,
+        "column": [
+          29,
+          33
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'hypothesis' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 99,
+        "column": [
+          51,
+          60
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 100,
+        "column": [
+          13,
+          17
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'hypothesis' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 100,
+        "column": [
+          37,
+          46
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 101,
+        "column": [
+          13,
+          17
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'cfg' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 101,
+        "column": [
+          51,
+          53
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'hypothesis' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 101,
+        "column": [
+          75,
+          84
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 101,
+        "column": [
+          94,
+          98
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 102,
+        "column": [
+          66,
+          70
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'cfg' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 102,
+        "column": [
+          78,
+          80
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 106,
+        "column": [
+          13,
+          17
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 107,
+        "column": [
+          66,
+          70
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 111,
+        "column": [
+          13,
+          17
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 111,
+        "column": [
+          63,
+          67
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 112,
+        "column": [
+          66,
+          70
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 147,
+        "column": [
+          13,
+          17
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'prediction' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 148,
+        "column": [
+          18,
+          27
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'block' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 148,
+        "column": [
+          64,
+          68
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'prediction' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 149,
+        "column": [
+          33,
+          42
+        ]
+      },
+      {
+        "id": "PROP",
+        "message": "'prediction' is also the name of a property, which may be confusing. Use obj.PropertyName syntax to reference the property, or rename this variable to improve readability.",
+        "fix": 0,
+        "line": 150,
+        "column": [
+          34,
+          43
+        ]
+      }
+    ]
+  }
+]

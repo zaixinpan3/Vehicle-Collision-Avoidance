@@ -1,0 +1,32 @@
+{
+  "scope": "joint dynamic output feedback with finite uncertainty scenarios",
+  "pipeline": "dynamicOutputFeedback",
+  "results": [
+    {
+      "scenario": "stoppedLead",
+      "referenceSpeedMetersPerSecond": 1.5,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 8,
+      "failure": "",
+      "minimumReplayClearanceMeters": 28.74311163901184,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/UNIFIED_OUTPUT_FEEDBACK_20261104/low-speed/1.5-stoppedLead.json"
+    },
+    {
+      "scenario": "hardBrakingLead",
+      "referenceSpeedMetersPerSecond": 1.5,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 8,
+      "failure": "",
+      "minimumReplayClearanceMeters": 25.200000000000003,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/UNIFIED_OUTPUT_FEEDBACK_20261104/low-speed/1.5-hardBrakingLead.json"
+    }
+  ]
+}
