@@ -2852,9 +2852,9 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
     localOfValidateBlock(block,cfg);
     assert(~cfg.controller.enforceRoadBoundaries, ...
         'collisionAvoidanceController:unsupportedJointRoadConstraint', ...
-        'The current joint terminal component does not certify road boundaries.');
+        'The joint deployment does not implement hard road-boundary inequalities.');
     assert(cfg.controller.horizonSteps>=2,'collisionAvoidanceController:invalidJointHorizon', ...
-        'At least two holds are required, including the fixed backup tail.');
+        'At least two holds are required by the current deployment.');
     count=cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod;
     assert(abs(count-round(count))<1e-10 && count>=2 && mod(round(count),2)==0, ...
         'collisionAvoidanceController:invalidSensorGrid', ...
@@ -2954,7 +2954,7 @@ function localOfValidateBlock(block,cfg)
         end
     end
     assert(cfg.model.speedMinimum==0,'collisionAvoidanceController:terminalRestExcluded', ...
-        'The physical domain must admit rest for the current terminal component.');
+        'The joint deployment uses a forward-only physical domain with zero minimum speed.');
 end
 
 function hypotheses = localOfValidateHypotheses(hypotheses,cfg)
@@ -3108,7 +3108,7 @@ end
 
 function policies = localOfUnpackPlan(point,problem)
     policies=repmat(localOfBackup(problem.cfg),1,problem.horizon);
-    for i=1:problem.horizon-1
+    for i=1:problem.horizon
         policies(i)=localOfUnpack(point(problem.policyIndices(:,i)),problem.cfg);
     end
 end
@@ -3117,8 +3117,8 @@ function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg
     n=numel(policies);dimension=numel(localOfPack(localOfBackup(cfg)));
     assert(isstruct(policies) && n>=2 && n<=cfg.controller.maximumHorizonSteps, ...
         'collisionAvoidanceController:invalidPolicySeed','The seed must have one complete policy per hold.');
-    indices=reshape(1:dimension*(n-1),dimension,n-1);point=zeros(dimension*(n-1),1);
-    for i=1:n-1
+    indices=reshape(1:dimension*n,dimension,n);point=zeros(dimension*n,1);
+    for i=1:n
         vector=localOfPack(policies(i));
         assert(numel(vector)==dimension && all(isfinite(vector)), ...
             'collisionAvoidanceController:invalidPolicySeed','Invalid policy dimensions or coefficients.');
@@ -3142,7 +3142,7 @@ function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg
         point=[point;zeros(numel(witnessIndices),1)];
     end
     lower=-cfg.outputFeedback.coefficientMaximum*ones(size(point));upper=-lower;
-    for i=1:n-1
+    for i=1:n
         gain=indices(3:2+2*cfg.outputFeedback.memoryDimension,i);
         lower(gain)=-cfg.outputFeedback.gainMaximum;upper(gain)=cfg.outputFeedback.gainMaximum;
     end
@@ -3225,6 +3225,11 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
     residual=cell(n*ns+1,1);constraint=cell(n*ns,1);numericalTolerance=cell(n*ns,1);
     lower=[problem.lower-point;-Inf(numel(ix),1)];upper=[problem.upper-point;Inf(numel(ix),1)];
     lower(1:np)=max(lower(1:np),-.25);upper(1:np)=min(upper(1:np),.25);
+    % Braking feedforward may use its full coefficient range. Actual commands
+    % still obey the input magnitude and configured slew constraints below.
+    brake=problem.policyIndices(2,:);
+    lower(brake)=problem.lower(brake)-point(brake);
+    upper(brake)=problem.upper(brake)-point(brake);
     linearTimer=tic;flowCount=0;
     for s=1:ns
         trace=trajectory{s};item=problem.scenarios(s).initial;
@@ -3238,7 +3243,7 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
             % Primitive local variables: x, u, previous u, memory, witnesses.
             z=[item.ego;u;previous;m;witness];nz=numel(z);
             data=localOfStageFlow(z,item,problem.scenarios(s).noise,cfg);flowCount=flowCount+1;
-            [r,c,f]=localOfStageValues(z,data,policy,item,problem,i);
+            [r,c,f]=localOfStageValues(z,data,policy,problem);
             dr=zeros(numel(r),nz);dc=zeros(numel(c),nz);df=zeros(nx,nz);
             for j=1:8
                 delta=of.finiteDifferenceStep*max(1,abs(z(j)));
@@ -3247,7 +3252,7 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
                 if j<=8
                     d=localOfStageFlow(trial,item,problem.scenarios(s).noise,cfg);flowCount=flowCount+1;
                 end
-                [rr,cc,ff]=localOfStageValues(trial,d,policy,item,problem,i);
+                [rr,cc,ff]=localOfStageValues(trial,d,policy,problem);
                 dr(:,j)=(rr-r)/delta;dc(:,j)=(cc-c)/delta;df(:,j)=(ff-f)/delta;
             end
             % Exact cheap derivatives avoid re-evaluating physical or
@@ -3267,10 +3272,6 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
                         x(1:3),shape,q(1:3),q(8:11),witness(2*check-1:2*check),0);
                     dc(base+(check-1)*8+(1:8),10+nm+(2*check-1:2*check))=-gj(:,4:5);
                 end
-                if i==n && (trace.targets(4,end)==0 || ...
-                        trace.targets(5,end)<=-of.minimumTargetDeceleration)
-                    dc(end-3:end,10+nm+(5:6))=-gj(1:4,4:5);
-                end
             end
             map=sparse(nz,nv);
             if i>1
@@ -3281,13 +3282,11 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
                 map(7:8,old(7:6+nm))=policy.K;
             end
             direct=sparse(nx,nv);
-            if i<n
-                pi=problem.policyIndices(:,i);
-                map(7:8,pi(1:2+2*nm))=[eye(2),kron(m.',eye(2))];
-                gain=1-f(7:6+nm).^2;
-                direct(7:6+nm,pi(3+2*nm:end))=diag(gain)* ...
-                    [kron(m.',eye(nm)),kron(data.feature.',eye(nm)),eye(nm)];
-            end
+            pi=problem.policyIndices(:,i);
+            map(7:8,pi(1:2+2*nm))=[eye(2),kron(m.',eye(2))];
+            gain=1-f(7:6+nm).^2;
+            direct(7:6+nm,pi(3+2*nm:end))=diag(gain)* ...
+                [kron(m.',eye(nm)),kron(data.feature.',eye(nm)),eye(nm)];
             if ~isempty(wi),map(11+nm:end,wi)=eye(numel(wi));end
             jr{k}=sparse(dr)*map;jc{k}=sparse(dc)*map;
             ae{k}=-sparse(df)*map-direct;ae{k}(:,ix(:,i,s))=speye(nx);
@@ -3372,7 +3371,7 @@ function data=localOfStageFlow(z,item,noise,cfg)
         'targets',targets,'next',item.ego,'feature',localOfFeatures(readings,cfg));
 end
 
-function [r,c,f]=localOfStageValues(z,data,policy,item,problem,stage)
+function [r,c,f]=localOfStageValues(z,data,policy,problem)
     cfg=problem.cfg;of=cfg.outputFeedback;nm=of.memoryDimension;h=cfg.controller.sampleTime;
     u=z(7:8);previous=z(9:10);m=z(11:10+nm);
     nextMemory=tanh(policy.A*m+policy.B*data.feature+policy.c);
@@ -3391,48 +3390,13 @@ function [r,c,f]=localOfStageValues(z,data,policy,item,problem,stage)
     c=[c;reshape([-states(4,:);states(4,:)-cfg.model.speedMaximum; ...
         states(5,:)-cfg.model.lateralVelocityMaximum;-states(5,:)-cfg.model.lateralVelocityMaximum; ...
         states(6,:)-cfg.model.yawRateMaximum;-states(6,:)-cfg.model.yawRateMaximum],[],1)];
-    target=[];
     if problem.hasTarget
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        q=data.targets(:,1);speed=max(q(4),q(4)+h*q(5));
         reserve=of.clearanceMeters+of.intersampleMarginMeters;
         witness=reshape(z(11+nm:end),2,3);
         for j=1:3
             q=data.targets(:,j);x=data.checks(:,j);
             c=[c;-predictiveSafetyGeometry.separationWitnessRows(x(1:3),shape,q(1:3),q(8:11),witness(:,j),reserve)]; %#ok<AGROW>
-        end
-        target=data.targets(:,end);
-    end
-    if stage==problem.horizon
-        % Coarsened terminal reserve. Constant-deceleration stopping travel
-        % plus fading-brake travel is an engineering approximation, not the
-        % invariant low-speed set.
-        if ~isempty(target)
-            mu=min(cfg.tire.frictionCoefficient.*item.parameters(3:4));
-            deceleration=of.backupBrakingRatio*mu*cfg.vehicle.gravity;
-            limit=cfg.model.kinematicSpeedRange(1);tau=cfg.model.kinematicLagSeconds;
-            lambda=deceleration*tanh(limit/cfg.model.brakeHoldSpeed)/limit;
-            absolute=@(v)sqrt(v.^2+of.smoothAbsoluteValue^2);
-            fadingTravel=(absolute(data.next(4))+tau/2*absolute(data.next(5)*data.next(6)))/lambda;
-            egoTravel=max(0,data.next(4))^2/(2*deceleration)+fadingTravel+tau*absolute(data.next(5));
-            if target(4)==0 || target(5)<=-of.minimumTargetDeceleration
-                % This finite-stop component is optional, not a model contract.
-                targetTravel=0;
-                if target(4)>0,targetTravel=target(4)^2/(-2*target(5));end
-                endpointRows=predictiveSafetyGeometry.separationWitnessRows( ...
-                    data.next(1:3),shape,target(1:3),target(8:11),witness(:,end),of.clearanceMeters);
-                c=[c;egoTravel+targetTravel-endpointRows(1:4)];
-            else
-                % Continuing targets retain their actual constant A and beta.
-                % A fixed finite continuation replaces an infinite stopping
-                % distance. It is a sampled deployment heuristic, not an
-                % invariant terminal certificate or a target-stopping assumption.
-                radius=norm(shape(1:2)+abs(shape(3:4)))+norm(target(8:9)+abs(target(10:11)));
-                for time=of.terminalPreviewSeconds*[.5,1]
-                    future=predictiveSafetyGeometry.predictTarget(target,time);
-                    c=[c;radius+of.clearanceMeters+egoTravel-norm(future(1:2)-data.next(1:2))]; %#ok<AGROW>
-                end
-            end
         end
     end
 end

@@ -470,27 +470,22 @@ Default deployment dimensions are four stages, one memory coordinate, and one
 future-noise direction per retained joint hypothesis. The horizon does not grow
 with speed. Separating planes are checked at start, midpoint and endpoint with
 a 0.2 m engineering reserve in addition to the requested clearance. This margin
-is not a verified intersample bound. The terminal condition uses
-$D_E=v_x^2/(2b_0\mu g)+(|v_x|+\tau_\ell|v_y r|/2)/\lambda+\tau_\ell|v_y|$ and the persistent target braking travel
-as an extra separation requirement on the terminal rectangle separating plane.
-The deployment does not require terminal membership in the circular invariant set.
-Here $\lambda=b_0\mu g\tanh(v_\ell/v_b)/v_\ell$; the linear travel term
-retains a reserve for the fading low-speed brake. This combined approximation is
-not the fading-brake invariant certificate of Section 5 and has no universal
-guarantee, especially near low-speed transitions or combined tire saturation.
+is not a verified intersample bound. The deployment retains the same rectangle
+clearance and physical-domain inequalities at the horizon endpoint. It imposes
+no additional remaining-braking-travel reserve, target stopping condition, or
+fixed braking final stage. All $N$ controller maps are optimized. The braking
+policy appended when shifting is only a numerical seed, not a required input
+or a certified terminal continuation. The exact terminal certificate in Sections
+4--5 remains a conditional theoretical construction; the deployment does not
+enforce membership in that set and does not inherit its recursive-feasibility
+claim. In particular, endpoint clearance alone is not a terminal invariance proof.
 
-The stopping construction above is only one terminal component. It imposes
-no sign restriction on the admitted target acceleration. The actual target
-contract remains $\dot A_T=0$, $\dot\beta_T=0$, with an absorbing stop at zero
-speed. For continuing targets outside the finite-stop component, deployment
-predicts their actual persistent-parameter motion at two terminal continuation
-times, $T_p/2$ and $T_p$ ($T_p=0.5$ s by default). At each time it constrains
-reference-point separation to exceed the two footprint radii, requested
-clearance and the approximate remaining ego braking travel. This sampled finite
-preview replaces the inapplicable target stopping-distance expression; it is
-not an invariant set, infinite-horizon continuation proof, or assertion that
-the target will brake. The existing stopping component still applies to
-absorbed or sufficiently braking hypotheses without rejecting other hypotheses.
+The actual target contract remains $\dot A_T=0$, $\dot\beta_T=0$, with an
+absorbing stop at zero speed, including zero and positive tangential acceleration.
+Braking feedforward coefficients can move over their full admissible coefficient
+range in one QP. Other coefficients and geometric witnesses retain the numerical
+$\pm0.25$ step box. Physical actuator magnitude and configured slew limits apply
+to the derived commands at every stage, including the newly optimized final stage.
 
 Numerical state and geometry inequalities allow half the configured constraint
 tolerance; actuator magnitude and slew rows have no such allowance. This bounds

@@ -2,6 +2,9 @@ function results=analyzeOutputFeedbackQpFailures(outputDirectory)
 %analyzeOutputFeedbackQpFailures Offline diagnosis; never changes live policies.
 % Reconstruct recorded failures, export the exact linearized constraints, and
 % distinguish feasibility from QP convergence with independent linear programs.
+% Historical reproduction requires controller/config sources from commit
+% f1a74d5f45dc00e9ad855cfb9d845f29bb45538b. Later runtime constraints differ;
+% the command-replay assertion intentionally rejects an incompatible version.
     arguments
         outputDirectory (1,1) string
     end

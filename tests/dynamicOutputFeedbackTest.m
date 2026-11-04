@@ -181,6 +181,37 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyTrue(testCase.prediction.metadata.predictionIsLinearized);
             testCase.verifyLessThan(testCase.prediction.metadata.maximumShootingEqualityResidual,1e-8);
         end
+        function brakingFeedforwardCanMoveBeyondTheNumericalBoxButNotActuatorLimits(testCase)
+            policies=testCase.state.policies;
+            for i=1:numel(policies)
+                policies(i).v=[0;-.6];policies(i).K(:)=0;
+            end
+            request=struct('operation',"linearize",'cfg',testCase.cfg, ...
+                'hypotheses',testCase.hypothesis,'memory',zeros(2,1), ...
+                'input',testCase.block.heldInput,'policies',policies,'reference',[]);
+            qp=solvePredictiveControl('outputFeedback',request);
+            [flag,step]=localBrakeStep(qp,-.35);
+            testCase.verifyGreaterThan(flag,0);
+            testCase.verifyEqual(step(qp.policyIndices(2,1)),-.35,AbsTol=1e-9);
+            testCase.verifyEqual(localBrakeStep(qp,-.5),-2);
+            request.cfg.model.brakingRatioRateMaximum=1;
+            limited=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyEqual(localBrakeStep(limited,-.35),-2);
+        end
+        function theFinalPolicyIsOptimizedInsteadOfFixedToBraking(testCase)
+            testCase.verifyGreaterThan(testCase.state.policies(end).v(2),-.5);
+            testCase.verifyLessThanOrEqual(abs(testCase.prediction.scenarios{1}.inputs(2,end)),1+1e-8);
+        end
+        function endpointClearanceDoesNotRequireRemainingStoppingTravel(testCase)
+            [cfg,hypothesis,block]=localFixture();
+            cfg.referenceSpeed=25;cfg.model.speedMaximum=max(30,cfg.model.speedMaximum);
+            hypothesis.ego(4)=25;block.initialHypotheses=hypothesis;
+            block.samples=localOperation('sensor',cfg,struct('hypothesis',hypothesis,'input',block.heldInput,'time',0));
+            [command,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyGreaterThan(prediction.scenarios{1}.ego(4,end),20);
+            testCase.verifyLessThan(prediction.metadata.maximumLinearizedConstraintViolation,cfg.solver.constraintTolerance);
+        end
         function theDefaultCampaignUsesRawSensorsWithoutTheNrmmPipeline(testCase)
             fixture=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             campaign=runCollisionThreatValidation(Frames=1,Speeds=1.5,Scenarios="stoppedLead", ...
@@ -252,4 +283,13 @@ function [stateError,memoryError]=localTangentAudit()
     changes=reshape(delta(indices),10,[]);
     stateError=max(abs(trace{1}.ego(:,2:end)-qp.nominal{1}.ego(:,2:end)-changes(1:6,:)),[],'all');
     memoryError=max(abs(trace{1}.memory(:,2:end)-qp.nominal{1}.memory(:,2:end)-changes(7:8,:)),[],'all');
+end
+
+function [flag,step]=localBrakeStep(qp,brakeIncrement)
+    lower=qp.lower;upper=qp.upper;index=qp.policyIndices(2,1);
+    lower(index)=max(lower(index),brakeIncrement);
+    upper(index)=min(upper(index),brakeIncrement);
+    options=optimoptions('linprog','Display','none','ConstraintTolerance',1e-9);
+    [step,~,flag]=linprog(zeros(size(lower)),qp.inequality,qp.bounds, ...
+        qp.equality,zeros(size(qp.equality,1),1),lower,upper,options);
 end

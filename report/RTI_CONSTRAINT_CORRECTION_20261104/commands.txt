@@ -1,0 +1,19 @@
+Run from repository root on November 4, 2026.
+
+matlab -batch "addpath('scripts'); results=runtests('tests/dynamicOutputFeedbackTest.m'); writetable(table(results),'report/RTI_CONSTRAINT_CORRECTION_20261104/initial-tests.csv'); assertSuccess(results); runJointOutputFeedbackScenario(Scenarios=["headOn","acceleratingHeadOn","curvedHeadOn","intersectionCrossing","stoppedLead","hardBrakingLead"],Speeds=8,Frames=60,OutputDirectory="report/RTI_CONSTRAINT_CORRECTION_20261104/8-mps"); runJointOutputFeedbackScenario(Scenarios=["stoppedLead","hardBrakingLead"],Speeds=25,Frames=60,OutputDirectory="report/RTI_CONSTRAINT_CORRECTION_20261104/25-mps");"
+
+matlab -batch "results=runtests({'tests/dynamicOutputFeedbackTest.m','tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m','tests/modifiedFialaTireTest.m','tests/longitudinalRoadLoadTest.m','tests/rtiModelConsistencyTest.m','tests/terminalSafeSetTest.m','tests/controllerInputGeometryTest.m'}); writetable(table(results),'report/RTI_CONSTRAINT_CORRECTION_20261104/tests.csv'); assertSuccess(results);"
+
+matlab -batch "addpath('scripts'); auditOutputFeedbackConstraintCorrection("report/RTI_CONSTRAINT_CORRECTION_20261104");"
+The first audit invocation failed on JSON null configuration entries; after
+correcting reconstruction, the same command completed successfully.
+
+The long commands above use double-quoted MATLAB strings. When invoked from
+bash, escape their inner double quotes or pass the MATLAB expression as one
+properly quoted argument. No post-failure command was applied to any plant.
+
+Python standard-library json/csv/statistics generated table.csv from the
+per-case JSON measurements; no filtering of failed cases was applied.
+
+Final focused rerun after strengthening the infeasibility checks to require exit -2:
+matlab -batch "results=runtests('tests/dynamicOutputFeedbackTest.m'); writetable(table(results),'report/RTI_CONSTRAINT_CORRECTION_20261104/final-dynamic-tests.csv'); assertSuccess(results);"

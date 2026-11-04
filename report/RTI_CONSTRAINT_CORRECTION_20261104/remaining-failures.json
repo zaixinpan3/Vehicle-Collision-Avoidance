@@ -1,0 +1,152 @@
+[
+  {
+    "source": "8-acceleratingHeadOn.json",
+    "completedHolds": 23,
+    "maximumReplayedCommandError": 0,
+    "full": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "withoutCollision": {
+      "exitFlag": 1,
+      "maximumResidual": 4.604518988315931E-10,
+      "collisionSlackMeters": null
+    },
+    "withoutOtherStepBoxes": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "collisionSlack": {
+      "exitFlag": 1,
+      "maximumResidual": 2.0600334892789673E-10,
+      "collisionSlackMeters": 0.20886289660952254
+    }
+  },
+  {
+    "source": "8-curvedHeadOn.json",
+    "completedHolds": 23,
+    "maximumReplayedCommandError": 0,
+    "full": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "withoutCollision": {
+      "exitFlag": 1,
+      "maximumResidual": 5.9144832625500788E-10,
+      "collisionSlackMeters": null
+    },
+    "withoutOtherStepBoxes": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "collisionSlack": {
+      "exitFlag": 1,
+      "maximumResidual": 6.3769625691101339E-10,
+      "collisionSlackMeters": 0.36642465438069227
+    }
+  },
+  {
+    "source": "8-headOn.json",
+    "completedHolds": 23,
+    "maximumReplayedCommandError": 0,
+    "full": {
+      "exitFlag": -9,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "withoutCollision": {
+      "exitFlag": 1,
+      "maximumResidual": 4.2458497828690156E-10,
+      "collisionSlackMeters": null
+    },
+    "withoutOtherStepBoxes": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "collisionSlack": {
+      "exitFlag": 1,
+      "maximumResidual": 3.0041453615474521E-10,
+      "collisionSlackMeters": 0.44672497318002086
+    }
+  },
+  {
+    "source": "8-intersectionCrossing.json",
+    "completedHolds": 32,
+    "maximumReplayedCommandError": 0,
+    "full": {
+      "exitFlag": -9,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "withoutCollision": {
+      "exitFlag": 1,
+      "maximumResidual": 3.3472059846051394E-10,
+      "collisionSlackMeters": null
+    },
+    "withoutOtherStepBoxes": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "collisionSlack": {
+      "exitFlag": 1,
+      "maximumResidual": 3.216123478644306E-10,
+      "collisionSlackMeters": 0.025558441890289017
+    }
+  },
+  {
+    "source": "25-hardBrakingLead.json",
+    "completedHolds": 20,
+    "maximumReplayedCommandError": 0,
+    "full": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "withoutCollision": {
+      "exitFlag": 1,
+      "maximumResidual": 1.5660528429606302E-12,
+      "collisionSlackMeters": null
+    },
+    "withoutOtherStepBoxes": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "collisionSlack": {
+      "exitFlag": 1,
+      "maximumResidual": 1.5660528429606302E-12,
+      "collisionSlackMeters": 0.1167982305959699
+    }
+  },
+  {
+    "source": "25-stoppedLead.json",
+    "completedHolds": 20,
+    "maximumReplayedCommandError": 0,
+    "full": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "withoutCollision": {
+      "exitFlag": 1,
+      "maximumResidual": 6.6716077107287219E-13,
+      "collisionSlackMeters": null
+    },
+    "withoutOtherStepBoxes": {
+      "exitFlag": -2,
+      "maximumResidual": null,
+      "collisionSlackMeters": null
+    },
+    "collisionSlack": {
+      "exitFlag": 1,
+      "maximumResidual": 6.6710525992164094E-13,
+      "collisionSlackMeters": 0.54366168196957942
+    }
+  }
+]

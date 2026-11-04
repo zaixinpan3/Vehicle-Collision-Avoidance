@@ -1,0 +1,114 @@
+RTI constraint correction, November 4, 2026
+
+Request and scope
+-----------------
+Remove the artificial +/-0.25 increment box on braking feedforward
+coefficients while keeping physical input limits. Remove the extra terminal
+remaining-braking-travel requirement: this was an implementation assumption,
+not a required general terminal condition. No target-motion admission filter
+is introduced. Target tangential acceleration and sideslip remain constant,
+with the existing absorbing stop at zero speed.
+
+Implementation
+--------------
+All N policy maps now participate in the sparse QP, including the previously
+fixed final braking stage. The appended braking policy is only a numerical
+warm-start seed. Braking feedforward coefficients retain their admissible
+coefficient bounds but have no additional +/-0.25 increment box. Other
+coefficients and separating witnesses retain that numerical step box.
+Derived actuator commands retain their magnitude and configured slew rows.
+The complete raw block still conditions the joint hypotheses; the committed
+memory map is still executed exactly once.
+
+Removed the entire extra stopping-travel terminal proxy, for both stopped /
+braking and continuing-target branches, and its witness derivatives. Removed
+the unused terminalPreviewSeconds configuration entry. Existing whole-horizon
+sampled rectangle constraints include the terminal endpoint, with the same
+0.1 m clearance plus 0.2 m engineering intersample reserve. Physical-domain
+rows also include the endpoint. There is no replacement invariant terminal
+certificate in this deployment. The conditional exact theorem and optional
+low-speed certificate remain documented; the offline lowSpeedReserve helper
+and comparator algorithms are unchanged. Endpoint constraints alone do not
+supply terminal invariance or recursive feasibility.
+
+Verification
+------------
+233 tests passed across dynamicOutputFeedbackTest (30 results), configuration,
+source-budget, Fiala tire, road-load, RTI model consistency, terminal safe-set,
+and controller input/geometry tests. No failed or incomplete tests. The full
+repository suite was not run. tests.csv records the individual results.
+Initial pre-regression dynamic-output-feedback run: 27 passed, recorded in
+initial-tests.csv. Final focused rerun: 30 passed after strengthening the
+actuator-limit infeasibility assertions to require solver exit -2, recorded
+in final-dynamic-tests.csv.
+
+New regressions force a -0.35 root brake coefficient increment from -0.6:
+its linear problem is feasible. A -0.5 increment (command -1.1) is infeasible;
+with braking slew limited to 1/s, the -0.35 increment is also infeasible.
+Another regression checks that the final optimized policy is not fixed to
+-0.6. A 25 m/s, 15 m stationary-lead fixture now admits a QP with terminal
+speed above 20 m/s, without imposing stopping travel on the endpoint.
+Existing overlap rejection, sensor causality, target persistence, and nonlinear
+certificate disclaimers continue to pass.
+
+Closed-loop experiments
+-----------------------
+Default four-stage horizon (0.2 s), one memory coordinate, two prediction
+substeps per hold, zero future-noise direction, three initial correlated
+hypotheses, seed 20261104. Actual hold 0.05 s, raw sensors every 0.0125 s.
+The independent ode45 plant uses relative tolerance 1e-10 and absolute tolerance
+1e-12, with 41 clearance checks per hold. Startup virtual warmup is enabled;
+its commands are not applied to the actual plant. Each case requests 60 holds.
+See table.csv and the per-case JSON files for all measurements and failures.
+
+8 m/s headOn, acceleratingHeadOn, curvedHeadOn: 23 holds completed, then QP
+failure at t=1.15 s, versus 13, 12, 13 holds in the prior version. The prior
+failure time is passed in each case; this does not establish recursive
+feasibility. IntersectionCrossing completes 32 holds then fails at t=1.60 s.
+StoppedLead and hardBrakingLead at 8 m/s complete all 60 requested holds.
+
+25 m/s stoppedLead and hardBrakingLead: initialization now succeeds and 20
+holds complete before failure at t=1.00 s; both previously failed initialization.
+No executed hold in these runs has a negative measured clearance. The run
+ends at QP failure; no claim is made about plant safety after that point or
+about longer encounters in cases that complete the requested 60 holds.
+
+There are 261 successful controller calls, of which 253 are continuation calls.
+All successful continuation calls are below 50 ms (maximum 43.051 ms).
+Two of eight recorded initialization calls exceed 50 ms (maximum 66.704 ms).
+One of six failing calls exceeds 50 ms (53.621 ms). These measurements exclude
+startup virtual warmup and do not establish a worst-case realtime guarantee.
+
+Remaining-failure audit
+-----------------------
+The new audit replays all six failing histories with exactly matching commands
+(maximum discrepancy zero), then exports the current QP. Removing only the
+collision inequalities makes all six linear programs feasible. Removing the
+remaining numerical step boxes does not make any feasible (all six exit -2).
+An elastic LP that changes only collision rows has a positive optimal common
+slack in all six cases: 0.446725 m headOn, 0.208863 m acceleratingHeadOn,
+0.366425 m curvedHeadOn, 0.0255584 m intersectionCrossing, 0.543662 m
+25 m/s stoppedLead, and 0.116798 m 25 m/s hardBrakingLead. Primal residuals
+are below 7e-10. The ordinary feasibility LP returns -9 for two cases;
+those numerical statuses are inconclusive on their own. The successful
+positive-slack optimizations provide separate evidence of local conflict.
+These diagnostics never execute relaxed commands. Collision constraints
+remain hard in the runtime. Linearized separating-plane slack is not an exact
+physical collision-distance deficit or proof of unavoidable collision.
+
+With only 0.2 s of prediction and endpoint constraints, these tests expose
+myopic behavior: the 25 m/s vehicles remain near 24.90 m/s when the QP first
+fails. A terminal continuation design or anticipatory planning change would
+be a further algorithmic change; the deleted stopping-distance proxy is not
+silently reintroduced. No global nonlinear maneuver search was performed.
+
+Reproduction notes
+------------------
+commands.txt lists actual MATLAB commands. The first new audit attempt tried
+to load all configuration values from JSON; Inf had been serialized to null,
+so configuration validation rejected the import before analysis. The corrected
+auditor reconstructs the defaults and scenario overrides used by these runs;
+it then replays successfully. It is scoped to these default-configuration runs.
+The older analyzeOutputFeedbackQpFailures script is explicitly documented as
+requiring the historical f1a74d5f45dc00e9ad855cfb9d845f29bb45538b controller/config
+sources; its archived findings are preserved, not overwritten with new results.
