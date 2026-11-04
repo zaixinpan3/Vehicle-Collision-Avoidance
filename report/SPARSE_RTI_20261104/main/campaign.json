@@ -1,0 +1,70 @@
+{
+  "scope": "joint dynamic output feedback with finite uncertainty scenarios",
+  "pipeline": "dynamicOutputFeedback",
+  "results": [
+    {
+      "scenario": "stoppedLead",
+      "referenceSpeedMetersPerSecond": 1.5,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 200,
+      "failure": "",
+      "minimumReplayClearanceMeters": 28.504908514299007,
+      "startupWarmupSeconds": 1.029197,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/SPARSE_RTI_20261104/main/1.5-stoppedLead.json"
+    },
+    {
+      "scenario": "hardBrakingLead",
+      "referenceSpeedMetersPerSecond": 1.5,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 200,
+      "failure": "",
+      "minimumReplayClearanceMeters": 25.200000000000003,
+      "startupWarmupSeconds": 0.172201,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/SPARSE_RTI_20261104/main/1.5-hardBrakingLead.json"
+    },
+    {
+      "scenario": "stoppedLead",
+      "referenceSpeedMetersPerSecond": 8,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 200,
+      "failure": "",
+      "minimumReplayClearanceMeters": 0.30002062512946281,
+      "startupWarmupSeconds": 0.309792,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/SPARSE_RTI_20261104/main/8-stoppedLead.json"
+    },
+    {
+      "scenario": "hardBrakingLead",
+      "referenceSpeedMetersPerSecond": 8,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 200,
+      "failure": "",
+      "minimumReplayClearanceMeters": 0.30003050401992259,
+      "startupWarmupSeconds": 0.176443,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/SPARSE_RTI_20261104/main/8-hardBrakingLead.json"
+    }
+  ]
+}

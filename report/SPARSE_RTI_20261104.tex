@@ -1,0 +1,104 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{booktabs,tabularx,xurl,hyperref,amsmath}
+\hypersetup{hidelinks}\setlength{\parindent}{0pt}\setlength{\parskip}{6pt}
+\title{Coarsened Sparse SQP--RTI Deployment Validation}
+\author{Collision Avoidance Research}\date{November 4, 2026}
+\begin{document}\maketitle
+\section*{Implemented result}
+The active raw-sensor controller now solves one sparse multiple-shooting QP
+per call. It optimizes shared actuator and tanh-memory coefficients, then commits
+the first policy directly. Whole-horizon coefficient finite differences,
+onlinear backtracking, nonlinear candidate acceptance, and iterative cold-start
+feasibility restoration were removed from the deployment path. The exact
+robust theorem remains in \path{controller/CONTROLLER_THEORY.md}.
+
+All 225 focused MATLAB tests passed. Five final closed-loop cases each completed
+200 holds. Two of the five initializations exceeded 50 ms; all subsequent
+995 continuation calls stayed below 50 ms, with a maximum of 43.629 ms on
+this workstation. Initialization must finish before the timed control loop. This is measured performance, not a worst-case
+execution-time or universal safety guarantee. Both original 25 m/s challenge
+cases remain outside the successful QP-admission domain and issued no command.
+
+\section*{Timing and physical replay}
+Hardware: AMD Ryzen 7 7800X3D (8 cores, 16 threads); Linux 7.3.1-1-cachyos;
+MATLAB R2026a Update 3 with Optimization Toolbox. Four discarded virtual startup calls
+warm initialization and continuation in MATLAB and the solver before each main/dropout run. The timing campaign runs in a separate fresh MATLAB process after the focused test process exits. Timing includes the
+entire controller API: information update, nominal prediction, local derivatives,
+QP and command bookkeeping. Independent tight-tolerance \texttt{ode45} plant
+replay, sensor synthesis, and JSON export are outside that controller timing.
+They are simulation infrastructure rather than controller work.
+
+\begin{center}\small
+\begin{tabular}{@{}rlrrrrrr@{}}\toprule
+Speed & Case & Holds & Median & P95 & Max & Misses & Min gap\\
+(m/s) & & & (ms) & (ms) & (ms) & $>50$ ms & (m)\\\midrule
+1.5 & braking & 200 & 24.81 & 34.73 & 36.66 & 0 & 25.200 \\
+1.5 & stopped & 200 & 24.54 & 32.64 & 102.26 & 1 & 28.505 \\
+8 & braking & 200 & 11.52 & 38.40 & 41.34 & 0 & 0.300 \\
+8 & stopped & 200 & 17.12 & 40.66 & 53.06 & 1 & 0.300 \\
+8 & dropout & 200 & 11.89 & 38.47 & 42.41 & 0 & 0.300 \\
+\bottomrule\end{tabular}\end{center}
+
+A fresh MATLAB process with explicit warmup disabled recorded controller calls
+of 903.8, 87.3, 65.0 ms. Startup must precede the timed loop. Earlier exploratory
+runs also showed occasional desktop latency outliers above 50 ms; the
+final continuation result does not rule out future outliers. No real-time operating
+system, deadline interrupt or actuator latency qualification is claimed.
+
+\section*{Default deployment and validation scope}
+The fixed horizon has four 50 ms stages, one memory coordinate and two future
+sensor substeps per hold. Each retained physical hypothesis has one zero-noise
+future case; the experiments start with three correlated hypotheses. Actual
+12.5 ms sensor readings all condition the posterior. The finite prior contains
+the actual initial member by construction; it is not a sensor-derived enclosure.
+Scenario seed is 20261104. Dropout holds are 2, 3, 20 and 21. Each hold has 41
+independent replay clearance checks, with \texttt{ode45} relative tolerance
+$10^{-10}$ and absolute tolerance $10^{-12}$.
+
+\section*{Computational and algorithmic changes}
+Each stage perturbs only six physical coordinates and two actuator coordinates.
+Analytic derivatives handle memory, shared coefficients, previous input and
+geometric witnesses. Shared policies couple sparse scenario state chains;
+root memory is fixed and all root hypotheses receive the same action. The
+shooting equalities, inequalities and regularized Gauss--Newton Hessian remain
+sparse through \texttt{quadprog}. Every successful recorded call uses one QP.
+The linearized shooting forecast is labeled explicitly; auxiliary physical
+nodes and sensor blocks are nominal, not verified trial trajectories.
+
+Collision planes use start/mid/end samples and a 0.2 m engineering reserve in
+addition to the 0.1 m requested clearance. The approximate terminal plane adds
+constant-deceleration travel and a fading-brake travel term. It does not enforce
+membership in the theoretical circular invariant set. Command magnitude and
+slew rows are hard QP inequalities; state and geometry rows allow half the
+configured $10^{-5}$ numerical tolerance. No nonlinear verification transfers
+these QP properties to the physical system.
+
+Earlier diagnostic terminal variants failed during an 8 m/s stop: the circular
+reserve left a roughly $10^{-6}$ local feasibility discrepancy at rest, and a
+constant-deceleration plane reserve omitted fading-brake travel. Adding the
+fading term completed the 200-hold stop in the final tests. These diagnostics
+were not accepted as successful final validation.
+
+\section*{Checks, limitations and reproducibility}
+The eight focused classes cover joint causality, complete raw-block conditioning,
+parameter persistence, actuator timing, one-QP execution, numerical shooting
+tangents against independent policy perturbations, configuration, source budget,
+tires, road load, physical terminal calculations and input geometry. Full
+repository tests were not run. Code Analyzer outputs are preserved; the missing
+configured R2025b settings file caused MATLAB to use defaults. Analyzer findings
+include style/performance suggestions and are not reported as warning-free.
+
+The 25 m/s stopped/braking-lead cases failed their single local QP with exit
+flag $-2$. This is not proof of physical unavoidability. The short horizon,
+restricted backup tail and approximate terminal reserve limit feasibility.
+No unsafe-initialization recovery, arbitrary continuing/restarting target,
+multiple-target, hard-road, or universal robust-safety claim is made. A QP error
+issues no new command but does not itself provide a safe continuation policy.
+
+Exact commands, all raw traces and per-call timing components, focused test
+results and analyzer diagnostics are under \path{report/SPARSE_RTI_20261104/}.
+The preceding 9--10 second measurements used different dimensions and a different
+algorithm; they are not a controlled speedup experiment. The revised measured
+latency and its full timing distribution are the deployment result.
+\end{document}

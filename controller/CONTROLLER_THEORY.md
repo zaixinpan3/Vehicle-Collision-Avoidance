@@ -424,9 +424,11 @@ m_{i+1}^s&=\tanh(A_im_i^s+B_i\varphi(Y_{i+1}^s)+c_i).
 \end{aligned} \tag{D9}
 $$
 
-All coefficients may be optimized. Eliminating shooting states by a numerical
-rollout gives a condensed single-shooting NLP for the same finite policy
-family. Fixing its last stage to $\alpha_f$ is an additional conservative
+All coefficients are optimized jointly. The deployment retains scenario shooting
+states $(x_i,m_i,u_{i-1})$ and shared stage coefficients in a sparse QP.
+Stage-local finite differences perturb only the six ego coordinates and two
+inputs; memory and coefficient derivatives are analytic. No coefficient
+perturbation repeats the whole-horizon nonlinear rollout. Fixing its last stage to $\alpha_f$ is an additional conservative
 restriction that enforces terminal previous-input compatibility; this restricted
 policy family remains closed under a tail shift and backup append.
 
@@ -455,13 +457,40 @@ $$
 \quad c+Dc\Delta w\le0.
 $$
 
-Initialization may use elastic QP rows to search for feasibility; execution
-still requires zero hard-constraint deficit within numerical tolerance. A single
-online QP can propose a replacement. Reevaluate the nonlinear finite problem,
-backtrack or reject the candidate, and recheck the shifted fallback using the
-actual current memory and posterior. If no accepted finite plan exists, report
-failure and issue no command. Accepting an unchecked RTI iterate would additionally
-remove even this finite-scenario nonlinear acceptance property.
+The actual deployment adds the sparse shooting equalities
+$\Delta X_{i+1}-A_i\Delta X_i-B_i\Delta\alpha_i=0$ at a dynamically consistent nominal
+rollout, fixes the root increments to zero, and solves exactly one QP. The
+shared root policy remains causal. Future shooting memories are tangent
+predictions, not actual future measurements. The accepted first policy uses
+the known actual memory, and its committed memory map processes the next raw
+block. All received raw samples condition the finite hypotheses; future sensor
+blocks are coarsened to two substeps by default.
+
+Default deployment dimensions are four stages, one memory coordinate, and one
+future-noise direction per retained joint hypothesis. The horizon does not grow
+with speed. Separating planes are checked at start, midpoint and endpoint with
+a 0.2 m engineering reserve in addition to the requested clearance. This margin
+is not a verified intersample bound. The terminal condition uses
+$D_E=v_x^2/(2b_0\mu g)+(|v_x|+\tau_\ell|v_y r|/2)/\lambda+\tau_\ell|v_y|$ and the persistent target braking travel
+as an extra separation requirement on the terminal rectangle separating plane.
+The deployment does not require terminal membership in the circular invariant set.
+Here $\lambda=b_0\mu g\tanh(v_\ell/v_b)/v_\ell$; the linear travel term
+retains a reserve for the fading low-speed brake. This combined approximation is
+not the fading-brake invariant certificate of Section 5 and has no universal
+guarantee, especially near low-speed transitions or combined tire saturation.
+
+Numerical state and geometry inequalities allow half the configured constraint
+tolerance; actuator magnitude and slew rows have no such allowance. This bounds
+the numerical tolerance of the QP, not the nonlinear residual.
+
+The trial coefficients are committed directly after a successful QP. There is
+no nonlinear line search, post-step acceptance gate, or certified fallback.
+A failed QP returns an explicit error without issuing a new command. This error
+is not itself a safe continuation policy. Initialization is one QP from a
+numerical seed; MATLAB/solver warmup can run before the timed control loop.
+The configured deadline is measured and reported, not enforced by interrupting
+the QP. The complete inference, nominal preparation, local linearization, QP,
+and command bookkeeping contribute to the exported total call time.
 
 Finite hypotheses can be depleted by valid measurements when the actual state
 lies between samples. Finite future cases also omit admissible noise histories.

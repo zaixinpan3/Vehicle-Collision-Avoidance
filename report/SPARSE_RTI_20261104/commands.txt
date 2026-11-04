@@ -1,0 +1,22 @@
+Final focused checks ran in their own MATLAB process:
+cd('/home/zai/Downloads/ResearchProjects/collisionAvoidance');
+files={'tests/dynamicOutputFeedbackTest.m','tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m','tests/modifiedFialaTireTest.m','tests/longitudinalRoadLoadTest.m','tests/rtiModelConsistencyTest.m','tests/terminalSafeSetTest.m','tests/controllerInputGeometryTest.m'};
+results=runtests(files);writetable(table(results),'report/SPARSE_RTI_20261104/tests.csv');assertSuccess(results);
+
+Final timing campaign ran in a separate fresh MATLAB process:
+matlab -batch "run('/tmp/run_sparse_rti_benchmark.m')"
+Executed script contents:
+cd('/home/zai/Downloads/ResearchProjects/collisionAvoidance');
+addpath('scripts');
+runJointOutputFeedbackScenario(Speeds=[1.5,8],Frames=200,OutputDirectory='report/SPARSE_RTI_20261104/main');
+runJointOutputFeedbackScenario(Scenarios='stoppedLead',Speeds=8,Frames=200,DropoutHolds=[2,3,20,21],OutputDirectory='report/SPARSE_RTI_20261104/dropout');
+runCollisionThreatValidation(Frames=1,OutputDirectory='report/SPARSE_RTI_20261104/high-speed');
+
+Cold-start command, in another fresh MATLAB process, with explicit startup replay disabled:
+matlab -batch "addpath('scripts'); disp(version); disp(computer); runJointOutputFeedbackScenario(Scenarios='stoppedLead',Speeds=8,Frames=3,Warmup=false,OutputDirectory='report/SPARSE_RTI_20261104/cold-start');"
+The cold-start run preceded the final warmup-only driver revision; Warmup=false executes the identical controller path and configuration.
+
+Code Analyzer: checkcode(file,'-id') on controller/solvePredictiveControl.m, config/collisionAvoidanceControllerConfig.m, scripts/runJointOutputFeedbackScenario.m, scripts/runNonlinearControllerExperiment.m, tests/dynamicOutputFeedbackTest.m. Preserve returned diagnostics in code-analysis.json. No parse-error diagnostics; performance/style and unavailable configured R2025b settings-file messages remain.
+Hardware: lscpu; uname -sr. MATLAB version and computer printed by the cold-start command.
+Checks: git diff --check on all in-scope edits; 225 focused tests passed, 0 failed, 0 incomplete. Full repository suite not run.
+An exploratory no-explicit-warmup trace from an already-warm MATLAB process is excluded from the final artifact set.

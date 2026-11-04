@@ -20,17 +20,17 @@ and `runNonlinearControllerExperiment` select this pipeline by default.
 ```matlab
 addpath('scripts');
 runJointOutputFeedbackScenario(Frames=8, ...
-    ControllerConfiguration=struct('controller',struct('horizonSteps',4)), ...
+    ControllerConfiguration=struct('outputFeedback',struct('horizonSteps',4)), ...
     OutputDirectory=string(tempname));
 ```
 
 Finite scenarios and numerical integration are deployment approximations;
-nonlinear acceptance does not establish a universal safety theorem. The
+one sparse RTI QP is executed without nonlinear acceptance or a universal safety claim. The
 [interface](../README.md#controller-interface),
 [theory](../controller/CONTROLLER_THEORY.md), and
-[measurements](../report/UNIFIED_OUTPUT_FEEDBACK_20261104.tex) state the supported
-contract and limits. The initial terminal component admits stopped or braking
-targets. Inference failure or failure to find a hard-feasible plan issues no
+[measurements](../report/SPARSE_RTI_20261104.tex) state the supported
+contract and limits. The approximate deployment terminal reserve supports stopped or braking
+targets. Inference failure or failure of the single QP issues no
 command. Scenario files record such failures explicitly.
 
 ## Finite-input information-state reference

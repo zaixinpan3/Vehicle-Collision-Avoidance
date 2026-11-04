@@ -1,0 +1,20 @@
+{
+  "scope": "joint dynamic output feedback with finite uncertainty scenarios",
+  "pipeline": "dynamicOutputFeedback",
+  "results": {
+    "scenario": "stoppedLead",
+    "referenceSpeedMetersPerSecond": 8,
+    "observationModel": "rawSensorJointDynamicOutputFeedback",
+    "randomSeed": 2.0261104E+7,
+    "outcome": "completed",
+    "executedFrames": 3,
+    "failure": "",
+    "minimumReplayClearanceMeters": 28.031632016704073,
+    "startupWarmupSeconds": 0,
+    "warmupEnabled": false,
+    "failureCallSeconds": 0,
+    "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+    "robustSafetyCertified": false,
+    "source": "report/SPARSE_RTI_20261104/cold-start/8-stoppedLead.json"
+  }
+}

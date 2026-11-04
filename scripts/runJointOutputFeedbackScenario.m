@@ -12,6 +12,7 @@ function campaign = runJointOutputFeedbackScenario(options)
         options.ControllerConfiguration (1,1) struct = struct()
         options.OutputDirectory (1,1) string = string(tempname)
         options.RandomSeed (1,1) double {mustBeInteger,mustBeNonnegative} = 20261104
+        options.Warmup (1,1) logical = true
         options.DropoutHolds (1,:) double {mustBeInteger,mustBeNonnegative} = []
     end
     root=fileparts(fileparts(mfilename('fullpath')));
@@ -30,11 +31,36 @@ function campaign = runJointOutputFeedbackScenario(options)
             sample=localSensor(truth,input,cfg,time,stream,false);
             block=struct('kind',"jointSensorBlock-v1",'time',time,'heldInput',input, ...
                 'samples',sample,'initialHypotheses',initial);
-            trace=struct([]);failure="";minimumClearance=Inf;
+            % Startup-only virtual sensor replay warms both initialization
+            % and continuation branches; no warmup command reaches the plant.
+            warmupSeconds=0;
+            if options.Warmup
+                warmupTimer=tic;warmupTruth=truth;warmupBlock=block;warmupState=[];
+                warmupStream=RandStream('mt19937ar','Seed',options.RandomSeed);
+                for warmup=1:4
+                    try
+                        [warmupCommand,~,~,warmupState]=collisionAvoidanceController( ...
+                            warmupBlock,[],reference,cfg,warmupState);
+                        warmupInput=warmupCommand.actuatorInput;
+                        [warmupTruth,warmupSamples]=localReplay(warmupTruth,warmupInput,cfg, ...
+                            warmupBlock.time,warmupStream,false);
+                        warmupBlock=struct('kind',"jointSensorBlock-v1", ...
+                            'time',warmupBlock.time+cfg.controller.sampleTime, ...
+                            'heldInput',warmupInput,'samples',warmupSamples);
+                    catch
+                        % The recorded call below reports any admission failure.
+                        break;
+                    end
+                end
+                warmupSeconds=toc(warmupTimer);
+            end
+            trace=struct([]);failure="";minimumClearance=Inf;failureCallSeconds=0;
             for frame=1:options.Frames
+                callTimer=tic;
                 try
                     [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
                 catch exception
+                    failureCallSeconds=toc(callTimer);
                     failure=string(exception.identifier)+": "+string(exception.message);break;
                 end
                 input=command.actuatorInput;
@@ -55,6 +81,8 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'observationModel',"rawSensorJointDynamicOutputFeedback",'randomSeed',options.RandomSeed, ...
                 'outcome',outcome,'executedFrames',numel(trace),'failure',failure, ...
                 'minimumReplayClearanceMeters',minimumClearance,'configuration',cfg, ...
+                'startupWarmupSeconds',warmupSeconds,'warmupEnabled',options.Warmup, ...
+                'failureCallSeconds',failureCallSeconds, ...
                 'initialInformationContract',initial,'initialContractScope', ...
                 "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure", ...
                 'robustSafetyCertified',false,'trace',trace);

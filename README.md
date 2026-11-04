@@ -6,8 +6,9 @@ an actuator map and a bounded controller-memory update. It does not require a
 separately designed state observer.
 
 The implementation uses finite joint scenarios, numerical Fiala-bicycle flows,
-and SQP. Every issued plan passes a nonlinear check of those scenarios. This
-is a research deployment approximation, **not a robust safety certificate**.
+and one sparse multiple-shooting SQP-RTI QP per call. The trial policy is
+committed without nonlinear line search or acceptance checks. This is a
+research deployment approximation, **not a robust safety certificate**.
 The conditional exact-set theorem and constructive braking terminal component
 are in [controller theory](controller/CONTROLLER_THEORY.md).
 
@@ -18,7 +19,7 @@ Run from the repository root:
 
 ```matlab
 addpath('scripts');
-cfg = struct('controller', struct('horizonSteps', 4));
+cfg = struct('outputFeedback', struct('horizonSteps', 4));
 result = runJointOutputFeedbackScenario(Frames=8, ...
     ControllerConfiguration=cfg, OutputDirectory=string(tempname));
 results = runtests('tests/dynamicOutputFeedbackTest.m');
@@ -36,10 +37,14 @@ provides the replay and empirical clearance checks.
 `runCollisionThreatValidation` and `runNonlinearControllerExperiment` now use
 the joint raw-sensor pipeline. The former defaults to the 25 m/s stopped/braking
 lead challenge; successful initialization or recovery is not assumed. The
-current finite-difference SQP implementation is substantially slower than the
-control hold in measured tests. Budgets are checked between operations and
-cannot interrupt a running QP. See the [validation report](report/UNIFIED_OUTPUT_FEEDBACK_20261104.tex)
-for actual outcomes and timings.
+current deployment uses four stages, one memory coordinate, two prediction
+substeps per hold, and one future-noise direction per retained hypothesis.
+The scenario driver performs four discarded virtual startup calls by default to warm
+initialization and continuation in MATLAB and the solver; `Warmup=false` exposes cold-start latency. Every recorded
+call still performs exactly one QP. Startup warmup time is exported separately.
+The control deadline is `min(outputFeedback.maximumSolveSeconds, sampleTime)`;
+it is a measured deadline, not an interruptible timeout. A deadline miss is
+reported explicitly. See [measured validation](report/SPARSE_RTI_20261104.tex).
 
 ## Controller interface
 
@@ -72,7 +77,8 @@ are persistent and correlated with their physical hypothesis.
 Optional `initialMemory` lies in the configured cube. Optional
 `initialPolicies` supplies one complete `(v,K,A,B,c)` structure per hold as a
 numerical seed. The final hold is always the constant braking backup; every
-seed is checked before execution.
+call solves one local QP, including initialization. No iterative feasibility
+restoration is performed online.
 
 On continuation, supply every sensor reading since the previous decision,
 including detection flags. The hold must contain an even integer number of
@@ -80,17 +86,21 @@ sensor periods. Do not resend initial hypotheses or reset memory. The retained
 first memory map processes the new block exactly once. Every raw reading
 conditions physical hypotheses, even though policy features use normalized
 block means and the detection fraction. An empty posterior, changed contract,
-missing reading, input mismatch, or unavailable hard-feasible plan produces
+missing reading, input mismatch, or unsuccessful QP produces
 an error without committing a command.
 
 Noise bounds, policy dimension, future noise directions, coefficient bounds,
-and solver settings live in `cfg.outputFeedback`. A dropout retains the target
-and its collision obligation. The current terminal component supports absorbed
+fixed horizon (`horizonSteps`), and solver settings live in `cfg.outputFeedback`.
+The separate comparator horizon in `cfg.controller` does not size this pipeline. A dropout retains the target
+and its collision obligation. The deployment terminal constraint approximates remaining travel by constant
+braking deceleration plus a fading-brake travel term, with a configured
+engineering intersample margin. It
+is not the invariant terminal certificate in the theory. It supports absorbed
 targets or targets that maintain constant negative acceleration until absorption.
 It does not cover continuing target motion, target restart, residual physical
 forces, multiple targets, or hard road constraints. No observer sideslip cone
 is imposed on this new pipeline; its physical speed, lateral-velocity and yaw
-caps are checked separately.
+caps are imposed as linearized constraints at prediction nodes.
 
 ## Research comparators and layout
 
