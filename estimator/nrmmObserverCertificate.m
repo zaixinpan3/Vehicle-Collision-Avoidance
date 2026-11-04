@@ -32,6 +32,10 @@ function certificate = nrmmObserverCertificate(action, varargin)
 %       relation q'*s = V*A is retained before maximizing over the domain.
 %       Four speed/acceleration corners suffice; no sampled maximization is
 %       used. range bounds true relative position and may vary online.
+%   certificate = nrmmObserverCertificate("sampled", design, period, filterGain)
+%       Exact small reset/flow matrices, a position-filter Lyapunov metric,
+%       and signed target innovation kernel. Contraction of these homogeneous
+%       maps alone does not certify the physical forcing or the RTI solve.
 
     switch string(action)
         case "core"
@@ -43,10 +47,58 @@ function certificate = nrmmObserverCertificate(action, varargin)
             certificate = localTargetLipschitz(varargin{1});
         case "targetGyro"
             certificate = localTargetGyro(varargin{:});
+        case "sampled"
+            certificate = localSampled(varargin{:});
         otherwise
             error("nrmmObserverCertificate:invalidAction", ...
-                "action must be 'core', 'velocity', 'targetLipschitz' or 'targetGyro'.");
+                "action must be 'core', 'velocity', 'targetLipschitz', 'targetGyro' or 'sampled'.");
     end
+end
+
+function certificate=localSampled(design,period,filterGain)
+% Exact reset/flow kernels of the compact comparison (S1)--(S5).
+% The homogeneous matrices do not certify their forcing budgets. Those
+% budgets must cover the admitted physical/observer domain and hold aging.
+    validateattributes(period,{'double'},{'scalar','positive','finite'});
+    validateattributes(filterGain,{'double'},{'size',[2,1],'finite'});
+    target=design.target;kv=design.velocity.gain;
+    matrix=[-kv,0,0;design.coupling.targetVelocityCoupling,-target.lambda, ...
+        target.disturbanceCoefficients.radar;1,target.componentConversion(2),0];
+    assert(kv>0 && target.lambda>0 && all(matrix(~eye(3))>=0), ...
+        'nrmmObserverCertificate:invalidComparison','A Metzler comparison with positive core decay is required.');
+    flow=expm([matrix,eye(3);zeros(3,6)]*period);
+    resetMatrix=flow(1:2,1:2);weights=-matrix(1:2,1:2)\ones(2,1);
+    contraction=max((resetMatrix*weights)./weights);
+    if contraction>=1 && max(abs(eig(resetMatrix)))<1
+        weights=(eye(2)-resetMatrix)\ones(2,1);
+        contraction=max((resetMatrix*weights)./weights);
+    end
+    continuousWeights=-matrix(1:2,1:2)\ones(2,1);
+    rate=norm(matrix,Inf);
+    % Fixed nondimensional state coordinates [position; period*velocity].
+    scaling=diag([1,period]);transition=[1,period;0,1];
+    prior=transition*(eye(2)-filterGain*[1,0]);
+    scaled=scaling*prior/scaling;
+    assert(max(abs(eig(scaled)))<1,'nrmmObserverCertificate:unstableFilter', ...
+        'The position filter must be Schur at its declared sample period.');
+    identity=eye(2);metric=reshape((eye(4)-kron(scaled',scaled'))\identity(:),2,2);
+    metric=(metric+metric')/2;
+    assert(min(eig(metric))>0,'nrmmObserverCertificate:invalidMetric','The filter metric must be positive definite.');
+    a0=[0,1,0;0,0,1;0,0,0];gains=target.innovationGains(:);
+    signed=expm([a0,gains;zeros(1,3),-gains(1)]*period);
+    impulse=signed(1:3,4);
+    certificate=struct('kind',"sampled-observer-comparison-v1",'period',period, ...
+        'matrix',matrix,'flow',flow(1:3,1:3),'forcingIntegral',flow(1:3,4:6), ...
+        'resetMatrix',resetMatrix,'radarNoiseColumn',flow(1:2,3), ...
+        'coreWeights',weights,'coreContraction',contraction, ...
+        'coreContractive',contraction<1, ...
+        'sufficientPeriod',1/(rate*(1+rate*max(continuousWeights))), ...
+        'filterTransition',prior,'filterMeasurementColumn',transition*filterGain, ...
+        'filterScaling',scaling,'filterMetric',metric, ...
+        'filterContraction',sqrt(max(0,1-1/max(eig(metric)))), ...
+        'targetSignedTransition',signed(1:3,1:3)-impulse*[1,0,0], ...
+        'targetRadarColumn',impulse,'publishedPositionDecay',exp(-design.position.gain*period), ...
+        'forcingCertified',false,'floatingPointCertified',false);
 end
 
 %% Triangular core ISS certificate

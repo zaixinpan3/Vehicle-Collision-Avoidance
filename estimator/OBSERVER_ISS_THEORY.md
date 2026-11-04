@@ -1757,6 +1757,59 @@ only because their reset and subsequent error equations were included above.
 The full controller construction and its cross-frame requirement are given in
 [the compact-certificate theorem](../controller/CONTROLLER_THEORY.md#compact-certificate).
 
+### 11.5 Constructive nonlinear forcing and executable sampled kernels
+
+The comparison coefficients are now available as the sampled action of
+nrmmObserverCertificate. It returns \(F(I-KC)\), the scaled Lyapunov
+metric \(P\), the exact reset/flow matrix \(E\exp(M\Delta)E^T\), its
+positive contraction weights when it is Schur, and the signed target
+kernel \(\exp(A_0\Delta)-B_\Delta C_r\). Checking the actual matrix can
+certify contraction at periods larger than the sufficient bound (S4).
+Its forcingCertified flag is deliberately false: a homogeneous contraction
+test cannot validate an unrelated disturbance budget.
+
+The forcing is supplied constructively by the
+[nonlinear transition evaluator](../controller/CONTROLLER_THEORY.md#compact-constructive-enclosure).
+It uses the actual Fiala formula in stress/capacity coordinates, an explicit
+whole-domain state-derivative bound, and Picard/Taylor enclosures of the
+continuous physical hold. The same physical acceleration produces the IMU
+sample and its discrepancy. At a command change, the old command remains
+in the measured acceleration and the new command drives the vehicle.
+Persistent tire factors are shared throughout; they are not a fresh
+observer disturbance at every sample.
+
+The key reduction is exact elimination of the radar innovation dynamics:
+\[
+ \lambda=y-\hat\rho,\qquad
+ \dot\lambda=-(a_1I+\omega_mJ)\lambda .
+\]
+In the coordinates \((\hat v,\hat\rho,\hat q,\hat s,\lambda)\), everything
+except the explicit NRMM jerk map is a small linear held-measurement
+system. A two-radius comparison bounds the change of that jerk; three
+integrals give its position, velocity and acceleration effects. The
+exactObserver action includes this forcing remainder, a matrix-series
+tail bound, the exact published-position map and a scalar nonlinear-yaw
+remainder. It does not require global yaw contraction or an invented
+velocity/direction measurement. It also does not reset the radar predictor
+at certification subdivisions.
+
+The compactEnclosure action of nrmmJointPrediction composes these blocks
+with future position-filter updates, radar resets, the persistent target
+flow, and the causal held feedback law. If the physical family straddles
+the perception boundary, both observer continuations are enclosed and
+joined; only following the nominal detection outcome would be unsound.
+This is a real-arithmetic enclosure of the stated continuous theoretical
+plant/observer and actual sensor clock. Finite-precision certification and
+the implementation's sample-end velocity reset are outside that claim.
+
+The online compactObserverPrediction option uses a faster signed
+point/derivative specialization of the same linear core. It omits the
+strict remainder sets as optimization tightenings and therefore retains
+nonlinearCertificate=false. Actual online estimation is unchanged.
+Nonlinear containment, useful tube width, and the safety guarantee of a
+particular RTI result remain different statements; only the first is the
+claim of the successfully returned exact transition certificate.
+
 <a id="implementation-map"></a>
 ## 12. Implementation map and existing validation
 

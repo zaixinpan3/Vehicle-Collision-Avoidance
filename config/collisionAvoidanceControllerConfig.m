@@ -37,7 +37,7 @@ function cfg=localDefaults()
         'enforceRoadBoundaries',false,'jointAffinePrediction',true,'jointNonlinearPrediction',false, ...
         'retainedTube',false,'reducedJointInformation',true, ...
         'jointPredictionSamplesPerHold',2,'jointPredictionInverseTolerance',.005, ...
-        'jointPredictionRefreshSteps',2);
+        'jointPredictionRefreshSteps',2,'compactObserverPrediction',true);
     % Engineering RTI retains one joint affine sensor-block history and uses
     % the actual observer for current ego information. Strict modes ignore this.
     % retainedTube selects a different, enclosure-certified policy-box
@@ -215,6 +215,7 @@ function localValidate(cfg)
         'Use zero for the sensor clock, or an even count resolving the hold midpoint.');
     validateattributes(cfg.controller.jointPredictionInverseTolerance,{'double'},{'scalar','positive','finite'});
     validateattributes(cfg.controller.jointPredictionRefreshSteps,{'double'},{'scalar','integer','positive','finite'});
+    validateattributes(cfg.controller.compactObserverPrediction,{'logical'},{'scalar'});
     validateattributes(cfg.controller.jointNonlinearPrediction,{'logical'},{'scalar'});
     validateattributes(cfg.controller.retainedTube,{'logical'},{'scalar'});
     validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});

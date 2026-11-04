@@ -1,9 +1,11 @@
 function result=nrmmJointEnclosure(action,varargin)
-%nrmmJointEnclosure Nonlinear outer images for the declared sampled joint map.
+%nrmmJointEnclosure Nonlinear outer images and exact-flow certificates.
 % Full-domain affine arithmetic retains shared primitive generators. Every
 % nonlinear operation adds a proved real-arithmetic remainder. No sample
 % maximum is promoted to a derivative bound. Arithmetic roundoff and model
 % residuals outside the declared Fiala parameter family are separate premises.
+% plant/hold enclose the declared numerical sampled map. exactPlant,
+% exactObserver and compactCoupledHold include continuous-flow remainders.
     switch string(action)
         case "plant"
             result=localPlantFlow(varargin{:});
@@ -13,6 +15,18 @@ function result=nrmmJointEnclosure(action,varargin)
             [~,result]=localPlantField(varargin{:});
         case "accelerationHold"
             result=localAccelerationHold(varargin{:});
+        case "exactPlant"
+            result=localExactPlant(varargin{:});
+        case "stateSlope"
+            result=localStateSlope(varargin{:});
+        case "targetPhi"
+            result=localTargetPhi(varargin{:});
+        case "targetObserverResidual"
+            result=localTargetObserverResidual(varargin{:});
+        case "exactObserver"
+            result=localExactObserver(varargin{:});
+        case "compactCoupledHold"
+            result=localCompactCoupledHold(varargin{:});
         case "hold"
             result=localHold(varargin{:});
         case "terminalPose"
@@ -20,6 +34,328 @@ function result=nrmmJointEnclosure(action,varargin)
         otherwise
             error('nrmmJointEnclosure:invalidAction','Unknown enclosure operation.');
     end
+end
+
+function phi=localTargetPhi(q,s,domain)
+% The actual globally Lipschitz NRMM extension, evaluated on a shared set.
+    minimum=domain.speedMinimum;
+    if minimum==0,minimum=domain.regularizationSpeedMinimum;end
+    speed=sqrt(max(0,sum(q.^2)));floor=max(speed,minimum);
+    qs=q/max(1,speed/domain.speedMaximum);
+    ss=s/max(1,sqrt(max(0,sum(s.^2)))/domain.accelerationNormBound);
+    along=min(domain.scalarAccelerationMaximum,max(-domain.scalarAccelerationMaximum,sum(qs.*ss)/floor));
+    turn=min(domain.yawRateMaximum,max(-domain.yawRateMaximum, ...
+        sum(([-qs(2);qs(1)]).*ss)/floor^2));
+    phi=-turn^2.*qs+3*along*turn.*([-q(2);q(1)]/floor);
+end
+
+function result=localTargetObserverResidual(target,innovation,rate,design,duration)
+% A two-radius Volterra closure bounds Phi(q(t),s(t))-Phi(q(0),s(0)).
+% Rotation is retained in the signed core. Only its effect on displacement
+% from the initial state enters this local forcing-change bound.
+    domain=design.target.domain;
+    if domain.speedMinimum==0,domain.speedMinimum=domain.regularizationSpeedMinimum;end
+    coefficients=nrmmObserverCertificate('targetLipschitz',domain);
+    lq=coefficients.phiVelocity;ls=coefficients.phiAcceleration;
+    cross=[0,-1;1,0];a=design.target.innovationGains(:);
+    phi=localTargetPhi(target(3:4),target(5:6),design.target.domain);
+    qfield=target(5:6)-rate.*(cross*target(3:4))+a(2)*innovation;
+    sfield=phi-rate.*(cross*target(5:6))+a(3)*innovation;
+    omega=localNormBound(rate);lambda=localNormBound(innovation);
+    % State order: displacement q,s; integral jerk, twice integral,
+    % three times integral; constant one; elapsed time.
+    comparison=zeros(7);comparison(1:2,1:2)=[omega,1;lq,ls+omega];
+    comparison(1:2,6)=[localNormBound(qfield);localNormBound(sfield)];
+    comparison(1:2,7)=abs(a(2:3))*(abs(a(1))+omega)*lambda;
+    comparison(3,1:2)=[lq,ls];comparison(4,3)=1;comparison(5,4)=1;comparison(7,6)=1;
+    value=expm(comparison*duration)*[zeros(5,1);1;0];
+    result=struct('radius',value([5,4,3]),'displacement',value(1:2), ...
+        'comparison',comparison,'phi',phi,'realArithmeticEnclosure',true, ...
+        'floatingPointCertified',false);
+end
+
+function result=localExactObserver(observer,position,velocity,acceleration,rate,pseudo,design,duration,options)
+% Small exact linear maps plus a proved NRMM forcing-change remainder.
+% observer = [position(2); yaw; body velocity(2); target(6); predictor(2)].
+% Sensor readings and pseudo measurements are held during this sensor slab.
+    if nargin<9,options=struct;end
+    if ~isfield(options,'maximumStep'),options.maximumStep=.001;end
+    validateattributes(duration,{'double'},{'scalar','positive','finite'});
+    validateattributes(options.maximumStep,{'double'},{'scalar','positive','finite'});
+    count=max(1,ceil(duration/options.maximumStep));h=duration/count;
+    kv=design.velocity.gain;kp=design.position.gain;gain=design.yaw.correctionBandwidth;
+    a=design.target.innovationGains(:);cross=[0,-1;1,0];
+    value=[observer(4:5);observer(6:11);observer(12:13)-observer(6:7)];
+    force=acceleration+kv*pseudo.body;original=observer;
+    maximum=zeros(3,1);
+    for step=1:count
+        residual=localTargetObserverResidual(value(3:8),value(9:10),rate,design,h);
+        y=[value;force;residual.phi];term=y;sumValue=y;
+        for order=1:14
+            term=h/order*localObserverLinearField(term,rate,kv,a);sumValue=sumValue+term;
+        end
+        omega=localNormBound(rate);
+        scalar=[-kv,0,0,0,0;-1,0,1,0,a(1);0,0,0,1,a(2);0,0,0,0,a(3);0,0,0,0,-a(1)];
+        bound=zeros(14);bound(1:10,1:10)=abs(kron(scalar,eye(2)))+omega*kron(eye(5),abs(cross));
+        bound(1:2,11:12)=eye(2);bound(7:8,13:14)=eye(2);
+        majorant=localAbsBound(y);
+        for order=1:15,majorant=h/order*bound*majorant;end
+        ratio=h/16*bound;
+        assert(max(abs(eig(ratio)))<1,'nrmmJointEnclosure:seriesFailed', ...
+            'The exponential-series remainder requires a smaller certification slab.');
+        tail=(eye(14)-ratio)\majorant;
+        radius=zeros(14,1);radius(3:8)=repelem(residual.radius,2);
+        value=sumValue(1:10)+nrmmSet(zeros(10,1),zeros(10,size(sumValue.generator,2)),tail(1:10)+radius(1:10));
+        maximum=maximum+residual.radius;
+        yaw=observer(3);field=localObserverYaw(yaw,rate,pseudo,gain);
+        % Q's physical norm is <=1; its affine outer box can be wider.
+        % Cover that complete outer box as well. No positive-speed or yaw
+        % contraction premise is used in this scalar integration bound.
+        correspondence=localNormBound(pseudo.rotation);
+        yawRemainder=h^2/2*gain*correspondence*(omega+gain*correspondence);
+        observer(3)=yaw+h*field+nrmmSet(0,zeros(1,size(yaw.generator,2)),yawRemainder);
+    end
+    observer(1:2)=position+duration*velocity+exp(-kp*duration)*(original(1:2)-position);
+    observer(4:5)=value(1:2);observer(6:11)=value(3:8);observer(12:13)=value(3:4)+value(9:10);
+    result=struct('endpoint',observer,'targetLocalRemainderSum',maximum, ...
+        'steps',count,'realArithmeticEnclosure',true,'floatingPointCertified',false, ...
+        'scope',"exact continuous observer flow under one held sensor block");
+end
+
+function value=localObserverLinearField(y,rate,kv,a)
+    cross=[0,-1;1,0];
+    value=[-kv*y(1:2)-rate.*(cross*y(1:2))+y(11:12); ...
+        y(5:6)-y(1:2)-rate.*(cross*y(3:4))+a(1)*y(9:10); ...
+        y(7:8)-rate.*(cross*y(5:6))+a(2)*y(9:10); ...
+        -rate.*(cross*y(7:8))+a(3)*y(9:10)+y(13:14); ...
+        -a(1)*y(9:10)-rate.*(cross*y(9:10));nrmmSet(zeros(4,1))];
+end
+
+function value=localAbsBound(x)
+    [lo,hi]=bounds(x);value=max(abs(lo),abs(hi));
+end
+
+function value=localNormBound(x)
+    value=norm(localAbsBound(x));
+end
+
+function result=localCompactCoupledHold(center,generator,context,options)
+% Construct the full nonlinear joint outer image using separate physical
+% slabs and small observer kernels. This is a research certificate evaluator,
+% not the ordinary affine RTI approximation or a safety claim for that solve.
+    if nargin<4,options=struct;end
+    c=context.contract;h=c.samplePeriod;count=round(context.duration/h);
+    assert(count>=1 && abs(count*h-context.duration)<1e-10);
+    old=size(generator,2);width=old+9*count;
+    symbols=nrmmSet.symbolPool('begin',width);
+    cleanup=onCleanup(@()nrmmSet.symbolPool('restore',symbols));
+    joint=nrmmSet(center,[generator,zeros(35,width-old)]);
+    amplitude=[c.noiseRadius;repmat(c.targetObserver.noiseRadius,2,1)];
+    columns=zeros(9*count,width);
+    for sample=1:count
+        if context.first && sample==1,continue;end
+        rows=9*(sample-1)+(1:9);columns(rows,old+rows)=diag(amplitude);
+    end
+    noise=nrmmSet(zeros(9,count),columns);
+    physical=joint(1:6);observer=[joint(7:11);joint(28:35)];
+    parameters=joint(12:15);previous=joint(16:17);frontend=joint(18:21);target=joint(22:27);
+    input=nrmmSet(context.input);
+    if ~context.first
+        yaw=observer(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
+        referenceRotation=[cos(context.referenceYaw),sin(context.referenceYaw);-sin(context.referenceYaw),cos(context.referenceYaw)];
+        feature=[-rotation*observer(6:7);yaw;observer(4:5)-referenceRotation*rotation*observer(8:9);physical(6)];
+        relative=feature-context.reference;relative(3)=localWrap(relative(3));
+        ego=[observer(1:5);physical(6)]-context.egoReference;ego(3)=localWrap(ego(3));
+        input=input+context.gain*(ego+[nrmmSet(zeros(5,1));noise(7,1)]) ...
+            +context.targetGain*(relative-ego);
+    end
+    [ul,uh]=bounds(input);
+    assert(ul(2)>=-1 && uh(2)<=1,'nrmmJointEnclosure:inputDomain', ...
+        'The complete held causal command must be admissible.');
+    targetEpoch=target;middle=[];inputRadius=radius(input);steps=0;joined=0;
+    for sample=1:count
+        ambiguous=false;withoutReset=observer;
+        if context.first && sample==1
+            m=c.currentMeasurement;
+            position=nrmmSet(m.gnssPosition);velocity=nrmmSet(m.gnssVelocity);
+            acceleration=nrmmSet(m.bodyAcceleration);rate=nrmmSet(m.yawRate);
+            frontend=nrmmSet(c.positionVelocity.point);pseudo=localKnownPseudo(m,c.design);
+            detected=m.radarDetectionAvailable;
+            if detected,observer(12:13)=nrmmSet(m.radarRelativePosition);end
+        else
+            measured=input;if sample==1,measured=previous;end
+            [~,body]=localPlantField(physical,measured,parameters,context.cfg);
+            position=physical(1:2)+noise(1:2,sample);
+            acceleration=body+noise(5:6,sample);rate=physical(6)+noise(7,sample);
+            frontend=frontend+[c.positionVelocity.gain(1)*eye(2);c.positionVelocity.gain(2)*eye(2)]*(position-frontend(1:2));
+            velocity=frontend(3:4);pseudo=localPseudo(velocity,acceleration,rate,measured,c,physical);
+            yaw=physical(3);rotation=[cos(yaw),sin(yaw);-sin(yaw),cos(yaw)];
+            relative=rotation*(target(1:2)-physical(1:2));
+            [rl,rh]=bounds(relative);nearest=max(0,max(rl,-rh));
+            inside=norm(max(abs(rl),abs(rh)))<=context.cfg.collision.encounterRangeMeters;
+            outside=norm(nearest)>context.cfg.collision.encounterRangeMeters;
+            ambiguous=~inside && ~outside;detected=inside || ambiguous;
+            if detected,observer(12:13)=relative+noise(8:9,sample);end
+        end
+        yaw=observer(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
+        inertial=rotation*acceleration;
+        frontend=[frontend(1:2)+h*frontend(3:4)+h^2*inertial/2;frontend(3:4)+h*inertial];
+        design=c.design;if ~detected,design.target.innovationGains(:)=0;end
+        observation=localExactObserver(observer,position,velocity,acceleration,rate,pseudo,design,h,options);
+        if ambiguous
+            noRadar=c.design;noRadar.target.innovationGains(:)=0;
+            alternative=localExactObserver(withoutReset,position,velocity,acceleration,rate,pseudo,noRadar,h,options);
+            difference=(observation.endpoint-alternative.endpoint)/2;
+            average=(observation.endpoint+alternative.endpoint)/2;
+            observation.endpoint=average+nrmmSet(zeros(13,1), ...
+                zeros(13,size(average.generator,2)),localAbsBound(difference));
+            joined=joined+1;
+        end
+        motion=localExactPlant(physical,input,parameters,context.cfg,h,options);
+        physical=motion.endpoint;observer=observation.endpoint;
+        target=localExactTarget(targetEpoch,sample*h,context.targetRearAxleDistance);
+        steps=steps+motion.steps;
+        if 2*sample==count,middle=[physical;target];end
+    end
+    % The continuous theoretical vehicle has no artificial sample-end stop
+    % reset. A discrete implementation wanting that convention must apply
+    % and enclose its reset separately.
+    image=[physical;observer(1:5);parameters;input;frontend;target;observer(6:13)];
+    result=struct('endpoint',image,'midpoint',middle,'input',input,'inputRadius',inputRadius, ...
+        'physicalSteps',steps,'sensorSamples',count,'joinedDetectionSamples',joined, ...
+        'realArithmeticEnclosure',true,'floatingPointCertified',false, ...
+        'futureTargetObserverIncluded',true,'futureTargetFeedbackIncluded',true, ...
+        'scope',"exact continuous Fiala/observer flows and sampled measurements; ambiguous detection histories joined");
+end
+
+function target=localExactTarget(initial,time,lr)
+    speed=initial(4);acceleration=initial(5);[al,ah]=bounds(acceleration);
+    [vl,~]=bounds(speed);assert(vl>=0,'nrmmJointEnclosure:domain','Target speed must be nonnegative.');
+    moving=time;
+    if ah<0
+        moving=min(time,speed/(-acceleration));
+    elseif al<0
+        % Arc is monotone in initial V and A. Retain the initial parameter
+        % family, but use its complete arc range when the stop guard crosses.
+        [vl,vh]=bounds(speed);[al,ah]=bounds(acceleration);arc=zeros(1,2);
+        for j=1:2
+            v=[vl,vh];a=[al,ah];t=time;if a(j)<0,t=min(t,-v(j)/a(j));end
+            arc(j)=v(j)*t+.5*a(j)*t^2;
+        end
+        distance=nrmmSet.range(arc(1),arc(2),size(initial.generator,2));
+    end
+    if ~(al<0 && ah>=0),distance=speed*moving+acceleration*moving^2/2;end
+    curvature=sin(initial(6))/lr;half=curvature*distance/2;
+    target=initial;direction=initial(3)+initial(6)+half;
+    target(1:2)=initial(1:2)+distance*sinc(half)*[cos(direction);sin(direction)];
+    target(3)=initial(3)+2*half;target(4)=max(0,speed+time*acceleration);
+    % Acceleration is a persistent encounter parameter, including after a
+    % stop; only the target's physical forward speed is clipped there.
+end
+
+function result=localExactPlant(state,input,parameters,cfg,duration,options)
+% Centered Taylor enclosure of the EXACT continuous held-input flow.
+% Picard inclusion proves the slab; the explicit state-Jacobian majorant
+% proves its time remainder. Input derivatives are never required, even at
+% full braking. Shared input/parameter generators survive the signed update.
+    if nargin<6,options=struct;end
+    if ~isfield(options,'maximumStep'),options.maximumStep=.001;end
+    validateattributes(duration,{'double'},{'scalar','positive','finite'});
+    validateattributes(options.maximumStep,{'double'},{'scalar','positive','finite'});
+    count=max(1,ceil(duration/options.maximumStep));h=duration/count;
+    remainder=zeros(6,1);iterations=0;lower=Inf(6,1);upper=-lower;
+    accelerationLower=Inf(2,1);accelerationUpper=-accelerationLower;
+    for step=1:count
+        [xl,xh]=bounds(state);lo=xl;hi=xh;accepted=false;
+        for iteration=1:24
+            box=nrmmSet.range(lo,hi);
+            [field,acceleration]=localPlantField(box,input,parameters,cfg);
+            [fl,fh]=bounds(field);
+            il=xl+h*min(0,fl);ih=xh+h*max(0,fh);
+            if all(il>=lo & ih<=hi),accepted=true;break;end
+            lo=min(lo,il);hi=max(hi,ih);
+            pad=.1*(hi-lo)+1e-12;lo=lo-pad;hi=hi+pad;
+        end
+        assert(accepted,'nrmmJointEnclosure:picardFailed', ...
+            'The complete physical hold could not be enclosed in its model domain.');
+        iterations=iterations+iteration;lower=min(lower,lo);upper=max(upper,hi);
+        [al,ah]=bounds(acceleration);
+        accelerationLower=min(accelerationLower,al);accelerationUpper=max(accelerationUpper,ah);
+        slope=localStateSlope(box,input,parameters,cfg);
+        localRemainder=h^2/2*slope*max(abs(fl),abs(fh));
+        state=state+h*localPlantField(state,input,parameters,cfg) ...
+            +nrmmSet(zeros(6,1),zeros(6,size(state.generator,2)),localRemainder);
+        remainder=remainder+localRemainder;
+    end
+    result=struct('endpoint',state,'slab',nrmmSet.range(lower,upper), ...
+        'acceleration',nrmmSet.range(accelerationLower,accelerationUpper), ...
+        'localRemainderSum',remainder,'steps',count,'picardIterations',iterations, ...
+        'realArithmeticEnclosure',true,'floatingPointCertified',false, ...
+        'scope',"exact continuous held-input physical flow; no discrete stop reset");
+end
+
+function slope=localStateSlope(x,u,parameters,cfg)
+% Explicit componentwise |D_x f| bound on the COMPLETE admitted box.
+% Fiala is globally 1-Lipschitz in stress C*t and capacity Q; Q is held
+% during a physical segment. There is no division by sqrt(1-b^2).
+    [lo,hi]=bounds(x);[ul,uh]=bounds(u);[pl,ph]=bounds(parameters);
+    assert(all(pl>-1),'nrmmJointEnclosure:domain','Physical tire factors must remain positive.');
+    v=max(abs([lo(4),hi(4)]));vy=max(abs([lo(5),hi(5)]));r=max(abs([lo(6),hi(6)]));
+    mass=cfg.vehicle.m;lf=cfg.vehicle.lf;lr=cfg.vehicle.lr;iz=cfg.vehicle.Iz;
+    load=localLoadSlope(v,cfg);range=cfg.model.kinematicSpeedRange;
+    normal=mass*cfg.vehicle.gravity/(lf+lr)*[lr;lf];
+    scale=cfg.tire.frictionCoefficient.*(1+ph(3:4)).*normal;
+    stiff=cfg.tire.corneringStiffness.*(1+ph(1:2));
+    lag=cfg.model.kinematicLagSeconds;hold=cfg.model.brakeHoldSpeed;
+    [~,tangent]=bounds(abs(tan(u(1))));
+    kin=[(sum(scale)/hold+load)/mass,r,vy; ...
+        lr*tangent/((lf+lr)*lag),1/lag,0; ...
+        tangent/((lf+lr)*lag),0,1/lag];
+    if lo(4)>=range(2) || hi(4)>range(1)
+        % Only the portion where the dynamic branch is used needs its chart.
+        dynamic=x;dynamic(4)=nrmmSet.range(max(lo(4),range(1)),hi(4));
+        vmin=max(lo(4),range(1));
+        slip=[atan((dynamic(5)+lf*dynamic(6))/dynamic(4))-u(1); ...
+            atan((dynamic(5)-lr*dynamic(6))/dynamic(4))];
+        [al,ah]=bounds(slip);
+        assert(all(al>-pi/2 & ah<pi/2),'nrmmJointEnclosure:domain', ...
+            'A state derivative certificate requires the complete tire chart.');
+        alpha=max(abs(al),abs(ah));gain=stiff./cos(alpha).^2;
+        tire=gain.*[(vy+[lf;lr]*r)/vmin^2,ones(2,1)/vmin,[lf;lr]/vmin];
+        [~,sine]=bounds(abs(sin(u(1))));[~,cosine]=bounds(abs(cos(u(1))));
+        dyn=[sine*tire(1,:)/mass+[load/mass,r,vy]; ...
+            (cosine*tire(1,:)+tire(2,:))/mass+[r,0,v]; ...
+            (lf*cosine*tire(1,:)+lr*tire(2,:))/iz];
+        if lo(4)>=range(2)
+            body=dyn;
+        else
+            body=max(kin,dyn);
+            % Product rule for the smooth transition; this is a model
+            % derivative bound, not a new tire/actuator constraint.
+            [f,~]=localFiala(dynamic,u, ...
+                cfg.tire.frictionCoefficient.*(1+parameters(3:4)).*normal, ...
+                cfg.tire.corneringStiffness.*(1+parameters(1:2)),cfg);
+            [k,~]=localKinematic(dynamic,u, ...
+                cfg.tire.frictionCoefficient.*(1+parameters(3:4)).*normal,cfg);
+            [dl,dh]=bounds(f-k);
+            body(:,1)=body(:,1)+1.5/(range(2)-range(1))*max(abs(dl),abs(dh));
+        end
+    else
+        body=kin;
+    end
+    slope=zeros(6);slope(1:2,3)=v+vy;slope(1:2,4:5)=1;
+    slope(3,6)=1;slope(4:6,4:6)=body;
+    assert(all(isfinite(slope),'all') && ul(2)>=-1 && uh(2)<=1, ...
+        'nrmmJointEnclosure:domain','A finite whole-domain state slope is required.');
+end
+
+function bound=localLoadSlope(speed,cfg)
+    r=cfg.roadLoad;
+    coefficient=abs(r.rollingCoefficient)+abs(r.rollingSpeedCoefficient)*speed ...
+        +abs(r.rollingQuarticCoefficient)*speed^4;
+    derivative=abs(r.rollingSpeedCoefficient)+4*abs(r.rollingQuarticCoefficient)*speed^3;
+    bound=abs(r.airDensity*r.dragCoefficient*r.frontalArea)*speed ...
+        +cfg.vehicle.m*cfg.vehicle.gravity*(derivative+coefficient/r.rollingTransitionSpeed);
 end
 
 function result=localAccelerationHold(state,input,parameters,cfg,duration)

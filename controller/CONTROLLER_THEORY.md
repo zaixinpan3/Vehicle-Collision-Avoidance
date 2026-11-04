@@ -2770,12 +2770,227 @@ selected shared-generator/support propagation and a nested root update.
 For fixed comparison dimension \(d\), fixed generator budget and fixed
 sensor/control ratio, the radius propagation costs \(O(Nd^2)\). This is
 neither a complexity claim for the optimization nor a measured speedup.
-The sampled scalar/two-state maps above are derived explicitly; a tight,
-uniform full-domain physical/observer coupling and a representable terminal
-append remain admission requirements for a certified full-vehicle version.
-Current RTI and its joint-affine predictor have not been switched to these
-maps, and no new full-vehicle safety or real-time claim follows from this
-theoretical reduction.
+The evaluator below supplies constructive physical/observer remainders
+instead of unknown whole-domain Jacobian constants. Tightness is tested at
+admission. The compatible terminal family remains the terminal assumption
+of Theorem C.
+
+<a id="compact-constructive-enclosure"></a>
+### Constructive nonlinear transition certificates
+
+**Finite force increments, including full braking.** Put
+\(\sigma(b)=\sqrt{1-b^2}\), \(s=C\tan\alpha\), \(Q=\mu F_z\sigma\), and
+\[
+ T(s,Q)=-\operatorname{sgn}(s)Q
+ \{1-[1-\min(|s|/(3Q),1)]^3\},\qquad T(s,0)=0 .
+\]
+For \(Q>0\), with \(z=\min(|s|/(3Q),1)\),
+\[
+ T_s=-(1-z)^2,\quad T_Q=-\operatorname{sgn}(s)z^2(3-2z),
+ \quad |T(s,Q)-T(\bar s,\bar Q)|\le|\Delta s|+|\Delta Q|.      \tag{D1}
+\]
+The increment bound follows by integrating the two partial derivatives,
+both bounded by one, then taking the continuous extension at \(Q=0\).
+For a braking interval, extrema of \(b^2\) occur at its endpoints and,
+when included, zero. Taking square roots of \(1-b^2\) gives its exact
+availability range. Use that finite range at saturation, rather than an
+infinite braking derivative. Share one \(\sigma\) between axles and retain
+the same persistent \(C_f,C_r,\mu_f,\mu_r\). The identity \(|T|\le Q\)
+tightens the formula's image; it introduces no extra friction constraint.
+
+If \(Q\ge Q_{\min}>0\), a sharper optional centered remainder is
+\[
+ |R_T|\le {|\Delta s|^2\over3Q_{\min}}
+ +{|\Delta s\,\Delta Q|\over2Q_{\min}}
+ +{4|\Delta Q|^2\over9Q_{\min}}.                            \tag{D2}
+\]
+This uses bounds \(2/(3Q_{\min}),1/(2Q_{\min}),8/(9Q_{\min})\) on
+the second partials; the first derivative is Lipschitz across the joins.
+A sign-fixed, fully saturated force is exactly linear in \(Q\).
+
+**Explicit state derivatives and exact physical flow.** Input and
+parameters are held, so a time-integration remainder needs only \(D_xf\).
+On a slab with \(v_x\ge v_*>0\), \(|v_y|\le Y\), \(|r|\le R\),
+\(|v_x|\le V\), and \(|\alpha_j|\le\alpha_{j,*}<\pi/2\), define
+\[
+ D_j=C_{j,\max}\sec^2\alpha_{j,*}
+ [(Y+l_jR)/v_*^2,\ 1/v_*,\ l_j/v_*].
+\]
+These bound tire state derivatives directly from (D1) and the slip formula.
+With \(s_\delta,c_\delta\) bounding absolute steering sine and cosine,
+the body-state Jacobian has the componentwise majorant
+\[
+ L_b=\begin{bmatrix}
+ s_\delta D_f/m+[L_{\rm load}/m,R,Y]\\
+ (c_\delta D_f+D_r)/m+[R,0,V]\\
+ (l_fc_\delta D_f+l_rD_r)/I_z
+ \end{bmatrix}.                                             \tag{D3}
+\]
+For the actual load
+\(\ell(v)=\rho C_d A v|v|/2+
+ mg(c_0+c_1|v|+c_4|v|^4)\tanh(v/v_0)\), use
+\[
+ L_{\rm load}=|\rho C_d A|V+
+ mg[|c_1|+4|c_4|V^3+(|c_0|+|c_1|V+|c_4|V^4)/v_0].
+\]
+Pose rows are bounded by \(L_{1:2,3}=V+Y\),
+\(L_{1:2,4:5}=1,L_{3,6}=1\). The low-speed formula is differentiated
+directly. Across its cubic blend add
+\(1.5|f_{\rm Fiala}-f_{\rm kin}|e_{v_x}^T/(v_2-v_1)\) to the
+componentwise maximum of the two branch bounds. Evaluate the dynamic branch
+only on its actual positive-speed domain. These are finite arithmetic
+expressions implemented by the stateSlope action of nrmmJointEnclosure.
+
+For an initial set \(X\), one held causal command \(U\), and persistent
+parameters \(\Theta\), certify a slab box \(Z\) satisfying
+\[
+ X+[0,d]f(Z,U,\Theta)\subseteq Z .
+\]
+Let \(F\ge|f(Z,U,\Theta)|\) and \(L\ge|D_xf|\) be the bounds above. Then
+\[
+ F_d(X,U,\Theta)\subseteq X+d f(X,U,\Theta)
+                   +[-r_d,r_d],\quad r_d=\tfrac12d^2LF.       \tag{D4}
+\]
+The Picard inclusion proves containment throughout the slab. The remainder
+is \(\int_0^d(d-t)D_xf\,f\,dt\), valid almost everywhere through smooth
+blend/saturation joins. Thus (D4) covers the exact ODE, not just an RK step.
+At full braking the held state derivative is finite. Expand or subdivide
+the certification slab until inclusion succeeds; reject an unresolved
+domain. Subdivision creates no new control decision or sensor measurement.
+The exactPlant action implements this rule.
+
+Evaluate the signed affine expression \(X+d f(X,U,\Theta)\) before taking
+supports. In particular compute \(U=\kappa(\hat c_i)\) once from the
+joint decision-boundary set and retain it throughout the hold. Shared
+state/feedback columns then cancel before norm bounds, as required by (C3).
+The residual bound is not a replacement open-loop propagation of those
+columns.
+
+**Small observer kernels with a complete nonlinear remainder.** During
+one held sensor block use
+\(y=(\hat v,\hat\rho,\hat q,\hat s,\lambda)\), where
+\(\lambda=y_{\rm predictor}-\hat\rho\). Its equations are
+\[
+ \dot y=\mathcal A y+\mathcal B[a_m+k_v\tilde v;\Phi_e(\hat q,\hat s)],
+ \quad\mathcal A=A_s\otimes I_2-I_5\otimes\omega_mJ,
+\quad A_s=\begin{bmatrix}
+ -k_v&0&0&0&0\\-1&0&1&0&a_1\\0&0&0&1&a_2\\
+ 0&0&0&0&a_3\\0&0&0&0&-a_1
+ \end{bmatrix}.                                             \tag{D5}
+\]
+\(\mathcal B\) injects its vector inputs into blocks one and four.
+On detection reset \(\lambda=y_{\rm radar}-\hat\rho\), one shared
+expression. Without detection retain it and set all innovation gains to
+zero. The only nonlinear forcing in (D5) is the actual saturated NRMM map.
+
+Freeze that forcing at the slab's initial state for the center map only.
+Let the already proved global NRMM Lipschitz coefficients be \(L_q,L_s\),
+\(\Omega\ge|\omega_m|\), and \(\Lambda\ge\|\lambda(0)\|\).
+Displacements from the initial target estimate satisfy the positive system
+\[
+ \dot d\le
+ \begin{bmatrix}\Omega&1\\L_q&L_s+\Omega\end{bmatrix}d+
+ [\|\dot{\hat q}(0)\|;\|\dot{\hat s}(0)\|]
+ +t[|a_2|;|a_3|](a_1+\Omega)\Lambda,\quad d(0)=0.             \tag{D6}
+\]
+Initial derivatives are whole-set evaluations of (D5), not sampled maxima.
+The last term follows from the exact decaying innovation.
+With \(j(t)=[L_q,L_s]d(t)\), the endpoint forcing remainder in
+\((\hat\rho,\hat q,\hat s)\), in vector norms, is bounded by
+\[
+ \left[\int_0^d{(d-t)^2\over2}j(t)\,dt;\
+       \int_0^d(d-t)j(t)\,dt;\
+       \int_0^d j(t)\,dt\right].                            \tag{D7}
+\]
+One seven-dimensional matrix exponential evaluates (D6)--(D7), including
+constant and time coordinates. Rotations have norm one, so no additional
+exponential factor is needed. This is targetObserverResidual.
+
+The exactObserver action also covers uncertainty in held gyro. Append the
+constant forcing to the state in (D5), apply the exponential series to
+shared affine variables, and bound its tail after order \(p\) by
+\[
+ (I-d\widehat A/(p+2))^{-1}
+ {(d\widehat A)^{p+1}\over(p+1)!}|y_{\rm augmented}(0)|,       \tag{D8}
+\]
+where \(\widehat A\ge|\mathcal A_{\rm augmented}|\) and
+\(\rho(d\widehat A/(p+2))<1\). Later Taylor factors are bounded by that
+nonnegative ratio matrix. Subdivide if the test fails.
+The published-position map is exactly
+\[
+ \hat p(d)=p_m+d\hat v_I+e^{-k_pd}(\hat p(0)-p_m).
+\]
+For \(\dot{\hat\psi}=\omega_m+
+k_\psi(Q_2\cos\hat\psi-Q_1\sin\hat\psi)\), with
+\(\|Q\|\le Q_*\), its centered Euler remainder is bounded by
+\[
+ \tfrac12 d^2 k_\psi Q_*(|\omega_m|+k_\psi Q_*).              \tag{D9}
+\]
+This also covers standstill. A true correspondence has norm at most one;
+its affine outer set may require a larger \(Q_*\). No yaw contraction is
+assumed. Certification subdivisions inherit the original innovation and
+held measurements.
+
+**The forcing coefficients are computed from the same physical branch.**
+At actual sensor events evaluate
+\(a_B=(\dot v_x-rv_y,\dot v_y+rv_x)^T\) using the same state, command,
+and persistent tire variables. Add each position, IMU, gyro, and radar
+noise once. Apply the actual position/IMU filter reset and construct the
+nominal force-balance pseudo measurement through its finite, clamped
+inverse. Interval bisection retains both possibilities for an unresolved
+predicate. There is no new independent tire-mismatch input in the observer.
+The inverse and the product-normalized yaw correspondence already have
+whole-domain arithmetic in nrmmJointEnclosure.
+
+The boundary IMU uses the previous command, whereas (D4) uses the newly
+issued command. Thus the acceleration jump
+\(a_B(x,u^+,\theta)-a_B(x,u^-,\theta)\) is included explicitly, with
+the same \(\theta\). Future target poses use the analytic constant-curvature
+flow, persistent encounter parameters, and forward stopping. This remains
+a controller prediction convention, not a new standalone-observer premise.
+
+**Transition-containment proposition.** Suppose the root set contains
+the true physical states, observer memories and persistent parameters;
+the sensor-noise bounds hold; the held causal input is admissible; and the
+whole-domain/slab tests above succeed. Compose sensor resets, the
+position-filter map, (D4)--(D9), and the analytic target flow. At an
+ambiguous perception guard propagate both detection outcomes and join
+their observer images. The result encloses every exact continuous
+plant/observer realization at the next decision.
+
+Proof is induction over the actual sensor events. Each reset is an outer
+image with shared primitives; (D4) encloses the physical flow; (D6)--(D8)
+bound all target-observer forcing changes; (D9) and the exact position
+formula cover the remaining observer blocks. Inputs are held, so later
+measurements do not change earlier physical motion. Persistent parameters
+are copied. Every composition therefore preserves inclusion. Fixed current
+observer memory makes the first command common.
+
+The executable constructor is the compactEnclosure action of
+nrmmJointPrediction, delegating to compactCoupledHold in nrmmJointEnclosure.
+A set crossing the perception guard has both observer continuations
+enclosed. For affine images \(A,B\), the join
+\((A+B)/2+[-r,r]\), \(r\ge|(A-B)/2|\), contains both images
+with their shared primitive assignments. Joining loses some correlation
+but cannot discard a possible detection history.
+Its vehicle is the continuous theoretical model, without the engineering
+sample-end velocity reset. Its certificate supplies the transition
+inclusion of Theorem C. With the inherited-domain restriction (C12) and
+the assumed compatible terminal append, that theorem gives recursive
+feasibility and nonincreasing deficit. Small width, universal admission,
+global yaw contraction, and finite-time zero deficit do not follow.
+
+**Online approximation.** The ordinary RTI predictor now uses the signed
+core (D5) for future virtual sensor holds. A fourth-order integrating-factor
+Runge--Kutta update resolves the NRMM forcing on short slabs; its analytic
+derivative includes the held gyro in the exponential. Freezing that forcing
+for an entire virtual hold is not used. The first successor retains
+the complete runtime observer and sensor block. The configuration field
+controller.compactObserverPrediction selects this specialization.
+It omits (D4), (D7)--(D9) as optimization tightenings, so its nonlinear
+certificate flags remain false. The separate exact evaluator includes
+those terms and claims real-arithmetic enclosure only; MATLAB arithmetic
+is not a directed-rounding certificate.
 
 ### The explicit route from theory to SQP-RTI
 

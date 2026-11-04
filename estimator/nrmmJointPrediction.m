@@ -23,6 +23,8 @@ function value = nrmmJointPrediction(action,varargin)
             value=localCoupledRoot(varargin{:});
         case "coupledPropagate"
             value=localCoupledPropagate(varargin{:});
+        case "compactEnclosure"
+            value=nrmmJointEnclosure('compactCoupledHold',varargin{:});
         case "coupledLinearize"
             [point,matrix,noise,branch]=localCoupledLinearize(varargin{:});
             value=struct('point',point,'matrix',matrix,'noise',noise,'branch',branch);
@@ -31,6 +33,9 @@ function value = nrmmJointPrediction(action,varargin)
         case "observerRk4"
             % Numeric core shared by MATLAB and the optional generated MEX.
             [point,gradient]=localObserverRk4(varargin{:});
+            value=struct('point',point,'gradient',gradient);
+        case "observerCompact"
+            [point,gradient]=localObserverCompact(varargin{:});
             value=struct('point',point,'gradient',gradient);
         case "posteriorOuter"
             value=localPosteriorOuter(varargin{:});
@@ -424,6 +429,7 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
         'scope',"joint affine maps along the RTI shooting reference; nonlinear remainders not certified", ...
         'mode',"causalObserverFeedback",'time',[0,cumsum(durations)], ...
         'predictionSensorSamples',round(durations/contract.samplePeriod), ...
+        'compactObserverStages',false(1,count), ...
         'mixedStopBranches',false(1,count));
     tube.generator{1}=initialGenerator;
     tube.physicalRadius(:,1)=sum(abs(initialGenerator),2);
@@ -757,7 +763,10 @@ function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
     measurement=struct('bodyAcceleration',input.bodyAcceleration,'yawRate',input.yawRate, ...
         'gnssVelocity',input.gnssVelocity,'radarDetectionAvailable',false);
     if numel(point)>5,measurement.radarDetectionAvailable=input.radarDetectionAvailable;end
-    if exist('nrmmJointObserverKernelMex','file')==3
+    if isfield(contract,'compactObserverFlow') && contract.compactObserverFlow
+        [state,gradient]=localObserverCompact(state,gradient,measurement,dm,pseudo,dpseudo, ...
+            kernelDesign,contract.samplePeriod);
+    elseif exist('nrmmJointObserverKernelMex','file')==3
         result=nrmmJointObserverKernelMex(state,gradient,measurement,dm,pseudo,dpseudo, ...
             kernelDesign,contract.integrationStep,contract.integrationSubstepCount);
         state=result.point;gradient=result.gradient;
@@ -768,6 +777,84 @@ function [point,dpoint]=localObserverTangent(point,dpoint,input,dm,contract)
     indices=[3,4,7,1,2];
     if numel(state)>7,indices=[indices,8:15];end
     point=state(indices);dpoint=gradient(indices,:);
+end
+
+function [state,gradient]=localObserverCompact(state,gradient,input,dm,pseudo,dpseudo,design,period)
+% Integrate the stable linear observer core as a small signed semigroup.
+% The target innovation lambda = predictor-rho has its OWN exact decay.
+% Only Phi_e needs nonlinear stages (fourth-order integrating-factor RK).
+% This engineering map is not a nonlinear enclosure. The first hold uses
+% the runtime observer, with its complete received sensor block.
+    if numel(state)==7
+        [state,gradient]=localObserverRk4(state,gradient,input,dm,pseudo,dpseudo,design,period/4,4);
+        return
+    end
+    n=size(gradient,2);cross=[0,-1;1,0];kv=design.velocity.gain;kp=design.position.gain;
+    a=design.target.innovationGains(:);
+    if ~input.radarDetectionAvailable,a(:)=0;end
+    scalar=[-kv,0,0,0,0;-1,0,1,0,a(1);0,0,0,1,a(2);0,0,0,0,a(3);0,0,0,0,-a(1)];
+    spin=kron(eye(5),cross);matrix=zeros(12);
+    matrix(1:10,1:10)=kron(scalar,eye(2))-input.yawRate*spin;
+    matrix(1:2,11:12)=eye(2);gyroMatrix=zeros(12);gyroMatrix(1:10,1:10)=-spin;
+    count=max(1,ceil(period/.0125));h=period/count;
+    % A small exponential and its Frechet derivative. The held body force
+    % is appended as a constant state, so its response is also exact.
+    half=eye(12);dhalf=zeros(12);term=eye(12);dterm=zeros(12);
+    for order=1:40
+        dterm=(dterm*matrix+term*gyroMatrix)*(h/(2*order));
+        term=term*(h/(2*order)*matrix);half=half+term;dhalf=dhalf+dterm;
+        if order>=8 && norm(term,Inf)<1e-15*max(1,norm(half,Inf)),break;end
+    end
+    assert(order<40,'nrmmJointPrediction:compactSeries','The observer semigroup series did not converge.');
+    force=input.bodyAcceleration+kv*pseudo(1:2);dforce=dm(5:6,:)+kv*dpseudo(1:2,:);
+    value=[state(1:2);state(8:13);state(14:15)-state(8:9);force];
+    derivative=[gradient(1:2,:);gradient(8:13,:);gradient(14:15,:)-gradient(8:9,:);dforce];
+    full=half*half;dfull=dhalf*half+half*dhalf;gyro=dm(7,:);
+    for step=1:count
+        [f1,d1]=localCompactJerk(value,derivative,design);
+        middle=half*value;dmiddle=half*derivative+dhalf*value*gyro;
+        next=full*value;dnext=full*derivative+dfull*value*gyro;
+        z=middle+h/2*half*f1;dz=dmiddle+h/2*(half*d1+dhalf*f1*gyro);
+        [f2,d2]=localCompactJerk(z,dz,design);
+        [f3,d3]=localCompactJerk(middle+h/2*f2,dmiddle+h/2*d2,design);
+        [f4,d4]=localCompactJerk(next+h*half*f3,dnext+h*(half*d3+dhalf*f3*gyro),design);
+        value=next+h/6*(full*f1+2*half*(f2+f3)+f4);
+        derivative=dnext+h/6*(full*d1+dfull*f1*gyro ...
+            +2*half*(d2+d3)+2*dhalf*(f2+f3)*gyro+d4);
+    end
+    state(1:2)=value(1:2);gradient(1:2,:)=derivative(1:2,:);
+    state(8:13)=value(3:8);gradient(8:13,:)=derivative(3:8,:);
+    state(14:15)=value(3:4)+value(9:10);
+    gradient(14:15,:)=derivative(3:4,:)+derivative(9:10,:);
+    decay=exp(-kp*period);
+    state(3:4)=state(5:6)+period*input.gnssVelocity+decay*(state(3:4)-state(5:6));
+    gradient(3:4,:)=gradient(5:6,:)+period*dm(3:4,:)+decay*(gradient(3:4,:)-gradient(5:6,:));
+    state(5:6)=state(5:6)+period*input.gnssVelocity;gradient(5:6,:)=gradient(5:6,:)+period*dm(3:4,:);
+    % The scalar yaw equation is cheap and retains its actual nonlinear
+    % position-only velocity correspondence, including vanishing speed.
+    yaw=state(7);dyaw=gradient(7,:);h=period/max(4,count);
+    for step=1:max(4,count)
+        [f1,d1]=localCompactYaw(yaw,dyaw,input,dm,pseudo,dpseudo,design);
+        [f2,d2]=localCompactYaw(yaw+h*f1/2,dyaw+h*d1/2,input,dm,pseudo,dpseudo,design);
+        [f3,d3]=localCompactYaw(yaw+h*f2/2,dyaw+h*d2/2,input,dm,pseudo,dpseudo,design);
+        [f4,d4]=localCompactYaw(yaw+h*f3,dyaw+h*d3,input,dm,pseudo,dpseudo,design);
+        yaw=yaw+h*(f1+2*f2+2*f3+f4)/6;dyaw=dyaw+h*(d1+2*d2+2*d3+d4)/6;
+    end
+    state(7)=atan2(sin(yaw),cos(yaw));gradient(7,:)=dyaw;
+    assert(size(gradient,2)==n);
+end
+
+function [value,derivative]=localCompactJerk(state,gradient,design)
+    [jac,phi]=nrmmObserverVectorField('targetJacobian','evaluate',state(5:6),state(7:8),design.target.domain);
+    value=zeros(12,1);value(7:8)=phi;
+    derivative=zeros(size(gradient));derivative(7:8,:)=jac*gradient(5:8,:);
+end
+
+function [value,derivative]=localCompactYaw(yaw,dyaw,input,dm,pseudo,dpseudo,design)
+    vector=pseudo(3:4);gain=design.yaw.correctionBandwidth;
+    value=input.yawRate+gain*(vector(2)*cos(yaw)-vector(1)*sin(yaw));
+    derivative=dm(7,:)+gain*([-sin(yaw),cos(yaw)]*dpseudo(3:4,:) ...
+        -(vector(2)*sin(yaw)+vector(1)*cos(yaw))*dyaw);
 end
 
 function [state,gradient]=localObserverRk4(state,gradient,input,dm,pseudo,dpseudo,design,h,count)
@@ -1010,6 +1097,7 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
             'duration',durations(k),'first',k==1, ...
             'targetRearAxleDistance',target(7));
         context.contract=localPredictionContract(contract,cfg,durations(k),k==1);
+        tube.compactObserverStages(k)=isfield(context.contract,'compactObserverFlow') && context.contract.compactObserverFlow;
         tube.predictionSensorSamples(k)=round(durations(k)/context.contract.samplePeriod);
         reuse=localReuseJointModel(cache,center,context,k);
         if reuse
@@ -1119,6 +1207,7 @@ function prediction=localPredictionContract(contract,cfg,duration,first)
     prediction.integrationSubstepCount=ceil(prediction.samplePeriod/contract.integrationStep);
     prediction.integrationStep=prediction.samplePeriod/prediction.integrationSubstepCount;
     prediction.predictionInverseTolerance=cfg.controller.jointPredictionInverseTolerance;
+    prediction.compactObserverFlow=cfg.controller.compactObserverPrediction;
 end
 
 function tube=localCoupledRecord(tube,index,~,~,ge,gt)
