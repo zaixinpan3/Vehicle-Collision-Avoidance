@@ -15,6 +15,8 @@ function value = nrmmJointPrediction(action,varargin)
 % of the declared sampled map (real arithmetic, not a complete safety proof).
 % No current observer budget is reset in the horizon.
     switch string(action)
+        case "momentFactor"
+            value=localMomentFactor(varargin{:});
         case "contract"
             value=localContract(varargin{:});
         case "conditionCoupled"
@@ -1045,6 +1047,9 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
         root=localCoupledRoot(anchor.states(:,1),initialGenerator,contract,target,errorSet);
     end
     count=size(anchor.inputs,2);center=root.center;generator=root.generator;
+    moment=cfg.controller.jointMomentPrediction && string(cfg.solver.method)=="rti" ...
+        && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction;
+    if moment,generator=localMomentFactor(generator);end
     inputRoom=inf(2,count);
     if nargin>=9 && isfield(options,'feedbackInputRadius'),inputRoom=options.feedbackInputRadius;end
     gains=localFeedback(anchor,cfg,durations);targetGains=zeros(size(gains));records=2*count+1;
@@ -1064,6 +1069,14 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
         'time',[0,cumsum(durations)],'root',root, ...
         'predictionSensorSamples',round(durations/contract.samplePeriod), ...
         'scope',"shared nonlinear joint rollout and local tangents; no certified nonlinear remainder");
+    tube.momentApproximation=moment;
+    tube.representation="boundedGenerators";
+    if moment
+        tube.representation="jointShapeFactor";
+        tube.scope="fixed-dimensional joint second-moment surrogate; no set containment or probability guarantee";
+        tube.persistentParameterColumns=[]; % Refactored columns have no permanent labels.
+        tube.persistentParameterCoordinates=[12:15,26:27];
+    end
     tube=localCoupledRecord(tube,1,center(1:6),center(22:27),generator(1:6,:),generator(22:27,:));
     tube.mean(:,1)=center;
     tube.observerErrorRadius(:,1)=localEgoError(center,generator);
@@ -1111,8 +1124,21 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
         raw=[branch.beforeResetMatrix*generator,branch.beforeResetNoise];
         [point,propagated,mixed]=localResetEnvelope(branch.beforeResetPoint,raw,cfg);
         tube.mixedStopBranches(k)=mixed;
+        % The feedback authority was selected in the incoming factor's box.
+        % A Gramian refactor preserves quadratic information but can enlarge
+        % its L1 input support. Keep that actual mapped support; refactoring
+        % must not invent extra actuator demand after gain allocation.
+        inputGenerator=propagated(48:49,:);
+        if moment
+            if k==1
+                measured=[[branch.measurementMatrix*generator,branch.measurementNoise], ...
+                    zeros(numel(branch.measurementCenter),size(propagated,2)-size(raw,2))];
+                blockShape=localMomentFactor([propagated(1:35,:);measured]);
+            end
+            propagated=localMomentFactor(propagated);
+        end
         tube.transition{k}=matrix(1:35,:);tube.noiseMap{k}=noise(1:35,:);
-        tube.inputGenerator{k}=propagated(48:49,:);
+        tube.inputGenerator{k}=inputGenerator;
         tube.inputRadius(:,k)=sum(abs(tube.inputGenerator{k}),2);
         tube=localCoupledRecord(tube,2*k,point(36:41),point(42:47), ...
             propagated(36:41,:),propagated(42:47,:));
@@ -1120,19 +1146,24 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
             propagated(1:6,:),propagated(22:27,:));
         if k==1
             tube.firstSuccessor=struct('center',point(1:35),'generator',propagated(1:35,:), ...
-                'measurementCenter',branch.measurementCenter, ...
-                'measurementGenerator',[[branch.measurementMatrix*generator,branch.measurementNoise], ...
-                    zeros(numel(branch.measurementCenter),size(propagated,2)-size(raw,2))], ...
-                'mixedStopBranch',mixed, ...
+                'measurementCenter',branch.measurementCenter,'mixedStopBranch',mixed, ...
                 'time',contract.time+durations(k),'sampleTimes',contract.time+branch.sampleTimes, ...
                 'contract',contract,'appliedInput',anchor.inputs(:,1), ...
                 'parameterColumns',root.parameterColumns,'nonlinearCertificate',false);
+            if moment
+                tube.firstSuccessor.jointShapeFactor=blockShape;
+                tube.firstSuccessor.parameterColumns=find(any(propagated(12:15,:),1));
+            else
+                tube.firstSuccessor.measurementGenerator=[[branch.measurementMatrix*generator,branch.measurementNoise], ...
+                    zeros(numel(branch.measurementCenter),size(propagated,2)-size(raw,2))];
+            end
         end
         % Transport the expansion point, not physical uncertainty, to the
         % RTI shooting reference. Keep target world motion and observer bias.
         next=point(1:35);
         [next,transport]=localCoupledReanchor(next,anchor.states(:,k+1));
         generator=transport*propagated(1:35,:);center=next;
+        if moment,generator=localMomentFactor(generator);end
         tube.mean(:,k+1)=center;gains(:,:,k)=gain;targetGains(:,:,k)=targetGain;
         tube.observerErrorRadius(:,k+1)=localEgoError(center,generator);
         tube.targetObserverErrorRadius(:,k+1)=localTargetError(center,generator,target(7));
@@ -1140,7 +1171,7 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
     tube.feedbackGain=gains;tube.targetFeedbackGain=targetGains;tube.finalJointGenerator=generator;
     tube.firstInputRadius=tube.inputRadius(:,1);tube.egoStateRadius=tube.physicalRadius;
     tube.observerErrorTime=tube.time;
-    if any(~tube.refreshedJointModel)
+    if ~moment && any(~tube.refreshedJointModel)
         tube.scope="scheduled joint affine prediction with current causal feedback; no certified nonlinear remainder";
     end
 end
@@ -1420,16 +1451,20 @@ function target=localTargetPoint(initial,h,lr)
     target(5)=initial(5);
 end
 
-function result=localConditionCoupled(prior,current,contract,maximumColumns)
+function result=localConditionCoupled(prior,current,contract,maximumColumns,moment)
     if nargin<4,maximumColumns=4096;end
-    % Restrict the affine first-successor history with the ENTIRE sensor block.
-    % The constrained primitive set is retained explicitly. Its compressed
-    % outer proposal is numerical: no nonlinear containment is claimed.
+    if nargin<5,moment=false;end
+    % Use the ENTIRE received sensor block. The generator reference retains
+    % its affine primitive intersection; moment mode uses block regression.
+    % Neither engineering update claims nonlinear containment or nesting.
     diagnostic=struct('method',"completeSensorBlockAffineIntersection", ...
         'accepted',false,'sampleCount',0,'usedAllSamples',false, ...
         'nonlinearCertificate',false,'reason',"missingPrior");
     result=struct('root',current,'diagnostics',diagnostic,'posterior',[]);
     if isempty(prior),return;end
+    if ~moment && isfield(prior,'jointShapeFactor')
+        result.diagnostics.reason="jointRepresentationChanged";return;
+    end
     if ~isequaln(prior.contract.targetObserver.identifier,contract.targetObserver.identifier)
         result.diagnostics.reason="targetIdentityChanged";return;
     end
@@ -1456,7 +1491,7 @@ function result=localConditionCoupled(prior,current,contract,maximumColumns)
         result.diagnostics.reason="detectionBranchChanged";return;
     end
     take=isfinite(observations(:));rows=reshape(8:numel(prior.measurementCenter),[],1);rows=rows(take);
-    equal=prior.measurementGenerator(rows,:);rhs=observations(take)-expected(take);
+    rhs=observations(take)-expected(take);
     % Once the entire measured block is known, observer software is a
     % deterministic NONLINEAR update, not an uncertain affine variable.
     % Equating its tangent prediction to its exact update would reject valid
@@ -1470,6 +1505,32 @@ function result=localConditionCoupled(prior,current,contract,maximumColumns)
     if residual>1e-8
         result.diagnostics.reason="observerHistoryInconsistent";return;
     end
+    if moment && isfield(prior,'jointShapeFactor')
+        % Shared state/measurement factors give the full correlated block
+        % regression without primitive-space feasibility optimization. This
+        % is an engineering shape update, NOT exact set conditioning.
+        joint=prior.jointShapeFactor;physical=joint(1:35,:);measured=joint(35+rows,:);
+        measurementShape=measured*measured';scale=max(abs(diag(measurementShape)),realmin);
+        normalized=measured./sqrt(scale);innovation=rhs./sqrt(scale);
+        gram=normalized*normalized';inverse=pinv(gram,1e-10*max(1,norm(gram,2)));
+        gain=(physical*normalized')*inverse;explained=gram*inverse*innovation;
+        result.diagnostics.normalizedInnovationResidual=norm(innovation-explained);
+        center=prior.center+gain*innovation;generator=physical-gain*normalized;
+        indices=[1:11,16:35];shift=zeros(35,1);
+        shift([1:6,22:27])=center([1:6,22:27])-current.center([1:6,22:27]);
+        for j=[3,24],shift(j)=atan2(sin(shift(j)),cos(shift(j)));end
+        center(indices)=current.center(indices);generator([7:11,16:21,28:35],:)=0;
+        root=current;root.center=center;root.generator=localMomentFactor([generator,shift]);
+        root.parameterColumns=find(any(root.generator(12:15,:),1));
+        root.targetParameterColumns=find(any(root.generator(26:27,:),1));
+        root.posteriorAvailable=true;root.momentApproximation=true;
+        result.root=root;result.diagnostics.accepted=true;
+        result.diagnostics.method="completeSensorBlockJointShapeRegression";
+        result.diagnostics.reason="jointShapeUpdated";
+        result.diagnostics.affineHistoryFeasibilityChecked=false;
+        return
+    end
+    equal=prior.measurementGenerator(rows,:);
     n=size(prior.generator,2);lower=-ones(n,1);upper=ones(n,1);
     % A small arithmetic tolerance is not a model-error allowance.
     tolerance=1e-9;
@@ -1539,6 +1600,19 @@ function result=localConditionCoupled(prior,current,contract,maximumColumns)
     root.posteriorAvailable=true;
     result.root=root;result.posterior=posterior;result.diagnostics.accepted=true;
     result.diagnostics.reason="affineHistoryConditioned";
+end
+
+function factor=localMomentFactor(generator)
+    % Fixed-dimensional Gramian approximation. A row-scaled square root
+    % preserves G*G' and shared linear cancellations, NOT zonotope support.
+    % Retaining this factor as a small box is an engineering coarsening.
+    scale=sqrt(sum(generator.^2,2));active=scale>0;
+    factor=zeros(size(generator,1));
+    if ~any(active),return;end
+    normalized=generator(active,:)./scale(active);
+    gram=normalized*normalized';[basis,value]=eig((gram+gram')/2,'vector');
+    square=(basis.*sqrt(max(0,value)).')*basis';
+    factor(active,active)=scale(active).*square;
 end
 
 function [observer,frontend]=localObservedBlock(prior,observations)

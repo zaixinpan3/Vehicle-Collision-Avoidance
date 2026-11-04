@@ -5,6 +5,7 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
     properties (TestParameter)
         coordinate={1,3,5,12,16,22,24,25,26,27,28,30,32}
         retainedValue=struct('lowerSpeed',[5;1],'upperSpeed',[7;-1])
+        predictionMode={false,true}
         targetMotion=struct('straight',[6;.2;0],'curved',[6;.2;.1], ...
             'stopping',[.01;-1;.05],'stationary',[0;-1;0])
     end
@@ -18,6 +19,52 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function shapeCompressionPreservesJointQuadraticInformation(testCase)
+            rng(11041);g=randn(35,300);g(22:23,:)=g(1:2,:);
+            factor=nrmmJointPrediction('momentFactor',g);
+            testCase.verifySize(factor,[35,35]);
+            testCase.verifyEqual(factor*factor',g*g',AbsTol=2e-10);
+            testCase.verifyLessThan(norm(factor(22:23,:)-factor(1:2,:),'fro'),1e-6);
+            scalar=nrmmJointPrediction('momentFactor',[1,1]);
+            testCase.verifyLessThan(sum(abs(scalar)),2); % Deliberately not a worst-case enclosure.
+        end
+        function shapePredictionRetainsFeedbackWithFixedStorage(testCase)
+            f=testCase.fixture;cfg=f.cfg;cfg.controller.jointMomentPrediction=true;
+            tube=nrmmJointPrediction('coupledPropagate',localAnchor(f,12),cfg, ...
+                f.generator,f.contract,repmat(.05,1,12),f.target,f.error);
+            testCase.verifySize(tube.finalJointGenerator,[35,35]);
+            testCase.verifyEqual(tube.firstInputRadius,zeros(2,1),AbsTol=1e-12);
+            testCase.verifyGreaterThan(norm(tube.inputRadius(:,2:end),'fro'),0);
+            testCase.verifyTrue(tube.momentApproximation);
+            testCase.verifyFalse(tube.realArithmeticEnclosure);
+            testCase.verifyFalse(isfield(tube.firstSuccessor,'measurementGenerator'));
+            root=f.root.generator;final=tube.finalJointGenerator;
+            rows=[12:15,26:27];
+            testCase.verifyEqual(final(rows,:)*final(rows,:)',root(rows,:)*root(rows,:)',AbsTol=2e-10);
+        end
+        function shapeConditioningUsesTheSharedCompleteBlockAndKnownMemory(testCase)
+            f=testCase.fixture;cfg=f.cfg;cfg.controller.jointMomentPrediction=true;
+            context=localContext(f,[.02;-.1]);branch=nrmmJointPrediction('coupledLinearize',f.root.center,context);
+            [~,contract]=localReplay(f,context,branch.branch);
+            anchor=localAnchor(f,1);anchor.inputs=context.input;
+            tube=nrmmJointPrediction('coupledPropagate',anchor,cfg,f.generator,f.contract,.05,f.target,f.error);
+            target=predictiveSafetyGeometry.predictTarget(f.target,.05);
+            current=nrmmJointPrediction('coupledRoot',branch.point(1:6),f.generator,contract,target,f.error);
+            result=nrmmJointPrediction('conditionCoupled',tube.firstSuccessor,current,contract,4096,true);
+            testCase.verifyTrue(result.diagnostics.accepted,result.diagnostics.reason);
+            testCase.verifyTrue(result.diagnostics.usedAllSamples);
+            testCase.verifyFalse(result.diagnostics.affineHistoryFeasibilityChecked);
+            testCase.verifyTrue(isfinite(result.diagnostics.normalizedInnovationResidual));
+            testCase.verifySize(result.root.generator,[35,35]);
+            testCase.verifyEqual(result.root.generator([7:11,16:21,28:35],:),zeros(19,35));
+            testCase.verifyEqual(result.root.center([7:11,28:33]),current.center([7:11,28:33]));
+            map=zeros(2,35);map(:,1:2)=-eye(2);map(:,22:23)=eye(2);
+            testCase.verifyLessThan(norm(map*result.root.generator,'fro'), ...
+                norm(map*tube.firstSuccessor.generator,'fro'));
+            reference=nrmmJointPrediction('conditionCoupled',tube.firstSuccessor,current,contract,4096,false);
+            testCase.verifyFalse(reference.diagnostics.accepted);
+            testCase.verifyEqual(reference.root,current);
+        end
         function targetArcSensitivitiesCoverTurningAndStopping(testCase,targetMotion)
             f=testCase.fixture;context=localContext(f,f.input);center=f.root.center;
             center(25:27)=targetMotion;
@@ -75,8 +122,9 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
                 testCase.verifyEqual(prediction.branch.beforeResetInputMatrix(:,j),expected,AbsTol=1e-4);
             end
         end
-        function modelReusePreservesTheAppliedCommandAndFutureFeedback(testCase)
+        function modelReusePreservesTheAppliedCommandAndFutureFeedback(testCase,predictionMode)
             f=testCase.fixture;anchor=localAnchor(f,10);cfg=f.cfg;
+            cfg.controller.jointMomentPrediction=predictionMode;
             cfg.controller.jointPredictionRefreshSteps=1;
             full=nrmmJointPrediction('coupledPropagate',anchor,cfg,f.generator, ...
                 f.contract,repmat(.05,1,10),f.target,f.error);
@@ -231,6 +279,7 @@ end
 
 function f=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
+    cfg.controller.jointMomentPrediction=false; % Retain the bounded-generator reference tests.
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
     design=synthesizeNrmmObserverGains(estimator.observer);
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;

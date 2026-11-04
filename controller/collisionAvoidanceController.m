@@ -188,7 +188,9 @@ function [command,predictedInput,prediction,controllerState] = ...
         if ~targetOnset && isstruct(previousState) && isfield(previousState,'coupledJointPrediction')
             memory=previousState.coupledJointPrediction;
         end
-        coupledUpdate=nrmmJointPrediction('conditionCoupled',memory,root,contract,cfg.controller.jointGeneratorLimit);
+        coupledUpdate=nrmmJointPrediction('conditionCoupled',memory,root,contract, ...
+            cfg.controller.jointGeneratorLimit, ...
+            cfg.controller.jointMomentPrediction && string(cfg.solver.method)=="rti");
         model.coupledPosterior=coupledUpdate.root;
     end
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);
@@ -334,6 +336,10 @@ function [command,predictedInput,prediction,controllerState] = ...
         if isfield(model.jointPredictionTube,'refreshedJointModel')
             metadata.jointPredictionModelRefresh=model.jointPredictionTube.refreshedJointModel;
         end
+    end
+    metadata.jointMomentApproximation=false;
+    if isfield(model,'jointPredictionTube') && isfield(model.jointPredictionTube,'momentApproximation')
+        metadata.jointMomentApproximation=model.jointPredictionTube.momentApproximation;
     end
     metadata.futureTargetObserverDynamicsIncluded=false;metadata.targetFeedbackIncluded=false;
     if isfield(model,'jointPredictionTube') && ...

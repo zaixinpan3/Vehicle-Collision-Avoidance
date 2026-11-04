@@ -2992,7 +2992,139 @@ certificate flags remain false. The separate exact evaluator includes
 those terms and claims real-arithmetic enclosure only; MATLAB arithmetic
 is not a directed-rounding certificate.
 
-### Bounded storage in the engineering joint predictor
+### Fixed-dimensional certificates and their engineering coarsening
+
+A small joint matrix can represent either a **certified ellipsoid** or an
+**uncertified dependence surrogate**. These are different algorithms. The
+following construction belongs to the mathematical layer; the implementation
+below intentionally omits its enclosure and nesting requirements.
+
+Let \(z=(x_E,x_T,\theta,m)\) contain both physical vehicles, persistent
+parameters and finite observer/controller memory. At a future decision,
+compose the causal feedback with the sensor-block flow before differentiating.
+At the current decision the held command is common, so \(\delta u_0=0\).
+Persistent parameters obey \(\theta^+=\theta\); their noise rows are zero.
+Assume the nonlinear remainder on the entire admitted domain has been enclosed,
+for example by (D4)--(D9). No point Jacobian alone supplies this enclosure.
+
+Define \(\mathcal E(c,Q)=\{c+Q^{1/2}v:\|v\|_2\le1\}\), including singular
+\(Q\succeq0\). A shared block expansion is
+\[
+ \begin{bmatrix}z^+\\y\end{bmatrix}
+ =\bar w+F(z-\bar z)+G\eta+r,\quad
+ F=\begin{bmatrix}A\\C\end{bmatrix},\quad
+ G=\begin{bmatrix}B\\D\end{bmatrix}.
+\]
+Here \(y\) is the complete received block; the SAME noise coordinates appear
+in the physical/observer successor and its measurement rows. Given
+\(z\in\mathcal E(c,Q)\), \(\eta\in\mathcal E(0,R)\) and
+\(r\in\mathcal E(c_r,R_r)\), set \(Q_0=FQF^T\), \(Q_1=GRG^T\),
+\(Q_2=R_r\). For positive weights summing to one on nonzero terms,
+\[
+ c_J=\bar w+F(c-\bar z)+c_r,\qquad
+ Q_J=\sum_j Q_j/\alpha_j.                                  \tag{E1}
+\]
+This encloses the joint image. Indeed its directional support follows from
+\((\sum_j\sqrt{a^TQ_ja})^2\le\sum_j a^TQ_ja/\alpha_j\).
+For a selected scaling \(W\succ0\), the weighted-trace minimizing weights
+are proportional to \(\sqrt{\operatorname{tr}(WQ_j)}\). A componentwise
+remainder \(|r-c_r|\le b\) admits the constructive choice
+\(R_r=s\operatorname{diag}(b^2)\), where \(s\) counts nonzero components.
+A remainder generator box with \(q\) columns admits \(R_r=qH_rH_r^T\).
+These enlargements are conservative; replacing their factors by one is not
+an enclosure. A single ellipsoid can leave a model's parameter domain, so
+retain that fixed domain as an additional intersection or reject the candidate
+if its propagated enclosure cannot be evaluated within a certified domain.
+
+Partition \(Q_J=\left[\begin{smallmatrix}T&S\\S^T&V\end{smallmatrix}\right]\)
+according to \((z^+,y)\). Write \(e=y_{\rm obs}-(c_J)_y\) and
+\(\tau=e^TV^\dagger e\). Its measurement slice is nonempty exactly when
+\(e\in\operatorname{range}(V)\) and \(\tau\le1\). Its state projection is
+\[
+ \mathcal E\left((c_J)_z+SV^\dagger e,
+       (1-\tau)(T-SV^\dagger S^T)\right).                  \tag{E2}
+\]
+To prove this, factor \(Q_J=HH^T\), partition \(H=(H_z^T,H_y^T)^T\),
+and write every latent solution as
+\(v=H_y^\dagger e+w\), \(w\in\ker H_y\),
+\(\|w\|^2\le1-\tau\). Applying \(H_z\) gives (E2), including the
+singular cases. A pseudoinverse without the range test is insufficient.
+The actual observer memory is known after the complete block. Its exact
+software value can be imposed as another linear slice of this certified
+joint set. With nonlinear observer updates, this is justified by the joint
+nonlinear enclosure, not by equating an uncorrected tangent prediction to
+the exact update.
+
+If the inherited successor is the state projection of this same joint
+ellipsoid, (E2), including the known-memory slice, is a subset of it.
+Thus the actual posterior and inherited tail satisfy (C12). Keep the old
+successor/tail certificates and policy after conditioning; do not require a
+fresh ellipsoidal enlargement of the tail to fit inside the old one. Extra
+information may be discarded by retaining the inherited certificate when a
+new outer approximation would break nesting. A replacement must enclose the
+posterior AND be contained in the inherited successor, or the old tail must
+be recertified on it. For ellipsoid candidates a simple sufficient containment
+test is
+\[
+ \|Q_h^{\dagger/2}(c_n-c_h)\|_2+
+ \|Q_h^{\dagger/2}Q_n^{1/2}\|_2\le1,                       \tag{E3}
+\]
+with both the displacement and the range of \(Q_n\) inside
+\(\operatorname{range}(Q_h)\). Keeping an offset relative to a new reference
+is an exact coordinate change; moving the set's physical center is not.
+Similarly a feedback reparameterization must preserve the SAME policy,
+including its offset. These conditions, together with the assumed terminal
+family and attained primary minimum, allow Theorem C's shift argument.
+They do not establish small tubes or admission of an arbitrary initial state.
+
+Constant storage does not retain every old measurement intersection exactly:
+even a constant two-dimensional parameter with bounded linear measurements
+can accumulate arbitrarily many strip facets. Ellipsoidal outer approximation
+can discard that history while remaining rigorous under the conditions above.
+This limitation concerns representation, not a need to abandon future feedback.
+
+**Engineering mode.** `controller.jointMomentPrediction` selects a much
+cheaper default for ordinary RTI encounters. Let \(P=HH^T\) be an auxiliary
+shape, not a certified covariance. The shared local block gives
+\[
+ M=[AH,B],\quad N=[CH,D],\quad L=MN^T(NN^T)^\dagger,\qquad
+ H_{\rm post}=M-LN.                                       \tag{E4}
+\]
+Then \(H_{\rm post}H_{\rm post}^T=MM^T-MN^T(NN^T)^\dagger NM^T\).
+This identity preserves common-noise cancellations and the persistent
+parameter cross blocks, but lacks both the certified nonlinear remainder
+and (E2)'s innovation-dependent radius and range feasibility condition.
+A diagnostic records the unexplained normalized innovation. It does not
+claim exact bounded-history consistency and does not solve its old LP.
+
+The online predictor refactors each joint shape to a fixed square root
+through \(\widetilde H\widetilde H^T=HH^T\). Joint physical state has 35
+coordinates; midpoint/input output factors have 49. The first-successor
+state/measurement factor has a fixed size determined by the actual sensor
+block. Thus storage does not grow with the number of past noise samples.
+The first command stays fixed, future actual observer/feedback derivatives
+remain coupled, and parameters are not reinjected as fresh disturbances.
+Actual software-memory rows are set to their known values only at the current
+root. Future memory is still uncertain. Recentring the physical surrogate
+adds the mean discrepancy as a shared column before refactorization.
+
+The current constraint interface uses the small factor's BOX support
+\(\|a^T\widetilde H\|_1\), combining the signed ego/target terms before
+that support. It is an engineering choice, not the original generator-box
+support or an ellipsoid/probability claim. In particular Gramian preservation
+alone does not preserve L1 support. Input authority is allocated using the
+incoming factor; its resulting mapped input support is recorded BEFORE
+refactoring so the refactor cannot create contradictory actuator tightening.
+The first common command therefore still has zero uncertainty.
+
+This mode is a coarsening of the theoretical joint prediction, and its
+certificate flags remain false. Successful simulations validate its tested
+behavior, not (C12), nonlinear set containment, or recursive feasibility of
+SQP-RTI. Disabling this option retains the generator reference implementation
+below. The rigorous nonlinear enclosure and retained-certificate modes do not
+use this approximation.
+
+### Bounded storage in the engineering generator reference
 
 After conditioning on the received sensor block, the engineering predictor
 reduces its joint generator matrix to at most
