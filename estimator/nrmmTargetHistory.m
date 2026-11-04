@@ -480,8 +480,13 @@ end
 
 function image=localImage(family,startTime,endTime,anglePadding)
     if nargin<4,anglePadding=0;end
-    assert(endTime>=startTime,'nrmmConstantMotionFamily:timeOrder','Expected a forward interval.');
-    lo=family.lower;hi=family.upper;t0=startTime-family.epochTime;t1=endTime-family.epochTime;
+    assert(all(endTime>=startTime),'nrmmConstantMotionFamily:timeOrder','Expected a forward interval.');
+    lo=family.lower;hi=family.upper;cells=size(lo,2);times=numel(endTime);
+    if times>1
+        lo=repmat(lo,1,times);hi=repmat(hi,1,times);
+        endTime=repelem(reshape(endTime,1,[]),cells);
+    end
+    t0=startTime-family.epochTime;t1=endTime-family.epochTime;
     backwardUnavailable=false(1,size(lo,2));
     if t0<0
         backwardUnavailable=lo(1,:)<=0 | lo(1,:)+t0*hi(2,:)<=0;
@@ -496,13 +501,13 @@ function image=localImage(family,startTime,endTime,anglePadding)
     else
         s0lo=t0*hi(1,:)+t0^2*lo(2,:)/2;
         s0hi=t0*lo(1,:)+t0^2*hi(2,:)/2;
-        duration=t1-t0;coefficient=(t1^2-t0^2)/2;
-        dslo=duration*lo(1,:)+min(coefficient*lo(2,:),coefficient*hi(2,:));
-        dshi=duration*hi(1,:)+max(coefficient*lo(2,:),coefficient*hi(2,:));
-        if t1>=0
-            mayStop=lo(1,:)+lo(2,:)*t1<0;
-            dslo(mayStop)=localArc(lo(1,mayStop),lo(2,mayStop),t1)-s0hi(mayStop);
-            dshi(mayStop)=localArc(hi(1,mayStop),hi(2,mayStop),t1)-s0lo(mayStop);
+        duration=t1-t0;coefficient=(t1.^2-t0^2)/2;
+        dslo=duration.*lo(1,:)+min(coefficient.*lo(2,:),coefficient.*hi(2,:));
+        dshi=duration.*hi(1,:)+max(coefficient.*lo(2,:),coefficient.*hi(2,:));
+        if any(t1>=0)
+            mayStop=t1>=0 & lo(1,:)+lo(2,:).*t1<0;
+            dslo(mayStop)=localArc(lo(1,mayStop),lo(2,mayStop),localSelectTime(t1,mayStop))-s0hi(mayStop);
+            dshi(mayStop)=localArc(hi(1,mayStop),hi(2,mayStop),localSelectTime(t1,mayStop))-s0lo(mayStop);
         end
     end
     [turnLo,turnHi]=localProduct(lo(3,:),hi(3,:),dslo/2,dshi/2);
@@ -525,9 +530,13 @@ function image=localImage(family,startTime,endTime,anglePadding)
     image.lower=image.lower-guard;image.upper=image.upper+guard;
 end
 
+function time=localSelectTime(time,mask)
+    if ~isscalar(time),time=time(mask);end
+end
+
 function arc=localArc(speed,acceleration,time)
-    duration=repmat(time,size(speed));braking=acceleration<0;
-    duration(braking)=min(time,-speed(braking)./acceleration(braking));
+    duration=time+zeros(size(speed));braking=acceleration<0;
+    duration(braking)=min(duration(braking),-speed(braking)./acceleration(braking));
     arc=speed.*duration+acceleration.*duration.^2/2;
 end
 

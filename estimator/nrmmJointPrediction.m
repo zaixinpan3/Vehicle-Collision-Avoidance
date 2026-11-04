@@ -1420,7 +1420,8 @@ function target=localTargetPoint(initial,h,lr)
     target(5)=initial(5);
 end
 
-function result=localConditionCoupled(prior,current,contract)
+function result=localConditionCoupled(prior,current,contract,maximumColumns)
+    if nargin<4,maximumColumns=4096;end
     % Restrict the affine first-successor history with the ENTIRE sensor block.
     % The constrained primitive set is retained explicitly. Its compressed
     % outer proposal is numerical: no nonlinear containment is claimed.
@@ -1525,10 +1526,13 @@ function result=localConditionCoupled(prior,current,contract)
     center(indices)=current.center(indices);
     generator([7:11,16:21,28:35],:)=0;
     generator=[generator,shift];
-    % Compress tiny directions in relative coordinates, preserving shared
-    % translation and the same persistent physical-parameter variables.
+    % Reparameterize the WHOLE joint outer image once per received block.
+    % Mixed parameter/noise columns are not individually protected: their
+    % complete discrepancy is retained. Physical parameter states remain
+    % shared and constant during each prediction; they are not resampled.
     transform=eye(35);transform(22:24,1:3)=-eye(3);
     outer=compress(nrmmSet(center,generator),.01,transform,[12:15,26:27]);
+    outer=reduceOrder(outer,maximumColumns,transform);
     root=current;root.center=outer.center;root.generator=outer.generator;
     root.parameterColumns=find(any(root.generator(12:15,:),1));
     root.targetParameterColumns=find(any(root.generator(26:27,:),1));

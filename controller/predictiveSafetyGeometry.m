@@ -169,8 +169,8 @@ classdef predictiveSafetyGeometry
                 holdTime=time;
             end
             starts=predictiveSafetyGeometry.predictTarget(model.target,max(0,time-holdTime));
-            support=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,holdTime);
-            tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,holdTime);
+            [support,tube]=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,holdTime);
+            if isempty(tube),tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,holdTime);end
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
@@ -624,15 +624,16 @@ classdef predictiveSafetyGeometry
             tube.yawRadius=min(pi,tube.courseRadius+errorSet.sideslipRadius);
             tube.speedRadius=errorSet.speedRadius+errorSet.accelerationRadius*abs(time);
             if isfield(errorSet,'family')
-                for k=1:numel(time)
-                    image=nrmmTargetHistory("constantMotion", 'image',errorSet.family,errorSet.familyTime, ...
-                        errorSet.familyTime+time(k),errorSet.familyYawRadius);
-                    nominal=predictiveSafetyGeometry.predictTarget(q(:,min(k,size(q,2))),time(k));
-                    displacement=nominal(1:2)-q(1:2,min(k,size(q,2)));
-                    extent=max(abs(image.lower-displacement),abs(image.upper-displacement));
-                    tube.positionRadius(k)=min(tube.positionRadius(k), ...
-                        errorSet.positionRadius+max(vecnorm(extent)));
-                end
+                image=nrmmTargetHistory("constantMotion", 'image',errorSet.family,errorSet.familyTime, ...
+                    errorSet.familyTime+time,errorSet.familyYawRadius);
+                half=sin(q(6,:))./q(7,:).*arc/2;
+                scale=ones(size(half));active=half~=0;scale(active)=sin(half(active))./half(active);
+                displacement=(arc.*scale).*predictiveSafetyGeometry.direction(q(3,:)+q(6,:)+half);
+                cells=size(errorSet.family.lower,2);
+                extent=max(abs(reshape(image.lower,2,cells,[])-reshape(displacement,2,1,[])), ...
+                    abs(reshape(image.upper,2,cells,[])-reshape(displacement,2,1,[])));
+                radius=reshape(max(sqrt(sum(extent.^2,1)),[],2),1,[]);
+                tube.positionRadius=min(tube.positionRadius,errorSet.positionRadius+radius);
             end
         end
 
@@ -706,13 +707,13 @@ classdef predictiveSafetyGeometry
             support=support+256*eps(max(1,abs(support)));
         end
 
-        function data = targetSupportData(q,errorSet,time)
+        function [data,ball] = targetSupportData(q,errorSet,time)
             % Batch the parameter-family support coefficients once per frame.
             time=reshape(time,1,[]);count=numel(time);
             data=struct('positionRadius',0,'direction',zeros(2,count),'arcError',zeros(1,count), ...
                 'courseDerivative',zeros(2,count),'curvatureDerivative',zeros(2,count), ...
                 'courseRadius',0,'curvatureRadius',0,'remainder',zeros(1,count),'ballRadius',zeros(1,count));
-            if isempty(errorSet),return;end
+            ball=[];if isempty(errorSet),return;end
             arc=predictiveSafetyGeometry.targetArc(q,time);kappa=sin(q(6,:))./q(7,:);
             ds=errorSet.speedRadius*abs(time)+.5*errorSet.accelerationRadius*time.^2;
             dg=errorSet.courseRadius;dk=errorSet.curvatureRadius;
@@ -1176,8 +1177,7 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
     familySupport=[];
     if isfield(parameters,'family')
         elapsed=parameters.family.time+time;
-        familySupport=predictiveSafetyGeometry.targetSupportData(parameters.family.target,parameters.family.error,elapsed);
-        familyTube=predictiveSafetyGeometry.targetErrorTube(parameters.family.target,parameters.family.error,elapsed);
+        [familySupport,familyTube]=predictiveSafetyGeometry.targetSupportData(parameters.family.target,parameters.family.error,elapsed);
         targetYaw=repmat(familyTube.yawRadius.',8,1);
     end
     egoSupport=predictiveSafetyGeometry.rotationSupport(shape,x(3),egoYaw,-axes);

@@ -2992,6 +2992,42 @@ certificate flags remain false. The separate exact evaluator includes
 those terms and claims real-arithmetic enclosure only; MATLAB arithmetic
 is not a directed-rounding certificate.
 
+### Bounded storage in the engineering joint predictor
+
+After conditioning on the received sensor block, the engineering predictor
+reduces its joint generator matrix to at most
+`controller.jointGeneratorLimit` columns (default 4096). This is a joint
+outer reparameterization, not deletion of small disturbances. In coordinates
+that retain ego--target relative translation and yaw, signed near-parallel
+columns are grouped. For a group, write its oriented columns as
+\(g_j=\alpha_j G+r_j\), where \(G=\sum_jg_j\),
+\(\alpha_j\ge0\), and \(\sum_j\alpha_j=1\). Then
+\[
+ \sum_j g_j z_j=G\eta+\sum_jr_jz_j,\qquad
+ \eta=\sum_j\alpha_jz_j\in[-1,1].
+\]
+The residual is enclosed by the componentwise radius \(\sum_j|r_j|\).
+Retain the largest group columns that fit the budget; box every discarded
+group column as well. Transforming that residual box back gives an outer
+image with bounded storage. This argument applies to mixed parameter/noise
+columns too. Marking every nonzero parameter entry as protected would prevent
+reduction after measurement conditioning spreads parameter dependence.
+
+The existing small-support compression is retained before this order cap;
+the additional reduction is inactive while that image fits the budget.
+
+Reduction occurs once after a received block. It is not repeated at every
+prediction node, where accumulated wrapping can destroy useful tightness.
+New future-noise columns are retained through that horizon. Physical tire
+and target parameters remain shared states held constant during prediction.
+The reparameterized outer root need not remain inside the inherited successor;
+this is an engineering RTI approximation, not the nested-certificate procedure
+of Theorem C. Strict transition evaluators are unchanged.
+
+Target-family images are batched across exact query times, including stopping;
+the field reuses those images instead of evaluating the same family twice.
+The collision oracle retains the existing symmetric finite-difference slopes.
+
 ### The explicit route from theory to SQP-RTI
 
 For fixed frame-level uncertainty data, transcribe the nominal nonlinear

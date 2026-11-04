@@ -188,7 +188,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         if ~targetOnset && isstruct(previousState) && isfield(previousState,'coupledJointPrediction')
             memory=previousState.coupledJointPrediction;
         end
-        coupledUpdate=nrmmJointPrediction('conditionCoupled',memory,root,contract);
+        coupledUpdate=nrmmJointPrediction('conditionCoupled',memory,root,contract,cfg.controller.jointGeneratorLimit);
         model.coupledPosterior=coupledUpdate.root;
     end
     [solution,search,model]=solvePredictiveControl(model,previousState,timer);

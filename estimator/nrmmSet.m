@@ -101,6 +101,34 @@ classdef nrmmSet
             remainder=diag(box);remainder=remainder(:,active);
             a.generator=[g(:,keep),transform\remainder];
         end
+        function a=reduceOrder(a,maximumColumns,transform)
+            % Bounded-order OUTER image. Merge nearly parallel shared
+            % directions before boxing their complete discrepancy. Parameter
+            % rows participate in the same joint image, never fresh noise.
+            a=promote(a);g=a.generator;n=size(g,1);
+            if nargin<3,transform=eye(n);end
+            validateattributes(maximumColumns,{'double'},{'scalar','integer','>=',2*n});
+            g=g(:,any(g,1));
+            if size(g,2)<=maximumColumns,a.generator=g;return;end
+            mapped=transform*g;scale=max(sum(abs(mapped),2),1e-15);
+            normalized=mapped./scale;
+            [mass,pivot]=max(abs(normalized),[],1);
+            orientation=sign(normalized(sub2ind(size(normalized),pivot,1:numel(pivot))));
+            key=round(normalized./(mass.*orientation)/.01).';
+            [~,~,group]=unique([pivot.',key],'rows');
+            membership=sparse(1:numel(group),group,1);
+            total=(mapped.*orientation)*membership;
+            groupMass=accumarray(group,mass.');
+            discrepancy=abs(mapped.*orientation-total(:,group).*(mass./groupMass(group).'));
+            padding=sum(discrepancy,2);
+            importance=sum(abs(total)./scale,1);
+            [~,order]=sort(importance,'descend');
+            keep=order(1:min(numel(order),maximumColumns-n));
+            discard=order(numel(keep)+1:end);
+            padding=padding+sum(abs(total(:,discard)),2);
+            box=diag(padding);box=box(:,padding>0);
+            a.generator=transform\[total(:,keep),box];
+        end
         function varargout=size(a,varargin)
             [varargout{1:nargout}]=size(a.center,varargin{:});
         end
