@@ -1,0 +1,2101 @@
+{
+  "scenario": "acceleratingHeadOn",
+  "referenceSpeedMetersPerSecond": 8,
+  "observationModel": "rawSensorJointDynamicOutputFeedback",
+  "randomSeed": 2.0261104E+7,
+  "outcome": "failed",
+  "executedFrames": 12,
+  "failure": "collisionAvoidanceController:noOutputFeedbackPlan: The single RTI QP failed (exit flag -2). No command was committed.",
+  "minimumReplayClearanceMeters": 12.676700380439572,
+  "configuration": {
+    "referenceSpeed": 8,
+    "outputFeedback": {
+      "sensorPeriod": 0.0125,
+      "memoryDimension": 1,
+      "noiseBounds": [
+        0.04,
+        0.03,
+        0.0015,
+        0.04
+      ],
+      "featureScale": [
+        50,
+        50,
+        10,
+        10,
+        1,
+        50,
+        50
+      ],
+      "noiseDirections": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "horizonSteps": 4,
+      "intersampleMarginMeters": 0.2,
+      "terminalPreviewSeconds": 0.5,
+      "backupBrakingRatio": 0.6,
+      "minimumTargetDeceleration": 0.2,
+      "clearanceMeters": 0.1,
+      "steeringMaximum": 0.5,
+      "steeringRateMaximum": 1,
+      "coefficientMaximum": 2,
+      "gainMaximum": 0.25,
+      "regularization": 0.01,
+      "inputWeight": 0.1,
+      "trackingWeights": [
+        1,
+        1,
+        0.2,
+        0.1,
+        0.1
+      ],
+      "finiteDifferenceStep": 1E-5,
+      "predictionSubsteps": 2,
+      "maximumHypotheses": 64,
+      "smoothAbsoluteValue": 1E-6,
+      "maximumSolveSeconds": 0.05,
+      "qpMaximumIterations": 60
+    },
+    "controller": {
+      "sampleTime": 0.05,
+      "horizonSteps": 16,
+      "maximumHorizonSteps": null,
+      "enforceRoadBoundaries": false,
+      "jointAffinePrediction": true,
+      "jointNonlinearPrediction": false,
+      "retainedTube": false,
+      "reducedJointInformation": true,
+      "jointPredictionSamplesPerHold": 2,
+      "jointPredictionInverseTolerance": 0.005,
+      "jointPredictionRefreshSteps": 2,
+      "compactObserverPrediction": true,
+      "jointGeneratorLimit": 4096,
+      "jointMomentPrediction": true
+    },
+    "nonlinear": {
+      "integrationStep": 0.05
+    },
+    "rti": {
+      "settlingSeconds": 0.5,
+      "referenceDeviationWeight": 0,
+      "nominalTrackingWeight": 1,
+      "inputVariationWeight": 20,
+      "trustRegion": {
+        "enabled": true,
+        "errorBudget": [
+          0.04,
+          0.04,
+          0.01,
+          0.4,
+          0.4,
+          0.2
+        ]
+      }
+    },
+    "planner": {
+      "radialRate": 1,
+      "tangentialRate": 2,
+      "wallRate": 2,
+      "lateralAccelerationFraction": 0.9,
+      "guideHalfWidthMeters": 9
+    },
+    "collision": {
+      "encounterRangeMeters": 50
+    },
+    "terminal": {
+      "brakingDecelerationMetersPerSecondSquared": 4
+    },
+    "vehicle": {
+      "m": 1650,
+      "Iz": 1700,
+      "lf": 1.4,
+      "lr": 1.65,
+      "wheelbase": 3.05,
+      "length": 4.8,
+      "width": 1.9,
+      "rectangleOffset": [
+        0,
+        0
+      ],
+      "gravity": 9.81
+    },
+    "tire": {
+      "corneringStiffness": [
+        96000,
+        96000
+      ],
+      "frictionCoefficient": [
+        0.85,
+        0.85
+      ]
+    },
+    "actuation": {
+      "brakingRatioMinimum": -1,
+      "brakingRatioMaximum": 1
+    },
+    "roadLoad": {
+      "airDensity": 1.225,
+      "dragCoefficient": 0.3,
+      "frontalArea": 2.2,
+      "rollingCoefficient": 0.01,
+      "rollingSpeedCoefficient": 0,
+      "rollingQuarticCoefficient": 0,
+      "rollingTransitionSpeed": 0.5
+    },
+    "model": {
+      "speedMinimum": 0,
+      "speedMaximum": 18,
+      "scheduleSpeedFloor": 1,
+      "kinematicSpeedRange": [
+        2.5,
+        4
+      ],
+      "kinematicLagSeconds": 0.1,
+      "brakeHoldSpeed": 0.25,
+      "brakingRatioRateMaximum": null,
+      "lateralVelocityMaximum": 12,
+      "yawRateMaximum": 5,
+      "sideslipMaximum": 0.25
+    },
+    "clf": {
+      "lateralPositionErrorScale": 0.5,
+      "headingErrorScale": 0.1,
+      "speedErrorScale": 0.25,
+      "lateralVelocityErrorScale": 0.5,
+      "yawRateErrorScale": 0.2,
+      "convergenceTimeConstantSeconds": 4,
+      "certificationLateralMeters": 2,
+      "certificationHeadingRadians": 0.2,
+      "certificationSpeedMetersPerSecond": 1,
+      "certificationLateralVelocityMetersPerSecond": 0.3,
+      "certificationYawRateRadiansPerSecond": 0.2,
+      "certificationSteeringRadians": 0.075,
+      "certificationBrakingRatio": 0.125
+    },
+    "nominalClf": {
+      "lookaheadSeconds": 1.5,
+      "minimumLookaheadMeters": 8,
+      "courseGain": 1.5,
+      "yawRateGain": 10,
+      "lateralAccelerationFraction": 0.75,
+      "frontForceFraction": 0.9,
+      "speedGain": 0.5,
+      "brakingRatioLimit": 0.35
+    },
+    "solver": {
+      "method": "rti",
+      "maxIterations": 40,
+      "timeLimitSeconds": 0.1,
+      "completionReserveSeconds": 0.002,
+      "feasibilityTolerance": 0.0001,
+      "constraintTolerance": 1E-5,
+      "optimalityTolerance": 1E-5,
+      "lexicographicTieTolerance": 0.001,
+      "reducedTolerance": 0.001
+    },
+    "target": {
+      "defaultLength": 4.8,
+      "defaultWidth": 1.9,
+      "rearAxleDistance": 1.6
+    }
+  },
+  "startupWarmupSeconds": 0.243473,
+  "warmupEnabled": true,
+  "failureCallSeconds": 0.018648,
+  "initialInformationContract": [
+    {
+      "ego": [
+        -0.005,
+        -0.005,
+        0,
+        7.995,
+        0,
+        0
+      ],
+      "target": [
+        26.875000000000004,
+        -0.005,
+        3.1415926535897931,
+        8,
+        1,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ],
+      "parameters": [
+        1,
+        1,
+        0.995,
+        0.995
+      ],
+      "sensorBias": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "ego": [
+        0,
+        0,
+        0,
+        8,
+        0,
+        0
+      ],
+      "target": [
+        26.880000000000003,
+        0,
+        3.1415926535897931,
+        8,
+        1,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ],
+      "parameters": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "sensorBias": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "ego": [
+        0.005,
+        0.005,
+        0,
+        8.005,
+        0,
+        0
+      ],
+      "target": [
+        26.885,
+        0.005,
+        3.1415926535897931,
+        8,
+        1,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ],
+      "parameters": [
+        1,
+        1,
+        1.005,
+        1.005
+      ],
+      "sensorBias": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+  "robustSafetyCertified": false,
+  "trace": [
+    {
+      "time": 0,
+      "input": [
+        7.89645916553138E-6,
+        -0.350000000176379
+      ],
+      "memory": 0,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 6,
+        "maximumLinearizedConstraintViolation": 0,
+        "maximumShootingEqualityResidual": 5.5511151231257827E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.012992624462713039,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.029941,
+        "qpSeconds": 0.00684,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3286,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": true,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.000195,
+        "predictionPreparationSeconds": 0.004016,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.0010690481755467247,
+            -0.0010690481755467247,
+            -0.0010690481755467247
+          ],
+          "rawReadingsConditioned": 1,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.045524,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          0,
+          0
+        ]
+      },
+      "minimumReplayClearanceMeters": 21.28253961998362,
+      "stateAfterHold": [
+        0.39620992769372931,
+        4.6889821135481309E-7,
+        4.7612939597897812E-7,
+        7.8484020130500225,
+        1.3586591544191843E-5,
+        1.515213343753921E-5
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.0125,
+          "position": [
+            0.09840876052396022,
+            -0.0096754538315781784
+          ],
+          "acceleration": [
+            -3.0266823321094627,
+            0.011133460548439729
+          ],
+          "yawRate": -0.00040573098953273904,
+          "relativePosition": [
+            26.686028904757165,
+            -0.0063686835064233607
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.025,
+          "position": [
+            0.18551258089118966,
+            0.014272177860189465
+          ],
+          "acceleration": [
+            -3.0341813181968136,
+            -0.002653501334670958
+          ],
+          "yawRate": 0.00013120597102980812,
+          "relativePosition": [
+            26.485939364226518,
+            0.00084629028396284735
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.037500000000000006,
+          "position": [
+            0.30094336573647046,
+            0.0046782096950291176
+          ],
+          "acceleration": [
+            -3.0229512825875742,
+            -0.0062305192779244477
+          ],
+          "yawRate": -0.00052659300298874283,
+          "relativePosition": [
+            26.288909929137919,
+            0.010619699125215759
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.05,
+          "position": [
+            0.40603704545243585,
+            -0.00093961239228718921
+          ],
+          "acceleration": [
+            -3.0288471281102289,
+            0.001748591461047774
+          ],
+          "yawRate": -0.0003039563964845851,
+          "relativePosition": [
+            26.089562694084787,
+            -0.0058380216647360306
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.05,
+      "input": [
+        -2.6757704187837777E-6,
+        -0.30388695276349614
+      ],
+      "memory": 0.00049518053039731506,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 8,
+        "maximumLinearizedConstraintViolation": 0,
+        "maximumShootingEqualityResidual": 5.5511151231257827E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.0092968967068880245,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.02824,
+        "qpSeconds": 0.008262,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3861,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.0012,
+        "predictionPreparationSeconds": 0.003869,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.00096013245579825378,
+            -0.00096013063259678985,
+            -0.00096012881315331745
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.042096,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          7.89645916553138E-6,
+          -0.350000000176379
+        ]
+      },
+      "minimumReplayClearanceMeters": 20.48967804233132,
+      "stateAfterHold": [
+        0.7853212986257615,
+        1.0119840463183321E-6,
+        6.9372999966080016E-7,
+        7.7160570298297282,
+        3.8184232020566106E-7,
+        -2.0071993231432475E-6
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.0625,
+          "position": [
+            0.4849108854193247,
+            0.0028546123271887295
+          ],
+          "acceleration": [
+            -2.6337072023660331,
+            -0.0015783462848299392
+          ],
+          "yawRate": -0.000483293001099027,
+          "relativePosition": [
+            25.891469191754219,
+            0.012860916821000663
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.075000000000000011,
+          "position": [
+            0.58016630788365231,
+            -0.0120822794823161
+          ],
+          "acceleration": [
+            -2.6531364673367488,
+            -0.0025047942681176438
+          ],
+          "yawRate": -0.00060710943938231253,
+          "relativePosition": [
+            25.681102625944053,
+            0.01186506512909344
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.087500000000000008,
+          "position": [
+            0.68410404191806951,
+            0.018469849325819059
+          ],
+          "acceleration": [
+            -2.6441433029222527,
+            -0.0093817753959448431
+          ],
+          "yawRate": 3.6414720020893481E-5,
+          "relativePosition": [
+            25.493348823757902,
+            -0.017966827339210619
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.1,
+          "position": [
+            0.76766512058372749,
+            0.0087845506327918679
+          ],
+          "acceleration": [
+            -2.6603554891100449,
+            -0.00032493937376893995
+          ],
+          "yawRate": 0.0005036682400720899,
+          "relativePosition": [
+            25.287202496788918,
+            0.0059976684219109249
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.1,
+      "input": [
+        -7.7094522403878013E-6,
+        -0.25226235510164818
+      ],
+      "memory": 0.0014407507787013902,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 7,
+        "maximumLinearizedConstraintViolation": 0,
+        "maximumShootingEqualityResidual": 2.7755575615628914E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.01217516641766159,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.028343,
+        "qpSeconds": 0.007312,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3864,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001187,
+        "predictionPreparationSeconds": 0.003782,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.00088961598293291655,
+            -0.0008896122062873505,
+            -0.00088960843157347646
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.041111,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          -2.6757704187837777E-6,
+          -0.30388695276349614
+        ]
+      },
+      "minimumReplayClearanceMeters": 19.700395721291308,
+      "stateAfterHold": [
+        1.1683541036129954,
+        8.2794361560915621E-7,
+        1.8431130589782611E-7,
+        7.6052586355583669,
+        -1.3012097496555214E-5,
+        -1.4963487535555232E-5
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.1125,
+          "position": [
+            0.865458338331641,
+            0.0022678313755778385
+          ],
+          "acceleration": [
+            -2.2211863412188544,
+            -0.0018585283375040789
+          ],
+          "yawRate": 0.00039000005234704905,
+          "relativePosition": [
+            25.086494778366244,
+            -0.0047770609746062608
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.125,
+          "position": [
+            0.979440029194229,
+            0.0040913750927820888
+          ],
+          "acceleration": [
+            -2.21482403829787,
+            0.0011269887588235624
+          ],
+          "yawRate": 3.8694279081900357E-5,
+          "relativePosition": [
+            24.894529223838564,
+            0.0013349712082463155
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.1375,
+          "position": [
+            1.0550839501071805,
+            0.0029244210741197108
+          ],
+          "acceleration": [
+            -2.2134644058479673,
+            -0.010471698103830321
+          ],
+          "yawRate": -0.00047272328740153495,
+          "relativePosition": [
+            24.689775869665656,
+            0.014612550722493053
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.15000000000000002,
+          "position": [
+            1.1666918719766077,
+            -0.015151377531207596
+          ],
+          "acceleration": [
+            -2.2224389357713972,
+            -0.0082541832038814551
+          ],
+          "yawRate": 0.00042532255344935693,
+          "relativePosition": [
+            24.510895421922058,
+            -0.012865523060752195
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.15000000000000002,
+      "input": [
+        -8.8889953989888722E-5,
+        -0.20106693722746918
+      ],
+      "memory": 0.0025237787011341433,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 6,
+        "maximumLinearizedConstraintViolation": 0,
+        "maximumShootingEqualityResidual": 5.5511151231257827E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.0148631424522319,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.028555,
+        "qpSeconds": 0.006422,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3864,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001213,
+        "predictionPreparationSeconds": 0.003771,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.0010406637194219541,
+            -0.0010406649675012358,
+            -0.0010406662127352387
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.040432,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          -7.7094522403878013E-6,
+          -0.25226235510164818
+        ]
+      },
+      "minimumReplayClearanceMeters": 18.913613683862707,
+      "stateAfterHold": [
+        1.5463810891468051,
+        -4.8842069569844742E-6,
+        -5.5021334933272161E-6,
+        7.5158235497111869,
+        -0.000159339479177878,
+        -0.00017091857499592467
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.16250000000000003,
+          "position": [
+            1.2533381914762041,
+            -0.0093615784253632955
+          ],
+          "acceleration": [
+            -1.7895517234380418,
+            -0.0053703273204050187
+          ],
+          "yawRate": -0.00031253461526030782,
+          "relativePosition": [
+            24.309726729958975,
+            -0.0066992594645562138
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.17500000000000002,
+          "position": [
+            1.3492722214359403,
+            -0.016010557632768544
+          ],
+          "acceleration": [
+            -1.7893145509884356,
+            0.0028597075464852351
+          ],
+          "yawRate": 0.00011656608719510088,
+          "relativePosition": [
+            24.090865814827175,
+            -0.00453079320656977
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.18750000000000003,
+          "position": [
+            1.4657143908620436,
+            -0.010855617390376779
+          ],
+          "acceleration": [
+            -1.8029869163684411,
+            -0.0037619908251895423
+          ],
+          "yawRate": -0.00088046289342804643,
+          "relativePosition": [
+            23.903659197440817,
+            -0.0092961186661221322
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.2,
+          "position": [
+            1.5450473086946,
+            0.018525876294779229
+          ],
+          "acceleration": [
+            -1.7865998521963569,
+            -0.01312291920411569
+          ],
+          "yawRate": 0.00046566558820771033,
+          "relativePosition": [
+            23.722940077973544,
+            -0.0011837403362030797
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.2,
+      "input": [
+        -7.3332895113144368E-6,
+        -0.1535558264162786
+      ],
+      "memory": -5.4982160896361489E-19,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 6,
+        "maximumLinearizedConstraintViolation": 0,
+        "maximumShootingEqualityResidual": 5.5511151231257827E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.017205641810304123,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.028382,
+        "qpSeconds": 0.006375,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3864,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001241,
+        "predictionPreparationSeconds": 0.003868,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.00077170786181969433,
+            -0.00077172658636644631,
+            -0.00077174529158140041
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.040333,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          -8.8889953989888722E-5,
+          -0.20106693722746918
+        ]
+      },
+      "minimumReplayClearanceMeters": 18.128308474892421,
+      "stateAfterHold": [
+        1.9204319172838911,
+        -1.3347547123062035E-5,
+        -1.0113627826004307E-5,
+        7.44621170418334,
+        -7.153953054062976E-5,
+        -4.6845786391617341E-5
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.21250000000000002,
+          "position": [
+            1.641973131785148,
+            0.011034311396581068
+          ],
+          "acceleration": [
+            -1.3860175231897034,
+            0.010884742929861968
+          ],
+          "yawRate": -0.00065173460986531553,
+          "relativePosition": [
+            23.52682515443411,
+            -0.010335531098557492
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.225,
+          "position": [
+            1.7400315356955682,
+            0.0064132101604900647
+          ],
+          "acceleration": [
+            -1.4006596301194292,
+            -0.0073980765947188184
+          ],
+          "yawRate": 0.0001953143699811426,
+          "relativePosition": [
+            23.312110514215441,
+            0.016614128636665039
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.23750000000000002,
+          "position": [
+            1.8279330188826397,
+            0.011538196761049528
+          ],
+          "acceleration": [
+            -1.3899037667212162,
+            0.0035750546075931692
+          ],
+          "yawRate": 0.000563380603504192,
+          "relativePosition": [
+            23.1169586118076,
+            -0.0030435913784633809
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.25,
+          "position": [
+            1.9384635483034509,
+            0.0061357582098122958
+          ],
+          "acceleration": [
+            -1.4050602520273847,
+            -0.0010998522575683175
+          ],
+          "yawRate": 0.00033111854955875396,
+          "relativePosition": [
+            22.927247409229796,
+            -0.0045157078935815628
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.25,
+      "input": [
+        -4.4814544213188004E-5,
+        -0.11154401271465279
+      ],
+      "memory": -6.7505693125897327E-19,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 7,
+        "maximumLinearizedConstraintViolation": 0,
+        "maximumShootingEqualityResidual": 5.5511151231257827E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.019130442460246963,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.028896,
+        "qpSeconds": 0.008579,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3900,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001171,
+        "predictionPreparationSeconds": 0.003998,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.0008749705053553527,
+            -0.00087494236768494214,
+            -0.00087491423575473276
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.043148,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          -7.3332895113144368E-6,
+          -0.1535558264162786
+        ]
+      },
+      "minimumReplayClearanceMeters": 17.3435463978082,
+      "stateAfterHold": [
+        2.2914403388565341,
+        -2.2375342884417028E-5,
+        -1.3961651771342007E-5,
+        7.3941267404611457,
+        -0.00010712012819353278,
+        -9.4098325181922723E-5
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.2625,
+          "position": [
+            1.9998137372130269,
+            0.0041703793696094265
+          ],
+          "acceleration": [
+            -1.0457784537049739,
+            0.0052431521729529289
+          ],
+          "yawRate": -2.6890202864398662E-5,
+          "relativePosition": [
+            22.731608328081638,
+            0.011749644055092226
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.275,
+          "position": [
+            2.1213737679603288,
+            -0.0022815879525257964
+          ],
+          "acceleration": [
+            -1.04306673207256,
+            0.011044773079249072
+          ],
+          "yawRate": 7.9531840827085063E-5,
+          "relativePosition": [
+            22.523816071661244,
+            -0.0074720244578943933
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.2875,
+          "position": [
+            2.1843054554560357,
+            0.01112120899932478
+          ],
+          "acceleration": [
+            -1.0421529608689297,
+            0.0013913058392667546
+          ],
+          "yawRate": 0.00047553925559280303,
+          "relativePosition": [
+            22.324563571719406,
+            -0.0082802174919169372
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.3,
+          "position": [
+            2.3031723566512041,
+            0.016026909389193572
+          ],
+          "acceleration": [
+            -1.0378006896697858,
+            0.0034595001290326174
+          ],
+          "yawRate": -0.00080499094474749,
+          "relativePosition": [
+            22.16276847023261,
+            -0.0029428819774192511
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.3,
+      "input": [
+        -1.3322851525760354E-5,
+        -0.076494550111111767
+      ],
+      "memory": 8.5135516787282364E-19,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 7,
+        "maximumLinearizedConstraintViolation": 0,
+        "maximumShootingEqualityResidual": 5.5511151231257827E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.02062409320463492,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.028752,
+        "qpSeconds": 0.007527,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3864,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001179,
+        "predictionPreparationSeconds": 0.003933,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.00078908282479997157,
+            -0.00078910244493808634,
+            -0.00078912206164779663
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.041916,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          -4.4814544213188004E-5,
+          -0.11154401271465279
+        ]
+      },
+      "minimumReplayClearanceMeters": 16.558523745635455,
+      "stateAfterHold": [
+        2.6602100513797255,
+        -3.226337301539191E-5,
+        -1.7056140963995512E-5,
+        7.3566628929613431,
+        -6.4326128345167482E-5,
+        -4.338164727347694E-5
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.3125,
+          "position": [
+            2.38853190151005,
+            0.0046594194841521131
+          ],
+          "acceleration": [
+            -0.74893750720480512,
+            3.4631703469522354E-5
+          ],
+          "yawRate": 0.00057855325291191135,
+          "relativePosition": [
+            21.96062524410587,
+            -0.013110383902423289
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.325,
+          "position": [
+            2.4748436359477011,
+            0.013848212858988653
+          ],
+          "acceleration": [
+            -0.74482239538198158,
+            -0.0047393348473404153
+          ],
+          "yawRate": -5.5713865552040516E-5,
+          "relativePosition": [
+            21.74430024167102,
+            0.0093765929902376137
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.3375,
+          "position": [
+            2.562948753566336,
+            -0.019233104913232511
+          ],
+          "acceleration": [
+            -0.76114438657730388,
+            -0.0048225125588223783
+          ],
+          "yawRate": -0.00059144794219256739,
+          "relativePosition": [
+            21.547083390591364,
+            -0.01136098150951537
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.35,
+          "position": [
+            2.6568268373183765,
+            -0.0005352072387807056
+          ],
+          "acceleration": [
+            -0.74608935017338507,
+            -0.011533646392635263
+          ],
+          "yawRate": -0.00051642215222863193,
+          "relativePosition": [
+            21.346406582347768,
+            -0.014666451762444589
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.35,
+      "input": [
+        2.2240313253883407E-6,
+        -0.049181557875157114
+      ],
+      "memory": -2.6404269928505314E-18,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 7,
+        "maximumLinearizedConstraintViolation": 0,
+        "maximumShootingEqualityResidual": 5.5511151231257827E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.021737425849282326,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.027779,
+        "qpSeconds": 0.007265,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3864,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001174,
+        "predictionPreparationSeconds": 0.003818,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.000848852001637109,
+            -0.0008488318894305343,
+            -0.00084881178018176423
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.040658,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          -1.3322851525760354E-5,
+          -0.076494550111111767
+        ]
+      },
+      "minimumReplayClearanceMeters": 15.772591494529124,
+      "stateAfterHold": [
+        3.0273914101348089,
+        -4.0724929831763938E-5,
+        -1.7995499659389018E-5,
+        7.3305922426854391,
+        -2.1635969645715892E-5,
+        -4.6077706576633978E-6
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.3625,
+          "position": [
+            2.7432580605665393,
+            0.0019398337506999494
+          ],
+          "acceleration": [
+            -0.51006688219923146,
+            -0.0022339991617688062
+          ],
+          "yawRate": 0.00066206290762200993,
+          "relativePosition": [
+            21.158620319338219,
+            -0.01754019598712173
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.375,
+          "position": [
+            2.8252570915461024,
+            -0.003094412437487874
+          ],
+          "acceleration": [
+            -0.52459783662651938,
+            0.005940854595673316
+          ],
+          "yawRate": 1.3877024799245302E-6,
+          "relativePosition": [
+            20.955931675897663,
+            0.013712084748176321
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.38749999999999996,
+          "position": [
+            2.9360133713724039,
+            -0.0090302360075242925
+          ],
+          "acceleration": [
+            -0.51065711064558228,
+            0.010858537208082195
+          ],
+          "yawRate": 0.00065730599233216464,
+          "relativePosition": [
+            20.758813676634048,
+            -0.015041567357660008
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.39999999999999997,
+          "position": [
+            3.0361645812391518,
+            -0.012126735152352719
+          ],
+          "acceleration": [
+            -0.529064981790692,
+            -0.010024188073033879
+          ],
+          "yawRate": 0.00046207846472432395,
+          "relativePosition": [
+            20.5852802610437,
+            -0.00827179900639232
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.39999999999999997,
+      "input": [
+        -0.0019244577847623353,
+        -0.17411084680350913
+      ],
+      "memory": -5.1701204655452722E-20,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 7,
+        "maximumLinearizedConstraintViolation": 4.7527695361121447E-6,
+        "maximumShootingEqualityResidual": 1.3877787807814457E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.025927430118594684,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.028378,
+        "qpSeconds": 0.007292,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3864,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001144,
+        "predictionPreparationSeconds": 0.003827,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.0008109462068298524,
+            -0.0008109339311587893,
+            -0.0008109216549420853
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.041109,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          2.2240313253883407E-6,
+          -0.049181557875157114
+        ]
+      },
+      "minimumReplayClearanceMeters": 14.986658168214779,
+      "stateAfterHold": [
+        3.3919670802072894,
+        -0.00016143335963970286,
+        -0.00013133924030342845,
+        7.2524383521802873,
+        -0.0033472988007364171,
+        -0.0035589261819591257
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.4125,
+          "position": [
+            3.1095842376249974,
+            -0.0087691667657729087
+          ],
+          "acceleration": [
+            -1.5604344650773643,
+            -0.1041510569212537
+          ],
+          "yawRate": -0.0013814497827364417,
+          "relativePosition": [
+            20.377506060802418,
+            0.00017129818498227571
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.425,
+          "position": [
+            3.191752663795532,
+            -0.002344231358419397
+          ],
+          "acceleration": [
+            -1.5595928136813435,
+            -0.088937358522156951
+          ],
+          "yawRate": -0.0022468517364825557,
+          "relativePosition": [
+            20.189303688507511,
+            -0.0012347108529692623
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.4375,
+          "position": [
+            3.3029043680626997,
+            0.0098626849809989835
+          ],
+          "acceleration": [
+            -1.5586341245119741,
+            -0.077916927625122742
+          ],
+          "yawRate": -0.00283942730717905,
+          "relativePosition": [
+            19.992256809390724,
+            0.01921234844259314
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.44999999999999996,
+          "position": [
+            3.3819474274051617,
+            0.0028858515773303277
+          ],
+          "acceleration": [
+            -1.5549245313072491,
+            -0.059538772042549072
+          ],
+          "yawRate": -0.0033473903663134076,
+          "relativePosition": [
+            19.795498221861958,
+            0.00711536775897368
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.44999999999999996,
+      "input": [
+        0.0026450073383937622,
+        -0.46111589330642411
+      ],
+      "memory": 1.0105161717940775E-19,
+      "posteriorCount": 3,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 6,
+        "maximumLinearizedConstraintViolation": 3.3698245416324824E-6,
+        "maximumShootingEqualityResidual": 6.7678053048900177E-11,
+        "maximumConstraintViolation": null,
+        "objective": 0.046378331938429052,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.028179,
+        "qpSeconds": 0.006554,
+        "stageFlowEvaluations": 108,
+        "qpVariables": 222,
+        "qpNonzeros": 3864,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001197,
+        "predictionPreparationSeconds": 0.003975,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 3,
+          "retainedIndices": [
+            1,
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            -0.0011984450011141932,
+            -0.0011982414494526358,
+            -0.0011980385559982988
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.040383,
+        "memoryDimension": 1,
+        "hypothesisCount": 3,
+        "scenarioCount": 3,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          -0.0019244577847623353,
+          -0.17411084680350913
+        ]
+      },
+      "minimumReplayClearanceMeters": 14.205292876772496,
+      "stateAfterHold": [
+        3.7496437862353944,
+        -0.00018172657328737742,
+        -6.6676133689357351E-5,
+        7.054638708458679,
+        0.0032306166395980268,
+        0.0040458499906482577
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.46249999999999997,
+          "position": [
+            3.4843381491575842,
+            -0.0042535290441470556
+          ],
+          "acceleration": [
+            -3.9645980381439463,
+            0.16141334948660019
+          ],
+          "yawRate": -0.00085603688538264232,
+          "relativePosition": [
+            19.594048788413623,
+            0.0073806177310577429
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.475,
+          "position": [
+            3.585739136793697,
+            0.010398519638550929
+          ],
+          "acceleration": [
+            -3.9644489213251988,
+            0.14023620940145207
+          ],
+          "yawRate": 0.0011194755373153025,
+          "relativePosition": [
+            19.39499892091451,
+            -0.0075697158993403083
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.48749999999999993,
+          "position": [
+            3.6805261031802052,
+            0.0038137644546211366
+          ],
+          "acceleration": [
+            -3.9685282485560167,
+            0.11434229036543363
+          ],
+          "yawRate": 0.0037766631782636517,
+          "relativePosition": [
+            19.210404889484462,
+            0.017474569343938644
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.49999999999999994,
+          "position": [
+            3.7569006436614645,
+            -0.010234466550010462
+          ],
+          "acceleration": [
+            -3.9584399236596761,
+            0.10608986133547925
+          ],
+          "yawRate": 0.0034190648635797978,
+          "relativePosition": [
+            19.022782571919635,
+            -0.0048994422897955386
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.49999999999999994,
+      "input": [
+        -0.0019104899987183004,
+        -0.70222325831853882
+      ],
+      "memory": 3.5155087309796167E-12,
+      "posteriorCount": 2,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 7,
+        "maximumLinearizedConstraintViolation": 4.9948079116624022E-6,
+        "maximumShootingEqualityResidual": 2.1942322091239586E-13,
+        "maximumConstraintViolation": null,
+        "objective": 0.069806088931681429,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.01854,
+        "qpSeconds": 0.005845,
+        "stageFlowEvaluations": 72,
+        "qpVariables": 162,
+        "qpNonzeros": 2602,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.001209,
+        "predictionPreparationSeconds": 0.002617,
+        "conditioning": {
+          "priorCount": 3,
+          "posteriorCount": 2,
+          "retainedIndices": [
+            2,
+            3
+          ],
+          "maximumNoiseExcess": [
+            0.0022783374985367796,
+            -0.00082044692257680039,
+            -0.00082095386934394679
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.028708,
+        "memoryDimension": 1,
+        "hypothesisCount": 2,
+        "scenarioCount": 2,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          0.0026450073383937622,
+          -0.46111589330642411
+        ]
+      },
+      "minimumReplayClearanceMeters": 13.433758484853858,
+      "stateAfterHold": [
+        4.0949186266555264,
+        -0.00019073358836724002,
+        -7.6732164293212779E-5,
+        6.7563651314362927,
+        -0.0020151908623823123,
+        -0.0025628776804089166
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.5125,
+          "position": [
+            3.824642824610919,
+            0.0035024934898964062
+          ],
+          "acceleration": [
+            -5.9573177215656274,
+            -0.11361101382410857
+          ],
+          "yawRate": 0.0013703271088879975,
+          "relativePosition": [
+            18.799414778696207,
+            0.0090242596679763858
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.52499999999999991,
+          "position": [
+            3.9232492921502007,
+            0.0016212111380814133
+          ],
+          "acceleration": [
+            -5.9685258048177516,
+            -0.10559169159772752
+          ],
+          "yawRate": 2.8177381790874521E-5,
+          "relativePosition": [
+            18.61475405914997,
+            0.0020418067902267037
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.5375,
+          "position": [
+            3.9959930744432035,
+            -0.011748529304100308
+          ],
+          "acceleration": [
+            -5.9518092522584531,
+            -0.084109498145004138
+          ],
+          "yawRate": -0.002135478348426693,
+          "relativePosition": [
+            18.434971784284862,
+            -0.015756253829173211
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.54999999999999993,
+          "position": [
+            4.0940750247907483,
+            -0.0045824672611934313
+          ],
+          "acceleration": [
+            -5.9636549071407137,
+            -0.077188731708855776
+          ],
+          "yawRate": -0.0022634693574597785,
+          "relativePosition": [
+            18.219903555276311,
+            -0.004861877879282139
+          ],
+          "radarAvailable": true
+        }
+      ]
+    },
+    {
+      "time": 0.54999999999999993,
+      "input": [
+        0.0032147031064904824,
+        -0.89524247764503784
+      ],
+      "memory": 2.55323320015432E-12,
+      "posteriorCount": 1,
+      "metadata": {
+        "sqpIterations": 1,
+        "acceptedSteps": 1,
+        "qpExitFlag": 1,
+        "qpIterations": 6,
+        "maximumLinearizedConstraintViolation": 4.8030945004051695E-6,
+        "maximumShootingEqualityResidual": 2.7755575615628914E-17,
+        "maximumConstraintViolation": null,
+        "objective": 0.10340339958293265,
+        "shiftedPlanRevalidated": false,
+        "usedRevalidatedFallback": false,
+        "nonlinearValidationPerformed": false,
+        "horizonSteps": 4,
+        "hardCollisionConstraints": true,
+        "terminalControllerActive": false,
+        "linearizationSeconds": 0.011478,
+        "qpSeconds": 0.003443,
+        "stageFlowEvaluations": 36,
+        "qpVariables": 102,
+        "qpNonzeros": 1340,
+        "sparseQp": true,
+        "predictionIsLinearized": true,
+        "auxiliaryNodesAreNominal": true,
+        "initialization": false,
+        "deadlineSeconds": 0.05,
+        "deadlineMissed": false,
+        "informationUpdateSeconds": 0.000852,
+        "predictionPreparationSeconds": 0.002729,
+        "conditioning": {
+          "priorCount": 2,
+          "posteriorCount": 1,
+          "retainedIndices": 1,
+          "maximumNoiseExcess": [
+            -0.00081687479508345663,
+            0.012819523555153013
+          ],
+          "rawReadingsConditioned": 4,
+          "representation": "finiteConsistentHypotheses"
+        },
+        "elapsedSeconds": 0.020071,
+        "memoryDimension": 1,
+        "hypothesisCount": 1,
+        "scenarioCount": 1,
+        "safetyScope": "finiteJointScenariosLinearizedRti",
+        "robustNonlinearSafetyCertified": false,
+        "recursiveFeasibilityCertified": false,
+        "optimizationReturned": true,
+        "wholeHoldReserveScope": "engineeringIntersampleMarginNoCertificate",
+        "predictionModel": "jointDynamicOutputFeedbackSparseMultipleShooting",
+        "sensorContract": "positionOnlyGnssBodyImuGyroRelativeRadar",
+        "previousInputUsedForMeasurements": [
+          -0.0019104899987183004,
+          -0.70222325831853882
+        ]
+      },
+      "minimumReplayClearanceMeters": 12.676700380439572,
+      "stateAfterHold": [
+        4.4232689473096514,
+        -0.00011880921535072843,
+        3.2287967504685848E-5,
+        6.3776616722088271,
+        0.00443673669692252,
+        0.0047557604973306328
+      ],
+      "rawSensorBlock": [
+        {
+          "time": 0.56249999999999989,
+          "position": [
+            4.1876693999608214,
+            0.014985714112356354
+          ],
+          "acceleration": [
+            -7.5778284591825358,
+            0.16428583800294558
+          ],
+          "yawRate": 0.0011426211128815248,
+          "relativePosition": [
+            18.039517709527029,
+            -0.0036373348671214167
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.575,
+          "position": [
+            4.2803953641489771,
+            -0.0062083659991392951
+          ],
+          "acceleration": [
+            -7.5695516291864413,
+            0.13903657982413051
+          ],
+          "yawRate": 0.0026785631825112666,
+          "relativePosition": [
+            17.849978800233057,
+            0.01056958644248274
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.58749999999999991,
+          "position": [
+            4.3328478015775245,
+            0.00579415624625416
+          ],
+          "acceleration": [
+            -7.5667506400627342,
+            0.12411295769688908
+          ],
+          "yawRate": 0.0041783848991417709,
+          "relativePosition": [
+            17.676832138198826,
+            0.010660776632789472
+          ],
+          "radarAvailable": true
+        },
+        {
+          "time": 0.6,
+          "position": [
+            4.4255396783935792,
+            0.013350890721394285
+          ],
+          "acceleration": [
+            -7.5778664945582994,
+            0.11571367421690792
+          ],
+          "yawRate": 0.0043425192200802149,
+          "relativePosition": [
+            17.475626410113865,
+            -0.015613717582999915
+          ],
+          "radarAvailable": true
+        }
+      ]
+    }
+  ]
+}

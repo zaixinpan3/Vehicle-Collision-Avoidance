@@ -1,0 +1,11 @@
+Executed: matlab -batch "run('/tmp/validate_target_contract.m')"
+
+Script contents:
+cd('/home/zai/Downloads/ResearchProjects/collisionAvoidance');
+files={'tests/dynamicOutputFeedbackTest.m','tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m','tests/modifiedFialaTireTest.m','tests/longitudinalRoadLoadTest.m','tests/rtiModelConsistencyTest.m','tests/terminalSafeSetTest.m','tests/controllerInputGeometryTest.m'};
+results=runtests(files);writetable(table(results),'report/TARGET_MOTION_CONTRACT_20261104/tests.csv');assertSuccess(results);
+addpath('scripts');
+runJointOutputFeedbackScenario(Scenarios=["headOn","acceleratingHeadOn","intersectionCrossing","curvedHeadOn"],Speeds=8,Frames=30,OutputDirectory='report/TARGET_MOTION_CONTRACT_20261104/continuing');
+runJointOutputFeedbackScenario(Scenarios=["stoppedLead","hardBrakingLead"],Speeds=8,Frames=30,OutputDirectory='report/TARGET_MOTION_CONTRACT_20261104/stopping-regression');
+
+All 230 selected tests passed. Full repository test suite not run.

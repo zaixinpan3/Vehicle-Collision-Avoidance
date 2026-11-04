@@ -2895,12 +2895,6 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
     inferenceTimer=tic;
     [hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
     inferenceSeconds=toc(inferenceTimer);
-    for j=1:numel(hypotheses)
-        q=hypotheses(j).target;
-        assert(isempty(q) || q(4)==0 || q(5)<=-cfg.outputFeedback.minimumTargetDeceleration, ...
-            'collisionAvoidanceController:unsupportedTerminalMode', ...
-            'The current terminal component requires an absorbed target or a declared braking-to-stop target.');
-    end
     preparationTimer=tic;
     problem=localOfProblem(hypotheses,memory,block.heldInput,policies,request.reference,cfg);
     preparationSeconds=toc(preparationTimer);
@@ -3268,7 +3262,8 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
                         x(1:3),shape,q(1:3),q(8:11),witness(2*check-1:2*check),0);
                     dc(base+(check-1)*8+(1:8),10+nm+(2*check-1:2*check))=-gj(:,4:5);
                 end
-                if i==n
+                if i==n && (trace.targets(4,end)==0 || ...
+                        trace.targets(5,end)<=-of.minimumTargetDeceleration)
                     dc(end-3:end,10+nm+(5:6))=-gj(1:4,4:5);
                 end
             end
@@ -3410,11 +3405,24 @@ function [r,c,f]=localOfStageValues(z,data,policy,item,problem,stage)
             absolute=@(v)sqrt(v.^2+of.smoothAbsoluteValue^2);
             fadingTravel=(absolute(data.next(4))+tau/2*absolute(data.next(5)*data.next(6)))/lambda;
             egoTravel=max(0,data.next(4))^2/(2*deceleration)+fadingTravel+tau*absolute(data.next(5));
-            targetTravel=0;
-            if target(4)>0,targetTravel=target(4)^2/(-2*target(5));end
-            endpointRows=predictiveSafetyGeometry.separationWitnessRows( ...
-                data.next(1:3),shape,target(1:3),target(8:11),witness(:,end),of.clearanceMeters);
-            c=[c;egoTravel+targetTravel-endpointRows(1:4)];
+            if target(4)==0 || target(5)<=-of.minimumTargetDeceleration
+                % This finite-stop component is optional, not a model contract.
+                targetTravel=0;
+                if target(4)>0,targetTravel=target(4)^2/(-2*target(5));end
+                endpointRows=predictiveSafetyGeometry.separationWitnessRows( ...
+                    data.next(1:3),shape,target(1:3),target(8:11),witness(:,end),of.clearanceMeters);
+                c=[c;egoTravel+targetTravel-endpointRows(1:4)];
+            else
+                % Continuing targets retain their actual constant A and beta.
+                % A fixed finite continuation replaces an infinite stopping
+                % distance. It is a sampled deployment heuristic, not an
+                % invariant terminal certificate or a target-stopping assumption.
+                radius=norm(shape(1:2)+abs(shape(3:4)))+norm(target(8:9)+abs(target(10:11)));
+                for time=of.terminalPreviewSeconds*[.5,1]
+                    future=predictiveSafetyGeometry.predictTarget(target,time);
+                    c=[c;radius+of.clearanceMeters+egoTravel-norm(future(1:2)-data.next(1:2))]; %#ok<AGROW>
+                end
+            end
         end
     end
 end

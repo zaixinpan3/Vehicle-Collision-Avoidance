@@ -29,8 +29,9 @@ one sparse RTI QP is executed without nonlinear acceptance or a universal safety
 [interface](../README.md#controller-interface),
 [theory](../controller/CONTROLLER_THEORY.md), and
 [measurements](../report/SPARSE_RTI_20261104.tex) state the supported
-contract and limits. The approximate deployment terminal reserve supports stopped or braking
-targets. Inference failure or failure of the single QP issues no
+contract and limits. Constant tangential acceleration (zero, positive or negative)
+and constant sideslip define the target-motion contract. The deployment terminal
+approximation supports continuing targets through a finite motion preview. Inference failure or failure of the single QP issues no
 command. Scenario files record such failures explicitly.
 
 ## Finite-input information-state reference

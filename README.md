@@ -95,10 +95,16 @@ The separate comparator horizon in `cfg.controller` does not size this pipeline.
 and its collision obligation. The deployment terminal constraint approximates remaining travel by constant
 braking deceleration plus a fading-brake travel term, with a configured
 engineering intersample margin. It
-is not the invariant terminal certificate in the theory. It supports absorbed
-targets or targets that maintain constant negative acceleration until absorption.
-It does not cover continuing target motion, target restart, residual physical
-forces, multiple targets, or hard road constraints. No observer sideslip cone
+is not the invariant terminal certificate in the theory. Target tangential
+acceleration and sideslip stay constant: zero, positive and negative acceleration
+are all supported, including curved motion. The finite-stop reserve is used only
+where applicable. Continuing targets instead use two samples of their actual
+constant-motion continuation over `terminalPreviewSeconds` (default 0.5 s),
+against an approximate ego braking-travel enclosure. This finite terminal
+preview is not an infinite-horizon certificate. `minimumTargetDeceleration`
+selects the finite-stop component; it is not a target-admission bound.
+Target restart after an absorbing stop, residual physical forces, multiple
+targets, and hard road constraints remain outside this implementation. No observer sideslip cone
 is imposed on this new pipeline; its physical speed, lateral-velocity and yaw
 caps are imposed as linearized constraints at prediction nodes.
 

@@ -1,0 +1,70 @@
+{
+  "scope": "joint dynamic output feedback with finite uncertainty scenarios",
+  "pipeline": "dynamicOutputFeedback",
+  "results": [
+    {
+      "scenario": "headOn",
+      "referenceSpeedMetersPerSecond": 8,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "failed",
+      "executedFrames": 13,
+      "failure": "collisionAvoidanceController:noOutputFeedbackPlan: The single RTI QP failed (exit flag -2). No command was committed.",
+      "minimumReplayClearanceMeters": 10.924983757653537,
+      "startupWarmupSeconds": 0.506283,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0.017885,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/TARGET_MOTION_CONTRACT_20261104/continuing/8-headOn.json"
+    },
+    {
+      "scenario": "acceleratingHeadOn",
+      "referenceSpeedMetersPerSecond": 8,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "failed",
+      "executedFrames": 12,
+      "failure": "collisionAvoidanceController:noOutputFeedbackPlan: The single RTI QP failed (exit flag -2). No command was committed.",
+      "minimumReplayClearanceMeters": 12.676700380439572,
+      "startupWarmupSeconds": 0.243473,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0.018648,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/TARGET_MOTION_CONTRACT_20261104/continuing/8-acceleratingHeadOn.json"
+    },
+    {
+      "scenario": "intersectionCrossing",
+      "referenceSpeedMetersPerSecond": 8,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 30,
+      "failure": "",
+      "minimumReplayClearanceMeters": 5.21650740354647,
+      "startupWarmupSeconds": 0.220851,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/TARGET_MOTION_CONTRACT_20261104/continuing/8-intersectionCrossing.json"
+    },
+    {
+      "scenario": "curvedHeadOn",
+      "referenceSpeedMetersPerSecond": 8,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "failed",
+      "executedFrames": 13,
+      "failure": "collisionAvoidanceController:noOutputFeedbackPlan: The single RTI QP failed (exit flag -2). No command was committed.",
+      "minimumReplayClearanceMeters": 10.831598706290608,
+      "startupWarmupSeconds": 0.207653,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0.017384,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/TARGET_MOTION_CONTRACT_20261104/continuing/8-curvedHeadOn.json"
+    }
+  ]
+}

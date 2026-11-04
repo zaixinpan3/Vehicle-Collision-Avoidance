@@ -479,6 +479,19 @@ retains a reserve for the fading low-speed brake. This combined approximation is
 not the fading-brake invariant certificate of Section 5 and has no universal
 guarantee, especially near low-speed transitions or combined tire saturation.
 
+The stopping construction above is only one terminal component. It imposes
+no sign restriction on the admitted target acceleration. The actual target
+contract remains $\dot A_T=0$, $\dot\beta_T=0$, with an absorbing stop at zero
+speed. For continuing targets outside the finite-stop component, deployment
+predicts their actual persistent-parameter motion at two terminal continuation
+times, $T_p/2$ and $T_p$ ($T_p=0.5$ s by default). At each time it constrains
+reference-point separation to exceed the two footprint radii, requested
+clearance and the approximate remaining ego braking travel. This sampled finite
+preview replaces the inapplicable target stopping-distance expression; it is
+not an invariant set, infinite-horizon continuation proof, or assertion that
+the target will brake. The existing stopping component still applies to
+absorbed or sufficiently braking hypotheses without rejecting other hypotheses.
+
 Numerical state and geometry inequalities allow half the configured constraint
 tolerance; actuator magnitude and slew rows have no such allowance. This bounds
 the numerical tolerance of the QP, not the nonlinear residual.

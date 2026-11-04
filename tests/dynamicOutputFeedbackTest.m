@@ -7,6 +7,10 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
         state
         prediction
     end
+    properties (TestParameter)
+        targetAcceleration = {0,.5,-.01}
+        targetSideslip = {0,.04}
+    end
     methods (TestClassSetup)
         function prepareJointController(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -95,12 +99,20 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
                 'duration',.05,'endOfHold',true));
             testCase.verifyEqual(next.target,hypothesis.target,AbsTol=0);
         end
-        function aContinuingTargetNeedsAnotherTerminalCertificate(testCase)
-            [cfg,hypothesis,block]=localFixture();hypothesis.target(4)=1;
+        function constantAccelerationAndSideslipTargetsReachTheQp(testCase,targetAcceleration,targetSideslip)
+            [cfg,hypothesis,block]=localFixture();
+            hypothesis.target(4:6)=[1;targetAcceleration;targetSideslip];
             block.initialHypotheses=hypothesis;
             block.samples=localOperation('sensor',cfg,struct('hypothesis',hypothesis,'input',block.heldInput,'time',0));
-            testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,[]), ...
-                'collisionAvoidanceController:unsupportedTerminalMode');
+            [command,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
+            nextBlock=localNextBlock(state,cfg);
+            [nextCommand,~,nextPrediction,nextState]=collisionAvoidanceController(nextBlock,[],[],cfg,state);
+            testCase.verifyTrue(all(isfinite([command.actuatorInput;nextCommand.actuatorInput])));
+            testCase.verifyEqual([prediction.metadata.sqpIterations,nextPrediction.metadata.sqpIterations],[1,1]);
+            testCase.verifyEqual(nextState.hypotheses.target(5:6),[targetAcceleration;targetSideslip],AbsTol=0);
+            expected=predictiveSafetyGeometry.predictTarget(hypothesis.target, ...
+                cfg.outputFeedback.horizonSteps*cfg.controller.sampleTime);
+            testCase.verifyEqual(prediction.scenarios{1}.targets(:,end),expected,AbsTol=1e-10);
         end
         function aSingleMeasurementDoesNotInventAnInitialInformationSet(testCase)
             block=rmfield(testCase.block,'initialHypotheses');

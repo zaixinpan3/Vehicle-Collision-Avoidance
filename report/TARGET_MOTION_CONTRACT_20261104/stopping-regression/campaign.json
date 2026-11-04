@@ -1,0 +1,38 @@
+{
+  "scope": "joint dynamic output feedback with finite uncertainty scenarios",
+  "pipeline": "dynamicOutputFeedback",
+  "results": [
+    {
+      "scenario": "stoppedLead",
+      "referenceSpeedMetersPerSecond": 8,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 30,
+      "failure": "",
+      "minimumReplayClearanceMeters": 18.150032468723595,
+      "startupWarmupSeconds": 0.174098,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/TARGET_MOTION_CONTRACT_20261104/stopping-regression/8-stoppedLead.json"
+    },
+    {
+      "scenario": "hardBrakingLead",
+      "referenceSpeedMetersPerSecond": 8,
+      "observationModel": "rawSensorJointDynamicOutputFeedback",
+      "randomSeed": 2.0261104E+7,
+      "outcome": "completed",
+      "executedFrames": 30,
+      "failure": "",
+      "minimumReplayClearanceMeters": 19.399248189269002,
+      "startupWarmupSeconds": 0.192223,
+      "warmupEnabled": true,
+      "failureCallSeconds": 0,
+      "initialContractScope": "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure",
+      "robustSafetyCertified": false,
+      "source": "report/TARGET_MOTION_CONTRACT_20261104/stopping-regression/8-hardBrakingLead.json"
+    }
+  ]
+}
