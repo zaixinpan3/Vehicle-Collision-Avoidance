@@ -24,6 +24,12 @@ the joint prediction, with one copy of each persistent model parameter and
 measurement-noise primitive. Bounded current error alone is not a proof of
 sound future prediction or measurement-consistent shifting.
 
+The [compact-certificate construction](#compact-certificate) below derives a
+lower-dimensional alternative to simulating every future observer state and
+sensor history. It uses sampled observer comparisons and nonlinear relative
+physical tubes. This is a theoretical reduction with explicit admission and
+shift conditions; it has not replaced the online joint-affine predictor.
+
 The implemented active encounter minimizes the sum of collision slacks first,
 then tracking and input variation without spending the attained primary budget.
 Without a target, the integrated continuous-time CLF supplies a soft cruise condition.
@@ -37,6 +43,7 @@ execution veto in RTI.
 | Layer | Mathematical object and scope |
 | --- | --- |
 | Nonlinear design | PCBF slack minimization and execution of any attained minimizer's first command, with causal joint observer/controller policies, sound reachable information sets, continuous separating witnesses, hard admissibility and a shift-compatible terminal family. Theorem U gives conditional recursive feasibility and zero-deficit invariance without a secondary optimization. |
+| Compact nonlinear certificate design | Sampled observer-error comparisons coupled to relative physical tubes, with inherited certificate coordinates and nested measurement updates. Theorem C specializes the shift proof to this outer representation; full-domain coupling constants and representable terminal closure must be supplied before deployment. |
 | Engineering nonlinear transcription | Nonlinear Fiala motion and plane/terminal constraints with a frame-frozen joint affine uncertainty prediction. Accepted shooting updates may refresh that prediction. These margins are not certified nonlinear reachable sets. |
 | Online SQP-RTI | One linearization of that transcription, including its plane variables and terminal function, with a Gauss--Newton performance Hessian. One primary LP and at most one secondary QP share the same local model. Convex solver iterations are not additional SQP linearizations. |
 | Optional retained-certificate research mode | Full-domain joint enclosures and retained policy-box/terminal certificates. Its admission restrictions in Section 8 are separate from ordinary RTI. |
@@ -86,7 +93,8 @@ driving objective.
 4. [One nominal CLF and recovery](#nominal-clf)
 5. [Joint terminal set and braking continuation](#terminal-set)
 6. [Joint feedback-aware prediction](#joint-prediction)
-7. [Unified observer-to-safety formulation](#recursive-feasibility)
+7. [Unified observer-to-safety formulation](#recursive-feasibility), including
+   [compact sampled certificates](#compact-certificate)
 8. [Numerical realization and certificate boundary](#runtime)
 9. [Source map and verification](#source-map)
 10. [Sources](#sources)
@@ -2381,6 +2389,393 @@ sufficient suboptimal implementation contract, not a property bestowed on
 ordinary RTI by a small QP residual. This online RTI implementation deliberately
 does not add a nonlinear acceptance filter or retained backup execution and
 therefore does not claim (U8).
+
+<a id="compact-certificate"></a>
+### Compact nonlinear certificates: replace history rollout by error comparisons
+
+The exact augmented construction (U1) remains the semantic model. The
+following reduction changes its **outer representation**, not the physical
+vehicle, the observer, the causal information available to control, or the
+meaning of collision slack. It does not introduce a linear tire model, a
+friction polygon, a fixed-width tube, or a new terminal-controller design.
+
+There are two different errors to retain:
+
+1. Estimation error: an observer output minus the physical quantity on the
+   **same** realization. Future sensing can reduce this error.
+2. Physical prediction spread: variation of physical trajectories across
+   different admissible realizations. Future sensing does not retrospectively
+   reveal which target trajectory occurs, but future ego control can respond
+   differently to the resulting estimates.
+
+Replacing target prediction spread by a small future estimation radius is
+invalid. Instead the physical relative tube and the estimation-error
+comparison must be coupled through the causal policy.
+
+**Relative physical coordinates.** Use
+\[
+ \rho=R(\psi_E)^T(p_T-p_E),\qquad \alpha=\psi_T-\psi_E,
+ \quad v_T^E=R(\psi_E)^T\dot p_T.
+\]
+Common rigid translation and rotation cancel from this relative pose. For a
+nominal comparison branch, (J8) implies exactly
+\[
+ \Delta\dot\rho=\Delta v_T^E-\Delta v_E
+       -\omega_EJ\Delta\rho-\Delta\omega_EJ\bar\rho,
+ \quad
+ D^+\|\Delta\rho\|\le\|\Delta v_T^E-\Delta v_E\|
+                      +|\Delta\omega_E|\|\bar\rho\|.         \tag{C1}
+\]
+The term \(\Delta\rho^TJ\Delta\rho\) vanishes. Adding
+\(|\omega_E|\|\Delta\rho\|\) would create artificial norm growth from
+a pure rotation. Likewise, combine the shared terms of
+\(\Delta v_T^E-\Delta v_E\) before taking support bounds. Absolute yaw
+and position errors still matter to world-referenced policies; their removal
+from collision geometry does not remove them from those policies.
+
+Let \(z\) contain sufficient physical coordinates to evaluate the relative
+flow, admissibility, and chosen policy outputs. Relative pose alone is not a
+closed vehicle state: body velocities, yaw rates and target motion variables
+are also required. Keep persistent tire parameters and target encounter
+parameters in \(\lambda\), with \(\lambda^+=\lambda\). Their domain may
+shrink with new information but is not independently regenerated at future
+steps. Constant target acceleration/sideslip is a prediction assumption for
+the encounter, not an extra restriction on the standalone NRMM observer.
+
+**A small observer interface.** Equations (S1)--(S8) in
+[the observer derivation](../estimator/OBSERVER_ISS_THEORY.md#compact-sampled-comparison)
+give explicit sampled bounds for the position/IMU filter, body/target core,
+vector yaw innovation, and published ego position. At synchronized detected
+samples a candidate interface is
+\[
+ e=[B_f,B_v,W_T,B_\psi,B_p]^T\ge0.                            \tag{C2}
+\]
+These are bounds on errors, not simulated observer estimates. Reset predictor
+memory is eliminated only at reset instants, using its exact intersample
+equations. Retain additional coordinates whenever an output, asynchronous
+sensor phase, stop event or policy memory is not covered by (C2). In
+particular an NRMM velocity/acceleration error bound is not by itself a target
+orientation bound at zero target speed.
+
+The two-state homogeneous sampled core contracts for a sufficiently short
+sensor period under the explicit conditions (S4). The position filter
+contracts in its Lyapunov metric under bounded acceleration discrepancy.
+Neither fact establishes uniform contraction of their yaw-coupled
+interconnection. A valid yaw bound may be the whole circle at standstill.
+
+**Close the physical map with future feedback.** Restrict implementation of
+the theoretical policy class, if desired, to finite-dimensional causal
+rules
+\[
+ u_i=\kappa_i(\hat c_i,m_i;a_i),\qquad \hat c_i=c(z_i)+\epsilon_i,
+                                                                  \tag{C3}
+\]
+where \(m_i\) is sufficient observable memory, \(a_i\) is the stored policy
+parameter, and the error output \(\epsilon_i\) is enclosed by (C2).
+This identity is an analysis device: the controller evaluates \(\hat c_i\),
+not the unknown \(z_i\) or \(\epsilon_i\). At the current decision the
+actual observer outputs and **all memory used by the controller** are fixed,
+so (C3) has one common first command. Fixing observer memory alone would not
+suffice for a policy depending on an unretained earlier reading. Allowing
+independent physical and error coordinates must not
+override that root equality. Later decisions permit different commands on
+distinguishable histories. Control remains held across all intermediate
+sensor updates in the decision period, as in (J4).
+
+For the physical exact held-input transition \(F_h\), the controlled map is
+\(F_h(z,\kappa_i(c(z)+\epsilon,m;a_i);\lambda)\). On a smooth chart its
+derivative with respect to physical state includes the **combined** term
+\[
+ D_zF_h+D_uF_h\,D_{\hat c}\kappa_i\,D_zc,                    \tag{C4}
+\]
+and the relevant memory derivatives when memory varies. Bounding
+\(D_zF_h\) and the feedback term separately before combining them can erase
+stabilizing cancellation. Equation (C4) differentiates the exact held-input
+map; it is not continuous feedback recomputed inside a control hold.
+Whole-domain derivative bounds, or finite-increment bounds across nonsmooth
+pieces, give the nonlinear comparison. A nominal Jacobian without its
+remainder does not give that comparison.
+
+**Constructive comparison coefficients.** Choose physical residual blocks
+\(w_a\), metrics \(P_a>0\), and radii \(s_a\) with
+\(\|w_a\|_{P_a}\le s_a\). Use the sampled observer functionals (C2) for
+the remaining blocks. On a convex chart containing all comparison segments,
+a valid cross-block coefficient for a differentiable output map \(\Psi_a\)
+is
+\[
+ L_{ab}=\sup_{\mathcal D}
+ \|P_a^{1/2}D_b\Psi_a P_b^{-1/2}\|_2.                        \tag{C5}
+\]
+The map \(\Psi\) includes (C3) before differentiation. Integrating its
+derivative along a segment proves the finite-increment bound. Exact sampled
+identities such as (S1), (S5), (S8), and common rotations such as (C1) should
+be simplified before applying (C5). For observer blocks, signed-error
+identities or comparison bounds are used rather than differentiating a norm
+at zero. If no common smooth chart exists, partition the domain with valid
+transition handling or use a directly verified finite-increment modulus.
+Unbounded derivatives at a singular branch do not define finite coefficients.
+
+Together with bounded forcing and persistent-parameter contributions, this
+produces a monotone map of the form
+\[
+ \begin{bmatrix}s^+\\e^+\end{bmatrix}
+ \le\mathcal Q_i(s,e,\Lambda;a_i),\qquad
+ \mathcal Q_i(q,\Lambda;a_i)=M_iq+d_i(\Lambda),\quad M_i\ge0,  \tag{C6}
+\]
+when an affine majorant is available; a nonlinear order-preserving majorant
+is also admissible. All observer forcings, held-sensor aging, inverse-map
+uncertainty, target extension discrepancy and stop resets belong in this
+map. Compose sensor-period maps with the input held, then the decision reset;
+do not apply a new control policy after every sensor sample. The coefficient
+domain must enclose the resulting trajectories and every allowed memory.
+Domain containment is part of the certificate, not an outcome assumed after
+an otherwise invalid bound has been calculated.
+
+Equation (C5) is a specification for constructing certified constants, not
+an inexpensive online instruction to solve new global supremum problems.
+The intended reduction uses analytically bounded or offline-certified domain
+tiles, precomputed sampled kernels, and online matrix/vector evaluations.
+The five observer radii do not provide these whole-domain physical and
+force-inverse constants automatically. Their useful tightness for the full
+Fiala interconnection remains to be established before deployment.
+
+**Retain shared uncertainty where it matters.** A more informative physical
+representation is
+\[
+ z_i=\bar z_i+G_i\eta+w_i,\qquad \eta\in\Lambda,\qquad
+ \|w_{a,i}\|_{P_{a,i}}\le s_{a,i}.                            \tag{C7}
+\]
+Selected columns carry common pose errors, persistent parameters or shared
+sensor primitives. A column shared by two outputs is combined before taking
+its directional support. Nonlinear products and unretained histories are
+enclosed in residual blocks; no affine exactness is assumed. Fresh sensor
+noise is introduced once per actual sensor event, and all its uses share
+that primitive. A fixed generator budget may absorb old nonpersistent
+columns into a sound residual bound. It must not erase the identity of
+persistent physical parameters. The state dimension of the comparison can
+stay fixed without preserving every statistical or geometric dependence.
+
+A product of separately bounded plant and observer consequences of one
+parameter is a conservative enlargement. It is not necessary to add a
+second, independently invented mismatch disturbance on top of those same
+consequences. Retaining their shared columns can reduce that enlargement.
+Noise need not be independent, zero-mean, or averaged down; bounded
+deterministic sensor errors are sufficient for these inequalities.
+
+**What bounded width actually requires.** Suppose the full relevant
+comparison, after removing constant parameters into the forcing/domain,
+has a common weight \(v>0\) and constants \(0\le\gamma<1\), \(d<\infty\)
+such that, uniformly over the admitted policies and domains,
+\[
+ M_i v\le\gamma v,\qquad \|d_i\|_v\le d,
+ \quad\|q\|_v=\max_j |q_j|/v_j.
+\]
+Then induction gives
+\[
+ \|q_i\|_v\le\gamma^i\|q_0\|_v+
+                    d(1-\gamma^i)/(1-\gamma).               \tag{C8}
+\]
+A radius may increase toward this noise floor without diverging. More
+generally, a uniform product bound
+\(\|M_{i-1}\cdots M_j\|\le C\gamma^{i-j}\) gives the analogous
+geometric-series bound and permits expanding individual steps. If neither
+condition is available, the finite-horizon recurrence can still be sound,
+but bounded long-run width has not been proved. Position-only sensors at
+rest do not justify a positive yaw-contraction rate; saturated steering does
+not justify arbitrary relative-motion contraction. Constant uncertain target
+parameters cannot contract under \(\lambda^+=\lambda\) in a positive
+definite full-state metric. Thus (C8) is a checkable additional condition,
+not a universal consequence of having an observer. It is not needed for the
+recursive-feasibility argument that follows.
+
+**Finite certificate semantics and collision constraints.** Write
+\(\mathcal C=(\bar z,G,\Lambda,q,\mathcal D,\mathcal M)\), where
+\(\mathcal M\) constrains observable memory. Define \(\Gamma(\mathcal C)\)
+as the set of full joint states consistent with these data and their
+anchored error functionals. There must be one physical/observer realization
+behind each member, with shared parameters; alternatively a deliberate
+outer product enlargement is allowed if all subsequent claims cover that
+larger set. At the current root \(\mathcal M\) fixes actual memory. At
+future stages it covers every possible memory required by the policy and
+the sampled error contract.
+
+Retained primitive values are part of this latent augmented state: all
+functionals of a member use the same \(\eta\) in (C7). Selecting a separate
+generator value for each inequality would discard the asserted joint
+semantics. Primitive retirement is an explicitly sound set enlargement.
+
+For fixed anchors, metrics, generators, domain and memory semantics,
+smaller radii and nested parameter/memory domains imply set inclusion.
+This is the order property used below. The essential admission test is
+\[
+ \mathcal T(\Gamma(\mathcal C_i),\pi_i)
+      \subseteq\Gamma(\mathcal C_{i+1}),                      \tag{C9}
+\]
+uniformly over all admissible noise blocks. It is established by the sampled
+comparisons, nonlinear residual enclosure, and domain checks. Merely
+calculating (C6) at one reference does not establish (C9). Require
+\(q_{i+1}\ge\mathcal Q_i(q_i,\Lambda_i;a_i)\), not equality: a previously
+valid larger successor can then be retained after the root is tightened.
+When monotonicity of a newly computed bound is unavailable, the stored
+uniform certificate for the old set remains valid on its subsets.
+
+Collision witnesses can be checked directly in the ego frame. Let \(V_E,V_T\)
+be the body-fixed occupied rectangles including reference-point offsets and
+\(h_V(n)=\sup_{v\in V}n^Tv\). A unit vector \(n\) from ego toward target
+satisfies the sufficient separation condition
+\[
+ g=n^T\rho-h_{V_E}(n)-h_{V_T}(-R(\alpha)^Tn)\ge0.           \tag{C10}
+\]
+Use \(\inf_{\Gamma(\mathcal C_i)}g\ge-\xi_i\) for this witness.
+This fixes the normal in the ego frame. If the optimization requires one
+common **world-frame** normal \(n_W\), as in the corresponding common-plane
+formulation of (U5), evaluate (C10) with
+\(n=R(\psi_E)^Tn_W\) for each member before taking the infimum. A common
+ego-frame normal is not silently interchangeable with a common world-frame
+normal under uncertain ego yaw. Both give downward-closed sufficient
+certificates, but they are different restricted witness families. The
+chosen family must be retained under shifting and in terminal appending.
+For example, position residual \(s_\rho\) and circular relative-yaw
+radius \(B_\alpha\le\pi\) give, for a fixed ego-frame normal, the valid
+geometric reserve
+\[
+ s_\rho+2r_T\sin(B_\alpha/2),\qquad
+ r_T=\max_{v\in V_T}\|v\|,
+\]
+with position measured in the Euclidean norm and shared-generator support
+added or jointly bounded. This is a conservative example, not a required
+loss of all position/yaw dependence. The exact support over shared
+primitives can be smaller. No positive physical stand-off is introduced.
+At zero deficit (C10) excludes interior overlap at the declared nodes and
+permits contact. Other hard constraints and the terminal family must use
+the same certificate semantics, including any common-witness requirement.
+
+**Nested compression after measurements.** Let \(\mathcal I^+\) be the
+posterior obtained by conditioning the old first successor on the entire
+received sensor block, as in (U2). It contains the true joint state and is a
+subset of \(\Gamma(\mathcal C_{1|k})\). Keeping the old first-successor
+anchor, metrics, generators, and domain, choose any bounds
+\[
+ \phi_j(S;\bar z_1,G_1)\le\beta_j(B)
+       \quad\hbox{for every }S\in\mathcal I^+,
+ \qquad q_j^+=\min\{q_{j,1|k},\beta_j(B)\}.                 \tag{C11}
+\]
+Fix the actual new memory and intersect \(\Lambda\) only with sound
+parameter restrictions. These operations give
+\[
+ \mathcal I^+\subseteq\Gamma(\mathcal C_0^+)
+              \subseteq\Gamma(\mathcal C_{1|k}).             \tag{C12}
+\]
+No explicit posterior set is needed if each restriction is proved sound.
+Using the old radii and old parameter domain, with actual memory fixed, is
+always a valid fallback under the transition contract. Ignoring some
+measurements in the compressed update is conservative, but should not be
+called exact conditioning. Error bounds \(\beta_j\) must refer to the
+**same anchored functionals**: a radius about the new estimate cannot be
+substituted for a radius about the old prediction without conversion.
+An empty update signals a violated or inconsistent information/model
+contract; it cannot be made sound by silently deleting the old certificate.
+
+A smaller recentered ball does not ensure (C12). For example, the cap
+\(\{x:\|x\|\le1,\ x_1\ge1/2\}\) has an enclosing ball centered at
+\((1/2,0)\) of radius \(\sqrt3/2\); this ball extends outside the old
+unit ball. For Euclidean balls, a sufficient replacement condition is
+\(\|c_{\rm new}-c_{\rm old}\|+r_{\rm new}\le r_{\rm old}\).
+General metrics, generators and nonlinear error functionals require their
+own inclusion map. Recentring must also transport the policy, rather than
+change what the retained feedback command means.
+
+**Theorem C: compact-certificate recursive feasibility.** Fix the same
+decision schedule and horizon \(N\) as in (U5). Replace its reachable sets
+by \(\Gamma(\mathcal C_i)\), use (C9), and permit the inherited anchors,
+metrics, generators, policies, domains and witnesses as feasible decisions.
+Assume:
+
+- The initial certificate contains the true state and has a feasible plan.
+- All propagated certificates satisfy the uniform nonlinear contract (C9),
+  hard constraints, and the stated uncertainty/detection contract.
+- Actual updates satisfy (C12), with a common first command and admissible
+  restriction of the old causal policy tail.
+- The assumed terminal family has a zero-slack append **representable in
+  this certificate and policy class**. Abstract pointwise terminal safety
+  alone does not establish this representation property.
+- Every optimization used for the optimal-value statement attains its
+  primary minimum. For example a nonempty compact feasible sublevel in a
+  finite-dimensional closed policy/certificate parametrization and lower
+  semicontinuous objective suffice.
+
+Let \(V_C(\mathcal C_0)\) be the minimum nonnegative slack sum over these
+certified plans. Executing its first command gives
+\[
+ 0\le V_C(\mathcal C_0^+)\le
+       V_C(\mathcal C_0)-\xi_0^*\le V_C(\mathcal C_0).        \tag{C13}
+\]
+In particular, zero certified slack stays zero at every subsequent active
+decision in this encounter.
+
+**Proof.** By (C12), the new root is a subset of the old first successor.
+The old second successor remains a valid image bound under the old next
+policy, because (C9) was valid for every old first-successor member. Repeat
+this restriction through the stored tail. Downward hard/collision conditions
+retain the old witnesses and slacks. Apply the assumed representable terminal
+append with zero slack. The resulting candidate has slack vector
+\((\xi_1^*,\ldots,\xi_N^*,0)\), hence cost
+\(V_C(\mathcal C_0)-\xi_0^*\). The next attained minimum cannot exceed it.
+True-state containment and nonnegative slacks establish the stated safety
+consequence. This proof does not require individual radius contraction or a
+constant-width tube. QED.
+
+For the same underlying information,
+\(V_P(\mathcal I)\le V_C(\mathcal C)\) if the compact root encloses
+\(\mathcal I\) and every compact plan is admissible in (U5), including
+its policy and geometric-witness family. No such ordering is asserted
+merely from using a different coordinate-dependent witness family.
+Equation (C13) concerns the compact certificate value. It does not establish
+the corresponding decrease of the exact optimal value along controls that
+only minimize the compact problem. With a retained feasible plan and a
+certified improvement instead of an attained optimum, (U8) applies to the
+stored cost rather than to either optimal value.
+
+**Finite representation and computational meaning.** A finite-memory Markov
+policy can use the observer states, prior input, clock and a bounded set of
+policy parameters as sufficient observable memory. The physical model and
+future-noise contract must be Markov in the augmented state, with persistent
+parameters retained. Then the inherited candidate stores \(N\) stage
+certificates and policies, not an ever-growing measurement tree. Arbitrary
+history-dependent policies or noise laws do not automatically admit this
+finite representation. Terminal concatenation must stay in the selected
+class. Keeping a literal chain of old histories is not a constant-memory
+implementation of this construction.
+
+Fresh planning may use a different reference; it cannot delete the inherited
+candidate solely because the new local parameterization excludes it. One
+retained candidate with its own valid certificate is sufficient for (U8).
+A fixed-size outer representation can discard information conservatively;
+it cannot represent every nonlinear posterior exactly. No bounded number of
+generators is asserted to preserve all useful correlations without inflation.
+
+A bounded total description also requires fixed templates or budgets for
+\(\Lambda\), domains, functionals and controller-memory updates. Intersecting
+new arbitrary halfspaces forever, or hiding a growing history expression
+inside one functional, defeats that claim. Componentwise parameter bounds
+can be intersected in a fixed box template; keeping the previous domain is
+the sound fallback when no representable tighter restriction is available.
+Generator reduction or domain simplification that expands the current root
+must satisfy (C12), or separately recertify the retained tail on the expanded
+root. The number of radii alone does not settle these issues.
+
+With certified coefficients available, the online work consists of one
+nominal physical rollout, a fixed-size comparison per sensor interval,
+selected shared-generator/support propagation and a nested root update.
+For fixed comparison dimension \(d\), fixed generator budget and fixed
+sensor/control ratio, the radius propagation costs \(O(Nd^2)\). This is
+neither a complexity claim for the optimization nor a measured speedup.
+The sampled scalar/two-state maps above are derived explicitly; a tight,
+uniform full-domain physical/observer coupling and a representable terminal
+append remain admission requirements for a certified full-vehicle version.
+Current RTI and its joint-affine predictor have not been switched to these
+maps, and no new full-vehicle safety or real-time claim follows from this
+theoretical reduction.
 
 ### The explicit route from theory to SQP-RTI
 

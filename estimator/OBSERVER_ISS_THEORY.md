@@ -1448,6 +1448,315 @@ The Jacobian is multiplied by the existing shared primitive matrix and
 propagated through the same RK4 stages. This preserves the causal update
 structure without adding or independently duplicating noise sources.
 
+<a id="compact-sampled-comparison"></a>
+### 11.4 Compact sampled comparison without future measurement simulation
+
+This subsection derives a **prediction interface**, not a replacement for the
+online observer. Future noisy readings need not be generated individually to
+bound the observer's error. They can be quantified over in a sampled error
+map. The actual observer still processes every received reading. The target's
+constant-motion contract belongs to controller prediction; the standalone
+observer retains its model-residual allowance for other admissible motion.
+
+All norms below use fixed, declared coordinate scalings. The derivation uses
+exact flows and resets. A numerical realization must additionally account for
+the defects in Section 11.3. Bounds are uniform over the represented physical
+states, observer memories, parameters, and sensor errors, not just one
+nominal sensor history.
+
+**Position/IMU filter.** Let \(\Delta>0\) be one sensor period. For the
+prior-to-prior error \(z_f=[e_p^-;e_v^-]\), use the filter's matrices
+\[
+ F=\begin{bmatrix}1&\Delta\\0&1\end{bmatrix},\quad C=[1,0],\quad
+ K=\begin{bmatrix}1-q_f^2\\(1-q_f)^2/\Delta\end{bmatrix},\quad
+ q_f=e^{-\omega_f\Delta},\quad A_f=F(I-KC).
+\]
+Correction followed by prediction gives the exact identity
+\[
+ z_{f,j+1}^-=(A_f\otimes I_2)z_{f,j}^-
+ +(FK\otimes I_2)\nu_p+
+ \int_0^\Delta
+   \left(\begin{bmatrix}\Delta-t\\1\end{bmatrix}\otimes I_2\right)
+       \delta a(t)\,dt.                                      \tag{S1}
+\]
+Here \(\delta a(t)=\hat a_j-a_I(t_j+t)\) is the difference between the
+held inertial acceleration estimate and the true acceleration. It includes
+yaw error, accelerometer error, and within-hold acceleration change. In
+particular it is not an independent second copy of plant mismatch.
+The polynomial of \(A_f\) is \((s-q_f)^2\), so it is Schur even though
+its Euclidean norm can exceed one. After scaling position and velocity,
+let \(P_f>0\) solve \(A_f^TP_fA_f-P_f=-I\). Define
+\[
+ B_f=\|z_f^-\|_{P_f\otimes I_2},\quad
+ \rho_f=\sqrt{1-1/\lambda_{\max}(P_f)}<1.
+\]
+The induced-norm inequality and the triangle inequality for the integral give
+\[
+ B_f^+\le \rho_f B_f+
+    \|P_f^{1/2}FK\|\varepsilon_p+
+ \int_0^\Delta
+    \left\|P_f^{1/2}\begin{bmatrix}\Delta-t\\1\end{bmatrix}\right\|
+      D_a(t)\,dt.                                             \tag{S2}
+\]
+With nontrivial scaling, all input columns in (S1)--(S2) are transformed by
+the same scaling. No measurement independence assumption is used. The single
+GNSS primitive acts on both position and velocity through \(FK\); the two
+acceleration integrals are bounded as one operator on a time-varying input,
+not identified as the same uncertain vector. Component output bounds follow
+from \(\|Lz_f\|\le\|L(P_f^{-1/2}\otimes I_2)\|B_f\).
+At a posterior output, first apply \(I-KC\) and the same position-noise
+column; do not confuse prior and posterior radii.
+
+The global physical bound \(D_a\le A_{\max}+\|\hat a_j\|\) is available
+without yaw contraction. The sharper bound given at the start of this
+document uses a valid yaw radius and acceleration aging. Thus bounded
+forcing yields a bounded filter enclosure with no future-readings rollout.
+This result alone establishes neither yaw observability nor small total
+controller uncertainty.
+
+The sensor/control event order matters here. If the boundary IMU sample
+precedes a newly applied control, acceleration may jump even with continuous
+vehicle state. A finite within-mode jerk bound cannot cover that jump. With
+\(J_u\) bounding this acceleration change and \(J_I\) the subsequent
+smooth aging bound, a valid refinement is
+\[
+ D_a(t)\le\min\{A_{\max}+\|a_m\|,
+ \varepsilon_a+2\|a_m\|\sin(B_{\psi,j}/2)+J_u+J_I t\}.
+\]
+The second member requires all of these bounds; otherwise use the first.
+There is no \(J_u\) contribution at sensor-only boundaries without an input
+change. This is an effect of the existing shared command and model, not a
+new independent disturbance. Any use of a jerk-only bound across an input
+switch must establish acceleration continuity or add the jump allowance.
+
+**Radar reset and the body/target core.** In correction mode write the
+matrix of Section 11.2 as \(M\), its nonnegative forcing as \(b(t)\), and
+let \(E=[I_2,0]\), \(e_3=[0,0,1]^T\). Immediately after every guaranteed
+detection, the radar predictor error is bounded by \(\varepsilon_\rho\).
+Consequently \(e_c=[B_v,W_T]^T\) satisfies
+\[
+ e_c^+\le A_\Delta e_c+d_\Delta,\quad
+ A_\Delta=E e^{M\Delta}E^T,\quad
+ d_\Delta=E e^{M\Delta}e_3\varepsilon_\rho+
+          \int_0^\Delta E e^{M(\Delta-t)}b(t)\,dt.             \tag{S3}
+\]
+This is a two-dimensional sampled map; the third radius is needed inside
+the hold but is reset, rather than carried as a free state across detections.
+It does not reset either actual target-observer error or body-velocity error.
+The matrices and integral kernels can be precomputed for fixed gains,
+sample period, and a certified domain. State-dependent forcing is still
+evaluated with valid bounds on the whole intervening hold.
+
+There is a constructive small-period stability result for the homogeneous
+map in (S3). Set
+\[
+ H=EME^T=\begin{bmatrix}-k_v&0\\c_{Tv}&-\lambda_T\end{bmatrix},
+ \quad w=-H^{-1}{\bf1}>0,\quad \mu=\|M\|_\infty,\quad W=\|w\|_\infty.
+\]
+Since \(M\) is Metzler, \(A_\Delta\ge0\). The exponential remainder gives
+\[
+ A_\Delta w=w-\Delta{\bf1}+r_\Delta,\qquad
+ \|r_\Delta\|_\infty\le W(e^{\mu\Delta}-1-\mu\Delta).
+\]
+For \(0\le x<1\), the exponential series gives
+\(e^x-1-x\le x^2/[2(1-x)]\). Thus the explicit sufficient condition
+\[
+ 0<\Delta\le\frac1{\mu(1+\mu W)}                           \tag{S4}
+\]
+implies \(\mu\Delta<1\) and
+\(\|r_\Delta\|_\infty\le W\mu^2\Delta^2/[2(1-\mu\Delta)]
+\le\Delta/2\). Consequently
+\[
+ A_\Delta w\le
+ \left(1-\frac{\Delta}{2\max_j w_j}\right)w<w.
+\]
+These inequalities apply after fixed state scaling. With dimensionless
+scaled states and physical time, \(\mu\) has inverse-time units and
+\(w,W\) have time units; (S4) is dimensionally consistent. Changing units
+without transforming the matrices is invalid. No assertion that the
+three-dimensional continuous matrix \(M\) is Hurwitz is needed. Equation
+(S4) is sufficient and conservative, not a necessary threshold or a
+recommendation to change the existing sample rate.
+For bounded \(d_\Delta\), a positive weighted maximum norm now yields an
+ultimate bound on this core. However, \(b\) includes frontend, force-inverse,
+yaw, aging, and model-residual bounds. Their joint interconnection must still
+be bounded. Neither (S4) nor the continuous two-state certificate proves that
+enlarged claim. Unbounded detection gaps invalidate (S3); use the dropout
+map, or an explicitly bounded-gap composition, in that case.
+
+**An exact, sharper elimination of radar-predictor memory.** The common
+rotation and common ego-velocity error permit more than separate norm bounds.
+In the notation (J5)--(J6) of the controller theory, let
+\(e_T=[e_\rho;e_q;e_s]\), \(C_r=[1,0,0]\),
+\(a=[a_1,a_2,a_3]^T\), and
+\[
+ A_0=\begin{bmatrix}0&1&0\\0&0&1\\0&0&0\end{bmatrix},\qquad
+ B_\Delta=\int_0^\Delta e^{A_0(\Delta-t)}a e^{-a_1t}\,dt.
+\]
+On a hold with gyro sample \(\omega_j\), rotation by
+\(I_3\otimes R(\omega_jt)\) removes the common skew term. Variation of
+constants then gives the exact identity
+\[
+\begin{split}
+ e_T(\Delta)=(I_3\otimes R(-\omega_j\Delta))\bigg\{
+ &[(e^{A_0\Delta}-B_\Delta C_r)\otimes I_2]e_T(0)
+ +(B_\Delta\otimes I_2)\nu_\rho\\
+ &+\int_0^\Delta(e^{A_0(\Delta-t)}\otimes I_2)f_R(t)\,dt
+ \bigg\}.
+\end{split}
+\tag{S5}
+\]
+Here \(f_R=(I_3\otimes R(\omega_jt))f\), with
+\[
+ f=\begin{bmatrix}
+ -e_v-w_\omega J\rho\\
+ -w_\omega Jq\\
+ \Phi_e(\hat q,\hat s)-j_{\rm phys}-w_\omega Js
+ \end{bmatrix},\qquad w_\omega=\omega_j-\omega_E(t).
+\]
+There is no additional innovation forcing: it has already produced the
+\(-B_\Delta C_r\) and \(B_\Delta\nu_\rho\) terms. The same gyro
+primitive enters all displayed rows before any norm is taken. The target
+nonlinearity remains in \(f_R\); it cannot be discarded or treated as
+independent of \(e_T\). Its whole-domain Lipschitz/residual bounds can be
+closed with a comparison inequality. Unlike simulating future observers,
+the polynomial-exponential kernels in (S5) require no future measurement
+samples. At a target stop, include the stated acceleration-error jump and
+compose the two flows. Equation (S5) without that jump is only an identity
+on a continuous-mode interval. It supplies an optional sharper enclosure,
+not an automatic improvement in every metric.
+
+This elimination depends on the exact shared non-injection terms in (J3):
+the predictor and target position observer use the same held gyro and body
+velocity, giving \(\dot\lambda=-(a_1I+\omega_jJ)\lambda\).
+If a realization adds a discrepancy \(g\) to that equation, the braces in
+(S5) additionally contain
+\(\int_0^\Delta(B_{\Delta-t}\otimes I_2)R(\omega_jt)g(t)dt\).
+Neither innovation saturation nor inconsistent sensor holds can be silently
+included in the exact-cancellation claim. Since \(A_0^3=0\), the kernel
+\(e^{A_0t}=I+tA_0+t^2A_0^2/2\) is polynomial; its convolution with
+\(e^{-a_1t}\) consists only of scalar exponential moments.
+
+**Continuous vector yaw correction.** Denote the normalized dot/cross pair
+in the current yaw law explicitly by
+\[
+ Q(x,y)=\frac{[x^Ty,\det(x,y)]^T}{\|x\|\|y\|+s^2}.
+\]
+The normalization is essential: the ideal equal-speed identity alone does
+not bound this map on reconstructed velocities of unequal magnitudes.
+The displayed product normalization, rather than a different squared-speed
+denominator, satisfies \(\|Q\|\le1\). For true velocity pairs,
+\[
+ Q(v_B,R(\psi)v_B)=a_v[\cos\psi,\sin\psi]^T,\qquad
+ a_v=V^2/(V^2+s^2)\in[0,1].
+\]
+If the actual held pair obeys
+\(\|\hat Q-Q(v_B(t),v_I(t))\|\le\varepsilon_Q(t)\), then
+\[
+ \dot e_\psi=w_\omega-k_\psi a_v\sin e_\psi+\eta_\psi,
+ \qquad |\eta_\psi|\le k_\psi\varepsilon_Q.
+\]
+On a valid angular chart \(|e_\psi|\le b_\psi<\pi\),
+\[
+ D^+|e_\psi|\le
+ -k_\psi\underline a_v\operatorname{sinc}(b_\psi)|e_\psi|
+ +\varepsilon_\omega+k_\psi\varepsilon_Q.                    \tag{S6}
+\]
+The chart/domain must be established over the interval, for example by
+checking that the comparison solution stays below \(b_\psi\).
+For \(s>0\), a simple uniform perturbation bound is
+\[
+ \varepsilon_Q\le\min\left\{2,
+ \frac{2\overline V_I}{s^2}B_B+
+ \frac{2\overline V_B}{s^2}B_I\right\},                       \tag{S7}
+\]
+where the velocity domains also enclose the line segments used in the
+finite-difference estimate. This follows from \(\|Q\|\le1\) and the
+partial Lipschitz constants \(2\overline V_I/s^2\) and
+\(2\overline V_B/s^2\). Here \(B_B\) bounds the held body-velocity
+pseudo-measurement, including force-inversion uncertainty, and \(B_I\)
+bounds held reconstructed inertial velocity, including filter uncertainty
+and aging. They are not both the body-velocity observer radius \(B_v\).
+Equation (S7) is a safe coarse bound, potentially very conservative for
+small \(s\). Shared-vector geometry can give a tighter bound.
+
+At rest \(\underline a_v=0\); no yaw-contraction claim or new runtime
+switch follows. A chart-free conservative circular radius uses
+\[
+ B_\psi^+\le\min\{\pi,
+ B_\psi+\int_0^\Delta(\varepsilon_\omega+k_\psi\varepsilon_Q)dt\}.
+\]
+For the exactly noiseless/zero-vector denominator case use the actual guarded
+law and its finite bound, not (S7) with division by zero. Coupling to the
+position/IMU filter changes the forcing and any joint stability test; it does
+not invalidate (S6) when its input bounds hold. This replaces neither the
+runtime yaw law nor its current set-based containment.
+
+**Published ego position.** This position estimate is distinct from the
+position/IMU filter's internal position. Its GNSS output predictor resets
+to \(p+\nu_p\), then integrates the same held inertial velocity \(\hat v_I\)
+as the position estimate. Their difference obeys
+\(\dot{(\hat y_p-\hat p)}=-k_p(\hat y_p-\hat p)\). Therefore
+\[
+ e_p^+=e^{-k_p\Delta}e_p+(1-e^{-k_p\Delta})\nu_p
+       +\int_0^\Delta(\hat v_I-v_I(t))dt,\qquad
+ B_p^+\le e^{-k_p\Delta}B_p+(1-e^{-k_p\Delta})\varepsilon_p
+       +\int_0^\Delta B_I(t)dt.                              \tag{S8}
+\]
+The position noise in (S8) is the same reading used in (S1), not a new
+physical noise source.
+
+**A bounded observer interface without full yaw contraction.** There is a
+useful distinction between a uniform finite bound and a useful small bound.
+Suppose the declared physical domain bounds acceleration, velocity, yaw-rate
+aging, target model residuals and stop jumps; position/radar/IMU errors are
+bounded; detections occur at the assumed periods; and the force-inversion
+output is bounded on the resulting measurement domain. Suppose also that
+the selected sampled core satisfies \(A_\Delta w\le\gamma_c w\) with
+\(0\le\gamma_c<1\). One sufficient test is (S4).
+
+Using the coarse yaw-independent acceleration bound in (S2), let
+\(d_f\) uniformly bound its two input terms. Then
+\[
+ B_{f,j}\le\rho_f^j B_{f,0}
+          +\frac{d_f(1-\rho_f^j)}{1-\rho_f}
+ \le\bar B_f:=\max\{B_{f,0},d_f/(1-\rho_f)\}.
+\]
+This supplies a finite held-velocity bound \(\bar B_I\), including aging.
+Together with the declared force-inverse and physical-domain bounds it gives
+a finite bound \(\bar d_c\) on \(\|d_\Delta\|_w\) in (S3), where
+\(\|e_c\|_w=\max_j |e_{c,j}|/w_j\). Hence
+\[
+ \|e_{c,j}\|_w\le\gamma_c^j\|e_{c,0}\|_w+
+             \bar d_c(1-\gamma_c^j)/(1-\gamma_c).
+\]
+Equation (S8) similarly gives, with \(a_p=e^{-k_p\Delta}<1\),
+\[
+ B_{p,j}\le a_p^j B_{p,0}+
+ (1-a_p^j)\left(\varepsilon_p+
+                 \frac{\Delta\bar B_I}{1-a_p}\right).
+\]
+Finally the circular yaw-error radius is at most \(\pi\). Thus this
+observer interface has a horizon-independent finite bound under the stated
+domain and sampling conditions, without a uniform yaw-observability premise.
+The argument is a bounded-input cascade: the first filter bound does not
+require the other observer errors to contract. This establishes boundedness,
+not an accurate heading at rest, a small collision reserve, or bounded
+physical target-position spread. A full-circle yaw bound and the coarse
+force-inverse allowance can be too conservative for control. Tighter
+coupled bounds require the corresponding verified geometry or small-gain
+test; the current runtime gains are not asserted to satisfy (S4).
+
+At synchronized detected-sample boundaries these results give a possible
+five-radius observer interface \((B_f,B_v,W_T,B_\psi,B_p)\).
+Target orientation reconstruction, target-stop jumps, asynchronous phases,
+or other policy memory may require additional bounds. Five is not a claim
+of an exact minimal state representation. The comparison has to cover every
+memory allowed by its certificate. Intersample predictors can be eliminated
+only because their reset and subsequent error equations were included above.
+The full controller construction and its cross-frame requirement are given in
+[the compact-certificate theorem](../controller/CONTROLLER_THEORY.md#compact-certificate).
+
 <a id="implementation-map"></a>
 ## 12. Implementation map and existing validation
 
