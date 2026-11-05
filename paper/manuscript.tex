@@ -106,15 +106,12 @@ collision risk. Consequently, the design of systems that
 can actively avoid collisions with surrounding vehicles has attracted
 considerable research interest \cite{LiEtAl2022Emergency,ChenChengLiZhaoWang2024}.
 
-Collision avoidance often requires maneuvers such as simultaneous braking
-and steering \cite{TanWuLiLiuZhang2025}, during which the ego vehicle's
-longitudinal and lateral dynamics are coupled through tire slip, yaw motion,
-and shared tire--road friction \cite{BealBoyd2019,ParkGerdes2017}. These
-maneuvers also complicate the estimation of surrounding-vehicle motion
-because relative-position measurements are expressed in the moving ego
-frame; neglecting the resulting dependence on ego velocity, acceleration,
-and yaw rate can lead to estimation errors
-\cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
+Vehicle collision avoidance often requires complex maneuvers, such as
+decelerating while turning \cite{TanWuLiLiuZhang2025}. Such maneuvers pose
+two challenges: the coupling between the ego vehicle's longitudinal and
+lateral dynamics becomes more pronounced \cite{BealBoyd2019,ParkGerdes2017},
+and analyzing the relative states of surrounding vehicles becomes more
+difficult \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
 When stopping distance is short, neither braking alone nor steering alone
 suffices across driving conditions. Hard braking on a curve can cause
