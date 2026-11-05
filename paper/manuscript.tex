@@ -106,25 +106,15 @@ collision risk. Consequently, the design of systems that
 can actively avoid collisions with surrounding vehicles has attracted
 considerable research interest \cite{LiEtAl2022Emergency,ChenChengLiZhaoWang2024}.
 
-Collision avoidance often requires the ego vehicle to perform complex
-maneuvers, such as braking while turning. Such maneuvers pose three
-closely related technical challenges \cite{TanWuLiLiuZhang2025}. First,
-the ego vehicle's longitudinal and lateral dynamics become strongly
-coupled. Changes in speed alter tire slip angles and yaw response, yaw
-motion couples longitudinal and lateral velocities, and braking and
-cornering forces share the limited tire--road friction
-\cite{BealBoyd2019,ParkGerdes2017}. Second, ego maneuvers complicate how
-the motion of surrounding vehicles is described and estimated. Because
-onboard sensors measure target positions in a frame that translates and
-rotates with the ego vehicle, the observed relative trajectory depends
-on the ego vehicle's velocity, acceleration, and yaw rate even when the
-target moves at constant velocity \cite{AlaiSharmaAlexanderRajamani2024}.
-Ignoring this dependence can attribute apparent motion caused by the ego
-maneuver to the target. Third, establishing formal safety guarantees
-becomes much harder when coupled vehicle dynamics and estimation
-uncertainty act together, since the controller must respect tire and
-actuator limits while keeping a collision-free continuation feasible as
-target estimates update online.
+Collision avoidance often requires maneuvers such as simultaneous braking
+and steering \cite{TanWuLiLiuZhang2025}, during which the ego vehicle's
+longitudinal and lateral dynamics are coupled through tire slip, yaw motion,
+and shared tire--road friction \cite{BealBoyd2019,ParkGerdes2017}. These
+maneuvers also complicate the estimation of surrounding-vehicle motion
+because relative-position measurements are expressed in the moving ego
+frame; neglecting the resulting dependence on ego velocity, acceleration,
+and yaw rate can lead to estimation errors
+\cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
 When stopping distance is short, neither braking alone nor steering alone
 suffices across driving conditions. Hard braking on a curve can cause
