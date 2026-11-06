@@ -117,12 +117,13 @@ vehicles in the ego frame, making their relative states more difficult to
 describe and estimate
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
-Regarding the ego vehicle's coupled dynamics, some methods simplify the
-vehicle model through constant-speed steering control
-\cite{JiKhajepourMelekHuang2017}, integrated path tracking at constant speed
-\cite{XiongLiuYangLeng2022}, or hierarchical planning with constant-speed
-lateral dynamics \cite{ChenAksunGuvenc2025}, while others use a kinematic
-planning model \cite{LiZhangGuoLenzoGuo2023}. Fixed-speed models, however,
+Regarding the ego vehicle's coupled dynamics, some approaches reduce control
+complexity by simplifying the vehicle model or treating longitudinal and
+lateral motions separately. For example, constant longitudinal speed is
+assumed in steering control \cite{JiKhajepourMelekHuang2017}, integrated
+path tracking \cite{XiongLiuYangLeng2022}, and hierarchical planning
+\cite{ChenAksunGuvenc2025}, whereas a kinematic model is used for trajectory
+planning \cite{LiZhangGuoLenzoGuo2023}. Fixed-speed models, however,
 neglect braking-induced speed changes, while kinematic models omit
 tire-force dynamics. To account for speed variations, lateral models can
 be formulated using linear parameter-varying control
