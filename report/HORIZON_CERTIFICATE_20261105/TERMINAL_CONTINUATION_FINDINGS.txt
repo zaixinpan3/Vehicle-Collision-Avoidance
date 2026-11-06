@@ -1,0 +1,99 @@
+Existing terminal endpoint structure, November 5, 2026
+
+Scope
+-----
+The user's question about a determinable final state was checked against the
+existing terminal continuation kernel. This finding concerns that declared
+constant-deceleration, constant-curvature terminal model; it does not silently
+identify it with the nonlinear Fiala plant under an arbitrary force-ratio input.
+No runtime change or newly guaranteed prediction window is claimed here.
+
+What is already determined
+--------------------------
+controller/terminalSafeSet.m: continuation(context,x,steps) supplies the exact
+pose map of the declared terminal law from an entry state x. Write
+V = hypot(v_x,v_y), beta = atan2(v_y,v_x), kappa = r/V (zero at V=0), and a>0
+for the declared terminal tangential deceleration. Then
+
+T_stop(x) = V/a,
+S_stop(x) = V^2/(2a),
+psi_stop = psi + kappa*S_stop,
+p_stop = p + S_stop*sinc_unscaled(kappa*S_stop/2)
+             * [cos(psi+beta+kappa*S_stop/2); sin(psi+beta+kappa*S_stop/2)],
+x_stop = [p_stop; psi_stop; 0; 0; 0],
+
+where sinc_unscaled(z)=sin(z)/z with value 1 at zero. The stopping arc length
+is used in the pose map. It is not an additional required radial separation
+reserve. At the stopping time, the target pose follows from its own persistent
+constant-A, constant-beta transition. No negative-A or stopped-target gate is
+needed for this endpoint calculation.
+
+For a known entry state, J_tail=ceil(V/(a*h)) covers the moving terminal tail;
+this is a direct calculation, not a search over QP horizon lengths. With a
+sound terminal entry family R_N, use a sound upper bound V_bar on the entry
+speed and a positive uniform lower bound a_lower if deceleration is uncertain:
+J_tail=ceil(V_bar/(a_lower*h)). Each earlier-stopping branch remains parked.
+For the declared fixed a, a_lower=a. A global admissible speed bound can supply
+a more conservative moving-tail allocation before the optimized entry is known.
+This count is for tail evaluation; it need not introduce J_tail extra controller
+coefficient blocks or independent shooting states.
+
+How the existing implementation uses the structure
+-------------------------------------------------
+continuation evaluates poses on the closed-form arc. nonlinearValue and its
+active-branch tangent evaluate terminal entry constraints, sampled moving-tail
+clearance and parked-tail geometry. parkedClearance computes clearance against
+the target's remaining line segment, circular arc or full circle, under the
+existing first-exit encounter contract. A target continuing after the ego stop
+therefore needs a parked-track check; it does not require waiting for a target
+stop or choosing a finite arbitrary target continuation time.
+
+Tests already exercise exact continuation versus fine RK4 integration,
+continuation shift consistency, sub-hold stops, unsafe parked-track rejection,
+constant-motion moving targets, and terminal input compatibility. The complete
+terminalSafeSetTest class was run for this review: 33 results passed, with zero
+failed/incomplete results. See terminal-continuation-tests.csv.
+
+Gap in the current primary path
+-------------------------------
+The primary dynamic output-feedback branch in solvePredictiveControl does not
+call this terminal continuation kernel. Its localOfStageValues includes only
+input/domain constraints and the start/midpoint/end collision rows of each
+optimized stage. The earlier replacement by an extra stopping-distance reserve,
+and later removal of that reserve without reconnecting terminal continuation,
+did not use the original closed-form terminal structure.
+
+A concrete way to exploit it is a finite optimized prefix followed by the
+known terminal flow, with endpoint/tail geometry evaluated as functions of the
+optimized entry. SQP can use the existing active-branch derivatives rather
+than optimize every tail pose as a new independent state. Integration must
+preserve the terminal model contract, entry admissibility, causal held-steering
+input, command increments, actual target epoch, posterior correlation, and
+collision coverage. Existing moving-tail node/midpoint checks alone must not
+be relabeled a verified continuous-time certificate.
+
+What this does not determine
+----------------------------
+The stop state is a closed-form function of the optimized terminal ENTRY, not
+a unique endpoint fixed independently of the preceding control policy. Under
+output uncertainty there is a correlated family of such endpoints. A known
+endpoint map does not itself bound the time needed for the optimized prefix
+to reach an admissible safe entry; nor does it guarantee that a local SQP QP
+can find that entry. In particular, V_current/a is not automatically the total
+optimized-prefix-plus-tail duration when that prefix may accelerate or turn.
+These distinctions delimit what can legitimately be claimed from the existing
+special structure, while avoiding the generic unconstructed-rank assumption
+as the starting point for this project-specific analysis.
+
+Documentation handling
+----------------------
+The exploratory 'Direct horizon bounds and their limits' subsection added in
+the preceding task was moved verbatim out of CONTROLLER_THEORY.md into
+HORIZON_BOUND_DISCUSSION.txt. No speculative horizon mechanism was added to
+the algorithm's derivation. Executable controller/configuration files were
+unchanged in this review. No new closed-loop campaign or realtime measurement
+was performed.
+
+Actual verification command
+---------------------------
+matlab -batch "results=runtests('tests/terminalSafeSetTest.m'); writetable(table(results),'report/HORIZON_CERTIFICATE_20261105/terminal-continuation-tests.csv'); assertSuccess(results);"
