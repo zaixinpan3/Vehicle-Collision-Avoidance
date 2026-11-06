@@ -120,26 +120,30 @@ describe and estimate
 Regarding the ego vehicle's coupled dynamics, many methods simplify the
 vehicle model by assuming a constant longitudinal speed or using kinematic
 models, often treating speed and steering separately
-\cite{JiKhajepourMelekHuang2017,XiongLiuYangLeng2022,ChenAksunGuvenc2025,LiZhangGuoLenzoGuo2023}.
-To account for changes in speed, lateral models can be updated or
-gain-scheduled, and steering decisions can be computed for prescribed
-braking and throttle profiles
-\cite{AtouiSenameMilanesMartinez2022,LiLamLuLi2022,TurriCarvalhoTsengJohanssonBorrelli2013}.
-Longitudinal and lateral control can also be coordinated through friction
-and stability limits or speed adjustment
+\cite{JiKhajepourMelekHuang2017,XiongLiuYangLeng2022,ChenAksunGuvenc2025,LiZhangGuoLenzoGuo2023},
+but these models may not capture nonlinear tire behavior during combined
+braking and cornering. To account for changes in speed, lateral models can
+be updated or gain-scheduled, and steering decisions can be computed for
+prescribed braking and throttle profiles
+\cite{AtouiSenameMilanesMartinez2022,LiLamLuLi2022,TurriCarvalhoTsengJohanssonBorrelli2013};
+speed dependence alone, however, does not account for the reduction in
+lateral tire capacity under braking. Longitudinal and lateral control can
+also be coordinated through friction and stability limits or speed adjustment
 \cite{ChenPengGrizzle2018,ChenChengLiZhaoWang2024,AttiaOrjuelaBasset2012,AttiaOrjuelaBasset2014},
 or through assume--guarantee contracts that bound the interaction between
-separate controllers \cite{XuGrizzleTabuadaAmes2018}. With the coupling
-retained explicitly, nonlinear feedback methods coordinate longitudinal and
-lateral actions using backstepping, Lyapunov design, or dynamic inversion
+separate controllers \cite{XuGrizzleTabuadaAmes2018}, whose guarantees depend
+on the prescribed bounds holding during operation. With the coupling retained
+explicitly, nonlinear feedback methods coordinate longitudinal and lateral
+actions using backstepping, Lyapunov design, or dynamic inversion
 \cite{GuoHuWang2016,CheblyTaljCharara2017,SeoLeeBaekHorowitzChoi2022},
 while predictive controllers optimize motion over a coupled vehicle model
 \cite{ZhouJiaJingLiuGuvenc2018,ZhangJiangLiuHuWangChen2023,ThompsonDallasGohBalachandran2024,ZhaoChenGaoYaoGaoHua2024}.
-At the tire level, force allocation distributes desired vehicle forces and
-moments among the actuators, subject to their physical capabilities
-\cite{ParkGerdes2015,ParkGerdes2017,ForsAnistratovOlofssonNielsen2021}.
-In aggressive maneuvers, accurately representing tire saturation while
-meeting actuator limits and real-time requirements remains challenging.
+These methods depend on model fidelity, and nonlinear predictive optimization
+must also meet real-time computational limits. At the tire level, force
+allocation distributes desired vehicle forces and moments among the actuators
+\cite{ParkGerdes2015,ParkGerdes2017,ForsAnistratovOlofssonNielsen2021},
+but the requested forces must remain attainable within tire and actuator
+limits.
 
 Planning an evasive maneuver also requires the surrounding vehicle's
 velocity, acceleration, and heading, which are not measured directly by
