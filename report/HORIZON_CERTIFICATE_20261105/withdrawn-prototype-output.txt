@@ -1,0 +1,19 @@
+{Error using nonlinearBicycleModel.derivative (line 24)
+The declared model requires forward travel and |b|<=1.
+
+Error in runJointOutputFeedbackScenario>@(~,x)nonlinearBicycleModel.derivative(x,input,cfg) (line 130)
+    start=truth;ode=ode45(@(~,x)nonlinearBicycleModel.derivative(x,input,cfg),[0,h],truth.ego, ...
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in odearguments (line 93)
+f0 = ode(t0,y0,args{:});
+     ^^^^^^^^^^^^^^^^^^
+Error in ode45 (line 50)
+    odearguments(odeIsFuncHandle,odeTreatAsMFile, solver_name, ode, tspan, y0, options, varargin);
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in runJointOutputFeedbackScenario>localReplay (line 130)
+    start=truth;ode=ode45(@(~,x)nonlinearBicycleModel.derivative(x,input,cfg),[0,h],truth.ego, ...
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in runJointOutputFeedbackScenario (line 67)
+                [truth,samples,clearance]=localReplay(truth,input,cfg,time,stream, ...
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+} 

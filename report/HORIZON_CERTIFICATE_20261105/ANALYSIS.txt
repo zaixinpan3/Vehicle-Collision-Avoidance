@@ -1,0 +1,77 @@
+Direct conservative horizon requirement, November 5, 2026
+
+The user clarified that runtime must select a sufficient horizon directly on
+each frame, rather than try successive prediction lengths or rely on an
+uncertified risk heuristic. A preliminary uncommitted adaptive-horizon patch
+was therefore withdrawn. No adaptive-horizon runtime feature is enabled by
+this task. controller/solvePredictiveControl.m and the controller configuration
+remain byte-identical to commit 17eb22f0ebb2abc648f05429b27fe7e44fcc539b.
+
+Correction to the preceding explanation
+---------------------------------------
+Shortsighted execution can lead to later infeasibility, but this is different
+from saying that the QP at a fixed state becomes feasible if length is increased.
+With only prefix constraints, truncating a feasible longer plan gives a shorter
+feasible plan. With a terminal inclusion and invariant terminal padding, the
+opposite nesting holds for the terminal-reaching feasible domains. The current
+runtime enforces only endpoint/prefix constraints, so simply lengthening its
+window does not supply the requested guarantee.
+
+Technical result
+----------------
+CONTROLLER_THEORY.md now states a sufficient direct bound, its induction proof,
+and its missing implementation prerequisites. If a common admissible finite-
+memory backup keeps whole holds safe on a certified domain and decreases a
+nonnegative joint-state rank by a uniform positive amount until an invariant
+zero set contained in the terminal set, the ceiling of the worst rank divided
+by that decrease is a conservative number of holds. All uncertainty branches
+must share the causal policy. Branches that arrive early must remain terminal
+under that same continuation. A separate hidden-state controller for each
+hypothesis does not establish a common output-feedback bound.
+
+The required rank, decrement, certified domain and compatible backup have NOT
+been constructed for the general vehicle/target contract. Constant target A
+and beta alone do not imply them, and the optional low-speed terminal component
+does not prove finite-time reachability of that component from arbitrary
+information sets. No target sign restriction or stopping-distance reserve is
+introduced. A resource cap cannot silently truncate a certified required length.
+
+Once a certified feasible terminal-reaching plan exists and conditioning stays
+inside its certified successor, its shifted tail provides the next horizon
+without a length search. A terminal append can meet a larger minimum horizon.
+For the finite NLP, a genuinely feasible nominal point makes the zero SQP step
+feasible, provided the lifted state/witness representation and increment bounds
+retain it. Accepting a nonzero unverified step can lose the next-frame property.
+The nonlinear constraint 1-z^2 <= 0 at z=0 gives the counterexample: feasible
+nonlinear points exist at +/-1, but its local linearization is 1 <= 0. A horizon
+length formula alone cannot prevent this local infeasibility.
+
+Scope and validation
+--------------------
+The proof and distinctions were checked directly against the current controller
+formulation, terminal assumptions and sparse QP assembly. No new successful
+closed-loop result, feasible backup for all initial states, numeric conservative
+horizon, realtime guarantee or runtime implementation is claimed. No regression
+suite was rerun because the final project change is theoretical documentation;
+the two executable files touched by the abandoned prototype were verified equal
+to the committed versions.
+
+Before clarification, a short prototype probe was started for 8 m/s head-on,
+intersection and stationary-lead cases and a 25 m/s stationary-lead case. The
+first case recorded initialization QP failure; the process then aborted during
+an independent plant replay with the forward-travel / force-ratio domain
+assertion. The complete requested probe campaign did not run. This is not
+validation of a sufficient-horizon selector. Its source changes were withdrawn,
+and no conclusion about the uninspected offending command is asserted.
+The saved prototype failure JSON and process log are diagnostic evidence only.
+The withdrawn, uncommitted prototype is not reproducible from the final runtime.
+
+Reasoning consultation
+----------------------
+The scoped input and returned reasoning are retained as working material. The
+pre-submit model picker showed 6 Pro; the subsequent composer showed 6 Medium.
+No independently verified model-computation attribution is claimed. Generation
+finished before the result was saved and the dedicated browser shut down.
+verification.json records the independently checked claims and a qualification:
+the runtime checks start/midpoint/end, not merely the final endpoint. No claims
+from external papers were needed for the self-contained proofs.

@@ -1,0 +1,21 @@
+{
+  "model_selection_observed_before_send": "6 Pro",
+  "composer_label_after_send": "6 Medium",
+  "model_note": "Pre-submit Pro selection was verified. Response computation attribution was not independently established.",
+  "consultation_generation_completed": true,
+  "browser_saved_and_stopped": true,
+  "independently_checked": [
+    "Induction for a common admissible backup and uniform positive rank decrement, including invariance of early-arriving branches.",
+    "Opposite feasible-domain nesting for exact prefixes and exact terminal-constrained plans.",
+    "Complete-hold safety, joint posterior containment, memory/previous-input causality and enclosure representability are separate assumptions.",
+    "Zero-step feasibility at a feasible nominal NLP point under compatible bounds.",
+    "For -2<=z<=2 and z^2>=1, z=3/2 is feasible. At zbar=1/4, the QP requires delta>=15/8 and delta<=14/8, a contradiction."
+  ],
+  "scope_correction": "Runtime checks start/midpoint/end of each hold, not only its terminal endpoint. Those sampled checks are still not a validated whole-hold certificate.",
+  "runtime_files_unchanged": {
+    "controller/solvePredictiveControl.m": true,
+    "config/collisionAvoidanceControllerConfig.m": true
+  },
+  "tests_run": false,
+  "numeric_horizon_certificate_implemented": false
+}
