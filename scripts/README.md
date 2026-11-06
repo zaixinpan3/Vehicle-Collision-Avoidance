@@ -24,15 +24,19 @@ runJointOutputFeedbackScenario(Frames=8, ...
     OutputDirectory=string(tempname));
 ```
 
-Finite scenarios and numerical integration are deployment approximations;
-one sparse RTI QP is executed without nonlinear acceptance or a universal safety claim. The
-[interface](../README.md#controller-interface),
-[theory](../controller/CONTROLLER_THEORY.md), and
-[measurements](../report/SPARSE_RTI_20261104.tex) state the supported
-contract and limits. Constant tangential acceleration (zero, positive or negative)
-and constant sideslip define the target-motion contract. The deployment terminal
-approximation supports continuing targets through a finite motion preview. Inference failure or failure of the single QP issues no
-command. Scenario files record such failures explicitly.
+Finite scenarios and numerical integration are deployment approximations.
+The default executes one sparse RTI QP without nonlinear acceptance. To run
+the cached CasADi/IPOPT backend with nonlinear replay acceptance, call
+`setupJointNlpSolver` and select `outputFeedback.method="ipopt"`; see the
+[setup and experiment commands](../README.md#run-a-raw-sensor-experiment).
+Neither backend supplies a universal safety claim. The
+[interface](../README.md#controller-interface) and
+[theory](../controller/CONTROLLER_THEORY.md) state the contract and limits. Constant tangential
+acceleration (zero, positive or negative) and constant sideslip define the
+target-motion contract. Endpoint constraints impose clearance and physical
+domain conditions without a target stopping restriction. Inference failure or
+failure to obtain an accepted plan issues no command. Scenario files record
+such failures explicitly.
 
 ## Finite-input information-state reference
 

@@ -4,7 +4,7 @@ The primary design jointly optimizes a causal control map and a bounded
 controller-memory update. A separate point observer is not part of this
 controller. The exact information state retains every physical hypothesis
 consistent with the complete raw sensor history. The deployed finite-scenario
-SQP transcription is explicitly an approximation to this robust problem.
+numerical transcription is explicitly an approximation to this robust problem.
 
 A finite controller architecture does not itself remove the safety theorem.
 Unverified uncertainty reduction, numerical flow error, and execution of an
@@ -410,7 +410,7 @@ forces, and general road geometry are outside this terminal component. For
 example $\dot v_x=-\lambda v_x+\varepsilon$ with $\varepsilon>0$ has infinite
 remaining travel. Such contracts need another certificate.
 
-## 6. Finite joint transcription and SQP deployment
+## 6. Finite joint transcription and numerical deployment
 
 Choose correlated initial physical/parameter/bias hypotheses and fixed future
 noise cases. Parameters remain persistent; scenarios share every stage
@@ -424,7 +424,7 @@ m_{i+1}^s&=\tanh(A_im_i^s+B_i\varphi(Y_{i+1}^s)+c_i).
 \end{aligned} \tag{D9}
 $$
 
-All coefficients are optimized jointly. The deployment retains scenario shooting
+All coefficients are optimized jointly. The RTI backend retains scenario shooting
 states $(x_i,m_i,u_{i-1})$ and shared stage coefficients in a sparse QP.
 Stage-local finite differences perturb only the six ego coordinates and two
 inputs; memory and coefficient derivatives are analytic. No coefficient
@@ -457,7 +457,7 @@ $$
 \quad c+Dc\Delta w\le0.
 $$
 
-The actual deployment adds the sparse shooting equalities
+The RTI backend adds the sparse shooting equalities
 $\Delta X_{i+1}-A_i\Delta X_i-B_i\Delta\alpha_i=0$ at a dynamically consistent nominal
 rollout, fixes the root increments to zero, and solves exactly one QP. The
 shared root policy remains causal. Future shooting memories are tangent
@@ -500,6 +500,59 @@ The configured deadline is measured and reported, not enforced by interrupting
 the QP. The complete inference, nominal preparation, local linearization, QP,
 and command bookkeeping contribute to the exported total call time.
 
+### Parameterized nonlinear backend
+
+The alternative IPOPT backend retains the same finite scenario contract,
+controller maps, fixed hold timing and hard constraints. With shooting state
+$Z_i^s=(x_i^s,m_i^s,u_{i-1}^s)$, known numerical data $p_k$, and the joint
+nonlinear stage map $F_i^s$ defined by (D9), it solves
+
+$$
+\begin{aligned}
+\min_w\quad &\frac12\sum_{s,i}q_s\|r_i^s(w;p_k)\|^2
+ +\frac{\lambda_\alpha}{2}\|\alpha-\bar\alpha\|^2,\\
+\text{subject to}\quad &Z_0^s=(x_k^s,m_k,u_k^-),\\
+&Z_{i+1}^s-F_i^s(Z_i^s,\alpha_i;p_k)=0,\\
+&c_i^s(Z_i^s,\alpha_i,\theta_i^s,b_i^s;p_k)\le0,\qquad
+\underline w\le w\le\overline w.
+\end{aligned} \tag{D10}
+$$
+
+Here $w$ contains the shared controller coefficients, scenario shooting states,
+and geometric witnesses. The stage residual uses a local reference-path tangent
+fixed at the nominal endpoint; this is a tracking-cost approximation on curved
+paths. Collision and physical constraints use the nonlinear predicted states.
+There is no coefficient step box. Target states are precomputed from their
+autonomous constant-motion equations and parameterized alongside persistent
+physical parameters, biases and future noise. CasADi differentiates the stage
+maps and assembles sparse first and second derivatives; IPOPT iterates on (D10)
+with finite iteration and solver-time budgets.
+
+The previous policy tail supplies $\bar\alpha$; fresh nonlinear rollout supplies
+shooting states and separating witnesses. Stage multipliers are shifted only
+when the posterior retains the same scenario correspondence. To keep a fixed
+compiled graph after hypothesis removal, unused slots repeat a surviving
+scenario with $q_s=0$; active scenarios have equal weights summing to one.
+Duplicated hard rows are redundant. This padding neither inserts new physical
+hypotheses nor enlarges the represented uncertainty set.
+
+If the measured memory makes a shifted seed leave the physical model's input
+domain, initialization replaces its actuator gains by zero and clips its
+feedforward inputs to magnitude and slew bounds before rollout. This changes
+only the optimization seed. The measured memory and committed preceding memory
+map are retained, and the replacement still requires nonlinear acceptance.
+
+An iterate is accepted only after independent numerical rollout of its policy
+passes every retained-scenario constraint and coefficient bound within the
+configured feasibility tolerance. Trial-domain numerical guards in the symbolic
+tire map do not replace this rollout through the original physical model.
+If the candidate fails, the shifted seed is subjected to the same check; if
+both fail, no new command is committed. Solver convergence alone is not an
+acceptance test. Nonlinear replay checks numerical prediction nodes; it does
+not validate integration error, unrepresented noise or intersample clearance.
+This backend uses the same endpoint constraints without enforcing the exact
+terminal certificate, so it supplies no recursive-feasibility theorem.
+
 Finite hypotheses can be depleted by valid measurements when the actual state
 lies between samples. Finite future cases also omit admissible noise histories.
 No scenario weights are probabilities and no deterministic or probabilistic
@@ -510,6 +563,12 @@ not prevent that upgrade.
 
 ## 7. Sources and relation to the comparator
 
+- Thompson, Dallas, Goh and Balachandran (2024), *Adaptive Nonlinear Model
+  Predictive Control: Maximizing Tire Force and Obstacle Avoidance in Autonomous
+  Vehicles*, [paper](https://doi.org/10.1109/TFR.2024.3497925), for the CasADi/IPOPT
+  numerical route with bounded iterations and warm initialization. Equation
+  (D10) retains this project's joint output-feedback formulation and hard
+  constraints; it is not a reproduction of their vehicle/controller architecture.
 - Zhang, Liniger and Borrelli, *Optimization-Based Collision Avoidance*,
   [primary manuscript](https://arxiv.org/abs/1711.03449), for separating-plane
   and signed-distance optimization. The geometry above is a vertex specialization.

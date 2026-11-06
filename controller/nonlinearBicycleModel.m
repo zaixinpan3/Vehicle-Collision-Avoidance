@@ -33,6 +33,67 @@ classdef nonlinearBicycleModel
             end
         end
 
+        function dx = symbolicDerivative(x,u,scales,cfg)
+            % CasADi transcription of the same declared blended model.
+            % Numerical guards make rejected NLP trial points evaluable;
+            % accepted policies are replayed through derivative/sensorFlow.
+            import casadi.*
+            v=x(4);vy=x(5);r=x(6);delta=u(1);brake=u(2);
+            mass=cfg.vehicle.m;lf=cfg.vehicle.lf;lr=cfg.vehicle.lr;
+            capacity=cfg.tire.frictionCoefficient(:).*scales(3:4) ...
+                .* (mass*cfg.vehicle.gravity/(lf+lr)*[lr;lf]);
+            stiffness=cfg.tire.corneringStiffness(:).*scales(1:2);
+            load=nonlinearBicycleModel.symbolicRoadLoad(v,cfg);
+            vx=fmax(v,cfg.model.scheduleSpeedFloor);
+            slip=atan2([vy+lf*r;vy-lr*r],vx)-[delta;0];
+            slip=fmin(pi/2-1e-6,fmax(-pi/2+1e-6,slip));
+            eta=if_else(abs(brake)<1,sqrt(fmax(1e-16,1-brake^2)),0);
+            scale=capacity*eta;tangent=tan(slip);
+            q=stiffness.*abs(tangent)./(3*fmax(scale,1e-12));
+            force=if_else(abs(tangent)<3*scale./stiffness, ...
+                -stiffness.*tangent.*(1-q+q.^2/3),-scale.*sign(slip));
+            fx=brake*capacity;
+            frontX=fx(1)*cos(delta)-force(1)*sin(delta);
+            frontY=fx(1)*sin(delta)+force(1)*cos(delta);
+            dynamic=[(frontX+fx(2)-load)/mass+vy*r; ...
+                (frontY+force(2))/mass-v*r; ...
+                (lf*frontY-lr*force(2))/cfg.vehicle.Iz];
+            rate=v*tan(delta)/(lf+lr);lag=cfg.model.kinematicLagSeconds;
+            drive=(fmax(brake,0)+fmin(brake,0)*tanh(v/cfg.model.brakeHoldSpeed)) ...
+                *(capacity(1)*cos(delta)+capacity(2));
+            kinematic=[(drive-load)/mass+vy*r;(lr*rate-vy)/lag;(rate-r)/lag];
+            range=cfg.model.kinematicSpeedRange;
+            blend=fmin(1,fmax(0,(v-range(1))/(range(2)-range(1))));
+            weight=blend^2*(3-2*blend);
+            dx=[v*cos(x(3))-vy*sin(x(3));v*sin(x(3))+vy*cos(x(3));r; ...
+                weight*dynamic+(1-weight)*kinematic];
+        end
+
+        function load = symbolicRoadLoad(v,cfg)
+            road=cfg.roadLoad;speed=abs(v);
+            load=.5*road.airDensity*road.dragCoefficient*road.frontalArea*v*speed ...
+                +cfg.vehicle.m*cfg.vehicle.gravity*(road.rollingCoefficient ...
+                +road.rollingSpeedCoefficient*speed+road.rollingQuarticCoefficient*speed^4) ...
+                *tanh(v/road.rollingTransitionSpeed);
+        end
+
+        function next = symbolicSensorFlow(x,u,scales,cfg,duration,endOfHold)
+            import casadi.*
+            count=max(1,round(nonlinearBicycleModel.meshCount(cfg)*duration/cfg.controller.sampleTime));
+            dt=duration/count;next=x;
+            for j=1:count
+                k1=nonlinearBicycleModel.symbolicDerivative(next,u,scales,cfg);
+                k2=nonlinearBicycleModel.symbolicDerivative(next+dt*k1/2,u,scales,cfg);
+                k3=nonlinearBicycleModel.symbolicDerivative(next+dt*k2/2,u,scales,cfg);
+                k4=nonlinearBicycleModel.symbolicDerivative(next+dt*k3,u,scales,cfg);
+                next=next+dt*(k1+2*k2+2*k3+k4)/6;
+            end
+            if endOfHold
+                stopped=(u(2)<=0)&(next(4)<.2*cfg.model.brakeHoldSpeed);
+                next=[next(1:3);if_else(stopped,zeros(3,1),next(4:6))];
+            end
+        end
+
         function count = meshCount(cfg)
             % RK4 steps per hold: one when integrationStep covers the hold,
             % otherwise an even number so that the midpoint is a mesh node.

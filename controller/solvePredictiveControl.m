@@ -2896,14 +2896,25 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
     [hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
     inferenceSeconds=toc(inferenceTimer);
     preparationTimer=tic;
-    problem=localOfProblem(hypotheses,memory,block.heldInput,policies,request.reference,cfg);
+    capacity=numel(hypotheses);
+    if ~initial && isfield(prior,'nlpHypothesisCapacity'),capacity=prior.nlpHypothesisCapacity;end
+    problem=localOfProblem(hypotheses,memory,block.heldInput,policies,request.reference,cfg,capacity);
     preparationSeconds=toc(preparationTimer);
     if string(request.operation)=="linearizeStep"
         problem.prepareOnly=true;
         [~,result]=localOfOptimize(problem,initial,timer);
         diagnostics=[];return;
     end
-    [point,diagnostics,trajectory]=localOfOptimize(problem,initial,timer);
+    warm=[];
+    if ~initial && isfield(prior,'nlpWarmStart') && ...
+            isequal(conditioning.retainedIndices(:),(1:numel(prior.hypotheses))')
+        warm=prior.nlpWarmStart;
+    end
+    if string(cfg.outputFeedback.method)=="ipopt"
+        [point,diagnostics,trajectory,warm]=localOfNonlinearOptimize(problem,initial,timer,warm);
+    else
+        [point,diagnostics,trajectory]=localOfOptimize(problem,initial,timer);
+    end
     diagnostics.informationUpdateSeconds=inferenceSeconds;
     diagnostics.predictionPreparationSeconds=preparationSeconds;
     accepted=localOfUnpackPlan(point,problem);input=accepted(1).v+accepted(1).K*memory;
@@ -2912,11 +2923,18 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
         'memory',memory,'hypotheses',hypotheses,'appliedInput',input, ...
         'committedPolicy',accepted(1),'policies',accepted,'configuration',cfg, ...
         'reference',request.reference,'conditioning',conditioning);
+    if string(cfg.outputFeedback.method)=="ipopt"
+        state.nlpWarmStart=warm;state.nlpHypothesisCapacity=capacity;
+    end
     diagnostics.conditioning=conditioning;diagnostics.elapsedSeconds=toc(timer);
     diagnostics.deadlineMissed=diagnostics.elapsedSeconds>diagnostics.deadlineSeconds;
     diagnostics.memoryDimension=numel(memory);diagnostics.hypothesisCount=numel(hypotheses);
     diagnostics.scenarioCount=numel(problem.scenarios);
+    diagnostics.activeScenarioCount=numel(hypotheses)*size(cfg.outputFeedback.noiseDirections,2);
     diagnostics.safetyScope="finiteJointScenariosLinearizedRti";
+    if string(cfg.outputFeedback.method)=="ipopt"
+        diagnostics.safetyScope="finiteJointScenariosNonlinearRolloutValidated";
+    end
     diagnostics.robustNonlinearSafetyCertified=false;
     diagnostics.recursiveFeasibilityCertified=false;
     diagnostics.optimizationReturned=true;
@@ -3113,7 +3131,8 @@ function policies = localOfUnpackPlan(point,problem)
     end
 end
 
-function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg)
+function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg,capacity)
+    if nargin<7,capacity=numel(hypotheses);end
     n=numel(policies);dimension=numel(localOfPack(localOfBackup(cfg)));
     assert(isstruct(policies) && n>=2 && n<=cfg.controller.maximumHorizonSteps, ...
         'collisionAvoidanceController:invalidPolicySeed','The seed must have one complete policy per hold.');
@@ -3128,10 +3147,18 @@ function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg
     radii=cfg.outputFeedback.noiseBounds([1;1;2;2;3;4;4]);
     for s=1:numel(hypotheses)
         for j=1:size(noise,2)
-            scenario=struct('initial',hypotheses(s),'noise',radii.*noise(:,j),'rootIndex',s);
+            scenario=struct('initial',hypotheses(s),'noise',radii.*noise(:,j),'rootIndex',s,'weight',1);
             if isempty(scenarios),scenarios=scenario;else,scenarios(end+1)=scenario;end %#ok<AGROW>
         end
     end
+    activeCount=numel(scenarios);
+    if string(cfg.outputFeedback.method)=="ipopt"
+        % Keep the compiled NLP shape through posterior pruning. Duplicate
+        % the last surviving trajectory with zero objective weight; its hard
+        % rows are redundant and do not add a new uncertainty realization.
+        scenarios(activeCount+1:capacity*size(noise,2))=scenarios(end);
+    end
+    for s=1:numel(scenarios),scenarios(s).weight=double(s<=activeCount)/activeCount;end
     x=hypotheses(1).ego;
     stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
     [~,lane]=readControllerInputs(stub,[],reference,cfg);
@@ -3152,9 +3179,31 @@ function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg
     problem=struct('cfg',cfg,'scenarios',scenarios,'memory',memory,'previousInput',input, ...
         'horizon',n,'lane',lane,'policyIndices',indices,'policyCount',policyCount, ...
         'witnessIndices',witnessIndices,'hasTarget',hasTarget,'lower',lower,'upper',upper, ...
-        'initial',point,'regularizationAnchor',point(1:policyCount));
-    if hasTarget
+        'initial',point,'regularizationAnchor',point(1:policyCount),'seedRepaired',false);
+    try
         trajectories=localOfRollout(point,problem);
+    catch exception
+        if string(cfg.outputFeedback.method)~="ipopt" || ...
+                ~any(string(exception.identifier)==["collisionAvoidanceController:jointTrialDomain", ...
+                "collisionAvoidanceController:nonlinearDomain"]),rethrow(exception);end
+        % A changed measured memory can invalidate a shifted numerical seed.
+        % Repair only the seed's actuator maps; inference and actual memory
+        % are untouched, and the optimizer must still pass nonlinear replay.
+        previous=input;
+        for i=1:n
+            policy=policies(i);policy.K(:)=0;
+            policy.v(1)=max(-cfg.outputFeedback.steeringMaximum,min(cfg.outputFeedback.steeringMaximum, ...
+                max(previous(1)-cfg.controller.sampleTime*cfg.outputFeedback.steeringRateMaximum, ...
+                min(previous(1)+cfg.controller.sampleTime*cfg.outputFeedback.steeringRateMaximum,policy.v(1)))));
+            change=cfg.controller.sampleTime*cfg.model.brakingRatioRateMaximum;
+            policy.v(2)=max(cfg.actuation.brakingRatioMinimum,min(cfg.actuation.brakingRatioMaximum, ...
+                max(previous(2)-change,min(previous(2)+change,policy.v(2)))));
+            point(indices(:,i))=localOfPack(policy);previous=policy.v;
+        end
+        problem.initial=point;problem.regularizationAnchor=point(1:policyCount);problem.seedRepaired=true;
+        trajectories=localOfRollout(point,problem);
+    end
+    if hasTarget
         for s=1:numel(scenarios)
             for i=1:n
                 for j=1:3
@@ -3170,7 +3219,7 @@ function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg
         problem.initial=point;
         problem.nominalTrajectories=trajectories;
     else
-        problem.nominalTrajectories=localOfRollout(point,problem);
+        problem.nominalTrajectories=trajectories;
     end
 end
 
@@ -3399,4 +3448,227 @@ function [r,c,f]=localOfStageValues(z,data,policy,problem)
             c=[c;-predictiveSafetyGeometry.separationWitnessRows(x(1:3),shape,q(1:3),q(8:11),witness(:,j),reserve)]; %#ok<AGROW>
         end
     end
+end
+
+function [point,info,trajectory,warm] = localOfNonlinearOptimize(problem,initial,timer,priorWarm)
+    % Thompson-style numerical route for OUR finite joint policy problem:
+    % cached parameterized NLP, automatic derivatives, IPOPT and warm starts.
+    assert(exist('casadi.SX','class')==8,'collisionAvoidanceController:missingCasadi', ...
+        'Run scripts/setupJointNlpSolver before selecting outputFeedback.method=ipopt.');
+    cfg=problem.cfg;of=cfg.outputFeedback;buildTimer=tic;
+    [kernel,cacheHit]=localOfNlpKernel(problem);buildSeconds=toc(buildTimer);
+    [parameters,seed]=localOfNlpData(problem,kernel);
+    lower=[problem.lower;kernel.stateLower];upper=[problem.upper;kernel.stateUpper];
+    seed=min(upper,max(lower,seed));
+    solverArguments={'x0',seed,'p',parameters,'lbx',lower,'ubx',upper, ...
+        'lbg',kernel.constraintLower,'ubg',kernel.constraintUpper};
+    dualWarm=false;
+    if ~isempty(priorWarm) && isequal(priorWarm.key,kernel.key)
+        lx=zeros(size(seed));lg=zeros(size(kernel.constraintLower));
+        pi=problem.policyIndices;wi=problem.witnessIndices;ix=kernel.stateIndices;
+        lx(pi(:,1:end-1))=priorWarm.lambdaX(pi(:,2:end));
+        if problem.hasTarget,lx(wi(:,:,1:end-1,:))=priorWarm.lambdaX(wi(:,:,2:end,:));end
+        lx(ix(:,1:end-1,:))=priorWarm.lambdaX(ix(:,2:end,:));
+        gi=kernel.constraintIndices;
+        lg(gi(:,1:end-1,:))=priorWarm.lambdaG(gi(:,2:end,:));
+        solverArguments=[solverArguments,{'lam_x0',lx,'lam_g0',lg}];dualWarm=true;
+    end
+    solveTimer=tic;solution=kernel.solver(solverArguments{:});solveSeconds=toc(solveTimer);
+    stats=kernel.solver.stats();trial=full(solution.x);
+    validationTimer=tic;
+    [valid,trajectory,violation,objective]=localOfValidateNlpPolicy(trial(1:numel(problem.initial)),problem);
+    trialViolation=violation;
+    fallback=false;point=trial(1:numel(problem.initial));
+    if ~valid
+        [valid,trajectory,violation,objective]=localOfValidateNlpPolicy(problem.initial,problem);
+        fallback=valid;point=problem.initial;
+    end
+    assert(valid,'collisionAvoidanceController:noOutputFeedbackPlan', ...
+        'IPOPT returned %s; nonlinear violation: candidate %g, shifted seed %g (limit %g). No command was committed.', ...
+        stats.return_status,trialViolation,violation,of.nlpTolerance);
+    validationSeconds=toc(validationTimer);warm=[];
+    if ~fallback
+        warm=struct('key',{kernel.key},'lambdaX',full(solution.lam_x),'lambdaG',full(solution.lam_g));
+    end
+    residual=full(solution.g);equality=kernel.constraintLower==kernel.constraintUpper;
+    info=struct('solver',"casadiIpopt",'nlpStatus',string(stats.return_status), ...
+        'nlpConverged',logical(stats.success),'nlpIterations',stats.iter_count, ...
+        'sqpIterations',0,'acceptedSteps',double(~fallback),'qpExitFlag',NaN, ...
+        'maximumLinearizedConstraintViolation',NaN, ...
+        'maximumShootingEqualityResidual',max([0;abs(residual(equality))]), ...
+        'maximumConstraintViolation',violation,'objective',objective, ...
+        'candidateMaximumConstraintViolation',trialViolation,'candidateObjective',full(solution.f), ...
+        'shiftedPlanRevalidated',fallback,'usedRevalidatedFallback',fallback, ...
+        'nonlinearValidationPerformed',true,'horizonSteps',problem.horizon, ...
+        'hardCollisionConstraints',true,'terminalControllerActive',false, ...
+        'linearizationSeconds',0,'qpSeconds',0,'nlpSeconds',solveSeconds, ...
+        'nlpBuildSeconds',buildSeconds,'nonlinearValidationSeconds',validationSeconds, ...
+        'nlpCacheHit',cacheHit,'nlpDualWarmStart',dualWarm, ...
+        'nlpVariables',numel(seed),'stageFlowEvaluations',NaN, ...
+        'predictionIsLinearized',false,'auxiliaryNodesAreNominal',false, ...
+        'automaticDerivatives',true,'initialization',initial,'numericalSeedRepaired',problem.seedRepaired, ...
+        'trackingReferenceScope',"nominalLocalPathTangent", ...
+        'deadlineSeconds',min(of.maximumSolveSeconds,cfg.controller.sampleTime), ...
+        'deadlineMissed',toc(timer)>min(of.maximumSolveSeconds,cfg.controller.sampleTime));
+end
+
+function [valid,traces,violation,objective] = localOfValidateNlpPolicy(point,problem)
+    valid=false;traces={};violation=Inf;objective=Inf;
+    if any(~isfinite(point)),return;end
+    try
+        traces=localOfRollout(point,problem);policies=localOfUnpackPlan(point,problem);
+        violation=max([0;problem.lower-point;point-problem.upper]);
+        objective=.5*problem.cfg.outputFeedback.regularization* ...
+            norm(point(1:problem.policyCount)-problem.initial(1:problem.policyCount))^2;
+        for s=1:numel(traces)
+            trace=traces{s};previous=problem.previousInput;
+            for i=1:problem.horizon
+                z=[trace.ego(:,i);trace.inputs(:,i);previous;trace.memory(:,i)];
+                if problem.hasTarget,z=[z;reshape(point(problem.witnessIndices(:,:,i,s)),[],1)];end %#ok<AGROW>
+                data=struct('next',trace.ego(:,i+1),'feature',localOfFeatures(trace.sensorBlocks{i},problem.cfg), ...
+                    'states',trace.physicalNodes(:,:,i),'checks',trace.checks(:,:,i),'targets',trace.targetChecks(:,:,i));
+                [r,c]=localOfStageValues(z,data,policies(i),problem);
+                objective=objective+.5*(r.'*r)*numel(problem.scenarios)*problem.scenarios(s).weight;
+                violation=max(violation,max(c));previous=trace.inputs(:,i);
+            end
+        end
+        valid=isfinite(violation) && violation<=problem.cfg.outputFeedback.nlpTolerance;
+    catch exception
+        if ~startsWith(exception.identifier,'collisionAvoidanceController:'),rethrow(exception);end
+    end
+end
+
+function [kernel,hit] = localOfNlpKernel(problem)
+    persistent keys kernels
+    key={problem.cfg,problem.horizon,numel(problem.scenarios),problem.hasTarget};
+    hit=false;
+    for j=1:numel(keys)
+        if isequaln(keys{j},key),kernel=kernels{j};hit=true;return;end
+    end
+    import casadi.*
+    cfg=problem.cfg;of=cfg.outputFeedback;n=problem.horizon;ns=numel(problem.scenarios);
+    nm=of.memoryDimension;nx=8+nm;np=numel(problem.initial);
+    ix=reshape(np+(1:nx*n*ns),nx,n,ns);w=MX.sym('decision',np+numel(ix));
+    stage=localOfSymbolicStage(cfg,problem.hasTarget);
+    stageParameterCount=stage.size1_in(3);rootCount=6*ns+nm+2;
+    p=MX.sym('parameter',rootCount+stageParameterCount*n*ns+problem.policyCount);
+    pi=reshape(rootCount+(1:stageParameterCount*n*ns),stageParameterCount,n,ns);
+    memory=p(6*ns+(1:nm));input=p(6*ns+nm+(1:2));
+    g=cell(n,ns);cost=0;
+    for s=1:ns
+        state=[p((s-1)*6+(1:6));memory;input];
+        for i=1:n
+            witness=MX.zeros(6,1);
+            if problem.hasTarget,witness=w(reshape(problem.witnessIndices(:,:,i,s),[],1));end
+            [next,c,r]=stage(state,w(problem.policyIndices(:,i)),witness,p(pi(:,i,s)));
+            g{i,s}=[w(ix(:,i,s))-next;c];cost=cost+p(pi(end,i,s))*dot(r,r)/2;
+            state=w(ix(:,i,s));
+        end
+    end
+    anchor=p(end-problem.policyCount+1:end);
+    cost=cost+.5*of.regularization*dot(w(1:problem.policyCount)-anchor,w(1:problem.policyCount)-anchor);
+    nc=numel(g{1});constraint=vertcat(g{:});
+    gl=repmat([zeros(nx,1);-Inf(nc-nx,1)],n*ns,1);gu=zeros(size(gl));
+    options=struct('print_time',false,'error_on_fail',false,'jit',of.nlpJit, ...
+        'ipopt',struct('print_level',0,'sb','yes','max_iter',of.nlpMaximumIterations, ...
+        'tol',of.nlpTolerance,'constr_viol_tol',of.nlpTolerance, ...
+        'bound_relax_factor',0,'warm_start_init_point','yes','mu_init',1e-3));
+    if isfinite(of.maximumSolveSeconds),options.ipopt.max_wall_time=of.maximumSolveSeconds;end
+    if of.nlpJit
+        directory=tempname;mkdir(directory);
+        options.compiler='shell';options.jit_options=struct('flags','-O3','directory',[directory,filesep]);
+        % CasADi writes the generated source in the current directory even
+        % when the compiler output directory is set. Keep both outside Git.
+        previousDirectory=pwd;restoreDirectory=onCleanup(@()cd(previousDirectory));
+        cd(directory);
+    end
+    solver=nlpsol('joint_output_feedback','ipopt',struct('x',w,'p',p,'f',cost,'g',constraint),options);
+    if of.nlpJit,clear restoreDirectory;end
+    sl=[-Inf(3,1);0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum; ...
+        -ones(nm,1);-of.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)];
+    su=[Inf(3,1);cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum; ...
+        ones(nm,1);of.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)];
+    kernel=struct('key',{key},'solver',solver,'stateIndices',ix,'parameterIndices',pi, ...
+        'parameterCount',numel(p),'constraintLower',gl,'constraintUpper',gu, ...
+        'constraintIndices',reshape(1:numel(gl),nc,n,ns), ...
+        'stateLower',repmat(sl,n*ns,1),'stateUpper',repmat(su,n*ns,1));
+    if numel(keys)>=8,keys=keys(2:end);kernels=kernels(2:end);end
+    keys{end+1}=key;kernels{end+1}=kernel;
+end
+
+function [parameters,seed] = localOfNlpData(problem,kernel)
+    cfg=problem.cfg;ns=numel(problem.scenarios);nm=cfg.outputFeedback.memoryDimension;
+    l=cfg.outputFeedback.predictionSubsteps;dt=cfg.controller.sampleTime/l;
+    parameters=zeros(kernel.parameterCount,1);seed=zeros(numel(problem.initial)+numel(kernel.stateIndices),1);
+    seed(1:numel(problem.initial))=problem.initial;
+    parameters(6*ns+(1:nm+2))=[problem.memory;problem.previousInput];
+    parameters(end-problem.policyCount+1:end)=problem.initial(1:problem.policyCount);
+    for s=1:ns
+        item=problem.scenarios(s).initial;trace=problem.nominalTrajectories{s};
+        parameters((s-1)*6+(1:6))=item.ego;
+        for i=1:problem.horizon
+            targets=zeros(11,l+1);
+            if problem.hasTarget
+                q=trace.targets(:,i);targets(:,1)=q;
+                for j=1:l
+                    if q(4)>0,q=predictiveSafetyGeometry.predictTarget(q,dt);end
+                    targets(:,j+1)=q;
+                end
+            end
+            projection=predictiveSafetyGeometry.project(trace.ego(1:2,i+1),problem.lane);
+            parameters(kernel.parameterIndices(:,i,s))=[item.parameters;item.sensorBias; ...
+                problem.scenarios(s).noise;targets(:);projection.point;projection.heading;problem.scenarios(s).weight];
+            seed(kernel.stateIndices(:,i,s))=[trace.ego(:,i+1);trace.memory(:,i+1);trace.inputs(:,i)];
+        end
+    end
+end
+
+function stage = localOfSymbolicStage(cfg,hasTarget)
+    import casadi.*
+    of=cfg.outputFeedback;nm=of.memoryDimension;l=of.predictionSubsteps;
+    z=SX.sym('state',8+nm);alpha=SX.sym('policy',2+2*nm+nm^2+9*nm);
+    witness=SX.sym('witness',6);p=SX.sym('data',18+11*(l+1)+4);
+    policy=localOfUnpack(alpha,cfg);x=z(1:6);m=z(7:6+nm);previous=z(7+nm:8+nm);
+    u=policy.v+policy.K*m;h=cfg.controller.sampleTime;dt=h/l;
+    states=x;feature=SX.zeros(8,1);q=reshape(p(19:18+11*(l+1)),11,l+1);
+    for j=1:l
+        x=nonlinearBicycleModel.symbolicSensorFlow(x,u,p(1:4),cfg,dt,j==l);states=[states,x]; %#ok<AGROW>
+        dx=nonlinearBicycleModel.symbolicDerivative(x,u,p(1:4),cfg);
+        relative=SX.zeros(2,1);detected=SX(0);
+        if hasTarget
+            relative=[cos(x(3)),sin(x(3));-sin(x(3)),cos(x(3))]*(q(1:2,j+1)-x(1:2));
+            detected=dot(relative,relative)<=cfg.collision.encounterRangeMeters^2;
+        end
+        y=[x(1:2);dx(4)-x(6)*x(5);dx(5)+x(6)*x(4);x(6);relative]+p(5:11)+p(12:18);
+        y=[y(1:5);if_else(detected,y(6:7),zeros(2,1))];
+        feature=feature+[y./of.featureScale;detected]/l;
+    end
+    next=[x;tanh(policy.A*m+policy.B*feature+policy.c);u];
+    ref=p(end-3:end-1);normal=[-sin(ref(3));cos(ref(3))];
+    error=[normal.'*(x(1:2)-ref(1:2));atan2(sin(x(3)-ref(3)),cos(x(3)-ref(3))); ...
+        x(4)-cfg.referenceSpeed;x(5);x(6)];
+    residual=[sqrt(h*of.trackingWeights).*error;sqrt(of.inputWeight)*(u-previous)];
+    c=[u(1)-of.steeringMaximum;-u(1)-of.steeringMaximum; ...
+        u(2)-min(1,cfg.actuation.brakingRatioMaximum);max(-1,cfg.actuation.brakingRatioMinimum)-u(2); ...
+        u(1)-previous(1)-h*of.steeringRateMaximum;previous(1)-u(1)-h*of.steeringRateMaximum];
+    if isfinite(cfg.model.brakingRatioRateMaximum)
+        change=h*cfg.model.brakingRatioRateMaximum;c=[c;u(2)-previous(2)-change;previous(2)-u(2)-change];
+    end
+    c=[c;reshape([-states(4,:);states(4,:)-cfg.model.speedMaximum; ...
+        states(5,:)-cfg.model.lateralVelocityMaximum;-states(5,:)-cfg.model.lateralVelocityMaximum; ...
+        states(6,:)-cfg.model.yawRateMaximum;-states(6,:)-cfg.model.yawRateMaximum],[],1)];
+    if hasTarget
+        signs=[-1,1,1,-1;-1,-1,1,1];body=cfg.vehicle.rectangleOffset ...
+            +[cfg.vehicle.length/2;cfg.vehicle.width/2].*signs;
+        reserve=of.clearanceMeters+of.intersampleMarginMeters;checks=[1,1+l/2,1+l];
+        for j=1:3
+            pose=states(1:3,checks(j));target=q(:,checks(j));
+            re=[cos(pose(3)),-sin(pose(3));sin(pose(3)),cos(pose(3))];
+            rt=[cos(target(3)),-sin(target(3));sin(target(3)),cos(target(3))];
+            normal=[cos(witness(2*j-1));sin(witness(2*j-1))];offset=witness(2*j);
+            ego=pose(1:2)-target(1:2)+re*body;other=rt*(target(10:11)+target(8:9).*signs);
+            c=[c;(offset+reserve-normal.'*ego).';(normal.'*other-offset).']; %#ok<AGROW>
+        end
+    end
+    stage=Function('joint_stage',{z,alpha,witness,p},{next,c,residual});
 end

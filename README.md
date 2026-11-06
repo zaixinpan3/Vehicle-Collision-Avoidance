@@ -6,9 +6,11 @@ an actuator map and a bounded controller-memory update. It does not require a
 separately designed state observer.
 
 The implementation uses finite joint scenarios, numerical Fiala-bicycle flows,
-and one sparse multiple-shooting SQP-RTI QP per call. The trial policy is
-committed without nonlinear line search or acceptance checks. This is a
-research deployment approximation, **not a robust safety certificate**.
+and a selectable sparse multiple-shooting solver. The default `sqpRti` backend
+executes one QP without nonlinear acceptance. The `ipopt` backend uses cached
+CasADi automatic derivatives, nonlinear iterations, shifted primal/dual warm
+starts, and nonlinear policy replay before acceptance. Both are research
+deployment approximations, **not robust safety certificates**.
 The conditional exact-set theorem and constructive braking terminal component
 are in [controller theory](controller/CONTROLLER_THEORY.md).
 
@@ -26,6 +28,27 @@ results = runtests('tests/dynamicOutputFeedbackTest.m');
 assertSuccess(results)
 ```
 
+To try the Thompson-style nonlinear solver route, install the CasADi MATLAB
+distribution outside the repository and load it once per MATLAB session:
+
+```matlab
+setupJointNlpSolver; % Or pass its installation directory / set CASADI_PATH.
+cfg = struct('outputFeedback', struct('method', "ipopt", ...
+    'horizonSteps', 4, 'nlpMaximumIterations', 50));
+result = runJointOutputFeedbackScenario(Frames=60, Speeds=8, ...
+    Scenarios=["headOn","intersectionCrossing"], ...
+    ControllerConfiguration=cfg, OutputDirectory=string(tempname));
+results = runtests('tests/nonlinearOutputFeedbackTest.m');
+assertSuccess(results)
+```
+
+`nlpJit=true` compiles model derivatives to C during the first solve for each
+configuration and initial scenario capacity. Posterior pruning reuses the
+compiled graph with zero-weight duplicate slots. Prepare kernels before online operation;
+compilation is not part of a real-time control budget. `nlpJit=false` avoids
+the compiler requirement. The external CasADi distribution must include IPOPT;
+the tested installation is CasADi 3.8.2. No solver binaries are stored here.
+
 This reproducible experiment uses seed `20261104`, noisy position-only GNSS,
 body-frame inertial acceleration, gyro and relative radar. Its initial finite
 physical contract is declared once and includes the actual simulation initial
@@ -41,10 +64,12 @@ current deployment uses four stages, one memory coordinate, two prediction
 substeps per hold, and one future-noise direction per retained hypothesis.
 The scenario driver performs four discarded virtual startup calls by default to warm
 initialization and continuation in MATLAB and the solver; `Warmup=false` exposes cold-start latency. Every recorded
-call still performs exactly one QP. Startup warmup time is exported separately.
+RTI call still performs exactly one QP. Startup warmup time is exported separately.
 The control deadline is `min(outputFeedback.maximumSolveSeconds, sampleTime)`;
-it is a measured deadline, not an interruptible timeout. A deadline miss is
-reported explicitly. See [measured validation](report/SPARSE_RTI_20261104.tex).
+it is a measured whole-call deadline. IPOPT also receives `maximumSolveSeconds`
+as its internal wall-time limit, which excludes inference, preparation,
+compilation and replay and is not a hard real-time guarantee. NLP metadata
+separates these costs and reports convergence, fallback use and deadline misses.
 
 ## Controller interface
 
@@ -76,9 +101,13 @@ are persistent and correlated with their physical hypothesis.
 
 Optional `initialMemory` lies in the configured cube. Optional
 `initialPolicies` supplies one complete `(v,K,A,B,c)` structure per hold as a
-numerical seed. The final hold is always the constant braking backup; every
-call solves one local QP, including initialization. No iterative feasibility
-restoration is performed online.
+numerical seed. Every stage is optimized, including the final hold. The
+appended braking policy is only a warm-start seed. IPOPT has no fixed coefficient
+step box; physical input, slew, collision and domain constraints remain hard.
+Its candidate must pass fresh nonlinear replay over all retained scenarios.
+Otherwise the shifted seed is replayed and used only if it passes; if neither
+passes, the call returns an error without committing a new command. This gate
+does not certify unsampled uncertainty or continuous-time clearance.
 
 On continuation, supply every sensor reading since the previous decision,
 including detection flags. The hold must contain an even integer number of
@@ -86,27 +115,22 @@ sensor periods. Do not resend initial hypotheses or reset memory. The retained
 first memory map processes the new block exactly once. Every raw reading
 conditions physical hypotheses, even though policy features use normalized
 block means and the detection fraction. An empty posterior, changed contract,
-missing reading, input mismatch, or unsuccessful QP produces
+missing reading, input mismatch, or absence of an accepted plan produces
 an error without committing a command.
 
 Noise bounds, policy dimension, future noise directions, coefficient bounds,
 fixed horizon (`horizonSteps`), and solver settings live in `cfg.outputFeedback`.
 The separate comparator horizon in `cfg.controller` does not size this pipeline. A dropout retains the target
-and its collision obligation. The deployment terminal constraint approximates remaining travel by constant
-braking deceleration plus a fading-brake travel term, with a configured
-engineering intersample margin. It
-is not the invariant terminal certificate in the theory. Target tangential
-acceleration and sideslip stay constant: zero, positive and negative acceleration
-are all supported, including curved motion. The finite-stop reserve is used only
-where applicable. Continuing targets instead use two samples of their actual
-constant-motion continuation over `terminalPreviewSeconds` (default 0.5 s),
-against an approximate ego braking-travel enclosure. This finite terminal
-preview is not an infinite-horizon certificate. `minimumTargetDeceleration`
-selects the finite-stop component; it is not a target-admission bound.
+and its collision obligation. Endpoint constraints impose the same clearance
+and physical domain conditions as other prediction nodes. There is no
+remaining-braking-travel reserve, fixed final braking input, or terminal
+invariance claim in this deployment. Target tangential acceleration and sideslip
+stay constant: zero, positive and negative acceleration are all supported,
+including curved motion.
 Target restart after an absorbing stop, residual physical forces, multiple
 targets, and hard road constraints remain outside this implementation. No observer sideslip cone
 is imposed on this new pipeline; its physical speed, lateral-velocity and yaw
-caps are imposed as linearized constraints at prediction nodes.
+caps are imposed at prediction nodes (linearized in RTI, nonlinear in IPOPT).
 
 ## Research comparators and layout
 
