@@ -466,9 +466,9 @@ the known actual memory, and its committed memory map processes the next raw
 block. All received raw samples condition the finite hypotheses; future sensor
 blocks are coarsened to two substeps by default.
 
-Default deployment dimensions are four stages, one memory coordinate, and one
-future-noise direction per retained joint hypothesis. The horizon does not grow
-with speed. Separating planes are checked at start, midpoint and endpoint with
+Default deployment uses one memory coordinate and one future-noise direction
+per retained joint hypothesis. The number of stages is selected before the
+solve from a physical-time preview, as specified below. Separating planes are checked at start, midpoint and endpoint with
 a 0.2 m engineering reserve in addition to the requested clearance. This margin
 is not a verified intersample bound. The deployment retains the same rectangle
 clearance and physical-domain inequalities at the horizon endpoint. It imposes
@@ -499,6 +499,33 @@ numerical seed; MATLAB/solver warmup can run before the timed control loop.
 The configured deadline is measured and reported, not enforced by interrupting
 the QP. The complete inference, nominal preparation, local linearization, QP,
 and command bookkeeping contribute to the exported total call time.
+
+### Time coverage and stage allocation
+
+For automatic coverage, let $v_k=\max_s\|(v_{x,k}^s,v_{y,k}^s)\|$ over the
+retained physical hypotheses. With a positive planning acceleration scale
+$a_p$, settling duration $\tau_p\ge0$ and allocation interval $\Delta_T>0$, set
+
+$$
+T_k^{\rm req}=\max\{2h,v_k/a_p+\tau_p\},\qquad
+T_k^{\rm alloc}=\Delta_T\left\lceil T_k^{\rm req}/\Delta_T\right\rceil,
+\qquad N_k=\max\left\{N_{k-1},\left\lceil T_k^{\rm alloc}/h\right\rceil\right\}.
+$$
+
+At initialization, $N_{k-1}$ is zero or the supplied seed length. A prescribed
+positive duration may replace the automatic rule; it is rounded upward to at
+least two holds. This selects one horizon directly, without trying successive
+NLPs. Shift the old policy tail and append numerical backup seeds until it has
+$N_k$ stages. Retaining an already longer horizon avoids shrink-induced graph
+rebuilds. If the configured stage capacity is insufficient, return an explicit
+error rather than shorten the selected coverage.
+
+The deployment values are $a_p=4$ m/s², $\tau_p=0.5$ s and $\Delta_T=1$ s.
+The acceleration scale is a preview parameter, not a uniform braking bound
+derived from the Fiala dynamics. This rule neither adds a terminal stopping
+constraint nor proves that a feasible avoidance maneuver fits inside the
+window. Universal horizon sufficiency would require an additional reachability
+argument under the same physical and information contract.
 
 ### Parameterized nonlinear backend
 

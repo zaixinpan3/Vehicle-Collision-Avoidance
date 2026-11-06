@@ -111,7 +111,7 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyEqual([prediction.metadata.sqpIterations,nextPrediction.metadata.sqpIterations],[1,1]);
             testCase.verifyEqual(nextState.hypotheses.target(5:6),[targetAcceleration;targetSideslip],AbsTol=0);
             expected=predictiveSafetyGeometry.predictTarget(hypothesis.target, ...
-                cfg.outputFeedback.horizonSteps*cfg.controller.sampleTime);
+                prediction.metadata.predictionWindow.allocatedSeconds);
             testCase.verifyEqual(prediction.scenarios{1}.targets(:,end),expected,AbsTol=1e-10);
         end
         function aSingleMeasurementDoesNotInventAnInitialInformationSet(testCase)
@@ -176,10 +176,46 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyLessThan(stateError,2e-7);
             testCase.verifyLessThan(memoryError,2e-7);
         end
-        function theDeploymentHorizonDoesNotGrowWithVehicleSpeed(testCase)
-            testCase.verifyEqual(numel(testCase.state.policies),testCase.cfg.outputFeedback.horizonSteps);
+        function anExplicitDurationControlsThePredictionCoverage(testCase)
+            testCase.verifyGreaterThanOrEqual(numel(testCase.state.policies)*testCase.cfg.controller.sampleTime, ...
+                testCase.cfg.outputFeedback.horizonSeconds);
             testCase.verifyTrue(testCase.prediction.metadata.predictionIsLinearized);
             testCase.verifyLessThan(testCase.prediction.metadata.maximumShootingEqualityResidual,1e-8);
+        end
+        function automaticCoverageGrowsWithTheCurrentSpeed(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.horizonSeconds=[];
+            slow=testCase.hypothesis;medium=slow;fast=slow;
+            medium.ego(4)=8;fast.ego(4)=25;
+            a=localOperation('window',cfg,struct('hypotheses',slow));
+            b=localOperation('window',cfg,struct('hypotheses',medium));
+            c=localOperation('window',cfg,struct('hypotheses',fast));
+            testCase.verifyGreaterThan(b.horizonSteps,a.horizonSteps);
+            testCase.verifyGreaterThan(c.horizonSteps,b.horizonSteps);
+            testCase.verifyGreaterThanOrEqual(c.allocatedSeconds,c.requestedSeconds);
+            testCase.verifyFalse(c.feasibilityCertified);
+        end
+        function automaticCoverageUsesEveryRetainedHypothesis(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.horizonSeconds=[];
+            hypotheses=repmat(testCase.hypothesis,1,2);hypotheses(2).ego(4:5)=[8;1];
+            window=localOperation('window',cfg,struct('hypotheses',hypotheses));
+            testCase.verifyEqual(window.speedUpperMetersPerSecond,hypot(8,1));
+            testCase.verifyGreaterThanOrEqual(window.allocatedSeconds, ...
+                hypot(8,1)/cfg.outputFeedback.previewDecelerationMetersPerSecondSquared ...
+                +cfg.outputFeedback.previewSettlingSeconds);
+        end
+        function theAutomaticWindowActuallySizesTheExecutedPlan(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.horizonSeconds=[];
+            [~,~,prediction,state]=collisionAvoidanceController(testCase.block,[],[],cfg,[]);
+            window=prediction.metadata.predictionWindow;
+            testCase.verifyEqual(window.source,"speedBasedPreview");
+            testCase.verifyEqual(numel(state.policies),window.horizonSteps);
+            testCase.verifyGreaterThan(window.allocatedSeconds,.2);
+        end
+        function aCapacityLimitCannotSilentlyShortenThePreview(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.horizonSeconds=[];
+            cfg.controller.maximumHorizonSteps=10;
+            testCase.verifyError(@()collisionAvoidanceController(testCase.block,[],[],cfg,[]), ...
+                'collisionAvoidanceController:predictionWindowCapacity');
         end
         function brakingFeedforwardCanMoveBeyondTheNumericalBoxButNotActuatorLimits(testCase)
             policies=testCase.state.policies;
@@ -232,7 +268,8 @@ end
 function [cfg,hypothesis,block]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',1.5, ...
         'controller',struct('horizonSteps',3), ...
-        'outputFeedback',struct('memoryDimension',2,'noiseDirections',zeros(7,1),'maximumSolveSeconds',120)));
+        'outputFeedback',struct('horizonSeconds',.15,'memoryDimension',2, ...
+        'noiseDirections',zeros(7,1),'maximumSolveSeconds',120)));
     hypothesis=struct('ego',[0;0;0;1.5;0;0],'target',[15;0;0;0;0;0;1.6;2.4;.95;0;0], ...
         'parameters',ones(4,1),'sensorBias',zeros(7,1));
     input=[0;-.6];

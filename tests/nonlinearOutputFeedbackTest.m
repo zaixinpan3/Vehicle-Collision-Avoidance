@@ -89,10 +89,37 @@ classdef nonlinearOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
         end
+        function theNonlinearBackendUsesAutomaticTimeCoverage(testCase)
+            [cfg,block]=localFixture();cfg.outputFeedback.horizonSeconds=[];cfg.referenceSpeed=1.5;
+            block.initialHypotheses.ego(4)=1.5;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
+            [~,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyEqual(prediction.metadata.predictionWindow.source,"speedBasedPreview");
+            testCase.verifyEqual(numel(state.policies),prediction.metadata.predictionWindow.horizonSteps);
+            testCase.verifyGreaterThan(prediction.metadata.predictionWindow.allocatedSeconds,.2);
+            testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
+        end
+        function risingSpeedExtendsTheShiftedPlanWithoutResettingMemory(testCase)
+            [cfg,block]=localFixture();cfg.outputFeedback.horizonSeconds=[];
+            cfg.outputFeedback.maximumSolveSeconds=5;block.initialHypotheses.ego(4)=1.95;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
+            [~,~,first,state]=collisionAvoidanceController(block,[],[],cfg,[]);
+            next=localBlock(state,cfg);
+            expected=solvePredictiveControl('outputFeedback',struct('operation',"memory", ...
+                'cfg',cfg,'memory',state.memory,'policy',state.committedPolicy,'samples',next.samples));
+            [~,~,second,state]=collisionAvoidanceController(next,[],[],cfg,state);
+            testCase.verifyGreaterThan(second.metadata.horizonSteps,first.metadata.horizonSteps);
+            testCase.verifyEqual(numel(state.policies),second.metadata.horizonSteps);
+            testCase.verifyEqual(state.memory,expected,AbsTol=1e-14);
+            testCase.verifyFalse(second.metadata.nlpDualWarmStart);
+            testCase.verifyLessThanOrEqual(second.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
+        end
         function anInvalidNumericalSeedDoesNotResetMeasuredMemory(testCase)
             [cfg,block]=localFixture();block.initialMemory=.9;
             policy=struct('v',[0;.95],'K',[0;.25],'A',0,'B',zeros(1,8),'c',0);
-            block.initialPolicies=repmat(policy,1,cfg.outputFeedback.horizonSteps);
+            block.initialPolicies=repmat(policy,1,ceil(cfg.outputFeedback.horizonSeconds/cfg.controller.sampleTime));
             [command,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyTrue(prediction.metadata.numericalSeedRepaired);
             testCase.verifyEqual(state.memory,.9);
@@ -102,7 +129,7 @@ classdef nonlinearOutputFeedbackTest < matlab.unittest.TestCase
         function nonlinearIterationsEscapeTheRtiCoefficientStepBox(testCase)
             [cfg,block]=localFixture();block.heldInput=[-.4;0];
             policy=struct('v',[.4;0],'K',zeros(2,1),'A',0,'B',zeros(1,8),'c',0);
-            block.initialPolicies=repmat(policy,1,cfg.outputFeedback.horizonSteps);
+            block.initialPolicies=repmat(policy,1,ceil(cfg.outputFeedback.horizonSeconds/cfg.controller.sampleTime));
             block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
                 'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
             rti=cfg;rti.outputFeedback.method="sqpRti";
@@ -125,7 +152,7 @@ end
 
 function [cfg,block]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-        'outputFeedback',struct('method',"ipopt",'maximumSolveSeconds',2,'nlpJit',false)));
+        'outputFeedback',struct('method',"ipopt",'horizonSeconds',.15,'maximumSolveSeconds',2,'nlpJit',false)));
     hypothesis=struct('ego',[0;0;0;8;0;0],'target',[30;0;0;0;0;0;1.6;2.4;.95;0;0], ...
         'parameters',ones(4,1),'sensorBias',zeros(7,1));
     input=[0;-.6];sample=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...

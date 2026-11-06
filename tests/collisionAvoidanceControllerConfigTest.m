@@ -68,6 +68,16 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function theJointHorizonHasNoFixedStageDefault(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            testCase.verifyEmpty(cfg.outputFeedback.horizonSeconds);
+            testCase.verifyFalse(isfield(cfg.outputFeedback,'horizonSteps'));
+        end
+        function retiredJointStageCountsCannotSilentlyOverrideCoverage(testCase)
+            testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
+                struct('outputFeedback',struct('horizonSteps',4))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
         function performanceWeightsMustBeFiniteAndNonnegative(testCase,invalidReferenceWeight,performanceWeight)
             testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
                 struct('rti',struct(performanceWeight,invalidReferenceWeight))), ...

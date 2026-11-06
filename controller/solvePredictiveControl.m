@@ -2830,6 +2830,8 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
             result=localOfAdvance(request.hypothesis,request.input,cfg,request.duration,request.endOfHold);
         case "condition"
             [result,diagnostics]=localOfCondition(request.hypotheses,request.block,cfg,request.initial);
+        case "window"
+            result=localOfWindow(localOfValidateHypotheses(request.hypotheses,cfg),0,cfg);
         case {"predict","linearize"}
             problem=localOfProblem(request.hypotheses,request.memory,request.input, ...
                 request.policies,request.reference,cfg);
@@ -2853,8 +2855,6 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
     assert(~cfg.controller.enforceRoadBoundaries, ...
         'collisionAvoidanceController:unsupportedJointRoadConstraint', ...
         'The joint deployment does not implement hard road-boundary inequalities.');
-    assert(cfg.controller.horizonSteps>=2,'collisionAvoidanceController:invalidJointHorizon', ...
-        'At least two holds are required by the current deployment.');
     count=cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod;
     assert(abs(count-round(count))<1e-10 && count>=2 && mod(round(count),2)==0, ...
         'collisionAvoidanceController:invalidSensorGrid', ...
@@ -2871,8 +2871,9 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
         if isfield(block,'initialMemory'),memory=block.initialMemory;end
         validateattributes(memory,{'double'},{'size',[cfg.outputFeedback.memoryDimension,1],'finite','real'});
         assert(all(abs(memory)<=1),'collisionAvoidanceController:invalidMemory','Memory must belong to its invariant cube.');
-        if isfield(block,'initialPolicies'),policies=block.initialPolicies;
-        else,policies=localOfInitialPolicies(cfg,hypotheses,request.reference,block.heldInput);end
+        policies=[];
+        if isfield(block,'initialPolicies'),policies=block.initialPolicies;end
+        inheritedCount=numel(policies);
     else
         assert(isstruct(prior) && isfield(prior,'kind') && prior.kind=="jointOutputFeedback-v1", ...
             'collisionAvoidanceController:incompatibleContinuation','Expected a joint output-feedback continuation.');
@@ -2890,12 +2891,18 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
             'collisionAvoidanceController:actuationMismatch','The received block must use the previously committed actuator command.');
         hypotheses=prior.hypotheses;
         memory=localOfMemory(prior.committedPolicy,prior.memory,block.samples,cfg);
-        policies=[prior.policies(2:end),localOfBackup(cfg)];
+        policies=prior.policies(2:end);inheritedCount=numel(prior.policies);
     end
     inferenceTimer=tic;
     [hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
     inferenceSeconds=toc(inferenceTimer);
     preparationTimer=tic;
+    window=localOfWindow(hypotheses,inheritedCount,cfg);
+    if isempty(policies)
+        policies=localOfInitialPolicies(cfg,hypotheses,request.reference,block.heldInput,window.horizonSteps);
+    else
+        policies=[policies,repmat(localOfBackup(cfg),1,window.horizonSteps-numel(policies))];
+    end
     capacity=numel(hypotheses);
     if ~initial && isfield(prior,'nlpHypothesisCapacity'),capacity=prior.nlpHypothesisCapacity;end
     problem=localOfProblem(hypotheses,memory,block.heldInput,policies,request.reference,cfg,capacity);
@@ -2917,6 +2924,7 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
     end
     diagnostics.informationUpdateSeconds=inferenceSeconds;
     diagnostics.predictionPreparationSeconds=preparationSeconds;
+    diagnostics.predictionWindow=window;
     accepted=localOfUnpackPlan(point,problem);input=accepted(1).v+accepted(1).K*memory;
     % Commit the full first controller, including its next-block memory map.
     state=struct('kind',"jointOutputFeedback-v1",'time',block.time, ...
@@ -3084,10 +3092,32 @@ function policy = localOfBackup(cfg)
         'K',zeros(2,n),'A',zeros(n),'B',zeros(n,8),'c',zeros(n,1));
 end
 
-function policies = localOfInitialPolicies(cfg,hypotheses,reference,previousInput)
-    % Fixed deployment horizon; initialization is a numerical seed only.
+function window = localOfWindow(hypotheses,inheritedCount,cfg)
+    % Select coverage directly, before optimization; never try increasing
+    % lengths until a solve succeeds. This is an engineering time scale,
+    % not a certified Fiala stopping-time or feasibility upper bound.
+    of=cfg.outputFeedback;h=cfg.controller.sampleTime;
+    speed=max(arrayfun(@(s)hypot(s.ego(4),s.ego(5)),hypotheses));
+    if isempty(of.horizonSeconds)
+        requested=max(2*h,speed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
+        allocated=of.horizonResolutionSeconds*ceil(requested/of.horizonResolutionSeconds);
+        source="speedBasedPreview";
+    else
+        requested=max(2*h,of.horizonSeconds);allocated=requested;source="configuredDuration";
+    end
+    count=max(inheritedCount,ceil(allocated/h));
+    assert(count<=cfg.controller.maximumHorizonSteps, ...
+        'collisionAvoidanceController:predictionWindowCapacity', ...
+        'The selected %.3g s preview needs %d stages, exceeding the configured capacity %g. It was not truncated.', ...
+        count*h,count,cfg.controller.maximumHorizonSteps);
+    window=struct('source',source,'requestedSeconds',requested,'allocatedSeconds',count*h, ...
+        'horizonSteps',count,'speedUpperMetersPerSecond',speed, ...
+        'inheritedHorizonSteps',inheritedCount,'feasibilityCertified',false);
+end
+
+function policies = localOfInitialPolicies(cfg,hypotheses,reference,previousInput,count)
+    % The selected time coverage sizes this numerical initialization only.
     speed=max(arrayfun(@(s)norm(s.ego(4:5)),hypotheses));
-    count=min(cfg.outputFeedback.horizonSteps,cfg.controller.maximumHorizonSteps);
     policy=localOfBackup(cfg);n=cfg.outputFeedback.memoryDimension;
     policy.A=.25*eye(n);policy.B=.1*eye(n,8);
     policies=repmat(policy,1,count);

@@ -20,7 +20,6 @@ and `runNonlinearControllerExperiment` select this pipeline by default.
 ```matlab
 addpath('scripts');
 runJointOutputFeedbackScenario(Frames=8, ...
-    ControllerConfiguration=struct('outputFeedback',struct('horizonSteps',4)), ...
     OutputDirectory=string(tempname));
 ```
 
@@ -37,6 +36,13 @@ target-motion contract. Endpoint constraints impose clearance and physical
 domain conditions without a target stopping restriction. Inference failure or
 failure to obtain an accepted plan issues no command. Scenario files record
 such failures explicitly.
+
+The joint window is selected from current retained speeds and preview timing
+parameters before each solve. It grows when the selected coverage exceeds the
+shifted plan; no fixed stage count is supplied by these entry points. Use
+`outputFeedback.horizonSeconds` only when explicitly prescribing a duration.
+The selection is an engineering preview rule, not a feasibility certificate;
+see the [window configuration](../README.md#controller-interface).
 
 ## Finite-input information-state reference
 

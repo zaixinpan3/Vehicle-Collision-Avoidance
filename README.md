@@ -21,9 +21,8 @@ Run from the repository root:
 
 ```matlab
 addpath('scripts');
-cfg = struct('outputFeedback', struct('horizonSteps', 4));
 result = runJointOutputFeedbackScenario(Frames=8, ...
-    ControllerConfiguration=cfg, OutputDirectory=string(tempname));
+    OutputDirectory=string(tempname));
 results = runtests('tests/dynamicOutputFeedbackTest.m');
 assertSuccess(results)
 ```
@@ -34,7 +33,7 @@ distribution outside the repository and load it once per MATLAB session:
 ```matlab
 setupJointNlpSolver; % Or pass its installation directory / set CASADI_PATH.
 cfg = struct('outputFeedback', struct('method', "ipopt", ...
-    'horizonSteps', 4, 'nlpMaximumIterations', 50));
+    'nlpMaximumIterations', 50));
 result = runJointOutputFeedbackScenario(Frames=60, Speeds=8, ...
     Scenarios=["headOn","intersectionCrossing"], ...
     ControllerConfiguration=cfg, OutputDirectory=string(tempname));
@@ -43,7 +42,7 @@ assertSuccess(results)
 ```
 
 `nlpJit=true` compiles model derivatives to C during the first solve for each
-configuration and initial scenario capacity. Posterior pruning reuses the
+configuration, horizon size and initial scenario capacity. Posterior pruning reuses the
 compiled graph with zero-weight duplicate slots. Prepare kernels before online operation;
 compilation is not part of a real-time control budget. `nlpJit=false` avoids
 the compiler requirement. The external CasADi distribution must include IPOPT;
@@ -60,8 +59,8 @@ provides the replay and empirical clearance checks.
 `runCollisionThreatValidation` and `runNonlinearControllerExperiment` now use
 the joint raw-sensor pipeline. The former defaults to the 25 m/s stopped/braking
 lead challenge; successful initialization or recovery is not assumed. The
-current deployment uses four stages, one memory coordinate, two prediction
-substeps per hold, and one future-noise direction per retained hypothesis.
+current deployment uses automatic time coverage, one memory coordinate, two
+prediction substeps per hold, and one future-noise direction per retained hypothesis.
 The scenario driver performs four discarded virtual startup calls by default to warm
 initialization and continuation in MATLAB and the solver; `Warmup=false` exposes cold-start latency. Every recorded
 RTI call still performs exactly one QP. Startup warmup time is exported separately.
@@ -119,8 +118,26 @@ missing reading, input mismatch, or absence of an accepted plan produces
 an error without committing a command.
 
 Noise bounds, policy dimension, future noise directions, coefficient bounds,
-fixed horizon (`horizonSteps`), and solver settings live in `cfg.outputFeedback`.
-The separate comparator horizon in `cfg.controller` does not size this pipeline. A dropout retains the target
+preview timing and solver settings live in `cfg.outputFeedback`. The retired
+`outputFeedback.horizonSteps` field is rejected. By default, `horizonSeconds=[]`
+selects a preview directly from the largest retained ego speed divided by
+`previewDecelerationMetersPerSecondSquared`, plus `previewSettlingSeconds`.
+Coverage is rounded upward to `horizonResolutionSeconds` and then to full
+control holds. These defaults are 4 m/s², 0.5 s and 1 s respectively: at 8 m/s
+the preview is 3 s (60 holds at 50 ms), and at 25 m/s it is 7 s (140 holds).
+This is an engineering preview scale, not a certified Fiala stopping-time or
+feasibility bound, and it imposes no terminal braking constraint.
+
+The preview is recomputed from the posterior before each solve. The previous
+stage count is retained when it already covers that preview; otherwise the
+shifted seed is extended. No successive-horizon optimization search is used.
+Set a positive `horizonSeconds` to request explicit time coverage instead.
+An insufficient `controller.maximumHorizonSteps` capacity causes an explicit
+error instead of truncating the selected coverage. Horizon growth changes the
+NLP graph size and can require a new kernel build; neither the solver budget
+nor previously measured short-horizon timings establish real-time operation
+with these longer windows. The comparator's `controller.horizonSteps` does
+not select the joint-controller window. A dropout retains the target
 and its collision obligation. Endpoint constraints impose the same clearance
 and physical domain conditions as other prediction nodes. There is no
 remaining-braking-travel reserve, fixed final braking input, or terminal
