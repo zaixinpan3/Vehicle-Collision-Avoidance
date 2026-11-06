@@ -117,29 +117,29 @@ vehicles in the ego frame, making their relative states more difficult to
 describe and estimate
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
-Regarding the ego vehicle's coupled dynamics, existing approaches can be
-broadly grouped by how they handle the interaction between longitudinal and
-lateral motion. One group simplifies the coupling using constant-speed
-lateral models or kinematic vehicle models, often with separate speed and
-steering controllers
+Regarding the ego vehicle's coupled dynamics, many methods simplify the
+vehicle model by assuming a constant longitudinal speed or using kinematic
+models, often treating speed and steering separately
 \cite{JiKhajepourMelekHuang2017,XiongLiuYangLeng2022,ChenAksunGuvenc2025,LiZhangGuoLenzoGuo2023}.
-A second group coordinates the two directions indirectly through
-speed-dependent lateral models or prescribed longitudinal profiles
-\cite{AtouiSenameMilanesMartinez2022,LiLamLuLi2022,TurriCarvalhoTsengJohanssonBorrelli2013},
-friction and stability limits or speed adjustment
+To account for changes in speed, lateral models can be updated or
+gain-scheduled, and steering decisions can be computed for prescribed
+braking and throttle profiles
+\cite{AtouiSenameMilanesMartinez2022,LiLamLuLi2022,TurriCarvalhoTsengJohanssonBorrelli2013}.
+Longitudinal and lateral control can also be coordinated through friction
+and stability limits or speed adjustment
 \cite{ChenPengGrizzle2018,ChenChengLiZhaoWang2024,AttiaOrjuelaBasset2012,AttiaOrjuelaBasset2014},
-and bounded-interaction contracts between longitudinal and lateral
-controllers \cite{XuGrizzleTabuadaAmes2018}. A third group explicitly retains
-coupled dynamics to coordinate longitudinal and lateral actions through
-nonlinear feedback
+or through assume--guarantee contracts that bound the interaction between
+separate controllers \cite{XuGrizzleTabuadaAmes2018}. With the coupling
+retained explicitly, nonlinear feedback methods coordinate longitudinal and
+lateral actions using backstepping, Lyapunov design, or dynamic inversion
 \cite{GuoHuWang2016,CheblyTaljCharara2017,SeoLeeBaekHorowitzChoi2022},
-joint predictive optimization
-\cite{ZhouJiaJingLiuGuvenc2018,ZhangJiangLiuHuWangChen2023,ThompsonDallasGohBalachandran2024,ZhaoChenGaoYaoGaoHua2024},
-or tire-force optimization and allocation
+while predictive controllers optimize motion over a coupled vehicle model
+\cite{ZhouJiaJingLiuGuvenc2018,ZhangJiangLiuHuWangChen2023,ThompsonDallasGohBalachandran2024,ZhaoChenGaoYaoGaoHua2024}.
+At the tire level, force allocation distributes desired vehicle forces and
+moments among the actuators, subject to their physical capabilities
 \cite{ParkGerdes2015,ParkGerdes2017,ForsAnistratovOlofssonNielsen2021}.
-These approaches can be combined, and their effectiveness near handling
-limits depends on tire-model fidelity, actuator feasibility, and online
-computational cost.
+In aggressive maneuvers, accurately representing tire saturation while
+meeting actuator limits and real-time requirements remains challenging.
 
 Planning an evasive maneuver also requires the surrounding vehicle's
 velocity, acceleration, and heading, which are not measured directly by
