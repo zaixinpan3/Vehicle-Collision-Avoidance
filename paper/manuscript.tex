@@ -117,35 +117,42 @@ vehicles in the ego frame, making their relative states more difficult to
 describe and estimate
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
-Regarding the ego vehicle's coupled dynamics, many methods simplify the
-vehicle model by assuming a constant longitudinal speed or using kinematic
-models, often treating speed and steering separately
-\cite{JiKhajepourMelekHuang2017,XiongLiuYangLeng2022,ChenAksunGuvenc2025,LiZhangGuoLenzoGuo2023}.
-Fixed-speed models, however, neglect braking-induced speed changes, while
-kinematic models omit tire-force dynamics. To account for speed variations,
-lateral models can be updated or gain-scheduled, and steering decisions can
-be computed for prescribed braking and throttle profiles
-\cite{AtouiSenameMilanesMartinez2022,LiLamLuLi2022,TurriCarvalhoTsengJohanssonBorrelli2013}.
+Regarding the ego vehicle's coupled dynamics, some methods simplify the
+vehicle model through constant-speed steering control
+\cite{JiKhajepourMelekHuang2017}, integrated path tracking at constant speed
+\cite{XiongLiuYangLeng2022}, or hierarchical planning with constant-speed
+lateral dynamics \cite{ChenAksunGuvenc2025}, while others use a kinematic
+planning model \cite{LiZhangGuoLenzoGuo2023}. Fixed-speed models, however,
+neglect braking-induced speed changes, while kinematic models omit
+tire-force dynamics. To account for speed variations, lateral models can
+be formulated using linear parameter-varying control
+\cite{AtouiSenameMilanesMartinez2022} or gain-scheduled robust control
+\cite{LiLamLuLi2022}, and steering decisions can be computed for prescribed
+braking and throttle profiles \cite{TurriCarvalhoTsengJohanssonBorrelli2013}.
 Although these methods capture the effect of speed on lateral motion, speed
 dependence alone does not account for the reduction in lateral tire capacity
-under braking. Friction and stability limits or speed adjustment can constrain
-these combined demands
-\cite{ChenPengGrizzle2018,ChenChengLiZhaoWang2024,AttiaOrjuelaBasset2012,AttiaOrjuelaBasset2014},
-while assume--guarantee contracts bound the interaction between separate
-controllers \cite{XuGrizzleTabuadaAmes2018}; their guarantees depend on the
-prescribed bounds holding during operation. Such constraints need not,
-however, represent the full nonlinear tire response. To describe the coupled
-dynamics more directly, nonlinear feedback methods coordinate longitudinal
-and lateral actions using backstepping, Lyapunov design, or dynamic inversion
-\cite{GuoHuWang2016,CheblyTaljCharara2017,SeoLeeBaekHorowitzChoi2022},
-while predictive controllers optimize motion over a coupled vehicle model
-\cite{ZhouJiaJingLiuGuvenc2018,ZhangJiangLiuHuWangChen2023,ThompsonDallasGohBalachandran2024,ZhaoChenGaoYaoGaoHua2024}.
-Their accuracy depends on the adopted model, and nonlinear prediction also
-increases computational demand. Tire-force allocation can complement these
-methods by distributing requested vehicle forces and moments among the
-actuators \cite{ParkGerdes2015,ParkGerdes2017,ForsAnistratovOlofssonNielsen2021},
-although the achievable commands remain constrained by tire and actuator
-limits.
+under braking. Combined demands can be constrained through acceleration
+limits \cite{ChenPengGrizzle2018}, stability envelopes
+\cite{ChenChengLiZhaoWang2024}, or stability-based speed adjustment
+\cite{AttiaOrjuelaBasset2012,AttiaOrjuelaBasset2014}, while
+assume--guarantee contracts bound the interaction between separate controllers
+\cite{XuGrizzleTabuadaAmes2018}; their guarantees depend on the prescribed
+bounds holding during operation. Such constraints need not, however,
+represent the full nonlinear tire response. To describe the coupled dynamics
+more directly, nonlinear feedback methods coordinate longitudinal and
+lateral actions using backstepping \cite{GuoHuWang2016}, Lyapunov design
+\cite{CheblyTaljCharara2017}, or dynamic inversion
+\cite{SeoLeeBaekHorowitzChoi2022}. Predictive controllers optimize motion
+using wheel-slip inputs \cite{ZhouJiaJingLiuGuvenc2018}, combined-slip tire
+models \cite{ZhangJiangLiuHuWangChen2023}, load-transfer dynamics
+\cite{ThompsonDallasGohBalachandran2024}, or drift-aware planning
+\cite{ZhaoChenGaoYaoGaoHua2024}. Their accuracy depends on the adopted model,
+and nonlinear prediction also increases computational demand. Tire-force
+coordination can complement these methods through optimal tire-force
+allocation \cite{ParkGerdes2015}, actuator-limited feasible force regions
+\cite{ParkGerdes2017}, or predictive force-centric control
+\cite{ForsAnistratovOlofssonNielsen2021}, although achievable commands remain
+constrained by tire and actuator limits.
 
 Planning an evasive maneuver also requires the surrounding vehicle's
 velocity, acceleration, and heading, which are not measured directly by
@@ -177,9 +184,9 @@ which a safety controller needs to tighten its collision constraints.
 
 Even with a coupled vehicle model and an ego-motion-aware observer,
 designing a controller with formal safety guarantees remains difficult.
-Field-based methods such as artificial potential fields and virtual
-fluid-flow planners blend lane keeping with obstacle repulsion
-intuitively \cite{WangGaoLiSunCheng2019,ChengLiLiuLiGuo2021}, yet a
+Field-based methods such as artificial potential fields \cite{WangGaoLiSunCheng2019}
+and virtual fluid-flow planners \cite{ChengLiLiuLiGuo2021} blend lane keeping
+with obstacle repulsion intuitively, yet a
 collision-free reference path does not guarantee closed-loop safety once
 tire saturation, input limits, and tracking errors come into play.
 Control barrier functions (CBFs) certify forward invariance directly at
