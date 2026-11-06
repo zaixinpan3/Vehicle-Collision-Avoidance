@@ -117,26 +117,29 @@ vehicles in the ego frame, making their relative states more difficult to
 describe and estimate
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
-When stopping distance is short, neither braking alone nor steering alone
-suffices across driving conditions. Hard braking on a curve can cause
-large lateral deviations \cite{LaiYang2023}, whereas steering at high
-speed without longitudinal coordination risks saturating the lateral tire
-forces and losing stability \cite{HeLiuLvJiLiu2019}. To keep online
-computation manageable, many planners generate a path and a speed profile
-separately \cite{FanEtAl2018,ZhangEtAl2023LaneChange}, or optimize them
-together using a kinematic bicycle model that neglects tire slip
-\cite{LiZhangGuoLenzoGuo2023}. Although effective in gentle driving,
-kinematic models lose accuracy once combined braking and turning push the
-tires toward saturation. Dynamic vehicle and nonlinear tire models
-capture slip angles, yaw dynamics, and friction sharing directly,
-enabling nonlinear chassis controllers and model predictive control (MPC)
-schemes to coordinate steering and braking within the available adhesion
-\cite{GuoHuWang2016,ForsAnistratovOlofssonNielsen2021,GeZhaoMaGuo2022,AmmourOrjuelaBasset2022,ThompsonDallasGohBalachandran2024}.
-However, optimizing over nonlinear tire dynamics and nonconvex obstacle
-constraints in real time is computationally demanding, and even
-full-scale limit-handling MPC implementations typically leave formal
-recursive-feasibility and safety guarantees open
-\cite{ThompsonDallasGohBalachandran2024}.
+Regarding the ego vehicle's coupled dynamics, existing approaches can be
+broadly grouped by how they handle the interaction between longitudinal and
+lateral motion. One group simplifies the coupling using constant-speed
+lateral models or kinematic vehicle models, often with separate speed and
+steering controllers
+\cite{JiKhajepourMelekHuang2017,XiongLiuYangLeng2022,ChenAksunGuvenc2025,LiZhangGuoLenzoGuo2023}.
+A second group coordinates the two directions indirectly through
+speed-dependent lateral models or prescribed longitudinal profiles
+\cite{AtouiSenameMilanesMartinez2022,LiLamLuLi2022,TurriCarvalhoTsengJohanssonBorrelli2013},
+friction and stability limits or speed adjustment
+\cite{ChenPengGrizzle2018,ChenChengLiZhaoWang2024,AttiaOrjuelaBasset2012,AttiaOrjuelaBasset2014},
+and bounded-interaction contracts between longitudinal and lateral
+controllers \cite{XuGrizzleTabuadaAmes2018}. A third group explicitly retains
+coupled dynamics to coordinate longitudinal and lateral actions through
+nonlinear feedback
+\cite{GuoHuWang2016,CheblyTaljCharara2017,SeoLeeBaekHorowitzChoi2022},
+joint predictive optimization
+\cite{ZhouJiaJingLiuGuvenc2018,ZhangJiangLiuHuWangChen2023,ThompsonDallasGohBalachandran2024,ZhaoChenGaoYaoGaoHua2024},
+or tire-force optimization and allocation
+\cite{ParkGerdes2015,ParkGerdes2017,ForsAnistratovOlofssonNielsen2021}.
+These approaches can be combined, and their effectiveness near handling
+limits depends on tire-model fidelity, actuator feasibility, and online
+computational cost.
 
 Planning an evasive maneuver also requires the surrounding vehicle's
 velocity, acceleration, and heading, which are not measured directly by
