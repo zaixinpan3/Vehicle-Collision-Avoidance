@@ -117,16 +117,16 @@ vehicles in the ego frame, making their relative states more difficult to
 describe and estimate
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
-Regarding the ego vehicle's coupled dynamics, some approaches reduce control
-complexity by simplifying the vehicle model or treating longitudinal and
-lateral motions separately. For example, constant longitudinal speed is
-assumed in steering control \cite{JiKhajepourMelekHuang2017}, integrated
-path tracking \cite{XiongLiuYangLeng2022}, and hierarchical planning
-\cite{ChenAksunGuvenc2025}, whereas a kinematic model is used for trajectory
-planning \cite{LiZhangGuoLenzoGuo2023}. Fixed-speed models, however,
-neglect braking-induced speed changes, while kinematic models omit
-tire-force dynamics. To account for speed variations, lateral models can
-be formulated using linear parameter-varying control
+Regarding the ego vehicle's coupled dynamics, some approaches simplify
+lateral control by assuming a constant longitudinal speed, thereby
+decoupling it from the longitudinal dynamics. This assumption is used in
+steering control \cite{JiKhajepourMelekHuang2017}, integrated path tracking
+\cite{XiongLiuYangLeng2022}, and hierarchical planning
+\cite{ChenAksunGuvenc2025}, but it cannot capture braking-induced speed
+changes. Other approaches use kinematic models for trajectory planning
+\cite{LiZhangGuoLenzoGuo2023}, which allow speed to vary but omit tire-force
+dynamics. To capture the effect of speed variations on lateral dynamics,
+lateral models can be formulated using linear parameter-varying control
 \cite{AtouiSenameMilanesMartinez2022} or gain-scheduled robust control
 \cite{LiLamLuLi2022}, and steering decisions can be computed for prescribed
 braking and throttle profiles \cite{TurriCarvalhoTsengJohanssonBorrelli2013}.
