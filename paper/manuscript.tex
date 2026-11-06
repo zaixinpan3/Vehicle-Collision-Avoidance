@@ -120,29 +120,31 @@ describe and estimate
 Regarding the ego vehicle's coupled dynamics, many methods simplify the
 vehicle model by assuming a constant longitudinal speed or using kinematic
 models, often treating speed and steering separately
-\cite{JiKhajepourMelekHuang2017,XiongLiuYangLeng2022,ChenAksunGuvenc2025,LiZhangGuoLenzoGuo2023},
-but these models may not capture nonlinear tire behavior during combined
-braking and cornering. To account for changes in speed, lateral models can
-be updated or gain-scheduled, and steering decisions can be computed for
-prescribed braking and throttle profiles
-\cite{AtouiSenameMilanesMartinez2022,LiLamLuLi2022,TurriCarvalhoTsengJohanssonBorrelli2013};
-speed dependence alone, however, does not account for the reduction in
-lateral tire capacity under braking. Longitudinal and lateral control can
-also be coordinated through friction and stability limits or speed adjustment
+\cite{JiKhajepourMelekHuang2017,XiongLiuYangLeng2022,ChenAksunGuvenc2025,LiZhangGuoLenzoGuo2023}.
+Fixed-speed models, however, neglect braking-induced speed changes, while
+kinematic models omit tire-force dynamics. To account for speed variations,
+lateral models can be updated or gain-scheduled, and steering decisions can
+be computed for prescribed braking and throttle profiles
+\cite{AtouiSenameMilanesMartinez2022,LiLamLuLi2022,TurriCarvalhoTsengJohanssonBorrelli2013}.
+Although these methods capture the effect of speed on lateral motion, speed
+dependence alone does not account for the reduction in lateral tire capacity
+under braking. Friction and stability limits or speed adjustment can constrain
+these combined demands
 \cite{ChenPengGrizzle2018,ChenChengLiZhaoWang2024,AttiaOrjuelaBasset2012,AttiaOrjuelaBasset2014},
-or through assume--guarantee contracts that bound the interaction between
-separate controllers \cite{XuGrizzleTabuadaAmes2018}, whose guarantees depend
-on the prescribed bounds holding during operation. With the coupling retained
-explicitly, nonlinear feedback methods coordinate longitudinal and lateral
-actions using backstepping, Lyapunov design, or dynamic inversion
+while assume--guarantee contracts bound the interaction between separate
+controllers \cite{XuGrizzleTabuadaAmes2018}; their guarantees depend on the
+prescribed bounds holding during operation. Such constraints need not,
+however, represent the full nonlinear tire response. To describe the coupled
+dynamics more directly, nonlinear feedback methods coordinate longitudinal
+and lateral actions using backstepping, Lyapunov design, or dynamic inversion
 \cite{GuoHuWang2016,CheblyTaljCharara2017,SeoLeeBaekHorowitzChoi2022},
 while predictive controllers optimize motion over a coupled vehicle model
 \cite{ZhouJiaJingLiuGuvenc2018,ZhangJiangLiuHuWangChen2023,ThompsonDallasGohBalachandran2024,ZhaoChenGaoYaoGaoHua2024}.
-These methods depend on model fidelity, and nonlinear predictive optimization
-must also meet real-time computational limits. At the tire level, force
-allocation distributes desired vehicle forces and moments among the actuators
-\cite{ParkGerdes2015,ParkGerdes2017,ForsAnistratovOlofssonNielsen2021},
-but the requested forces must remain attainable within tire and actuator
+Their accuracy depends on the adopted model, and nonlinear prediction also
+increases computational demand. Tire-force allocation can complement these
+methods by distributing requested vehicle forces and moments among the
+actuators \cite{ParkGerdes2015,ParkGerdes2017,ForsAnistratovOlofssonNielsen2021},
+although the achievable commands remain constrained by tire and actuator
 limits.
 
 Planning an evasive maneuver also requires the surrounding vehicle's
