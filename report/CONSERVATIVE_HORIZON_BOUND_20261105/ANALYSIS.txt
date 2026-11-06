@@ -1,0 +1,247 @@
+Conservative prediction-window construction
+November 5, 2026
+
+Decision and scope
+------------------
+Use a conservative upper bound on terminal ENTRY speed, not an accurately
+optimized stopping time, to allocate the complete analytic moving tail before
+the frame's QP. The existing terminalSafeSet.continuation map then evaluates
+that tail as a function of the optimized entry. It needs no independent tail
+controller coefficients or shooting states. Continuing target motion after
+the ego stop is handled by the existing parked-track geometry under its
+declared encounter contract; target deceleration is not an admission condition.
+
+This study implements and tests the allocation as a research helper. It does
+not change the production controller, its current four-stage free prefix, or
+the algorithm theory. The main output-feedback path still needs the existing
+terminal geometry connected to its QP before it uses this construction.
+
+A conservative bound is sufficient. Precision is not the obstacle. The bound
+below proves that the declared stopping tail is long enough. It does not prove
+that any chosen free prefix can reach a safe terminal entry or that an
+unverified SQP linearization is feasible. In particular, this research does
+not claim to resolve the six previously recorded QP failures.
+
+1. Direct calculation
+---------------------
+Let h be the control period, N_f the number of freely optimized holds, and
+T_f=N_f*h. Let V_bar_N bound hypot(vx,vy) at every admissible terminal entry.
+Let a_lower>0 be a lower bound on the DECLARED terminal tangential deceleration.
+The direct conservative allocation is
+
+    J_tail = ceil(V_bar_N / (a_lower*h)),
+    N_cover = N_f + J_tail,
+    T_cover = N_cover*h.
+
+The moving tail is complete because each branch stops by V_bar_N/a_lower.
+An earlier-stopping branch keeps its actual stopped pose, rather than moving
+for the extra allocated time. The known pose map uses that branch's own
+entry speed, sideslip and curvature. A bound allocates time; it does not replace
+the entry states by one worst-speed state or merge their target correlations.
+
+The coarsest bound is already available from the configured admissible domain:
+
+    V_cap = sqrt(vx_max^2 + vy_max^2),
+    V_bar_N = V_cap.
+
+It is independent of an optimized policy and works for any free-prefix
+duration, provided its endpoint obeys those speed caps. At the default
+vx_max=18 m/s, vy_max=12 m/s, a_lower=4 m/s^2 and h=0.05 s, it allocates
+109 terminal holds, or 5.45 s. No horizon search or precise endpoint calculation
+is involved. If the physical domain changes, this bound must be recomputed.
+
+The terminal stopping arc length V^2/(2*a) is only part of the pose map.
+No radial clearance reserve involving that distance is introduced here.
+
+2. A cheap bound that varies with the current frame
+--------------------------------------------------
+The following refinement covers the existing blended physical prefix model.
+Assume its actual trajectory remains in 0<=vx<=vx_max, |vy|<=vy_max, the tire
+force model is valid, |b|<=1, road load is passive, and there is no additional
+unmodeled force. Let V_bar_0 bound the current information set's speed. For
+the finite deployment ensemble it may instead bound that ensemble, with only
+that restricted meaning. Friction bounds must cover the actual parameter
+contract; a sample maximum is not automatically a robust parameter bound.
+
+For the pure Fiala branch, each axle's combined force norm is at most mu_i*Fzi.
+Front-wheel rotation preserves that norm. The Coriolis terms cancel in
+vx*vx_dot+vy*vy_dot, while vx*F_load(vx)>=0. Therefore
+
+    D+V <= a_plus = (mu_f_upper*Fzf + mu_r_upper*Fzr)/mass
+                 = g*(mu_f_upper*lr + mu_r_upper*lf)/(lf+lr).
+
+The last equality uses this repository's static axle-load model with fixed
+geometry. Parameter uncertainty in other models requires a uniform bound on
+the actual force-to-mass ratio, rather than blindly reusing this expression.
+
+Do not extend this derivative inequality through the low-speed blend. Its
+lateral lag equation differs from the Fiala equation. An explicit probe in
+this study, (vx,vy,r)=(2.4,0.6,5) with (delta,b)=(0,1), gives V_dot=9.4482 m/s^2
+while the nominal tire acceleration sum is only 8.3385 m/s^2.
+
+Instead, let vx_blend be the upper blend threshold, 4 m/s by default, and set
+
+    V_blend = sqrt(vx_blend^2 + vy_max^2).
+
+Whenever V>V_blend, the forward and lateral bounds force vx>vx_blend, so the
+system is on the pure Fiala branch. Consider each connected interval on which
+V>V_blend. At its left endpoint V is at most max(V_bar_0,V_blend), and inside
+the interval its growth is at most a_plus. Below the threshold it is already
+bounded by V_blend. Hence, for all admissible prefix times t,
+
+    V(t) <= min(V_cap, max(V_bar_0,V_blend) + a_plus*t).
+
+The absorbing rest reset can only decrease speed. This establishes a coarse
+bound without differentiating the blend or estimating its exact trajectory.
+At a zero-length prefix use min(V_cap,V_bar_0) directly. Otherwise use
+
+    V_bar_N = min(V_cap, max(V_bar_0,V_blend) + a_plus*T_f).
+
+The helper intentionally does not assume the primary free prefix enforces
+the terminal sideslip cone. Using vy_max makes the low-speed bound loose,
+including at rest, but avoids introducing that extra restriction.
+
+This proof is conditional on the continuous domain contract. Sampled RTI
+domain rows alone are not a proof of it. The domain-only endpoint bound can
+also serve independently when only terminal endpoint caps are established.
+The implementation uses ordinary double precision and upward integer rounding;
+it is not an outward-rounded validated numerical enclosure.
+
+3. Numerical examples, not selected free-prefix guarantees
+---------------------------------------------------------
+These use frictionUpper=1.005*[0.85;0.85], giving a_plus=8.3801925 m/s^2.
+The 25 m/s example uses vx_max=30 m/s, as in the earlier high-speed campaign.
+All cases use vy_max=12 m/s and a_lower=4 m/s^2.
+
+ V_bar_0   N_f    V_bar_N     J_tail   total holds   total seconds
+   8        4    14.325149      72        76            3.80
+  15        4    16.676039      84        88            4.40
+  25        4    26.676039     134       138            6.90
+   8       16    19.353265      97       113            5.65
+  25       16    31.704154     159       175            8.75
+
+The four-stage rows illustrate the current configuration; they do not endorse
+four stages as sufficient. The sixteen-stage rows are comparison inputs, not
+a recommendation supported by a new closed-loop study. The table contains
+time coverage counts, not that many independently optimized controller blocks.
+
+4. How this belongs in a single SQP-RTI solve
+--------------------------------------------
+At each boundary, condition the joint information state and obtain V_bar_0
+and the parameter bounds. Compute J_tail once from the selected free prefix.
+Freeze this schedule for QP preparation, differentiation, and that QP update.
+Evaluate tail poses from each branch's candidate terminal entry and continue
+the corresponding target from epoch k+N_f. Linearize the resulting geometry
+with respect to that entry and the relevant terminal policy quantities. Tail
+poses are dependent functions, not new independent shooting-state variables.
+
+Terminal command compatibility still belongs in the constraint set, including
+the preceding command and causally available memory. Different hidden current
+hypotheses cannot receive different current commands merely because their
+geometry witnesses differ. The declared terminal deceleration is not silently
+identified with an arbitrary Fiala braking-force-ratio input.
+
+At the ego's actual stopping time V_entry/a, start the parked-target check
+from the target state at that same time. Do not advance the target to the
+conservative padded endpoint and discard the intervening parked interval.
+The existing kernel checks the remaining target line/arc, or full circle when
+appropriate, under its first-exit encounter contract. This requires neither
+negative target acceleration nor a finite target stopping time. Extending
+the encounter beyond that contract would require the corresponding geometry,
+not a fabricated target-stop restriction.
+
+Existing nonlinearValue chooses ceil(V_entry/(a*h)) internally. A production
+integration of a fixed precomputed allocation must consistently pass the
+chosen tail schedule through value/derivative evaluation. Existing active
+geometry branches can change, and one tangent is an RTI approximation to the
+nonlinear maximum. The current sampled tail checks also need either the
+declared engineering intersample margin or a verified whole-hold certificate,
+depending on the guarantee claimed.
+
+An inexpensive post-trial check V_entry<=V_bar_N detects violation of the
+allocation's premise; passing it certifies only duration coverage. It does not
+verify the other nonlinear constraints. If a memory/time budget cannot support
+the computed tail, report the budget limit; clipping J_tail removes coverage.
+Upward quantization can stabilize buffer sizes without losing this bound.
+
+The free prefix and the prediction window are separate choices. A retained
+feasible plan can supply an already witnessed prefix and be shifted under the
+usual containment and terminal-invariance conditions. This is a constructive
+source of a sufficient length, without retrying lengths. Initialization still
+needs such a plan. For arbitrary information states, the speed bound alone
+provides no upper bound on reaching a safe entry. Longer free prefixes are not
+automatically monotone-feasible under arbitrary policy restrictions, terminal
+equalities, new scenario compression, or a local SQP linearization.
+
+5. Implemented research and verification
+---------------------------------------
+scripts/researchConservativePredictionWindow.m implements both bounds and
+returns the prefix, tail, and total durations without solving any optimization.
+scripts/runConservativePredictionWindowStudy.m writes the comparison table,
+an independent ode45 sample check, the low-speed counterexample, and timings.
+tests/researchConservativePredictionWindowTest.m covers rounding, stopping-tail
+completion, parameter uncertainty, speed adaptation and the passive-load contract.
+
+55 MATLAB test results passed: 22 research-helper cases and 33 existing terminal
+kernel cases; zero failed or incomplete. The latter include exact terminal flow
+versus fine RK4, sub-hold stops and continuing-target parked geometry. The ODE
+study used 21 deterministic held-input trajectories, 0.8 s each, 801 requested
+points per trajectory, initial speeds 0.2, 2.5, 3.5, 4, 8, 15 and 25 m/s, and
+input columns (0,0.95), (0.04,0.2), (-0.04,-0.2). Its longitudinal cap was 40 m/s,
+friction was the upper bound above, and ode45 tolerances were 1e-9 relative and
+1e-11 absolute. All 16,821 samples satisfied the checked domain and the speed
+envelope. Maximum speed minus bound was 0, attained at initial-time equality.
+This sampled check supports implementation consistency; it is not the proof.
+There was no stochastic seed because no random sampling was used.
+
+MATLAB R2026a Update 3 on the current GLNXA64 host, timeit measurements:
+  window helper, including input checks:             10.40 microseconds
+  analytic poses for a fixed 72-hold tail:             12.88 microseconds
+  existing terminal nonlinear value, actual 41 holds:   1.110 milliseconds
+  existing terminal active-branch tangent:              1.553 milliseconds
+
+The last two measurements use ego [0;0;0;8;0.1;0.02], a target with speed 8 m/s,
+constant acceleration +0.5 m/s^2 and zero sideslip, and a collision-active
+terminal branch. The target continues moving. Those functions still choose
+their own actual-entry tail length; they are not timings of a newly integrated
+72-hold terminal constraint. Geometry is materially more expensive than the
+allocation and pose map. None of these leaf-function timings establishes a
+50 ms closed-loop deadline or worst-case runtime.
+
+Commands:
+  matlab -batch "addpath('scripts'); runConservativePredictionWindowStudy; results=runtests({'tests/researchConservativePredictionWindowTest.m','tests/terminalSafeSetTest.m'}); writetable(table(results),'report/CONSERVATIVE_HORIZON_BOUND_20261105/tests.csv'); assertSuccess(results);"
+  MATLAB checkcode(file,'-id','-config=factory') on the three added source/test
+  files: no diagnostics. The default analyzer configuration first reported a
+  missing legacy R2025b settings file; using factory settings resolved that
+  environment warning without changing any global preferences.
+
+The first study run exposed an empty-structure concatenation error in the new
+driver; cell accumulation fixed it before successful validation. A subsequent
+timing run used a collision-active geometry case. No production closed-loop
+campaign or full repository test suite was run for this research-only change.
+
+6. Literature context and limits of transfer
+--------------------------------------------
+Chen and Allgower, "A Quasi-Infinite Horizon Nonlinear Model Predictive Control
+Scheme with Guaranteed Stability," Automatica 34(10), 1998, 1205-1217,
+DOI 10.1016/S0005-1098(98)00073-9. Introduction and Section 2 distinguish a
+finite optimized input profile from an analytically bounded continuation cost
+and a terminal region. This supports separating control degrees of freedom
+from prediction coverage; it does not supply our collision-specific bound.
+Primary paper: https://perso.ensta-paris.fr/~alexandre/contents/chen_allgower.pdf
+Publisher: https://www.sciencedirect.com/science/article/pii/S0005109898000739
+
+Shekhar and Maciejowski, "Robust variable horizon MPC with move blocking,"
+Systems & Control Letters 61(4), 2012, 587-594,
+DOI 10.1016/j.sysconle.2012.02.004. The publisher abstract describes reducing
+variable-horizon optimization size through blocking for linear systems.
+This is a related computational distinction, not a theorem imported into this
+nonlinear output-feedback controller. The 2013 corrigendum explicitly corrects
+errors in the original article; this study does not rely on its detailed proofs.
+Primary metadata/abstract: https://www.sciencedirect.com/science/article/pii/S016769111200031X
+Corrigendum metadata: https://www.sciencedirect.com/science/article/pii/S0167691113000285
+
+The new speed-envelope proof above is derived from this repository's equations.
+The nominal terminal deceleration contract, continuous-domain assumptions,
+uncertainty coverage and unverified RTI acceptance remain explicit. No arbitrary
+target motion restriction or additional stopping-distance reserve was added.

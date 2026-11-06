@@ -1,0 +1,37 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "computer": "GLNXA64",
+  "sampleTimeSeconds": 0.05,
+  "frictionUpper": [
+    0.85424999999999984,
+    0.85424999999999984
+  ],
+  "terminalDecelerationLower": 4,
+  "odePrefixSeconds": 0.8,
+  "odeLongitudinalSpeedCap": 40,
+  "odeTrajectories": 21,
+  "odeSamples": 16821,
+  "odeMaximumSpeedMinusBound": 0,
+  "lowSpeedProbe": [
+    0,
+    0,
+    0,
+    2.4,
+    0.6,
+    5
+  ],
+  "lowSpeedProbeSpeedDerivative": 9.4482198340666663,
+  "nominalTireAccelerationLimit": 8.3385,
+  "selectorMicroseconds": 10.400227272727273,
+  "fixedTailPoseMicroseconds": 12.8775,
+  "fixedTailSteps": 72,
+  "existingTerminalValueMilliseconds": 1.1098474999999999,
+  "existingTerminalTangentMilliseconds": 1.5528475,
+  "existingTerminalValue": -0.30619291693846717,
+  "existingTerminalActiveKind": "collision",
+  "existingTerminalActualSteps": 41,
+  "targetAcceleration": 0.5,
+  "targetSideslip": 0,
+  "productionRuntimeChanged": false,
+  "closedLoopCampaignRun": false
+}
