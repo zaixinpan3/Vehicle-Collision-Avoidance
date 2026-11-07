@@ -111,9 +111,14 @@ maneuvers, such as decelerating while turning \cite{TanWuLiLiuZhang2025}.
 Such maneuvers pose two challenges. First, the vehicle's longitudinal and
 lateral dynamics become strongly coupled, as changes in speed alter lateral
 tire forces and yaw response while yaw motion couples the longitudinal and
-lateral velocities \cite{BealBoyd2019,ParkGerdes2017}. Second, assessing collision risk requires knowledge of surrounding vehicles'
-states, but the ego vehicle's acceleration and rotation affect their relative
-motion and complicate state estimation
+lateral velocities \cite{BealBoyd2019,ParkGerdes2017}. Neglecting this
+coupling can lead to large prediction errors and control commands that demand
+maneuvers beyond the vehicle's physical capabilities. Second, sensors
+such as LiDAR can provide relative-position measurements of surrounding
+vehicles, but assessing collision risk also requires information about their
+velocity, acceleration, and heading. When only relative positions are
+available, estimating these states is complicated by the ego vehicle's
+evasive maneuvers, which also affect the measurements
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
 Regarding the ego vehicle's coupled dynamics, some approaches simplify
@@ -149,10 +154,7 @@ models \cite{ZhangJiangLiuHuWangChen2023}, load-transfer dynamics
 \cite{ZhaoChenGaoYaoGaoHua2024}. Their accuracy depends on the adopted model,
 and nonlinear prediction also increases computational demand.
 
-Planning an evasive maneuver also requires the surrounding vehicle's
-velocity, acceleration, and heading, which are not measured directly by
-relative-position sensors and must be estimated online
-\cite{JeonZemoucheRajamani2019,AlaiZemoucheRajamani2024}. One option is
+Regarding the estimation of surrounding-vehicle motion, one option is
 to transform relative-position measurements into an inertial frame using
 estimated ego pose \cite{SharmaRajamani2024}, but ego localization and
 heading errors then feed directly into the target track. Working in the
