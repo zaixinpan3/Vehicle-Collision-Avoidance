@@ -215,6 +215,12 @@ estimation, simply refreshing the estimate and re-tightening constraints
 at each sample can invalidate the previous step's backup plan unless
 successive uncertainty sets remain compatible.
 
+For nonlinear observer design, Sharma, Zemouche and Rajamani
+\cite{SharmaZemoucheRajamani2026} develop derivative-based LMI conditions
+for systems with vector arguments and introduce state scaling to improve
+numerical feasibility. Their analysis informs the nonlinear-increment
+bounds and scaled quadratic certificate used in the estimator below.
+
 To address these challenges, this paper develops a joint NRMM-based
 state estimator and PCBF--CLF controller built around a shared dynamic
 bicycle model with modified Fiala tires. The system also includes a
@@ -859,6 +865,12 @@ and, for $P\succ0$, define
     W_T=\sqrt{\bm\epsilon^{\trans}(P\otimes I_2)\bm\epsilon}.
     \label{eq:target_metric}
 \end{equation}
+The derivative-based treatment of nonlinear increments follows the
+framework of \cite[Lemma~1 and Theorem~1]{SharmaZemoucheRajamani2026};
+the normalization in \eqref{eq:target_metric} also draws on the state
+scaling in \cite[Sec.~3, Eqs.~(33)--(35)]{SharmaZemoucheRajamani2026}.
+The extension \eqref{eq:target_extension} and its explicit derivative
+bounds below are derived for the present NRMM coordinates.
 Write $\Delta\Phi_e=\Phi_e(\hat{\bm q},\hat{\bm s})-\Phi_e(\bm q,\bm s)$.
 
 \begin{lemma}
@@ -907,6 +919,12 @@ at most $L_s$; composing with $\tilde{\bm s}=\Pi_S(\bm s)$ preserves the
 bound because $\|D_s\Pi_S\|_2\leq1$ almost everywhere, and continuity
 covers $\bm q=0$.
 \end{IEEEproof}
+
+The following sufficient condition uses the derivative-based LMI design
+principle of \cite[Theorem~1]{SharmaZemoucheRajamani2026}, with the
+nonlinear increments bounded by \eqref{eq:global_lipschitz}. Its two
+norm multipliers yield the NRMM condition proved here; they do not
+reproduce the vector-sector multipliers of that paper's Eq.~(13).
 
 \begin{lemma}
 \label{lem:dissipation}
