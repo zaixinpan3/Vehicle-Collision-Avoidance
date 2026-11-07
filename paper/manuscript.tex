@@ -108,13 +108,12 @@ considerable research interest \cite{LiEtAl2022Emergency,ChenChengLiZhaoWang2024
 
 Collision avoidance often requires the ego vehicle to perform complex
 maneuvers, such as decelerating while turning \cite{TanWuLiLiuZhang2025}.
-During such maneuvers, the vehicle's longitudinal and lateral dynamics
-become strongly coupled, as changes in speed alter lateral tire forces and
-yaw response while yaw motion couples the longitudinal and lateral
-velocities \cite{BealBoyd2019,ParkGerdes2017}. The ego vehicle's
-acceleration and rotation also affect the apparent motion of surrounding
-vehicles in the ego frame, making their relative states more difficult to
-describe and estimate
+Such maneuvers pose two challenges. First, the vehicle's longitudinal and
+lateral dynamics become strongly coupled, as changes in speed alter lateral
+tire forces and yaw response while yaw motion couples the longitudinal and
+lateral velocities \cite{BealBoyd2019,ParkGerdes2017}. Second, assessing collision risk requires knowledge of surrounding vehicles'
+states, but the ego vehicle's acceleration and rotation affect their relative
+motion and complicate state estimation
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
 
 Regarding the ego vehicle's coupled dynamics, some approaches simplify
