@@ -66,7 +66,8 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
     if curvature~=0
         road = struct('referenceCurve',curve,'lateralClearance',road.lateralClearance, ...
             'scenarioHalfWidthMeters',road.scenarioHalfWidthMeters);
-        trim = nonlinearBicycleModel.cruise(cfg,curvature);
+        % Scenario geometry needs only physical trim, not a controller CLF.
+        trim = nonlinearBicycleModel.operatingPoint(cfg,curvature);
         state = trim.state;state(1:2) = 0;
     end
     [position,heading] = predictiveSafetyGeometry.referencePose(cfg.referenceSpeed*impactTime,0,curve);

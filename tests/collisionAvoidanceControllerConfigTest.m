@@ -68,6 +68,15 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function generatedCodeOptimizationCanBeSelectedForExperiments(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('nlpCompilerOptimization',1)));
+            testCase.verifyEqual(cfg.outputFeedback.nlpCompilerOptimization,1);
+        end
+        function invalidCompilerOptimizationLevelsAreRejected(testCase)
+            testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
+                struct('outputFeedback',struct('nlpCompilerOptimization',4))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
         function theJointHorizonHasNoFixedStageDefault(testCase)
             cfg=collisionAvoidanceControllerConfig();
             testCase.verifyEmpty(cfg.outputFeedback.horizonSeconds);

@@ -47,6 +47,9 @@ compiled graph with zero-weight duplicate slots. Prepare kernels before online o
 compilation is not part of a real-time control budget. `nlpJit=false` avoids
 the compiler requirement. The external CasADi distribution must include IPOPT;
 the tested installation is CasADi 3.8.2. No solver binaries are stored here.
+`nlpCompilerOptimization` selects the generated-C compiler level from 0 to 3
+(default 3). Record it when comparing timings: a lower level can shorten
+startup compilation while changing steady-state evaluation cost.
 
 This reproducible experiment uses seed `20261104`, noisy position-only GNSS,
 body-frame inertial acceleration, gyro and relative radar. Its initial finite

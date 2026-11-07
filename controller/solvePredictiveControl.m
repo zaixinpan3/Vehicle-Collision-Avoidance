@@ -3606,7 +3606,8 @@ function [kernel,hit] = localOfNlpKernel(problem)
     if isfinite(of.maximumSolveSeconds),options.ipopt.max_wall_time=of.maximumSolveSeconds;end
     if of.nlpJit
         directory=tempname;mkdir(directory);
-        options.compiler='shell';options.jit_options=struct('flags','-O3','directory',[directory,filesep]);
+        options.compiler='shell';options.jit_options=struct( ...
+            'flags',sprintf('-O%d',of.nlpCompilerOptimization),'directory',[directory,filesep]);
         % CasADi writes the generated source in the current directory even
         % when the compiler output directory is set. Keep both outside Git.
         previousDirectory=pwd;restoreDirectory=onCleanup(@()cd(previousDirectory));

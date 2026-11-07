@@ -37,6 +37,41 @@ domain conditions without a target stopping restriction. Inference failure or
 failure to obtain an accepted plan issues no command. Scenario files record
 such failures explicitly.
 
+Campaign timing measures the complete outer controller call, including rejected
+calls, separately from startup warmup and the offline plant replay. Results
+include deadline misses, failure phase, final speed/progress and sampled
+clearance status. Completing the requested frame count does not establish
+encounter exit or cruise recovery; a zero-frame run has no plant-safety result.
+
+To repeat the expanded nonlinear campaign with automatic preview durations:
+
+```matlab
+addpath('scripts'); setupJointNlpSolver;
+names = ["stoppedLead","hardBrakingLead","brakingLead","headOn", ...
+    "acceleratingHeadOn","intersectionCrossing","crossing", ...
+    "turningCrossing","curvedHeadOn","curvedCrossing"];
+cfg = struct('outputFeedback',struct('method',"ipopt", ...
+    'nlpCompilerOptimization',0));
+campaign = runJointOutputFeedbackScenario(Frames=160, Speeds=[8,15,25], ...
+    Scenarios=names, RandomSeed=20261107, ControllerConfiguration=cfg, ...
+    OutputDirectory=string(tempname));
+```
+
+This selects GCC `-O0` to reduce startup compilation time. It retains the
+50 ms solver budget and all prediction and acceptance constraints; its online
+timings must be reported separately from optimized compiler configurations.
+
+On a Ryzen 7 7800X3D with MATLAB R2026a Update 3 and CasADi 3.8.2, this
+campaign completed 7 of 30 cases on 2026-11-07: three at 8 m/s, three at
+15 m/s and one at 25 m/s. The other 23 calls rejected both the candidate and
+seed at the first hold. All 1,143 controller calls exceeded 50 ms; per-speed
+mean times were 282, 228 and 308 ms. All accepted calls reached IPOPT's time
+limit after zero or one iteration. Sampled replay clearance remained positive
+in the completed cases, but most vehicles stopped; neither cruise recovery
+nor real-time operation was demonstrated. The offline plant did not include
+computation delays. These measurements concern this finite test configuration,
+not global feasibility of the nonlinear control problem.
+
 The joint window is selected from current retained speeds and preview timing
 parameters before each solve. It grows when the selected coverage exceeds the
 shifted plan; no fixed stage count is supplied by these entry points. Use

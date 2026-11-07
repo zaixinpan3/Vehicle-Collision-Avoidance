@@ -14,6 +14,18 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function curvedInitialConditionsDoNotRequireAControllerCertificate(testCase)
+            for speed=[8,15,25]
+                for name=["curvedHeadOn","curvedCrossing"]
+                    cfg=struct('referenceSpeed',speed, ...
+                        'clf',struct('convergenceTimeConstantSeconds',1.2345));
+                    [x,~,road]=collisionThreatScenario(name,cfg);
+                    testCase.verifyEqual(norm(x(4:5)),speed,AbsTol=1e-10);
+                    testCase.verifyEqual(x(6),speed*road.referenceCurve.curvature,AbsTol=1e-10);
+                    testCase.verifyEqual(x(3)+atan2(x(5),x(4)),0,AbsTol=1e-10);
+                end
+            end
+        end
         function anApproachingTargetCanEnterTheThirtyMetreSensorLater(testCase)
             [x,q,road,cfg]=collisionThreatScenario("stoppedLead",struct('referenceSpeed',25, ...
                 'model',struct('speedMaximum',30),'collision',struct('encounterRangeMeters',30)));

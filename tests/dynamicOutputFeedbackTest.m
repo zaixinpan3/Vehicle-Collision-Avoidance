@@ -256,6 +256,22 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyEqual(campaign.results.observationModel,"rawSensorJointDynamicOutputFeedback");
             testCase.verifyEqual(campaign.results.executedFrames,1);
             testCase.verifyEqual(campaign.results.outcome,"completed");
+            testCase.verifyEqual(campaign.results.timing.calls,1);
+            testCase.verifyGreaterThan(campaign.results.timing.maximumSeconds,0);
+            testCase.verifyTrue(campaign.results.sampledSafetyEvaluated);
+            testCase.verifyTrue(campaign.results.sampledClearanceSatisfied);
+        end
+        function aRejectedCallIsCountedWithoutClaimingAPlantReplay(testCase)
+            fixture=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            cfg=testCase.cfg;cfg.outputFeedback.horizonSeconds=[];cfg.controller.maximumHorizonSteps=10;
+            campaign=runJointOutputFeedbackScenario(Frames=2,Speeds=1.5,Scenarios="stoppedLead", ...
+                Warmup=false,ControllerConfiguration=cfg,OutputDirectory=string(fixture.Folder));
+            testCase.verifyEqual(campaign.results.executedFrames,0);
+            testCase.verifyEqual(campaign.results.failurePhase,"controller");
+            testCase.verifyEqual(campaign.results.timing.calls,1);
+            testCase.verifyGreaterThan(campaign.results.failureCallSeconds,0);
+            testCase.verifyFalse(campaign.results.sampledSafetyEvaluated);
+            testCase.verifyFalse(campaign.results.sampledClearanceSatisfied);
         end
     end
 end
