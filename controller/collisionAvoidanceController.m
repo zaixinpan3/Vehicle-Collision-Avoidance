@@ -1,8 +1,9 @@
 function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
 %collisionAvoidanceController Joint raw-sensor output feedback and comparisons.
-% A jointSensorBlock-v1 input selects the primary joint inference/control
-% pipeline: optimize both actuator and memory maps, and commit both together.
+% A jointSensorBlock-v1 input selects fixed raw-data consistency inference
+% and compact nonlinear direct-input control with checked plan retention.
+% Explicit outputFeedback.method choices retain dynamic-memory comparators.
 % The state-estimate overload below is the separate-observer comparator.
 % Its default is one SQP-RTI update. solver.method="nonlinear"
 % selects an iterated shooting diagnostic. The nonlinear backend refreshes

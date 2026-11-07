@@ -1,6 +1,6 @@
 function campaign = runCollisionThreatValidation(options)
 %runCollisionThreatValidation Test encounters that require a steering maneuver.
-% Dynamic output feedback consumes raw synthetic sensor blocks by default.
+% Compact nonlinear control consumes raw synthetic sensor blocks by default.
 % Pipeline="nrmmComparator" explicitly selects the independent-observer
 % comparator and its original qualification experiment.
 % Qualification requires an in-road bypass and a longitudinal-order argument,

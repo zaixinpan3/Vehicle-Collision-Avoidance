@@ -1,5 +1,5 @@
 function campaign = runJointOutputFeedbackScenario(options)
-%runJointOutputFeedbackScenario Raw-sensor dynamic output-feedback experiments.
+%runJointOutputFeedbackScenario Raw-sensor predictive-control experiments.
 % The initial finite joint contract is declared once; no truth state or point
 % observer estimate is supplied to subsequent controller calls. An independent
 % ode45 plant supplies only position GNSS, body IMU, gyro and relative radar.
@@ -14,6 +14,10 @@ function campaign = runJointOutputFeedbackScenario(options)
         options.RandomSeed (1,1) double {mustBeInteger,mustBeNonnegative} = 20261104
         options.Warmup (1,1) logical = true
         options.DropoutHolds (1,:) double {mustBeInteger,mustBeNonnegative} = []
+        options.HypothesisOffsets (1,:) double {mustBeFinite,mustBeNonempty} = [-.005,0,.005]
+        options.EgoPositionOffsetMeters (2,1) double {mustBeFinite} = [0;0]
+        options.EgoYawOffsetRadians (1,1) double {mustBeFinite} = 0
+        options.TargetPositionOffsetMeters (2,1) double {mustBeFinite} = [0;0]
     end
     root=fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'));
@@ -22,18 +26,26 @@ function campaign = runJointOutputFeedbackScenario(options)
     for speed=options.Speeds
         for name=options.Scenarios
             cfg=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
+            if any(string(cfg.outputFeedback.method)==["compactNlp","ipopt"]) && exist('casadi.SX','class')~=8
+                setupJointNlpSolver;
+            end
             cfg.referenceSpeed=speed;cfg.model.speedMaximum=max(cfg.model.speedMaximum,1.2*speed);
             [x,q,road,cfg]=collisionThreatScenario(name,cfg);
+            x(1:2)=x(1:2)+options.EgoPositionOffsetMeters;
+            x(3)=x(3)+options.EgoYawOffsetRadians;
+            q(1:2)=q(1:2)+options.TargetPositionOffsetMeters;
             reference=road;input=zeros(2,1);time=0;state=[];
             stream=RandStream('mt19937ar','Seed',options.RandomSeed);
-            initial=localInitialContract(x,q);
+            initial=localInitialContract(x,q,options.HypothesisOffsets);
+            initialClearance=predictiveSafetyGeometry.rectangle(x(1:3), ...
+                [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset],q(1:3),q(8:11));
             truth=struct('ego',x,'target',q,'parameters',ones(4,1),'sensorBias',zeros(7,1));
             sample=localSensor(truth,input,cfg,time,stream,false);
             block=struct('kind',"jointSensorBlock-v1",'time',time,'heldInput',input, ...
                 'samples',sample,'initialHypotheses',initial);
             % Startup-only virtual sensor replay warms both initialization
             % and continuation branches; no warmup command reaches the plant.
-            warmupSeconds=0;
+            warmupSeconds=0;warmupHolds=0;warmupFailure="";
             if options.Warmup
                 warmupTimer=tic;warmupTruth=truth;warmupBlock=block;warmupState=[];
                 warmupStream=RandStream('mt19937ar','Seed',options.RandomSeed);
@@ -47,7 +59,9 @@ function campaign = runJointOutputFeedbackScenario(options)
                         warmupBlock=struct('kind',"jointSensorBlock-v1", ...
                             'time',warmupBlock.time+cfg.controller.sampleTime, ...
                             'heldInput',warmupInput,'samples',warmupSamples);
-                    catch
+                        warmupHolds=warmupHolds+1;
+                    catch exception
+                        warmupFailure=string(exception.identifier)+": "+string(exception.message);
                         % The recorded call below reports any admission failure.
                         break;
                     end
@@ -64,6 +78,8 @@ function campaign = runJointOutputFeedbackScenario(options)
                     failureCallSeconds=toc(callTimer);
                     callCount=callCount+1;callSeconds(callCount)=failureCallSeconds;
                     failurePhase="controller";
+                    save(fullfile(options.OutputDirectory,sprintf('%g-%s-failure.mat',speed,name)), ...
+                        'block','state','reference','cfg');
                     failure=string(exception.identifier)+": "+string(exception.message);break;
                 end
                 elapsed=toc(callTimer);callCount=callCount+1;callSeconds(callCount)=elapsed;
@@ -92,22 +108,28 @@ function campaign = runJointOutputFeedbackScenario(options)
             outcome="completed";if strlength(failure)>0,outcome="failed";end
             file=fullfile(options.OutputDirectory,sprintf('%g-%s.json',speed,name));
             result=struct('scenario',name,'referenceSpeedMetersPerSecond',speed, ...
-                'observationModel',"rawSensorJointDynamicOutputFeedback",'randomSeed',options.RandomSeed, ...
+                'observationModel',"rawSensorFixedConsistencyInference",'controllerMethod',string(cfg.outputFeedback.method), ...
+                'randomSeed',options.RandomSeed, ...
                 'outcome',outcome,'requestedFrames',options.Frames,'executedFrames',numel(trace), ...
                 'simulatedSeconds',time,'failure',failure,'failurePhase',failurePhase, ...
                 'minimumReplayClearanceMeters',minimumClearance,'configuration',cfg, ...
                 'sampledSafetyEvaluated',~isempty(trace), ...
                 'sampledClearanceSatisfied',~isempty(trace)&&minimumClearance>=cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance, ...
-                'sampledCollisionDetected',~isempty(trace)&&minimumClearance<0, ...
+                'sampledCollisionDetected',~isempty(trace)&&minimumClearance<=0, ...
+                'initialFootprintClearanceMeters',initialClearance,'initialContactOrOverlap',initialClearance<=0, ...
                 'finalSpeedMetersPerSecond',hypot(truth.ego(4),truth.ego(5)), ...
                 'finalDistanceToTargetMeters',norm(truth.ego(1:2)-truth.target(1:2)), ...
                 'finalLongitudinalProgressMeters',truth.ego(1)-x(1), ...
                 'startupWarmupSeconds',warmupSeconds,'warmupEnabled',options.Warmup, ...
+                'warmupCompletedHolds',warmupHolds,'warmupFailure',warmupFailure, ...
                 'failureCallSeconds',failureCallSeconds, ...
                 'initialInformationContract',initial,'initialContractScope', ...
-                "finiteExperimentalPriorIncludesActualInitialMember;notASensorDerivedEnclosure", ...
+                "finiteExperimentalPrior;notASensorDerivedEnclosure", ...
+                'actualInitialMemberIncluded',any(options.HypothesisOffsets==0), ...
+                'experimentOptions',options, ...
                 'robustSafetyCertified',false,'timing',localTiming(callSeconds(1:callCount),cfg.controller.sampleTime), ...
                 'trace',trace);
+            result.solverTiming=localSolverTiming(trace);
             localWriteJson(file,result);
             entry=rmfield(result,{'configuration','trace','initialInformationContract'});entry.source=file;
             if isempty(summaries),summaries=entry;else,summaries(end+1)=entry;end %#ok<AGROW>
@@ -116,26 +138,37 @@ function campaign = runJointOutputFeedbackScenario(options)
                 1000*result.timing.maximumSeconds,result.timing.deadlineMisses);
         end
     end
-    campaign=struct('scope',"joint dynamic output feedback with finite uncertainty scenarios", ...
-        'pipeline',"dynamicOutputFeedback",'results',summaries);
+    campaign=struct('scope',"raw-sensor control with an explicitly declared finite initial information contract", ...
+        'pipeline',string(cfg.outputFeedback.method),'results',summaries);
     localWriteJson(fullfile(options.OutputDirectory,'campaign.json'),campaign);
 end
 
 function timing=localTiming(seconds,deadline)
     ordered=sort(seconds);count=numel(seconds);
+    if count==0,ordered=NaN;seconds=NaN;end
     timing=struct('scope',"wholeControllerCallIncludingRejectedCallsExcludingStartupWarmupAndOfflinePlantReplay", ...
         'calls',count,'deadlineSeconds',deadline,'meanSeconds',mean(seconds), ...
         'medianSeconds',median(seconds),'p95Seconds',ordered(max(1,ceil(.95*count))), ...
         'maximumSeconds',max(seconds),'deadlineMisses',sum(seconds>deadline));
 end
 
-function hypotheses=localInitialContract(x,q)
+function timing=localSolverTiming(trace)
+    seconds=[];
+    for j=1:numel(trace)
+        if isfield(trace(j).metadata,'nlpSeconds'),seconds(end+1)=trace(j).metadata.nlpSeconds;end %#ok<AGROW>
+    end
+    timing=localTiming(seconds,.1);
+    timing.scope="acceptedCallsOnlyNlpSolveExcludingCompilationPreparationAndReplay";
+    timing.meanUnder100Milliseconds=~isempty(seconds) && mean(seconds)<.1;
+end
+
+function hypotheses=localInitialContract(x,q,offsets)
     % This is an experimental prior, not an estimate derived from truth at
     % every decision. Common translation and friction remain correlated.
     prototype=struct('ego',x,'target',q,'parameters',ones(4,1),'sensorBias',zeros(7,1));
-    hypotheses=repmat(prototype,1,3);
-    for j=1:3
-        offset=(j-2)*.005;
+    hypotheses=repmat(prototype,1,numel(offsets));
+    for j=1:numel(offsets)
+        offset=offsets(j);
         hypotheses(j).ego(1:2)=x(1:2)+[offset;offset];
         hypotheses(j).ego(4)=x(4)+offset;
         hypotheses(j).target(1:2)=q(1:2)+[offset;offset];
@@ -166,7 +199,10 @@ function [truth,samples,clearance]=localReplay(truth,input,cfg,time,stream,dropo
     for j=1:count
         truth.ego=deval(ode,j*dt);
         if j==count,truth.ego=nonlinearBicycleModel.sampleEndState(truth.ego,input,cfg);end
-        if start.target(4)>0,truth.target=predictiveSafetyGeometry.predictTarget(start.target,j*dt);end
+        if start.target(4)>0
+            truth.target=predictiveSafetyGeometry.predictTarget(start.target,j*dt);
+            truth.target(5:6)=start.target(5:6);
+        end
         y=localSensor(truth,input,cfg,time+j*dt,stream,dropout);
         if isempty(samples),samples=y;else,samples(end+1)=y;end %#ok<AGROW>
     end

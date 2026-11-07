@@ -4,8 +4,7 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
 % change the interpretation of a controller run.
     if nargin<1,userCfg=[];end
     cfg=localDefaults();
-    % Online execution takes one SQP-RTI update. Iterated nonlinear shooting
-    % is an explicitly requested diagnostic of the same constraint family.
+    % These solver settings belong to the optional state-estimate comparator.
     if isstruct(userCfg) && isscalar(userCfg) && isfield(userCfg,'solver') ...
             && isstruct(userCfg.solver) && isscalar(userCfg.solver) && isfield(userCfg.solver,'method') ...
             && (ischar(userCfg.solver.method) || isstring(userCfg.solver.method)) ...
@@ -29,11 +28,11 @@ end
 
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
-    % Joint dynamic output feedback. Noise bounds are Euclidean radii for
+    % Raw-sensor compact nonlinear control. Noise bounds are Euclidean radii for
     % GNSS position, inertial body acceleration, gyro, and radar position.
     % Finite hypotheses and future noise cases are a deployment approximation.
-    cfg.outputFeedback=struct('method',"sqpRti",'nlpMaximumIterations',50, ...
-        'nlpTolerance',1e-7,'nlpJit',true,'nlpCompilerOptimization',3, ...
+    cfg.outputFeedback=struct('method',"compactNlp",'nlpMaximumIterations',50, ...
+        'nlpTolerance',1e-7,'nlpJit',true,'nlpCompilerOptimization',0,'nlpCompiler',"clang", ...
         'sensorPeriod',.0125,'memoryDimension',1, ...
         'noiseBounds',[.04;.03;.0015;.04], ...
         'featureScale',[50;50;10;10;1;50;50], ...
@@ -47,7 +46,10 @@ function cfg=localDefaults()
         'inputWeight',.1,'trackingWeights',[1;1;.2;.1;.1], ...
         'finiteDifferenceStep',1e-5,'predictionSubsteps',2, ...
         'maximumHypotheses',64,'smoothAbsoluteValue',1e-6, ...
-        'maximumSolveSeconds',.05,'qpMaximumIterations',60);
+        'maximumSolveSeconds',.06,'initializationSolveSeconds',2,'recoverySolveSeconds',.6, ...
+        'qpMaximumIterations',60, ...
+        'controlNodes',24,'nearControlNodes',4,'planningBufferMeters',.05,'minimumPreviewSeconds',3, ...
+        'validationSubsteps',64);
     % horizonSteps is the shortest horizon. Every collision stage has slack.
     % Encounter preview sizes the first reference; its first accepted length
     % stays fixed throughout that encounter.
@@ -219,12 +221,16 @@ end
 
 function localValidate(cfg)
     of=cfg.outputFeedback;
-    assert(isscalar(string(of.method)) && any(string(of.method)==["sqpRti","ipopt"]), ...
-        'outputFeedback.method must be sqpRti or ipopt.');
+    assert(isscalar(string(of.method)) && any(string(of.method)==["compactNlp","sqpRti","ipopt"]), ...
+        'outputFeedback.method must be compactNlp, sqpRti or ipopt.');
+    validateattributes(of.controlNodes,{'double'},{'scalar','integer','finite','>=',6});
+    validateattributes(of.nearControlNodes,{'double'},{'scalar','integer','finite','positive','<',of.controlNodes});
     validateattributes(of.nlpMaximumIterations,{'double'},{'scalar','integer','finite','positive'});
     validateattributes(of.nlpTolerance,{'double'},{'scalar','finite','positive'});
     validateattributes(of.nlpJit,{'logical'},{'scalar'});
     validateattributes(of.nlpCompilerOptimization,{'double'},{'scalar','integer','>=',0,'<=',3});
+    assert(isscalar(string(of.nlpCompiler)) && any(string(of.nlpCompiler)==["gcc","clang","cc"]), ...
+        'nlpCompiler must name gcc, clang or cc.');
     if ~isempty(of.horizonSeconds)
         validateattributes(of.horizonSeconds,{'double'},{'scalar','real','finite','positive'});
     end
@@ -238,12 +244,17 @@ function localValidate(cfg)
         validateattributes(of.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(of.maximumSolveSeconds,{'double'},{'scalar','real','positive'});
+    validateattributes(of.initializationSolveSeconds,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(of.recoverySolveSeconds,{'double'},{'scalar','real','finite','positive'});
     assert(of.backupBrakingRatio<1,'backupBrakingRatio must lie strictly between zero and one.');
     assert(of.steeringMaximum<pi/2,'steeringMaximum must be below pi/2.');
     for name=["memoryDimension","predictionSubsteps","qpMaximumIterations","maximumHypotheses"]
         validateattributes(of.(name),{'double'},{'scalar','integer','finite','positive'});
     end
     assert(mod(of.predictionSubsteps,2)==0,'predictionSubsteps must be even.');
+    validateattributes(of.planningBufferMeters,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(of.minimumPreviewSeconds,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(of.validationSubsteps,{'double'},{'scalar','integer','finite','>=',4});
     validateattributes(of.intersampleMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(of.clearanceMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(of.inputWeight,{'double'},{'scalar','real','finite','nonnegative'});

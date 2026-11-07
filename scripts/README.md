@@ -9,80 +9,25 @@ Its target equations, Jacobian enclosure and position/IMU filter are actions
 of `nrmmObserverVectorField`; orientation sets use `nrmmSet.yaw`, and retained
 motion-parameter covers use `nrmmTargetHistory("constantMotion",...)`.
 
-## Primary raw-sensor output-feedback pipeline
+## Primary raw-sensor predictive controller
 
-`runJointOutputFeedbackScenario` drives the jointly optimized memory/control
-maps using complete raw GNSS-position, body-IMU, gyro and radar blocks. It uses
-an explicit finite initial information contract and an independent `ode45`
-plant. No NRMM gains or point observer are constructed. `runCollisionThreatValidation`
-and `runNonlinearControllerExperiment` select this pipeline by default.
+`runJointOutputFeedbackScenario` runs the compact nonlinear controller by
+default. Fixed raw-measurement consistency inference supplies the current
+information; the NLP optimizes physical states and direct actuator commands.
+Coarse control knots retain dense held-input propagation and geometric checks.
+The complete fine input plan is replayed on all retained hypotheses and kept
+for fallback. No memory-update map is optimized.
 
-```matlab
-addpath('scripts');
-runJointOutputFeedbackScenario(Frames=8, ...
-    OutputDirectory=string(tempname));
-```
-
-Finite scenarios and numerical integration are deployment approximations.
-The default executes one sparse RTI QP without nonlinear acceptance. To run
-the cached CasADi/IPOPT backend with nonlinear replay acceptance, call
-`setupJointNlpSolver` and select `outputFeedback.method="ipopt"`; see the
-[setup and experiment commands](../README.md#run-a-raw-sensor-experiment).
-Neither backend supplies a universal safety claim. The
-[interface](../README.md#controller-interface) and
-[theory](../controller/CONTROLLER_THEORY.md) state the contract and limits. Constant tangential
-acceleration (zero, positive or negative) and constant sideslip define the
-target-motion contract. Endpoint constraints impose clearance and physical
-domain conditions without a target stopping restriction. Inference failure or
-failure to obtain an accepted plan issues no command. Scenario files record
-such failures explicitly.
-
-Campaign timing measures the complete outer controller call, including rejected
-calls, separately from startup warmup and the offline plant replay. Results
-include deadline misses, failure phase, final speed/progress and sampled
-clearance status. Completing the requested frame count does not establish
-encounter exit or cruise recovery; a zero-frame run has no plant-safety result.
-
-To repeat the expanded nonlinear campaign with automatic preview durations:
-
-```matlab
-addpath('scripts'); setupJointNlpSolver;
-names = ["stoppedLead","hardBrakingLead","brakingLead","headOn", ...
-    "acceleratingHeadOn","intersectionCrossing","crossing", ...
-    "turningCrossing","curvedHeadOn","curvedCrossing"];
-cfg = struct('outputFeedback',struct('method',"ipopt", ...
-    'nlpCompilerOptimization',0));
-campaign = runJointOutputFeedbackScenario(Frames=160, Speeds=[8,15,25], ...
-    Scenarios=names, RandomSeed=20261107, ControllerConfiguration=cfg, ...
-    OutputDirectory=string(tempname));
-```
-
-This selects GCC `-O0` to reduce startup compilation time. It retains the
-50 ms solver budget and all prediction and acceptance constraints; its online
-timings must be reported separately from optimized compiler configurations.
-
-On a Ryzen 7 7800X3D with MATLAB R2026a Update 3 and CasADi 3.8.2, this
-campaign completed 7 of 30 cases on 2026-11-07: three at 8 m/s, three at
-15 m/s and one at 25 m/s. The other 23 calls rejected both the candidate and
-seed at the first hold. All 1,143 controller calls exceeded 50 ms; per-speed
-mean times were 282, 228 and 308 ms. All accepted calls reached IPOPT's time
-limit after zero or one iteration. Sampled replay clearance remained positive
-in the completed cases, but most vehicles stopped; neither cruise recovery
-nor real-time operation was demonstrated. The offline plant did not include
-computation delays. These measurements concern this finite test configuration,
-not global feasibility of the nonlinear control problem.
-
-The joint window is selected from current retained speeds and preview timing
-parameters before each solve. It grows when the selected coverage exceeds the
-shifted plan; no fixed stage count is supplied by these entry points. Use
-`outputFeedback.horizonSeconds` only when explicitly prescribing a duration.
-The selection is an engineering preview rule, not a feasibility certificate;
-see the [window configuration](../README.md#controller-interface).
+Load external CasADi with `setupJointNlpSolver` before execution. See the
+[setup, scenario campaign, interface and timing definitions](../README.md).
+`outputFeedback.method="sqpRti"` and `"ipopt"` explicitly select the previous
+dynamic-memory comparison formulations. Experiment outputs are written to the
+chosen output directory, not retained as routine research reports.
 
 ## Finite-input information-state reference
 
-`verifyUnifiedObserverSafety` executes the physical information-set algorithm
-from [controller theory, Section 7](../controller/CONTROLLER_THEORY.md).
+`verifyUnifiedObserverSafety` is a standalone finite-input information-set
+research comparator with its own longitudinal model and terminal rule.
 It propagates a retained physical set, conditions it on current bounded
 observations, minimizes signed collision deficits and then a speed/braking
 cost, and appends a common admissible terminal continuation. Future observer

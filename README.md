@@ -1,175 +1,204 @@
 # Collision Avoidance Research Core
 
-The primary pipeline is a nonlinear dynamic output-feedback controller. It
-conditions joint physical hypotheses on raw sensor blocks and optimizes both
-an actuator map and a bounded controller-memory update. It does not require a
-separately designed state observer.
+The default controller uses fixed raw-measurement consistency updates and a
+compact nonlinear MPC problem. It optimizes one physical trajectory and the
+steering and longitudinal-force commands. Observer gains and controller-memory
+maps are not optimization variables. Every proposed command sequence is
+numerically replayed against all retained physical hypotheses before use.
 
-The implementation uses finite joint scenarios, numerical Fiala-bicycle flows,
-and a selectable sparse multiple-shooting solver. The default `sqpRti` backend
-executes one QP without nonlinear acceptance. The `ipopt` backend uses cached
-CasADi automatic derivatives, nonlinear iterations, shifted primal/dual warm
-starts, and nonlinear policy replay before acceptance. Both are research
-deployment approximations, **not robust safety certificates**.
-The conditional exact-set theorem and constructive braking terminal component
-are in [controller theory](controller/CONTROLLER_THEORY.md).
+The nonlinear Fiala bicycle model, constant target tangential acceleration and
+sideslip, and absorbing target-stop convention are retained. Moving, turning,
+and accelerating targets are admitted; targets need not brake or stop.
 
-## Run a raw-sensor experiment
+The mathematical derivation is in
+[CONTROLLER_THEORY.md](controller/CONTROLLER_THEORY.md). Finite hypotheses,
+numerical integration and sampled checks are deployment approximations. The
+implementation does not claim universal uncertainty coverage, continuous-time
+certification, a complete physical-feasibility test, or guaranteed deadlines.
 
-MATLAB R2026a and Optimization Toolbox are used by the current implementation.
-Run from the repository root:
+## Run an experiment
+
+The tested environment is MATLAB R2026a with external CasADi 3.8.2 and IPOPT.
+The default generated-C compiler is Clang at `-O0`; GCC and `cc` are also
+selectable. Solver distributions and compiled kernels stay outside the
+repository. Load the external installation once per MATLAB session:
 
 ```matlab
 addpath('scripts');
-result = runJointOutputFeedbackScenario(Frames=8, ...
+setupJointNlpSolver; % Optional installation path, or CASADI_PATH.
+result = runJointOutputFeedbackScenario( ...
+    Scenarios=["headOn","intersectionCrossing"], Speeds=8, Frames=160, ...
     OutputDirectory=string(tempname));
-results = runtests('tests/dynamicOutputFeedbackTest.m');
-assertSuccess(results)
 ```
 
-To try the Thompson-style nonlinear solver route, install the CasADi MATLAB
-distribution outside the repository and load it once per MATLAB session:
+For the complete encounter suite:
 
 ```matlab
-setupJointNlpSolver; % Or pass its installation directory / set CASADI_PATH.
-cfg = struct('outputFeedback', struct('method', "ipopt", ...
-    'nlpMaximumIterations', 50));
-result = runJointOutputFeedbackScenario(Frames=60, Speeds=8, ...
-    Scenarios=["headOn","intersectionCrossing"], ...
-    ControllerConfiguration=cfg, OutputDirectory=string(tempname));
-results = runtests('tests/nonlinearOutputFeedbackTest.m');
-assertSuccess(results)
+names = ["stoppedLead","hardBrakingLead","brakingLead","headOn", ...
+    "acceleratingHeadOn","intersectionCrossing","crossing", ...
+    "turningCrossing","curvedHeadOn","curvedCrossing"];
+result = runJointOutputFeedbackScenario(Scenarios=names, Speeds=[8,15,25], ...
+    Frames=160, RandomSeed=20261107, OutputDirectory=string(tempname));
 ```
 
-`nlpJit=true` compiles model derivatives to C during the first solve for each
-configuration, horizon size and initial scenario capacity. Posterior pruning reuses the
-compiled graph with zero-weight duplicate slots. Prepare kernels before online operation;
-compilation is not part of a real-time control budget. `nlpJit=false` avoids
-the compiler requirement. The external CasADi distribution must include IPOPT;
-the tested installation is CasADi 3.8.2. No solver binaries are stored here.
-`nlpCompilerOptimization` selects the generated-C compiler level from 0 to 3
-(default 3). Record it when comparing timings: a lower level can shorten
-startup compilation while changing steady-state evaluation cost.
+The default `outputFeedback.method="compactNlp"` uses 24 control knots where
+preview length permits. Preview duration follows the current retained speed,
+a configured minimum duration, and inherited coverage. Physical commands
+still update every 50 ms, with dynamics and collision checks between knots.
+The allocated graph supports preview growth without online recompilation.
+At 24 knots the problem has 192 physical state/input variables and one
+restoration slack, independent of the number of retained information members.
 
-This reproducible experiment uses seed `20261104`, noisy position-only GNSS,
-body-frame inertial acceleration, gyro and relative radar. Its initial finite
-physical contract is declared once and includes the actual simulation initial
-member. It is not a sensor-derived uncertainty enclosure. Subsequent controller
-calls receive only raw sensor blocks, the preceding applied command, the
-reference path, and retained controller state. An independent `ode45` plant
-provides the replay and empirical clearance checks.
+`outputFeedback.nlpCompiler` selects `"clang"`, `"gcc"`, or `"cc"`;
+`nlpCompilerOptimization` selects levels 0--3. `nlpJit=false` permits execution
+without a C compiler. Record these choices when comparing timings.
+Compilation and virtual startup warmup are reported separately. The driver
+warms initialization and continuation with four discarded virtual holds; no
+warmup command is applied to the recorded plant.
 
-`runCollisionThreatValidation` and `runNonlinearControllerExperiment` now use
-the joint raw-sensor pipeline. The former defaults to the 25 m/s stopped/braking
-lead challenge; successful initialization or recovery is not assumed. The
-current deployment uses automatic time coverage, one memory coordinate, two
-prediction substeps per hold, and one future-noise direction per retained hypothesis.
-The scenario driver performs four discarded virtual startup calls by default to warm
-initialization and continuation in MATLAB and the solver; `Warmup=false` exposes cold-start latency. Every recorded
-RTI call still performs exactly one QP. Startup warmup time is exported separately.
-The control deadline is `min(outputFeedback.maximumSolveSeconds, sampleTime)`;
-it is a measured whole-call deadline. IPOPT also receives `maximumSolveSeconds`
-as its internal wall-time limit, which excludes inference, preparation,
-compilation and replay and is not a hard real-time guarantee. NLP metadata
-separates these costs and reports convergence, fallback use and deadline misses.
+`solverTiming` measures accepted NLP solves, including all solve attempts in
+an accepted call. `timing` measures full controller calls, including rejected
+calls. Both exclude startup warmup and offline plant simulation. Full-call
+measurements include inference, preparation, solve and acceptance. The 100 ms
+mean-solve target is distinct from the configured 50 ms control period and
+from a worst-case deadline. The solver wall-time limit is not a hard interrupt.
+Simulation does not inject computation delay into the plant.
+`maximumSolveSeconds` limits one solver attempt. Additional attempts are
+allowed only when no checked plan is available, within
+`initializationSolveSeconds` or `recoverySolveSeconds`; their time is included.
 
-## Controller interface
+The 2026-11-07 baseline run used the command above, MATLAB R2026a, CasADi
+3.8.2, Clang `-O0`, and an AMD Ryzen 7 7800X3D. All 30 combinations completed
+160 holds (8 simulated seconds) each. The independent `ode45` plant checked
+41 poses per hold; the smallest measured footprint clearance was 0.534 m
+against a 0.1 m requirement. These are finite simulation results, not a proof
+of indefinite safety or hardware deadlines.
+
+| Initial/reference speed | Completed cases | Mean NLP solve | Mean whole call |
+| --- | ---: | ---: | ---: |
+| 8 m/s | 10/10 | 53.9 ms | 62.2 ms |
+| 15 m/s | 10/10 | 62.3 ms | 73.9 ms |
+| 25 m/s | 10/10 | 71.0 ms | 84.2 ms |
+
+Startup compilation and four virtual warmup holds were excluded; the recorded
+initialization call and all its attempts were included. No recorded call
+rebuilt the kernel. The largest full call was 315.3 ms, and 4,313 of 4,800
+calls exceeded the configured 50 ms hold. The average 100 ms target was met
+in this run; a 50 ms deadline guarantee was not.
+
+The additional stress run used the same ten encounters at 3 and 30 m/s,
+320 holds per case, friction coefficients 0.65, doubled sensor-noise bounds,
+five initial members, pose offsets and consecutive radar dropouts:
+
+```matlab
+cfg = struct('tire',struct('frictionCoefficient',[.65;.65]), ...
+    'outputFeedback',struct('noiseBounds',[.08;.06;.003;.08]));
+stress = runJointOutputFeedbackScenario(Scenarios=names, Speeds=[3,30], ...
+    Frames=320, RandomSeed=20261108, ControllerConfiguration=cfg, ...
+    HypothesisOffsets=[-.01,-.005,0,.005,.01], ...
+    EgoPositionOffsetMeters=[0;.3], EgoYawOffsetRadians=.02, ...
+    TargetPositionOffsetMeters=[-1;.2], ...
+    DropoutHolds=[5:12,45:52,100:110], OutputDirectory=string(tempname));
+```
+
+Fifteen of twenty cases completed, including all ten at 30 m/s. Their 4,800
+executed holds had minimum measured clearance 0.142 m, mean NLP solve 66.2 ms
+and mean full call 83.2 ms. Every completed case had mean NLP solve below
+100 ms (largest 77.3 ms). Four completed cases had mean full calls just above
+100 ms (largest 102.1 ms); the largest accepted full call was 1.756 s.
+
+At 3 m/s, `headOn`, `crossing`, `turningCrossing`, `curvedHeadOn` and
+`curvedCrossing` were rejected before the first command. They are failures,
+not collision-avoidance successes or physical-infeasibility certificates.
+Including their rejected calls gives an 86.8 ms aggregate full-call mean and
+a 3.704 s maximum. Offline searches with one control knot per hold and a
+larger solve budget also found no plan; this is not a completeness proof.
+Thus the requested success for every physically feasible encounter remains
+unestablished. Across both campaigns, 45 of 50 cases completed and 9,600
+executed holds respected the sampled 0.1 m clearance requirement.
+
+## Information and actuation interface
 
 ```matlab
 [command, predictedInput, prediction, state] = ...
     collisionAvoidanceController(block, [], referencePath, cfg, previousState);
 ```
 
-`block.kind` is `"jointSensorBlock-v1"`. It contains `time`, `heldInput` (the
-preceding `[steeringRadians; signedForceRatio]`), and a struct array `samples`.
-Each reading contains:
+`block.kind` is `"jointSensorBlock-v1"`. It contains `time`, `heldInput`
+(the preceding `[steeringRadians; signedForceRatio]`) and all consecutive
+sensor readings in `samples`:
 
-| Field | Meaning and units |
+| Field | Units and meaning |
 | --- | --- |
 | `time` | Absolute sensor time, s |
-| `position` | GNSS inertial position, 2-by-1 m |
-| `acceleration` | Gravity-compensated body inertial acceleration, 2-by-1 m/s² |
+| `position` | Position-only GNSS, 2-by-1 m |
+| `acceleration` | Gravity-compensated body acceleration, 2-by-1 m/s² |
 | `yawRate` | Gyro yaw rate, rad/s |
 | `relativePosition` | Radar position in the ego frame, 2-by-1 m |
-| `radarAvailable` | Logical detection flag; unavailable radar values are masked |
+| `radarAvailable` | Detection flag; absent values are ignored |
 
-Initialize with explicit `previousState=[]`, one current-boundary reading,
-and `block.initialHypotheses`. Each hypothesis contains `ego` as
-`[x;y;yaw;vx;vy;r]`, `target` as
-`[xT;yT;yawT;VT;AT;betaT;lrT;halfLength;halfWidth;offsetX;offsetY]` (or `[]`),
-`parameters` as positive `[CfScale;CrScale;muFrontScale;muRearScale]`, and
-`sensorBias` in `[GNSS(2);IMU(2);gyro;radar(2)]` order. The latter two fields
-are persistent and correlated with their physical hypothesis.
+Initialize with `previousState=[]`, one boundary reading, and
+`block.initialHypotheses`. Each hypothesis contains:
 
-Optional `initialMemory` lies in the configured cube. Optional
-`initialPolicies` supplies one complete `(v,K,A,B,c)` structure per hold as a
-numerical seed. Every stage is optimized, including the final hold. The
-appended braking policy is only a warm-start seed. IPOPT has no fixed coefficient
-step box; physical input, slew, collision and domain constraints remain hard.
-Its candidate must pass fresh nonlinear replay over all retained scenarios.
-Otherwise the shifted seed is replayed and used only if it passes; if neither
-passes, the call returns an error without committing a new command. This gate
-does not certify unsampled uncertainty or continuous-time clearance.
+- `ego`: `[x;y;yaw;vx;vy;r]`.
+- `target`: `[xT;yT;yawT;VT;AT;betaT;lrT;halfLength;halfWidth;offsetX;offsetY]`,
+  or `[]` for a target-free contract.
+- `parameters`: persistent positive `[CfScale;CrScale;muFrontScale;muRearScale]`.
+- `sensorBias`: persistent `[GNSS(2);IMU(2);gyro;radar(2)]` offsets.
 
-On continuation, supply every sensor reading since the previous decision,
-including detection flags. The hold must contain an even integer number of
-sensor periods. Do not resend initial hypotheses or reset memory. The retained
-first memory map processes the new block exactly once. Every raw reading
-conditions physical hypotheses, even though policy features use normalized
-block means and the detection fraction. An empty posterior, changed contract,
-missing reading, input mismatch, or absence of an accepted plan produces
-an error without committing a command.
+Hypotheses and their correlations persist through conditioning; their count
+is not an optimization-trajectory count. The experiment driver declares its
+finite initial contract once, including the actual initial simulated member.
+It is not a sensor-derived uncertainty enclosure. Subsequent calls receive
+raw measurements, actual applied-input history and retained controller state;
+they receive no further plant truth. The independent `ode45` plant is used
+for sensor synthesis and evaluation.
 
-Noise bounds, policy dimension, future noise directions, coefficient bounds,
-preview timing and solver settings live in `cfg.outputFeedback`. The retired
-`outputFeedback.horizonSteps` field is rejected. By default, `horizonSeconds=[]`
-selects a preview directly from the largest retained ego speed divided by
-`previewDecelerationMetersPerSecondSquared`, plus `previewSettlingSeconds`.
-Coverage is rounded upward to `horizonResolutionSeconds` and then to full
-control holds. These defaults are 4 m/s², 0.5 s and 1 s respectively: at 8 m/s
-the preview is 3 s (60 holds at 50 ms), and at 25 m/s it is 7 s (140 holds).
-This is an engineering preview scale, not a certified Fiala stopping-time or
-feasibility bound, and it imposes no terminal braking constraint.
+On continuation, supply every reading from the preceding hold. The hold must
+contain an even integer number of sensor periods. Do not reset initial
+information. Acceleration measurements use the preceding actual input. Radar
+dropout preserves target obligations and latent motion parameters. An empty
+posterior or inconsistent input history is reported explicitly.
 
-The preview is recomputed from the posterior before each solve. The previous
-stage count is retained when it already covers that preview; otherwise the
-shifted seed is extended. No successive-horizon optimization search is used.
-Set a positive `horizonSeconds` to request explicit time coverage instead.
-An insufficient `controller.maximumHorizonSteps` capacity causes an explicit
-error instead of truncating the selected coverage. Horizon growth changes the
-NLP graph size and can require a new kernel build; neither the solver budget
-nor previously measured short-horizon timings establish real-time operation
-with these longer windows. The comparator's `controller.horizonSteps` does
-not select the joint-controller window. A dropout retains the target
-and its collision obligation. Endpoint constraints impose the same clearance
-and physical domain conditions as other prediction nodes. There is no
-remaining-braking-travel reserve, fixed final braking input, or terminal
-invariance claim in this deployment. Target tangential acceleration and sideslip
-stay constant: zero, positive and negative acceleration are all supported,
-including curved motion.
-Target restart after an absorbing stop, residual physical forces, multiple
-targets, and hard road constraints remain outside this implementation. No observer sideslip cone
-is imposed on this new pipeline; its physical speed, lateral-velocity and yaw
-caps are imposed at prediction nodes (linearized in RTI, nonlinear in IPOPT).
+## Planning and acceptance
 
-## Research comparators and layout
+Endpoint control variables interpolate into a complete sequence of held
+commands. Constraints apply to those actual inputs and their increments.
+A smooth conservative combination of the four rectangle separation axes
+provides one collision inequality per check, without geometric decision
+variables. Physical state constraints and nonlinear shooting equalities
+remain hard. There is no forced braking endpoint, remaining-stop-distance
+terminal condition, or target-braking admission gate.
 
-The state-estimate overload of `collisionAvoidanceController` and the NRMM
-observer remain explicit comparison interfaces. Use
-`runCollisionThreatValidation(Pipeline="nrmmComparator", ...)` for the original
-separate-observer campaign. Their results do not validate the new pipeline.
+Numerical replay checks the candidate on every retained member. IPOPT timeout
+or nonconvergence does not authorize a constraint-violating command. The full
+fine input sequence of an accepted plan is retained; its shifted continuation
+is independently rechecked and can serve as fallback. Refitting onto coarse
+knots supplies a warm start and is not assumed to preserve feasibility. The
+appended tail must also pass the check. If no checked plan exists, the runtime
+reports failure without labeling the encounter physically impossible.
+Tail braking repairs and an elastic feasibility-restoration solve supply
+additional candidates. Positive restoration slack never relaxes execution
+acceptance: the original clearance checks must still pass.
+Geometric rejection can trigger a compiled 64-step-per-hold replay with
+endpoint speed-bound checks. This reduces the reserve associated with time
+spacing while keeping the requested clearance. The speed-bound argument is
+conditional on the continuous physical domain; numerical integration and
+finite information remain uncertified.
 
-- `controller/`: entry point, shared Fiala physics and geometry, joint
-  inference/SQP in `solvePredictiveControl`, terminal certificates, and theory.
-- `config/`: validated configuration entry points; CLF tables for comparators.
-- `estimator/`: independently executable observer/gain research and theory.
-- `perception/`: Python YOLO + LiDAR target-position pipeline.
-- `scripts/`: sensor/replay drivers, experiments, comparators, and audits.
-- `tests/`: behavior-focused MATLAB tests.
-- `report/`: measured outcomes, validation data, and implementation findings.
+## Tests and comparisons
 
-Run the full MATLAB suite from the repository root:
-
-```bash
-matlab -batch "results = runtests('tests'); assertSuccess(results)"
+```matlab
+addpath('scripts'); setupJointNlpSolver;
+results = runtests({'tests/compactPredictiveControlTest.m', ...
+    'tests/dynamicOutputFeedbackTest.m','tests/nonlinearOutputFeedbackTest.m', ...
+    'tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m'});
+assertSuccess(results)
 ```
+
+The optional `sqpRti` and `ipopt` methods retain the earlier dynamic-memory
+formulation as numerical comparators. The separate NRMM observer integration
+remains available through `Pipeline="nrmmComparator"`; it is not part of the
+compact optimizer. Source files stay in their existing controller,
+configuration, estimator and experiment directories. Experiment output goes
+to the requested directory; routine runs do not create repository reports.

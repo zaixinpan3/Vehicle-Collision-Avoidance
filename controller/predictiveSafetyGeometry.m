@@ -834,6 +834,27 @@ classdef predictiveSafetyGeometry
             tangent=[cospi(angle/pi);sinpi(angle/pi)];
         end
 
+        function gaps = rectangleAxisGaps(poseE,shapeE,poseT,shapeT,smoothing)
+            % Signed projection gaps on both rectangles' edge normals.
+            % A positive maximum is a lower bound on Euclidean clearance.
+            % Positive smoothing lowers the center projection and increases
+            % support radii, so each returned gap remains conservative.
+            if nargin<5,smoothing=0;end
+            ce=cos(poseE(3,:));se=sin(poseE(3,:));ct=cos(poseT(3,:));st=sin(poseT(3,:));
+            delta=poseE(1:2,:)-poseT(1:2,:) ...
+                +[ce.*shapeE(3,:)-se.*shapeE(4,:);se.*shapeE(3,:)+ce.*shapeE(4,:)] ...
+                -[ct.*shapeT(3,:)-st.*shapeT(4,:);st.*shapeT(3,:)+ct.*shapeT(4,:)];
+            projection=[ce.*delta(1,:)+se.*delta(2,:);-se.*delta(1,:)+ce.*delta(2,:); ...
+                ct.*delta(1,:)+st.*delta(2,:);-st.*delta(1,:)+ct.*delta(2,:)];
+            angle=poseE(3,:)-poseT(3,:);
+            c=sqrt(cos(angle).^2+smoothing^2);s=sqrt(sin(angle).^2+smoothing^2);
+            support=[shapeE(1,:)+shapeT(1,:).*c+shapeT(2,:).*s; ...
+                shapeE(2,:)+shapeT(1,:).*s+shapeT(2,:).*c; ...
+                shapeT(1,:)+shapeE(1,:).*c+shapeE(2,:).*s; ...
+                shapeT(2,:)+shapeE(1,:).*s+shapeE(2,:).*c];
+            gaps=sqrt(projection.^2+smoothing^2)-smoothing-support;
+        end
+
         function [distance,certificate] = rectangle(poseE,shapeE,poseT,shapeT)
             kernel=localKernel();
             if isempty(kernel),[distance,normal]=predictiveSafetyGeometry.rectangleNumeric(poseE,shapeE,poseT,shapeT);

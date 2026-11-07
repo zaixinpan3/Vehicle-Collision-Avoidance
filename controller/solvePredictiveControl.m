@@ -2832,6 +2832,15 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
             [result,diagnostics]=localOfCondition(request.hypotheses,request.block,cfg,request.initial);
         case "window"
             result=localOfWindow(localOfValidateHypotheses(request.hypotheses,cfg),0,cfg);
+        case "validateInputSequence"
+            hypotheses=localOfValidateHypotheses(request.hypotheses,cfg);
+            validateattributes(request.inputs,{'double'},{'2d','nrows',2,'nonempty','finite','real'});
+            count=size(request.inputs,2);nodes=min(count,cfg.outputFeedback.controlNodes);
+            near=min(nodes-1,cfg.outputFeedback.nearControlNodes);
+            boundaries=[0:near,near+round((1:nodes-near)*(count-near)/(nodes-near))];
+            kernel=localCompactKernel(cfg,diff(boundaries),~isempty(hypotheses(1).target));
+            [valid,traces,violation]=localCompactValidate(request.inputs,hypotheses,request.input,kernel,cfg,true);
+            result=struct('accepted',valid,'maximumViolation',violation,'trajectories',{traces});
         case {"predict","linearize"}
             problem=localOfProblem(request.hypotheses,request.memory,request.input, ...
                 request.policies,request.reference,cfg);
@@ -2849,6 +2858,9 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
 end
 
 function [result,diagnostics,problem] = localOfStep(request,cfg)
+    if string(cfg.outputFeedback.method)=="compactNlp" && string(request.operation)=="step"
+        [result,diagnostics]=localCompactStep(request,cfg);problem=[];return;
+    end
     timer=tic;block=request.block;prior=request.previousState;
     if isempty(request.reference),request.reference=[-1000,0;1000,0];end
     localOfValidateBlock(block,cfg);
@@ -3018,6 +3030,7 @@ function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold)
     next.ego=nonlinearBicycleModel.sensorFlow(hypothesis.ego,input,physical,duration,endOfHold);
     if ~isempty(hypothesis.target) && hypothesis.target(4)>0
         next.target=predictiveSafetyGeometry.predictTarget(hypothesis.target,duration);
+        next.target(5:6)=hypothesis.target(5:6);
     end
     % V=0 is an absorbing mode, including when latent A was nonzero.
 end
@@ -3099,7 +3112,9 @@ function window = localOfWindow(hypotheses,inheritedCount,cfg)
     of=cfg.outputFeedback;h=cfg.controller.sampleTime;
     speed=max(arrayfun(@(s)hypot(s.ego(4),s.ego(5)),hypotheses));
     if isempty(of.horizonSeconds)
-        requested=max(2*h,speed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
+        minimum=2*h;
+        if string(of.method)=="compactNlp",minimum=max(minimum,of.minimumPreviewSeconds);end
+        requested=max(minimum,speed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
         allocated=of.horizonResolutionSeconds*ceil(requested/of.horizonResolutionSeconds);
         source="speedBasedPreview";
     else
@@ -3599,7 +3614,7 @@ function [kernel,hit] = localOfNlpKernel(problem)
     cost=cost+.5*of.regularization*dot(w(1:problem.policyCount)-anchor,w(1:problem.policyCount)-anchor);
     nc=numel(g{1});constraint=vertcat(g{:});
     gl=repmat([zeros(nx,1);-Inf(nc-nx,1)],n*ns,1);gu=zeros(size(gl));
-    options=struct('print_time',false,'error_on_fail',false,'jit',of.nlpJit, ...
+    options=struct('print_time',false,'error_on_fail',false,'jit',of.nlpJit,'calc_lam_p',false, ...
         'ipopt',struct('print_level',0,'sb','yes','max_iter',of.nlpMaximumIterations, ...
         'tol',of.nlpTolerance,'constr_viol_tol',of.nlpTolerance, ...
         'bound_relax_factor',0,'warm_start_init_point','yes','mu_init',1e-3));
@@ -3607,7 +3622,7 @@ function [kernel,hit] = localOfNlpKernel(problem)
     if of.nlpJit
         directory=tempname;mkdir(directory);
         options.compiler='shell';options.jit_options=struct( ...
-            'flags',sprintf('-O%d',of.nlpCompilerOptimization),'directory',[directory,filesep]);
+            'flags',sprintf('-O%d',of.nlpCompilerOptimization),'compiler',char(of.nlpCompiler),'directory',[directory,filesep]);
         % CasADi writes the generated source in the current directory even
         % when the compiler output directory is set. Keep both outside Git.
         previousDirectory=pwd;restoreDirectory=onCleanup(@()cd(previousDirectory));
@@ -3702,4 +3717,461 @@ function stage = localOfSymbolicStage(cfg,hasTarget)
         end
     end
     stage=Function('joint_stage',{z,alpha,witness,p},{next,c,residual});
+end
+
+function [result,info] = localCompactStep(request,cfg)
+    % Fixed set-membership inference; optimize physical states and inputs only.
+    timer=tic;block=request.block;prior=request.previousState;initial=isempty(prior);
+    localOfValidateBlock(block,cfg);
+    sensorCount=cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod;
+    assert(abs(sensorCount-round(sensorCount))<1e-10 && sensorCount>=2 && mod(round(sensorCount),2)==0, ...
+        'collisionAvoidanceController:invalidSensorGrid','A hold needs an even integer number of sensor samples.');
+    assert(~cfg.controller.enforceRoadBoundaries, ...
+        'collisionAvoidanceController:unsupportedCompactRoadConstraint', ...
+        'Hard road-boundary constraints are not implemented by this transcription.');
+    if isempty(request.reference),request.reference=[-1000,0;1000,0];end
+    if initial
+        assert(isfield(block,'initialHypotheses'), ...
+            'collisionAvoidanceController:missingInitialInformation','Supply an explicit initial information contract.');
+        assert(~isfield(block,'initialMemory') && ~isfield(block,'initialPolicies'), ...
+            'collisionAvoidanceController:unsupportedCompactMemory','The compact controller has no optimized memory map.');
+        hypotheses=localOfValidateHypotheses(block.initialHypotheses,cfg);
+        assert(numel(block.samples)==1 && abs(block.samples.time-block.time)<1e-9, ...
+            'collisionAvoidanceController:invalidInitialBlock','Initialization uses the current reading.');
+        inherited=0;
+    else
+        assert(isfield(prior,'kind') && prior.kind=="compactOutputFeedback-v1", ...
+            'collisionAvoidanceController:incompatibleContinuation','Expected a compact controller continuation.');
+        assert(isequaln(prior.configuration,cfg) && isequaln(prior.reference,request.reference), ...
+            'collisionAvoidanceController:changedContinuationProblem','The continuation contract changed.');
+        assert(~isfield(block,'initialHypotheses') && ~isfield(block,'initialMemory') && ~isfield(block,'initialPolicies'), ...
+            'collisionAvoidanceController:informationReset','Continuation cannot reset its information.');
+        sensorCount=round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod);
+        times=prior.time+(1:sensorCount)*cfg.outputFeedback.sensorPeriod;
+        assert(abs(block.time-prior.time-cfg.controller.sampleTime)<1e-9 && ...
+            numel(block.samples)==numel(times) && max(abs([block.samples.time]-times))<1e-9, ...
+            'collisionAvoidanceController:invalidSensorGrid','Receive the complete consecutive block.');
+        assert(norm(block.heldInput-prior.appliedInput,Inf)<1e-12, ...
+            'collisionAvoidanceController:actuationMismatch','Measurements must use the committed input.');
+        hypotheses=prior.hypotheses;inherited=prior.horizonSteps;
+    end
+    clock=tic;[hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
+    inferenceSeconds=toc(clock);window=localOfWindow(hypotheses,inherited,cfg);
+    count=window.horizonSteps;nodes=min(count,cfg.outputFeedback.controlNodes);
+    if ~initial,nodes=size(prior.controls,2);end
+    near=min(nodes-1,cfg.outputFeedback.nearControlNodes);
+    boundaries=[0:near,near+round((1:nodes-near)*(count-near)/(nodes-near))];
+    holds=diff(boundaries);h=cfg.controller.sampleTime;hasTarget=~isempty(hypotheses(1).target);
+    clock=tic;[kernel,cacheHit]=localCompactKernel(cfg,holds,hasTarget);buildSeconds=toc(clock);
+    % A representative retained member supplies the nominal dynamics. All
+    % retained members are replayed before accepting a control sequence.
+    values=[hypotheses.ego];[~,nominal]=min(sum((values-mean(values,2)).^2,1));item=hypotheses(nominal);
+    x=item.ego;
+    stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
+    [~,lane]=readControllerInputs(stub,[],request.reference,cfg);
+    clock=tic;capacity=sum(kernel.capacity);targets=zeros(11,2*capacity);times=[];
+    for i=1:nodes
+        times=[times,boundaries(i)*h+min((1:2*kernel.capacity(i))*h/2,holds(i)*h)]; %#ok<AGROW>
+    end
+    if hasTarget
+        if item.target(4)>0,targets=predictiveSafetyGeometry.predictTarget(item.target,times);
+        else,targets=repmat(item.target,1,2*capacity);end
+    end
+    reference=zeros(3,nodes);
+    for i=1:nodes
+        position=item.ego(1:2)+boundaries(i+1)*h*cfg.referenceSpeed*[cos(item.ego(3));sin(item.ego(3))];
+        projection=predictiveSafetyGeometry.project(position,lane);
+        reference(:,i)=[projection.point;projection.heading];
+    end
+    p=[item.ego;block.heldInput;item.parameters;targets(:);reference(:);holds(:)];
+    if initial
+        seeds=localCompactSeeds(item,block.heldInput,holds,lane,kernel,cfg);
+    else
+        controls=prior.fineControls(:,min(size(prior.fineControls,2),boundaries(2:end)+1));
+        seeds={localCompactRateLimit(controls,block.heldInput,holds,cfg)};
+    end
+    preparationSeconds=toc(clock);clock=tic;
+    best=[];bestValue=Inf;bestViolation=Inf;bestTrace=[];retainedFine=false;tailRepaired=false;
+    if ~initial
+        inherited=prior.fineControls(:,2:end);
+        inherited=[inherited,repmat(prior.fineControls(:,end),1,count-size(inherited,2))];
+        [valid,traces,violation]=localCompactValidate(inherited,hypotheses,block.heldInput,kernel,cfg,true);
+        if ~valid
+            % A constant tail is not invariant. Try slowing its final portion
+            % before discarding the executable prefix; every repair is replayed.
+            for seconds=[.5,1,2]
+                repaired=inherited;start=max(1,count-ceil(seconds/h)+1);
+                repaired(2,start:end)=-cfg.outputFeedback.backupBrakingRatio;
+                repaired=localCompactRateLimit(repaired,block.heldInput,ones(1,count),cfg);
+                [valid,traces,violation]=localCompactValidate(repaired,hypotheses,block.heldInput,kernel,cfg,true);
+                if valid,inherited=repaired;tailRepaired=true;break;end
+            end
+        end
+        if valid
+            [~,states]=localCompactRollout(kernel,item.ego,block.heldInput,inherited,item.parameters,true);
+            projection=inherited(:,boundaries(2:end));
+            best=[projection(:);states(:);0];bestTrace=traces;bestViolation=violation;retainedFine=true;
+        end
+    end
+    % A feasible retained sequence remains usable when optimization times out.
+    for j=1:numel(seeds)
+        [valid,traces,violation]=localCompactValidate(seeds{j},hypotheses,block.heldInput,kernel,cfg,false,isempty(best));
+        [~,states]=localCompactRollout(kernel,item.ego,block.heldInput,seeds{j},item.parameters,false);
+        seed=[seeds{j}(:);full(states(:));0];seedValue=full(kernel.objective(seed,p));
+        if valid && seedValue<bestValue
+            best=seed;bestValue=seedValue;bestViolation=violation;bestTrace=traces;retainedFine=false;
+        end
+        seedScores(j)=seedValue+1e5*max(0,violation); %#ok<AGROW>
+        seedPoints{j}=seed; %#ok<AGROW>
+    end
+    [~,order]=sort(seedScores);solveSeconds=0;iterations=0;acceptedTrial=false;
+    stats=struct('return_status','Not_Run','success',false,'iter_count',0);
+    active=false(1,0);
+    for i=1:nodes,active=[active,(1:kernel.capacity(i))<=holds(i)];end %#ok<AGROW>
+    constraintLower=kernel.constraintLower;constraintUpper=kernel.constraintUpper;
+    free=kernel.holdConstraintIndices(:,~active);constraintLower(free)=-Inf;constraintUpper(free)=Inf;
+    budget=cfg.outputFeedback.recoverySolveSeconds;
+    if initial,budget=cfg.outputFeedback.initializationSolveSeconds;end
+    dual=cell(1,numel(seeds));pass=0;bestAttemptViolation=Inf;restorationAttempted=false;
+    while true
+        pass=pass+1;j=order(1+mod(pass-1,numel(order)));
+        solveTimer=tic;
+        upper=kernel.upper;
+        if isempty(best)
+            % Elastic restoration is a search device only. Acceptance below
+            % always checks the original hard clearance on actual rollouts.
+            upper(end)=Inf;seedPoints{j}(end)=max(0,seedPoints{j}(end));restorationAttempted=true;
+        end
+        arguments={'x0',seedPoints{j},'p',p,'lbx',kernel.lower,'ubx',upper, ...
+            'lbg',constraintLower,'ubg',constraintUpper};
+        if ~isempty(dual{j}),arguments=[arguments,{'lam_x0',dual{j}.x,'lam_g0',dual{j}.g}];end %#ok<AGROW>
+        try
+            solution=kernel.solver(arguments{:});
+        catch exception
+            if isempty(best),rethrow(exception);end
+            solveSeconds=solveSeconds+toc(solveTimer);stats.return_status='Solver_Exception_With_Checked_Fallback';break;
+        end
+        solveSeconds=solveSeconds+toc(solveTimer);stats=kernel.solver.stats();iterations=iterations+stats.iter_count;
+        trial=full(solution.x);controls=reshape(trial(1:2*nodes),2,nodes);
+        seedPoints{j}=trial;dual{j}=struct('x',solution.lam_x,'g',solution.lam_g);
+        [valid,traces,violation]=localCompactValidate(controls,hypotheses,block.heldInput,kernel,cfg,false,isempty(best));
+        bestAttemptViolation=min(bestAttemptViolation,violation);
+        if valid
+            [~,states]=localCompactRollout(kernel,item.ego,block.heldInput,controls,item.parameters,false);
+            replay=[controls(:);full(states(:));0];value=full(kernel.objective(replay,p));
+            if value<bestValue || isempty(best)
+                best=replay;bestValue=value;bestViolation=violation;bestTrace=traces;acceptedTrial=true;retainedFine=false;
+            end
+        end
+        if ~isempty(best) || solveSeconds>=budget,break;end
+    end
+    assert(~isempty(best),'collisionAvoidanceController:compactNoFeasiblePlan', ...
+        'No replay-feasible compact plan; solver %s, candidate violation %.6g. This is not a physical infeasibility certificate.', ...
+        stats.return_status,bestAttemptViolation);
+    controls=reshape(best(1:2*nodes),2,nodes);input=bestTrace{nominal}.inputs(:,1);
+    validationSeconds=max(0,toc(clock)-solveSeconds);
+    state=struct('kind',"compactOutputFeedback-v1",'time',block.time,'memory',zeros(0,1), ...
+        'hypotheses',hypotheses,'appliedInput',input,'controls',controls,'fineControls',bestTrace{nominal}.inputs,'boundaries',boundaries, ...
+        'horizonSteps',count,'configuration',cfg,'reference',request.reference,'conditioning',conditioning);
+    info=struct('solver',"compactCasadiIpopt",'nlpStatus',string(stats.return_status), ...
+        'nlpConverged',logical(stats.success),'nlpIterations',iterations,'nlpSeconds',solveSeconds,'nlpAttempts',pass, ...
+        'nlpBuildSeconds',buildSeconds,'nlpCacheHit',cacheHit,'nlpVariables',numel(best), ...
+        'nlpConstraints',numel(kernel.constraintLower),'predictionPreparationSeconds',preparationSeconds, ...
+        'informationUpdateSeconds',inferenceSeconds,'nonlinearValidationSeconds',validationSeconds, ...
+        'elapsedSeconds',toc(timer),'deadlineSeconds',cfg.controller.sampleTime,'predictionWindow',window, ...
+        'controlNodes',nodes,'horizonSteps',count,'fallbackUsed',~acceptedTrial,'retainedFinePlanUsed',retainedFine, ...
+        'retainedTailRepaired',tailRepaired&&retainedFine,'restorationAttempted',restorationAttempted, ...
+        'validationSubsteps',max(cellfun(@(t)t.validationSubsteps,bestTrace)), ...
+        'nonlinearValidationPerformed',true,'maximumConstraintViolation',bestViolation, ...
+        'scenarioCount',numel(hypotheses),'activeScenarioCount',numel(hypotheses), ...
+        'hypothesisCount',numel(hypotheses),'memoryDimension',0,'conditioning',conditioning, ...
+        'robustNonlinearSafetyCertified',false,'recursiveFeasibilityCertified',false, ...
+        'safetyScope',"finiteHypothesesDenseNonlinearReplay", ...
+        'wholeHoldReserveScope',"engineeringMarginAndDenseChecksNoCertificate", ...
+        'predictionModel',"fixedInferenceDirectInputNonuniformMultipleShooting", ...
+        'previousInputUsedForMeasurements',block.heldInput,'optimizationReturned',true);
+    info.deadlineMissed=info.elapsedSeconds>info.deadlineSeconds;
+    command=struct('actuatorInput',input,'steeringAngle',input(1),'brakingRatio',input(2));
+    prediction=struct('metadata',info,'scenarios',{bestTrace},'memory',zeros(0,1),'information',hypotheses);
+    result=struct('command',command,'inputs',bestTrace{nominal}.inputs,'prediction',prediction,'state',state);
+end
+
+function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
+    persistent keys kernels
+    key={cfg,numel(holds),hasTarget};hit=false;
+    for j=1:numel(keys)
+        if isequaln(key,keys{j}),kernel=kernels{j};
+            assert(all(holds<=kernel.capacity),'collisionAvoidanceController:predictionWindowCapacity','The requested preview exceeds the allocated kernel.');
+            kernel.holds=holds;hit=true;return;end
+    end
+    assert(exist('casadi.SX','class')==8,'collisionAvoidanceController:missingCasadi', ...
+        'Run scripts/setupJointNlpSolver before using compactNlp.');
+    import casadi.*
+    n=numel(holds);h=cfg.controller.sampleTime;of=cfg.outputFeedback;
+    maximumSpeed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum);
+    if isempty(of.horizonSeconds)
+        maximumSeconds=of.horizonResolutionSeconds*ceil(max(of.minimumPreviewSeconds, ...
+            maximumSpeed/of.previewDecelerationMetersPerSecondSquared ...
+            +of.previewSettlingSeconds)/of.horizonResolutionSeconds);
+    else
+        maximumSeconds=max(2*h,of.horizonSeconds);
+    end
+    maximumCount=ceil(maximumSeconds/h);near=min(n-1,of.nearControlNodes);
+    capacity=[ones(1,near),repmat(ceil((maximumCount-near)/(n-near)),1,n-near)];
+    assert(all(holds<=capacity),'collisionAvoidanceController:predictionWindowCapacity','The physical-domain preview exceeds the allocated kernel.');
+    count=sum(capacity);
+    x=SX.sym('x',6);u=SX.sym('u',2);scales=SX.sym('scales',4);
+    next=x;
+    for j=1:round(h/(2*of.sensorPeriod))
+        next=nonlinearBicycleModel.symbolicSensorFlow(next,u,scales,cfg,of.sensorPeriod,false);
+    end
+    flow=Function('compact_flow',{x,u,scales},{next});
+    identity=Function('compact_identity',{x,u,scales},{x});
+    activeFlow=Function.if_else('compact_active_flow',flow,identity);
+    z=MX.sym('z',8*n+1);p=MX.sym('p',12+22*count+4*n);
+    ui=reshape(1:2*n,2,n);xi=reshape(2*n+(1:6*n),6,n);
+    target=reshape(p(13:12+22*count),11,2*count);ref=reshape(p(13+22*count:12+22*count+3*n),3,n);steps=p(end-n+1:end);
+    root=MX.sym('root',6);previous=MX.sym('previous',2);control=MX.sym('control',2,count);parameters=MX.sym('scales',4);rollSteps=MX.sym('holds',n);
+    state=p(1:6);prior=p(7:8);roll=root;dense={root};ends=cell(1,n);inputs={};
+    constraint={};lower={};objective=1e4*z(end);sample=0;
+    for i=1:n
+        endpoint=z(ui(:,i));
+        constraint{end+1}=(endpoint(1)-prior(1))/(h*steps(i));lower{end+1}=-of.steeringRateMaximum;
+        constraint{end+1}=(prior(1)-endpoint(1))/(h*steps(i));lower{end+1}=-of.steeringRateMaximum;
+        if isfinite(cfg.model.brakingRatioRateMaximum)
+            constraint{end+1}=(endpoint(2)-prior(2))/(h*steps(i));lower{end+1}=-cfg.model.brakingRatioRateMaximum;
+            constraint{end+1}=(prior(2)-endpoint(2))/(h*steps(i));lower{end+1}=-cfg.model.brakingRatioRateMaximum;
+        end
+        for j=1:capacity(i)
+            active=j<=steps(i);rollActive=j<=rollSteps(i);
+            applied=prior+(endpoint-prior)*fmin(1,j/steps(i));rollInput=control(:,sample/2+1);
+            inputs{end+1}=rollInput;
+            for k=1:2
+                sample=sample+1;state=activeFlow(active,state,applied,p(9:12));roll=activeFlow(rollActive,roll,rollInput,parameters);
+                dense{end+1}=roll;
+                if hasTarget
+                    distance=localCompactSeparation(state,target(:,sample),cfg);
+                    constraint{end+1}=if_else(active,distance+z(end),1);lower{end+1}=0;
+                end
+            end
+            % Match the declared absorbing ego stop at actual hold boundaries.
+            state=[state(1:3);if_else(active&(applied(2)<=0)&(state(4)<.2*cfg.model.brakeHoldSpeed),zeros(3,1),state(4:6))];
+            roll=[roll(1:3);if_else(rollActive&(rollInput(2)<=0)&(roll(4)<.2*cfg.model.brakeHoldSpeed),zeros(3,1),roll(4:6))];
+            constraint{end+1}=state(4:6);
+            lower{end+1}=[0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
+            constraint{end+1}=-state(4:6);
+            lower{end+1}=[-cfg.model.speedMaximum;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
+        end
+        constraint{end+1}=z(xi(:,i))-state;lower{end+1}=zeros(6,1);
+        normal=[-sin(ref(3,i));cos(ref(3,i))];
+        error=[normal.'*(state(1:2)-ref(1:2,i));atan2(sin(state(3)-ref(3,i)),cos(state(3)-ref(3,i))); ...
+            state(4)-cfg.referenceSpeed;state(5:6)];
+        objective=objective+.5*h*steps(i)*dot(of.trackingWeights.*error,error) ...
+            +.5*of.inputWeight*dot(endpoint-prior,endpoint-prior)/steps(i);
+        ends{i}=roll;state=z(xi(:,i));prior=endpoint;
+    end
+    g=vertcat(constraint{:});gl=vertcat(lower{:});gu=Inf(size(gl));offset=0;
+    for i=1:numel(constraint)
+        if numel(constraint{i})==6 && all(lower{i}==0),gu(offset+(1:6))=0;end
+        offset=offset+numel(constraint{i});
+    end
+    rowsPerHold=6+2*hasTarget;holdRows=zeros(rowsPerHold,count);row=0;slot=0;
+    for i=1:n
+        row=row+2+2*isfinite(cfg.model.brakingRatioRateMaximum);
+        for j=1:capacity(i)
+            slot=slot+1;holdRows(:,slot)=row+(1:rowsPerHold);row=row+rowsPerHold;
+        end
+        row=row+6;
+    end
+    options=struct('print_time',false,'error_on_fail',false,'jit',of.nlpJit,'calc_lam_p',false, ...
+        'ipopt',struct('print_level',0,'sb','yes','max_iter',of.nlpMaximumIterations, ...
+        'tol',of.nlpTolerance,'constr_viol_tol',of.nlpTolerance,'bound_relax_factor',0, ...
+        'mu_init',1e-3,'hessian_approximation','limited-memory', ...
+        'warm_start_init_point','yes','warm_start_bound_push',1e-6,'warm_start_mult_bound_push',1e-6, ...
+        'acceptable_tol',1e-3,'acceptable_constr_viol_tol',of.nlpTolerance,'acceptable_iter',2));
+    if isfinite(of.maximumSolveSeconds),options.ipopt.max_wall_time=of.maximumSolveSeconds;end
+    if of.nlpJit
+        directory=tempname;mkdir(directory);options.compiler='shell';
+        options.jit_options=struct('flags',sprintf('-O%d',of.nlpCompilerOptimization),'compiler',char(of.nlpCompiler),'directory',[directory,filesep]);
+        old=pwd;restore=onCleanup(@()cd(old));cd(directory);
+    end
+    solver=nlpsol('compact_nmpc','ipopt',struct('x',z,'p',p,'f',objective,'g',g),options);
+    rollout=Function('compact_rollout',{root,previous,control,parameters,rollSteps}, ...
+        {horzcat(dense{:}),horzcat(ends{:}),horzcat(inputs{:})});
+    fineState=x;finePoints=cell(1,of.validationSubsteps);
+    for j=1:of.validationSubsteps
+        fineState=nonlinearBicycleModel.symbolicSensorFlow(fineState,u,scales,cfg,h/of.validationSubsteps,false);
+        finePoints{j}=fineState;
+    end
+    fineEnd=[fineState(1:3);if_else((u(2)<=0)&(fineState(4)<.2*cfg.model.brakeHoldSpeed),zeros(3,1),fineState(4:6))];
+    fineHold=Function('compact_fine_hold',{x,u,scales},{fineEnd,horzcat(finePoints{:})});
+    fineMap=fineHold.mapaccum(count);
+    [fineEnds,fineDense]=fineMap(root,control,repmat(parameters,1,count));
+    refinedRollout=Function('compact_refined_rollout',{root,control,parameters},{fineDense,fineEnds});
+    if of.nlpJit
+        evaluateOptions=struct('jit',true,'compiler','shell','jit_options',options.jit_options);
+        rollout=Function('compact_rollout',{root,previous,control,parameters,rollSteps}, ...
+            {horzcat(dense{:}),horzcat(ends{:}),horzcat(inputs{:})},evaluateOptions);
+        refinedRollout=Function('compact_refined_rollout',{root,control,parameters},{fineDense,fineEnds},evaluateOptions);
+        clear restore;
+    end
+    kernel=struct('solver',solver,'rollout',rollout,'flow',flow,'holds',holds,'capacity',capacity,'holdConstraintIndices',holdRows, ...
+        'refinedRollout',refinedRollout,'validationSubsteps',of.validationSubsteps, ...
+        'objective',Function('compact_objective',{z,p},{objective}), ...
+        'constraintLower',gl,'constraintUpper',gu, ...
+        'lower',[repmat([-of.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)],n,1); ...
+            repmat([-Inf(3,1);0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum],n,1);0], ...
+        'upper',[repmat([of.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],n,1); ...
+            repmat([Inf(3,1);cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum],n,1);0]);
+    keys{end+1}=key;kernels{end+1}=kernel;
+end
+
+function gap = localCompactSeparation(x,q,cfg)
+    import casadi.*
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    g=predictiveSafetyGeometry.rectangleAxisGaps(x(1:3),shape,q(1:3),q(8:11),cfg.outputFeedback.smoothAbsoluteValue);
+    % log-mean-exp is below max(g), including at ties. Stabilizing by the
+    % maximum avoids overflow; its derivative cancels in the complete sum.
+    maximum=fmax(fmax(g(1),g(2)),fmax(g(3),g(4)));sharpness=50;
+    separation=maximum+log(sum(exp(sharpness*(g-maximum))))/sharpness-log(4)/sharpness;
+    gap=separation-cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.intersampleMarginMeters ...
+        -cfg.outputFeedback.planningBufferMeters;
+end
+
+function controls = localCompactRateLimit(controls,previous,holds,cfg)
+    for i=1:numel(holds)
+        span=cfg.controller.sampleTime*holds(i);
+        change=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum]*span;
+        controls(:,i)=max(previous-change,min(previous+change,controls(:,i)));
+        controls(:,i)=max([-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)], ...
+            min([cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],controls(:,i)));
+        previous=controls(:,i);
+    end
+end
+
+function seeds = localCompactSeeds(item,previous,holds,lane,kernel,cfg)
+    seeds=cell(1,5);h=cfg.controller.sampleTime;
+    for branch=1:5
+        side=[0,1,-1,1,-1];side=side(branch);x=item.ego;prior=previous;controls=zeros(2,numel(holds));
+        for i=1:numel(holds)
+            projection=predictiveSafetyGeometry.project(x(1:2),lane);
+            normal=[-sin(projection.heading);cos(projection.heading)];
+            lateral=normal.'*(x(1:2)-projection.point);heading=atan2(sin(projection.heading-x(3)),cos(projection.heading-x(3)));
+            lookahead=max(4,.7*max(x(4),1));desired=side*4.5;
+            curvature=2*sin(heading+atan2(desired-lateral,lookahead))/lookahead;
+            % Seed curvature must respect the approximate available lateral
+            % acceleration. The nonlinear constraints still decide acceptance.
+            lateralCapacity=.8*min(cfg.tire.frictionCoefficient.*item.parameters(3:4))*cfg.vehicle.gravity;
+            curvature=max(-lateralCapacity/max(1,x(4)^2),min(lateralCapacity/max(1,x(4)^2),curvature));
+            command=[atan(cfg.vehicle.wheelbase*curvature);-.1];
+            if branch==1,command(2)=-cfg.outputFeedback.backupBrakingRatio;end
+            if branch>=4
+                command(2)=max(-.6,min(.6,.02+.25*(max(8,cfg.referenceSpeed)-x(4))));
+            end
+            command=localCompactRateLimit(command,prior,holds(i),cfg);controls(:,i)=command;
+            for j=1:holds(i)
+                input=prior+(command-prior)*j/holds(i);
+                x=full(kernel.flow(x,input,item.parameters));x=full(kernel.flow(x,input,item.parameters));
+                x=nonlinearBicycleModel.sampleEndState(x,input,cfg);
+            end
+            prior=command;
+        end
+        seeds{branch}=controls;
+    end
+end
+
+function [valid,traces,violation] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,allowRefinement)
+    if nargin<6,fine=false;end
+    if nargin<7,allowRefinement=true;end
+    traces=cell(1,numel(hypotheses));violation=0;h=cfg.controller.sampleTime;
+    durations=kernel.holds;if fine,durations=ones(1,size(controls,2));end
+    clipped=localCompactRateLimit(controls,previous,durations,cfg);
+    violation=max(violation,max(abs(controls-clipped),[],'all'));
+    stateViolation=violation;
+    for s=1:numel(hypotheses)
+        item=hypotheses(s);
+        [dense,states,inputs]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,fine);
+        if any(~isfinite(dense),'all'),violation=Inf;valid=false;return;end
+        stateViolation=max([stateViolation;max(-dense(4,:));max(dense(4,:)-cfg.model.speedMaximum); ...
+            max(abs(dense(5,:))-cfg.model.lateralVelocityMaximum);max(abs(dense(6,:))-cfg.model.yawRateMaximum)]);
+        violation=max(violation,stateViolation);
+        times=(0:size(dense,2)-1)*h/2;q=[];
+        if ~isempty(item.target)
+            if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);
+            else,q=repmat(item.target,1,numel(times));end
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            gaps=predictiveSafetyGeometry.rectangleAxisGaps(dense(1:3,:),shape,q(1:3,:),q(8:11,:));
+            separation=max(gaps,[],1);
+            violation=max(violation,max(cfg.outputFeedback.clearanceMeters ...
+                +cfg.outputFeedback.intersampleMarginMeters-separation));
+            violation=max(violation,localCompactIntervalViolation(dense,q,inputs,separation,cfg,2));
+        end
+        traces{s}=struct('ego',[item.ego,states],'inputs',inputs,'denseEgo',dense,'targets',q,'validationSubsteps',2);
+    end
+    valid=isfinite(violation) && violation<=max(1e-6,cfg.outputFeedback.nlpTolerance);
+    if ~valid && allowRefinement && stateViolation<=max(1e-6,cfg.outputFeedback.nlpTolerance) && ~isempty(hypotheses(1).target)
+        [valid,traces,violation]=localCompactRefinedValidate(inputs,hypotheses,previous,kernel,cfg);
+    end
+end
+
+function [dense,states,inputs] = localCompactRollout(kernel,x,previous,controls,parameters,fine)
+    capacity=sum(kernel.capacity);values=zeros(2,capacity);active=false(1,capacity);slot=0;hold=0;
+    for i=1:numel(kernel.holds)
+        for j=1:kernel.capacity(i)
+            slot=slot+1;active(slot)=j<=kernel.holds(i);
+            if fine
+                if active(slot),hold=hold+1;values(:,slot)=controls(:,hold);end
+            else
+                values(:,slot)=previous+(controls(:,i)-previous)*min(1,j/kernel.holds(i));
+            end
+        end
+        if ~fine,previous=controls(:,i);end
+    end
+    [dense,states,inputs]=kernel.rollout(x,previous,values,parameters,kernel.holds);
+    % Mask numeric arrays with logical indices, never a numeric 0/1 list.
+    dense=full(dense);inputs=full(inputs);states=full(states);
+    dense=dense(:,[true,repelem(active,2)]);inputs=inputs(:,active);
+end
+function [valid,traces,violation] = localCompactRefinedValidate(inputs,hypotheses,previous,kernel,cfg)
+    % Refine rejected geometric checks without lowering requested clearance.
+    count=size(inputs,2);capacity=sum(kernel.capacity);substeps=kernel.validationSubsteps;
+    values=[inputs,zeros(2,capacity-count)];traces=cell(1,numel(hypotheses));violation=0;
+    clipped=localCompactRateLimit(inputs,previous,ones(1,count),cfg);
+    violation=max(violation,max(abs(inputs-clipped),[],'all'));
+    times=(0:substeps*count)*cfg.controller.sampleTime/substeps;
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    for s=1:numel(hypotheses)
+        item=hypotheses(s);[dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters);
+        dense=full(dense);ends=full(ends);dense=[item.ego,dense(:,1:substeps*count)];
+        if any(~isfinite(dense),'all'),violation=Inf;valid=false;return;end
+        violation=max([violation;max(-dense(4,:));max(dense(4,:)-cfg.model.speedMaximum); ...
+            max(abs(dense(5,:))-cfg.model.lateralVelocityMaximum);max(abs(dense(6,:))-cfg.model.yawRateMaximum)]);
+        if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);
+        else,q=repmat(item.target,1,numel(times));end
+        gaps=predictiveSafetyGeometry.rectangleAxisGaps(dense(1:3,:),shape,q(1:3,:),q(8:11,:));
+        violation=max(violation,localCompactIntervalViolation(dense,q,inputs,max(gaps,[],1),cfg,substeps));
+        traces{s}=struct('ego',[item.ego,ends(:,cumsum(kernel.holds))],'inputs',inputs, ...
+            'denseEgo',dense,'targets',q,'validationSubsteps',substeps);
+    end
+    valid=isfinite(violation) && violation<=max(1e-6,cfg.outputFeedback.nlpTolerance);
+end
+
+function violation = localCompactIntervalViolation(states,targets,inputs,separation,cfg,substeps)
+    radiusE=hypot(cfg.vehicle.length/2,cfg.vehicle.width/2)+norm(cfg.vehicle.rectangleOffset);
+    radiusT=norm(targets(8:9,1))+norm(targets(10:11,1));
+    targetSpeed=max(targets(4,:));targetRate=abs(sin(targets(6,1))/targets(7,1))*targetSpeed;
+    pointSpeed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum) ...
+        +targetSpeed+radiusE*cfg.model.yawRateMaximum+radiusT*targetRate;
+    % Exact rest is an equilibrium of the declared model under nonpositive
+    % force commands. No residual force or target restart is admitted here.
+    if all(states(4:6,:)==0,'all') && all(targets(4,:)==0) && all(inputs(2,:)<=0)
+        pointSpeed=0;
+    end
+    travel=pointSpeed*cfg.controller.sampleTime/substeps;
+    a=separation(1:end-1);b=separation(2:end);
+    % Minimum of the two endpoint Lipschitz cones on each interval. This is
+    % conditional on the continuous speed/rate domain and exact node poses;
+    % numerical integration and finite information remain uncertified.
+    lower=max([a-travel;b-travel;(a+b-travel)/2],[],1);
+    violation=max(cfg.outputFeedback.clearanceMeters-lower);
 end

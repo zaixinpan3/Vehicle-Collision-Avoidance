@@ -1,16 +1,11 @@
-# Unified nonlinear output-feedback safety theory
+# Compact nonlinear output-feedback predictive control
 
-The primary design jointly optimizes a causal control map and a bounded
-controller-memory update. A separate point observer is not part of this
-controller. The exact information state retains every physical hypothesis
-consistent with the complete raw sensor history. The deployed finite-scenario
-numerical transcription is explicitly an approximation to this robust problem.
-
-A finite controller architecture does not itself remove the safety theorem.
-Unverified uncertainty reduction, numerical flow error, and execution of an
-unverified nonlinear step do. The theorem below assumes sound joint set
-operations and whole-hold verification; finite-scenario acceptance alone
-satisfies neither universal requirement.
+The adopted controller combines fixed measurement-consistency inference with
+a compact nonlinear optimization of physical states and actuator commands.
+It retains a complete held-input plan for numerical safety validation and
+fallback. Control knots, integration samples, and sensor samples have distinct
+roles; reducing the decision dimension does not remove the physical model.
+The derivation below states both the algorithm and the limits of its guarantees.
 
 ## 1. Physical model and uncertainty contract
 
@@ -191,427 +186,334 @@ command or trigger a control-boundary reset. If a declared hybrid reset is
 present, specify the ordering of reset and boundary measurement and use it
 consistently for prediction, conditioning, and physical replay.
 
-<a id="joint-prediction"></a>
-## 3. Jointly optimized finite controller memory
+## 3. Fixed information update and causal control
 
-Choose $m\in[-1,1]^{n_m}$ and shared stage coefficients
-$\alpha=(v,K,A,B,c)$ in a compact coefficient set. Define
-
-$$
-u=\kappa_\alpha(m)=v+Km,\qquad
-m^+=M_\alpha(m,Y)=\tanh(Am+B\varphi(Y)+c). \tag{D1}
-$$
-
-The feature map $\varphi$ is fixed and smooth for each detection mode; missing
-values are masked and the flags are features. The cube is invariant. Memory
-need not approximate physical state and has no separately prescribed observer
-gain or observer-convergence requirement.
-
-At the boundary choose $\alpha$, apply $\kappa_\alpha(m)$ throughout the hold,
-receive the complete block, and apply that same committed $M_\alpha$. Updating
-memory through a different map invalidates the predicted continuation.
-Coordinates, feature scales, and model contracts remain fixed when shifting.
-
-Augment $s=(\chi,m,u^-)$. The joint transition $\mathscr G_\alpha$ applies
-$\mathscr R_h$, (D1), and $(u^-)^+=\kappa_\alpha(m)$. At a real boundary,
+Let $\mathcal I_k$ be the physical states consistent with the initial contract,
+all actual applied inputs, and all received raw measurements. Its update is
 
 $$
-\mathcal I_k\subseteq\mathcal X\times\{m_k\}\times\{u_k^-\}.
+\mathcal I_{k+1}=\{\chi^+:\exists\chi\in\mathcal I_k,\gamma,
+ (\chi^+,Y_{k+1},\gamma)\in\mathscr R_h(\chi,u_k)\}.
 $$
 
-The exact information state is the consistency set for the initial contract,
-all actual inputs, committed memory maps, and all raw observations. Its update
-and unconditioned prediction are
+The received block is conditioned using the input that actually generated it.
+Persistent parameter and bias coordinates remain attached to each physical
+history. An unavailable radar reading does not delete a target. The Markov
+augmentation makes this set a sufficient information state; it need not be a
+minimal statistic. If the contract is valid and the initial state is contained,
+the exact update retains the actual successor.
+
+The numerical representation is a finite retained ensemble
+$\widehat{\mathcal I}_k=\{\chi_k^s\}_{s=1}^{S_k}$. Each member is propagated
+through every sensor period with the applied input. It survives only if every
+received residual satisfies its sensor bound. No surviving member is replaced
+by an independently fitted point, and parameters are not redrawn. An empty
+ensemble is an information-contract failure, not evidence that collision
+avoidance is physically impossible. A finite ensemble does not enclose all
+states between its members.
+
+The inference equations are fixed. There is no online optimization of an
+observer gain or learned memory update. Planning selects one representative
+member by
 
 $$
-\begin{aligned}
-\Psi_\alpha(\mathcal I,Y)
- &=\{s^+:\exists s\in\mathcal I,\gamma,
-          (s^+,Y,\gamma)\in\mathscr G_\alpha(s)\},\\
-\mathcal T_\alpha(R)
- &=\{s^+:\exists s\in R,Y,\gamma,
-          (s^+,Y,\gamma)\in\mathscr G_\alpha(s)\}. \tag{D2}
-\end{aligned}
+s_0\in\arg\min_s\left\|x_k^s-\frac1{S_k}\sum_a x_k^a\right\|^2.
 $$
 
-Condition on the entire block, even when $\varphi$ compresses it. Initial
-containment and a valid Markov contract imply true-successor containment.
-Future memory and physical state remain correlated within $R_i$. All root
-hypotheses have the same memory and therefore the same immediate command;
-future commands differ only through observations already received.
+Only its physical trajectory is a shooting decision. All retained members
+are subsequently propagated under the same proposed input sequence for
+acceptance. This is an approximation to robust output feedback: control at
+$t_k$ depends only on $\mathcal I_k$, the reference, and retained plans. Future
+open-loop inputs are reoptimized after future measurements arrive.
 
-## 4. Whole-hold hard safety and the predictive problem
+## 4. Preview time, control knots, and held-input dynamics
 
-For footprint vertices $e_a,c_b$ in their body frames, including reference-point
-offsets, define signed clearance and its complete-hold margin by
-
-$$
-d(\chi)=\max_{\|n\|=1}\left[\min_a n^\top e_a-
-             \max_b n^\top(\rho+Qc_b)\right],
-\qquad g(\chi)=d(\chi)-d_{\rm safe},
-$$
+For speed bound $v_k^+=\max_s\sqrt{(v_{x,k}^s)^2+(v_{y,k}^s)^2}$ choose
 
 $$
-\underline g(R,\alpha)=\inf_{s\in R,
- (s^+,Y,\gamma)\in\mathscr G_\alpha(s),\;0\le t\le h}g(\gamma(t)).
+T_k^{\rm req}=\max\{T_{\min},2h,v_k^+/a_p+T_s\},\qquad
+N_k=\max\left\{N_{k-1},\left\lceil
+ \frac{\Delta T\lceil T_k^{\rm req}/\Delta T\rceil}{h}
+\right\rceil\right\}.
 $$
 
-This is the rectangle vertex specialization of signed-distance separation;
-positive clearance separates the bodies and negative clearance permits
-penetration. Geometric witness normals may depend on physical configuration.
-They are proof witnesses, whereas actuator decisions must satisfy (D1).
+Here $a_p>0$ is a preview scale, not a certified braking acceleration. The
+minimum preview admits avoidance planning even when the ego is slow and a
+target is approaching. An explicitly configured duration replaces the
+speed-based rule. Neither rule proves that a feasible maneuver exists or
+that this is an upper bound on the necessary maneuver time. A uniquely
+predicted endpoint for specified inputs does not determine those inputs or
+establish reachability of a safe endpoint.
 
-Let $\mathsf H(R,\alpha)$ include input bounds, actual command increments
-relative to $u^-$, and all physical-domain constraints. Choose a fixed terminal
-policy $\alpha_f$ and a joint set $Z_f$ such that
-
-$$
-\mathsf H(Z_f,\alpha_f),\quad
-\underline g(Z_f,\alpha_f)\ge0,\quad
-\mathcal T_{\alpha_f}(Z_f)\subseteq Z_f. \tag{D3}
-$$
-
-The hard-safety problem is
-
-$$
-\begin{aligned}
-\min_{\alpha_{0:N-1},R_{0:N}}\quad&J_{\rm perf}\\
-\text{subject to}\quad&R_0=\mathcal I_k,\\
-&\mathcal T_{\alpha_i}(R_i)\subseteq R_{i+1},\\
-&\mathsf H(R_i,\alpha_i),\quad\underline g(R_i,\alpha_i)\ge0,\\
-&R_N\subseteq Z_f,\quad\alpha_i\in\mathcal A. \tag{D4}
-\end{aligned}
-$$
-
-Performance may penalize route error, effort, input increments, or policy
-changes. Global optimality is unnecessary for safety: every executed plan
-must be feasible, and local optimization may propose improvements.
-
-<a id="recursive-feasibility"></a>
-### Recursive-feasibility theorem
-
-Assume initial containment, an unchanged valid physical/sensor contract, sound
-joint prediction and conditioning, whole-hold constraint checks, (D3), and an
-initially feasible plan. Assume the admissible policy, set, and certificate
-representations retain the shifted tail and terminal append. Each executed
-replacement is verified feasible. Then (D4) is recursively feasible, the true
-state remains in the information set, and $d(\chi(t))\ge d_{\rm safe}$ for all
-covered holds.
-
-**Proof.** The actual block and committed memory map give
-$\mathcal I_{k+1}\subseteq R_{1|k}$. Set images under a fixed $\alpha$ are
-inclusion-monotone. Use $(\alpha_{1|k},\ldots,\alpha_{N-1|k},\alpha_f)$ and
-reuse the old future certificates, restricting them to the surviving branch
-where necessary. Every inherited constraint still holds, including the next
-command increment: its predecessor is the actual applied root command,
-retained in the augmented state. The final inherited image is inside $Z_f$;
-(D3) supplies one more safe hold and terminal image. True trajectories belong
-to the certified hold sets. Induction proves the claim.
-
-A sound fitted posterior is insufficient if it protrudes beyond the old
-successor. Require
+Use $M\le N$ control intervals, with integer boundaries
+$0=c_0<c_1<\cdots<c_M=N$ and $b_i=c_i-c_{i-1}$. The first few intervals
+have one hold each; the remaining holds are distributed over the remaining
+intervals by rounded equally spaced boundaries. The initial knot count is
+retained when the preview grows. Independent decisions are endpoint commands
+$v_i\in\mathbb R^2$ and physical shooting states $X_i\in\mathbb R^6$.
+With $v_0=u^-$, the commands within interval $i$ are
 
 $$
-\Psi_{\alpha_0}(\widehat{\mathcal I}_k,Y)
- \subseteq\widehat{\mathcal I}_{k+1}\subseteq R_{1|k}. \tag{D5}
+u_{c_{i-1}+j}=v_{i-1}+\frac{j}{b_i}(v_i-v_{i-1}),
+\qquad j=1,\ldots,b_i.
 $$
 
-Even (D5) does not make an arbitrary fixed-capacity set representation closed
-under shifting. Retain the old certificate or prove that the new representation
-can encode its required successors without losing feasibility. Policies and
-certificate classes, not just root sets, must admit the shift.
-
-No theorem is asserted for every collision-free initial state: indistinguishable
-states can need incompatible actions. Safety does not imply tracking convergence.
-
-## 5. Constructive low-speed terminal component
-
-Choose $u_f=(0,-b_0)$, $0<b_0<1$, with $K_f=0$ and $A_f=B_f=c_f=0$.
-In the pure low-speed branch the physical equations reduce to
+Each $u_j$ is held for the actual control period $h$. This interpolation does
+not assume a continuously varying actuator within a hold. Since $b_1=1$,
+the next applied command is $v_1$. Input bounds on endpoint commands imply
+the same convex bounds on every interpolated command. Steering slew is
+imposed by
 
 $$
-\dot v_x=-B_\vartheta(v_x)+v_yr,\qquad
-\dot v_y=-v_y/\tau_\ell,\qquad\dot r=-r/\tau_\ell,
+|v_{i,\delta}-v_{i-1,\delta}|\le b_i h\dot\delta_{\max};
 $$
 
-$$
-B_\vartheta(v)=\frac{b_0(\mu_fF_{zf}+\mu_rF_{zr})\tanh(v/v_b)+F_{\rm load}(v)}{m_E}.
-$$
+hence every physical command increment is at most $h\dot\delta_{\max}$.
+The analogous force-ratio increment is imposed when its bound is finite.
 
-Assume passive continuous road load, $B_\vartheta(0)=0$, positive friction,
-well-posed flows, and no additional residual forces. For $|v|\le v_\ell$,
-concavity of $\tanh$ gives
-
-$$
-\operatorname{sgn}(v)B_\vartheta(v)\ge\lambda|v|,\qquad
-\lambda=\inf_\vartheta\frac{b_0(\mu_fF_{zf}+\mu_rF_{zr})}{m_E}
-               \frac{\tanh(v_\ell/v_b)}{v_\ell}>0. \tag{D6}
-$$
-
-A persistent-parameter-dependent positive $\lambda(\vartheta)$ is also valid
-when retained as part of the same joint state and checked for every member.
-Define
+Let $\widetilde F_h$ denote the numerical flow with a held input. It composes
+RK4 sensor-period subflows and applies the declared rest reset only at the
+control boundary. Inference and planning use the same sensor-period mesh.
+The multiple-shooting equality is
 
 $$
-s_E=|v_x|+\frac{\tau_\ell}{2}|v_yr|,\qquad
-D_E=s_E/\lambda+\tau_\ell|v_y|. \tag{D7}
+X_i=\widetilde F_h(\cdots\widetilde F_h(X_{i-1},u_{c_{i-1}+1},\vartheta^{s_0})
+\cdots,u_{c_i},\vartheta^{s_0}),\qquad X_0=x_k^{s_0}.
 $$
 
-Since $D^+|v_yr|=-2|v_yr|/\tau_\ell$,
-$D^+s_E\le-\lambda|v_x|$ and
-$D^+D_E\le-|v_x|-|v_y|\le-\|v_E\|$. Thus $s_E\le v_\ell$ is invariant and
-$\int_t^\infty\|\dot p_E\|\,d\tau\le D_E(t)$.
+Additional numerical poses are evaluated at each half hold. Reducing the
+number of independent commands and shooting states does not remove these
+intermediate motion and collision checks.
 
-For a forward-only domain additionally require $v_x\ge0$, $v_yr\ge0$.
-The product keeps its sign and at $v_x=0$ one has $\dot v_x=v_yr\ge0$.
-The unrestricted signed-speed proof alone does not ensure membership in a
-forward-only or limited-reverse-speed implementation domain.
+The graph allocates capacity from the configured physical speed domain and
+the preview rule. Per-interval active hold counts are parameters. Unused
+integration slots act as identities, and their inequalities are made
+unbounded. Changing the active preview within that capacity does not rebuild
+the solver. The capacity is not an authorization to truncate a longer
+requested preview.
 
-For targets guaranteed to maintain $A_T\le-a_0<0$ until absorbing rest, use
-$D_T=V_T^2/(2a_0)$. Under the stricter persistent constant-$A_T$ contract one
-can sharpen this to $D_T=V_T^2/(-2A_T)$ separately for each moving hypothesis.
-Then $\dot D_T=-V_T$. For absorbed targets $D_T=0$ independently of latent
-$A_T$. A measured negative acceleration alone is not a future braking promise.
+## 5. Rectangle separation without geometric decision variables
 
-Let $a_E,a_T$ be the maximum vertex radii about the dynamics reference points.
-The reserve
+For rectangle $a\in\{E,T\}$, let its half dimensions be $(l_a,w_a)$, its
+reference-point offset be $o_a$, and its center be $z_a=p_a+R_a o_a$. The
+four separating axes are the columns of $R_E$ and $R_T$. For a unit axis $n$,
 
 $$
-h_f=\|\rho\|-a_E-a_T-d_{\rm safe}-D_E-D_T \tag{D8}
+q(n)=|n^\top(z_E-z_T)|
+-l_E|n^\top R_Ee_1|-w_E|n^\top R_Ee_2|
+-l_T|n^\top R_Te_1|-w_T|n^\top R_Te_2|.
 $$
 
-is nondecreasing: $d\|\rho\|/dt\ge-\|v_E\|-V_T$, and the travel reserves
-account for both terms. The integral argument also avoids differentiability
-issues at zero separation; terminal membership with positive footprint radii
-already excludes that case.
+The separating-axis theorem gives intersection or contact exactly when all
+four $q(n)$ are nonpositive. If $q(n)>0$, projection onto this unit axis shows
+that Euclidean footprint distance is at least $q(n)$. Consequently
+$\max_n q(n)\ge d_{\rm safe}$ is a sufficient clearance condition for
+$d_{\rm safe}>0$. It can be conservative for diagonally separated corners;
+it is not the exact Euclidean-distance function.
 
-A concrete $Z_f$ imposes $s_E\le v_\ell$, $h_f\ge0$, the forward conditions,
-target braking/absorption, $m\in[-1,1]^{n_m}$, $u^-=u_f$, and any additional
-invariant physical limits. Bounds on $|v_y|$, $|r|$, and $s_E$ imply the respective
-lateral, yaw, and longitudinal caps. Arbitrary sideslip-ratio limits are not
-automatically invariant, since longitudinal and lateral speeds can decay at
-different rates. Additional road constraints need their own invariant component.
-
-The pose-preserving reset $(v_x,v_y,r)\mapsto(0,0,0)$ decreases $D_E$ to zero
-and increases $h_f$, so it preserves this set if every preceding continuous
-flow remains in the declared domain. A numerical integrator still needs a
-sound integration error bound before it can certify that continuous flow.
-
-For a smooth sufficient transcription, replace each $|z|$ in (D7) by
-$\sqrt{z^2+\epsilon^2}$, or use epigraph variables $p\ge z,p\ge-z$. Both
-upper-bound the absolute values and therefore strengthen the entry inequalities.
-Their smoothed sublevel sets need not themselves be invariant: they certify
-entry to the exact invariant set. Finite-scenario fallback plans must therefore
-recheck the smoothed inequalities instead of assuming that exact invariance
-preserves their representation.
-
-Continuing/coasting targets, target restart, arbitrary persistent residual
-forces, and general road geometry are outside this terminal component. For
-example $\dot v_x=-\lambda v_x+\varepsilon$ with $\varepsilon>0$ has infinite
-remaining travel. Such contracts need another certificate.
-
-## 6. Finite joint transcription and numerical deployment
-
-Choose correlated initial physical/parameter/bias hypotheses and fixed future
-noise cases. Parameters remain persistent; scenarios share every stage
-coefficient and the same root memory. For each scenario $s$,
+For differentiation use
 
 $$
-\begin{aligned}
-u_i^s&=v_i+K_im_i^s,\\
-(\chi_{i+1}^s,Y_{i+1}^s)&=\widetilde{\mathscr R}_h(\chi_i^s,u_i^s;\omega^s),\\
-m_{i+1}^s&=\tanh(A_im_i^s+B_i\varphi(Y_{i+1}^s)+c_i).
-\end{aligned} \tag{D9}
+|a|_-=\sqrt{a^2+\varepsilon^2}-\varepsilon\le |a|,
+\qquad |a|_+=\sqrt{a^2+\varepsilon^2}\ge |a|.
 $$
 
-All coefficients are optimized jointly. The RTI backend retains scenario shooting
-states $(x_i,m_i,u_{i-1})$ and shared stage coefficients in a sparse QP.
-Stage-local finite differences perturb only the six ego coordinates and two
-inputs; memory and coefficient derivatives are analytic. No coefficient
-perturbation repeats the whole-horizon nonlinear rollout. Fixing its last stage to $\alpha_f$ is an additional conservative
-restriction that enforces terminal previous-input compatibility; this restricted
-policy family remains closed under a tail shift and backup append.
-
-At start, midpoint and endpoint, use a unit witness
-$n=(\cos\theta,\sin\theta)$ and offset $b$ with
+Replace the center projection by $|\cdot|_-$ and support projections by
+$|\cdot|_+$. This produces four lower bounds $\widehat q_j\le q_j$.
+Define the smooth lower approximation
 
 $$
-n^\top e_a-b\ge d_{\rm safe}+\epsilon_{\rm hold},\quad
-b-n^\top(\rho+Qc_b)\ge0.
+G_\kappa=\frac1\kappa\log\left(\frac14
+ \sum_{j=1}^4\exp(\kappa\widehat q_j)\right)
+\le\max_j\widehat q_j\le\max_j q_j.
 $$
 
-A sufficient intersample reserve is
+Its difference from $\max_j\widehat q_j$ is at most $\log(4)/\kappa$.
+For numerical stability, subtract $m=\max_j\widehat q_j$ inside the
+exponentials and add it outside the logarithm. This leaves $G_\kappa$
+unchanged. The implementation uses $\kappa=50\,\mathrm m^{-1}$.
+
+At every predicted half hold impose one scalar inequality
 
 $$
-\epsilon_{\rm hold}=\frac h4(\bar v_E+\bar v_T+a_E\bar r_E+a_T\bar r_T),
+G_\kappa\ge d_{\rm safe}+\epsilon_h+\epsilon_p.
 $$
 
-provided these are valid continuous speed/rate bounds throughout the hold.
-Checking caps only at finite numerical nodes does not establish that premise.
+Here $\epsilon_h$ is the configured intersample engineering reserve and
+$\epsilon_p$ gives additional space for plan updating and finite-member
+validation. Neither is an uncertainty-enclosure theorem. With an independently
+proved point-speed bound $L_d$ on the signed clearance and check spacing
+$h/2$, a reserve $L_dh/4$ would bound the intersample distance decrease.
+Numerical node checks alone do not establish that premise or bound integration
+error. Common translations cancel in $p_E-p_T$ before offsets are added.
 
-For least-squares residual $r(w)$ and inequalities $c(w)\le0$, an SQP step uses
+## 6. The compact nonlinear program
 
-$$
-\min_{\Delta w}\ (J_r^\top r)^\top\Delta w+
-\tfrac12\Delta w^\top(J_r^\top J_r+\lambda I)\Delta w,
-\quad c+Dc\Delta w\le0.
-$$
-
-The RTI backend adds the sparse shooting equalities
-$\Delta X_{i+1}-A_i\Delta X_i-B_i\Delta\alpha_i=0$ at a dynamically consistent nominal
-rollout, fixes the root increments to zero, and solves exactly one QP. The
-shared root policy remains causal. Future shooting memories are tangent
-predictions, not actual future measurements. The accepted first policy uses
-the known actual memory, and its committed memory map processes the next raw
-block. All received raw samples condition the finite hypotheses; future sensor
-blocks are coarsened to two substeps by default.
-
-Default deployment uses one memory coordinate and one future-noise direction
-per retained joint hypothesis. The number of stages is selected before the
-solve from a physical-time preview, as specified below. Separating planes are checked at start, midpoint and endpoint with
-a 0.2 m engineering reserve in addition to the requested clearance. This margin
-is not a verified intersample bound. The deployment retains the same rectangle
-clearance and physical-domain inequalities at the horizon endpoint. It imposes
-no additional remaining-braking-travel reserve, target stopping condition, or
-fixed braking final stage. All $N$ controller maps are optimized. The braking
-policy appended when shifting is only a numerical seed, not a required input
-or a certified terminal continuation. The exact terminal certificate in Sections
-4--5 remains a conditional theoretical construction; the deployment does not
-enforce membership in that set and does not inherit its recursive-feasibility
-claim. In particular, endpoint clearance alone is not a terminal invariance proof.
-
-The actual target contract remains $\dot A_T=0$, $\dot\beta_T=0$, with an
-absorbing stop at zero speed, including zero and positive tangential acceleration.
-Braking feedforward coefficients can move over their full admissible coefficient
-range in one QP. Other coefficients and geometric witnesses retain the numerical
-$\pm0.25$ step box. Physical actuator magnitude and configured slew limits apply
-to the derived commands at every stage, including the newly optimized final stage.
-
-Numerical state and geometry inequalities allow half the configured constraint
-tolerance; actuator magnitude and slew rows have no such allowance. This bounds
-the numerical tolerance of the QP, not the nonlinear residual.
-
-The trial coefficients are committed directly after a successful QP. There is
-no nonlinear line search, post-step acceptance gate, or certified fallback.
-A failed QP returns an explicit error without issuing a new command. This error
-is not itself a safe continuation policy. Initialization is one QP from a
-numerical seed; MATLAB/solver warmup can run before the timed control loop.
-The configured deadline is measured and reported, not enforced by interrupting
-the QP. The complete inference, nominal preparation, local linearization, QP,
-and command bookkeeping contribute to the exported total call time.
-
-### Time coverage and stage allocation
-
-For automatic coverage, let $v_k=\max_s\|(v_{x,k}^s,v_{y,k}^s)\|$ over the
-retained physical hypotheses. With a positive planning acceleration scale
-$a_p$, settling duration $\tau_p\ge0$ and allocation interval $\Delta_T>0$, set
+Let $e_i$ contain lateral displacement from the fixed reference frame at
+node $i$, wrapped heading error, longitudinal-speed error, lateral velocity,
+and yaw rate. Reference frames are obtained by projecting the constant-speed
+extrapolation from the current nominal pose onto the reference path. The
+objective is
 
 $$
-T_k^{\rm req}=\max\{2h,v_k/a_p+\tau_p\},\qquad
-T_k^{\rm alloc}=\Delta_T\left\lceil T_k^{\rm req}/\Delta_T\right\rceil,
-\qquad N_k=\max\left\{N_{k-1},\left\lceil T_k^{\rm alloc}/h\right\rceil\right\}.
+J=\frac12\sum_{i=1}^M h b_i e_i^\top W e_i
+ +\frac{w_u}{2}\sum_{i=1}^M\frac{\|v_i-v_{i-1}\|^2}{b_i}.
 $$
 
-At initialization, $N_{k-1}$ is zero or the supplied seed length. A prescribed
-positive duration may replace the automatic rule; it is rounded upward to at
-least two holds. This selects one horizon directly, without trying successive
-NLPs. Shift the old policy tail and append numerical backup seeds until it has
-$N_k$ stages. Retaining an already longer horizon avoids shrink-induced graph
-rebuilds. If the configured stage capacity is insufficient, return an explicit
-error rather than shorten the selected coverage.
+The second term equals the sum of squared increments over all interpolated
+held commands. The nonlinear program minimizes $J$ over $\{X_i,v_i\}$,
+subject to the shooting equalities, physical state bounds, endpoint input
+bounds, command-increment inequalities, and the separation inequalities.
+There are $8M$ physical state and command variables. The target has its prescribed forecast,
+not a separately optimized motion or a requirement to brake or stop.
 
-The deployment values are $a_p=4$ m/s², $\tau_p=0.5$ s and $\Delta_T=1$ s.
-The acceleration scale is a preview parameter, not a uniform braking bound
-derived from the Fiala dynamics. This rule neither adds a terminal stopping
-constraint nor proves that a feasible avoidance maneuver fits inside the
-window. Universal horizon sufficiency would require an additional reachability
-argument under the same physical and information contract.
+The endpoint obeys the same physical and collision constraints. There is no
+remaining-braking-distance condition, forced final braking input, or assumed
+invariant terminal set in this numerical algorithm. Therefore the formulation
+does not inherit an invariant-terminal-set recursive-feasibility theorem.
 
-### Parameterized nonlinear backend
+IPOPT performs nonlinear iterations with automatic first derivatives and a
+limited-memory Hessian approximation. The nonlinear vehicle equations remain
+in the problem; a linearization is only an internal step of the nonlinear
+solver. A numerical iteration/time limit can stop the solve before convergence.
+Convergence is neither required nor sufficient for acceptance: the proposed
+input sequence is checked separately by numerical rollout.
 
-The alternative IPOPT backend retains the same finite scenario contract,
-controller maps, fixed hold timing and hard constraints. With shooting state
-$Z_i^s=(x_i^s,m_i^s,u_{i-1}^s)$, known numerical data $p_k$, and the joint
-nonlinear stage map $F_i^s$ defined by (D9), it solves
+For feasibility restoration, allocate one additional scalar $s\ge0$ and
+replace each planning separation inequality by
+$G_\kappa+s\ge d_{\rm safe}+\epsilon_h+\epsilon_p$. Its objective is
+$J+10^4s$. During ordinary improvement fix $s=0$. When no checked plan is
+available, permit $s\ge0$ temporarily while searching from braking and
+left/right maneuver seeds. The initial maneuver curvature is limited by an
+approximate friction-based lateral-acceleration bound; this is an initial-guess
+heuristic, not a replacement for nonlinear dynamics or acceptance.
+
+Restoration is a numerical search procedure, not a recovery control law or
+an exact lexicographic optimization. Its positive slack never authorizes a
+clearance deficit: every executable candidate must independently pass the
+original hard checks in Section 7. Unsuccessful solves may resume from their
+primal and dual iterates within a separate initialization or recovery budget.
+These attempts count toward the actual call time; the iteration-level wall
+limit is not a guaranteed interrupt deadline.
+
+## 7. Dense acceptance and retention of executable plans
+
+For each retained physical member, expand the proposed coarse commands into
+all $N$ held commands, propagate its own persistent parameters, and evaluate
+input bounds, every physical input increment, state bounds, and exact
+rectangle-axis gaps at the numerical half holds. The inexpensive first check
+uses the engineering reserve
 
 $$
-\begin{aligned}
-\min_w\quad &\frac12\sum_{s,i}q_s\|r_i^s(w;p_k)\|^2
- +\frac{\lambda_\alpha}{2}\|\alpha-\bar\alpha\|^2,\\
-\text{subject to}\quad &Z_0^s=(x_k^s,m_k,u_k^-),\\
-&Z_{i+1}^s-F_i^s(Z_i^s,\alpha_i;p_k)=0,\\
-&c_i^s(Z_i^s,\alpha_i,\theta_i^s,b_i^s;p_k)\le0,\qquad
-\underline w\le w\le\overline w.
-\end{aligned} \tag{D10}
+\max_j q_j(\chi^s(t_\ell))\ge d_{\rm safe}+\epsilon_h
+\quad\text{for every retained }s\text{ and every check }\ell.
 $$
 
-Here $w$ contains the shared controller coefficients, scenario shooting states,
-and geometric witnesses. The stage residual uses a local reference-path tangent
-fixed at the nominal endpoint; this is a tracking-cost approximation on curved
-paths. Collision and physical constraints use the nonlinear predicted states.
-There is no coefficient step box. Target states are precomputed from their
-autonomous constant-motion equations and parameterized alongside persistent
-physical parameters, biases and future noise. CasADi differentiates the stage
-maps and assembles sparse first and second derivatives; IPOPT iterates on (D10)
-with finite iteration and solver-time budgets.
+It additionally checks the intersample lower bound below. If geometric
+acceptance fails while input and sampled state bounds hold, refine the rollout
+to $K_v$ RK4 steps per hold, with $K_v=64$ by default. The finer integrator
+retains the same held command and control-boundary rest reset. This refinement
+does not change the physical model or reduce $d_{\rm safe}$. An improvement
+proposal need not be refined when another checked executable plan is available.
 
-The previous policy tail supplies $\bar\alpha$; fresh nonlinear rollout supplies
-shooting states and separating witnesses. Stage multipliers are shifted only
-when the posterior retains the same scenario correspondence. To keep a fixed
-compiled graph after hypothesis removal, unused slots repeat a surviving
-scenario with $q_s=0$; active scenarios have equal weights summing to one.
-Duplicated hard rows are redundant. This padding neither inserts new physical
-hypotheses nor enlarges the represented uncertainty set.
+For the given member let $a_E,a_T$ be footprint-radius upper bounds about the
+vehicle reference points. Conditional on the continuous physical speed/rate
+domain, a Lipschitz bound on Euclidean footprint distance is
 
-If the measured memory makes a shifted seed leave the physical model's input
-domain, initialization replaces its actuator gains by zero and clips its
-feedforward inputs to magnitude and slew bounds before rollout. This changes
-only the optimization seed. The measured memory and committed preceding memory
-map are retained, and the replacement still requires nonlinear acceptance.
+$$
+L_d=\sqrt{v_{x,\max}^2+v_{y,\max}^2}
++\bar V_T+a_E\bar r_E+a_T\bar r_T,\qquad
+\bar r_T=|\sin\beta_T/l_{rT}|\bar V_T.
+$$
 
-An iterate is accepted only after independent numerical rollout of its policy
-passes every retained-scenario constraint and coefficient bound within the
-configured feasibility tolerance. Trial-domain numerical guards in the symbolic
-tire map do not replace this rollout through the original physical model.
-If the candidate fails, the shifted seed is subjected to the same check; if
-both fail, no new command is committed. Solver convergence alone is not an
-acceptance test. Nonlinear replay checks numerical prediction nodes; it does
-not validate integration error, unrepresented noise or intersample clearance.
-This backend uses the same endpoint constraints without enforcing the exact
-terminal certificate, so it supplies no recursive-feasibility theorem.
+The target maxima are obtained from its prescribed motion over the preview.
+For two neighboring check times separated by $\Delta t$, write
+$q_0,q_1$ for their maximum rectangle-axis gaps. Since each is a lower bound
+on Euclidean distance, the two endpoint Lipschitz cones give
 
-Finite hypotheses can be depleted by valid measurements when the actual state
-lies between samples. Finite future cases also omit admissible noise histories.
-No scenario weights are probabilities and no deterministic or probabilistic
-safety claim follows. Validated nonlinear enclosures, uniform uncertainty
-coverage, nested conditioning, and retained certificates are required to
-upgrade the deployment to (D4). Restricting the memory dimension alone does
-not prevent that upgrade.
+$$
+d(t)\ge\max\{q_0-L_dt,\ q_1-L_d(\Delta t-t)\},\qquad
+\underline d=\max\left\{q_0-L_d\Delta t,\ q_1-L_d\Delta t,
+\frac{q_0+q_1-L_d\Delta t}{2}\right\}.
+$$
 
-## 7. Sources and relation to the comparator
+Require $\underline d\ge d_{\rm safe}$ on every interval. Use
+$\Delta t=h/2$ for the first check and $h/K_v$ after refinement. If both
+vehicles remain exactly at their declared rest equilibria under nonpositive
+ego force commands, $L_d=0$ is valid; stationary configurations do not need a
+moving-vehicle reserve. Numerical node poses and between-node satisfaction of
+the physical domain are not interval-certified by this implementation, so this
+conditional geometric bound is not an end-to-end robust safety certificate.
 
-- Thompson, Dallas, Goh and Balachandran (2024), *Adaptive Nonlinear Model
-  Predictive Control: Maximizing Tire Force and Obstacle Avoidance in Autonomous
-  Vehicles*, [paper](https://doi.org/10.1109/TFR.2024.3497925), for the CasADi/IPOPT
-  numerical route with bounded iterations and warm initialization. Equation
-  (D10) retains this project's joint output-feedback formulation and hard
-  constraints; it is not a reproduction of their vehicle/controller architecture.
-- Zhang, Liniger and Borrelli, *Optimization-Based Collision Avoidance*,
-  [primary manuscript](https://arxiv.org/abs/1711.03449), for separating-plane
-  and signed-distance optimization. The geometry above is a vertex specialization.
-- Huang, Wang, Margellos and Goulart (2025), *Predictive Control Barrier Functions:
-  Bridging model predictive control and control barrier functions*,
-  [primary manuscript](https://arxiv.org/html/2502.08400v1), Section III, for the
-  shifted predictive-deficit construction. Hard safety here does not require
-  minimizing a soft deficit. If common stage deficits are admitted, the shift
-  yields $V_N(\mathcal I^+)\le V_N(\mathcal I)-\xi_0^\star$ for an attained
-  primary optimum. A positive deficit is recovery, not a safety certificate.
-- Diehl, Bock and Schloeder (2005), *Real-Time Iterations for Nonlinear Optimal
-  Feedback Control*, [primary paper](https://skoge.folk.ntnu.no/prost/proceedings/cdc-ecc05/pdffiles/papers/1186.pdf),
-  for local one-step SQP approximations and their regularity/initialization
-  assumptions. One QP is not a nonlinear feasibility proof.
+Only a sequence passing these checks can supply a command. An NLP iterate
+with a shooting defect is assessed using its actual command rollout, not its
+inconsistent shooting states. Geometry and state checks include the current
+root. The full accepted fine input sequence is stored.
 
-The separately designed NRMM observer remains a research comparator whose own
-conditional ISS theory is in [OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md).
-Its gain synthesis, force-inversion assumptions, and observer-error supports
-are not prerequisites of (D1)--(D9).
+At the next boundary, construct a retained candidate by deleting its executed
+first input and extending its tail with the last input as needed. Recheck the
+complete sequence from the conditioned information. This sequence is retained
+at its original hold resolution. It is not replaced by a fit to new coarse
+knots: coarse interpolation is not generally closed under a one-hold shift.
+A coarse refit is only a warm start for improvement.
+
+If constant extension fails, try changing the final $0.5$, $1$, or $2$ seconds
+of its force-ratio commands to the configured braking input, respecting input
+bounds and increments. Each repaired sequence is rechecked on every retained
+member. This candidate construction neither constrains the optimized endpoint
+to stop nor assumes that braking is safe for every target motion.
+
+Under identical discrete propagation and a valid finite-member update, the
+old prefix after conditioning lies inside the old predicted member paths.
+This explains why retaining the fine sequence preserves its previous checks
+on the inherited interval. A refined verification mesh differs from the
+inference mesh, so this exact-discrete argument cannot be transferred to that
+numerical pair without an integration-error enclosure; the whole retained plan
+is rechecked. The appended interval still requires a fresh check;
+without an invariant terminal condition its feasibility is not guaranteed.
+
+A replay-feasible proposal or seed can be accepted even if IPOPT reaches its
+iteration or time limit. If improvement fails, a replay-feasible retained fine
+plan remains available. If no checked candidate exists, the runtime reports a
+planning failure and does not claim physical impossibility or authorize an
+unchecked command. In particular, failure of a local solve, a coarse input
+parameterization, or a conservative separator is not a proof that all
+physically admissible causal controllers fail.
+
+## 8. Scope of the resulting statements
+
+The exact information update has the containment property under its stated
+contract. The separating-axis lower bound proves geometric separation for
+individual configurations. The command interpolation enforces each actual
+input increment. These facts do not convert a finite ensemble, numerical
+integration, sampled geometry checks, or finite preview into a universal
+continuous-time safety certificate.
+
+Even individual physical feasibility is weaker than output-feedback
+feasibility: indistinguishable states may need different actions. To assert
+that every information state with some physically safe trajectory is handled
+would require a suitable causal viability analysis, uncertainty coverage,
+and a complete feasibility method. This local nonlinear program supplies no
+such completeness theorem. Experiments can establish success over the tested
+contracts and encounters; unclassified failures must remain unclassified.
+
+Mean solve time, full controller-call time, startup compilation, and worst-case
+latency are different quantities. A solver time limit is not a hard actuator
+deadline, and an average latency does not certify every deadline. The sampled
+physical model presumes commands are delivered at their specified boundaries;
+latency must be included in the plant/actuation contract for delayed execution.
+
+## 9. Relation to the literature and other numerical backends
+
+Thompson, Dallas, Goh and Balachandran (2024), *Adaptive Nonlinear Model
+Predictive Control: Maximizing Tire Force and Obstacle Avoidance in Autonomous
+Vehicles*, [paper](https://doi.org/10.1109/TFR.2024.3497925), motivates sparse
+nonlinear optimization, few decision nodes over substantial preview, and warm
+initialization. Its spatial-coordinate vehicle/actuator transcription is not
+identical to this held-input time-coordinate model, which includes rest.
+
+The optional `sqpRti` and `ipopt` dynamic-memory implementations and the
+independent NRMM integration are research comparators. The adopted compact
+controller does not optimize their memory maps or observer gains. The NRMM
+observer's own conditional derivation is in
+[OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md).

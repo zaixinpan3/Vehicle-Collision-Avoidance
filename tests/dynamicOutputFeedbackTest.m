@@ -248,12 +248,12 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(prediction.scenarios{1}.ego(4,end),20);
             testCase.verifyLessThan(prediction.metadata.maximumLinearizedConstraintViolation,cfg.solver.constraintTolerance);
         end
-        function theDefaultCampaignUsesRawSensorsWithoutTheNrmmPipeline(testCase)
+        function theSelectedRtiCampaignUsesRawSensorsWithoutTheNrmmPipeline(testCase)
             fixture=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             campaign=runCollisionThreatValidation(Frames=1,Speeds=1.5,Scenarios="stoppedLead", ...
                 ControllerConfiguration=testCase.cfg,OutputDirectory=string(fixture.Folder));
-            testCase.verifyEqual(campaign.pipeline,"dynamicOutputFeedback");
-            testCase.verifyEqual(campaign.results.observationModel,"rawSensorJointDynamicOutputFeedback");
+            testCase.verifyEqual(campaign.pipeline,"sqpRti");
+            testCase.verifyEqual(campaign.results.observationModel,"rawSensorFixedConsistencyInference");
             testCase.verifyEqual(campaign.results.executedFrames,1);
             testCase.verifyEqual(campaign.results.outcome,"completed");
             testCase.verifyEqual(campaign.results.timing.calls,1);
@@ -284,7 +284,7 @@ end
 function [cfg,hypothesis,block]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',1.5, ...
         'controller',struct('horizonSteps',3), ...
-        'outputFeedback',struct('horizonSeconds',.15,'memoryDimension',2, ...
+        'outputFeedback',struct('method',"sqpRti",'horizonSeconds',.15,'memoryDimension',2, ...
         'noiseDirections',zeros(7,1),'maximumSolveSeconds',120)));
     hypothesis=struct('ego',[0;0;0;1.5;0;0],'target',[15;0;0;0;0;0;1.6;2.4;.95;0;0], ...
         'parameters',ones(4,1),'sensorBias',zeros(7,1));
