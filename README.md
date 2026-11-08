@@ -48,6 +48,12 @@ still update every 50 ms, with dynamics and collision checks between knots.
 The allocated graph supports preview growth without online recompilation.
 At 24 knots the problem has 192 physical state/input variables and one
 restoration slack, independent of the number of retained information members.
+State and actuator-rate limits use native two-sided constraint rows. At the
+tested 24-knot capacities this reduces the allocated constraint expressions
+from 1,184--1,824 to 788--1,188 without changing their feasible set. Candidate
+validation supplies the same shooting-grid states used to score that candidate,
+so they are not integrated twice. Refined validation skips the unused capacity
+beyond the actual preview; its integration grid and clearance checks are unchanged.
 
 `outputFeedback.nlpCompiler` selects `"clang"`, `"gcc"`, or `"cc"`;
 `nlpCompilerOptimization` selects levels 0--3. `nlpJit=false` permits execution
@@ -70,21 +76,34 @@ allowed only when no checked plan is available, within
 The 2026-11-07 baseline run used the command above, MATLAB R2026a, CasADi
 3.8.2, Clang `-O0`, and an AMD Ryzen 7 7800X3D. All 30 combinations completed
 160 holds (8 simulated seconds) each. The independent `ode45` plant checked
-41 poses per hold; the smallest measured footprint clearance was 0.534 m
+41 poses per hold; the smallest measured footprint clearance was 0.537 m
 against a 0.1 m requirement. These are finite simulation results, not a proof
 of indefinite safety or hardware deadlines.
 
 | Initial/reference speed | Completed cases | Mean NLP solve | Mean whole call |
 | --- | ---: | ---: | ---: |
-| 8 m/s | 10/10 | 53.9 ms | 62.2 ms |
-| 15 m/s | 10/10 | 62.3 ms | 73.9 ms |
-| 25 m/s | 10/10 | 71.0 ms | 84.2 ms |
+| 8 m/s | 10/10 | 53.3 ms | 60.1 ms |
+| 15 m/s | 10/10 | 56.4 ms | 65.8 ms |
+| 25 m/s | 10/10 | 70.6 ms | 81.6 ms |
 
 Startup compilation and four virtual warmup holds were excluded; the recorded
 initialization call and all its attempts were included. No recorded call
-rebuilt the kernel. The largest full call was 315.3 ms, and 4,313 of 4,800
+rebuilt the kernel. The largest full call was 304.4 ms, and 3,827 of 4,800
 calls exceeded the configured 50 ms hold. The average 100 ms target was met
 in this run; a 50 ms deadline guarantee was not.
+
+Compared with the preceding implementation (`23e0405`) under the same
+campaign settings, mean validation time fell from 7.55 to 5.55 ms, mean NLP
+time from 62.37 to 60.10 ms, and mean whole-call time from 73.42 to 69.16 ms.
+These are separate closed-loop runs: the solver has a wall-time budget and
+can take different iterations and commands after reformulation.
+
+An isolated comparison on the same three-member initial problem at 8 m/s,
+with an 80 m stopped target and exactly three IPOPT iterations, alternated
+12 measured calls per version after warmup. Mean NLP time fell from 40.99 to
+37.57 ms. Separately, one-member refined replay at 24, 60 and 120 actual holds
+in a 124-hold allocation returned bitwise identical validation outputs;
+warm evaluation times fell from 12.71/13.20/13.82 to 4.60/8.60/13.25 ms.
 
 The additional stress run used the same ten encounters at 3 and 30 m/s,
 320 holds per case, friction coefficients 0.65, doubled sensor-noise bounds,
@@ -102,16 +121,18 @@ stress = runJointOutputFeedbackScenario(Scenarios=names, Speeds=[3,30], ...
 ```
 
 Fifteen of twenty cases completed, including all ten at 30 m/s. Their 4,800
-executed holds had minimum measured clearance 0.142 m, mean NLP solve 66.2 ms
-and mean full call 83.2 ms. Every completed case had mean NLP solve below
-100 ms (largest 77.3 ms). Four completed cases had mean full calls just above
-100 ms (largest 102.1 ms); the largest accepted full call was 1.756 s.
+executed holds had minimum measured clearance 0.142 m, mean NLP solve 62.2 ms
+and mean full call 76.4 ms. Every completed case had mean NLP solve below
+100 ms (largest 72.5 ms), and mean full calls were also below 100 ms (largest
+95.6 ms). The largest accepted full call was 1.661 s. Relative to `23e0405`,
+mean validation time fell from 13.49 to 10.62 ms and mean full-call time from
+83.19 to 76.37 ms; the former maximum case mean was 102.1 ms.
 
 At 3 m/s, `headOn`, `crossing`, `turningCrossing`, `curvedHeadOn` and
 `curvedCrossing` were rejected before the first command. They are failures,
 not collision-avoidance successes or physical-infeasibility certificates.
-Including their rejected calls gives an 86.8 ms aggregate full-call mean and
-a 3.704 s maximum. Offline searches with one control knot per hold and a
+Including their rejected calls gives a 79.4 ms aggregate full-call mean and
+a 3.122 s maximum. Earlier offline searches with one control knot per hold and a
 larger solve budget also found no plan; this is not a completeness proof.
 Thus the requested success for every physically feasible encounter remains
 unestablished. Across both campaigns, 45 of 50 cases completed and 9,600

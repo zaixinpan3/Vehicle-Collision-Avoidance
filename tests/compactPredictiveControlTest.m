@@ -9,6 +9,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
     end
     properties (TestParameter)
         rectangleYaw={0,.2,pi/4,pi/2}
+        refinedHolds={24,60}
+        requestedSpeed={4,12}
     end
     methods (TestClassSetup)
         function prepareController(testCase)
@@ -53,6 +55,29 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(size(u,2),testCase.prediction.metadata.horizonSteps);
             testCase.verifyEqual(size(testCase.prediction.scenarios{1}.denseEgo,2), ...
                 2*testCase.prediction.metadata.horizonSteps+1);
+        end
+        function finiteActuatorRatesRemainBoundedInBothDirections(testCase,requestedSpeed)
+            cfg=testCase.cfg;cfg.referenceSpeed=requestedSpeed;
+            cfg.model.brakingRatioRateMaximum=.8;
+            block=localBlock(cfg,8);
+            [~,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
+            u=prediction.scenarios{1}.inputs;
+            rates=diff([block.heldInput,u],1,2)/cfg.controller.sampleTime;
+            limits=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+            testCase.verifyLessThanOrEqual(max(rates,[],2),limits+1e-8);
+            testCase.verifyGreaterThanOrEqual(min(rates,[],2),-limits-1e-8);
+            states=prediction.scenarios{1}.denseEgo(4:6,:);
+            testCase.verifyGreaterThanOrEqual(min(states,[],2), ...
+                [0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum]-1e-6);
+            testCase.verifyLessThanOrEqual(max(states,[],2), ...
+                [cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum]+1e-6);
+        end
+        function continuationReplaysTheUpdatedPhysicalState(testCase)
+            block=localNextBlock(testCase.state,testCase.cfg);
+            [command,~,prediction,state]=collisionAvoidanceController(block,[],[],testCase.cfg,testCase.state);
+            expected=localAdvanceHold(state.hypotheses(1),command.actuatorInput,testCase.cfg);
+            testCase.verifyEqual(prediction.scenarios{1}.ego(:,2),expected.ego,AbsTol=1e-10);
+            testCase.verifyTrue(prediction.metadata.nlpCacheHit);
         end
         function aMissingRawReadingIsRejected(testCase)
             block=localNextBlock(testCase.state,testCase.cfg);block.samples(2)=[];
@@ -116,6 +141,19 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(result.trajectories{1}.denseEgo(4:6,:), ...
                 zeros(3,1+60*testCase.cfg.outputFeedback.validationSubsteps),AbsTol=1e-14);
         end
+        function refinementPreservesTheMovingPrefixAndHoldBoundaryStop(testCase,refinedHolds)
+            item=testCase.block.initialHypotheses;item.ego(4)=.5;
+            item.target=[5.07;0;0;0;0;0;1.6;2.4;.95;0;0];
+            inputs=repmat([0;-.8],1,refinedHolds);
+            result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',inputs));
+            expected=localRefinedSequence(item.ego,inputs,testCase.cfg);
+            testCase.verifyTrue(result.accepted);
+            testCase.verifyEqual(result.trajectories{1}.validationSubsteps,testCase.cfg.outputFeedback.validationSubsteps);
+            testCase.verifyEqual(result.trajectories{1}.denseEgo,expected,AbsTol=1e-10);
+            testCase.verifyGreaterThan(expected(1,end),item.ego(1));
+            testCase.verifyEqual(result.trajectories{1}.ego(4:6,end),zeros(3,1),AbsTol=1e-14);
+        end
         function aTargetCannotCrossBetweenCoarseChecksUndetected(testCase)
             item=testCase.block.initialHypotheses;item.ego(4:6)=0;
             % A temporal-aliasing fixture: all half-hold poses are separated.
@@ -165,6 +203,17 @@ end
 
 function item=localAdvanceSequence(item,inputs,cfg)
     for j=1:size(inputs,2),item=localAdvanceHold(item,inputs(:,j),cfg);end
+end
+
+function dense=localRefinedSequence(x,inputs,cfg)
+    substeps=cfg.outputFeedback.validationSubsteps;dense=zeros(6,1+substeps*size(inputs,2));dense(:,1)=x;
+    for i=1:size(inputs,2)
+        for j=1:substeps
+            x=nonlinearBicycleModel.sensorFlow(x,inputs(:,i),cfg,cfg.controller.sampleTime/substeps,false);
+            dense(:,1+(i-1)*substeps+j)=x;
+        end
+        x=nonlinearBicycleModel.sampleEndState(x,inputs(:,i),cfg);
+    end
 end
 
 function block=localBlock(cfg,speed)

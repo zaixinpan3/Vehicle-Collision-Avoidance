@@ -3795,7 +3795,7 @@ function [result,info] = localCompactStep(request,cfg)
     if ~initial
         inherited=prior.fineControls(:,2:end);
         inherited=[inherited,repmat(prior.fineControls(:,end),1,count-size(inherited,2))];
-        [valid,traces,violation]=localCompactValidate(inherited,hypotheses,block.heldInput,kernel,cfg,true);
+        [valid,traces,violation,nodeStates]=localCompactValidate(inherited,hypotheses,block.heldInput,kernel,cfg,true);
         if ~valid
             % A constant tail is not invariant. Try slowing its final portion
             % before discarding the executable prefix; every repair is replayed.
@@ -3803,20 +3803,24 @@ function [result,info] = localCompactStep(request,cfg)
                 repaired=inherited;start=max(1,count-ceil(seconds/h)+1);
                 repaired(2,start:end)=-cfg.outputFeedback.backupBrakingRatio;
                 repaired=localCompactRateLimit(repaired,block.heldInput,ones(1,count),cfg);
-                [valid,traces,violation]=localCompactValidate(repaired,hypotheses,block.heldInput,kernel,cfg,true);
+                [valid,traces,violation,nodeStates]=localCompactValidate(repaired,hypotheses,block.heldInput,kernel,cfg,true);
                 if valid,inherited=repaired;tailRepaired=true;break;end
             end
         end
         if valid
-            [~,states]=localCompactRollout(kernel,item.ego,block.heldInput,inherited,item.parameters,true);
+            states=nodeStates{nominal};
             projection=inherited(:,boundaries(2:end));
             best=[projection(:);states(:);0];bestTrace=traces;bestViolation=violation;retainedFine=true;
         end
     end
     % A feasible retained sequence remains usable when optimization times out.
     for j=1:numel(seeds)
-        [valid,traces,violation]=localCompactValidate(seeds{j},hypotheses,block.heldInput,kernel,cfg,false,isempty(best));
-        [~,states]=localCompactRollout(kernel,item.ego,block.heldInput,seeds{j},item.parameters,false);
+        [valid,traces,violation,nodeStates]=localCompactValidate(seeds{j},hypotheses,block.heldInput,kernel,cfg,false,isempty(best));
+        states=nodeStates{nominal};
+        if isempty(states)
+            % An earlier nonfinite member can stop validation before nominal.
+            [~,states]=localCompactRollout(kernel,item.ego,block.heldInput,seeds{j},item.parameters,false);
+        end
         seed=[seeds{j}(:);full(states(:));0];seedValue=full(kernel.objective(seed,p));
         if valid && seedValue<bestValue
             best=seed;bestValue=seedValue;bestViolation=violation;bestTrace=traces;retainedFine=false;
@@ -3854,10 +3858,10 @@ function [result,info] = localCompactStep(request,cfg)
         solveSeconds=solveSeconds+toc(solveTimer);stats=kernel.solver.stats();iterations=iterations+stats.iter_count;
         trial=full(solution.x);controls=reshape(trial(1:2*nodes),2,nodes);
         seedPoints{j}=trial;dual{j}=struct('x',solution.lam_x,'g',solution.lam_g);
-        [valid,traces,violation]=localCompactValidate(controls,hypotheses,block.heldInput,kernel,cfg,false,isempty(best));
+        [valid,traces,violation,nodeStates]=localCompactValidate(controls,hypotheses,block.heldInput,kernel,cfg,false,isempty(best));
         bestAttemptViolation=min(bestAttemptViolation,violation);
         if valid
-            [~,states]=localCompactRollout(kernel,item.ego,block.heldInput,controls,item.parameters,false);
+            states=nodeStates{nominal};
             replay=[controls(:);full(states(:));0];value=full(kernel.objective(replay,p));
             if value<bestValue || isempty(best)
                 best=replay;bestValue=value;bestViolation=violation;bestTrace=traces;acceptedTrial=true;retainedFine=false;
@@ -3933,14 +3937,14 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     target=reshape(p(13:12+22*count),11,2*count);ref=reshape(p(13+22*count:12+22*count+3*n),3,n);steps=p(end-n+1:end);
     root=MX.sym('root',6);previous=MX.sym('previous',2);control=MX.sym('control',2,count);parameters=MX.sym('scales',4);rollSteps=MX.sym('holds',n);
     state=p(1:6);prior=p(7:8);roll=root;dense={root};ends=cell(1,n);inputs={};
-    constraint={};lower={};objective=1e4*z(end);sample=0;
+    constraint={};lower={};upper={};objective=1e4*z(end);sample=0;
     for i=1:n
         endpoint=z(ui(:,i));
         constraint{end+1}=(endpoint(1)-prior(1))/(h*steps(i));lower{end+1}=-of.steeringRateMaximum;
-        constraint{end+1}=(prior(1)-endpoint(1))/(h*steps(i));lower{end+1}=-of.steeringRateMaximum;
+        upper{end+1}=of.steeringRateMaximum;
         if isfinite(cfg.model.brakingRatioRateMaximum)
             constraint{end+1}=(endpoint(2)-prior(2))/(h*steps(i));lower{end+1}=-cfg.model.brakingRatioRateMaximum;
-            constraint{end+1}=(prior(2)-endpoint(2))/(h*steps(i));lower{end+1}=-cfg.model.brakingRatioRateMaximum;
+            upper{end+1}=cfg.model.brakingRatioRateMaximum;
         end
         for j=1:capacity(i)
             active=j<=steps(i);rollActive=j<=rollSteps(i);
@@ -3951,7 +3955,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
                 dense{end+1}=roll;
                 if hasTarget
                     distance=localCompactSeparation(state,target(:,sample),cfg);
-                    constraint{end+1}=if_else(active,distance+z(end),1);lower{end+1}=0;
+                    constraint{end+1}=if_else(active,distance+z(end),1);lower{end+1}=0;upper{end+1}=Inf;
                 end
             end
             % Match the declared absorbing ego stop at actual hold boundaries.
@@ -3959,10 +3963,9 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
             roll=[roll(1:3);if_else(rollActive&(rollInput(2)<=0)&(roll(4)<.2*cfg.model.brakeHoldSpeed),zeros(3,1),roll(4:6))];
             constraint{end+1}=state(4:6);
             lower{end+1}=[0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
-            constraint{end+1}=-state(4:6);
-            lower{end+1}=[-cfg.model.speedMaximum;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
+            upper{end+1}=[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
         end
-        constraint{end+1}=z(xi(:,i))-state;lower{end+1}=zeros(6,1);
+        constraint{end+1}=z(xi(:,i))-state;lower{end+1}=zeros(6,1);upper{end+1}=zeros(6,1);
         normal=[-sin(ref(3,i));cos(ref(3,i))];
         error=[normal.'*(state(1:2)-ref(1:2,i));atan2(sin(state(3)-ref(3,i)),cos(state(3)-ref(3,i))); ...
             state(4)-cfg.referenceSpeed;state(5:6)];
@@ -3970,14 +3973,10 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
             +.5*of.inputWeight*dot(endpoint-prior,endpoint-prior)/steps(i);
         ends{i}=roll;state=z(xi(:,i));prior=endpoint;
     end
-    g=vertcat(constraint{:});gl=vertcat(lower{:});gu=Inf(size(gl));offset=0;
-    for i=1:numel(constraint)
-        if numel(constraint{i})==6 && all(lower{i}==0),gu(offset+(1:6))=0;end
-        offset=offset+numel(constraint{i});
-    end
-    rowsPerHold=6+2*hasTarget;holdRows=zeros(rowsPerHold,count);row=0;slot=0;
+    g=vertcat(constraint{:});gl=vertcat(lower{:});gu=vertcat(upper{:});
+    rowsPerHold=3+2*hasTarget;holdRows=zeros(rowsPerHold,count);row=0;slot=0;
     for i=1:n
-        row=row+2+2*isfinite(cfg.model.brakingRatioRateMaximum);
+        row=row+1+isfinite(cfg.model.brakingRatioRateMaximum);
         for j=1:capacity(i)
             slot=slot+1;holdRows(:,slot)=row+(1:rowsPerHold);row=row+rowsPerHold;
         end
@@ -4005,14 +4004,21 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     end
     fineEnd=[fineState(1:3);if_else((u(2)<=0)&(fineState(4)<.2*cfg.model.brakeHoldSpeed),zeros(3,1),fineState(4:6))];
     fineHold=Function('compact_fine_hold',{x,u,scales},{fineEnd,horzcat(finePoints{:})});
-    fineMap=fineHold.mapaccum(count);
-    [fineEnds,fineDense]=fineMap(root,control,repmat(parameters,1,count));
-    refinedRollout=Function('compact_refined_rollout',{root,control,parameters},{fineDense,fineEnds});
+    fineIdentity=Function('compact_fine_identity',{x,u,scales},{x,repmat(x,1,of.validationSubsteps)});
+    fineSwitch=Function.if_else('compact_fine_switch',fineHold,fineIdentity);
+    enabled=MX.sym('enabled');fineActive=MX.sym('active',1,count);
+    [endPoint,points]=fineSwitch(enabled,root,previous,parameters);
+    % mapaccum carries its first state input/output. The conditional branch
+    % skips RK4 beyond the actual preview, without rebuilding the kernel.
+    activeFineHold=Function('compact_active_fine_hold',{root,previous,parameters,enabled},{endPoint,points});
+    fineMap=activeFineHold.mapaccum(count);
+    [fineEnds,fineDense]=fineMap(root,control,repmat(parameters,1,count),fineActive);
+    refinedRollout=Function('compact_refined_rollout',{root,control,parameters,fineActive},{fineDense,fineEnds});
     if of.nlpJit
         evaluateOptions=struct('jit',true,'compiler','shell','jit_options',options.jit_options);
         rollout=Function('compact_rollout',{root,previous,control,parameters,rollSteps}, ...
             {horzcat(dense{:}),horzcat(ends{:}),horzcat(inputs{:})},evaluateOptions);
-        refinedRollout=Function('compact_refined_rollout',{root,control,parameters},{fineDense,fineEnds},evaluateOptions);
+        refinedRollout=Function('compact_refined_rollout',{root,control,parameters,fineActive},{fineDense,fineEnds},evaluateOptions);
         clear restore;
     end
     kernel=struct('solver',solver,'rollout',rollout,'flow',flow,'holds',holds,'capacity',capacity,'holdConstraintIndices',holdRows, ...
@@ -4080,10 +4086,10 @@ function seeds = localCompactSeeds(item,previous,holds,lane,kernel,cfg)
     end
 end
 
-function [valid,traces,violation] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,allowRefinement)
+function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,allowRefinement)
     if nargin<6,fine=false;end
     if nargin<7,allowRefinement=true;end
-    traces=cell(1,numel(hypotheses));violation=0;h=cfg.controller.sampleTime;
+    traces=cell(1,numel(hypotheses));nodeStates=cell(size(traces));violation=0;h=cfg.controller.sampleTime;
     durations=kernel.holds;if fine,durations=ones(1,size(controls,2));end
     clipped=localCompactRateLimit(controls,previous,durations,cfg);
     violation=max(violation,max(abs(controls-clipped),[],'all'));
@@ -4091,6 +4097,9 @@ function [valid,traces,violation] = localCompactValidate(controls,hypotheses,pre
     for s=1:numel(hypotheses)
         item=hypotheses(s);
         [dense,states,inputs]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,fine);
+        % Keep the shooting-grid rollout even when geometric validation is
+        % refined below. Its states are reused for the identical NLP candidate.
+        nodeStates{s}=states;
         if any(~isfinite(dense),'all'),violation=Inf;valid=false;return;end
         stateViolation=max([stateViolation;max(-dense(4,:));max(dense(4,:)-cfg.model.speedMaximum); ...
             max(abs(dense(5,:))-cfg.model.lateralVelocityMaximum);max(abs(dense(6,:))-cfg.model.yawRateMaximum)]);
@@ -4136,12 +4145,13 @@ function [valid,traces,violation] = localCompactRefinedValidate(inputs,hypothese
     % Refine rejected geometric checks without lowering requested clearance.
     count=size(inputs,2);capacity=sum(kernel.capacity);substeps=kernel.validationSubsteps;
     values=[inputs,zeros(2,capacity-count)];traces=cell(1,numel(hypotheses));violation=0;
+    active=double((1:capacity)<=count);
     clipped=localCompactRateLimit(inputs,previous,ones(1,count),cfg);
     violation=max(violation,max(abs(inputs-clipped),[],'all'));
     times=(0:substeps*count)*cfg.controller.sampleTime/substeps;
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     for s=1:numel(hypotheses)
-        item=hypotheses(s);[dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters);
+        item=hypotheses(s);[dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,active);
         dense=full(dense);ends=full(ends);dense=[item.ego,dense(:,1:substeps*count)];
         if any(~isfinite(dense),'all'),violation=Inf;valid=false;return;end
         violation=max([violation;max(-dense(4,:));max(dense(4,:)-cfg.model.speedMaximum); ...
