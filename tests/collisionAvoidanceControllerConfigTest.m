@@ -55,6 +55,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
         invalidActuation = {[], 1.0, struct([])}
         invalidReferenceWeight = {-1, Inf, NaN, [1,2]}
         performanceWeight = {"referenceDeviationWeight","nominalTrackingWeight","inputVariationWeight"}
+        invalidSteeringRate = {0,-1,-Inf,NaN,[1,2],1i}
     end
 
     methods (TestClassSetup)
@@ -68,6 +69,17 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function steeringRateIsUnboundedUnlessExplicitlyConfigured(testCase)
+            defaults=collisionAvoidanceControllerConfig();
+            supplied=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('steeringRateMaximum',2)));
+            testCase.verifyEqual(defaults.outputFeedback.steeringRateMaximum,Inf);
+            testCase.verifyEqual(supplied.outputFeedback.steeringRateMaximum,2,AbsTol=0);
+        end
+        function invalidSteeringRatesAreRejected(testCase,invalidSteeringRate)
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('outputFeedback', ...
+                struct('steeringRateMaximum',invalidSteeringRate))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
         function generatedCodeOptimizationCanBeSelectedForExperiments(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('nlpCompilerOptimization',1)));
             testCase.verifyEqual(cfg.outputFeedback.nlpCompilerOptimization,1);

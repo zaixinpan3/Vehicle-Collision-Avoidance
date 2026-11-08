@@ -46,11 +46,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(prediction.metadata.nlpVariables,testCase.prediction.metadata.nlpVariables);
             testCase.verifyTrue(prediction.metadata.nlpCacheHit);
         end
-        function everyAppliedHoldRespectsSteeringSlew(testCase)
+        function everyAppliedHoldUsesThePredictedCommand(testCase)
             u=testCase.prediction.scenarios{1}.inputs;
-            change=diff([testCase.block.heldInput,u],1,2);
-            testCase.verifyLessThanOrEqual(max(abs(change(1,:))), ...
-                testCase.cfg.controller.sampleTime*testCase.cfg.outputFeedback.steeringRateMaximum+1e-8);
             testCase.verifyEqual(testCase.command.actuatorInput,u(:,1),AbsTol=1e-12);
             testCase.verifyEqual(size(u,2),testCase.prediction.metadata.horizonSteps);
             testCase.verifyEqual(size(testCase.prediction.scenarios{1}.denseEgo,2), ...
@@ -58,6 +55,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function finiteActuatorRatesRemainBoundedInBothDirections(testCase,requestedSpeed)
             cfg=testCase.cfg;cfg.referenceSpeed=requestedSpeed;
+            cfg.outputFeedback.steeringRateMaximum=1;
             cfg.model.brakingRatioRateMaximum=.8;
             block=localBlock(cfg,8);
             [~,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
@@ -71,6 +69,29 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 [0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum]-1e-6);
             testCase.verifyLessThanOrEqual(max(states,[],2), ...
                 [cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum]+1e-6);
+        end
+        function defaultReplayAllowsSteeringChangesWithoutAnActuatorRateContract(testCase)
+            item=testCase.block.initialHypotheses;item.ego(4:6)=0;
+            inputs=[.5,-.5;-1,-1];
+            result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',inputs));
+            testCase.verifyTrue(result.accepted);
+            testCase.verifyEqual(result.trajectories{1}.inputs,inputs,AbsTol=1e-14);
+        end
+        function replayRejectsChangesExceedingAnExplicitSteeringRate(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.steeringRateMaximum=1;
+            item=testCase.block.initialHypotheses;item.ego(4:6)=0;
+            result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[.5,-.5;-1,-1]));
+            testCase.verifyFalse(result.accepted);
+            testCase.verifyGreaterThan(result.maximumViolation,.4);
+        end
+        function removingSteeringSlewPreservesAngleBounds(testCase)
+            item=testCase.block.initialHypotheses;item.ego(4:6)=0;
+            result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[.6;-1]));
+            testCase.verifyFalse(result.accepted);
+            testCase.verifyGreaterThan(result.maximumViolation,.09);
         end
         function continuationReplaysTheUpdatedPhysicalState(testCase)
             block=localNextBlock(testCase.state,testCase.cfg);

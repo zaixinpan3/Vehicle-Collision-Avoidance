@@ -3352,9 +3352,12 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
             % Exact cheap derivatives avoid re-evaluating physical or
             % geometric functions for memory, prior input and witnesses.
             dr(end-1:end,9:10)=-sqrt(of.inputWeight/ns)*eye(2);
-            dc(5:6,9)=[-1;1];base=6;
+            base=4;
+            if isfinite(of.steeringRateMaximum)
+                dc(base+(1:2),9)=[-1;1];base=base+2;
+            end
             if isfinite(cfg.model.brakingRatioRateMaximum)
-                dc(7:8,10)=[-1;1];base=8;
+                dc(base+(1:2),10)=[-1;1];base=base+2;
             end
             df(7:6+nm,11:10+nm)=diag(1-f(7:6+nm).^2)*policy.A;
             if ~isempty(wi)
@@ -3386,7 +3389,7 @@ function [point,info,trajectory] = localOfOptimize(problem,initial,timer)
             ae{k}=-sparse(df)*map-direct;ae{k}(:,ix(:,i,s))=speye(nx);
             residual{k}=r;constraint{k}=c;
             numericalTolerance{k}=.5*cfg.solver.constraintTolerance*ones(size(c));
-            commandRows=6+2*isfinite(cfg.model.brakingRatioRateMaximum);
+            commandRows=4+2*isfinite(of.steeringRateMaximum)+2*isfinite(cfg.model.brakingRatioRateMaximum);
             numericalTolerance{k}(1:commandRows)=0;
             lower(ix(7:6+nm,i,s))=-1-trace.memory(:,i+1);
             upper(ix(7:6+nm,i,s))=1-trace.memory(:,i+1);
@@ -3475,8 +3478,10 @@ function [r,c,f]=localOfStageValues(z,data,policy,problem)
         x(4)-cfg.referenceSpeed;x(5);x(6)];
     r=[sqrt(h*of.trackingWeights).*error;sqrt(of.inputWeight)*(u-previous)]/sqrt(numel(problem.scenarios));
     c=[u(1)-of.steeringMaximum;-u(1)-of.steeringMaximum; ...
-        u(2)-cfg.actuation.brakingRatioMaximum;cfg.actuation.brakingRatioMinimum-u(2); ...
-        u(1)-previous(1)-h*of.steeringRateMaximum;previous(1)-u(1)-h*of.steeringRateMaximum];
+        u(2)-cfg.actuation.brakingRatioMaximum;cfg.actuation.brakingRatioMinimum-u(2)];
+    if isfinite(of.steeringRateMaximum)
+        change=h*of.steeringRateMaximum;c=[c;u(1)-previous(1)-change;previous(1)-u(1)-change];
+    end
     if isfinite(cfg.model.brakingRatioRateMaximum)
         change=h*cfg.model.brakingRatioRateMaximum;c=[c;u(2)-previous(2)-change;previous(2)-u(2)-change];
     end
@@ -3695,8 +3700,10 @@ function stage = localOfSymbolicStage(cfg,hasTarget)
         x(4)-cfg.referenceSpeed;x(5);x(6)];
     residual=[sqrt(h*of.trackingWeights).*error;sqrt(of.inputWeight)*(u-previous)];
     c=[u(1)-of.steeringMaximum;-u(1)-of.steeringMaximum; ...
-        u(2)-min(1,cfg.actuation.brakingRatioMaximum);max(-1,cfg.actuation.brakingRatioMinimum)-u(2); ...
-        u(1)-previous(1)-h*of.steeringRateMaximum;previous(1)-u(1)-h*of.steeringRateMaximum];
+        u(2)-min(1,cfg.actuation.brakingRatioMaximum);max(-1,cfg.actuation.brakingRatioMinimum)-u(2)];
+    if isfinite(of.steeringRateMaximum)
+        change=h*of.steeringRateMaximum;c=[c;u(1)-previous(1)-change;previous(1)-u(1)-change];
+    end
     if isfinite(cfg.model.brakingRatioRateMaximum)
         change=h*cfg.model.brakingRatioRateMaximum;c=[c;u(2)-previous(2)-change;previous(2)-u(2)-change];
     end
@@ -3963,8 +3970,10 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     constraint={};lower={};upper={};objective=1e4*z(end);sample=0;
     for i=1:n
         endpoint=z(ui(:,i));
-        constraint{end+1}=(endpoint(1)-prior(1))/(h*steps(i));lower{end+1}=-of.steeringRateMaximum;
-        upper{end+1}=of.steeringRateMaximum;
+        if isfinite(of.steeringRateMaximum)
+            constraint{end+1}=(endpoint(1)-prior(1))/(h*steps(i));lower{end+1}=-of.steeringRateMaximum;
+            upper{end+1}=of.steeringRateMaximum;
+        end
         if isfinite(cfg.model.brakingRatioRateMaximum)
             constraint{end+1}=(endpoint(2)-prior(2))/(h*steps(i));lower{end+1}=-cfg.model.brakingRatioRateMaximum;
             upper{end+1}=cfg.model.brakingRatioRateMaximum;
@@ -4002,7 +4011,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     g=vertcat(constraint{:});gl=vertcat(lower{:});gu=vertcat(upper{:});
     rowsPerHold=3+2*hasTarget;holdRows=zeros(rowsPerHold,count);row=0;slot=0;
     for i=1:n
-        row=row+1+isfinite(cfg.model.brakingRatioRateMaximum);
+        row=row+isfinite(of.steeringRateMaximum)+isfinite(cfg.model.brakingRatioRateMaximum);
         for j=1:capacity(i)
             slot=slot+1;holdRows(:,slot)=row+(1:rowsPerHold);row=row+rowsPerHold;
         end

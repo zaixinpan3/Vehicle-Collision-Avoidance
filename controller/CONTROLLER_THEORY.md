@@ -261,15 +261,16 @@ $$
 Each $u_j$ is held for the actual control period $h$. This interpolation does
 not assume a continuously varying actuator within a hold. Since $b_1=1$,
 the next applied command is $v_1$. Input bounds on endpoint commands imply
-the same convex bounds on every interpolated command. Steering slew is
-imposed by
+the same convex bounds on every interpolated command. If a finite steering-rate
+bound is explicitly supplied as part of the actuator contract, it is imposed by
 
 $$
 |v_{i,\delta}-v_{i-1,\delta}|\le b_i h\dot\delta_{\max};
 $$
 
 hence every physical command increment is at most $h\dot\delta_{\max}$.
-The analogous force-ratio increment is imposed when its bound is finite.
+Without a specified finite bound this inequality is omitted. The analogous
+force-ratio increment is imposed when its bound is finite.
 
 Let $\widetilde F_h$ denote the numerical flow with a held input. It composes
 RK4 sensor-period subflows and applies the declared rest reset only at the

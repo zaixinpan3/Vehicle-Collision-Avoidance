@@ -128,6 +128,7 @@ classdef nonlinearOutputFeedbackTest < matlab.unittest.TestCase
         end
         function nonlinearIterationsEscapeTheRtiCoefficientStepBox(testCase)
             [cfg,block]=localFixture();block.heldInput=[-.4;0];
+            cfg.outputFeedback.steeringRateMaximum=1;
             policy=struct('v',[.4;0],'K',zeros(2,1),'A',0,'B',zeros(1,8),'c',0);
             block.initialPolicies=repmat(policy,1,ceil(cfg.outputFeedback.horizonSeconds/cfg.controller.sampleTime));
             block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
