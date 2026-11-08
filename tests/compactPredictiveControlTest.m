@@ -123,6 +123,53 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(result.accepted);
             testCase.verifyGreaterThan(result.maximumViolation,0);
         end
+        function restorationCanRepairAnUnsafeBrakingInitialization(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=3;
+            cfg.outputFeedback.initializationSolveSeconds=10;
+            block=localBlock(cfg,3);item=block.initialHypotheses;
+            item.target=[5.6;0;0;0;0;0;1.6;2.4;.95;0;0];
+            block.initialHypotheses=item;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+            request=struct('operation',"validateInputSequence",'cfg',cfg,'hypotheses',item, ...
+                'input',block.heldInput,'inputs',repmat([0;-.6],1,60));
+            unsafe=solvePredictiveControl('outputFeedback',request);
+            request.inputs=repmat([0;-.8],1,60);
+            witness=solvePredictiveControl('outputFeedback',request);
+            testCase.assertFalse(unsafe.accepted);
+            testCase.assertTrue(witness.accepted);
+            [~,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
+            info=prediction.metadata;
+            testCase.verifyTrue(info.restorationAttempted);
+            testCase.verifyGreaterThan(info.initialRestorationSlack,0);
+            testCase.verifyLessThanOrEqual(info.initialNlpViolation,1e-9);
+            testCase.verifyLessThanOrEqual(info.nlpAttempts,5);
+            request.inputs=prediction.scenarios{1}.inputs;
+            result=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyTrue(result.accepted);
+            testCase.verifyLessThanOrEqual(result.maximumViolation,1e-6);
+        end
+        function elasticRestorationCannotAuthorizeAnOverlappingTrajectory(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.initializationSolveSeconds=.1;
+            block=localBlock(cfg,0);item=block.initialHypotheses;
+            item.target=[0;0;0;0;0;0;1.6;2.4;.95;0;0];
+            block.initialHypotheses=item;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+            testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,[]), ...
+                'collisionAvoidanceController:compactNoFeasiblePlan');
+        end
+        function optimizationFromRestRespectsPhysicalVelocityBounds(testCase)
+            block=localBlock(testCase.cfg,0);
+            [~,~,prediction]=collisionAvoidanceController(block,[],[],testCase.cfg,[]);
+            trace=prediction.scenarios{1};
+            testCase.verifyGreaterThanOrEqual(min(trace.denseEgo(4,:)),-1e-6);
+            request=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
+                'hypotheses',block.initialHypotheses,'input',block.heldInput,'inputs',trace.inputs);
+            replay=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyTrue(replay.accepted);
+            testCase.verifyEqual(replay.trajectories{1}.denseEgo,trace.denseEgo,AbsTol=1e-10);
+        end
         function anInconsistentMemberCannotBeDroppedDuringPlanValidation(testCase)
             safe=testCase.block.initialHypotheses;safe.target=[80;0;0;0;0;0;1.6;2.4;.95;0;0];
             unsafe=safe;unsafe.target(1)=8;

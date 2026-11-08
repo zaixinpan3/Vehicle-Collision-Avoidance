@@ -31,7 +31,7 @@ function cfg=localDefaults()
     % Raw-sensor compact nonlinear control. Noise bounds are Euclidean radii for
     % GNSS position, inertial body acceleration, gyro, and radar position.
     % Finite hypotheses and future noise cases are a deployment approximation.
-    cfg.outputFeedback=struct('method',"compactNlp",'nlpMaximumIterations',50, ...
+    cfg.outputFeedback=struct('method',"compactNlp",'nlpMaximumIterations',50,'restorationMaximumIterations',1000, ...
         'nlpTolerance',1e-7,'nlpJit',true,'nlpCompilerOptimization',0,'nlpCompiler',"clang", ...
         'sensorPeriod',.0125,'memoryDimension',1, ...
         'noiseBounds',[.04;.03;.0015;.04], ...
@@ -226,6 +226,7 @@ function localValidate(cfg)
     validateattributes(of.controlNodes,{'double'},{'scalar','integer','finite','>=',6});
     validateattributes(of.nearControlNodes,{'double'},{'scalar','integer','finite','positive','<',of.controlNodes});
     validateattributes(of.nlpMaximumIterations,{'double'},{'scalar','integer','finite','positive'});
+    validateattributes(of.restorationMaximumIterations,{'double'},{'scalar','integer','finite','positive'});
     validateattributes(of.nlpTolerance,{'double'},{'scalar','finite','positive'});
     validateattributes(of.nlpJit,{'logical'},{'scalar'});
     validateattributes(of.nlpCompilerOptimization,{'double'},{'scalar','integer','>=',0,'<=',3});

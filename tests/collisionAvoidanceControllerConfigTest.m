@@ -77,6 +77,17 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
                 struct('outputFeedback',struct('nlpCompilerOptimization',4))), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
+        function restorationIterationsHaveAnIndependentPositiveLimit(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('outputFeedback', ...
+                struct('nlpMaximumIterations',5,'restorationMaximumIterations',200)));
+            testCase.verifyEqual(cfg.outputFeedback.nlpMaximumIterations,5);
+            testCase.verifyEqual(cfg.outputFeedback.restorationMaximumIterations,200);
+            for invalid=[0,-1,1.5,Inf,NaN]
+                testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('outputFeedback', ...
+                    struct('restorationMaximumIterations',invalid))), ...
+                    'collisionAvoidanceController:invalidConfiguration');
+            end
+        end
         function theJointHorizonHasNoFixedStageDefault(testCase)
             cfg=collisionAvoidanceControllerConfig();
             testCase.verifyEmpty(cfg.outputFeedback.horizonSeconds);

@@ -3836,28 +3836,48 @@ function [result,info] = localCompactStep(request,cfg)
     free=kernel.holdConstraintIndices(:,~active);constraintLower(free)=-Inf;constraintUpper(free)=Inf;
     budget=cfg.outputFeedback.recoverySolveSeconds;
     if initial,budget=cfg.outputFeedback.initializationSolveSeconds;end
-    dual=cell(1,numel(seeds));pass=0;bestAttemptViolation=Inf;restorationAttempted=false;
-    while true
-        pass=pass+1;j=order(1+mod(pass-1,numel(order)));
-        solveTimer=tic;
-        upper=kernel.upper;
-        if isempty(best)
-            % Elastic restoration is a search device only. Acceptance below
-            % always checks the original hard clearance on actual rollouts.
-            upper(end)=Inf;seedPoints{j}(end)=max(0,seedPoints{j}(end));restorationAttempted=true;
+    bestAttemptViolation=Inf;restorationAttempted=isempty(best);
+    initialRestorationSlack=NaN;initialNlpViolation=NaN;finalRestorationSlack=NaN;
+    solver=kernel.solver;upper=kernel.upper;attemptLimit=1;
+    if restorationAttempted
+        % Each seed gets one uninterrupted solve. Primal/dual restarts would
+        % discard IPOPT's limited-memory history at every short time slice.
+        attemptLimit=numel(order);upper(end)=Inf;
+        buildTimer=tic;
+        solver=localCompactRestorationSolver(kernel,cfg,budget/attemptLimit);
+        buildElapsed=toc(buildTimer);buildSeconds=buildSeconds+buildElapsed;
+    else
+        buildElapsed=0;
+    end
+    for pass=1:attemptLimit
+        j=order(pass);point=seedPoints{j};
+        if restorationAttempted
+            % Repair only the auxiliary slack; an unsafe physical seed is a
+            % valid starting trajectory for feasibility restoration.
+            values=full(kernel.constraints(point,p));
+            if hasTarget
+                collisionRows=kernel.holdConstraintIndices(1:2,:);
+                rows=collisionRows(:);
+                point(end)=point(end)+max([0;constraintLower(rows)-values(rows)]) ...
+                    +10*cfg.outputFeedback.nlpTolerance;
+            end
+            values=full(kernel.constraints(point,p));
+            initialRestorationSlack=point(end);
+            initialNlpViolation=max([0;constraintLower-values;values-constraintUpper; ...
+                kernel.lower-point;point-upper]);
         end
-        arguments={'x0',seedPoints{j},'p',p,'lbx',kernel.lower,'ubx',upper, ...
+        solveTimer=tic;
+        arguments={'x0',point,'p',p,'lbx',kernel.lower,'ubx',upper, ...
             'lbg',constraintLower,'ubg',constraintUpper};
-        if ~isempty(dual{j}),arguments=[arguments,{'lam_x0',dual{j}.x,'lam_g0',dual{j}.g}];end %#ok<AGROW>
         try
-            solution=kernel.solver(arguments{:});
+            solution=solver(arguments{:});
         catch exception
             if isempty(best),rethrow(exception);end
             solveSeconds=solveSeconds+toc(solveTimer);stats.return_status='Solver_Exception_With_Checked_Fallback';break;
         end
-        solveSeconds=solveSeconds+toc(solveTimer);stats=kernel.solver.stats();iterations=iterations+stats.iter_count;
+        solveSeconds=solveSeconds+toc(solveTimer);stats=solver.stats();iterations=iterations+stats.iter_count;
         trial=full(solution.x);controls=reshape(trial(1:2*nodes),2,nodes);
-        seedPoints{j}=trial;dual{j}=struct('x',solution.lam_x,'g',solution.lam_g);
+        if restorationAttempted,finalRestorationSlack=trial(end);end
         [valid,traces,violation,nodeStates]=localCompactValidate(controls,hypotheses,block.heldInput,kernel,cfg,false,isempty(best));
         bestAttemptViolation=min(bestAttemptViolation,violation);
         if valid
@@ -3870,10 +3890,11 @@ function [result,info] = localCompactStep(request,cfg)
         if ~isempty(best) || solveSeconds>=budget,break;end
     end
     assert(~isempty(best),'collisionAvoidanceController:compactNoFeasiblePlan', ...
-        'No replay-feasible compact plan; solver %s, candidate violation %.6g. This is not a physical infeasibility certificate.', ...
-        stats.return_status,bestAttemptViolation);
+        ['No replay-feasible compact plan after %d continuous solve(s); solver %s, restoration slack %.6g, ' ...
+        'candidate violation %.6g. This is not a physical infeasibility certificate.'], ...
+        pass,stats.return_status,finalRestorationSlack,bestAttemptViolation);
     controls=reshape(best(1:2*nodes),2,nodes);input=bestTrace{nominal}.inputs(:,1);
-    validationSeconds=max(0,toc(clock)-solveSeconds);
+    validationSeconds=max(0,toc(clock)-solveSeconds-buildElapsed);
     state=struct('kind',"compactOutputFeedback-v1",'time',block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',controls,'fineControls',bestTrace{nominal}.inputs,'boundaries',boundaries, ...
         'horizonSteps',count,'configuration',cfg,'reference',request.reference,'conditioning',conditioning);
@@ -3885,6 +3906,8 @@ function [result,info] = localCompactStep(request,cfg)
         'elapsedSeconds',toc(timer),'deadlineSeconds',cfg.controller.sampleTime,'predictionWindow',window, ...
         'controlNodes',nodes,'horizonSteps',count,'fallbackUsed',~acceptedTrial,'retainedFinePlanUsed',retainedFine, ...
         'retainedTailRepaired',tailRepaired&&retainedFine,'restorationAttempted',restorationAttempted, ...
+        'initialRestorationSlack',initialRestorationSlack,'initialNlpViolation',initialNlpViolation, ...
+        'finalRestorationSlack',finalRestorationSlack, ...
         'validationSubsteps',max(cellfun(@(t)t.validationSubsteps,bestTrace)), ...
         'nonlinearValidationPerformed',true,'maximumConstraintViolation',bestViolation, ...
         'scenarioCount',numel(hypotheses),'activeScenarioCount',numel(hypotheses), ...
@@ -3959,9 +3982,12 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
                 end
             end
             % Match the declared absorbing ego stop at actual hold boundaries.
-            state=[state(1:3);if_else(active&(applied(2)<=0)&(state(4)<.2*cfg.model.brakeHoldSpeed),zeros(3,1),state(4:6))];
+            stopped=active&(applied(2)<=0)&(state(4)<.2*cfg.model.brakeHoldSpeed);
+            state=[state(1:3);if_else(stopped,zeros(3,1),state(4:6))];
             roll=[roll(1:3);if_else(rollActive&(rollInput(2)<=0)&(roll(4)<.2*cfg.model.brakeHoldSpeed),zeros(3,1),roll(4:6))];
-            constraint{end+1}=state(4:6);
+            % The absorbing branch already enforces zero velocity exactly.
+            % An interior constant avoids the tautological active bound 0>=0.
+            constraint{end+1}=if_else(stopped,[cfg.model.speedMaximum/2;0;0],state(4:6));
             lower{end+1}=[0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
             upper{end+1}=[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
         end
@@ -4021,15 +4047,40 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
         refinedRollout=Function('compact_refined_rollout',{root,control,parameters,fineActive},{fineDense,fineEnds},evaluateOptions);
         clear restore;
     end
+    % The hold constraints and shooting equalities already impose every
+    % physical node-state bound. Repeating them as variable bounds is redundant.
     kernel=struct('solver',solver,'rollout',rollout,'flow',flow,'holds',holds,'capacity',capacity,'holdConstraintIndices',holdRows, ...
         'refinedRollout',refinedRollout,'validationSubsteps',of.validationSubsteps, ...
         'objective',Function('compact_objective',{z,p},{objective}), ...
+        'constraints',Function('compact_constraints',{z,p},{g}), ...
+        'restorationProblem',Function('compact_restoration_problem',{z,p},{objective/1e4,g},{'x','p'},{'f','g'}), ...
+        'solverOptions',options,'cacheKey',{key}, ...
         'constraintLower',gl,'constraintUpper',gu, ...
         'lower',[repmat([-of.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)],n,1); ...
-            repmat([-Inf(3,1);0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum],n,1);0], ...
+            -Inf(6*n,1);0], ...
         'upper',[repmat([of.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],n,1); ...
-            repmat([Inf(3,1);cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum],n,1);0]);
+            Inf(6*n,1);0]);
     keys{end+1}=key;kernels{end+1}=kernel;
+end
+
+function solver = localCompactRestorationSolver(kernel,cfg,seconds)
+    persistent keys solvers
+    key={kernel.cacheKey,seconds};
+    for j=1:numel(keys)
+        if isequaln(key,keys{j}),solver=solvers{j};return;end
+    end
+    options=kernel.solverOptions;
+    options.ipopt.max_wall_time=seconds;
+    options.ipopt.max_iter=cfg.outputFeedback.restorationMaximumIterations;
+    % A positive scaling preserves the original restoration objective while
+    % avoiding its large slack gradient. Keep the barrier initialization used
+    % by the physical trajectory seeds.
+    options.ipopt.nlp_scaling_method='none';
+    if cfg.outputFeedback.nlpJit
+        old=pwd;restore=onCleanup(@()cd(old));cd(options.jit_options.directory);
+    end
+    solver=casadi.nlpsol('compact_restoration','ipopt',kernel.restorationProblem,options);
+    keys{end+1}=key;solvers{end+1}=solver;
 end
 
 function gap = localCompactSeparation(x,q,cfg)
