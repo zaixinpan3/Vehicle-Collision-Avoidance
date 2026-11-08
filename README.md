@@ -138,6 +138,49 @@ Thus the requested success for every physically feasible encounter remains
 unestablished. Across both campaigns, 45 of 50 cases completed and 9,600
 executed holds respected the sampled 0.1 m clearance requirement.
 
+A diagnostic replay of the five rejected initial states separated input,
+physical-state and geometric violations. The best candidates passed the
+input, speed and yaw-rate checks, but failed clearance within the first
+0.8--1.24 s of their 3 s preview. Their worst retained-member projection gaps
+were as follows; negative gaps mean overlapping rectangles. These are
+candidate-specific results, not bounds on every possible control policy.
+
+| Rejected case at 3 m/s | Minimum signed projection gap | Time of minimum |
+| --- | ---: | ---: |
+| `headOn` | 0.00244 m | 1.240 s |
+| `crossing` | -0.26022 m | 1.070 s |
+| `turningCrossing` | -0.45950 m | 0.894 s |
+| `curvedHeadOn` | -0.07059 m | 1.240 s |
+| `curvedCrossing` | -0.42089 m | 0.798 s |
+
+Independent `ode45` replay of the same commands and member parameters agreed
+with these gaps within 2e-10 m. Refinement used 64 substeps per hold; the
+interval allowance added approximately 15--16 mm at the worst check. The
+100 mm clearance requirement already rejected each candidate before that
+allowance. The nominal member also violated clearance in all five cases.
+Initialization has no previously checked plan to retain, so the
+search budget expires without an executable plan.
+
+The stress geometry is consequential. In the straight crossing case, the
+ego front has only 0.43148 m before the target's crossing corridor, whereas
+straight full braking travels 0.70104 m in the nominal physical model.
+Controlled first-frame comparisons retained the other stress settings and
+the same sensor-noise realization: moving the target 1 m farther in the
+world longitudinal direction admitted all five cases; restoring friction
+from 0.65 to 0.85 admitted the two opposing-traffic cases but not the three
+crossings. Restoring only ego lateral position and yaw admitted none.
+These comparisons establish sensitivity of admission, not closed-loop safety
+for the modified cases.
+
+Longer local solves (up to 500 iterations per uninterrupted attempt, with
+at least 5 s accumulated search when still rejected) did not resolve the
+original cases, including when the 0.20 m intersample planning margin and
+0.05 m planning buffer were removed. A search of 3,801 steering/force
+schedules per case also found no checked witness. These finite searches do
+not distinguish all locally missed solutions from physical infeasibility;
+the five cases remain recorded as failures, with no scenario exclusion or
+physical-infeasibility claim.
+
 ## Information and actuation interface
 
 ```matlab
