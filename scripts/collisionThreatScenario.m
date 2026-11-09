@@ -62,6 +62,24 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
         otherwise
             error('collisionThreatScenario:unknownScenario','Unknown collision threat %s.',name);
     end
+    if any(name==["crossing","turningCrossing","curvedCrossing"])
+        % Algorithm diagnostics need ample physical authority. Place the
+        % conflict beyond a comfortable stop, with reaction time and body
+        % extent accounted for. These are scenario-design allowances, not
+        % extra clearance constraints in the controller.
+        comfortableDeceleration=2;reactionSeconds=1;
+        bodyAllowance=cfg.vehicle.length/2+norm(cfg.vehicle.rectangleOffset)+hypot(2.4,.95)+3;
+        conflictStation=max([12,4*cfg.referenceSpeed,bodyAllowance ...
+            +reactionSeconds*cfg.referenceSpeed+cfg.referenceSpeed^2/(2*comfortableDeceleration)]);
+        crossingTime=conflictStation/cfg.referenceSpeed;
+        % Dilate time as well as moving the intersection. Scaling V by s
+        % and A by s^2 preserves the target's local crossing/stop geometry,
+        % constant A/beta contract, and the encounter with ideal cruise.
+        timeScale=impactTime/crossingTime;
+        targetSpeed=targetSpeed*timeScale;
+        targetAcceleration=targetAcceleration*timeScale^2;
+        impactTime=crossingTime;
+    end
     curve = struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200);
     if curvature~=0
         road = struct('referenceCurve',curve,'lateralClearance',road.lateralClearance, ...

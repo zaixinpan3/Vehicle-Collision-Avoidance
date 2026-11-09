@@ -4,6 +4,9 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         scenario = {"headOn","acceleratingHeadOn","brakingLead","stoppedLead","hardBrakingLead","crossing", ...
             "turningCrossing","curvedHeadOn","curvedCrossing"};
         referenceSpeed = {8,15};
+        crossingScenario = {"crossing","turningCrossing","curvedCrossing"};
+        crossingSpeed = {1.5,3,6,15,25};
+        crossingPressure = {false,true};
     end
     methods (TestClassSetup)
         function preparePaths(testCase)
@@ -14,6 +17,48 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function crossingsLeaveReactionTimeButStillIntersectCruise(testCase,crossingScenario,crossingSpeed)
+            [~,q,road,cfg,impactTime]=collisionThreatScenario(crossingScenario, ...
+                struct('referenceSpeed',crossingSpeed));
+            baseline=givenPathCollisionBaseline(road,q,cfg,impactTime+2);
+            testCase.verifyGreaterThan(baseline.initialClearanceMeters,5);
+            testCase.verifyTrue(baseline.collisionDetected);
+            testCase.verifyGreaterThan(baseline.firstCollisionSeconds,2);
+            atImpact=predictiveSafetyGeometry.predictTarget(q,impactTime);
+            position=predictiveSafetyGeometry.referencePose( ...
+                baseline.initialStationMeters+crossingSpeed*impactTime,0,baseline.referenceCurve);
+            testCase.verifyEqual(atImpact(1:2),position,AbsTol=1e-10);
+            testCase.verifyGreaterThan(atImpact(4),0);
+            testCase.verifyLessThan(q(5),0);
+        end
+        function crossingsAllowDelayedGentleBraking(testCase,crossingScenario,crossingSpeed,crossingPressure)
+            configuration=struct('referenceSpeed',crossingSpeed);
+            offsets=[-.005,0,.005];
+            if crossingPressure
+                configuration.tire=struct('frictionCoefficient',[.65;.65]);
+                offsets=[-.01,-.005,0,.005,.01];
+            end
+            [x,q,~,cfg]=collisionThreatScenario(crossingScenario,configuration);
+            if crossingPressure
+                x(1:2)=x(1:2)+[0;.3];x(3)=x(3)+.02;
+                q(1:2)=q(1:2)+[-1;.2];
+            end
+            minimum=Inf;
+            for offset=offsets
+                member=x;member(1:2)=member(1:2)+offset;member(4)=member(4)+offset;
+                target=q;target(1:2)=target(1:2)+offset;
+                physical=cfg;physical.tire.frictionCoefficient=cfg.tire.frictionCoefficient*(1+offset);
+                witness=localDelayedBraking(member,target,physical);
+                testCase.assertTrue(witness.stopped,'The independent gentle-braking witness did not reach rest.');
+                testCase.verifyGreaterThanOrEqual(witness.minimumForwardSpeed,-1e-7);
+                minimum=min(minimum,witness.minimumClearanceMeters);
+            end
+            % This is a scenario qualification threshold, not the 0.1 m
+            % collision constraint used by the actual controller.
+            testCase.verifyGreaterThan(minimum,2);
+            fprintf('Gentle-braking witness: %s, %.1f m/s, pressure=%d, minimum %.6f m\n', ...
+                crossingScenario,crossingSpeed,crossingPressure,minimum);
+        end
         function curvedInitialConditionsDoNotRequireAControllerCertificate(testCase)
             for speed=[8,15,25]
                 for name=["curvedHeadOn","curvedCrossing"]
@@ -181,4 +226,40 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             testCase.verifyEqual(baseline.strictOverlapSamples,0);
         end
     end
+end
+
+function witness=localDelayedBraking(x,target,cfg)
+    % Independent numerical witness: one second without braking, then 35%
+    % braking and zero steering. Check the complete target motion through its
+    % absorbing stop, including the time after the ego has already stopped.
+    delaySeconds=1;brakingRatio=.35;h=cfg.controller.sampleTime;
+    maximumSeconds=delaySeconds+2*norm(x(4:5))/(brakingRatio ...
+        *min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity)+5;
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    minimum=Inf;minimumSpeed=x(4);time=0;stopped=false;
+    for hold=1:ceil(maximumSeconds/h)
+        input=[0;-brakingRatio*double(time>=delaySeconds-1e-10)];
+        solution=ode45(@(~,z)nonlinearBicycleModel.derivative(z,input,cfg),[0,h],x, ...
+            odeset('RelTol',1e-10,'AbsTol',1e-12));
+        times=linspace(0,h,21);states=deval(solution,times);
+        targets=predictiveSafetyGeometry.predictTarget(target,time+times);
+        minimumSpeed=min(minimumSpeed,min(states(4,:)));
+        for node=1:numel(times)
+            gap=predictiveSafetyGeometry.rectangle(states(1:3,node),shape,targets(1:3,node),target(8:11));
+            minimum=min(minimum,gap);
+        end
+        x=nonlinearBicycleModel.sampleEndState(states(:,end),input,cfg);time=time+h;
+        if time>delaySeconds && all(x(4:6)==0),stopped=true;break;end
+    end
+    if stopped
+        targetStopSeconds=-target(4)/target(5);
+        remainingTimes=unique([time:.01:max(time,targetStopSeconds),max(time,targetStopSeconds)]);
+        targets=predictiveSafetyGeometry.predictTarget(target,remainingTimes);
+        for node=1:numel(remainingTimes)
+            gap=predictiveSafetyGeometry.rectangle(x(1:3),shape,targets(1:3,node),target(8:11));
+            minimum=min(minimum,gap);
+        end
+    end
+    witness=struct('stopped',stopped,'minimumClearanceMeters',minimum, ...
+        'minimumForwardSpeed',minimumSpeed);
 end
