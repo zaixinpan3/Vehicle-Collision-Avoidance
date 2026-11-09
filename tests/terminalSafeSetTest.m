@@ -43,6 +43,30 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(value,0);
             testCase.verifyFalse(info.member);
         end
+        function aFullCircularSweepHasANonflatPenetrationValue(testCase)
+            cfg=collisionAvoidanceControllerConfig();x=zeros(6,1);
+            q=[5;0;pi;8;0;-.008;1.6;2.4;.95;0;0];
+            context=terminalSafeSet.compactContext(q,cfg);
+            [value,gradient]=terminalSafeSet.nonlinearTangent(context,x,0);
+            testCase.verifyGreaterThan(value,cfg.outputFeedback.clearanceMeters);
+            testCase.verifyGreaterThan(norm(gradient(1:3)),.5);
+            step=1e-5;direction=[.2;-.3;.1;0;0;0];
+            plus=terminalSafeSet.nonlinearValue(context,x+step*direction,0);
+            minus=terminalSafeSet.nonlinearValue(context,x-step*direction,0);
+            testCase.verifyEqual(gradient*direction,(plus-minus)/(2*step),AbsTol=1e-5);
+        end
+        function fullCircularSweepMatchesIndependentArcDistanceGeometry(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            q=[0;0;0;4;0;.1;1.6;2.4;.95;.2;-.1];
+            context=terminalSafeSet.compactContext(q,cfg);context.stateLower(1)=-Inf;
+            center=q(1:2)+[-sin(q(3)+q(6));cos(q(3)+q(6))]/(sin(q(6))/q(7));
+            for offset=[0,15,30]
+                pose=[center+[offset;0];.2];x=[pose;zeros(3,1)];
+                exact=terminalSafeSet.parkedClearance(context,pose,q);
+                value=terminalSafeSet.nonlinearValue(context,x,0);
+                testCase.verifyEqual(max(0,context.required-value),exact,AbsTol=1e-8);
+            end
+        end
         function compactTerminalHasNoStabilityAdmissionCaps(testCase)
             cfg=collisionAvoidanceControllerConfig();cfg.model.speedMaximum=1;
             cfg.model.lateralVelocityMaximum=.01;cfg.model.yawRateMaximum=.01;

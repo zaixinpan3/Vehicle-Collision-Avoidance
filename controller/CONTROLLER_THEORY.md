@@ -1,7 +1,7 @@
 # Compact nonlinear output-feedback predictive control
 
 The adopted controller combines fixed measurement-consistency inference with
-a compact nonlinear optimization of physical states and actuator commands.
+a condensed nonlinear predictive-CBF optimization of actuator commands.
 It enforces a terminal continuation set and retains a complete held-input
 plan for numerical safety validation and fallback. Control knots, integration samples, and sensor samples have distinct
 roles; reducing the decision dimension does not remove the physical model.
@@ -220,9 +220,9 @@ $$
 s_0\in\arg\min_s\left\|x_k^s-\frac1{S_k}\sum_a x_k^a\right\|^2.
 $$
 
-Only its physical trajectory is a shooting decision. All retained members
-are subsequently propagated under the same proposed input sequence for
-acceptance. This is an approximation to robust output feedback: control at
+This member defines the performance cost. Every retained member is propagated
+under the same proposed input sequence inside the nonlinear constraint oracle
+and again at the refined acceptance resolution. This is an approximation to robust output feedback: control at
 $t_k$ depends only on $\mathcal I_k$, the reference, and retained plans. Future
 open-loop inputs are reoptimized after future measurements arrive.
 
@@ -249,8 +249,9 @@ Use $M\le N$ control intervals, with integer boundaries
 $0=c_0<c_1<\cdots<c_M=N$ and $b_i=c_i-c_{i-1}$. The first few intervals
 have one hold each; the remaining holds are distributed over the remaining
 intervals by rounded equally spaced boundaries. The initial knot count is
-retained when the preview grows. Independent decisions are endpoint commands
-$v_i\in\mathbb R^2$ and physical shooting states $X_i\in\mathbb R^6$.
+retained when the preview grows. Independent physical decisions are endpoint
+commands $v_i\in\mathbb R^2$. Physical states are eliminated by forward
+substitution of the dynamics, separately for every retained hypothesis.
 With $v_0=u^-$, the commands within interval $i$ are
 
 $$
@@ -272,28 +273,51 @@ hence every physical command increment is at most $h\dot\delta_{\max}$.
 Without a specified finite bound this inequality is omitted. The analogous
 force-ratio increment is imposed when its bound is finite.
 
-Let $\widetilde F_h$ denote the numerical flow with a held input. It composes
-RK4 sensor-period subflows and applies the declared rest reset only at the
-control boundary. Inference and planning use the same sensor-period mesh.
-The multiple-shooting equality is
+Let $\widetilde F_h$ denote the numerical held-input flow, including the
+rest reset only at the control boundary. Define the condensed trajectories
 
 $$
-X_i=\widetilde F_h(\cdots\widetilde F_h(X_{i-1},u_{c_{i-1}+1},\vartheta^{s_0})
-\cdots,u_{c_i},\vartheta^{s_0}),\qquad X_0=x_k^{s_0}.
+x_0^s=x_k^s,\qquad x_{j+1}^s=\widetilde F_h(x_j^s,u_{j+1},\vartheta^s).
 $$
 
-Additional numerical poses are evaluated at each half hold. Reducing the
-number of independent commands and shooting states does not remove these
-intermediate motion and collision checks.
+The initial integration mesh resolves the sensor period and configured
+integration step. Dense poses inside each RK4 step of duration $\Delta$ use
+its continuous extension
 
-The graph initially allocates capacity using configuration size hints and
-the preview rule. These hints are not planner velocity constraints; a larger
-requested preview grows the graph instead of being rejected. Per-interval
-active hold counts are parameters. Unused
-integration slots act as identities, and their inequalities are made
-unbounded. Changing the active preview within that capacity does not rebuild
-the solver. The capacity is not an authorization to truncate a longer
-requested preview.
+$$
+x(\theta)=x+\Delta\{b_1(\theta)k_1+b_2(\theta)(k_2+k_3)+b_4(\theta)k_4\},
+\quad 0\le\theta\le1,
+$$
+
+$$
+b_1=\theta-\tfrac32\theta^2+\tfrac23\theta^3,\quad
+b_2=\theta^2-\tfrac23\theta^3,\quad
+b_4=-\tfrac12\theta^2+\tfrac23\theta^3.
+$$
+
+Thus dense collision sampling does not require a new integration at every
+sample. Automatic derivatives of these same expressions are propagated by
+$S_{j+1}=F_xS_j+F_uD_vu_j$. There are no shooting defects to restore.
+All executable proposals still undergo independent fine RK4 replay. If a
+proposal passes the initial oracle but fails fine replay, the oracle is
+upgraded to that fine integration mesh and optimization continues from the
+same iterate while budget remains. A failed replay never authorizes execution.
+The dense extension and fine replay are numerical approximations, not validated
+integration error bounds.
+
+The causal measurement-consistency update uses the same fine RK4 resolution,
+subdividing each sensor interval without applying the absorbing reset before
+the control boundary. Its small compiled flow is cached independently of the
+optimization graph. Otherwise, an accurate raw acceleration reading near a
+model transition can reject the true physical member solely because inference
+used a coarser flow. Sensor noise bounds are unchanged; finer integration is
+still not a certified discretization-error enclosure.
+
+The compiled flow graph allocates capacity from configuration size hints and
+the preview rule. These hints are not planner velocity constraints. A larger
+preview grows the graph; unused slots are identities. Updating the active
+preview within the allocation does not require rebuilding the flow graph.
+The allocation cannot truncate a requested preview.
 
 ## 5. Dual rectangle separation
 
@@ -320,6 +344,24 @@ The normal is optimized continuously and is not restricted to body-edge axes.
 No fixed planning buffer or smooth-max distance approximation is added.
 Common translations cancel in $p_E-p_T$.
 
+For the predictive deficit, use the signed extension with a unit normal:
+
+$$
+d_\pm(x,q)=\max_{\lambda\ge0,\ \|A_T^\top\lambda\|_2=1}
+\min_a\{\lambda^\top A_T(p_E+R_Ee_a-p_T)-b_T^\top\lambda\}.
+$$
+
+It equals Euclidean distance for separated convex rectangles and is negative
+in penetration. In particular, zero multipliers cannot make an overlapping
+configuration's deficit independent of its penetration. The inner dual
+optimization is eliminated exactly: closest vertex/edge pairs give its value
+outside collision, while Minkowski-polygon facet normals give its signed value
+inside collision. The latter use of body-edge normals is exact for penetration;
+positive separation is never replaced by a four-axis clearance approximation.
+This is algebraic elimination of the geometric witnesses, not removal of the
+dual geometry. The resulting value is piecewise smooth at feature changes.
+
+
 ## 6. The compact nonlinear program
 
 Let $e_i$ contain lateral displacement from the fixed reference frame at
@@ -334,127 +376,167 @@ J=\frac12\sum_{i=1}^M h b_i e_i^\top W e_i
 $$
 
 The second term equals the sum of squared increments over all interpolated
-held commands. The nonlinear program minimizes $J$ over physical states,
-commands and the separation multipliers,
-subject to the shooting equalities, the declared forward-motion domain, endpoint input
-bounds, command-increment inequalities, and the separation inequalities.
-There are $8M$ physical state and command variables and four nonnegative dual
-variables per collision check. Longitudinal speed upper bounds, lateral velocity
-bounds and yaw-rate bounds are not imposed by the collision planner. The target
-has its prescribed forecast,
-not a separately optimized motion or a requirement to brake or stop.
-
-### Terminal continuation set
-
-The terminal model is a deliberately simpler model than the main Fiala
-prediction. At entry define $V=\sqrt{v_x^2+v_y^2}$,
-$\beta=\operatorname{atan2}(v_y,v_x)$ and $\kappa=r/V$ for $V>0$;
-at rest set $\beta=\kappa=0$. Hold $\beta,\kappa$ fixed and prescribe
+held commands. Let $C_j(v)$ be the maximum clearance deficit over retained hypotheses and
+dense intervals of hold $j$, using the interval lower bounds in Section 7.
+The primary problem is
 
 $$
-V_f(t)=\max(0,V-a_f t),\qquad
-s_f(t)=V\bar t-\tfrac12a_f\bar t^2,\qquad
-\bar t=\min(t,V/a_f),\qquad \psi_f(t)=\psi+\kappa s_f(t),
+\min_{v,\xi\ge0}\ \sum_{j=0}^{N-1}\xi_j,\qquad
+C_j(v)\le\xi_j,\qquad v\in\mathcal U_N,\qquad
+v_{x,j}^s\ge0,\qquad (x_N^s,q_N^s,u_N)\in Z_f\quad\forall s.
 $$
 
-$$
-p_f(t)=p+s_f(t)\operatorname{sinc}\!\left(\frac{\kappa s_f(t)}2\right)
-e\!\left(\psi+\beta+\frac{\kappa s_f(t)}2\right),
-\qquad \operatorname{sinc}(z)=\begin{cases}\sin(z)/z,&z\ne0,\\1,&z=0.\end{cases}
-$$
+Here $\mathcal U_N$ includes physical command bounds and any explicitly
+specified input increments. The forward-motion condition and the original
+Fiala model domain are checked throughout the sampled trajectory, including
+both sides of command changes. On the dynamic or blended branch, the front
+wheel velocity must satisfy
+$v_x\cos\delta+(v_y+l_f r)\sin\delta>0$, equivalent to
+$|\alpha_f|<\pi/2$ on the declared steering domain. This condition is inactive
+on the pure low-speed branch. Symbolic guards used to evaluate rejected trial
+points do not extend the physical model's domain. Terminal membership is hard
+and has no safety slack.
+There are $2M+N$ primary variables and $2M$ performance variables. The terminal
+and collision constraints retain all supplied physical hypotheses; those
+hypotheses are not independent controller initializations. No longitudinal
+speed cap, lateral velocity cap or yaw-rate cap is imposed.
 
-After $t_s=V/a_f$ the ego keeps its parked pose. The terminal actuator command
-holds the preceding steering and uses $b_f=-a_f/g_b$, with $g_b$ the nominal
-longitudinal acceleration gain. Input magnitude and any explicitly configured
-input-increment limits apply at terminal entry. This command is the actuator
-realization assumed for the simple terminal law; equality with the nonlinear
-Fiala flow is not proved or required as a model identity.
+A feasible zero-deficit plan attains the global lower bound of this primary
+objective. Only after finding such a plan does the implementation minimize
+$J$ with all deficits fixed to zero. A positive-deficit local solution is a
+search result, never an executable safety plan. In particular, performance
+cannot be exchanged against positive deficit through a weighted penalty.
+For an attained exact primary optimum and a valid shifted terminal extension,
+the usual shift yields $V_N(\mathcal I^+)\le V_N(\mathcal I)-\xi_0^*$.
+A local positive-deficit iterate alone does not establish this inequality.
+The deployed acceptance rule uses its zero-deficit special case.
 
-The target retains its constant tangential acceleration and sideslip, including
-zero or positive acceleration and its absorbing stopped mode. With $\Phi_f$
-the joint terminal continuation and $d$ the footprint clearance, define
+### Terminal set of a common backup controller
 
-$$
-Z_f=\{(x,q,u^-):\ u_f\text{ is admissible},\ v_x\ge0,\quad
- d(\Phi_f(t;x,q))\ge d_{\rm safe}\ \text{for every }t\ge0\}.
-$$
-
-This is a continuation-based set, not a radial stopping-distance reserve.
-It uses the complete rectangle geometry and the target's future path. No
-speed upper bound, sideslip cone or yaw-rate cap is imposed by this terminal
-component. The final optimized command need not equal $u_f$; only its transition
-to $u_f$ must be admissible. The endpoint requirement is
-
-$$
-(x_N^s,q_N^s,u_{N-1})\in Z_f\qquad\text{for every retained hypothesis }s.
-$$
-
-**Terminal assumption.** The numerical membership rule below is assumed to
-select a safe terminal region, and the associated terminal controller is
-assumed to provide admissible, safe continuation that remains in that region.
-The handoff from main prediction to this simple terminal law is included in
-this assumption. This is a design premise, not a proved Fiala-model certificate.
-
-Membership evaluates the braking arc at half-hold times and checks the parked
-rectangle against the complete remaining target track. A straight target has
-a finite segment or a forward ray; a curved target has a finite arc or the
-whole circle. For a forward ray, the closest-distance calculation can stop once
-every target vertex lies ahead of every ego vertex along the travel direction:
-beyond that point the distance cannot decrease. Thus the infinite straight
-track has a finite exact geometry calculation. Perception-range exit does not
-end this obligation. Positive rectangle clearance is evaluated by the exact
-convex distance geometry; signed penetration values supply restoration
-information. Sampling of the moving braking prefix is part of the stated
-terminal assumption, not a continuous-time proof.
-
-Let $c_f\le0$ denote numerical membership, including terminal input compatibility.
-At terminal expansion point $\bar X_N$, the optimization imposes the hard row
+Use the simple, causal backup command
 
 $$
-c_f(\bar X_N,q_N)+D_xc_f(\bar X_N,q_N)(X_N-\bar X_N)\le0,
+u_f=(0,b_f),\qquad b_f=\operatorname{clip}_{[b_{\min},b_{\max}]}(-b_0),\quad 0<b_0<1,
 $$
 
-with explicit input-transition rows. This terminal row has no collision slack.
-After each solve the complete terminal function is recomputed on every actual
-command rollout. A failed nonlinear terminal check cannot authorize execution;
-its tangent is refreshed for another solve if budget remains. A feasible
-retained plan is eligible only after the same terminal check.
+where $b_0$ is the configured backup braking ratio (default $0.6$). The
+steering is zero and braking is constant, within the physical input bounds.
+The preceding command is used only to check entry increments. The actual
+deceleration follows the vehicle dynamics and persistent physical parameters;
+no fixed stopping acceleration is assumed.
 
-IPOPT performs nonlinear iterations with automatic first derivatives and a
-limited-memory Hessian approximation. The nonlinear vehicle equations remain
-in the problem; a linearization is only an internal step of the nonlinear
-solver. A numerical iteration/time limit can stop the solve before convergence.
-Convergence is neither required nor sufficient for acceptance: the proposed
-input sequence is checked separately by numerical rollout. Numerical input
-bound violations are projected onto the actuator bounds before replay; only
-the projected and rechecked commands may be executed.
+For each endpoint hypothesis, propagate the fixed command with the same
+vehicle flow used for the main trajectory. No backup controls are optimized.
+Let $J_f^s$ be its first absorbing-rest boundary under the declared reset.
+After that boundary the ego remains parked. The target retains its constant
+tangential acceleration and sideslip, including its absorbing stop. Let
+$\Phi_f$ denote the resulting joint continuation. Define
 
-For feasibility restoration, allocate one additional scalar $s\ge0$ and
-require each vertex dual value plus $s$ to be at least $d_{\rm safe}$. Its objective is
-$J+10^4s$. During ordinary improvement fix $s=0$. When no checked plan is
-available, permit $s\ge0$ temporarily while searching from one geometric
-planner rollout. Its dual multipliers are initialized from closest-feature
-normals. Measurement-consistent physical hypotheses are distinct from this
-single control initialization.
+$$
+Z_f=\{(x,q,\vartheta,u^-):\ u_f\text{ and its entry increment are admissible},
+\quad J_f<\infty,\quad \Phi_f(t)\in\mathcal D,\quad
+ d(\Phi_f(t))\ge d_{\rm safe}\ \text{for every }t\ge0\}.
+$$
 
-Restoration is a numerical search procedure, not a recovery control law or
-an exact lexicographic optimization. Its positive slack never authorizes a
-clearance deficit: every executable candidate must independently pass the
-original hard checks in Section 7. Each solve uses the single initialized or
-updated trajectory; further solves refresh the terminal tangent within the
-initialization or recovery budget.
-These attempts count toward the actual call time; the iteration-level wall
-limit is not a guaranteed interrupt deadline.
+Here $\mathcal D$ is the forward-motion and physical-model domain described
+above. Require $(x_N^s,q_N^s,\vartheta^s,u_N)\in Z_f$ for every retained hypothesis.
+This is a backup-trajectory set, not a radial stopping-distance reserve.
+It does not require the target to brake, impose stability caps, or require
+an instantaneous ego stop at the optimized endpoint. Holding the backup input
+makes its continuation suffix the backup of its successor, including after
+rest. With exact dynamics and whole-trajectory membership, this suffix
+property gives terminal invariance. The final optimized command need not
+already equal $u_f$; its transition to $u_f$ must be admissible.
+
+Numerical membership propagates the backup until absorbing rest, checks its
+dense geometry and motion domain, and checks the parked rectangle against the
+target's complete remaining track. Integration blocks are extended when needed;
+an allocation limit is not a terminal state restriction. The common command
+can produce different stopping times for different physical hypotheses.
+These are deterministic continuations of one candidate, not additional planner
+initializations.
+
+If the current information set already belongs to this common backup set,
+its checked terminal continuation supplies an executable fallback immediately.
+The optimizer still receives only one planner-generated initialization.
+Continuation keeps the executable fine plan and the last accepted optimization
+iterate separately: an infeasible search iterate may warm-start further search,
+but can never replace the checked executable plan. At absorbing rest,
+nonpositive braking commands generate the same stationary trajectory. Replacing
+such warm-start commands by neutral braking exposes an acceleration derivative
+without changing that trajectory; actuator increments still apply.
+
+A straight target has a finite segment or forward ray; a curved target has
+a finite arc or complete circle. A forward ray can be bounded for positive
+distance evaluation once all target vertices lie ahead of all ego vertices
+along travel, beyond which distance cannot decrease. Positive parked clearance
+uses exact convex feature geometry. Negative signed values guide restoration;
+perception-range exit never terminates the safety obligation.
+
+For a complete circular target track, its rigid rectangle sweeps exactly an
+annulus about the instantaneous rotation center $c_T$. Let $r_T^-$ be the
+point-to-rectangle distance from $c_T$ to the target footprint and $r_T^+$ the
+maximum distance to its vertices. For the parked ego footprint, let $r_E^+$
+be its maximum vertex radius and $s_E(c_T)$ the signed point-to-rectangle
+distance, positive outside. A signed continuation margin is
+
+$$
+d_{\rm ring}=\max\{r_T^- - r_E^+,\ s_E(c_T)-r_T^+\}.
+$$
+
+Its positive part equals the exact distance to the swept target set; negative
+values supply restoration directions. The inner-hole and outer-region branches
+are both retained. This is the exact rotational sweep, not replacement of the
+vehicle by a bounding disk, and needs no angular sampling to detect collision.
+
+**Terminal assumption and numerical scope.** The backup is assumed to reach
+rest on the admitted terminal domain, and the numerical membership rule is
+assumed to select a safe terminal region. The runtime explicitly replays the
+backup with the vehicle model, rather than assuming that an independently
+chosen kinematic curvature is realized by the held steering. Finite hypotheses,
+numerical integration and sampled extrema still prevent an unconditional
+physical safety or recursive-feasibility theorem. The exact suffix argument
+requires consistent flow, information containment and sound whole-trajectory
+membership.
+
+Let $c_f(x_N,q_N,u_N)\le0$ denote numerical membership, including terminal
+input compatibility. The nonlinear constraint oracle evaluates this complete
+function at every new control iterate. The SQP subproblem linearizes its
+current value and derivatives; a frozen terminal tangent is not an additional
+constraint on later nonlinear iterates. Derivatives propagate the optimized endpoint state through every backup hold.
+Backup state sensitivities are propagated with those of the main trajectory;
+the absorbing reset has its declared zero velocity sensitivities.
+
+At regular minima, the active backup interval and closest parked-track
+geometric feature supply envelope derivatives. Negative restoration branches retain
+their selected sample/axis, or repeat the track search when an intersection
+witness is not a minimizing signed-distance feature. The complete minimum is
+reselected at each new iterate. This avoids assuming that a stale feature
+remains valid during the nonlinear solve.
+
+The condensed solver uses SQP with nonlinear trial evaluation and a local
+quasi-Newton Hessian. The vehicle dynamics remain nonlinear. A single
+planner-generated control sequence initializes the first solve; continuation
+uses the shifted stored sequence. For a moving target, the initializer retains
+the obstacle tangent with nonnegative projection onto the ego forward
+direction as its circulation preference, using a fixed sign at an exact tie. This breaks collinear symmetry
+without enumerating alternate trajectories. Its actuator mapping uses the
+physical steering range and does not impose the legacy observer sideslip or
+speed caps. These are initialization choices, not safety constraints or an
+admission rule; the nonlinear optimizer may change the resulting commands. Iteration and wall-time budgets limit local
+improvement, and do not constitute global feasibility or hard execution-time
+guarantees. Every accepted replacement passes both the hard constraints and
+fine nonlinear replay. Numerical command normalization requires replay if it
+changes the already checked sequence.
 
 ## 7. Dense acceptance and retention of executable plans
 
 For each retained physical member, expand the proposed coarse commands into
 all $N$ held commands, propagate its own persistent parameters, and evaluate
-input bounds, configured physical input increments, the forward-motion domain,
+input bounds, configured physical input increments, the physical-model domain,
 and the exact rectangle-distance dual value. Dense acceptance uses $K_v=64$
 RK4 steps per hold by default and retains the held command and control-boundary
-rest reset. An improvement can use the coarse check when a checked fallback
-is already available. There is no fixed extra clearance buffer.
+rest reset. Every new executable proposal uses the fine check. There is no fixed extra clearance buffer.
 
 For the given member let $a_E,a_T$ be footprint-radius upper bounds about the
 vehicle reference points. Given valid continuous speed/rate bounds, a Lipschitz bound on Euclidean footprint distance is
@@ -476,8 +558,8 @@ d(t)\ge\max\{q_0-L_dt,\ q_1-L_d(\Delta t-t)\},\qquad
 \frac{q_0+q_1-L_d\Delta t}{2}\right\}.
 $$
 
-Require $\underline d\ge d_{\rm safe}$ on every interval. Use
-$\Delta t=h/2$ for the first check and $h/K_v$ after refinement. If both
+Require $\underline d\ge d_{\rm safe}$ on every interval. Use $\Delta t=h/K_v$ on the dense pose grid in both the constraint oracle
+and refined replay. If both
 vehicles remain exactly at their declared rest equilibria under nonpositive
 ego force commands, $L_d=0$ is valid; stationary configurations do not need a
 moving-vehicle reserve. The implementation estimates the speed/rate extrema
@@ -486,14 +568,12 @@ sampled extrema and numerical poses are not validated continuous bounds, so
 the interval check is an engineering check, not an end-to-end robust safety
 certificate.
 
-Only a sequence passing these checks can supply a command. An NLP iterate
-with a shooting defect is assessed using its actual command rollout, not its
-inconsistent shooting states. Geometry and state checks include the current
+Only a sequence passing these checks can supply a command. The condensed trajectory is dynamically consistent with its numerical flow
+by construction. Geometry and state checks include the current
 root. The full accepted fine input sequence is stored.
 
 At the next boundary, delete the executed first input and append the terminal
-controller command, repeating it if the preview has grown. The terminal steering
-is held, so this simple terminal input remains constant. Recheck the complete
+controller command, repeating it if the preview has grown. The backup input remains constant. Recheck the complete
 sequence and its new terminal membership from the conditioned information.
 The retained sequence stays at its original hold resolution; a coarse refit is
 only a warm start and may not replace it without validation. Heuristic repeated
@@ -504,14 +584,13 @@ and conditioning, exact constraint evaluation, and an admissible policy class
 containing the retained fine sequence, the usual shift argument supplies a
 feasible continuation: the old feasible prefix survives conditioning, its old
 endpoint belongs to $Z_f$, and the appended terminal law stays in $Z_f$.
-A different main/terminal prediction model requires the assumed valid handoff;
-terminal safety alone does not establish that interface. Numerical integration,
-finite hypotheses and local tangents are implementation approximations, so the
+The backup uses the same vehicle transition, so its continuation does not
+require a switch to a different curvature model. Numerical integration,
+finite hypotheses and sampled membership are implementation approximations, so the
 runtime still reports an assumed terminal contract rather than an unconditional
-recursive-feasibility certificate. Exact membership of the executed plan is
-never inferred from the affine terminal row alone.
+recursive-feasibility certificate. Membership of an executed plan is evaluated through the full terminal function.
 
-A replay-feasible proposal or seed can be accepted even if IPOPT reaches its
+A replay-feasible proposal or seed can be accepted even if SQP reaches its
 iteration or time limit. If improvement fails, a replay-feasible retained fine
 plan remains available. If no checked candidate exists, the runtime reports a
 planning failure and does not claim physical impossibility or authorize an

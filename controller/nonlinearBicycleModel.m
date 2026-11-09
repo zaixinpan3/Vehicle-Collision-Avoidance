@@ -455,12 +455,13 @@ classdef nonlinearBicycleModel
             u=[atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-slip+terminal.steeringOffset;b];
         end
 
-        function u = accelerationGuidance(x,acceleration,previous,cfg,longitudinalWeight,coupled)
+        function u = accelerationGuidance(x,acceleration,previous,cfg,longitudinalWeight,coupled,physicalBoundsOnly)
             % Map a virtual world acceleration to initialization inputs using
             % the existing yaw-rate loop and inverse Fiala branch. This is
             % not an affine-input barrier projection or an execution filter.
             if nargin<5,longitudinalWeight=1;end
             if nargin<6,coupled=false;end
+            if nargin<7,physicalBoundsOnly=false;end
             speed=hypot(x(4),x(5));course=x(3)+atan2(x(5),x(4));
             forward=[cos(course);sin(course)];lateral=[-forward(2);forward(1)];
             tire=nonlinearBicycleModel.tireParameters(cfg);p=cfg.nominalClf;
@@ -469,10 +470,14 @@ classdef nonlinearBicycleModel
             % Slow turns must remain reachable in the same sideslip domain as
             % the RTI model; a friction-only yaw demand grows as speed falls.
             kinematicLimit=.8*tan(cfg.model.sideslipMaximum)*max(x(4),0)/cfg.vehicle.lr;
+            if physicalBoundsOnly
+                betaLimit=atan(cfg.vehicle.lr/(cfg.vehicle.lf+cfg.vehicle.lr)*tan(cfg.outputFeedback.steeringMaximum));
+                kinematicLimit=sin(betaLimit)*speed/cfg.vehicle.lr;
+            end
             limit=min(limit,kinematicLimit);
             desiredYaw=min(limit,max(-limit,desiredYaw));
             longitudinal=longitudinalWeight*(forward.'*acceleration);
-            longitudinal=min(longitudinal,(cfg.model.speedMaximum-x(4))/cfg.controller.sampleTime);
+            if ~physicalBoundsOnly,longitudinal=min(longitudinal,(cfg.model.speedMaximum-x(4))/cfg.controller.sampleTime);end
             b=(longitudinal+nonlinearBicycleModel.roadLoad(x(4),cfg)/cfg.vehicle.m)/nonlinearBicycleModel.tireAccelerationGain(cfg);
             % Allocate braking and lateral force together. The cruise seed's
             % brakingRatioLimit is not an avoidance actuator bound. Reserve
@@ -516,7 +521,7 @@ classdef nonlinearBicycleModel
             kinematicSteering=atan((cfg.vehicle.lf+cfg.vehicle.lr)/cfg.vehicle.lr*tan(beta));
             weight=localBlend(x(4),cfg);
             u=[weight*steering+(1-weight)*kinematicSteering;b];
-            if coupled && b<0 && abs(x(5))>0
+            if coupled && ~physicalBoundsOnly && b<0 && abs(x(5))>0
                 % The field selects the maneuver. Its input mapping must
                 % also respect the already declared observer domain: rapid
                 % braking can shrink vx faster than lateral motion decays.

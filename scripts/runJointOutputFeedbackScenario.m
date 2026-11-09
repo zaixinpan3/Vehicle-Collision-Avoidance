@@ -158,7 +158,7 @@ function timing=localSolverTiming(trace)
         if isfield(trace(j).metadata,'nlpSeconds'),seconds(end+1)=trace(j).metadata.nlpSeconds;end %#ok<AGROW>
     end
     timing=localTiming(seconds,.1);
-    timing.scope="acceptedCallsOnlyNlpSolveExcludingCompilationPreparationAndReplay";
+    timing.scope="acceptedCallsOptimizationIncludingTrialChecksExcludingCompilationAndRetainedPlanPreparation";
     timing.meanUnder100Milliseconds=~isempty(seconds) && mean(seconds)<.1;
 end
 

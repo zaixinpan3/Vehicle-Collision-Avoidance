@@ -344,6 +344,12 @@ classdef predictiveSafetyGeometry
             anticipation=localAnticipation(x,target,cfg,parameters,normalWorld);
             tangentialAcceleration=cfg.planner.tangentialRate*parameters.speed ...
                 *(anticipation.transportGradient+anticipation.separationGradient);
+            if isfield(parameters,'initialCirculation') && parameters.initialCirculation~=0
+                % Keep the initial forward-facing circulation direction through the
+                % one seed rollout; an exactly symmetric case uses a fixed tie.
+                tangentialAcceleration=tangentialAcceleration ...
+                    +parameters.initialCirculation*cfg.planner.tangentialRate*parameters.speed*r*tangent;
+            end
             desired=0;
             rate=cfg.planner.radialRate;
             relative=(-kappa*tau^2-2*rate*nu-rate^2*(h-desired))*normal ...
@@ -352,9 +358,9 @@ classdef predictiveSafetyGeometry
             acceleration=r*(relative+transport)+tangentialAcceleration;
             correction=0;activation=1;incidence=1;
             if isfield(parameters,'preferredAcceleration')
-                % Keep only the outward normal correction. Add both signed
-                % tangential vectors directly: there is no selected side,
-                % one-sided tangential clipping, or release timer.
+                % Keep only the outward normal correction and add the signed
+                % tangential vectors. The compact seed's circulation is fixed
+                % at initialization; no release timer is needed.
                 preferred=parameters.preferredAcceleration;normalWorld=r*normal;
                 incidence=anticipation.incidence;
                 correction=incidence*max(0,normalWorld.'*(acceleration-preferred));
@@ -1412,6 +1418,16 @@ end
 
 function candidate=localCirculationRollout(model,data,speed,count)
     cfg=model.cfg;h=cfg.controller.sampleTime;
+    physicalOnly=isfield(model,'compactInitialization') && model.compactInitialization;
+    circulationSign=0;
+    if physicalOnly && model.target(4)>0
+        parameters=localFieldParameters(data,1,speed);
+        [~,initialField]=predictiveSafetyGeometry.circulationField(model.initialState,data.target(:,1),cfg,parameters);
+        forward=predictiveSafetyGeometry.direction(model.initialState(3));
+        alignment=forward.'*initialField.rotation*initialField.tangent;
+        circulationSign=sign(alignment);
+        if abs(alignment)<1e-8,circulationSign=1;end
+    end
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1), ...
         'speedScale',speed, ...
@@ -1435,7 +1451,7 @@ function candidate=localCirculationRollout(model,data,speed,count)
         projection=predictiveSafetyGeometry.project(x(1:2),model.lane);
         candidate.maximumDeviation=max(candidate.maximumDeviation,abs(projection.lateralPosition));
         if index>count,break;end
-        if hypot(x(4),x(5))<=cfg.model.brakeHoldSpeed
+        if ~physicalOnly && hypot(x(4),x(5))<=cfg.model.brakeHoldSpeed
             b=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/nonlinearBicycleModel.tireAccelerationGain(cfg);
             change=cfg.model.brakingRatioRateMaximum*h;
             u=[prior(1);min(prior(2)+change,max(prior(2)-change,b))];
@@ -1446,13 +1462,14 @@ function candidate=localCirculationRollout(model,data,speed,count)
             acceleration=localRouteAcceleration(x,projection,model);
             if ~encounterEnded
                 parameters=localFieldParameters(data,index,speed);
-                parameters.preferredAcceleration=acceleration;
+                parameters.preferredAcceleration=acceleration;parameters.initialCirculation=circulationSign;
                 [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
                 candidate.fieldActive=candidate.fieldActive || field.activation>0;
                 if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
             end
             acceleration=predictiveSafetyGeometry.wallGuidance(x,acceleration,model);
-            u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true);
+            u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true,physicalOnly);
+            if physicalOnly,u(1)=min(cfg.outputFeedback.steeringMaximum,max(-cfg.outputFeedback.steeringMaximum,u(1)));end
         end
         candidate.inputs(:,index)=u;
         next=nonlinearBicycleModel.sample(x,u,cfg);

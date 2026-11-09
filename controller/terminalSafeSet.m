@@ -1,9 +1,10 @@
 classdef terminalSafeSet
-% compactContext/compactEvaluate implement the active compact terminal set:
-% assumed-safe simple braking continuation plus the full parked-target track,
-% without the legacy stability domain or perception-exit termination below.
+% compactControl supplies the runtime backup command. The compact solver
+% propagates that command with its vehicle flow until rest, then uses
+% compactEvaluate for the complete parked-target track. The kinematic
+% continuation below remains available as a simplified research comparator.
 %terminalSafeSet Terminal set of the braking continuation, and the anchor's holds.
-% The terminal set uses the shared observer operating domain, and inside it the ego is a
+% The legacy state-input comparator below uses the shared observer operating domain, and inside it the ego is a
 % kinematic vehicle under the simplest law: the steering held and a constant
 % mild braking rate to rest. In the terminal set the declared model is taken to
 % follow this kinematic model (the user's modeling assumption of October 11,
@@ -54,34 +55,34 @@ classdef terminalSafeSet
 % (CONTROLLER_THEORY.md, Section 4).
     methods (Static)
         function context = compactContext(target,cfg)
-            % Assumed-safe terminal contract: hold course curvature and sideslip,
-            % decelerate the ego to rest, then check the complete target track.
+            % Parked-track completion for the compact runtime, also usable
+            % with the simplified kinematic continuation as a comparator.
             % No target braking condition, stability caps, or perception exit.
             if ~isempty(target) && target(4)==0,target(5)=0;end
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-            context=struct('deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
+            context=struct('compactRuntime',true,'deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
                 'sampleTime',cfg.controller.sampleTime,'shape',shape, ...
                 'required',cfg.outputFeedback.clearanceMeters,'inflation',0, ...
                 'range',Inf,'clearance',[Inf;Inf],'hasTarget',~isempty(target), ...
                 'targetEpoch',target,'targetEpochIndex',0,'sampleIndex',0, ...
                 'encounterEnded',false,'stateLower',[0;-Inf;-Inf], ...
                 'stateUpper',Inf(3,1),'sideslipMaximum',0,'checkSideslip',false, ...
-                'brakingRatio',-cfg.terminal.brakingDecelerationMetersPerSecondSquared ...
-                    /nonlinearBicycleModel.tireAccelerationGain(cfg), ...
+                'brakingRatio',min(min(1,cfg.actuation.brakingRatioMaximum), ...
+                    max(max(-1,cfg.actuation.brakingRatioMinimum),-cfg.outputFeedback.backupBrakingRatio)), ...
                 'brakingBounds',[max(-1,cfg.actuation.brakingRatioMinimum);min(1,cfg.actuation.brakingRatioMaximum)]);
         end
 
         function input = compactControl(previous,cfg)
             context=terminalSafeSet.compactContext([],cfg);
-            input=[previous(1);context.brakingRatio];
+            input=[0;context.brakingRatio];
         end
 
         function [value,info] = compactEvaluate(x,target,previous,cfg)
             context=terminalSafeSet.compactContext(target,cfg);
             value=terminalSafeSet.nonlinearValue(context,x,0);
             input=terminalSafeSet.compactControl(previous,cfg);
-            slew=abs(input(2)-previous(2))-cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
-            value=max([value;slew;abs(input(1))-cfg.outputFeedback.steeringMaximum]);
+            slew=abs(input-previous)-[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
+            value=max([value;slew;abs(previous(1))-cfg.outputFeedback.steeringMaximum]);
             info=struct('member',isfinite(value)&&value<=1e-6, ...
                 'value',value,'input',input,'stopSeconds',hypot(x(4),x(5))/context.deceleration, ...
                 'model',"constantCurvatureBrakingThenParked", ...
@@ -657,7 +658,7 @@ classdef terminalSafeSet
                     value=context.required-localSignedRectangle(path.pose(:,active.index),context.shape,q);
                 else
                     q=localTarget(context,node,path.speed/context.deceleration);
-                    value=context.required-localSignedParked(context,path.pose(:,end),q);
+                    value=context.required-localSignedParked(context,path.pose(:,end),q,active.parked);
                 end
                 return;
             end
@@ -684,11 +685,12 @@ classdef terminalSafeSet
             end
             if isempty(out)
                 parkedTarget=localTarget(context,node,path.speed/context.deceleration);
-                candidate=localSignedParked(context,path.pose(:,end),parkedTarget);
+                [candidate,parked]=localSignedParked(context,path.pose(:,end),parkedTarget);
                 if candidate<gap,gap=candidate;kind="parked";end
             end
             if context.required-gap>value
                 value=context.required-gap;active.kind=kind;active.index=gapIndex;
+                if kind=="parked",active.parked=parked;end
             end
         end
 
@@ -711,7 +713,7 @@ classdef terminalSafeSet
             end
             [distance,sigma]=localTrackDistance(pose,context.shape,q,lower,upper,full);
             witness=localAlong(q,sigma);
-            track=struct('lower',lower,'upper',upper,'fullCircle',full,'exitSeconds',exitSeconds);
+            track=struct('lower',lower,'upper',upper,'fullCircle',full,'exitSeconds',exitSeconds,'witnessArcLength',sigma);
         end
 
         function [middle,next] = holdStates(x,u,cfg)
@@ -953,33 +955,84 @@ function gap=localSignedRectangle(pose,shape,q)
     gap=max(abs(relative.'*axes)-shape(1:2).'*abs(re.'*axes)-q(8:9).'*abs(rt.'*axes));
 end
 
-function gap=localSignedParked(context,pose,q)
+function [gap,branch]=localSignedParked(context,pose,q,branch)
+    % Differentiate the selected feature/time without rerunning the global
+    % track minimization. The full value is still recomputed at every iterate.
+    compact=isfield(context,'compactRuntime') && context.compactRuntime;
+    full=false;if compact,[~,~,full]=localTrack(q,pose(1:2),context.range);end
+    if full
+        gap=localFullCircleGap(pose,context.shape,q);
+        branch=struct('kind',"fullCircle");return;
+    end
+    if compact && nargin>3 && branch.kind=="witness"
+        witness=branch.witness;if branch.atStart,witness=q;end
+        gap=localSignedRectangle(pose,context.shape,witness);return;
+    end
+    if compact && nargin>3 && branch.kind=="sample"
+        [lower,upper,full]=localTrack(q,pose(1:2),context.range);
+        if full,upper=lower+2*pi/abs(sin(q(6))/q(7));end
+        witness=localAlong(q,lower+branch.fraction*(upper-lower));
+        gap=localSignedRectangle(pose,context.shape,witness);return;
+    end
+    if compact && nargin>3 && branch.kind=="sweptAxis"
+        [lower,upper]=localTrack(q,pose(1:2),context.range);
+        gap=localSweptAxisGap(context,pose,q,lower,upper,branch.index);return;
+    end
     [gap,witness,track]=terminalSafeSet.parkedClearance(context,pose,q);
+    branch=struct('kind',"witness",'witness',witness, ...
+        'atStart',abs(track.witnessArcLength)<1e-9,'fraction',0,'index',0);
     if gap>0,return;end
-    if track.lower==track.upper,gap=localSignedRectangle(pose,context.shape,q);return;end
+    if track.lower==track.upper,gap=localSignedRectangle(pose,context.shape,q);branch.atStart=true;return;end
+    if ~branch.atStart,branch.kind="search";end
     curvature=sin(q(6))/q(7);
     if curvature==0
-        % A translating rectangle sweeps a convex polygon. Its edge normals
-        % are the vehicle axes and the transverse travel direction.
-        re=[cos(pose(3)),-sin(pose(3));sin(pose(3)),cos(pose(3))];
-        rt=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
-        direction=predictiveSafetyGeometry.direction(q(3)+q(6));
-        axes=[re,rt,[-direction(2);direction(1)]];axes=[axes,-axes];
-        relative=pose(1:2)+re*context.shape(3:4)-q(1:2)-rt*q(10:11);
-        displacement=direction.'*axes;
-        support=max(track.lower*displacement,track.upper*displacement);
-        gap=max(relative.'*axes-context.shape(1:2).'*abs(re.'*axes) ...
-            -q(8:9).'*abs(rt.'*axes)-support);
+        [gap,branch.index]=localSweptAxisGap(context,pose,q,track.lower,track.upper);
+        branch.kind="sweptAxis";
     else
-        % The exact positive-distance test above decides separation. Inside
-        % a curved swept footprint, sampled penetrations only supply a
-        % negative restoration value; they never certify a positive gap.
+        % Positive clearance uses exact arc/edge geometry. These negative
+        % sampled penetrations guide restoration and cannot certify safety.
         high=track.upper;
         if track.fullCircle,high=track.lower+2*pi/abs(curvature);end
-        arc=linspace(track.lower,high,65);gap=localSignedRectangle(pose,context.shape,witness);
-        for s=arc,gap=min(gap,localSignedRectangle(pose,context.shape,localAlong(q,s)));end
+        fractions=linspace(0,1,65);gap=localSignedRectangle(pose,context.shape,witness);
+        for fraction=fractions
+            candidate=localSignedRectangle(pose,context.shape,localAlong(q,track.lower+fraction*(high-track.lower)));
+            if candidate<gap,gap=candidate;branch.kind="sample";branch.fraction=fraction;end
+        end
         gap=min(0,gap);
     end
+end
+
+function gap=localFullCircleGap(pose,shape,q)
+    % A rectangle rotating through a complete revolution sweeps an exact
+    % annulus, not a bounding disk. Its radius range is the continuous image
+    % of the connected rectangle. This also supplies a nonflat penetration
+    % value when sparse angular samples miss the colliding arc.
+    curvature=sin(q(6))/q(7);course=q(3)+q(6);
+    center=q(1:2)+[-sin(course);cos(course)]/curvature;
+    rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+    local=rotation.'*(center-q(1:2))-q(10:11);
+    inner=norm(max(abs(local)-q(8:9),0));
+    outer=max(vecnorm(localCorners(q(1:3),q(8:11))-center));
+    rotation=[cos(pose(3)),-sin(pose(3));sin(pose(3)),cos(pose(3))];
+    local=rotation.'*(center-pose(1:2))-shape(3:4);residual=abs(local)-shape(1:2);
+    nearest=norm(max(residual,0));if all(residual<=0),nearest=max(residual);end
+    farthest=max(vecnorm(localCorners(pose,shape)-center));
+    gap=max(inner-farthest,nearest-outer);
+end
+
+function [gap,index]=localSweptAxisGap(context,pose,q,lower,upper,index)
+    re=[cos(pose(3)),-sin(pose(3));sin(pose(3)),cos(pose(3))];
+    rt=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+    direction=predictiveSafetyGeometry.direction(q(3)+q(6));
+    axes=[re,rt,[-direction(2);direction(1)]];axes=[axes,-axes];
+    relative=pose(1:2)+re*context.shape(3:4)-q(1:2)-rt*q(10:11);
+    displacement=direction.'*axes;
+    if isinf(upper)
+        % A ray has infinite support only in its forward-facing directions.
+        support=lower*displacement;support(displacement>1e-14)=Inf;
+    else,support=max(lower*displacement,upper*displacement);end
+    values=relative.'*axes-context.shape(1:2).'*abs(re.'*axes)-q(8:9).'*abs(rt.'*axes)-support;
+    if nargin>5,gap=values(index);else,[gap,index]=max(values);end
 end
 
 function witness=localTerminalEntryCollision(context,entry,target,errorSet,epoch)
