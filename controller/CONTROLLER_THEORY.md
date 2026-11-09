@@ -231,12 +231,23 @@ open-loop inputs are reoptimized after future measurements arrive.
 For speed bound $v_k^+=\max_s\sqrt{(v_{x,k}^s)^2+(v_{y,k}^s)^2}$ choose
 
 $$
-T_k^{\rm req}=\max\{T_{\min},2h,v_k^+/a_p+T_s\},\qquad
+T_k^{\rm req}=\max\{T_{\min},2h,v_k^+/a_p+T_s,T_{\rm space}\},\qquad
 N_k=\max\left\{N_{k-1},\left\lceil
  \frac{\Delta T\lceil T_k^{\rm req}/\Delta T\rceil}{h}
 \right\rceil\right\}.
 $$
 
+For a target and positive cruise reference $v_{\rm ref}$, let
+
+$$
+T_{\rm space}=\frac{2(a_E+\max_s a_T^s)}{\max(v_k^+,v_{\rm ref})},
+\qquad a=\sqrt{\ell^2+w^2}+\|o\|,
+$$
+
+where $\ell,w$ are footprint half dimensions and $o$ is the reference-point
+offset. Otherwise set $T_{\rm space}=0$. This spatial lookahead exposes the
+scale of passing both footprints at low speed; these radii size the horizon
+only and never replace the rectangle-distance constraints.
 Here $a_p>0$ is a preview scale, not a certified braking acceleration. The
 minimum preview admits avoidance planning even when the ego is slow and a
 target is approaching. An explicitly configured duration replaces the
@@ -463,8 +474,13 @@ Continuation keeps the executable fine plan and the last accepted optimization
 iterate separately: an infeasible search iterate may warm-start further search,
 but can never replace the checked executable plan. At absorbing rest,
 nonpositive braking commands generate the same stationary trajectory. Replacing
-such warm-start commands by neutral braking exposes an acceleration derivative
-without changing that trajectory; actuator increments still apply.
+such warm-start commands by neutral braking leaves that trajectory unchanged;
+actuator increments still apply. At exact rest and neutral force, the local
+model selects the one-sided acceleration branch of the force map and held
+transition. The negative-force branch still has the absorbing reset and zero
+velocity sensitivities. There is no two-sided classical derivative at this
+switch. Nonlinear trial evaluation uses the unchanged physical transition,
+and accepting a search direction requires the full replay checks.
 
 A straight target has a finite segment or forward ray; a curved target has
 a finite arc or complete circle. A forward ray can be bounded for positive
@@ -514,15 +530,41 @@ witness is not a minimizing signed-distance feature. The complete minimum is
 reselected at each new iterate. This avoids assuming that a stale feature
 remains valid during the nonlinear solve.
 
-The condensed solver uses SQP with nonlinear trial evaluation and a local
-quasi-Newton Hessian. The vehicle dynamics remain nonlinear. A single
+The primary deficit problem uses SQP with nonlinear trial evaluation. Once a
+checked zero-deficit plan is available, the performance problem uses a
+regularized Gauss--Newton model. Write its least-squares objective as
+$J(v)=\tfrac12\|r(v)\|^2$, put $g=D r^\top r$ and
+$H=D r^\top D r+\lambda I$ with $\lambda>0$, and collect the nonlinear
+zero-deficit stage, domain and terminal constraints in $c(v)\le0$.
+At a search iterate $\bar v$, compute
+
+$$
+\begin{aligned}
+\min_{d,e}\quad &g^\top d+\tfrac12d^\top H d+\rho e+\tfrac12e^2,\\
+\text{subject to}\quad &c(\bar v)+Dc(\bar v)d\le e\mathbf1,\\
+&\bar v+d\in\mathcal U_N,\qquad e\ge0.
+\end{aligned}
+$$
+
+Only $e$ is constrained nonnegative; $d$ is unrestricted except for the input
+rows. A backtracking line search evaluates the original nonlinear merit
+$J(v)+\rho\|[c(v)]_+\|_1$. The elastic variable globalizes the numerical
+search and is never an executable safety slack: a replacement still requires
+zero deficit, hard terminal membership and fine replay. Trial evaluations
+need values only; sensitivities are evaluated at the next linearization point.
+This avoids rebuilding a general-purpose performance NLP on every frame.
+The vehicle dynamics remain nonlinear. A single
 planner-generated control sequence initializes the first solve; continuation
 uses the shifted stored sequence. For a moving target, the initializer retains
 the obstacle tangent with nonnegative projection onto the ego forward
 direction as its circulation preference, using a fixed sign at an exact tie. This breaks collinear symmetry
 without enumerating alternate trajectories. Its actuator mapping uses the
 physical steering range and does not impose the legacy observer sideslip or
-speed caps. These are initialization choices, not safety constraints or an
+speed caps. Before nonlinear search, project the single warm sequence onto
+the existing linear input bounds, configured increments and terminal-command
+handoff rows by minimizing its squared change. This numerical projection
+adds no physical constraint and does not certify collision or terminal safety.
+These are initialization choices, not safety constraints or an
 admission rule; the nonlinear optimizer may change the resulting commands. Iteration and wall-time budgets limit local
 improvement, and do not constitute global feasibility or hard execution-time
 guarantees. Every accepted replacement passes both the hard constraints and
@@ -591,7 +633,13 @@ runtime still reports an assumed terminal contract rather than an unconditional
 recursive-feasibility certificate. Membership of an executed plan is evaluated through the full terminal function.
 
 A replay-feasible proposal or seed can be accepted even if SQP reaches its
-iteration or time limit. If improvement fails, a replay-feasible retained fine
+iteration or time limit. Its performance cost, evaluated on the fine replay,
+must improve on the stored feasible plan under the same current reference.
+For a retained sequence that is not a coarse interpolation, use the actual
+sum of squared increments of its held inputs; do not substitute increments of
+refitted knots. The original fine sequence remains an admissible fallback
+even when its coarse projection is infeasible or has worse performance.
+If improvement fails, a replay-feasible retained fine
 plan remains available. If no checked candidate exists, the runtime reports a
 planning failure and does not claim physical impossibility or authorize an
 unchecked command. In particular, failure of a local solve, a coarse input

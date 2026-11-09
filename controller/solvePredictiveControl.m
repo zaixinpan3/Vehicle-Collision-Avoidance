@@ -3143,7 +3143,21 @@ function window = localOfWindow(hypotheses,inheritedCount,cfg)
     speed=max(arrayfun(@(s)hypot(s.ego(4),s.ego(5)),hypotheses));
     if isempty(of.horizonSeconds)
         minimum=2*h;
-        if string(of.method)=="compactNlp",minimum=max(minimum,of.minimumPreviewSeconds);end
+        if string(of.method)=="compactNlp"
+            minimum=max(minimum,of.minimumPreviewSeconds);
+            % A low-speed preview must span the encounter's spatial scale,
+            % not only braking time. This is a performance lookahead, not a
+            % stopping reserve or a certificate of feasibility.
+            targetRadius=0;
+            for s=1:numel(hypotheses)
+                q=hypotheses(s).target;
+                if ~isempty(q),targetRadius=max(targetRadius,norm(q(8:9))+norm(q(10:11)));end
+            end
+            if targetRadius>0 && cfg.referenceSpeed>0
+                egoRadius=hypot(cfg.vehicle.length/2,cfg.vehicle.width/2)+norm(cfg.vehicle.rectangleOffset);
+                minimum=max(minimum,2*(egoRadius+targetRadius)/max(speed,cfg.referenceSpeed));
+            end
+        end
         requested=max(minimum,speed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
         allocated=of.horizonResolutionSeconds*ceil(requested/of.horizonResolutionSeconds);
         source="speedBasedPreview";
@@ -3809,6 +3823,8 @@ function [result,info] = localCompactStep(request,cfg)
 end
 
 function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning,window,holds,lane,nominal,timer,inferenceSeconds)
+    persistent qpOptions
+    if isempty(qpOptions),qpOptions=optimoptions('quadprog','Algorithm','active-set','Display','off','MaxIterations',200);end
     clock=tic;integrationCount=max(round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod),nonlinearBicycleModel.meshCount(cfg));
     if ~isempty(request.previousState) && isfield(request.previousState,'requiresFineIntegration') && request.previousState.requiresFineIntegration
         integrationCount=cfg.outputFeedback.validationSubsteps;
@@ -3854,10 +3870,20 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         controls=localCompactRateLimit(search(:,boundaries(2:end)),previous,holds,cfg);
     end
     controls=localCompactReleaseRestingBrakes(controls,hypotheses,previous,kernel,cfg);
-    lastIterate=controls(:);
+    if ~isempty(best)
+        bestCost=localCompactPerformance(bestTraces{nominal}.ego(:,2:end),best,model);
+    end
+    inheritedCost=bestCost;
     [a,b]=localCondensedInputRows(previous,holds,cfg);lower=repmat([-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)],nodes,1);
     upper=repmat([cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],nodes,1);
-    cacheU=[];cache=[];calls=0;phase=1;needsRefinement=false;solveClock=tic;
+    if max([a*controls(:)-b;lower-controls(:);controls(:)-upper])>cfg.outputFeedback.nlpTolerance
+        % Project the one warm trajectory onto the complete linear actuator
+        % contract, including the terminal handoff, before nonlinear search.
+        [projected,~,flag]=quadprog(eye(nu),-controls(:),a,b,[],[],lower,upper,controls(:),qpOptions);
+        if flag>0,controls=reshape(projected,2,nodes);end
+    end
+    lastIterate=controls(:);
+    cacheU=[];checkedU=[];cache=[];calls=0;phase=1;needsRefinement=false;solveClock=tic;
     budget=cfg.outputFeedback.maximumSolveSeconds;
     if isempty(best)
         budget=cfg.outputFeedback.recoverySolveSeconds;
@@ -3865,12 +3891,14 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         if rootTerminal,budget=cfg.outputFeedback.maximumSolveSeconds;end
     end
     evaluation=evaluate(controls(:));initialDeficit=sum(max(0,evaluation.stage));initialTerminal=max(evaluation.terminal);
-    restoration=isempty(best);iterationCount=0;phaseIterations=0;exitFlag=0;attempts=0;
-    options=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
-        'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true, ...
-        'ConstraintTolerance',max(1e-7,cfg.outputFeedback.nlpTolerance),'OptimalityTolerance',1e-5, ...
-        'StepTolerance',1e-9,'MaxIterations',cfg.outputFeedback.restorationMaximumIterations, ...
-        'MaxFunctionEvaluations',10000,'OutputFcn',@progress);
+    restoration=isempty(best);iterationCount=0;phaseIterations=0;exitFlag=0;attempts=0;performanceSteps=0;
+    if isempty(best)
+        options=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
+            'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true, ...
+            'ConstraintTolerance',max(1e-7,cfg.outputFeedback.nlpTolerance),'OptimalityTolerance',1e-5, ...
+            'StepTolerance',1e-9,'MaxIterations',cfg.outputFeedback.restorationMaximumIterations, ...
+            'MaxFunctionEvaluations',10000,'OutputFcn',@progress);
+    end
     while isempty(best) && (attempts==0 || needsRefinement)
         if needsRefinement,model.kernel=fineKernel;cacheU=[];needsRefinement=false;evaluation=evaluate(controls(:));end
         z=[controls(:);max(0,evaluation.stage)];attempts=attempts+1;phaseIterations=0;
@@ -3886,21 +3914,47 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     % A checked zero-deficit plan attains the global lower bound of the PCBF
     % primary objective. Only then may performance replace the stored plan.
-    while ~isempty(best) && toc(solveClock)<budget
+    while ~isempty(best) && toc(solveClock)<budget && iterationCount<cfg.outputFeedback.nlpMaximumIterations
         if needsRefinement
             model.kernel=fineKernel;cacheU=[];needsRefinement=false;
         end
         phase=2;attempts=attempts+1;phaseIterations=0;
-        options.MaxIterations=cfg.outputFeedback.nlpMaximumIterations;
         try
-            [lastIterate,~,exitFlag,output]=fmincon(@objective,lastIterate,a,b,[],[],lower,upper,@constraints,options);
-            iterationCount=iterationCount+output.iterations;
+            e=evaluate(lastIterate);c=[e.stage;e.forward;e.terminal];
+            jac=[e.stageGradient,e.forwardGradient,e.terminalGradient].';
+            penalty=max(100,10*norm(e.costGradient,Inf));
+            % Elasticity globalizes the numerical step only. Executable plans
+            % still require zero PCBF deficit and hard terminal membership.
+            H=blkdiag((e.costHessian+e.costHessian.')/2+1e-4*eye(nu),1);
+            rows=[jac,-ones(numel(c),1);a,zeros(size(a,1),1)];rhs=[-c;b-a*lastIterate];
+            start=[zeros(nu,1);max([0;c])];
+            [step,~,flag]=quadprog(H,[e.costGradient;penalty],rows,rhs,[],[], ...
+                [lower-lastIterate;0],[upper-lastIterate;Inf],start,qpOptions);
+            if flag<=0,exitFlag=-2;break;end
+            direction=step(1:nu);iterationCount=iterationCount+1;
+            if norm(direction,Inf)<1e-7
+                exitFlag=-3;if max(c)<=cfg.outputFeedback.nlpTolerance,exitFlag=1;end
+                break;
+            end
+            merit=e.cost+penalty*sum(max(0,c));
+            decrease=e.costGradient.'*direction+penalty*(sum(max(0,c+jac*direction))-sum(max(0,c)));
+            accepted=false;fraction=1;
+            while fraction>=1/128 && toc(solveClock)<budget
+                trial=lastIterate+fraction*direction;value=evaluate(trial,false);
+                trialMerit=value.cost+penalty*sum(max(0,[value.stage;value.forward;value.terminal]));
+                if trialMerit<=merit+1e-4*fraction*min(-eps,decrease)
+                    lastIterate=trial;accepted=true;performanceSteps=performanceSteps+1;break;
+                end
+                fraction=fraction/2;
+            end
+            if ~accepted,exitFlag=-3;break;end
+            exitFlag=0;
         catch exception
             if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
-            exitFlag=-1;iterationCount=iterationCount+phaseIterations;
+            exitFlag=-1;break;
         end
-        if ~needsRefinement,break;end
     end
+    if exitFlag==0 && toc(solveClock)>=budget,exitFlag=-1;end
     assert(~isempty(best),'collisionAvoidanceController:compactNoFeasiblePlan', ...
         'No checked feasible PCBF plan; last evaluated clearance deficit %.6g, terminal violation %.6g after %d evaluations. This is not a proof of physical infeasibility.', ...
         sum(max(0,cache.stage)),max(cache.terminal),calls);
@@ -3939,30 +3993,40 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'wholeHoldReserveScope',"sampledMotionEstimateAndDenseChecksNoCertificate", ...
         'predictionModel',"condensedSharedInputNonlinearRollout",'previousInputUsedForMeasurements',previous, ...
         'optimizationReturned',true,'pcbfValue',0,'primaryOptimumComputed',true, ...
+        'inheritedPerformanceCost',inheritedCost,'acceptedPerformanceCost',bestCost, ...
+        'performanceAcceptedSteps',performanceSteps, ...
         'safetyObjective',"sumOfHorizonSafetySlacks",'nonlinearOracleEvaluations',calls);
     info.deadlineMissed=info.elapsedSeconds>h;
     command=struct('actuatorInput',input,'steeringAngle',input(1),'brakingRatio',input(2));
     prediction=struct('metadata',info,'scenarios',{traces},'memory',zeros(0,1),'information',hypotheses);
     result=struct('command',command,'inputs',best,'prediction',prediction,'state',state);
 
-    function e=evaluate(u)
-        if isempty(cacheU)||~isequal(u,cacheU)
+    function e=evaluate(u,derivatives)
+        if nargin<2,derivatives=true;end
+        if isempty(cacheU)||~isequal(u,cacheU)||(derivatives && ~cache.derivatives)
             if calls>0 && toc(solveClock)>=budget
                 error('collisionAvoidanceController:condensedDeadline','The nonlinear evaluation budget elapsed.');
             end
-            cache=localCondensedOracle(u,model);cacheU=u;calls=calls+1;
-            feasible=max([cache.stage;cache.forward;cache.terminal;a*u-b;lower-u;u-upper])<=max(1e-6,cfg.outputFeedback.nlpTolerance);
-            if feasible && cache.cost<bestCost
+            cache=localCondensedOracle(u,model,derivatives);cacheU=u;calls=calls+1;
+            feasible=max([cache.stage;cache.forward;cache.terminal;a*u-b;lower-u;u-upper])<=cfg.outputFeedback.nlpTolerance;
+            promising=feasible && cache.cost<bestCost && ~isequal(u,checkedU);
+            if promising
                 candidate=reshape(u,2,nodes)*map.'+offset;
+                candidate=localCompactRateLimit(candidate,previous,ones(1,count),cfg);
+                checkedU=u;
                 validationClock=tic;[feasible,candidateTraces,candidateViolation]=localCompactValidate(candidate,hypotheses,previous,fineKernel,cfg,true);
                 validationSeconds=validationSeconds+toc(validationClock);
                 needsRefinement=~feasible && model.kernel.integrationSubsteps<fineKernel.integrationSubsteps;
+                if feasible
+                    candidateCost=localCompactPerformance(candidateTraces{nominal}.ego(:,2:end),candidate,model);
+                    feasible=candidateCost<bestCost;
+                end
             end
-            if feasible && cache.cost<bestCost
+            if promising && feasible
                 if initial && isempty(best)
                     budget=min(budget,toc(solveClock)+cfg.outputFeedback.maximumSolveSeconds);
                 end
-                best=reshape(u,2,nodes)*map.'+offset;bestCost=cache.cost;bestTraces=candidateTraces;bestViolation=candidateViolation;retained=false;
+                best=candidate;bestCost=candidateCost;bestTraces=candidateTraces;bestViolation=candidateViolation;retained=false;
             end
         end
         e=cache;
@@ -4080,7 +4144,10 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     varying=variationMap([root;initialSensitivity(:);repmat(initialSensitivity(:),5,1)], ...
         repmat(command,1,M),repmat(parameters,1,M),repmat(index/D,1,M)-repmat(0:M-1,5,1));
     E=reshape(varying(7:54,end),6,8);D=reshape(varying(55:294,end),6,40);
-    stopped=(command(2)<=0)&(varying(4,end)<.2*cfg.model.brakeHoldSpeed);
+    % At exact rest and neutral force, select the outgoing acceleration
+    % branch. The reset value is unchanged; nonlinear replay accepts steps.
+    starting=(command(2)==0)&(dot(root(4:6),root(4:6))==0);
+    stopped=(command(2)<=0)&(varying(4,end)<.2*cfg.model.brakeHoldSpeed)&~starting;
     E=[E(1:3,:);if_else(stopped,MX.zeros(3,8),E(4:6,:))];
     derivative=Function('pcbf_sensitivity',{root,command,parameters,index},{E,D});
     identity=Function('pcbf_identity',{x,u,p},{x,repmat(x,1,K)});
@@ -4096,17 +4163,19 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     keys{end+1}=key;kernels{end+1}=kernel;
 end
 
-function e=localCondensedOracle(u,model)
+function e=localCondensedOracle(u,model,derivatives)
+    if nargin<3,derivatives=true;end
     cfg=model.cfg;kernel=model.kernel;N=sum(kernel.holds);n=numel(kernel.holds);nu=numel(u);K=kernel.validationSubsteps;h=cfg.controller.sampleTime;
     controls=reshape(u,2,n);inputs=controls*model.map.'+model.offset;capacity=sum(kernel.capacity);
     values=[inputs,zeros(2,capacity-N)];enabled=double((1:capacity)<=N);times=(0:K*N)*h/K;
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     e=struct('stage',-Inf(N,1),'stageGradient',zeros(nu,N),'forward',-Inf(N,1), ...
         'forwardGradient',zeros(nu,N),'terminal',zeros(numel(model.hypotheses),1), ...
-        'terminalGradient',zeros(nu,numel(model.hypotheses)),'cost',0,'costGradient',zeros(nu,1));
+        'terminalGradient',zeros(nu,numel(model.hypotheses)),'cost',0,'costGradient',zeros(nu,1), ...
+        'costHessian',zeros(nu),'derivatives',derivatives);
     for s=1:numel(model.hypotheses)
         item=model.hypotheses(s);[dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,enabled);
-        ends=full(ends(:,1:N));dense=[item.ego,full(dense(:,1:K*N))];
+        ends=full(ends);dense=full(dense);ends=ends(:,1:N);dense=[item.ego,dense(:,1:K*N)];
         [backupDense,backupEnds,backupInputs]=localCompactBackupRollout(kernel,ends(:,end),item.parameters,inputs(:,end),cfg);
         ends=[ends,backupEnds];dense=[dense,backupDense(:,2:end)];
         allInputs=[inputs,backupInputs];total=size(allInputs,2);times=(0:K*total)*h/K;
@@ -4128,6 +4197,15 @@ function e=localCondensedOracle(u,model)
             travelWeights=ones(1,total);travelWeights(branch==3)=.5;
         end
         [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K);
+        if ~derivatives
+            e.stage=max(e.stage,localStage(1:N).');e.forward=max(e.forward,forward(1:N).');
+            target=[];if ~isempty(q),target=q(:,end);end
+            context=terminalSafeSet.compactContext(target,cfg);
+            terminal=terminalSafeSet.nonlinearValue(context,ends(:,end),0);
+            e.terminal(s)=max([terminal,localStage(N+1:end),forward(N+1:end)]);
+            if s==model.nominal,e.cost=localCompactPerformance(ends(:,cumsum(kernel.holds)),inputs,model);end
+            continue;
+        end
         si=max(1,ceil((speedIndex-1)/K));sj=max(1,ceil((yawIndex-1)/K));
         speedSample=zeros(1,total);speedSample(si)=speedIndex-1-(si-1)*K;
         yawSample=zeros(1,total);yawSample(sj)=yawIndex-1-(sj-1)*K;
@@ -4173,13 +4251,17 @@ function e=localCondensedOracle(u,model)
                 derivative=[normal.'*S(1:2,:);S(3:6,:)];
                 e.cost=e.cost+.5*h*kernel.holds(i)*sum(cfg.outputFeedback.trackingWeights.*error.^2);
                 e.costGradient=e.costGradient+h*kernel.holds(i)*derivative.'*(cfg.outputFeedback.trackingWeights.*error);
+                e.costHessian=e.costHessian+h*kernel.holds(i)*derivative.'*(cfg.outputFeedback.trackingWeights.*derivative);
             end
         end
     end
+    if ~derivatives,return;end
     differences=diff([model.previous,controls],1,2);
     e.cost=e.cost+.5*cfg.outputFeedback.inputWeight*sum(sum(differences.^2)./kernel.holds);
     du=cfg.outputFeedback.inputWeight*differences./kernel.holds;
     e.costGradient=e.costGradient+reshape(du-[du(:,2:end),zeros(2,1)],[],1);
+    difference=eye(n)-diag(ones(n-1,1),-1);
+    e.costHessian=e.costHessian+cfg.outputFeedback.inputWeight*kron(difference.'*diag(1./kernel.holds)*difference,eye(2));
 end
 
 function [selected,ends]=localCondensedSensitivities(roots,inputs,parameters,index,model)
@@ -4198,11 +4280,17 @@ function [selected,ends]=localCondensedSensitivities(roots,inputs,parameters,ind
 end
 
 function gradient=localCompactDistanceGradient(states,targets,shape)
-    gradient=zeros(3,size(states,2));step=1e-5;
-    for j=1:3
-        plus=states;minus=states;plus(j,:)=plus(j,:)+step;minus(j,:)=minus(j,:)-step;
-        gradient(j,:)=(localCompactExactClearance(plus,targets,shape)-localCompactExactClearance(minus,targets,shape))/(2*step);
-    end
+    [~,gradient]=localCompactExactClearance(states,targets,shape);
+end
+
+function value=localCompactPerformance(states,inputs,model)
+    cfg=model.cfg;reference=model.reference;
+    lateral=-sin(reference(3,:)).*(states(1,:)-reference(1,:)) ...
+        +cos(reference(3,:)).*(states(2,:)-reference(2,:));
+    angle=states(3,:)-reference(3,:);
+    error=[lateral;atan2(sin(angle),cos(angle));states(4,:)-cfg.referenceSpeed;states(5:6,:)];
+    value=.5*cfg.controller.sampleTime*sum(model.kernel.holds.*sum(cfg.outputFeedback.trackingWeights.*error.^2,1)) ...
+        +.5*cfg.outputFeedback.inputWeight*sum(diff([model.previous,inputs],1,2).^2,'all');
 end
 
 function controls=localCompactReleaseRestingBrakes(controls,hypotheses,previous,kernel,cfg)
@@ -4277,7 +4365,7 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
         end
         traces{s}=struct('ego',[item.ego,states],'inputs',inputs,'denseEgo',dense,'targets',q,'validationSubsteps',kernel.validationSubsteps);
     end
-    valid=isfinite(violation) && violation<=max(1e-6,cfg.outputFeedback.nlpTolerance);
+    valid=isfinite(violation) && violation<=cfg.outputFeedback.nlpTolerance;
     if isfinite(violation)
         for s=1:numel(hypotheses)
             trace=traces{s};target=[];
@@ -4285,7 +4373,7 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
             [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg);
             traces{s}.terminal=terminal;violation=max(violation,terminalValue);
         end
-        valid=isfinite(violation)&&violation<=max(1e-6,cfg.outputFeedback.nlpTolerance);
+        valid=isfinite(violation)&&violation<=cfg.outputFeedback.nlpTolerance;
     end
 end
 
@@ -4299,7 +4387,8 @@ function [dense,states,inputs] = localCompactRollout(kernel,x,previous,controls,
     end
     capacity=sum(kernel.capacity);
     [dense,ends]=kernel.refinedRollout(x,[inputs,zeros(2,capacity-N)],parameters,double((1:capacity)<=N));
-    dense=[x,full(dense(:,1:kernel.validationSubsteps*N))];states=full(ends(:,cumsum(kernel.holds)));
+    dense=full(dense);ends=full(ends);
+    dense=[x,dense(:,1:kernel.validationSubsteps*N)];states=ends(:,cumsum(kernel.holds));
 end
 function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg)
     h=cfg.controller.sampleTime;
@@ -4334,7 +4423,8 @@ function [dense,ends,inputs]=localCompactBackupRollout(kernel,x,parameters,previ
     while true
         blockCount=min(capacity,max(1,ceil(2*hypot(x(4),x(5))/(cfg.terminal.brakingDecelerationMetersPerSecondSquared*cfg.controller.sampleTime))));
         active=double((1:capacity)<=blockCount);
-        [points,states]=kernel.refinedRollout(x,commands,parameters,active);states=full(states(:,1:blockCount));points=full(points(:,1:blockCount*kernel.validationSubsteps));
+        [points,states]=kernel.refinedRollout(x,commands,parameters,active);states=full(states);points=full(points);
+        states=states(:,1:blockCount);points=points(:,1:blockCount*kernel.validationSubsteps);
         assert(all(isfinite(states),'all'),'collisionAvoidanceController:invalidTerminalFlow','The backup rollout left the numerical model domain.');
         stopped=find(all(states(4:6,:)==0,1),1);count=blockCount;if ~isempty(stopped),count=stopped;end
         dense=[dense,points(:,1:count*kernel.validationSubsteps)];ends=[ends,states(:,1:count)];inputs=[inputs,commands(:,1:count)]; %#ok<AGROW>
@@ -4390,7 +4480,7 @@ function violation = localCompactIntervalViolation(states,targets,inputs,separat
     violation=max(cfg.outputFeedback.clearanceMeters-lower);
 end
 
-function clearance = localCompactExactClearance(states,targets,shape)
+function [clearance,gradient] = localCompactExactClearance(states,targets,shape)
     % Batched closest-feature evaluation of the rectangle distance dual.
     ce=cos(states(3,:));se=sin(states(3,:));ct=cos(targets(3,:));st=sin(targets(3,:));
     signs=[-1,1,1,-1;-1,-1,1,1];ego=cell(1,4);target=cell(1,4);
@@ -4400,18 +4490,38 @@ function clearance = localCompactExactClearance(states,targets,shape)
         ego{j}=states(1:2,:)+[ce*e(1)-se*e(2);se*e(1)+ce*e(2)];
         target{j}=targets(1:2,:)+[ct.*t(1,:)-st.*t(2,:);st.*t(1,:)+ct.*t(2,:)];
     end
-    clearance=Inf(1,size(states,2));
+    square=Inf(1,size(states,2));closest=zeros(2,size(states,2));difference=closest;
     for j=1:4
         for k=1:4
             next=mod(k,4)+1;
             edge=target{next}-target{k};offset=ego{j}-target{k};
             t=max(0,min(1,sum(offset.*edge,1)./sum(edge.^2,1)));
-            clearance=min(clearance,vecnorm(offset-edge.*t));
+            delta=offset-edge.*t;distance=sum(delta.^2,1);selected=distance<square;
+            square(selected)=distance(selected);
+            if nargout>1,closest(:,selected)=ego{j}(:,selected);difference(:,selected)=delta(:,selected);end
             edge=ego{next}-ego{k};offset=target{j}-ego{k};
             t=max(0,min(1,sum(offset.*edge,1)./sum(edge.^2,1)));
-            clearance=min(clearance,vecnorm(offset-edge.*t));
+            delta=edge.*t-offset;distance=sum(delta.^2,1);selected=distance<square;
+            square(selected)=distance(selected);
+            if nargout>1
+                point=ego{k}+edge.*t;closest(:,selected)=point(:,selected);difference(:,selected)=delta(:,selected);
+            end
         end
     end
+    clearance=sqrt(square);
     gap=max(predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:)),[],1);
     overlap=gap<=0;clearance(overlap)=gap(overlap);
+    if nargout>1
+        normal=difference./max(sqrt(square),eps);arm=closest-states(1:2,:);
+        gradient=[normal;normal(2,:).*arm(1,:)-normal(1,:).*arm(2,:)];
+        if any(overlap)
+            x=states(1:3,overlap);q=targets(:,overlap);step=1e-5;
+            for j=1:3
+                plus=x;minus=x;plus(j,:)=plus(j,:)+step;minus(j,:)=minus(j,:)-step;
+                a=max(predictiveSafetyGeometry.rectangleAxisGaps(plus,shape,q(1:3,:),q(8:11,:)),[],1);
+                b=max(predictiveSafetyGeometry.rectangleAxisGaps(minus,shape,q(1:3,:),q(8:11,:)),[],1);
+                gradient(j,overlap)=(a-b)/(2*step);
+            end
+        end
+    end
 end

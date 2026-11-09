@@ -59,7 +59,8 @@ classdef nonlinearBicycleModel
                 (frontY+force(2))/mass-v*r; ...
                 (lf*frontY-lr*force(2))/cfg.vehicle.Iz];
             rate=v*tan(delta)/(lf+lr);lag=cfg.model.kinematicLagSeconds;
-            drive=(fmax(brake,0)+fmin(brake,0)*tanh(v/cfg.model.brakeHoldSpeed)) ...
+            % Same force values, with the acceleration-side derivative at zero.
+            drive=if_else(brake>=0,brake,brake*tanh(v/cfg.model.brakeHoldSpeed)) ...
                 *(capacity(1)*cos(delta)+capacity(2));
             kinematic=[(drive-load)/mass+vy*r;(lr*rate-vy)/lag;(rate-r)/lag];
             range=cfg.model.kinematicSpeedRange;
