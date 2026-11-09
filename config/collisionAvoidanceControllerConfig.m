@@ -120,19 +120,12 @@ function cfg=localDefaults()
     % Collision rows require nonoverlap after uncertainty tightening. There
     % is no extra fixed clearance in the optimizer or geometric guide.
     cfg.collision=struct('encounterRangeMeters',50);
-    % Terminal set (controller/terminalSafeSet.m, CONTROLLER_THEORY.md, Section 5): it
-    % uses the shared observer operating domain, where the ego is taken to be a
-    % kinematic vehicle. Past the plan's endpoint the target
-    % keeps its forecast and the ego brakes at
-    % brakingDecelerationMetersPerSecondSquared [m/s^2] with the steering
-    % (its sideslip and course curvature) held until a forward-only stop,
-    % possibly inside a hold; the endpoint is terminal when it respects any
-    % enabled road edges and clears the target until it leaves encounterRangeMeters (after
-    % the stop, over the target's remaining track). The braking rate must
-    % lie inside the longitudinal tire capacity. There is no additional
-    % terminal turn-intensity constraint or coupled-force certificate for
-    % this declared kinematic continuation. No encounter duration is preset.
-    % No separate terminal sideslip bound is imposed.
+    % Terminal continuation: the simple ego model holds course curvature and
+    % sideslip and brakes at the specified tangential rate to a parked pose.
+    % compactNlp checks the braking prefix and the target's complete future
+    % track, without stability caps or a perception-range exit. Its safety
+    % and main-model handoff are explicit design assumptions, not certificates.
+    % Legacy state-input comparators retain their separate terminal context.
     cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',4);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);

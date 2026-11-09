@@ -111,6 +111,21 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(prediction.scenarios{1}.ego(:,2),expected.ego,AbsTol=1e-10);
             testCase.verifyTrue(prediction.metadata.nlpCacheHit);
         end
+        function endpointClearanceCannotReplaceTerminalMembership(testCase)
+            item=testCase.block.initialHypotheses;item.ego(:)=0;
+            item.target=[100;0;pi;5;0;0;1.6;2.4;.95;0;0];
+            result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[0;0]));
+            testCase.verifyFalse(result.accepted);
+            testCase.verifyFalse(result.trajectories{1}.terminal.member);
+        end
+        function everyReturnedPlanHasAnExplicitTerminalContinuation(testCase)
+            testCase.verifyTrue(testCase.prediction.metadata.terminalSetEnforced);
+            testCase.verifyTrue(testCase.state.terminal.member);
+            testCase.verifyTrue(testCase.state.terminal.safetyAssumed);
+            testCase.verifyEqual(testCase.state.terminal.input, ...
+                terminalSafeSet.compactControl(testCase.state.fineControls(:,end),testCase.cfg));
+        end
         function aMissingRawReadingIsRejected(testCase)
             block=localNextBlock(testCase.state,testCase.cfg);block.samples(2)=[];
             testCase.verifyError(@()collisionAvoidanceController(block,[],[],testCase.cfg,testCase.state), ...
@@ -174,7 +189,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             info=prediction.metadata;
             testCase.verifyTrue(info.restorationAttempted);
             testCase.verifyGreaterThan(info.initialRestorationSlack,0);
-            testCase.verifyLessThanOrEqual(info.initialNlpViolation,1e-9);
+            testCase.verifyGreaterThan(info.initialNlpViolation,0);
+            testCase.verifyTrue(info.terminalSetEnforced);
+            testCase.verifyLessThanOrEqual(info.terminalValue,1e-6);
             testCase.verifyEqual(info.nlpAttempts,1);
             testCase.verifyEqual(info.initializationTrajectoryCount,1);
             inputs=prediction.scenarios{1}.inputs;

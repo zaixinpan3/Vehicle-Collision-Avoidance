@@ -3790,7 +3790,7 @@ function [result,info] = localCompactStep(request,cfg)
         projection=predictiveSafetyGeometry.project(position,lane);
         reference(:,i)=[projection.point;projection.heading];
     end
-    p=[item.ego;block.heldInput;item.parameters;targets(:);reference(:);holds(:)];
+    p=[item.ego;block.heldInput;item.parameters;targets(:);reference(:);holds(:);zeros(7,1)];
     if initial
         seeds=localCompactSeeds(item,block.heldInput,holds,lane,kernel,cfg);
     else
@@ -3801,19 +3801,9 @@ function [result,info] = localCompactStep(request,cfg)
     best=[];bestValue=Inf;bestViolation=Inf;bestTrace=[];retainedFine=false;tailRepaired=false;
     if ~initial
         inherited=prior.fineControls(:,2:end);
-        inherited=[inherited,repmat(prior.fineControls(:,end),1,count-size(inherited,2))];
+        terminalInput=terminalSafeSet.compactControl(prior.fineControls(:,end),cfg);
+        inherited=[inherited,repmat(terminalInput,1,count-size(inherited,2))];
         [valid,traces,violation,nodeStates]=localCompactValidate(inherited,hypotheses,block.heldInput,kernel,cfg,true);
-        if ~valid
-            % A constant tail is not invariant. Try slowing its final portion
-            % before discarding the executable prefix; every repair is replayed.
-            for seconds=[.5,1,2]
-                repaired=inherited;start=max(1,count-ceil(seconds/h)+1);
-                repaired(2,start:end)=-cfg.outputFeedback.backupBrakingRatio;
-                repaired=localCompactRateLimit(repaired,block.heldInput,ones(1,count),cfg);
-                [valid,traces,violation,nodeStates]=localCompactValidate(repaired,hypotheses,block.heldInput,kernel,cfg,true);
-                if valid,inherited=repaired;tailRepaired=true;break;end
-            end
-        end
         if valid
             states=nodeStates{nominal};
             projection=inherited(:,boundaries(2:end));
@@ -3847,8 +3837,8 @@ function [result,info] = localCompactStep(request,cfg)
     initialRestorationSlack=NaN;initialNlpViolation=NaN;finalRestorationSlack=NaN;
     solver=kernel.solver;upper=kernel.upper;attemptLimit=1;
     if restorationAttempted
-        % Each seed gets one uninterrupted solve. Primal/dual restarts would
-        % discard IPOPT's limited-memory history at every short time slice.
+        % Solve continuously for each terminal tangent; do not restart in
+        % short time slices. A failed terminal check may refresh the tangent.
         attemptLimit=numel(order);upper(end)=Inf;
         buildTimer=tic;
         solver=localCompactRestorationSolver(kernel,cfg,budget/attemptLimit);
@@ -3856,8 +3846,10 @@ function [result,info] = localCompactStep(request,cfg)
     else
         buildElapsed=0;
     end
-    for pass=1:attemptLimit
-        j=order(pass);point=seedPoints{j};
+    for pass=1:cfg.outputFeedback.nlpMaximumIterations
+        j=order(1);
+        if pass==1,point=seedPoints{j};else,point=trial;end
+        p=localCompactTerminalRow(p,point,item,count,nodes,cfg);
         if restorationAttempted
             % Repair only the auxiliary slack; an unsafe physical seed is a
             % valid starting trajectory for feasibility restoration.
@@ -3869,9 +3861,11 @@ function [result,info] = localCompactStep(request,cfg)
                     +10*cfg.outputFeedback.nlpTolerance;
             end
             values=full(kernel.constraints(point,p));
-            initialRestorationSlack=point(end);
-            initialNlpViolation=max([0;constraintLower-values;values-constraintUpper; ...
-                kernel.lower-point;point-upper]);
+            if pass==1
+                initialRestorationSlack=point(end);
+                initialNlpViolation=max([0;constraintLower-values;values-constraintUpper; ...
+                    kernel.lower-point;point-upper]);
+            end
         end
         solveTimer=tic;
         arguments={'x0',point,'p',p,'lbx',kernel.lower,'ubx',upper, ...
@@ -3907,7 +3901,8 @@ function [result,info] = localCompactStep(request,cfg)
     validationSeconds=max(0,toc(clock)-solveSeconds-buildElapsed);
     state=struct('kind',"compactOutputFeedback-v1",'time',block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',controls,'fineControls',bestTrace{nominal}.inputs,'boundaries',boundaries, ...
-        'horizonSteps',count,'configuration',cfg,'reference',request.reference,'conditioning',conditioning);
+        'horizonSteps',count,'configuration',cfg,'reference',request.reference,'conditioning',conditioning, ...
+        'terminal',bestTrace{nominal}.terminal);
     info=struct('solver',"compactCasadiIpopt",'nlpStatus',string(stats.return_status), ...
         'nlpConverged',logical(stats.success),'nlpIterations',iterations,'nlpSeconds',solveSeconds,'nlpAttempts',pass, ...
         'nlpBuildSeconds',buildSeconds,'nlpCacheHit',cacheHit,'nlpVariables',numel(best), ...
@@ -3922,6 +3917,10 @@ function [result,info] = localCompactStep(request,cfg)
         'nonlinearValidationPerformed',true,'maximumConstraintViolation',bestViolation, ...
         'scenarioCount',numel(hypotheses),'activeScenarioCount',numel(hypotheses), ...
         'hypothesisCount',numel(hypotheses),'memoryDimension',0,'conditioning',conditioning, ...
+        'terminalSetEnforced',true,'terminalSafetyAssumed',true, ...
+        'terminalModel',"constantCurvatureBrakingThenParked", ...
+        'terminalValue',max(cellfun(@(t)t.terminal.value,bestTrace)), ...
+        'terminalInput',bestTrace{nominal}.terminal.input, ...
         'robustNonlinearSafetyCertified',false,'recursiveFeasibilityCertified',false, ...
         'safetyScope',"finiteHypothesesDenseNonlinearReplay", ...
         'wholeHoldReserveScope',"sampledMotionEstimateAndDenseChecksNoCertificate", ...
@@ -3965,9 +3964,9 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     flow=Function('compact_flow',{x,u,scales},{next});
     identity=Function('compact_identity',{x,u,scales},{x});
     activeFlow=Function.if_else('compact_active_flow',flow,identity);
-    normalCount=8*count*hasTarget;z=MX.sym('z',8*n+normalCount+1);p=MX.sym('p',12+22*count+4*n);
+    normalCount=8*count*hasTarget;z=MX.sym('z',8*n+normalCount+1);p=MX.sym('p',12+22*count+4*n+7);
     ui=reshape(1:2*n,2,n);xi=reshape(2*n+(1:6*n),6,n);
-    target=reshape(p(13:12+22*count),11,2*count);ref=reshape(p(13+22*count:12+22*count+3*n),3,n);steps=p(end-n+1:end);
+    target=reshape(p(13:12+22*count),11,2*count);ref=reshape(p(13+22*count:12+22*count+3*n),3,n);steps=p(end-7-n+1:end-7);
     root=MX.sym('root',6);previous=MX.sym('previous',2);control=MX.sym('control',2,count);parameters=MX.sym('scales',4);rollSteps=MX.sym('holds',n);
     state=p(1:6);prior=p(7:8);roll=root;dense={root};ends=cell(1,n);inputs={};
     constraint={};lower={};upper={};objective=1e4*z(end);sample=0;
@@ -4011,6 +4010,15 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
         objective=objective+.5*h*steps(i)*dot(of.trackingWeights.*error,error) ...
             +.5*of.inputWeight*dot(endpoint-prior,endpoint-prior)/steps(i);
         ends{i}=roll;state=z(xi(:,i));prior=endpoint;
+    end
+    % Hard terminal membership tangent; independently re-evaluated on replay.
+    constraint{end+1}=p(end-6)+p(end-5:end).'*z(xi(:,end));
+    lower{end+1}=-Inf;upper{end+1}=0;
+    terminalInput=terminalSafeSet.compactControl(zeros(2,1),cfg);
+    if isfinite(cfg.model.brakingRatioRateMaximum)
+        constraint{end+1}=z(ui(2,end))-terminalInput(2);
+        lower{end+1}=-h*cfg.model.brakingRatioRateMaximum;
+        upper{end+1}=h*cfg.model.brakingRatioRateMaximum;
     end
     g=vertcat(constraint{:});gl=vertcat(lower{:});gu=vertcat(upper{:});
     rowsPerHold=1+10*hasTarget;holdRows=zeros(rowsPerHold,count);row=0;slot=0;
@@ -4194,6 +4202,25 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
     if allowRefinement && stateViolation<=max(1e-6,cfg.outputFeedback.nlpTolerance) && ~isempty(hypotheses(1).target)
         [valid,traces,violation]=localCompactRefinedValidate(inputs,hypotheses,previous,kernel,cfg);
     end
+    if isfinite(violation)
+        for s=1:numel(hypotheses)
+            trace=traces{s};target=[];
+            if ~isempty(trace.targets),target=trace.targets(:,end);end
+            [terminalValue,terminal]=terminalSafeSet.compactEvaluate( ...
+                trace.ego(:,end),target,trace.inputs(:,end),cfg);
+            traces{s}.terminal=terminal;violation=max(violation,terminalValue);
+        end
+        valid=isfinite(violation)&&violation<=max(1e-6,cfg.outputFeedback.nlpTolerance);
+    end
+end
+
+function p = localCompactTerminalRow(p,point,item,count,nodes,cfg)
+    state=reshape(point(2*nodes+(1:6*nodes)),6,nodes);x=state(:,end);
+    target=item.target;
+    if ~isempty(target) && target(4)>0,target=predictiveSafetyGeometry.predictTarget(target,count*cfg.controller.sampleTime);end
+    context=terminalSafeSet.compactContext(target,cfg);
+    [value,gradient]=terminalSafeSet.nonlinearTangent(context,x,0);
+    p(end-6:end)=[value-gradient*x;gradient.'];
 end
 
 function [dense,states,inputs] = localCompactRollout(kernel,x,previous,controls,parameters,fine)

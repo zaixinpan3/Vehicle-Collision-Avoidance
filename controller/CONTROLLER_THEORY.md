@@ -2,8 +2,8 @@
 
 The adopted controller combines fixed measurement-consistency inference with
 a compact nonlinear optimization of physical states and actuator commands.
-It retains a complete held-input plan for numerical safety validation and
-fallback. Control knots, integration samples, and sensor samples have distinct
+It enforces a terminal continuation set and retains a complete held-input
+plan for numerical safety validation and fallback. Control knots, integration samples, and sensor samples have distinct
 roles; reducing the decision dimension does not remove the physical model.
 The derivation below states both the algorithm and the limits of its guarantees.
 
@@ -344,10 +344,81 @@ bounds and yaw-rate bounds are not imposed by the collision planner. The target
 has its prescribed forecast,
 not a separately optimized motion or a requirement to brake or stop.
 
-The endpoint obeys the same physical and collision constraints. There is no
-remaining-braking-distance condition, forced final braking input, or assumed
-invariant terminal set in this numerical algorithm. Therefore the formulation
-does not inherit an invariant-terminal-set recursive-feasibility theorem.
+### Terminal continuation set
+
+The terminal model is a deliberately simpler model than the main Fiala
+prediction. At entry define $V=\sqrt{v_x^2+v_y^2}$,
+$\beta=\operatorname{atan2}(v_y,v_x)$ and $\kappa=r/V$ for $V>0$;
+at rest set $\beta=\kappa=0$. Hold $\beta,\kappa$ fixed and prescribe
+
+$$
+V_f(t)=\max(0,V-a_f t),\qquad
+s_f(t)=V\bar t-\tfrac12a_f\bar t^2,\qquad
+\bar t=\min(t,V/a_f),\qquad \psi_f(t)=\psi+\kappa s_f(t),
+$$
+
+$$
+p_f(t)=p+s_f(t)\operatorname{sinc}\!\left(\frac{\kappa s_f(t)}2\right)
+e\!\left(\psi+\beta+\frac{\kappa s_f(t)}2\right),
+\qquad \operatorname{sinc}(z)=\begin{cases}\sin(z)/z,&z\ne0,\\1,&z=0.\end{cases}
+$$
+
+After $t_s=V/a_f$ the ego keeps its parked pose. The terminal actuator command
+holds the preceding steering and uses $b_f=-a_f/g_b$, with $g_b$ the nominal
+longitudinal acceleration gain. Input magnitude and any explicitly configured
+input-increment limits apply at terminal entry. This command is the actuator
+realization assumed for the simple terminal law; equality with the nonlinear
+Fiala flow is not proved or required as a model identity.
+
+The target retains its constant tangential acceleration and sideslip, including
+zero or positive acceleration and its absorbing stopped mode. With $\Phi_f$
+the joint terminal continuation and $d$ the footprint clearance, define
+
+$$
+Z_f=\{(x,q,u^-):\ u_f\text{ is admissible},\ v_x\ge0,\quad
+ d(\Phi_f(t;x,q))\ge d_{\rm safe}\ \text{for every }t\ge0\}.
+$$
+
+This is a continuation-based set, not a radial stopping-distance reserve.
+It uses the complete rectangle geometry and the target's future path. No
+speed upper bound, sideslip cone or yaw-rate cap is imposed by this terminal
+component. The final optimized command need not equal $u_f$; only its transition
+to $u_f$ must be admissible. The endpoint requirement is
+
+$$
+(x_N^s,q_N^s,u_{N-1})\in Z_f\qquad\text{for every retained hypothesis }s.
+$$
+
+**Terminal assumption.** The numerical membership rule below is assumed to
+select a safe terminal region, and the associated terminal controller is
+assumed to provide admissible, safe continuation that remains in that region.
+The handoff from main prediction to this simple terminal law is included in
+this assumption. This is a design premise, not a proved Fiala-model certificate.
+
+Membership evaluates the braking arc at half-hold times and checks the parked
+rectangle against the complete remaining target track. A straight target has
+a finite segment or a forward ray; a curved target has a finite arc or the
+whole circle. For a forward ray, the closest-distance calculation can stop once
+every target vertex lies ahead of every ego vertex along the travel direction:
+beyond that point the distance cannot decrease. Thus the infinite straight
+track has a finite exact geometry calculation. Perception-range exit does not
+end this obligation. Positive rectangle clearance is evaluated by the exact
+convex distance geometry; signed penetration values supply restoration
+information. Sampling of the moving braking prefix is part of the stated
+terminal assumption, not a continuous-time proof.
+
+Let $c_f\le0$ denote numerical membership, including terminal input compatibility.
+At terminal expansion point $\bar X_N$, the optimization imposes the hard row
+
+$$
+c_f(\bar X_N,q_N)+D_xc_f(\bar X_N,q_N)(X_N-\bar X_N)\le0,
+$$
+
+with explicit input-transition rows. This terminal row has no collision slack.
+After each solve the complete terminal function is recomputed on every actual
+command rollout. A failed nonlinear terminal check cannot authorize execution;
+its tangent is refreshed for another solve if budget remains. A feasible
+retained plan is eligible only after the same terminal check.
 
 IPOPT performs nonlinear iterations with automatic first derivatives and a
 limited-memory Hessian approximation. The nonlinear vehicle equations remain
@@ -369,7 +440,8 @@ single control initialization.
 Restoration is a numerical search procedure, not a recovery control law or
 an exact lexicographic optimization. Its positive slack never authorizes a
 clearance deficit: every executable candidate must independently pass the
-original hard checks in Section 7. One continuous solve uses the single initialized trajectory within the
+original hard checks in Section 7. Each solve uses the single initialized or
+updated trajectory; further solves refresh the terminal tangent within the
 initialization or recovery budget.
 These attempts count toward the actual call time; the iteration-level wall
 limit is not a guaranteed interrupt deadline.
@@ -419,27 +491,25 @@ with a shooting defect is assessed using its actual command rollout, not its
 inconsistent shooting states. Geometry and state checks include the current
 root. The full accepted fine input sequence is stored.
 
-At the next boundary, construct a retained candidate by deleting its executed
-first input and extending its tail with the last input as needed. Recheck the
-complete sequence from the conditioned information. This sequence is retained
-at its original hold resolution. It is not replaced by a fit to new coarse
-knots: coarse interpolation is not generally closed under a one-hold shift.
-A coarse refit is only a warm start for improvement.
+At the next boundary, delete the executed first input and append the terminal
+controller command, repeating it if the preview has grown. The terminal steering
+is held, so this simple terminal input remains constant. Recheck the complete
+sequence and its new terminal membership from the conditioned information.
+The retained sequence stays at its original hold resolution; a coarse refit is
+only a warm start and may not replace it without validation. Heuristic repeated
+last inputs and a bank of tail-repair durations are not terminal continuations.
 
-If constant extension fails, try changing the final $0.5$, $1$, or $2$ seconds
-of its force-ratio commands to the configured braking input, respecting input
-bounds and increments. Each repaired sequence is rechecked on every retained
-member. This candidate construction neither constrains the optimized endpoint
-to stop nor assumes that braking is safe for every target motion.
-
-Under identical discrete propagation and a valid finite-member update, the
-old prefix after conditioning lies inside the old predicted member paths.
-This explains why retaining the fine sequence preserves its previous checks
-on the inherited interval. A refined verification mesh differs from the
-inference mesh, so this exact-discrete argument cannot be transferred to that
-numerical pair without an integration-error enclosure; the whole retained plan
-is rechecked. The appended interval still requires a fresh check;
-without an invariant terminal condition its feasibility is not guaranteed.
+Under the terminal safety and invariance assumption, consistent state evolution
+and conditioning, exact constraint evaluation, and an admissible policy class
+containing the retained fine sequence, the usual shift argument supplies a
+feasible continuation: the old feasible prefix survives conditioning, its old
+endpoint belongs to $Z_f$, and the appended terminal law stays in $Z_f$.
+A different main/terminal prediction model requires the assumed valid handoff;
+terminal safety alone does not establish that interface. Numerical integration,
+finite hypotheses and local tangents are implementation approximations, so the
+runtime still reports an assumed terminal contract rather than an unconditional
+recursive-feasibility certificate. Exact membership of the executed plan is
+never inferred from the affine terminal row alone.
 
 A replay-feasible proposal or seed can be accepted even if IPOPT reaches its
 iteration or time limit. If improvement fails, a replay-feasible retained fine

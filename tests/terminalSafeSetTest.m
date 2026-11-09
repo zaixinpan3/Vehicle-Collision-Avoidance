@@ -15,6 +15,66 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function compactTerminalRejectsAnApproachingTargetBeyondThePreview(testCase)
+            cfg=collisionAvoidanceControllerConfig();x=zeros(6,1);
+            q=[100;0;pi;5;0;0;1.6;2.4;.95;0;0];
+            [value,info]=terminalSafeSet.compactEvaluate(x,q,[0;0],cfg);
+            testCase.verifyGreaterThan(value,0);
+            testCase.verifyFalse(info.member);
+        end
+        function compactTerminalAdmitsAnAcceleratingTargetMovingAway(testCase)
+            cfg=collisionAvoidanceControllerConfig();x=zeros(6,1);
+            q=[10;0;0;5;2;0;1.6;2.4;.95;0;0];
+            [value,info]=terminalSafeSet.compactEvaluate(x,q,[0;0],cfg);
+            testCase.verifyLessThanOrEqual(value,0);
+            testCase.verifyTrue(info.member);
+        end
+        function compactTerminalUsesRectangleGeometryForParking(testCase)
+            cfg=collisionAvoidanceControllerConfig();x=zeros(6,1);
+            q=[4.88;1.98;0;0;0;0;1.6;2.4;.95;0;0];
+            [~,info]=terminalSafeSet.compactEvaluate(x,q,[0;0],cfg);
+            testCase.verifyTrue(info.member);
+        end
+        function compactTerminalChecksTheReturningPartOfACircularTrack(testCase)
+            cfg=collisionAvoidanceControllerConfig();x=zeros(6,1);
+            beta=.1;radius=1.6/sin(beta);
+            q=[0;2*radius;pi-beta;5;0;beta;1.6;2.4;.95;0;0];
+            [value,info]=terminalSafeSet.compactEvaluate(x,q,[0;0],cfg);
+            testCase.verifyGreaterThan(value,0);
+            testCase.verifyFalse(info.member);
+        end
+        function compactTerminalHasNoStabilityAdmissionCaps(testCase)
+            cfg=collisionAvoidanceControllerConfig();cfg.model.speedMaximum=1;
+            cfg.model.lateralVelocityMaximum=.01;cfg.model.yawRateMaximum=.01;
+            [~,info]=terminalSafeSet.compactEvaluate([0;0;0;3;1;.2],[],[0;0],cfg);
+            testCase.verifyTrue(info.member);
+        end
+        function compactTerminalClosureHoldsUnderItsDeclaredSimpleFlow(testCase)
+            cfg=collisionAvoidanceControllerConfig();x=[0;0;0;3;0;0];
+            q=[20;10;0;5;1;0;1.6;2.4;.95;0;0];
+            context=terminalSafeSet.compactContext(q,cfg);
+            path=terminalSafeSet.continuation(context,x,1);h=cfg.controller.sampleTime;
+            next=[path.pose(:,end);3-context.deceleration*h;0;0];
+            [~,before]=terminalSafeSet.compactEvaluate(x,q,[.1;0],cfg);
+            [~,after]=terminalSafeSet.compactEvaluate(next, ...
+                predictiveSafetyGeometry.predictTarget(q,h),before.input,cfg);
+            testCase.verifyTrue(before.member);
+            testCase.verifyTrue(after.member);
+            testCase.verifyEqual(after.input,before.input);
+            testCase.verifyEqual(after.stopSeconds,before.stopSeconds-h,AbsTol=1e-12);
+            testCase.verifyTrue(after.safetyAssumed);
+            testCase.verifyFalse(after.safetyProved);
+        end
+        function compactTerminalKeepsThePhysicalSteeringLimit(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            [~,info]=terminalSafeSet.compactEvaluate(zeros(6,1),[],[1;0],cfg);
+            testCase.verifyFalse(info.member);
+        end
+        function compactTerminalRespectsAnExplicitActuatorSlewContract(testCase)
+            cfg=collisionAvoidanceControllerConfig();cfg.model.brakingRatioRateMaximum=.1;
+            [~,info]=terminalSafeSet.compactEvaluate(zeros(6,1),[],[0;0],cfg);
+            testCase.verifyFalse(info.member);
+        end
         function nonlinearTerminalValueRejectsAnUnsafeParkedTrack(testCase)
             q=[20;0;pi;8;0;0;1.6;2.4;.95;0;0];
             model=localModel([0;0;0;8;0;0],q);context=terminalSafeSet.context(model);

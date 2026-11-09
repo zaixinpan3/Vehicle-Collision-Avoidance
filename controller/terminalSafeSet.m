@@ -1,4 +1,7 @@
 classdef terminalSafeSet
+% compactContext/compactEvaluate implement the active compact terminal set:
+% assumed-safe simple braking continuation plus the full parked-target track,
+% without the legacy stability domain or perception-exit termination below.
 %terminalSafeSet Terminal set of the braking continuation, and the anchor's holds.
 % The terminal set uses the shared observer operating domain, and inside it the ego is a
 % kinematic vehicle under the simplest law: the steering held and a constant
@@ -50,6 +53,41 @@ classdef terminalSafeSet
 % to the offline certificate of the cruise controller and the CLF
 % (CONTROLLER_THEORY.md, Section 4).
     methods (Static)
+        function context = compactContext(target,cfg)
+            % Assumed-safe terminal contract: hold course curvature and sideslip,
+            % decelerate the ego to rest, then check the complete target track.
+            % No target braking condition, stability caps, or perception exit.
+            if ~isempty(target) && target(4)==0,target(5)=0;end
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            context=struct('deceleration',cfg.terminal.brakingDecelerationMetersPerSecondSquared, ...
+                'sampleTime',cfg.controller.sampleTime,'shape',shape, ...
+                'required',cfg.outputFeedback.clearanceMeters,'inflation',0, ...
+                'range',Inf,'clearance',[Inf;Inf],'hasTarget',~isempty(target), ...
+                'targetEpoch',target,'targetEpochIndex',0,'sampleIndex',0, ...
+                'encounterEnded',false,'stateLower',[0;-Inf;-Inf], ...
+                'stateUpper',Inf(3,1),'sideslipMaximum',0,'checkSideslip',false, ...
+                'brakingRatio',-cfg.terminal.brakingDecelerationMetersPerSecondSquared ...
+                    /nonlinearBicycleModel.tireAccelerationGain(cfg), ...
+                'brakingBounds',[max(-1,cfg.actuation.brakingRatioMinimum);min(1,cfg.actuation.brakingRatioMaximum)]);
+        end
+
+        function input = compactControl(previous,cfg)
+            context=terminalSafeSet.compactContext([],cfg);
+            input=[previous(1);context.brakingRatio];
+        end
+
+        function [value,info] = compactEvaluate(x,target,previous,cfg)
+            context=terminalSafeSet.compactContext(target,cfg);
+            value=terminalSafeSet.nonlinearValue(context,x,0);
+            input=terminalSafeSet.compactControl(previous,cfg);
+            slew=abs(input(2)-previous(2))-cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
+            value=max([value;slew;abs(input(1))-cfg.outputFeedback.steeringMaximum]);
+            info=struct('member',isfinite(value)&&value<=1e-6, ...
+                'value',value,'input',input,'stopSeconds',hypot(x(4),x(5))/context.deceleration, ...
+                'model',"constantCurvatureBrakingThenParked", ...
+                'safetyAssumed',true,'safetyProved',false,'fullTargetFutureChecked',true);
+        end
+
         function [margins,info] = lowSpeedReserve(ego,target,cfg,previousInput,smooth)
             % Physical fading-brake terminal component for dynamic output
             % feedback. Positive margins mean membership. The target is
@@ -600,6 +638,7 @@ classdef terminalSafeSet
             % Do not reuse rows(): its local side choices are unsuitable as
             % a nonlinear function when the optimization iterate changes.
             side=abs(x(5))-tan(context.sideslipMaximum)*x(4);
+            if isfield(context,'checkSideslip') && ~context.checkSideslip,side=-Inf;end
             entry=[side;context.stateLower-x(4:6);x(4:6)-context.stateUpper];
             if nargin>3
                 % Differentiate the active branch of this maximum. Holding
@@ -665,6 +704,11 @@ classdef terminalSafeSet
             % the least distance over the track is the least distance from a
             % vertex path (segment or arc) to an edge (localTrackDistance).
             [lower,upper,full,exitSeconds]=localTrack(q,pose(1:2),context.range);
+            if isinf(upper) && sin(q(6))==0
+                direction=predictiveSafetyGeometry.direction(q(3)+q(6));
+                ego=localCorners(pose,context.shape);body=localCorners(q(1:3),q(8:11));
+                upper=max(0,max(direction.'*ego)-min(direction.'*body));
+            end
             [distance,sigma]=localTrackDistance(pose,context.shape,q,lower,upper,full);
             witness=localAlong(q,sigma);
             track=struct('lower',lower,'upper',upper,'fullCircle',full,'exitSeconds',exitSeconds);

@@ -50,7 +50,12 @@ not an implementation of the adopted controller.
   NMPC is not an equivalent replacement for that formulation.
 - Preserve terminal-set membership, a realizable terminal continuation law,
   and the invariance, information-consistency and horizon-shift conditions
-  supporting recursive feasibility. Endpoint clearance, tail repetition,
+  supporting recursive feasibility. Per the user's November 8, 2026 clarification,
+  the terminal model and controller may be simpler than the main predictor;
+  terminal safety and closure may be explicit design assumptions rather than
+  strictly proved properties. Still enforce terminal membership and retain the
+  associated continuation; state the handoff assumption and do not present it
+  as a verified physical-model theorem. Endpoint clearance, tail repetition,
   finite rollout checks and heuristic braking do not replace these conditions.
 - Preserve the collision-distance dual-variable formulation. Do not replace
   it with clearance along a fixed finite list of body normals, bounding
