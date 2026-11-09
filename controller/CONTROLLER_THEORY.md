@@ -286,67 +286,39 @@ Additional numerical poses are evaluated at each half hold. Reducing the
 number of independent commands and shooting states does not remove these
 intermediate motion and collision checks.
 
-The graph allocates capacity from the configured physical speed domain and
-the preview rule. Per-interval active hold counts are parameters. Unused
+The graph initially allocates capacity using configuration size hints and
+the preview rule. These hints are not planner velocity constraints; a larger
+requested preview grows the graph instead of being rejected. Per-interval
+active hold counts are parameters. Unused
 integration slots act as identities, and their inequalities are made
 unbounded. Changing the active preview within that capacity does not rebuild
 the solver. The capacity is not an authorization to truncate a longer
 requested preview.
 
-## 5. Rectangle separation without geometric decision variables
+## 5. Dual rectangle separation
 
-For rectangle $a\in\{E,T\}$, let its half dimensions be $(l_a,w_a)$, its
-reference-point offset be $o_a$, and its center be $z_a=p_a+R_a o_a$. The
-four separating axes are the columns of $R_E$ and $R_T$. For a unit axis $n$,
-
-$$
-q(n)=|n^\top(z_E-z_T)|
--l_E|n^\top R_Ee_1|-w_E|n^\top R_Ee_2|
--l_T|n^\top R_Te_1|-w_T|n^\top R_Te_2|.
-$$
-
-The separating-axis theorem gives intersection or contact exactly when all
-four $q(n)$ are nonpositive. If $q(n)>0$, projection onto this unit axis shows
-that Euclidean footprint distance is at least $q(n)$. Consequently
-$\max_n q(n)\ge d_{\rm safe}$ is a sufficient clearance condition for
-$d_{\rm safe}>0$. It can be conservative for diagonally separated corners;
-it is not the exact Euclidean-distance function.
-
-For differentiation use
+Write the target footprint as $A_T(y-p_T)\le b_T$, where
+$A_T=[I;-I]R_T^\top$ and $b_T=[h_T+o_T;h_T-o_T]$.
+Introduce one nonnegative target multiplier shared by all ego vertices $e_a$,
+$\lambda\in\mathbb R^4_+$ at each prediction check. Impose
 
 $$
-|a|_-=\sqrt{a^2+\varepsilon^2}-\varepsilon\le |a|,
-\qquad |a|_+=\sqrt{a^2+\varepsilon^2}\ge |a|.
+\lambda^\top A_T(p_E+R_E e_a-p_T)-b_T^\top\lambda
+\ge d_{\rm safe},\qquad \forall a,
+\qquad \|A_T^\top\lambda\|_2^2\le1.
 $$
 
-Replace the center projection by $|\cdot|_-$ and support projections by
-$|\cdot|_+$. This produces four lower bounds $\widehat q_j\le q_j$.
-Define the smooth lower approximation
-
-$$
-G_\kappa=\frac1\kappa\log\left(\frac14
- \sum_{j=1}^4\exp(\kappa\widehat q_j)\right)
-\le\max_j\widehat q_j\le\max_j q_j.
-$$
-
-Its difference from $\max_j\widehat q_j$ is at most $\log(4)/\kappa$.
-For numerical stability, subtract $m=\max_j\widehat q_j$ inside the
-exponentials and add it outside the logarithm. This leaves $G_\kappa$
-unchanged. The implementation uses $\kappa=50\,\mathrm m^{-1}$.
-
-At every predicted half hold impose one scalar inequality
-
-$$
-G_\kappa\ge d_{\rm safe}+\epsilon_h+\epsilon_p.
-$$
-
-Here $\epsilon_h$ is the configured intersample engineering reserve and
-$\epsilon_p$ gives additional space for plan updating and finite-member
-validation. Neither is an uncertainty-enclosure theorem. With an independently
-proved point-speed bound $L_d$ on the signed clearance and check spacing
-$h/2$, a reserve $L_dh/4$ would bound the intersample distance decrease.
-Numerical node checks alone do not establish that premise or bound integration
-error. Common translations cancel in $p_E-p_T$ before offsets are added.
+For any target point $y$, $\lambda\ge0$ implies
+$\lambda^\top A_T(y-p_T)\le b_T^\top\lambda$.
+Consequently each displayed vertex inequality lower-bounds the projection
+of every ego-to-target displacement onto $n=A_T^\top\lambda$.
+Convexity extends the inequality from vertices to the complete ego footprint;
+$\|n\|\le1$ then proves clearance at least $d_{\rm safe}$.
+Conversely, strong convex distance duality supplies such a multiplier for
+disjoint rectangles with distance at least a positive $d_{\rm safe}$.
+The normal is optimized continuously and is not restricted to body-edge axes.
+No fixed planning buffer or smooth-max distance approximation is added.
+Common translations cancel in $p_E-p_T$.
 
 ## 6. The compact nonlinear program
 
@@ -362,10 +334,14 @@ J=\frac12\sum_{i=1}^M h b_i e_i^\top W e_i
 $$
 
 The second term equals the sum of squared increments over all interpolated
-held commands. The nonlinear program minimizes $J$ over $\{X_i,v_i\}$,
-subject to the shooting equalities, physical state bounds, endpoint input
+held commands. The nonlinear program minimizes $J$ over physical states,
+commands and the separation multipliers,
+subject to the shooting equalities, the declared forward-motion domain, endpoint input
 bounds, command-increment inequalities, and the separation inequalities.
-There are $8M$ physical state and command variables. The target has its prescribed forecast,
+There are $8M$ physical state and command variables and four nonnegative dual
+variables per collision check. Longitudinal speed upper bounds, lateral velocity
+bounds and yaw-rate bounds are not imposed by the collision planner. The target
+has its prescribed forecast,
 not a separately optimized motion or a requirement to brake or stop.
 
 The endpoint obeys the same physical and collision constraints. There is no
@@ -378,22 +354,23 @@ limited-memory Hessian approximation. The nonlinear vehicle equations remain
 in the problem; a linearization is only an internal step of the nonlinear
 solver. A numerical iteration/time limit can stop the solve before convergence.
 Convergence is neither required nor sufficient for acceptance: the proposed
-input sequence is checked separately by numerical rollout.
+input sequence is checked separately by numerical rollout. Numerical input
+bound violations are projected onto the actuator bounds before replay; only
+the projected and rechecked commands may be executed.
 
 For feasibility restoration, allocate one additional scalar $s\ge0$ and
-replace each planning separation inequality by
-$G_\kappa+s\ge d_{\rm safe}+\epsilon_h+\epsilon_p$. Its objective is
+require each vertex dual value plus $s$ to be at least $d_{\rm safe}$. Its objective is
 $J+10^4s$. During ordinary improvement fix $s=0$. When no checked plan is
-available, permit $s\ge0$ temporarily while searching from braking and
-left/right maneuver seeds. The initial maneuver curvature is limited by an
-approximate friction-based lateral-acceleration bound; this is an initial-guess
-heuristic, not a replacement for nonlinear dynamics or acceptance.
+available, permit $s\ge0$ temporarily while searching from one geometric
+planner rollout. Its dual multipliers are initialized from closest-feature
+normals. Measurement-consistent physical hypotheses are distinct from this
+single control initialization.
 
 Restoration is a numerical search procedure, not a recovery control law or
 an exact lexicographic optimization. Its positive slack never authorizes a
 clearance deficit: every executable candidate must independently pass the
-original hard checks in Section 7. Unsuccessful solves may resume from their
-primal and dual iterates within a separate initialization or recovery budget.
+original hard checks in Section 7. One continuous solve uses the single initialized trajectory within the
+initialization or recovery budget.
 These attempts count toward the actual call time; the iteration-level wall
 limit is not a guaranteed interrupt deadline.
 
@@ -401,25 +378,14 @@ limit is not a guaranteed interrupt deadline.
 
 For each retained physical member, expand the proposed coarse commands into
 all $N$ held commands, propagate its own persistent parameters, and evaluate
-input bounds, every physical input increment, state bounds, and exact
-rectangle-axis gaps at the numerical half holds. The inexpensive first check
-uses the engineering reserve
-
-$$
-\max_j q_j(\chi^s(t_\ell))\ge d_{\rm safe}+\epsilon_h
-\quad\text{for every retained }s\text{ and every check }\ell.
-$$
-
-It additionally checks the intersample lower bound below. If geometric
-acceptance fails while input and sampled state bounds hold, refine the rollout
-to $K_v$ RK4 steps per hold, with $K_v=64$ by default. The finer integrator
-retains the same held command and control-boundary rest reset. This refinement
-does not change the physical model or reduce $d_{\rm safe}$. An improvement
-proposal need not be refined when another checked executable plan is available.
+input bounds, configured physical input increments, the forward-motion domain,
+and the exact rectangle-distance dual value. Dense acceptance uses $K_v=64$
+RK4 steps per hold by default and retains the held command and control-boundary
+rest reset. An improvement can use the coarse check when a checked fallback
+is already available. There is no fixed extra clearance buffer.
 
 For the given member let $a_E,a_T$ be footprint-radius upper bounds about the
-vehicle reference points. Conditional on the continuous physical speed/rate
-domain, a Lipschitz bound on Euclidean footprint distance is
+vehicle reference points. Given valid continuous speed/rate bounds, a Lipschitz bound on Euclidean footprint distance is
 
 $$
 L_d=\sqrt{v_{x,\max}^2+v_{y,\max}^2}
@@ -429,7 +395,7 @@ $$
 
 The target maxima are obtained from its prescribed motion over the preview.
 For two neighboring check times separated by $\Delta t$, write
-$q_0,q_1$ for their maximum rectangle-axis gaps. Since each is a lower bound
+$q_0,q_1$ for their exact rectangle distances. Since each is a lower bound
 on Euclidean distance, the two endpoint Lipschitz cones give
 
 $$
@@ -442,9 +408,11 @@ Require $\underline d\ge d_{\rm safe}$ on every interval. Use
 $\Delta t=h/2$ for the first check and $h/K_v$ after refinement. If both
 vehicles remain exactly at their declared rest equilibria under nonpositive
 ego force commands, $L_d=0$ is valid; stationary configurations do not need a
-moving-vehicle reserve. Numerical node poses and between-node satisfaction of
-the physical domain are not interval-certified by this implementation, so this
-conditional geometric bound is not an end-to-end robust safety certificate.
+moving-vehicle reserve. The implementation estimates the speed/rate extrema
+from the replay itself; it does not impose them as state constraints. These
+sampled extrema and numerical poses are not validated continuous bounds, so
+the interval check is an engineering check, not an end-to-end robust safety
+certificate.
 
 Only a sequence passing these checks can supply a command. An NLP iterate
 with a shooting defect is assessed using its actual command rollout, not its
@@ -484,7 +452,7 @@ physically admissible causal controllers fail.
 ## 8. Scope of the resulting statements
 
 The exact information update has the containment property under its stated
-contract. The separating-axis lower bound proves geometric separation for
+contract. The feasible distance dual proves geometric separation for
 individual configurations. The command interpolation enforces each actual
 input increment. These facts do not convert a finite ensemble, numerical
 integration, sampled geometry checks, or finite preview into a universal

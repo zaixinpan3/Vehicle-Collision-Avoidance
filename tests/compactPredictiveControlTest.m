@@ -65,10 +65,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(rates,[],2),limits+1e-8);
             testCase.verifyGreaterThanOrEqual(min(rates,[],2),-limits-1e-8);
             states=prediction.scenarios{1}.denseEgo(4:6,:);
-            testCase.verifyGreaterThanOrEqual(min(states,[],2), ...
-                [0;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum]-1e-6);
-            testCase.verifyLessThanOrEqual(max(states,[],2), ...
-                [cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum]+1e-6);
+            testCase.verifyGreaterThanOrEqual(min(states(1,:)), -1e-6);
         end
         function defaultReplayAllowsSteeringChangesWithoutAnActuatorRateContract(testCase)
             item=testCase.block.initialHypotheses;item.ego(4:6)=0;
@@ -89,9 +86,23 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         function removingSteeringSlewPreservesAngleBounds(testCase)
             item=testCase.block.initialHypotheses;item.ego(4:6)=0;
             result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
-                'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[.6;-1]));
+                'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[.7;-1]));
             testCase.verifyFalse(result.accepted);
-            testCase.verifyGreaterThan(result.maximumViolation,.09);
+            testCase.verifyGreaterThan(result.maximumViolation,.08);
+        end
+        function diagonalClearanceUsesTheFullDistanceDual(testCase)
+            item=testCase.block.initialHypotheses;item.ego(:)=0;
+            item.target=[4.88;1.98;0;0;0;0;1.6;2.4;.95;0;0];
+            result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[0;-1]));
+            testCase.verifyTrue(result.accepted);
+        end
+        function stabilityStateCapsDoNotRejectCollisionFreeMotion(testCase)
+            cfg=testCase.cfg;cfg.model.speedMaximum=10;cfg.model.lateralVelocityMaximum=.1;cfg.model.yawRateMaximum=.1;
+            item=testCase.block.initialHypotheses;item.ego(4:6)=[19;.2;.2];
+            result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[0;0]));
+            testCase.verifyTrue(result.accepted);
         end
         function continuationReplaysTheUpdatedPhysicalState(testCase)
             block=localNextBlock(testCase.state,testCase.cfg);
@@ -146,7 +157,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function restorationCanRepairAnUnsafeBrakingInitialization(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=3;
-            cfg.outputFeedback.initializationSolveSeconds=10;
+            cfg.outputFeedback.initializationSolveSeconds=10;cfg.outputFeedback.nlpJit=true;
             block=localBlock(cfg,3);item=block.initialHypotheses;
             item.target=[5.6;0;0;0;0;0;1.6;2.4;.95;0;0];
             block.initialHypotheses=item;
@@ -164,7 +175,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(info.restorationAttempted);
             testCase.verifyGreaterThan(info.initialRestorationSlack,0);
             testCase.verifyLessThanOrEqual(info.initialNlpViolation,1e-9);
-            testCase.verifyLessThanOrEqual(info.nlpAttempts,5);
+            testCase.verifyEqual(info.nlpAttempts,1);
+            testCase.verifyEqual(info.initializationTrajectoryCount,1);
+            inputs=prediction.scenarios{1}.inputs;
+            testCase.verifyLessThanOrEqual(max(abs(inputs(1,:))),cfg.outputFeedback.steeringMaximum);
+            testCase.verifyLessThanOrEqual(max(abs(inputs(2,:))),1);
             request.inputs=prediction.scenarios{1}.inputs;
             result=solvePredictiveControl('outputFeedback',request);
             testCase.verifyTrue(result.accepted);
