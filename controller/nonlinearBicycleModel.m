@@ -2,6 +2,64 @@ classdef nonlinearBicycleModel
     %nonlinearBicycleModel Nominal held-input prediction, tangents and lane trims.
     % RK4 and its variational equations define the numerical prediction model.
     methods (Static)
+        function [selected,ends] = condenseSensitivities(endMaps,sampleMaps,controlMap,index,required,substeps)
+            % Chain local flow Jacobians over the actual, variable horizon.
+            % Generated native code calls this same numerical implementation.
+            % Sample maps precede the stop reset; end maps follow it.
+            count=size(index,2);width=size(controlMap,2);
+            assert(size(index,1)==5 && isequal(size(required),size(index)));
+            assert(isequal(size(endMaps),[6,8*count]) && isequal(size(sampleMaps),[6,40*count]));
+            assert(size(controlMap,1)==2*count);
+            selected=zeros(6,5*width*count);ends=zeros(6,width*(count+1));active=0;
+            value=zeros(6,width);columns=zeros(1,width);
+            for i=1:count
+                before=ends(:,width*(i-1)+(1:width));
+                endpoint=endMaps(:,8*(i-1)+(1:8));used=0;
+                for c=1:width
+                    if controlMap(2*i-1,c)~=0 || controlMap(2*i,c)~=0
+                        used=used+1;columns(used)=c;
+                    end
+                end
+                % Reuse one workspace. Scalar fixed-size products avoid
+                % allocating variable-size slices and BLAS work per sample.
+                for j=0:5
+                    if j>0 && ~required(j,i),continue;end
+                    slot=5*(i-1)+j;point=endpoint;alias=0;
+                    if j>0
+                        point=sampleMaps(:,8*(slot-1)+(1:8));
+                        for earlier=1:j-1
+                            if required(earlier,i) && index(earlier,i)==index(j,i),alias=earlier;break;end
+                        end
+                    end
+                    if j>0 && index(j,i)==0
+                        value(:,:)=before;
+                    elseif j>0 && index(j,i)==substeps && isequal(point,endpoint)
+                        value(:,:)=ends(:,width*i+(1:width));
+                    elseif alias>0
+                        value(:,:)=selected(:,width*(5*(i-1)+alias-1)+(1:width));
+                    else
+                        value(:)=0;
+                        for c=1:active
+                            for r=1:6
+                                product=0;
+                                for k=1:6,product=product+point(r,k)*before(k,c);end
+                                value(r,c)=product;
+                            end
+                        end
+                        for k=1:used
+                            c=columns(k);
+                            for r=1:6
+                                value(r,c)=value(r,c)+(point(r,7)*controlMap(2*i-1,c)+point(r,8)*controlMap(2*i,c));
+                            end
+                        end
+                    end
+                    if j==0,ends(:,width*i+(1:width))=value;
+                    else,selected(:,width*(slot-1)+(1:width))=value;end
+                end
+                if used>0,active=max(active,columns(used));end
+            end
+        end
+
         function [lower,upper] = inputBounds(cfg,linearizationPoint)
             % Physical saturation includes +/-1. Only tangent seeds need an
             % interior point because the Fiala input slope is singular there.

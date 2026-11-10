@@ -4447,6 +4447,14 @@ function [selected,ends]=localCondensedSensitivities(roots,inputs,parameters,ind
     mapped=model.kernel.sensitivity.map(N);
     [allEnd,allSelected]=mapped(roots,inputs,repmat(parameters,1,N),index);
     allEnd=full(allEnd);allSelected=full(allSelected);
+    native=[];
+    if model.cfg.outputFeedback.nlpJit,native=localCompactSensitivityKernel();end
+    if ~isempty(native)
+        [points,endpoints]=native(allEnd,allSelected,model.controlMap,index,required,model.kernel.validationSubsteps);
+        ends=mat2cell(endpoints,6,repmat(nu,1,N+1));
+        selected=reshape(mat2cell(points,6,repmat(nu,1,5*N)),5,N);
+        selected(~required)={[]};return;
+    end
     % Establish aliases once for the entire horizon. Equal dense sample
     % indices have the same local map; an endpoint may have a different
     % post-stop reset, so its map must match exactly before it is reused.
@@ -4485,6 +4493,36 @@ function [selected,ends]=localCondensedSensitivities(roots,inputs,parameters,ind
     end
     duplicate=required & aliases~=0 & ~atRoot & ~atEnd;
     selected(duplicate)=selected(aliases(duplicate));
+end
+
+function kernel=localCompactSensitivityKernel()
+    % Optional native copy of the numerical chain rule. A deterministic
+    % probe covers aliases, a pre-reset sample and causal control columns.
+    persistent handle checked
+    if isempty(checked)
+        checked=true;handle=[];
+        folder=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
+        if isfile(fullfile(folder,['condensedSensitivityKernelMex.',mexext]))
+            previous=addpath(folder);cleanup=onCleanup(@()path(previous));candidate=@condensedSensitivityKernelMex;
+            E=[eye(6),ones(6,2)/8];E=[E,E];E(4:6,9:16)=0;
+            D=repmat([eye(6),ones(6,2)/8],1,10);
+            U=[eye(2),zeros(2);eye(2)/2,eye(2)/2];
+            index=[0,0;64,64;32,32;32,32;16,16];required=true(5,2);required(5,1)=false;
+            [points,ends]=nonlinearBicycleModel.condenseSensitivities(E,D,U,index,required,64);
+            same=false;
+            try
+                [a,b]=candidate(E,D,U,index,required,64);same=isequal(a,points)&&isequal(b,ends);
+            catch
+                % Missing or stale native interfaces use the MATLAB path.
+            end
+            if same,handle=candidate;
+            else
+                warning('collisionAvoidanceController:staleSensitivityKernel', ...
+                    'The compiled sensitivity kernel differs from its source probe. Rebuild it with buildControllerKernels.');
+            end
+        end
+    end
+    kernel=handle;
 end
 
 function gradient=localCompactDistanceGradient(states,targets,shape)

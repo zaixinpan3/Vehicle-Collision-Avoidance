@@ -460,6 +460,30 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(value.forwardGradient(3:end,1),zeros(8,1));
             testCase.verifyGreaterThan(abs(value.forwardGradient(2,1)),1e-3);
         end
+        function nativeDerivativesAgreeAcrossChangingHorizons(testCase,integrationMesh,movingTarget)
+            root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.assumeTrue(isfile(fullfile(root,'solver','controller',['condensedSensitivityKernelMex.',mexext])), ...
+                'Run buildControllerKernels to test the optional native sensitivity implementation.');
+            cfg=testCase.cfg;cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            item=testCase.block.initialHypotheses;item.ego=[0;0;.12;3.3;.08;.03];item.target=[];
+            if movingTarget,item.target=[12;4;.8;2;0;.04;1.6;2.4;.95;0;0];end
+            other=item;other.ego(2)=other.ego(2)+.03;other.parameters(3:4)=.98;
+            request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
+                'hypotheses',[item,other],'input',zeros(2,1),'holds',[1,2,4,3,6], ...
+                'inputs',[.02,.07,.1,.04,-.01;-.05,.08,.12,.02,-.04]);
+            fields={'stage','forward','terminal','cost','stageGradient','forwardGradient', ...
+                'terminalGradient','costGradient','costHessian'};
+            windows={[1,2,4,3,6],[1,2,61,3,60],[2,1,1,2,1]};
+            for i=1:numel(windows)
+                request.holds=windows{i};request.cfg.outputFeedback.nlpJit=false;
+                interpreted=solvePredictiveControl('outputFeedback',request);
+                request.cfg.outputFeedback.nlpJit=true;
+                native=solvePredictiveControl('outputFeedback',request);
+                for j=1:numel(fields)
+                    testCase.verifyEqual(native.(fields{j}),interpreted.(fields{j}),AbsTol=1e-9,RelTol=1e-12);
+                end
+            end
+        end
         function denseStopSamplesKeepTheirPreResetSensitivity(testCase,integrationMesh)
             cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
             cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
