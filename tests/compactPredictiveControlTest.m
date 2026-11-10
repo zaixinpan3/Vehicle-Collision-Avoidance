@@ -71,6 +71,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,expected,AbsTol=1e-12);
             testCase.verifyTrue(prediction.metadata.retainedFinePlanUsed);
             testCase.verifyEqual(prediction.metadata.performanceAcceptedSteps,0);
+            testCase.verifyEqual(prediction.metadata.nonlinearOracleEvaluations,0);
+            testCase.verifyTrue(prediction.metadata.budgetStopped);
+            testCase.verifyEqual(prediction.metadata.budgetScope,"completeWarmControllerCall");
         end
         function anOpenRoadRestStateCanResumeCruise(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.nlpJit=true;
@@ -82,6 +85,61 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(command.actuatorInput(2),.01);
             testCase.verifyGreaterThan(prediction.scenarios{1}.ego(4,end),1.4);
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,1e-6);
+        end
+        function anExpiredCallBudgetCannotStartTheInitialOracle(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            block=localBlock(cfg,0);
+            [command,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyEqual(prediction.metadata.nonlinearOracleEvaluations,0);
+            testCase.verifyTrue(prediction.metadata.rootTerminalPlanUsed);
+            testCase.verifyTrue(prediction.metadata.budgetStopped);
+            testCase.verifyEqual(prediction.metadata.pcbfValue,0);
+            testCase.verifyEqual(prediction.metadata.callBudgetSeconds,cfg.outputFeedback.maximumSolveSeconds,AbsTol=1e-12);
+            testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
+            testCase.verifyEqual(command.actuatorInput,prediction.scenarios{1}.inputs(:,1));
+        end
+        function aDeferredTrialCannotReplaceThePlanWithoutImprovement(testCase)
+            state=testCase.state;
+            state.deferredFineControls=repmat([testCase.cfg.outputFeedback.steeringMaximum;-1],1,state.horizonSteps);
+            block=localNextBlock(state,testCase.cfg);
+            [command,inputs,prediction]=collisionAvoidanceController(block,[],[],testCase.cfg,state);
+            testCase.verifyFalse(prediction.metadata.deferredTrialAccepted);
+            testCase.verifyLessThanOrEqual(prediction.metadata.acceptedPerformanceCost, ...
+                prediction.metadata.inheritedPerformanceCost+1e-10);
+            testCase.verifyGreaterThan(norm(command.actuatorInput-state.deferredFineControls(:,2)),1e-3);
+            replay=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',testCase.cfg,'hypotheses',prediction.information,'input',block.heldInput,'inputs',inputs));
+            testCase.verifyTrue(replay.accepted);
+        end
+        function aCheckedDeferredImprovementCanResumeFromTheRetainedStop(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.nlpJit=true;
+            cfg.outputFeedback.maximumSolveSeconds=2;
+            block=localBlock(cfg,0);block.initialHypotheses.target=[];
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
+            [~,~,~,state]=collisionAvoidanceController(block,[],[],cfg,[]);
+            state.deferredFineControls=state.fineControls;
+            backup=[0;-cfg.outputFeedback.backupBrakingRatio];
+            state.fineControls=repmat(backup,1,state.horizonSteps);
+            state.searchFineControls=state.fineControls;
+            state.controls=repmat(backup,1,size(state.controls,2));state.appliedInput=backup;
+            block=localNextBlock(state,cfg);
+            [command,~,prediction]=collisionAvoidanceController(block,[],[],cfg,state);
+            testCase.verifyTrue(prediction.metadata.deferredTrialAccepted);
+            testCase.verifyLessThan(prediction.metadata.acceptedPerformanceCost,prediction.metadata.inheritedPerformanceCost);
+            testCase.verifyGreaterThan(command.actuatorInput(2),0);
+            testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
+            testCase.verifyEqual(prediction.metadata.pcbfValue,0);
+            testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
+        end
+        function anExpiredAdmissionCannotAuthorizeAnUncheckedSeed(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.initializationSolveSeconds=1e-12;
+            block=localBlock(cfg,0);item=block.initialHypotheses;
+            item.target=[0;0;0;0;0;0;1.6;2.4;.95;0;0];block.initialHypotheses=item;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+            testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,[]), ...
+                'collisionAvoidanceController:compactNoFeasiblePlan');
         end
         function theDefaultOptimizesDirectInputsWithoutMemoryMaps(testCase)
             cfg=collisionAvoidanceControllerConfig();

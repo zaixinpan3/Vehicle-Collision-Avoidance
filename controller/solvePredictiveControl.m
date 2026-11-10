@@ -2799,6 +2799,7 @@ end
 function [result,diagnostics,problem] = localOutputFeedback(request)
     % One joint inference/control runtime; the state-input solver above is
     % retained as a research comparator. No NRMM routine is called here.
+    if ~isfield(request,'callTimer'),request.callTimer=tic;end
     cfg=collisionAvoidanceControllerConfig(request.cfg);
     diagnostics=[];problem=[];
     switch string(request.operation)
@@ -2835,7 +2836,8 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
             count=max(round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod),nonlinearBicycleModel.meshCount(cfg));
             kernel=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target),count);
             model=localCondensedModel(cfg,hypotheses,request.input,holds,lane,nominal,kernel);
-            result=localCondensedOracle(controls(:),model);
+            [~,rollouts]=localCondensedOracle(controls(:),model,false);
+            result=localCondensedOracle(controls(:),model,true,rollouts);
         case {"predict","linearize"}
             problem=localOfProblem(request.hypotheses,request.memory,request.input, ...
                 request.policies,request.reference,cfg);
@@ -3772,7 +3774,7 @@ end
 
 function [result,info] = localCompactStep(request,cfg)
     % Fixed inference and a condensed PCBF solve with exact geometry dual values.
-    timer=tic;block=request.block;prior=request.previousState;initial=isempty(prior);
+    timer=request.callTimer;block=request.block;prior=request.previousState;initial=isempty(prior);
     localOfValidateBlock(block,cfg);
     sensorCount=cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod;
     assert(abs(sensorCount-round(sensorCount))<1e-10 && sensorCount>=2 && mod(round(sensorCount),2)==0, ...
@@ -3830,7 +3832,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         integrationCount=cfg.outputFeedback.validationSubsteps;
     end
     [kernel,cacheHit]=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target),integrationCount);
-    fineKernel=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target));buildSeconds=toc(clock);
+    [fineKernel,fineCacheHit]=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target));buildSeconds=toc(clock);
     count=sum(holds);nodes=numel(holds);nu=2*nodes;previous=request.block.heldInput;prior=request.previousState;
     initial=isempty(prior);h=cfg.controller.sampleTime;boundaries=[0,cumsum(holds)];
     model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel);
@@ -3869,29 +3871,68 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         end
         controls=localCompactRateLimit(search(:,boundaries(2:end)),previous,holds,cfg);
     end
-    controls=localCompactReleaseRestingBrakes(controls,hypotheses,previous,kernel,cfg);
+    budget=cfg.outputFeedback.maximumSolveSeconds;budgetPhase="performance";
+    if isempty(best)
+        budget=cfg.outputFeedback.recoverySolveSeconds;budgetPhase="recovery";
+        if initial,budget=cfg.outputFeedback.initializationSolveSeconds;budgetPhase="initialization";end
+    end
+    % Compilation is startup preparation, never a warmed online exemption.
+    startupBuildSeconds=0;
+    if initial && (~cacheHit || ~fineCacheHit),startupBuildSeconds=buildSeconds;end
+    budget=budget+startupBuildSeconds;completionReserve=.002;
+    timing=struct('values',NaN,'gradient',NaN,'fullGradient',NaN,'validation',NaN,'cachedValidation',NaN,'qp',NaN);
+    workUnits=numel(hypotheses)*count;
+    if ~initial && isfield(prior,'runtimeTiming') && prior.runtimeTiming.integrationSubsteps==kernel.integrationSubsteps
+        timing=prior.runtimeTiming.cost;
+    end
+    baselineValidationSeconds=validationSeconds;timingIntegrationSubsteps=kernel.integrationSubsteps;
+    budgetStopped=false;budgetStopPhase="";rollouts=[];reuseCount=0;
     if ~isempty(best)
         bestCost=localCompactPerformance(bestTraces{nominal}.ego(:,2:end),best,model);
     end
     inheritedCost=bestCost;
     [a,b]=localCondensedInputRows(previous,holds,cfg);lower=repmat([-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)],nodes,1);
     upper=repmat([cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],nodes,1);
-    if max([a*controls(:)-b;lower-controls(:);controls(:)-upper])>cfg.outputFeedback.nlpTolerance
+    lastIterate=controls(:);
+    cacheU=[];checkedU=[];cache=[];calls=0;phase=1;needsRefinement=false;solveClock=tic;
+    initialDeficit=NaN;initialTerminal=NaN;restoration=isempty(best);
+    iterationCount=0;phaseIterations=0;exitFlag=0;attempts=0;performanceSteps=0;
+    deferred=zeros(2,0);activeTrial=[];deferredAccepted=false;
+    % A QP trial interrupted before validation is a proposal, not a warm
+    % iterate or executable plan. Recheck it against the new posterior and
+    % shifted-plan cost before allowing it to replace either one.
+    if ~initial && isfield(prior,'deferredFineControls') && ~isempty(prior.deferredFineControls)
+        pending=prior.deferredFineControls(:,2:end);
+        pending=[pending,repmat(extension,1,count-size(pending,2))];
+        pending=localCompactRateLimit(pending(:,boundaries(2:end)),previous,holds,cfg);
+        deferred=pending*map.'+offset;
+        try
+            savedCost=bestCost;evaluate(pending(:),false);
+            deferredAccepted=bestCost<savedCost;
+            if deferredAccepted,controls=pending;lastIterate=pending(:);end
+            deferred=zeros(2,0);
+        catch exception
+            if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
+            exitFlag=-1;
+        end
+    end
+    if ~budgetStopped && (isempty(cacheU) || ~isequal(controls(:),cacheU)) && canStart("values")
+        [controls,rollouts]=localCompactReleaseRestingBrakes(controls,model);
+        lastIterate=controls(:);
+    end
+    if ~budgetStopped && canStart("qp") && max([a*controls(:)-b;lower-controls(:);controls(:)-upper])>cfg.outputFeedback.nlpTolerance
         % Project the one warm trajectory onto the complete linear actuator
         % contract, including the terminal handoff, before nonlinear search.
         [projected,~,flag]=quadprog(eye(nu),-controls(:),a,b,[],[],lower,upper,controls(:),qpOptions);
-        if flag>0,controls=reshape(projected,2,nodes);end
+        if flag>0,controls=reshape(projected,2,nodes);lastIterate=controls(:);end
     end
-    lastIterate=controls(:);
-    cacheU=[];checkedU=[];cache=[];calls=0;phase=1;needsRefinement=false;solveClock=tic;
-    budget=cfg.outputFeedback.maximumSolveSeconds;
-    if isempty(best)
-        budget=cfg.outputFeedback.recoverySolveSeconds;
-        if initial,budget=cfg.outputFeedback.initializationSolveSeconds;end
-        if rootTerminal,budget=cfg.outputFeedback.maximumSolveSeconds;end
+    try
+        evaluation=evaluate(controls(:),restoration);
+        initialDeficit=sum(max(0,evaluation.stage));initialTerminal=max(evaluation.terminal);
+    catch exception
+        if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
+        exitFlag=-1;
     end
-    evaluation=evaluate(controls(:));initialDeficit=sum(max(0,evaluation.stage));initialTerminal=max(evaluation.terminal);
-    restoration=isempty(best);iterationCount=0;phaseIterations=0;exitFlag=0;attempts=0;performanceSteps=0;
     if isempty(best)
         options=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
             'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true, ...
@@ -3899,10 +3940,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             'StepTolerance',1e-9,'MaxIterations',cfg.outputFeedback.restorationMaximumIterations, ...
             'MaxFunctionEvaluations',10000,'OutputFcn',@progress);
     end
-    while isempty(best) && (attempts==0 || needsRefinement)
-        if needsRefinement,model.kernel=fineKernel;cacheU=[];needsRefinement=false;evaluation=evaluate(controls(:));end
-        z=[controls(:);max(0,evaluation.stage)];attempts=attempts+1;phaseIterations=0;
+    while isempty(best) && ~budgetStopped && (attempts==0 || needsRefinement)
+        attempts=attempts+1;phaseIterations=0;
         try
+            if needsRefinement,model.kernel=fineKernel;cacheU=[];needsRefinement=false;evaluation=evaluate(controls(:));end
+            z=[controls(:);max(0,evaluation.stage)];
             [z,~,exitFlag,output]=fmincon(@objective,z,[a,zeros(size(a,1),count)],b,[],[], ...
                 [lower;zeros(count,1)],[upper;Inf(count,1)],@constraints,options);
             iterationCount=iterationCount+output.iterations;controls=reshape(z(1:nu),2,nodes);lastIterate=z(1:nu);
@@ -3910,11 +3952,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
             exitFlag=-1;iterationCount=iterationCount+phaseIterations;controls=reshape(lastIterate,2,nodes);
         end
-        if toc(solveClock)>=budget,break;end
+        if toc(timer)>=budget,break;end
     end
     % A checked zero-deficit plan attains the global lower bound of the PCBF
     % primary objective. Only then may performance replace the stored plan.
-    while ~isempty(best) && toc(solveClock)<budget && iterationCount<cfg.outputFeedback.nlpMaximumIterations
+    while ~isempty(best) && ~budgetStopped && toc(timer)<budget-completionReserve && iterationCount<cfg.outputFeedback.nlpMaximumIterations
         if needsRefinement
             model.kernel=fineKernel;cacheU=[];needsRefinement=false;
         end
@@ -3928,8 +3970,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             H=blkdiag((e.costHessian+e.costHessian.')/2+1e-4*eye(nu),1);
             rows=[jac,-ones(numel(c),1);a,zeros(size(a,1),1)];rhs=[-c;b-a*lastIterate];
             start=[zeros(nu,1);max([0;c])];
+            requireBudget("qp");qpClock=tic;
             [step,~,flag]=quadprog(H,[e.costGradient;penalty],rows,rhs,[],[], ...
                 [lower-lastIterate;0],[upper-lastIterate;Inf],start,qpOptions);
+            recordCost("qp",toc(qpClock));
             if flag<=0,exitFlag=-2;break;end
             direction=step(1:nu);iterationCount=iterationCount+1;
             if norm(direction,Inf)<1e-7
@@ -3939,8 +3983,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             merit=e.cost+penalty*sum(max(0,c));
             decrease=e.costGradient.'*direction+penalty*(sum(max(0,c+jac*direction))-sum(max(0,c)));
             accepted=false;fraction=1;
-            while fraction>=1/128 && toc(solveClock)<budget
-                trial=lastIterate+fraction*direction;value=evaluate(trial,false);
+            while fraction>=1/128 && ~budgetStopped
+                trial=lastIterate+fraction*direction;activeTrial=trial;
+                value=evaluate(trial,false);activeTrial=[];
                 trialMerit=value.cost+penalty*sum(max(0,[value.stage;value.forward;value.terminal]));
                 if trialMerit<=merit+1e-4*fraction*min(-eps,decrease)
                     lastIterate=trial;accepted=true;performanceSteps=performanceSteps+1;break;
@@ -3951,13 +3996,15 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             exitFlag=0;
         catch exception
             if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
+            if ~isempty(activeTrial),deferred=reshape(activeTrial,2,nodes)*map.'+offset;end
             exitFlag=-1;break;
         end
     end
-    if exitFlag==0 && toc(solveClock)>=budget,exitFlag=-1;end
-    assert(~isempty(best),'collisionAvoidanceController:compactNoFeasiblePlan', ...
-        'No checked feasible PCBF plan; last evaluated clearance deficit %.6g, terminal violation %.6g after %d evaluations. This is not a proof of physical infeasibility.', ...
-        sum(max(0,cache.stage)),max(cache.terminal),calls);
+    if budgetStopped || (exitFlag==0 && toc(timer)>=budget-completionReserve),exitFlag=-1;end
+    if isempty(best)
+        error('collisionAvoidanceController:compactNoFeasiblePlan', ...
+            'No checked feasible PCBF plan after %d evaluations within the %s call budget. This is not a proof of physical infeasibility.',calls,budgetPhase);
+    end
     % Reuse the complete replay of the selected plan. Only actuator
     % normalization that actually changes a command needs another replay.
     solveSeconds=toc(solveClock);clipped=localCompactRateLimit(best,previous,ones(1,count),cfg);
@@ -3967,11 +4014,14 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         assert(valid,'collisionAvoidanceController:compactNoFeasiblePlan','Final condensed-plan replay failed.');
     end
     best=clipped;traces=bestTraces;violation=bestViolation;
+    % Keep unfinished proposals separate from the accepted numerical iterate.
+    runtimeTiming=struct('integrationSubsteps',model.kernel.integrationSubsteps,'cost',timing);
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v1",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
         'fineControls',best,'searchFineControls',reshape(lastIterate,2,nodes)*map.'+offset,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
+        'deferredFineControls',deferred, ...
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
-        'pcbfDeficit',0,'stageDeficits',zeros(count,1), ...
+        'pcbfDeficit',0,'stageDeficits',zeros(count,1),'runtimeTiming',runtimeTiming, ...
         'requiresFineIntegration',needsRefinement || model.kernel.integrationSubsteps==fineKernel.integrationSubsteps);
     info=struct('solver',"condensedNonlinearPcbfSqp",'nlpStatus',string(exitFlag), ...
         'nlpConverged',exitFlag>0,'nlpIterations',iterationCount,'nlpSeconds',solveSeconds, ...
@@ -3995,7 +4045,12 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'optimizationReturned',true,'pcbfValue',0,'primaryOptimumComputed',true, ...
         'inheritedPerformanceCost',inheritedCost,'acceptedPerformanceCost',bestCost, ...
         'performanceAcceptedSteps',performanceSteps, ...
-        'safetyObjective',"sumOfHorizonSafetySlacks",'nonlinearOracleEvaluations',calls);
+        'deferredTrialAccepted',deferredAccepted,'deferredTrialStored',~isempty(deferred), ...
+        'safetyObjective',"sumOfHorizonSafetySlacks",'nonlinearOracleEvaluations',calls, ...
+        'oraclePropagationReuses',reuseCount,'callBudgetSeconds',budget-startupBuildSeconds, ...
+        'startupBuildSeconds',startupBuildSeconds,'budgetPhase',budgetPhase, ...
+        'budgetScope',"completeWarmControllerCall",'budgetStopped',budgetStopped,'budgetStopPhase',budgetStopPhase);
+    info.callBudgetOverrunSeconds=max(0,info.elapsedSeconds-budget);
     info.deadlineMissed=info.elapsedSeconds>h;
     command=struct('actuatorInput',input,'steeringAngle',input(1),'brakingRatio',input(2));
     prediction=struct('metadata',info,'scenarios',{traces},'memory',zeros(0,1),'information',hypotheses);
@@ -4004,18 +4059,27 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     function e=evaluate(u,derivatives)
         if nargin<2,derivatives=true;end
         if isempty(cacheU)||~isequal(u,cacheU)||(derivatives && ~cache.derivatives)
-            if calls>0 && toc(solveClock)>=budget
-                error('collisionAvoidanceController:condensedDeadline','The nonlinear evaluation budget elapsed.');
+            kind="values";
+            reuse=localCompactCacheMatches(rollouts,reshape(u,2,nodes)*map.'+offset,hypotheses,previous,model.kernel,cfg);
+            if derivatives
+                kind="fullGradient";
+                if reuse && all(cellfun(@(flow)isstruct(flow) && isfield(flow,'oracle'),rollouts.trajectories)),kind="gradient";end
             end
-            [cache,rollouts]=localCondensedOracle(u,model,derivatives);cacheU=u;calls=calls+1;
+            requireBudget(kind);evaluationClock=tic;
+            [cache,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,@checkClock);
+            recordCost(kind,toc(evaluationClock));reuseCount=reuseCount+reuse;
+            cacheU=u;calls=calls+1;
             feasible=max([cache.stage;cache.forward;cache.terminal;a*u-b;lower-u;u-upper])<=cfg.outputFeedback.nlpTolerance;
             promising=feasible && cache.cost<bestCost && ~isequal(u,checkedU);
             if promising
                 candidate=reshape(u,2,nodes)*map.'+offset;
                 candidate=localCompactRateLimit(candidate,previous,ones(1,count),cfg);
-                checkedU=u;
-                validationClock=tic;[feasible,candidateTraces,candidateViolation]=localCompactValidate(candidate,hypotheses,previous,fineKernel,cfg,true,rollouts);
-                validationSeconds=validationSeconds+toc(validationClock);
+                validationKind="validation";
+                if localCompactCacheMatches(rollouts,candidate,hypotheses,previous,fineKernel,cfg),validationKind="cachedValidation";end
+                requireBudget(validationKind);checkedU=u;
+                validationClock=tic;[feasible,candidateTraces,candidateViolation]=localCompactValidate(candidate,hypotheses,previous,fineKernel,cfg,true,rollouts,@checkClock);
+                validationElapsed=toc(validationClock);recordCost(validationKind,validationElapsed);
+                validationSeconds=validationSeconds+validationElapsed;
                 needsRefinement=~feasible && model.kernel.integrationSubsteps<fineKernel.integrationSubsteps;
                 if feasible
                     candidateCost=localCompactPerformance(candidateTraces{nominal}.ego(:,2:end),candidate,model);
@@ -4024,13 +4088,51 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             end
             if promising && feasible
                 if initial && isempty(best)
-                    budget=min(budget,toc(solveClock)+cfg.outputFeedback.maximumSolveSeconds);
+                    budget=min(budget,toc(timer)+cfg.outputFeedback.maximumSolveSeconds);
                 end
                 best=candidate;bestCost=candidateCost;bestTraces=candidateTraces;bestViolation=candidateViolation;retained=false;
             end
         end
         e=cache;
     end
+    function estimate=estimatedCost(kind)
+        if timingIntegrationSubsteps~=model.kernel.integrationSubsteps
+            names=fieldnames(timing);for j=1:numel(names),timing.(names{j})=NaN;end
+            timingIntegrationSubsteps=model.kernel.integrationSubsteps;
+        end
+        estimate=timing.(kind)*workUnits;
+        if ~isfinite(estimate)
+            base=max(.001,baselineValidationSeconds);
+            switch kind
+                case "values",estimate=.5*base;
+                case "gradient",estimate=base;
+                case "fullGradient",estimate=1.5*base;
+                case "validation",estimate=base;
+                case "cachedValidation",estimate=.2*base;
+                case "qp",estimate=.001;
+            end
+        end
+        estimate=1.1*estimate;
+    end
+    function allowed=canStart(kind)
+        allowed=toc(timer)+estimatedCost(kind)+completionReserve<budget;
+        if ~allowed,budgetStopped=true;budgetStopPhase=kind;end
+    end
+    function requireBudget(kind)
+        if ~canStart(kind)
+            error('collisionAvoidanceController:condensedDeadline','Insufficient remaining call budget for %s.',kind);
+        end
+    end
+    function checkClock()
+        if toc(timer)>=budget-completionReserve
+            budgetStopped=true;budgetStopPhase="inProgress";
+            error('collisionAvoidanceController:condensedDeadline','The complete controller-call budget elapsed.');
+        end
+    end
+    function recordCost(kind,elapsed)
+        timing.(kind)=elapsed/workUnits;
+    end
+
     function [f,g]=objective(z)
         e=evaluate(z(1:nu));
         if phase==1,f=sum(z(nu+1:end));g=[zeros(nu,1);ones(count,1)];else,f=e.cost;g=e.costGradient;end
@@ -4044,7 +4146,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     function stop=progress(z,values,status)
         if strcmp(status,'iter') || strcmp(status,'init'),lastIterate=z(1:nu);phaseIterations=values.iteration;end
-        stop=toc(solveClock)>=budget || needsRefinement || (phase==1 && ~isempty(best));
+        stop=budgetStopped || toc(timer)>=budget-completionReserve || needsRefinement || (phase==1 && ~isempty(best));
     end
 end
 
@@ -4176,14 +4278,13 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     keys{end+1}=key;kernels{end+1}=kernel;
 end
 
-function [e,rollouts]=localCondensedOracle(u,model,derivatives)
+function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBudget)
     if nargin<3,derivatives=true;end
+    if nargin<5,checkBudget=[];end
     cfg=model.cfg;kernel=model.kernel;N=sum(kernel.holds);n=numel(kernel.holds);nu=numel(u);K=kernel.validationSubsteps;h=cfg.controller.sampleTime;
     controls=reshape(u,2,n);inputs=controls*model.map.'+model.offset;capacity=sum(kernel.capacity);
-    rollouts=[];
-    if nargout>1 && kernel.integrationSubsteps==K
-        % This cache belongs to one evaluation only. Fine validation checks
-        % its complete contract before reusing propagation, never verdicts.
+    if nargin<4,rollouts=[];end
+    if ~localCompactCacheMatches(rollouts,inputs,model.hypotheses,model.previous,kernel,cfg)
         rollouts=struct('hypotheses',model.hypotheses,'inputs',inputs,'previous',model.previous, ...
             'cfg',cfg,'holds',kernel.holds,'integrationSubsteps',kernel.integrationSubsteps, ...
             'trajectories',{cell(1,numel(model.hypotheses))});
@@ -4195,33 +4296,66 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives)
         'terminalGradient',zeros(nu,numel(model.hypotheses)),'cost',0,'costGradient',zeros(nu,1), ...
         'costHessian',zeros(nu),'derivatives',derivatives);
     for s=1:numel(model.hypotheses)
-        item=model.hypotheses(s);[dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,enabled);
-        ends=full(ends);dense=full(dense);ends=ends(:,1:N);dense=[item.ego,dense(:,1:K*N)];
-        [backupDense,backupEnds,backupInputs]=localCompactBackupRollout(kernel,ends(:,end),item.parameters,inputs(:,end),cfg);
-        if ~isempty(rollouts)
+        if ~isempty(checkBudget),checkBudget();end
+        item=model.hypotheses(s);
+        if ~isempty(rollouts.trajectories{s}) && isfield(rollouts.trajectories{s},'oracle')
+            flow=rollouts.trajectories{s}.oracle;
+            dense=flow.dense;
+            ends=flow.ends;
+            allInputs=flow.allInputs;
+            total=flow.total;
+            q=flow.q;
+            localStage=flow.localStage;
+            indices=flow.indices;
+            weights=flow.weights;
+            travelWeights=flow.travelWeights;
+            radiusE=flow.radiusE;
+            speed=flow.speed;
+            speedIndex=flow.speedIndex;
+            yawIndex=flow.yawIndex;
+            forward=flow.forward;
+            fi=flow.fi;
+            domainState=flow.domainState;
+            domainInput=flow.domainInput;
+        else
+            if ~isempty(rollouts.trajectories{s}) && isfield(rollouts.trajectories{s},'ends')
+                dense=rollouts.trajectories{s}.dense;ends=rollouts.trajectories{s}.ends;
+            else
+                [dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,enabled);
+                ends=full(ends);dense=full(dense);ends=ends(:,1:N);dense=[item.ego,dense(:,1:K*N)];
+            end
+            [backupDense,backupEnds,backupInputs]=localCompactBackupRollout(kernel,ends(:,end),item.parameters,inputs(:,end),cfg,checkBudget);
             rollouts.trajectories{s}=struct('dense',dense,'states',ends(:,cumsum(kernel.holds)), ...
-                'backup',struct('dense',backupDense,'states',backupEnds,'inputs',backupInputs));
+                    'backup',struct('dense',backupDense,'states',backupEnds,'inputs',backupInputs));
+            ends=[ends,backupEnds];dense=[dense,backupDense(:,2:end)];
+            allInputs=[inputs,backupInputs];total=size(allInputs,2);times=(0:K*total)*h/K;
+            q=[];gap=[];localStage=-ones(1,total);indices=1+(0:total-1)*K;weights=ones(1,total);travelWeights=zeros(1,total);
+            radiusE=norm(shape(1:2))+norm(shape(3:4));
+            [speed,speedIndex]=max(hypot(dense(4,:),dense(5,:)));[yaw,yawIndex]=max(abs(dense(6,:)));
+            if ~isempty(item.target)
+                if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);else,q=repmat(item.target,1,numel(times));end
+                gap=localCompactExactClearance(dense,q,shape);
+                radiusT=norm(q(8:9,1))+norm(q(10:11,1));targetSpeed=max(q(4,:));
+                L=speed+radiusE*yaw+targetSpeed+radiusT*abs(sin(q(6,1))/q(7,1))*targetSpeed;
+                a=gap(1:end-1);b=gap(2:end);travel=L*h/K;
+                [lower,branch]=max([a-travel;b-travel;(a+b-travel)/2],[],1);
+                [localStage,j]=max(reshape(cfg.outputFeedback.clearanceMeters-lower,K,total),[],1);
+                indices=(0:total-1)*K+j;branch=branch(indices);weights=.5*ones(1,total);weights(branch==1)=1;weights(branch==2)=0;
+                travelWeights=ones(1,total);travelWeights(branch==3)=.5;
+            end
+            [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K);
+            rollouts.trajectories{s}.oracle=struct('dense',dense,'ends',ends,'allInputs',allInputs,'total',total, ...
+                'q',q,'localStage',localStage,'indices',indices,'weights',weights, ...
+                'travelWeights',travelWeights,'radiusE',radiusE,'speed',speed,'speedIndex',speedIndex, ...
+                'yawIndex',yawIndex,'forward',forward,'fi',fi,'domainState',domainState, ...
+                'domainInput',domainInput);
+            if ~isempty(q)
+                rollouts.trajectories{s}.targets=q(:,1:K*N+1);
+                rollouts.trajectories{s}.separation=gap(1:K*N+1);
+            end
         end
-        ends=[ends,backupEnds];dense=[dense,backupDense(:,2:end)];
-        allInputs=[inputs,backupInputs];total=size(allInputs,2);times=(0:K*total)*h/K;
         roots=[item.ego,ends(:,1:end-1)];derivativeModel=model;
-        backupMap=zeros(2,nu);
-        derivativeModel.controlMap=[model.controlMap;repmat(backupMap,total-N,1)];
-        q=[];localStage=-ones(1,total);indices=1+(0:total-1)*K;weights=ones(1,total);travelWeights=zeros(1,total);
-        radiusE=norm(shape(1:2))+norm(shape(3:4));
-        [speed,speedIndex]=max(hypot(dense(4,:),dense(5,:)));[yaw,yawIndex]=max(abs(dense(6,:)));
-        if ~isempty(item.target)
-            if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);else,q=repmat(item.target,1,numel(times));end
-            gap=localCompactExactClearance(dense,q,shape);
-            radiusT=norm(q(8:9,1))+norm(q(10:11,1));targetSpeed=max(q(4,:));
-            L=speed+radiusE*yaw+targetSpeed+radiusT*abs(sin(q(6,1))/q(7,1))*targetSpeed;
-            a=gap(1:end-1);b=gap(2:end);travel=L*h/K;
-            [lower,branch]=max([a-travel;b-travel;(a+b-travel)/2],[],1);
-            [localStage,j]=max(reshape(cfg.outputFeedback.clearanceMeters-lower,K,total),[],1);
-            indices=(0:total-1)*K+j;branch=branch(indices);weights=.5*ones(1,total);weights(branch==1)=1;weights(branch==2)=0;
-            travelWeights=ones(1,total);travelWeights(branch==3)=.5;
-        end
-        [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K);
+        derivativeModel.controlMap=[model.controlMap;zeros(2*(total-N),nu)];
         if ~derivatives
             e.stage=max(e.stage,localStage(1:N).');e.forward=max(e.forward,forward(1:N).');
             target=[];if ~isempty(q),target=q(:,end);end
@@ -4234,8 +4368,10 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives)
         si=max(1,ceil((speedIndex-1)/K));sj=max(1,ceil((yawIndex-1)/K));
         speedSample=zeros(1,total);speedSample(si)=speedIndex-1-(si-1)*K;
         yawSample=zeros(1,total);yawSample(sj)=yawIndex-1-(sj-1)*K;
+        if ~isempty(checkBudget),checkBudget();end
         [SC,SE]=localCondensedSensitivities(roots,allInputs,item.parameters, ...
             [mod(indices-1,K);mod(indices-1,K)+1;fi;speedSample;yawSample],derivativeModel);
+        if ~isempty(checkBudget),checkBudget();end
         S1=SC(1,:);S2=SC(2,:);SF=SC(3,:);speedS=SC{4,si};yawS=SC{5,sj};
         dL=zeros(1,nu);
         if speed>0,dL=dense(4:5,speedIndex).'/speed*speedS(4:5,:);end
@@ -4318,20 +4454,27 @@ function value=localCompactPerformance(states,inputs,model)
         +.5*cfg.outputFeedback.inputWeight*sum(diff([model.previous,inputs],1,2).^2,'all');
 end
 
-function controls=localCompactReleaseRestingBrakes(controls,hypotheses,previous,kernel,cfg)
-    % Nonpositive commands are physically identical at absorbing rest. Use
-    % neutral braking there to expose the one-sided acceleration derivative;
-    % the retained executable plan is kept separately and remains untouched.
-    resting=true(1,numel(kernel.holds));allInputs=[];
+function [controls,rollouts]=localCompactReleaseRestingBrakes(controls,model)
+    % Neutralize only nonpositive commands at rest in every physical member.
+    % Reuse unchanged initialization flows in the subsequent oracle evaluation.
+    cfg=model.cfg;hypotheses=model.hypotheses;previous=model.previous;kernel=model.kernel;
+    inputs=controls*model.map.'+model.offset;boundary=[0,cumsum(kernel.holds)];
+    resting=false(1,numel(kernel.holds));rollouts=[];
+    for i=1:numel(resting),resting(i)=all(inputs(2,boundary(i)+1:boundary(i+1))<=0);end
+    if ~any(resting),return;end
+    count=sum(kernel.holds);capacity=kernel.capacity;
+    rollouts=struct('hypotheses',hypotheses,'inputs',inputs,'previous',previous, ...
+        'cfg',cfg,'holds',kernel.holds,'integrationSubsteps',kernel.integrationSubsteps, ...
+        'trajectories',{cell(1,numel(hypotheses))});
     for s=1:numel(hypotheses)
-        item=hypotheses(s);[~,states,allInputs]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,false);
-        roots=[item.ego,states(:,1:end-1)];resting=resting & all(roots(4:6,:)==0,1);
+        item=hypotheses(s);
+        [dense,ends]=kernel.refinedRollout(item.ego,[inputs,zeros(2,capacity-count)],item.parameters,double((1:capacity)<=count));
+        dense=full(dense);ends=full(ends);ends=ends(:,1:count);
+        rollouts.trajectories{s}=struct('dense',[item.ego,dense(:,1:kernel.validationSubsteps*count)],'ends',ends);
+        roots=[item.ego,ends(:,boundary(2:end-1))];resting=resting & all(roots(4:6,:)==0,1);
         if ~any(resting),break;end
     end
-    boundary=[0,cumsum(kernel.holds)];
-    for i=1:numel(kernel.holds)
-        if resting(i) && all(allInputs(2,boundary(i)+1:boundary(i+1))<=0),controls(2,i)=0;end
-    end
+    controls(2,resting)=0;
     controls=localCompactRateLimit(controls,previous,kernel.holds,cfg);
 end
 
@@ -4363,19 +4506,25 @@ function seeds = localCompactSeeds(item,previous,holds,lane,kernel,cfg)
     seeds={localCompactRateLimit(controls,previous,holds,cfg)};
 end
 
-function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,rollouts)
-    if nargin<6,fine=false;end
-    if nargin<7,rollouts=[];end
-    reuse=~isempty(rollouts) && fine && isequal(controls,rollouts.inputs) ...
+function matches=localCompactCacheMatches(rollouts,inputs,hypotheses,previous,kernel,cfg)
+    matches=~isempty(rollouts) && isequal(inputs,rollouts.inputs) ...
         && isequal(previous,rollouts.previous) && isequaln(hypotheses,rollouts.hypotheses) ...
         && isequaln(cfg,rollouts.cfg) && isequal(kernel.holds,rollouts.holds) ...
         && kernel.integrationSubsteps==rollouts.integrationSubsteps;
+end
+
+function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,rollouts,checkBudget)
+    if nargin<6,fine=false;end
+    if nargin<7,rollouts=[];end
+    if nargin<8,checkBudget=[];end
+    reuse=fine && localCompactCacheMatches(rollouts,controls,hypotheses,previous,kernel,cfg);
     traces=cell(1,numel(hypotheses));nodeStates=cell(size(traces));violation=0;h=cfg.controller.sampleTime;
     durations=kernel.holds;if fine,durations=ones(1,size(controls,2));end
     clipped=localCompactRateLimit(controls,previous,durations,cfg);
     violation=max(violation,max(abs(controls-clipped),[],'all'));
     stateViolation=violation;
     for s=1:numel(hypotheses)
+        if ~isempty(checkBudget),checkBudget();end
         item=hypotheses(s);
         if reuse
             flow=rollouts.trajectories{s};dense=flow.dense;states=flow.states;inputs=controls;
@@ -4391,10 +4540,14 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
         violation=max(violation,stateViolation);
         times=(0:size(dense,2)-1)*h/kernel.validationSubsteps;q=[];
         if ~isempty(item.target)
-            if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);
-            else,q=repmat(item.target,1,numel(times));end
-            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-            separation=localCompactExactClearance(dense,q,shape);
+            if reuse && isfield(flow,'separation')
+                q=flow.targets;separation=flow.separation;
+            else
+                if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);
+                else,q=repmat(item.target,1,numel(times));end
+                shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+                separation=localCompactExactClearance(dense,q,shape);
+            end
             violation=max(violation,max(cfg.outputFeedback.clearanceMeters-separation));
             violation=max(violation,localCompactIntervalViolation(dense,q,inputs,separation,cfg,kernel.validationSubsteps));
         end
@@ -4403,10 +4556,11 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
     valid=isfinite(violation) && violation<=cfg.outputFeedback.nlpTolerance;
     if isfinite(violation)
         for s=1:numel(hypotheses)
+            if ~isempty(checkBudget),checkBudget();end
             trace=traces{s};target=[];
             if ~isempty(trace.targets),target=trace.targets(:,end);end
             backup=[];if reuse,backup=rollouts.trajectories{s}.backup;end
-            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup);
+            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup,checkBudget);
             traces{s}.terminal=terminal;violation=max(violation,terminalValue);
         end
         valid=isfinite(violation)&&violation<=cfg.outputFeedback.nlpTolerance;
@@ -4426,10 +4580,11 @@ function [dense,states,inputs] = localCompactRollout(kernel,x,previous,controls,
     dense=full(dense);ends=full(ends);
     dense=[x,dense(:,1:kernel.validationSubsteps*N)];states=ends(:,cumsum(kernel.holds));
 end
-function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup)
+function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup,checkBudget)
     h=cfg.controller.sampleTime;
+    if nargin<8,checkBudget=[];end
     if nargin<7 || isempty(backup)
-        [tail,tailEnds,tailInputs]=localCompactBackupRollout(kernel,x,parameters,previous,cfg);
+        [tail,tailEnds,tailInputs]=localCompactBackupRollout(kernel,x,parameters,previous,cfg,checkBudget);
     else
         tail=backup.dense;tailEnds=backup.states;tailInputs=backup.inputs;
     end
@@ -4455,12 +4610,14 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,pa
     terminal.backupHolds=size(tailInputs,2);
 end
 
-function [dense,ends,inputs]=localCompactBackupRollout(kernel,x,parameters,previous,cfg)
+function [dense,ends,inputs]=localCompactBackupRollout(kernel,x,parameters,previous,cfg,checkBudget)
+    if nargin<6,checkBudget=[];end
     timer=tic;dense=x;ends=zeros(6,0);inputs=zeros(2,0);
     if all(x(4:6)==0),return;end
     command=terminalSafeSet.compactControl(previous,cfg);capacity=kernel.capacity;
     commands=repmat(command,1,capacity);
     while true
+        if ~isempty(checkBudget),checkBudget();end
         blockCount=min(capacity,max(1,ceil(2*hypot(x(4),x(5))/(cfg.terminal.brakingDecelerationMetersPerSecondSquared*cfg.controller.sampleTime))));
         active=double((1:capacity)<=blockCount);
         [points,states]=kernel.refinedRollout(x,commands,parameters,active);states=full(states);points=full(points);

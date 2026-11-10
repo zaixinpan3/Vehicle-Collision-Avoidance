@@ -40,6 +40,7 @@ function [command,predictedInput,prediction,controllerState] = ...
     % point estimate or independently designed observer update enters it.
     if isstruct(egoState) && isfield(egoState,'kind') ...
             && string(egoState.kind)=="jointSensorBlock-v1"
+        callTimer=tic;
         if nargin<2,targetEstimate=[];end
         if nargin<3,laneCenterline=[];end
         if nargin<4,cfg=[];end
@@ -47,7 +48,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         assert(isempty(targetEstimate),'collisionAvoidanceController:independentEstimate', ...
             'The joint raw-sensor interface does not accept an independent target estimate.');
         request=struct('operation',"step",'block',egoState,'cfg',cfg, ...
-            'reference',laneCenterline,'previousState',previousState);
+            'reference',laneCenterline,'previousState',previousState,'callTimer',callTimer);
         [result,~,~]=solvePredictiveControl("outputFeedback",request);
         command=result.command;predictedInput=result.inputs;
         prediction=result.prediction;controllerState=result.state;

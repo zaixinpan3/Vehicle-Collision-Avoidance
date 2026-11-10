@@ -69,6 +69,17 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function compactTimingUsesTheWholeCallBudget(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            testCase.verifyEqual(cfg.outputFeedback.maximumSolveSeconds,.1);
+            comparator=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('method',"ipopt")));
+            testCase.verifyEqual(comparator.outputFeedback.maximumSolveSeconds,.06);
+            explicit=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('maximumSolveSeconds',.25)));
+            testCase.verifyEqual(explicit.outputFeedback.maximumSolveSeconds,.25);
+        end
+    end
+
+    methods (Test)
         function steeringRateIsUnboundedUnlessExplicitlyConfigured(testCase)
             defaults=collisionAvoidanceControllerConfig();
             supplied=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('steeringRateMaximum',2)));
