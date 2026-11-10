@@ -4007,14 +4007,14 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             if calls>0 && toc(solveClock)>=budget
                 error('collisionAvoidanceController:condensedDeadline','The nonlinear evaluation budget elapsed.');
             end
-            cache=localCondensedOracle(u,model,derivatives);cacheU=u;calls=calls+1;
+            [cache,rollouts]=localCondensedOracle(u,model,derivatives);cacheU=u;calls=calls+1;
             feasible=max([cache.stage;cache.forward;cache.terminal;a*u-b;lower-u;u-upper])<=cfg.outputFeedback.nlpTolerance;
             promising=feasible && cache.cost<bestCost && ~isequal(u,checkedU);
             if promising
                 candidate=reshape(u,2,nodes)*map.'+offset;
                 candidate=localCompactRateLimit(candidate,previous,ones(1,count),cfg);
                 checkedU=u;
-                validationClock=tic;[feasible,candidateTraces,candidateViolation]=localCompactValidate(candidate,hypotheses,previous,fineKernel,cfg,true);
+                validationClock=tic;[feasible,candidateTraces,candidateViolation]=localCompactValidate(candidate,hypotheses,previous,fineKernel,cfg,true,rollouts);
                 validationSeconds=validationSeconds+toc(validationClock);
                 needsRefinement=~feasible && model.kernel.integrationSubsteps<fineKernel.integrationSubsteps;
                 if feasible
@@ -4128,28 +4128,41 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     hold=Function('pcbf_hold',{root,command,parameters},{finish,points});
     % RK4 continuous extension supplies dense geometry and its derivatives
     % without a new dynamics integration at every collision sample.
-    sensitivity=SX.sym('sensitivity',6,8);chosen=SX.sym('chosen',6,40);
+    sensitivity=SX.sym('sensitivity',6,8);
     updated=jacobian(next,x)*sensitivity+[SX.zeros(6,6),jacobian(next,u)];
-    augmented=[x;sensitivity(:);chosen(:)];selected=cell(1,5);
-    for j=1:5
-        t=fmin(1,fmax(0,fraction(j)));
-        point=x+dt*((t-1.5*t^2+2/3*t^3)*k1+(t^2-2/3*t^3)*(k2+k3)+(-.5*t^2+2/3*t^3)*k4);
-        variation=jacobian(point,x)*sensitivity+[SX.zeros(6,6),jacobian(point,u)];
-        selected{j}=if_else((fraction(j)>0)&(fraction(j)<=1),variation,chosen(:,8*(j-1)+(1:8)));
-    end
-    selected=horzcat(selected{:});update=[next;updated(:);selected(:)];
-    variation=Function('pcbf_variation',{augmented,u,p,fraction},{update},options);
     index=MX.sym('index',5);initialSensitivity=DM([eye(6),zeros(6,2)]);
-    variationMap=variation.mapaccum(M);
-    varying=variationMap([root;initialSensitivity(:);repmat(initialSensitivity(:),5,1)], ...
-        repmat(command,1,M),repmat(parameters,1,M),repmat(index/D,1,M)-repmat(0:M-1,5,1));
-    E=reshape(varying(7:54,end),6,8);D=reshape(varying(55:294,end),6,40);
+    if D==1
+        % On the fine mesh, dense samples are RK4 endpoints. Propagate one
+        % sensitivity and select the requested samples before the hold reset.
+        augmented=[x;sensitivity(:)];
+        variation=Function('pcbf_variation',{augmented,u,p},{[next;updated(:)]},options);
+        initialVariation=[root;initialSensitivity(:)];
+        variationMap=variation.mapaccum(M);
+        varying=variationMap(initialVariation,repmat(command,1,M),repmat(parameters,1,M));
+        history=densify([initialVariation,varying]);selected=cell(1,5);
+        for j=1:5,selected{j}=reshape(history(7:54,index(j)+1),6,8);end
+        E=reshape(varying(7:54,end),6,8);D=horzcat(selected{:});
+    else
+        chosen=SX.sym('chosen',6,40);augmented=[x;sensitivity(:);chosen(:)];selected=cell(1,5);
+        for j=1:5
+            t=fmin(1,fmax(0,fraction(j)));
+            point=x+dt*((t-1.5*t^2+2/3*t^3)*k1+(t^2-2/3*t^3)*(k2+k3)+(-.5*t^2+2/3*t^3)*k4);
+            variation=jacobian(point,x)*sensitivity+[SX.zeros(6,6),jacobian(point,u)];
+            selected{j}=if_else((fraction(j)>0)&(fraction(j)<=1),variation,chosen(:,8*(j-1)+(1:8)));
+        end
+        selected=horzcat(selected{:});update=[next;updated(:);selected(:)];
+        variation=Function('pcbf_variation',{augmented,u,p,fraction},{update},options);
+        variationMap=variation.mapaccum(M);
+        varying=variationMap([root;initialSensitivity(:);repmat(initialSensitivity(:),5,1)], ...
+            repmat(command,1,M),repmat(parameters,1,M),repmat(index/D,1,M)-repmat(0:M-1,5,1));
+        E=reshape(varying(7:54,end),6,8);D=reshape(varying(55:294,end),6,40);
+    end
     % At exact rest and neutral force, select the outgoing acceleration
     % branch. The reset value is unchanged; nonlinear replay accepts steps.
     starting=(command(2)==0)&(dot(root(4:6),root(4:6))==0);
     stopped=(command(2)<=0)&(varying(4,end)<.2*cfg.model.brakeHoldSpeed)&~starting;
     E=[E(1:3,:);if_else(stopped,MX.zeros(3,8),E(4:6,:))];
-    derivative=Function('pcbf_sensitivity',{root,command,parameters,index},{E,D});
+    derivative=Function('pcbf_sensitivity',{root,command,parameters,index},{E,D},options);
     identity=Function('pcbf_identity',{x,u,p},{x,repmat(x,1,K)});
     switchFlow=Function.if_else('pcbf_active',hold,identity);
     root=MX.sym('root',6);input=MX.sym('input',2);scale=MX.sym('scale',4);active=MX.sym('active');
@@ -4157,16 +4170,24 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     piece=Function('pcbf_piece',{root,input,scale,active},{endpoint,dense});mapped=piece.mapaccum(capacity);
     inputs=MX.sym('inputs',2,capacity);enabled=MX.sym('enabled',1,capacity);
     [ends,points]=mapped(root,inputs,repmat(scale,1,capacity),enabled);
-    rollout=Function('pcbf_rollout',{root,inputs,scale,enabled},{points,ends});
+    rollout=Function('pcbf_rollout',{root,inputs,scale,enabled},{points,ends},options);
     kernel=struct('refinedRollout',rollout,'sensitivity',derivative,'capacity',capacity, ...
         'holds',holds,'validationSubsteps',K,'integrationSubsteps',M,'hasTarget',hasTarget);
     keys{end+1}=key;kernels{end+1}=kernel;
 end
 
-function e=localCondensedOracle(u,model,derivatives)
+function [e,rollouts]=localCondensedOracle(u,model,derivatives)
     if nargin<3,derivatives=true;end
     cfg=model.cfg;kernel=model.kernel;N=sum(kernel.holds);n=numel(kernel.holds);nu=numel(u);K=kernel.validationSubsteps;h=cfg.controller.sampleTime;
     controls=reshape(u,2,n);inputs=controls*model.map.'+model.offset;capacity=sum(kernel.capacity);
+    rollouts=[];
+    if nargout>1 && kernel.integrationSubsteps==K
+        % This cache belongs to one evaluation only. Fine validation checks
+        % its complete contract before reusing propagation, never verdicts.
+        rollouts=struct('hypotheses',model.hypotheses,'inputs',inputs,'previous',model.previous, ...
+            'cfg',cfg,'holds',kernel.holds,'integrationSubsteps',kernel.integrationSubsteps, ...
+            'trajectories',{cell(1,numel(model.hypotheses))});
+    end
     values=[inputs,zeros(2,capacity-N)];enabled=double((1:capacity)<=N);times=(0:K*N)*h/K;
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     e=struct('stage',-Inf(N,1),'stageGradient',zeros(nu,N),'forward',-Inf(N,1), ...
@@ -4177,6 +4198,10 @@ function e=localCondensedOracle(u,model,derivatives)
         item=model.hypotheses(s);[dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,enabled);
         ends=full(ends);dense=full(dense);ends=ends(:,1:N);dense=[item.ego,dense(:,1:K*N)];
         [backupDense,backupEnds,backupInputs]=localCompactBackupRollout(kernel,ends(:,end),item.parameters,inputs(:,end),cfg);
+        if ~isempty(rollouts)
+            rollouts.trajectories{s}=struct('dense',dense,'states',ends(:,cumsum(kernel.holds)), ...
+                'backup',struct('dense',backupDense,'states',backupEnds,'inputs',backupInputs));
+        end
         ends=[ends,backupEnds];dense=[dense,backupDense(:,2:end)];
         allInputs=[inputs,backupInputs];total=size(allInputs,2);times=(0:K*total)*h/K;
         roots=[item.ego,ends(:,1:end-1)];derivativeModel=model;
@@ -4301,6 +4326,7 @@ function controls=localCompactReleaseRestingBrakes(controls,hypotheses,previous,
     for s=1:numel(hypotheses)
         item=hypotheses(s);[~,states,allInputs]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,false);
         roots=[item.ego,states(:,1:end-1)];resting=resting & all(roots(4:6,:)==0,1);
+        if ~any(resting),break;end
     end
     boundary=[0,cumsum(kernel.holds)];
     for i=1:numel(kernel.holds)
@@ -4337,8 +4363,13 @@ function seeds = localCompactSeeds(item,previous,holds,lane,kernel,cfg)
     seeds={localCompactRateLimit(controls,previous,holds,cfg)};
 end
 
-function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine)
+function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,rollouts)
     if nargin<6,fine=false;end
+    if nargin<7,rollouts=[];end
+    reuse=~isempty(rollouts) && fine && isequal(controls,rollouts.inputs) ...
+        && isequal(previous,rollouts.previous) && isequaln(hypotheses,rollouts.hypotheses) ...
+        && isequaln(cfg,rollouts.cfg) && isequal(kernel.holds,rollouts.holds) ...
+        && kernel.integrationSubsteps==rollouts.integrationSubsteps;
     traces=cell(1,numel(hypotheses));nodeStates=cell(size(traces));violation=0;h=cfg.controller.sampleTime;
     durations=kernel.holds;if fine,durations=ones(1,size(controls,2));end
     clipped=localCompactRateLimit(controls,previous,durations,cfg);
@@ -4346,7 +4377,11 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
     stateViolation=violation;
     for s=1:numel(hypotheses)
         item=hypotheses(s);
-        [dense,states,inputs]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,fine);
+        if reuse
+            flow=rollouts.trajectories{s};dense=flow.dense;states=flow.states;inputs=controls;
+        else
+            [dense,states,inputs]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,fine);
+        end
         % The accepted trace contains the original control-knot states.
         nodeStates{s}=states;
         if any(~isfinite(dense),'all'),violation=Inf;valid=false;return;end
@@ -4370,7 +4405,8 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
         for s=1:numel(hypotheses)
             trace=traces{s};target=[];
             if ~isempty(trace.targets),target=trace.targets(:,end);end
-            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg);
+            backup=[];if reuse,backup=rollouts.trajectories{s}.backup;end
+            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup);
             traces{s}.terminal=terminal;violation=max(violation,terminalValue);
         end
         valid=isfinite(violation)&&violation<=cfg.outputFeedback.nlpTolerance;
@@ -4390,9 +4426,13 @@ function [dense,states,inputs] = localCompactRollout(kernel,x,previous,controls,
     dense=full(dense);ends=full(ends);
     dense=[x,dense(:,1:kernel.validationSubsteps*N)];states=ends(:,cumsum(kernel.holds));
 end
-function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg)
+function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup)
     h=cfg.controller.sampleTime;
-    [tail,tailEnds,tailInputs]=localCompactBackupRollout(kernel,x,parameters,previous,cfg);
+    if nargin<7 || isempty(backup)
+        [tail,tailEnds,tailInputs]=localCompactBackupRollout(kernel,x,parameters,previous,cfg);
+    else
+        tail=backup.dense;tailEnds=backup.states;tailInputs=backup.inputs;
+    end
     terminalTarget=target;tailViolation=max([0,-tail(4,:)]);
     if ~isempty(tailInputs)
         [domain,~,~,~,defined]=localCompactModelDomain(tail,tailInputs,cfg,kernel.validationSubsteps);

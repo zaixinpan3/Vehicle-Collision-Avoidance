@@ -11,6 +11,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         rectangleYaw={0,.2,pi/4,pi/2}
         refinedHolds={24,60}
         requestedSpeed={4,12}
+        integrationMesh={4,64}
+        movingTarget={false,true}
     end
     methods (TestClassSetup)
         function prepareController(testCase)
@@ -39,8 +41,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(window.allocatedSeconds,cfg.outputFeedback.minimumPreviewSeconds);
             testCase.verifyFalse(window.feasibilityCertified);
         end
-        function neutralRestExposesTheOneSidedStartingDirection(testCase)
+        function neutralRestExposesTheOneSidedStartingDirection(testCase,integrationMesh)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;
+            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
             item=testCase.block.initialHypotheses;item.ego=zeros(6,1);item.target=[];
             request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
                 'hypotheses',item,'input',zeros(2,1),'holds',[1,2,2],'inputs',zeros(2,3));
@@ -105,8 +108,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(size(testCase.prediction.scenarios{1}.denseEgo,2), ...
                 testCase.cfg.outputFeedback.validationSubsteps*testCase.prediction.metadata.horizonSteps+1);
         end
-        function finiteActuatorRatesRemainBoundedInBothDirections(testCase,requestedSpeed)
+        function finiteActuatorRatesRemainBoundedInBothDirections(testCase,requestedSpeed,integrationMesh)
             cfg=testCase.cfg;cfg.referenceSpeed=requestedSpeed;
+            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
             cfg.outputFeedback.steeringRateMaximum=1;
             cfg.model.brakingRatioRateMaximum=.8;
             block=localBlock(cfg,8);
@@ -329,8 +333,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(result.accepted);
             testCase.verifyLessThanOrEqual(result.maximumViolation,1e-6);
         end
-        function condensedGradientsDifferentiateTheActualConstraintValues(testCase)
+        function condensedGradientsDifferentiateTheActualConstraintValues(testCase,integrationMesh)
             cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
+            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
             item=testCase.block.initialHypotheses;item.ego=[0;0;.12;4;.1;.03];
             item.target=[8;3;.8;2;0;.04;1.6;2.4;.95;0;0];
             request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
@@ -345,6 +350,33 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             difference=([p.stage;p.forward;p.terminal]-[m.stage;m.forward;m.terminal])/(2*step);
             testCase.verifyEqual(gradient,difference,AbsTol=2e-4);
             testCase.verifyEqual(value.costGradient.'*direction,(p.cost-m.cost)/(2*step),AbsTol=2e-4);
+        end
+        function finePredictionsAgreeWithFreshReplayAcrossFrames(testCase,movingTarget)
+            cfg=testCase.cfg;cfg.referenceSpeed=3;cfg.outputFeedback.nlpJit=true;
+            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/cfg.outputFeedback.validationSubsteps;
+            block=localBlock(cfg,2);item=block.initialHypotheses;
+            if movingTarget,item.target=[35;15;pi/2;2;0;.04;1.6;2.4;.95;0;0];end
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+            other=item;other.ego(1)=other.ego(1)+.005;
+            block.initialHypotheses=[item,other];state=[];
+            for k=1:2
+                [~,inputs,prediction,state]=collisionAvoidanceController(block,[],[],cfg,state);
+                replay=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                    'cfg',cfg,'hypotheses',state.hypotheses,'input',block.heldInput,'inputs',inputs));
+                testCase.verifyTrue(replay.accepted);
+                testCase.verifyEqual(numel(prediction.scenarios),2);
+                testCase.verifyEqual(replay.maximumViolation,prediction.metadata.maximumConstraintViolation,AbsTol=1e-12);
+                for s=1:numel(prediction.scenarios)
+                    actual=prediction.scenarios{s};expected=replay.trajectories{s};
+                    testCase.verifyEqual(actual.denseEgo,expected.denseEgo,AbsTol=1e-12);
+                    testCase.verifyEqual(actual.ego,expected.ego,AbsTol=1e-12);
+                    testCase.verifyEqual(actual.targets,expected.targets,AbsTol=1e-12);
+                    testCase.verifyEqual(actual.terminal,expected.terminal);
+                    testCase.verifyTrue(actual.terminal.member);
+                end
+                block=localNextBlock(state,cfg);
+            end
         end
         function penetrationCannotDisappearIntoAZeroDualWitness(testCase)
             item=testCase.block.initialHypotheses;item.ego=[0;0;0;1;0;0];
