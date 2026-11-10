@@ -4368,26 +4368,43 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         si=max(1,ceil((speedIndex-1)/K));sj=max(1,ceil((yawIndex-1)/K));
         speedSample=zeros(1,total);speedSample(si)=speedIndex-1-(si-1)*K;
         yawSample=zeros(1,total);yawSample(sj)=yawIndex-1-(sj-1)*K;
+        % Every value remains checked. Differentiate only samples consumed by
+        % those rows: each backup maximum selects one row, and the common
+        % travel bound uses only its actual speed and yaw extrema.
+        stageNeeded=false(1,total);domainNeeded=false(1,total);
+        stageNeeded(1:N)=~isempty(q);domainNeeded(1:N)=true;
+        if total>N
+            [~,backupStage]=max(localStage(N+1:end));
+            [~,backupDomain]=max(forward(N+1:end));
+            stageNeeded(N+backupStage)=~isempty(q);domainNeeded(N+backupDomain)=true;
+        end
+        required=[stageNeeded & weights~=0;stageNeeded & weights~=1;domainNeeded;false(2,total)];
+        required(4,si)=~isempty(q) && speed>0;
+        required(5,sj)=~isempty(q) && dense(6,yawIndex)~=0;
         if ~isempty(checkBudget),checkBudget();end
         [SC,SE]=localCondensedSensitivities(roots,allInputs,item.parameters, ...
-            [mod(indices-1,K);mod(indices-1,K)+1;fi;speedSample;yawSample],derivativeModel);
+            [mod(indices-1,K);mod(indices-1,K)+1;fi;speedSample;yawSample],required,derivativeModel);
         if ~isempty(checkBudget),checkBudget();end
-        S1=SC(1,:);S2=SC(2,:);SF=SC(3,:);speedS=SC{4,si};yawS=SC{5,sj};
+        S1=SC(1,:);S2=SC(2,:);SF=SC(3,:);
         dL=zeros(1,nu);
-        if speed>0,dL=dense(4:5,speedIndex).'/speed*speedS(4:5,:);end
-        dL=dL+radiusE*sign(dense(6,yawIndex))*yawS(6,:);
+        if required(4,si),speedS=SC{4,si};dL=dense(4:5,speedIndex).'/speed*speedS(4:5,:);end
+        if required(5,sj),yawS=SC{5,sj};dL=dL+radiusE*sign(dense(6,yawIndex))*yawS(6,:);end
         if ~isempty(q)
-            grad1=localCompactDistanceGradient(dense(:,indices),q(:,indices),shape);
-            grad2=localCompactDistanceGradient(dense(:,indices+1),q(:,indices+1),shape);
+            grad1=zeros(3,total);grad2=grad1;
+            first=required(1,:);second=required(2,:);
+            grad1(:,first)=localCompactDistanceGradient(dense(:,indices(first)),q(:,indices(first)),shape);
+            grad2(:,second)=localCompactDistanceGradient(dense(:,indices(second)+1),q(:,indices(second)+1),shape);
         end
         stageGradient=zeros(nu,total);
         for i=1:total
-            if ~isempty(q)
-                stageGradient(:,i)=(-weights(i)*grad1(:,i).'*S1{i}(1:3,:) ...
-                    -(1-weights(i))*grad2(:,i).'*S2{i}(1:3,:)+travelWeights(i)*h/K*dL).';
+            if stageNeeded(i)
+                row=zeros(1,nu);
+                if required(1,i),row=-weights(i)*grad1(:,i).'*S1{i}(1:3,:);end
+                if required(2,i),row=row-(1-weights(i))*grad2(:,i).'*S2{i}(1:3,:);end
+                stageGradient(:,i)=(row+travelWeights(i)*h/K*dL).';
             end
-            domainGradient=(domainState(:,i).'*SF{i}+domainInput(:,i).'*derivativeModel.controlMap(2*i-1:2*i,:)).';
             if i<=N
+                domainGradient=(domainState(:,i).'*SF{i}+domainInput(:,i).'*derivativeModel.controlMap(2*i-1:2*i,:)).';
                 if localStage(i)>e.stage(i),e.stage(i)=localStage(i);e.stageGradient(:,i)=stageGradient(:,i);end
                 if forward(i)>e.forward(i),e.forward(i)=forward(i);e.forwardGradient(:,i)=domainGradient;end
             end
@@ -4425,19 +4442,49 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
     e.costHessian=e.costHessian+cfg.outputFeedback.inputWeight*kron(difference.'*diag(1./kernel.holds)*difference,eye(2));
 end
 
-function [selected,ends]=localCondensedSensitivities(roots,inputs,parameters,index,model)
+function [selected,ends]=localCondensedSensitivities(roots,inputs,parameters,index,required,model)
     N=size(inputs,2);nu=size(model.controlMap,2);selected=cell(5,N);ends=cell(1,N+1);ends{1}=zeros(6,nu);
     mapped=model.kernel.sensitivity.map(N);
     [allEnd,allSelected]=mapped(roots,inputs,repmat(parameters,1,N),index);
     allEnd=full(allEnd);allSelected=full(allSelected);
+    % Establish aliases once for the entire horizon. Equal dense sample
+    % indices have the same local map; an endpoint may have a different
+    % post-stop reset, so its map must match exactly before it is reused.
+    aliases=zeros(5,N);
+    for j=2:5
+        for earlier=1:j-1
+            same=required(j,:) & required(earlier,:) & index(j,:)==index(earlier,:) & aliases(j,:)==0;
+            aliases(j,same)=earlier+5*(find(same)-1);
+        end
+    end
+    atRoot=required & index==0;atEnd=false(5,N);
+    candidates=find(required & index==model.kernel.validationSubsteps);
+    blocks=reshape(allSelected,48,[]);endpointBlocks=reshape(allEnd,48,[]);
+    atEnd(candidates)=all(blocks(:,candidates)==endpointBlocks(:,ceil(candidates/5)),1);
+    assemble=find(required & ~atRoot & ~atEnd & aliases==0);
+    active=0;widths=zeros(1,N);columns=cell(1,N);weights=cell(1,N);
     for i=1:N
         E=allEnd(:,8*(i-1)+(1:8));U=model.controlMap(2*i-1:2*i,:);
-        for j=1:5
-            D=allSelected(:,40*(i-1)+8*(j-1)+(1:8));
-            selected{j,i}=D(:,1:6)*ends{i}+D(:,7:8)*U;
+        columns{i}=find(any(U,1));weights{i}=U(:,columns{i});widths(i)=active;
+        previous=ends{i};next=zeros(6,nu);
+        if active>0,next(:,1:active)=E(:,1:6)*previous(:,1:active);end
+        if ~isempty(columns{i})
+            next(:,columns{i})=next(:,columns{i})+E(:,7:8)*weights{i};
+            active=max(active,columns{i}(end));
         end
-        ends{i+1}=E(:,1:6)*ends{i}+E(:,7:8)*U;
+        ends{i+1}=next;
     end
+    selected(atRoot)=ends(ceil(find(atRoot)/5));
+    selected(atEnd)=ends(ceil(find(atEnd)/5)+1);
+    for slot=assemble.'
+        i=ceil(slot/5);D=allSelected(:,8*(slot-1)+(1:8));
+        previous=ends{i};active=widths(i);point=zeros(6,nu);
+        if active>0,point(:,1:active)=D(:,1:6)*previous(:,1:active);end
+        if ~isempty(columns{i}),point(:,columns{i})=point(:,columns{i})+D(:,7:8)*weights{i};end
+        selected{slot}=point;
+    end
+    duplicate=required & aliases~=0 & ~atRoot & ~atEnd;
+    selected(duplicate)=selected(aliases(duplicate));
 end
 
 function gradient=localCompactDistanceGradient(states,targets,shape)

@@ -436,6 +436,47 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 block=localNextBlock(state,cfg);
             end
         end
+        function nonuniformInputKnotsPreserveDirectionalDerivatives(testCase,integrationMesh,movingTarget)
+            cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
+            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            item=testCase.block.initialHypotheses;item.ego=[0;0;.12;3.3;.08;.03];
+            item.target=[];
+            if movingTarget,item.target=[12;4;.8;2;0;.04;1.6;2.4;.95;0;0];end
+            other=item;other.ego(2)=other.ego(2)+.03;other.ego(4)=other.ego(4)+.04;
+            other.parameters(3:4)=.98;
+            request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
+                'hypotheses',[item,other],'input',zeros(2,1),'holds',[1,2,4,3,6], ...
+                'inputs',[.02,.07,.1,.04,-.01;-.05,.08,.12,.02,-.04]);
+            value=solvePredictiveControl('outputFeedback',request);
+            direction=[.2;-.3;.1;.2;-.15;.4;.12;-.1;-.2;.05];step=1e-6;
+            plus=request;minus=request;
+            plus.inputs=request.inputs+step*reshape(direction,2,[]);
+            minus.inputs=request.inputs-step*reshape(direction,2,[]);
+            p=solvePredictiveControl('outputFeedback',plus);m=solvePredictiveControl('outputFeedback',minus);
+            actual=[value.stageGradient,value.forwardGradient,value.terminalGradient].'*direction;
+            expected=([p.stage;p.forward;p.terminal]-[m.stage;m.forward;m.terminal])/(2*step);
+            testCase.verifyEqual(actual,expected,AbsTol=3e-4);
+            testCase.verifyEqual(value.costGradient.'*direction,(p.cost-m.cost)/(2*step),AbsTol=3e-4);
+            testCase.verifyEqual(value.forwardGradient(3:end,1),zeros(8,1));
+            testCase.verifyGreaterThan(abs(value.forwardGradient(2,1)),1e-3);
+        end
+        function denseStopSamplesKeepTheirPreResetSensitivity(testCase,integrationMesh)
+            cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
+            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            item=testCase.block.initialHypotheses;item.ego=[0;0;0;.051;0;0];
+            item.target=[8;3;.7;2;0;.02;1.6;2.4;.95;0;0];input=[0;-.1];
+            stopped=solvePredictiveControl('outputFeedback',struct('operation',"advance",'cfg',cfg, ...
+                'hypothesis',item,'input',input,'duration',cfg.controller.sampleTime,'endOfHold',true));
+            testCase.assertEqual(stopped.ego(4:6),zeros(3,1));
+            request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
+                'hypotheses',item,'input',input,'holds',1,'inputs',input);
+            value=solvePredictiveControl('outputFeedback',request);step=1e-6;
+            plus=request;minus=request;plus.inputs(2)=input(2)+step;minus.inputs(2)=input(2)-step;
+            p=solvePredictiveControl('outputFeedback',plus);m=solvePredictiveControl('outputFeedback',minus);
+            testCase.verifyGreaterThan(abs(value.forwardGradient(2)),1e-3);
+            testCase.verifyEqual([value.stageGradient(2,:).';value.forwardGradient(2,:).';value.terminalGradient(2,:).'], ...
+                ([p.stage;p.forward;p.terminal]-[m.stage;m.forward;m.terminal])/(2*step),AbsTol=3e-4);
+        end
         function penetrationCannotDisappearIntoAZeroDualWitness(testCase)
             item=testCase.block.initialHypotheses;item.ego=[0;0;0;1;0;0];
             item.target=[3;.2;0;0;0;0;1.6;2.4;.95;0;0];
