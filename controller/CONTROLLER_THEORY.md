@@ -233,7 +233,7 @@ For speed bound $v_k^+=\max_s\sqrt{(v_{x,k}^s)^2+(v_{y,k}^s)^2}$ choose
 
 $$
 T_k^{\rm req}=\max\{T_{\min},2h,v_k^+/a_p+T_s,T_{\rm space}\},\qquad
-N_k=\max\left\{N_{k-1},\left\lceil
+N_k=\max\left\{N_{k-1}-1,\left\lceil
  \frac{\Delta T\lceil T_k^{\rm req}/\Delta T\rceil}{h}
 \right\rceil\right\}.
 $$
@@ -257,11 +257,19 @@ that this is an upper bound on the necessary maneuver time. A uniquely
 predicted endpoint for specified inputs does not determine those inputs or
 establish reachability of a safe endpoint.
 
+At initialization the inherited-length term is zero. On continuation,
+$N_{k-1}-1$ is the length of the unexecuted feasible suffix, which ends at
+the old terminal state. The preview may therefore shrink by one hold per
+decision as its current time requirement decreases; no terminal action is
+appended solely to preserve the previous horizon length. If the current
+preview requires a longer horizon, append the terminal continuation.
+
 Use $M\le N$ control intervals, with integer boundaries
 $0=c_0<c_1<\cdots<c_M=N$ and $b_i=c_i-c_{i-1}$. The first few intervals
 have one hold each; the remaining holds are distributed over the remaining
-intervals by rounded equally spaced boundaries. The initial knot count is
-retained when the preview grows. Independent physical decisions are endpoint
+intervals by rounded equally spaced boundaries. The knot count is retained
+when the preview grows and capped by $N$ when it shrinks, so every interval
+contains at least one hold. Independent physical decisions are endpoint
 commands $v_i\in\mathbb R^2$. Physical states are eliminated by forward
 substitution of the dynamics, separately for every retained hypothesis.
 With $v_0=u^-$, the commands within interval $i$ are
@@ -614,8 +622,9 @@ Only a sequence passing these checks can supply a command. The condensed traject
 by construction. Geometry and state checks include the current
 root. The full accepted fine input sequence is stored.
 
-At the next boundary, delete the executed first input and append the terminal
-controller command, repeating it if the preview has grown. The backup input remains constant. Recheck the complete
+At the next boundary, delete the executed first input. Append the constant
+terminal-controller command only for holds beyond this suffix that are needed
+by the new preview. Recheck the complete
 sequence and its new terminal membership from the conditioned information.
 The retained sequence stays at its original hold resolution; a coarse refit is
 only a warm start and may not replace it without validation. Heuristic repeated
@@ -624,11 +633,9 @@ last inputs and a bank of tail-repair durations are not terminal continuations.
 Under the terminal safety and invariance assumption, consistent state evolution
 and conditioning, exact node and terminal constraint evaluation, and an
 admissible policy class containing the retained fine sequence, the usual shift argument supplies a
-feasible continuation: the old feasible prefix survives conditioning, its old
-endpoint belongs to $Z_f$, and the appended terminal law stays in $Z_f$.
-Nondecreasing horizon length is a sufficient scheduling choice for retaining
-this candidate, not a necessary condition for recursive feasibility. After
-one executed hold, the old suffix has $N_k-1$ holds and ends at the old
+feasible continuation: the old feasible suffix survives conditioning, its old
+endpoint belongs to $Z_f$, and any appended terminal law stays in $Z_f$.
+After one executed hold, the old suffix has $N_k-1$ holds and ends at the old
 terminal state. It is feasible at a new horizon $N_{k+1}=N_k-1$ under the same
 assumptions. A longer horizon appends the terminal law. Shortening further
 requires the new prefix endpoint to belong to $Z_f$, together with node

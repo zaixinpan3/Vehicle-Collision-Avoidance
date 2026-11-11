@@ -61,6 +61,40 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(isfinite(info.inheritedPerformanceCost));
             testCase.verifyLessThanOrEqual(info.acceptedPerformanceCost,info.inheritedPerformanceCost+1e-10);
         end
+        function aShrinkingPreviewRetainsTheExecutableSuffixAndTerminalPoint(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            block=localBlock(cfg,10.01);
+            [~,~,first,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            block=localNextBlock(prior,cfg);
+            [command,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,prior);
+            testCase.verifyEqual(state.horizonSteps,prior.horizonSteps-1);
+            testCase.verifyEqual(state.fineControls,prior.fineControls(:,2:end),AbsTol=1e-12);
+            testCase.verifyEqual(command.actuatorInput,prior.fineControls(:,2),AbsTol=1e-12);
+            testCase.verifyEqual(prediction.scenarios{1}.ego(:,end),first.scenarios{1}.ego(:,end),AbsTol=1e-5);
+            testCase.verifyTrue(prediction.metadata.retainedFinePlanUsed);
+            testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
+            testCase.verifyEqual(prediction.metadata.pcbfValue,0);
+            testCase.verifyEqual(prediction.metadata.nonlinearOracleEvaluations,0);
+        end
+        function shrinkingBelowTheKnotCountKeepsPositiveControlIntervals(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            cfg.outputFeedback.minimumPreviewSeconds=.1;
+            cfg.outputFeedback.previewSettlingSeconds=.05;cfg.outputFeedback.horizonResolutionSeconds=.05;
+            block=localBlock(cfg,2.01);
+            [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            initialCount=prior.horizonSteps;
+            for j=1:initialCount
+                block=localNextBlock(prior,cfg);
+                [~,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,prior);
+                testCase.verifyEqual(state.horizonSteps,max(2,prior.horizonSteps-1));
+                testCase.verifyGreaterThanOrEqual(diff(state.boundaries),ones(1,size(state.controls,2)));
+                testCase.verifyLessThanOrEqual(size(state.controls,2),state.horizonSteps);
+                testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
+                testCase.verifyEqual(prediction.metadata.pcbfValue,0);
+                prior=state;
+            end
+            testCase.verifyEqual(state.horizonSteps,2);
+        end
         function releasingBrakesWithoutProgressCannotReplaceTheRetainedPlan(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.maximumSolveSeconds=1e-12;
             block=localBlock(cfg,0);

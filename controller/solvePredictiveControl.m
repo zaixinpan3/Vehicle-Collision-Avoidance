@@ -2900,7 +2900,7 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
             'collisionAvoidanceController:actuationMismatch','The received block must use the previously committed actuator command.');
         hypotheses=prior.hypotheses;
         memory=localOfMemory(prior.committedPolicy,prior.memory,block.samples,cfg);
-        policies=prior.policies(2:end);inheritedCount=numel(prior.policies);
+        policies=prior.policies(2:end);inheritedCount=numel(policies);
     end
     inferenceTimer=tic;
     [hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
@@ -3166,6 +3166,8 @@ function window = localOfWindow(hypotheses,inheritedCount,cfg)
     else
         requested=max(2*h,of.horizonSeconds);allocated=requested;source="configuredDuration";
     end
+    % Retain only the unexecuted suffix, which still reaches the old
+    % terminal endpoint. The executed hold is no longer a horizon floor.
     count=max(inheritedCount,ceil(allocated/h));
     assert(count<=cfg.controller.maximumHorizonSteps, ...
         'collisionAvoidanceController:predictionWindowCapacity', ...
@@ -3806,12 +3808,12 @@ function [result,info] = localCompactStep(request,cfg)
             'collisionAvoidanceController:invalidSensorGrid','Receive the complete consecutive block.');
         assert(norm(block.heldInput-prior.appliedInput,Inf)<1e-12, ...
             'collisionAvoidanceController:actuationMismatch','Measurements must use the committed input.');
-        hypotheses=prior.hypotheses;inherited=prior.horizonSteps;
+        hypotheses=prior.hypotheses;inherited=size(prior.fineControls,2)-1;
     end
     clock=tic;[hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
     inferenceSeconds=toc(clock);window=localOfWindow(hypotheses,inherited,cfg);
     count=window.horizonSteps;nodes=min(count,cfg.outputFeedback.controlNodes);
-    if ~initial,nodes=size(prior.controls,2);end
+    if ~initial,nodes=min(count,size(prior.controls,2));end
     near=min(nodes-1,cfg.outputFeedback.nearControlNodes);
     boundaries=[0:near,near+round((1:nodes-near)*(count-near)/(nodes-near))];
     holds=diff(boundaries);h=cfg.controller.sampleTime;hasTarget=~isempty(hypotheses(1).target);
