@@ -562,14 +562,44 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(expected(1,end),item.ego(1));
             testCase.verifyEqual(result.trajectories{1}.ego(4:6,end),zeros(3,1),AbsTol=1e-14);
         end
-        function aTargetCannotCrossBetweenCoarseChecksUndetected(testCase)
+        function collisionBetweenControlNodesDoesNotRejectThePlan(testCase)
             item=testCase.block.initialHypotheses;item.ego(4:6)=0;
-            % A temporal-aliasing fixture: all half-hold poses are separated.
+            % The target crosses the stationary ego between two control
+            % boundaries, then moves away from the parked terminal set.
             item.target=[0;-6;pi/2;480;0;0;1.6;2.4;.95;0;0];
-            result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
-                'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1)));
-            testCase.verifyFalse(result.accepted);
+            request=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
+                'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1));
+            result=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyTrue(result.accepted);
+            testCase.verifySize(result.trajectories{1}.collisionEgo,[6,2]);
+            testCase.verifyEqual(result.trajectories{1}.collisionTimes,[0,testCase.cfg.controller.sampleTime]);
             testCase.verifyEqual(result.trajectories{1}.validationSubsteps,testCase.cfg.outputFeedback.validationSubsteps);
+            request.operation="evaluateControlSequence";request.holds=1;
+            value=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyLessThanOrEqual(max(value.stage),0);
+            crossing=predictiveSafetyGeometry.predictTarget(item.target,.0125);
+            shape=[testCase.cfg.vehicle.length/2;testCase.cfg.vehicle.width/2;testCase.cfg.vehicle.rectangleOffset];
+            testCase.verifyLessThanOrEqual(predictiveSafetyGeometry.rectangle(item.ego(1:3),shape,crossing(1:3),crossing(8:11)),0);
+        end
+        function collisionAtAnIntermediateControlNodeStillRejectsThePlan(testCase)
+            item=testCase.block.initialHypotheses;item.ego(4:6)=0;
+            item.target=[0;-12;pi/2;240;0;0;1.6;2.4;.95;0;0];
+            request=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
+                'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,2));
+            result=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyFalse(result.accepted);
+            % A single control knot spans both holds. Its interior control
+            % boundary must remain a collision node in the condensed oracle.
+            request.operation="evaluateControlSequence";request.holds=2;request.inputs=zeros(2,1);
+            value=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyGreaterThan(min(value.stage),testCase.cfg.outputFeedback.clearanceMeters);
+        end
+        function nodeSafetyScopeDoesNotClaimIntersampleProtection(testCase)
+            info=testCase.prediction.metadata;
+            testCase.verifyEqual(info.safetyScope,"finiteHypothesesControlBoundaryCollisionChecks");
+            testCase.verifyEqual(info.wholeHoldReserveScope,"notAppliedNodeCollisionContract");
+            testCase.verifyEqual(info.collisionNodeCount,info.horizonSteps+1);
+            testCase.verifyEqual(info.collisionCheckPeriodSeconds,testCase.cfg.controller.sampleTime);
         end
         function aSeparationWitnessBoundsActualFootprintDistance(testCase,rectangleYaw)
             ego=[0;0;rectangleYaw];target=[7;.3;-.3];shape=[2.4;.95;.1;-.2];

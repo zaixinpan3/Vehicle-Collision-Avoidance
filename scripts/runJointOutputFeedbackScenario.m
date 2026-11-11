@@ -68,7 +68,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                 end
                 warmupSeconds=toc(warmupTimer);
             end
-            trace=struct([]);failure="";failurePhase="";minimumClearance=Inf;failureCallSeconds=0;
+            trace=struct([]);failure="";failurePhase="";minimumClearance=Inf;minimumNodeClearance=Inf;failureCallSeconds=0;
             callSeconds=zeros(1,options.Frames);callCount=0;
             for frame=1:options.Frames
                 callTimer=tic;
@@ -85,23 +85,25 @@ function campaign = runJointOutputFeedbackScenario(options)
                 elapsed=toc(callTimer);callCount=callCount+1;callSeconds(callCount)=elapsed;
                 input=command.actuatorInput;
                 try
-                    [truth,samples,clearance]=localReplay(truth,input,cfg,time,stream, ...
+                    [truth,samples,clearance,nodeClearance]=localReplay(truth,input,cfg,time,stream, ...
                         ismember(frame,options.DropoutHolds));
                 catch exception
                     failurePhase="plantReplay";
                     failure=string(exception.identifier)+": "+string(exception.message);break;
                 end
                 minimumClearance=min(minimumClearance,clearance);
+                minimumNodeClearance=min(minimumNodeClearance,nodeClearance);
                 entry=struct('time',time,'input',input,'memory',state.memory, ...
                     'posteriorCount',numel(state.hypotheses),'metadata',prediction.metadata, ...
                     'controllerCallSeconds',elapsed,'deadlineMissed',elapsed>cfg.controller.sampleTime, ...
-                    'minimumReplayClearanceMeters',clearance,'stateAfterHold',truth.ego, ...
+                    'minimumReplayClearanceMeters',clearance,'minimumNodeClearanceMeters',nodeClearance, ...
+                    'stateAfterHold',truth.ego, ...
                     'rawSensorBlock',samples);
                 if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 time=time+cfg.controller.sampleTime;
-                if clearance<cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance
+                if nodeClearance<cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance
                     failurePhase="replaySafety";
-                    failure="The independent plant replay violated the requested sampled clearance.";break;
+                    failure="The independent plant replay violated clearance at a control-boundary node.";break;
                 end
                 block=struct('kind',"jointSensorBlock-v1",'time',time,'heldInput',input,'samples',samples);
             end
@@ -113,6 +115,10 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'outcome',outcome,'requestedFrames',options.Frames,'executedFrames',numel(trace), ...
                 'simulatedSeconds',time,'failure',failure,'failurePhase',failurePhase, ...
                 'minimumReplayClearanceMeters',minimumClearance,'configuration',cfg, ...
+                'collisionCheckScope',"controlBoundaryNodes", ...
+                'minimumNodeClearanceMeters',minimumNodeClearance, ...
+                'nodeClearanceSatisfied',~isempty(trace)&&minimumNodeClearance>=cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance, ...
+                'nodeCollisionDetected',~isempty(trace)&&minimumNodeClearance<=0, ...
                 'sampledSafetyEvaluated',~isempty(trace), ...
                 'sampledClearanceSatisfied',~isempty(trace)&&minimumClearance>=cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance, ...
                 'sampledCollisionDetected',~isempty(trace)&&minimumClearance<=0, ...
@@ -191,7 +197,7 @@ function noise=localNoise(stream,radius)
     angle=2*pi*rand(stream);noise=.5*radius*sqrt(rand(stream))*[cos(angle);sin(angle)];
 end
 
-function [truth,samples,clearance]=localReplay(truth,input,cfg,time,stream,dropout)
+function [truth,samples,clearance,nodeClearance]=localReplay(truth,input,cfg,time,stream,dropout)
     h=cfg.controller.sampleTime;dt=cfg.outputFeedback.sensorPeriod;count=round(h/dt);
     start=truth;ode=ode45(@(~,x)nonlinearBicycleModel.derivative(x,input,cfg),[0,h],truth.ego, ...
         odeset('RelTol',1e-10,'AbsTol',1e-12));
@@ -206,12 +212,15 @@ function [truth,samples,clearance]=localReplay(truth,input,cfg,time,stream,dropo
         y=localSensor(truth,input,cfg,time+j*dt,stream,dropout);
         if isempty(samples),samples=y;else,samples(end+1)=y;end %#ok<AGROW>
     end
-    clearance=Inf;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    % Dense clearance remains an independent diagnostic. Only the actual
+    % control-boundary nodes determine the node-safety campaign outcome.
+    clearance=Inf;nodeClearance=Inf;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     for t=linspace(0,h,41)
         x=deval(ode,t);q=start.target;
         if q(4)>0,q=predictiveSafetyGeometry.predictTarget(q,t);end
         gap=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3),q(8:11));
         clearance=min(clearance,gap);
+        if t==0 || t==h,nodeClearance=min(nodeClearance,gap);end
     end
 end
 

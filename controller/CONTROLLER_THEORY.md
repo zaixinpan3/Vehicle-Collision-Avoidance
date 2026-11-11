@@ -3,8 +3,9 @@
 The adopted controller combines fixed measurement-consistency inference with
 a condensed nonlinear predictive-CBF optimization of actuator commands.
 It enforces a terminal continuation set and retains a complete held-input
-plan for numerical safety validation and fallback. Control knots, integration samples, and sensor samples have distinct
-roles; reducing the decision dimension does not remove the physical model.
+plan for numerical safety validation and fallback. Collision constraints apply
+to control-boundary state nodes. Control knots, integration samples, and sensor
+samples have distinct roles; reducing the decision dimension does not remove the physical model.
 The derivation below states both the algorithm and the limits of its guarantees.
 
 ## 1. Physical model and uncertainty contract
@@ -306,8 +307,9 @@ b_2=\theta^2-\tfrac23\theta^3,\quad
 b_4=-\tfrac12\theta^2+\tfrac23\theta^3.
 $$
 
-Thus dense collision sampling does not require a new integration at every
-sample. Automatic derivatives of these same expressions are propagated by
+The dense extension supplies physical-model domain checks inside each hold;
+collision checks use only its control-boundary states. Automatic derivatives
+of these same expressions are propagated by
 $S_{j+1}=F_xS_j+F_uD_vu_j$. There are no shooting defects to restore.
 All executable proposals still undergo independent fine RK4 replay. If a
 proposal passes the initial oracle but fails fine replay, the oracle is
@@ -387,9 +389,16 @@ J=\frac12\sum_{i=1}^M h b_i e_i^\top W e_i
 $$
 
 The second term equals the sum of squared increments over all interpolated
-held commands. Let $C_j(v)$ be the maximum clearance deficit over retained hypotheses and
-dense intervals of hold $j$, using the interval lower bounds in Section 7.
-The primary problem is
+held commands. For the node-only collision contract, define
+
+$$
+C_j(v)=\max_s\max_{r\in\{j,j+1\}}
+\{d_{\rm safe}-d_\pm(x_r^s,q_r^s)\},\qquad j=0,\ldots,N-1.
+$$
+
+Each stage covers its two control-boundary nodes; their union includes the
+current root and the terminal node. No interior collision sample or motion
+reserve enters this deficit. The primary problem is
 
 $$
 \min_{v,\xi\ge0}\ \sum_{j=0}^{N-1}\xi_j,\qquad
@@ -445,8 +454,8 @@ $\Phi_f$ denote the resulting joint continuation. Define
 
 $$
 Z_f=\{(x,q,\vartheta,u^-):\ u_f\text{ and its entry increment are admissible},
-\quad J_f<\infty,\quad \Phi_f(t)\in\mathcal D,\quad
- d(\Phi_f(t))\ge d_{\rm safe}\ \text{for every }t\ge0\}.
+\quad J_f<\infty,\quad \Phi_f(t)\in\mathcal D\ \forall t\ge0,\quad
+ d(\Phi_f(jh))\ge d_{\rm safe}\ \text{for every integer }j\ge0\}.
 $$
 
 Here $\mathcal D$ is the forward-motion and physical-model domain described
@@ -455,13 +464,17 @@ This is a backup-trajectory set, not a radial stopping-distance reserve.
 It does not require the target to brake, impose stability caps, or require
 an instantaneous ego stop at the optimized endpoint. Holding the backup input
 makes its continuation suffix the backup of its successor, including after
-rest. With exact dynamics and whole-trajectory membership, this suffix
-property gives terminal invariance. The final optimized command need not
+rest. With exact dynamics, physical-domain validity and membership at every
+control-boundary node, this suffix property gives terminal invariance at those
+boundaries. The final optimized command need not
 already equal $u_f$; its transition to $u_f$ must be admissible.
 
 Numerical membership propagates the backup until absorbing rest, checks its
-dense geometry and motion domain, and checks the parked rectangle against the
-target's complete remaining track. Integration blocks are extended when needed;
+control-boundary collision geometry and dense physical-model domain, and
+checks the parked rectangle against the target's complete remaining track.
+The latter is the existing sufficient parked-set membership test: it covers
+all future nodes but can be more restrictive than checking only those nodes.
+Integration blocks are extended when needed;
 an allocation limit is not a terminal state restriction. The common command
 can produce different stopping times for different physical hypotheses.
 These are deterministic continuations of one candidate, not additional planner
@@ -512,8 +525,8 @@ backup with the vehicle model, rather than assuming that an independently
 chosen kinematic curvature is realized by the held steering. Finite hypotheses,
 numerical integration and sampled extrema still prevent an unconditional
 physical safety or recursive-feasibility theorem. The exact suffix argument
-requires consistent flow, information containment and sound whole-trajectory
-membership.
+requires consistent flow, information containment and sound node-clearance
+and physical-domain membership.
 
 Let $c_f(x_N,q_N,u_N)\le0$ denote numerical membership, including terminal
 input compatibility. The nonlinear constraint oracle evaluates this complete
@@ -571,44 +584,31 @@ guarantees. Every accepted replacement passes both the hard constraints and
 fine nonlinear replay. Numerical command normalization requires replay if it
 changes the already checked sequence.
 
-## 7. Dense acceptance and retention of executable plans
+## 7. Node acceptance and retention of executable plans
 
 For each retained physical member, expand the proposed coarse commands into
-all $N$ held commands, propagate its own persistent parameters, and evaluate
-input bounds, configured physical input increments, the physical-model domain,
-and the exact rectangle-distance dual value. Dense acceptance uses $K_v=64$
-RK4 steps per hold by default and retains the held command and control-boundary
-rest reset. Every new executable proposal uses the fine check. There is no fixed extra clearance buffer.
+all $N$ held commands and propagate its own persistent parameters. Fine RK4
+replay uses $K_v=64$ steps per hold by default, with the held command and the
+rest reset applied at control boundaries. This is the integration and
+physical-domain mesh; it does not define additional collision constraints.
+Every new executable proposal is checked for physical input bounds,
+configured input increments, and the physical-model domain.
 
-For the given member let $a_E,a_T$ be footprint-radius upper bounds about the
-vehicle reference points. Given valid continuous speed/rate bounds, a Lipschitz bound on Euclidean footprint distance is
-
-$$
-L_d=\sqrt{v_{x,\max}^2+v_{y,\max}^2}
-+\bar V_T+a_E\bar r_E+a_T\bar r_T,\qquad
-\bar r_T=|\sin\beta_T/l_{rT}|\bar V_T.
-$$
-
-The target maxima are obtained from its prescribed motion over the preview.
-For two neighboring check times separated by $\Delta t$, write
-$q_0,q_1$ for their exact rectangle distances. Since each is a lower bound
-on Euclidean distance, the two endpoint Lipschitz cones give
+Let $z_j^s=(x_j^s,q_j^s)$ be the joint state at $t_k+jh$. The collision checks are
 
 $$
-d(t)\ge\max\{q_0-L_dt,\ q_1-L_d(\Delta t-t)\},\qquad
-\underline d=\max\left\{q_0-L_d\Delta t,\ q_1-L_d\Delta t,
-\frac{q_0+q_1-L_d\Delta t}{2}\right\}.
+d_\pm(z_j^s)\ge d_{\rm safe},\qquad
+j=0,\ldots,N,\qquad s=1,\ldots,S,
 $$
 
-Require $\underline d\ge d_{\rm safe}$ on every interval. Use $\Delta t=h/K_v$ on the dense pose grid in both the constraint oracle
-and refined replay. If both
-vehicles remain exactly at their declared rest equilibria under nonpositive
-ego force commands, $L_d=0$ is valid; stationary configurations do not need a
-moving-vehicle reserve. The implementation estimates the speed/rate extrema
-from the replay itself; it does not impose them as state constraints. These
-sampled extrema and numerical poses are not validated continuous bounds, so
-the interval check is an engineering check, not an end-to-end robust safety
-certificate.
+with the same condition at every control boundary of the finite backup
+continuation. These checks use the exact rectangle-distance dual value from
+Section 5. The control-boundary state nodes are retained even inside a long
+control-knot interval. The first $N$ stage inequalities $C_j\le0$ are
+therefore equivalent to clearance at all $N+1$ state nodes. There is no
+intersample clearance requirement or collision reserve. A trajectory can
+pass these collision inequalities while intersecting between nodes; the
+algorithm makes no safety claim at those intermediate times.
 
 Only a sequence passing these checks can supply a command. The condensed trajectory is dynamically consistent with its numerical flow
 by construction. Geometry and state checks include the current
@@ -622,10 +622,19 @@ only a warm start and may not replace it without validation. Heuristic repeated
 last inputs and a bank of tail-repair durations are not terminal continuations.
 
 Under the terminal safety and invariance assumption, consistent state evolution
-and conditioning, exact constraint evaluation, and an admissible policy class
-containing the retained fine sequence, the usual shift argument supplies a
+and conditioning, exact node and terminal constraint evaluation, and an
+admissible policy class containing the retained fine sequence, the usual shift argument supplies a
 feasible continuation: the old feasible prefix survives conditioning, its old
 endpoint belongs to $Z_f$, and the appended terminal law stays in $Z_f$.
+Nondecreasing horizon length is a sufficient scheduling choice for retaining
+this candidate, not a necessary condition for recursive feasibility. After
+one executed hold, the old suffix has $N_k-1$ holds and ends at the old
+terminal state. It is feasible at a new horizon $N_{k+1}=N_k-1$ under the same
+assumptions. A longer horizon appends the terminal law. Shortening further
+requires the new prefix endpoint to belong to $Z_f$, together with node
+constraints and an admissible representation of the retained controls.
+Simply discarding a tail before terminal entry does not establish feasibility.
+
 The backup uses the same vehicle transition, so its continuation does not
 require a switch to a different curvature model. Numerical integration,
 finite hypotheses and sampled membership are implementation approximations, so the

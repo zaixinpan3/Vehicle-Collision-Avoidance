@@ -4039,8 +4039,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'conditioning',conditioning,'terminalSetEnforced',true,'terminalSafetyAssumed',true, ...
         'terminalModel',"straighteningBrakingThenParked",'terminalValue',max(cellfun(@(t)t.terminal.value,traces)), ...
         'terminalInput',traces{nominal}.terminal.input,'robustNonlinearSafetyCertified',false, ...
-        'recursiveFeasibilityCertified',false,'safetyScope',"finiteHypothesesDenseNonlinearReplay", ...
-        'wholeHoldReserveScope',"sampledMotionEstimateAndDenseChecksNoCertificate", ...
+        'recursiveFeasibilityCertified',false,'safetyScope',"finiteHypothesesControlBoundaryCollisionChecks", ...
+        'collisionCheckPeriodSeconds',h,'collisionNodeCount',count+1, ...
+        'wholeHoldReserveScope',"notAppliedNodeCollisionContract", ...
         'predictionModel',"condensedSharedInputNonlinearRollout",'previousInputUsedForMeasurements',previous, ...
         'optimizationReturned',true,'pcbfValue',0,'primaryOptimumComputed',true, ...
         'inheritedPerformanceCost',inheritedCost,'acceptedPerformanceCost',bestCost, ...
@@ -4228,8 +4229,8 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     last=ends(:,end);stopped=(command(2)<=0)&(last(4)<.2*cfg.model.brakeHoldSpeed);
     finish=[last(1:3);if_else(stopped,zeros(3,1),last(4:6))];
     hold=Function('pcbf_hold',{root,command,parameters},{finish,points});
-    % RK4 continuous extension supplies dense geometry and its derivatives
-    % without a new dynamics integration at every collision sample.
+    % RK4 continuous extension supplies dense physical-domain samples and
+    % their derivatives without an additional integration at every sample.
     sensitivity=SX.sym('sensitivity',6,8);
     updated=jacobian(next,x)*sensitivity+[SX.zeros(6,6),jacobian(next,u)];
     index=MX.sym('index',5);initialSensitivity=DM([eye(6),zeros(6,2)]);
@@ -4289,7 +4290,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             'cfg',cfg,'holds',kernel.holds,'integrationSubsteps',kernel.integrationSubsteps, ...
             'trajectories',{cell(1,numel(model.hypotheses))});
     end
-    values=[inputs,zeros(2,capacity-N)];enabled=double((1:capacity)<=N);times=(0:K*N)*h/K;
+    values=[inputs,zeros(2,capacity-N)];enabled=double((1:capacity)<=N);
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     e=struct('stage',-Inf(N,1),'stageGradient',zeros(nu,N),'forward',-Inf(N,1), ...
         'forwardGradient',zeros(nu,N),'terminal',zeros(numel(model.hypotheses),1), ...
@@ -4306,13 +4307,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             total=flow.total;
             q=flow.q;
             localStage=flow.localStage;
-            indices=flow.indices;
-            weights=flow.weights;
-            travelWeights=flow.travelWeights;
-            radiusE=flow.radiusE;
-            speed=flow.speed;
-            speedIndex=flow.speedIndex;
-            yawIndex=flow.yawIndex;
+            nodeIndices=flow.nodeIndices;
             forward=flow.forward;
             fi=flow.fi;
             domainState=flow.domainState;
@@ -4326,35 +4321,30 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             end
             [backupDense,backupEnds,backupInputs]=localCompactBackupRollout(kernel,ends(:,end),item.parameters,inputs(:,end),cfg,checkBudget);
             rollouts.trajectories{s}=struct('dense',dense,'states',ends(:,cumsum(kernel.holds)), ...
+                    'collisionStates',[item.ego,ends], ...
                     'backup',struct('dense',backupDense,'states',backupEnds,'inputs',backupInputs));
             ends=[ends,backupEnds];dense=[dense,backupDense(:,2:end)];
-            allInputs=[inputs,backupInputs];total=size(allInputs,2);times=(0:K*total)*h/K;
-            q=[];gap=[];localStage=-ones(1,total);indices=1+(0:total-1)*K;weights=ones(1,total);travelWeights=zeros(1,total);
-            radiusE=norm(shape(1:2))+norm(shape(3:4));
-            [speed,speedIndex]=max(hypot(dense(4,:),dense(5,:)));[yaw,yawIndex]=max(abs(dense(6,:)));
+            allInputs=[inputs,backupInputs];total=size(allInputs,2);times=(0:total)*h;
+            nodes=[item.ego,ends];q=[];gap=[];localStage=-ones(1,total);nodeIndices=1:total;
             if ~isempty(item.target)
-                if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);else,q=repmat(item.target,1,numel(times));end
-                gap=localCompactExactClearance(dense,q,shape);
-                radiusT=norm(q(8:9,1))+norm(q(10:11,1));targetSpeed=max(q(4,:));
-                L=speed+radiusE*yaw+targetSpeed+radiusT*abs(sin(q(6,1))/q(7,1))*targetSpeed;
-                a=gap(1:end-1);b=gap(2:end);travel=L*h/K;
-                [lower,branch]=max([a-travel;b-travel;(a+b-travel)/2],[],1);
-                [localStage,j]=max(reshape(cfg.outputFeedback.clearanceMeters-lower,K,total),[],1);
-                indices=(0:total-1)*K+j;branch=branch(indices);weights=.5*ones(1,total);weights(branch==1)=1;weights(branch==2)=0;
-                travelWeights=ones(1,total);travelWeights(branch==3)=.5;
+                if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);else,q=repmat(item.target,1,total+1);end
+                gap=localCompactExactClearance(nodes,q,shape);
+                % Each stage covers its two control-boundary nodes. No
+                % collision condition is imposed on the integration mesh.
+                [localStage,side]=max(cfg.outputFeedback.clearanceMeters-[gap(1:end-1);gap(2:end)],[],1);
+                nodeIndices=(0:total-1)+side;
             end
             [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K);
             rollouts.trajectories{s}.oracle=struct('dense',dense,'ends',ends,'allInputs',allInputs,'total',total, ...
-                'q',q,'localStage',localStage,'indices',indices,'weights',weights, ...
-                'travelWeights',travelWeights,'radiusE',radiusE,'speed',speed,'speedIndex',speedIndex, ...
-                'yawIndex',yawIndex,'forward',forward,'fi',fi,'domainState',domainState, ...
+                'q',q,'localStage',localStage,'nodeIndices',nodeIndices, ...
+                'forward',forward,'fi',fi,'domainState',domainState, ...
                 'domainInput',domainInput);
             if ~isempty(q)
-                rollouts.trajectories{s}.targets=q(:,1:K*N+1);
-                rollouts.trajectories{s}.separation=gap(1:K*N+1);
+                rollouts.trajectories{s}.targets=q(:,1:N+1);
+                rollouts.trajectories{s}.separation=gap(1:N+1);
             end
         end
-        roots=[item.ego,ends(:,1:end-1)];derivativeModel=model;
+        nodes=[item.ego,ends];roots=nodes(:,1:end-1);derivativeModel=model;
         derivativeModel.controlMap=[model.controlMap;zeros(2*(total-N),nu)];
         if ~derivatives
             e.stage=max(e.stage,localStage(1:N).');e.forward=max(e.forward,forward(1:N).');
@@ -4365,12 +4355,8 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             if s==model.nominal,e.cost=localCompactPerformance(ends(:,cumsum(kernel.holds)),inputs,model);end
             continue;
         end
-        si=max(1,ceil((speedIndex-1)/K));sj=max(1,ceil((yawIndex-1)/K));
-        speedSample=zeros(1,total);speedSample(si)=speedIndex-1-(si-1)*K;
-        yawSample=zeros(1,total);yawSample(sj)=yawIndex-1-(sj-1)*K;
-        % Every value remains checked. Differentiate only samples consumed by
-        % those rows: each backup maximum selects one row, and the common
-        % travel bound uses only its actual speed and yaw extrema.
+        % Geometry uses boundary sensitivities. Only the active physical
+        % domain sample inside each hold needs a dense-sample sensitivity.
         stageNeeded=false(1,total);domainNeeded=false(1,total);
         stageNeeded(1:N)=~isempty(q);domainNeeded(1:N)=true;
         if total>N
@@ -4378,30 +4364,21 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             [~,backupDomain]=max(forward(N+1:end));
             stageNeeded(N+backupStage)=~isempty(q);domainNeeded(N+backupDomain)=true;
         end
-        required=[stageNeeded & weights~=0;stageNeeded & weights~=1;domainNeeded;false(2,total)];
-        required(4,si)=~isempty(q) && speed>0;
-        required(5,sj)=~isempty(q) && dense(6,yawIndex)~=0;
+        required=[false(2,total);domainNeeded;false(2,total)];
         if ~isempty(checkBudget),checkBudget();end
         [SC,SE]=localCondensedSensitivities(roots,allInputs,item.parameters, ...
-            [mod(indices-1,K);mod(indices-1,K)+1;fi;speedSample;yawSample],required,derivativeModel);
+            [zeros(2,total);fi;zeros(2,total)],required,derivativeModel);
         if ~isempty(checkBudget),checkBudget();end
-        S1=SC(1,:);S2=SC(2,:);SF=SC(3,:);
-        dL=zeros(1,nu);
-        if required(4,si),speedS=SC{4,si};dL=dense(4:5,speedIndex).'/speed*speedS(4:5,:);end
-        if required(5,sj),yawS=SC{5,sj};dL=dL+radiusE*sign(dense(6,yawIndex))*yawS(6,:);end
+        SF=SC(3,:);gradient=zeros(3,total);
         if ~isempty(q)
-            grad1=zeros(3,total);grad2=grad1;
-            first=required(1,:);second=required(2,:);
-            grad1(:,first)=localCompactDistanceGradient(dense(:,indices(first)),q(:,indices(first)),shape);
-            grad2(:,second)=localCompactDistanceGradient(dense(:,indices(second)+1),q(:,indices(second)+1),shape);
+            selected=nodeIndices(stageNeeded);
+            gradient(:,stageNeeded)=localCompactDistanceGradient(nodes(:,selected),q(:,selected),shape);
         end
         stageGradient=zeros(nu,total);
         for i=1:total
             if stageNeeded(i)
-                row=zeros(1,nu);
-                if required(1,i),row=-weights(i)*grad1(:,i).'*S1{i}(1:3,:);end
-                if required(2,i),row=row-(1-weights(i))*grad2(:,i).'*S2{i}(1:3,:);end
-                stageGradient(:,i)=(row+travelWeights(i)*h/K*dL).';
+                S=SE{nodeIndices(i)};
+                stageGradient(:,i)=-(gradient(:,i).'*S(1:3,:)).';
             end
             if i<=N
                 domainGradient=(domainState(:,i).'*SF{i}+domainInput(:,i).'*derivativeModel.controlMap(2*i-1:2*i,:)).';
@@ -4612,9 +4589,9 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
         if ~isempty(checkBudget),checkBudget();end
         item=hypotheses(s);
         if reuse
-            flow=rollouts.trajectories{s};dense=flow.dense;states=flow.states;inputs=controls;
+            flow=rollouts.trajectories{s};dense=flow.dense;states=flow.states;inputs=controls;collisionStates=flow.collisionStates;
         else
-            [dense,states,inputs]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,fine);
+            [dense,states,inputs,collisionStates]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,fine);
         end
         % The accepted trace contains the original control-knot states.
         nodeStates{s}=states;
@@ -4623,7 +4600,7 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
         stateViolation=max(stateViolation,max(domain));
         if ~defined,stateViolation=Inf;end
         violation=max(violation,stateViolation);
-        times=(0:size(dense,2)-1)*h/kernel.validationSubsteps;q=[];
+        times=(0:size(inputs,2))*h;q=[];
         if ~isempty(item.target)
             if reuse && isfield(flow,'separation')
                 q=flow.targets;separation=flow.separation;
@@ -4631,12 +4608,12 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
                 if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);
                 else,q=repmat(item.target,1,numel(times));end
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-                separation=localCompactExactClearance(dense,q,shape);
+                separation=localCompactExactClearance(collisionStates,q,shape);
             end
             violation=max(violation,max(cfg.outputFeedback.clearanceMeters-separation));
-            violation=max(violation,localCompactIntervalViolation(dense,q,inputs,separation,cfg,kernel.validationSubsteps));
         end
-        traces{s}=struct('ego',[item.ego,states],'inputs',inputs,'denseEgo',dense,'targets',q,'validationSubsteps',kernel.validationSubsteps);
+        traces{s}=struct('ego',[item.ego,states],'inputs',inputs,'denseEgo',dense,'collisionEgo',collisionStates,'collisionTimes',times, ...
+            'targets',q,'validationSubsteps',kernel.validationSubsteps);
     end
     valid=isfinite(violation) && violation<=cfg.outputFeedback.nlpTolerance;
     if isfinite(violation)
@@ -4652,7 +4629,7 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
     end
 end
 
-function [dense,states,inputs] = localCompactRollout(kernel,x,previous,controls,parameters,fine)
+function [dense,states,inputs,collisionStates] = localCompactRollout(kernel,x,previous,controls,parameters,fine)
     N=sum(kernel.holds);inputs=zeros(2,N);k=0;
     if fine,inputs=controls;else
         for i=1:numel(kernel.holds)
@@ -4664,6 +4641,7 @@ function [dense,states,inputs] = localCompactRollout(kernel,x,previous,controls,
     [dense,ends]=kernel.refinedRollout(x,[inputs,zeros(2,capacity-N)],parameters,double((1:capacity)<=N));
     dense=full(dense);ends=full(ends);
     dense=[x,dense(:,1:kernel.validationSubsteps*N)];states=ends(:,cumsum(kernel.holds));
+    if nargout>3,collisionStates=[x,ends(:,1:N)];end
 end
 function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup,checkBudget)
     h=cfg.controller.sampleTime;
@@ -4680,13 +4658,13 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,pa
         if ~defined,tailViolation=Inf;end
     end
     if ~isempty(target)
-        terminalTarget=predictiveSafetyGeometry.predictTarget(target,(size(tail,2)-1)*h/kernel.validationSubsteps);
-        if target(4)==0,tailTarget=repmat(target,1,size(tail,2));terminalTarget=target;
-        else,tailTarget=predictiveSafetyGeometry.predictTarget(target,(0:size(tail,2)-1)*h/kernel.validationSubsteps);end
+        times=(0:size(tailInputs,2))*h;
+        if target(4)==0,tailTarget=repmat(target,1,numel(times));
+        else,tailTarget=predictiveSafetyGeometry.predictTarget(target,times);end
+        terminalTarget=tailTarget(:,end);
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        gap=localCompactExactClearance(tail,tailTarget,shape);
-        if size(tail,2)>1,tailViolation=max(tailViolation,localCompactIntervalViolation(tail,tailTarget,tailInputs,gap,cfg,kernel.validationSubsteps));
-        else,tailViolation=max(tailViolation,cfg.outputFeedback.clearanceMeters-gap);end
+        gap=localCompactExactClearance([x,tailEnds],tailTarget,shape);
+        tailViolation=max(tailViolation,max(cfg.outputFeedback.clearanceMeters-gap));
     end
     parked=tail(:,end);if ~isempty(tailEnds),parked=tailEnds(:,end);end
     [terminalValue,terminal]=terminalSafeSet.compactEvaluate(parked,terminalTarget,previous,cfg);
@@ -4740,26 +4718,6 @@ function [value,index,stateGradient,inputGradient,defined]=localCompactModelDoma
     stateGradient(4,wheel)=-c(wheel);stateGradient(5,wheel)=-s(wheel);
     stateGradient(6,wheel)=-cfg.vehicle.lf*s(wheel);
     inputGradient(1,wheel)=x(4,wheel).*s(wheel)-lateral(wheel).*c(wheel);
-end
-
-function violation = localCompactIntervalViolation(states,targets,inputs,separation,cfg,substeps)
-    radiusE=hypot(cfg.vehicle.length/2,cfg.vehicle.width/2)+norm(cfg.vehicle.rectangleOffset);
-    radiusT=norm(targets(8:9,1))+norm(targets(10:11,1));
-    targetSpeed=max(targets(4,:));targetRate=abs(sin(targets(6,1))/targets(7,1))*targetSpeed;
-    pointSpeed=max(hypot(states(4,:),states(5,:))) ...
-        +targetSpeed+radiusE*max(abs(states(6,:)))+radiusT*targetRate;
-    % Exact rest is an equilibrium of the declared model under nonpositive
-    % force commands. No residual force or target restart is admitted here.
-    if all(states(4:6,:)==0,'all') && all(targets(4,:)==0) && all(inputs(2,:)<=0)
-        pointSpeed=0;
-    end
-    travel=pointSpeed*cfg.controller.sampleTime/substeps;
-    a=separation(1:end-1);b=separation(2:end);
-    % Minimum of the two endpoint Lipschitz cones on each interval. This is
-    % conditional on the continuous speed/rate domain and exact node poses;
-    % numerical integration and finite information remain uncertified.
-    lower=max([a-travel;b-travel;(a+b-travel)/2],[],1);
-    violation=max(cfg.outputFeedback.clearanceMeters-lower);
 end
 
 function [clearance,gradient] = localCompactExactClearance(states,targets,shape)
