@@ -396,6 +396,11 @@ J=\frac12\sum_{i=1}^M h b_i e_i^\top W e_i
  +\frac{w_u}{2}\sum_{i=1}^M\frac{\|v_i-v_{i-1}\|^2}{b_i}.
 $$
 
+The compact default is $W=\operatorname{diag}(0.02,0.2,2,0.1,0.1)$ and
+$w_u=0.1$. The lower transverse weight permits a passing excursion while
+retaining the fixed cruise path and speed as the zero-error reference. This
+performance choice does not supply a general convergence or liveness theorem.
+
 The second term equals the sum of squared increments over all interpolated
 held commands. For the node-only collision contract, define
 
@@ -569,17 +574,30 @@ $$
 
 Only $e$ is constrained nonnegative; $d$ is unrestricted except for the input
 rows. A backtracking line search evaluates the original nonlinear merit
-$J(v)+\rho\|[c(v)]_+\|_1$. The elastic variable globalizes the numerical
+$J(v)+\rho\|[c(v)]_+\|_1$. A feasible QP iterate returned at its iteration
+limit may propose a direction; it still undergoes nonlinear acceptance.
+Backtracking continues to numerical step resolution or the call deadline,
+rather than imposing a fixed minimum fraction of the full direction.
+The elastic variable globalizes the numerical
 search and is never an executable safety slack: a replacement still requires
 zero deficit, hard terminal membership and fine replay. Trial evaluations
 need values only; sensitivities are evaluated at the next linearization point.
 This avoids rebuilding a general-purpose performance NLP on every frame.
 The vehicle dynamics remain nonlinear. A single
 planner-generated control sequence initializes the first solve; continuation
-uses the shifted stored sequence. For a moving target, the initializer retains
-the obstacle tangent with nonnegative projection onto the ego forward
-direction as its circulation preference, using a fixed sign at an exact tie. This breaks collinear symmetry
-without enumerating alternate trajectories. Its actuator mapping uses the
+normally shifts the stored search sequence. On entry to exact rest in all
+retained physical members, regenerate this single search sequence from the
+current posterior and fixed cruise reference. Do so once per rest episode,
+so subsequent calls can continue unfinished optimization. Discard any pending
+proposal from the replaced search. The separately retained, replay-checked
+fine plan is unaffected, preserving its suffix and terminal continuation;
+the restart neither certifies its new seed nor extends the online budget.
+For both moving and stopped targets, the initializer retains
+the obstacle tangent with positive projection onto the ego forward
+direction as its circulation preference. At a perpendicular tie, a moving
+target uses a fixed sign; a stopped target leaves circulation unbiased so
+straight braking remains a possible initialization. This uses one trajectory.
+Its actuator mapping uses the
 physical steering range and does not impose the legacy observer sideslip or
 speed caps. Before nonlinear search, project the single warm sequence onto
 the existing linear input bounds, configured increments and terminal-command
@@ -588,7 +606,10 @@ adds no physical constraint and does not certify collision or terminal safety.
 These are initialization choices, not safety constraints or an
 admission rule; the nonlinear optimizer may change the resulting commands. Iteration and wall-time budgets limit local
 improvement, and do not constitute global feasibility or hard execution-time
-guarantees. Every accepted replacement passes both the hard constraints and
+guarantees. Initialization retains its configured search budget after finding
+a safe backup, allowing performance optimization at zero primary deficit;
+subsequent calls use the online budget when a checked suffix remains available.
+Every accepted replacement passes both the hard constraints and
 fine nonlinear replay. Numerical command normalization requires replay if it
 changes the already checked sequence.
 

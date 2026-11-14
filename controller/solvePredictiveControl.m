@@ -3841,6 +3841,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     map=model.map;offset=model.offset;
     best=[];bestCost=Inf;bestTraces={};bestViolation=Inf;retained=false;validationSeconds=0;
     rootTerminal=false;initializationSource="shiftedFinePlan";
+    rootStates=[hypotheses.ego];atRest=all(rootStates(4:6,:)==0,'all');
+    restartSearch=~initial && atRest && ...
+        (~isfield(prior,'searchAtRest') || ~prior.searchAtRest);
     if initial
         validationClock=tic;rootTerminal=true;
         for s=1:numel(hypotheses)
@@ -3872,11 +3875,21 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             search=[search,repmat(extension,1,count-size(search,2))];
         end
         controls=localCompactRateLimit(search(:,boundaries(2:end)),previous,holds,cfg);
+        if restartSearch
+            % A stop can strand the shifted search on a poor circulation
+            % path. Replace that one search trajectory at rest entry, while
+            % retaining the checked fine plan and the online call budget.
+            seed=localCompactSeeds(hypotheses(nominal),previous,holds,lane,kernel,cfg);controls=seed{1};
+            initializationSource="singleCirculationRecovery";
+        end
     end
     budget=cfg.outputFeedback.maximumSolveSeconds;budgetPhase="performance";
-    if isempty(best)
+    % A safe backup solves admission, not cruise recovery. Keep the initial
+    % search budget even when that backup already attains zero PCBF deficit.
+    if initial
+        budget=cfg.outputFeedback.initializationSolveSeconds;budgetPhase="initialization";
+    elseif isempty(best)
         budget=cfg.outputFeedback.recoverySolveSeconds;budgetPhase="recovery";
-        if initial,budget=cfg.outputFeedback.initializationSolveSeconds;budgetPhase="initialization";end
     end
     % Compilation is startup preparation, never a warmed online exemption.
     startupBuildSeconds=0;
@@ -3898,12 +3911,12 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     lastIterate=controls(:);
     cacheU=[];checkedU=[];cache=[];calls=0;phase=1;needsRefinement=false;solveClock=tic;
     initialDeficit=NaN;initialTerminal=NaN;restoration=isempty(best);
-    iterationCount=0;phaseIterations=0;exitFlag=0;attempts=0;performanceSteps=0;
+    iterationCount=0;phaseIterations=0;exitFlag=0;attempts=0;performanceSteps=0;partialQpSteps=0;
     deferred=zeros(2,0);activeTrial=[];deferredAccepted=false;
     % A QP trial interrupted before validation is a proposal, not a warm
     % iterate or executable plan. Recheck it against the new posterior and
     % shifted-plan cost before allowing it to replace either one.
-    if ~initial && isfield(prior,'deferredFineControls') && ~isempty(prior.deferredFineControls)
+    if ~initial && ~restartSearch && isfield(prior,'deferredFineControls') && ~isempty(prior.deferredFineControls)
         pending=prior.deferredFineControls(:,2:end);
         pending=[pending,repmat(extension,1,count-size(pending,2))];
         pending=localCompactRateLimit(pending(:,boundaries(2:end)),previous,holds,cfg);
@@ -3976,7 +3989,13 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             [step,~,flag]=quadprog(H,[e.costGradient;penalty],rows,rhs,[],[], ...
                 [lower-lastIterate;0],[upper-lastIterate;Inf],start,qpOptions);
             recordCost("qp",toc(qpClock));
-            if flag<=0,exitFlag=-2;break;end
+            % An iteration-limited convex QP may still return a useful
+            % feasible step. Nonlinear replay remains the execution gate.
+            partial=flag==0 && ~isempty(step) && all(isfinite(step)) ...
+                && max([rows*step-rhs;lower-lastIterate-step(1:nu); ...
+                    step(1:nu)-(upper-lastIterate);-step(end)])<=cfg.outputFeedback.nlpTolerance;
+            if flag<=0 && ~partial,exitFlag=-2;break;end
+            partialQpSteps=partialQpSteps+partial;
             direction=step(1:nu);iterationCount=iterationCount+1;
             if norm(direction,Inf)<1e-7
                 exitFlag=-3;if max(c)<=cfg.outputFeedback.nlpTolerance,exitFlag=1;end
@@ -3985,7 +4004,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             merit=e.cost+penalty*sum(max(0,c));
             decrease=e.costGradient.'*direction+penalty*(sum(max(0,c+jac*direction))-sum(max(0,c)));
             accepted=false;fraction=1;
-            while fraction>=1/128 && ~budgetStopped
+            % Constraint curvature can require fractions below 1/128. Stop
+            % at numerical step resolution or the shared call deadline.
+            while norm(fraction*direction,Inf)>1e-10*(1+norm(lastIterate,Inf)) && ~budgetStopped
                 trial=lastIterate+fraction*direction;activeTrial=trial;
                 value=evaluate(trial,false);activeTrial=[];
                 trialMerit=value.cost+penalty*sum(max(0,[value.stage;value.forward;value.terminal]));
@@ -4022,6 +4043,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
         'fineControls',best,'searchFineControls',reshape(lastIterate,2,nodes)*map.'+offset,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
         'deferredFineControls',deferred, ...
+        'searchAtRest',atRest, ...
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
         'pcbfDeficit',0,'stageDeficits',zeros(count,1),'runtimeTiming',runtimeTiming, ...
         'requiresFineIntegration',needsRefinement || model.kernel.integrationSubsteps==fineKernel.integrationSubsteps);
@@ -4047,7 +4069,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'predictionModel',"condensedSharedInputNonlinearRollout",'previousInputUsedForMeasurements',previous, ...
         'optimizationReturned',true,'pcbfValue',0,'primaryOptimumComputed',true, ...
         'inheritedPerformanceCost',inheritedCost,'acceptedPerformanceCost',bestCost, ...
-        'performanceAcceptedSteps',performanceSteps, ...
+        'performanceAcceptedSteps',performanceSteps,'partialQpSteps',partialQpSteps, ...
+        'searchRestartedAtRest',restartSearch, ...
         'deferredTrialAccepted',deferredAccepted,'deferredTrialStored',~isempty(deferred), ...
         'safetyObjective',"sumOfHorizonSafetySlacks",'nonlinearOracleEvaluations',calls, ...
         'oraclePropagationReuses',reuseCount,'callBudgetSeconds',budget-startupBuildSeconds, ...
@@ -4090,9 +4113,6 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 end
             end
             if promising && feasible
-                if initial && isempty(best)
-                    budget=min(budget,toc(timer)+cfg.outputFeedback.maximumSolveSeconds);
-                end
                 best=candidate;bestCost=candidateCost;bestTraces=candidateTraces;bestViolation=candidateViolation;retained=false;
             end
         end

@@ -63,6 +63,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function aShrinkingPreviewRetainsTheExecutableSuffixAndTerminalPoint(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            cfg.outputFeedback.initializationSolveSeconds=1e-12;
             block=localBlock(cfg,10.01);
             [~,~,first,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
             block=localNextBlock(prior,cfg);
@@ -78,6 +79,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function shrinkingBelowTheKnotCountKeepsPositiveControlIntervals(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            cfg.outputFeedback.initializationSolveSeconds=1e-12;
             cfg.outputFeedback.minimumPreviewSeconds=.1;
             cfg.outputFeedback.previewSettlingSeconds=.05;cfg.outputFeedback.horizonResolutionSeconds=.05;
             block=localBlock(cfg,2.01);
@@ -97,6 +99,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function releasingBrakesWithoutProgressCannotReplaceTheRetainedPlan(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            cfg.outputFeedback.initializationSolveSeconds=1e-12;
             block=localBlock(cfg,0);
             [~,~,~,state]=collisionAvoidanceController(block,[],[],cfg,[]);
             expected=state.fineControls(:,2);
@@ -120,15 +123,70 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(prediction.scenarios{1}.ego(4,end),1.4);
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,1e-6);
         end
-        function anExpiredCallBudgetCannotStartTheInitialOracle(testCase)
-            cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+        function aPassingDetourCostsLessThanRemainingParked(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=1.5;
+            item=testCase.block.initialHypotheses;item.target=[];
+            item.ego=[0;6;0;cfg.referenceSpeed;0;0];
+            request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
+                'hypotheses',item,'input',zeros(2,1),'holds',[1,1,1],'inputs',zeros(2,3));
+            passing=solvePredictiveControl('outputFeedback',request);
+            request.hypotheses.ego=zeros(6,1);
+            parked=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyLessThan(passing.cost,parked.cost);
+        end
+        function aSafeBackupDoesNotCancelTheInitializationSearch(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.nlpJit=true;
+            cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            cfg.outputFeedback.initializationSolveSeconds=2;
+            block=localBlock(cfg,0);
+            [command,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyGreaterThan(command.actuatorInput(2),.01);
+            testCase.verifyGreaterThan(prediction.metadata.nonlinearOracleEvaluations,0);
+            testCase.verifyEqual(prediction.metadata.budgetPhase,"initialization");
+            testCase.verifyEqual(prediction.metadata.callBudgetSeconds,2,AbsTol=1e-12);
+            testCase.verifyLessThan(prediction.metadata.acceptedPerformanceCost, ...
+                prediction.metadata.inheritedPerformanceCost);
+            testCase.verifyEqual(prediction.metadata.pcbfValue,0);
+            testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
+            % The next call obeys the online budget and keeps the checked suffix.
+            block=localNextBlock(state,cfg);
+            [command,~,prediction]=collisionAvoidanceController(block,[],[],cfg,state);
+            testCase.verifyEqual(prediction.metadata.budgetPhase,"performance");
+            testCase.verifyEqual(prediction.metadata.nonlinearOracleEvaluations,0);
+            testCase.verifyEqual(command.actuatorInput,state.fineControls(:,2),AbsTol=1e-12);
+        end
+        function aRestEntryRefreshesOnlyTheSearchAndKeepsTheSafeSuffix(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=1.5;
+            cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            cfg.outputFeedback.initializationSolveSeconds=1e-12;
+            [~,~,~,prior]=collisionAvoidanceController(localBlock(cfg,0),[],[],cfg,[]);
+            prior.searchAtRest=false;
+            prior.searchFineControls=repmat([cfg.outputFeedback.steeringMaximum;-1],1,prior.horizonSteps);
+            prior.deferredFineControls=prior.searchFineControls;
+            block=localNextBlock(prior,cfg);
+            [command,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,prior);
+            testCase.verifyTrue(prediction.metadata.searchRestartedAtRest);
+            testCase.verifyEqual(prediction.metadata.initializationSource,"singleCirculationRecovery");
+            testCase.verifyEqual(prediction.metadata.initializationTrajectoryCount,1);
+            testCase.verifyTrue(prediction.metadata.retainedFinePlanUsed);
+            testCase.verifyEqual(command.actuatorInput,prior.fineControls(:,2),AbsTol=1e-12);
+            testCase.verifyEqual(prediction.metadata.pcbfValue,0);
+            testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
+            testCase.verifyFalse(prediction.metadata.deferredTrialStored);
+            testCase.verifyGreaterThan(norm(state.searchFineControls-prior.searchFineControls,'fro'),1);
+            block=localNextBlock(state,cfg);
+            [~,~,prediction]=collisionAvoidanceController(block,[],[],cfg,state);
+            testCase.verifyFalse(prediction.metadata.searchRestartedAtRest);
+        end
+        function anExpiredInitializationBudgetCannotStartTheInitialOracle(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.initializationSolveSeconds=1e-12;
             block=localBlock(cfg,0);
             [command,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyEqual(prediction.metadata.nonlinearOracleEvaluations,0);
             testCase.verifyTrue(prediction.metadata.rootTerminalPlanUsed);
             testCase.verifyTrue(prediction.metadata.budgetStopped);
             testCase.verifyEqual(prediction.metadata.pcbfValue,0);
-            testCase.verifyEqual(prediction.metadata.callBudgetSeconds,cfg.outputFeedback.maximumSolveSeconds,AbsTol=1e-12);
+            testCase.verifyEqual(prediction.metadata.callBudgetSeconds,cfg.outputFeedback.initializationSolveSeconds,AbsTol=1e-12);
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
             testCase.verifyEqual(command.actuatorInput,prediction.scenarios{1}.inputs(:,1));
         end
@@ -333,6 +391,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function anUnsafeWarmIterateCannotOverwriteTheExecutablePlan(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=3;cfg.outputFeedback.maximumSolveSeconds=1e-9;
+            cfg.outputFeedback.initializationSolveSeconds=1e-9;
             block=localBlock(cfg,0);item=block.initialHypotheses;
             item.target=[8;0;0;0;0;0;1.6;2.4;.95;0;0];block.initialHypotheses=item;
             block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...

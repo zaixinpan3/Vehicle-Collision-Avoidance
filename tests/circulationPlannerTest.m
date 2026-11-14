@@ -11,6 +11,19 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function anAbsorbingStopPreservesTheCompactCirculationDirection(testCase)
+            model=localModel("crossing",8);model.compactInitialization=true;
+            model.cfg.referenceSpeed=1.5;
+            model.nominalReference=struct('state',[0;0;0;1.5;0;0],'curvature',0);
+            model.initialState=[7.7;-.8;-.5;.3;0;0];
+            model.target=[12;-2.1;-pi/2;0;-.06;0;1.6;2.4;.95;0;0];
+            stopped=predictiveSafetyGeometry.avoidanceGuide(model,40);
+            model.target(4)=1e-9;
+            stopping=predictiveSafetyGeometry.avoidanceGuide(model,40);
+            testCase.verifyEqual(stopped.inputs,stopping.inputs,AbsTol=1e-6);
+            testCase.verifyEqual(stopped.states,stopping.states,AbsTol=1e-6);
+            testCase.verifyEqual(stopped.candidateCount,1);
+        end
         function aRetainedInitializerDoesNotAssumeFutureTargetMeasurements(testCase)
             model=localModel("headOn",8);model.target(1:6)=[-30;10;pi;8;0;0];
             model.uncertainty.target=struct('positionRadius',.04,'courseRadius',.02, ...

@@ -1420,13 +1420,15 @@ function candidate=localCirculationRollout(model,data,speed,count)
     cfg=model.cfg;h=cfg.controller.sampleTime;
     physicalOnly=isfield(model,'compactInitialization') && model.compactInitialization;
     circulationSign=0;
-    if physicalOnly && model.target(4)>0
+    if physicalOnly
         parameters=localFieldParameters(data,1,speed);
         [~,initialField]=predictiveSafetyGeometry.circulationField(model.initialState,data.target(:,1),cfg,parameters);
         forward=predictiveSafetyGeometry.direction(model.initialState(3));
         alignment=forward.'*initialField.rotation*initialField.tangent;
         circulationSign=sign(alignment);
-        if abs(alignment)<1e-8,circulationSign=1;end
+        % A stationary collinear obstacle can admit straight braking; do
+        % not inject a transverse turn when neither tangent faces forward.
+        if abs(alignment)<1e-8,circulationSign=double(model.target(4)>0);end
     end
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1), ...
