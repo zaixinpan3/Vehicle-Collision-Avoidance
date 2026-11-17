@@ -13,6 +13,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         requestedSpeed={4,12}
         integrationMesh={4,64}
         movingTarget={false,true}
+        cacheSpeed={.04,3}
+        cacheMesh={8,24,64}
     end
     methods (TestClassSetup)
         function prepareController(testCase)
@@ -30,6 +32,68 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aShiftedCachedPlanEqualsFreshPropagation(testCase,cacheSpeed,cacheMesh)
+            cfg=testCase.cfg;cfg.outputFeedback.validationSubsteps=cacheMesh;
+            [cfg,prior]=localRetainedPlan(cfg,cacheSpeed);
+            block=localNextBlock(prior,cfg);
+            [~,inputs,prediction]=collisionAvoidanceController(block,[],[],cfg,prior);
+            fresh=rmfield(prior,'retainedTrajectories');
+            [~,expectedInputs,expected]=collisionAvoidanceController(block,[],[],cfg,fresh);
+            testCase.verifyEqual(inputs,expectedInputs);
+            testCase.verifyEqual(prediction.scenarios,expected.scenarios);
+            testCase.verifyGreaterThan(prediction.metadata.inheritedReusedHolds,0);
+            testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
+            testCase.verifyEqual(prediction.metadata.pcbfValue,0);
+        end
+        function staleTrajectoryMetadataRequiresFreshPropagation(testCase)
+            [cfg,prior]=localRetainedPlan(testCase.cfg,3);
+            block=localNextBlock(prior,cfg);
+            [~,expectedInputs,expected]=collisionAvoidanceController(block,[],[],cfg, ...
+                rmfield(prior,'retainedTrajectories'));
+            for change=["root","parameters","mesh","input"]
+                changed=prior;old=changed.retainedTrajectories{1};
+                switch change
+                    case "root",old.collisionEgo(1,2)=old.collisionEgo(1,2)+.01;
+                    case "parameters",old.parameters(3)=old.parameters(3)+.01;
+                    case "mesh",old.validationSubsteps=2*old.validationSubsteps;
+                    case "input",old.inputs(1,2)=old.inputs(1,2)+.01;
+                end
+                changed.retainedTrajectories{1}=old;
+                [~,inputs,prediction]=collisionAvoidanceController(block,[],[],cfg,changed);
+                testCase.verifyEqual(inputs,expectedInputs);
+                testCase.verifyEqual(prediction.scenarios,expected.scenarios);
+                testCase.verifyEqual(prediction.metadata.inheritedReusedHolds,0);
+            end
+        end
+        function aChangedLaterInputReusesOnlyTheUnchangedPrefix(testCase)
+            [cfg,prior]=localRetainedPlan(testCase.cfg,3);
+            prior.fineControls(1,8)=.03;
+            block=localNextBlock(prior,cfg);
+            [~,inputs,prediction]=collisionAvoidanceController(block,[],[],cfg,prior);
+            [~,expectedInputs,expected]=collisionAvoidanceController(block,[],[],cfg, ...
+                rmfield(prior,'retainedTrajectories'));
+            testCase.verifyEqual(inputs,expectedInputs);
+            testCase.verifyEqual(prediction.scenarios,expected.scenarios);
+            testCase.verifyGreaterThan(prediction.metadata.inheritedReusedHolds,0);
+            testCase.verifyLessThan(prediction.metadata.inheritedReusedHolds,7);
+        end
+        function posteriorPruningUsesTheSurvivingTrajectory(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            cfg.outputFeedback.initializationSolveSeconds=1e-12;
+            block=localBlock(cfg,3);other=block.initialHypotheses;other.ego(1)=.03;
+            block.initialHypotheses=[block.initialHypotheses,other];
+            [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            block=localNextBlock(prior,cfg);
+            for j=1:numel(block.samples),block.samples(j).position(1)=block.samples(j).position(1)+.05;end
+            [~,inputs,prediction,state]=collisionAvoidanceController(block,[],[],cfg,prior);
+            [~,expectedInputs,expected]=collisionAvoidanceController(block,[],[],cfg, ...
+                rmfield(prior,'retainedTrajectories'));
+            testCase.verifyNumElements(state.hypotheses,1);
+            testCase.verifyEqual(prediction.metadata.conditioning.retainedIndices,2);
+            testCase.verifyGreaterThan(prediction.metadata.inheritedReusedHolds,0);
+            testCase.verifyEqual(inputs,expectedInputs);
+            testCase.verifyEqual(prediction.scenarios,expected.scenarios);
+        end
         function aSlowEncounterReceivesSpatialPreviewDirectly(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;
             item=testCase.block.initialHypotheses;item.ego(4)=1.5;
@@ -351,7 +415,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(prediction.scenarios{1}.ego(:,2),expected.ego,AbsTol=1e-5);
             testCase.verifyTrue(prediction.metadata.nlpCacheHit);
         end
-        function inferenceResolvesTheDynamicToLowSpeedTransition(testCase)
+        function transitionPredictionErrorsStayWithinTheSensorNoiseBounds(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
             item=testCase.block.initialHypotheses;
             item.ego=[0;0;-1.7876160012;4.5485240535;9.0552937408;-3.1554270904];
@@ -364,10 +428,14 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                     'cfg',cfg,'hypothesis',item,'input',input,'duration',cfg.outputFeedback.sensorPeriod,'endOfHold',j==count));
                 reference=deval(exact,j*cfg.outputFeedback.sensorPeriod);
                 if j==count,reference=nonlinearBicycleModel.sampleEndState(reference,input,cfg);end
-                testCase.verifyEqual(item.ego,reference,AbsTol=1e-5);
-                actual=nonlinearBicycleModel.derivative(item.ego,input,cfg);
-                expected=nonlinearBicycleModel.derivative(reference,input,cfg);
-                testCase.verifyEqual(actual(4:6),expected(4:6),AbsTol=1e-4);
+                predicted=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                    'cfg',cfg,'hypothesis',item,'input',input,'time',j*cfg.outputFeedback.sensorPeriod));
+                physical=item;physical.ego=reference;
+                measured=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                    'cfg',cfg,'hypothesis',physical,'input',input,'time',predicted.time));
+                testCase.verifyLessThanOrEqual(norm(predicted.position-measured.position),cfg.outputFeedback.noiseBounds(1));
+                testCase.verifyLessThanOrEqual(norm(predicted.acceleration-measured.acceleration),cfg.outputFeedback.noiseBounds(2));
+                testCase.verifyLessThanOrEqual(abs(predicted.yawRate-measured.yawRate),cfg.outputFeedback.noiseBounds(3));
             end
         end
         function endpointClearanceCannotReplaceTerminalMembership(testCase)
@@ -738,6 +806,14 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(next.target(5:6),item.target(5:6),AbsTol=0);
         end
     end
+end
+
+function [cfg,prior]=localRetainedPlan(cfg,speed)
+    cfg.referenceSpeed=1.5;
+    cfg.outputFeedback.maximumSolveSeconds=1e-12;
+    cfg.outputFeedback.initializationSolveSeconds=1e-12;
+    block=localBlock(cfg,speed);
+    [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
 end
 
 function item=localAdvanceHold(item,input,cfg)

@@ -3037,15 +3037,16 @@ function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold)
 end
 
 function next=localCompactInferenceFlow(x,u,parameters,cfg,duration)
-    % Use the fine acceptance resolution for the causal sensor update too.
-    % A coarse inference integrator can otherwise discard the true member
-    % because its acceleration prediction exceeds the declared noise bound.
+    % Match the fixed prediction/replay mesh so conditioned successor roots
+    % agree with the previously accepted held-input trajectory.
     persistent keys flows
     key={cfg,duration};index=[];
     for j=1:numel(keys),if isequaln(keys{j},key),index=j;break;end,end
     if isempty(index)
         import casadi.*
-        count=max(1,ceil(cfg.outputFeedback.validationSubsteps*duration/cfg.controller.sampleTime));dt=duration/count;
+        % Align integer sensor blocks with the held-input integration mesh.
+        requested=cfg.outputFeedback.validationSubsteps*duration/cfg.controller.sampleTime;
+        count=max(1,ceil(requested-8*eps(max(1,requested))));dt=duration/count;
         root=SX.sym('inference_state',6);command=SX.sym('inference_input',2);scale=SX.sym('inference_scale',4);
         k1=nonlinearBicycleModel.symbolicDerivative(root,command,scale,cfg);
         k2=nonlinearBicycleModel.symbolicDerivative(root+dt*k1/2,command,scale,cfg);
@@ -3836,6 +3837,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel);
     map=model.map;offset=model.offset;
     best=[];bestCost=Inf;bestTraces={};bestViolation=Inf;retained=false;validationSeconds=0;
+    inheritedReusedHolds=zeros(1,numel(hypotheses));
     rootTerminal=false;initializationSource="shiftedFinePlan";
     rootStates=[hypotheses.ego];atRest=all(rootStates(4:6,:)==0,'all');
     restartSearch=~initial && atRest && ...
@@ -3859,7 +3861,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     else
         extension=terminalSafeSet.compactControl(prior.fineControls(:,end),cfg);
         inherited=prior.fineControls(:,2:end);inherited=[inherited,repmat(extension,1,count-size(inherited,2))];
-        validationClock=tic;[valid,bestTraces,bestViolation]=localCompactValidate(inherited,hypotheses,previous,kernel,cfg,true);
+        validationClock=tic;
+        [shiftedCache,inheritedReusedHolds]=localCompactShiftedCache(prior,hypotheses,conditioning,inherited,kernel,cfg);
+        [valid,bestTraces,bestViolation]=localCompactValidate(inherited,hypotheses,previous,kernel,cfg,true,shiftedCache);
         validationSeconds=validationSeconds+toc(validationClock);
         if valid
             best=inherited;
@@ -4031,18 +4035,27 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     best=clipped;traces=bestTraces;violation=bestViolation;
     % Keep unfinished proposals separate from the accepted numerical iterate.
     runtimeTiming=struct('integrationSubsteps',kernel.integrationSubsteps,'sensitivitySubsteps',kernel.sensitivitySubsteps,'cost',timing);
+    retainedTrajectories=cell(1,numel(hypotheses));
+    for s=1:numel(hypotheses)
+        trace=traces{s};
+        retainedTrajectories{s}=struct('inputs',trace.inputs,'denseEgo',trace.denseEgo, ...
+            'collisionEgo',trace.collisionEgo,'validationSubsteps',kernel.validationSubsteps, ...
+            'parameters',hypotheses(s).parameters);
+    end
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v1",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
         'fineControls',best,'searchFineControls',reshape(lastIterate,2,nodes)*map.'+offset,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
         'deferredFineControls',deferred, ...
         'searchAtRest',atRest, ...
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
-        'pcbfDeficit',0,'stageDeficits',zeros(count,1),'runtimeTiming',runtimeTiming);
+        'pcbfDeficit',0,'stageDeficits',zeros(count,1),'runtimeTiming',runtimeTiming, ...
+        'retainedTrajectories',{retainedTrajectories});
     info=struct('solver',"condensedNonlinearPcbfSqp",'nlpStatus',string(exitFlag), ...
         'nlpConverged',exitFlag>0,'nlpIterations',iterationCount,'nlpSeconds',solveSeconds, ...
         'nlpAttempts',attempts,'nlpBuildSeconds',buildSeconds,'nlpCacheHit',cacheHit, ...
         'nlpVariables',nu+count,'nlpConstraints',2*count+numel(hypotheses), ...
         'informationUpdateSeconds',inferenceSeconds,'nonlinearValidationSeconds',validationSeconds, ...
+        'inheritedReusedHolds',sum(inheritedReusedHolds), ...
         'elapsedSeconds',toc(timer),'deadlineSeconds',h,'predictionWindow',window, ...
         'controlNodes',nodes,'horizonSteps',count,'initializationTrajectoryCount',1,'initializationSource',initializationSource, ...
         'fallbackUsed',retained,'retainedFinePlanUsed',retained && ~initial,'rootTerminalPlanUsed',retained && initial,'retainedTailRepaired',false, ...
@@ -4586,6 +4599,58 @@ function matches=localCompactCacheMatches(rollouts,inputs,hypotheses,previous,ke
         && isequal(previous,rollouts.previous) && isequaln(hypotheses,rollouts.hypotheses) ...
         && isequaln(cfg,rollouts.cfg) && isequal(kernel.holds,rollouts.holds) ...
         && kernel.integrationSubsteps==rollouts.integrationSubsteps;
+end
+
+function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,conditioning,inputs,kernel,cfg)
+    % Reuse only the identical suffix of the accepted numerical trajectory.
+    % Measurement conditioning may prune members, so use their retained indices.
+    cache=[];reusedHolds=zeros(1,numel(hypotheses));
+    if ~isfield(prior,'retainedTrajectories') || ~iscell(prior.retainedTrajectories),return;end
+    count=size(inputs,2);substeps=kernel.validationSubsteps;
+    cache=struct('hypotheses',hypotheses,'inputs',inputs,'previous',prior.appliedInput, ...
+        'cfg',cfg,'holds',kernel.holds,'integrationSubsteps',kernel.integrationSubsteps, ...
+        'trajectories',{cell(1,numel(hypotheses))});
+    for s=1:numel(hypotheses)
+        original=conditioning.retainedIndices(s);item=hypotheses(s);prefix=0;
+        if original<=numel(prior.retainedTrajectories)
+            old=prior.retainedTrajectories{original};
+            compatible=isstruct(old) && isscalar(old) && all(isfield(old, ...
+                {'inputs','denseEgo','collisionEgo','validationSubsteps','parameters'}));
+            if compatible
+                oldCount=size(old.inputs,2);
+                compatible=old.validationSubsteps==substeps && oldCount>=1 ...
+                    && isequal(size(old.inputs),[2,oldCount]) ...
+                    && isequal(size(old.collisionEgo),[6,oldCount+1]) ...
+                    && isequal(size(old.denseEgo),[6,substeps*oldCount+1]) ...
+                    && isequal(old.collisionEgo(:,2),item.ego) ...
+                    && isequal(old.parameters,item.parameters);
+            end
+            if compatible
+                prefix=min(count,oldCount-1);
+                mismatch=find(any(inputs(:,1:prefix)~=old.inputs(:,2:prefix+1),1),1);
+                if ~isempty(mismatch),prefix=mismatch-1;end
+            end
+        end
+        if prefix>0
+            dense=old.denseEgo(:,substeps+1:substeps*(prefix+1)+1);
+            % Dense samples precede the hold-end stop reset; the new root follows it.
+            dense(:,1)=item.ego;
+            ends=old.collisionEgo(:,3:prefix+2);root=ends(:,end);
+        else
+            dense=item.ego;ends=zeros(6,0);root=item.ego;
+        end
+        if prefix<count
+            remaining=count-prefix;capacity=kernel.capacity;
+            [points,states]=kernel.refinedRollout(root,[inputs(:,prefix+1:end),zeros(2,capacity-remaining)], ...
+                item.parameters,double((1:capacity)<=remaining));
+            points=full(points);states=full(states);
+            dense=[dense,points(:,1:substeps*remaining)];ends=[ends,states(:,1:remaining)];
+        end
+        reusedHolds(s)=prefix;
+        % Geometry, physical-domain constraints and terminal continuation are rechecked.
+        cache.trajectories{s}=struct('dense',dense,'states',ends(:,cumsum(kernel.holds)), ...
+            'collisionStates',[item.ego,ends],'backup',[]);
+    end
 end
 
 function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,rollouts,checkBudget)
