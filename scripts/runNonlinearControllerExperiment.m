@@ -9,7 +9,7 @@ function summaries = runNonlinearControllerExperiment(outputDirectory,options)
         options.Speeds (1,:) double = [8,8,8,8]
         options.Frames (1,1) double {mustBePositive,mustBeInteger,mustBeFinite} = 100
         options.MaximumIterations (1,1) double {mustBePositive,mustBeInteger} = 60
-        options.FrameBudgetSeconds (1,1) double {mustBePositive} = .06
+        options.FrameBudgetSeconds (1,1) double {mustBePositive}
         options.ControllerConfiguration (1,1) struct = struct()
     end
     assert(numel(options.Scenarios)==numel(options.Speeds));
@@ -17,7 +17,9 @@ function summaries = runNonlinearControllerExperiment(outputDirectory,options)
     cfg=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
     cfg.outputFeedback.qpMaximumIterations=options.MaximumIterations;
     cfg.outputFeedback.nlpMaximumIterations=options.MaximumIterations;
-    cfg.outputFeedback.maximumSolveSeconds=options.FrameBudgetSeconds;
+    if isfield(options,'FrameBudgetSeconds')
+        cfg.outputFeedback.maximumSolveSeconds=options.FrameBudgetSeconds;
+    end
     summaries=struct([]);
     for k=1:numel(options.Scenarios)
         folder=fullfile(outputDirectory,options.Scenarios(k));
