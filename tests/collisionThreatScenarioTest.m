@@ -17,6 +17,51 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function replayContinuesBelowPlanningClearanceUntilContact(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.WorkingFolderFixture());
+            % Coast into a stationary target to isolate the replay verdict
+            % from the optimizer, which would otherwise avoid this trajectory.
+            writelines(["function [command,info,prediction,state]=collisionAvoidanceController(varargin)"
+                "command=struct('actuatorInput',[0;0]);"
+                "info=[];prediction=struct('metadata',struct());"
+                "state=struct('memory',[],'hypotheses',[]);"
+                "end"],fullfile(folder.Folder,'collisionAvoidanceController.m'));
+            rehash;
+            [ego,target,~,cfg]=collisionThreatScenario("stoppedLead",struct('referenceSpeed',1.5));
+            gap=.2;
+            offset=[ego(1)+cfg.vehicle.length/2+target(8)+gap-target(1);0];
+            for frames=[2,4]
+                campaign=runJointOutputFeedbackScenario(Frames=frames,Speeds=1.5,Scenarios="stoppedLead", ...
+                    ControllerConfiguration=struct('outputFeedback',struct('method',"sqpRti")), ...
+                    TargetPositionOffsetMeters=offset,Warmup=false,OutputDirectory=string(folder.Folder));
+                result=campaign.results;
+                testCase.verifyFalse(result.nodeClearanceSatisfied);
+                if frames==2
+                    testCase.verifyEqual(result.outcome,"completed");
+                    testCase.verifyEqual(result.executedFrames,2);
+                    testCase.verifyFalse(result.nodeCollisionDetected);
+                    testCase.verifyGreaterThan(result.minimumNodeClearanceMeters,0);
+                else
+                    testCase.verifyEqual(result.failurePhase,"replaySafety");
+                    testCase.verifyEqual(result.executedFrames,3);
+                    testCase.verifyTrue(result.nodeCollisionDetected);
+                end
+            end
+        end
+
+        function initialOverlapIsReportedBeforeControllerAdmission(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            [ego,target]=collisionThreatScenario("stoppedLead");
+            campaign=runJointOutputFeedbackScenario(Frames=1,Speeds=1.5,Scenarios="stoppedLead", ...
+                ControllerConfiguration=struct('outputFeedback',struct('method',"sqpRti")), ...
+                TargetPositionOffsetMeters=ego(1:2)-target(1:2),OutputDirectory=string(folder.Folder));
+            result=campaign.results;
+            testCase.verifyTrue(result.initialContactOrOverlap);
+            testCase.verifyTrue(result.nodeCollisionDetected);
+            testCase.verifyEqual(result.failurePhase,"replaySafety");
+            testCase.verifyEqual(result.timing.calls,0);
+        end
+
         function crossingsLeaveReactionTimeButStillIntersectCruise(testCase,crossingScenario,crossingSpeed)
             [~,q,road,cfg,impactTime]=collisionThreatScenario(crossingScenario, ...
                 struct('referenceSpeed',crossingSpeed));

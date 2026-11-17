@@ -46,7 +46,7 @@ function campaign = runJointOutputFeedbackScenario(options)
             % Startup-only virtual sensor replay warms both initialization
             % and continuation branches; no warmup command reaches the plant.
             warmupSeconds=0;warmupHolds=0;warmupFailure="";
-            if options.Warmup
+            if options.Warmup && initialClearance>0
                 warmupTimer=tic;warmupTruth=truth;warmupBlock=block;warmupState=[];
                 warmupStream=RandStream('mt19937ar','Seed',options.RandomSeed);
                 for warmup=1:4
@@ -71,6 +71,11 @@ function campaign = runJointOutputFeedbackScenario(options)
             trace=struct([]);failure="";failurePhase="";minimumClearance=Inf;minimumNodeClearance=Inf;failureCallSeconds=0;
             callSeconds=zeros(1,options.Frames);callCount=0;
             for frame=1:options.Frames
+                if frame==1 && initialClearance<=0
+                    minimumNodeClearance=initialClearance;
+                    failurePhase="replaySafety";
+                    failure="The vehicle footprints touched or overlapped at the initial node.";break;
+                end
                 callTimer=tic;
                 try
                     [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
@@ -101,9 +106,10 @@ function campaign = runJointOutputFeedbackScenario(options)
                     'rawSensorBlock',samples);
                 if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 time=time+cfg.controller.sampleTime;
-                if nodeClearance<cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance
+                % Positive clearance below the planning margin is diagnostic.
+                if nodeClearance<=0
                     failurePhase="replaySafety";
-                    failure="The independent plant replay violated clearance at a control-boundary node.";break;
+                    failure="The vehicle footprints touched or overlapped at a control-boundary node.";break;
                 end
                 block=struct('kind',"jointSensorBlock-v1",'time',time,'heldInput',input,'samples',samples);
             end
@@ -118,7 +124,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'collisionCheckScope',"controlBoundaryNodes", ...
                 'minimumNodeClearanceMeters',minimumNodeClearance, ...
                 'nodeClearanceSatisfied',~isempty(trace)&&minimumNodeClearance>=cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance, ...
-                'nodeCollisionDetected',~isempty(trace)&&minimumNodeClearance<=0, ...
+                'nodeCollisionDetected',minimumNodeClearance<=0, ...
                 'sampledSafetyEvaluated',~isempty(trace), ...
                 'sampledClearanceSatisfied',~isempty(trace)&&minimumClearance>=cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance, ...
                 'sampledCollisionDetected',~isempty(trace)&&minimumClearance<=0, ...
