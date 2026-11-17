@@ -1,5 +1,5 @@
 classdef compactPredictiveControlTest < matlab.unittest.TestCase
-    % Direct-input planning with fixed inference and dense policy replay.
+    % Direct-input planning with one fixed flow and checked SQP proposals.
     properties (Access=private)
         cfg
         block
@@ -43,7 +43,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function neutralRestExposesTheOneSidedStartingDirection(testCase,integrationMesh)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;
-            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            cfg.outputFeedback.validationSubsteps=integrationMesh;
             item=testCase.block.initialHypotheses;item.ego=zeros(6,1);item.target=[];
             request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
                 'hypotheses',item,'input',zeros(2,1),'holds',[1,2,2],'inputs',zeros(2,3));
@@ -53,6 +53,23 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThan(sum(value.costGradient(2:2:end)),0);
             testCase.verifyEqual(sum(value.costGradient(2:2:end)), ...
                 (moved.cost-value.cost)/step,AbsTol=1e-5);
+        end
+        function legacyIntegrationHistoryCannotChangeTheContinuation(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=3;cfg.outputFeedback.nlpJit=true;
+            cfg.outputFeedback.maximumSolveSeconds=2;cfg.outputFeedback.nlpMaximumIterations=1;
+            block=localBlock(cfg,2);
+            [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            block=localNextBlock(prior,cfg);
+            prior.requiresFineIntegration=false;
+            [~,first,firstPrediction]=collisionAvoidanceController(block,[],[],cfg,prior);
+            prior.requiresFineIntegration=true;
+            [~,second,secondPrediction,state]=collisionAvoidanceController(block,[],[],cfg,prior);
+            testCase.verifyEqual(second,first,AbsTol=1e-12);
+            testCase.verifyEqual(secondPrediction.scenarios{1}.collisionEgo, ...
+                firstPrediction.scenarios{1}.collisionEgo,AbsTol=1e-12);
+            testCase.verifyTrue(secondPrediction.scenarios{1}.terminal.member);
+            testCase.verifyEqual(secondPrediction.metadata.pcbfValue,0);
+            testCase.verifyFalse(isfield(state,'requiresFineIntegration'));
         end
         function aSafeContinuationCannotLosePerformanceToCompression(testCase)
             block=localNextBlock(testCase.state,testCase.cfg);
@@ -260,7 +277,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function finiteActuatorRatesRemainBoundedInBothDirections(testCase,requestedSpeed,integrationMesh)
             cfg=testCase.cfg;cfg.referenceSpeed=requestedSpeed;
-            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            cfg.outputFeedback.validationSubsteps=integrationMesh;
             cfg.outputFeedback.steeringRateMaximum=1;
             cfg.model.brakingRatioRateMaximum=.8;
             block=localBlock(cfg,8);
@@ -486,7 +503,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function condensedGradientsDifferentiateTheActualConstraintValues(testCase,integrationMesh)
             cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
-            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            cfg.outputFeedback.validationSubsteps=integrationMesh;
             item=testCase.block.initialHypotheses;item.ego=[0;0;.12;4;.1;.03];
             item.target=[8;3;.8;2;0;.04;1.6;2.4;.95;0;0];
             request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
@@ -502,9 +519,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(gradient,difference,AbsTol=2e-4);
             testCase.verifyEqual(value.costGradient.'*direction,(p.cost-m.cost)/(2*step),AbsTol=2e-4);
         end
-        function finePredictionsAgreeWithFreshReplayAcrossFrames(testCase,movingTarget)
+        function predictionsAgreeWithFreshReplayAcrossFrames(testCase,movingTarget)
             cfg=testCase.cfg;cfg.referenceSpeed=3;cfg.outputFeedback.nlpJit=true;
-            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/cfg.outputFeedback.validationSubsteps;
             block=localBlock(cfg,2);item=block.initialHypotheses;
             if movingTarget,item.target=[35;15;pi/2;2;0;.04;1.6;2.4;.95;0;0];end
             block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
@@ -531,7 +547,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function nonuniformInputKnotsPreserveDirectionalDerivatives(testCase,integrationMesh,movingTarget)
             cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
-            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            cfg.outputFeedback.validationSubsteps=integrationMesh;
             item=testCase.block.initialHypotheses;item.ego=[0;0;.12;3.3;.08;.03];
             item.target=[];
             if movingTarget,item.target=[12;4;.8;2;0;.04;1.6;2.4;.95;0;0];end
@@ -557,7 +573,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             root=fileparts(fileparts(mfilename('fullpath')));
             testCase.assumeTrue(isfile(fullfile(root,'solver','controller',['condensedSensitivityKernelMex.',mexext])), ...
                 'Run buildControllerKernels to test the optional native sensitivity implementation.');
-            cfg=testCase.cfg;cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            cfg=testCase.cfg;cfg.outputFeedback.validationSubsteps=integrationMesh;
             item=testCase.block.initialHypotheses;item.ego=[0;0;.12;3.3;.08;.03];item.target=[];
             if movingTarget,item.target=[12;4;.8;2;0;.04;1.6;2.4;.95;0;0];end
             other=item;other.ego(2)=other.ego(2)+.03;other.parameters(3:4)=.98;
@@ -579,7 +595,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function denseStopSamplesKeepTheirPreResetSensitivity(testCase,integrationMesh)
             cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
-            cfg.nonlinear.integrationStep=cfg.controller.sampleTime/integrationMesh;
+            cfg.outputFeedback.validationSubsteps=integrationMesh;
             item=testCase.block.initialHypotheses;item.ego=[0;0;0;.051;0;0];
             item.target=[8;3;.7;2;0;.02;1.6;2.4;.95;0;0];input=[0;-.1];
             stopped=solvePredictiveControl('outputFeedback',struct('operation',"advance",'cfg',cfg, ...

@@ -2833,8 +2833,7 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
             stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
             reference=[-1000,0;1000,0];if isfield(request,'reference'),reference=request.reference;end
             [~,lane]=readControllerInputs(stub,[],reference,cfg);
-            count=max(round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod),nonlinearBicycleModel.meshCount(cfg));
-            kernel=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target),count);
+            kernel=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target));
             model=localCondensedModel(cfg,hypotheses,request.input,holds,lane,nominal,kernel);
             [~,rollouts]=localCondensedOracle(controls(:),model,false);
             result=localCondensedOracle(controls(:),model,true,rollouts);
@@ -3829,12 +3828,9 @@ end
 function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning,window,holds,lane,nominal,timer,inferenceSeconds)
     persistent qpOptions
     if isempty(qpOptions),qpOptions=optimoptions('quadprog','Algorithm','active-set','Display','off','MaxIterations',200);end
-    clock=tic;integrationCount=max(round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod),nonlinearBicycleModel.meshCount(cfg));
-    if ~isempty(request.previousState) && isfield(request.previousState,'requiresFineIntegration') && request.previousState.requiresFineIntegration
-        integrationCount=cfg.outputFeedback.validationSubsteps;
-    end
-    [kernel,cacheHit]=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target),integrationCount);
-    [fineKernel,fineCacheHit]=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target));buildSeconds=toc(clock);
+    % One fixed nonlinear flow is shared by inference, optimization and replay.
+    % Only its SQP sensitivity approximation uses a cheaper integration mesh.
+    clock=tic;[kernel,cacheHit]=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target));buildSeconds=toc(clock);
     count=sum(holds);nodes=numel(holds);nu=2*nodes;previous=request.block.heldInput;prior=request.previousState;
     initial=isempty(prior);h=cfg.controller.sampleTime;boundaries=[0,cumsum(holds)];
     model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel);
@@ -3848,13 +3844,13 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         validationClock=tic;rootTerminal=true;
         for s=1:numel(hypotheses)
             item=hypotheses(s);
-            [value,~]=localCompactTerminalCheck(item.ego,item.target,previous,item.parameters,fineKernel,cfg);
+            [value,~]=localCompactTerminalCheck(item.ego,item.target,previous,item.parameters,kernel,cfg);
             if value>1e-6,rootTerminal=false;break;end
         end
         validationSeconds=validationSeconds+toc(validationClock);
         if rootTerminal
             inherited=repmat(terminalSafeSet.compactControl(previous,cfg),1,count);
-            validationClock=tic;[valid,bestTraces,bestViolation]=localCompactValidate(inherited,hypotheses,previous,fineKernel,cfg,true);
+            validationClock=tic;[valid,bestTraces,bestViolation]=localCompactValidate(inherited,hypotheses,previous,kernel,cfg,true);
             validationSeconds=validationSeconds+toc(validationClock);
             if valid,best=inherited;retained=true;end
         end
@@ -3863,7 +3859,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     else
         extension=terminalSafeSet.compactControl(prior.fineControls(:,end),cfg);
         inherited=prior.fineControls(:,2:end);inherited=[inherited,repmat(extension,1,count-size(inherited,2))];
-        validationClock=tic;[valid,bestTraces,bestViolation]=localCompactValidate(inherited,hypotheses,previous,fineKernel,cfg,true);
+        validationClock=tic;[valid,bestTraces,bestViolation]=localCompactValidate(inherited,hypotheses,previous,kernel,cfg,true);
         validationSeconds=validationSeconds+toc(validationClock);
         if valid
             best=inherited;
@@ -3893,14 +3889,15 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     % Compilation is startup preparation, never a warmed online exemption.
     startupBuildSeconds=0;
-    if initial && (~cacheHit || ~fineCacheHit),startupBuildSeconds=buildSeconds;end
+    if initial && ~cacheHit,startupBuildSeconds=buildSeconds;end
     budget=budget+startupBuildSeconds;completionReserve=.002;
     timing=struct('values',NaN,'gradient',NaN,'fullGradient',NaN,'validation',NaN,'cachedValidation',NaN,'qp',NaN);
     workUnits=numel(hypotheses)*count;
-    if ~initial && isfield(prior,'runtimeTiming') && prior.runtimeTiming.integrationSubsteps==kernel.integrationSubsteps
+    if ~initial && isfield(prior,'runtimeTiming') && prior.runtimeTiming.integrationSubsteps==kernel.integrationSubsteps ...
+            && isfield(prior.runtimeTiming,'sensitivitySubsteps') && prior.runtimeTiming.sensitivitySubsteps==kernel.sensitivitySubsteps
         timing=prior.runtimeTiming.cost;
     end
-    baselineValidationSeconds=validationSeconds;timingIntegrationSubsteps=kernel.integrationSubsteps;
+    baselineValidationSeconds=validationSeconds;
     budgetStopped=false;budgetStopPhase="";rollouts=[];reuseCount=0;
     if ~isempty(best)
         bestCost=localCompactPerformance(bestTraces{nominal}.ego(:,2:end),best,model);
@@ -3909,7 +3906,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     [a,b]=localCondensedInputRows(previous,holds,cfg);lower=repmat([-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)],nodes,1);
     upper=repmat([cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],nodes,1);
     lastIterate=controls(:);
-    cacheU=[];checkedU=[];cache=[];calls=0;phase=1;needsRefinement=false;solveClock=tic;
+    cacheU=[];checkedU=[];cache=[];calls=0;phase=1;solveClock=tic;
     initialDeficit=NaN;initialTerminal=NaN;restoration=isempty(best);
     iterationCount=0;phaseIterations=0;exitFlag=0;attempts=0;performanceSteps=0;partialQpSteps=0;
     deferred=zeros(2,0);activeTrial=[];deferredAccepted=false;
@@ -3955,10 +3952,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             'StepTolerance',1e-9,'MaxIterations',cfg.outputFeedback.restorationMaximumIterations, ...
             'MaxFunctionEvaluations',10000,'OutputFcn',@progress);
     end
-    while isempty(best) && ~budgetStopped && (attempts==0 || needsRefinement)
+    if isempty(best) && ~budgetStopped
         attempts=attempts+1;phaseIterations=0;
         try
-            if needsRefinement,model.kernel=fineKernel;cacheU=[];needsRefinement=false;evaluation=evaluate(controls(:));end
             z=[controls(:);max(0,evaluation.stage)];
             [z,~,exitFlag,output]=fmincon(@objective,z,[a,zeros(size(a,1),count)],b,[],[], ...
                 [lower;zeros(count,1)],[upper;Inf(count,1)],@constraints,options);
@@ -3967,14 +3963,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
             exitFlag=-1;iterationCount=iterationCount+phaseIterations;controls=reshape(lastIterate,2,nodes);
         end
-        if toc(timer)>=budget,break;end
     end
     % A checked zero-deficit plan attains the global lower bound of the PCBF
     % primary objective. Only then may performance replace the stored plan.
     while ~isempty(best) && ~budgetStopped && toc(timer)<budget-completionReserve && iterationCount<cfg.outputFeedback.nlpMaximumIterations
-        if needsRefinement
-            model.kernel=fineKernel;cacheU=[];needsRefinement=false;
-        end
         phase=2;attempts=attempts+1;phaseIterations=0;
         try
             e=evaluate(lastIterate);c=[e.stage;e.forward;e.terminal];
@@ -4032,21 +4024,20 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     % normalization that actually changes a command needs another replay.
     solveSeconds=toc(solveClock);clipped=localCompactRateLimit(best,previous,ones(1,count),cfg);
     if ~isequal(clipped,best)
-        validationClock=tic;[valid,bestTraces,bestViolation]=localCompactValidate(clipped,hypotheses,previous,fineKernel,cfg,true);
+        validationClock=tic;[valid,bestTraces,bestViolation]=localCompactValidate(clipped,hypotheses,previous,kernel,cfg,true);
         validationSeconds=validationSeconds+toc(validationClock);
         assert(valid,'collisionAvoidanceController:compactNoFeasiblePlan','Final condensed-plan replay failed.');
     end
     best=clipped;traces=bestTraces;violation=bestViolation;
     % Keep unfinished proposals separate from the accepted numerical iterate.
-    runtimeTiming=struct('integrationSubsteps',model.kernel.integrationSubsteps,'cost',timing);
+    runtimeTiming=struct('integrationSubsteps',kernel.integrationSubsteps,'sensitivitySubsteps',kernel.sensitivitySubsteps,'cost',timing);
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v1",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
         'fineControls',best,'searchFineControls',reshape(lastIterate,2,nodes)*map.'+offset,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
         'deferredFineControls',deferred, ...
         'searchAtRest',atRest, ...
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
-        'pcbfDeficit',0,'stageDeficits',zeros(count,1),'runtimeTiming',runtimeTiming, ...
-        'requiresFineIntegration',needsRefinement || model.kernel.integrationSubsteps==fineKernel.integrationSubsteps);
+        'pcbfDeficit',0,'stageDeficits',zeros(count,1),'runtimeTiming',runtimeTiming);
     info=struct('solver',"condensedNonlinearPcbfSqp",'nlpStatus',string(exitFlag), ...
         'nlpConverged',exitFlag>0,'nlpIterations',iterationCount,'nlpSeconds',solveSeconds, ...
         'nlpAttempts',attempts,'nlpBuildSeconds',buildSeconds,'nlpCacheHit',cacheHit, ...
@@ -4057,7 +4048,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'fallbackUsed',retained,'retainedFinePlanUsed',retained && ~initial,'rootTerminalPlanUsed',retained && initial,'retainedTailRepaired',false, ...
         'restorationAttempted',restoration,'initialRestorationSlack',initialDeficit, ...
         'initialNlpViolation',max(0,initialTerminal),'finalRestorationSlack',0, ...
-        'validationSubsteps',kernel.validationSubsteps,'nonlinearValidationPerformed',true, ...
+        'validationSubsteps',kernel.validationSubsteps,'sensitivitySubsteps',kernel.sensitivitySubsteps,'nonlinearValidationPerformed',true, ...
         'maximumConstraintViolation',violation,'scenarioCount',numel(hypotheses), ...
         'activeScenarioCount',numel(hypotheses),'hypothesisCount',numel(hypotheses),'memoryDimension',0, ...
         'conditioning',conditioning,'terminalSetEnforced',true,'terminalSafetyAssumed',true, ...
@@ -4101,12 +4092,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 candidate=reshape(u,2,nodes)*map.'+offset;
                 candidate=localCompactRateLimit(candidate,previous,ones(1,count),cfg);
                 validationKind="validation";
-                if localCompactCacheMatches(rollouts,candidate,hypotheses,previous,fineKernel,cfg),validationKind="cachedValidation";end
+                if localCompactCacheMatches(rollouts,candidate,hypotheses,previous,kernel,cfg),validationKind="cachedValidation";end
                 requireBudget(validationKind);checkedU=u;
-                validationClock=tic;[feasible,candidateTraces,candidateViolation]=localCompactValidate(candidate,hypotheses,previous,fineKernel,cfg,true,rollouts,@checkClock);
+                validationClock=tic;[feasible,candidateTraces,candidateViolation]=localCompactValidate(candidate,hypotheses,previous,kernel,cfg,true,rollouts,@checkClock);
                 validationElapsed=toc(validationClock);recordCost(validationKind,validationElapsed);
                 validationSeconds=validationSeconds+validationElapsed;
-                needsRefinement=~feasible && model.kernel.integrationSubsteps<fineKernel.integrationSubsteps;
                 if feasible
                     candidateCost=localCompactPerformance(candidateTraces{nominal}.ego(:,2:end),candidate,model);
                     feasible=candidateCost<bestCost;
@@ -4119,10 +4109,6 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         e=cache;
     end
     function estimate=estimatedCost(kind)
-        if timingIntegrationSubsteps~=model.kernel.integrationSubsteps
-            names=fieldnames(timing);for j=1:numel(names),timing.(names{j})=NaN;end
-            timingIntegrationSubsteps=model.kernel.integrationSubsteps;
-        end
         estimate=timing.(kind)*workUnits;
         if ~isfinite(estimate)
             base=max(.001,baselineValidationSeconds);
@@ -4169,7 +4155,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     function stop=progress(z,values,status)
         if strcmp(status,'iter') || strcmp(status,'init'),lastIterate=z(1:nu);phaseIterations=values.iteration;end
-        stop=budgetStopped || toc(timer)>=budget-completionReserve || needsRefinement || (phase==1 && ~isempty(best));
+        stop=budgetStopped || toc(timer)>=budget-completionReserve || (phase==1 && ~isempty(best));
     end
 end
 
@@ -4211,12 +4197,9 @@ function [a,b]=localCondensedInputRows(previous,holds,cfg)
 
 end
 
-function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
+function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     persistent keys kernels
-    if nargin<4,integrationCount=cfg.outputFeedback.validationSubsteps;end
-    integrationCount=min(cfg.outputFeedback.validationSubsteps,integrationCount);
-    if mod(cfg.outputFeedback.validationSubsteps,integrationCount)~=0,integrationCount=cfg.outputFeedback.validationSubsteps;end
-    key={cfg,numel(holds),integrationCount};hit=false;
+    key={cfg,numel(holds)};hit=false;
     for k=1:numel(keys)
         if isequaln(key,keys{k})&&sum(holds)<=sum(kernels{k}.capacity)
             kernel=kernels{k};kernel.holds=holds;hit=true;return;
@@ -4227,7 +4210,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     maximumSpeed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum);
     maximumCount=ceil(max(of.minimumPreviewSeconds,maximumSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds)/h);
     capacity=max(sum(holds),maximumCount);K=of.validationSubsteps;
-    M=integrationCount;D=K/M;dt=h/M;
+    M=K;D=1;dt=h/M;
     x=SX.sym('x',6);u=SX.sym('u',2);p=SX.sym('p',4);fraction=SX.sym('fraction',5);
     k1=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);
     k2=nonlinearBicycleModel.symbolicDerivative(x+dt*k1/2,u,p,cfg);
@@ -4253,6 +4236,14 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     hold=Function('pcbf_hold',{root,command,parameters},{finish,points});
     % RK4 continuous extension supplies dense physical-domain samples and
     % their derivatives without an additional integration at every sample.
+    % This is an approximate SQP Jacobian, not a second trajectory model.
+    % The nonlinear oracle and acceptance gate always use the flow above.
+    M=min(K,max(4,round(h/of.sensorPeriod)));D=K/M;dt=h/M;
+    k1=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);
+    k2=nonlinearBicycleModel.symbolicDerivative(x+dt*k1/2,u,p,cfg);
+    k3=nonlinearBicycleModel.symbolicDerivative(x+dt*k2/2,u,p,cfg);
+    k4=nonlinearBicycleModel.symbolicDerivative(x+dt*k3,u,p,cfg);
+    next=x+dt*(k1+2*k2+2*k3+k4)/6;
     sensitivity=SX.sym('sensitivity',6,8);
     updated=jacobian(next,x)*sensitivity+[SX.zeros(6,6),jacobian(next,u)];
     index=MX.sym('index',5);initialSensitivity=DM([eye(6),zeros(6,2)]);
@@ -4297,7 +4288,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,integrationCount)
     [ends,points]=mapped(root,inputs,repmat(scale,1,capacity),enabled);
     rollout=Function('pcbf_rollout',{root,inputs,scale,enabled},{points,ends},options);
     kernel=struct('refinedRollout',rollout,'sensitivity',derivative,'capacity',capacity, ...
-        'holds',holds,'validationSubsteps',K,'integrationSubsteps',M,'hasTarget',hasTarget);
+        'holds',holds,'validationSubsteps',K,'integrationSubsteps',K,'sensitivitySubsteps',M,'hasTarget',hasTarget);
     keys{end+1}=key;kernels{end+1}=kernel;
 end
 
