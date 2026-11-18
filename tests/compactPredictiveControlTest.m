@@ -32,6 +32,27 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function sensorBlockPropagationPreservesEachSurvivingHypothesis(testCase)
+            cfg=testCase.cfg;
+            cfg.outputFeedback.noiseBounds=[.1;1;.1;.1];
+            first=testCase.block.initialHypotheses;
+            first.target=[12;3;pi/2;2;0;.01;1.6;2.4;.95;0;0];
+            second=first;second.parameters=[.98;1;1.02;1];
+            displaced=first;displaced.target(1)=displaced.target(1)+1;
+            input=[.03;-.12];
+            prior=struct('time',0,'appliedInput',input,'hypotheses',[first,displaced,second]);
+            for samplesPerHold=[2,4]
+                cfg.outputFeedback.sensorPeriod=cfg.controller.sampleTime/samplesPerHold;
+                block=localNextBlock(prior,cfg);
+                for j=2:samplesPerHold,block.samples(j).radarAvailable=false;end
+                [posterior,info]=solvePredictiveControl('outputFeedback',struct('operation',"condition", ...
+                    'cfg',cfg,'hypotheses',prior.hypotheses,'block',block,'initial',false));
+                expected=[localAdvanceHold(first,input,cfg),localAdvanceHold(second,input,cfg)];
+                testCase.verifyEqual(info.retainedIndices,[1,3]);
+                testCase.verifyEqual(posterior,expected);
+                testCase.verifyNotEqual(posterior(1).ego,posterior(2).ego);
+            end
+        end
         function aShiftedCachedPlanEqualsFreshPropagation(testCase,cacheSpeed,cacheMesh)
             cfg=testCase.cfg;cfg.outputFeedback.validationSubsteps=cacheMesh;
             [cfg,prior]=localRetainedPlan(cfg,cacheSpeed);

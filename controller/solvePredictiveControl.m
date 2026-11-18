@@ -3019,12 +3019,14 @@ function cfg = localOfPhysicalConfiguration(hypothesis,cfg)
     cfg.tire.frictionCoefficient=cfg.tire.frictionCoefficient.*hypothesis.parameters(3:4);
 end
 
-function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold)
-    physical=localOfPhysicalConfiguration(hypothesis,cfg);next=hypothesis;
-    if string(cfg.outputFeedback.method)=="compactNlp"
-        next.ego=localCompactInferenceFlow(hypothesis.ego,input,hypothesis.parameters,cfg,duration);
+function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold,flow)
+    if nargin<6,flow=localOfInferenceKernel(cfg,duration);end
+    next=hypothesis;
+    if ~isempty(flow)
+        next.ego=full(flow(hypothesis.ego,input,hypothesis.parameters));
         if endOfHold,next.ego=nonlinearBicycleModel.sampleEndState(next.ego,input,cfg);end
     else
+        physical=localOfPhysicalConfiguration(hypothesis,cfg);
         next.ego=nonlinearBicycleModel.sensorFlow(hypothesis.ego,input,physical,duration,endOfHold);
     end
     if ~isempty(hypothesis.target) && hypothesis.target(4)>0
@@ -3034,10 +3036,11 @@ function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold)
     % V=0 is an absorbing mode, including when latent A was nonzero.
 end
 
-function next=localCompactInferenceFlow(x,u,parameters,cfg,duration)
+function flow=localOfInferenceKernel(cfg,duration)
     % Match the fixed prediction/replay mesh so conditioned successor roots
     % agree with the previously accepted held-input trajectory.
     persistent keys flows
+    if string(cfg.outputFeedback.method)~="compactNlp",flow=[];return;end
     key={cfg,duration};index=[];
     for j=1:numel(keys),if isequaln(keys{j},key),index=j;break;end,end
     if isempty(index)
@@ -3062,7 +3065,7 @@ function next=localCompactInferenceFlow(x,u,parameters,cfg,duration)
         states=mapped(root,repmat(command,1,count),repmat(scale,1,count));
         flows{end+1}=Function('pcbf_inference',{root,command,scale},{states(:,end)});keys{end+1}=key;index=numel(keys);
     end
-    next=full(flows{index}(x,u,parameters));
+    flow=flows{index};
 end
 
 function y = localOfSensor(hypothesis,input,cfg,time)
@@ -3086,11 +3089,14 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
     keep=false(1,numel(hypotheses));residual=Inf(numel(hypotheses),1);
     next=hypotheses;bounds=cfg.outputFeedback.noiseBounds;
     tolerance=1e-9; % Numerical measurement comparison only; not extra noise.
+    % The sensor mesh and model are shared; the persistent physical
+    % parameters remain separate arguments for each hypothesis.
+    if ~initial,flow=localOfInferenceKernel(cfg,cfg.outputFeedback.sensorPeriod);end
     for s=1:numel(hypotheses)
         item=hypotheses(s);excess=-Inf;
         for j=1:numel(block.samples)
             if ~initial
-                item=localOfAdvance(item,block.heldInput,cfg,cfg.outputFeedback.sensorPeriod,j==numel(block.samples));
+                item=localOfAdvance(item,block.heldInput,cfg,cfg.outputFeedback.sensorPeriod,j==numel(block.samples),flow);
             end
             measured=block.samples(j);
             expected=localOfSensor(item,block.heldInput,cfg,measured.time);
