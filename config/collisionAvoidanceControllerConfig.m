@@ -15,6 +15,11 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
         if ~isstruct(userCfg) || ~isscalar(userCfg)
             localInvalid('The override must be a scalar structure.');
         end
+        % Saved configurations may still contain the retired secondary deadline.
+        if isfield(userCfg,'outputFeedback') && isstruct(userCfg.outputFeedback) ...
+                && isfield(userCfg.outputFeedback,'recoverySolveSeconds')
+            userCfg.outputFeedback=rmfield(userCfg.outputFeedback,'recoverySolveSeconds');
+        end
         cfg=localMerge(cfg,userCfg);
     end
     try
@@ -60,12 +65,12 @@ function cfg=localDefaults()
         'inputWeight',.1,'trackingWeights',[.02;.2;2;.1;.1], ...
         'finiteDifferenceStep',1e-5,'predictionSubsteps',2, ...
         'maximumHypotheses',64,'smoothAbsoluteValue',1e-6, ...
-        'maximumSolveSeconds',.03,'initializationSolveSeconds',2,'recoverySolveSeconds',.6, ...
+        'maximumSolveSeconds',.03,'initializationSolveSeconds',2, ...
         'qpMaximumIterations',60, ...
         'controlNodes',24,'nearControlNodes',4,'planningBufferMeters',0,'minimumPreviewSeconds',3, ...
         'validationSubsteps',8); % Fixed integration/domain mesh; collision nodes are control boundaries.
     % Compact maximumSolveSeconds covers the whole warmed controller call.
-    % Initialization and recovery have their own budgets; none is a WCET bound.
+    % Only initialization has a separate budget. Both are soft search deadlines.
     % The transverse penalty permits a passing detour while the fixed speed
     % reference continues to penalize waiting; the cruise path stays fixed.
     % A finite steering-rate bound requires an explicitly supplied actuator contract.
@@ -259,7 +264,6 @@ function localValidate(cfg)
     validateattributes(of.steeringRateMaximum,{'double'},{'scalar','real','nonnan','positive'});
     validateattributes(of.maximumSolveSeconds,{'double'},{'scalar','real','positive'});
     validateattributes(of.initializationSolveSeconds,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(of.recoverySolveSeconds,{'double'},{'scalar','real','finite','positive'});
     assert(of.backupBrakingRatio<1,'backupBrakingRatio must lie strictly between zero and one.');
     assert(of.steeringMaximum<pi/2,'steeringMaximum must be below pi/2.');
     for name=["memoryDimension","predictionSubsteps","qpMaximumIterations","maximumHypotheses"]

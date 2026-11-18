@@ -69,9 +69,8 @@ measurements include inference, preparation, solve and acceptance. The 100 ms
 mean-solve target is distinct from the configured 50 ms control period and
 from a worst-case deadline. The solver wall-time limit is not a hard interrupt.
 Simulation does not inject computation delay into the plant.
-`maximumSolveSeconds` limits one solver attempt. Additional attempts are
-allowed only when no checked plan is available, within
-`initializationSolveSeconds` or `recoverySolveSeconds`; their time is included.
+The compact controller uses `initializationSolveSeconds` for admission and
+`maximumSolveSeconds` for the search on every subsequent call.
 
 The 2026-11-07 baseline run used the command above, MATLAB R2026a, CasADi
 3.8.2, Clang `-O0`, and an AMD Ryzen 7 7800X3D. All 30 combinations completed

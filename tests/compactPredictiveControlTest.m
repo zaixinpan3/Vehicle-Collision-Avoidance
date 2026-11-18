@@ -210,6 +210,32 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             parked=solvePredictiveControl('outputFeedback',request);
             testCase.verifyLessThan(passing.cost,parked.cost);
         end
+        function rejectedExtensionRetainsTheMovingSuffixAtItsOwnEndpoint(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            campaign=runJointOutputFeedbackScenario(Frames=18,Speeds=8,Scenarios="hardBrakingLead", ...
+                RandomSeed=20261107,OutputDirectory=string(folder.Folder), ...
+                ControllerConfiguration=struct('outputFeedback',struct('maximumSolveSeconds',1)));
+            testCase.assertEqual(campaign.results.outcome,"completed");
+            data=jsondecode(fileread(campaign.results.source));
+            current=data.trace(17).metadata;prior=data.trace(16).metadata;
+            testCase.verifyEqual(current.horizonSteps,prior.horizonSteps-1);
+            testCase.verifyEqual(current.predictionWindow.allocatedSeconds, ...
+                current.horizonSteps*data.configuration.controller.sampleTime);
+            testCase.verifyEqual(current.pcbfValue,0);
+            testCase.verifyLessThanOrEqual(current.terminalValue,data.configuration.outputFeedback.nlpTolerance);
+            testCase.verifyEqual(current.nlpAttempts,0);
+            testCase.verifyTrue(current.retainedFinePlanUsed);
+        end
+        function expiredContinuationCannotStartASecondSearchBudget(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            [~,~,~,prior]=collisionAvoidanceController(localBlock(cfg,3),[],[],cfg,[]);
+            block=localNextBlock(prior,cfg);
+            prior=rmfield(prior,'firstFeasibleDrivingPlan');
+            cfg.outputFeedback.recoverySolveSeconds=100;
+            prior.configuration.outputFeedback.recoverySolveSeconds=100;
+            testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,prior), ...
+                'collisionAvoidanceController:compactNoFeasiblePlan');
+        end
         function anExpiredAdmissionCannotDispatchTheTerminalBrake(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.initializationSolveSeconds=1e-12;
             block=localBlock(cfg,0);

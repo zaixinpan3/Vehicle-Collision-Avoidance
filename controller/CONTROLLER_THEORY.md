@@ -263,16 +263,17 @@ $N_{k-1}-1$ is the length of the unexecuted feasible suffix, which ends at
 the old terminal state. The preview may therefore shrink by one hold per
 decision as its current time requirement decreases; no terminal action is
 appended solely to preserve the previous horizon length. If the current
-preview requires a longer horizon, the driving extension must itself satisfy
-the executable constraints and end in the terminal set.
+preview requests a longer horizon, the driving extension must itself satisfy
+the executable constraints and end in the terminal set. If an extension
+fails, a nonempty, revalidated suffix can still supply its next input at the
+original terminal time. In that case the accepted horizon is $N_{k-1}-1$.
 
 Use $M\le N$ control intervals, with integer boundaries
 $0=c_0<c_1<\cdots<c_M=N$ and $b_i=c_i-c_{i-1}$. The first few intervals
 have one hold each; the remaining holds are distributed over the remaining
-intervals by rounded equally spaced boundaries. The knot count is retained
-when the preview grows and capped by $N$ when it shrinks, so every interval
-contains at least one hold. Independent physical decisions are endpoint
-commands $v_i\in\mathbb R^2$. Physical states are eliminated by forward
+intervals by rounded equally spaced boundaries. The knot count is the smaller
+of the configured count and the accepted horizon, so each interval contains
+at least one hold. Independent physical decisions are endpoint commands $v_i\in\mathbb R^2$. Physical states are eliminated by forward
 substitution of the dynamics, separately for every retained hypothesis.
 With $v_0=u^-$, the commands within interval $i$ are
 
@@ -606,8 +607,11 @@ request against the conditioned hypotheses and, if it fails, test the shifted
 driving sequence. When the extrapolated last input fails and the horizon
 requires new holds, keep the suffix and generate the extra inputs from its
 nominal endpoint using the fixed cruise reference. Each complete candidate must pass the same nonlinear
-checks, including movement and terminal membership. If neither succeeds,
-initialize the primary search from the single geometric guide. A failed
+checks, including movement and terminal membership. If the extensions fail,
+evaluate the original unexecuted suffix against the current posterior at its
+original terminal time. Accept it when it passes the same checks. Only when
+no checked plan is available, initialize the primary search from the single
+geometric guide within the remaining frame budget. A failed
 search supplies no command. The witness inputs used in evaluating $Z_f$ are
 never copied into executable controls.
 

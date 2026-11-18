@@ -2818,9 +2818,7 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
         case "validateInputSequence"
             hypotheses=localOfValidateHypotheses(request.hypotheses,cfg);
             validateattributes(request.inputs,{'double'},{'2d','nrows',2,'nonempty','finite','real'});
-            count=size(request.inputs,2);nodes=min(count,cfg.outputFeedback.controlNodes);
-            near=min(nodes-1,cfg.outputFeedback.nearControlNodes);
-            boundaries=[0:near,near+round((1:nodes-near)*(count-near)/(nodes-near))];
+            boundaries=localCompactBoundaries(size(request.inputs,2),cfg);
             kernel=localCompactKernel(cfg,diff(boundaries),~isempty(hypotheses(1).target));
             [valid,traces,violation]=localCompactValidate(request.inputs,hypotheses,request.input,kernel,cfg,true);
             result=struct('accepted',valid,'maximumViolation',violation,'trajectories',{traces});
@@ -3797,7 +3795,11 @@ function [result,info] = localCompactStep(request,cfg)
     else
         assert(isfield(prior,'kind') && prior.kind=="compactOutputFeedback-v1", ...
             'collisionAvoidanceController:incompatibleContinuation','Expected a compact controller continuation.');
-        assert(isequaln(prior.configuration,cfg) && isequaln(prior.reference,request.reference), ...
+        previousCfg=prior.configuration;
+        if isfield(previousCfg.outputFeedback,'recoverySolveSeconds')
+            previousCfg.outputFeedback=rmfield(previousCfg.outputFeedback,'recoverySolveSeconds');
+        end
+        assert(isequaln(previousCfg,cfg) && isequaln(prior.reference,request.reference), ...
             'collisionAvoidanceController:changedContinuationProblem','The continuation contract changed.');
         assert(~isfield(block,'initialHypotheses') && ~isfield(block,'initialMemory') && ~isfield(block,'initialPolicies'), ...
             'collisionAvoidanceController:informationReset','Continuation cannot reset its information.');
@@ -3812,11 +3814,7 @@ function [result,info] = localCompactStep(request,cfg)
     end
     clock=tic;[hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
     inferenceSeconds=toc(clock);window=localOfWindow(hypotheses,inherited,cfg);
-    count=window.horizonSteps;nodes=min(count,cfg.outputFeedback.controlNodes);
-    if ~initial,nodes=min(count,size(prior.controls,2));end
-    near=min(nodes-1,cfg.outputFeedback.nearControlNodes);
-    boundaries=[0:near,near+round((1:nodes-near)*(count-near)/(nodes-near))];
-    holds=diff(boundaries);h=cfg.controller.sampleTime;hasTarget=~isempty(hypotheses(1).target);
+    holds=diff(localCompactBoundaries(window.horizonSteps,cfg));
     % A representative retained member supplies the nominal dynamics. All
     % retained members are replayed before accepting a control sequence.
     values=[hypotheses.ego];[~,nominal]=min(sum((values-mean(values,2)).^2,1));item=hypotheses(nominal);
@@ -3824,6 +3822,12 @@ function [result,info] = localCompactStep(request,cfg)
     stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
     [~,lane]=readControllerInputs(stub,[],request.reference,cfg);
     [result,info]=localCondensedSolve(request,cfg,hypotheses,conditioning,window,holds,lane,nominal,timer,inferenceSeconds);
+end
+
+function boundaries=localCompactBoundaries(count,cfg)
+    nodes=min(count,cfg.outputFeedback.controlNodes);
+    near=min(nodes-1,cfg.outputFeedback.nearControlNodes);
+    boundaries=[0:near,near+round((1:nodes-near)*(count-near)/(nodes-near))];
 end
 
 function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning,window,holds,lane,nominal,timer,inferenceSeconds)
@@ -3882,10 +3886,25 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                     end
                 end
             end
+            if isempty(best) && extra>0 && ~isempty(suffix)
+                % The old endpoint can remain feasible when the extra holds fail.
+                % Verify the entire unexecuted suffix at its own terminal time.
+                suffixCount=size(suffix,2);
+                suffixBounds=localCompactBoundaries(suffixCount,cfg);
+                suffixKernel=kernel;suffixKernel.holds=diff(suffixBounds);
+                [flow,reused]=localCompactShiftedCache(prior,hypotheses,conditioning,suffix,suffixKernel,cfg);
+                validatePlan(suffix,flow,[],suffixKernel);
+                if ~isempty(best)
+                    retained=true;inheritedReusedHolds=reused;initializationSource="verifiedDrivingSuffix";
+                    kernel=suffixKernel;holds=kernel.holds;boundaries=suffixBounds;
+                    count=suffixCount;nodes=numel(holds);nu=2*nodes;
+                    model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel);
+                    window.source="retainedTerminalEndpoint";window.allocatedSeconds=count*h;window.horizonSteps=count;
+                end
+            end
         end
     end
     if isempty(best)
-        if ~initial,budget=cfg.outputFeedback.recoverySolveSeconds;budgetPhase="recovery";end
         deadline=budget+startupBuildSeconds;
         initializationSource="singleCirculationRollout";
         try
@@ -3977,10 +3996,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     prediction=struct('metadata',info,'scenarios',{traces},'memory',zeros(0,1),'information',hypotheses);
     result=struct('command',command,'inputs',best,'prediction',prediction,'state',state);
 
-    function checked=validatePlan(inputs,flows,clockCheck)
+    function checked=validatePlan(inputs,flows,clockCheck,planKernel)
         if nargin<3,clockCheck=[];end
+        if nargin<4,planKernel=kernel;end
         clock=tic;
-        [valid,checked,maximum]=localCompactValidate(inputs,hypotheses,previous,kernel,cfg,true,flows,clockCheck);
+        [valid,checked,maximum]=localCompactValidate(inputs,hypotheses,previous,planKernel,cfg,true,flows,clockCheck);
         validationSeconds=validationSeconds+toc(clock);
         if valid,best=inputs;traces=checked;violation=maximum;end
     end
@@ -4060,14 +4080,14 @@ end
 
 function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     persistent keys kernels
-    key={cfg,numel(holds)};hit=false;
+    key=cfg;hit=false;
     for k=1:numel(keys)
         if isequaln(key,keys{k})&&sum(holds)<=sum(kernels{k}.capacity)
             kernel=kernels{k};kernel.holds=holds;hit=true;return;
         end
     end
     import casadi.*
-    of=cfg.outputFeedback;h=cfg.controller.sampleTime;n=numel(holds);
+    of=cfg.outputFeedback;h=cfg.controller.sampleTime;
     maximumSpeed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum);
     previewTime=max(of.minimumPreviewSeconds,maximumSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
     allocatedTime=of.horizonResolutionSeconds*ceil(previewTime/of.horizonResolutionSeconds);
@@ -4609,7 +4629,7 @@ function [dense,ends,inputs]=localCompactBackupRollout(kernel,x,parameters,previ
         stopped=find(all(states(4:6,:)==0,1),1);count=blockCount;if ~isempty(stopped),count=stopped;end
         dense=[dense,points(:,1:count*kernel.validationSubsteps)];ends=[ends,states(:,1:count)];inputs=[inputs,commands(:,1:count)]; %#ok<AGROW>
         if ~isempty(stopped),return;end
-        if toc(timer)>=max([cfg.outputFeedback.initializationSolveSeconds,cfg.outputFeedback.recoverySolveSeconds,cfg.outputFeedback.maximumSolveSeconds])
+        if toc(timer)>=max(cfg.outputFeedback.initializationSolveSeconds,cfg.outputFeedback.maximumSolveSeconds)
             error('collisionAvoidanceController:condensedDeadline','The backup did not reach rest within the numerical evaluation budget.');
         end
         x=states(:,end);
