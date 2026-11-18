@@ -3846,16 +3846,16 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     % A previous implementation could store a parking sequence. Preserve the
     % posterior when resuming such states and construct a fresh driving plan.
-    inherit=~initial && isfield(prior,'firstFeasibleDrivingPlan') && prior.firstFeasibleDrivingPlan;
+    inherit=~initial && isfield(prior,'movingTerminalPlan') && prior.movingTerminalPlan;
     attempts=0;iterationCount=0;calls=0;reuseCount=0;restoration=false;seedCount=0;
     cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;
     if inherit
         suffix=prior.fineControls(:,2:end);
-        inherited=[suffix,repmat(prior.fineControls(:,end),1,count-size(suffix,2))];
-        initializationSource="shiftedDrivingPlan";
+        extra=count-size(suffix,2);
+        cruise=terminalSafeSet.movingControl(cfg);
+        inherited=[suffix,repmat(cruise,1,extra)];
+        initializationSource="shiftedMovingTerminalLaw";
         if toc(timer)<budget
-            % Request one action from the original route/avoidance guide.
-            % The remainder of the executable plan supplies the look-ahead.
             guide=localCompactSeed(item,previous,1,lane,cfg);
             proposal=inherited;proposal(:,1)=guide;
             proposal=localCompactRateLimit(proposal,previous,ones(1,count),cfg);
@@ -3866,42 +3866,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         end
         if isempty(best)
             [shifted,reused]=localCompactShiftedCache(prior,hypotheses,conditioning,inherited,kernel,cfg);
-            checked=validatePlan(inherited,shifted);
+            normals=prior.terminalNormals(:,conditioning.retainedIndices);
+            validatePlan(inherited,shifted,[],normals);
             if ~isempty(best),retained=true;inheritedReusedHolds=reused;end
-            extra=count-size(suffix,2);
-            if isempty(best) && extra>0 && ~isempty(checked{nominal})
-                % The unexecuted prefix can still be valid when extrapolating
-                % its last actuator input would stop the vehicle. Request the
-                % fixed cruise reference at the prefix endpoint and recheck all
-                % members, including the target and the new terminal handoff.
-                endpoint=item;endpoint.ego=checked{nominal}.collisionEgo(:,size(suffix,2)+1);
-                endpoint.target=[];
-                tail=localCompactSeed(endpoint,prior.fineControls(:,end),ones(1,extra),lane,cfg);
-                driving=[suffix,tail];
-                if ~isequal(driving,inherited)
-                    [shifted,reused]=localCompactShiftedCache(prior,hypotheses,conditioning,driving,kernel,cfg);
-                    validatePlan(driving,shifted);
-                    if ~isempty(best)
-                        retained=true;inheritedReusedHolds=reused;initializationSource="shiftedPlanWithCruiseTail";
-                    end
-                end
-            end
-            if isempty(best) && extra>0 && ~isempty(suffix)
-                % The old endpoint can remain feasible when the extra holds fail.
-                % Verify the entire unexecuted suffix at its own terminal time.
-                suffixCount=size(suffix,2);
-                suffixBounds=localCompactBoundaries(suffixCount,cfg);
-                suffixKernel=kernel;suffixKernel.holds=diff(suffixBounds);
-                [flow,reused]=localCompactShiftedCache(prior,hypotheses,conditioning,suffix,suffixKernel,cfg);
-                validatePlan(suffix,flow,[],suffixKernel);
-                if ~isempty(best)
-                    retained=true;inheritedReusedHolds=reused;initializationSource="verifiedDrivingSuffix";
-                    kernel=suffixKernel;holds=kernel.holds;boundaries=suffixBounds;
-                    count=suffixCount;nodes=numel(holds);nu=2*nodes;
-                    model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel);
-                    window.source="retainedTerminalEndpoint";window.allocatedSeconds=count*h;window.horizonSteps=count;
-                end
-            end
         end
     end
     if isempty(best)
@@ -3955,8 +3922,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v1",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
-        'fineControls',best,'firstFeasibleDrivingPlan',true,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
+        'fineControls',best,'movingTerminalPlan',true,'firstFeasibleDrivingPlan',true,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
+        'terminalNormals',cell2mat(cellfun(@(t)t.terminal.normal,traces(:).','UniformOutput',false)), ...
         'pcbfDeficit',0,'stageDeficits',zeros(count,1), ...
         'retainedTrajectories',{retainedTrajectories});
     info=struct('solver',"condensedNonlinearPcbfSqp",'nlpStatus',"feasible", ...
@@ -3968,14 +3936,14 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'elapsedSeconds',toc(timer),'deadlineSeconds',h,'predictionWindow',window, ...
         'controlNodes',nodes,'horizonSteps',count,'initializationTrajectoryCount',seedCount,'initializationSource',initializationSource, ...
         'fallbackUsed',retained,'retainedFinePlanUsed',retained && ~initial,'rootTerminalPlanUsed',false, ...
-        'retainedTailRepaired',initializationSource=="shiftedPlanWithCruiseTail", ...
+        'retainedTailRepaired',false, ...
         'restorationAttempted',restoration,'initialRestorationSlack',initialDeficit, ...
         'initialNlpViolation',max(0,initialTerminal),'finalRestorationSlack',0, ...
         'validationSubsteps',kernel.validationSubsteps,'sensitivitySubsteps',kernel.sensitivitySubsteps,'nonlinearValidationPerformed',true, ...
         'maximumConstraintViolation',violation,'scenarioCount',numel(hypotheses), ...
         'activeScenarioCount',numel(hypotheses),'hypothesisCount',numel(hypotheses),'memoryDimension',0, ...
         'conditioning',conditioning,'terminalSetEnforced',true,'terminalSafetyAssumed',true, ...
-        'terminalModel',"straighteningBrakingThenParked",'terminalValue',max(cellfun(@(t)t.terminal.value,traces)), ...
+        'terminalModel',"straightCruiseEscape",'terminalValue',max(cellfun(@(t)t.terminal.value,traces)), ...
         'terminalInput',traces{nominal}.terminal.input,'robustNonlinearSafetyCertified',false, ...
         'recursiveFeasibilityCertified',false,'safetyScope',"finiteHypothesesControlBoundaryCollisionChecks", ...
         'collisionCheckPeriodSeconds',h,'collisionNodeCount',count+1, ...
@@ -3996,11 +3964,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     prediction=struct('metadata',info,'scenarios',{traces},'memory',zeros(0,1),'information',hypotheses);
     result=struct('command',command,'inputs',best,'prediction',prediction,'state',state);
 
-    function checked=validatePlan(inputs,flows,clockCheck,planKernel)
+    function checked=validatePlan(inputs,flows,clockCheck,normals)
         if nargin<3,clockCheck=[];end
-        if nargin<4,planKernel=kernel;end
+        if nargin<4,normals=[];end
         clock=tic;
-        [valid,checked,maximum]=localCompactValidate(inputs,hypotheses,previous,planKernel,cfg,true,flows,clockCheck);
+        [valid,checked,maximum]=localCompactValidate(inputs,hypotheses,previous,kernel,cfg,true,flows,clockCheck,normals);
         validationSeconds=validationSeconds+toc(clock);
         if valid,best=inputs;traces=checked;violation=maximum;end
     end
@@ -4069,7 +4037,7 @@ function [a,b]=localCondensedInputRows(previous,holds,cfg)
             a=[a;row;-row];b=[b;rates(k)*cfg.controller.sampleTime*holds(i)+origin;rates(k)*cfg.controller.sampleTime*holds(i)-origin];
         end
     end
-    terminal=terminalSafeSet.compactControl(previous,cfg);
+    terminal=terminalSafeSet.movingControl(cfg);
     for k=1:2
         if ~isfinite(rates(k)),continue;end
         row=zeros(1,2*n);row(2*n-2+k)=1;
@@ -4216,7 +4184,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 [dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,enabled);
                 ends=full(ends);dense=full(dense);ends=ends(:,1:N);dense=[item.ego,dense(:,1:K*N)];
             end
-            [backupDense,backupEnds,backupInputs]=localCompactBackupRollout(kernel,ends(:,end),item.parameters,inputs(:,end),cfg,checkBudget);
+            [backupDense,backupEnds,backupInputs]=localCompactCruiseRollout(kernel,ends(:,end),item.parameters,cfg,checkBudget);
             rollouts.trajectories{s}=struct('dense',dense,'states',ends(:,cumsum(kernel.holds)), ...
                     'collisionStates',[item.ego,ends], ...
                     'backup',struct('dense',backupDense,'states',backupEnds,'inputs',backupInputs));
@@ -4246,8 +4214,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         if ~derivatives
             e.stage=max(e.stage,localStage(1:N).');e.forward=max(e.forward,forward(1:N).');
             target=[];if ~isempty(q),target=q(:,end);end
-            context=terminalSafeSet.compactContext(target,cfg);
-            terminal=terminalSafeSet.nonlinearValue(context,ends(:,end),0);
+            terminal=terminalSafeSet.movingValue(ends(:,end),target,cfg);
             e.terminal(s)=max([terminal,localStage(N+1:end),forward(N+1:end)]);
             if s==model.nominal,e.cost=localCompactPerformance(ends(:,cumsum(kernel.holds)),inputs,model);end
             continue;
@@ -4284,8 +4251,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             end
         end
         target=[];if ~isempty(q),target=q(:,end);end
-        context=terminalSafeSet.compactContext(target,cfg);
-        [terminal,g]=terminalSafeSet.nonlinearTangent(context,ends(:,end),0);
+        [terminal,~,g]=terminalSafeSet.movingValue(ends(:,end),target,cfg);
         e.terminal(s)=terminal;e.terminalGradient(:,s)=(g*SE{end}).';
         if total>N
             [backupValue,index]=max(localStage(N+1:end));
@@ -4508,10 +4474,11 @@ function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,condition
     end
 end
 
-function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,rollouts,checkBudget)
+function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,rollouts,checkBudget,normals)
     if nargin<6,fine=false;end
     if nargin<7,rollouts=[];end
     if nargin<8,checkBudget=[];end
+    if nargin<9,normals=[];end
     reuse=fine && localCompactCacheMatches(rollouts,controls,hypotheses,previous,kernel,cfg);
     traces=cell(1,numel(hypotheses));nodeStates=cell(size(traces));violation=0;h=cfg.controller.sampleTime;
     durations=kernel.holds;if fine,durations=ones(1,size(controls,2));end
@@ -4555,7 +4522,8 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
             trace=traces{s};target=[];
             if ~isempty(trace.targets),target=trace.targets(:,end);end
             backup=[];if reuse,backup=rollouts.trajectories{s}.backup;end
-            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup,checkBudget);
+            normal=[];if ~isempty(normals),normal=normals(:,s);end
+            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup,checkBudget,normal);
             traces{s}.terminal=terminal;violation=max(violation,terminalValue);
         end
         valid=isfinite(violation)&&violation<=cfg.outputFeedback.nlpTolerance;
@@ -4583,57 +4551,46 @@ function [dense,states,inputs,collisionStates] = localCompactRollout(kernel,x,pr
     dense=[x,dense(:,1:kernel.validationSubsteps*N)];states=ends(:,cumsum(kernel.holds));
     if nargout>3,collisionStates=[x,ends(:,1:N)];end
 end
-function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup,checkBudget)
+function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup,checkBudget,normal)
     h=cfg.controller.sampleTime;
     if nargin<8,checkBudget=[];end
     if nargin<7 || isempty(backup)
-        [tail,tailEnds,tailInputs]=localCompactBackupRollout(kernel,x,parameters,previous,cfg,checkBudget);
+        [tail,tailEnds,tailInputs]=localCompactCruiseRollout(kernel,x,parameters,cfg,checkBudget);
     else
         tail=backup.dense;tailEnds=backup.states;tailInputs=backup.inputs;
     end
-    terminalTarget=target;tailViolation=max([0,-tail(4,:)]);
-    if ~isempty(tailInputs)
-        [domain,~,~,~,defined]=localCompactModelDomain(tail,tailInputs,cfg,kernel.validationSubsteps);
-        tailViolation=max(tailViolation,max(domain));
-        if ~defined,tailViolation=Inf;end
-    end
+    [domain,~,~,~,defined]=localCompactModelDomain(tail,tailInputs,cfg,kernel.validationSubsteps);
+    value=max([0,domain]);terminalTarget=target;
     if ~isempty(target)
         times=(0:size(tailInputs,2))*h;
-        if target(4)==0,tailTarget=repmat(target,1,numel(times));
-        else,tailTarget=predictiveSafetyGeometry.predictTarget(target,times);end
-        terminalTarget=tailTarget(:,end);
+        if target(4)==0,q=repmat(target,1,numel(times));else,q=predictiveSafetyGeometry.predictTarget(target,times);end
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        gap=localCompactExactClearance([x,tailEnds],tailTarget,shape);
-        tailViolation=max(tailViolation,max(cfg.outputFeedback.clearanceMeters-gap));
+        value=max(value,max(cfg.outputFeedback.clearanceMeters-localCompactExactClearance([x,tailEnds],q,shape)));
+        terminalTarget=q(:,end);
     end
-    parked=tail(:,end);if ~isempty(tailEnds),parked=tailEnds(:,end);end
-    [terminalValue,terminal]=terminalSafeSet.compactEvaluate(parked,terminalTarget,previous,cfg);
-    terminalValue=max(terminalValue,tailViolation);terminal.value=terminalValue;terminal.member=terminalValue<=1e-6;
-    terminal.model="straighteningBrakingThenParked";terminal.stopSeconds=size(tailInputs,2)*h;
-    terminal.backupHolds=size(tailInputs,2);
+    [core,normal]=terminalSafeSet.movingValue(tailEnds(:,end),terminalTarget,cfg,normal);
+    command=tailInputs(:,1);
+    slew=abs(command-previous)-h*[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    terminalValue=max([value;core;slew]);
+    unsustainableCoast=command(2)==0 && (nonlinearBicycleModel.roadLoad(cfg.referenceSpeed,cfg)>0 ...
+        || tailEnds(4,end)<.2*cfg.model.brakeHoldSpeed);
+    if command(2)<0 || unsustainableCoast || ~defined || x(4)<=0 || any(tailEnds(4,:)<=0) || any(tail(4,:)<=0)
+        terminalValue=Inf;
+    end
+    terminal=struct('value',terminalValue,'member',terminalValue<=cfg.outputFeedback.nlpTolerance, ...
+        'input',command,'bridgeHolds',size(tailInputs,2),'normal',normal, ...
+        'model',"straightCruiseEscape",'safetyAssumed',true,'safetyProved',false);
 end
 
-function [dense,ends,inputs]=localCompactBackupRollout(kernel,x,parameters,previous,cfg,checkBudget)
-    if nargin<6,checkBudget=[];end
-    timer=tic;dense=x;ends=zeros(6,0);inputs=zeros(2,0);
-    if all(x(4:6)==0),return;end
-    command=terminalSafeSet.compactControl(previous,cfg);capacity=kernel.capacity;
-    commands=repmat(command,1,capacity);
-    while true
-        if ~isempty(checkBudget),checkBudget();end
-        blockCount=min(capacity,max(1,ceil(2*hypot(x(4),x(5))/(cfg.terminal.brakingDecelerationMetersPerSecondSquared*cfg.controller.sampleTime))));
-        active=double((1:capacity)<=blockCount);
-        [points,states]=kernel.refinedRollout(x,commands,parameters,active);states=full(states);points=full(points);
-        states=states(:,1:blockCount);points=points(:,1:blockCount*kernel.validationSubsteps);
-        assert(all(isfinite(states),'all'),'collisionAvoidanceController:invalidTerminalFlow','The backup rollout left the numerical model domain.');
-        stopped=find(all(states(4:6,:)==0,1),1);count=blockCount;if ~isempty(stopped),count=stopped;end
-        dense=[dense,points(:,1:count*kernel.validationSubsteps)];ends=[ends,states(:,1:count)];inputs=[inputs,commands(:,1:count)]; %#ok<AGROW>
-        if ~isempty(stopped),return;end
-        if toc(timer)>=max(cfg.outputFeedback.initializationSolveSeconds,cfg.outputFeedback.maximumSolveSeconds)
-            error('collisionAvoidanceController:condensedDeadline','The backup did not reach rest within the numerical evaluation budget.');
-        end
-        x=states(:,end);
-    end
+function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,parameters,cfg,checkBudget)
+    if ~isempty(checkBudget),checkBudget();end
+    count=max(1,ceil(cfg.outputFeedback.minimumPreviewSeconds/cfg.controller.sampleTime));
+    capacity=kernel.capacity;
+    command=terminalSafeSet.movingControl(cfg);
+    inputs=repmat(command,1,count);
+    [points,states]=kernel.refinedRollout(x,[inputs,zeros(2,capacity-count)],parameters,double((1:capacity)<=count));
+    states=full(states);points=full(points);
+    ends=states(:,1:count);dense=[x,points(:,1:count*kernel.validationSubsteps)];
 end
 
 function [value,index,stateGradient,inputGradient,defined]=localCompactModelDomain(states,inputs,cfg,K,drivingHolds)

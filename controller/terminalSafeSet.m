@@ -1,8 +1,6 @@
 classdef terminalSafeSet
-% compactControl supplies the runtime backup command. The compact solver
-% propagates that command with its vehicle flow until rest, then uses
-% compactEvaluate for the complete parked-target track. The kinematic
-% continuation below remains available as a simplified research comparator.
+% The compact runtime uses movingControl and movingValue for recurring
+% forward cruise. The braking continuations below are research comparators.
 %terminalSafeSet Terminal set of the braking continuation, and the anchor's holds.
 % The legacy state-input comparator below uses the shared observer operating domain, and inside it the ego is a
 % kinematic vehicle under the simplest law: the steering held and a constant
@@ -70,6 +68,118 @@ classdef terminalSafeSet
                 'brakingRatio',min(min(1,cfg.actuation.brakingRatioMaximum), ...
                     max(max(-1,cfg.actuation.brakingRatioMinimum),-cfg.outputFeedback.backupBrakingRatio)), ...
                 'brakingBounds',[max(-1,cfg.actuation.brakingRatioMinimum);min(1,cfg.actuation.brakingRatioMaximum)]);
+        end
+
+        function input=movingControl(cfg)
+            gain=nonlinearBicycleModel.tireAccelerationGain(cfg);
+            trim=nonlinearBicycleModel.roadLoad(cfg.referenceSpeed,cfg)/(cfg.vehicle.m*gain);
+            input=[0;min(cfg.actuation.brakingRatioMaximum,max(cfg.actuation.brakingRatioMinimum,trim))];
+        end
+
+        function [value,normal,gradient]=movingValue(x,q,cfg,priorNormal)
+            % Dual separation of the straight forward sweep from the convex
+            % hull of every remaining target footprint. Each angle is a
+            % continuous unit-normal witness, including tangent separators.
+            if nargin<4,priorNormal=[];end
+            gradient=zeros(1,6);normal=zeros(2,1);
+            value=-x(4);
+            if isempty(q),gradient(4)=-1;return;end
+            t=q(3);rot=[cos(t),-sin(t);sin(t),cos(t)];
+            signs=[1,1,-1,-1;1,-1,1,-1];
+            corners=rot*(q(10:11)+q(8:9).*signs);
+            direction=predictiveSafetyGeometry.direction(t+q(6));
+            curvature=sin(q(6))/q(7);
+            arc=Inf;
+            if q(4)==0,arc=0;elseif q(5)<0,arc=-q(4)^2/(2*q(5));end
+            corners=corners+q(1:2)-x(1:2);
+            origin=corners;
+            circle=curvature~=0 && arc>0;
+            if circle
+                arms=rot*(q(10:11)+q(8:9).*signs)-[-direction(2);direction(1)]/curvature;
+                radii=hypot(arms(1,:),arms(2,:));angles=atan2(arms(2,:),arms(1,:));
+                sweep=curvature*arc;
+                if abs(sweep)<2*pi
+                    last=predictiveSafetyGeometry.predictTarget(q,-q(4)/q(5));
+                    rotEnd=[cos(last(3)),-sin(last(3));sin(last(3)),cos(last(3))];
+                    finish=last(1:2)-x(1:2)+rotEnd*(q(10:11)+q(8:9).*signs);
+                end
+            elseif isfinite(arc)
+                origin=[corners,corners+direction*arc];
+            end
+            % In body coordinates the moving rectangle sweeps a half strip.
+            % Include both strip boundaries and optimize an interior witness.
+            forward=predictiveSafetyGeometry.direction(x(3));
+            side=[-forward(2);forward(1)];
+            unboundedLine=~circle && isinf(arc);
+            lo=-pi/2;hi=pi/2;parallel=false;
+            if unboundedLine
+                angle=atan2(side.'*direction,forward.'*direction);
+                parallel=angle==0;
+                if angle>=0,hi=angle-pi/2;else,lo=angle+pi/2;end
+            end
+            grid=linspace(lo,hi,9);
+            if parallel,grid=[-pi/2,pi/2];end
+            vals=margin(grid);[gap,k]=max(vals);alpha=grid(k);
+            if ~parallel && hi>lo
+                left=grid(max(1,k-1));right=grid(min(9,k+1));
+                for j=1:14
+                    pair=[(2*left+right)/3,(left+2*right)/3];v=margin(pair);
+                    if v(1)>v(2),right=pair(2);else,left=pair(1);end
+                end
+                a=(left+right)/2;v=margin(a);
+                if v>gap,gap=v;alpha=a;end
+            end
+            normal=axisAt(alpha).';
+            if ~isempty(priorNormal) && all(isfinite(priorNormal)) && abs(norm(priorNormal)-1)<1e-12 ...
+                    && priorNormal.'*forward>=0 && (~unboundedLine || priorNormal.'*direction<=0)
+                priorGap=supportGap(priorNormal.');
+                if priorGap>gap,gap=priorGap;normal=priorNormal;end
+            end
+            clearance=cfg.outputFeedback.clearanceMeters-gap;
+            if clearance<=value,gradient(4)=-1;return;end
+            value=clearance;
+            if nargout>=3
+                gradient(1:2)=-normal.';
+                % Reselect the constrained polar maximum for yaw, including
+                % optima on the moving half strip's rotating boundaries.
+                step=1e-5;plus=x;minus=x;plus(3)=x(3)+step;minus(3)=x(3)-step;
+                gradient(3)=(terminalSafeSet.movingValue(plus,q,cfg)-terminalSafeSet.movingValue(minus,q,cfg))/(2*step);
+            end
+
+            function gap=margin(a)
+                gap=supportGap(axisAt(a));
+            end
+            function n=axisAt(a)
+                a=a(:);n=cos(a)*forward.'+sin(a)*side.';
+                n(a==-pi/2,:)=repmat(-side.',nnz(a==-pi/2),1);
+                n(a==pi/2,:)=repmat(side.',nnz(a==pi/2),1);
+                if unboundedLine && ~parallel
+                    if angle>=0
+                        n(a==hi,:)=repmat([direction(2),-direction(1)],nnz(a==hi),1);
+                    else
+                        n(a==lo,:)=repmat([-direction(2),direction(1)],nnz(a==lo),1);
+                    end
+                end
+            end
+            function gap=supportGap(n)
+                along=n*forward;across=n*side;
+                ego=cfg.vehicle.rectangleOffset(:);
+                lower=along*ego(1)+across*ego(2)-abs(along)*cfg.vehicle.length/2-abs(across)*cfg.vehicle.width/2;
+                if circle
+                    phase=atan2(n(:,2),n(:,1))-angles;
+                    peak=n*corners+2*radii.*sin(phase/2).^2;
+                    if abs(sweep)<2*pi
+                        included=mod(sign(curvature)*phase,2*pi)<=abs(sweep);
+                        peak(~included)=-Inf;
+                        upper=max([n*corners,n*finish,peak],[],2);
+                    else
+                        upper=max(peak,[],2);
+                    end
+                else
+                    upper=max(n*origin,[],2);
+                end
+                gap=lower-upper;
+            end
         end
 
         function input = compactControl(previous,cfg)

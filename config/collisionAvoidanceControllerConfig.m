@@ -140,12 +140,8 @@ function cfg=localDefaults()
     % Collision rows require nonoverlap after uncertainty tightening. There
     % is no extra fixed clearance in the optimizer or geometric guide.
     cfg.collision=struct('encounterRangeMeters',50);
-    % Terminal continuation: the simple ego model holds course curvature and
-    % sideslip and brakes at the specified tangential rate to a parked pose.
-    % compactNlp checks the braking prefix and the target's complete future
-    % track, without stability caps or a perception-range exit. Its safety
-    % and main-model handoff are explicit design assumptions, not certificates.
-    % Legacy state-input comparators retain their separate terminal context.
+    % Nominal deceleration for the braking-model comparators. The compact
+    % controller continues under straight cruise and checks a moving core.
     cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',4);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);

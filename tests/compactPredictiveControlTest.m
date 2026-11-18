@@ -210,7 +210,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             parked=solvePredictiveControl('outputFeedback',request);
             testCase.verifyLessThan(passing.cost,parked.cost);
         end
-        function rejectedExtensionRetainsTheMovingSuffixAtItsOwnEndpoint(testCase)
+        function theTerminalCruiseInputRenewsTheRequestedHorizon(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             campaign=runJointOutputFeedbackScenario(Frames=18,Speeds=8,Scenarios="hardBrakingLead", ...
                 RandomSeed=20261107,OutputDirectory=string(folder.Folder), ...
@@ -218,7 +218,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.assertEqual(campaign.results.outcome,"completed");
             data=jsondecode(fileread(campaign.results.source));
             current=data.trace(17).metadata;prior=data.trace(16).metadata;
-            testCase.verifyEqual(current.horizonSteps,prior.horizonSteps-1);
+            testCase.verifyEqual(current.horizonSteps,prior.horizonSteps);
             testCase.verifyEqual(current.predictionWindow.allocatedSeconds, ...
                 current.horizonSteps*data.configuration.controller.sampleTime);
             testCase.verifyEqual(current.pcbfValue,0);
@@ -226,11 +226,58 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(current.nlpAttempts,0);
             testCase.verifyTrue(current.retainedFinePlanUsed);
         end
+        function aCheckedPlanCanShiftPastItsOriginalEndWithoutAnotherSolve(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=3;cfg.outputFeedback.horizonSeconds=.15;
+            cfg.outputFeedback.maximumSolveSeconds=1e-12;block=localBlock(cfg,3);
+            [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            terminalInput=terminalSafeSet.movingControl(cfg);
+            for k=1:12
+                block=localNextBlock(prior,cfg);
+                [~,inputs,prediction,next]=collisionAvoidanceController(block,[],[],cfg,prior);
+                testCase.verifyEqual(inputs,[prior.fineControls(:,2:end),terminalInput]);
+                testCase.verifyEqual(prediction.metadata.nlpAttempts,0);
+                testCase.verifyTrue(next.terminal.member);
+                testCase.verifyGreaterThan(min(prediction.scenarios{1}.collisionEgo(4,:)),0);
+                prior=next;
+            end
+        end
+        function theMovingCoreChecksTheEntireFutureTargetTrack(testCase)
+            x=[0;0;0;3;0;0];
+            target=[100;0;pi;1;0;0;1.6;2.4;.95;0;0];
+            testCase.verifyGreaterThan(terminalSafeSet.movingValue(x,target,testCase.cfg),0);
+            target(2)=10;
+            [value,n]=terminalSafeSet.movingValue(x,target,testCase.cfg);
+            testCase.verifyLessThan(value,0);
+            next=x;next(1)=x(1)+3;
+            target=predictiveSafetyGeometry.predictTarget(target,1);
+            testCase.verifyLessThanOrEqual(terminalSafeSet.movingValue(next,target,testCase.cfg,n),value+1e-9);
+        end
+        function aBrakeOnlyActuatorCannotCertifyPerpetualCruiseAgainstDrag(testCase)
+            cfg=testCase.cfg;cfg.actuation.brakingRatioMaximum=0;
+            item=testCase.block.initialHypotheses;item.target=[];
+            checked=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',cfg,'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1)));
+            testCase.verifyFalse(checked.accepted);
+            testCase.verifyFalse(checked.trajectories{1}.terminal.member);
+        end
+        function turningTargetSupportIncludesLaterRevolutions(testCase)
+            x=[0;0;0;2;0;0];
+            target=[20;0;0;2;0;.2;1.6;2.4;.95;.3;-.2];
+            testCase.verifyGreaterThan(terminalSafeSet.movingValue(x,target,testCase.cfg),0);
+            x(2)=-20;
+            [value,normal]=terminalSafeSet.movingValue(x,target,testCase.cfg);
+            testCase.verifyLessThan(value,0);
+            testCase.verifyGreaterThanOrEqual(normal(1),-eps);
+            % The analytic stationary circular support also covers the target
+            % when it accelerates and traverses the circle repeatedly.
+            target(5)=1;
+            testCase.verifyEqual(terminalSafeSet.movingValue(x,target,testCase.cfg),value,AbsTol=1e-10);
+        end
         function expiredContinuationCannotStartASecondSearchBudget(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=1e-12;
             [~,~,~,prior]=collisionAvoidanceController(localBlock(cfg,3),[],[],cfg,[]);
             block=localNextBlock(prior,cfg);
-            prior=rmfield(prior,'firstFeasibleDrivingPlan');
+            prior=rmfield(prior,'movingTerminalPlan');
             cfg.outputFeedback.recoverySolveSeconds=100;
             prior.configuration.outputFeedback.recoverySolveSeconds=100;
             testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,prior), ...
@@ -245,7 +292,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         function aLegacyParkedPlanIsReplannedFromTheConditionedState(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;
             [~,~,~,old]=collisionAvoidanceController(localBlock(cfg,0),[],[],cfg,[]);
-            old=rmfield(old,'firstFeasibleDrivingPlan');
+            old=rmfield(old,'movingTerminalPlan');
             brake=terminalSafeSet.compactControl(old.appliedInput,cfg);
             old.fineControls=repmat(brake,1,old.horizonSteps);old.appliedInput=brake;
             block=localNextBlock(old,cfg);
@@ -404,9 +451,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(testCase.state.terminal.member);
             testCase.verifyTrue(testCase.state.terminal.safetyAssumed);
             testCase.verifyEqual(testCase.state.terminal.input, ...
-                terminalSafeSet.compactControl(testCase.state.fineControls(:,end),testCase.cfg));
+                terminalSafeSet.movingControl(testCase.cfg));
         end
-        function theTerminalBackupStraightensAndReachesDeclaredRest(testCase)
+        function theTerminalContinuationStraightensAndKeepsDriving(testCase)
             item=testCase.block.initialHypotheses;item.ego=[0;0;.1;3;.4;.2];
             request=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
                 'hypotheses',item,'input',[.2;0],'inputs',[.2;0]);
@@ -414,9 +461,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(value.accepted);
             terminal=value.trajectories{1}.terminal;
             testCase.verifyEqual(terminal.input(1),0);
-            testCase.verifyGreaterThan(terminal.backupHolds,0);
-            testCase.verifyEqual(terminal.model,"straighteningBrakingThenParked");
-            testCase.verifyTrue(isfinite(terminal.stopSeconds));
+            testCase.verifyGreaterThan(terminal.bridgeHolds,0);
+            testCase.verifyEqual(terminal.model,"straightCruiseEscape");
+            testCase.verifyGreaterThan(terminal.input(2),0);
         end
         function terminalEntryHonorsAnExplicitSteeringSlewContract(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.steeringRateMaximum=.1;
@@ -519,7 +566,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,prediction]=collisionAvoidanceController(block,[],[],cfg,prior);
             testCase.verifyEqual(command.actuatorInput,brake);
             testCase.verifyEqual(inputs(:,1:end-1),prior.fineControls(:,2:end));
-            testCase.verifyTrue(prediction.metadata.retainedTailRepaired);
+            testCase.verifyEqual(inputs(:,end),terminalSafeSet.movingControl(cfg));
             testCase.verifyFalse(prediction.metadata.restorationAttempted);
             testCase.verifyGreaterThan(min(prediction.scenarios{1}.collisionEgo(4,:)),0);
             testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
@@ -531,7 +578,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             request=struct('operation',"validateInputSequence",'cfg',cfg, ...
                 'hypotheses',item,'input',block.heldInput,'inputs',repmat([0;-.8],1,60));
             parked=solvePredictiveControl('outputFeedback',request);
-            testCase.verifyTrue(parked.trajectories{1}.terminal.member);
+            testCase.verifyFalse(parked.trajectories{1}.terminal.member);
             testCase.verifyFalse(parked.accepted);
         end
         function restorationCanLeaveTheStopResetAlongTheDriveInput(testCase)
@@ -690,13 +737,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(result.accepted);
             testCase.verifyEqual(numel(result.trajectories),2);
         end
-        function stationarySafeVehiclesDoNotNeedAMovingVehicleReserve(testCase)
+        function stationaryEndpointsCannotSupplyMovingContinuation(testCase)
             item=testCase.block.initialHypotheses;item.ego(4:6)=0;
             item.target=[4.95;0;0;0;0;0;1.6;2.4;.95;0;0];
             result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
                 'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',repmat([0;-.1],1,60)));
             testCase.verifyFalse(result.accepted);
-            testCase.verifyTrue(result.trajectories{1}.terminal.member);
+            testCase.verifyFalse(result.trajectories{1}.terminal.member);
             testCase.verifyEqual(result.trajectories{1}.validationSubsteps,testCase.cfg.outputFeedback.validationSubsteps);
             testCase.verifyEqual(result.trajectories{1}.denseEgo(4:6,:), ...
                 zeros(3,1+60*testCase.cfg.outputFeedback.validationSubsteps),AbsTol=1e-14);
@@ -709,7 +756,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',inputs));
             expected=localRefinedSequence(item.ego,inputs,testCase.cfg);
             testCase.verifyFalse(result.accepted);
-            testCase.verifyTrue(result.trajectories{1}.terminal.member);
+            testCase.verifyFalse(result.trajectories{1}.terminal.member);
             testCase.verifyEqual(result.trajectories{1}.validationSubsteps,testCase.cfg.outputFeedback.validationSubsteps);
             testCase.verifyEqual(result.trajectories{1}.denseEgo,expected,AbsTol=1e-10);
             testCase.verifyGreaterThan(expected(1,end),item.ego(1));

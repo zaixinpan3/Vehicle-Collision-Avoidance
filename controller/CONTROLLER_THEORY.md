@@ -264,9 +264,8 @@ the old terminal state. The preview may therefore shrink by one hold per
 decision as its current time requirement decreases; no terminal action is
 appended solely to preserve the previous horizon length. If the current
 preview requests a longer horizon, the driving extension must itself satisfy
-the executable constraints and end in the terminal set. If an extension
-fails, a nonempty, revalidated suffix can still supply its next input at the
-original terminal time. In that case the accepted horizon is $N_{k-1}-1$.
+the executable constraints and end in the terminal set. The accepted plan always spans the
+selected preview. The construction below supplies all missing holds.
 
 Use $M\le N$ control intervals, with integer boundaries
 $0=c_0<c_1<\cdots<c_M=N$ and $b_i=c_i-c_{i-1}$. The first few intervals
@@ -449,118 +448,78 @@ A feasible zero-deficit driving sequence attains the lower bound of the PCBF
 objective. Its first input is issued immediately after validation. Tracking
 cost $J$ is available for analysis and does not rank accepted plans.
 
-### Terminal set and its hypothetical continuation
+### A moving terminal set and its continuation
 
-Use the simple, causal backup command
-
+Let the common terminal command be zero steering and the nominal force ratio
+for straight travel at the fixed cruise speed,
 $$
-u_f=(0,b_f),\qquad b_f=\operatorname{clip}_{[b_{\min},b_{\max}]}(-b_0),\quad 0<b_0<1,
+ u_f=(0,b_f),\qquad
+ b_f=\operatorname{clip}_{[b_{\min},b_{\max}]}
+        \frac{F_{\rm load}(v_{\rm ref})}{\sum_i\mu_iF_{zi}}.
 $$
+All hypotheses receive the same command. When the trim is within the actuator
+bounds it balances the nominal road load at the reference speed. The resulting
+speeds may differ across physical members.
+The cruise certificate requires sustainable forward motion under this input.
 
-where $b_0$ is the configured backup braking ratio (default $0.6$). The
-steering is zero and braking is constant, within the physical input bounds.
-The preceding command is used only to check entry increments. The actual
-deceleration follows the vehicle dynamics and persistent physical parameters;
-no fixed stopping acceleration is assumed.
-
-For each endpoint hypothesis, propagate the fixed command with the same
-vehicle flow used for the main trajectory. No backup controls are optimized.
-Let $J_f^s$ be its first absorbing-rest boundary under the declared reset.
-After that boundary the ego remains parked. The target retains its constant
-tangential acceleration and sideslip, including its absorbing stop. Let
-$\Phi_f$ denote the resulting joint continuation. Define
-
+Write $E(x)$ for the oriented ego rectangle, $e=(\cos\psi,\sin\psi)$ and
+$T(q(t))$ for the target rectangle. In the simplified terminal model the ego
+continues along the forward ray with fixed orientation and strictly positive
+speed. Its speed need not have a specified time profile. Define
 $$
-Z_f=\{(x,q,\vartheta,u^-):\ u_f\text{ and its entry increment are admissible},
-\quad J_f<\infty,\quad \Phi_f(t)\in\mathcal D\ \forall t\ge0,\quad
- d(\Phi_f(jh))\ge d_{\rm safe}\ \text{for every integer }j\ge0\}.
+ L_E(n,x)=\min_{z\in E(x)} n^\top z,\qquad
+ U_T(n,q)=\sup_{t\ge0}\max_{z\in T(q(t))}n^\top z .
 $$
-
-Here $\mathcal D$ is the physical-model domain with nonnegative longitudinal
-speed, including rest for the terminal witness. Require
-$(x_N^s,q_N^s,\vartheta^s,u_N)\in Z_f$ for every retained hypothesis.
-This is a backup-trajectory set, not a radial stopping-distance reserve.
-It does not require the target to brake, impose stability caps, or require
-an instantaneous ego stop at the optimized endpoint. Holding the backup input
-makes its continuation suffix the backup of its successor, including after
-rest. With exact dynamics, physical-domain validity and membership at every
-control-boundary node, this suffix property gives terminal invariance at those
-boundaries. The final optimized command need not
-already equal $u_f$; its transition to $u_f$ must be admissible.
-
-Numerical membership propagates the backup until absorbing rest, checks its
-control-boundary collision geometry and dense physical-model domain, and
-checks the parked rectangle against the target's complete remaining track.
-The latter is the existing sufficient parked-set membership test: it covers
-all future nodes but can be more restrictive than checking only those nodes.
-Integration blocks are extended when needed;
-an allocation limit is not a terminal state restriction. The common command
-can produce different stopping times for different physical hypotheses.
-These are deterministic continuations of one candidate, not additional planner
-initializations.
-
-If the current information set already belongs to this common backup set,
-its checked terminal continuation supplies an executable fallback immediately.
-The optimizer still receives only one planner-generated initialization.
-Continuation keeps the executable fine plan and the last accepted optimization
-iterate separately: an infeasible search iterate may warm-start further search,
-but can never replace the checked executable plan. At absorbing rest,
-nonpositive braking commands generate the same stationary trajectory. Replacing
-such warm-start commands by neutral braking leaves that trajectory unchanged;
-actuator increments still apply. At exact rest and neutral force, the local
-model selects the one-sided acceleration branch of the force map and held
-transition. The negative-force branch still has the absorbing reset and zero
-velocity sensitivities. There is no two-sided classical derivative at this
-switch. Nonlinear trial evaluation uses the unchanged physical transition,
-and accepting a search direction requires the full replay checks.
-
-A straight target has a finite segment or forward ray; a curved target has
-a finite arc or complete circle. A forward ray can be bounded for positive
-distance evaluation once all target vertices lie ahead of all ego vertices
-along travel, beyond which distance cannot decrease. Positive parked clearance
-uses exact convex feature geometry. Negative signed values guide restoration;
-perception-range exit never terminates the safety obligation.
-
-For a complete circular target track, its rigid rectangle sweeps exactly an
-annulus about the instantaneous rotation center $c_T$. Let $r_T^-$ be the
-point-to-rectangle distance from $c_T$ to the target footprint and $r_T^+$ the
-maximum distance to its vertices. For the parked ego footprint, let $r_E^+$
-be its maximum vertex radius and $s_E(c_T)$ the signed point-to-rectangle
-distance, positive outside. A signed continuation margin is
-
+A sufficient moving core $C$ requires $v_x>0$ and a witness satisfying
 $$
-d_{\rm ring}=\max\{r_T^- - r_E^+,\ s_E(c_T)-r_T^+\}.
+ \|n\|=1,\qquad n^\top e\ge0,\qquad
+ L_E(n,x)-U_T(n,q)\ge d_{\rm safe}.
 $$
+In the absence of a target the separation condition is vacuous. The witness
+may differ across hypotheses. One common separating plane over the remaining
+sweeps is a sufficient terminal condition. Stage constraints still use the
+configuration-specific rectangle distance dual. Some encounters that are
+safe solely because the vehicles reach a crossing at different times need
+a longer maneuver before they enter this core.
 
-Its positive part equals the exact distance to the swept target set; negative
-values supply restoration directions. The inner-hole and outer-region branches
-are both retained. This is the exact rotational sweep, not replacement of the
-vehicle by a bounding disk, and needs no angular sampling to detect collision.
+For straight target motion each corner sweeps a segment up to the absorbing
+stop, or a ray if the target continues indefinitely. Its upper support is the
+larger endpoint projection for a segment. For a ray it is finite for
+$n^\top e_T\le0$ and equals the initial projection. At rest use the current
+rectangle. For nonzero curvature each corner moves on a circular arc about
+the target turn center. Its maximum projection occurs at an endpoint or at
+the point whose outward radius is parallel to $n$, if that angle belongs to
+the remaining directed arc. A full revolution includes that extremum for
+every direction. Maximizing over the four corners gives $U_T$. The angle
+search in the admissible semicircle returns a unit-normal witness. Acceptance
+uses that witness's support gap, so it needs no globally optimal angle.
+A retained normal remains available for its surviving hypothesis on shift.
 
-**Terminal assumption and numerical scope.** The backup is assumed to reach
-rest on the admitted terminal domain, and the numerical membership rule is
-assumed to select a safe terminal region. The runtime explicitly replays the
-backup with the vehicle model, rather than assuming that an independently
-chosen kinematic curvature is realized by the held steering. Finite hypotheses,
-numerical integration and sampled extrema still prevent an unconditional
-physical safety or recursive-feasibility theorem. The exact suffix argument
-requires consistent flow, information containment and sound node-clearance
-and physical-domain membership.
+Under the simplified model the core is positively invariant. After a forward
+translation by $\Delta s>0$, $L_E$ increases by $\Delta s\, n^\top e\ge0$.
+The remaining target sweep is a subset of its previous sweep, so $U_T$
+cannot increase. The same normal certifies the successor.
 
-Let $c_f(x_N,q_N,u_N)\le0$ denote numerical membership, including terminal
-input compatibility. The nonlinear constraint oracle evaluates this complete
-function at every new control iterate. The SQP subproblem linearizes its
-current value and derivatives; a frozen terminal tangent is not an additional
-constraint on later nonlinear iterates. Derivatives propagate the optimized endpoint state through every backup hold.
-Backup state sensitivities are propagated with those of the main trajectory;
-the absorbing reset has its declared zero velocity sensitivities.
+Let $F_f$ be one full nonlinear prediction hold under $u_f$ and set
+$B=\max(1,\lceil T_{\rm preview,min}/h\rceil)$. The accepted terminal set is
+the constrained $B$-step predecessor of $C$. Entry requires compatibility of
+$u_f$ with the preceding input, forward motion, and admissible nonlinear
+states and node clearance along the entire $B$-hold bridge. Its last state
+must belong to $C$. SQP differentiates the bridge and the active terminal
+support gap. Acceptance recomputes the original nonlinear inequalities.
+The bridge allows steering and lateral transients to evolve before the
+straight-cruise handoff.
 
-At regular minima, the active backup interval and closest parked-track
-geometric feature supply envelope derivatives. Negative restoration branches retain
-their selected sample/axis, or repeat the track search when an intersection
-witness is not a minimizing signed-distance feature. The complete minimum is
-reselected at each new iterate. This avoids assuming that a stale feature
-remains valid during the nonlinear solve.
+**Physical handoff assumption.** For the full vehicle, the terminal argument
+assumes that under $u_f$ a core state remains forward-moving and in the
+physical domain, with $n^\top e^+\ge0$ and $L_E(n,x^+)\ge L_E(n,x)$ for
+the retained witness. These are conditions on ego motion. Together with
+nesting of the target sweep they imply successor separation. The ray model
+establishes these conditions for fixed heading and forward translation. A nonlinear vehicle can still
+have residual sideslip and yaw rate after $B$ holds. The finite bridge does
+not prove the handoff assumption for that vehicle. Each online acceptance
+rechecks nonlinear motion and core membership. A violation invalidates
+the shift and must be reported if no other plan passes.
 
 The geometric guide constructs one route-following trajectory for the
 primary search. Its obstacle circulation uses a consistent tangential
@@ -587,8 +546,8 @@ d_\pm(z_j^s)\ge d_{\rm safe},\qquad
 j=0,\ldots,N,\qquad s=1,\ldots,S,
 $$
 
-with the same condition at every control boundary of the finite backup
-continuation. These checks use the exact rectangle-distance dual value from
+with the same condition at every control boundary of the nonlinear cruise
+bridge. These checks use the exact rectangle-distance dual value from
 Section 5. The control-boundary state nodes are retained even inside a long
 control-knot interval. The first $N$ stage inequalities $C_j\le0$ are
 therefore equivalent to clearance at all $N+1$ state nodes. There is no
@@ -600,39 +559,42 @@ Only a sequence passing these checks can supply a command. The condensed traject
 by construction. Geometry and state checks include the current
 root. The full accepted fine input sequence is stored.
 
-At the next boundary, remove the executed input. If the preview grows
-beyond the retained suffix, initially fill the new tail with the last driving
-input. The guide may request a new first input on this sequence. Test this
-request against the conditioned hypotheses and, if it fails, test the shifted
-driving sequence. When the extrapolated last input fails and the horizon
-requires new holds, keep the suffix and generate the extra inputs from its
-nominal endpoint using the fixed cruise reference. Each complete candidate must pass the same nonlinear
-checks, including movement and terminal membership. If the extensions fail,
-evaluate the original unexecuted suffix against the current posterior at its
-original terminal time. Accept it when it passes the same checks. Only when
-no checked plan is available, initialize the primary search from the single
-geometric guide within the remaining frame budget. A failed
-search supplies no command. The witness inputs used in evaluating $Z_f$ are
-never copied into executable controls.
+### Recursive feasibility on the admitted information domain
 
-For exact dynamics, suppose the posterior is contained in the predicted
-successors and the full-resolution suffix is representable. Write
-$r=N_{k+1}-(N_k-1)\ge0$. When $r=0$, the suffix ends at the previous feasible
-terminal endpoint. For $r>0$, recursive feasibility for continuous driving
-additionally requires a common admissible extension $w_{1:r}$ for all surviving
-members. This extension must keep them moving, preserve the stage constraints
-and place the extended endpoints in $Z_f$. Under that hypothesis, shifting
-the old deficits and appending $r$ zeros gives
+After applying the first input, let $r=N_{k+1}-(N_k-1)\ge0$. Form the
+executable candidate
 $$
-V_{N_{k+1}}(\mathcal I_{k+1})\le V_{N_k}(\mathcal I_k)-\xi_{0|k}^* .
+ U_{k+1}^{\rm shift}
+   =(u_{1|k},\ldots,u_{N_k-1|k},\underbrace{u_f,\ldots,u_f}_{r}).
 $$
-Invariance under the hypothetical braking law alone only establishes a
-continuation in a class that permits stopping. The driving-extension
-hypothesis is stronger and is unproved for the numerical controller. Repeating
-a driving input proposes an extension, whose validity is checked each time.
-A physical state can belong to $Z_f$ while moving: membership expresses the
-existence of the hypothetical safe continuation and triggers no actuator
-switch.
+The fine held-input suffix remains directly representable even when it no
+longer interpolates the new control knots. Generated candidates and this
+shift must each pass the same checks over the complete selected horizon.
+An optional new guide input is accepted only with a feasible continuation.
+
+Suppose an initial plan is feasible, the posterior contains the true member
+and is contained in the predicted successors, the flow and timing agree,
+requested horizons fit the numerical allocation, and the core handoff
+assumption holds. Let $z\in Z_f$. One step of $F_f$ consumes the first of
+the $B$ checked bridge holds. The remaining $B-1$ holds reach $C$. Core
+invariance supplies one more admissible moving hold ending in $C$. Thus
+$F_f(z)\in Z_f$. Induction gives any $r$ required extension holds under a
+single common input. Conditioning can discard physical members, and all
+surviving members inherit their own witnesses. When $r=0$ the old endpoint
+is already in $Z_f$.
+
+The shifted feasible plan inherits the old stage deficits after the executed
+stage and appends $r$ zeros. On a shift-closed policy domain this gives
+$$
+ V_{N_{k+1}}(\mathcal I_{k+1})
+ \le V_{N_k}(\mathcal I_k)-\xi^*_{0|k}.
+$$
+In particular, an accepted zero-deficit plan supplies a zero-deficit
+successor even if the optimizer returns no improvement. This induction gives
+continued admissible motion under the stated assumptions. It supplies
+neither a positive minimum speed uniform over all initial conditions nor a
+proof of return to the nominal lane. Numerical rechecks and finite
+hypotheses do not provide a robust physical-model or timing certificate.
 
 ## 8. Scope of the resulting statements
 
