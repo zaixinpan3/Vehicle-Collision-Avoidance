@@ -148,6 +148,26 @@ classdef predictiveSafetyGeometry
             valid=valid && max(one,two)<=0;
         end
 
+        function acceleration=routeAcceleration(x,projection,model)
+            % A course field converges to the path without prescribing waypoints or
+            % an avoidance/return schedule. The existing initialization gains set its
+            % lookahead, course response and speed recovery; no CLF row is introduced.
+            cfg=model.cfg;p=cfg.nominalClf;speed=hypot(x(4),x(5));
+            course=x(3)+atan2(x(5),x(4));
+            error=atan2(sin(course-projection.heading),cos(course-projection.heading));
+            lateral=projection.lateralPosition;
+            referenceSpeed=hypot(model.nominalReference.state(4),model.nominalReference.state(5));
+            lookahead=max(p.minimumLookaheadMeters,p.lookaheadSeconds*referenceSpeed);
+            desired=-atan(lateral/lookahead);
+            desiredRate=-lookahead/(lookahead^2+lateral^2)*speed*sin(error);
+            courseError=atan2(sin(error-desired),cos(error-desired));
+            curvature=model.nominalReference.curvature;
+            courseRate=curvature*speed*cos(error)/max(1-curvature*lateral,.1) ...
+                +desiredRate-p.courseGain*courseError;
+            forward=[cos(course);sin(course)];normal=[-forward(2);forward(1)];
+            acceleration=p.speedGain*(referenceSpeed-speed)*forward+speed*courseRate*normal;
+        end
+
         function guide = avoidanceGuide(model,count)
             % Route-following initialization, corrected by an avoidance field.
             % No candidate scores or admission gate. RTI receives the states
@@ -1426,9 +1446,8 @@ function candidate=localCirculationRollout(model,data,speed,count)
         forward=predictiveSafetyGeometry.direction(model.initialState(3));
         alignment=forward.'*initialField.rotation*initialField.tangent;
         circulationSign=sign(alignment);
-        % A stationary collinear obstacle can admit straight braking; do
-        % not inject a transverse turn when neither tangent faces forward.
-        if abs(alignment)<1e-8,circulationSign=double(model.target(4)>0);end
+        % Choose a passing side even for an exactly collinear parked target.
+        if abs(alignment)<1e-8,circulationSign=1;end
     end
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1), ...
@@ -1461,7 +1480,7 @@ function candidate=localCirculationRollout(model,data,speed,count)
             % Route attraction is the preferred acceleration BEFORE obstacle
             % and boundary correction. Never overwrite longitudinal obstacle
             % acceleration with a cruise-speed request afterwards.
-            acceleration=localRouteAcceleration(x,projection,model);
+            acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
             if ~encounterEnded
                 parameters=localFieldParameters(data,index,speed);
                 parameters.preferredAcceleration=acceleration;parameters.initialCirculation=circulationSign;
@@ -1479,25 +1498,7 @@ function candidate=localCirculationRollout(model,data,speed,count)
     end
 end
 
-function acceleration=localRouteAcceleration(x,projection,model)
-    % A course field converges to the path without prescribing waypoints or
-    % an avoidance/return schedule. The existing initialization gains set its
-    % lookahead, course response and speed recovery; no CLF row is introduced.
-    cfg=model.cfg;p=cfg.nominalClf;speed=hypot(x(4),x(5));
-    course=x(3)+atan2(x(5),x(4));
-    error=atan2(sin(course-projection.heading),cos(course-projection.heading));
-    lateral=projection.lateralPosition;
-    referenceSpeed=hypot(model.nominalReference.state(4),model.nominalReference.state(5));
-    lookahead=max(p.minimumLookaheadMeters,p.lookaheadSeconds*referenceSpeed);
-    desired=-atan(lateral/lookahead);
-    desiredRate=-lookahead/(lookahead^2+lateral^2)*speed*sin(error);
-    courseError=atan2(sin(error-desired),cos(error-desired));
-    curvature=model.nominalReference.curvature;
-    courseRate=curvature*speed*cos(error)/max(1-curvature*lateral,.1) ...
-        +desiredRate-p.courseGain*courseError;
-    forward=[cos(course);sin(course)];normal=[-forward(2);forward(1)];
-    acceleration=p.speedGain*(referenceSpeed-speed)*forward+speed*courseRate*normal;
-end
+
 
 function violation=localPlannerStateViolation(x,model)
     cfg=model.cfg;

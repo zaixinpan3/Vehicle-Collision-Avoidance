@@ -3,7 +3,8 @@
 The adopted controller combines fixed measurement-consistency inference with
 a condensed nonlinear predictive-CBF optimization of actuator commands.
 It enforces a terminal continuation set and retains a complete held-input
-plan for numerical safety validation and fallback. Collision constraints apply
+moving plan for validation at the next measurement. The first feasible
+driving sequence supplies the next command. Collision constraints apply
 to control-boundary state nodes. Control knots, integration samples, and sensor
 samples have distinct roles; reducing the decision dimension does not remove the physical model.
 The derivation below states both the algorithm and the limits of its guarantees.
@@ -221,7 +222,7 @@ $$
 s_0\in\arg\min_s\left\|x_k^s-\frac1{S_k}\sum_a x_k^a\right\|^2.
 $$
 
-This member defines the performance cost. Every retained member is propagated
+This member supplies the geometric guide and the reported tracking cost. Every retained member is propagated
 under the same proposed input sequence inside the nonlinear constraint oracle
 and again at the refined acceptance resolution. This is an approximation to robust output feedback: control at
 $t_k$ depends only on $\mathcal I_k$, the reference, and retained plans. Future
@@ -262,7 +263,8 @@ $N_{k-1}-1$ is the length of the unexecuted feasible suffix, which ends at
 the old terminal state. The preview may therefore shrink by one hold per
 decision as its current time requirement decreases; no terminal action is
 appended solely to preserve the previous horizon length. If the current
-preview requires a longer horizon, append the terminal continuation.
+preview requires a longer horizon, the driving extension must itself satisfy
+the executable constraints and end in the terminal set.
 
 Use $M\le N$ control intervals, with integer boundaries
 $0=c_0<c_1<\cdots<c_M=N$ and $b_i=c_i-c_{i-1}$. The first few intervals
@@ -315,16 +317,11 @@ b_2=\theta^2-\tfrac23\theta^3,\quad
 b_4=-\tfrac12\theta^2+\tfrac23\theta^3.
 $$
 
-The dense extension supplies physical-model domain checks inside each hold;
-collision checks use only its control-boundary states. Automatic derivatives
-of these same expressions are propagated by
-$S_{j+1}=F_xS_j+F_uD_vu_j$. There are no shooting defects to restore.
-All executable proposals still undergo independent fine RK4 replay. If a
-proposal passes the initial oracle but fails fine replay, the oracle is
-upgraded to that fine integration mesh and optimization continues from the
-same iterate while budget remains. A failed replay never authorizes execution.
-The dense extension and fine replay are numerical approximations, not validated
-integration error bounds.
+The nonlinear validation flow uses a fixed RK4 mesh, with physical-domain
+checks inside each hold and collision checks at its boundaries. Local SQP
+sensitivities propagate $S_{j+1}=F_x S_j+F_uD_v u_j$ on a cheaper mesh. The
+held inputs reconstructed from a trial must pass the original nonlinear
+validation. Neither mesh supplies a certified integration-error bound.
 
 The causal measurement-consistency update uses the same fine RK4 resolution,
 subdividing each sensor interval without applying the absorbing reset before
@@ -389,7 +386,7 @@ Let $e_i$ contain lateral displacement from the fixed reference frame at
 node $i$, wrapped heading error, longitudinal-speed error, lateral velocity,
 and yaw rate. Reference frames are obtained by projecting the constant-speed
 extrapolation from the current nominal pose onto the reference path. The
-objective is
+reported tracking cost is
 
 $$
 J=\frac12\sum_{i=1}^M h b_i e_i^\top W e_i
@@ -429,22 +426,29 @@ $|\alpha_f|<\pi/2$ on the declared steering domain. This condition is inactive
 on the pure low-speed branch. Symbolic guards used to evaluate rejected trial
 points do not extend the physical model's domain. Terminal membership is hard
 and has no safety slack.
-There are $2M+N$ primary variables and $2M$ performance variables. The terminal
-and collision constraints retain all supplied physical hypotheses; those
-hypotheses are not independent controller initializations. No longitudinal
-speed cap, lateral velocity cap or yaw-rate cap is imposed.
+The primary problem has $2M+N$ variables. A driving sequence must also
+satisfy $\|(v_x^s,v_y^s)\|_2>0$ after the initial node at the sampled
+physical states of each executable hold, including its post-reset endpoint.
+An initially stationary ego can depart on the first hold. The strict
+condition introduces no calibrated minimum cruise speed.
 
-A feasible zero-deficit plan attains the global lower bound of this primary
-objective. Only after finding such a plan does the implementation minimize
-$J$ with all deficits fixed to zero. A positive-deficit local solution is a
-search result, never an executable safety plan. In particular, performance
-cannot be exchanged against positive deficit through a weighted penalty.
-For an attained exact primary optimum and a valid shifted terminal extension,
-the usual shift yields $V_N(\mathcal I^+)\le V_N(\mathcal I)-\xi_0^*$.
-A local positive-deficit iterate alone does not establish this inequality.
-The deployed acceptance rule uses its zero-deficit special case.
+Let $\tilde v_{x,j}^s$ denote the longitudinal speed just before the
+boundary reset. Its stop branch has $b_j\le0$ and
+$\tilde v_{x,j}^s<0.2v_{\rm hold}$. During feasibility restoration, the
+inequality
+$$
+\min\{0.2v_{\rm hold}-\tilde v_{x,j}^s,-b_j\}\le 0
+$$
+excludes the interior of that branch. The original nonlinear flow and the
+strict motion check resolve equality cases. These constraints apply to the
+executable horizon. The following terminal construction has its own dynamics
+and is evaluated as a membership witness.
 
-### Terminal set of a common backup controller
+A feasible zero-deficit driving sequence attains the lower bound of the PCBF
+objective. Its first input is issued immediately after validation. Tracking
+cost $J$ is available for analysis and does not rank accepted plans.
+
+### Terminal set and its hypothetical continuation
 
 Use the simple, causal backup command
 
@@ -471,8 +475,9 @@ Z_f=\{(x,q,\vartheta,u^-):\ u_f\text{ and its entry increment are admissible},
  d(\Phi_f(jh))\ge d_{\rm safe}\ \text{for every integer }j\ge0\}.
 $$
 
-Here $\mathcal D$ is the forward-motion and physical-model domain described
-above. Require $(x_N^s,q_N^s,\vartheta^s,u_N)\in Z_f$ for every retained hypothesis.
+Here $\mathcal D$ is the physical-model domain with nonnegative longitudinal
+speed, including rest for the terminal witness. Require
+$(x_N^s,q_N^s,\vartheta^s,u_N)\in Z_f$ for every retained hypothesis.
 This is a backup-trajectory set, not a radial stopping-distance reserve.
 It does not require the target to brake, impose stability caps, or require
 an instantaneous ego stop at the optimized endpoint. Holding the backup input
@@ -556,68 +561,19 @@ witness is not a minimizing signed-distance feature. The complete minimum is
 reselected at each new iterate. This avoids assuming that a stale feature
 remains valid during the nonlinear solve.
 
-The primary deficit problem uses SQP with nonlinear trial evaluation. Once a
-checked zero-deficit plan is available, the performance problem uses a
-regularized Gauss--Newton model. Write its least-squares objective as
-$J(v)=\tfrac12\|r(v)\|^2$, put $g=D r^\top r$ and
-$H=D r^\top D r+\lambda I$ with $\lambda>0$, and collect the nonlinear
-zero-deficit stage, domain and terminal constraints in $c(v)\le0$.
-At a search iterate $\bar v$, compute
-
-$$
-\begin{aligned}
-\min_{d,e}\quad &g^\top d+\tfrac12d^\top H d+\rho e+\tfrac12e^2,\\
-\text{subject to}\quad &c(\bar v)+Dc(\bar v)d\le e\mathbf1,\\
-&\bar v+d\in\mathcal U_N,\qquad e\ge0.
-\end{aligned}
-$$
-
-Only $e$ is constrained nonnegative; $d$ is unrestricted except for the input
-rows. A backtracking line search evaluates the original nonlinear merit
-$J(v)+\rho\|[c(v)]_+\|_1$. A feasible QP iterate returned at its iteration
-limit may propose a direction; it still undergoes nonlinear acceptance.
-Backtracking continues to numerical step resolution or the call deadline,
-rather than imposing a fixed minimum fraction of the full direction.
-The elastic variable globalizes the numerical
-search and is never an executable safety slack: a replacement still requires
-zero deficit, hard terminal membership and fine replay. Trial evaluations
-need values only; sensitivities are evaluated at the next linearization point.
-This avoids rebuilding a general-purpose performance NLP on every frame.
-The vehicle dynamics remain nonlinear. A single
-planner-generated control sequence initializes the first solve; continuation
-normally shifts the stored search sequence. On entry to exact rest in all
-retained physical members, regenerate this single search sequence from the
-current posterior and fixed cruise reference. Do so once per rest episode,
-so subsequent calls can continue unfinished optimization. Discard any pending
-proposal from the replaced search. The separately retained, replay-checked
-fine plan is unaffected, preserving its suffix and terminal continuation;
-the restart neither certifies its new seed nor extends the online budget.
-For both moving and stopped targets, the initializer retains
-the obstacle tangent with positive projection onto the ego forward
-direction as its circulation preference. At a perpendicular tie, a moving
-target uses a fixed sign; a stopped target leaves circulation unbiased so
-straight braking remains a possible initialization. This uses one trajectory.
-Its actuator mapping uses the
-physical steering range and does not impose the legacy observer sideslip or
-speed caps. Before nonlinear search, project the single warm sequence onto
-the existing linear input bounds, configured increments and terminal-command
-handoff rows by minimizing its squared change. This numerical projection
-adds no physical constraint and does not certify collision or terminal safety.
-These are initialization choices, not safety constraints or an
-admission rule; the nonlinear optimizer may change the resulting commands. Iteration and wall-time budgets limit local
-improvement, and do not constitute global feasibility or hard execution-time
-guarantees. Initialization retains its configured search budget after finding
-a safe backup, allowing performance optimization at zero primary deficit;
-subsequent calls use the online budget when a checked suffix remains available.
-Every accepted replacement passes both the hard constraints and
-fine nonlinear replay. Numerical command normalization requires replay if it
-changes the already checked sequence.
+The geometric guide constructs one route-following trajectory for the
+primary search. Its obstacle circulation uses a consistent tangential
+direction through each rollout, with a fixed sign for a perpendicular tie.
+When needed, project the initialization onto the linear actuator and terminal
+handoff rows. SQP then minimizes the sum of stage deficits under the hard
+domain, motion and terminal constraints. Validation of the first feasible
+trial ends the search, including a trial found inside a line search.
 
 ## 7. Node acceptance and retention of executable plans
 
 For each retained physical member, expand the proposed coarse commands into
 all $N$ held commands and propagate its own persistent parameters. Fine RK4
-replay uses $K_v=64$ steps per hold by default, with the held command and the
+replay uses $K_v=8$ steps per hold by default, with the held command and the
 rest reset applied at control boundaries. This is the integration and
 physical-domain mesh; it does not define additional collision constraints.
 Every new executable proposal is checked for physical input bounds,
@@ -643,45 +599,36 @@ Only a sequence passing these checks can supply a command. The condensed traject
 by construction. Geometry and state checks include the current
 root. The full accepted fine input sequence is stored.
 
-At the next boundary, delete the executed first input. Append the constant
-terminal-controller command only for holds beyond this suffix that are needed
-by the new preview. Recheck the complete
-sequence and its new terminal membership from the conditioned information.
-The retained sequence stays at its original hold resolution; a coarse refit is
-only a warm start and may not replace it without validation. Heuristic repeated
-last inputs and a bank of tail-repair durations are not terminal continuations.
+At the next boundary, remove the executed input. If the preview grows
+beyond the retained suffix, initially fill the new tail with the last driving
+input. The guide may request a new first input on this sequence. Test this
+request against the conditioned hypotheses and, if it fails, test the shifted
+driving sequence. When the extrapolated last input fails and the horizon
+requires new holds, keep the suffix and generate the extra inputs from its
+nominal endpoint using the fixed cruise reference. Each complete candidate must pass the same nonlinear
+checks, including movement and terminal membership. If neither succeeds,
+initialize the primary search from the single geometric guide. A failed
+search supplies no command. The witness inputs used in evaluating $Z_f$ are
+never copied into executable controls.
 
-Under the terminal safety and invariance assumption, consistent state evolution
-and conditioning, exact node and terminal constraint evaluation, and an
-admissible policy class containing the retained fine sequence, the usual shift argument supplies a
-feasible continuation: the old feasible suffix survives conditioning, its old
-endpoint belongs to $Z_f$, and any appended terminal law stays in $Z_f$.
-After one executed hold, the old suffix has $N_k-1$ holds and ends at the old
-terminal state. It is feasible at a new horizon $N_{k+1}=N_k-1$ under the same
-assumptions. A longer horizon appends the terminal law. Shortening further
-requires the new prefix endpoint to belong to $Z_f$, together with node
-constraints and an admissible representation of the retained controls.
-Simply discarding a tail before terminal entry does not establish feasibility.
-
-The backup uses the same vehicle transition, so its continuation does not
-require a switch to a different curvature model. Numerical integration,
-finite hypotheses and sampled membership are implementation approximations, so the
-runtime still reports an assumed terminal contract rather than an unconditional
-recursive-feasibility certificate. Membership of an executed plan is evaluated through the full terminal function.
-
-A replay-feasible proposal or seed can be accepted even if SQP reaches its
-iteration or time limit. Its performance cost, evaluated on the fine replay,
-must improve on the stored feasible plan under the same current reference.
-For a retained sequence that is not a coarse interpolation, use the actual
-sum of squared increments of its held inputs; do not substitute increments of
-refitted knots. The original fine sequence remains an admissible fallback
-even when its coarse projection is infeasible or has worse performance.
-If improvement fails, a replay-feasible retained fine
-plan remains available. If no checked candidate exists, the runtime reports a
-planning failure and does not claim physical impossibility or authorize an
-unchecked command. In particular, failure of a local solve, a coarse input
-parameterization, or a conservative separator is not a proof that all
-physically admissible causal controllers fail.
+For exact dynamics, suppose the posterior is contained in the predicted
+successors and the full-resolution suffix is representable. Write
+$r=N_{k+1}-(N_k-1)\ge0$. When $r=0$, the suffix ends at the previous feasible
+terminal endpoint. For $r>0$, recursive feasibility for continuous driving
+additionally requires a common admissible extension $w_{1:r}$ for all surviving
+members. This extension must keep them moving, preserve the stage constraints
+and place the extended endpoints in $Z_f$. Under that hypothesis, shifting
+the old deficits and appending $r$ zeros gives
+$$
+V_{N_{k+1}}(\mathcal I_{k+1})\le V_{N_k}(\mathcal I_k)-\xi_{0|k}^* .
+$$
+Invariance under the hypothetical braking law alone only establishes a
+continuation in a class that permits stopping. The driving-extension
+hypothesis is stronger and is unproved for the numerical controller. Repeating
+a driving input proposes an extension, whose validity is checked each time.
+A physical state can belong to $Z_f$ while moving: membership expresses the
+existence of the hypothetical safe continuation and triggers no actuator
+switch.
 
 ## 8. Scope of the resulting statements
 
