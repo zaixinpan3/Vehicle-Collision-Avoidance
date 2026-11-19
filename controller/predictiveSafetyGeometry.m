@@ -168,12 +168,14 @@ classdef predictiveSafetyGeometry
             acceleration=p.speedGain*(referenceSpeed-speed)*forward+speed*courseRate*normal;
         end
 
-        function guide = avoidanceGuide(model,count)
+        function guide = avoidanceGuide(model,count,holds)
             % Route-following initialization, corrected by an avoidance field.
             % No candidate scores or admission gate. RTI receives the states
             % and inputs over exactly count holds. Terminal constraints
             % belong to RTI, not this heuristic initialization.
-            cfg=model.cfg;time=(0:count)*cfg.controller.sampleTime;
+            if nargin<3,holds=ones(1,count);end
+            cfg=model.cfg;durations=holds*cfg.controller.sampleTime;
+            time=[0,cumsum(holds)]*cfg.controller.sampleTime;
             target=predictiveSafetyGeometry.predictTarget(model.target,time);
             shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
             generator=model.uncertainty.collisionGenerator;
@@ -181,7 +183,7 @@ classdef predictiveSafetyGeometry
             % Guide and optimizer must use the same persistent target family
             % whenever joint prediction is selected. Only legacy per-hold
             % prediction uses its distinct conditional approximation.
-            holdTime=[0,repmat(cfg.controller.sampleTime,1,count)];
+            holdTime=[0,durations];
             jointTarget=isfield(model.uncertainty,'jointPrediction') ...
                 && (cfg.controller.retainedTube || cfg.controller.jointAffinePrediction || cfg.controller.jointNonlinearPrediction);
             jointTarget=jointTarget || (~isempty(model.uncertainty.target) && isfield(model.uncertainty.target,'family'));
@@ -211,20 +213,19 @@ classdef predictiveSafetyGeometry
             % One autonomous field, integrated once. Route attraction,
             % obstacle circulation and road guidance act at every moving node;
             % no separate nominal rollout classifies or selects a behavior.
-            best=localCirculationRollout(model,data,speed,count);
+            best=localCirculationRollout(model,data,speed,durations);
             total=1;diagnostics=localCandidateSummary(best);
-            time=(0:numel(best.gaps)-1)*cfg.controller.sampleTime;
             conflict=best.gaps<=0;first=NaN;last=NaN;
             if any(conflict),first=time(find(conflict,1));last=time(find(conflict,1,'last'));end
             guide=best;
-            guide.time=(0:size(best.inputs,2))*cfg.controller.sampleTime;
+            guide.time=time;
             guide.target=predictiveSafetyGeometry.predictTarget(model.target,guide.time);
             guide.position=best.states(1:2,:);guide.velocity=zeros(2,size(best.states,2));
             for index=1:size(best.states,2)
                 angle=best.states(3,index);rotation=[cos(angle),-sin(angle);sin(angle),cos(angle)];
                 guide.velocity(:,index)=rotation*best.states(4:5,index);
             end
-            guide.acceleration=[diff(guide.velocity,1,2)/cfg.controller.sampleTime,zeros(2,1)];
+            guide.acceleration=[diff(guide.velocity,1,2)./durations,zeros(2,1)];
             % Record transverse excursion relative to the initial motion,
             % independently of the displacement to the cruise route.
             transverse=lateral.'*(guide.position-model.initialState(1:2));
@@ -1436,8 +1437,8 @@ function [distance,point]=localPointSegment(vertex,first,last)
     point=first+alpha*edge;distance=norm(vertex-point);
 end
 
-function candidate=localCirculationRollout(model,data,speed,count)
-    cfg=model.cfg;h=cfg.controller.sampleTime;
+function candidate=localCirculationRollout(model,data,speed,durations)
+    cfg=model.cfg;h=cfg.controller.sampleTime;count=numel(durations);
     physicalOnly=isfield(model,'compactInitialization') && model.compactInitialization;
     circulationSign=0;
     if physicalOnly
@@ -1493,7 +1494,7 @@ function candidate=localCirculationRollout(model,data,speed,count)
             if physicalOnly,u(1)=min(cfg.outputFeedback.steeringMaximum,max(-cfg.outputFeedback.steeringMaximum,u(1)));end
         end
         candidate.inputs(:,index)=u;
-        next=nonlinearBicycleModel.sample(x,u,cfg);
+        next=nonlinearBicycleModel.sample(x,u,cfg,[],durations(index));
         candidate.states(:,index+1)=next;prior=u;
     end
 end

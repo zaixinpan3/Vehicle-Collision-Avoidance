@@ -130,11 +130,10 @@ For $A_C<0$, the physical target moves until $V_C=0$ and then retains its
 stopped pose. The latent acceleration and sideslip parameters remain fixed;
 zero physical acceleration after stopping does not redefine those parameters.
 
-The target stopping mode is absorbing. Losing a radar return does not remove
-a target, terminate its collision obligation, or justify reinitializing the
-physical information. A new target requires an explicit admissible initial
-information contract. Multiple targets require joint hypotheses and separate
-collision constraints for each footprint.
+The target stopping mode is absorbing. Inference retains its physical track
+through missed radar returns and confirmed range exits. A new target requires
+an explicit admissible initial information contract. Multiple targets require
+joint hypotheses and separate collision constraints for each footprint.
 
 Let the augmented physical Markov state be
 
@@ -213,6 +212,16 @@ by an independently fitted point, and parameters are not redrawn. An empty
 ensemble is an information-contract failure, not evidence that collision
 avoidance is physically impossible. A finite ensemble does not enclose all
 states between its members.
+
+For a tracked target let \(d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|\) and let
+\(R\) be the radar range. Record entry once a radar return has occurred or
+\(d_k^-\le R\). A target explicitly supplied by the initial contract is
+included on its first approach. Following entry, the target contributes
+collision and terminal separation constraints at decision \(k\) exactly when
+\(d_k^-\le R\). If \(d_k^->R\), the target-free planning problem retains
+the physical-domain, actuator and moving terminal continuation conditions.
+The posterior continues to propagate the target. Re-entry restores its full
+node and terminal constraints before a new command can be issued.
 
 The inference equations are fixed. There is no online optimization of an
 observer gain or learned memory update. Planning selects one representative
@@ -539,7 +548,8 @@ physical-domain mesh; it does not define additional collision constraints.
 Every new executable proposal is checked for physical input bounds,
 configured input increments, and the physical-model domain.
 
-Let $z_j^s=(x_j^s,q_j^s)$ be the joint state at $t_k+jh$. The collision checks are
+Let $z_j^s=(x_j^s,q_j^s)$ be the joint state at $t_k+jh$. While the target
+is active at decision $k$, each proposed plan must satisfy
 
 $$
 d_\pm(z_j^s)\ge d_{\rm safe},\qquad
@@ -559,7 +569,26 @@ Only a sequence passing these checks can supply a command. The condensed traject
 by construction. Geometry and state checks include the current
 root. The full accepted fine input sequence is stored.
 
+For target-free cruise on a realizable constant-curvature reference, let
+\(u^\star,x^\star\) denote the physical trim and \(G(x,u^-)\) the
+route-guidance command. The nominal guide uses
+\(G(x,u^-)+u^\star-G(x^\star,u^\star)\), subject to the actuator and
+increment bounds. The straight-road correction is zero. At an admissible
+trim this gives \(u^\star\), so a vehicle at trim follows the reference.
+An unattainable steady turn uses the bounded route guidance without a trim
+correction. This equilibrium identity alone supplies no CLF decay inequality.
+
 ### Recursive feasibility on the admitted information domain
+
+Releasing target constraints enlarges the feasible set for the same
+horizon. On re-entry the collision obligations increase. The shift proof
+below applies through that boundary only if the incoming state and
+continuation are feasible for the reactivated encounter. The controller
+constructs one guide sampled at the control knots and their discrete
+midpoints. Its interpolated knot commands and, if needed, its original
+held commands undergo the full nonlinear checks. The retained suffix must
+pass those same checks to supply an action. Re-entry feasibility thus
+requires a separate admission assumption.
 
 After applying the first input, let $r=N_{k+1}-(N_k-1)\ge0$. Form the
 executable candidate

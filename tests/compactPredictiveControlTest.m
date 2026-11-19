@@ -32,6 +32,66 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function confirmedExitReleasesOnlyTheCollisionObligation(testCase)
+            cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
+            radius=cfg.collision.encounterRangeMeters;
+            item.target=[-radius+.2;0;pi;1;0;0;1.6;2.4;.95;0;0];
+            other=item;other.target(1)=-radius-.2;
+            block.initialHypotheses=[item,other];
+            % With no radar return both positions remain possible.
+            block.samples.radarAvailable=false;
+            [~,~,p,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyTrue(p.metadata.collisionTargetActive);
+            testCase.verifyNotEmpty(p.scenarios{1}.targets);
+            block=localNextBlock(prior,cfg);
+            for j=1:numel(block.samples),block.samples(j).radarAvailable=false;end
+            [~,~,p,state]=collisionAvoidanceController(block,[],[],cfg,prior);
+            testCase.verifyFalse(p.metadata.collisionTargetActive);
+            testCase.verifyNumElements(state.hypotheses,2);
+            testCase.verifyEqual(p.information,state.hypotheses);
+            for j=1:2
+                testCase.verifyNotEmpty(state.hypotheses(j).target);
+                testCase.verifyEmpty(p.scenarios{j}.targets);
+                testCase.verifyTrue(p.scenarios{j}.terminal.member);
+            end
+        end
+        function reentryChecksTheRetainedTargetAgain(testCase)
+            cfg=testCase.cfg;block=localBlock(cfg,8);
+            edge=sqrt(cfg.collision.encounterRangeMeters^2-3^2);
+            target=[edge-.01;3;0;9;-20;0;1.6;2.4;.95;0;0];
+            block.initialHypotheses.target=target;
+            [~,~,p,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyTrue(p.metadata.collisionTargetActive);
+            [~,~,p,prior]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
+            testCase.verifyFalse(p.metadata.collisionTargetActive);
+            [~,~,p,state]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
+            testCase.verifyTrue(p.metadata.collisionTargetActive);
+            testCase.verifyEqual(p.scenarios{1}.targets(:,1),state.hypotheses.target);
+            testCase.verifyTrue(p.scenarios{1}.terminal.member);
+        end
+        function upstreamInitialTargetRemainsInTheFirstEncounterPlan(testCase)
+            cfg=testCase.cfg;block=localBlock(cfg,8);
+            block.initialHypotheses.target=[cfg.collision.encounterRangeMeters+1;4;pi;5;0;0;1.6;2.4;.95;0;0];
+            [~,~,p,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyTrue(p.metadata.collisionTargetActive);
+            testCase.verifyNotEmpty(p.scenarios{1}.targets);
+            [~,~,p]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
+            testCase.verifyTrue(p.metadata.collisionTargetActive);
+        end
+        function clearRoadSteadyTurnIsAPublicControllerEquilibrium(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=30;cfg.tire.frictionCoefficient=[.65;.65];
+            [x,~,road,cfg]=collisionThreatScenario("curvedHeadOn",cfg);
+            trim=nonlinearBicycleModel.operatingPoint(cfg,road.referenceCurve.curvature);
+            block=localBlock(cfg,30);block.initialHypotheses.ego=x;block.heldInput=trim.input;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor",'cfg',cfg, ...
+                'hypothesis',block.initialHypotheses,'input',trim.input,'time',0));
+            [command,~,p,prior]=collisionAvoidanceController(block,[],road,cfg,[]);
+            testCase.verifyEqual(command.actuatorInput,trim.input,AbsTol=1e-12);
+            testCase.verifyFalse(p.metadata.collisionTargetActive);
+            [command,~,p]=collisionAvoidanceController(localNextBlock(prior,cfg),[],road,cfg,prior);
+            testCase.verifyEqual(command.actuatorInput,trim.input,AbsTol=1e-10);
+            testCase.verifyTrue(p.scenarios{1}.terminal.member);
+        end
         function sensorBlockPropagationPreservesEachSurvivingHypothesis(testCase)
             cfg=testCase.cfg;
             cfg.outputFeedback.noiseBounds=[.1;1;.1;.1];

@@ -3107,8 +3107,7 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                 if isempty(item.target) || ~expected.radarAvailable,excess=Inf;
                 else,excess=max(excess,norm(measured.relativePosition-expected.relativePosition)-bounds(4));end
             end
-            % No return is compatible with a dropout: it never deletes a
-            % physical target or clears its future collision obligations.
+            % A missed return alone cannot establish target departure.
         end
         next(s)=item;residual(s)=excess;keep(s)=excess<=tolerance;
     end
@@ -3819,7 +3818,26 @@ function [result,info] = localCompactStep(request,cfg)
         hypotheses=prior.hypotheses;inherited=size(prior.fineControls,2)-1;
     end
     clock=tic;[hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
-    inferenceSeconds=toc(clock);window=localOfWindow(hypotheses,inherited,cfg);
+    inferenceSeconds=toc(clock);
+    % A dropout alone gives no range information. Keep the physical target
+    % in the posterior even when all surviving members place it outside.
+    planning=hypotheses;
+    inRange=any(arrayfun(@(s)~isempty(s.target) && ...
+        norm(s.target(1:2)-s.ego(1:2))<=cfg.collision.encounterRangeMeters,hypotheses));
+    seen=inRange || any([block.samples.radarAvailable]);
+    if ~initial
+        if isfield(prior,'targetEnteredRange')
+            seen=seen || prior.targetEnteredRange;
+        else
+            seen=seen || any(arrayfun(@(s)~isempty(s.target) && ...
+                norm(s.target(1:2)-s.ego(1:2))<=cfg.collision.encounterRangeMeters,prior.hypotheses));
+        end
+    end
+    % A target supplied by the initial contract can start upstream of the
+    % radar. Its first approach is distinct from a confirmed encounter exit.
+    active=~isempty(hypotheses(1).target) && (inRange || ~seen);
+    if ~active,[planning.target]=deal([]);end
+    window=localOfWindow(planning,inherited,cfg);
     holds=diff(localCompactBoundaries(window.horizonSteps,cfg));
     % A representative retained member supplies the nominal dynamics. All
     % retained members are replayed before accepting a control sequence.
@@ -3827,7 +3845,13 @@ function [result,info] = localCompactStep(request,cfg)
     x=item.ego;
     stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
     [~,lane]=readControllerInputs(stub,[],request.reference,cfg);
-    [result,info]=localCondensedSolve(request,cfg,hypotheses,conditioning,window,holds,lane,nominal,timer,inferenceSeconds);
+    [result,info]=localCondensedSolve(request,cfg,planning,conditioning,window,holds,lane,nominal,timer,inferenceSeconds);
+    info.collisionTargetActive=active;
+    result.prediction.metadata=info;
+    result.prediction.information=hypotheses;
+    result.state.hypotheses=hypotheses;
+    result.state.targetEnteredRange=seen;
+    result.state.collisionTargetActive=active;
 end
 
 function boundaries=localCompactBoundaries(count,cfg)
@@ -3855,13 +3879,22 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     inherit=~initial && isfield(prior,'movingTerminalPlan') && prior.movingTerminalPlan;
     attempts=0;iterationCount=0;calls=0;reuseCount=0;restoration=false;seedCount=0;
     cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;
-    if inherit
+    reentered=inherit && isfield(prior,'collisionTargetActive') && ~prior.collisionTargetActive && ~isempty(item.target);
+    if reentered
+        % The target-free suffix carries no collision witness for this
+        % encounter. Form one guide on the shooting knots; check every hold.
+        [controls,guideInputs]=localCompactSeed(item,previous,holds,lane,cfg,true);seedCount=1;
+        initializationSource="singleCirculationRollout";
+        validatePlan(controls*model.map.'+model.offset,[]);
+        if isempty(best),validatePlan(guideInputs,[]);end
+    end
+    if inherit && isempty(best)
         suffix=prior.fineControls(:,2:end);
         extra=count-size(suffix,2);
         cruise=terminalSafeSet.movingControl(cfg);
         inherited=[suffix,repmat(cruise,1,extra)];
         initializationSource="shiftedMovingTerminalLaw";
-        if toc(timer)<budget
+        if ~reentered && toc(timer)<budget
             guide=localCompactSeed(item,previous,1,lane,cfg);
             proposal=inherited;proposal(:,1)=guide;
             proposal=localCompactRateLimit(proposal,previous,ones(1,count),cfg);
@@ -3882,9 +3915,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         initializationSource="singleCirculationRollout";
         try
             checkClock();
-            controls=localCompactSeed(item,previous,holds,lane,cfg);seedCount=1;
-            candidate=controls*model.map.'+model.offset;
-            validatePlan(candidate,[],@checkClock);
+            if ~reentered
+                controls=localCompactSeed(item,previous,holds,lane,cfg);seedCount=1;
+                candidate=controls*model.map.'+model.offset;
+                validatePlan(candidate,[],@checkClock);
+            end
             if isempty(best)
                 restoration=true;
                 [a,b]=localCondensedInputRows(previous,holds,cfg);
@@ -4396,7 +4431,7 @@ function controls = localCompactRateLimit(controls,previous,holds,cfg)
     end
 end
 
-function controls = localCompactSeed(item,previous,holds,lane,cfg)
+function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg,reentered)
     % One geometric-planner rollout initializes the optimizer.
     count=sum(holds);x=item.ego;
     frame=predictiveSafetyGeometry.roadFrame(lane,struct('lateralClearance',[]));
@@ -4404,13 +4439,25 @@ function controls = localCompactSeed(item,previous,holds,lane,cfg)
     model=struct('cfg',cfg,'initialState',x,'previousInput',previous,'target',item.target, ...
         'lane',lane,'road',struct('lateralClearance',[]),'frame',frame,'nominalReference',nominal,'compactInitialization',true, ...
         'uncertainty',struct('collisionGenerator',zeros(6,0),'target',[]));
-    if isempty(item.target)
+    if nargin>=6 && reentered
+        % Sample the same guide at knot boundaries and their midpoints.
+        % Both its knot projection and its original held commands can be
+        % checked using the existing full-resolution plan representation.
+        boundaries=[0,cumsum(holds)];
+        grid=unique([boundaries,boundaries(1:end-1)+ceil(holds/2)]);
+        spans=diff(grid);
+        guide=predictiveSafetyGeometry.avoidanceGuide(model,numel(spans),spans);
+        guideInputs=localCompactRateLimit(repelem(guide.inputs,1,spans),previous,ones(1,count),cfg);
+        controls=guideInputs(:,boundaries(2:end));
+        return
+    elseif isempty(item.target)
+        trimOffset=localCompactCruiseOffset(cfg,frame(4));
         inputs=zeros(2,count);prior=previous;
         for i=1:count
             projection=predictiveSafetyGeometry.project(x(1:2),lane);
             acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
-            prior=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true,true);
-            prior(1)=max(-cfg.outputFeedback.steeringMaximum,min(cfg.outputFeedback.steeringMaximum,prior(1)));
+            guided=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true,true);
+            prior=localCompactRateLimit(guided+trimOffset,prior,1,cfg);
             inputs(:,i)=prior;
             if i<count,x=nonlinearBicycleModel.sample(x,prior,cfg);end
         end
@@ -4419,6 +4466,24 @@ function controls = localCompactSeed(item,previous,holds,lane,cfg)
     end
     controls=inputs(:,cumsum(holds));
     controls=localCompactRateLimit(controls,previous,holds,cfg);
+end
+
+function offset=localCompactCruiseOffset(cfg,curvature)
+    % Anchor route feedback at the physical steady turn. Its longitudinal
+    % inverse accounts for road load but omits the tangential tire forces.
+    offset=zeros(2,1);
+    if curvature==0,return;end
+    persistent lastCfg lastCurvature lastOffset
+    if isequal(lastCurvature,curvature) && isequaln(lastCfg,cfg),offset=lastOffset;return;end
+    try
+        trim=nonlinearBicycleModel.operatingPoint(cfg,curvature);
+        acceleration=[0;curvature*cfg.referenceSpeed^2];
+        guided=nonlinearBicycleModel.accelerationGuidance(trim.state,acceleration,trim.input,cfg,1,true,true);
+        offset=trim.input-guided;
+    catch exception
+        if ~strcmp(exception.identifier,'collisionAvoidanceController:unrealizableReference'),rethrow(exception);end
+    end
+    lastCfg=cfg;lastCurvature=curvature;lastOffset=offset;
 end
 
 function matches=localCompactCacheMatches(rollouts,inputs,hypotheses,previous,kernel,cfg)
