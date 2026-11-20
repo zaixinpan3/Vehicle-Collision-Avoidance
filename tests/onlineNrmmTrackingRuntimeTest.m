@@ -26,6 +26,42 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function trafficPointReconstructsTurningAndBrakingFromPositionSamples(testCase)
+            cfg=collisionAvoidanceControllerConfig();dt=.0125;
+            for sideslip=[-.01,.01]
+                target=[20;4;.7;15;-.6;sideslip;1.6;2.4;.95;0;0];track=[];
+                for index=0:160
+                    time=index*dt;
+                    q=predictiveSafetyGeometry.predictTarget(target,time);
+                    position=q(1:2);
+                    if index>=80 && index<84,position=[];end
+                    [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,time,position,0,cfg);
+                    if index==0
+                        testCase.verifyFalse(track.initialized);
+                        testCase.verifyEqual(motion(2:4),zeros(3,1));
+                    end
+                end
+                testCase.verifyTrue(track.initialized);
+                testCase.verifyEqual(motion,q(3:6),AbsTol=.025);
+                testCase.verifyEqual(sign(motion(4)),sign(sideslip));
+                testCase.verifyEqual(track.detections,157);
+            end
+        end
+
+        function boundedPositionJitterAtRestPreservesTheLastResolvedHeading(testCase)
+            cfg=collisionAvoidanceControllerConfig();t0=[12;3;.8;4;-2;0;1.6;2.4;.95;0;0];
+            track=[];motion=[];
+            for index=0:256
+                time=index*.0125;
+                q=predictiveSafetyGeometry.predictTarget(t0,time);
+                jitter=.3*cfg.outputFeedback.noiseBounds(4)*[sin(index);cos(index)];
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,time,q(1:2)+jitter,0,cfg);
+            end
+            testCase.verifyTrue(track.initialized);
+            testCase.verifyTrue(track.restCompatible);
+            testCase.verifyEqual(motion(2:4),zeros(3,1));
+            testCase.verifyEqual(motion(1),t0(3),AbsTol=.15);
+        end
         function sharedMeasurementPreservesCurrentPublicationAndEveryNextState(testCase)
             runtime = localRuntime();
             for detected = [true,false,true]

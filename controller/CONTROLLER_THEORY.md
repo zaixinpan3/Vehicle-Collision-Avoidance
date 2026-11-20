@@ -1,6 +1,6 @@
 # Compact nonlinear output-feedback predictive control
 
-The adopted controller combines fixed measurement-consistency inference with
+The adopted controller combines ego measurement consistency and NRMM target observation with
 a condensed nonlinear predictive-CBF optimization of actuator commands.
 It enforces a terminal continuation set and retains a complete held-input
 moving plan for validation at the next measurement. On the zero-deficit
@@ -204,28 +204,56 @@ augmentation makes this set a sufficient information state; it need not be a
 minimal statistic. If the contract is valid and the initial state is contained,
 the exact update retains the actual successor.
 
-The numerical representation is a finite retained ensemble
-$\widehat{\mathcal I}_k=\{\chi_k^s\}_{s=1}^{S_k}$. Each member is propagated
-through every sensor period with the applied input. It survives only if every
-received residual satisfies its sensor bound. No surviving member is replaced
-by an independently fitted point, and parameters are not redrawn. An empty
-ensemble is an information-contract failure, not evidence that collision
-avoidance is physically impossible. A finite ensemble does not enclose all
-states between its members.
+The numerical controller retains a finite set of ego hypotheses, each with
+its own persistent physical parameters and sensor bias. Each surviving ego
+member explains the complete GNSS/IMU block. A newly detected target is
+represented by a causal NRMM point observer paired with each member. This
+finite collection approximates the exact information update.
+A separately declared initial joint contract may already contain a known
+track. The traffic experiments start with ego hypotheses only.
 
 Let $t_d$ be the timestamp of the first received radar return. Before $t_d$
-the controller carries only ego hypotheses and applies the target-free cruise
-problem. At $t_d$, a known acquisition motion and footprint prior can be
-attached to each surviving ego hypothesis. For a position return that initializes the track, set
+there is no target track. At a detection the position in the inertial frame
+of ego hypothesis $s$ is
 $$
- p_T^s=p_E^s+R_E^s\,\Pi_{\|\rho\|\le R}(y_\rho-\eta_\rho^s).
+ y_T^s=p_E^s+R_E^s\,\Pi_{\|\rho\|\le R}(y_\rho-\eta_\rho^s).
 $$
-The projection enforces the detection radius on the physical relative
-position. A positive return must still satisfy its measurement residual
-bound. Subsequent samples in the same hold condition the new joint track
-with their own timestamps. The finite experimental motion prior supplies
-heading, speed, constant tangential acceleration, sideslip and geometry
-at acquisition. A single position return does not identify these quantities.
+The projection must respect the radar noise bound. In inertial axes the
+observer state is $(\hat p,\hat v,\hat a)$. With radar predictor $z$ reset
+to $y_T^s$ at a return, the sampled NRMM equations take the form
+$$
+ \dot{\hat p}=\hat v+L_1 e,\quad
+ \dot{\hat v}=\hat a+L_2 e,\quad
+ \dot{\hat a}=\Phi_e(\hat v,\hat a)+L_3 e,\quad
+ \dot z=\hat v,\qquad e=z-\hat p .
+$$
+The innovation is disabled over intervals following a missed sample.
+$\Phi_e$, the gain design and the regularized inverse are the target
+equations in [the NRMM derivation](../estimator/OBSERVER_ISS_THEORY.md).
+Above the inverse floor on the unsaturated branch, the outputs are
+$V=\|\hat v\|$, $A=\hat v^\top\hat a/V$,
+$\omega=(J\hat v)^\top\hat a/V^2$, $\beta=\arcsin(l_r\omega/V)$ and
+$\psi_T=\arg(\hat v)-\beta$.
+
+A single position return identifies neither velocity nor body orientation.
+The numerical seed uses zero Cartesian derivatives and a provisional heading
+aligned with the ego. Measured displacements that exceed the two-return
+noise bound initialize velocity by a causal line fit. The high-gain observer
+takes over once its acquisition window is populated. The provisional
+target already participates in collision planning. At a positive return
+the planning root retains its previous observer-based constant-motion
+forecast while the predicted position explains the measurement and range.
+When all positions in the acquisition window lie within the radar noise
+bound of their mean, a stationary nominal forecast retains the most recent
+heading resolved by displacement. The moving point observer continues to
+process returns. Below the inverse speed floor, a fitted displacement
+direction and the estimated turn over the window give the body heading.
+This stationary-compatible window does not identify a
+unique physical speed. Initializing the velocity observer, changing the
+stationary hypothesis or receiving a return inconsistent with the forecast
+refreshes the root. Its filtered center is constrained to both the detection
+disk and the current radar error ball. Footprint
+dimensions and rear axle distance are declared vehicle-class parameters.
 
 For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
 target contributes node and terminal separation constraints when $d_k^-\le R$.
@@ -637,7 +665,10 @@ constructs one guide sampled at the control knots and their discrete
 midpoints. Its interpolated knot commands and, if needed, its original
 held commands undergo the full nonlinear checks. The retained suffix must
 pass those same checks to supply an action. Re-entry feasibility thus
-requires a separate admission assumption.
+requires a separate admission assumption. Refreshing a target point from new
+measurements can also move it outside the previously predicted successor
+set. The numerical controller rechecks the suffix from the updated root.
+The observer point alone supplies no successor-containment guarantee.
 
 After applying the first input, let $r=N_{k+1}-(N_k-1)\ge0$. Form the
 executable candidate
@@ -711,7 +742,7 @@ initialization. Its spatial-coordinate vehicle/actuator transcription is not
 identical to this held-input time-coordinate model, which includes rest.
 
 The optional `sqpRti` and `ipopt` dynamic-memory implementations and the
-independent NRMM integration are research comparators. The adopted compact
+full independent ego/target observer integration are research comparators. The adopted compact
 controller does not optimize their memory maps or observer gains. The NRMM
 observer's own conditional derivation is in
 [OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md).

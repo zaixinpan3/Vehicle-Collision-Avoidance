@@ -7,8 +7,8 @@ function campaign = runCollisionThreatValidation(options)
 % not just a collision under one maximum-braking input history.
     arguments
         options.Frames (1,1) double {mustBePositive} = 100
-        options.Speeds (1,:) double {mustBePositive,mustBeFinite} = 25
-        options.Scenarios (1,:) string = ["stoppedLead","hardBrakingLead"]
+        options.Speeds (1,:) double {mustBePositive,mustBeFinite} = zeros(1,0)
+        options.Scenarios (1,:) string = strings(1,0)
         options.OutputDirectory (1,1) string = string(tempname)
         options.ControllerConfiguration (1,1) struct = struct()
         options.EstimatorConfiguration (1,1) struct = struct()
@@ -17,6 +17,13 @@ function campaign = runCollisionThreatValidation(options)
         options.Pipeline (1,1) string {mustBeMember(options.Pipeline,["dynamicOutputFeedback","nrmmComparator"])} = "dynamicOutputFeedback"
     end
     names = options.Scenarios;
+    if options.Pipeline=="dynamicOutputFeedback"
+        if isempty(names),names=["stoppedLead","trafficBrakingLead","trafficHeadOn","trafficCrossing"];end
+        if isempty(options.Speeds),options.Speeds=15;end
+    else
+        if isempty(names),names=["stoppedLead","hardBrakingLead"];end
+        if isempty(options.Speeds),options.Speeds=25;end
+    end
     root = fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'));
     if options.Pipeline=="dynamicOutputFeedback"

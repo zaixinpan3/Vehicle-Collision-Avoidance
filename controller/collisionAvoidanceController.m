@@ -2,7 +2,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
 %collisionAvoidanceController Joint raw-sensor output feedback and comparisons.
 % A jointSensorBlock-v1 input selects fixed raw-data consistency inference
-% and compact nonlinear direct-input control with checked plan retention.
+% with radar-driven NRMM target motion and compact nonlinear direct-input control with checked plan retention.
 % Explicit outputFeedback.method choices retain dynamic-memory comparators.
 % The state-estimate overload below is the separate-observer comparator.
 % Its default is one SQP-RTI update. solver.method="nonlinear"
@@ -36,8 +36,7 @@ function [command,predictedInput,prediction,controllerState] = ...
 % Startup preparation is separate from the online computation budget.
 % The retained backend reports terminal takeover as an experiment-stop error.
     persistent lastState
-    % The raw-block interface owns inference and control jointly. No observer
-    % point estimate or independently designed observer update enters it.
+    % Raw-block acquisition initializes NRMM motion from received radar positions.
     if isstruct(egoState) && isfield(egoState,'kind') ...
             && string(egoState.kind)=="jointSensorBlock-v1"
         callTimer=tic;

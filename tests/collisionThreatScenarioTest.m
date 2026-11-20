@@ -62,6 +62,22 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             testCase.verifyEqual(result.timing.calls,0);
         end
 
+        function trafficTargetsReachTheUnmodifiedCruiseAtRoadSpeeds(testCase)
+            speeds=[50,60,40]/3.6;
+            names=["trafficBrakingLead","trafficHeadOn","trafficCrossing"];
+            for i=1:numel(names)
+                [~,q,road,cfg,impact]=collisionThreatScenario(names(i),struct('referenceSpeed',15));
+                testCase.verifyEqual(q(4),speeds(i),AbsTol=1e-12);
+                baseline=givenPathCollisionBaseline(road,q,cfg,impact+1);
+                testCase.verifyTrue(baseline.collisionDetected);
+                target=predictiveSafetyGeometry.predictTarget(q,impact);
+                testCase.verifyEqual(target(1:2),[impact*15;0],AbsTol=1e-10);
+                if names(i)=="trafficCrossing"
+                    testCase.verifyTrue(isfield(road,'drivablePolygons'));
+                    testCase.verifyEqual(target(4),speeds(i),AbsTol=1e-12);
+                end
+            end
+        end
         function crossingsLeaveReactionTimeButStillIntersectCruise(testCase,crossingScenario,crossingSpeed)
             [~,q,road,cfg,impactTime]=collisionThreatScenario(crossingScenario, ...
                 struct('referenceSpeed',crossingSpeed));

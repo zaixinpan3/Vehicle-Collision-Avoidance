@@ -17,13 +17,18 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % states use held-input RK4. Numerical defects, sampling and model uncertainty
 % enter separate conditional enclosures; no floating-point interval proof is
 % claimed. See OBSERVER_ISS_THEORY.md for the position-only sensor amendment.
+% targetPoint advances the target point channel from timestamped radar
+% positions transformed by a synchronized ego hypothesis. It returns the
+% updated observer state and [heading; speed; tangential acceleration; slip].
 
     action = lower(string(action));
     if ~isscalar(action)
         error("onlineNrmmTrackingRuntime:invalidAction", ...
-            "action must be 'initialize', 'step', 'sample', 'output', 'measurement', or 'resetTarget'.");
+            "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', or 'targetPoint'.");
     end
     switch action
+        case "targetpoint"
+            [varargout{1},varargout{2}]=localTargetPoint(varargin{:});
         case "initialize"
             varargout{1} = localInitialize(varargin{:});
         case "step"
@@ -45,8 +50,99 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
             varargout{1} = localResetTarget(varargin{:});
         otherwise
             error("onlineNrmmTrackingRuntime:invalidAction", ...
-                "action must be 'initialize', 'step', 'sample', 'output', 'measurement', or 'resetTarget'.");
+                "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', or 'targetPoint'.");
     end
+end
+
+function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg)
+% The existing sampled high-gain target chain in inertial axes. Transform
+% each relative radar position using this member's synchronized ego pose.
+% In these axes the ego transport terms vanish and the absolute Cartesian
+% target derivatives and inverse NRMM map are unchanged.
+    persistent design kernelDesign settings
+    if isempty(design)
+        localAddProjectPaths();
+        settings=estimatorControllerIntegrationConfig();
+        design=settings.trafficTargetObserver;
+        domain=design.domain;
+        domain.speedMinimum=domain.regularizationSpeedMinimum;
+        domain=orderfields(rmfield(domain,'regularizationSpeedMinimum'), ...
+            {'speedMinimum','speedMaximum','scalarAccelerationMaximum','yawRateMaximum', ...
+            'accelerationNormBound','sideslipMaximum','rearAxleDistance','relativePositionMaximum'});
+        % The unused ego channels stay at zero in this fixed inertial frame.
+        kernelDesign=struct('velocity',struct('gain',1),'position',struct('gain',1), ...
+            'target',struct('innovationGains',design.innovationGains,'domain',domain), ...
+            'yaw',struct('correctionBandwidth',1,'courseModel',struct( ...
+            'rearAxleDistance',1,'sideslipDomainMaximum',0)));
+    end
+    if isempty(track)
+        assert(~isempty(position),'onlineNrmmTrackingRuntime:missingFirstReturn','Radar must initialize a track.');
+        track=struct('state',[position;zeros(4,1)],'time',time,'lastReturn',time, ...
+            'previousPosition',[],'times',[],'positions',zeros(2,0),'initialized',false, ...
+            'heading',egoHeading,'detections',0,'restCompatible',false);
+    end
+    dt=time-track.time;
+    assert(dt>=0,'onlineNrmmTrackingRuntime:nonmonotonicTime','Target samples must be time ordered.');
+    if time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
+        track.initialized=false;track.times=[];track.positions=zeros(2,0);
+    end
+    if dt>0 && track.initialized
+        reference=track.previousPosition;detected=~isempty(reference);
+        if ~detected,reference=track.state(1:2);end
+        measurement=struct('yawRate',0,'gnssVelocity',zeros(2,1),'bodyAcceleration',zeros(2,1), ...
+            'radarDetectionAvailable',detected,'correspondence',struct('rotationVector',[1;0]), ...
+            'lateralVelocity',0);
+        packed=[zeros(6,1);track.state;reference;0];
+        count=max(1,ceil(dt/settings.observer.runtime.integrationStepMaximum-1e-9));
+        if exist('nrmmObserverIntegrationKernelV2Mex','file')==3
+            states=nrmmObserverIntegrationKernelV2Mex(packed,measurement,kernelDesign,dt/count,count);
+        else
+            states=nrmmObserverVectorField("integrate",packed,measurement,kernelDesign,dt/count,count);
+        end
+        track.state=states(7:12,end);
+    elseif dt>0
+        track.state(1:2)=track.state(1:2)+dt*track.state(3:4);
+    end
+    if ~isempty(position)
+        track.detections=track.detections+1;
+        track.lastReturn=time;
+        track.times(end+1)=time;track.positions(:,end+1)=position;
+        count=settings.initialization.minimumRadarSamples;
+        keep=max(1,numel(track.times)-count+1):numel(track.times);
+        track.times=track.times(keep);track.positions=track.positions(:,keep);
+        center=mean(track.positions,2);
+        noise=cfg.outputFeedback.noiseBounds(4);
+        track.restCompatible=numel(keep)==count && max(vecnorm(track.positions-center))<=noise;
+        resolved=norm(position-track.positions(:,1))>2*noise;
+        if ~track.initialized
+            % Bootstrap on measured displacement. The first position alone
+            % leaves both Cartesian derivatives and body heading unresolved.
+            t=track.times-mean(track.times);velocity=zeros(2,1);
+            if resolved && numel(t)>1
+                velocity=track.positions*t.'/sum(t.^2);
+                track.initialized=numel(t)==count;
+            end
+            track.state=[center+t(end)*velocity;velocity;zeros(2,1)];
+        end
+    else
+        resolved=false;
+    end
+    track.time=time;track.previousPosition=position;
+    domain=design.domain;domain.rearAxleDistance=cfg.target.rearAxleDistance;
+    ego=struct('bodyVelocity',zeros(2,1),'yawRate',0);
+    [~,estimate]=nrmmObserverVectorField("targetDerivative",track.state,ego,domain);
+    if resolved && estimate.targetSpeed>0
+        track.heading=estimate.targetRelativeHeading;
+        if track.initialized && estimate.regularizationActive
+            % Near rest the instantaneous velocity direction is ill-conditioned.
+            % A causal fitted chord resolves course over the measured window.
+            t=track.times-mean(track.times);
+            chord=(track.positions-mean(track.positions,2))*t.';
+            track.heading=atan2(chord(2),chord(1))+t(end)*estimate.targetYawRate-estimate.targetSideslip;
+        end
+    end
+    motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;estimate.targetSideslip];
+    if track.restCompatible,motion(2:4)=0;end
 end
 
 function runtime = localResetTarget(runtime,physicalState,history)

@@ -90,6 +90,17 @@ function cfg = estimatorControllerIntegrationConfig()
         cfg.sensor.gyroscope.yawRateNoiseMaximum;
     observer.measurement.radar.noiseMaximum = ...
         cfg.sensor.radar.positionNoiseMaximum;
+    % Fixed point-observer design shared by the raw-block traffic experiments.
+    % The gains are synthesizeNrmmObserverGains(observer).target.innovationGains
+    % with these target-domain overrides and the above nominal sensor settings.
+    % Keeping the offline gains avoids solving an SDP at first radar contact.
+    trafficDomain=observer.target.domain;
+    trafficDomain.speedMaximum=35;trafficDomain.scalarAccelerationMaximum=6;
+    trafficDomain.sideslipMaximum=.12;trafficDomain.yawRateMaximum=.5;
+    trafficDomain.accelerationNormBound=8;
+    cfg.trafficTargetObserver=struct('domain',trafficDomain,'innovationGains', ...
+        [22.35910170441581;249.63879191633592;1256.7133478449043]);
+
     cfg.observer = observer;
 
     % Controller errors come from the online timestamped observer enclosure.

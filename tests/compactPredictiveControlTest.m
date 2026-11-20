@@ -108,11 +108,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             plant=prior;plant.hypotheses=item;
             block=localNextBlock(plant,cfg);
             block.samples(1).radarAvailable=false;
-            block.acquisitionMotionPrior=item.target(3:end);
             [~,~,p,state]=collisionAvoidanceController(block,[],[],cfg,prior);
             testCase.verifyEqual(state.firstRadarTime,block.samples(2).time);
             testCase.verifyTrue(p.metadata.collisionTargetActive);
-            testCase.verifyEqual(state.hypotheses.target,localAdvanceHold(item,prior.appliedInput,cfg).target,AbsTol=1e-10);
+            testCase.verifyEqual(state.hypotheses.target(1:2),localAdvanceHold(item,prior.appliedInput,cfg).target(1:2), ...
+                AbsTol=cfg.outputFeedback.noiseBounds(4)+1e-9);
+            testCase.verifyEqual(state.hypotheses.targetObserver.detections,numel(block.samples)-1);
             testCase.verifyTrue(p.scenarios{1}.terminal.member);
         end
         function firstRadarReturnLocalizesTheTrackWithinItsMeasuredDisk(testCase)
@@ -125,12 +126,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             block.samples.relativePosition=[0;radius+.01]+item.sensorBias(6:7);
             request=struct('operation',"condition",'cfg',cfg,'initial',true, ...
                 'block',block,'hypotheses',item);
-            testCase.verifyError(@()solvePredictiveControl('outputFeedback',request), ...
-                'collisionAvoidanceController:missingAcquisitionPrior');
-            request.block.acquisitionMotionPrior=[pi;2;0;0;1.6;2.4;.95;0;0];
             posterior=solvePredictiveControl('outputFeedback',request);
             position=item.ego(1:2)+radius*[-sin(item.ego(3));cos(item.ego(3))];
-            testCase.verifyEqual(posterior.target,[position;request.block.acquisitionMotionPrior],AbsTol=1e-12);
+            testCase.verifyEqual(posterior.target(1:2),position,AbsTol=1e-12);
+            testCase.verifyFalse(posterior.targetObserver.initialized);
+            testCase.verifyEqual(posterior.target(4:6),zeros(3,1));
             [~,~,prediction]=collisionAvoidanceController(request.block,[],[],cfg,[]);
             testCase.verifyTrue(prediction.metadata.collisionTargetActive);
             request.block.samples.relativePosition(2)=radius+1;
@@ -145,7 +145,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.assertEqual(run.results.outcome,"completed");
             data=jsondecode(fileread(run.results.source));
             testCase.verifyTrue(all(arrayfun(@(s)isempty(s.target),data.initialInformationContract)));
-            testCase.verifyEmpty(data.initialAcquisitionMotionPrior);
+            testCase.verifyFalse(isfield(data,'initialAcquisitionMotionPrior'));
             testCase.verifyFalse(data.initialSensorSample.radarAvailable);
             testCase.verifyTrue(all(isnan(data.initialSensorSample.relativePosition)));
             first=[];
@@ -156,9 +156,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 hits=[current.rawSensorBlock.radarAvailable];
                 if isempty(first) && any(hits)
                     first=current.rawSensorBlock(find(hits,1)).time;
-                    testCase.verifyNumElements(current.nextAcquisitionMotionPrior,9);
+                end
+                if isempty(current.metadata.firstRadarTime)
+                    testCase.verifyEmpty(current.targetEstimateAtDecision);
                 else
-                    testCase.verifyEmpty(current.nextAcquisitionMotionPrior);
+                    testCase.verifyGreaterThan(current.targetEstimateAtDecision.detections,0);
                 end
             end
             testCase.verifyNotEmpty(first);
@@ -410,7 +412,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(current.pcbfValue,0);
             testCase.verifyLessThanOrEqual(current.terminalValue,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyEqual(current.nlpAttempts,0);
-            testCase.verifyTrue(current.retainedFinePlanUsed);
+            testCase.verifyTrue(current.retainedFinePlanUsed || current.initializationSource=="guideWithDrivingSuffix");
         end
         function aCheckedPlanCanShiftPastItsOriginalEndWithoutAnotherSolve(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=3;cfg.outputFeedback.horizonSeconds=.15;
@@ -722,18 +724,23 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(result.maximumViolation,0);
         end
         function stabilityPreferencePreservesZeroDeficitAndHardTerminalMembership(testCase)
-            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
-            campaign=runJointOutputFeedbackScenario(Frames=1,Speeds=15,Scenarios="headOn", ...
-                RandomSeed=20261107,Warmup=false,OutputDirectory=string(folder.Folder), ...
-                ControllerConfiguration=struct('outputFeedback',struct('initializationSolveSeconds',10)));
-            testCase.assertEqual(campaign.results.outcome,"completed");
-            data=jsondecode(fileread(campaign.results.source));info=data.trace.metadata;
+            % A previously tracked opposing vehicle exercises the nonzero
+            % initial deficit independently of cold target acquisition.
+            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',15,'outputFeedback', ...
+                struct('initializationSolveSeconds',10)));
+            [ego,target,road]=collisionThreatScenario("headOn",cfg);
+            block=localBlock(cfg,15);
+            block.initialHypotheses.ego=ego;block.initialHypotheses.target=target;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor",'cfg',cfg, ...
+                'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
+            [~,~,prediction]=collisionAvoidanceController(block,[],road,cfg,[]);
+            info=prediction.metadata;
             testCase.verifyTrue(info.restorationAttempted);
             testCase.verifyGreaterThan(info.initialRestorationSlack,0);
             testCase.verifyLessThanOrEqual(info.acceptedStabilityCost,info.firstFeasibleStabilityCost);
             testCase.verifyEqual(info.pcbfValue,0);
             testCase.verifyTrue(info.terminalSetEnforced);
-            testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
+            testCase.verifyLessThanOrEqual(info.terminalValue,cfg.outputFeedback.nlpTolerance);
         end
         function highSpeedLeadAvoidanceKeepsRearWheelSlipBelowThePureCorneringPeak(testCase,leadEncounter)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());

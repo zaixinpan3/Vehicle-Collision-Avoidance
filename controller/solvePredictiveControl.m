@@ -2798,7 +2798,7 @@ end
 
 function [result,diagnostics,problem] = localOutputFeedback(request)
     % One joint inference/control runtime; the state-input solver above is
-    % retained as a research comparator. No NRMM routine is called here.
+    % retained as a research comparator. New radar tracks use the NRMM observer.
     if ~isfield(request,'callTimer'),request.callTimer=tic;end
     cfg=collisionAvoidanceControllerConfig(request.cfg);
     diagnostics=[];problem=[];
@@ -3095,16 +3095,12 @@ end
 
 function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
     hypotheses=localOfValidateHypotheses(hypotheses,cfg);
-    firstReturn=find([block.samples.radarAvailable],1);
-    acquiring=isempty(hypotheses(1).target) && ~isempty(firstReturn);
-    if acquiring
-        assert(isfield(block,'acquisitionMotionPrior'), ...
-            'collisionAvoidanceController:missingAcquisitionPrior', ...
-            'A first position return requires a declared target motion and footprint prior at its timestamp.');
-        motion=block.acquisitionMotionPrior;
-        validateattributes(motion,{'double'},{'size',[9,1],'real','finite'});
-        assert(motion(2)>=0 && all(motion(5:7)>0), ...
-            'collisionAvoidanceController:invalidAcquisitionPrior','Invalid target speed or geometry at acquisition.');
+    observe=isempty(hypotheses(1).target) || ...
+        (isfield(hypotheses,'targetObserver') && ~isempty(hypotheses(1).targetObserver));
+    if observe && ~isfield(hypotheses,'targetObserver'),[hypotheses.targetObserver]=deal([]);end
+    if observe && (~isempty(hypotheses(1).target) || any([block.samples.radarAvailable])) && ...
+            exist('onlineNrmmTrackingRuntime','file')~=2
+        addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'estimator'));
     end
     keep=false(1,numel(hypotheses));residual=Inf(numel(hypotheses),1);
     next=hypotheses;bounds=cfg.outputFeedback.noiseBounds;
@@ -3119,25 +3115,49 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                 item=localOfAdvance(item,block.heldInput,cfg,cfg.outputFeedback.sensorPeriod,j==numel(block.samples),flow);
             end
             measured=block.samples(j);
-            if acquiring && j==firstReturn
-                % Locate the new track at the sample time. A bounded radar
-                % error can place the measured point just outside the disk.
-                rho=measured.relativePosition-item.sensorBias(6:7);
-                radius=cfg.collision.encounterRangeMeters;
-                if norm(rho)>radius,rho=rho*(radius/norm(rho));end
-                yaw=item.ego(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
-                item.target=[item.ego(1:2)+rotation*rho;motion];
+            if observe && (measured.radarAvailable || ~isempty(item.targetObserver))
+                measuredPosition=[];
+                if measured.radarAvailable
+                    corrected=measured.relativePosition-item.sensorBias(6:7);
+                    radius=cfg.collision.encounterRangeMeters;
+                    rho=corrected*min(1,radius/max(norm(corrected),realmin));
+                    excess=max(excess,norm(corrected-rho)-bounds(4));
+                    yaw=item.ego(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
+                    measuredPosition=item.ego(1:2)+rotation*rho;
+                end
+                previousTrack=item.targetObserver;
+                [item.targetObserver,motion]=onlineNrmmTrackingRuntime("targetPoint", ...
+                    item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg);
+                if measured.radarAvailable
+                    % Keep the previous observer forecast while this return
+                    % explains it. Replacing it with each noisy position
+                    % would discard a consistent shifted collision witness.
+                    refresh=isempty(item.target) || (~isempty(previousTrack) && ...
+                        (isempty(previousTrack.times) || previousTrack.restCompatible~=item.targetObserver.restCompatible || ...
+                        ~previousTrack.initialized && item.targetObserver.initialized));
+                    if ~refresh
+                        refresh=norm(item.target(1:2)-item.ego(1:2))>radius || ...
+                            norm(rotation.'*(item.target(1:2)-item.ego(1:2))-corrected)>bounds(4)+tolerance;
+                    end
+                    if refresh
+                        % Use the filtered position inside both the detection
+                        % disk and the current bounded position observation.
+                        filtered=rotation.'*(item.targetObserver.state(1:2)-item.ego(1:2));
+                        filtered=filtered*min(1,radius/max(norm(filtered),realmin));
+                        delta=filtered-rho;
+                        room=max(0,bounds(4)-norm(corrected-rho));
+                        center=measuredPosition+rotation*(min(1,room/max(norm(delta),realmin))*delta);
+                        item.target=[center;motion;cfg.target.rearAxleDistance; ...
+                            cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
+                    end
+                end
             end
             expected=localOfSensor(item,block.heldInput,cfg,measured.time);
             errors=[norm(measured.position-expected.position); ...
                 norm(measured.acceleration-expected.acceleration);abs(measured.yawRate-expected.yawRate)];
             excess=max(excess,max(errors-bounds(1:3)));
-            if measured.radarAvailable
-                if acquiring && j==firstReturn
-                    % The projected point is inside the disk in body coordinates.
-                    % Use those coordinates directly at a grazing first return.
-                    excess=max(excess,norm(measured.relativePosition-item.sensorBias(6:7)-rho)-bounds(4));
-                elseif isempty(item.target) || ~expected.radarAvailable
+            if measured.radarAvailable && ~observe
+                if isempty(item.target) || ~expected.radarAvailable
                     excess=Inf;
                 else
                     excess=max(excess,norm(measured.relativePosition-expected.relativePosition)-bounds(4));
@@ -3153,6 +3173,7 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
     info=struct('priorCount',numel(hypotheses),'posteriorCount',nnz(keep), ...
         'retainedIndices',find(keep),'maximumNoiseExcess',residual, ...
         'rawReadingsConditioned',numel(block.samples),'representation',"finiteConsistentHypotheses");
+    if observe,info.representation="finiteEgoHypothesesWithNrmmTargetPoint";end
 end
 
 function feature = localOfFeatures(samples,cfg)

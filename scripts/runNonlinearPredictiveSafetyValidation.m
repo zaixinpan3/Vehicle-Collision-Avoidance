@@ -626,7 +626,8 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
             q=[24;0;pi;8;1;atan(-.1*lr);lr;2.4;.95;0;0];
         case "brakingTarget"
             q=[24;6;pi;2;-1;0;lr;2.4;.95;0;0];
-        case {"headOn","acceleratingHeadOn","stoppedLead","hardBrakingLead","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing","intersectionCrossing"}
+        case {"headOn","acceleratingHeadOn","stoppedLead","hardBrakingLead","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing","intersectionCrossing", ...
+                "trafficHeadOn","trafficCrossing","trafficBrakingLead"}
             [x,q,road,cfg]=collisionThreatScenario(name,controllerConfiguration);
         otherwise,error('runNonlinearPredictiveSafetyValidation:unknownScenario','Unknown scenario %s.',name);
     end

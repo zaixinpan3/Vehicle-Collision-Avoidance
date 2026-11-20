@@ -253,7 +253,7 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             campaign=runCollisionThreatValidation(Frames=1,Speeds=1.5,Scenarios="stoppedLead", ...
                 ControllerConfiguration=testCase.cfg,OutputDirectory=string(fixture.Folder));
             testCase.verifyEqual(campaign.pipeline,"sqpRti");
-            testCase.verifyEqual(campaign.results.observationModel,"rawSensorFixedConsistencyInference");
+            testCase.verifyEqual(campaign.results.observationModel,"rawSensorEgoConsistencyAndNrmmTargetObserver");
             testCase.verifyEqual(campaign.results.executedFrames,1);
             testCase.verifyEqual(campaign.results.outcome,"completed");
             testCase.verifyEqual(campaign.results.timing.calls,1);

@@ -16,6 +16,21 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
     lr = cfg.target.rearAxleDistance;
     impactTime = 1.6;curvature = 0;
     switch name
+        case "trafficHeadOn"
+            impactTime=3.5;
+            targetSpeed=60/3.6;targetAcceleration=0;beta=0;relativeCourse=pi;
+        case "trafficCrossing"
+            impactTime=4;
+            targetSpeed=40/3.6;targetAcceleration=0;beta=0;relativeCourse=-pi/2;
+        case "trafficBrakingLead"
+            speed=50/3.6;deceleration=4;gap=22;
+            target=[gap;0;0;speed;-deceleration;0;lr;2.4;.95;0;0];
+            closing=cfg.referenceSpeed-speed;
+            impactTime=2*gap/(closing+sqrt(closing^2+2*deceleration*gap));
+            if impactTime>speed/deceleration
+                impactTime=(gap+speed^2/(2*deceleration))/cfg.referenceSpeed;
+            end
+            return;
         case "headOn"
             distance = 1.6*(cfg.referenceSpeed+8);
             target = [distance;0;pi;8;0;0;lr;2.4;.95;0;0];
@@ -89,7 +104,7 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
         state = trim.state;state(1:2) = 0;
     end
     [position,heading] = predictiveSafetyGeometry.referencePose(cfg.referenceSpeed*impactTime,0,curve);
-    if name=="intersectionCrossing"
+    if any(name==["intersectionCrossing","trafficCrossing"])
         center=position(1);width=road.scenarioHalfWidthMeters;reach=1000;
         road.drivablePolygons={[-reach,-width;reach,-width;reach,width;-reach,width], ...
             [center-width,-reach;center+width,-reach;center+width,reach;center-width,reach]};
