@@ -365,12 +365,6 @@ classdef predictiveSafetyGeometry
             anticipation=localAnticipation(x,target,cfg,parameters,normalWorld);
             tangentialAcceleration=cfg.planner.tangentialRate*parameters.speed ...
                 *(anticipation.transportGradient+anticipation.separationGradient);
-            if isfield(parameters,'initialCirculation') && parameters.initialCirculation~=0
-                % Keep the initial forward-facing circulation direction through the
-                % one seed rollout; an exactly symmetric case uses a fixed tie.
-                tangentialAcceleration=tangentialAcceleration ...
-                    +parameters.initialCirculation*cfg.planner.tangentialRate*parameters.speed*r*tangent;
-            end
             desired=0;
             rate=cfg.planner.radialRate;
             relative=(-kappa*tau^2-2*rate*nu-rate^2*(h-desired))*normal ...
@@ -379,9 +373,7 @@ classdef predictiveSafetyGeometry
             acceleration=r*(relative+transport)+tangentialAcceleration;
             correction=0;activation=1;incidence=1;
             if isfield(parameters,'preferredAcceleration')
-                % Keep only the outward normal correction and add the signed
-                % tangential vectors. The compact seed's circulation is fixed
-                % at initialization; no release timer is needed.
+                % Apply the outward correction and the local tangential field.
                 preferred=parameters.preferredAcceleration;normalWorld=r*normal;
                 incidence=anticipation.incidence;
                 correction=incidence*max(0,normalWorld.'*(acceleration-preferred));
@@ -1440,16 +1432,6 @@ end
 function candidate=localCirculationRollout(model,data,speed,durations)
     cfg=model.cfg;h=cfg.controller.sampleTime;count=numel(durations);
     physicalOnly=isfield(model,'compactInitialization') && model.compactInitialization;
-    circulationSign=0;
-    if physicalOnly
-        parameters=localFieldParameters(data,1,speed);
-        [~,initialField]=predictiveSafetyGeometry.circulationField(model.initialState,data.target(:,1),cfg,parameters);
-        forward=predictiveSafetyGeometry.direction(model.initialState(3));
-        alignment=forward.'*initialField.rotation*initialField.tangent;
-        circulationSign=sign(alignment);
-        % Choose a passing side even for an exactly collinear parked target.
-        if abs(alignment)<1e-8,circulationSign=1;end
-    end
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1), ...
         'speedScale',speed, ...
@@ -1484,7 +1466,7 @@ function candidate=localCirculationRollout(model,data,speed,durations)
             acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
             if ~encounterEnded
                 parameters=localFieldParameters(data,index,speed);
-                parameters.preferredAcceleration=acceleration;parameters.initialCirculation=circulationSign;
+                parameters.preferredAcceleration=acceleration;
                 [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
                 candidate.fieldActive=candidate.fieldActive || field.activation>0;
                 if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end

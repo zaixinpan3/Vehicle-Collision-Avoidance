@@ -531,8 +531,12 @@ rechecks nonlinear motion and core membership. A violation invalidates
 the shift and must be reported if no other plan passes.
 
 The geometric guide constructs one route-following trajectory for the
-primary search. Its obstacle circulation uses a consistent tangential
-direction through each rollout, with a fixed sign for a perpendicular tie.
+primary search. At each integration step its tangential acceleration is
+proportional to the sum of the transport and separation gradients of the
+predicted encounter. In a reflection-symmetric head-on encounter on a
+straight reference, the lateral contributions cancel. The resulting
+trajectory supplies the initial actuator sequence. For each subsequent
+trial, Section 5's separation problem uses that trial's node poses.
 When needed, project the initialization onto the linear actuator and terminal
 handoff rows. SQP then minimizes the sum of stage deficits under the hard
 domain, motion and terminal constraints. Validation of the first feasible

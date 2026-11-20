@@ -150,6 +150,10 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyEqual(guide.states(:,1),model.initialState,AbsTol=0);
             testCase.verifyEqual(guide.states(2,:),zeros(1,17),AbsTol=1e-10);
             testCase.verifyFalse(guide.robustCertificate);
+            model.compactInitialization=true;
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,16);
+            testCase.verifyEqual(guide.inputs(1,:),zeros(1,16),AbsTol=1e-10);
+            testCase.verifyEqual(guide.states(2,:),zeros(1,17),AbsTol=1e-10);
         end
         function returnedStatesComeFromTheActualHeldInputModel(testCase)
             model=localModel("crossing",8);model.cfg.model.brakingRatioRateMaximum=1;
@@ -206,6 +210,16 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             guide=predictiveSafetyGeometry.avoidanceGuide(model,40);
             testCase.verifyGreaterThan(guide.inputs(1,1),0);
             testCase.verifyEqual(guide.candidateCount,1);
+        end
+        function compactGuideReflectsWithTheCrossingTarget(testCase)
+            model=localModel("intersectionCrossing",8);
+            model.compactInitialization=true;
+            original=predictiveSafetyGeometry.avoidanceGuide(model,40);
+            model.target([2,3,6,11])=-model.target([2,3,6,11]);
+            mirrored=predictiveSafetyGeometry.avoidanceGuide(model,40);
+            testCase.verifyGreaterThan(max(abs(original.states(2,:))),0.1);
+            testCase.verifyEqual(mirrored.states,[1;-1;-1;1;-1;-1].*original.states,AbsTol=1e-8);
+            testCase.verifyEqual(mirrored.inputs,[-1;1].*original.inputs,AbsTol=1e-8);
         end
         function smallOppositeOffsetsProduceSmallOppositeFieldCorrections(testCase)
             model=localModel("headOn",8);model.target(1:6)=[12;1e-6;0;0;0;0];
