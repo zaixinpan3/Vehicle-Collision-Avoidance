@@ -53,13 +53,16 @@ still a primary minimizer. An affine RTI cap alone does not establish this
 nonlinear property. An unbounded soft CLF slack preserves feasibility for
 finite residuals but does not prove recovery.
 
-The detailed derivation is maintained in
-[controller theory, Section 6](../controller/CONTROLLER_THEORY.md#joint-prediction)
-and [the shift proof in Section 7](../controller/CONTROLLER_THEORY.md#recursive-feasibility).
-It includes exact target-error identities, history-conditioned error sets,
-and a symbolic Fiala special case in which future target observations permit
-a strictly tighter relative-position bound than any prescribed ego trajectory.
-That example is not a universal small-tube result.
+The detailed compact nonlinear controller derivation is maintained in
+[controller theory](../controller/CONTROLLER_THEORY.md).
+Section II-B of `manuscript.tex` now presents the adopted
+compact nonlinear controller (fixed measurement-consistency ensemble
+inference, condensed nonlinear PCBF SQP over coarse control knots, exact
+dual rectangle separation at control-boundary nodes, moving straight-cruise
+terminal set with $B$-hold bridge under an explicit physical handoff
+assumption, and zero-deficit tire-loading/rear-slip preference $J_{\rm tire}$
+with damped Gauss--Newton refinement) alongside the idealized joint
+output-feedback safety theory.
 
 Tezuka and Nakamura (2020) and Quan et al. (2025) motivate error compensation
 and containing-set interfaces. Their hypotheses are distinguished from this
@@ -74,11 +77,14 @@ construction.
 
 ## Numerical evidence and implementation scope
 
-The October 11 vehicle results are unchanged: fourteen exact-state encounters
-recovered cruise; 74 of 84 noisy estimated-state runs recovered; none collided
-or left the road. Those trials use per-hold affine tightening and center-based
-terminal rows, with road constraints. They do not evaluate the complete
-information-set algorithm or later runtime revisions.
+The October 11 vehicle results are preserved as historical baseline
+evidence and remain pending rerun for the revised compact nonlinear
+controller: fourteen exact-state encounters recovered cruise; 74 of 84
+noisy estimated-state runs recovered; none collided or left the road.
+Those historical trials used the superseded affine-RTI/CLF/braking-terminal
+formulation with per-hold affine tightening and center-based terminal rows.
+They do not evaluate the adopted compact nonlinear controller or the
+complete information-set algorithm.
 
 The paper separately reports the October 25 longitudinal reference, including
 moving observation boxes, dropouts, common braking, parked uncertainty and a
@@ -86,12 +92,6 @@ between-sample collision counterexample. Eleven reference behavior tests and
 64 targeted MATLAB tests in total passed in the preceding algorithm task.
 These are floating-point specializations, not full-vehicle certification.
 No vehicle campaign was rerun for this manuscript revision.
-
-The campaign-era discrete CLF formulas are labeled as historical. The current
-runtime uses a continuous derivative CLF row, a primary LP and secondary QP,
-and nonlinear sampled checks. It still lacks validated whole-hold images,
-retained posterior sets and robust terminal witnesses. Neither solver success
-nor sampled replay closes those gaps.
 
 ## Figures and submission fields
 

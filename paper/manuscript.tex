@@ -1,6 +1,6 @@
 \documentclass[journal]{IEEEtran}
 
-\usepackage{amsmath,amssymb,bm}
+\usepackage{amsmath,amssymb,bm,mathrsfs}
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage[nocompress]{cite}
@@ -79,13 +79,17 @@ restricting the old policy tail and appending a terminal rule proves
 recursive feasibility. The optimal slack sum is nonincreasing, and its
 zero set excludes interior collision at control decision instants.
 No constant-width tube or finite-time arrival at zero is asserted.
-The real-time Fiala controller approximates this construction and adds
-a performance refinement for nominal driving and recovery.
-In the October 11
-baseline, all fourteen
+The adopted compact nonlinear Fiala controller approximates this
+construction using fixed measurement-consistency ensemble inference,
+condensed nonlinear sequential quadratic programming over coarse control
+knots, a moving straight-cruise terminal set, and a secondary tire-loading
+and rear-slip preference on the zero-deficit level.
+In the historical October 11 affine-RTI baseline (predating this compact
+nonlinear controller revision and pending rerun), all fourteen
 exact-state collision-threat encounters recover cruise without collision;
 with the estimator and bounded noise, 74 of 84 recover, and none collides
-or leaves the road. These results do not evaluate the full robust construction.
+or leaves the road. These results do not evaluate the revised compact
+controller or the full robust construction.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -115,8 +119,8 @@ lateral velocities \cite{BealBoyd2019,ParkGerdes2017}. Neglecting this
 coupling can lead to large prediction errors and control commands that demand
 maneuvers beyond the vehicle's physical capabilities. Second, sensors
 such as LiDAR can provide relative-position measurements of surrounding
-vehicles, but assessing collision risk also requires information about their
-velocity, acceleration, and heading. When only relative positions are
+vehicles, but a more comprehensive assessment of collision risk benefits
+from additional state information, such as velocity, acceleration, and heading. When only relative positions are
 available, estimating these states is complicated by the ego vehicle's
 evasive maneuvers, which also affect the measurements
 \cite{AlaiSharmaAlexanderRajamani2024,SharmaAlaiRajamani2026}.
@@ -154,66 +158,72 @@ models \cite{ZhangJiangLiuHuWangChen2023}, load-transfer dynamics
 \cite{ZhaoChenGaoYaoGaoHua2024}. Their accuracy depends on the adopted model,
 and nonlinear prediction also increases computational demand.
 
-Regarding the estimation of surrounding-vehicle motion, one option is
-to transform relative-position measurements into an inertial frame using
-estimated ego pose \cite{SharmaRajamani2024}, but ego localization and
-heading errors then feed directly into the target track. Working in the
-ego sensor frame avoids this global transformation, yet some relative-motion
-observers do not account for ego rotation
-\cite{JeonZemoucheRajamani2019,AlaiZemoucheRajamani2024}. This omission can
-introduce errors in the estimated target motion during evasive maneuvers that
-involve ego rotation \cite{SharmaAlaiRajamani2026}. To resolve this
-issue, Alai \emph{et al.} \cite{AlaiSharmaAlexanderRajamani2024}
-formulated a nonlinear relative motion model (NRMM) that incorporates ego
-velocity and yaw rate explicitly, and Sharma \emph{et al.}
-\cite{SharmaAlaiRajamani2026} designed a multistage high-gain observer
-(HGO) around the NRMM for simultaneous ego-state estimation and target
-trajectory tracking. While the NRMM captures how an evasive maneuver
-alters relative motion in the sensor frame, the observer in
-\cite{SharmaAlaiRajamani2026} writes the ego translational kinematics as
-third-order companion chains by differentiating body acceleration and yaw
-rate and setting those derivatives to zero. During rapid steering and
-braking, that zero-jerk and zero-yaw-acceleration assumption no longer
-holds. In addition, the nominal convergence and yaw $H_\infty$ results in
-\cite{SharmaAlaiRajamani2026} do not provide an explicit, time-varying
-error bound under sensor noise, model mismatch, and initial transients,
-which a safety controller needs to tighten its collision constraints.
+Regarding the estimation of surrounding-vehicle motion, one option is to
+express the motion model in an inertial frame using estimated ego position and
+orientation \cite{SharmaRajamani2024}, but ego localization and heading errors
+then feed directly into the target track. Working in the ego sensor frame
+avoids this global transformation, yet some relative-motion observers do not
+account for ego rotation
+\cite{JeonZemoucheRajamani2019,AlaiZemoucheRajamani2024}. To address the estimation errors that this omission can cause during
+evasive maneuvers, Alai \emph{et al.}
+\cite{AlaiSharmaAlexanderRajamani2024} formulated a nonlinear relative motion
+model (NRMM) that incorporates ego velocity and yaw rate explicitly, and Sharma
+\emph{et al.} \cite{SharmaAlaiRajamani2026} designed a multistage high-gain
+observer (HGO) around the NRMM for simultaneous ego-state estimation and target
+trajectory tracking. While the NRMM captures how an evasive maneuver alters
+relative motion in the sensor frame, that multistage HGO transforms both the
+ego kinematics and the NRMM relative-position dynamics into third-order
+companion chains by assuming zero body jerk and zero yaw acceleration, an
+assumption that breaks down during rapid steering and braking. In addition, its
+nominal convergence and scalar yaw $H_\infty$ analyses do not provide an
+explicit, time-varying state-error bound under sensor noise, model mismatch,
+and initial transients, which a safety controller needs to tighten its
+collision constraints.
 
-Even with a coupled vehicle model and an ego-motion-aware observer,
-designing a controller with formal safety guarantees remains difficult.
-Field-based methods such as artificial potential fields \cite{WangGaoLiSunCheng2019}
-and virtual fluid-flow planners \cite{ChengLiLiuLiGuo2021} blend lane keeping
-with obstacle repulsion intuitively, yet a
-collision-free reference path does not guarantee closed-loop safety once
-tire saturation, input limits, and tracking errors come into play.
-Control barrier functions (CBFs) certify forward invariance directly at
-the control-input level \cite{AmesXuGrizzleTabuada2017,XiaoBelta2022},
-but myopic one-step CBF filters can run into actuator saturation at high
-speeds \cite{BruggemannSteevesKrstic2022,TayalEtAl2026} and have shown
-safety violations in road experiments when cut-ins and sensing errors
-break ideal state assumptions
-\cite{GunterNiceBuntingSprinkleWork2022,AlanTaylorHeAmesOrosz2023}.
-Enforcing barrier constraints over a prediction horizon reduces myopia
-\cite{ZengZhangSreenath2021,BlackJankovicSharmaPanagou2023}, and
-predictive control barrier functions (PCBFs) go further by minimizing
-constraint-violation slack up to an invariant terminal safe set, which
-guarantees recursive feasibility and safety invariance via a shifted-plan
-argument \cite{WabersichZeilinger2023,HuangWangMargellosGoulart2025}.
-Still, standard PCBF proofs assume exact state feedback and fixed
-constraints \cite{HeZengZhangSreenath2021,HuangWangMargellosGoulart2025}.
-Recent observer-based CBFs compensate for obstacle-tracking errors
-through input-to-state safety margins or error-containing sets
-\cite{TezukaNakamura2020,QuanZhouFriskChung2025}, yet do not address
-multi-step feasibility under coupled tire and actuator limits. Meanwhile,
-output-feedback tube MPC \cite{MayneRakovicFindeisenAllgower2006} and
-safe MPC for uncertain road users \cite{BatkovicGuptaZanonFalcone2023}
-show that reachable-set tightening requires a safe terminal continuation
-and step-to-step prediction consistency, although
-\cite{BatkovicGuptaZanonFalcone2023} assumes ego state information is
-already available. In coupled maneuvers with online ego and target
-estimation, simply refreshing the estimate and re-tightening constraints
-at each sample can invalidate the previous step's backup plan unless
-successive uncertainty sets remain compatible.
+Together, these two challenges raise the central problem of how to
+construct a collision-avoidance controller with formal safety guarantees
+that respects coupled tire and actuator limits while remaining feasible
+under online estimation errors. Field-based
+planners such as artificial potential fields \cite{WangGaoLiSunCheng2019}
+and virtual fluid-flow models \cite{ChengLiLiuLiGuo2021} blend lane keeping
+with obstacle repulsion intuitively, yet a collision-free
+reference path does not certify closed-loop safety once tire saturation,
+input bounds, and tracking errors intervene. Control barrier functions
+(CBFs) enforce set forward invariance directly through affine conditions
+on the control input \cite{AmesXuGrizzleTabuada2017,XiaoBelta2022}. Under
+bounded actuation, however, myopic one-step CBF quadratic programs can
+lose feasibility \cite{ZengZhangLiSreenath2021}. For lane keeping and
+obstacle avoidance, Bruggemann \emph{et al.}
+\cite{BruggemannSteevesKrstic2022} investigate input-constrained barrier
+functions using a constant-speed lateral vehicle model. Hardware actuator
+limits can also lead to saturation in high-speed corner cases when they are
+omitted from the controller formulation
+\cite{TayalEtAl2026}. Road experiments have also recorded safety
+violations under nominal CBFs during vehicle cut-ins and delays in live
+traffic \cite{GunterNiceBuntingSprinkleWork2022} and under unmodeled
+actuation disturbances on automated trucks
+\cite{AlanTaylorHeAmesOrosz2023}. Approaches to anticipating future
+hazards include enforcing discrete-time barrier constraints within MPC
+\cite{ZengZhangSreenath2021} and constructing barriers from predicted
+motion under a prescribed policy \cite{BlackJankovicSharmaPanagou2023}.
+Predictive control barrier functions (PCBFs) use finite-horizon
+constraint relaxations and terminal constructions to establish recursive
+feasibility and safety recovery under their respective assumptions
+\cite{WabersichZeilinger2023,HuangWangMargellosGoulart2025}. Still,
+these PCBF guarantees assume exact state measurements or fixed offline
+disturbance bounds. Conversely,
+observer-based CBFs account for moving-obstacle estimation errors via
+input-to-state safety margins \cite{TezukaNakamura2020} or bounded-error
+observer sets \cite{QuanZhouFriskChung2025}, yet remain one-step filters
+without multi-step prediction under coupled tire and actuator limits.
+Safe MPC for uncertain road users \cite{BatkovicGuptaZanonFalcone2023}
+establishes recursive feasibility through reachable-set tightening, a
+safe terminal set, and step-to-step prediction consistency, but relies on
+a kinematic ego model and assumes ego sensing and localization are
+already solved. In coupled maneuvers with online ego and target
+estimation, refreshing the estimate and re-tightening constraints at each
+sample can invalidate the prior backup plan unless successive uncertainty
+sets remain compatible.
 
 For nonlinear observer design, Sharma, Zemouche and Rajamani
 \cite{SharmaZemoucheRajamani2026} develop derivative-based LMI conditions
@@ -241,14 +251,15 @@ and a tire force-balance lateral-velocity measurement, the observer
 admits a continuous-time cascade input-to-state stability (ISS)
 certificate and publishes explicit, time-varying error enclosures online
 (Section~\ref{sec:estimator}).
-\item We design a real-time PCBF--CLF controller on the coupled Fiala
-bicycle model that coordinates steering and longitudinal force through
-one nonlinear rollout and two prioritized convex programs per step. A
-closed-form terminal safe set built from constant-rate ego braking and
-the target's predicted motion supports finite-horizon collision
-avoidance, while a single quadratic control Lyapunov function (CLF)
-governs nominal lane keeping, speed regulation, and post-maneuver
-recovery (Section~\ref{sec:control}).
+\item We design a compact nonlinear PCBF controller on the coupled Fiala
+bicycle model that pairs fixed measurement-consistency ensemble inference
+with condensed nonlinear sequential quadratic programming over coarse
+control knots and exact dual rectangle separation at control-boundary
+nodes. A moving straight-cruise terminal set reached through a nonlinear
+cruise bridge supports horizon-shift feasibility under an explicit
+physical handoff assumption, while a secondary tire-loading and rear-slip
+preference guides selection among validated zero-deficit driving plans
+without altering the primary safety objective (Section~\ref{sec:control}).
 \item We establish a joint nonlinear output-feedback safety formulation
 that propagates both vehicles and observers under future
 measurement-dependent policies. Conditioning on the entire received
@@ -256,14 +267,16 @@ sensor block permits restriction of the old policy tail. Under explicit
 uncertainty, attainment and terminal-closure assumptions, this proves
 recursive feasibility, nonincreasing optimal safety relaxation and
 decision-instant safety of its zero set for the road-free problem.
-The real-time Fiala controller's approximations are stated separately (Section~\ref{subsec:robust}).
+The adopted compact Fiala controller's approximations are stated
+separately (Section~\ref{subsec:robust}).
 \item We benchmark the proposed estimator against the reproduced
 multistage HGO of \cite{SharmaAlaiRajamani2026}, verify the
 information-set safety mechanisms on a longitudinal reference problem,
-and evaluate the closed-loop estimator--controller stack across 14
+and preserve the historical October 11 closed-loop baseline across 14
 collision-threat encounters under both exact states and bounded sensor
 noise over six random seeds, including an audit of truth containment for
-the published enclosures (Section~\ref{sec:results}).
+the published enclosures; closed-loop re-evaluation of the revised
+compact controller remains pending (Section~\ref{sec:results}).
 \end{enumerate}
 The remainder of this paper is organized as follows.
 Section~\ref{sec:systemDesign} introduces the task and system architecture.
@@ -316,28 +329,14 @@ cruising speed once the threat has passed.
 This section presents the design of a collision-avoidance system for this
 task, with the overall architecture shown in Fig.~\ref{fig:architecture}.
 The perception module provides position measurements of surrounding
-vehicles relative to the ego vehicle. The algorithms used to obtain
-these measurements depend on the sensing modality and are not the focus
-of this paper. Section~\ref{sec:results} briefly describes the perception
-implementation used in the simulation environment. The estimator
-combines the target vehicle's relative-position measurement with GNSS
-position, body-frame acceleration, and yaw rate to estimate the ego and target states. A position--IMU
-filter reconstructs inertial velocity, and a body-velocity observer and a
-parallel yaw observer estimate the ego motion. A nonlinear relative
-motion model accounts for the effect of that motion on target tracking.
-The estimator also provides error enclosures under the specified sensor,
-model, and operating-domain assumptions.
-
-The controller uses the state estimates, their error enclosures, and a
-nominal path and speed to coordinate steering and longitudinal actuation.
-During an encounter, its primary optimization minimizes collision-constraint
-relaxation, and a secondary optimization refines performance under the
-attained safety budget. A control Lyapunov function represents the
-nominal driving objectives. The controller also returns its held input to
-the estimator, which uses the shared vehicle model to infer lateral
-velocity. Sections~\ref{sec:estimator} and~\ref{sec:control} develop the
-estimator and controller, respectively, including the assumptions and
-implementation approximations.
+vehicles relative to the ego vehicle. Since perception is not the focus
+of this paper and the algorithms depend on the sensors used to detect
+surrounding vehicles, we do not discuss them in detail, but briefly
+describe the implementation used in our simulation environment in
+Section~\ref{sec:results}. The estimator provides state estimates and
+corresponding estimation-error bounds for both the ego and target vehicles. The controller uses these
+estimates and error bounds to compute the collision-avoidance control
+input at each time step.
 
 \subsection{Estimator Design}
 \label{sec:estimator}
@@ -1243,34 +1242,39 @@ the computed bounds.
 \subsection{Control Design}
 \label{sec:control}
 
-The controller first minimizes collision-constraint relaxation, following
-the predictive barrier formulation of \cite{HuangWangMargellosGoulart2025}.
-Its implementation then optimizes a soft CLF/performance objective under the
-attained safety budget, an ordering related to the predictive safety filter
-of \cite{WabersichZeilinger2023}. The mathematical formulation in
-Section~\ref{subsec:robust} makes the observer interface explicit and
-proves recursive feasibility under its declared contracts.
+The adopted controller combines fixed measurement-consistency inference
+over a retained physical ensemble with condensed nonlinear predictive
+control barrier function (PCBF) optimization of held actuator commands,
+following the predictive barrier formulation of
+\cite{HuangWangMargellosGoulart2025} and related predictive safety
+filtering ideas \cite{WabersichZeilinger2023}. Sparse nonlinear
+optimization over few control knots across a substantial preview with warm
+initialization is motivated by \cite{ThompsonDallasGohBalachandran2024},
+adapted here to a time-coordinate held-input vehicle model that includes
+rest. The controller enforces a moving straight-cruise terminal
+continuation set, retains a complete held-input moving plan for
+validation at the next measurement, and applies collision constraints at
+control-boundary state nodes. On the zero-deficit level, predicted tire
+loading and rear slip guide the choice of driving sequence without
+altering the primary safety objective or terminal membership condition.
+Section~\ref{subsec:robust} develops the idealized joint nonlinear
+observer--feedback theory and proves recursive feasibility under its
+declared contracts; the subsections below present the adopted compact
+nonlinear algorithm and the explicit limits of its guarantees. The
+obstacle vehicle of this section is the target of
+Section~\ref{sec:estimator}.
 
-The numerical construction below uses an affine model about one nonlinear
-rollout and the estimator's enclosures. Its campaign-era formulas explain
-the historical results of Section~\ref{sec:results}; subsequent runtime
-changes are identified where relevant. The current implementation uses a
-continuous CLF derivative row and a primary LP followed by a secondary
-QP, and checks completed inputs by nonlinear sampled replay before
-returning them. These checks do not certify whole-hold reachable sets.
-The obstacle vehicle of this section is the target of the previous one.
-
-\subsubsection{Prediction Model}
+\subsubsection{Prediction Model and Physical Contract}
 \label{subsec:predictionModel}
 
-The ego vehicle has speed \(V_E\) and yaw \(\psi_E\), the obstacle speed \(V_C\) and yaw
-\(\psi_C\). One ego model serves the whole system, a dynamic bicycle
-with modified Fiala tires: the controller predicts with it, and the
-estimator inverts its lateral force balance to measure the lateral
-velocity (Section~\ref{subsec:modelAided}). With \(\bm p_E\in\R^2\) and
-\(\bm v_E\in\R^2\) the inertial position and velocity,
-\(\bm v^E=[v_x\;\;v_y]^{\trans}=R(\psi_E)^{\trans}\bm v_E\)
-the body velocity, and
+The ego vehicle has speed \(V_E\) and yaw \(\psi_E\), the obstacle speed
+\(V_C\) and yaw \(\psi_C\). One ego model serves the whole system, a
+dynamic bicycle with modified Fiala tires: the controller predicts with
+it, and the estimator inverts its lateral force balance to measure the
+lateral velocity (Section~\ref{subsec:modelAided}). With
+\(\bm p_E\in\R^2\) and \(\bm v_E\in\R^2\) the inertial position and
+velocity, \(\bm v^E=[v_x\;\;v_y]^{\trans}=R(\psi_E)^{\trans}\bm v_E\) the
+body velocity, and
 \begin{equation}
     R(\psi_E)=\begin{bmatrix}
         \cos\psi_E&-\sin\psi_E\\
@@ -1295,60 +1299,44 @@ The force and moment balances in the body frame read
 \end{equation}
 where $[F_{xf}^{b},F_{yf}^{b}]^{\trans}
 =R(\delta_F)[F_{xf},F_{yf}]^{\trans}$ rotates the front wheel forces into
-the body frame and $F_R$ is the passive road load
-\eqref{eq:road_load}. The slip angles and lateral tire forces are given by
-\eqref{eq:tire_forces} and \eqref{eq:fiala_force}. One signed input
-\(u_L\) acts on both axles: negative values brake, positive values drive. The static loads are
+the body frame and $F_R$ is the passive road load \eqref{eq:road_load}.
+The slip angles and lateral tire forces are given by
+\eqref{eq:tire_forces} and \eqref{eq:fiala_force}. One signed
+longitudinal-force ratio \(u_L\in[-1,1]\) acts on both axles: negative
+values brake, positive values drive. The static loads are
 \(F_{zf}=m_Egl_{r,E}/L\) and \(F_{zr}=m_Egl_{f,E}/L\) with
-\(L=l_{f,E}+l_{r,E}\), each axle stands for a wheel pair, \(m_E\) and
-\(I_{z,E}\) are the mass and yaw inertia, \(l_{f,E}\) and \(l_{r,E}\) the
-lever arms, and \(\delta_F\) the front steering angle. We use the
+\(L=l_{f,E}+l_{r,E}\), the longitudinal forces are
+\(F_{xi}=u_L\mu_iF_{zi}\), and the lateral force capacities are
+\(Q_i=\mu_iF_{zi}\sqrt{1-u_L^2}\) for \(i\in\{f,r\}\). We use the
 symmetric branch condition and \cite[eq.~(13)]{FahmyGhanyBaumann2018};
 the additional arctangent printed in \cite[eq.~(12)]{FahmyGhanyBaumann2018}
-is inconsistent with it. At \(|u_L|=1\) the force is defined by
-\(Q_i=0\), \(\Phi_i=0\), without evaluating the singular polynomial;
-the derivatives of \(\Phi_i\) are unbounded there, and every
-linearization point is kept strictly inside the input interval. The
-physical optimization bounds include $u_L=\pm1$; only the tangent
-seed has an interior numerical reserve. A shifted saturated plan is
-rerolled from an interior seed without modifying the issued input. The tire
-model is used above 4\,m/s. Below that speed the prediction model blends
-into a kinematic bicycle so that the vehicle can come to rest
-(Section~\ref{subsec:predictionModel}). The saturation branch bounds the
-lateral force at both axles without an additional nonsaturation
-constraint (Section~\ref{subsec:envelope}). Speed, sideslip and course are
+is inconsistent with it. At \(|u_L|=1\) we set \(Q_i=0\) and
+\(\Phi_i=0\) without evaluating the singular polynomial. Tire saturation
+is part of the physical model; admitted flows must remain in a domain on
+which the declared vehicle and observer dynamics are well posed. Speed,
+sideslip and course are
 \begin{equation}
     V_E=\normtwo{\bm v_E},
     \qquad
-    \beta_E=\arctan\frac{v_y}{v_x},
+    \beta_E=\operatorname{atan2}(v_y,v_x),
     \qquad
     \gamma_E=\psi_E+\beta_E .
     \label{eq:yaw_from_course}
 \end{equation}
 
-The obstacle vehicle has inputs we do not observe. For the joint
-estimator--controller design, we model its motion with constant scalar
-acceleration and constant sideslip during forward motion, hence constant
-course curvature \cite{SharmaAlaiRajamani2026}. This relation also permits
-the target body yaw to be reconstructed from its estimated course and
-curvature. The tracker supplies the target estimates and their error
-bounds, and the controller forecasts the target motion with braking that
-ends at rest and never reverses the vehicle
-(Section~\ref{subsec:predictionModel}).
-
 For the controller, write $\psi=\psi_E$ and
-$\bm p=[x_E,y_E]^{\trans}$. The controller state and input are
+$\bm p=[x_E,y_E]^{\trans}$. The physical ego state and held actuator
+input at control instants $t_k=kh$ ($h=T_s>0$) are
 \begin{equation}
     \bm x=[x_E,\,y_E,\,\psi,\,v_x,\,v_y,\,\omega_E]^{\trans},\qquad
     \bm u=[\delta_F,\,u_L]^{\trans},
     \label{eq:controller_state}
 \end{equation}
-the inertial pose, the body velocities and the yaw rate $\omega_E=\dot\psi$,
-and the front steering angle and the signed longitudinal force ratio.
-Equations \eqref{eq:position_kinematics}, \eqref{eq:bicycle_model},
+where $\omega_E=\dot\psi$ is the yaw rate. Equations
+\eqref{eq:position_kinematics}, \eqref{eq:bicycle_model},
 \eqref{eq:tire_forces} and \eqref{eq:fiala_force} define
-$\dot{\bm x}=f(\bm x,\bm u)$ above the speed $v_2=4$\,m/s. Below
-$v_1=2.5$\,m/s the body accelerations are those of a kinematic bicycle,
+$\dot{\bm x}=f(\bm x,\bm u)$ above the blend speed $v_2=4$\,m/s. Below
+$v_1=2.5$\,m/s the body accelerations follow the low-speed kinematic map
 \begin{equation}
     \begin{gathered}
     m_E\dot v_x=\bigl[u_{L,+}+u_{L,-}\tanh(v_x/v_{\rm h})\bigr]\\
@@ -1360,26 +1348,14 @@ $v_1=2.5$\,m/s the body accelerations are those of a kinematic bicycle,
     \end{gathered}
     \label{eq:kinematic_model}
 \end{equation}
-with $u_{L,+}=\max(u_L,0)$, $u_{L,-}=\min(u_L,0)$, a brake-hold
-speed $v_{\rm h}$ and a lag $T_{\rm k}$. The yaw rate and the lateral
-velocity relax to their kinematic values, a rear axle without slip; the
-longitudinal force is the force ratio times the axle capacities; and
-braking fades below $v_{\rm h}$, so that it ends at rest and never
-reverses the vehicle, while driving moves it off from rest. Between
-$v_1$ and $v_2$ the body accelerations of the two models are blended
-with the weight $\lambda=s^2(3-2s)$, $s=(v_x-v_1)/(v_2-v_1)$; position
-and heading follow the body velocities in all three regimes. A braked
-vehicle slower than $v_{\rm h}/5$ at the end of a hold is taken to be at
-rest exactly, with zero body velocities and zero sensitivities, because
-the vanishing tail of the fading brake, with coefficients of $10^{-4}$
-to $10^{-7}$, had left the second program without a numerical result
-while the vehicle crept to a stop. Above $v_2$ the model is the Fiala
-bicycle exactly, so the certificates of Section~\ref{subsec:clf},
-computed at 8 and 15\,m/s, do not see the low-speed regime. That regime
-exists so that the vehicle can stop: the terminal set of
-Section~\ref{subsec:terminal} contains stops, and a model that ended at
-the tire's 1\,m/s floor could not reach them. The passive flat-road
-load in still air is
+with $u_{L,+}=\max(u_L,0)$, $u_{L,-}=\min(u_L,0)$, brake-hold speed
+$v_{\rm h}$ and lag $T_{\rm k}>0$. Between $v_1$ and $v_2$, the three
+body derivatives are blended using $w=s^2(3-2s)$ with
+$s=\operatorname{clip}((v_x-v_1)/(v_2-v_1),0,1)$, while position and yaw
+kinematics are unchanged. A braked vehicle slower than $0.2\,v_{\rm h}$
+at a control boundary is reset to rest; any such hybrid reset is applied
+only at control boundaries and consistently across prediction,
+conditioning, and replay. The passive road load is
 \begin{equation}
     \begin{split}
     F_R(v)={}&\tfrac12\rho_{\rm air}C_dA_fv|v|\\
@@ -1389,43 +1365,43 @@ load in still air is
 \end{equation}
 with air density $\rho_{\rm air}$, drag coefficient $C_d$, frontal area
 $A_f$, nonnegative rolling coefficients $q_0,q_1,q_4$ and
-$v_{\rm tr}>0$. The model uses static axle loads and leaves out wheel
-inertia, wind, grade and dynamic load transfer.
+$v_{\rm tr}>0$.
 
-An input is held for the sample period $T_s$. The prediction map
-$F(\bm x,\bm u)$ is one classical RK4 step of $f$ over $T_s$, and its
-Jacobians $D_xF$ and $D_uF$ come from the variational equations
-propagated through the same step, with analytic tire-force derivatives
-in both slip angle and force ratio. Linearization points stay strictly
-inside $|u_L|<1$, where those derivatives exist. Constraints are also
-imposed halfway through each hold; with one integration step per hold,
-the mid-hold state is the endpoint interpolant
-$\tfrac12(\bm x+F(\bm x,\bm u))$, not an independently integrated half
-step.
+The body sideslip $\beta_E$ is the angle of the center-of-mass velocity,
+not either tire slip angle $\alpha_f,\alpha_r$. In low-speed turning,
+$v_y\simeq l_{r,E}\omega_E$ can give nonzero body sideslip while rear
+tire slip is near zero. The shared observer sideslip cone
+\begin{equation}
+    |v_y|\leq v_x\tan\beta_{\rm dom}
+    \label{eq:sideslip_cone}
+\end{equation}
+is an estimation-domain premise rather than a tire-force capacity limit;
+enlarging it changes the estimator premise and recomputed error bounds
+without increasing tire capacity. On the dynamic or blended branch,
+well-posedness of the front-tire slip map requires
+$v_x\cos\delta_F+(v_y+l_{f,E}\omega_E)\sin\delta_F>0$, equivalent to
+$|\alpha_f|<\pi/2$ on the declared steering domain.
 
-The reference path is straight or of constant curvature
-$\kappa_{\rm r}$ and is traversed at the prescribed speed $v_*$. Steady
-motion along it has yaw rate $\omega_*=\kappa_{\rm r}v_*$ and a constant
-sideslip; the three balances of \eqref{eq:bicycle_model} determine that
-sideslip and the trim input $\bm u_*=[\delta_{F,*},u_{L,*}]^{\trans}$.
-Deviation from cruise is measured by the transverse error
+The reference path has constant curvature $\kappa_{\rm r}$ and prescribed
+cruise speed $v_*$. On the path chart with phase $s_p$, signed lateral
+offset $e_y$ and heading error $e_\psi$,
+$\dot s_p=(v_x\cos e_\psi-v_y\sin e_\psi)/(1-\kappa_{\rm r}e_y)$,
+$\dot e_y=v_x\sin e_\psi+v_y\cos e_\psi$, and
+$\dot e_\psi=\omega_E-\kappa_{\rm r}\dot s_p$ on $1-\kappa_{\rm r}e_y>0$.
+Deviation from the steady cruise trim $(\bm x_*,\bm u_*)$ is measured by
+the transverse error
 \begin{equation}
     \bm e(\bm x)=[e_y,\ e_\psi,\ v_x-v_{x,*},\ v_y-v_{y,*},\
         \omega_E-\omega_*]^{\trans},
     \label{eq:transverse_error}
 \end{equation}
-where $e_y$ is the signed lateral offset of the center of mass from the
-path and $e_\psi$ the heading relative to the path tangent minus its
-trim value. Position along the path is not an error: the nominal
-behavior is the set of all phases of cruise on the path. The road is the
-strip $-c_{\rm R}\leq e_y\leq c_{\rm L}$ with declared clearances
-$c_{\rm R},c_{\rm L}>0$ to the right and left of the path.
+leaving longitudinal phase free.
 
-The obstacle motion used for joint prediction has constant scalar
-acceleration $A_C$ and constant sideslip $\beta_C$ during forward motion,
-with braking that ends at rest. With the curvature
-$\kappa_C=\sin\beta_C/l_{r,C}$, the speed $V_C(t)=\max(0,V_{C,0}+A_Ct)$,
-the arc length $s(t)$ its integral and $\vartheta(t)=\tfrac12\kappa_Cs(t)$,
+The obstacle motion has constant tangential acceleration $A_C$ and
+constant sideslip $\beta_C$ during forward motion, with an absorbing stop
+at rest. With $\kappa_C=\sin\beta_C/l_{r,C}$, $V_C(t)=\max(0,V_{C,0}+A_Ct)$,
+arc length $s(t)=\int_0^t V_C(\tau)\,d\tau$ and
+$\vartheta(t)=\tfrac12\kappa_Cs(t)$,
 \begin{equation}
     \begin{aligned}
     \bm p_C(t)&=\bm p_{C,0}+s\,\frac{\sin\vartheta}{\vartheta}
@@ -1435,213 +1411,175 @@ the arc length $s(t)$ its integral and $\vartheta(t)=\tfrac12\kappa_Cs(t)$,
     \end{aligned}
     \label{eq:target_flow}
 \end{equation}
-with $\sin\vartheta/\vartheta=1$ at $\vartheta=0$. No quadrature is
-needed, and the yaw rate $\kappa_CV_C(t)$ varies with the speed. A
-braking obstacle stops at the arc length $-V_{C,0}^2/(2A_C)$ and stays
-there, with $A_C$ then zero; an obstacle at rest moves off only forward.
-Every new estimate replaces the obstacle state and the parameters $A_C$
-and $\beta_C$; the forecast runs forward from the latest estimate and
-the sample at which it was taken, because a stop cannot be run
-backward, and the parameters are constant within one prediction and may
-change at the next sample. When no estimate arrives, the last forecast
-continues unless a complete current empty scan confirms its absence.
-The obstacle is perceived only within the range $R_{\rm enc}$. An absorbing
-encounter flag removes collision constraints after the first exit; a later
-actual reacquisition starts a new problem. In the affine RTI prediction,
-exit is certified only after subtracting the published position enclosures
-and the position correction allowed by the trust box from the center
-distance. This flag is passed to the terminal condition as well.
+with $\sin\vartheta/\vartheta=1$ at $\vartheta=0$. For $A_C<0$, the
+target stops at $V_C=0$ and retains its stopped pose while keeping its
+latent parameters $(A_C,\beta_C)$ fixed; stopping is absorbing, and
+inference retains the physical track through missed returns and range
+exits.
 
-An anchor trajectory $(\bar{\bm x}_i,\bar{\bm u}_i)$, $i=0,\ldots,M$,
-with $\bar{\bm x}_0$ the supplied estimate and
-$\bar{\bm x}_{i+1}=F(\bar{\bm x}_i,\bar{\bm u}_i)$, supplies every
-linearization of the sample. With
-$\Delta\bm x_i=\bm x_i-\bar{\bm x}_i$,
-$\Delta\bm u_i=\bm u_i-\bar{\bm u}_i$,
-$A_i=D_xF(\bar{\bm x}_i,\bar{\bm u}_i)$ and
-$B_i=D_uF(\bar{\bm x}_i,\bar{\bm u}_i)$, the shared model is
+Let $\widetilde F_h$ denote the numerical held-input flow over one
+control period $h$, applying the rest reset only at the control boundary.
+Nonlinear validation uses a fixed fine RK4 mesh ($K_v=8$ substeps per
+hold by default) together with the continuous cubic RK4 interpolant for
+dense physical-domain checks inside each hold, while local SQP
+sensitivities propagate on a coarser mesh. Neither mesh supplies a
+certified integration-error bound.
+
+\subsubsection{Fixed Measurement-Consistency Inference}
+\label{subsec:uncertainty}
+
+Let the augmented physical Markov state be
+\begin{equation}
+    \bm\chi=(\bm p_E,R_E,\bm v^E,\omega_E,\bm r,R_{\rm rel},
+        V_C,A_C,\beta_C,\bm\vartheta,\bm\sigma,\bm\eta),
+    \label{eq:markov_state}
+\end{equation}
+where $\bm r=R_E^{\trans}(\bm p_C-\bm p_E)$,
+$R_{\rm rel}=R_E^{\trans}R_C$, $\bm\vartheta$ collects persistent
+physical parameters ($\bm\vartheta^+=\bm\vartheta$), $\bm\sigma$ collects
+physical modes, and $\bm\eta$ collects persistent sensor biases or
+disturbance memory. With $\bm e(\beta)=[\cos\beta,\sin\beta]^{\trans}$,
+the relative pose obeys
+$\dot{\bm r}=V_CR_{\rm rel}\bm e(\beta_C)-\bm v^E-\omega_EJ\bm r$ and
+$\dot R_{\rm rel}=(\kappa_CV_C-\omega_E)JR_{\rm rel}$ during forward
+target motion, reducing to $\dot{\bm r}=-\bm v^E-\omega_EJ\bm r$ and
+$\dot R_{\rm rel}=-\omega_EJR_{\rm rel}$ after target absorption.
+
+Observations arrive at sensor period $h_s$ with $h=Lh_s$: position-only
+GNSS, gyro yaw rate, gravity-compensated center-of-mass body acceleration
+evaluated under the preceding applied input $\bm u^-$, and relative
+target position when available,
 \begin{equation}
     \begin{gathered}
-    \Delta\bm x_{i+1}=A_i\Delta\bm x_i+B_i\Delta\bm u_i,\qquad
-    \Delta\bm x_0=0,\\
-    |\Delta\bm x_i|\leq\bm\tau_x,\qquad
-    |\Delta\bm u_i|\leq\sigma\bm\tau_u .
+    \bm y_p=\bm p_E+\bm\eta_p+\bm n_p,\qquad
+    u_3=\omega_E+\eta_r+d_\omega,\\
+    \bm a_m=f_v(\bm v^E,\omega_E,\bm u^-;\bm\vartheta)
+        +\omega_EJ\bm v^E+\bm\eta_a+\bm n_a,\\
+    \bm y_R=\bm r+\bm\eta_R+\bm n_R.
     \end{gathered}
-    \label{eq:affine_model}
+    \label{eq:raw_measurements}
 \end{equation}
-The trust boxes limit the correction of one solve; they are not
-certified bounds on the linearization remainder. The scale
-$\sigma\in[\sigma_{\min},1]$ of the input box is estimated online
-(Section~\ref{subsec:trust}) and starts at $\sigma_0$. The force ratio
-obeys its actuator interval, and the body velocities $v_x$, $v_y$ and $\omega_E$
-obey box bounds at the nodes and mid-hold points, with $v_x\geq0$. The
-steering angle has neither a magnitude nor a rate bound.
-
-The horizon length $M$ is not fixed. It has $N$ primary holds, on which
-the collision constraints may be relaxed. The shifted plan or geometric guide
-determines an initial length of at least $N$ holds. Its endpoint is then
-extended until it lies in the terminal set $\mathcal X_f$ of
-Section~\ref{subsec:terminal}. An explicit finite $M_{\max}$ may cap extension;
-the default has no such cap. Computation remains subject to the sample deadline.
-
-\subsubsection{The Anchor}
-\label{subsec:initialization}
-
-Without a previous plan, a target invokes one analytic geometric planner;
-without a target the anchor is a lane-feedback rollout. With a previous plan,
-RTI first shifts its inputs by one hold and rolls them through $F$ from the
-current estimate. No separate threat-screening gate can bypass replanning
-following local infeasibility. The planner's geometric search starts at the
-measured position, course and speed and expands until the approaching
-interaction and its conflict interval are bracketed, or the target first
-leaves sensing range. A stationary relative forecast terminates expansion.
-The first grid uses the minimum prefix of $N$ holds, with no separate duration
-parameter. The guide covers the detected conflict interval plus settling time.
-This is initialization, not a safety certificate. A same-direction lead uses
-an unbraked guide base so that seed deceleration cannot erase a passing conflict.
-The shifted plan's absolute endpoint is retained until the minimum prefix length $N$ is
-reached. Missing holds from a terminal endpoint prefer a checked
-cruise-feedback hold. A bounded cruise-to-braking seed search, with at most
-five scalar halvings, can retain terminal membership while avoiding
-unnecessary braking. This numerical initializer is distinct from the
-unique terminal controller $\kappa_{\rm f}$. If no certified hold is found,
-a moving endpoint uses nominal feedback, whereas a stopped endpoint keeps
-a nonpositive longitudinal command instead of restarting into a local
-positive-input box. A nonterminal anchor endpoint is extended along its tangent,
-using the vehicle model and speed-holding feedback, until it belongs to the
-terminal set. An immobile joint reference or an explicit finite horizon cap
-ends extension without certifying membership and leaves correction to RTI.
-The default has no horizon cap; extension shares the computation deadline with
-formulation and optimization. The terminal inequalities remain in the convex
-problem. This reference check is not a robust nonlinear certificate, and does
-not make stopping the nominal objective. Road boundaries are disabled in the
-current experiments; the given path still defines the cruise CLF.
-If a local convex subproblem reports primal
-infeasibility, one fresh initialization and RTI retry are allowed within the
-original controller-call budget. The retry discards the old input seed,
-separation normals and terminal linearization context, and regenerates the
-reference from the same current observation and uncertainty sets. A target
-always invokes the planner on this retry; no nominal-cruise risk test gates it.
-A failed reference that was already fresh
-receives $N$ additional settling holds, subject to an explicitly configured
-horizon maximum. Dynamics tangents, separating directions, collision dual
-multipliers and terminal rows are recomputed at the new reference. No further
-retry is permitted; timeouts and numerical iteration limits do not trigger
-replanning. This is a bounded recovery from local infeasibility, not a
-convergence-driven sequence of nonlinear iterations. A returned optimized
-input is issued without substitution.
-
-The path-guidance law steers the course toward the path through a
-lookahead and regulates the speed through the force ratio. With $\chi$
-the course relative to the path tangent, $V$ the speed, $d_{\rm la}$ a
-lookahead distance, $\chi_d$ the commanded course and $\dot\chi_d$ its
-rate along the motion,
+A derived velocity is not treated as an independent GNSS measurement.
+Write $(\bm\chi^+,Y,\gamma)\in\mathscr R_h(\bm\chi,\bm u)$ when one
+admissible realization generates the physical hold $\gamma$, every sensor
+reading and detection flag in block $Y$, and endpoint $\bm\chi^+$. The
+exact measurement-consistent set update is
 \begin{equation}
-    \begin{gathered}
-    \chi_d=-\arctan\frac{e_y}{d_{\rm la}},\qquad
-    \dot\chi_d=-\frac{d_{\rm la}V\sin\chi}{d_{\rm la}^2+e_y^2},\\
-    \omega_d=\operatorname{sat}_{\bar\omega_d}\Bigl[
-        \frac{\kappa_{\rm r}V\cos\chi}{1-\kappa_{\rm r}e_y}
-        +\dot\chi_d-k_\chi(\chi-\chi_d)\Bigr],\\
-    F_d=\frac{I_{z,E}k_\omega(\omega_d-\omega_E)+l_{r,E}F_{yr}}{l_{f,E}},\\
-    \phi_d=\min\Bigl(\frac{|F_d|}{Q_f},c_\phi\Bigr),\\
-    \delta_F=\operatorname{atan2}(v_y+l_{f,E}\omega_E,v_x)+\delta_0\\
-        \qquad{}+\operatorname{sgn}(F_d)\arctan
-        \frac{3Q_f[1-(1-\phi_d)^{1/3}]}{C_f},\\
-    u_L=\operatorname{sat}_{\bar u_L}\bigl[
-        u_{L,*}+k_L(v_{x,*}-v_x)\bigr].
-    \end{gathered}
-    \label{eq:guidance_law}
+    \mathcal I_{k+1}=\{\bm\chi^+:\exists\bm\chi\in\mathcal I_k,\gamma,\;
+        (\bm\chi^+,Y_{k+1},\gamma)\in\mathscr R_h(\bm\chi,\bm u_k)\},
+    \label{eq:exact_consistency_update}
 \end{equation}
-The yaw-rate demand $\omega_d$ is limited to $\bar\omega_d=c_a\mu g/V$, a fraction
-of the available lateral acceleration, with $\mu$ the smaller axle
-friction coefficient. The front force demand $F_d$ follows from a
-yaw-rate loop and the current rear force $F_{yr}$, the steering angle
-inverts the front Fiala curve \eqref{eq:fiala_force} below the fraction
-$c_\phi$ of its capacity $Q_f$, and $\delta_0$ is the constant that
-makes the trim an equilibrium. The law is never issued as a command.
+conditioned using the input $\bm u_k$ that actually generated $Y_{k+1}$.
+Under a valid contract and initial containment,
+\eqref{eq:exact_consistency_update} retains the true successor.
 
-With an obstacle, the course demand follows a potential field adapted
-from \cite{ZhaiEtAl2024}: obstacle influence that depends on direction,
-repulsion that depends on the relative motion, and joint course and
-speed guidance. At each rollout node the ego is previewed along the path
-for a time $T_{\rm p}$, at its current speed along the path and with its
-lateral offset decaying as $e^{-\tau/T_{\rm la}}$, and compared with the
-obstacle prediction \eqref{eq:target_flow} at the same absolute times
-$\tau_j$. With the longitudinal and lateral separations
-$\Delta s_j,\Delta d_j$ in path coordinates and the summed half extents
-$a_j,b_j$ of the two rectangles along and across the path, including a
-padding,
+The numerical controller maintains a finite retained ensemble
+$\widehat{\mathcal I}_k=\{\bm\chi_k^s\}_{s=1}^{S_k}$ with fixed
+inference equations (no online observer-gain optimization or learned
+memory update). Each member is propagated through every sensor period
+using the same fine RK4 resolution as nonlinear validation (without
+applying the absorbing rest reset before the control boundary) and
+survives only if every received residual satisfies its declared sensor
+bound. No surviving member is replaced by an independently fitted point,
+and parameters are not redrawn. An empty ensemble signals an
+information-contract failure rather than physical infeasibility, and a
+finite ensemble does not enclose states lying between its members.
+
+For a tracked target with perception range $R_{\rm enc}$, define
+$d_k^-=\min_s\normtwo{\bm p_{C,k}^s-\bm p_{E,k}^s}$. Once entry has been
+recorded (by a return, $d_k^-\le R_{\rm enc}$, or explicit initial
+supply), the target contributes collision and terminal separation
+constraints at step $k$ if and only if $d_k^-\le R_{\rm enc}$. When
+$d_k^->R_{\rm enc}$, the target-free problem retains physical-domain,
+actuator, and moving terminal conditions while the posterior continues
+propagating the target; re-entry restores full constraints before a new
+command is issued. Planning selects one representative member
 \begin{equation}
-    \begin{gathered}
-    w=\max_jw_j,\qquad
-    w_j=\exp\!\Bigl(-\frac{\Delta s_j^2}{2a_j^2}
-        -\frac{\Delta d_j^2}{2b_j^2}-\frac{\tau_j}{2T_{\rm la}}\Bigr),\\
-    v_d=-\frac{e_y}{T_{\rm la}}+0.7\,v_*w\Bigl(
-        \frac{\Delta d_\star}{b_\star}+2c\Bigr),\\
-    v_s=\max\bigl(1.5\,\mathrm{m/s},\ 0.5v_*,\
-        v_*[1-0.35\,w\min(2,v_{\rm cl}/v_*)]\bigr),
-    \end{gathered}
-    \label{eq:potential_field}
+    s_0\in\arg\min_s
+        \normtwo{\bm x_k^s-\frac1{S_k}\sum_{a=1}^{S_k}\bm x_k^a}^2
+    \label{eq:representative_member}
 \end{equation}
-where the star marks the preview instant of largest influence,
-$v_{\rm cl}\geq0$ is the closing speed along the path at that instant,
-and $c=-\nu_{\rm p}\,\bm t_{\rm r}^{\trans}(\bm p-\bm p_C)/
-\max(\normtwo{\bm p-\bm p_C},1\,\mathrm m)$ is a circulation term with
-path tangent $\bm t_{\rm r}$ and passing side $\nu_{\rm p}\in\{-1,1\}$.
-The commanded course is the path heading plus
-$\operatorname{atan2}(v_d,v_s)$, with $v_d$ limited so that the body
-stays on the road, and the speed demand is $v_s$. The side $\nu_{\rm p}$
-is selected once per rollout from the lateral separation at the closest
-predicted approach, the obstacle's transverse velocity and the road room
-that would remain on either side after clearing the obstacle. The last
-term matters with estimated states: without it a head-on encounter in
-the lane was decided by the sign of the estimated obstacle sideslip,
-which is noise. The field combines attraction, a normalized repulsion
-and circulation and is not the gradient of one potential. A yaw-rate
-loop, the inverse Fiala curve and a speed loop as in
-\eqref{eq:guidance_law}, with limits that apply only to this rollout,
-drive the map $F$. The rollout fixes the side on which the obstacle is
-passed; the programs of Section~\ref{subsec:program} refine the
-trajectory locally and do not revisit that choice. A fresh anchor is a
-search initialization and nothing more: it can itself overlap the
-obstacle or leave the road.
+to generate the single geometric initialization trajectory and reported
+tracking cost. Every retained member is propagated under the same
+proposed input sequence inside both the nonlinear oracle and fine
+acceptance validation; future open-loop commands are reoptimized as new
+measurements arrive.
 
-\subsubsection{Collision Constraints}
+\subsubsection{Preview Horizon, Control Knots, and Dual Geometry}
 \label{subsec:geometry}
+
+With speed bound $v_k^+=\max_s\normtwo{\bm v_k^{E,s}}$, the requested
+preview time and hold count are
+\begin{equation}
+    \begin{gathered}
+    T_k^{\rm req}=\max\bigl\{T_{\min},\,2h,\,v_k^+/a_p+T_s,\,
+        T_{\rm space}\bigr\},\\
+    N_k=\max\left\{N_{k-1}-1,\left\lceil
+        \frac{\Delta T\lceil T_k^{\rm req}/\Delta T\rceil}{h}
+        \right\rceil\right\},
+    \end{gathered}
+    \label{eq:preview_rule}
+\end{equation}
+where $a_p>0$ is a preview scale (not a certified braking deceleration)
+and, for an active target with $v_*>0$,
+$T_{\rm space}=2(a_E+\max_s a_C^s)/\max(v_k^+,v_*)$ with footprint radii
+$a=\sqrt{\ell^2+w^2}+\normtwo{\bm o}$ sizes the passing lookahead
+without replacing rectangle geometry ($T_{\rm space}=0$ otherwise). At
+initialization the $N_{k-1}-1$ term is zero; on continuation the preview
+may shrink by one hold per step as $T_k^{\rm req}$ decreases, and an
+accepted plan always spans $N_k$ holds.
+
+The $N_k$ holds are partitioned into $M\le N_k$ control intervals with
+integer boundaries $0=c_0<c_1<\cdots<c_M=N_k$ and lengths
+$b_i=c_i-c_{i-1}$, where the first intervals have $b_i=1$ (in particular
+$b_1=1$) and the remaining holds are distributed evenly. Independent
+decision variables are endpoint commands $\bm v_i\in\R^2$,
+$i=1,\ldots,M$, with $\bm v_0=\bm u^-$. Held commands inside interval
+$i$ are linearly interpolated,
+\begin{equation}
+    \bm u_{c_{i-1}+j}=\bm v_{i-1}+\frac{j}{b_i}(\bm v_i-\bm v_{i-1}),
+    \qquad j=1,\ldots,b_i,
+    \label{eq:knot_interpolation}
+\end{equation}
+and each $\bm u_j$ is held constant over $h$, so $\bm v_1$ is the next
+applied command. Convex bounds on $\bm v_i$ imply the same bounds on all
+interpolated commands, and any explicitly specified finite slew bound
+$|v_{i,\delta}-v_{i-1,\delta}|\le b_ih\dot\delta_{\max}$ (and
+analogously for $u_L$) bounds every physical hold increment; omitted
+bounds are not imposed. Physical states are condensed by forward
+substitution $\bm x_0^s=\bm x_k^s$,
+$\bm x_{j+1}^s=\widetilde F_h(\bm x_j^s,\bm u_{j+1},\bm\vartheta^s)$.
 
 Both vehicles are rectangles. Let
 $\mathcal C(t)=\{\bm m:H_C(\bm m-\bm p_C(t))\leq\bm h_C\}$ be the
 obstacle rectangle, with $H_C=[I;\,-I]R(\psi_C(t))^{\trans}$ and
-$\bm h_C$ its extents about $\bm p_C$, and let
-$\bm p_j(\bm x)=\bm p+R(\psi)\bm o_j$, $j=1,\ldots,4$, be the ego
-vertices with body-frame offsets $\bm o_j$. The Euclidean distance
-between the two sets has the dual representation
+$\bm h_C$ its directional extents about $\bm p_C$, and let
+$\bm p_a(\bm x)=\bm p+R(\psi)\bm o_a$, $a=1,\ldots,4$, be the ego
+vertices with body-frame offsets $\bm o_a$. The Euclidean distance
+between the two rectangles has the dual representation
 \cite{ZhangLinigerBorrelli2021}
 \begin{equation}
     \begin{gathered}
-    d(\bm x,t)=\max_{\bm\lambda\in\Lambda}\ \min_j\
-        g_j(\bm x;\bm\lambda),\\
-    g_j=\bm\lambda^{\trans}\bigl[H_C(\bm p_j(\bm x)-\bm p_C)
+    d(\bm x,t)=\max_{\bm\lambda\in\Lambda}\ \min_a\
+        g_a(\bm x;\bm\lambda),\\
+    g_a=\bm\lambda^{\trans}\bigl[H_C(\bm p_a(\bm x)-\bm p_C)
         -\bm h_C\bigr],\\
     \Lambda=\{\bm\lambda\geq0:\normtwo{H_C^{\trans}\bm\lambda}\leq1\}.
     \end{gathered}
     \label{eq:distance_dual}
 \end{equation}
-Following \cite{LiZhangGuoLenzoGuo2023}, the multipliers are chosen at
-the anchor and then held fixed while the trajectory is optimized.
 
 \begin{lemma}
 \label{lem:dualRows}
 (i) For every $\bm\lambda\in\Lambda$ and every $\bm x$,
-$d(\bm x,t)\geq\min_jg_j(\bm x;\bm\lambda)$.
+$d(\bm x,t)\geq\min_ag_a(\bm x;\bm\lambda)$.
 (ii) If the rectangles are disjoint at $\bar{\bm x}$ and $\bm n$ is the
 unit vector from a closest point of $\mathcal C$ to a closest point of
 the ego rectangle, then
 $\bm\lambda^\star=[\max(\bm w,0);\,\max(-\bm w,0)]$ with
 $\bm w=R(\psi_C)^{\trans}\bm n$ satisfies
 $H_C^{\trans}\bm\lambda^\star=\bm n$ and
-$\min_jg_j(\bar{\bm x};\bm\lambda^\star)=d(\bar{\bm x},t)$.
+$\min_ag_a(\bar{\bm x};\bm\lambda^\star)=d(\bar{\bm x},t)$.
 (iii) If a point of the ego rectangle lies in the interior of
 $\mathcal C$, the maximum in \eqref{eq:distance_dual} is zero and
 $\bm\lambda=0$ is its only maximizer.
@@ -1662,645 +1600,298 @@ $\bm h_C^{\trans}\bm\lambda^\star$ is the support of
 $\mathcal C-\bm p_C$ in direction $\bm n$, attained at the closest point
 $\bm m_C$. The line through the closest ego point with normal $\bm n$
 supports the ego rectangle, hence
-$\min_j\bm n^{\trans}(\bm p_j-\bm m_C)=d$. (iii) At such a point
+$\min_a\bm n^{\trans}(\bm p_a-\bm m_C)=d$. (iii) At such a point
 $\bm m_0$ every component of $H_C(\bm m_0-\bm p_C)-\bm h_C$ is negative,
-so $\min_jg_j\leq\bm\lambda^{\trans}[H_C(\bm m_0-\bm p_C)-\bm h_C]<0$
+so $\min_ag_a\leq\bm\lambda^{\trans}[H_C(\bm m_0-\bm p_C)-\bm h_C]<0$
 unless $\bm\lambda=0$.
 \end{IEEEproof}
 
-When the anchor is disjoint from the obstacle at a constrained instant,
-the multipliers are those of Lemma~\ref{lem:dualRows}(ii), computed in
-closed form from the closest features of the two rectangles. When the
-anchor overlaps, Lemma~\ref{lem:dualRows}(iii) leaves only the zero
-multiplier, whose row has no gradient in the ego pose, and the row is
-built from another element of $\Lambda$: the unit normal $\bm n$ of the
-rectangle axis, among the four axes of the two bodies, along which the
-penetration is smallest. By Lemma~\ref{lem:dualRows}(i) its value is
-still a lower bound of the distance; it is negative at the anchor and
-increases as the bodies separate along that axis, so the program keeps
-a direction of escape. With $\bm\lambda$ so chosen at the anchor pose
-and the obstacle pose taken from \eqref{eq:target_flow} at the same
-absolute time, each constrained instant contributes the four rows
+For the predictive deficit, we use the signed unit-normal extension
 \begin{equation}
-    g_j(\bar{\bm x};\bm\lambda)+\bm n^{\trans}\Delta\bm p
-    +\bm n^{\trans}R(\bar\psi)J\bm o_j\,\Delta\psi-\theta_i+\xi_i
-    \geq d_{\rm m},
-    \label{eq:collision_rows}
+    d_\pm(\bm x,\bm q)=\max_{\bm\lambda\ge0,\;\normtwo{H_C^{\trans}\bm\lambda}=1}
+        \min_a g_a(\bm x;\bm\lambda),
+    \label{eq:signed_distance_dual}
 \end{equation}
-affine in the decision variables, with $\bm n=H_C^{\trans}\bm\lambda$, a
-node threshold $d_{\rm m}=0$ (no extra design clearance), a slack $\xi_i\geq0$ and a tightening
-$\theta_i\geq0$ that accounts for the estimation error
-(Section~\ref{subsec:uncertainty}; $\theta_i=0$ without an enclosure).
-At the zero threshold, nonoverlap follows from separation by the selected
-nonzero normal, not from the ordinary distance inequality $d\geq0$, which
-also holds for overlapping rectangles. Zero support is boundary contact;
-positive support gives strict separation. No additional fixed clearance is
-used by the geometric guide or terminal continuation; their uncertainty
-reserves remain.
-The constrained instants are the hold starts and mid-hold points within
-$R_{\rm enc}$ and the endpoint of the horizon. Without an enclosure, one
-slack per primary hold relaxes its start and mid-hold rows, and the rows
-of later holds have none. With an enclosure, every hold has a slack on
-its tightened rows, and beyond the primary holds the untightened rows
-($\theta_i=0$) are imposed in addition without slack, so that the
-formulation reduces to the former as the enclosure vanishes. Rows that
-no correction inside the trust boxes can violate are not formed, which
-leaves the feasible set unchanged (Section~\ref{subsec:computation}).
-The vertex rotation is kept to first order, with remainder at most
-$\tfrac12\normtwo{\bm o_j}\Delta\psi^2$, so by Lemma~\ref{lem:dualRows}(i)
-the rows \eqref{eq:collision_rows} with $\xi_i=\theta_i=0$ imply
-$d\geq d_{\rm m}-\tfrac12r_E\Delta\psi_i^2$ for the affine-predicted
-pose, where $r_E=\max_j\normtwo{\bm o_j}$. With zero extra clearance,
-this lower bound can be negative: affine feasibility alone does not certify
-nonoverlap of the nonlinear pose. The issued
-plan is rolled out under the nonlinear prediction model without
-post-solve input substitution. Independent scenario replay checks its
-rectangle distances; the affine rows alone do not certify the nonlinear
-trajectory.
+which equals Euclidean distance for separated rectangles and is strictly
+negative in penetration, preserving a separating gradient even at
+centered overlap. The inner dual maximization is eliminated
+algebraically and exactly: closest vertex--edge pairs give its value
+outside collision (optimizing $\bm n=H_C^{\trans}\bm\lambda$ continuously
+on the unit circle), while Minkowski-polygon facet normals give its exact
+signed depth inside collision. Positive separation is never replaced by a
+fixed four-axis clearance bound, bounding circles, smooth-max surrogate,
+or extra fixed planning buffer; the resulting value is piecewise smooth
+at feature changes.
 
-\subsubsection{Road, Handling Envelope and Estimator Domain}
-\label{subsec:envelope}
-
-The ego drives on the road: at every predicted node after the current
-one and at every mid-hold point, each rectangle vertex satisfies
-\begin{equation}
-    -c_{\rm R}\leq e_y\bigl(\bm p_j(\bm x)\bigr)\leq c_{\rm L},
-    \qquad j=1,\ldots,4,
-    \label{eq:road_rows}
-\end{equation}
-linearized in position and heading on the path normal at the anchor
-vertex. These rows carry no slack in either program.
-
-The observer's force-balance inversion assumes the sideslip domain
-\begin{equation}
-    |v_y|\leq v_x\tan\beta_{\rm dom}.
-    \label{eq:sideslip_cone}
-\end{equation}
-The implemented value $\beta_{\rm dom}=0.25$ rad is a selected
-observer-domain premise, passed from the controller configuration into the
-observer design. It is not a measured uncertainty radius or a universal
-vehicle limit. The reconstruction bounds in Section~\ref{subsec:modelAided}
-contain $\sec\beta_{\rm dom}$ and require an appropriate finite domain
-strictly below $\pi/2$.
-The numerical program imposes this condition above $v_{\rm h}$, where
-sideslip is defined, with the observer's support margin. It is a premise
-of the observer enclosure, not a tire-force capacity constraint.
-Modified Fiala dynamics already limit both axles' forces. No additional
-rear-tire nonsaturation cone is imposed: the interval inversion includes
-the saturated branch and widens when that branch loses information.
-The local cruise certificate may retain a conservative nonsaturated
-neighborhood without imposing it on the entire avoidance horizon.
-
-\subsubsection{Terminal-Set Implementation Candidate}
+\subsubsection{Moving Terminal Set and Continuation}
 \label{subsec:terminal}
 
-This subsection describes the concrete terminal construction used in the
-reported implementation. The core theory assumes the existence of a
-terminal family and controller with the properties stated in
-\eqref{eq:terminal_information}; it does not require the braking law or
-terminal-set shape below.
+This subsection describes the moving cruise terminal construction used by
+the adopted compact controller. The general theory of
+Section~\ref{subsec:robust} assumes only the abstract terminal property
+\eqref{eq:terminal_information} and does not depend on this construction.
 
-The horizon ends where a simple continuation of both vehicles is known
-to be safe for the rest of the encounter. Past the endpoint
-at time $t_M$, define the joint terminal state
-$\bm z=(\bm x_{E,M},\bm q_{C,M},a_M,\bm u_{M-1})$, containing both
-vehicles, their motion parameters, an active-encounter flag $a_M$, and
-input memory. The obstacle keeps its forecast
-\eqref{eq:target_flow}, and the ego follows one terminal law
-$\kappa_{\rm f}$: a kinematic vehicle with its steering held, braking
-at the constant rate $a_{\rm b}$ until it stops. With the steering held
-a kinematic bicycle keeps its sideslip and its course curvature, so the
-law keeps the ego in the same constant-acceleration, constant-curvature
-family as the obstacle. With $V=\normtwo{\bm v^E}$,
-$\beta_E=\operatorname{atan2}(v_y,v_x)$ and $\kappa_E=\omega_E/V$ at $\bm z$,
-the speed is $V(\tau)=\max(V-a_{\rm b}\tau,0)$ and the stop occurs
-at $t_s=V/a_{\rm b}$, possibly inside a hold. With
-$\tau_m=\min(\tau,t_s)$, the arc length is
-$s(\tau)=V\tau_m-a_{\rm b}\tau_m^2/2$. Set
-$J=\lceil V/(a_{\rm b}T_s)\rceil$ and
-$\vartheta=\tfrac12\kappa_Es$; then
-\begin{equation}
-    \begin{aligned}
-    \bm p(\tau)&=\bm p+s\,\frac{\sin\vartheta}{\vartheta}
-        \begin{bmatrix}\cos(\psi+\beta_E+\vartheta)\\
-        \sin(\psi+\beta_E+\vartheta)\end{bmatrix},\\
-    \psi(\tau)&=\psi+\kappa_Es,\qquad \tau\in[0,JT_s].
-    \end{aligned}
-    \label{eq:continuation}
-\end{equation}
-The joint continuation is exact and in closed form; it agrees with an
-RK4 integration of the same kinematics to $10^{-9}$\,m. It is sampled at
-its nodes and mid-hold points, the instants at which the plan's own
-collision rows are sampled. The measured yaw-rate-to-speed ratio $\omega_E/V$ is held
-rather than the kinematic $\sin\beta_E/l_{r,E}$ of the obstacle model,
-which presumes a rear axle without slip: for the Fiala state in the trim
-of a 4\,m/s$^2$ left turn at 15\,m/s, whose sideslip at the center of
-mass is $-0.0093$\,rad, that relation would continue the turn as a
-right turn.
-
-A state is \emph{mild} when its sideslip lies in the separate terminal
-cone ($|\beta_E|\le0.05$~rad in the current configuration), inside
-\eqref{eq:sideslip_cone} and the lateral acceleration of the held arc is
-small, $|rV|\leq a_{\rm m}$. With $a_{\rm b}=4$\,m/s$^2$ and
-$a_{\rm m}=2$\,m/s$^2$ the continuation uses 54\% of the friction
-budget $\mu g=8.3$\,m/s$^2$, and the configuration requires
-$\sqrt{a_{\rm b}^2+a_{\rm m}^2}<\mu g$. The terminal braking ratio is also checked against the actuator bounds. Along the continuation
-$\beta_E$ is constant and $|rV|=|\kappa_E|V^2$ only falls, so a mild
-state stays mild. An endpoint in the middle of a swerve is not mild: the
-plan has to settle before it is terminal.
-
-\begin{assumption}
-\label{asm:mild}
-In a mild state the prediction model of
-Section~\ref{subsec:predictionModel} follows the kinematic vehicle under
-the terminal law. No bound on the mismatch is computed.
-\end{assumption}
-
-This is a modeling assumption for this implementation candidate, not a
-derived mismatch bound. Applying the general safety theorem to this
-candidate requires the candidate to satisfy the abstract terminal
-condition \eqref{eq:terminal_information} under the same prediction
-dynamics and constraints. The general theorem itself assumes that a
-terminal pair with those properties exists and does not depend on
-Assumption~\ref{asm:mild}.
-
-For a braking realization with an absorbing stop and realized
-deceleration $a(t)\ge a_{\min}>0$, an initial speed
-$V(0)\le\overline V$ gives
-\begin{equation}
-    t_{\rm stop}\le\overline V/a_{\min},\qquad
-    s_{\rm stop}\le\overline V^2/(2a_{\min}).
-    \label{eq:terminal_stop_bound}
-\end{equation}
-These implementation bounds follow by integrating $\dot V\le-a_{\min}$
-to rest. To validate this candidate, its complete uncertain braking and
-parked continuations must satisfy \eqref{eq:terminal_information}.
-Pose uncertainty remains at rest; a disturbance capable of moving a
-parked vehicle needs a compatible parked invariant set. Every active
-branch must exit before the encounter is discarded. Nominal stopping
-bounds alone do not verify the abstract terminal condition.
-
-Let $\phi^j(\bm z)$, $j\geq0$, be the joint continuation at the nodes
-and mid-hold points after $t_M$, $t_e(\bm z)$ the first of these
-instants at which the obstacle's reference point is farther than
-$R_{\rm enc}$ from the ego's ($+\infty$ if none), with the parked
-phase's exit evaluated continuously. The flag obeys
-$a^+=a\,\mathbf 1_{\{\|p_C^+-p_E^+\|\le R_{\rm enc}\}}$ at the
-constraint instants; once zero, it stays zero throughout this certificate.
-The actual stop time is $t_s(\bm z)=V/a_{\rm b}$. The terminal set is
-\begin{equation}
-    \mathcal X_f=\bigl\{\bm z\ \text{mild}:\ \text{(a), (b) and (c) hold}\bigr\},
-    \label{eq:terminal_set}
-\end{equation}
-where (a) every node, mid-hold pose and the parked pose of the
-continuation keeps the ego rectangle on the road; (b) every active node and
-mid-hold pose before $t_e(\bm z)$ clears the forecast obstacle rectangle
-by $d_{\rm m}$; and (c) if $t_e(\bm z)>t_s(\bm z)$, the obstacle's
-remaining track until it leaves the range about the parked reference
-point, or comes to rest, clears the parked rectangle by $d_{\rm m}$. Physical state and terminal input bounds, including the
-first command slew from $\bm u_{M-1}$ and admissibility of rest, are also
-required. The first exit ends the encounter, and no property of the obstacle after it
-is used. An already ended encounter has no obstacle rows, but retains
-physical and road conditions. Condition (b) at $j=0$ includes an active
-endpoint itself, so $\mathcal X_f$ lies in the encounter's safe set. An enclosure, when published,
-widens $d_{\rm m}$ in (b) and (c) and the road margin in (a) by the ego
-position radius and the chord of its heading radius
-(Section~\ref{subsec:uncertainty}).
-
-Condition (c) is decided in closed form. After the stop the ego is a
-fixed rectangle and the obstacle moves along its line or circle. The arc
-lengths at which its reference point stays within $R_{\rm enc}$ of the
-parked point form one interval (a quadratic inequality on a line, an arc
-of angles on a circle, the whole circle when it lies inside the range),
-and from its position the obstacle sweeps that stretch until it leaves,
-or until it comes to rest and stays. The distance between two
-rectangles is continuous along the track and, while they are apart, is
-attained between a vertex of one and an edge of the other. Initial overlap
-at the exact stop time is rejected explicitly, including containment.
-Otherwise, the least distance over the stretch is the least distance between a vertex path, a segment on a line
-or an arc on a circle, and an edge, over the 32 vertex--edge pairs. The
-arc-to-segment distance has three kinds of candidates: the ends of the
-arc against the segment, the ends of the segment against the arc, and
-the point of the circle nearest to the segment's line when it lies on
-both. The check also returns the obstacle pose attaining the least
-distance, the witness, which the convex program linearizes. In 2895
-random cases it was never above the least distance of a dense sampling
-of the forecast in time (spacing at most 2.4\,mm; above by at most
-$5\cdot10^{-13}$\,m from rounding) and within $3\cdot10^{-7}$\,m of it.
-
-\begin{proposition}
-\label{prop:invariance}
-Let $\bm z\in\mathcal X_f$ and let $\bm z'$ be the joint state one hold
-later under $\kappa_{\rm f}$, with the obstacle on its forecast and the
-encounter flag retained. Then $\bm z'\in\mathcal X_f$. No sampled
-pose of the continuation from $\bm z$ meets the obstacle before the
-exit, nor does the parked ego after the stop and before that first exit. $\mathcal X_f$ is the largest such set within the settled admissible
-domain for the law $\kappa_{\rm f}$.
-\end{proposition}
-
-\begin{IEEEproof}
-The continuation of $\bm z'$ is the continuation of $\bm z$ shifted by
-one hold: the clipped-speed flow from $\max(0,V-a_{\rm b}T_s)$ is the
-remainder of the flow from $V$, the arc continues on the same circle with the
-same sideslip and curvature, and the forecast is evaluated at the same
-absolute times. An ended flag stays ended, so predicted re-entry adds no
-new collision condition. $\bm z'$ is mild because $\beta_E$ is held and $|rV|$
-falls. State bounds persist as velocity components decrease to admissible
-rest, and the repeated command has zero subsequent slew. Every sampled pose of the new continuation is a pose of the old
-one, so (a) holds and (b) holds up to the same exit instant; the parked
-pose and the obstacle's remaining track are the same, so (c) holds. The
-safety statements are (b) and (c) themselves. A state in the settled admissible domain but outside
-$\mathcal X_f$ has a continuation under $\kappa_{\rm f}$ that leaves the
-road or meets the obstacle at a sampled instant before the exit or after
-the stop, so no admissible set that the law keeps safe contains it.
-\end{IEEEproof}
-
-The terminal-set construction follows the idea of a backup policy in
-\cite{ChenJankovicSantilloAmes2021}; here it is used only to define the
-terminal set. The free holds of the plan enlarge the set of states from which the
-problem is feasible, and the ego never has to brake: the law only
-certifies that a safe continuation exists.
-
-In the convex program, membership of the endpoint is imposed through
-the conditions of \eqref{eq:terminal_set} linearized at the anchor
-endpoint $\bar{\bm x}_M$ on the correction $\Delta\bm x_M$: the mildness
-bound $|rV|\leq a_{\rm m}$, linearized in speed and yaw rate where the
-anchor is within 1\,m/s$^2$ of it and keeping up to $0.1$\,m/s$^2$ of
-the margin the anchor has; fixed-multiplier rows
-\eqref{eq:collision_rows} at the nodes and mid-hold poses of the
-continuation before the exit and at the parked pose against the
-witness; and road rows \eqref{eq:road_rows} at every pose of the
-continuation; each composed with the derivative of the closed-form pose
-\eqref{eq:continuation} with respect to the endpoint state, with the
-braking schedule held. Each row keeps up to 5\,cm of the margin the
-anchor has, so that an endpoint inside $\mathcal X_f$ stays inside by
-that much and the next sample's shift survives a small departure of the
-plant or of an appended hold from the law; a row is never tighter than
-the anchor itself, so when $\bar{\bm x}_M\in\mathcal X_f$ the zero
-correction satisfies every row. Conditions with more than 5\,m to
-spare, or whose margin exceeds the most their pose can move over the
-trust boxes, are left out. Exact membership is used when building the
-anchor. At circular-track overlap the local inner or outer separation
-chart is selected by the smaller geometric escape, not by a prescribed
-road-side preference. Both charts describe the same terminal controller;
-no additional nonlinear iteration is introduced. The current direct-execution
-policy does not apply a post-solve terminal membership test to issued inputs.
-
-\subsubsection{Quadratic Control-Lyapunov Function and Cruise Law}
-\label{subsec:clf}
-
-One obstacle-independent function measures the distance from cruise at
-every sample, during avoidance and after it:
-\begin{equation}
-    V(\bm x)=\bm e(\bm x)^{\trans}P\,\bm e(\bm x),\qquad P\succ0 .
-    \label{eq:clf}
-\end{equation}
-The matrix $P$ and a gain $K$ are synthesized offline for each operating
-point (vehicle, speed, path curvature, sample period) and only read at
-run time. They certify the cruise law $\bm u=\bm u_*+K\bm e$ on the
-sampled nonlinear model: on the sublevel set $\Omega=\{V\leq1\}$, one
-hold under that law gives
-$V(F(\bm x,\bm u_*+K\bm e))\leq\rho^\star V(\bm x)$ with
-$\rho^\star<\rho_V=e^{-2T_s/T_V}$ for a convergence time constant
-$T_V$, the inputs satisfy $|K_j\bm e|\leq\bar u_j$, and $\Omega$ lies
-inside a certification box $|e_i|\leq b_i$.
-
-Let $g(\bm e,\Delta\bm u)$ be the transverse error after one hold from
-the state with error $\bm e$ under the input $\bm u_*+\Delta\bm u$, and
-$G=[\partial g/\partial\bm e,\ \partial g/\partial\Delta\bm u]$ its
-Jacobian from the RK4 variational equations and the path chart. The trim
-is a fixed point, $g(0,0)=0$, so along the ray from the origin
-\begin{equation}
-    g(\bm e,\Delta\bm u)=\bar G(\bm e,\Delta\bm u)
-        \begin{bmatrix}\bm e\\\Delta\bm u\end{bmatrix},\qquad
-    \bar G=\int_0^1G(t\bm e,t\Delta\bm u)\,dt,
-    \label{eq:ray_average}
-\end{equation}
-exactly. A discrete Lyapunov inequality that holds for every matrix of
-an enclosure of the ray averages $\bar G$ over $\Omega$ along the cruise
-law therefore holds for the nonlinear map on $\Omega$. The enclosure is
-a zonotope in box-scaled coordinates, $G_0+\sum_k\delta_kD_k+R$ with
-$|\delta_k|\leq1$ and $\normtwo{R}\leq\epsilon_G$: the Jacobian $G_0$ at
-the trim, the six leading principal directions $D_k$ of the sampled
-deviations with their coefficient bounds, and a residual, all widened by
-a factor of 1.25. The ray averages are computed by eight-node
-Gauss--Legendre quadrature, whose residual in \eqref{eq:ray_average} is
-added to $\epsilon_G$. Enclosing the ray averages rather than the
-pointwise Jacobians matters for a saturating tire: the averages spread
-like the secants of the force curve and the pointwise Jacobians like its
-tangents, and at the slips that $\Omega$ reaches the tangent spread is
-two to three times the secant spread. With $S=P^{-1}$, $Y=KS$ and
-$[A_v\ B_v]$ the vertices of the zonotope, the synthesis maximizes the
-fill $t$ subject to
+Define the common straight-cruise terminal command
 \begin{equation}
     \begin{gathered}
-    \begin{bmatrix}\rho_VS&N_v^{\trans}&Z^{\trans}\\
-        N_v&S-\lambda_vI&0\\Z&0&\lambda_vI\end{bmatrix}\succeq0,\\
-    N_v=A_vS+B_vY,\qquad Z=\epsilon_G\begin{bmatrix}S\\Y\end{bmatrix},\\
-    \begin{bmatrix}\bar u_j^2&Y_j\\Y_j^{\trans}&S\end{bmatrix}\succeq0,\qquad
-    S_{ii}\leq b_i^2,\qquad S\succeq t\,\diag(\bm b)^2,
+    \bm u_f=[0,\,u_{L,f}]^{\trans},\\
+    u_{L,f}=\operatorname{clip}_{[u_{L,\min},u_{L,\max}]}
+        \frac{F_R(v_*)}{\mu_fF_{zf}+\mu_rF_{zr}},
     \end{gathered}
-    \label{eq:clf_lmi}
+    \label{eq:terminal_command}
 \end{equation}
-for every vertex $v$ and $j=1,2$, where $Y_j$ is the $j$th row of $Y$.
-The first family is the vertex inequalities
-$(A_v+B_vK)^{\trans}P(A_v+B_vK)\preceq\rho_VP$ with the residual
-bounded using the norm-bounded uncertainty inequality, the second bounds the
-inputs on $\Omega$, and the last two place $\Omega$ in the box and
-maximize its fill. Because the enclosure depends on $\Omega$ and $K$,
-the design iterates to self-consistency: each round encloses the ray
-averages over an inflation of the current set and over inputs within a
-band of the current gain, and solves \eqref{eq:clf_lmi} with the new set
-inside that inflated set and the new gain within the band. Every
-round's pair is therefore certified by the enclosure it was designed
-with; the pair with the largest fill is kept, re-verified by
-eigenvalues, and the smallest contraction it certifies is recorded as
-$\rho^\star$. The one non-algebraic step is the enclosure hypothesis,
-that the ray averages over $\Omega$ along the law lie in the recorded
-zonotope. It is built from 1200 boundary and 600 interior samples with a
-recorded seed and checked again on fresh samples with another seed. The
-certificate is conditional on that hypothesis; it is not a proof for the
-nonlinear map. A Lipschitz bound on the remainder of the trim's
-linearization would make it one but fails by two orders of magnitude on
-this tire, which saturates at slips of a few hundredths of a radian.
-
-The campaign-era controller requests
+applied identically to all retained hypotheses (balancing the nominal
+road load at $v_*$ when within actuator bounds; individual member speeds
+may still differ). Write $E(\bm x)$ for the oriented ego rectangle,
+$\bm e=[\cos\psi,\sin\psi]^{\trans}$ for its forward unit vector, and
+$T(\bm q(t))$ for the forecast target rectangle. In the simplified
+terminal model, the ego continues along its forward ray with fixed
+orientation and strictly positive speed (without a prescribed speed
+profile). Define the directional ego lower support and target-sweep upper
+support
 \begin{equation}
-    V\bigl(F(\bm x,\bm u_0)\bigr)\leq\rho_VV(\bm x)+\delta,
-    \quad\rho_V=e^{-2T_s/T_V},\quad\delta\geq0,
-    \label{eq:clf_row}
+    \begin{gathered}
+    L_E(\bm n,\bm x)=\min_{\bm z\in E(\bm x)}\bm n^{\trans}\bm z,\\
+    U_T(\bm n,\bm q)=\sup_{t\ge0}\max_{\bm z\in T(\bm q(t))}\bm n^{\trans}\bm z.
+    \end{gathered}
+    \label{eq:terminal_supports}
 \end{equation}
-with $\bm x$ the supplied estimate: without slack the error measure
-$\sqrt V$ shrinks by a factor $1/e$ every $T_V$. Only the first input
-enters. In the program the successor is the affine first node, and the
-error is linearized there with the analytic Jacobian $D\bm e$ of the
-path chart,
+A sufficient moving core $\mathcal C_f$ requires $v_x>0$ and a
+per-hypothesis unit witness $\bm n$ satisfying
 \begin{equation}
-    \normtwo{P^{1/2}\bigl[\bm e(\bar{\bm x}_1)
-        +D\bm e(\bar{\bm x}_1)\Delta\bm x_1\bigr]}^2
-    \leq\rho_VV(\bm x)+\delta,
-    \label{eq:clf_model}
+    \normtwo{\bm n}=1,\qquad \bm n^{\trans}\bm e\ge0,\qquad
+    L_E(\bm n,\bm x)-U_T(\bm n,\bm q)\ge d_{\rm safe},
+    \label{eq:terminal_core}
 \end{equation}
-one second-order cone. The left side is a local model, so $\delta=0$ in
-the program does not prove \eqref{eq:clf_row} for the nonlinear map.
-The row acts on the estimate and carries no enclosure
-(Section~\ref{subsec:uncertainty}). The gain $K$ is never used by the
-programs: it defines the cruise hold that extends the anchor
-(Section~\ref{subsec:initialization}). On $\Omega$ that hold decreases
-$V$ by at least the requested factor within the input bound, and the
-extension checks the decrease and the hard rows on every hold it
-appends rather than relying on the certificate.
+with the separation inequality vacuous when target-free. For straight
+target motion each target corner sweeps a segment up to the absorbing
+stop or a ray if it never stops (finite upper support when
+$\bm n^{\trans}\bm e_T\le0$); for nonzero target curvature each corner
+sweeps a circular arc whose directional extremum occurs at an endpoint or
+where the outward radius aligns with $\bm n$. An angle search over the
+admissible semicircle returns a witness $\bm n$ that is retained for its
+surviving hypothesis on shift. Under the simplified ray model, forward
+translation by $\Delta s>0$ increases $L_E$ by
+$\Delta s\,\bm n^{\trans}\bm e\ge0$ while the remaining target sweep
+shrinks so $U_T$ cannot increase; hence $\mathcal C_f$ is positively
+invariant with the same witness $\bm n$.
 
-The current runtime instead imposes the continuous derivative residual
-at the supplied estimate,
-\begin{equation}
- \widehat{\dot V}(\hat{\bm x},\bar{\bm u}_0)
- +D_{\bm u}\widehat{\dot V}\,\Delta\bm u_0
- \le -\frac{2}{T_V}V(\hat{\bm x})+s_V,\qquad s_V\ge0.
- \label{eq:current_clf}
-\end{equation}
-Only the Fiala input dependence is linearized here. The slack is
-unbounded and the objective includes a nonvanishing quadratic penalty
-on scaled state and input deviations from the reference. This gives an
-LP for primary safety and a QP for secondary performance. A finite
-residual always admits a slack, as in Corollary~\ref{cor:softClf}; neither
-zero local slack nor feasibility proves nonlinear closed-loop recovery.
-The historical measurements of \eqref{eq:clf_row} are unchanged.
+Let $F_f$ denote one full nonlinear prediction hold under $\bm u_f$ and
+set $B=\max(1,\lceil T_{\rm preview,\min}/h\rceil)$. The accepted
+terminal set $Z_f$ is the constrained $B$-step predecessor of
+$\mathcal C_f$: entry requires compatibility of $\bm u_f$ with the
+preceding input, forward motion, admissible nonlinear states, and node
+clearance along all $B$ bridge holds, with the $B$th state belonging to
+$\mathcal C_f$. The bridge allows steering and lateral transients to
+evolve before straight-cruise handoff; SQP differentiates both the bridge
+and the active terminal support gap, and acceptance rechecks the exact
+nonlinear inequalities.
 
-\subsubsection{Use of the Estimation Enclosure}
-\label{subsec:uncertainty}
+\begin{assumption}[Physical handoff]
+\label{asm:handoff}
+Under $\bm u_f$, any state in the moving core $\mathcal C_f$ remains
+forward-moving and inside the physical model domain over one hold of the
+full Fiala model, with $\bm n^{\trans}\bm e^+\ge0$ and
+$L_E(\bm n,\bm x^+)\ge L_E(\bm n,\bm x)$ for its retained witness
+$\bm n$.
+\end{assumption}
 
-This subsection describes the numerical approximation used in the reported
-trials. The information-set formulation and proof for the uncertainty-aware
-mathematical design are given in Section~\ref{subsec:robust}.
+Assumption~\ref{asm:handoff} is an explicit modeling assumption rather
+than a proved theorem for the nonlinear Fiala vehicle, which may retain
+residual sideslip and yaw rate after $B$ bridge holds. Every online
+acceptance rechecks nonlinear motion and core membership; a violation
+invalidates the shift and is reported if no other plan passes.
 
-The estimator publishes at every sample the ego generator matrix $G_0$
-and the target set of Section~\ref{subsec:enclosure}. Every hold of the
-plan will be issued from such an estimate, and hold $i$ is tightened by
-the present enclosure propagated through that hold only,
-\begin{equation}
-    G_i(\tau)=\Phi_i(\tau)G_0,\qquad\tau\in\{T_s/2,T_s\},
-    \label{eq:hold_generator}
-\end{equation}
-with $\Phi_i$ the affine map of hold $i$ to its mid-hold point and its
-end, $\tfrac12(I+A_i)$ and $A_i$; the node that closes hold $i$ is
-constrained with $A_iG_0$ and the present node with $G_0$. A row
-$\bm a^{\trans}\Delta\bm x\leq b$ on the ego state is tightened by the
-support $\normone{\bm a^{\trans}G_i}$ of the zonotope; this applies to
-the road rows \eqref{eq:road_rows}, the body-velocity bounds and the
-sideslip cone \eqref{eq:sideslip_cone}. The terminal rows widen the
-clearances and road margins of \eqref{eq:terminal_set} by the position
-radius of $G_0$ and the chord of its heading radius, as a static offset;
-the continuation is not propagated from the enclosure. No separate
-rear-adhesion cone is used.
-
-The target is measured relative to the ego, so an error of the ego pose
-moves both bodies rigidly and cancels from their distance. For the
-collision rows, the rigid motion generated by the pose columns of $G_0$
-about the ego position at the start of the hold is therefore subtracted
-from $G_i$, leaving a relative generator $G_i^{\rm rel}$. The target set
-restarts at each hold from the predicted target state at the hold
-start. With radii $b_p,b_\gamma,b_V,b_A,b_\kappa$ of the published
-position, course, speed, acceleration and curvature sets, nominal arc
-length $s$ over the elapsed time $\tau$ and
-$b_s=b_V\tau+\tfrac12b_A\tau^2$, the constant-parameter family
-\eqref{eq:target_flow} is enclosed by
-\begin{equation}
-    \begin{aligned}
-    b_p(\tau)&=b_p+b_s+|s|b_\gamma+\tfrac12s^2b_\kappa,\\
-    b_\gamma(\tau)&=\min\bigl(\pi,\ b_\gamma+|s|b_\kappa
-        +(|\kappa_C|+b_\kappa)b_s\bigr),
-    \end{aligned}
-    \label{eq:target_tube}
-\end{equation}
-and the heading radius $b_{\psi_C}$ adds the sideslip radius to
-$b_\gamma(\tau)$; braking that ends at rest keeps $b_s$ valid, because
-the speed $\max(0,V_{C,0}+A_C\tau)$ is 1-Lipschitz in $(V_{C,0},A_C\tau)$
-for forward obstacles. A directional version of the position bound,
-which charges a speed error along the path of the target only, is used
-when it is smaller. The tightening of \eqref{eq:collision_rows} is
-\begin{equation}
-    \begin{split}
-    \theta_i={}&\normone{\bm n^{\trans}G_{i,p}^{\rm rel}}
-        +\sigma_C(\bm n)\\
-      &+2r_E\sin\frac{\min(\pi,b_{\psi})}{2}
-        +2r_C\sin\frac{b_{\psi_C}}{2},
-    \end{split}
-    \label{eq:collision_tightening}
-\end{equation}
-with $G_{i,p}^{\rm rel}$ the position rows of the relative generator,
-$\sigma_C(\bm n)\leq b_p(\tau)$ the target position support, $b_\psi$
-the ego heading radius and $r_C$ the circumradius of the obstacle
-rectangle; the last two terms bound the displacement of any body point
-under a heading error by its chord. The tightening is sound for every
-pose in the sets: for a target rectangle translated by $\Delta\bm p_C$
-and rotated by $\Delta\psi_C$ from the forecast pose, the row value of
-Lemma~\ref{lem:dualRows}(i) falls by at most
-$\bm n^{\trans}\Delta\bm p_C+2r_C\sin(|\Delta\psi_C|/2)$, and the ego
-terms are the supports of its own pose set.
-
-For the first hold, \eqref{eq:hold_generator} and
-\eqref{eq:target_tube} propagate the current enclosures through the affine
-ego model and the declared target family. Nonlinear ego remainders are
-additional and have not been certified by this affine propagation. For later holds they are an approximation: they assume that
-the enclosure at the start of hold $i$ will equal the present one and
-that the estimate will then lie on the plan. Neither the family of
-possible future estimates nor the forecast error of the target beyond
-one hold is covered. We tried the alternatives. Propagating the ego
-generator over the whole horizon, $G_{i+1}=A_iG_i$ from $G_0$, which is
-the corresponding affine open-loop propagation, grew with the variable
-horizon
-until the road and state rows were infeasible. Propagating the target
-set from the present sample over the whole horizon recovered 31 of 84
-noisy encounters against 55 for the per-hold form and produced one
-collision, because the tightened and the nominal row of a node share
-one slack within the primary holds. Section~\ref{subsec:robust} explains
-what these measurements mean for the guarantee. The row
-\eqref{eq:clf_model} uses the estimate for a similar reason: a worst
-case over the enclosure asks that the largest successor value over the
-successor's enclosure stay below $\rho_V$ times the smallest current
-value, and near the path that budget is zero while the successor's
-enclosure is not, so no input meets it; the second program then
-minimized the next value greedily, the force ratio chattered, and a
-15\,m/s head-on run did not recover in 100\,s. Estimation error enters
-the decrease as a disturbance instead, and recovery of the true state
-can at best reach a neighborhood of the path set by that error.
-
-\subsubsection{Implementation Refinement and the Issued Plan}
-\label{subsec:program}
-
-The theoretical encounter controller in Section~\ref{subsec:robust}
-executes the first input of an attained PCBF minimizer. The secondary
-performance program below is an implementation choice; neither its
-objective nor its successful solution is required by the safety theorem.
-
-For the campaign-era formulation, let $\mathcal A$ denote the constraints
-shared by both programs on
-$(\Delta\bm x_{0:M},\Delta\bm u_{0:M-1},\bm\xi)$: the model
-\eqref{eq:affine_model}, the force-ratio and body-velocity bounds, the
-collision rows \eqref{eq:collision_rows} with $\bm\xi\geq0$, the road
-rows \eqref{eq:road_rows}, the sideslip rows
-\eqref{eq:sideslip_cone}, and the terminal rows of
-Section~\ref{subsec:terminal} on $\Delta\bm x_M$, each with its
-tightening. The primary program is
-\begin{equation}
-    J_1^\star=\min\ \sum_i\xi_i
-    \quad\text{subject to }\mathcal A,
-    \label{eq:primary_program}
-\end{equation}
-and the secondary program is
-\begin{equation}
-    \begin{aligned}
-    \min_{\delta\geq0}\quad&
-        \frac{\delta+\epsilon\,\ell(\bm x)\,\mathcal R(\Delta\bm u)}
-            {\max(V(\bm x),1)}\\
-    \text{s.t.}\quad&\mathcal A,\qquad\sum_i\xi_i
-        \leq J_1^\star+\epsilon_{\rm lex}\max(1,J_1^\star),\\
-    &\text{\eqref{eq:clf_model}},
-    \end{aligned}
-    \label{eq:secondary_program}
-\end{equation}
-with $\ell(\bm x)=\bm e(\bm x)^{\trans}Q_e\bm e(\bm x)$,
-$Q_e=\diag(\varsigma_1^{-2},\ldots,\varsigma_5^{-2})$ for error scales
-$\varsigma_i>0$, and
-\begin{equation}
-    \mathcal R(\Delta\bm u)=\frac1{2M}\sum_{i=0}^{M-1}
-        \normtwo{(\sigma W_u)^{-1}\Delta\bm u_i}^2,\qquad
-    W_u=\diag(\bm\tau_u).
-    \label{eq:tie_term}
-\end{equation}
-These campaign-era problems have second-order cone representations. If the zero correction with zero
-slacks satisfies $\mathcal A$, it attains $J_1^\star=0$ and the primary
-program is not passed to the solver; the secondary program is always
-solved. The primary objective follows the predictive barrier formulation of
-\cite{HuangWangMargellosGoulart2025}. The subsequent performance refinement
-under an attained safety budget is related to the two-step safety filter of
-\cite{WabersichZeilinger2023}, which uses the previously computed stagewise
-slacks in its performance problem.
-
-Minimizing a first-step slack alone leaves the later inputs
-undetermined, and the next anchor inherits them. The term
-$\epsilon\ell\mathcal R$ makes the plan unique at a bounded cost. Since
-$0\leq\mathcal R\leq1$ on the trust box, the slack of an exact optimum
-exceeds the smallest attainable one by at most $\epsilon\,\ell(\bm x)$,
-which vanishes at cruise. The penalty acts on increments from the
-anchor and pulls the inputs neither toward zero nor toward $\bm\pi$. The
-tolerance $\epsilon_{\rm lex}$ is $10^{-4}$\,m; with a cap of
-$10^{-5}$\,m the zero-slack set is a slab a few micrometers thick, and
-the cone solver repeatedly stalled on the secondary program. Both
-programs are solved by an interior-point cone solver to feasibility and
-gap tolerances of $10^{-6}$, and a solve that stalls is accepted at
-$10^{-4}$. The October 12 revision issued the completed input sequence directly;
-positive numerical termination is not a nonlinear safety certificate.
-
-When the solver certifies the primary program primal infeasible, the
-input trust scale $\sigma$ is doubled on the same linearization, up to
-$\sigma=1$, until the program is feasible; the formulated problem is
-reused and only the input bounds change. If the program around a shifted
-anchor is still infeasible, one fresh anchor is rolled out under the
-guidance feedback and treated the same way. The secondary program is
-then solved on the selected model.
-
-In the October 12 revision the completed secondary program supplies its
-input sequence directly. Its
-first input is applied without clipping, post-solve scaling, or a nonlinear
-feasibility veto. A nonlinear rollout of that same sequence supplies prediction
-and the trust remainder only; it does not replace the optimized slacks or
-objective. A rollout outside the declared model domain is reported as
-unavailable and the affine prediction is retained. A frame without a usable
-primary and secondary result reports no optimization solution. Numerical
-solver return is not part of the mathematical recursive-feasibility claim.
-The current runtime also checks nonlinear sampled constraints on the
-completed inputs and can report no usable solution when that check fails.
-It still lacks the set certificates of Section~\ref{subsec:robust}.
-A positive primary value remains a relaxation of modeled margins, not a
-statement of physical safety.
-
-\subsubsection{Recursive Feasibility With Exact Information}
-\label{subsec:recursive}
-
-Call a plan \emph{accepted} when it is the rollout of its inputs through
-$F$ from the current state, meets the road, state and handling rows at
-every node and mid-hold point, clears the obstacle by $d_{\rm m}$ at
-every node and mid-hold point after the $N$ primary holds, and ends in
-$\mathcal X_f$. This defines feasibility of the ideal nonlinear problem; a
-local convex output is not assumed to meet these exact rows. Consider the hypotheses: (H1) the plant is $F$
-and the state is known exactly; (H2) the obstacle follows the forecast
-used at sample $k$, with the same $A_C$ and $\beta_C$; (H3) from the
-endpoint of the plan, some hold of $F$ keeps the endpoint in
-$\mathcal X_f$ with the hard rows met and its mid-hold point clear.
-
-\begin{proposition}
-\label{prop:recursive}
-Under (H1) and (H2), if the plan of sample $k$ is accepted and has at
-least two holds, its inputs shifted by one hold form an accepted plan at
-sample $k+1$, one hold shorter, whose summed clearance deficit over the
-primary holds does not exceed that of sample $k$. Under (H3) as well,
-the shifted plan extended by that hold is accepted.
+\begin{proposition}[Terminal-set invariance]
+\label{prop:invariance}
+Under Assumption~\ref{asm:handoff} and the declared constant-parameter
+target flow \eqref{eq:target_flow}, if $\bm z=(\bm x,\bm q,\bm u^-)\in Z_f$,
+then $F_f(\bm z)\in Z_f$, with the surviving hypothesis inheriting its
+retained witness $\bm n$.
 \end{proposition}
 
 \begin{IEEEproof}
-By (H1) the new state is the plan's second node, so the shifted inputs
-reproduce the old nodes $2,\ldots,M+1$ exactly, and every hard row of
-the old plan holds at them. The old node $N+1$ was hard, with zero
-deficit, and is now the last primary node, so the deficit sum loses the
-old first node's deficit and gains zero. The endpoint is the old
-endpoint at the same absolute time, and by (H2) the forecast is
-unchanged, so its membership \eqref{eq:terminal_set} is the same
-evaluation as before. An appended hold under (H3) meets the hard rows,
-its mid-hold point clears the obstacle, and its endpoint lies in
-$\mathcal X_f$, whose condition (b) at $j=0$ includes the node's own
-clearance.
+Applying one hold of $F_f$ consumes the first of the $B$ checked bridge
+holds; the remaining $B-1$ holds are admissible and reach $\mathcal C_f$.
+By Assumption~\ref{asm:handoff} and nesting of the remaining target sweep
+(so $U_T$ cannot increase), one further hold of $F_f$ from $\mathcal C_f$
+stays admissible and remains in $\mathcal C_f$ with the same witness
+$\bm n$. Hence $F_f(\bm z)$ satisfies the $B$-hold bridge into
+$\mathcal C_f$, giving $F_f(\bm z)\in Z_f$.
 \end{IEEEproof}
 
-This is an existence proof for the ideal problem, following
-\cite[eq.~(10)]{HuangWangMargellosGoulart2025}. It does not assert that a
-solver returns a command. Assumption~\ref{asm:mild} identifies the mild
-model with the terminal kinematics; to infer (H3), the terminal input must
-also meet actuator and any slew bounds. The runtime checks
-these on appended holds of the declared model. The start of an encounter
-and re-acquisition after its absorbing exit remain initial-feasibility
-questions outside the proposition.
+\subsubsection{Condensed PCBF Program and Zero-Deficit Tire-Loading Preference}
+\label{subsec:program}
+
+For the node-only collision contract, define the stage deficit over hold
+$j\in\{0,\ldots,N-1\}$ by
+\begin{equation}
+    C_j(\bm v)=\max_{s=1,\ldots,S}\max_{r\in\{j,j+1\}}
+        \bigl\{d_{\rm safe}-d_\pm(\bm x_r^s,\bm q_r^s)\bigr\},
+    \label{eq:stage_deficit}
+\end{equation}
+covering both control-boundary nodes of each hold (their union covers the
+root and terminal nodes, with no interior collision sample or motion
+reserve). The primary condensed PCBF problem over $2M+N$ decision
+variables is
+\begin{equation}
+    \begin{aligned}
+    \min_{\bm v,\bm\xi\ge0}\quad&\sum_{j=0}^{N-1}\xi_j\\
+    \text{s.t.}\quad&C_j(\bm v)\le\xi_j,\quad j=0,\ldots,N-1,\\
+    &\bm v\in\mathcal U_N,\quad v_{x,j}^s\ge0,\quad
+        (\bm x_N^s,\bm q_N^s,\bm u_N)\in Z_f\;\forall s,
+    \end{aligned}
+    \label{eq:primary_program}
+\end{equation}
+where $\mathcal U_N$ enforces physical command bounds and any configured
+increment limits, terminal membership is hard with no safety slack, and
+the forward-motion and Fiala front-wheel domain conditions are checked
+across the sampled trajectory. A driving sequence must also satisfy
+$\normtwo{[v_x^s,v_y^s]^{\trans}}>0$ after the initial node at sampled
+states of each executable hold (including post-reset endpoints). Letting
+$\tilde v_{x,j}^s$ be the pre-reset longitudinal speed at boundary $j$,
+restoration imposes $\min\{0.2\,v_{\rm h}-\tilde v_{x,j}^s,-u_{L,j}\}\le0$
+to exclude the interior of the stop-reset branch.
+
+Reference tracking along the fixed cruise path and speed is measured by
+\begin{equation}
+    J=\frac12\sum_{i=1}^{M}hb_i\bm e_i^{\trans}W\bm e_i
+      +\frac{w_u}{2}\sum_{i=1}^{M}\frac{\normtwo{\bm v_i-\bm v_{i-1}}^2}{b_i},
+    \label{eq:tracking_cost}
+\end{equation}
+evaluated on the representative member $s_0$ with defaults
+$W=\diag(0.02,0.2,2,0.1,0.1)$ and $w_u=0.1$; the second term equals the
+sum of squared command increments over all interpolated holds. This cost
+permits passing excursions while retaining the fixed cruise reference and
+makes no general convergence or liveness claim.
+
+A feasible zero-deficit driving sequence attains the lower bound zero of
+\eqref{eq:primary_program}. To guide selection on this zero-deficit level
+without altering the primary safety objective or terminal membership,
+define at the end of hold $j$ for each retained hypothesis $s$ the
+dimensionless rear-slip residual
+\begin{equation}
+    \begin{split}
+    a_{j+1}^s=\frac{C_r^s}{\mu_r^sF_{zr}}\,
+        \operatorname{atan2}\Bigl(&
+            v_{y,j+1}^s-l_{r,E}\omega_{E,j+1}^s,\\
+            &\sqrt{(v_{x,j+1}^s)^2+v_{\rm floor}^2}\Bigr),
+    \end{split}
+    \label{eq:rear_slip_residual}
+\end{equation}
+where $v_{\rm floor}$ is the scheduling speed floor regularizing slip
+near rest and $\mu_r^sF_{zr}/C_r^s$ sets the angular scale from member
+$s$'s rear tire parameters. Define the secondary tire-loading and rear-slip
+cost over the $N$ held inputs $U=(\bm u_0,\ldots,\bm u_{N-1})$ by
+\begin{equation}
+    J_{\rm tire}(U)=\frac h2\sum_{j=0}^{N-1}
+        \left[u_{L,j}^2+u_{L,j}^4
+            +\frac1S\sum_{s=1}^S (a_{j+1}^s)^2\right].
+    \label{eq:secondary_program}
+\end{equation}
+Here $u_{L,j}^2$ measures squared longitudinal force utilization; since
+$Q_r^2/(\mu_rF_{zr})^2=1-u_{L,j}^2$, the quartic term emphasizes the loss
+of lateral tire capacity under large traction or braking. All terms are
+even under lateral reflection and act only within the available actuator
+range. Between two validated zero-deficit plans, a proposed replacement
+is accepted only if it strictly reduces $J_{\rm tire}$ and satisfies
+$J_{\rm new}\le J_{\rm incumbent}$ up to numerical tolerance. This rule
+preserves a feasible incumbent when tire-loading preference and reference
+tracking favor different plans; it provides a local preference and makes
+no claim of global secondary optimality or yaw stability.
+
+When no retained plan is immediately accepted, one planner-generated
+geometric guide trajectory on representative member $s_0$ supplies the
+initial actuator sequence. At each integration step, its tangential
+acceleration is proportional to the sum of transport and separation
+gradients of the predicted encounter, so lateral contributions cancel in
+a reflection-symmetric straight head-on encounter without imposing a
+fixed passing direction; when target-free, trim-corrected route guidance
+reproduces an admissible steady turn $\bm u_*$ at trim. Steering
+increments are scaled in units of the bicycle's friction-limited turn
+angle, and when needed the initial knot vector is projected onto the
+linear actuator and terminal handoff rows. From this starting point, a
+damped Gauss--Newton step for $J_{\rm tire}$ using residuals
+$(u_{L,j},u_{L,j}^2,a_{j+1}^s/\sqrt S)$ under the same interpolation and
+physical bounds can advance the iterate when nonlinear replay strictly
+reduces $J_{\rm tire}$ without increasing total positive collision
+deficit or maximum positive model-domain and terminal violation beyond
+numerical tolerance. Condensed SQP then minimizes the summed stage
+deficits in \eqref{eq:primary_program} under the hard domain, motion, and
+terminal constraints. Its first validated zero-deficit trial supplies an
+incumbent. Within the same call budget, one further damped Gauss--Newton
+proposal on the linearized zero-deficit level (imposing linearized stage,
+forward-motion, and terminal constraints) may replace that incumbent
+after full nonlinear validation and the two cost comparisons above.
+
+\subsubsection{Node Acceptance, Plan Retention, and Shift Feasibility}
+\label{subsec:recursive}
+
+Before any candidate sequence can supply a command, its $N$ interpolated
+held inputs are replayed on every retained hypothesis using the fine RK4
+flow ($K_v=8$ substeps per hold) and checked for physical input bounds,
+configured increment bounds, model-domain admissibility, and exact
+node-only dual separation $d_\pm(\bm x_j^s,\bm q_j^s)\ge d_{\rm safe}$
+for $j=0,\ldots,N$ and along the $B$-hold cruise bridge (while the target
+is active). There is no intersample clearance requirement or collision
+reserve; a trajectory may satisfy every node inequality while
+intersecting between nodes, and the algorithm makes no safety claim at
+intermediate times. The complete accepted fine held-input sequence is
+stored.
+
+After applying $\bm u_{0|k}$, set $r=N_{k+1}-(N_k-1)\ge0$ and form the
+shifted executable candidate
+\begin{equation}
+    U_{k+1}^{\rm shift}=
+        \bigl(\bm u_{1|k},\ldots,\bm u_{N_k-1|k},
+        \underbrace{\bm u_f,\ldots,\bm u_f}_{r}\bigr).
+    \label{eq:shifted_plan}
+\end{equation}
+This fine held-input suffix remains directly representable even when it
+no longer interpolates the new coarse control knots. An optional new
+guide input spliced onto a feasible driving continuation is accepted only
+after full validation. During an active encounter, when both the guide
+splice and the shifted plan can be checked within the call budget, the
+shifted plan replaces the guide splice if it strictly reduces
+$J_{\rm tire}$ while satisfying $J_{\rm new}\le J_{\rm incumbent}$ up to
+numerical tolerance; if only one plan passes validation, that plan
+supplies the next command.
+
+\begin{proposition}[Shift feasibility on the admitted information domain]
+\label{prop:recursive}
+Suppose an initial plan is feasible, the posterior contains the true
+member and is contained in the predicted successors, the physical flow
+and timing agree, requested horizons fit the numerical allocation,
+Assumption~\ref{asm:handoff} holds, and the target encounter remains
+active without newly reactivated obligations. Then the shifted plan
+\eqref{eq:shifted_plan} is feasible at step $k+1$ and satisfies
+\begin{equation}
+    V_{N_{k+1}}(\mathcal I_{k+1})\le V_{N_k}(\mathcal I_k)-\xi_{0|k}^\star
+    \label{eq:compact_descent}
+\end{equation}
+on a shift-closed policy domain; in particular, a validated zero-deficit
+plan supplies a zero-deficit successor even if the optimizer returns no
+improvement.
+\end{proposition}
+
+\begin{IEEEproof}
+Conditioning can discard physical members, and every surviving member
+inherits its own trajectory suffix and terminal witness. By
+Proposition~\ref{prop:invariance} and induction over $r\ge0$ holds of
+$F_f$, appending $r$ copies of $\bm u_f$ preserves admissibility,
+control-boundary clearance, and membership in $Z_f$ for all surviving
+members. The shifted plan inherits the remaining stage deficits
+$(\xi_{1|k}^\star,\ldots,\xi_{N_k-1|k}^\star)$ followed by $r$ zeros,
+yielding \eqref{eq:compact_descent} and preserving zero deficit.
+\end{IEEEproof}
+
+Releasing target constraints upon range exit enlarges the feasible set,
+whereas re-entry increases collision obligations and requires a separate
+initial-admission check. Proposition~\ref{prop:recursive} gives continued
+admissible motion under its stated assumptions; it supplies neither a
+uniform positive minimum speed nor a proof of lane return, and numerical
+rechecks over a finite ensemble do not constitute a robust physical-model
+or timing certificate.
 
 \subsubsection{Joint Nonlinear Observer--Feedback Safety}
 \label{subsec:robust}
@@ -2690,122 +2281,77 @@ stores $J_k$ and accepts the shifted plan or a feasible replacement with
 $J_{k+1}\le J_k-\xi_{0|k}$; this certifies the stored cost rather than
 the optimal value.
 
-\begin{corollary}[Feasibility of the soft CLF stage]
-\label{cor:softClf}
-A finite CLF residual $r_V$ with an unbounded nonnegative slack preserves
-a primary feasible candidate under the exact primary budget.
-\end{corollary}
-\begin{IEEEproof}
-Keep the candidate and choose $s_V=\max(0,r_V)$, or
-$s_V=\max(0,\sup r_V)$ for a bounded robust residual. No safety row changes.
-\end{IEEEproof}
-This optional performance construction is not a premise of
-Theorem~\ref{thm:robust} and does not prove CLF convergence.
-
-The complete nonlinear construction and a symbolic Fiala special case
-showing a strict observation-feedback benefit are maintained in
-\path{controller/CONTROLLER_THEORY.md}, Sections 6--7. The special case
-does not assert a small relative tube for every encounter.
-
-
-\subsubsection{Trust Scale from the Model Remainder}
-\label{subsec:trust}
-
-In the campaign-era trust heuristic, the scale $\sigma$ of the input
-trust box is estimated from the
-remainder of the linearization, measured in the same sample. For a
-correction of size $s$, the largest input change from the anchor in
-units of $\bm\tau_u$, the affine prediction differs from the nonlinear
-rollout of the same inputs by a second-order remainder of the form
-$Ls^2$, with a coefficient $L$ that depends on the operating point. The
-prediction-only nonlinear rollout evaluates the full step. With
-$\varpi(\Delta\bm x)=\normtwo{\Delta\bm p}+r_E|\Delta\psi|$, which bounds
-the displacement of any body point, $\tilde{\bm x}_j$ that rollout,
-$\hat{\bm x}_j$ the affine prediction of the same inputs and
-$e_k=\max_j\varpi(\tilde{\bm x}_j-\hat{\bm x}_j)$,
-\begin{equation}
-    \begin{gathered}
-    \hat L_k=\max\Bigl(
-        \frac{e_k}{\max(s_k,\sigma_k/2)^2},\
-        \gamma_L\hat L_{k-1}\Bigr),\\
-    \sigma_{k+1}=\min\Bigl(1,\ \max\Bigl(\sigma_{\min},\
-        \sqrt{\tau_e/\hat L_k}\Bigr)\Bigr).
-    \end{gathered}
-    \label{eq:trust_update}
-\end{equation}
-The scale is the step whose predicted remainder equals a target
-remainder $\tau_e$. It shrinks at once and grows by at most
-$\gamma_L^{-1/2}$ per sample, and a step far inside the box is not taken
-as evidence about its boundary. The departure of the next estimate from
-the plan's second node, the innovation of \eqref{eq:innovation}, is
-recorded separately; it belongs to the estimator and the plant and does
-not set the scale. An earlier rule that subtracted the estimator's
-worst-case radius from the total innovation explained every innovation
-by that radius, so the scale rose to its maximum and the encounters
-became infeasible. The update is not a check of the issued solution,
-and $\tau_e$ is an empirical consistency target, not a bound on the
-remainder or on the separation.
+A validated secondary preference among zero-deficit plans (such as
+\eqref{eq:secondary_program}) leaves the attained primary optimum
+unchanged and is not a premise of Theorem~\ref{thm:robust}. The compact
+nonlinear implementation and its derivations are maintained in
+\path{controller/CONTROLLER_THEORY.md}.
 
 \subsubsection{Scope of the Guarantees}
 \label{subsec:scope}
 
-The production optimizer uses affine sampled constraints and approximate
-terminal rows, followed by nonlinear sampled checks. Positive primary
-slack remains relaxation. Zero CLF slack concerns a local derivative
-model and does not establish nonlinear plant decrease.
+The exact information update \eqref{eq:exact_consistency_update} has the
+containment property under its stated contract, the feasible distance
+dual \eqref{eq:signed_distance_dual} certifies geometric separation at
+individual control-boundary nodes, and knot interpolation
+\eqref{eq:knot_interpolation} enforces every configured input increment.
+Proposition~\ref{prop:invariance} concerns the moving cruise terminal law
+under Assumption~\ref{asm:handoff}, Proposition~\ref{prop:recursive}
+gives shift feasibility on the admitted information domain, and
+Theorem~\ref{thm:robust} proves recursive feasibility and zero-value
+safety for the road-free information-set problem under its exact
+joint-flow, whole-block conditioning, policy-closure and terminal
+contracts.
 
-Proposition~\ref{prop:invariance} concerns the declared terminal law.
-Proposition~\ref{prop:recursive} proves feasibility of an ideal
-exact-information problem. Theorem~\ref{thm:robust} proves recursive
-feasibility and zero-value safety for the road-free information-set
-problem under its exact joint-flow, whole-block conditioning,
-policy-closure and terminal contracts. Future observer feedback is part
-of this nonlinear predictor. None of
-these statements promises numerical solver return. The cruise-law
-certificate retains its sampled-enclosure hypothesis.
-
-The runtime checks nodes and midpoints without a certified intersample
-reserve. Its per-hold affine tightening lacks proved nonlinear remainder
-bounds, retained posterior sets and a robust terminal witness. Consequently
-the decision-instant theorem is not a safety certificate for the current
-production optimizer or historical trials. Intersample safety would
-require additional interval certificates. Re-acquisition after an
-absorbing encounter exit requires a new initial-feasibility problem.
+These facts do not convert a finite retained ensemble, numerical RK4
+integration, node-only geometry checks, finite preview, or local SQP
+into a universal continuous-time safety or completeness certificate. A
+finite ensemble does not enclose states between its members, node-only
+checks make no intersample collision claim, and
+Assumption~\ref{asm:handoff} is an explicit handoff premise rather than a
+proved nonlinear Fiala theorem. Moreover, even individual physical
+feasibility is weaker than output-feedback feasibility because
+indistinguishable histories must share one command; re-entry after
+confirmed range exit requires separate admission, and solver time limits
+do not certify hard actuator deadlines or compensate unmodeled execution
+latency.
 
 \subsubsection{Computation}
 \label{subsec:computation}
 
-The campaign-era assembly uses small dense blocks on the few variables each
-inequality row
-involves, and the sparse matrices are assembled in one call; building
-them row by row had cost time quadratic in the plan length. A row whose
-largest value over the variables' boxes, the state box of
-\eqref{eq:affine_model} and the input box at $\sigma=1$, is below its
-bound cannot bind and is left out, which leaves the feasible set and the
-optimum unchanged; most road rows, state-limit rows and collision rows
-far from the obstacle go this way, and a collision multiplier is not
-computed where the reference distance less both reaches, the margin and
-the largest tightening exceeds the most the pose can move over the
-boxes. A larger trust scale reuses the formulated problem. In the October 12 direct-execution revision the nonlinear rollout supplied
-prediction data only. The current runtime additionally checks nonlinear
-sampled constraints on the completed plan. The cruise trim is solved by
-Newton's method with the analytic tangent. On 120 captured problems the
-block assembly reproduced the previous matrices to $4.4\cdot10^{-16}$,
-and on 2880 candidate plans the batched rule gave the same decision as a
-hold-by-hold scan. A warm-up action runs one synthetic encounter at
-start-up, so that every code path is compiled before the first sample.
+The compact nonlinear controller compiles its flow and causal sensitivity
+graphs from configuration size hints and the preview rule
+\eqref{eq:preview_rule}, keeping unused horizon slots as identities so
+horizon updates within the allocation avoid rebuilding the graph (a
+larger preview grows the allocation rather than truncating it). The
+fine-RK4 measurement-consistency inference kernel is cached independently
+of the optimization graph and reused across sensor blocks. Local SQP
+sensitivities propagate $S_{j+1}=F_xS_j+F_uD_{\bm v}\bm u_j$ on the
+coarser mesh exploiting causal sparsity, while fine-validation rollouts
+cache and reuse identical suffixes of shifted plans. A start-up warm-up
+primes the compiled kernels and straight-road trim before timed samples.
+Mean solve time, full controller-call time, startup compilation, and
+worst-case latency remain distinct quantities.
 
 \section{Results}
 
-The vehicle experiments describe the October 11 baseline at commit
-\path{4ed2344}, including its nonlinear acceptance-step policy and earlier
-terminal sideslip definition. Subsequent runtime and theory revisions
-have not been rerun through that campaign. In particular, those trials
-used direct GNSS velocity measurements and do not validate the present
-position-only GNSS interface. Its numbers are preserved and
-are not attributed to the current production algorithm or the complete
-information-set construction. Section~\ref{subsec:informationChecks}
-separately reports an October 25 longitudinal reference verification.
+The vehicle experiments in
+Sections~\ref{subsec:controlProtocol}--\ref{subsec:computationResults}
+preserve the historical October 11 affine-RTI, quadratic-CLF, and
+braking-terminal baseline at commit \path{4ed2344}, including its
+nonlinear acceptance-step policy and earlier terminal sideslip
+definition. Subsequent runtime and theory revisions---including the
+compact nonlinear controller with fixed measurement-consistency ensemble
+inference, moving cruise terminal set, and zero-deficit tire-loading
+preference of Section~\ref{sec:control}---have not yet been rerun through
+that closed-loop campaign and remain pending re-evaluation. In
+particular, those historical trials used direct GNSS velocity
+measurements and do not validate the present position-only GNSS interface
+or the revised compact controller. Their numbers are preserved for
+reference and are not attributed to the adopted compact controller or the
+complete information-set construction.
+Section~\ref{subsec:informationChecks} separately reports an October 25
+longitudinal reference verification.
 
 \label{sec:results}
 
@@ -3076,11 +2622,12 @@ Estimator rate, $\epsilon_{\rm par}$ & 80\,Hz, 0.05\\
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:controllerParameters} lists the parameters. The vehicle
+Table~\ref{tab:controllerParameters} lists the historical baseline
+parameters. The vehicle
 is a generic passenger car. In the closed-loop trials the estimator uses
 the same vehicle parameters as the controller, not the rear-axle
 distance of Section~\ref{subsec:designResults}. With these values the
-synthesis \eqref{eq:clf_lmi} certifies, for the cruise law, contraction
+historical offline CLF LMI synthesis certifies, for the cruise law, contraction
 factors $\rho^\star$ of 0.9744 to 0.9748 per sample against the
 requested $\rho_V=0.9753$, that is, time constants of $\sqrt V$ of 3.85
 to 3.92\,s against $T_V=4$\,s, on sets $\Omega$ whose half-extents are
@@ -3249,7 +2796,7 @@ and at most 117 holds; the first sample of a run plans 24 to 25 holds.
 With estimated states the passes are wider. The median over the 84 runs
 of the smallest distance is 1.80\,m, against 0.28\,m with exact states,
 and no run comes within that historical clearance (least 0.21\,m), because the
-tightened rows \eqref{eq:collision_tightening} reserve the current
+historical per-hold tightened collision rows reserve the current
 enclosure and the forecast of the obstacle changes from sample to
 sample. The wider passes use the road: the lateral deviation reaches
 11.0\,m, and the smallest distance to a road edge falls to 0.18\,m in a
@@ -3265,7 +2812,7 @@ has a median of 16 holds, a 95th percentile of 74 and a maximum of 184.
 The primary optimum is positive at 1109 of the 23083 estimated-state
 samples, in 75 runs, and exceeds 1\,m at 665 of them. With an
 enclosure it is the summed relaxation of the tightened rows over the
-whole horizon, and the target tube \eqref{eq:target_tube} over a long
+whole horizon, and the historical per-hold target tube over a long
 horizon can exceed the available room; the untightened rows beyond the
 primary holds are hard. The issued plans themselves clear the obstacle
 by $d_{\rm m}$ at every constrained instant beyond the primary holds, by
@@ -3275,14 +2822,14 @@ samples of five runs, by at most 0.5\,mm.
 
 The CLF condition is met in the model more often than on the plant. In
 the exact-state runs, 3702 consecutive state pairs have $V>10^{-3}$,
-and 3078 of them have zero slack in \eqref{eq:secondary_program} and
-the full step accepted. In 217 of those the requested decrease
-\eqref{eq:clf_row} is not achieved by the plant, and in 60 $V$
+and 3078 of them have zero slack in the historical secondary CLF program and
+the full step accepted. In 217 of those the requested discrete CLF decrease
+is not achieved by the plant, and in 60 $V$
 increases; all 60 are in the 15\,m/s curved head-on run at $V<0.04$,
 where the ego cruises on the curve between its two encounters with a
 speed error within $\pm0.15$\,m/s, a lateral offset within 0.11\,m, and
 zero modeled slack unattained at 58 of 601 samples. The tie term of
-\eqref{eq:secondary_program} fixes the later inputs of the plan with a
+that historical secondary program fixes the later inputs of the plan with a
 weight that vanishes on the path, and the next anchor inherits those
 inputs; the run at 8\,m/s on the same curve cruises without a visible
 error, and the four estimated-state runs on the curve that recover hold
@@ -3341,8 +2888,8 @@ a fixed declared domain, the same encounters gave heading errors of
 15\,m/s (one seed, on the controller of October 5), the ego enclosure
 was lost in nine of thirteen runs, and only five of fourteen runs
 recovered. The force-balance measurement of
-Section~\ref{subsec:modelAided} and the handling envelope of
-Section~\ref{subsec:envelope} were introduced together for this reason.
+Section~\ref{subsec:modelAided} and the historical handling-envelope
+constraints were introduced together for this reason.
 
 The published enclosures were audited against the recorded truth in
 every sample of the fourteen runs of one seed, by replaying the
@@ -3379,8 +2926,8 @@ robust problem against.
 \begin{table*}[!t]
 \caption{The ten estimated-state runs that stop without a solved
 command: the sample that fails, the program without a result (primary:
-the solver finds no point of \eqref{eq:primary_program}; step: no step
-of the rule in Section~\ref{subsec:program} is acceptable), the horizon
+the solver finds no point of the historical primary SOCP; step: no step
+of the historical acceptance rule is acceptable), the horizon
 of the last solved sample, and the obstacle parameters published at
 that sample against their true values: course error, curvature and
 acceleration (published; true), and the distance between the published
@@ -3455,7 +3002,7 @@ problem. In a separate benchmark with exact states, two runs sharing the
 machine and the obstacle appearing after 2\,s of target-free driving,
 the sample at which the obstacle appears took 26\,ms in the median and
 72\,ms at most, and all samples 6.5\,ms in the median and 23\,ms at the
-95th percentile. The measures of Section~\ref{subsec:computation} halved
+95th percentile. The historical block-assembly and row-pruning optimizations halved
 these times against the previous implementation of the same problem,
 whose 95th percentile with estimated states was 136\,ms; the solver
 tolerances account for about 6\% of the time at the median and 15\% at
@@ -3547,8 +3094,11 @@ interpreted as validation of the revised constraint set. In the other direction,
 could not be used as a worst case throughout the horizon or in the
 decrease condition: both made the programs infeasible or the commands
 erratic. The baseline compromise tightens one affine hold and replans; it does
-not certify the nonlinear hold without remainder bounds. The theoretical
-construction of Section~\ref{subsec:robust} instead propagates both
+not certify the nonlinear hold without remainder bounds. The adopted
+compact nonlinear controller of Section~\ref{sec:control} instead pairs
+fixed measurement-consistency ensemble inference with condensed nonlinear
+PCBF optimization and full fine-RK4 replay across every retained member.
+The theoretical construction of Section~\ref{subsec:robust} instead propagates both
 vehicles, their observers and future control responses on common
 measurement branches. Conditioning the retained successor preserves the
 old policy continuation. This retains information-feedback effects that
@@ -3556,10 +3106,10 @@ a prescribed open-loop input sequence omits. It does not establish a
 uniformly narrow tube or initial feasibility for every encounter.
 
 \subsubsection*{The terminal set and the ten failures}
-The terminal set is built from the obstacle's own motion model and one
-braking law, is invariant under that law, and makes the problem
-recursively feasible on the declared model
-(Proposition~\ref{prop:recursive}). In the loop the statement held
+In the historical October 11 baseline, the braking-to-rest terminal set
+was built from the obstacle's own motion model and one braking law, was
+invariant under that law, and supported exact-information shift
+feasibility. In the loop the statement held
 where its premises held: the shifted plan was accepted at every
 exact-state sample and at 99.8\% of the estimated-state samples. The
 cost is that the forecast is now trusted until the obstacle leaves the
@@ -3569,7 +3119,12 @@ half a second earlier are not good enough for that on the curved road:
 eight of the ten failures are of this kind, and an earlier design with a
 weaker, non-invariant terminal condition recovered 82 of 84. The
 published parameter sets contained the truth in every audited sample;
-the controller forecasts with their centers. These historical failures concern the baseline approximation. Propagating
+the controller forecasts with their centers. These historical failures
+concern the October 11 braking-terminal baseline; the adopted compact
+controller of Section~\ref{subsec:terminal} instead uses a moving
+straight-cruise terminal set and $B$-hold nonlinear bridge evaluated
+across the retained ensemble under Assumption~\ref{asm:handoff}, which
+remains pending closed-loop campaign re-evaluation. Propagating
 the published target marginal through the full horizon recovered 31 of 84
 encounters in an earlier ablation, with one collision; that experiment
 does not test the complete information-set formulation.
@@ -3586,8 +3141,9 @@ Efficient sound image and terminal-membership algorithms for the full
 Fiala/NRMM system remain implementation work. Shared relative geometry
 can reduce conservatism, but every remaining uncertainty must be covered.
 
-\subsubsection*{The CLF}
-One obstacle-independent function governs avoidance and recovery, every
+\subsubsection*{The CLF and secondary preference}
+In the historical October 11 baseline, one obstacle-independent function
+governs avoidance and recovery, every
 completed run returns to cruise with the same function and programs
 throughout, and the certificate of the cruise law rests on the sampled
 nonlinear model rather than on its linearization at the trim, at the
@@ -3602,7 +3158,12 @@ scales on that weight, applied to the shifted plan, removed the
 oscillation in the revision of the controller that followed the
 campaign of this section (cruise exact at both speeds on both paths, 14
 of 14 and 73 of 84 encounters recovered); the results reported here
-predate it.
+predate it. The adopted compact nonlinear controller of
+Section~\ref{subsec:program} replaces the per-step CLF inequality with
+the quadratic tracking cost \eqref{eq:tracking_cost} and guides selection
+on the zero-deficit level using the tire-loading and rear-slip preference
+\eqref{eq:secondary_program}, which remains to be evaluated in a rerun of
+the closed-loop campaign.
 
 \subsubsection*{Premises of the trials}
 Several premises are favorable. The plant is the prediction model with
@@ -3611,15 +3172,18 @@ measurement holds by construction above 4\,m/s, and the 5\% parameter
 box is a design margin, not a measured mismatch. The obstacle follows
 its declared model. Computation is treated as instantaneous although 1
 to 2\% of the calls exceed the hold. The steering angle is unbounded in
-magnitude and rate, and the estimated-state runs use up to 1.04\,rad.
+magnitude and rate in the historical trials, and the estimated-state
+runs use up to 1.04\,rad.
 The road edges are declared, not perceived, and the relative-position
 measurement is synthetic with a noise bound of 0.04\,m; on simulated
 camera and LiDAR captures the perception pipeline has so far produced
 position errors
 above the 0.12\,m bound assumed in Section~\ref{subsec:designResults} on
 most frames, and it has not been run in the loop.
-Assumption~\ref{asm:mild} carries no mismatch bound, and the braking
-phase of the terminal continuation is sampled like the plan. The
+Both the historical braking-terminal premise and the revised moving
+handoff assumption (Assumption~\ref{asm:handoff}) carry no derived
+Fiala mismatch bound, and node-only collision checks leave intersample
+separation uncertified. The
 sampled realization of the observer is not covered by the
 continuous-time theorem. Each of these premises has to be removed
 before physical collision avoidance can be claimed.
@@ -3636,14 +3200,15 @@ away, so it needs neither zero jerk nor zero yaw acceleration; it
 carries a cascade ISS certificate, chooses its gains inside that
 certificate, measures the lateral velocity through the controller's
 tire model and held input, and publishes an enclosure with every
-estimate. The controller is a predictive control barrier function for
-the vehicle: one nonlinear rollout per sample on a Fiala bicycle, two
-convex programs in priority order, a terminal set built from the
-obstacle's forecast and one braking law that is invariant and makes the
-problem recursively feasible on the declared model, and one quadratic
-CLF for nominal path and speed tracking and post-avoidance recovery. The
-controller keeps the vehicle where the estimator's measurement is informative, and the enclosure
-tightens each hold.
+estimate. The adopted compact nonlinear controller combines fixed
+measurement-consistency ensemble inference with condensed nonlinear PCBF
+optimization over coarse control knots on the Fiala bicycle model, exact
+dual rectangle separation at control-boundary nodes, a moving
+straight-cruise terminal set reached through a $B$-hold nonlinear bridge
+that supports shift feasibility under Assumption~\ref{asm:handoff}, and
+a secondary tire-loading and rear-slip preference \eqref{eq:secondary_program}
+that guides selection on the zero-deficit level without altering the
+primary safety objective.
 
 Theorem~\ref{thm:robust} provides a unified conditional link from
 observer containment to decision-instant safety. A valid current
@@ -3659,7 +3224,8 @@ terminal closure remain explicit premises. This theorem neither
 requires constant tube width nor proves finite-time arrival at zero;
 road boundaries and intersample collision are outside its scope.
 
-In the October 11 baseline, in fourteen collision-threat encounters with exact states every run
+In the historical October 11 baseline (predating the revised compact
+nonlinear controller and pending rerun), in fourteen collision-threat encounters with exact states every run
 ends collision-free on the road with cruise recovered and the shifted
 plan feasible at every sample. With the estimator and bounded sensor
 noise, 74 of 84 runs do so, none collides or leaves the road, and ten
@@ -3667,13 +3233,15 @@ stop without a solved command, eight of them within two seconds of the
 start, where the published course and curvature of the obstacle place
 its forecast meters from its motion. The published enclosures contained
 the truth in every audited sample. These are simulations on the
-prediction model itself. The reported implementation uses per-hold affine
-tightening and center-based terminal rows, so these results are evidence
-about that approximation. The longitudinal reference verifies selected
-containment and shift mechanisms separately. Implementing the full certificate construction
-and evaluating physical model, perception and intersample separation
-contracts are future engineering work. They do not leave a missing step
-in the stated mathematical recursive-feasibility proof.
+prediction model itself. That historical implementation used per-hold affine
+tightening and center-based braking terminal rows, so those results are evidence
+about that earlier approximation rather than the revised compact controller.
+The longitudinal reference verifies selected
+containment and shift mechanisms separately. Re-evaluating the adopted
+compact controller across the closed-loop campaign, implementing the full
+certificate construction, and evaluating physical model, perception and
+intersample separation contracts are future engineering work. They do not
+leave a missing step in the stated mathematical recursive-feasibility proof.
 
 \section*{Data and Code Availability}
 
@@ -3730,7 +3298,14 @@ user-supplied ChatGPT Pro (OpenAI) mathematical derivation. Codex
 integrated its exact sensor-period construction, causal-policy
 conditioning and shift argument into the theory and manuscript, checked
 their stated scope and compiled the revised LaTeX. No new vehicle
-experiment was performed for that revision. The authors remain
+experiment was performed for that revision. The November 20
+control-design synchronization used Gemini (Google) to replace the
+superseded affine-RTI/CLF/braking-terminal subsections of
+Section~\ref{sec:control} with the adopted compact nonlinear controller
+from \path{controller/CONTROLLER_THEORY.md} (including the zero-deficit
+tire-loading and rear-slip preference and Gauss--Newton refinement),
+realign summary statements while preserving the October 11 historical
+results as pending rerun, and rebuild the PDF. The authors remain
 responsible for verifying every equation,
 proof, citation, result, interpretation, and submission declaration.
 
