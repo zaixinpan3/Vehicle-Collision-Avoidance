@@ -3,8 +3,8 @@
 The adopted controller combines fixed measurement-consistency inference with
 a condensed nonlinear predictive-CBF optimization of actuator commands.
 It enforces a terminal continuation set and retains a complete held-input
-moving plan for validation at the next measurement. The first feasible
-driving sequence supplies the next command. Collision constraints apply
+moving plan for validation at the next measurement. On the zero-deficit
+level, predicted tire loading and rear slip guide the choice of driving sequence. Collision constraints apply
 to control-boundary state nodes. Control knots, integration samples, and sensor
 samples have distinct roles; reducing the decision dimension does not remove the physical model.
 The derivation below states both the algorithm and the limits of its guarantees.
@@ -454,8 +454,34 @@ executable horizon. The following terminal construction has its own dynamics
 and is evaluated as a membership witness.
 
 A feasible zero-deficit driving sequence attains the lower bound of the PCBF
-objective. Its first input is issued immediately after validation. Tracking
-cost $J$ is available for analysis and does not rank accepted plans.
+objective. Define a secondary cost over its $N$ held inputs. Write $b_j$ for
+the signed longitudinal-force ratio on hold $j$ and $s$ for a retained
+physical hypothesis. At the end of that hold, form the dimensionless residual
+$$
+ a_{j+1}^s=
+ \frac{C_r^s}{\mu_r^s F_{zr}}\,
+ \operatorname{atan2}\!\left(v_{y,j+1}^s-l_r r_{j+1}^s,
+             \sqrt{(v_{x,j+1}^s)^2+v_{\rm floor}^2}\right).
+$$
+The existing scheduling speed floor regularizes the slip measure near rest.
+The factor $\mu_r^s F_{zr}/C_r^s$ sets the angular scale from each member's
+rear tire parameters. Define
+$$
+ J_{\rm tire}(U)=\frac h2\sum_{j=0}^{N-1}
+ \left[b_j^2+b_j^4+\frac1S\sum_{s=1}^S(a_{j+1}^s)^2\right].
+$$
+Here $b_j^2$ measures squared longitudinal force utilization. Since
+$D_r^2/(\mu_rF_{zr})^2=1-b_j^2$, the quartic term emphasizes the loss of
+lateral force capacity at large traction or braking. All terms are even
+under lateral reflection. These terms affect preference within the available
+actuator range. The PCBF primary objective and the terminal membership
+condition are independent of their values.
+
+For two validated zero-deficit plans, a proposed replacement must strictly
+reduce $J_{\rm tire}$ and satisfy $J_{\rm new}\le J_{\rm incumbent}$ up to
+numerical tolerance. This comparison preserves a feasible incumbent when
+stability and reference tracking favor different plans. It supplies a local
+preference and makes no claim of global secondary optimality or yaw stability.
 
 ### A moving terminal set and its continuation
 
@@ -538,9 +564,17 @@ straight reference, the lateral contributions cancel. The resulting
 trajectory supplies the initial actuator sequence. For each subsequent
 trial, Section 5's separation problem uses that trial's node poses.
 When needed, project the initialization onto the linear actuator and terminal
-handoff rows. SQP then minimizes the sum of stage deficits under the hard
-domain, motion and terminal constraints. Validation of the first feasible
-trial ends the search, including a trial found inside a line search.
+handoff rows. From this point a damped Gauss--Newton step for
+$J_{\rm tire}$ can advance the iterate when nonlinear replay reduces the
+cost without increasing either the total positive collision deficit or the
+maximum positive model-domain and terminal violation beyond numerical
+tolerance. The step uses the residuals $(b_j,b_j^2,a_{j+1}^s/\sqrt S)$ and
+the same input interpolation and physical bounds as the primary problem.
+SQP minimizes the sum of stage deficits under the hard domain, motion and
+terminal constraints. Its first validated zero-deficit trial supplies an
+incumbent. Within the same budget, one further Gauss--Newton proposal on
+the linearized zero-deficit level may replace it after nonlinear validation
+and the two cost comparisons above.
 
 ## 7. Node acceptance and retention of executable plans
 
@@ -604,6 +638,10 @@ The fine held-input suffix remains directly representable even when it no
 longer interpolates the new control knots. Generated candidates and this
 shift must each pass the same checks over the complete selected horizon.
 An optional new guide input is accepted only with a feasible continuation.
+During an active encounter, when both the guide splice and the shifted plan
+can be checked in time, the shift replaces the splice if it reduces the tire
+cost while preserving tracking performance. If only one plan is validated,
+that plan supplies the next command.
 
 Suppose an initial plan is feasible, the posterior contains the true member
 and is contained in the predicted successors, the flow and timing agree,

@@ -3879,6 +3879,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     inherit=~initial && isfield(prior,'movingTerminalPlan') && prior.movingTerminalPlan;
     attempts=0;iterationCount=0;calls=0;reuseCount=0;restoration=false;seedCount=0;
     cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;
+    stabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
+    bestCost=Inf;inheritedCost=NaN;deadline=budget+startupBuildSeconds;
     reentered=inherit && isfield(prior,'collisionTargetActive') && ~prior.collisionTargetActive && ~isempty(item.target);
     if reentered
         % The target-free suffix carries no collision witness for this
@@ -3903,15 +3905,26 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 if ~isempty(best),initializationSource="guideWithDrivingSuffix";end
             end
         end
-        if isempty(best)
-            [shifted,reused]=localCompactShiftedCache(prior,hypotheses,conditioning,inherited,kernel,cfg);
-            normals=prior.terminalNormals(:,conditioning.retainedIndices);
-            validatePlan(inherited,shifted,[],normals);
-            if ~isempty(best),retained=true;inheritedReusedHolds=reused;end
+        % If the guide splice passes, compare the shifted driving plan while
+        % there is time. A validated incumbent survives an interrupted replay.
+        compare=~isempty(best) && ~isempty(item.target) && toc(timer)<deadline;
+        if isempty(best) || compare
+            try
+                clockCheck=[];
+                if compare,clockCheck=@checkClock;end
+                [shifted,reused]=localCompactShiftedCache(prior,hypotheses,conditioning,inherited,kernel,cfg,clockCheck);
+                normals=prior.terminalNormals(:,conditioning.retainedIndices);
+                [selected,inheritedCost]=validatePlan(inherited,shifted,clockCheck,normals);
+                if selected
+                    retained=true;inheritedReusedHolds=reused;
+                    initializationSource="shiftedMovingTerminalLaw";
+                end
+            catch exception
+                if ~compare || ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
+            end
         end
     end
     if isempty(best)
-        deadline=budget+startupBuildSeconds;
         initializationSource="singleCirculationRollout";
         try
             checkClock();
@@ -3927,28 +3940,28 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 upper=repmat([cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],nodes,1);
                 start=controls(:);
                 controlScale=ones(nu,1);
-                brakingIndices=2:2:nu;
-                [guideLower,~]=nonlinearBicycleModel.inputBounds(cfg,true);
-                brakingShare=sqrt(1-cfg.planner.lateralAccelerationFraction^2);
-                if ~isempty(item.target) && guideLower(2)<-brakingShare && any(start(brakingIndices)<=guideLower(2)+eps)
-                    % A saturated braking guide leaves almost no lateral tire
-                    % force for a steering correction. Move its SQP expansion
-                    % point inside the combined-slip circle before differentiation.
-                    start(brakingIndices)=min(upper(brakingIndices),max(start(brakingIndices),-brakingShare));
-                    % Scale steering by the bicycle angle for a friction-limited
-                    % turn at the representative hypothesis's speed. Map the
-                    % bounds and derivatives through the same coordinate change.
-                    speedSquared=sum(item.ego(4:5).^2);
-                    lateralGrip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-                    steerScale=atan2(cfg.vehicle.wheelbase*lateralGrip,speedSquared);
-                    controlScale(1:2:end)=min(cfg.outputFeedback.steeringMaximum,steerScale);
-                end
+                % Express steering increments in units of the bicycle's
+                % friction-limited turn angle. Bounds use the same coordinates.
+                speedSquared=sum(item.ego(4:5).^2);
+                lateralGrip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
+                steerScale=atan2(cfg.vehicle.wheelbase*lateralGrip,speedSquared);
+                controlScale(1:2:end)=min(cfg.outputFeedback.steeringMaximum,steerScale);
                 if any(a*start-b>tolerance)
                     opts=optimoptions('quadprog','Algorithm','active-set','Display','off','MaxIterations',200);
                     [projected,~,flag]=quadprog(eye(nu),-start,a,b,[],[],lower,upper,start,opts);
                     if flag>0,start=projected;else,start=controls(:);end
                 end
                 e=evaluate(start);initialDeficit=sum(max(0,e.stage));initialTerminal=max(e.terminal);
+                trial=stabilityStep(start,e,false);
+                if ~isempty(trial)
+                    candidate=evaluate(trial);
+                    if candidate.stabilityCost<e.stabilityCost && ...
+                            sum(max(0,candidate.stage))<=initialDeficit+tolerance && ...
+                            max([0;candidate.forward;candidate.terminal])<=max([0;e.forward;e.terminal])+tolerance
+                        start=trial;
+                        e=candidate;
+                    end
+                end
                 z=[start./controlScale;max(0,e.stage)];
                 opts=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
                     'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true, ...
@@ -3968,9 +3981,25 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         error('collisionAvoidanceController:compactNoFeasiblePlan', ...
             'No validated moving PCBF plan within the %s search. No command was committed.',budgetPhase);
     end
+    if restoration && toc(timer)<deadline
+        % The primary optimum is zero. A secondary step must satisfy that
+        % same level and the terminal handoff on nonlinear replay.
+        try
+            trial=stabilityStep(cacheU,cache,true);
+            if ~isempty(trial)
+                [candidate,flows]=localCondensedOracle(trial,model,false,[],@checkClock,false);
+                calls=calls+1;
+                if candidate.stabilityCost<incumbentStability && ...
+                        max([candidate.stage;candidate.forward;candidate.terminal])<=tolerance
+                    inputs=localCompactRateLimit(reshape(trial,2,nodes)*model.map.'+model.offset,previous,ones(1,count),cfg);
+                    validatePlan(inputs,flows,@checkClock);
+                end
+            end
+        catch exception
+            if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
+        end
+    end
     solveSeconds=toc(solveClock);
-    bestCost=localCompactPerformance(traces{nominal}.ego(:,2:end),best,model);
-    inheritedCost=NaN;if retained,inheritedCost=bestCost;end
     retainedTrajectories=cell(1,numel(hypotheses));
     for s=1:numel(hypotheses)
         trace=traces{s};
@@ -3980,7 +4009,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v1",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
-        'fineControls',best,'movingTerminalPlan',true,'firstFeasibleDrivingPlan',true,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
+        'fineControls',best,'movingTerminalPlan',true,'firstFeasibleDrivingPlan',stabilitySteps==0,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
         'terminalNormals',cell2mat(cellfun(@(t)t.terminal.normal,traces(:).','UniformOutput',false)), ...
         'pcbfDeficit',0,'stageDeficits',zeros(count,1), ...
@@ -3993,7 +4022,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'inheritedReusedHolds',sum(inheritedReusedHolds), ...
         'elapsedSeconds',toc(timer),'deadlineSeconds',h,'predictionWindow',window, ...
         'controlNodes',nodes,'horizonSteps',count,'initializationTrajectoryCount',seedCount,'initializationSource',initializationSource, ...
-        'fallbackUsed',retained,'retainedFinePlanUsed',retained && ~initial,'rootTerminalPlanUsed',false, ...
+        'fallbackUsed',retained && stabilitySteps==0,'retainedFinePlanUsed',retained && ~initial,'rootTerminalPlanUsed',false, ...
         'retainedTailRepaired',false, ...
         'restorationAttempted',restoration,'initialRestorationSlack',initialDeficit, ...
         'initialNlpViolation',max(0,initialTerminal),'finalRestorationSlack',0, ...
@@ -4009,7 +4038,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'predictionModel',"condensedSharedInputNonlinearRollout",'previousInputUsedForMeasurements',previous, ...
         'optimizationReturned',true,'pcbfValue',0,'primaryOptimumComputed',true, ...
         'inheritedPerformanceCost',inheritedCost,'acceptedPerformanceCost',bestCost, ...
-        'performanceAcceptedSteps',0,'partialQpSteps',0, ...
+        'firstFeasibleStabilityCost',firstFeasibleStability,'acceptedStabilityCost',incumbentStability, ...
+        'performanceAcceptedSteps',stabilitySteps,'partialQpSteps',0, ...
         'searchRestartedAtRest',false, ...
         'deferredTrialAccepted',false,'deferredTrialStored',false, ...
         'safetyObjective',"sumOfHorizonSafetySlacks",'nonlinearOracleEvaluations',calls, ...
@@ -4022,13 +4052,50 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     prediction=struct('metadata',info,'scenarios',{traces},'memory',zeros(0,1),'information',hypotheses);
     result=struct('command',command,'inputs',best,'prediction',prediction,'state',state);
 
-    function checked=validatePlan(inputs,flows,clockCheck,normals)
+    function [selected,tracking]=validatePlan(inputs,flows,clockCheck,normals)
         if nargin<3,clockCheck=[];end
         if nargin<4,normals=[];end
         clock=tic;
         [valid,checked,maximum]=localCompactValidate(inputs,hypotheses,previous,kernel,cfg,true,flows,clockCheck,normals);
         validationSeconds=validationSeconds+toc(clock);
-        if valid,best=inputs;traces=checked;violation=maximum;end
+        selected=false;
+        tracking=NaN;
+        if ~valid,return;end
+        tracking=localCompactPerformance(checked{nominal}.ego(:,2:end),inputs,model);
+        score=h/2*sum(inputs(2,:).^2+inputs(2,:).^4);
+        for k=1:numel(hypotheses)
+            residual=localRearSlipResidual(checked{k}.collisionEgo(:,2:end),model,k);
+            score=score+h/(2*numel(hypotheses))*sum(residual.^2);
+        end
+        if ~isempty(best)
+            if score>=incumbentStability || tracking>bestCost+tolerance,return;end
+            stabilitySteps=stabilitySteps+1;
+        else
+            firstFeasibleStability=score;
+        end
+        selected=true;bestCost=tracking;incumbentStability=score;
+        best=inputs;traces=checked;violation=maximum;
+    end
+    function trial=stabilityStep(u,e,zeroLevel)
+        checkClock();
+        rows=a;
+        rhs=b-a*u;
+        if zeroLevel
+            rows=[rows;[e.stageGradient,e.forwardGradient,e.terminalGradient].'];
+            rhs=[rhs;-e.stage;-e.forward;-e.terminal];
+        end
+        hessian=(controlScale*controlScale.').*e.stabilityHessian+cfg.outputFeedback.regularization*eye(nu);
+        gradient=controlScale.*e.stabilityGradient;
+        options=optimoptions('quadprog','Algorithm','active-set','Display','off','MaxIterations',200);
+        [step,~,flag]=quadprog(hessian,gradient,rows.*controlScale.',rhs,[],[], ...
+            (lower-u)./controlScale,(upper-u)./controlScale,zeros(nu,1),options);
+        trial=[];
+        if flag>0
+            proposal=u+controlScale.*step;
+            if ~isequal(proposal,u) && max([a*proposal-b;lower-proposal;proposal-upper])<=tolerance
+                trial=proposal;
+            end
+        end
     end
     function checkClock()
         if toc(timer)>=deadline
@@ -4079,6 +4146,9 @@ function model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,ke
     controlMap=kron(map,eye(2));
     model=struct('cfg',cfg,'hypotheses',hypotheses,'previous',previous,'kernel',kernel, ...
         'map',map,'offset',offset,'controlMap',controlMap,'nominal',nominal,'reference',zeros(3,nodes));
+    tire=nonlinearBicycleModel.tireParameters(cfg);
+    scales=[hypotheses.parameters];
+    model.rearSlipScale=(tire.longitudinalForceScale(2)/tire.corneringStiffness(2))*scales(4,:)./scales(2,:);
     x=hypotheses(nominal).ego;
     for i=1:nodes
         p=x(1:2)+boundaries(i+1)*h*cfg.referenceSpeed*[cos(x(3));sin(x(3))];
@@ -4220,6 +4290,16 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         'forwardGradient',zeros(nu,N),'terminal',zeros(numel(model.hypotheses),1), ...
         'terminalGradient',zeros(nu,numel(model.hypotheses)),'cost',0,'costGradient',zeros(nu,1), ...
         'costHessian',zeros(nu),'derivatives',derivatives);
+    ratio=inputs(2,:).';
+    e.stabilityCost=h/2*sum(ratio.^2+ratio.^4);
+    if derivatives
+        ratioJacobian=model.map;
+        squaredRatioJacobian=2*ratio.*ratioJacobian;
+        e.stabilityGradient=zeros(nu,1);
+        e.stabilityHessian=zeros(nu);
+        e.stabilityGradient(2:2:end)=h*(ratioJacobian.'*ratio+squaredRatioJacobian.'*(ratio.^2));
+        e.stabilityHessian(2:2:end,2:2:end)=h*(ratioJacobian.'*ratioJacobian+squaredRatioJacobian.'*squaredRatioJacobian);
+    end
     for s=1:numel(model.hypotheses)
         if ~isempty(checkBudget),checkBudget();end
         item=model.hypotheses(s);
@@ -4268,6 +4348,9 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 rollouts.trajectories{s}.separation=gap(1:N+1);
             end
         end
+        [residual,slipDerivative]=localRearSlipResidual(ends(:,1:N),model,s);
+        weight=h/numel(model.hypotheses);
+        e.stabilityCost=e.stabilityCost+weight/2*sum(residual.^2);
         nodes=[item.ego,ends];roots=nodes(:,1:end-1);derivativeModel=model;
         derivativeModel.controlMap=[model.controlMap;zeros(2*(total-N),nu)];
         if ~derivatives
@@ -4321,6 +4404,13 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 e.terminalGradient(:,s)=(domainState(:,j).'*SF{j}+domainInput(:,j).'*derivativeModel.controlMap(2*j-1:2*j,:)).';
             end
         end
+        jacobian=zeros(N,nu);
+        for j=1:N
+            sensitivity=SE{j+1};
+            jacobian(j,:)=slipDerivative(:,j).'*sensitivity(4:6,:);
+        end
+        e.stabilityGradient=e.stabilityGradient+weight*jacobian.'*residual.';
+        e.stabilityHessian=e.stabilityHessian+weight*(jacobian.'*jacobian);
         if performance && s==model.nominal
             for i=1:n
                 state=ends(:,sum(kernel.holds(1:i)));S=SE{sum(kernel.holds(1:i))+1};ref=model.reference(:,i);
@@ -4339,6 +4429,19 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
     e.costGradient=e.costGradient+reshape(du-[du(:,2:end),zeros(2,1)],[],1);
     difference=eye(n)-diag(ones(n-1,1),-1);
     e.costHessian=e.costHessian+cfg.outputFeedback.inputWeight*kron(difference.'*diag(1./kernel.holds)*difference,eye(2));
+end
+
+function [residual,derivative]=localRearSlipResidual(states,model,index)
+    cfg=model.cfg;
+    vx=states(4,:);
+    speed=hypot(vx,cfg.model.scheduleSpeedFloor);
+    lateral=states(5,:)-cfg.vehicle.lr*states(6,:);
+    scale=model.rearSlipScale(index);
+    residual=atan2(lateral,speed)/scale;
+    if nargout>1
+        factor=1./(scale*(speed.^2+lateral.^2));
+        derivative=[-factor.*lateral.*vx./speed;factor.*speed;-cfg.vehicle.lr*factor.*speed];
+    end
 end
 
 function [selected,ends]=localCondensedSensitivities(roots,inputs,parameters,index,required,model)
@@ -4511,7 +4614,7 @@ function matches=localCompactCacheMatches(rollouts,inputs,hypotheses,previous,ke
         && kernel.integrationSubsteps==rollouts.integrationSubsteps;
 end
 
-function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,conditioning,inputs,kernel,cfg)
+function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,conditioning,inputs,kernel,cfg,checkBudget)
     % Reuse only the identical suffix of the accepted numerical trajectory.
     % Measurement conditioning may prune members, so use their retained indices.
     cache=[];reusedHolds=zeros(1,numel(hypotheses));
@@ -4521,6 +4624,7 @@ function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,condition
         'cfg',cfg,'holds',kernel.holds,'integrationSubsteps',kernel.integrationSubsteps, ...
         'trajectories',{cell(1,numel(hypotheses))});
     for s=1:numel(hypotheses)
+        if ~isempty(checkBudget),checkBudget();end
         original=conditioning.retainedIndices(s);item=hypotheses(s);prefix=0;
         if original<=numel(prior.retainedTrajectories)
             old=prior.retainedTrajectories{original};

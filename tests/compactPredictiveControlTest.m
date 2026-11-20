@@ -281,6 +281,26 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(prediction.scenarios{1}.ego(4,end),1.4);
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,1e-6);
         end
+        function stabilityCostIsSymmetricAndRespondsToTireLoading(testCase)
+            cfg=testCase.cfg;
+            item=testCase.block.initialHypotheses;item.target=[];item.ego=[0;0;0;14;0;0];
+            request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
+                'hypotheses',item,'input',zeros(2,1),'holds',[1,2,3],'inputs',zeros(2,3));
+            straight=solvePredictiveControl('outputFeedback',request);
+            request.inputs(2,:)=-.8;
+            braking=solvePredictiveControl('outputFeedback',request);
+            request.inputs(2,:)=.8;
+            traction=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyEqual(straight.stabilityCost,0,AbsTol=1e-12);
+            testCase.verifyGreaterThan(braking.stabilityCost,straight.stabilityCost);
+            testCase.verifyEqual(traction.stabilityCost,braking.stabilityCost,AbsTol=1e-12);
+            request.inputs(1,:)=[.08,.05,-.01];
+            left=solvePredictiveControl('outputFeedback',request);
+            request.inputs(1,:)=-request.inputs(1,:);
+            right=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyGreaterThan(left.stabilityCost,traction.stabilityCost);
+            testCase.verifyEqual(right.stabilityCost,left.stabilityCost,AbsTol=1e-12);
+        end
         function aPassingDetourCostsLessThanRemainingParked(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;
             item=testCase.block.initialHypotheses;item.target=[];
@@ -617,7 +637,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(result.accepted);
             testCase.verifyGreaterThan(result.maximumViolation,0);
         end
-        function firstFeasibleRestorationRetainsTheHardTerminalConstraint(testCase)
+        function stabilityPreferencePreservesZeroDeficitAndHardTerminalMembership(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             campaign=runJointOutputFeedbackScenario(Frames=1,Speeds=15,Scenarios="headOn", ...
                 RandomSeed=20261107,Warmup=false,OutputDirectory=string(folder.Folder), ...
@@ -626,7 +646,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             data=jsondecode(fileread(campaign.results.source));info=data.trace.metadata;
             testCase.verifyTrue(info.restorationAttempted);
             testCase.verifyGreaterThan(info.initialRestorationSlack,0);
-            testCase.verifyEqual(info.performanceAcceptedSteps,0);
+            testCase.verifyLessThanOrEqual(info.acceptedStabilityCost,info.firstFeasibleStabilityCost);
             testCase.verifyEqual(info.pcbfValue,0);
             testCase.verifyTrue(info.terminalSetEnforced);
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
@@ -635,7 +655,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             campaign=runJointOutputFeedbackScenario(Frames=160,Speeds=25,Scenarios=leadEncounter, ...
                 RandomSeed=20261107,OutputDirectory=string(folder.Folder), ...
-                ControllerConfiguration=struct('outputFeedback',struct('initializationSolveSeconds',10)));
+                ControllerConfiguration=struct('outputFeedback',struct('initializationSolveSeconds',10,'maximumSolveSeconds',1)));
             testCase.assertEqual(campaign.results.outcome,"completed");
             data=jsondecode(fileread(campaign.results.source));cfg=data.configuration;
             x=[data.trace.stateAfterHold];
@@ -643,6 +663,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             tire=nonlinearBicycleModel.tireParameters(cfg);
             pureCorneringPeak=atan(3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2));
             testCase.verifyLessThan(max(abs(rearSlip)),pureCorneringPeak);
+            metadata=[data.trace.metadata];
+            compared=[metadata.performanceAcceptedSteps]>0;
+            testCase.verifyTrue(any(compared));
+            testCase.verifyTrue(all([metadata(compared).acceptedStabilityCost]<[metadata(compared).firstFeasibleStabilityCost]));
+            testCase.verifyTrue(all([metadata.pcbfValue]==0));
             testCase.verifyFalse(data.nodeCollisionDetected);
             testCase.verifyLessThan(abs(x(2,end)),cfg.vehicle.width/2);
         end
@@ -752,6 +777,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             expected=([p.stage;p.forward;p.terminal]-[m.stage;m.forward;m.terminal])/(2*step);
             testCase.verifyEqual(actual,expected,AbsTol=3e-4);
             testCase.verifyEqual(value.costGradient.'*direction,(p.cost-m.cost)/(2*step),AbsTol=3e-4);
+            testCase.verifyEqual(value.stabilityGradient.'*direction, ...
+                (p.stabilityCost-m.stabilityCost)/(2*step),AbsTol=3e-4);
             testCase.verifyEqual(value.forwardGradient(3:end,1),zeros(8,1));
             testCase.verifyGreaterThan(abs(value.forwardGradient(2,1)),1e-3);
         end
