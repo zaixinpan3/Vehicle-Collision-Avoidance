@@ -4728,18 +4728,29 @@ function [clearance,gradient] = localCompactExactClearance(states,targets,shape)
         end
     end
     clearance=sqrt(square);
-    gap=max(predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:)),[],1);
+    if nargout>1
+        [gaps,facetGradient,projection]=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
+    else
+        gaps=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
+    end
+    gap=max(gaps,[],1);
     overlap=gap<=0;clearance(overlap)=gap(overlap);
     if nargout>1
         normal=difference./max(sqrt(square),eps);arm=closest-states(1:2,:);
         gradient=[normal;normal(2,:).*arm(1,:)-normal(1,:).*arm(2,:)];
-        if any(overlap)
-            x=states(1:3,overlap);q=targets(:,overlap);step=1e-5;
+        % A centered difference across |projection| can cancel the two
+        % separating normals. Differentiate one attaining facet in that stencil.
+        step=1e-5;
+        crossesZero=overlap & abs(projection)<=step;
+        gradient(:,crossesZero)=facetGradient(:,crossesZero);
+        regular=overlap & ~crossesZero;
+        if any(regular)
+            x=states(1:3,regular);q=targets(:,regular);
             for j=1:3
                 plus=x;minus=x;plus(j,:)=plus(j,:)+step;minus(j,:)=minus(j,:)-step;
                 a=max(predictiveSafetyGeometry.rectangleAxisGaps(plus,shape,q(1:3,:),q(8:11,:)),[],1);
                 b=max(predictiveSafetyGeometry.rectangleAxisGaps(minus,shape,q(1:3,:),q(8:11,:)),[],1);
-                gradient(j,overlap)=(a-b)/(2*step);
+                gradient(j,regular)=(a-b)/(2*step);
             end
         end
     end

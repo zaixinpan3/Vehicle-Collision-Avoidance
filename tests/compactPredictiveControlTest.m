@@ -789,6 +789,48 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(min(value.stage),testCase.cfg.outputFeedback.clearanceMeters+1);
             testCase.verifyGreaterThan(norm(value.stageGradient,'fro'),1e-5);
         end
+        function centeredPenetrationHasAnImprovingTranslation(testCase,rectangleYaw)
+            pose=[3;-2;rectangleYaw];shape=[2.4;.95;.2;-.1];
+            [gap,gradient]=predictiveSafetyGeometry.rectangleAxisGaps(pose,shape,pose,shape);
+            normal=gradient(1:2);step=1e-5;
+            testCase.verifyEqual(norm(normal),1,AbsTol=1e-12);
+            for side=[-1,1]
+                moved=pose+[side*step*normal;0];
+                gapMoved=predictiveSafetyGeometry.rectangleAxisGaps(moved,shape,pose,shape);
+                testCase.verifyEqual(max(gapMoved)-max(gap),step,AbsTol=1e-10);
+            end
+        end
+        function penetrationGradientFollowsTheActiveFacetOnEitherSide(testCase)
+            ego=[1;2;.38];targets=[1.1,1.1;2.4,1.6;-.17,-.17];shape=[2.4;.95;.2;-.1];
+            targetShape=[2.1;.8;-.15;.05];step=1e-6;
+            [gap,gradient]=predictiveSafetyGeometry.rectangleAxisGaps(ego,shape,targets,targetShape);
+            testCase.verifyLessThan(max(gap,[],1),0);
+            for j=1:3
+                delta=zeros(3,1);delta(j)=step;
+                plus=predictiveSafetyGeometry.rectangleAxisGaps(ego+delta,shape,targets,targetShape);
+                minus=predictiveSafetyGeometry.rectangleAxisGaps(ego-delta,shape,targets,targetShape);
+                testCase.verifyEqual(gradient(j,:),(max(plus)-max(minus))/(2*step),AbsTol=1e-7);
+            end
+        end
+        function centeredTerminalBridgeExposesASteeringCorrection(testCase)
+            cfg=testCase.cfg;item=localBlock(cfg,8).initialHypotheses;
+            item.target=[26;0;0;0;0;0;1.6;2.4;.95;0;0];
+            request=struct('operation',"evaluateControlSequence",'cfg',cfg,'hypotheses',item, ...
+                'input',zeros(2,1),'holds',[10,10],'inputs',zeros(2,2));
+            value=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyLessThan(max(value.stage),0);
+            testCase.verifyGreaterThan(value.terminal,1);
+            centered=value.terminalGradient(1:2:end);
+            testCase.verifyGreaterThan(norm(centered),1e-3);
+            offsets=[-1e-8,1e-8];steering=zeros(numel(centered),numel(offsets));
+            for k=1:numel(offsets)
+                request.hypotheses.target(2)=offsets(k);
+                near=solvePredictiveControl('outputFeedback',request);
+                steering(:,k)=near.terminalGradient(1:2:end);
+                testCase.verifyEqual(norm(steering(:,k)),norm(centered),AbsTol=1e-6);
+            end
+            testCase.verifyEqual(steering(:,1),-steering(:,2),AbsTol=1e-6);
+        end
         function elasticRestorationCannotAuthorizeAnOverlappingTrajectory(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.initializationSolveSeconds=.1;
             block=localBlock(cfg,0);item=block.initialHypotheses;

@@ -853,7 +853,7 @@ classdef predictiveSafetyGeometry
             tangent=[cospi(angle/pi);sinpi(angle/pi)];
         end
 
-        function gaps = rectangleAxisGaps(poseE,shapeE,poseT,shapeT,smoothing)
+        function [gaps,gradient,activeProjection] = rectangleAxisGaps(poseE,shapeE,poseT,shapeT,smoothing)
             % Signed projection gaps on both rectangles' edge normals.
             % A positive maximum is a lower bound on Euclidean clearance.
             % Positive smoothing lowers the center projection and increases
@@ -872,6 +872,31 @@ classdef predictiveSafetyGeometry
                 shapeT(1,:)+shapeE(1,:).*c+shapeE(2,:).*s; ...
                 shapeT(2,:)+shapeE(1,:).*s+shapeE(2,:).*c];
             gaps=sqrt(projection.^2+smoothing^2)-smoothing-support;
+            if nargout>1
+                % One signed, attaining facet of the penetration distance.
+                % At a centered projection either sign attains the same gap.
+                [~,facet]=max(gaps,[],1);
+                index=sub2ind(size(gaps),facet,1:numel(facet));
+                batch=zeros(size(facet));
+                ce=ce+batch;se=se+batch;ct=ct+batch;st=st+batch;
+                nx=[ce;-se;ct;-st];ny=[se;ce;st;ct];
+                activeProjection=projection(index);
+                if smoothing==0
+                    side=ones(size(facet));side(activeProjection<0)=-1;
+                    dc=-sin(angle).*sign(cos(angle));ds=cos(angle).*sign(sin(angle));
+                else
+                    side=activeProjection./hypot(activeProjection,smoothing);
+                    product=sin(angle).*cos(angle);dc=-product./c;ds=product./s;
+                end
+                normal=side.*[nx(index);ny(index)];
+                offsetYaw=[-se.*shapeE(3,:)-ce.*shapeE(4,:);ce.*shapeE(3,:)-se.*shapeE(4,:)];
+                % Ego axes rotate with yaw; axes belonging to the target stay fixed.
+                projectionYaw=sum(normal.*offsetYaw,1)+(facet<=2).*(normal(1,:).*delta(2,:)-normal(2,:).*delta(1,:));
+                dc=dc+batch;ds=ds+batch;
+                supportYaw=[shapeT(1,:).*dc+shapeT(2,:).*ds;shapeT(1,:).*ds+shapeT(2,:).*dc; ...
+                    shapeE(1,:).*dc+shapeE(2,:).*ds;shapeE(1,:).*ds+shapeE(2,:).*dc];
+                gradient=[normal;projectionYaw-supportYaw(index)];
+            end
         end
 
         function [distance,certificate] = rectangle(poseE,shapeE,poseT,shapeT)
