@@ -69,6 +69,11 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function compactPlanningRequiresAPositiveSafetyMargin(testCase)
+            override=struct('outputFeedback',struct('clearanceMeters',0));
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(override), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
         function compactTimingUsesTheWholeCallBudget(testCase)
             cfg=collisionAvoidanceControllerConfig();
             testCase.verifyEqual(cfg.outputFeedback.maximumSolveSeconds,1);

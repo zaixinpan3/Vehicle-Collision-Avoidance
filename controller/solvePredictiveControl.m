@@ -3880,11 +3880,9 @@ function [result,info] = localCompactStep(request,cfg)
         % A search deadline does not enter the dynamics or plan certificate.
         previousCfg.outputFeedback.maximumSolveSeconds=cfg.outputFeedback.maximumSolveSeconds;
         previousCfg.outputFeedback.initializationSolveSeconds=cfg.outputFeedback.initializationSolveSeconds;
-        % A smaller requested clearance admits the old strictly separated
-        % plans. Replay still checks every node and the terminal continuation.
-        if cfg.outputFeedback.clearanceMeters<previousCfg.outputFeedback.clearanceMeters
-            previousCfg.outputFeedback.clearanceMeters=cfg.outputFeedback.clearanceMeters;
-        end
+        % Clearance changes preserve inference and dynamics. A stored plan
+        % is only a candidate until replay under the current margin passes.
+        previousCfg.outputFeedback.clearanceMeters=cfg.outputFeedback.clearanceMeters;
         if isfield(previousCfg.outputFeedback,'recoverySolveSeconds')
             previousCfg.outputFeedback=rmfield(previousCfg.outputFeedback,'recoverySolveSeconds');
         end
@@ -4212,20 +4210,6 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 return;
             end
             candidate=evaluate(proposal);
-            % A minimum-norm projection aims at equality. When the nonlinear
-            % replay still touches or overlaps, extrapolate the improving
-            % secant once across zero. The step scales with the residual;
-            % it imposes no minimum distance on accepted plans.
-            before=max([e.stage;e.terminal]);
-            after=max([candidate.stage;candidate.terminal]);
-            if cfg.outputFeedback.clearanceMeters==0 && ~isempty(item.target) && ...
-                    after>=0 && before>2*after && max(candidate.forward)<=tolerance
-                fraction=min(1,max(sqrt(eps),2*after/(before-after)));
-                interior=min(upper,max(lower,proposal+fraction*(proposal-u)));
-                if ~isequal(interior,proposal) && all(a*interior<=b+tolerance)
-                    evaluate(interior);
-                end
-            end
             % A poor tangent model returns control to the full slack SQP.
             % Only nonlinear replay can accept the command sequence.
             if max([candidate.stage;candidate.forward;candidate.terminal])>=max(margins)/2

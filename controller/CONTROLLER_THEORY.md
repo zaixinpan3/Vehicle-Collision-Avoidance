@@ -622,9 +622,6 @@ Since the primary value is nonnegative, the solver first seeks a zero-deficit
 witness by minimizing the squared scaled actuator correction subject to all
 linearized zero-level inequalities and actuator bounds. Nonlinear replay
 checks the trial and further linearization uses a contracting residual.
-If a correction approaches contact from overlap, a secant extrapolation
-of that correction can propose an interior point. It must pass the same
-actuator, nonlinear node and terminal checks.
 When the projection cannot yield a witness, the full slack-variable
 SQP minimizes the sum of stage deficits under the hard domain, motion and
 terminal constraints. Its first validated zero-deficit trial supplies an
@@ -653,11 +650,12 @@ $$
 with the same condition at every control boundary of the nonlinear cruise
 bridge. These checks use the exact rectangle-distance dual value from
 Section 5. The control-boundary state nodes are retained even inside a long
-control-knot interval. The compact controller uses $d_{\rm safe}=0$ by
-default. The first $N$ inequalities $C_j\le0$ then include contact on the
-boundary of the optimization problem. Execution requires strictly positive
-signed distance at every checked node and a strictly separating terminal
-witness. There is no intersample clearance requirement or collision reserve. A trajectory can
+control-knot interval. The compact controller requires $d_{\rm safe}>0$,
+with a default of $0.10\,\mathrm{m}$. The primary optimization and nonlinear
+acceptance use the same clearance at the prediction nodes, on the cruise
+bridge and in the terminal separation witness. The simulation counts
+contact or overlap at a control node when the true signed distance is
+nonpositive. A trajectory can
 pass these collision inequalities while intersecting between nodes; the
 algorithm makes no safety claim at those intermediate times.
 
@@ -702,12 +700,14 @@ An optional new guide input is accepted only with a feasible continuation.
 During an active encounter, when both the guide splice and the shifted plan
 can be checked in time, the shift replaces the splice if it reduces the tire
 cost while preserving tracking performance. If only one plan is validated,
-that plan supplies the next command.
+that plan supplies the next command. Increasing $d_{\rm safe}$ requires
+feasibility to be established under the new margin before a command is issued.
 
 Suppose an initial plan is feasible, the posterior contains the true member
 and is contained in the predicted successors, the flow and timing agree,
-requested horizons fit the numerical allocation, and the core handoff
-assumption holds. Let $z\in Z_f$. One step of $F_f$ consumes the first of
+the required clearance stays fixed, requested horizons fit the numerical
+allocation, and the core handoff assumption holds. Let $z\in Z_f$.
+One step of $F_f$ consumes the first of
 the $B$ checked bridge holds. The remaining $B-1$ holds reach $C$. Core
 invariance supplies one more admissible moving hold ending in $C$. Thus
 $F_f(z)\in Z_f$. Induction gives any $r$ required extension holds under a
