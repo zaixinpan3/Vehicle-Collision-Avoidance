@@ -3880,6 +3880,11 @@ function [result,info] = localCompactStep(request,cfg)
         % A search deadline does not enter the dynamics or plan certificate.
         previousCfg.outputFeedback.maximumSolveSeconds=cfg.outputFeedback.maximumSolveSeconds;
         previousCfg.outputFeedback.initializationSolveSeconds=cfg.outputFeedback.initializationSolveSeconds;
+        % A smaller requested clearance admits the old strictly separated
+        % plans. Replay still checks every node and the terminal continuation.
+        if cfg.outputFeedback.clearanceMeters<previousCfg.outputFeedback.clearanceMeters
+            previousCfg.outputFeedback.clearanceMeters=cfg.outputFeedback.clearanceMeters;
+        end
         if isfield(previousCfg.outputFeedback,'recoverySolveSeconds')
             previousCfg.outputFeedback=rmfield(previousCfg.outputFeedback,'recoverySolveSeconds');
         end
@@ -4035,6 +4040,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                     roots=[hypotheses.ego];targets=[hypotheses.target];
                     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
                     clearance=min(localCompactExactClearance(roots,targets,shape));
+                    if ~(clearance>0)
+                        error('collisionAvoidanceController:compactNoFeasiblePlan', ...
+                            'Current node has no positive footprint separation (%.9g m).',clearance);
+                    end
                     if cfg.outputFeedback.clearanceMeters-clearance>tolerance
                         error('collisionAvoidanceController:compactNoFeasiblePlan', ...
                             'Current node clearance %.9g m violates the %.9g m planning constraint.', ...
@@ -4203,6 +4212,20 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 return;
             end
             candidate=evaluate(proposal);
+            % A minimum-norm projection aims at equality. When the nonlinear
+            % replay still touches or overlaps, extrapolate the improving
+            % secant once across zero. The step scales with the residual;
+            % it imposes no minimum distance on accepted plans.
+            before=max([e.stage;e.terminal]);
+            after=max([candidate.stage;candidate.terminal]);
+            if cfg.outputFeedback.clearanceMeters==0 && ~isempty(item.target) && ...
+                    after>=0 && before>2*after && max(candidate.forward)<=tolerance
+                fraction=min(1,max(sqrt(eps),2*after/(before-after)));
+                interior=min(upper,max(lower,proposal+fraction*(proposal-u)));
+                if ~isequal(interior,proposal) && all(a*interior<=b+tolerance)
+                    evaluate(interior);
+                end
+            end
             % A poor tangent model returns control to the full slack SQP.
             % Only nonlinear replay can accept the command sequence.
             if max([candidate.stage;candidate.forward;candidate.terminal])>=max(margins)/2
@@ -4813,7 +4836,7 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
     durations=kernel.holds;if fine,durations=ones(1,size(controls,2));end
     clipped=localCompactRateLimit(controls,previous,durations,cfg);
     violation=max(violation,max(abs(controls-clipped),[],'all'));
-    stateViolation=violation;
+    stateViolation=violation;separated=true;
     for s=1:numel(hypotheses)
         if ~isempty(checkBudget),checkBudget();end
         item=hypotheses(s);
@@ -4839,12 +4862,13 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
                 separation=localCompactExactClearance(collisionStates,q,shape);
             end
+            separated=separated && all(separation>0);
             violation=max(violation,max(cfg.outputFeedback.clearanceMeters-separation));
         end
         traces{s}=struct('ego',[item.ego,states],'inputs',inputs,'denseEgo',dense,'collisionEgo',collisionStates,'collisionTimes',times, ...
             'targets',q,'validationSubsteps',kernel.validationSubsteps);
     end
-    valid=isfinite(violation) && violation<=cfg.outputFeedback.nlpTolerance;
+    valid=separated && isfinite(violation) && violation<=cfg.outputFeedback.nlpTolerance;
     if isfinite(violation)
         for s=1:numel(hypotheses)
             if ~isempty(checkBudget),checkBudget();end
@@ -4854,8 +4878,8 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
             normal=[];if ~isempty(normals),normal=normals(:,s);end
             [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup,checkBudget,normal);
             traces{s}.terminal=terminal;violation=max(violation,terminalValue);
+            valid=valid && terminal.member;
         end
-        valid=isfinite(violation)&&violation<=cfg.outputFeedback.nlpTolerance;
     end
     % A stationary initial measurement may start moving. Rest belongs only
     % to the hypothetical terminal witness after the driving horizon.
@@ -4889,15 +4913,20 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,pa
         tail=backup.dense;tailEnds=backup.states;tailInputs=backup.inputs;
     end
     [domain,~,~,~,defined]=localCompactModelDomain(tail,tailInputs,cfg,kernel.validationSubsteps);
-    value=max([0,domain]);terminalTarget=target;
+    value=max([0,domain]);terminalTarget=target;separated=true;
     if ~isempty(target)
         times=(0:size(tailInputs,2))*h;
         if target(4)==0,q=repmat(target,1,numel(times));else,q=predictiveSafetyGeometry.predictTarget(target,times);end
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        value=max(value,max(cfg.outputFeedback.clearanceMeters-localCompactExactClearance([x,tailEnds],q,shape)));
+        gaps=localCompactExactClearance([x,tailEnds],q,shape);
+        separated=all(gaps>0);
+        value=max(value,max(cfg.outputFeedback.clearanceMeters-gaps));
         terminalTarget=q(:,end);
     end
     [core,normal]=terminalSafeSet.movingValue(tailEnds(:,end),terminalTarget,cfg,normal);
+    % At positive forward speed, core = max(-vx, requiredGap - supportGap).
+    % Strict separation of the terminal sweeps therefore requires core < requiredGap.
+    separated=separated && (isempty(target) || core<cfg.outputFeedback.clearanceMeters);
     command=tailInputs(:,1);
     slew=abs(command-previous)-h*[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     terminalValue=max([value;core;slew]);
@@ -4906,7 +4935,7 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,pa
     if command(2)<0 || unsustainableCoast || ~defined || x(4)<=0 || any(tailEnds(4,:)<=0) || any(tail(4,:)<=0)
         terminalValue=Inf;
     end
-    terminal=struct('value',terminalValue,'member',terminalValue<=cfg.outputFeedback.nlpTolerance, ...
+    terminal=struct('value',terminalValue,'member',separated && terminalValue<=cfg.outputFeedback.nlpTolerance, ...
         'input',command,'bridgeHolds',size(tailInputs,2),'normal',normal, ...
         'model',"straightCruiseEscape",'safetyAssumed',true,'safetyProved',false);
 end

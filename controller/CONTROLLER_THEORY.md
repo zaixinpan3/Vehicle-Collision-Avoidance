@@ -410,6 +410,9 @@ Consequently each displayed vertex inequality lower-bounds the projection
 of every ego-to-target displacement onto $n=A_T^\top\lambda$.
 Convexity extends the inequality from vertices to the complete ego footprint;
 $\|n\|\le1$ then proves clearance at least $d_{\rm safe}$.
+When $d_{\rm safe}=0$, strict separation requires a witness with a strictly
+positive minimum over the vertex projections above. The compact controller
+checks the sign of the optimized signed distance.
 Conversely, strong convex distance duality supplies such a multiplier for
 disjoint rectangles with distance at least a positive $d_{\rm safe}$.
 The normal is optimized continuously and is not restricted to body-edge axes.
@@ -553,7 +556,7 @@ $$
 A sufficient moving core $C$ requires $v_x>0$ and a witness satisfying
 $$
  \|n\|=1,\qquad n^\top e\ge0,\qquad
- L_E(n,x)-U_T(n,q)\ge d_{\rm safe}.
+ L_E(n,x)-U_T(n,q)>0,\qquad L_E(n,x)-U_T(n,q)\ge d_{\rm safe}.
 $$
 In the absence of a target the separation condition is vacuous. The witness
 may differ across hypotheses. One common separating plane over the remaining
@@ -619,6 +622,9 @@ Since the primary value is nonnegative, the solver first seeks a zero-deficit
 witness by minimizing the squared scaled actuator correction subject to all
 linearized zero-level inequalities and actuator bounds. Nonlinear replay
 checks the trial and further linearization uses a contracting residual.
+If a correction approaches contact from overlap, a secant extrapolation
+of that correction can propose an interior point. It must pass the same
+actuator, nonlinear node and terminal checks.
 When the projection cannot yield a witness, the full slack-variable
 SQP minimizes the sum of stage deficits under the hard domain, motion and
 terminal constraints. Its first validated zero-deficit trial supplies an
@@ -640,16 +646,18 @@ Let $z_j^s=(x_j^s,q_j^s)$ be the joint state at $t_k+jh$. While the target
 is active at decision $k$, each proposed plan must satisfy
 
 $$
-d_\pm(z_j^s)\ge d_{\rm safe},\qquad
+d_\pm(z_j^s)>0,\qquad d_\pm(z_j^s)\ge d_{\rm safe},\qquad
 j=0,\ldots,N,\qquad s=1,\ldots,S,
 $$
 
 with the same condition at every control boundary of the nonlinear cruise
 bridge. These checks use the exact rectangle-distance dual value from
 Section 5. The control-boundary state nodes are retained even inside a long
-control-knot interval. The first $N$ stage inequalities $C_j\le0$ are
-therefore equivalent to clearance at all $N+1$ state nodes. There is no
-intersample clearance requirement or collision reserve. A trajectory can
+control-knot interval. The compact controller uses $d_{\rm safe}=0$ by
+default. The first $N$ inequalities $C_j\le0$ then include contact on the
+boundary of the optimization problem. Execution requires strictly positive
+signed distance at every checked node and a strictly separating terminal
+witness. There is no intersample clearance requirement or collision reserve. A trajectory can
 pass these collision inequalities while intersecting between nodes; the
 algorithm makes no safety claim at those intermediate times.
 

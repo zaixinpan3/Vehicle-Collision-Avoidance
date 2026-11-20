@@ -1028,6 +1028,36 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,[]), ...
                 'collisionAvoidanceController:compactNoFeasiblePlan');
         end
+        function positiveSeparationIsStrictAtNodesAndThroughTheTerminalHandoff(testCase)
+            cfg=testCase.cfg;cfg.vehicle.width=2;
+            testCase.verifyEqual(cfg.outputFeedback.clearanceMeters,0);
+            request=struct('operation',"validateInputSequence",'cfg',cfg, ...
+                'hypotheses',testCase.block.initialHypotheses,'input',zeros(2,1),'inputs',zeros(2,1));
+            % Each stationary target is alongside only at the root, on the
+            % cruise bridge, or on the infinite terminal ray, respectively.
+            for station=[-4.75,10,120]
+                for gap=[.014,1e-9,0,-1e-9]
+                    request.hypotheses.target=[station;2+gap;0;0;0;0;1.6;2.4;1;0;0];
+                    result=solvePredictiveControl("outputFeedback",request);
+                    testCase.verifyEqual(result.accepted,gap>0);
+                    if station>0
+                        testCase.verifyEqual(result.trajectories{1}.terminal.member,gap>0);
+                    end
+                end
+            end
+            request.cfg.outputFeedback.clearanceMeters=.1;
+            request.hypotheses.target=[-4.75;2.014;0;0;0;0;1.6;2.4;1;0;0];
+            result=solvePredictiveControl("outputFeedback",request);
+            testCase.verifyFalse(result.accepted);
+        end
+        function aStoredPlanCanResumeWithThePositiveSeparationDefault(testCase)
+            cfg=testCase.cfg;cfg.outputFeedback.clearanceMeters=.1;
+            [~,~,~,prior]=collisionAvoidanceController(testCase.block,[],[],cfg,[]);
+            cfg=testCase.cfg;
+            [~,~,prediction,state]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
+            testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
+            testCase.verifyEqual(state.configuration.outputFeedback.clearanceMeters,0);
+        end
         function optimizationFromRestRespectsPhysicalVelocityBounds(testCase)
             block=localBlock(testCase.cfg,0);
             [~,~,prediction]=collisionAvoidanceController(block,[],[],testCase.cfg,[]);
