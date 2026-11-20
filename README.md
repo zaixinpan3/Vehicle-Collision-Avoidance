@@ -46,14 +46,8 @@ preview length permits. Preview duration follows the current retained speed,
 a configured minimum duration, and inherited coverage. Physical commands
 still update every 50 ms, with dynamics and collision checks between knots.
 The allocated graph supports preview growth without online recompilation.
-At 24 knots the problem has 192 physical state/input variables and one
-restoration slack, independent of the number of retained information members.
-State and actuator-rate limits use native two-sided constraint rows. At the
-tested 24-knot capacities this reduces the allocated constraint expressions
-from 1,184--1,824 to 788--1,188 without changing their feasible set. Candidate
-validation supplies the same shooting-grid states used to score that candidate,
-so they are not integrated twice. Refined validation skips the unused capacity
-beyond the actual preview; its integration grid and clearance checks are unchanged.
+With 24 knots, the zero-deficit projection uses 48 actuator variables.
+The full SQP adds one nonnegative clearance slack per predicted hold.
 
 `outputFeedback.nlpCompiler` selects `"clang"`, `"gcc"`, or `"cc"`;
 `nlpCompilerOptimization` selects levels 0--3. `nlpJit=false` permits execution
@@ -69,8 +63,8 @@ measurements include inference, preparation, solve and acceptance. The 100 ms
 mean-solve target is distinct from the configured 50 ms control period and
 from a worst-case deadline. The solver wall-time limit is not a hard interrupt.
 Simulation does not inject computation delay into the plant.
-The compact controller uses `initializationSolveSeconds` for admission and
-`maximumSolveSeconds` for the search on every subsequent call.
+The compact controller uses `initializationSolveSeconds` for startup and
+encounter admission and `maximumSolveSeconds` for continuation.
 
 The 2026-11-07 baseline run used the command above, MATLAB R2026a, CasADi
 3.8.2, Clang `-O0`, and an AMD Ryzen 7 7800X3D. All 30 combinations completed
@@ -155,6 +149,7 @@ sensor readings in `samples`:
 | `acceleration` | Gravity-compensated body acceleration, 2-by-1 m/s² |
 | `yawRate` | Gyro yaw rate, rad/s |
 | `relativePosition` | Radar position in the ego frame, 2-by-1 m |
+| `relativeHeading` | Optional perceived target yaw relative to ego, rad. The simulator supplies it on detected stationary targets. |
 | `radarAvailable` | Detection flag; absent values are ignored |
 
 Initialize with `previousState=[]`, one boundary reading, and
@@ -167,12 +162,9 @@ Initialize with `previousState=[]`, one boundary reading, and
 - `sensorBias`: persistent `[GNSS(2);IMU(2);gyro;radar(2)]` offsets.
 
 Hypotheses and their correlations persist through conditioning; their count
-is not an optimization-trajectory count. The experiment driver declares its
-finite initial contract once, including the actual initial simulated member.
-It is not a sensor-derived uncertainty enclosure. Subsequent calls receive
-raw measurements, actual applied-input history and retained controller state;
-they receive no further plant truth. The independent `ode45` plant is used
-for sensor synthesis and evaluation.
+is not an optimization-trajectory count. The experiment driver starts with an ego-only prior. Avoidance starts after
+NRMM has produced a full target estimate. The independent plant supplies
+sensor readings and evaluates the executed motion.
 
 On continuation, supply every reading from the preceding hold. The hold must
 contain an even integer number of sensor periods. Do not reset initial
@@ -184,27 +176,11 @@ posterior or inconsistent input history is reported explicitly.
 
 Endpoint control variables interpolate into a complete sequence of held
 commands. Constraints apply to those actual inputs and their increments.
-A smooth conservative combination of the four rectangle separation axes
-provides one collision inequality per check, without geometric decision
-variables. Physical state constraints and nonlinear shooting equalities
-remain hard. There is no forced braking endpoint, remaining-stop-distance
-terminal condition, or target-braking admission gate.
-
-Numerical replay checks the candidate on every retained member. IPOPT timeout
-or nonconvergence does not authorize a constraint-violating command. The full
-fine input sequence of an accepted plan is retained; its shifted continuation
-is independently rechecked and can serve as fallback. Refitting onto coarse
-knots supplies a warm start and is not assumed to preserve feasibility. The
-appended tail must also pass the check. If no checked plan exists, the runtime
-reports failure without labeling the encounter physically impossible.
-Tail braking repairs and an elastic feasibility-restoration solve supply
-additional candidates. Positive restoration slack never relaxes execution
-acceptance: the original clearance checks must still pass.
-Geometric rejection can trigger a compiled 64-step-per-hold replay with
-endpoint speed-bound checks. This reduces the reserve associated with time
-spacing while keeping the requested clearance. The speed-bound argument is
-conditional on the continuous physical domain; numerical integration and
-finite information remain uncertified.
+Collision checks use the rectangle distance dual at the control boundaries.
+A candidate must pass nonlinear replay for every retained member, including
+terminal membership and its continuation. The shared actuator projection
+seeks zero PCBF deficit first. The full slack SQP continues the search when
+needed. A shifted plan must pass the same checks on the updated information.
 
 ## Tests and comparisons
 

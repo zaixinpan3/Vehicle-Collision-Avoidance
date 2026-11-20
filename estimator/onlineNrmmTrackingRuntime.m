@@ -17,7 +17,9 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % states use held-input RK4. Numerical defects, sampling and model uncertainty
 % enter separate conditional enclosures; no floating-point interval proof is
 % claimed. See OBSERVER_ISS_THEORY.md for the position-only sensor amendment.
-% targetPoint advances the target point channel from timestamped radar
+% targetPoint returns empty motion until the acquisition history resolves the
+% state. An optional relative perception heading can initialize a target at rest.
+% It advances the target point channel from timestamped radar
 % positions transformed by a synchronized ego hypothesis. It returns the
 % updated observer state and [heading; speed; tangential acceleration; slip].
 
@@ -54,11 +56,12 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
     end
 end
 
-function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg)
+function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,relativeHeading)
 % The existing sampled high-gain target chain in inertial axes. Transform
 % each relative radar position using this member's synchronized ego pose.
 % In these axes the ego transport terms vanish and the absolute Cartesian
 % target derivatives and inverse NRMM map are unchanged.
+    if nargin<6,relativeHeading=NaN;end
     persistent design kernelDesign settings
     if isempty(design)
         localAddProjectPaths();
@@ -84,7 +87,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg)
     dt=time-track.time;
     assert(dt>=0,'onlineNrmmTrackingRuntime:nonmonotonicTime','Target samples must be time ordered.');
     if time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
-        track.initialized=false;track.times=[];track.positions=zeros(2,0);
+        track.initialized=false;track.restCompatible=false;track.times=[];track.positions=zeros(2,0);
     end
     if dt>0 && track.initialized
         reference=track.previousPosition;detected=~isempty(reference);
@@ -106,7 +109,11 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg)
     if ~isempty(position)
         track.detections=track.detections+1;
         track.lastReturn=time;
-        track.times(end+1)=time;track.positions(:,end+1)=position;
+        if ~isempty(track.times) && time==track.times(end)
+            track.positions(:,end)=position;
+        else
+            track.times(end+1)=time;track.positions(:,end+1)=position;
+        end
         count=settings.initialization.minimumRadarSamples;
         keep=max(1,numel(track.times)-count+1):numel(track.times);
         track.times=track.times(keep);track.positions=track.positions(:,keep);
@@ -120,14 +127,33 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg)
             t=track.times-mean(track.times);velocity=zeros(2,1);
             if resolved && numel(t)>1
                 velocity=track.positions*t.'/sum(t.^2);
-                track.initialized=numel(t)==count;
             end
             track.state=[center+t(end)*velocity;velocity;zeros(2,1)];
+            if resolved && numel(t)==count
+                % Fit position, velocity and acceleration at the last return.
+                % Scaling the sample times keeps the small LS system conditioned.
+                span=track.times(end)-track.times(1);
+                tau=(track.times(:)-track.times(end))/span;
+                basis=[ones(size(tau)),tau,tau.^2/2];
+                coefficients=basis\(track.positions-center).';
+                track.state=[center+coefficients(1,:).';coefficients(2,:).'/span;coefficients(3,:).'/span^2];
+                chord=position-track.positions(:,1);
+                track.heading=atan2(chord(2),chord(1));
+                track.initialized=true;
+            elseif track.restCompatible && isfinite(relativeHeading)
+                % A stationary position window cannot identify body heading.
+                track.state=[center;zeros(4,1)];
+                track.initialized=true;
+            end
         end
     else
         resolved=false;
     end
     track.time=time;track.previousPosition=position;
+    if ~track.initialized
+        motion=[];
+        return
+    end
     domain=design.domain;domain.rearAxleDistance=cfg.target.rearAxleDistance;
     ego=struct('bodyVelocity',zeros(2,1),'yawRate',0);
     [~,estimate]=nrmmObserverVectorField("targetDerivative",track.state,ego,domain);
@@ -140,6 +166,9 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg)
             chord=(track.positions-mean(track.positions,2))*t.';
             track.heading=atan2(chord(2),chord(1))+t(end)*estimate.targetYawRate-estimate.targetSideslip;
         end
+    end
+    if track.restCompatible && ~isempty(position) && isfinite(relativeHeading)
+        track.heading=atan2(sin(egoHeading+relativeHeading),cos(egoHeading+relativeHeading));
     end
     motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;estimate.targetSideslip];
     if track.restCompatible,motion(2:4)=0;end

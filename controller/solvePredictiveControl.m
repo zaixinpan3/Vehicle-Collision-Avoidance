@@ -2981,6 +2981,11 @@ function localOfValidateBlock(block,cfg)
         validateattributes(y.acceleration,{'double'},{'size',[2,1],'real','finite'});
         validateattributes(y.yawRate,{'double'},{'scalar','real','finite'});
         validateattributes(y.radarAvailable,{'logical'},{'scalar'});
+        if isfield(y,'relativeHeading') && ~isempty(y.relativeHeading)
+            validateattributes(y.relativeHeading,{'double'},{'real','scalar'});
+            assert(isnan(y.relativeHeading) || (y.radarAvailable && isfinite(y.relativeHeading)), ...
+                'collisionAvoidanceController:invalidSensorBlock','A relative heading requires a detected target.');
+        end
         if y.radarAvailable
             validateattributes(y.relativePosition,{'double'},{'size',[2,1],'real','finite'});
         end
@@ -3125,10 +3130,14 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                     yaw=item.ego(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
                     measuredPosition=item.ego(1:2)+rotation*rho;
                 end
+                relativeHeading=NaN;
+                if measured.radarAvailable && isfield(measured,'relativeHeading') && ~isempty(measured.relativeHeading)
+                    relativeHeading=measured.relativeHeading;
+                end
                 previousTrack=item.targetObserver;
                 [item.targetObserver,motion]=onlineNrmmTrackingRuntime("targetPoint", ...
-                    item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg);
-                if measured.radarAvailable
+                    item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading);
+                if measured.radarAvailable && ~isempty(motion)
                     % Keep the previous observer forecast while this return
                     % explains it. Replacing it with each noisy position
                     % would discard a consistent shifted collision witness.
@@ -3150,6 +3159,11 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                         item.target=[center;motion;cfg.target.rearAxleDistance; ...
                             cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
                     end
+                    if item.targetObserver.restCompatible && isfinite(relativeHeading) && item.target(4)==0
+                        % A position-consistent stationary forecast can still
+                        % have an incorrect body orientation after braking.
+                        item.target(3)=motion(1);
+                    end
                 end
             end
             expected=localOfSensor(item,block.heldInput,cfg,measured.time);
@@ -3170,6 +3184,11 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
     assert(any(keep),'collisionAvoidanceController:emptyJointInformation', ...
         'No retained physical hypothesis explains the complete raw block. No command or memory reset is authorized.');
     posterior=next(keep);
+    if observe && any(arrayfun(@(s)isempty(s.target),posterior))
+        % The common planner starts when every surviving ego hypothesis has
+        % a full target estimate. Each observer keeps its own acquisition history.
+        [posterior.target]=deal([]);
+    end
     info=struct('priorCount',numel(hypotheses),'posteriorCount',nnz(keep), ...
         'retainedIndices',find(keep),'maximumNoiseExcess',residual, ...
         'rawReadingsConditioned',numel(block.samples),'representation',"finiteConsistentHypotheses");
@@ -3858,6 +3877,9 @@ function [result,info] = localCompactStep(request,cfg)
         assert(isfield(prior,'kind') && prior.kind=="compactOutputFeedback-v1", ...
             'collisionAvoidanceController:incompatibleContinuation','Expected a compact controller continuation.');
         previousCfg=prior.configuration;
+        % A search deadline does not enter the dynamics or plan certificate.
+        previousCfg.outputFeedback.maximumSolveSeconds=cfg.outputFeedback.maximumSolveSeconds;
+        previousCfg.outputFeedback.initializationSolveSeconds=cfg.outputFeedback.initializationSolveSeconds;
         if isfield(previousCfg.outputFeedback,'recoverySolveSeconds')
             previousCfg.outputFeedback=rmfield(previousCfg.outputFeedback,'recoverySolveSeconds');
         end
@@ -3873,6 +3895,12 @@ function [result,info] = localCompactStep(request,cfg)
         assert(norm(block.heldInput-prior.appliedInput,Inf)<1e-12, ...
             'collisionAvoidanceController:actuationMismatch','Measurements must use the committed input.');
         hypotheses=prior.hypotheses;inherited=size(prior.fineControls,2)-1;
+        if ~isfield(prior,'targetEstimateReady') && isfield(hypotheses,'targetObserver') && ...
+                any(arrayfun(@(s)~isempty(s.targetObserver) && ~s.targetObserver.initialized,hypotheses))
+            [hypotheses.target]=deal([]);
+            prior.collisionTargetActive=false;
+            request.previousState=prior;
+        end
         if ~isfield(prior,'firstRadarTime') && ~isempty(hypotheses(1).target) && ~any([block.samples.radarAvailable])
             % Older checkpoints could carry a target and an avoidance plan
             % without ever receiving radar. Preserve only their ego history.
@@ -3895,7 +3923,8 @@ function [result,info] = localCompactStep(request,cfg)
         hit=find([block.samples.radarAvailable],1);
         if ~isempty(hit),firstRadarTime=block.samples(hit).time;end
     end
-    active=~isempty(firstRadarTime) && (block.samples(end).radarAvailable || inRange);
+    targetReady=all(arrayfun(@(s)~isempty(s.target),hypotheses));
+    active=targetReady && ~isempty(firstRadarTime) && (block.samples(end).radarAvailable || inRange);
     if ~active,[planning.target]=deal([]);end
     window=localOfWindow(planning,inherited,cfg);
     holds=diff(localCompactBoundaries(window.horizonSteps,cfg));
@@ -3907,10 +3936,12 @@ function [result,info] = localCompactStep(request,cfg)
     [~,lane]=readControllerInputs(stub,[],request.reference,cfg);
     [result,info]=localCondensedSolve(request,cfg,planning,conditioning,window,holds,lane,nominal,timer,inferenceSeconds);
     info.collisionTargetActive=active;
+    info.targetEstimateReady=targetReady;
     info.firstRadarTime=firstRadarTime;
     result.prediction.metadata=info;
     result.prediction.information=hypotheses;
     result.state.hypotheses=hypotheses;
+    result.state.targetEstimateReady=targetReady;
     result.state.firstRadarTime=firstRadarTime;
     result.state.targetEnteredRange=~isempty(firstRadarTime);
     result.state.collisionTargetActive=active;
@@ -3931,19 +3962,20 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     best=[];traces={};violation=Inf;validationSeconds=0;retained=false;
     inheritedReusedHolds=zeros(1,numel(hypotheses));solveClock=tic;
     startupBuildSeconds=0;
+    firstEncounter=~initial && isfield(prior,'collisionTargetActive') && ~prior.collisionTargetActive && ~isempty(item.target);
     budget=cfg.outputFeedback.maximumSolveSeconds;budgetPhase="continuation";
-    if initial
+    if initial || firstEncounter
         budget=cfg.outputFeedback.initializationSolveSeconds;budgetPhase="initialization";
         if ~cacheHit,startupBuildSeconds=buildSeconds;end
     end
     % A previous implementation could store a parking sequence. Preserve the
     % posterior when resuming such states and construct a fresh driving plan.
     inherit=~initial && isfield(prior,'movingTerminalPlan') && prior.movingTerminalPlan;
-    attempts=0;iterationCount=0;calls=0;reuseCount=0;restoration=false;seedCount=0;
+    attempts=0;iterationCount=0;projectionSteps=0;calls=0;reuseCount=0;restoration=false;seedCount=0;
     cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;
     stabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
     bestCost=Inf;inheritedCost=NaN;deadline=budget+startupBuildSeconds;
-    reentered=inherit && isfield(prior,'collisionTargetActive') && ~prior.collisionTargetActive && ~isempty(item.target);
+    reentered=inherit && firstEncounter;
     if reentered
         % The target-free suffix carries no collision witness for this
         % encounter. Form one guide on the shooting knots; check every hold.
@@ -3987,7 +4019,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         end
     end
     if isempty(best)
-        initializationSource="singleCirculationRollout";
+        if isempty(item.target),initializationSource="nominalCruiseRollout";
+        else,initializationSource="singleCirculationRollout";end
         try
             checkClock();
             if ~reentered
@@ -3996,6 +4029,18 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 validatePlan(candidate,[],@checkClock);
             end
             if isempty(best)
+                if ~isempty(item.target)
+                    % The root predates every decision variable. Its exact
+                    % node clearance can rule out every zero-deficit solution.
+                    roots=[hypotheses.ego];targets=[hypotheses.target];
+                    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+                    clearance=min(localCompactExactClearance(roots,targets,shape));
+                    if cfg.outputFeedback.clearanceMeters-clearance>tolerance
+                        error('collisionAvoidanceController:compactNoFeasiblePlan', ...
+                            'Current node clearance %.9g m violates the %.9g m planning constraint.', ...
+                            clearance,cfg.outputFeedback.clearanceMeters);
+                    end
+                end
                 restoration=true;
                 [a,b]=localCondensedInputRows(previous,holds,cfg);
                 lower=repmat([-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)],nodes,1);
@@ -4014,6 +4059,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                     if flag>0,start=projected;else,start=controls(:);end
                 end
                 e=evaluate(start);initialDeficit=sum(max(0,e.stage));initialTerminal=max(e.terminal);
+                % Zero is the lower bound of the PCBF objective. Seek a
+                % witness on that level in actuator coordinates alone.
+                [start,e]=projectToZeroDeficit(start,e);
                 trial=stabilityStep(start,e,false);
                 if ~isempty(trial)
                     candidate=evaluate(trial);
@@ -4077,7 +4125,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'pcbfDeficit',0,'stageDeficits',zeros(count,1), ...
         'retainedTrajectories',{retainedTrajectories});
     info=struct('solver',"condensedNonlinearPcbfSqp",'nlpStatus',"feasible", ...
-        'nlpConverged',false,'nlpIterations',iterationCount,'nlpSeconds',solveSeconds, ...
+        'nlpConverged',false,'nlpIterations',iterationCount+projectionSteps,'nlpSeconds',solveSeconds, ...
         'nlpAttempts',attempts,'nlpBuildSeconds',buildSeconds,'nlpCacheHit',cacheHit, ...
         'nlpVariables',nu+count,'nlpConstraints',2*count+numel(hypotheses), ...
         'informationUpdateSeconds',inferenceSeconds,'nonlinearValidationSeconds',validationSeconds, ...
@@ -4101,7 +4149,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'optimizationReturned',true,'pcbfValue',0,'primaryOptimumComputed',true, ...
         'inheritedPerformanceCost',inheritedCost,'acceptedPerformanceCost',bestCost, ...
         'firstFeasibleStabilityCost',firstFeasibleStability,'acceptedStabilityCost',incumbentStability, ...
-        'performanceAcceptedSteps',stabilitySteps,'partialQpSteps',0, ...
+        'performanceAcceptedSteps',stabilitySteps,'partialQpSteps',0,'zeroDeficitQpSteps',projectionSteps, ...
         'searchRestartedAtRest',false, ...
         'deferredTrialAccepted',false,'deferredTrialStored',false, ...
         'safetyObjective',"sumOfHorizonSafetySlacks",'nonlinearOracleEvaluations',calls, ...
@@ -4138,6 +4186,32 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         selected=true;bestCost=tracking;incumbentStability=score;
         best=inputs;traces=checked;violation=maximum;
     end
+    function [u,e]=projectToZeroDeficit(u,e)
+        options=optimoptions('quadprog','Algorithm','active-set','Display','off', ...
+            'MaxIterations',cfg.outputFeedback.qpMaximumIterations);
+        while projectionSteps<cfg.outputFeedback.restorationMaximumIterations
+            checkClock();
+            margins=[e.stage;e.forward;e.terminal];
+            rows=[a;[e.stageGradient,e.forwardGradient,e.terminalGradient].'];
+            rhs=[b-a*u;-margins];
+            [step,~,flag]=quadprog(eye(nu),zeros(nu,1),rows.*controlScale.',rhs,[],[], ...
+                (lower-u)./controlScale,(upper-u)./controlScale,zeros(nu,1),options);
+            projectionSteps=projectionSteps+1;
+            if flag<=0,return;end
+            proposal=u+controlScale.*step;
+            if isequal(proposal,u) || any(~isfinite(proposal)) || max([a*proposal-b;lower-proposal;proposal-upper])>tolerance
+                return;
+            end
+            candidate=evaluate(proposal);
+            % A poor tangent model returns control to the full slack SQP.
+            % Only nonlinear replay can accept the command sequence.
+            if max([candidate.stage;candidate.forward;candidate.terminal])>=max(margins)/2
+                return;
+            end
+            u=proposal;e=candidate;
+        end
+    end
+
     function trial=stabilityStep(u,e,zeroLevel)
         checkClock();
         rows=a;

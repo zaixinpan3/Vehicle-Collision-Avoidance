@@ -212,6 +212,12 @@ function y=localSensor(truth,input,cfg,time,stream,dropout)
     y.yawRate=y.yawRate+.5*bounds(3)*(2*rand(stream)-1);
     y.relativePosition=y.relativePosition+localNoise(stream,bounds(4));
     if dropout,y.radarAvailable=false;y.relativePosition=[NaN;NaN];end
+    y.relativeHeading=NaN;
+    if y.radarAvailable && truth.target(4)==0
+        % Ideal perception yaw for the stationary target, in the sensor frame.
+        angle=truth.target(3)-truth.ego(3);
+        y.relativeHeading=atan2(sin(angle),cos(angle));
+    end
 end
 
 function noise=localNoise(stream,radius)

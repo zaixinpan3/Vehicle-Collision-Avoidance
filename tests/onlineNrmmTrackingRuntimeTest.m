@@ -38,7 +38,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                     [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,time,position,0,cfg);
                     if index==0
                         testCase.verifyFalse(track.initialized);
-                        testCase.verifyEqual(motion(2:4),zeros(3,1));
+                        testCase.verifyEmpty(motion);
                     end
                 end
                 testCase.verifyTrue(track.initialized);
@@ -46,6 +46,34 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 testCase.verifyEqual(sign(motion(4)),sign(sideslip));
                 testCase.verifyEqual(track.detections,157);
             end
+        end
+
+        function firstFullOutputUsesPositionVelocityAndAccelerationAtTheLastReturn(testCase)
+            cfg=collisionAvoidanceControllerConfig();track=[];
+            settings=estimatorControllerIntegrationConfig();
+            for j=1:settings.initialization.minimumRadarSamples
+                t=(j-1)*cfg.outputFeedback.sensorPeriod;
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,[15+12*t-2*t^2;2],0,cfg);
+                if j<settings.initialization.minimumRadarSamples,testCase.verifyEmpty(motion);end
+            end
+            testCase.verifyEqual(motion,[0;12-4*t;-4;0],AbsTol=1e-9);
+        end
+
+        function stationaryAcquisitionRequiresBothPositionHistoryAndPerceivedYaw(testCase)
+            cfg=collisionAvoidanceControllerConfig();settings=estimatorControllerIntegrationConfig();track=[];
+            for j=1:settings.initialization.minimumRadarSamples
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,0,[12;3],.4,cfg,-.8);
+                testCase.verifyEmpty(motion);
+            end
+            for j=1:settings.initialization.minimumRadarSamples
+                t=(j-1)*cfg.outputFeedback.sensorPeriod;
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,[12;3],.4,cfg);
+                testCase.verifyEmpty(motion);
+            end
+            testCase.verifyTrue(track.restCompatible);
+            [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t+.0125,[12;3],.4,cfg,-.8);
+            testCase.verifyTrue(track.initialized);
+            testCase.verifyEqual(motion,[-.4;0;0;0],AbsTol=1e-12);
         end
 
         function boundedPositionJitterAtRestPreservesTheLastResolvedHeading(testCase)
@@ -61,6 +89,8 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyTrue(track.restCompatible);
             testCase.verifyEqual(motion(2:4),zeros(3,1));
             testCase.verifyEqual(motion(1),t0(3),AbsTol=.15);
+            [~,motion]=onlineNrmmTrackingRuntime("targetPoint",track,time+.0125,q(1:2),.3,cfg,.48);
+            testCase.verifyEqual(motion,[.78;0;0;0],AbsTol=1e-12);
         end
         function sharedMeasurementPreservesCurrentPublicationAndEveryNextState(testCase)
             runtime = localRuntime();

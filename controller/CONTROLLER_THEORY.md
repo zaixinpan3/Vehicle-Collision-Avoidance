@@ -236,20 +236,26 @@ $\omega=(J\hat v)^\top\hat a/V^2$, $\beta=\arcsin(l_r\omega/V)$ and
 $\psi_T=\arg(\hat v)-\beta$.
 
 A single position return identifies neither velocity nor body orientation.
-The numerical seed uses zero Cartesian derivatives and a provisional heading
-aligned with the ego. Measured displacements that exceed the two-return
-noise bound initialize velocity by a causal line fit. The high-gain observer
-takes over once its acquisition window is populated. The provisional
-target already participates in collision planning. At a positive return
-the planning root retains its previous observer-based constant-motion
+During acquisition the ego follows its nominal cruise controller. For a
+populated window with resolved displacement, let $T=t_n-t_1$ and
+$\tau_j=(t_j-t_n)/T$. The least-squares fit
+$p_j\simeq c_0+\tau_j c_1+\tau_j^2 c_2/2$ supplies the current Cartesian
+state $(c_0,c_1/T,c_2/T^2)$ to the high-gain observer and inverse above.
+A stationary-compatible window can instead initialize $(\bar p,0,0)$
+with a measured relative body heading added to ego yaw. The simulation
+supplies this heading on a detected, stopped target. With position alone,
+stationary acquisition remains pending. Avoidance starts at the first
+control boundary with a complete target estimate for every retained member.
+During acquisition the target-free plan carries no encounter certificate.
+At a positive return the planning root retains its previous observer-based constant-motion
 forecast while the predicted position explains the measurement and range.
 When all positions in the acquisition window lie within the radar noise
-bound of their mean, a stationary nominal forecast retains the most recent
-heading resolved by displacement. The moving point observer continues to
+bound of their mean, a stationary nominal forecast uses the perceived body
+heading when available and otherwise retains its last resolved heading. The moving point observer continues to
 process returns. Below the inverse speed floor, a fitted displacement
 direction and the estimated turn over the window give the body heading.
 This stationary-compatible window does not identify a
-unique physical speed. Initializing the velocity observer, changing the
+unique physical speed. Initializing the target observer, changing the
 stationary hypothesis or receiving a return inconsistent with the forecast
 refreshes the root. Its filtered center is constrained to both the detection
 disk and the current radar error ball. Footprint
@@ -609,6 +615,11 @@ cost without increasing either the total positive collision deficit or the
 maximum positive model-domain and terminal violation beyond numerical
 tolerance. The step uses the residuals $(b_j,b_j^2,a_{j+1}^s/\sqrt S)$ and
 the same input interpolation and physical bounds as the primary problem.
+Since the primary value is nonnegative, the solver first seeks a zero-deficit
+witness by minimizing the squared scaled actuator correction subject to all
+linearized zero-level inequalities and actuator bounds. Nonlinear replay
+checks the trial and further linearization uses a contracting residual.
+When the projection cannot yield a witness, the full slack-variable
 SQP minimizes the sum of stage deficits under the hard domain, motion and
 terminal constraints. Its first validated zero-deficit trial supplies an
 incumbent. Within the same budget, one further Gauss--Newton proposal on
@@ -658,7 +669,7 @@ correction. This equilibrium identity alone supplies no CLF decay inequality.
 ### Recursive feasibility on the admitted information domain
 
 Releasing target constraints enlarges the feasible set for the same
-horizon. On first detection or re-entry the collision obligations increase. The shift proof
+horizon. On the first complete observation or re-entry the collision obligations increase. The shift proof
 below applies through that boundary only if the incoming state and
 continuation are feasible for the reactivated encounter. The controller
 constructs one guide sampled at the control knots and their discrete
