@@ -31,9 +31,13 @@ classdef terminalSafeSetTest < matlab.unittest.TestCase
         end
         function compactTerminalUsesRectangleGeometryForParking(testCase)
             cfg=collisionAvoidanceControllerConfig();x=zeros(6,1);
-            q=[4.88;1.98;0;0;0;0;1.6;2.4;.95;0;0];
-            [~,info]=terminalSafeSet.compactEvaluate(x,q,[0;0],cfg);
-            testCase.verifyTrue(info.member);
+            touchingCorner=[cfg.vehicle.length/2+2.4;cfg.vehicle.width/2+.95];
+            margin=cfg.outputFeedback.clearanceMeters;
+            for axisGap=[.6,.8]*margin
+                q=[touchingCorner+axisGap;0;0;0;0;1.6;2.4;.95;0;0];
+                [~,info]=terminalSafeSet.compactEvaluate(x,q,[0;0],cfg);
+                testCase.verifyEqual(info.member,hypot(axisGap,axisGap)>=margin);
+            end
         end
         function compactTerminalChecksTheReturningPartOfACircularTrack(testCase)
             cfg=collisionAvoidanceControllerConfig();x=zeros(6,1);

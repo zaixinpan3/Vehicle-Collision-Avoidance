@@ -619,7 +619,10 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function diagonalClearanceUsesTheFullDistanceDual(testCase)
             item=testCase.block.initialHypotheses;item.ego=[0;0;pi;.3;0;0];
-            item.target=[4.88;1.98;0;0;0;0;1.6;2.4;.95;0;0];
+            % Both axis gaps fall below the margin while the diagonal exceeds it.
+            axisGap=.8*testCase.cfg.outputFeedback.clearanceMeters;
+            center=[testCase.cfg.vehicle.length/2+2.4;testCase.cfg.vehicle.width/2+.95]+axisGap;
+            item.target=[center;0;0;0;0;1.6;2.4;.95;0;0];
             result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
                 'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[0;-1]));
             testCase.verifyTrue(result.accepted);
@@ -1031,13 +1034,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         function thePlanningMarginAppliesAtNodesAndThroughTheTerminalHandoff(testCase)
             cfg=testCase.cfg;cfg.vehicle.width=2;
             margin=cfg.outputFeedback.clearanceMeters;
-            testCase.verifyEqual(margin,.1);
+            testCase.verifyEqual(margin,.2);
             request=struct('operation',"validateInputSequence",'cfg',cfg, ...
                 'hypotheses',testCase.block.initialHypotheses,'input',zeros(2,1),'inputs',zeros(2,1));
             % Each stationary target is alongside only at the root, on the
             % cruise bridge, or on the infinite terminal ray, respectively.
             for station=[-4.75,10,120]
-                for gap=[.15,.1,.09,.014,0,-1e-9]
+                for gap=[.21,.2,.19,.15,.1,.014,0,-1e-9]
                     request.hypotheses.target=[station;2+gap;0;0;0;0;1.6;2.4;1;0;0];
                     result=solvePredictiveControl("outputFeedback",request);
                     testCase.verifyEqual(result.accepted,gap>=margin);
@@ -1046,20 +1049,22 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                     end
                 end
             end
-            request.cfg.outputFeedback.clearanceMeters=.2;
-            request.hypotheses.target=[-4.75;2.15;0;0;0;0;1.6;2.4;1;0;0];
+            request.cfg.outputFeedback.clearanceMeters=.3;
+            request.hypotheses.target=[-4.75;2.25;0;0;0;0;1.6;2.4;1;0;0];
             result=solvePredictiveControl("outputFeedback",request);
             testCase.verifyFalse(result.accepted);
             request.operation="evaluateControlSequence";request.holds=1;
             value=solvePredictiveControl("outputFeedback",request);
-            testCase.verifyEqual(value.stage,.2-.15,AbsTol=1e-10);
+            testCase.verifyEqual(value.stage,.3-.25,AbsTol=1e-10);
         end
         function aStoredPlanCanResumeUnderATighterMarginAfterReplay(testCase)
             cfg=testCase.cfg;prior=testCase.state;
-            prior.configuration.outputFeedback.clearanceMeters=0; % Legacy checkpoint.
-            [~,~,prediction,state]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
-            testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
-            testCase.verifyEqual(state.configuration.outputFeedback.clearanceMeters,.1);
+            for previousMargin=[0,.1]
+                prior.configuration.outputFeedback.clearanceMeters=previousMargin;
+                [~,~,prediction,state]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
+                testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
+                testCase.verifyEqual(state.configuration.outputFeedback.clearanceMeters,cfg.outputFeedback.clearanceMeters);
+            end
         end
         function optimizationFromRestRespectsPhysicalVelocityBounds(testCase)
             block=localBlock(testCase.cfg,0);

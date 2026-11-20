@@ -114,8 +114,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
                 testCase.verifyGreaterThanOrEqual(witness.minimumForwardSpeed,-1e-7);
                 minimum=min(minimum,witness.minimumClearanceMeters);
             end
-            % This is a scenario qualification threshold, not the 0.1 m
-            % collision constraint used by the actual controller.
+            % Qualify the scenario with an independent 2 m braking reserve.
             testCase.verifyGreaterThan(minimum,2);
             fprintf('Gentle-braking witness: %s, %.1f m/s, pressure=%d, minimum %.6f m\n', ...
                 crossingScenario,crossingSpeed,crossingPressure,minimum);
