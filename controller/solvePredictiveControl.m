@@ -3926,21 +3926,38 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 lower=repmat([-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)],nodes,1);
                 upper=repmat([cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],nodes,1);
                 start=controls(:);
+                controlScale=ones(nu,1);
+                brakingIndices=2:2:nu;
+                [guideLower,~]=nonlinearBicycleModel.inputBounds(cfg,true);
+                brakingShare=sqrt(1-cfg.planner.lateralAccelerationFraction^2);
+                if ~isempty(item.target) && guideLower(2)<-brakingShare && any(start(brakingIndices)<=guideLower(2)+eps)
+                    % A saturated braking guide leaves almost no lateral tire
+                    % force for a steering correction. Move its SQP expansion
+                    % point inside the combined-slip circle before differentiation.
+                    start(brakingIndices)=min(upper(brakingIndices),max(start(brakingIndices),-brakingShare));
+                    % Scale steering by the bicycle angle for a friction-limited
+                    % turn at the representative hypothesis's speed. Map the
+                    % bounds and derivatives through the same coordinate change.
+                    speedSquared=sum(item.ego(4:5).^2);
+                    lateralGrip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
+                    steerScale=atan2(cfg.vehicle.wheelbase*lateralGrip,speedSquared);
+                    controlScale(1:2:end)=min(cfg.outputFeedback.steeringMaximum,steerScale);
+                end
                 if any(a*start-b>tolerance)
                     opts=optimoptions('quadprog','Algorithm','active-set','Display','off','MaxIterations',200);
                     [projected,~,flag]=quadprog(eye(nu),-start,a,b,[],[],lower,upper,start,opts);
-                    if flag>0,start=projected;end
+                    if flag>0,start=projected;else,start=controls(:);end
                 end
                 e=evaluate(start);initialDeficit=sum(max(0,e.stage));initialTerminal=max(e.terminal);
-                z=[start;max(0,e.stage)];
+                z=[start./controlScale;max(0,e.stage)];
                 opts=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
                     'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true, ...
                     'ConstraintTolerance',max(1e-7,tolerance),'OptimalityTolerance',1e-5, ...
                     'StepTolerance',1e-9,'MaxIterations',cfg.outputFeedback.restorationMaximumIterations, ...
                     'MaxFunctionEvaluations',10000,'OutputFcn',@progress);
                 attempts=1;
-                fmincon(@objective,z,[a,zeros(size(a,1),count)],b,[],[], ...
-                    [lower;zeros(count,1)],[upper;Inf(count,1)],@constraints,opts);
+                fmincon(@objective,z,[a.*controlScale.',zeros(size(a,1),count)],b,[],[], ...
+                    [lower./controlScale;zeros(count,1)],[upper./controlScale;Inf(count,1)],@constraints,opts);
             end
         catch exception
             if ~any(strcmp(exception.identifier,{'collisionAvoidanceController:condensedFeasible', ...
@@ -4039,9 +4056,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         f=sum(z(nu+1:end));g=[zeros(nu,1);ones(count,1)];
     end
     function [c,ceq,gc,gceq]=constraints(z)
-        e=evaluate(z(1:nu));ceq=[];gceq=[];
+        e=evaluate(controlScale.*z(1:nu));ceq=[];gceq=[];
         c=[e.stage-z(nu+1:end);e.forward;e.terminal];
-        gc=[e.stageGradient,e.forwardGradient,e.terminalGradient;-eye(count),zeros(count,count+numel(hypotheses))];
+        gc=[controlScale.*[e.stageGradient,e.forwardGradient,e.terminalGradient]; ...
+            -eye(count),zeros(count,count+numel(hypotheses))];
     end
     function stop=progress(~,values,status)
         if strcmp(status,'iter') || strcmp(status,'init'),iterationCount=values.iteration;end

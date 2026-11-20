@@ -13,6 +13,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         requestedSpeed={4,12}
         integrationMesh={4,64}
         movingTarget={false,true}
+        leadEncounter={"stoppedLead","hardBrakingLead"}
         cacheSpeed={.04,3}
         cacheMesh={8,24,64}
     end
@@ -629,6 +630,21 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(info.pcbfValue,0);
             testCase.verifyTrue(info.terminalSetEnforced);
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
+        end
+        function highSpeedLeadAvoidanceKeepsRearWheelSlipBelowThePureCorneringPeak(testCase,leadEncounter)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            campaign=runJointOutputFeedbackScenario(Frames=160,Speeds=25,Scenarios=leadEncounter, ...
+                RandomSeed=20261107,OutputDirectory=string(folder.Folder), ...
+                ControllerConfiguration=struct('outputFeedback',struct('initializationSolveSeconds',10)));
+            testCase.assertEqual(campaign.results.outcome,"completed");
+            data=jsondecode(fileread(campaign.results.source));cfg=data.configuration;
+            x=[data.trace.stateAfterHold];
+            rearSlip=atan2(x(5,:)-cfg.vehicle.lr*x(6,:),x(4,:));
+            tire=nonlinearBicycleModel.tireParameters(cfg);
+            pureCorneringPeak=atan(3*tire.longitudinalForceScale(2)/tire.corneringStiffness(2));
+            testCase.verifyLessThan(max(abs(rearSlip)),pureCorneringPeak);
+            testCase.verifyFalse(data.nodeCollisionDetected);
+            testCase.verifyLessThan(abs(x(2,end)),cfg.vehicle.width/2);
         end
         function aMovingSuffixCanBeExtendedWhenRepeatingItsLastInputWouldStop(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.maximumSolveSeconds=1e-12;
