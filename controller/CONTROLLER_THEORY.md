@@ -651,7 +651,7 @@ with the same condition at every control boundary of the nonlinear cruise
 bridge. These checks use the exact rectangle-distance dual value from
 Section 5. The control-boundary state nodes are retained even inside a long
 control-knot interval. The compact controller requires $d_{\rm safe}>0$,
-with a default of $0.20\,\mathrm{m}$. The primary optimization and nonlinear
+with a default of $0.10\,\mathrm{m}$. The primary optimization and nonlinear
 acceptance use the same clearance at the prediction nodes, on the cruise
 bridge and in the terminal separation witness. The simulation counts
 contact or overlap at a control node when the true signed distance is

@@ -1034,13 +1034,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         function thePlanningMarginAppliesAtNodesAndThroughTheTerminalHandoff(testCase)
             cfg=testCase.cfg;cfg.vehicle.width=2;
             margin=cfg.outputFeedback.clearanceMeters;
-            testCase.verifyEqual(margin,.2);
+            testCase.verifyEqual(margin,.1);
             request=struct('operation',"validateInputSequence",'cfg',cfg, ...
                 'hypotheses',testCase.block.initialHypotheses,'input',zeros(2,1),'inputs',zeros(2,1));
             % Each stationary target is alongside only at the root, on the
             % cruise bridge, or on the infinite terminal ray, respectively.
             for station=[-4.75,10,120]
-                for gap=[.21,.2,.19,.15,.1,.014,0,-1e-9]
+                for gap=[.2,margin+.01,margin,margin-.01,.014,0,-1e-9]
                     request.hypotheses.target=[station;2+gap;0;0;0;0;1.6;2.4;1;0;0];
                     result=solvePredictiveControl("outputFeedback",request);
                     testCase.verifyEqual(result.accepted,gap>=margin);
@@ -1057,9 +1057,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             value=solvePredictiveControl("outputFeedback",request);
             testCase.verifyEqual(value.stage,.3-.25,AbsTol=1e-10);
         end
-        function aStoredPlanCanResumeUnderATighterMarginAfterReplay(testCase)
+        function aStoredPlanCanResumeAfterReplayWithTheCurrentMargin(testCase)
             cfg=testCase.cfg;prior=testCase.state;
-            for previousMargin=[0,.1]
+            for previousMargin=[0,.2]
                 prior.configuration.outputFeedback.clearanceMeters=previousMargin;
                 [~,~,prediction,state]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
                 testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
