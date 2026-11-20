@@ -1,8 +1,8 @@
 function campaign = runJointOutputFeedbackScenario(options)
 %runJointOutputFeedbackScenario Raw-sensor predictive-control experiments.
-% The initial finite joint contract is declared once; no truth state or point
-% observer estimate is supplied to subsequent controller calls. An independent
-% ode45 plant supplies only position GNSS, body IMU, gyro and relative radar.
+% Target existence is disclosed on a radar return. At first detection
+% the experiment supplies its declared motion prior and radar supplies position.
+% An independent ode45 plant generates position GNSS, body IMU, gyro and radar.
 % The finite initial contract and future noise cases do not cover all bounded
 % uncertainty. Reported checks are empirical, with no deterministic guarantee.
     arguments
@@ -36,13 +36,15 @@ function campaign = runJointOutputFeedbackScenario(options)
             q(1:2)=q(1:2)+options.TargetPositionOffsetMeters;
             reference=road;input=zeros(2,1);time=0;state=[];
             stream=RandStream('mt19937ar','Seed',options.RandomSeed);
-            initial=localInitialContract(x,q,options.HypothesisOffsets);
+            motionPrior=q(3:end);
             initialClearance=predictiveSafetyGeometry.rectangle(x(1:3), ...
                 [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset],q(1:3),q(8:11));
             truth=struct('ego',x,'target',q,'parameters',ones(4,1),'sensorBias',zeros(7,1));
             sample=localSensor(truth,input,cfg,time,stream,false);
-            block=struct('kind',"jointSensorBlock-v1",'time',time,'heldInput',input, ...
-                'samples',sample,'initialHypotheses',initial);
+            initial=localInitialContract(x,options.HypothesisOffsets);
+            block=localSensorBlock(time,input,sample,initial,motionPrior);
+            block.initialHypotheses=initial;
+            initialMotionPrior=block.acquisitionMotionPrior;
             % Startup-only virtual sensor replay warms both initialization
             % and continuation branches; no warmup command reaches the plant.
             warmupSeconds=0;warmupHolds=0;warmupFailure="";
@@ -56,9 +58,8 @@ function campaign = runJointOutputFeedbackScenario(options)
                         warmupInput=warmupCommand.actuatorInput;
                         [warmupTruth,warmupSamples]=localReplay(warmupTruth,warmupInput,cfg, ...
                             warmupBlock.time,warmupStream,false);
-                        warmupBlock=struct('kind',"jointSensorBlock-v1", ...
-                            'time',warmupBlock.time+cfg.controller.sampleTime, ...
-                            'heldInput',warmupInput,'samples',warmupSamples);
+                        warmupBlock=localSensorBlock(warmupBlock.time+cfg.controller.sampleTime, ...
+                            warmupInput,warmupSamples,warmupState.hypotheses,motionPrior);
                         warmupHolds=warmupHolds+1;
                     catch exception
                         warmupFailure=string(exception.identifier)+": "+string(exception.message);
@@ -96,6 +97,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                     failurePhase="plantReplay";
                     failure=string(exception.identifier)+": "+string(exception.message);break;
                 end
+                nextBlock=localSensorBlock(time+cfg.controller.sampleTime,input,samples,state.hypotheses,motionPrior);
                 minimumClearance=min(minimumClearance,clearance);
                 minimumNodeClearance=min(minimumNodeClearance,nodeClearance);
                 entry=struct('time',time,'input',input,'memory',state.memory, ...
@@ -103,7 +105,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                     'controllerCallSeconds',elapsed,'deadlineMissed',elapsed>cfg.controller.sampleTime, ...
                     'minimumReplayClearanceMeters',clearance,'minimumNodeClearanceMeters',nodeClearance, ...
                     'stateAfterHold',truth.ego, ...
-                    'rawSensorBlock',samples);
+                    'rawSensorBlock',samples,'nextAcquisitionMotionPrior',nextBlock.acquisitionMotionPrior);
                 if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 time=time+cfg.controller.sampleTime;
                 % Positive clearance below the planning margin is diagnostic.
@@ -111,7 +113,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                     failurePhase="replaySafety";
                     failure="The vehicle footprints touched or overlapped at a control-boundary node.";break;
                 end
-                block=struct('kind',"jointSensorBlock-v1",'time',time,'heldInput',input,'samples',samples);
+                block=nextBlock;
             end
             outcome="completed";if strlength(failure)>0,outcome="failed";end
             file=fullfile(options.OutputDirectory,sprintf('%g-%s.json',speed,name));
@@ -135,15 +137,18 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'startupWarmupSeconds',warmupSeconds,'warmupEnabled',options.Warmup, ...
                 'warmupCompletedHolds',warmupHolds,'warmupFailure',warmupFailure, ...
                 'failureCallSeconds',failureCallSeconds, ...
-                'initialInformationContract',initial,'initialContractScope', ...
-                "finiteExperimentalPrior;notASensorDerivedEnclosure", ...
-                'actualInitialMemberIncluded',any(options.HypothesisOffsets==0), ...
+                'initialSensorSample',sample,'initialInformationContract',initial, ...
+                'initialAcquisitionMotionPrior',initialMotionPrior, ...
+                'initialPlantState',struct('ego',x,'target',q), ...
+                'initialContractScope',"finiteExperimentalPrior;radarRequiredForTargetAcquisition", ...
+                'actualInitialEgoMemberIncluded',any(options.HypothesisOffsets==0), ...
+                'actualInitialMemberIncluded',false, ...
                 'experimentOptions',options, ...
                 'robustSafetyCertified',false,'timing',localTiming(callSeconds(1:callCount),cfg.controller.sampleTime), ...
                 'trace',trace);
             result.solverTiming=localSolverTiming(trace);
             localWriteJson(file,result);
-            entry=rmfield(result,{'configuration','trace','initialInformationContract'});entry.source=file;
+            entry=rmfield(result,{'configuration','trace','initialInformationContract','initialPlantState','initialSensorSample','initialAcquisitionMotionPrior'});entry.source=file;
             if isempty(summaries),summaries=entry;else,summaries(end+1)=entry;end %#ok<AGROW>
             fprintf('%s at %g m/s: %s, %d/%d holds, mean/max call %.1f/%.1f ms, %d deadline misses\n', ...
                 name,speed,outcome,numel(trace),options.Frames,1000*result.timing.meanSeconds, ...
@@ -174,17 +179,30 @@ function timing=localSolverTiming(trace)
     timing.meanUnder100Milliseconds=~isempty(seconds) && mean(seconds)<.1;
 end
 
-function hypotheses=localInitialContract(x,q,offsets)
+function hypotheses=localInitialContract(x,offsets)
     % This is an experimental prior, not an estimate derived from truth at
     % every decision. Common translation and friction remain correlated.
-    prototype=struct('ego',x,'target',q,'parameters',ones(4,1),'sensorBias',zeros(7,1));
+    prototype=struct('ego',x,'target',[],'parameters',ones(4,1),'sensorBias',zeros(7,1));
     hypotheses=repmat(prototype,1,numel(offsets));
     for j=1:numel(offsets)
         offset=offsets(j);
         hypotheses(j).ego(1:2)=x(1:2)+[offset;offset];
         hypotheses(j).ego(4)=x(4)+offset;
-        hypotheses(j).target(1:2)=q(1:2)+[offset;offset];
         hypotheses(j).parameters(3:4)=1+offset;
+    end
+end
+
+function block=localSensorBlock(time,input,samples,hypotheses,motionPrior)
+    block=struct('kind',"jointSensorBlock-v1",'time',time,'heldInput',input, ...
+        'samples',samples,'acquisitionMotionPrior',[]);
+    first=find([samples.radarAvailable],1);
+    if ~isempty(first) && isempty(hypotheses(1).target)
+        % Only the conditional motion/geometry contract is supplied. The
+        % receiver reconstructs absolute position from its measured return.
+        q=[zeros(2,1);motionPrior];
+        if q(4)>0,q=predictiveSafetyGeometry.predictTarget(q,samples(first).time);end
+        q(5:6)=motionPrior(3:4);
+        block.acquisitionMotionPrior=q(3:end);
     end
 end
 

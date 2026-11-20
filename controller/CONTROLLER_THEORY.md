@@ -213,15 +213,26 @@ ensemble is an information-contract failure, not evidence that collision
 avoidance is physically impossible. A finite ensemble does not enclose all
 states between its members.
 
-For a tracked target let \(d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|\) and let
-\(R\) be the radar range. Record entry once a radar return has occurred or
-\(d_k^-\le R\). A target explicitly supplied by the initial contract is
-included on its first approach. Following entry, the target contributes
-collision and terminal separation constraints at decision \(k\) exactly when
-\(d_k^-\le R\). If \(d_k^->R\), the target-free planning problem retains
-the physical-domain, actuator and moving terminal continuation conditions.
-The posterior continues to propagate the target. Re-entry restores its full
-node and terminal constraints before a new command can be issued.
+Let $t_d$ be the timestamp of the first received radar return. Before $t_d$
+the controller carries only ego hypotheses and applies the target-free cruise
+problem. At $t_d$, a known acquisition motion and footprint prior can be
+attached to each surviving ego hypothesis. For a position return that initializes the track, set
+$$
+ p_T^s=p_E^s+R_E^s\,\Pi_{\|\rho\|\le R}(y_\rho-\eta_\rho^s).
+$$
+The projection enforces the detection radius on the physical relative
+position. A positive return must still satisfy its measurement residual
+bound. Subsequent samples in the same hold condition the new joint track
+with their own timestamps. The finite experimental motion prior supplies
+heading, speed, constant tangential acceleration, sideslip and geometry
+at acquisition. A single position return does not identify these quantities.
+
+For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
+target contributes node and terminal separation constraints when $d_k^-\le R$.
+Missed returns preserve the acquired posterior. If $d_k^->R$, the target-free
+planning problem retains its physical-domain, actuator and moving-terminal
+conditions. First detection and re-entry both require a feasible plan for
+the newly active constraints before issuing a command.
 
 The inference equations are fixed. There is no online optimization of an
 observer gain or learned memory update. Planning selects one representative
@@ -619,7 +630,7 @@ correction. This equilibrium identity alone supplies no CLF decay inequality.
 ### Recursive feasibility on the admitted information domain
 
 Releasing target constraints enlarges the feasible set for the same
-horizon. On re-entry the collision obligations increase. The shift proof
+horizon. On first detection or re-entry the collision obligations increase. The shift proof
 below applies through that boundary only if the incoming state and
 continuation are feasible for the reactivated encounter. The controller
 constructs one guide sampled at the control knots and their discrete

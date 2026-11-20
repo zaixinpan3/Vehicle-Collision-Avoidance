@@ -2870,7 +2870,7 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
         assert(isfield(block,'initialHypotheses') && ~isempty(block.initialHypotheses), ...
             'collisionAvoidanceController:missingInitialInformation', ...
             'An explicit joint initial hypothesis contract is required; a single sensor block cannot identify it.');
-        hypotheses=localOfValidateHypotheses(block.initialHypotheses,cfg);
+        hypotheses=localOfInitialHypotheses(block,cfg);
         assert(numel(block.samples)==1 && block.samples.time==block.time, ...
             'collisionAvoidanceController:invalidInitialBlock','Initialization uses one current-boundary reading.');
         memory=zeros(cfg.outputFeedback.memoryDimension,1);
@@ -2989,6 +2989,14 @@ function localOfValidateBlock(block,cfg)
         'The joint deployment uses a forward-only physical domain with zero minimum speed.');
 end
 
+function hypotheses=localOfInitialHypotheses(block,cfg)
+    hypotheses=block.initialHypotheses;
+    if ~any([block.samples.radarAvailable]) && isstruct(hypotheses) && isfield(hypotheses,'target')
+        [hypotheses.target]=deal([]);
+    end
+    hypotheses=localOfValidateHypotheses(hypotheses,cfg);
+end
+
 function hypotheses = localOfValidateHypotheses(hypotheses,cfg)
     assert(isstruct(hypotheses) && ~isempty(hypotheses) ...
         && numel(hypotheses)<=cfg.outputFeedback.maximumHypotheses, ...
@@ -3078,6 +3086,7 @@ function y = localOfSensor(hypothesis,input,cfg,time)
         relative=rotation*(hypothesis.target(1:2)-x(1:2));
         detected=norm(relative)<=cfg.collision.encounterRangeMeters;
     end
+    if ~detected,relative=NaN(2,1);end
     bias=hypothesis.sensorBias;
     y=struct('time',time,'position',x(1:2)+bias(1:2), ...
         'acceleration',a+bias(3:4),'yawRate',x(6)+bias(5), ...
@@ -3086,6 +3095,17 @@ end
 
 function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
     hypotheses=localOfValidateHypotheses(hypotheses,cfg);
+    firstReturn=find([block.samples.radarAvailable],1);
+    acquiring=isempty(hypotheses(1).target) && ~isempty(firstReturn);
+    if acquiring
+        assert(isfield(block,'acquisitionMotionPrior'), ...
+            'collisionAvoidanceController:missingAcquisitionPrior', ...
+            'A first position return requires a declared target motion and footprint prior at its timestamp.');
+        motion=block.acquisitionMotionPrior;
+        validateattributes(motion,{'double'},{'size',[9,1],'real','finite'});
+        assert(motion(2)>=0 && all(motion(5:7)>0), ...
+            'collisionAvoidanceController:invalidAcquisitionPrior','Invalid target speed or geometry at acquisition.');
+    end
     keep=false(1,numel(hypotheses));residual=Inf(numel(hypotheses),1);
     next=hypotheses;bounds=cfg.outputFeedback.noiseBounds;
     tolerance=1e-9; % Numerical measurement comparison only; not extra noise.
@@ -3099,13 +3119,29 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                 item=localOfAdvance(item,block.heldInput,cfg,cfg.outputFeedback.sensorPeriod,j==numel(block.samples),flow);
             end
             measured=block.samples(j);
+            if acquiring && j==firstReturn
+                % Locate the new track at the sample time. A bounded radar
+                % error can place the measured point just outside the disk.
+                rho=measured.relativePosition-item.sensorBias(6:7);
+                radius=cfg.collision.encounterRangeMeters;
+                if norm(rho)>radius,rho=rho*(radius/norm(rho));end
+                yaw=item.ego(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];
+                item.target=[item.ego(1:2)+rotation*rho;motion];
+            end
             expected=localOfSensor(item,block.heldInput,cfg,measured.time);
             errors=[norm(measured.position-expected.position); ...
                 norm(measured.acceleration-expected.acceleration);abs(measured.yawRate-expected.yawRate)];
             excess=max(excess,max(errors-bounds(1:3)));
             if measured.radarAvailable
-                if isempty(item.target) || ~expected.radarAvailable,excess=Inf;
-                else,excess=max(excess,norm(measured.relativePosition-expected.relativePosition)-bounds(4));end
+                if acquiring && j==firstReturn
+                    % The projected point is inside the disk in body coordinates.
+                    % Use those coordinates directly at a grazing first return.
+                    excess=max(excess,norm(measured.relativePosition-item.sensorBias(6:7)-rho)-bounds(4));
+                elseif isempty(item.target) || ~expected.radarAvailable
+                    excess=Inf;
+                else
+                    excess=max(excess,norm(measured.relativePosition-expected.relativePosition)-bounds(4));
+                end
             end
             % A missed return alone cannot establish target departure.
         end
@@ -3793,7 +3829,7 @@ function [result,info] = localCompactStep(request,cfg)
             'collisionAvoidanceController:missingInitialInformation','Supply an explicit initial information contract.');
         assert(~isfield(block,'initialMemory') && ~isfield(block,'initialPolicies'), ...
             'collisionAvoidanceController:unsupportedCompactMemory','The compact controller has no optimized memory map.');
-        hypotheses=localOfValidateHypotheses(block.initialHypotheses,cfg);
+        hypotheses=localOfInitialHypotheses(block,cfg);
         assert(numel(block.samples)==1 && abs(block.samples.time-block.time)<1e-9, ...
             'collisionAvoidanceController:invalidInitialBlock','Initialization uses the current reading.');
         inherited=0;
@@ -3816,6 +3852,14 @@ function [result,info] = localCompactStep(request,cfg)
         assert(norm(block.heldInput-prior.appliedInput,Inf)<1e-12, ...
             'collisionAvoidanceController:actuationMismatch','Measurements must use the committed input.');
         hypotheses=prior.hypotheses;inherited=size(prior.fineControls,2)-1;
+        if ~isfield(prior,'firstRadarTime') && ~isempty(hypotheses(1).target) && ~any([block.samples.radarAvailable])
+            % Older checkpoints could carry a target and an avoidance plan
+            % without ever receiving radar. Preserve only their ego history.
+            [hypotheses.target]=deal([]);
+            prior.movingTerminalPlan=false;
+            request.previousState=prior;
+            inherited=0;
+        end
     end
     clock=tic;[hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
     inferenceSeconds=toc(clock);
@@ -3824,18 +3868,13 @@ function [result,info] = localCompactStep(request,cfg)
     planning=hypotheses;
     inRange=any(arrayfun(@(s)~isempty(s.target) && ...
         norm(s.target(1:2)-s.ego(1:2))<=cfg.collision.encounterRangeMeters,hypotheses));
-    seen=inRange || any([block.samples.radarAvailable]);
-    if ~initial
-        if isfield(prior,'targetEnteredRange')
-            seen=seen || prior.targetEnteredRange;
-        else
-            seen=seen || any(arrayfun(@(s)~isempty(s.target) && ...
-                norm(s.target(1:2)-s.ego(1:2))<=cfg.collision.encounterRangeMeters,prior.hypotheses));
-        end
+    firstRadarTime=[];
+    if ~initial && isfield(prior,'firstRadarTime'),firstRadarTime=prior.firstRadarTime;end
+    if isempty(firstRadarTime)
+        hit=find([block.samples.radarAvailable],1);
+        if ~isempty(hit),firstRadarTime=block.samples(hit).time;end
     end
-    % A target supplied by the initial contract can start upstream of the
-    % radar. Its first approach is distinct from a confirmed encounter exit.
-    active=~isempty(hypotheses(1).target) && (inRange || ~seen);
+    active=~isempty(firstRadarTime) && (block.samples(end).radarAvailable || inRange);
     if ~active,[planning.target]=deal([]);end
     window=localOfWindow(planning,inherited,cfg);
     holds=diff(localCompactBoundaries(window.horizonSteps,cfg));
@@ -3847,10 +3886,12 @@ function [result,info] = localCompactStep(request,cfg)
     [~,lane]=readControllerInputs(stub,[],request.reference,cfg);
     [result,info]=localCondensedSolve(request,cfg,planning,conditioning,window,holds,lane,nominal,timer,inferenceSeconds);
     info.collisionTargetActive=active;
+    info.firstRadarTime=firstRadarTime;
     result.prediction.metadata=info;
     result.prediction.information=hypotheses;
     result.state.hypotheses=hypotheses;
-    result.state.targetEnteredRange=seen;
+    result.state.firstRadarTime=firstRadarTime;
+    result.state.targetEnteredRange=~isempty(firstRadarTime);
     result.state.collisionTargetActive=active;
 end
 

@@ -36,14 +36,18 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         function confirmedExitReleasesOnlyTheCollisionObligation(testCase)
             cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
             radius=cfg.collision.encounterRangeMeters;
-            item.target=[-radius+.2;0;pi;1;0;0;1.6;2.4;.95;0;0];
-            other=item;other.target(1)=-radius-.2;
+            item.target=[-radius+.46;0;pi;1;0;0;1.6;2.4;.95;0;0];
+            other=item;other.target(1)=item.target(1)-.02;
             block.initialHypotheses=[item,other];
-            % With no radar return both positions remain possible.
-            block.samples.radarAvailable=false;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
             [~,~,p,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyTrue(p.metadata.collisionTargetActive);
-            testCase.verifyNotEmpty(p.scenarios{1}.targets);
+            block=localNextBlock(prior,cfg);
+            for j=1:numel(block.samples),block.samples(j).radarAvailable=false;end
+            [~,~,p,prior]=collisionAvoidanceController(block,[],[],cfg,prior);
+            testCase.verifyTrue(p.metadata.collisionTargetActive);
+            testCase.verifyNumElements(prior.hypotheses,2);
             block=localNextBlock(prior,cfg);
             for j=1:numel(block.samples),block.samples(j).radarAvailable=false;end
             [~,~,p,state]=collisionAvoidanceController(block,[],[],cfg,prior);
@@ -61,6 +65,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             edge=sqrt(cfg.collision.encounterRangeMeters^2-3^2);
             target=[edge-.01;3;0;9;-20;0;1.6;2.4;.95;0;0];
             block.initialHypotheses.target=target;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
             [~,~,p,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyTrue(p.metadata.collisionTargetActive);
             [~,~,p,prior]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
@@ -70,14 +76,92 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(p.scenarios{1}.targets(:,1),state.hypotheses.target);
             testCase.verifyTrue(p.scenarios{1}.terminal.member);
         end
-        function upstreamInitialTargetRemainsInTheFirstEncounterPlan(testCase)
+        function anUnseenTargetCannotChangeCruiseOrSurviveInControllerMemory(testCase)
             cfg=testCase.cfg;block=localBlock(cfg,8);
-            block.initialHypotheses.target=[cfg.collision.encounterRangeMeters+1;4;pi;5;0;0;1.6;2.4;.95;0;0];
-            [~,~,p,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            [~,cruise,baseline]=collisionAvoidanceController(block,[],[],cfg,[]);
+            item=block.initialHypotheses;
+            item.target=[cfg.collision.encounterRangeMeters+.2;0;pi;5;0;0;1.6;2.4;.95;0;0];
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+            testCase.assertFalse(block.samples.radarAvailable);
+            testCase.verifyTrue(all(isnan(block.samples.relativePosition)));
+            block.initialHypotheses=item;
+            [~,inputs,p,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyEqual(inputs,cruise);
+            testCase.verifyEqual(p.metadata.predictionWindow,baseline.metadata.predictionWindow);
+            testCase.verifyEmpty(p.information.target);
+            testCase.verifyEmpty(prior.hypotheses.target);
+            testCase.verifyEmpty(prior.firstRadarTime);
+            testCase.verifyFalse(p.metadata.collisionTargetActive);
+
+            % The plant enters range during the first hold, but all returns
+            % are dropped. Its actual motion remains private to the fixture.
+            plant=prior;plant.hypotheses=item;
+            block=localNextBlock(plant,cfg);
+            testCase.assertTrue(any([block.samples.radarAvailable]));
+            for j=1:numel(block.samples),block.samples(j).radarAvailable=false;end
+            [~,~,p,prior]=collisionAvoidanceController(block,[],[],cfg,prior);
+            testCase.verifyEmpty(prior.hypotheses.target);
+            testCase.verifyFalse(p.metadata.collisionTargetActive);
+
+            item=localAdvanceHold(item,plant.appliedInput,cfg);
+            plant=prior;plant.hypotheses=item;
+            block=localNextBlock(plant,cfg);
+            block.samples(1).radarAvailable=false;
+            block.acquisitionMotionPrior=item.target(3:end);
+            [~,~,p,state]=collisionAvoidanceController(block,[],[],cfg,prior);
+            testCase.verifyEqual(state.firstRadarTime,block.samples(2).time);
             testCase.verifyTrue(p.metadata.collisionTargetActive);
-            testCase.verifyNotEmpty(p.scenarios{1}.targets);
-            [~,~,p]=collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior);
-            testCase.verifyTrue(p.metadata.collisionTargetActive);
+            testCase.verifyEqual(state.hypotheses.target,localAdvanceHold(item,prior.appliedInput,cfg).target,AbsTol=1e-10);
+            testCase.verifyTrue(p.scenarios{1}.terminal.member);
+        end
+        function firstRadarReturnLocalizesTheTrackWithinItsMeasuredDisk(testCase)
+            cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
+            item.ego(1:3)=[42;-17;.3];item.sensorBias(6:7)=[.01;-.005];
+            block.initialHypotheses=item;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+            block.samples.radarAvailable=true;radius=cfg.collision.encounterRangeMeters;
+            block.samples.relativePosition=[0;radius+.01]+item.sensorBias(6:7);
+            request=struct('operation',"condition",'cfg',cfg,'initial',true, ...
+                'block',block,'hypotheses',item);
+            testCase.verifyError(@()solvePredictiveControl('outputFeedback',request), ...
+                'collisionAvoidanceController:missingAcquisitionPrior');
+            request.block.acquisitionMotionPrior=[pi;2;0;0;1.6;2.4;.95;0;0];
+            posterior=solvePredictiveControl('outputFeedback',request);
+            position=item.ego(1:2)+radius*[-sin(item.ego(3));cos(item.ego(3))];
+            testCase.verifyEqual(posterior.target,[position;request.block.acquisitionMotionPrior],AbsTol=1e-12);
+            [~,~,prediction]=collisionAvoidanceController(request.block,[],[],cfg,[]);
+            testCase.verifyTrue(prediction.metadata.collisionTargetActive);
+            request.block.samples.relativePosition(2)=radius+1;
+            testCase.verifyError(@()solvePredictiveControl('outputFeedback',request), ...
+                'collisionAvoidanceController:emptyJointInformation');
+        end
+        function campaignSuppliesOnlyEgoInformationBeforeFirstContact(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            run=runJointOutputFeedbackScenario(Frames=4,Speeds=25,Scenarios="headOn", ...
+                RandomSeed=20261107,OutputDirectory=string(folder.Folder), ...
+                ControllerConfiguration=struct('outputFeedback',struct('maximumSolveSeconds',2)));
+            testCase.assertEqual(run.results.outcome,"completed");
+            data=jsondecode(fileread(run.results.source));
+            testCase.verifyTrue(all(arrayfun(@(s)isempty(s.target),data.initialInformationContract)));
+            testCase.verifyEmpty(data.initialAcquisitionMotionPrior);
+            testCase.verifyFalse(data.initialSensorSample.radarAvailable);
+            testCase.verifyTrue(all(isnan(data.initialSensorSample.relativePosition)));
+            first=[];
+            for k=1:numel(data.trace)
+                current=data.trace(k);
+                testCase.verifyEqual(current.metadata.collisionTargetActive,~isempty(first));
+                testCase.verifyEqual(current.metadata.firstRadarTime,first);
+                hits=[current.rawSensorBlock.radarAvailable];
+                if isempty(first) && any(hits)
+                    first=current.rawSensorBlock(find(hits,1)).time;
+                    testCase.verifyNumElements(current.nextAcquisitionMotionPrior,9);
+                else
+                    testCase.verifyEmpty(current.nextAcquisitionMotionPrior);
+                end
+            end
+            testCase.verifyNotEmpty(first);
         end
         function clearRoadSteadyTurnIsAPublicControllerEquilibrium(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=30;cfg.tire.frictionCoefficient=[.65;.65];
