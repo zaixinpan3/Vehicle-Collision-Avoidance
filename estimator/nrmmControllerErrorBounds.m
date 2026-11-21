@@ -125,24 +125,17 @@ function output = localPublish(output, bound, input, design)
     if components(2) < speed
         courseRadius = asin(min(1.0, components(2)/speed));
     end
-    % Global Lipschitz bounds for the saturated inverse reconstruction.
-    speedFloor = domain.speedMinimum;
-    if domain.speedMinimum == 0 && isfield(domain,"regularizationSpeedMinimum")
-        speedFloor = domain.regularizationSpeedMinimum;
-    end
-    yawRateRadius = min(domain.yawRateMaximum+abs(target.targetYawRate), ...
-        (domain.accelerationNormBound/speedFloor^2 ...
-        + 2*domain.speedMaximum*domain.accelerationNormBound/speedFloor^3)*components(2) ...
-        + domain.speedMaximum/speedFloor^2*components(3));
-    sideslipRadius = min(domain.sideslipMaximum+abs(target.targetSideslip), ...
-        domain.rearAxleDistance/cos(domain.sideslipMaximum) ...
-        *(yawRateRadius/speedFloor ...
-        + domain.yawRateMaximum/speedFloor^2*components(2)));
-    if domain.speedMinimum == 0 && speed-components(2) < speedFloor
-        % The inverse is regularized in this region, and body orientation is
-        % unobservable at rest. Use physical bounds, not a fictitious course.
-        yawRateRadius = domain.yawRateMaximum+abs(target.targetYawRate);
-        sideslipRadius = domain.sideslipMaximum+abs(target.targetSideslip);
+    yawRateRadius = domain.yawRateMaximum+abs(target.targetYawRate);
+    sideslipRadius = domain.sideslipMaximum+abs(target.targetSideslip);
+    if components(2) < speed
+        % Compare projected normal accelerations at the estimated speed.
+        % Projection onto each physical interval can only reduce the error.
+        directionError = 2*sin(courseRadius/2);
+        normalAccelerationError = components(3)+domain.accelerationNormBound*directionError;
+        yawRateRadius = min(yawRateRadius, ...
+            (normalAccelerationError+domain.yawRateMaximum*components(2))/speed);
+        sineError = (domain.rearAxleDistance*yawRateRadius+sin(domain.sideslipMaximum)*components(2))/speed;
+        sideslipRadius = min(sideslipRadius,sineError/cos(domain.sideslipMaximum));
     end
     yawRadius = min(pi, bound.yaw+courseRadius+sideslipRadius);
     values = [repmat(positionRadius, 2, 1); repmat(velocityRadius, 2, 1); ...

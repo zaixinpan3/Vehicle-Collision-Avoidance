@@ -69,10 +69,10 @@ function cfg = estimatorControllerIntegrationConfig()
 
     % Standalone target operating domain. The closed-loop drivers replace
     % it by the hull of the scenario targets (scripts/collisionThreatContract).
-    % The physical domain includes rest. A separate inverse floor keeps
-    % the NRMM reconstruction Lipschitz; its bias enters the observer bound.
+    % The physical domain includes rest. The Cartesian jerk extension uses
+    % a positive speed floor in its Lipschitz certificate.
     observer.target.domain.speedMinimum = 0.0;        % m/s
-    observer.target.domain.regularizationSpeedMinimum = 5.0; % m/s, numerical inverse
+    observer.target.domain.regularizationSpeedMinimum = 5.0; % m/s, Cartesian jerk extension
     observer.target.domain.speedMaximum = 20.0;       % m/s
     observer.target.domain.scalarAccelerationMaximum = 2.0; % m/s^2
     observer.target.domain.sideslipMaximum = 0.005;   % rad

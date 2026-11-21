@@ -90,6 +90,15 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(motion.scalarAccelerationMaximum, domain.accelerationNormBound);
             testCase.verifyGreaterThan(motion.scalarAccelerationMaximum, domain.scalarAccelerationMaximum);
         end
+        function resolvedSlowTracksHaveADataDependentYawRateRadius(testCase)
+            design=testCase.Design;
+            design.target.domain.speedMinimum=0;
+            design.target.domain.regularizationSpeedMinimum=5;
+            [published,errors]=localReconstruction(design,[0,0,0],1,1e-3);
+            estimate=published.targetEstimate;
+            testCase.verifyGreaterThanOrEqual(estimate.targetYawRateErrorBound,errors(end));
+            testCase.verifyLessThan(estimate.targetYawRateErrorBound,design.target.domain.yawRateMaximum);
+        end
         function thePublishedParameterBoundsContainTheTruthAndBeatTheBox(testCase, geometry)
             [published, ~, truth] = localReconstruction(testCase.Design, geometry);
             estimate = published.targetEstimate;
@@ -175,7 +184,13 @@ function [output, bound, input] = localVelocityFixture()
     input = struct("time",0,"yawRate",0,"gnssPosition",[0;0],"gnssVelocity",[10;0]);
 end
 
-function [published, actualError, truth, output, bound, input] = localReconstruction(design, geometry)
+function [published, actualError, truth, output, bound, input] = localReconstruction(design, geometry, speed, errorScale)
+    if nargin<3
+        speed=0.5*(design.target.domain.speedMinimum+design.target.domain.speedMaximum);
+    end
+    if nargin<4
+        errorScale=1;
+    end
     yaw = geometry(1);
     estimatedYaw = yaw+geometry(2);
     rotation = localRotation(yaw);
@@ -185,7 +200,6 @@ function [published, actualError, truth, output, bound, input] = localReconstruc
     egoVelocity = [12; 0.1];
     estimatedEgoVelocity = egoVelocity+[0.04; -0.08];
     targetPosition = [25; 5];
-    speed = 0.5*(design.target.domain.speedMinimum+design.target.domain.speedMaximum);
     course = -3.13;
     domain = design.target.domain;
     yawRate = min(0.25*domain.yawRateMaximum, ...
@@ -197,7 +211,7 @@ function [published, actualError, truth, output, bound, input] = localReconstruc
     targetYaw = course-asin(domain.rearAxleDistance*yawRate/speed);
     actual = [rotation.'*(targetPosition-position); ...
         rotation.'*targetVelocity; rotation.'*targetAcceleration];
-    estimated = actual+[0.1; -0.15; 0.08; -0.1; 0.04; 0.06];
+    estimated = actual+errorScale*[0.1; -0.15; 0.08; -0.1; 0.04; 0.06];
     switch geometry(3)
         case 1
             estimated(3:4) = [100; -120];

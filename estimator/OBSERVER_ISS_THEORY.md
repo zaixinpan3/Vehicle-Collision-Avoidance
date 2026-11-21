@@ -208,16 +208,31 @@ O_{\max}=b\sin(\beta_{\max})/l_r,\qquad
 S=\sqrt{A_{\max}^2+(bO_{\max})^2}.
 \]
 
-For a strictly moving domain, the inverse floor is `a = Vmin > 0`.
-A domain including rest instead declares `Vmin = 0` and a separate positive
-`a < b`. This floor regularizes divisions; it
-never replaces the Cartesian target velocity by a fictitious positive speed.
-The corresponding model discrepancy is bounded in Section 2 and enters the ISS input.
-The physical heading reconstruction is not observable at zero target speed.
-Without informative heading history, a velocity enclosure containing zero
-requires a full-circle heading enclosure and a speed interval including zero. Below the inverse
-floor, reconstructed yaw-rate and sideslip errors use the physical domain caps,
-because the regularized inverse is not the physical inverse there.
+The Cartesian propagation field $\Phi_e$ uses $a=V_{\min}>0$ on a
+strictly moving domain, or a separate $0<a<b$ on a domain including rest.
+Its model discrepancy enters the ISS input in Section 2.
+
+The motion output uses the actual estimated speed $V=\|\hat q\|$. For
+$V>0$ let $u=\hat q/V$ and let $s_c$ be the acceleration estimate projected
+onto its physical ball. The published tangential acceleration and yaw rate
+are the projections of $u^T s_c$ and $(Ju)^T s_c/V$ onto their respective
+physical intervals. The published sideslip is the arcsine of
+$l_r\hat\Omega/V$ projected onto $[-\sin\beta_{\max},\sin\beta_{\max}]$.
+At $V=0$ the numerical motion output is zero. Body heading then requires
+perception or informative history.
+
+Let $E_q,E_s$ bound the Cartesian velocity and acceleration errors.
+When $E_q<V$, the direction error angle is at most $\theta=\arcsin(E_q/V)$.
+The projected normal acceleration error is at most
+$E_n=E_s+2S\sin(\theta/2)$. Multiplying the true yaw rate by the
+estimated speed and bounding the speed error gives
+$|\hat\Omega-\Omega|\le (E_n+O_{\max}E_q)/V$. Take the smaller of this
+radius and the physical cap as $E_\Omega$. Applying the same
+argument to $V\sin\beta=l_r\Omega$ gives the sideslip radius
+$(l_r E_\Omega+\sin\beta_{\max}E_q)/(V\cos\beta_{\max})$.
+Each radius is capped by the largest possible deviation from the estimate
+on the physical interval. If $E_q\ge V$, use those physical caps and the
+full-circle course uncertainty until independent heading information is available.
 Estimated states may peak outside this domain: the globally Lipschitz extension
 below keeps the observer defined. The operating-domain premises constrain truth, not just the estimates.
 

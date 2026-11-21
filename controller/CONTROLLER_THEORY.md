@@ -230,12 +230,15 @@ $$
  \dot z=\hat v,\qquad e=z-\hat p .
 $$
 The innovation is disabled over intervals following a missed sample.
-$\Phi_e$, the gain design and the regularized inverse are the target
+$\Phi_e$, the gain design and the motion reconstruction use the target
 equations in [the NRMM derivation](../estimator/OBSERVER_ISS_THEORY.md).
-Above the inverse floor on the unsaturated branch, the outputs are
+For every positive estimated speed on the unsaturated branch, the outputs are
 $V=\|\hat v\|$, $A=\hat v^\top\hat a/V$,
 $\omega=(J\hat v)^\top\hat a/V^2$, $\beta=\arcsin(l_r\omega/V)$ and
-$\psi_T=\arg(\hat v)-\beta$.
+$\psi_T=\arg(\hat v)-\beta$. The published motion uses $V$ in each denominator.
+At exact rest the numerical motion outputs are zero and body heading requires
+perception or prior information. The Cartesian jerk extension $\Phi_e$ has its
+own positive denominator bound for the observer gain and error analysis.
 
 A single position return identifies neither velocity nor body orientation.
 During acquisition the ego follows its nominal cruise controller. For a
@@ -258,7 +261,7 @@ A received body heading updates the forecast orientation even when its position 
 When all positions in the acquisition window lie within the radar noise
 bound of their mean, a stationary nominal forecast uses the perceived body
 heading when available and otherwise retains its last resolved heading. The moving point observer continues to
-process returns. Below the inverse speed floor, when no body heading is received,
+process returns. Below the Cartesian jerk regularization speed, when no body heading is received,
 use a resolved chord between the earliest
 and latest retained returns within a quarter turn. For chord vector $c$ and
 representative curvature $\kappa=\sin\beta/l_r$, its endpoint body heading is

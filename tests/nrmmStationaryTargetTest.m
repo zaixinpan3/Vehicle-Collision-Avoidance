@@ -36,6 +36,21 @@ classdef nrmmStationaryTargetTest < matlab.unittest.TestCase
             testCase.verifyEqual(derivative(5:6), ...
                 min(1,speed/domain.regularizationSpeedMinimum)^4*trueJerk,AbsTol=1e-11);
         end
+        function motionOutputsUseTheEstimatedSpeedDownToRest(testCase,speed,turnSign)
+            domain=testCase.Design.target.domain;
+            slip=turnSign*domain.sideslipMaximum/2;
+            acceleration=domain.scalarAccelerationMaximum/2;
+            rate=speed*sin(slip)/domain.rearAxleDistance;
+            state=[30;2;0;speed;-speed*rate;acceleration];
+            [~,estimate]=nrmmObserverVectorField("targetDerivative",state, ...
+                struct('bodyVelocity',[0;0],'yawRate',0),domain);
+            expected=[speed;acceleration;rate;slip];
+            if speed==0
+                expected=zeros(4,1);
+            end
+            testCase.verifyEqual([estimate.targetSpeed;estimate.targetScalarAcceleration; ...
+                estimate.targetYawRate;estimate.targetSideslip],expected,AbsTol=1e-12);
+        end
         function stationaryMeasurementsPublishPositionAndUnknownHeading(testCase)
             [~,output,target]=localStationaryPublication();
             testCase.verifyTrue(output.controllerErrorBound.available);

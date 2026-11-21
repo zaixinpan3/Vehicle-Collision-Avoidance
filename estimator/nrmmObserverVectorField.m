@@ -312,8 +312,8 @@ function [stateDerivative, estimate] = localTargetDerivative( ...
     if speedMinimum == 0 && isfield(domain,"regularizationSpeedMinimum")
         inverseSpeedMinimum = domain.regularizationSpeedMinimum;
     end
-    speedFloor = max(targetSpeed, inverseSpeedMinimum);
-    unitDirection = targetVelocity/speedFloor;
+    propagationSpeed = max(targetSpeed, inverseSpeedMinimum);
+    propagationDirection = targetVelocity/propagationSpeed;
     speedScale = min(1.0, speedMaximum/max(targetSpeed, realmin));
     qSaturated = speedScale*targetVelocity;
     accelerationRaw = norm(targetAcceleration);
@@ -321,16 +321,12 @@ function [stateDerivative, estimate] = localTargetDerivative( ...
         accelerationNormBound/max(accelerationRaw, realmin));
     sSaturated = accelerationScale*targetAcceleration;
 
-    scalarAccelerationRaw = (qSaturated.'*sSaturated)/speedFloor;
-    targetScalarAcceleration = min(max(scalarAccelerationRaw, ...
-        -scalarAccelerationMaximum), scalarAccelerationMaximum);
-    yawRateRaw = ((planarCross*qSaturated).'*sSaturated)/speedFloor^2;
-    targetYawRate = min(max(yawRateRaw, ...
-        -yawRateMaximum), yawRateMaximum);
-
-    phiValue = -targetYawRate^2*qSaturated ...
-        + 3.0*targetScalarAcceleration*targetYawRate ...
-            * planarCross*unitDirection;
+    propagationAcceleration = min(max((qSaturated.'*sSaturated)/propagationSpeed, ...
+        -scalarAccelerationMaximum),scalarAccelerationMaximum);
+    propagationYawRate = min(max(((planarCross*qSaturated).'*sSaturated)/propagationSpeed^2, ...
+        -yawRateMaximum),yawRateMaximum);
+    phiValue = -propagationYawRate^2*qSaturated ...
+        + 3.0*propagationAcceleration*propagationYawRate*planarCross*propagationDirection;
 
     stateDerivative = [ ...
         targetVelocity-bodyVelocity ...
@@ -342,7 +338,22 @@ function [stateDerivative, estimate] = localTargetDerivative( ...
         return
     end
 
-    % Reconstruct diagnostics only when the caller requests the estimate.
+    % Reconstruct motion using the estimated direction of travel. At exact
+    % rest the Cartesian state does not identify a sideslip angle.
+    scalarAccelerationRaw = 0;
+    yawRateRaw = 0;
+    if targetSpeed > 0
+        direction = targetVelocity/targetSpeed;
+        scalarAccelerationRaw = direction.'*sSaturated;
+        yawRateRaw = ((planarCross*direction).'*sSaturated)/targetSpeed;
+    end
+    targetScalarAcceleration = min(max(scalarAccelerationRaw,-scalarAccelerationMaximum),scalarAccelerationMaximum);
+    targetYawRate = min(max(yawRateRaw,-yawRateMaximum),yawRateMaximum);
+    targetSideslip = 0;
+    if targetSpeed > 0
+        sineLimit = sin(sideslipMaximum);
+        targetSideslip = asin(min(sineLimit,max(-sineLimit,rearAxleDistance*targetYawRate/targetSpeed)));
+    end
     saturatedQuantities = strings(0, 1);
     if targetSpeed < speedMinimum
         saturatedQuantities(end+1, 1) = "targetSpeedBelowMinimum";
@@ -361,10 +372,6 @@ function [stateDerivative, estimate] = localTargetDerivative( ...
     end
     saturationActive = ~isempty(saturatedQuantities);
     courseAngleEgoFrame = atan2(targetVelocity(2), targetVelocity(1));
-    sideslipSine = min(max( ...
-        rearAxleDistance*targetYawRate/speedFloor, ...
-        -sin(sideslipMaximum)), sin(sideslipMaximum));
-    targetSideslip = asin(sideslipSine);
     speedDomainValid = targetSpeed >= speedMinimum;
 
     estimate = struct( ...
