@@ -219,6 +219,29 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(replay.trajectories{1}.targets(3,1),q(3),AbsTol=1e-12);
         end
 
+        function positionOnlyUpdatesCarryTheAdmittedMotionIntoTheNextHold(testCase)
+            cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
+            initial=[12;4;.3;9;-.6;.012;1.6;2.4;.95;0;0];track=[];
+            for t=0:cfg.outputFeedback.sensorPeriod:1
+                q=predictiveSafetyGeometry.predictTarget(initial,t);
+                track=onlineNrmmTrackingRuntime('targetPoint',track,t,q(1:2),0,cfg);
+            end
+            item.targetObserver=track;t=t+cfg.outputFeedback.sensorPeriod;
+            item.target=predictiveSafetyGeometry.predictTarget(initial,t);
+            item.target(5:6)=[5;-.1];
+            block.time=t;block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',t));
+            posterior=solvePredictiveControl('outputFeedback',struct('operation',"condition", ...
+                'cfg',cfg,'initial',true,'block',block,'hypotheses',item));
+            bounds=posterior.targetObserver.motionBounds;
+            testCase.verifyEqual(posterior.target(5:6),[bounds(2,1);bounds(1,2)],AbsTol=1e-12);
+            replay=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                'cfg',cfg,'hypotheses',posterior,'input',block.heldInput,'inputs',zeros(2,1)));
+            testCase.verifyEqual(replay.trajectories{1}.targets(:,1),posterior.target,AbsTol=1e-12);
+            next=predictiveSafetyGeometry.predictTarget(posterior.target,cfg.controller.sampleTime);
+            testCase.verifyEqual(replay.trajectories{1}.targets(:,end),next,AbsTol=1e-12);
+        end
+
         function anExactRelativeHeadingConditionsKnownTargetHypotheses(testCase)
             cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
             item.ego(3)=2.95;item.target=[12;4;-3.05;2;-.6;.035;1.6;2.4;.95;0;0];

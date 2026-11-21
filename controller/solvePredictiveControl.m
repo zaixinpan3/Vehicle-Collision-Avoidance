@@ -3178,12 +3178,12 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                     if isfinite(relativeHeading)
                         % Position consistency does not constrain body heading.
                         item.target(3)=motion(1);
-                        if item.target(4)>0
-                            % Propagate the same admissible central parameters
-                            % between returns as in the planner's central case.
-                            motionBounds=item.targetObserver.motionBounds;
-                            item.target(5:6)=min(motionBounds(2,:).',max(motionBounds(1,:).',item.target(5:6)));
-                        end
+                    end
+                    if item.target(4)>0
+                        % A position-only return can also tighten these intervals.
+                        % Retain the same forecast that the controller propagates.
+                        motionBounds=item.targetObserver.motionBounds;
+                        item.target(5:6)=min(motionBounds(2,:).',max(motionBounds(1,:).',item.target(5:6)));
                     end
                 end
             end
