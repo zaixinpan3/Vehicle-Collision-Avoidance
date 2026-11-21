@@ -295,17 +295,37 @@ interval image of $2(s_2/T_2-s_1/T_1)/(T_1+T_2)$. A subsequent resolved
 displacement establishes that these earlier intervals preceded absorption.
 These bounds use the declared moving-target observer domain.
 
-For a moving estimate the compact controller evaluates its central parameter
-pair projected into these intervals and their four endpoint combinations.
-Each endpoint case uses a common observed chord to reconstruct speed for
-that pair. Its body heading at the last return comes from perception when
-available and from the chord otherwise. Across a dropout each case advances
-from that return under its own parameters. The central case retains the
-observer pose and speed. The same
-pair determines the forecast through braking to rest and terminal handoff.
-An absorbed nominal state has one stationary footprint. The cases share all
-ego commands and supply distinct geometric witnesses. Interior parameters
-and continuous pose errors are not covered by this finite transcription.
+The central case uses the NRMM forecast with its persistent parameters clipped
+to the retained intervals. For additional position-only cases, let $p_j,t_j,r_j$
+be each measured center in one ego member's inertial frame, its time from the
+first retained return and its declared position error radius. When the sensor
+supplies no individual radius, use the configured bound. The simulation samples
+its radar perturbation uniformly in a disk of half the general envelope and
+publishes that disk radius. Ego motion and the sensor bias stay attached to
+the same member.
+
+For a proposed initial position $p_0$, course $\theta$, speed $V_0$, and
+constant $A,\beta$, let $t'_j=\min(t_j,-V_0/A)$ when $A<0$, otherwise
+$t'_j=t_j$. Put $s_j=V_0t'_j+A(t'_j)^2/2$, $z_j=s_j\sin\beta/(2l_r)$ and
+$e(\theta)=(\cos\theta,\sin\theta)^\top$. A shared history must satisfy
+\[
+ \|p_0+s_j\operatorname{sinc}(z_j)e(\theta+z_j)-p_j\|_2\le r_j
+ \quad\text{for every return},\qquad \operatorname{sinc}(z)=\sin(z)/z .
+\]
+The last body heading is $\theta+2z_n-\beta$. Four local support searches
+use the four signed sums of $A$ and $\beta$ scaled by their interval widths.
+Each accepted fit supplies its own last position, body heading, speed and
+persistent parameters. The same model advances it through any missed returns.
+A fitted family requires all four searches to finish and satisfy the measured
+disks within numerical tolerance. Otherwise, or in the presence of a direct
+heading in the retained history, the interval corners use a common measured
+chord to reconstruct the compatible speed and heading. A received body
+heading fixes the heading at its timestamp.
+
+All retained cases share the planned input sequence and have distinct geometric
+witnesses. The local support samples and the interval-corner fallback provide
+finite uncertainty representations. They do not certify coverage of the
+continuous posterior. Replanning still checks the inherited PCBF deficit cap.
 
 For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
 target contributes node and terminal separation constraints when $d_k^-\le R$.

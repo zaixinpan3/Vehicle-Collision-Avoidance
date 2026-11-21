@@ -26,6 +26,29 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function eachMovingTargetCaseExplainsEveryMeasuredPosition(testCase)
+            time=0:.0125:.4;
+            initial=[10;-3;pi-.02;9;.4;.018;1.6;2.4;.95;0;0];
+            actual=predictiveSafetyGeometry.predictTarget(initial,time);
+            radius=.012+.006*(1+cos(21*time));
+            observed=actual(1:2,:)+.8*radius.*[cos(87*time);sin(87*time)];
+            history=struct('times',time,'positions',observed,'headings',NaN(size(time)), ...
+                'positionErrorRadii',radius);
+            track=struct('motionHistory',history,'motionBounds',[-6,-.12;6,.12]);
+            family=onlineNrmmTrackingRuntime('targetMotionCases',track,initial(7));
+            testCase.assertSize(family,[6,4]);
+            for j=1:size(family,2)
+                last=family(:,j);speed=last(4)-last(5)*time(end);
+                lengthTraveled=(speed+last(4))*time(end)/2;
+                yaw=last(3)-sin(last(6))*lengthTraveled/initial(7);
+                trajectory=predictiveSafetyGeometry.predictTarget([0;0;yaw;speed;last(5:6);initial(7:end)],time);
+                fitted=last(1:2)+trajectory(1:2,:)-trajectory(1:2,end);
+                testCase.verifyLessThanOrEqual(vecnorm(fitted-observed),radius*(1+2e-6));
+            end
+            track.motionHistory.positions(:,8)=observed(:,8)+[4;2];
+            testCase.verifyEmpty(onlineNrmmTrackingRuntime('targetMotionCases',track,initial(7)));
+        end
+
         function trafficPointReconstructsTurningAndBrakingFromPositionSamples(testCase)
             cfg=collisionAvoidanceControllerConfig();dt=.0125;
             for sideslip=[-.01,.01]

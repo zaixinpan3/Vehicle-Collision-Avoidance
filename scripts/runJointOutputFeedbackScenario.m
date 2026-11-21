@@ -271,10 +271,13 @@ function y=localSensor(truth,input,cfg,time,stream,dropout)
     y=solvePredictiveControl('outputFeedback',struct('operation',"sensor",'cfg',cfg, ...
         'hypothesis',truth,'input',input,'time',time));
     bounds=cfg.outputFeedback.noiseBounds;
-    y.position=y.position+localNoise(stream,bounds(1));
-    y.acceleration=y.acceleration+localNoise(stream,bounds(2));
+    y.position=y.position+localNoise(stream,.5*bounds(1));
+    y.acceleration=y.acceleration+localNoise(stream,.5*bounds(2));
     y.yawRate=y.yawRate+.5*bounds(3)*(2*rand(stream)-1);
-    y.relativePosition=y.relativePosition+localNoise(stream,bounds(4));
+    % This generator uses a uniform disk of half the general sensor envelope.
+    % Publish its fixed radius with the return, independently of the drawn sample.
+    y.radarPositionErrorMeters=.5*bounds(4);
+    y.relativePosition=y.relativePosition+localNoise(stream,y.radarPositionErrorMeters);
     if dropout,y.radarAvailable=false;y.relativePosition=[NaN;NaN];end
     y.relativeHeading=NaN;
     historySpan=(sensorSettings.initialization.minimumRadarSamples-1)*cfg.outputFeedback.sensorPeriod;
@@ -287,7 +290,7 @@ function y=localSensor(truth,input,cfg,time,stream,dropout)
 end
 
 function noise=localNoise(stream,radius)
-    angle=2*pi*rand(stream);noise=.5*radius*sqrt(rand(stream))*[cos(angle);sin(angle)];
+    angle=2*pi*rand(stream);noise=radius*sqrt(rand(stream))*[cos(angle);sin(angle)];
 end
 
 function [truth,samples,clearance,nodeClearance]=localReplay(truth,input,cfg,time,stream,dropout)

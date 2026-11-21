@@ -14,7 +14,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         integrationMesh={4,64}
         movingTarget={false,true}
         leadEncounter={"stoppedLead","hardBrakingLead"}
-        uncertainEncounter={"brakingLead","trafficBrakingLead","curvedCrossing"}
+        uncertainEncounter={"brakingLead","trafficBrakingLead","curvedCrossing", ...
+            "headOn","trafficHeadOn","curvedHeadOn","acceleratingHeadOn"}
         cacheSpeed={.04,3}
         cacheMesh={8,24,64}
     end
@@ -333,6 +334,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             meta=[data.trace.metadata];
             testCase.verifyTrue(all([meta.terminalSetEnforced] & [meta.deficitDescentMet]));
             testCase.verifyLessThanOrEqual(max([meta.initializationTrajectoryCount]),1);
+            if any(uncertainEncounter==["headOn","trafficHeadOn","curvedHeadOn","acceleratingHeadOn"])
+                testCase.verifyGreaterThan(max([meta.targetHistoryFitCount]),0);
+                for k=1:numel(data.trace)
+                    samples=data.trace(k).rawSensorBlock;
+                    testCase.assertFalse(any(arrayfun(@(s) ~isempty(s.relativeHeading) && isfinite(s.relativeHeading),samples)));
+                end
+            end
             cfg=collisionAvoidanceControllerConfig();[x,~,road,cfg]=collisionThreatScenario(uncertainEncounter,cfg);
             stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
             [~,lane]=readControllerInputs(stub,[],road,cfg);

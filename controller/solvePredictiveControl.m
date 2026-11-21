@@ -2985,6 +2985,9 @@ function localOfValidateBlock(block,cfg)
         validateattributes(y.acceleration,{'double'},{'size',[2,1],'real','finite'});
         validateattributes(y.yawRate,{'double'},{'scalar','real','finite'});
         validateattributes(y.radarAvailable,{'logical'},{'scalar'});
+        if isfield(y,'radarPositionErrorMeters') && ~isempty(y.radarPositionErrorMeters)
+            validateattributes(y.radarPositionErrorMeters,{'double'},{'real','scalar','finite','nonnegative'});
+        end
         if isfield(y,'relativeHeading') && ~isempty(y.relativeHeading)
             validateattributes(y.relativeHeading,{'double'},{'real','scalar'});
             assert(isnan(y.relativeHeading) || (y.radarAvailable && isfinite(y.relativeHeading)), ...
@@ -3138,10 +3141,14 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                 if measured.radarAvailable && isfield(measured,'relativeHeading') && ~isempty(measured.relativeHeading)
                     relativeHeading=measured.relativeHeading;
                 end
+                positionError=bounds(4);
+                if isfield(measured,'radarPositionErrorMeters') && ~isempty(measured.radarPositionErrorMeters)
+                    positionError=min(positionError,measured.radarPositionErrorMeters);
+                end
                 previousTrack=item.targetObserver;
                 try
                     [item.targetObserver,motion]=onlineNrmmTrackingRuntime("targetPoint", ...
-                        item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading);
+                        item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading,positionError);
                 catch exception
                     if ~strcmp(exception.identifier,'onlineNrmmTrackingRuntime:inconsistentTargetMotion'),rethrow(exception);end
                     excess=Inf;break
@@ -3955,7 +3962,11 @@ function [result,info] = localCompactStep(request,cfg)
     x=item.ego;
     stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
     [~,lane]=readControllerInputs(stub,[],request.reference,cfg);
-    [planning,parents,centers]=localCompactTargetCases(planning);
+    budget=cfg.outputFeedback.maximumSolveSeconds;
+    if initial || (active && isfield(prior,'collisionTargetActive') && ~prior.collisionTargetActive),budget=cfg.outputFeedback.initializationSolveSeconds;end
+    caseClock=tic;
+    [planning,parents,centers,historyFits]=localCompactTargetCases(planning,@()toc(timer)>=budget);
+    inferenceSeconds=inferenceSeconds+toc(caseClock);
     expanded=conditioning;
     expanded.retainedIndices=conditioning.retainedIndices(parents);
     [result,info]=localCondensedSolve(request,cfg,planning,expanded,window,holds,lane,centers(nominal),timer,inferenceSeconds);
@@ -3965,6 +3976,7 @@ function [result,info] = localCompactStep(request,cfg)
     info.conditioning=conditioning;result.state.conditioning=conditioning;
     info.hypothesisCount=numel(hypotheses);
     info.targetCaseParents=parents;
+    info.targetHistoryFitCount=nnz(historyFits);
     info.collisionTargetActive=active;
     info.targetEstimateReady=targetReady;
     info.firstRadarTime=firstRadarTime;
@@ -3977,10 +3989,11 @@ function [result,info] = localCompactStep(request,cfg)
     result.state.collisionTargetActive=active;
 end
 
-function [cases,parents,centers]=localCompactTargetCases(members)
+function [cases,parents,centers,historyFits]=localCompactTargetCases(members,expired)
+    if nargin<2,expired=[];end
     % One command sequence for all targets. Constant parameters remain
     % attached to each sampled trajectory through its terminal continuation.
-    blocks=cell(1,numel(members));counts=ones(1,numel(members));
+    blocks=cell(1,numel(members));counts=ones(1,numel(members));historyFits=false(size(counts));
     for j=1:numel(members)
         item=members(j);q=item.target;track=[];
         if isfield(item,'targetObserver'),track=item.targetObserver;item=rmfield(item,'targetObserver');end
@@ -3992,11 +4005,25 @@ function [cases,parents,centers]=localCompactTargetCases(members)
         pairs=[center;a(:),beta(:)];
         counts(j)=size(pairs,1);block=repmat(item,1,counts(j));
         history=track.motionHistory;
+        fitted=[];
+        if isfield(history,'positionErrorRadii')
+            fitted=onlineNrmmTrackingRuntime('targetMotionCases',track,q(7),expired);
+            historyFits(j)=~isempty(fitted);
+        end
         chord=history.positions(:,end)-history.positions(:,1);
         span=history.times(end)-history.times(1);lengthChord=norm(chord);
         for k=1:counts(j)
             pair=pairs(k,:);block(k).target(5:6)=pair.';
-            if k==1 || span<=0 || lengthChord==0,continue;end
+            if k==1,continue;end
+            if ~isempty(fitted)
+                target=q;target(1:6)=fitted(:,k-1);
+                if track.time>history.times(end)
+                    target=predictiveSafetyGeometry.predictTarget(target,track.time-history.times(end));
+                end
+                block(k).target=target;
+                continue
+            end
+            if span<=0 || lengthChord==0,continue;end
             % Reconstruct endpoint course and speed from the SAME measured
             % chord for this curvature and tangential acceleration.
             curvature=sin(pair(2))/q(7);half=asin(max(-1,min(1,curvature*lengthChord/2)));
