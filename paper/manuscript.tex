@@ -167,7 +167,10 @@ account for ego rotation
 \cite{JeonZemoucheRajamani2019,AlaiZemoucheRajamani2024}. To address the estimation errors that this omission can cause during
 evasive maneuvers, Alai \emph{et al.}
 \cite{AlaiSharmaAlexanderRajamani2024} formulated a nonlinear relative motion
-model (NRMM) that incorporates ego velocity and yaw rate explicitly, and Sharma
+model (NRMM) that incorporates ego velocity and yaw rate explicitly,
+Kyong \emph{et al.} \cite{KyongAlaiTamehRajamani2026} further demonstrated
+the importance of ego sideslip-angle estimation for relative-motion target
+tracking during sharp turns and U-turns, and Sharma
 \emph{et al.} \cite{SharmaAlaiRajamani2026} designed a multistage high-gain
 observer (HGO) around the NRMM for simultaneous ego-state estimation and target
 trajectory tracking. While the NRMM captures how an evasive maneuver alters
@@ -641,8 +644,12 @@ numerical defects; the comparison alone is not a sampled-system proof.
 
 The kinematic measurement in \eqref{eq:ego_observer} depends on the
 single-track relation in Assumption~\ref{asm:singleTrack}, whose mismatch
-can increase when the rear tire develops lateral slip. To account for
-this slip, the estimator uses the ego vehicle's dynamic bicycle model
+can increase when the rear tire develops lateral slip. As highlighted in
+\cite{AlaiSharmaAlexanderRajamani2024,KyongAlaiTamehRajamani2026}, accurate
+ego lateral-velocity (sideslip) information is critical for relative-motion
+target tracking during turning maneuvers. To account for rear-tire slip
+during evasive maneuvers, the estimator uses the ego vehicle's dynamic
+bicycle model
 and the control input $\bm u=[\delta_F,u_L]^{\trans}$ held by the
 controller, where $\delta_F$ is the front steering angle and $u_L$ is
 the longitudinal-force ratio. Let $m_E$ be the vehicle mass, $l_{f,E}$
