@@ -22,7 +22,7 @@ function campaign = runJointOutputFeedbackScenario(options)
     root=fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'));
     if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
-    summaries=struct([]);
+    summaries=struct([]);compactSolversReady=false;
     for speed=options.Speeds
         for name=options.Scenarios
             cfg=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
@@ -35,38 +35,16 @@ function campaign = runJointOutputFeedbackScenario(options)
             x(3)=x(3)+options.EgoYawOffsetRadians;
             q(1:2)=q(1:2)+options.TargetPositionOffsetMeters;
             reference=road;input=zeros(2,1);time=0;state=[];
-            stream=RandStream('mt19937ar','Seed',options.RandomSeed);
             initialClearance=predictiveSafetyGeometry.rectangle(x(1:3), ...
                 [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset],q(1:3),q(8:11));
             truth=struct('ego',x,'target',q,'parameters',ones(4,1),'sensorBias',zeros(7,1));
-            sample=localSensor(truth,input,cfg,time,stream,false);
             initial=localInitialContract(x,options.HypothesisOffsets);
-            block=localSensorBlock(time,input,sample);
-            block.initialHypotheses=initial;
-            % Startup-only virtual sensor replay warms both initialization
-            % and continuation branches; no warmup command reaches the plant.
-            warmupSeconds=0;warmupHolds=0;warmupFailure="";
-            if options.Warmup && initialClearance>0
-                warmupTimer=tic;warmupTruth=truth;warmupBlock=block;warmupState=[];
-                warmupStream=RandStream('mt19937ar','Seed',options.RandomSeed);
-                for warmup=1:4
-                    try
-                        [warmupCommand,~,~,warmupState]=collisionAvoidanceController( ...
-                            warmupBlock,[],reference,cfg,warmupState);
-                        warmupInput=warmupCommand.actuatorInput;
-                        [warmupTruth,warmupSamples]=localReplay(warmupTruth,warmupInput,cfg, ...
-                            warmupBlock.time,warmupStream,false);
-                        warmupBlock=localSensorBlock(warmupBlock.time+cfg.controller.sampleTime, ...
-                            warmupInput,warmupSamples);
-                        warmupHolds=warmupHolds+1;
-                    catch exception
-                        warmupFailure=string(exception.identifier)+": "+string(exception.message);
-                        % The recorded call below reports any admission failure.
-                        break;
-                    end
-                end
-                warmupSeconds=toc(warmupTimer);
-            end
+            startup=localWarmup(cfg,options,truth,reference,initial,initialClearance,compactSolversReady);
+            compactSolversReady=startup.solversReady;
+
+            stream=RandStream('mt19937ar','Seed',options.RandomSeed);
+            sample=localSensor(truth,input,cfg,time,stream,false);
+            block=localSensorBlock(time,input,sample);block.initialHypotheses=initial;
             trace=struct([]);failure="";failurePhase="";minimumClearance=Inf;minimumNodeClearance=Inf;failureCallSeconds=0;
             callSeconds=zeros(1,options.Frames);callCount=0;
             for frame=1:options.Frames
@@ -132,8 +110,10 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'finalSpeedMetersPerSecond',hypot(truth.ego(4),truth.ego(5)), ...
                 'finalDistanceToTargetMeters',norm(truth.ego(1:2)-truth.target(1:2)), ...
                 'finalLongitudinalProgressMeters',truth.ego(1)-x(1), ...
-                'startupWarmupSeconds',warmupSeconds,'warmupEnabled',options.Warmup, ...
-                'warmupCompletedHolds',warmupHolds,'warmupFailure',warmupFailure, ...
+                'startupWarmupSeconds',startup.seconds,'warmupEnabled',options.Warmup, ...
+                'warmupCompletedHolds',startup.holds,'warmupFailure',startup.failure, ...
+                'compactSolversReadyBeforeFirstFrame',compactSolversReady, ...
+                'warmupAvoidanceContinuation',startup.avoidanceContinuation, ...
                 'failureCallSeconds',failureCallSeconds, ...
                 'initialSensorSample',sample,'initialInformationContract',initial, ...
                 'initialPlantState',struct('ego',x,'target',q), ...
@@ -155,6 +135,81 @@ function campaign = runJointOutputFeedbackScenario(options)
     campaign=struct('scope',"raw-sensor control with an explicitly declared finite initial information contract", ...
         'pipeline',string(cfg.outputFeedback.method),'results',summaries);
     localWriteJson(fullfile(options.OutputDirectory,'campaign.json'),campaign);
+end
+
+function startup=localWarmup(cfg,options,truth,reference,initial,initialClearance,solversReady)
+    startup=struct('seconds',0,'holds',0,'failure',"",'solversReady',solversReady,'avoidanceContinuation',false);
+    if ~options.Warmup || initialClearance<=0,return;end
+    timer=tic;input=zeros(2,1);state=[];compact=string(cfg.outputFeedback.method)=="compactNlp";
+    if compact && ~solversReady
+        try
+            startup.solversReady=localWarmCompactSolvers(cfg);
+            if ~startup.solversReady
+                startup.failure="The startup probe did not exercise both the active-set QP and nonlinear SQP.";
+            end
+        catch exception
+            startup.failure=string(exception.identifier)+": "+string(exception.message);
+        end
+    end
+    if compact
+        % Use a private sensor stream to exercise target acquisition and
+        % the following active continuation with the simulation's actual configuration.
+        stream=RandStream('mt19937ar','Seed',0);reference=[-100,0;1000,0];
+        initial=localInitialContract([0;0;0;cfg.referenceSpeed;0;0],0);
+        truth=initial;
+        truth.target=[cfg.collision.encounterRangeMeters/2;cfg.vehicle.width+cfg.target.defaultWidth; ...
+            0;0;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
+        sample=localSensor(truth,input,cfg,0,stream,false);
+        observerCfg=estimatorControllerIntegrationConfig();
+        samplesPerHold=round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod);
+        count=2+ceil((observerCfg.initialization.minimumRadarSamples-1)/samplesPerHold);
+    else
+        % Match the original four-hold replay of the research comparators.
+        stream=RandStream('mt19937ar','Seed',options.RandomSeed);
+        sample=localSensor(truth,input,cfg,0,stream,false);
+        reset(stream);count=4;
+    end
+    block=localSensorBlock(0,input,sample);block.initialHypotheses=initial;
+    for k=1:count
+        try
+            [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
+            input=command.actuatorInput;
+            if compact
+                info=prediction.metadata;
+                startup.avoidanceContinuation=startup.avoidanceContinuation || ...
+                    (info.collisionTargetActive && info.budgetPhase=="continuation");
+            end
+            [truth,samples]=localReplay(truth,input,cfg,block.time,stream,false);
+            block=localSensorBlock(block.time+cfg.controller.sampleTime,input,samples);
+            startup.holds=startup.holds+1;
+        catch exception
+            startup.failure=strtrim(startup.failure+" "+string(exception.identifier)+": "+string(exception.message));
+            break;
+        end
+    end
+    startup.seconds=toc(timer);
+end
+
+function ready=localWarmCompactSolvers(runCfg)
+    % A fixed synthetic encounter exercises the actual projection QP, SQP
+    % callbacks and trajectory derivatives before the experiment clock starts.
+    cfg=collisionAvoidanceControllerConfig();
+    cfg.outputFeedback.nlpJit=runCfg.outputFeedback.nlpJit;
+    cfg.outputFeedback.nlpCompiler=runCfg.outputFeedback.nlpCompiler;
+    cfg.outputFeedback.nlpCompilerOptimization=runCfg.outputFeedback.nlpCompilerOptimization;
+    item=localInitialContract([0;0;0;15;0;0],0);
+    item.target=[25;0;0;0;0;0;cfg.target.rearAxleDistance; ...
+        cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
+    input=zeros(2,1);
+    sample=solvePredictiveControl("outputFeedback",struct('operation',"sensor", ...
+        'cfg',cfg,'hypothesis',item,'input',input,'time',0));
+    block=localSensorBlock(0,input,sample);block.initialHypotheses=item;
+    % The probe has no access to the experiment state or controller memory.
+    request=struct('operation',"step",'cfg',cfg,'reference',[-100,0;1000,0], ...
+        'block',block,'previousState',[]);
+    result=solvePredictiveControl("outputFeedback",request);
+    info=result.prediction.metadata;
+    ready=info.zeroDeficitQpSteps>0 && info.nlpAttempts>0;
 end
 
 function timing=localTiming(seconds,deadline)

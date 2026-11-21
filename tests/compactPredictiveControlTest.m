@@ -217,6 +217,30 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             end
             testCase.verifyNotEmpty(first);
         end
+        function startupExercisesAvoidanceWithoutSeedingTheExperiment(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            for warmup=[true,false]
+                campaign=runJointOutputFeedbackScenario(Frames=8,Speeds=15,Scenarios="stoppedLead", ...
+                    Warmup=warmup,RandomSeed=20261107,OutputDirectory=string(folder.Folder));
+                result=campaign.results;
+                testCase.assertEqual(result.outcome,"completed");
+                testCase.verifyEqual(result.compactSolversReadyBeforeFirstFrame,warmup);
+                testCase.verifyEqual(result.warmupAvoidanceContinuation,warmup);
+                testCase.verifyEqual(result.warmupFailure,"");
+                testCase.verifyEqual(result.timing.calls,8);
+                data=jsondecode(fileread(result.source));
+                if warmup
+                    prepared=data;
+                    testCase.verifyGreaterThan(result.startupWarmupSeconds,0);
+                else
+                    testCase.verifyEqual(result.startupWarmupSeconds,0);
+                    testCase.verifyEqual(prepared.initialSensorSample,data.initialSensorSample);
+                    testCase.verifyEqual([prepared.trace.rawSensorBlock],[data.trace.rawSensorBlock]);
+                    testCase.verifyEqual([prepared.trace.input],[data.trace.input]);
+                    testCase.verifyEqual([prepared.trace.stateAfterHold],[data.trace.stateAfterHold]);
+                end
+            end
+        end
         function clearRoadSteadyTurnIsAPublicControllerEquilibrium(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=30;cfg.tire.frictionCoefficient=[.65;.65];
             [x,~,road,cfg]=collisionThreatScenario("curvedHeadOn",cfg);
