@@ -7,6 +7,62 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aTurningCellRemainsBoundedAfterSeveralRevolutions(testCase)
+            root=[0;0;.3;15;1;.09;1.6;2.4;.95;0;0];
+            limits=[.5,.08;1.5,.10];time=[20,40];
+            [~,center]=predictiveSafetyGeometry.targetMotionEnvelope(root,limits,time);
+            nominal=predictiveSafetyGeometry.predictTarget(root,time);
+            diameter=2*root(7)/sin(limits(1,2));
+            testCase.verifyLessThanOrEqual(center(2,:)-center(1,:),2*diameter+1e-8);
+            testCase.verifyLessThanOrEqual(center(4,:)-center(3,:),2*diameter+1e-8);
+            singleton=repmat(root(5:6).',2,1);
+            box=predictiveSafetyGeometry.targetMotionEnvelope(root,singleton,time);
+            testCase.verifyEqual(box,nominal,AbsTol=1e-8);
+        end
+
+        function valueOnlyDistanceAgreesWithTheDualWitnessEvaluation(testCase)
+            rngStream=RandStream('mt19937ar',Seed=1523);
+            n=300;ego=randn(rngStream,3,n);q=zeros(11,n);
+            q(1:3,:)=4*randn(rngStream,3,n);q(8:9,:)=.1+2*rand(rngStream,2,n);
+            q(10:11,:)=randn(rngStream,2,n);
+            shape=[2.1;.9;.37;-.13];
+            value=predictiveSafetyGeometry.rectangleClearance(ego,q,shape);
+            [withWitness,~]=predictiveSafetyGeometry.rectangleClearance(ego,q,shape);
+            testCase.verifyGreaterThan(max(value),0);
+            testCase.verifyLessThan(min(value),0);
+            testCase.verifyEqual(value,withWitness,AbsTol=1e-12);
+        end
+
+        function continuousArcEnvelopeContainsInteriorFootprintsThroughStopping(testCase)
+            root=[12;-4;2.8;4;-.5;.03;1.6;2.4;.95;.35;-.21];
+            times=[0,.1,1,2,4,12];limits=[-3,-.2;1,.17];
+            [box,centers]=predictiveSafetyGeometry.targetMotionEnvelope(root,limits,times);
+            ego=[7;8]+zeros(2,numel(times));
+            d=predictiveSafetyGeometry.targetEnvelopeRange(ego,box,centers);
+            vertices=root(10:11)+root(8:9).*[-1,1,1,-1;-1,-1,1,1];
+            for acceleration=linspace(limits(1,1),limits(2,1),5)
+                for slip=linspace(limits(1,2),limits(2,2),7)
+                    trial=root;trial(5:6)=[acceleration;slip];
+                    pose=predictiveSafetyGeometry.predictTarget(trial,times);
+                    testCase.verifyLessThanOrEqual(d,vecnorm(ego-pose(1:2,:))+1e-10);
+                    for j=1:numel(times)
+                        yaw=pose(3,j);basis=box(3,j);
+                        world=pose(1:2,j)+[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)]*vertices;
+                        local=[cos(basis),sin(basis);-sin(basis),cos(basis)]*(world-box(1:2,j));
+                        extent=max(abs(local-box(10:11,j)),[],2);
+                        testCase.verifyLessThanOrEqual(extent,box(8:9,j)+1e-10);
+                    end
+                end
+            end
+            exact=predictiveSafetyGeometry.predictTarget(root,times);
+            singleton=repmat(root(5:6).',2,1);
+            box=predictiveSafetyGeometry.targetMotionEnvelope(root,singleton,times);
+            testCase.verifyEqual(box,exact,AbsTol=1e-10);
+            root(4)=0;
+            box=predictiveSafetyGeometry.targetMotionEnvelope(root,limits,times);
+            testCase.verifyEqual(box,repmat(root,1,numel(times)));
+        end
+
         function conditionedFamilySupportsContainMovingAndStoppedTargets(testCase)
             q=[3;-2;.4;8;-1;.02;1.6;2.4;.95;.2;-.1];
             kappa=sin(q(6))/q(7);course=q(3)+q(6);

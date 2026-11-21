@@ -196,17 +196,6 @@ classdef predictiveSafetyGeometry
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
-            if isfield(model,'guideTargets')
-                for j=1:size(model.guideTargets,2)
-                    path=predictiveSafetyGeometry.predictTarget(model.guideTargets(:,j),time);
-                    data.guideTargets(:,:,j)=path;
-                    delta=path(1:2,:)-target(1:2,:);
-                    data.support.offsets(:,:,j)=delta;
-                    data.support.ballRadius=max(data.support.ballRadius,vecnorm(delta));
-                    yaw=path(3,:)-target(3,:);
-                    data.targetYawRadius=max(data.targetYawRadius,abs(atan2(sin(yaw),cos(yaw))));
-                end
-            end
             if jointTarget
                 data.family=struct('target',model.target,'error',model.uncertainty.target,'time',time);
             end
@@ -783,9 +772,6 @@ classdef predictiveSafetyGeometry
                 +abs(normal*data.curvatureDerivative(:,index))*data.curvatureRadius ...
                 +magnitude*data.remainder(index);
             support=min(support,magnitude*data.ballRadius(index));
-            if isfield(data,'offsets')
-                support=max(normal*reshape(data.offsets(:,index,:),2,[]),[],2);
-            end
         end
 
         function q = target(observation,raw,~)
@@ -821,6 +807,76 @@ classdef predictiveSafetyGeometry
             if isempty(acceleration),acceleration=tangent.'*observation.acceleration;end
             q=[observation.position;observation.yaw;speed;acceleration;beta;observation.rearAxleDistance; ...
                 observation.length/2;observation.width/2;offset];
+        end
+
+        function [box,centers] = targetMotionEnvelope(root,limits,time,nominal)
+            % Enclose the continuous constant-A, constant-beta footprint in
+            % axes centered on the possible body headings at each node.
+            time=reshape(time,1,[]);
+            if root(4)==0
+                box=repmat(root,1,numel(time));centers=zeros(4,numel(time));return
+            end
+            if nargin<4,nominal=predictiveSafetyGeometry.predictTarget(root,time);end
+            box=nominal;
+            centers=zeros(4,numel(time));
+            if isempty(limits),return;end
+            % Forward arc length is monotone in A, including absorption.
+            slow=root;slow(5)=limits(1,1);
+            fast=root;fast(5)=limits(2,1);
+            arcLow=predictiveSafetyGeometry.targetArc(slow,time);
+            arcHigh=predictiveSafetyGeometry.targetArc(fast,time);
+            curvature=sin(limits(:,2))/root(7);
+            turns=[curvature(1)*arcLow;curvature(1)*arcHigh;curvature(2)*arcLow;curvature(2)*arcHigh];
+            halfLow=min(turns,[],1)/2;halfHigh=max(turns,[],1)/2;
+            far=max(abs(halfLow),abs(halfHigh));near=max(0,max(halfLow,-halfHigh));
+            sincLow=-ones(size(time));sincHigh=ones(size(time));
+            short=far<=pi;sincLow(short)=1;
+            use=short & far>0;sincLow(use)=sin(far(use))./far(use);
+            use=short & near>0;sincHigh(use)=sin(near(use))./near(use);
+            products=[arcLow.*sincLow;arcHigh.*sincLow;arcLow.*sincHigh;arcHigh.*sincHigh];
+            chordLow=min(products,[],1);chordHigh=max(products,[],1);
+            % On a turning cell the chord is also 2*sin(half turn)/curvature.
+            % This bounds its radius through arbitrarily many revolutions.
+            if any(~short) && curvature(1)*curvature(2)>0 && min(abs(curvature))>eps
+                [low,high]=localCosRange(halfLow-pi/2,halfHigh-pi/2);
+                chords=2*[low/curvature(1);low/curvature(2);high/curvature(1);high/curvature(2)];
+                % At small curvature the sinc form avoids cancellation.
+                use=far>pi;
+                chordLow(use)=max(chordLow(use),min(chords(:,use),[],1));
+                chordHigh(use)=min(chordHigh(use),max(chords(:,use),[],1));
+            end
+            midHeading=halfLow+halfHigh;
+            box(3,:)=root(3)+midHeading;
+            courseLow=limits(1,2)+halfLow-midHeading;courseHigh=limits(2,2)+halfHigh-midHeading;
+            yawLow=2*halfLow-midHeading;yawHigh=2*halfHigh-midHeading;
+            vertices=root(10:11)+root(8:9).*[-1,1,1,-1;-1,-1,1,1];
+            vertexAngles=atan2(vertices(2,:),vertices(1,:)).';
+            radii=vecnorm(vertices).';
+            axes=[cos(box(3,:));sin(box(3,:))];
+            offset=nominal(1:2,:)-root(1:2);
+            padding=64*eps(max([1;abs(root(1:2));root(8:9);abs(root(10:11))])+arcHigh).*(1+far);
+            for k=1:2
+                phase=(k-1)*pi/2;
+                [low,high]=localCosRange(courseLow-phase,courseHigh-phase);
+                projections=[chordLow.*low;chordLow.*high;chordHigh.*low;chordHigh.*high]-sum(axes.*offset,1);
+                row=2*k-1;
+                centers(row,:)=min(projections,[],1)-padding;
+                centers(row+1,:)=max(projections,[],1)+padding;
+                [vl,vh]=localCosRange(yawLow+vertexAngles-phase,yawHigh+vertexAngles-phase);
+                lower=centers(row,:)+min(radii.*vl,[],1);
+                upper=centers(row+1,:)+max(radii.*vh,[],1);
+                box(7+k,:)=(upper-lower)/2;
+                box(9+k,:)=(upper+lower)/2;
+                axes=[-axes(2,:);axes(1,:)];
+            end
+        end
+
+        function range=targetEnvelopeRange(ego,target,centers)
+            % Distance to the box of possible dynamics reference points.
+            d=ego(1:2,:)-target(1:2,:);c=cos(target(3,:));s=sin(target(3,:));
+            relative=[c.*d(1,:)+s.*d(2,:);-s.*d(1,:)+c.*d(2,:)];
+            nearest=max(0,max(centers([1,3],:)-relative,relative-centers([2,4],:)));
+            range=vecnorm(nearest);
         end
 
         function next = predictTarget(q,time)
@@ -923,6 +979,26 @@ classdef predictiveSafetyGeometry
                 ego{j}=states(1:2,:)+[ce*e(1)-se*e(2);se*e(1)+ce*e(2)];
                 target{j}=targets(1:2,:)+[ct.*t(1,:)-st.*t(2,:);st.*t(1,:)+ct.*t(2,:)];
             end
+            if nargout<2
+                % For disjoint rectangles at least one closest pair contains
+                % a vertex. Project all eight vertices onto the opposite box.
+                % For overlap the signed dual attains a face normal.
+                penetration=max(predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:)),[],1);
+                clearance=penetration;
+                if ~any(penetration>0),return;end
+                squared=Inf(size(clearance));
+                for j=1:4
+                    d=ego{j}-targets(1:2,:);
+                    u=max(0,abs(ct.*d(1,:)+st.*d(2,:)-targets(10,:))-targets(8,:));
+                    v=max(0,abs(-st.*d(1,:)+ct.*d(2,:)-targets(11,:))-targets(9,:));
+                    squared=min(squared,u.^2+v.^2);
+                    d=target{j}-states(1:2,:);
+                    u=max(0,abs(ce.*d(1,:)+se.*d(2,:)-shape(3))-shape(1));
+                    v=max(0,abs(-se.*d(1,:)+ce.*d(2,:)-shape(4))-shape(2));
+                    squared=min(squared,u.^2+v.^2);
+                end
+                outside=penetration>0;clearance(outside)=sqrt(squared(outside));return
+            end
             square=Inf(1,size(states,2));closest=zeros(2,size(states,2));difference=closest;
             for j=1:4
                 for k=1:4
@@ -942,11 +1018,7 @@ classdef predictiveSafetyGeometry
                 end
             end
             clearance=sqrt(square);
-            if nargout>1
-                [gaps,facetGradient,projection]=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
-            else
-                gaps=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
-            end
+            [gaps,facetGradient,projection]=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
             gap=max(gaps,[],1);
             overlap=gap<=0;clearance(overlap)=gap(overlap);
             if nargout>1
@@ -1330,19 +1402,6 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
         end
         inflation=inflation+sum(abs(axes*parameters.generator(1:2,:)),2)+targetInflation;
     end
-    if isfield(parameters,'guideTargets')
-        % The seed sees the support of all sampled rectangles along the same
-        % ballistic characteristic. Their exact distances still enter the PCBF.
-        rangeOffsets=zeros(1,count);targetSupport=-Inf(size(targetSupport));
-        inflation=parameters.inflation+sum(abs(axes*parameters.generator(1:2,:)),2);
-        for j=1:size(parameters.guideTargets,2)
-            path=predictiveSafetyGeometry.predictTarget(parameters.guideTargets(:,j),time);
-            shift=path(1:2,:)-future(1:2,:);
-            rangeOffsets=max(rangeOffsets,vecnorm(shift));
-            footprint=localMovingSupport(target(8:11),repmat(path(3,:).',8,1),0,axes);
-            targetSupport=max(targetSupport,footprint+sum(axes.*repmat(shift.',8,1),2));
-        end
-    end
     faceGap=reshape(sum(axes.*repmat((positions-future(1:2,:)).',8,1),2) ...
         -egoSupport-targetSupport-inflation,count,8);
     gaps=max(faceGap,[],2).';
@@ -1361,9 +1420,6 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
         if ~isempty(familySupport)
             rangeReserve=rangeReserve-parameters.support.ballRadius(parameters.index)+familySupport.ballRadius;
         end
-    end
-    if isfield(parameters,'guideTargets')
-        rangeReserve=rangeReserve-parameters.support.ballRadius(parameters.index)+rangeOffsets;
     end
     outside=vecnorm(positions-future(1:2,:),2,1)-rangeReserve>cfg.collision.encounterRangeMeters;
     if ~outside(1)
@@ -1551,16 +1607,15 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
         'maximumDeviation',0,'completion',"requestedHorizon");
     candidate.states(:,1)=model.initialState;
-    if isfield(model,'guideTargets')
+    uncertainMotion=physicalOnly && ~isempty(model.target) && model.target(4)>0 ...
+        && isfield(model,'motionLimits') && ~isempty(model.motionLimits);
+    if uncertainMotion
         preview=max(cfg.outputFeedback.minimumPreviewSeconds, ...
             cfg.referenceSpeed/cfg.outputFeedback.previewDecelerationMetersPerSecondSquared);
         ticks=round([0,cumsum(durations)]/h);
         future=(0:ceil(preview/h))*h;
         pathTime=(0:ticks(end)+numel(future)-1)*h;
-        paths=zeros(size(model.guideTargets,1),numel(pathTime),size(model.guideTargets,2));
-        for j=1:size(model.guideTargets,2)
-            paths(:,:,j)=predictiveSafetyGeometry.predictTarget(model.guideTargets(:,j),pathTime);
-        end
+        path=predictiveSafetyGeometry.targetMotionEnvelope(model.target,model.motionLimits,pathTime);
     end
     prior=model.previousInput;encounterEnded=false;
     for index=1:count+1
@@ -1593,8 +1648,8 @@ function candidate=localCirculationRollout(model,data,speed,durations)
                 parameters.preferredAcceleration=acceleration;
                 [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
                 active=field.activation>0;
-                if isfield(model,'guideTargets')
-                    targets=paths(:,ticks(index)+(1:numel(future)),:);
+                if uncertainMotion
+                    targets=path(:,ticks(index)+(1:numel(future)));
                     [acceleration,corrected]=localEncounterAcceleration(x,projection,acceleration,targets,future,model);
                     active=active || corrected;
                 end
@@ -1616,7 +1671,7 @@ end
 function [acceleration,active]=localEncounterAcceleration(x,projection,preferred,targets,time,model)
     % Project the route field outside the lateral accelerations that cross
     % a predicted footprint during longitudinal overlap. The projection
-    % uses a common correction across the observed target motion family.
+    % uses the observed target forecast.
     cfg=model.cfg;
     course=x(3)+atan2(x(5),x(4));speed=hypot(x(4),x(5));
     courseError=course-projection.heading;
@@ -1624,12 +1679,12 @@ function [acceleration,active]=localEncounterAcceleration(x,projection,preferred
     curve=struct('origin',projection.point,'heading',projection.heading,'curvature',model.frame(4));
     [path,heading]=predictiveSafetyGeometry.referencePose(along*time,0,curve);
     c=cos(heading);s=sin(heading);
-    dx=targets(1,:,:)-path(1,:);dy=targets(2,:,:)-path(2,:);
-    angle=targets(3,:,:)-heading;
-    longitudinal=c.*dx+s.*dy+targets(10,:,:).*cos(angle)-targets(11,:,:).*sin(angle);
-    lateral=-s.*dx+c.*dy+targets(10,:,:).*sin(angle)+targets(11,:,:).*cos(angle);
-    extent=abs(cos(angle)).*targets(8,:,:)+abs(sin(angle)).*targets(9,:,:);
-    width=abs(sin(angle)).*targets(8,:,:)+abs(cos(angle)).*targets(9,:,:);
+    dx=targets(1,:)-path(1,:);dy=targets(2,:)-path(2,:);
+    angle=targets(3,:)-heading;
+    longitudinal=c.*dx+s.*dy+targets(10,:).*cos(angle)-targets(11,:).*sin(angle);
+    lateral=-s.*dx+c.*dy+targets(10,:).*sin(angle)+targets(11,:).*cos(angle);
+    extent=abs(cos(angle)).*targets(8,:)+abs(sin(angle)).*targets(9,:);
+    width=abs(sin(angle)).*targets(8,:)+abs(cos(angle)).*targets(9,:);
     ego=cfg.vehicle;
     yaw=x(3)-projection.heading;
     longRadius=abs(cos(yaw))*ego.length/2+abs(sin(yaw))*ego.width/2;
@@ -1693,9 +1748,6 @@ function parameters=localFieldParameters(data,index,speed)
     parameters=struct('speed',speed,'inflation',0, ...
         'egoYawRadius',data.egoYawRadius,'targetYawRadius',data.targetYawRadius(index), ...
         'generator',data.generator,'support',data.support,'index',index);
-    if isfield(data,'guideTargets')
-        parameters.guideTargets=reshape(data.guideTargets(:,index,:),size(data.target,1),[]);
-    end
     if isfield(data,'family')
         parameters.family=data.family;parameters.family.time=data.family.time(index);
     end

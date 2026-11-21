@@ -22,17 +22,13 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % It advances the target point channel from timestamped radar
 % positions transformed by a synchronized ego hypothesis. It returns the
 % updated observer state and [heading; speed; tangential acceleration; slip].
-% targetMotionCases fits joint constant-motion support samples to the retained
-% radar error disks and returns each pose and motion at the last detection.
 
     action = lower(string(action));
     if ~isscalar(action)
         error("onlineNrmmTrackingRuntime:invalidAction", ...
-            "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', 'targetPoint', or 'targetMotionCases'.");
+            "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', or 'targetPoint'.");
     end
     switch action
-        case "targetmotioncases"
-            varargout{1}=localTargetMotionCases(varargin{:});
         case "targetpoint"
             [varargout{1},varargout{2}]=localTargetPoint(varargin{:});
         case "initialize"
@@ -56,7 +52,7 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
             varargout{1} = localResetTarget(varargin{:});
         otherwise
             error("onlineNrmmTrackingRuntime:invalidAction", ...
-                "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', 'targetPoint', or 'targetMotionCases'.");
+                "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', or 'targetPoint'.");
     end
 end
 
@@ -197,7 +193,7 @@ function [track,heading]=localMotionBounds(track,time,position,noiseBounds,domai
     track.motionHistory=struct('times',times,'positions',points,'headings',headings, ...
         'positionErrorRadii',[history.positionErrorRadii(keep),positionErrorRadius]);
     bounds=track.motionBounds;heading=NaN;
-    count=numel(times);rad=2*noiseBounds(4)+64*eps(max(1,max(abs(points),[],'all')));
+    count=numel(times);rad=2*max(track.motionHistory.positionErrorRadii)+64*eps(max(1,max(abs(points),[],'all')));
     if count<3,return;end
     mid=ceil(count/2);
     chord=points(:,end)-points(:,1);lengthTotal=norm(chord);
@@ -259,94 +255,6 @@ function [track,heading]=localMotionBounds(track,time,position,noiseBounds,domai
         % and the course-to-body rotation. It remains defined at rest.
         heading=atan2(chord(2),chord(1))+asin(max(-1,min(1,k*lengthTotal/2)))-beta;
         heading=atan2(sin(heading),cos(heading));
-    end
-end
-
-function cases=localTargetMotionCases(track,lr,expired)
-% Support samples of one constant-motion history inside all received radar disks.
-% Return pose and motion at the last detection. Empty requests the interval fallback.
-    cases=[];
-    if nargin<3,expired=[];end
-    history=track.motionHistory;
-    if ~isfield(history,'positionErrorRadii') || numel(history.times)<3 || ...
-            (isfield(history,'headings') && any(isfinite(history.headings))) || any(history.positionErrorRadii<=0)
-        return
-    end
-    time=history.times-history.times(1);
-    radii=history.positionErrorRadii;
-    chord=history.positions(:,end)-history.positions(:,1);
-    distance=norm(chord);
-    if time(end)<=0 || distance<=radii(1)+radii(end),return;end
-    course=atan2(chord(2),chord(1));
-    rotation=[cos(course),-sin(course);sin(course),cos(course)];
-    points=rotation.'*(history.positions-history.positions(:,1));
-    bounds=track.motionBounds;
-    span=bounds(2,:)-bounds(1,:);
-    if ~any(span>0),return;end
-    % Work in chord coordinates to preserve conditioning under world translations.
-    persistent opts settings
-    if isempty(opts)
-        opts=optimoptions('fmincon','Algorithm','sqp','Display','off','MaxIterations',25, ...
-            'SpecifyConstraintGradient',true,'SpecifyObjectiveGradient',true,'ConstraintTolerance',1e-8);
-        settings=estimatorControllerIntegrationConfig();
-    end
-    domain=settings.trafficTargetObserver.domain;
-    lower=[-radii(1);-radii(1);-pi;0;bounds(1,:).'];
-    upper=[radii(1);radii(1);pi;domain.speedMaximum;bounds(2,:).'];
-    start=max(lower,min(upper,[0;0;0;distance/time(end);0;0]));
-    directions=[-1,-1;-1,1;1,-1;1,1];
-    family=zeros(6,size(directions,1));
-    options=opts;
-    if ~isempty(expired),options.OutputFcn=@(~,~,~)expired();end
-    for j=1:size(directions,1)
-        if ~isempty(expired) && expired(),return;end
-        weight=zeros(1,2);
-        varying=span>eps(max(1,abs(bounds(2,:))));
-        weight(varying)=directions(j,varying)./span(varying);
-        gradient=[zeros(4,1);weight.'];
-        [fit,~,flag]=fmincon(@linear,start,[],[],[],[],lower,upper,@disks,options);
-        if flag<=0 || any(~isfinite(fit)) || max(disks(fit))>2e-6,return;end
-        [positions,arc]=trajectory(fit);
-        yaw=course+fit(3)+sin(fit(6))*arc(end)/lr-fit(6);
-        family(:,j)=[history.positions(:,1)+rotation*positions(:,end);atan2(sin(yaw),cos(yaw)); ...
-            max(0,fit(4)+fit(5)*time(end));fit(5:6)];
-    end
-    cases=family;
-
-    function [value,g]=linear(x)
-        g=gradient;value=g.'*x;
-    end
-    function [c,ceq,g,gEq]=disks(x)
-        if nargout>2
-            [position,~,derivative]=trajectory(x);
-        else
-            position=trajectory(x);
-        end
-        residual=position-points;
-        c=(sum(residual.^2,1)./radii.^2-1).';ceq=[];
-        if nargout>2
-            g=zeros(6,numel(time));
-            for i=1:6,g(i,:)=2*sum(residual.*derivative{i},1)./radii.^2;end
-            gEq=[];
-        end
-    end
-    function [position,arc,derivative]=trajectory(x)
-        movingTime=time;
-        if x(5)<0,movingTime=min(time,-x(4)/x(5));end
-        arc=x(4)*movingTime+.5*x(5)*movingTime.^2;
-        curvature=sin(x(6))/lr;half=curvature*arc/2;
-        scale=ones(size(time));slope=zeros(size(time));
-        small=abs(half)<1e-4;
-        scale(small)=1-half(small).^2/6;slope(small)=-half(small)/3;
-        scale(~small)=sin(half(~small))./half(~small);
-        slope(~small)=(cos(half(~small))-scale(~small))./half(~small);
-        tangent=[cos(x(3)+half);sin(x(3)+half)];normal=[-tangent(2,:);tangent(1,:)];
-        position=x(1:2)+arc.*scale.*tangent;
-        if nargout<3,return;end
-        angleDerivative=arc.*(slope.*tangent+scale.*normal);
-        lengthDerivative=scale.*tangent+curvature*angleDerivative/2;
-        derivative={[1;0],[0;1],arc.*scale.*normal,lengthDerivative.*movingTime, ...
-            lengthDerivative.*(.5*movingTime.^2),angleDerivative.*(arc*cos(x(6))/(2*lr))};
     end
 end
 

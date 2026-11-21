@@ -275,7 +275,9 @@ disk and the current radar error ball. Footprint
 dimensions and rear axle distance are declared vehicle-class parameters.
 
 For each ego member, a radar position error of radius $r$ gives a chord
-error of at most $2r$. Let $c_1,c_2$ be consecutive measured chords and
+error of at most $2r$. Here $r$ is the largest declared return radius
+in the retained chord history, with the configured bound for an unlabeled
+return. Let $c_1,c_2$ be consecutive measured chords and
 $c=c_1+c_2$. The underlying constant-curvature arc satisfies
 $\kappa=2\sin\theta/\|c_{\rm true}\|$, where $\theta$ is the signed angle
 between its true chords. A resolved chord $c_i$ bounds its direction error
@@ -298,37 +300,50 @@ interval image of $2(s_2/T_2-s_1/T_1)/(T_1+T_2)$. A subsequent resolved
 displacement establishes that these earlier intervals preceded absorption.
 These bounds use the declared moving-target observer domain.
 
-The central case uses the NRMM forecast with its persistent parameters clipped
-to the retained intervals. For additional position-only cases, let $p_j,t_j,r_j$
-be each measured center in one ego member's inertial frame, its time from the
-first retained return and its declared position error radius. When the sensor
-supplies no individual radius, use the configured bound. The simulation samples
-its radar perturbation uniformly in a disk of half the general envelope and
-publishes that disk radius. Ego motion and the sensor bias stay attached to
-the same member.
+For each retained physical member, let the observer supply the closed
+intervals $I_A$ and $I_\beta$. The compact predictor uses one NRMM forecast
+per member. Its central $A,\beta$ are clipped to the intervals. The PCBF
+quantifies over their Cartesian product from that member's estimated root
+position, heading and speed. Errors in those root quantities are covered
+only to the extent represented by the physical members.
 
-For a proposed initial position $p_0$, course $\theta$, speed $V_0$, and
-constant $A,\beta$, let $t'_j=\min(t_j,-V_0/A)$ when $A<0$, otherwise
-$t'_j=t_j$. Put $s_j=V_0t'_j+A(t'_j)^2/2$, $z_j=s_j\sin\beta/(2l_r)$ and
-$e(\theta)=(\cos\theta,\sin\theta)^\top$. A shared history must satisfy
-\[
- \|p_0+s_j\operatorname{sinc}(z_j)e(\theta+z_j)-p_j\|_2\le r_j
- \quad\text{for every return},\qquad \operatorname{sinc}(z)=\sin(z)/z .
-\]
-The last body heading is $\theta+2z_n-\beta$. Four local support searches
-use the four signed sums of $A$ and $\beta$ scaled by their interval widths.
-Each accepted fit supplies its own last position, body heading, speed and
-persistent parameters. The same model advances it through any missed returns.
-A fitted family requires all four searches to finish and satisfy the measured
-disks within numerical tolerance. Otherwise, or in the presence of a direct
-heading in the retained history, the interval corners use a common measured
-chord to reconstruct the compatible speed and heading. A received body
-heading fixes the heading at its timestamp.
+To enclose the target footprint at elapsed time $t$, write
+$s(A,t)=\int_0^t\max(0,V_0+A\tau)\,d\tau$ on the moving branch.
+The absorbing stopped branch retains its pose. For any closed parameter
+cell $C=[A_l,A_u]\times[\beta_l,\beta_u]$, monotonicity gives
+$s\in[s(A_l,t),s(A_u,t)]$. Set $z=s\sin(\beta)/(2l_r)$. The offset of the
+reference point and the body heading are
 
-All retained cases share the planned input sequence and have distinct geometric
-witnesses. The local support samples and the interval-corner fallback provide
-finite uncertainty representations. They do not certify coverage of the
-continuous posterior. Replanning still checks the inherited PCBF deficit cap.
+$$
+\Delta p=s\operatorname{sinc}(z)e(\psi_0+\beta+z),\qquad
+\psi=\psi_0+2z,\qquad \operatorname{sinc}(0)=1.
+$$
+
+On turning cells whose curvature interval excludes zero, the chord length
+factor also equals $2\sin(z)/\kappa$. Intersecting the two interval bounds
+keeps this factor bounded after a full revolution.
+Project these interval expressions and the four rotated footprint vertices
+onto axes centered on the cell's heading interval. Coordinate minima and
+maxima enclose the reference points in $P_C(t)$ and the complete occupied
+footprints in $B_C(t)$. The compact calculation partitions each nondegenerate
+parameter interval into four adjacent closed subintervals. Every value in
+each cell contributes to its enclosure. At each control node the clearance
+lower bound is
+
+$$
+\underline d_j^s=\min_{C\ \mathrm{active}} d_\pm(B_E(x_j^s),B_C^s(jh)).
+$$
+
+A known point prediction uses its physical rectangle directly. An empty
+active set has clearance $+\infty$. The rectangle dual retains its
+continuous separating normal. Using an outer
+footprint can underestimate clearance. If the distance from the ego
+reference point to $P_C(jh)$ exceeds the sensor range, the entire cell
+has left this encounter. Check its exit node and discharge its subsequent
+obligations. The terminal bridge and straight continuation carry the same
+constant parameter cells forward from the planning root, including cells
+whose target can brake to rest. A measured update requires a fresh replay
+when shifted containment has not been established.
 
 For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
 target contributes node and terminal separation constraints when $d_k^-\le R$.
@@ -529,7 +544,7 @@ held commands. For the node-only collision contract, define
 
 $$
 C_j(v)=\max_s\max_{r\in\{j,j+1\}}
-\{d_{\rm safe}-d_\pm(x_r^s,q_r^s)\},\qquad j=0,\ldots,N-1.
+\{d_{\rm safe}-\underline d_r^s\},\qquad j=0,\ldots,N-1.
 $$
 
 Each stage covers its two control-boundary nodes; their union includes the
@@ -670,9 +685,8 @@ path and speed recovery.
 
 The geometric guide integrates one route-following field. Its
 preferred acceleration includes the transport and separation
-gradients of the predicted encounter. For a sampled motion family, use
-path coordinates to compute the longitudinal overlap times for each target
-rectangle. At such a time \(t\), let \(y^s(t)\) denote its signed lateral
+gradients of the predicted encounter. For an uncertain moving target, use
+path coordinates to compute the longitudinal overlap times for its footprint enclosure. At such a time \(t\), let \(y^s(t)\) denote its signed lateral
 displacement from the ego footprint center extrapolated with its current
 lateral velocity. Let \(r^s(t)\) be the sum of the projected lateral
 half-widths and the planning clearance. Under a first-order yaw response
@@ -682,7 +696,7 @@ of corrective acceleration is approximated by
 D(t)=\max\{h^2/2,\ t^2/2-Tt+T^2(1-e^{-t/T})\}.
 \]
 The guide takes the interval hull of
-\([(y^s-r^s)/D,(y^s+r^s)/D]\) over these times and cases.
+\([(y^s-r^s)/D,(y^s+r^s)/D]\) over these times.
 When the preferred transverse acceleration, relative to the path curvature
 feedforward, is inside the hull, project it onto the nearest endpoint.
 An equal-distance tie gives zero correction. This projection preserves the
@@ -690,12 +704,13 @@ longitudinal component of the circulation field and the fixed cruise reference.
 Every trial uses its own poses in the distance dual of Section 5.
 
 When the initial and shifted plans leave an unresolved primary deficit
-for a target family, a reduced shooting search can propose held inputs
+during an encounter, a reduced shooting search can propose held inputs
 before full SQP. Two actuator values and two durations parameterize a
 piecewise linear transition from the first value to the second and then
 to the terminal input. Sample and refine these six coordinates around the
-best nominal-ego trial. Rank by maximum and total positive deficit over
-the sampled target family, then by rear slip, longitudinal effort and
+best nominal-ego trial while retaining proposals across the actuator domain.
+Rank by maximum and total positive deficit over the active parameter cells,
+including terminal feasibility at zero stage deficit, then by rear slip, longitudinal effort and
 clearance. Screening caps clearance at one vehicle width. Admission
 replays the full sequence with every retained physical member and the
 original terminal conditions and inherited deficit budget. This search
@@ -735,12 +750,13 @@ Let $z_j^s=(x_j^s,q_j^s)$ be the joint state at $t_k+jh$. While the target
 is active at decision $k$, each proposed plan must satisfy
 
 $$
-d_\pm(z_r^s)>0,\qquad d_\pm(z_r^s)\ge d_{\rm safe}-\xi_j,\qquad
+\underline d_r^s>0,\qquad \underline d_r^s\ge d_{\rm safe}-\xi_j,\qquad
 r\in\{j,j+1\},\quad j=0,\ldots,N-1,\quad s=1,\ldots,S .
 $$
 
-Replay assigns $\xi_j=[C_j(v)]_+$ from the exact rectangle-distance dual
-at the held-command boundaries. On the terminal bridge and in the terminal
+Replay assigns $\xi_j=[C_j(v)]_+$ using the lower bound $\underline d_r^s$
+at the held-command boundaries for each uncertain member. A point member
+uses its exact rectangle-distance dual. On the terminal bridge and in the terminal
 set the full $d_{\rm safe}$ remains hard through range exit. The default
 planning margin is $0.10\,\mathrm{m}$. The simulation counts
 contact or overlap at a control node when the true signed distance is

@@ -191,7 +191,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(posterior.target(4:6),zeros(3,1));
         end
 
-        function perceivedHeadingAnchorsEveryMovingCaseBeforeTheStop(testCase)
+        function perceivedHeadingAnchorsTheMovingForecastBeforeTheStop(testCase)
             cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
             item.ego(3)=2.95;
             target=[12;4;-3.05;2;-.6;.035;1.6;2.4;.95;0;0];
@@ -215,11 +215,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(posterior.target,q,AbsTol=1e-12);
             replay=solvePredictiveControl("outputFeedback",struct('operation',"validateInputSequence", ...
                 'cfg',cfg,'hypotheses',posterior,'input',block.heldInput,'inputs',zeros(2,1)));
-            testCase.assertGreaterThan(numel(replay.trajectories),1);
-            for j=1:numel(replay.trajectories)
-                trace=replay.trajectories{j};
-                testCase.verifyEqual(trace.targets(3,1),q(3),AbsTol=1e-12);
-            end
+            testCase.assertNumElements(replay.trajectories,1);
+            testCase.verifyEqual(replay.trajectories{1}.targets(3,1),q(3),AbsTol=1e-12);
         end
 
         function anExactRelativeHeadingConditionsKnownTargetHypotheses(testCase)
@@ -335,7 +332,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(all([meta.terminalSetEnforced] & [meta.deficitDescentMet]));
             testCase.verifyLessThanOrEqual(max([meta.initializationTrajectoryCount]),1);
             if any(uncertainEncounter==["headOn","trafficHeadOn","curvedHeadOn","acceleratingHeadOn"])
-                testCase.verifyGreaterThan(max([meta.targetHistoryFitCount]),0);
+                testCase.verifyEqual([meta.activeScenarioCount],[meta.hypothesisCount]);
                 for k=1:numel(data.trace)
                     samples=data.trace(k).rawSensorBlock;
                     testCase.assertFalse(any(arrayfun(@(s) ~isempty(s.relativeHeading) && isfinite(s.relativeHeading),samples)));
@@ -1265,48 +1262,40 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(next.metadata.inheritedDeficitCap,sum(state.stageDeficits(2:end)));
             testCase.verifyLessThanOrEqual(next.metadata.pcbfValue,next.metadata.inheritedDeficitCap+1e-12);
         end
-        function targetParameterCasesShareCommandsAndReachTheTerminalCheck(testCase)
+        function eachPhysicalMemberHasOnePersistentTargetForecast(testCase)
             cfg=testCase.cfg;item=testCase.block.initialHypotheses;
             item.target=[14;5;0;6;-1;0;1.6;2.4;1;0;0];
-            item.targetObserver=struct('time',.5,'motionBounds',[-2,-.015;0,.015], ...
-                'motionHistory',struct('times',[0,.5],'positions',[11,14;5,5]));
+            item.targetObserver=struct('motionBounds',[-2,-.015;0,.015]);
             request=struct('operation',"validateInputSequence",'cfg',cfg,'hypotheses',item, ...
                 'input',zeros(2,1),'inputs',zeros(2,5));
             replay=solvePredictiveControl("outputFeedback",request);
-            testCase.verifyNumElements(replay.trajectories,5);
-            testCase.verifyTrue(replay.trajectories{1}.terminal.member);
-            testCase.verifyFalse(replay.trajectories{3}.terminal.member);
-            testCase.verifyFalse(replay.accepted);
-            expected=[-1,0;-2,-.015;0,-.015;-2,.015;0,.015];
-            for k=1:5
-                trace=replay.trajectories{k};
-                testCase.verifyEqual(trace.targets(5:6,:),repmat(expected(k,:).',1,6));
-                testCase.verifyEqual(trace.ego,replay.trajectories{1}.ego);
-                testCase.verifyEqual(trace.targetMotionParameters,expected(k,:).');
-                single=request;single.hypotheses=rmfield(item,'targetObserver');
-                single.hypotheses.target=trace.targets(:,1);
-                exact=solvePredictiveControl("outputFeedback",single);
-                testCase.verifyEqual(trace.terminal,exact.trajectories{1}.terminal);
-            end
+            testCase.assertNumElements(replay.trajectories,1);
+            expected=predictiveSafetyGeometry.predictTarget(item.target,(0:5)*cfg.controller.sampleTime);
+            testCase.verifyEqual(replay.trajectories{1}.targets,expected,AbsTol=1e-12);
+            testCase.verifyFalse(replay.trajectories{1}.terminal.member);
+            testCase.verifyGreaterThan(replay.trajectories{1}.terminal.value,1);
+            point=request;point.hypotheses=rmfield(item,'targetObserver');
+            nominal=solvePredictiveControl("outputFeedback",point);
+            testCase.verifyTrue(nominal.accepted && nominal.trajectories{1}.terminal.member);
             request.operation="evaluateControlSequence";request.holds=ones(1,5);
-            eval=solvePredictiveControl("outputFeedback",request);
-            testCase.verifyEqual(max(0,eval.stage),replay.stageDeficits,AbsTol=1e-11);
+            oracle=solvePredictiveControl("outputFeedback",request);
+            testCase.verifyEqual(max(0,oracle.stage),replay.stageDeficits,AbsTol=1e-11);
         end
-        function missedReturnsAdvanceEachParameterCaseFromTheLastObservedChord(testCase)
-            item=testCase.block.initialHypotheses;item.target=[20;4;0;5;-2;0;1.6;2.4;1;0;0];
-            item.targetObserver=struct('time',1,'lastReturnHeading',item.target(3),'motionBounds',[-2,-.01;-1,.01], ...
-                'motionHistory',struct('times',[0,1],'positions',[15,20;4,4]));
-            req=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
-                'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1));
-            old=solvePredictiveControl("outputFeedback",req);
-            req.hypotheses.targetObserver.time=1.25;
-            req.hypotheses.target=predictiveSafetyGeometry.predictTarget(item.target,.25);
-            next=solvePredictiveControl("outputFeedback",req);
-            for k=2:5
-                testCase.verifyEqual(old.trajectories{k}.targets(3,1),item.targetObserver.lastReturnHeading);
-                expected=predictiveSafetyGeometry.predictTarget(old.trajectories{k}.targets(:,1),.25);
-                testCase.verifyEqual(next.trajectories{k}.targets(:,1),expected,AbsTol=1e-12);
-            end
+        function continuousMotionIntervalsContributeToThePrimaryDeficit(testCase)
+            item=testCase.block.initialHypotheses;
+            item.target=[10;5;pi;8;0;0;1.6;2.4;1;0;0];
+            request=struct('operation',"validateInputSequence",'cfg',testCase.cfg,'hypotheses',item, ...
+                'input',zeros(2,1),'inputs',zeros(2,28));
+            nominal=solvePredictiveControl("outputFeedback",request);
+            testCase.verifyTrue(nominal.accepted);
+            testCase.verifyEqual(max(nominal.stageDeficits),0);
+            request.hypotheses.targetObserver=struct('motionBounds',[-1,-.13;1,.13]);
+            replay=solvePredictiveControl("outputFeedback",request);
+            testCase.assertNumElements(replay.trajectories,1);
+            testCase.verifyGreaterThan(max(replay.stageDeficits),.05);
+            request.operation="evaluateControlSequence";request.holds=ones(1,28);
+            oracle=solvePredictiveControl("outputFeedback",request);
+            testCase.verifyEqual(max(0,oracle.stage),replay.stageDeficits,AbsTol=1e-11);
         end
         function aStoredPlanCanResumeAfterReplayWithTheCurrentMargin(testCase)
             cfg=testCase.cfg;prior=testCase.state;

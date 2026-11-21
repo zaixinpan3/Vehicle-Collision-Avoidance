@@ -2820,15 +2820,15 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
             validateattributes(request.inputs,{'double'},{'2d','nrows',2,'nonempty','finite','real'});
             boundaries=localCompactBoundaries(size(request.inputs,2),cfg);
             kernel=localCompactKernel(cfg,diff(boundaries),~isempty(hypotheses(1).target));
-            hypotheses=localCompactTargetCases(hypotheses);
+            hypotheses=localCompactPlanningMembers(hypotheses,cfg,size(request.inputs,2));
             [valid,traces,violation,~,slacks]=localCompactValidate(request.inputs,hypotheses,request.input,kernel,cfg,true);
             result=struct('accepted',valid,'maximumViolation',violation,'trajectories',{traces}, ...
                 'stageDeficits',slacks,'pcbfDeficit',sum(slacks));
         case "evaluateControlSequence"
             hypotheses=localOfValidateHypotheses(request.hypotheses,cfg);
             nominal=ceil(numel(hypotheses)/2);
-            [hypotheses,~,centers]=localCompactTargetCases(hypotheses);
-            controls=request.inputs;holds=request.holds;nominal=centers(nominal);
+            hypotheses=localCompactPlanningMembers(hypotheses,cfg,sum(request.holds));
+            controls=request.inputs;holds=request.holds;
             validateattributes(holds,{'double'},{'row','integer','positive','numel',size(controls,2)});
             validateattributes(controls,{'double'},{'2d','nrows',2,'nonempty','finite','real'});
             x=hypotheses(nominal).ego;
@@ -3962,21 +3962,10 @@ function [result,info] = localCompactStep(request,cfg)
     x=item.ego;
     stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
     [~,lane]=readControllerInputs(stub,[],request.reference,cfg);
-    budget=cfg.outputFeedback.maximumSolveSeconds;
-    if initial || (active && isfield(prior,'collisionTargetActive') && ~prior.collisionTargetActive),budget=cfg.outputFeedback.initializationSolveSeconds;end
-    caseClock=tic;
-    [planning,parents,centers,historyFits]=localCompactTargetCases(planning,@()toc(timer)>=budget);
-    inferenceSeconds=inferenceSeconds+toc(caseClock);
-    expanded=conditioning;
-    expanded.retainedIndices=conditioning.retainedIndices(parents);
-    [result,info]=localCondensedSolve(request,cfg,planning,expanded,window,holds,lane,centers(nominal),timer,inferenceSeconds);
-    result.state.retainedTrajectories=result.state.retainedTrajectories(centers);
-    result.state.targetCases=cell(1,numel(centers));
-    for j=1:numel(centers),result.state.targetCases{j}=[planning(parents==j).target];end
+    planning=localCompactPlanningMembers(planning,cfg,sum(holds));
+    [result,info]=localCondensedSolve(request,cfg,planning,conditioning,window,holds,lane,nominal,timer,inferenceSeconds);
     info.conditioning=conditioning;result.state.conditioning=conditioning;
     info.hypothesisCount=numel(hypotheses);
-    info.targetCaseParents=parents;
-    info.targetHistoryFitCount=nnz(historyFits);
     info.collisionTargetActive=active;
     info.targetEstimateReady=targetReady;
     info.firstRadarTime=firstRadarTime;
@@ -3989,83 +3978,44 @@ function [result,info] = localCompactStep(request,cfg)
     result.state.collisionTargetActive=active;
 end
 
-function [cases,parents,centers,historyFits]=localCompactTargetCases(members,expired)
-    if nargin<2,expired=[];end
-    % One command sequence for all targets. Constant parameters remain
-    % attached to each sampled trajectory through its terminal continuation.
-    blocks=cell(1,numel(members));counts=ones(1,numel(members));historyFits=false(size(counts));
+function members=localCompactPlanningMembers(members,cfg,count)
     for j=1:numel(members)
-        item=members(j);q=item.target;track=[];
-        if isfield(item,'targetObserver'),track=item.targetObserver;item=rmfield(item,'targetObserver');end
-        item.physicalMember=j;blocks{j}=item;
-        if isempty(q) || q(4)==0 || ~isfield(track,'motionBounds'),continue;end
-        b=track.motionBounds;
-        center=min(b(2,:),max(b(1,:),q(5:6).'));
-        [a,beta]=ndgrid(b(:,1),b(:,2));
-        pairs=[center;a(:),beta(:)];
-        counts(j)=size(pairs,1);block=repmat(item,1,counts(j));
-        history=track.motionHistory;
-        fitted=[];
-        if isfield(history,'positionErrorRadii')
-            fitted=onlineNrmmTrackingRuntime('targetMotionCases',track,q(7),expired);
-            historyFits(j)=~isempty(fitted);
+        members(j).motionLimits=[];members(j).cover=[];
+        q=members(j).target;track=[];
+        if isfield(members,'targetObserver'),track=members(j).targetObserver;end
+        if isempty(q) || q(4)==0 || isempty(track),continue;end
+        if isfield(track,'motionBounds') && ~isempty(track.motionBounds)
+            b=track.motionBounds;
+        else
+            settings=estimatorControllerIntegrationConfig();domain=settings.trafficTargetObserver.domain;
+            limit=[domain.scalarAccelerationMaximum,domain.sideslipMaximum];
+            b=[-limit;limit];
         end
-        chord=history.positions(:,end)-history.positions(:,1);
-        span=history.times(end)-history.times(1);lengthChord=norm(chord);
-        for k=1:counts(j)
-            pair=pairs(k,:);block(k).target(5:6)=pair.';
-            if k==1,continue;end
-            if ~isempty(fitted)
-                target=q;target(1:6)=fitted(:,k-1);
-                if track.time>history.times(end)
-                    target=predictiveSafetyGeometry.predictTarget(target,track.time-history.times(end));
-                end
-                block(k).target=target;
-                continue
-            end
-            if span<=0 || lengthChord==0,continue;end
-            % Reconstruct endpoint course and speed from the SAME measured
-            % chord for this curvature and tangential acceleration.
-            curvature=sin(pair(2))/q(7);half=asin(max(-1,min(1,curvature*lengthChord/2)));
-            arc=lengthChord;if curvature~=0,arc=2*half/curvature;end
-            if isfield(track,'lastReturnHeading') && isfinite(track.lastReturnHeading)
-                block(k).target(3)=track.lastReturnHeading;
-            else
-                block(k).target(3)=atan2(chord(2),chord(1))+half-pair(2);
-            end
-            block(k).target(4)=max(0,arc/span+pair(1)*span/2);
-            if track.time>history.times(end)
-                % The chord ends at the last return. Advance this case over
-                % its own missed returns with the same constant parameters.
-                block(k).target(1:2)=history.positions(:,end);
-                block(k).target=predictiveSafetyGeometry.predictTarget(block(k).target,track.time-history.times(end));
-            end
+        members(j).target(5:6)=min(b(2,:).',max(b(1,:).',q(5:6)));
+        if any(b(1,:)~=b(2,:))
+            members(j).motionLimits=b;
+            h=cfg.controller.sampleTime;
+            members(j).cover=localCompactCover(members(j),h,count+ceil(cfg.outputFeedback.minimumPreviewSeconds/h));
         end
-        [~,distinct]=unique([block.target].','rows','stable');
-        blocks{j}=block(distinct);counts(j)=numel(distinct);
     end
-    cases=[blocks{:}];parents=repelem(1:numel(members),counts);
-    centers=1+[0,cumsum(counts(1:end-1))];
+    if isfield(members,'targetObserver'),members=rmfield(members,'targetObserver');end
 end
 
-function contained=localCompactShiftContained(prior,cases,indices,h)
-    contained=isfield(prior,'targetCases') && isfield(prior,'retainedTrajectories');
+function contained=localCompactShiftContained(prior,members,indices,h)
+    contained=isfield(prior,'retainedTrajectories');
     if ~contained,return;end
-    for j=1:numel(cases)
-        parent=indices(j);old=prior.retainedTrajectories{parent};item=cases(j);
+    for j=1:numel(members)
+        old=prior.retainedTrajectories{indices(j)};item=members(j);
         if ~isequal(old.collisionEgo(:,2),item.ego) || ~isequal(old.parameters,item.parameters)
             contained=false;return
         end
         if isempty(item.target),continue;end
-        q=prior.targetCases{parent};matched=false;
-        for k=1:size(q,2)
-            pred=q(:,k);
-            if pred(4)>0,pred=predictiveSafetyGeometry.predictTarget(pred,h);end
-            if pred(4)==0 && item.target(4)==0,pred(5:6)=item.target(5:6);end
-            delta=pred-item.target;delta(3)=atan2(sin(delta(3)),cos(delta(3)));
-            if all(abs(delta)<=128*eps(max(1,abs(pred)))),matched=true;break;end
-        end
-        if ~matched,contained=false;return;end
+        if ~isempty(item.motionLimits),contained=false;return;end
+        if ~isfield(old,'target') || isempty(old.target),contained=false;return;end
+        pred=localCompactTargetNodes(old.target,h);
+        if pred(4)==0 && item.target(4)==0,pred(5:6)=item.target(5:6);end
+        delta=pred-item.target;delta(3)=atan2(sin(delta(3)),cos(delta(3)));
+        if any(abs(delta)>128*eps(max(1,abs(pred)))),contained=false;return;end
     end
 end
 
@@ -4081,7 +4031,6 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     initial=isempty(prior);h=cfg.controller.sampleTime;boundaries=[0,cumsum(holds)];
     model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel);
     item=hypotheses(nominal);
-    item.guideTargets=[hypotheses([hypotheses.physicalMember]==item.physicalMember).target];
     tolerance=cfg.outputFeedback.nlpTolerance;
     best=[];traces={};violation=Inf;validationSeconds=0;retained=false;
     inheritedReusedHolds=zeros(1,numel(hypotheses));solveClock=tic;
@@ -4176,9 +4125,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 candidate=controls*model.map.'+model.offset;
                 [~,~,seedReplay]=validatePlan(candidate,[],@checkClock);
             end
-            if bestLoss>lossFloor+slackRoundoff && size(item.guideTargets,2)>1
-                [coarse,pollEvaluations]=localCompactControlSearch(item,previous,kernel,cfg,@checkClock);
+            if bestLoss>lossFloor+slackRoundoff && ~isempty(item.cover)
+                [coarse,pollEvaluations]=localCompactControlSearch(item,previous,kernel,cfg,@checkClock,@admitScreenedPlan);
                 for trialIndex=1:numel(coarse)
+                    if bestLoss<=lossFloor+slackRoundoff,break;end
                     [selected,~,residual]=validatePlan(coarse{trialIndex},[],@checkClock);
                     pollAccepted=pollAccepted || selected;
                     if bestLoss<=lossFloor+slackRoundoff,break;end
@@ -4216,6 +4166,16 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 % Zero is the lower bound of the PCBF objective. Seek a
                 % witness on that level in actuator coordinates alone.
                 [start,e]=projectToZeroDeficit(start,e);
+                if ~isempty(item.target) && isempty(item.cover) && bestLoss>lossFloor+slackRoundoff
+                    [coarse,pollEvaluations]=localCompactControlSearch(item,previous,kernel,cfg,@checkClock,@admitScreenedPlan);
+                    for trialIndex=1:numel(coarse)
+                        if bestLoss<=lossFloor+slackRoundoff,break;end
+                        admitScreenedPlan(coarse{trialIndex});
+                    end
+                    if bestLoss<=lossFloor+slackRoundoff
+                        error('collisionAvoidanceController:condensedFeasible','Replay reached the primary lower bound.');
+                    end
+                end
                 trial=stabilityStep(start,e,false);
                 if ~isempty(trial)
                     candidate=evaluate(trial);
@@ -4258,7 +4218,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         error('collisionAvoidanceController:compactNoFeasiblePlan', ...
             'No validated moving PCBF plan within the %s search. No command was committed.',budgetPhase);
     end
-    if restoration && bestLoss<=tolerance && toc(timer)<deadline
+    if restoration && ~isempty(cache) && bestLoss<=tolerance && toc(timer)<deadline
         % The primary optimum is zero. A secondary step must satisfy that
         % same level and the terminal handoff on nonlinear replay.
         try
@@ -4282,7 +4242,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         trace=traces{s};
         retainedTrajectories{s}=struct('inputs',trace.inputs,'denseEgo',trace.denseEgo, ...
             'collisionEgo',trace.collisionEgo,'validationSubsteps',kernel.validationSubsteps, ...
-            'parameters',hypotheses(s).parameters);
+            'parameters',hypotheses(s).parameters,'target',hypotheses(s).target);
     end
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v1",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
@@ -4330,6 +4290,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     prediction=struct('metadata',info,'scenarios',{traces},'memory',zeros(0,1),'information',hypotheses);
     result=struct('command',command,'inputs',best,'prediction',prediction,'state',state);
 
+    function admitted=admitScreenedPlan(inputs)
+        selected=validatePlan(inputs,[],@checkClock);
+        pollAccepted=pollAccepted || selected;
+        admitted=bestLoss<=lossFloor+slackRoundoff;
+    end
     function [selected,tracking,replayResidual]=validatePlan(inputs,flows,clockCheck)
         if nargin<3,clockCheck=[];end
         clock=tic;
@@ -4343,7 +4308,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         score=h/2*sum(inputs(2,:).^2+inputs(2,:).^4);
         for k=1:numel(hypotheses)
             residual=localRearSlipResidual(checked{k}.collisionEgo(:,2:end),model,k);
-            score=score+h*model.caseWeights(k)/2*sum(residual.^2);
+            score=score+h/(2*numel(hypotheses))*sum(residual.^2);
         end
         if ~isempty(best)
             if loss==bestLoss
@@ -4373,21 +4338,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             rhs=[b-a*u;-margins];
             lo=((lower-u)./controlScale)/stepUnit;hi=((upper-u)./controlScale)/stepUnit;
             scaled=rows.*controlScale.';rhs=rhs/stepUnit;
-            % Add a sibling tangent only when the proposed step violates it.
-            % The target that limits a stage can change even for a small step.
-            added=false(0,1);
-            if isfield(e,'caseStage'),added=false(size(e.caseStage));end
-            while true
-                checkClock();
-                [step,~,flag]=quadprog(eye(nu),zeros(nu,1),scaled,rhs,[],[],lo,hi,zeros(nu,1),options);
-                if flag<=0 || isempty(added),break;end
-                grad=reshape(e.caseGradient,nu,[]);
-                predicted=e.caseStage(:)+stepUnit*grad.'*(controlScale.*step);
-                insert=~added(:) & predicted>max(tolerance,128*eps);
-                if ~any(insert),break;end
-                scaled=[scaled;grad(:,insert).'.*controlScale.'];
-                rhs=[rhs;-e.caseStage(insert)/stepUnit];added(insert)=true;
-            end
+            [step,~,flag]=quadprog(eye(nu),zeros(nu,1),scaled,rhs,[],[],lo,hi,zeros(nu,1),options);
             projectionSteps=projectionSteps+1;
             if flag<=0,return;end
             proposal=u+controlScale.*(stepUnit*step);
@@ -4397,7 +4348,6 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             candidate=evaluate(proposal);
             residual=max([candidate.stage;candidate.forward;candidate.terminal]);
             if residual>=worstMargin/2
-                if isempty(added),return;end
                 % A bound-constrained tangent step can overshoot the nonlinear
                 % flow. Backtrack on the actual worst inequality.
                 while residual>=worstMargin && norm(proposal-u,Inf)>tolerance
@@ -4487,8 +4437,6 @@ function model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,ke
     controlMap=kron(map,eye(2));
     model=struct('cfg',cfg,'hypotheses',hypotheses,'previous',previous,'kernel',kernel, ...
         'map',map,'offset',offset,'controlMap',controlMap,'nominal',nominal,'reference',zeros(3,nodes));
-    parents=[hypotheses.physicalMember];counts=accumarray(parents(:),1);
-    model.caseWeights=1./(numel(counts)*reshape(counts(parents),1,[]));
     tire=nonlinearBicycleModel.tireParameters(cfg);
     scales=[hypotheses.parameters];
     model.rearSlipScale=(tire.longitudinalForceScale(2)/tire.corneringStiffness(2))*scales(4,:)./scales(2,:);
@@ -4637,70 +4585,77 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         e.stabilityGradient(2:2:end)=h*(ratioJacobian.'*ratio+squaredRatioJacobian.'*(ratio.^2));
         e.stabilityHessian(2:2:end,2:2:end)=h*(ratioJacobian.'*ratioJacobian+squaredRatioJacobian.'*squaredRatioJacobian);
     end
-    multipleTargets=numel(model.hypotheses)>max([model.hypotheses.physicalMember]);
-    if derivatives && multipleTargets
-        e.caseStage=zeros(N,numel(model.hypotheses));
-        e.caseGradient=zeros(nu,N,numel(model.hypotheses));
-    end
     for s=1:numel(model.hypotheses)
         if ~isempty(checkBudget),checkBudget();end
         item=model.hypotheses(s);
-        shared=s>1 && item.physicalMember==model.hypotheses(s-1).physicalMember;
-        if ~shared,sensitivityCache={};end
         if ~isempty(rollouts.trajectories{s}) && isfield(rollouts.trajectories{s},'oracle')
             flow=rollouts.trajectories{s}.oracle;
             dense=flow.dense;
             ends=flow.ends;
             allInputs=flow.allInputs;
             total=flow.total;
-            q=flow.q;
+            q=flow.q;boxes=flow.boxes;activeStages=flow.activeStages;
             localStage=flow.localStage;
             nodeIndices=flow.nodeIndices;
             forward=flow.forward;
             fi=flow.fi;
             domainState=flow.domainState;
-            domainInput=flow.domainInput;
+            domainInput=flow.domainInput;remaining=flow.remaining;
         else
-            if shared
-                previousFlow=rollouts.trajectories{s-1};
-                dense=previousFlow.dense;ends=previousFlow.collisionStates(:,2:end);
-            elseif ~isempty(rollouts.trajectories{s}) && isfield(rollouts.trajectories{s},'ends')
+            if ~isempty(rollouts.trajectories{s}) && isfield(rollouts.trajectories{s},'ends')
                 dense=rollouts.trajectories{s}.dense;ends=rollouts.trajectories{s}.ends;
             else
                 [dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,enabled);
                 ends=full(ends);dense=full(dense);ends=ends(:,1:N);dense=[item.ego,dense(:,1:K*N)];
             end
-            endpointTarget=[];
-            if ~isempty(item.target)
-                endpointTarget=localCompactTargetNodes(item.target,N*h);
+            remaining=[];
+            if ~isempty(item.cover)
+                [drivingGap,drivingBoxes,remaining]=localCompactOccupied(item,[item.ego,ends],(0:N)*h,shape,cfg);
+                activeAtHandoff=remaining;
             end
-            [backupDense,backupEnds,backupInputs]=localCompactCruiseRollout(kernel,ends(:,end),endpointTarget,item.parameters,cfg,checkBudget);
+            [backupDense,backupEnds,backupInputs]=localCompactCruiseRollout(kernel,ends(:,end),item,N*h,cfg,checkBudget,remaining);
             rollouts.trajectories{s}=struct('dense',dense,'states',ends(:,cumsum(kernel.holds)), ...
                     'collisionStates',[item.ego,ends], ...
                     'backup',struct('dense',backupDense,'states',backupEnds,'inputs',backupInputs));
             ends=[ends,backupEnds];dense=[dense,backupDense(:,2:end)];
             allInputs=[inputs,backupInputs];total=size(allInputs,2);times=(0:total)*h;
-            nodes=[item.ego,ends];q=[];gap=[];localStage=-ones(1,total);nodeIndices=1:total;
+            nodes=[item.ego,ends];q=[];boxes=[];gap=[];localStage=-ones(1,total);nodeIndices=1:total;
+            activeStages=false(1,total);
             if ~isempty(item.target)
                 if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);else,q=repmat(item.target,1,total+1);end
-                gap=predictiveSafetyGeometry.rectangleClearance(nodes,q,shape);
+                boxes=q;
+                if isempty(item.cover)
+                    gap=predictiveSafetyGeometry.rectangleClearance(nodes,boxes,shape);
+                else
+                    gap=drivingGap;boxes=drivingBoxes;
+                    if total>N
+                        tailNodes=N+2:total+1;
+                        [tailGap,tailBoxes,remaining]=localCompactOccupied(item,nodes(:,tailNodes),times(tailNodes),shape,cfg,remaining);
+                        gap=[gap,tailGap];boxes=[boxes,tailBoxes];
+                    end
+                end
                 % Each stage covers its two control-boundary nodes. No
                 % collision condition is imposed on the integration mesh.
                 [localStage,side]=max(cfg.outputFeedback.clearanceMeters-[gap(1:end-1);gap(2:end)],[],1);
+                activeStages=isfinite(localStage);
+                localStage(~activeStages)=-1;
                 nodeIndices=(0:total-1)+side;
             end
             [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K,N);
             rollouts.trajectories{s}.oracle=struct('dense',dense,'ends',ends,'allInputs',allInputs,'total',total, ...
-                'q',q,'localStage',localStage,'nodeIndices',nodeIndices, ...
+                'q',q,'boxes',boxes,'remaining',remaining,'activeStages',activeStages,'localStage',localStage,'nodeIndices',nodeIndices, ...
                 'forward',forward,'fi',fi,'domainState',domainState, ...
                 'domainInput',domainInput);
             if ~isempty(q)
                 rollouts.trajectories{s}.targets=q(:,1:N+1);
                 rollouts.trajectories{s}.separation=gap(1:N+1);
+                if ~isempty(item.cover)
+                    rollouts.trajectories{s}.remaining=activeAtHandoff;
+                end
             end
         end
         [residual,slipDerivative]=localRearSlipResidual(ends(:,1:N),model,s);
-        weight=h*model.caseWeights(s);
+        weight=h/numel(model.hypotheses);
         e.stabilityCost=e.stabilityCost+weight/2*sum(residual.^2);
         nodes=[item.ego,ends];roots=nodes(:,1:end-1);derivativeModel=model;
         derivativeModel.controlMap=[model.controlMap;zeros(2*(total-N),nu)];
@@ -4712,7 +4667,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         if ~derivatives
             e.stage=max(e.stage,localStage(1:N).');e.forward=max(e.forward,forward(1:N).');
             target=[];if ~isempty(q),target=q(:,end);end
-            terminal=terminalSafeSet.movingValue(ends(:,end),target,cfg,checkBudget);
+            terminal=localCompactMovingValue(ends(:,end),target,item,total*h,cfg,checkBudget,remaining);
             e.terminal(s)=max([terminal,slew,localStage(N+1:end),forward(N+1:end)]);
             if s==model.nominal,e.cost=localCompactPerformance(ends(:,cumsum(kernel.holds)),inputs,model);end
             continue;
@@ -4720,27 +4675,21 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         % Geometry uses boundary sensitivities. Only the active physical
         % domain sample inside each hold needs a dense-sample sensitivity.
         stageNeeded=false(1,total);domainNeeded=false(1,total);
-        stageNeeded(1:N)=~isempty(q);domainNeeded(1:N)=true;
+        stageNeeded(1:N)=activeStages(1:N);domainNeeded(1:N)=true;
         if total>N
             [~,backupStage]=max(localStage(N+1:end));
             [~,backupDomain]=max(forward(N+1:end));
-            stageNeeded(N+backupStage)=~isempty(q);domainNeeded(N+backupDomain)=true;
+            stageNeeded(N+backupStage)=activeStages(N+backupStage);domainNeeded(N+backupDomain)=true;
         end
         required=[false(2,total);domainNeeded;false(2,total)];
         if ~isempty(checkBudget),checkBudget();end
-        slot=total-N+1;
-        if numel(sensitivityCache)>=slot && ~isempty(sensitivityCache{slot})
-            SC=sensitivityCache{slot}.samples;SE=sensitivityCache{slot}.ends;
-        else
-            [SC,SE]=localCondensedSensitivities(roots,allInputs,item.parameters, ...
-                [zeros(2,total);fi;zeros(2,total)],required,derivativeModel);
-            sensitivityCache{slot}=struct('samples',{SC},'ends',{SE});
-        end
+        [SC,SE]=localCondensedSensitivities(roots,allInputs,item.parameters, ...
+            [zeros(2,total);fi;zeros(2,total)],required,derivativeModel);
         if ~isempty(checkBudget),checkBudget();end
         SF=SC(3,:);gradient=zeros(3,total);
-        if ~isempty(q)
+        if any(stageNeeded)
             selected=nodeIndices(stageNeeded);
-            gradient(:,stageNeeded)=localCompactDistanceGradient(nodes(:,selected),q(:,selected),shape);
+            gradient(:,stageNeeded)=localCompactDistanceGradient(nodes(:,selected),boxes(:,selected),shape);
         end
         stageGradient=zeros(nu,total);
         for i=1:total
@@ -4754,12 +4703,8 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 if forward(i)>e.forward(i),e.forward(i)=forward(i);e.forwardGradient(:,i)=domainGradient;end
             end
         end
-        if multipleTargets
-            e.caseStage(:,s)=localStage(1:N).';
-            e.caseGradient(:,:,s)=stageGradient(:,1:N);
-        end
         target=[];if ~isempty(q),target=q(:,end);end
-        [terminal,~,g]=terminalSafeSet.movingValue(ends(:,end),target,cfg,checkBudget);
+        [terminal,~,g]=localCompactMovingValue(ends(:,end),target,item,total*h,cfg,checkBudget,remaining);
         e.terminal(s)=terminal;e.terminalGradient(:,s)=(g*SE{end}).';
         if total>N
             [backupValue,index]=max(localStage(N+1:end));
@@ -4929,9 +4874,8 @@ function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg,
     frame=predictiveSafetyGeometry.roadFrame(lane,struct('lateralClearance',[]));
     nominal=struct('state',[0;0;0;cfg.referenceSpeed;0;0],'curvature',frame(4));
     model=struct('cfg',cfg,'initialState',x,'previousInput',previous,'target',item.target, ...
-        'lane',lane,'road',struct('lateralClearance',[]),'frame',frame,'nominalReference',nominal,'compactInitialization',true, ...
+        'lane',lane,'road',struct('lateralClearance',[]),'frame',frame,'nominalReference',nominal,'compactInitialization',true,'motionLimits',item.motionLimits, ...
         'uncertainty',struct('collisionGenerator',zeros(6,0),'target',[]));
-    if size(item.guideTargets,2)>1,model.guideTargets=item.guideTargets;end
     if nargin>=6 && reentered
         % Sample the same guide at knot boundaries and their midpoints.
         % Both its knot projection and its original held commands can be
@@ -4961,32 +4905,28 @@ function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg,
     controls=localCompactRateLimit(controls,previous,holds,cfg);
 end
 
-function [candidates,evaluations]=localCompactControlSearch(item,previous,kernel,cfg,checkClock)
+function [candidates,evaluations]=localCompactControlSearch(item,previous,kernel,cfg,checkClock,admit)
     % Poll two actuator knots and their durations before the full SQP.
     % A nominal-ego screen orders trials. Only the caller's replay over
     % all physical members can admit a driving plan or spend PCBF slack.
     h=cfg.controller.sampleTime;count=sum(kernel.holds);time=(0:count)*h;
-    cases=item.guideTargets;
-    targets=zeros(size(cases,1),count+1,size(cases,2));
-    for j=1:size(cases,2)
-        targets(:,:,j)=localCompactTargetNodes(cases(:,j),time);
-    end
+    q=localCompactTargetNodes(item.target,time);
+    if ~isempty(item.motionLimits),q=predictiveSafetyGeometry.targetMotionEnvelope(item.target,item.motionLimits,time);end
     x=item.ego;speed=hypot(x(4),x(5));course=x(3)+atan2(x(5),x(4));
     drift=x(1:2)+[cos(course);sin(course)]*speed*time;
-    [~,closest]=min(vecnorm(drift-targets(1:2,:,1)));
+    [~,closest]=min(vecnorm(drift-q(1:2,:)));
     span=max(cfg.outputFeedback.minimumPreviewSeconds/4,time(closest));
     t=time(2:end)/span;
-    grip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-    turn=min(cfg.outputFeedback.steeringMaximum,2*atan2(cfg.vehicle.wheelbase*grip,max(speed^2,1)));
+    turn=cfg.outputFeedback.steeringMaximum;
     lower=[-turn;max(-1,cfg.actuation.brakingRatioMinimum)];
     upper=[turn;min(1,cfg.actuation.brakingRatioMaximum)];
     boxLow=[lower;lower;.25;.25];boxHigh=[upper;upper;1.25;1.5];
     persistent mesh
     if isempty(mesh)
         % Radical inverses in six coprime bases, without a toolbox or RNG.
-        bases=[2,3,5,7,11,13];mesh=zeros(6,72);
+        bases=[2,3,5,7,11,13];mesh=zeros(6,472);
         for k=1:numel(bases)
-            indices=32:103;factor=1;
+            indices=32+(0:size(mesh,2)-1);factor=1;
             while any(indices)
                 factor=factor/bases(k);
                 mesh(k,:)=mesh(k,:)+factor*mod(indices,bases(k));
@@ -4996,11 +4936,12 @@ function [candidates,evaluations]=localCompactControlSearch(item,previous,kernel
     end
     trim=terminalSafeSet.movingControl(cfg);
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    q=reshape(targets,11,[]);
     radius=norm(shape(1:2))+norm(shape(3:4))+vecnorm(q(8:9,:))+vecnorm(q(10:11,:));
     capacity=kernel.capacity;pad=zeros(2,capacity-count);enabled=double((1:capacity)<=count);
     rateLimited=isfinite(cfg.outputFeedback.steeringRateMaximum) || isfinite(cfg.model.brakingRatioRateMaximum);
-    width=boxHigh-boxLow;points=boxLow+width.*mesh;
+    width=boxHigh-boxLow;
+    firstBatch=72;if ~isempty(item.cover),firstBatch=256;end
+    points=boxLow+width.*mesh(:,1:firstBatch);
     candidates={};rank=zeros(0,3);locations=zeros(6,0);evaluations=0;
     for level=1:4
         fresh=cell(1,size(points,2));scores=Inf(size(points,2),3);
@@ -5014,16 +4955,24 @@ function [candidates,evaluations]=localCompactControlSearch(item,previous,kernel
             [~,ends]=kernel.refinedRollout(x,[inputs,pad],item.parameters,enabled);
             ego=[x,full(ends(:,1:count))];evaluations=evaluations+1;
             if any(ego(4,:)<=0) || any(~isfinite(ego),'all'),continue;end
-            poses=repmat(ego(1:3,:),1,size(cases,2));
-            % Exact clearance clipped at one body width for ranking. A
-            % radius bound culls only pairs already beyond that clip.
-            near=vecnorm(poses(1:2,:)-q(1:2,:))-radius<cfg.vehicle.width;
-            gap=cfg.vehicle.width*ones(size(near));
-            gap(near)=min(cfg.vehicle.width,predictiveSafetyGeometry.rectangleClearance(poses(:,near),q(:,near),shape));
-            worst=min(reshape(gap,count+1,[]),[],2);
+            if ~isempty(item.cover)
+                [gap,~,remaining]=localCompactOccupied(item,ego,time,shape,cfg,[],cfg.vehicle.width);
+            else
+                poses=ego(1:3,:);
+                % Exact clearance clipped at one body width for ranking. A
+                % radius bound culls only pairs already beyond that clip.
+                near=vecnorm(poses(1:2,:)-q(1:2,:))-radius<cfg.vehicle.width;
+                gap=cfg.vehicle.width*ones(size(near));
+                gap(near)=min(cfg.vehicle.width,predictiveSafetyGeometry.rectangleClearance(poses(:,near),q(:,near),shape));
+            end
             slip=atan2(ego(5,:)-cfg.vehicle.lr*ego(6,:),ego(4,:));
-            deficit=max(0,cfg.outputFeedback.clearanceMeters-worst);
-            scores(j,:)=[max(deficit),sum(deficit),max(abs(slip))+.1*mean(inputs(2,:).^2)-min(worst)];
+            deficit=max(0,cfg.outputFeedback.clearanceMeters-gap);
+            hard=0;
+            if ~isempty(item.cover) && all(deficit==0)
+                hard=localCompactTerminalCheck(ego(:,end),item,time(end),inputs(:,end),kernel,cfg,[],checkClock,remaining);
+            end
+            scores(j,:)=[max(max(deficit),hard),sum(deficit)+hard,max(abs(slip))+.1*mean(inputs(2,:).^2)-min(gap)];
+            if all(deficit==0) && hard==0 && admit(inputs),return;end
             fresh{j}=inputs;
         end
         [allScores,order]=sortrows([rank;scores]);
@@ -5032,8 +4981,10 @@ function [candidates,evaluations]=localCompactControlSearch(item,previous,kernel
         candidates=[candidates,fresh];candidates=candidates(order(keep));
         locations=[locations,points];locations=locations(:,order(keep));
         rank=allScores(keep,:);
-        if rank(1,1)==0,return;end
-        width=width/2;points=max(boxLow,min(boxHigh,locations(:,1)+width.*(mesh-.5)));
+        if level==4,break;end
+        width=width/2;nextMesh=mesh(:,firstBatch+72*(level-1)+(1:72));
+        refined=max(boxLow,min(boxHigh,locations(:,1)+width.*(nextMesh(:,1:36)-.5)));
+        points=[refined,boxLow+(boxHigh-boxLow).*nextMesh(:,37:72)];
     end
 end
 
@@ -5074,9 +5025,6 @@ function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,condition
     for s=1:numel(hypotheses)
         if ~isempty(checkBudget),checkBudget();end
         original=conditioning.retainedIndices(s);item=hypotheses(s);prefix=0;
-        if s>1 && item.physicalMember==hypotheses(s-1).physicalMember
-            cache.trajectories{s}=cache.trajectories{s-1};reusedHolds(s)=reusedHolds(s-1);continue;
-        end
         if original<=numel(prior.retainedTrajectories)
             old=prior.retainedTrajectories{original};
             compatible=isstruct(old) && isscalar(old) && all(isfield(old, ...
@@ -5134,9 +5082,6 @@ function [valid,traces,violation,nodeStates,slacks] = localCompactValidate(contr
         item=hypotheses(s);
         if reuse
             flow=rollouts.trajectories{s};dense=flow.dense;states=flow.states;inputs=controls;collisionStates=flow.collisionStates;
-        elseif s>1 && item.physicalMember==hypotheses(s-1).physicalMember
-            sibling=traces{s-1};dense=sibling.denseEgo;states=sibling.ego(:,2:end);
-            inputs=sibling.inputs;collisionStates=sibling.collisionEgo;
         else
             [dense,states,inputs,collisionStates]=localCompactRollout(kernel,item.ego,previous,controls,item.parameters,fine);
         end
@@ -5147,15 +5092,20 @@ function [valid,traces,violation,nodeStates,slacks] = localCompactValidate(contr
         stateViolation=max(stateViolation,max(domain));
         if ~defined,stateViolation=Inf;end
         violation=max(violation,stateViolation);
-        times=(0:size(inputs,2))*h;q=[];
+        times=(0:size(inputs,2))*h;q=[];remaining=[];
         if ~isempty(item.target)
             if reuse && isfield(flow,'separation')
                 q=flow.targets;separation=flow.separation;
+                if ~isempty(item.cover),remaining=flow.remaining;end
             else
                 if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);
                 else,q=repmat(item.target,1,numel(times));end
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-                separation=predictiveSafetyGeometry.rectangleClearance(collisionStates,q,shape);
+                if isempty(item.cover)
+                    separation=predictiveSafetyGeometry.rectangleClearance(collisionStates,q,shape);
+                else
+                    [separation,~,remaining]=localCompactOccupied(item,collisionStates,times,shape,cfg);
+                end
             end
             separated=separated && all(separation>0);
             violation=max(violation,-min(separation));
@@ -5163,16 +5113,15 @@ function [valid,traces,violation,nodeStates,slacks] = localCompactValidate(contr
         end
         parameters=[];if ~isempty(item.target),parameters=item.target(5:6);end
         traces{s}=struct('ego',[item.ego,states],'inputs',inputs,'denseEgo',dense,'collisionEgo',collisionStates,'collisionTimes',times, ...
-            'targets',q,'targetMotionParameters',parameters,'validationSubsteps',kernel.validationSubsteps);
+            'targets',q,'remainingParameterCells',remaining,'targetMotionParameters',parameters,'validationSubsteps',kernel.validationSubsteps);
     end
     valid=separated && isfinite(violation) && violation<=cfg.outputFeedback.nlpTolerance;
     if isfinite(violation)
         for s=1:numel(hypotheses)
             if ~isempty(checkBudget),checkBudget();end
-            trace=traces{s};target=[];
-            if ~isempty(trace.targets),target=trace.targets(:,end);end
+            trace=traces{s};
             backup=[];if reuse,backup=rollouts.trajectories{s}.backup;end
-            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup,checkBudget);
+            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),hypotheses(s),trace.collisionTimes(end),trace.inputs(:,end),kernel,cfg,backup,checkBudget,trace.remainingParameterCells);
             traces{s}.terminal=terminal;violation=max(violation,terminalValue);
             valid=valid && terminal.member;
         end
@@ -5200,11 +5149,11 @@ function [dense,states,inputs,collisionStates] = localCompactRollout(kernel,x,pr
     dense=[x,dense(:,1:kernel.validationSubsteps*N)];states=ends(:,cumsum(kernel.holds));
     if nargout>3,collisionStates=[x,ends(:,1:N)];end
 end
-function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup,checkBudget)
+function [terminalValue,terminal]=localCompactTerminalCheck(x,item,start,previous,kernel,cfg,backup,checkBudget,remaining)
     h=cfg.controller.sampleTime;
     if nargin<8,checkBudget=[];end
     if nargin<7 || isempty(backup)
-        [tail,tailEnds,tailInputs]=localCompactCruiseRollout(kernel,x,target,parameters,cfg,checkBudget);
+        [tail,tailEnds,tailInputs]=localCompactCruiseRollout(kernel,x,item,start,cfg,checkBudget,remaining);
     else
         tail=backup.dense;tailEnds=backup.states;tailInputs=backup.inputs;
     end
@@ -5212,10 +5161,15 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,pa
     normalWitness=zeros(2,1);exitSteps=0;terminalValue=0;member=true;
     if nBridge>0
         [domain,~,~,~,defined]=localCompactModelDomain(tail,tailInputs,cfg,kernel.validationSubsteps);
-        q=localCompactTargetNodes(target,(0:nBridge)*h);
+        times=start+(0:nBridge)*h;
+        q=localCompactTargetNodes(item.target,times);
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        gaps=predictiveSafetyGeometry.rectangleClearance([x,tailEnds],q,shape);
-        [core,normalWitness,~,coreSteps]=terminalSafeSet.movingValue(tailEnds(:,end),q(:,end),cfg,checkBudget);
+        if isempty(item.cover)
+            gaps=predictiveSafetyGeometry.rectangleClearance([x,tailEnds],q,shape);
+        else
+            [gaps,~,remaining]=localCompactOccupied(item,[x,tailEnds],times,shape,cfg,remaining);
+        end
+        [core,normalWitness,~,coreSteps]=localCompactMovingValue(tailEnds(:,end),q(:,end),item,times(end),cfg,checkBudget,remaining);
         exitSteps=nBridge+coreSteps;
         rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
         slew=abs(command-previous)-h*rates;
@@ -5233,21 +5187,120 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,pa
         'model',"safeRangeExit",'safetyAssumed',true,'safetyProved',false);
 end
 
-function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,target,parameters,cfg,checkBudget)
+function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,item,start,cfg,checkBudget,remaining)
     if ~isempty(checkBudget),checkBudget();end
-    if isempty(target) || norm(target(1:2)-x(1:2))>cfg.collision.encounterRangeMeters
+    if isempty(item.target) || (~isempty(item.cover) && ~any(remaining)) || localCompactRange(item,x,start)>cfg.collision.encounterRangeMeters
         dense=x;ends=zeros(6,0);inputs=zeros(2,0);return;
     end
     h=cfg.controller.sampleTime;
     count=max(1,ceil(cfg.outputFeedback.minimumPreviewSeconds/h));
     capacity=kernel.capacity;
     inputs=repmat(terminalSafeSet.movingControl(cfg),1,count);
-    [points,states]=kernel.refinedRollout(x,[inputs,zeros(2,capacity-count)],parameters,double((1:capacity)<=count));
+    [points,states]=kernel.refinedRollout(x,[inputs,zeros(2,capacity-count)],item.parameters,double((1:capacity)<=count));
     ends=full(states(:,1:count));
-    q=localCompactTargetNodes(target,(1:count)*h);
-    out=find(vecnorm(ends(1:2,:)-q(1:2,:))>cfg.collision.encounterRangeMeters,1);
+    out=find(localCompactRange(item,ends,start+(1:count)*h)>cfg.collision.encounterRangeMeters,1);
     if ~isempty(out),count=out;ends=ends(:,1:count);inputs=inputs(:,1:count);end
     dense=[x,full(points(:,1:count*kernel.validationSubsteps))];
+end
+
+function cover=localCompactCover(item,h,count)
+    bounds=item.motionLimits;
+    acceleration=unique(linspace(bounds(1,1),bounds(2,1),5));
+    slip=unique(linspace(bounds(1,2),bounds(2,2),5));
+    na=max(1,numel(acceleration)-1);nb=max(1,numel(slip)-1);
+    [i,j]=ndgrid(1:na,1:nb);
+    % Store closed interval cells, each with its complete footprint image.
+    cover=struct('h',h,'cells',zeros(2,2,numel(i)),'boxes',zeros(11,count+1,numel(i)), ...
+        'centers',zeros(4,count+1,numel(i)));
+    times=(0:count)*h;nominal=predictiveSafetyGeometry.predictTarget(item.target,times);
+    for k=1:numel(i)
+        limits=[acceleration(i(k)),slip(j(k));acceleration(min(i(k)+1,end)),slip(min(j(k)+1,end))];
+        cover.cells(:,:,k)=limits;
+        [cover.boxes(:,:,k),cover.centers(:,:,k)]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,limits,times,nominal);
+    end
+end
+
+function [gap,worst,remaining,last]=localCompactOccupied(item,states,times,shape,cfg,remaining,clip)
+    cover=item.cover;nodes=round(times/cover.h)+1;count=numel(nodes);
+    if nargin<6 || isempty(remaining),remaining=true(1,size(cover.cells,3));end
+    if nargin<7,clip=Inf;end
+    gap=repmat(clip,1,count);worst=repmat(item.target,1,count);last=1;
+    which=find(remaining);number=numel(which);
+    if number==0,return;end
+    if nodes(end)<=size(cover.boxes,2)
+        boxes=cover.boxes(:,nodes,which);centers=cover.centers(:,nodes,which);
+    else
+        boxes=zeros(11,count,number);centers=zeros(4,count,number);
+        nominal=predictiveSafetyGeometry.predictTarget(item.target,times);
+        for k=1:number
+            [boxes(:,:,k),centers(:,:,k)]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,cover.cells(:,:,which(k)),times,nominal);
+        end
+    end
+    boxes=reshape(boxes,11,[]);centers=reshape(centers,4,[]);
+    ego=repmat(states,1,number);
+    range=reshape(predictiveSafetyGeometry.targetEnvelopeRange(ego,boxes,centers),count,[]);
+    outside=range>cfg.collision.encounterRangeMeters;
+    [hasExit,stop]=max(outside,[],1);stop(~hasExit)=count;
+    remaining(which(hasExit))=false;last=max(stop);
+    active=reshape((1:count).'<=stop,1,[]);
+    c=cos(boxes(3,:));sn=sin(boxes(3,:));
+    center=boxes(1:2,:)+[c.*boxes(10,:)-sn.*boxes(11,:);sn.*boxes(10,:)+c.*boxes(11,:)];
+    radius=vecnorm(boxes(8:9,:))+norm(shape(1:2))+norm(shape(3:4));
+    distance=vecnorm(ego(1:2,:)-center);
+    lower=reshape(distance-radius,count,[]);
+    upper=reshape(distance+radius,count,[]);upper(~reshape(active,count,[]))=Inf;
+    bound=min(clip,min(upper,[],2));
+    check=active & reshape(lower<=bound,1,[]);
+    values=repmat(clip,1,count*number);
+    if any(check)
+        values(check)=min(clip,predictiveSafetyGeometry.rectangleClearance(ego(:,check),boxes(:,check),shape));
+    end
+    [gap,index]=min(reshape(values,count,[]),[],2);
+    gap=gap.';worst=boxes(:,(index.'-1)*count+(1:count));
+end
+
+function range=localCompactRange(item,states,time)
+    if isempty(item.motionLimits)
+        q=localCompactTargetNodes(item.target,time);
+        range=vecnorm(states(1:2,:)-q(1:2,:));
+    else
+        [q,centers]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,item.motionLimits,time);
+        range=predictiveSafetyGeometry.targetEnvelopeRange(states,q,centers);
+    end
+end
+
+function [value,normal,gradient,exitSteps]=localCompactMovingValue(x,target,item,start,cfg,checkBudget,remaining)
+    if isempty(item.motionLimits)
+        [value,normal,gradient,exitSteps]=terminalSafeSet.movingValue(x,target,cfg,checkBudget);
+        return
+    end
+    R=cfg.collision.encounterRangeMeters;h=cfg.controller.sampleTime;
+    value=-R;normal=zeros(2,1);gradient=zeros(1,6);exitSteps=0;
+    if ~any(remaining) || localCompactRange(item,x,start)>R,return;end
+    exitSteps=Inf;
+    if x(4)<=0,value=max(2*cfg.outputFeedback.nlpTolerance,-x(4));gradient(4)=-1;return;end
+    e=predictiveSafetyGeometry.direction(x(3));lateral=[-e(2);e(1)];
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    clock=tic;first=0;best=Inf;
+    while isinf(exitSteps)
+        if isempty(checkBudget) && toc(clock)>cfg.outputFeedback.maximumSolveSeconds
+            value=R;return
+        end
+        if ~isempty(checkBudget),checkBudget();end
+        indices=first+(0:31);time=h*indices;
+        states=[x(1:2)+x(4)*e*time;repmat(x(3),size(time))];
+        [gaps,boxes,remaining,last]=localCompactOccupied(item,states,start+time,shape,cfg,remaining);
+        if ~any(remaining),exitSteps=indices(last);end
+        [minimum,j]=min(gaps);
+        if minimum<best
+            best=minimum;value=cfg.outputFeedback.clearanceMeters-best;
+            [~,g]=predictiveSafetyGeometry.rectangleClearance(states(:,j),boxes(:,j),shape);
+            normal=g(1:2);t=time(j);
+            gradient=-[normal.',g(3)+x(4)*t*(normal.'*lateral),t*(normal.'*e),0,0];
+        end
+        if best<cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance,return;end
+        first=indices(end)+1;
+    end
 end
 
 function q=localCompactTargetNodes(target,times)
