@@ -241,6 +241,23 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 end
             end
         end
+        function firstStoppedLeadEncounterReachesZeroDeficitWithQpProjection(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            campaign=runJointOutputFeedbackScenario(Frames=8,Speeds=15,Scenarios="stoppedLead", ...
+                RandomSeed=20261107,OutputDirectory=string(folder.Folder));
+            testCase.assertEqual(campaign.results.outcome,"completed");
+            data=jsondecode(fileread(campaign.results.source));
+            active=find(arrayfun(@(frame) frame.metadata.collisionTargetActive,data.trace),1);
+            testCase.assertNotEmpty(active);
+            info=data.trace(active).metadata;
+            testCase.verifyEqual(info.callBudgetSeconds,data.configuration.outputFeedback.initializationSolveSeconds);
+            testCase.verifyGreaterThan(info.zeroDeficitQpSteps,0);
+            testCase.verifyEqual(info.nlpAttempts,0);
+            testCase.verifyTrue(info.nonlinearValidationPerformed && info.terminalSetEnforced);
+            testCase.verifyEqual(info.pcbfValue,0);
+            testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
+            testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
+        end
         function clearRoadSteadyTurnIsAPublicControllerEquilibrium(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=30;cfg.tire.frictionCoefficient=[.65;.65];
             [x,~,road,cfg]=collisionThreatScenario("curvedHeadOn",cfg);

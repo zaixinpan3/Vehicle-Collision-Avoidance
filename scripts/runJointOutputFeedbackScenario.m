@@ -194,6 +194,9 @@ function ready=localWarmCompactSolvers(runCfg)
     % A fixed synthetic encounter exercises the actual projection QP, SQP
     % callbacks and trajectory derivatives before the experiment clock starts.
     cfg=collisionAvoidanceControllerConfig();
+    % This discarded offline solve uses the solver iteration limits. An
+    % online wall-clock deadline can interrupt first-time toolbox loading.
+    cfg.outputFeedback.initializationSolveSeconds=realmax;
     cfg.outputFeedback.nlpJit=runCfg.outputFeedback.nlpJit;
     cfg.outputFeedback.nlpCompiler=runCfg.outputFeedback.nlpCompiler;
     cfg.outputFeedback.nlpCompilerOptimization=runCfg.outputFeedback.nlpCompilerOptimization;

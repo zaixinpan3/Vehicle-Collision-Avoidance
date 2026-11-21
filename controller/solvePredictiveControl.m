@@ -4199,20 +4199,27 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         while projectionSteps<cfg.outputFeedback.restorationMaximumIterations
             checkClock();
             margins=[e.stage;e.forward;e.terminal];
+            worstMargin=max(margins);
+            stepUnit=1;
+            if worstMargin>0 && worstMargin<1e-4
+                % Express tiny corrections in units of the remaining deficit
+                % so the active-set solver can resolve them near feasibility.
+                stepUnit=max(worstMargin,eps);
+            end
             rows=[a;[e.stageGradient,e.forwardGradient,e.terminalGradient].'];
             rhs=[b-a*u;-margins];
-            [step,~,flag]=quadprog(eye(nu),zeros(nu,1),rows.*controlScale.',rhs,[],[], ...
-                (lower-u)./controlScale,(upper-u)./controlScale,zeros(nu,1),options);
+            [step,~,flag]=quadprog(eye(nu),zeros(nu,1),rows.*controlScale.',rhs/stepUnit,[],[], ...
+                ((lower-u)./controlScale)/stepUnit,((upper-u)./controlScale)/stepUnit,zeros(nu,1),options);
             projectionSteps=projectionSteps+1;
             if flag<=0,return;end
-            proposal=u+controlScale.*step;
+            proposal=u+controlScale.*(stepUnit*step);
             if isequal(proposal,u) || any(~isfinite(proposal)) || max([a*proposal-b;lower-proposal;proposal-upper])>tolerance
                 return;
             end
             candidate=evaluate(proposal);
             % A poor tangent model returns control to the full slack SQP.
             % Only nonlinear replay can accept the command sequence.
-            if max([candidate.stage;candidate.forward;candidate.terminal])>=max(margins)/2
+            if max([candidate.stage;candidate.forward;candidate.terminal])>=worstMargin/2
                 return;
             end
             u=proposal;e=candidate;
