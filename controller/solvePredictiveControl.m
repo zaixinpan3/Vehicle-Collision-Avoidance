@@ -4012,8 +4012,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 clockCheck=[];
                 if compare,clockCheck=@checkClock;end
                 [shifted,reused]=localCompactShiftedCache(prior,hypotheses,conditioning,inherited,kernel,cfg,clockCheck);
-                normals=prior.terminalNormals(:,conditioning.retainedIndices);
-                [selected,inheritedCost]=validatePlan(inherited,shifted,clockCheck,normals);
+                [selected,inheritedCost]=validatePlan(inherited,shifted,clockCheck);
                 if selected
                     retained=true;inheritedReusedHolds=reused;
                     initializationSource="shiftedMovingTerminalLaw";
@@ -4130,7 +4129,6 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
         'fineControls',best,'movingTerminalPlan',true,'firstFeasibleDrivingPlan',stabilitySteps==0,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
-        'terminalNormals',cell2mat(cellfun(@(t)t.terminal.normal,traces(:).','UniformOutput',false)), ...
         'pcbfDeficit',0,'stageDeficits',zeros(count,1), ...
         'retainedTrajectories',{retainedTrajectories});
     info=struct('solver',"condensedNonlinearPcbfSqp",'nlpStatus',"feasible", ...
@@ -4171,11 +4169,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     prediction=struct('metadata',info,'scenarios',{traces},'memory',zeros(0,1),'information',hypotheses);
     result=struct('command',command,'inputs',best,'prediction',prediction,'state',state);
 
-    function [selected,tracking]=validatePlan(inputs,flows,clockCheck,normals)
+    function [selected,tracking]=validatePlan(inputs,flows,clockCheck)
         if nargin<3,clockCheck=[];end
-        if nargin<4,normals=[];end
         clock=tic;
-        [valid,checked,maximum]=localCompactValidate(inputs,hypotheses,previous,kernel,cfg,true,flows,clockCheck,normals);
+        [valid,checked,maximum]=localCompactValidate(inputs,hypotheses,previous,kernel,cfg,true,flows,clockCheck);
         validationSeconds=validationSeconds+toc(clock);
         selected=false;
         tracking=NaN;
@@ -4511,7 +4508,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         if ~derivatives
             e.stage=max(e.stage,localStage(1:N).');e.forward=max(e.forward,forward(1:N).');
             target=[];if ~isempty(q),target=q(:,end);end
-            terminal=terminalSafeSet.movingValue(ends(:,end),target,cfg,[],checkBudget);
+            terminal=terminalSafeSet.movingValue(ends(:,end),target,cfg,checkBudget);
             e.terminal(s)=max([terminal,slew,localStage(N+1:end),forward(N+1:end)]);
             if s==model.nominal,e.cost=localCompactPerformance(ends(:,cumsum(kernel.holds)),inputs,model);end
             continue;
@@ -4548,7 +4545,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             end
         end
         target=[];if ~isempty(q),target=q(:,end);end
-        [terminal,~,g]=terminalSafeSet.movingValue(ends(:,end),target,cfg,[],checkBudget);
+        [terminal,~,g]=terminalSafeSet.movingValue(ends(:,end),target,cfg,checkBudget);
         e.terminal(s)=terminal;e.terminalGradient(:,s)=(g*SE{end}).';
         if total>N
             [backupValue,index]=max(localStage(N+1:end));
@@ -4827,11 +4824,10 @@ function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,condition
     end
 end
 
-function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,rollouts,checkBudget,normals)
+function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hypotheses,previous,kernel,cfg,fine,rollouts,checkBudget)
     if nargin<6,fine=false;end
     if nargin<7,rollouts=[];end
     if nargin<8,checkBudget=[];end
-    if nargin<9,normals=[];end
     reuse=fine && localCompactCacheMatches(rollouts,controls,hypotheses,previous,kernel,cfg);
     traces=cell(1,numel(hypotheses));nodeStates=cell(size(traces));violation=0;h=cfg.controller.sampleTime;
     durations=kernel.holds;if fine,durations=ones(1,size(controls,2));end
@@ -4876,8 +4872,7 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
             trace=traces{s};target=[];
             if ~isempty(trace.targets),target=trace.targets(:,end);end
             backup=[];if reuse,backup=rollouts.trajectories{s}.backup;end
-            normal=[];if ~isempty(normals),normal=normals(:,s);end
-            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup,checkBudget,normal);
+            [terminalValue,terminal]=localCompactTerminalCheck(trace.ego(:,end),target,trace.inputs(:,end),hypotheses(s).parameters,kernel,cfg,backup,checkBudget);
             traces{s}.terminal=terminal;violation=max(violation,terminalValue);
             valid=valid && terminal.member;
         end
@@ -4905,7 +4900,7 @@ function [dense,states,inputs,collisionStates] = localCompactRollout(kernel,x,pr
     dense=[x,dense(:,1:kernel.validationSubsteps*N)];states=ends(:,cumsum(kernel.holds));
     if nargout>3,collisionStates=[x,ends(:,1:N)];end
 end
-function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup,checkBudget,normal)
+function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,parameters,kernel,cfg,backup,checkBudget)
     h=cfg.controller.sampleTime;
     if nargin<8,checkBudget=[];end
     if nargin<7 || isempty(backup)
@@ -4920,7 +4915,7 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,pa
         q=localCompactTargetNodes(target,(0:nBridge)*h);
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
         gaps=predictiveSafetyGeometry.rectangleClearance([x,tailEnds],q,shape);
-        [core,normalWitness,~,coreSteps]=terminalSafeSet.movingValue(tailEnds(:,end),q(:,end),cfg,normal,checkBudget);
+        [core,normalWitness,~,coreSteps]=terminalSafeSet.movingValue(tailEnds(:,end),q(:,end),cfg,checkBudget);
         exitSteps=nBridge+coreSteps;
         rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
         slew=abs(command-previous)-h*rates;

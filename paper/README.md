@@ -44,8 +44,8 @@ Initial feasibility, truth containment, well-posed joint flows, primary
 attainment, policy/certificate closure and a nonempty downward-closed terminal
 family remain explicit premises. The terminal family must admit a common
 causal zero-slack continuation under the same model and uncertainty contract.
-Its existence is assumed; the simplified braking candidate is an
-implementation choice, not a terminal construction supplied by the theorem.
+The theorem assumes this family exists. The compact controller uses a
+simplified continuation to the first control node outside sensing range.
 
 No performance optimization is required by the theoretical control law.
 A feasible secondary refinement under the exact attained primary cap is
@@ -58,9 +58,8 @@ The detailed compact nonlinear controller derivation is maintained in
 Section II-B of `manuscript.tex` now presents the adopted
 compact nonlinear controller (fixed measurement-consistency ensemble
 inference, condensed nonlinear PCBF SQP over coarse control knots, exact
-dual rectangle separation at control-boundary nodes, moving straight-cruise
-terminal set with $B$-hold bridge under an explicit physical handoff
-assumption, and zero-deficit tire-loading/rear-slip preference $J_{\rm tire}$
+dual rectangle separation at control-boundary nodes, terminal continuation
+to sensing-range exit under an explicit physical handoff assumption, and zero-deficit tire-loading/rear-slip preference $J_{\rm tire}$
 with damped Gauss--Newton refinement) alongside the idealized joint
 output-feedback safety theory.
 

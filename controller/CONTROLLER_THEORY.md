@@ -263,9 +263,9 @@ dimensions and rear axle distance are declared vehicle-class parameters.
 
 For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
 target contributes node and terminal separation constraints when $d_k^-\le R$.
-Missed returns preserve the acquired posterior. If $d_k^->R$, the target-free
-planning problem retains its physical-domain, actuator and moving-terminal
-conditions. First detection and re-entry both require a feasible plan for
+Missed returns preserve the acquired posterior. After confirmed exit, the
+encounter is complete and the target-free plan must still satisfy the
+physical-domain and actuator constraints. First detection and re-entry both require a feasible plan for
 the newly active constraints before issuing a command.
 
 The inference equations are fixed. There is no online optimization of an
@@ -647,8 +647,8 @@ through the first strict exit. These checks use the exact rectangle-distance dua
 Section 5. The control-boundary state nodes are retained even inside a long
 control-knot interval. The compact controller requires $d_{\rm safe}>0$,
 with a default of $0.10\,\mathrm{m}$. The primary optimization and nonlinear
-acceptance use the same clearance at the prediction nodes, on the cruise
-bridge and in the terminal separation witness. The simulation counts
+acceptance use the same clearance at the prediction nodes and throughout
+the sampled terminal continuation to range exit. The simulation counts
 contact or overlap at a control node when the true signed distance is
 nonpositive. A trajectory can
 pass these collision inequalities while intersecting between nodes; the

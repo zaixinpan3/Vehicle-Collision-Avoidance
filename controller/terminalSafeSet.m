@@ -76,11 +76,11 @@ classdef terminalSafeSet
             input=[0;min(cfg.actuation.brakingRatioMaximum,max(cfg.actuation.brakingRatioMinimum,trim))];
         end
 
-        function [value,normal,gradient,exitSteps]=movingValue(x,q,cfg,priorNormal,checkClock)
+        function [value,normal,gradient,exitSteps]=movingValue(x,q,cfg,checkClock)
             % Terminal handoff: fixed heading and positive forward speed under
             % the common terminal input. End this encounter at its first
             % control node strictly outside the sensor disk.
-            if nargin<5,checkClock=[];end
+            if nargin<4,checkClock=[];end
             R=cfg.collision.encounterRangeMeters;h=cfg.controller.sampleTime;
             value=-R;normal=zeros(2,1);gradient=zeros(1,6);exitSteps=0;
             if isempty(q) || norm(q(1:2)-x(1:2))>R,return;end
@@ -139,14 +139,6 @@ classdef terminalSafeSet
                 [~,g]=clearances(worst);
                 normal=g(1:2);time=h*worst;
                 gradient=-[g(1:2).',g(3)+speed*time*(g(1:2).'*lateral),time*(g(1:2).'*e),0,0];
-                if nargin>=4 && ~isempty(priorNormal) && abs(norm(priorNormal)-1)<1e-12
-                    % Keep a shifted dual witness when its support gap
-                    % also attains the worst node's exact distance.
-                    n=priorNormal(:).'/norm(priorNormal);atWorst=relativeTarget(worst);
-                    gap=-predictiveSafetyGeometry.rotationSupport(shape,x(3),0,-n) ...
-                        -n*atWorst(1:2)-predictiveSafetyGeometry.rotationSupport(q(8:11),atWorst(3),0,n);
-                    if gap>=best,normal=n.';end
-                end
             end
 
             function target=relativeTarget(indices)

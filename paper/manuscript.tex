@@ -82,7 +82,7 @@ No constant-width tube or finite-time arrival at zero is asserted.
 The adopted compact nonlinear Fiala controller approximates this
 construction using fixed measurement-consistency ensemble inference,
 condensed nonlinear sequential quadratic programming over coarse control
-knots, a moving straight-cruise terminal set, and a secondary tire-loading
+knots, a terminal continuation to sensing-range exit, and a secondary tire-loading
 and rear-slip preference on the zero-deficit level.
 In the historical October 11 affine-RTI baseline (predating this compact
 nonlinear controller revision and pending rerun), all fourteen
@@ -258,8 +258,8 @@ certificate and publishes explicit, time-varying error enclosures online
 bicycle model that pairs fixed measurement-consistency ensemble inference
 with condensed nonlinear sequential quadratic programming over coarse
 control knots and exact dual rectangle separation at control-boundary
-nodes. A moving straight-cruise terminal set reached through a nonlinear
-cruise bridge supports horizon-shift feasibility under an explicit
+nodes. A terminal continuation that keeps the vehicles separated until
+the target leaves sensing range supports horizon-shift feasibility under an explicit
 physical handoff assumption, while a secondary tire-loading and rear-slip
 preference guides selection among validated zero-deficit driving plans
 without altering the primary safety objective (Section~\ref{sec:control}).
@@ -1258,8 +1258,8 @@ filtering ideas \cite{WabersichZeilinger2023}. Sparse nonlinear
 optimization over few control knots across a substantial preview with warm
 initialization is motivated by \cite{ThompsonDallasGohBalachandran2024},
 adapted here to a time-coordinate held-input vehicle model that includes
-rest. The controller enforces a moving straight-cruise terminal
-continuation set, retains a complete held-input moving plan for
+rest. The controller enforces terminal membership by checking safe
+continuation to sensing-range exit, retains a complete held-input plan for
 validation at the next measurement, and applies collision constraints at
 control-boundary state nodes. On the zero-deficit level, predicted tire
 loading and rear slip guide the choice of driving sequence without
@@ -1497,10 +1497,10 @@ $d_k^-=\min_s\normtwo{\bm p_{C,k}^s-\bm p_{E,k}^s}$. Once entry has been
 recorded (by a return, $d_k^-\le R_{\rm enc}$, or explicit initial
 supply), the target contributes collision and terminal separation
 constraints at step $k$ if and only if $d_k^-\le R_{\rm enc}$. When
-$d_k^->R_{\rm enc}$, the target-free problem retains physical-domain,
-actuator, and moving terminal conditions while the posterior continues
-propagating the target; re-entry restores full constraints before a new
-command is issued. Planning selects one representative member
+$d_k^->R_{\rm enc}$ and exit is confirmed, the target-free plan must
+still satisfy the physical-domain and actuator constraints. The posterior
+continues propagating the target. Re-entry restores the encounter
+constraints before a new command is issued. Planning selects one representative member
 \begin{equation}
     s_0\in\arg\min_s
         \normtwo{\bm x_k^s-\frac1{S_k}\sum_{a=1}^{S_k}\bm x_k^a}^2
@@ -1630,102 +1630,78 @@ fixed four-axis clearance bound, bounding circles, smooth-max surrogate,
 or extra fixed planning buffer; the resulting value is piecewise smooth
 at feature changes.
 
-\subsubsection{Moving Terminal Set and Continuation}
+\subsubsection{Terminal Continuation to Sensing-Range Exit}
 \label{subsec:terminal}
 
-This subsection describes the moving cruise terminal construction used by
-the adopted compact controller. The general theory of
-Section~\ref{subsec:robust} assumes only the abstract terminal property
-\eqref{eq:terminal_information} and does not depend on this construction.
+The terminal set $Z_f$ covers the current encounter. The first
+control node at which the two reference points are strictly farther
+apart than $R_{\rm enc}$ completes the encounter. Equality is in range.
+A predicted exit completes a terminal witness. Online release requires
+the observation update to confirm exit for the surviving members.
+Nominal control then governs path and speed recovery.
 
-Define the common straight-cruise terminal command
+At an endpoint with the target still in range, all members share the
+terminal command
 \begin{equation}
     \begin{gathered}
     \bm u_f=[0,\,u_{L,f}]^{\trans},\\
     u_{L,f}=\operatorname{clip}_{[u_{L,\min},u_{L,\max}]}
-        \frac{F_R(v_*)}{\mu_fF_{zf}+\mu_rF_{zr}},
+        \frac{F_R(v_*)}{\mu_f F_{zf}+\mu_r F_{zr}} .
     \end{gathered}
     \label{eq:terminal_command}
 \end{equation}
-applied identically to all retained hypotheses (balancing the nominal
-road load at $v_*$ when within actuator bounds; individual member speeds
-may still differ). Write $E(\bm x)$ for the oriented ego rectangle,
-$\bm e=[\cos\psi,\sin\psi]^{\trans}$ for its forward unit vector, and
-$T(\bm q(t))$ for the forecast target rectangle. In the simplified
-terminal model, the ego continues along its forward ray with fixed
-orientation and strictly positive speed (without a prescribed speed
-profile). Define the directional ego lower support and target-sweep upper
-support
+Membership requires this input to be reachable from the preceding
+command. Apply it in the nonlinear vehicle model for up to
+$B=\max(1,\lceil T_{\rm preview,\min}/h\rceil)$ holds, checking model
+admissibility and the signed rectangle distance
+\eqref{eq:signed_distance_dual} at the control nodes through the first
+exit. An endpoint already outside range needs zero continuation holds.
+
+For a target still in range after these holds, write $\bm p_0,\psi_0,v$
+for the ego handoff position, heading, and positive longitudinal speed.
+Under the same command the simplified continuation uses
 \begin{equation}
-    \begin{gathered}
-    L_E(\bm n,\bm x)=\min_{\bm z\in E(\bm x)}\bm n^{\trans}\bm z,\\
-    U_T(\bm n,\bm q)=\sup_{t\ge0}\max_{\bm z\in T(\bm q(t))}\bm n^{\trans}\bm z.
-    \end{gathered}
-    \label{eq:terminal_supports}
+    \bm p_{E,j}=\bm p_0+jhv
+        [\cos\psi_0,\sin\psi_0]^{\trans},\quad \psi_{E,j}=\psi_0 .
 \end{equation}
-A sufficient moving core $\mathcal C_f$ requires $v_x>0$ and a
-per-hypothesis unit witness $\bm n$ satisfying
+The target follows \eqref{eq:target_flow}, including its absorbing stop.
+Set $J=\min\{j\ge0:\normtwo{\bm p_{C,j}-\bm p_{E,j}}>R_{\rm enc}\}$,
+with $J=\infty$ when the set is empty. The terminal core requires finite
+$J$ and, at each $j=0,\ldots,J$,
 \begin{equation}
-    \normtwo{\bm n}=1,\qquad \bm n^{\trans}\bm e\ge0,\qquad
-    L_E(\bm n,\bm x)-U_T(\bm n,\bm q)\ge d_{\rm safe},
+    d_\pm(\bm x_j,\bm q_j)>0,\qquad
+    d_\pm(\bm x_j,\bm q_j)\ge d_{\rm safe}.
     \label{eq:terminal_core}
 \end{equation}
-with the separation inequality vacuous when target-free. For straight
-target motion each target corner sweeps a segment up to the absorbing
-stop or a ray if it never stops (finite upper support when
-$\bm n^{\trans}\bm e_T\le0$); for nonzero target curvature each corner
-sweeps a circular arc whose directional extremum occurs at an endpoint or
-where the outward radius aligns with $\bm n$. An angle search over the
-admissible semicircle returns a witness $\bm n$ that is retained for its
-surviving hypothesis on shift. Under the simplified ray model, forward
-translation by $\Delta s>0$ increases $L_E$ by
-$\Delta s\,\bm n^{\trans}\bm e\ge0$ while the remaining target sweep
-shrinks so $U_T$ cannot increase; hence $\mathcal C_f$ is positively
-invariant with the same witness $\bm n$.
-
-Let $F_f$ denote one full nonlinear prediction hold under $\bm u_f$ and
-set $B=\max(1,\lceil T_{\rm preview,\min}/h\rceil)$. The accepted
-terminal set $Z_f$ is the constrained $B$-step predecessor of
-$\mathcal C_f$: entry requires compatibility of $\bm u_f$ with the
-preceding input, forward motion, admissible nonlinear states, and node
-clearance along all $B$ bridge holds, with the $B$th state belonging to
-$\mathcal C_f$. The bridge allows steering and lateral transients to
-evolve before straight-cruise handoff; SQP differentiates both the bridge
-and the active terminal support gap, and acceptance rechecks the exact
-nonlinear inequalities.
+The dual compares the two footprints at the same node. The vehicles may
+cross the same location at different times when their simultaneous
+clearance satisfies \eqref{eq:terminal_core}.
 
 \begin{assumption}[Physical handoff]
 \label{asm:handoff}
-Under $\bm u_f$, any state in the moving core $\mathcal C_f$ remains
-forward-moving and inside the physical model domain over one hold of the
-full Fiala model, with $\bm n^{\trans}\bm e^+\ge0$ and
-$L_E(\bm n,\bm x^+)\ge L_E(\bm n,\bm x)$ for its retained witness
-$\bm n$.
+From a core member with an active encounter, one hold of the full
+Fiala flow under $\bm u_f$ is admissible, maintains the required node
+clearance and either reaches exit or preserves membership in the core.
 \end{assumption}
 
-Assumption~\ref{asm:handoff} is an explicit modeling assumption rather
-than a proved theorem for the nonlinear Fiala vehicle, which may retain
-residual sideslip and yaw rate after $B$ bridge holds. Every online
-acceptance rechecks nonlinear motion and core membership; a violation
-invalidates the shift and is reported if no other plan passes.
-
-\begin{proposition}[Terminal-set invariance]
+\begin{proposition}[Terminal closure for the current encounter]
 \label{prop:invariance}
-Under Assumption~\ref{asm:handoff} and the declared constant-parameter
-target flow \eqref{eq:target_flow}, if $\bm z=(\bm x,\bm q,\bm u^-)\in Z_f$,
-then $F_f(\bm z)\in Z_f$, with the surviving hypothesis inheriting its
-retained witness $\bm n$.
+Under Assumption~\ref{asm:handoff} and the declared target flow,
+applying $\bm u_f$ from an active member of $Z_f$ either completes
+the encounter or gives another member of $Z_f$.
 \end{proposition}
 
 \begin{IEEEproof}
-Applying one hold of $F_f$ consumes the first of the $B$ checked bridge
-holds; the remaining $B-1$ holds are admissible and reach $\mathcal C_f$.
-By Assumption~\ref{asm:handoff} and nesting of the remaining target sweep
-(so $U_T$ cannot increase), one further hold of $F_f$ from $\mathcal C_f$
-stays admissible and remains in $\mathcal C_f$ with the same witness
-$\bm n$. Hence $F_f(\bm z)$ satisfies the $B$-hold bridge into
-$\mathcal C_f$, giving $F_f(\bm z)\in Z_f$.
+In the simplified model a hold before exit consumes one checked node
+and reduces $J$ by one. A nonlinear bridge ending at exit likewise
+retains its checked suffix. For a bridge of $B$ holds reaching the core,
+one hold leaves $B-1$ checked holds. Assumption~\ref{asm:handoff}
+supplies the additional admissible hold at their far end. This gives a
+bridge ending at exit or in the core as required.
 \end{IEEEproof}
+The full-model handoff is a design assumption. Each numerical candidate
+is checked for the retained hypotheses. A new detection after actual
+release requires fresh admission.
 
 \subsubsection{Condensed PCBF Program and Zero-Deficit Tire-Loading Preference}
 \label{subsec:program}
@@ -1839,8 +1815,8 @@ held inputs are replayed on every retained hypothesis using the fine RK4
 flow ($K_v=8$ substeps per hold) and checked for physical input bounds,
 configured increment bounds, model-domain admissibility, and exact
 node-only dual separation $d_\pm(\bm x_j^s,\bm q_j^s)\ge d_{\rm safe}$
-for $j=0,\ldots,N$ and along the $B$-hold cruise bridge (while the target
-is active). There is no intersample clearance requirement or collision
+for $j=0,\ldots,N$ and along the terminal bridge through its last
+in-range or first out-of-range node. There is no intersample clearance requirement or collision
 reserve; a trajectory may satisfy every node inequality while
 intersecting between nodes, and the algorithm makes no safety claim at
 intermediate times. The complete accepted fine held-input sequence is
@@ -1851,9 +1827,13 @@ shifted executable candidate
 \begin{equation}
     U_{k+1}^{\rm shift}=
         \bigl(\bm u_{1|k},\ldots,\bm u_{N_k-1|k},
-        \underbrace{\bm u_f,\ldots,\bm u_f}_{r}\bigr).
+        \bm w_1,\ldots,\bm w_r\bigr).
     \label{eq:shifted_plan}
 \end{equation}
+Starting from the old last command, each $\bm w_j$ moves toward $\bm u_f$
+within the actuator increment bounds. Active terminal entry makes
+$\bm u_f$ reachable in one hold. After exit the extension uses the
+admissible transition toward nominal control.
 This fine held-input suffix remains directly representable even when it
 no longer interpolates the new coarse control knots. An optional new
 guide input spliced onto a feasible driving continuation is accepted only
@@ -1869,8 +1849,8 @@ supplies the next command.
 Suppose an initial plan is feasible, the posterior contains the true
 member and is contained in the predicted successors, the physical flow
 and timing agree, requested horizons fit the numerical allocation,
-Assumption~\ref{asm:handoff} holds, and the target encounter remains
-active without newly reactivated obligations. Then the shifted plan
+Assumption~\ref{asm:handoff} holds, the target-free extension is
+admissible after exit, and no new encounter requires admission. Then the shifted plan
 \eqref{eq:shifted_plan} is feasible at step $k+1$ and satisfies
 \begin{equation}
     V_{N_{k+1}}(\mathcal I_{k+1})\le V_{N_k}(\mathcal I_k)-\xi_{0|k}^\star
@@ -1883,11 +1863,11 @@ improvement.
 
 \begin{IEEEproof}
 Conditioning can discard physical members, and every surviving member
-inherits its own trajectory suffix and terminal witness. By
-Proposition~\ref{prop:invariance} and induction over $r\ge0$ holds of
-$F_f$, appending $r$ copies of $\bm u_f$ preserves admissibility,
-control-boundary clearance, and membership in $Z_f$ for all surviving
-members. The shifted plan inherits the remaining stage deficits
+inherits its checked trajectory suffix. Proposition~\ref{prop:invariance}
+supplies each appended hold while an encounter is active. The assumed
+admissible extension covers the remaining holds after exit. Induction
+gives a common executable extension of $r$ holds. The shifted plan
+inherits the remaining stage deficits
 $(\xi_{1|k}^\star,\ldots,\xi_{N_k-1|k}^\star)$ followed by $r$ zeros,
 yielding \eqref{eq:compact_descent} and preserving zero deficit.
 \end{IEEEproof}
@@ -2302,7 +2282,7 @@ containment property under its stated contract, the feasible distance
 dual \eqref{eq:signed_distance_dual} certifies geometric separation at
 individual control-boundary nodes, and knot interpolation
 \eqref{eq:knot_interpolation} enforces every configured input increment.
-Proposition~\ref{prop:invariance} concerns the moving cruise terminal law
+Proposition~\ref{prop:invariance} concerns terminal closure through sensing-range exit
 under Assumption~\ref{asm:handoff}, Proposition~\ref{prop:recursive}
 gives shift feasibility on the admitted information domain, and
 Theorem~\ref{thm:robust} proves recursive feasibility and zero-value
@@ -2349,7 +2329,7 @@ braking-terminal baseline at commit \path{4ed2344}, including its
 nonlinear acceptance-step policy and earlier terminal sideslip
 definition. Subsequent runtime and theory revisions---including the
 compact nonlinear controller with fixed measurement-consistency ensemble
-inference, moving cruise terminal set, and zero-deficit tire-loading
+inference, terminal continuation to sensing-range exit, and zero-deficit tire-loading
 preference of Section~\ref{sec:control}---have not yet been rerun through
 that closed-loop campaign and remain pending re-evaluation. In
 particular, those historical trials used direct GNSS velocity
@@ -3128,8 +3108,8 @@ weaker, non-invariant terminal condition recovered 82 of 84. The
 published parameter sets contained the truth in every audited sample;
 the controller forecasts with their centers. These historical failures
 concern the October 11 braking-terminal baseline; the adopted compact
-controller of Section~\ref{subsec:terminal} instead uses a moving
-straight-cruise terminal set and $B$-hold nonlinear bridge evaluated
+controller of Section~\ref{subsec:terminal} checks continuation to first
+range exit, with up to $B$ nonlinear bridge holds evaluated
 across the retained ensemble under Assumption~\ref{asm:handoff}, which
 remains pending closed-loop campaign re-evaluation. Propagating
 the published target marginal through the full horizon recovered 31 of 84
@@ -3210,8 +3190,8 @@ tire model and held input, and publishes an enclosure with every
 estimate. The adopted compact nonlinear controller combines fixed
 measurement-consistency ensemble inference with condensed nonlinear PCBF
 optimization over coarse control knots on the Fiala bicycle model, exact
-dual rectangle separation at control-boundary nodes, a moving
-straight-cruise terminal set reached through a $B$-hold nonlinear bridge
+dual rectangle separation at control-boundary nodes, a terminal
+continuation to sensing-range exit
 that supports shift feasibility under Assumption~\ref{asm:handoff}, and
 a secondary tire-loading and rear-slip preference \eqref{eq:secondary_program}
 that guides selection on the zero-deficit level without altering the

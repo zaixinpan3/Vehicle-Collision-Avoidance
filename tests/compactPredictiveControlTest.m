@@ -527,13 +527,27 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             target=[40;0;pi;1;0;0;1.6;2.4;.95;0;0];
             testCase.verifyGreaterThan(terminalSafeSet.movingValue(x,target,cfg),0);
             target(2)=10;
-            [value,n,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
+            [value,~,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
             testCase.verifyLessThan(value,0);
             h=cfg.controller.sampleTime;x(1)=h*x(4);
             target=predictiveSafetyGeometry.predictTarget(target,h);
-            [next,~,~,remaining]=terminalSafeSet.movingValue(x,target,cfg,n);
+            [next,~,~,remaining]=terminalSafeSet.movingValue(x,target,cfg);
             testCase.verifyLessThanOrEqual(next,value+1e-9);
             testCase.verifyEqual(remaining,steps-1);
+        end
+        function crossingAtDifferentTimesCanBelongToTheTerminalSet(testCase)
+            cfg=testCase.cfg;
+            ego=[0;0;0;5;0;0];
+            target=[15;-5;pi/2;5;0;0;1.6;2.4;.95;0;0];
+            % Both centerlines pass through (15,0). The target arrives at
+            % 1 s and the ego at 3 s. Delaying the target produces contact.
+            [safe,~,~,exitSteps]=terminalSafeSet.movingValue(ego,target,cfg);
+            testCase.verifyLessThan(safe,0);
+            testCase.verifyGreaterThan(exitSteps,0);
+            testCase.verifyTrue(isfinite(exitSteps));
+            target(2)=-15;
+            testCase.verifyGreaterThan(terminalSafeSet.movingValue(ego,target,cfg), ...
+                cfg.outputFeedback.clearanceMeters);
         end
         function coMovingInRangeTargetCannotClaimExit(testCase)
             cfg=testCase.cfg;x=[0;0;0;3;0;0];
@@ -1190,7 +1204,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         function collisionBetweenControlNodesDoesNotRejectThePlan(testCase)
             item=testCase.block.initialHypotheses;item.ego(4:6)=[.1;0;0];
             % The target crosses the slowly moving ego between two control
-            % boundaries, then moves away from the parked terminal set.
+            % boundaries, then leaves sensing range.
             item.target=[0;-6;pi/2;480;0;0;1.6;2.4;.95;0;0];
             request=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
                 'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1));
