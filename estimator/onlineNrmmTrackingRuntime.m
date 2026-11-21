@@ -88,6 +88,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     assert(dt>=0,'onlineNrmmTrackingRuntime:nonmonotonicTime','Target samples must be time ordered.');
     if time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
         track.initialized=false;track.restCompatible=false;track.times=[];track.positions=zeros(2,0);
+        if isfield(track,'motionHistory'),track=rmfield(track,{'motionHistory','motionBounds'});end
     end
     if dt>0 && track.initialized
         reference=track.previousPosition;detected=~isempty(reference);
@@ -121,6 +122,8 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         noise=cfg.outputFeedback.noiseBounds(4);
         track.restCompatible=numel(keep)==count && max(vecnorm(track.positions-center))<=noise;
         resolved=norm(position-track.positions(:,1))>2*noise;
+        [track,arcHeading]=localMotionBounds(track,time,position,noise,design.domain,cfg.target.rearAxleDistance);
+
         if ~track.initialized
             % Bootstrap on measured displacement. The first position alone
             % leaves both Cartesian derivatives and body heading unresolved.
@@ -147,7 +150,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
             end
         end
     else
-        resolved=false;
+        resolved=false;arcHeading=NaN;
     end
     track.time=time;track.previousPosition=position;
     if ~track.initialized
@@ -159,19 +162,82 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     [~,estimate]=nrmmObserverVectorField("targetDerivative",track.state,ego,domain);
     if resolved && estimate.targetSpeed>0
         track.heading=estimate.targetRelativeHeading;
-        if track.initialized && estimate.regularizationActive
-            % Near rest the instantaneous velocity direction is ill-conditioned.
-            % A causal fitted chord resolves course over the measured window.
-            t=track.times-mean(track.times);
-            chord=(track.positions-mean(track.positions,2))*t.';
-            track.heading=atan2(chord(2),chord(1))+t(end)*estimate.targetYawRate-estimate.targetSideslip;
-        end
+    end
+    if estimate.regularizationActive && isfinite(arcHeading)
+        track.heading=arcHeading;
     end
     if track.restCompatible && ~isempty(position) && isfinite(relativeHeading)
         track.heading=atan2(sin(egoHeading+relativeHeading),cos(egoHeading+relativeHeading));
     end
     motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;estimate.targetSideslip];
     if track.restCompatible,motion(2:4)=0;end
+end
+
+function [track,heading]=localMotionBounds(track,time,position,noise,domain,lr)
+% Each displacement uses the radar error radius twice. The retained arc
+% spans at most a quarter revolution under the declared yaw-rate bound.
+    prior=[-domain.scalarAccelerationMaximum,-domain.sideslipMaximum; ...
+            domain.scalarAccelerationMaximum,domain.sideslipMaximum];
+    if ~isfield(track,'motionHistory')
+        track.motionHistory=struct('times',track.times,'positions',track.positions);
+        track.motionBounds=prior;
+    end
+    history=track.motionHistory;
+    keep=history.times<time & (time-history.times)*domain.yawRateMaximum<=pi/2;
+    times=[history.times(keep),time];points=[history.positions(:,keep),position];
+    track.motionHistory=struct('times',times,'positions',points);
+    bounds=track.motionBounds;heading=NaN;
+    count=numel(times);rad=2*noise+64*eps(max(1,max(abs(points),[],'all')));
+    if count<3,return;end
+    mid=ceil(count/2);
+    chord=points(:,end)-points(:,1);lengthTotal=norm(chord);
+    chords=diff(points(:,[1,mid,end]),1,2);lengths=vecnorm(chords);
+    if all(lengths>rad) && lengthTotal>rad
+        % For a circular arc kappa = 2 sin(turn between chords)/total chord.
+        angle=atan2(det(chords),dot(chords(:,1),chords(:,2)));
+        error=sum(asin(rad./lengths));limit=domain.yawRateMaximum*(time-times(1))/2;
+        branches=angle+[-2*pi,0,2*pi];
+        lower=max(-limit,branches-error);upper=min(limit,branches+error);
+        allowed=lower<=upper;
+        if any(allowed)
+            angles=[min(lower(allowed));max(upper(allowed))];
+            ratios=2*sin(angles)./[lengthTotal-rad,lengthTotal+rad];
+            beta=asin(max(-1,min(1,lr*[min(ratios,[],'all');max(ratios,[],'all')])));
+            bounds(:,2)=[max(bounds(1,2),beta(1));min(bounds(2,2),beta(2))];
+        end
+    end
+    % A later resolvable displacement proves the target had not yet
+    % reached its absorbing stop at the end of these two earlier chords.
+    last=find(vecnorm(position-points)>rad,1,'last');
+    if ~isempty(last) && last>=3
+        idx=[1,ceil(last/2),last];dt=diff(times(idx));
+        lengths=vecnorm(diff(points(:,idx),1,2));
+        low=max(0,lengths-rad);high=lengths+rad;
+        halfTurn=domain.yawRateMaximum*dt/2;
+        scale=ones(size(dt));nz=halfTurn>0;scale(nz)=halfTurn(nz)./sin(halfTurn(nz));
+        upper=high.*scale;
+        k=max(abs(sin(bounds(:,2))))/lr;
+        if k>0
+            small=k*high<2;
+            upper(small)=min(upper(small),2*asin(k*high(small)/2)/k);
+        else
+            upper=high;
+        end
+        accel=2*[low(2)/dt(2)-upper(1)/dt(1);upper(2)/dt(2)-low(1)/dt(1)]/sum(dt);
+        bounds(:,1)=[max(bounds(1,1),accel(1));min(bounds(2,1),accel(2))];
+    end
+    if any(bounds(1,:)>bounds(2,:))
+        error('onlineNrmmTrackingRuntime:inconsistentTargetMotion', ...
+            'Radar history does not admit the declared constant target parameters.');
+    end
+    track.motionBounds=bounds;
+    if lengthTotal>rad
+        beta=mean(bounds(:,2));k=sin(beta)/lr;
+        % Endpoint body heading from the long chord, including the arc turn
+        % and the course-to-body rotation. It remains defined at rest.
+        heading=atan2(chord(2),chord(1))+asin(max(-1,min(1,k*lengthTotal/2)))-beta;
+        heading=atan2(sin(heading),cos(heading));
+    end
 end
 
 function runtime = localResetTarget(runtime,physicalState,history)

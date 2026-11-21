@@ -905,7 +905,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             compared=[metadata.performanceAcceptedSteps]>0;
             testCase.verifyTrue(any(compared));
             testCase.verifyTrue(all([metadata(compared).acceptedStabilityCost]<[metadata(compared).firstFeasibleStabilityCost]));
-            testCase.verifyTrue(all([metadata.pcbfValue]==0));
+            testCase.verifyTrue(all([metadata.deficitDescentMet]));
+            testCase.verifyLessThanOrEqual([metadata.pcbfValue],128*eps*[metadata.horizonSteps]);
             testCase.verifyFalse(data.nodeCollisionDetected);
             testCase.verifyLessThan(abs(x(2,end)),cfg.vehicle.width/2);
         end
@@ -1122,7 +1123,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,[]), ...
                 'collisionAvoidanceController:compactNoFeasiblePlan');
         end
-        function thePlanningMarginAppliesAtNodesAndThroughTheTerminalHandoff(testCase)
+        function thePlanningMarginCanRelaxAtNodesAndRemainsHardAtTheHandoff(testCase)
             cfg=testCase.cfg;cfg.vehicle.width=2;
             margin=cfg.outputFeedback.clearanceMeters;
             testCase.verifyEqual(margin,.1);
@@ -1134,7 +1135,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 for gap=[.2,margin+.01,margin,margin-.01,.014,0,-1e-9]
                     request.hypotheses.target=[station;2+gap;0;0;0;0;1.6;2.4;1;0;0];
                     result=solvePredictiveControl("outputFeedback",request);
-                    testCase.verifyEqual(result.accepted,gap>=margin);
+                    if station<0
+                        testCase.verifyEqual(result.accepted,gap>0);
+                        testCase.verifyEqual(result.pcbfDeficit,max(0,margin-gap),AbsTol=1e-10);
+                    else
+                        testCase.verifyEqual(result.accepted,gap>=margin);
+                    end
                     if station>0
                         testCase.verifyEqual(result.trajectories{1}.terminal.member,gap>=margin);
                     end
@@ -1143,10 +1149,68 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             request.cfg.outputFeedback.clearanceMeters=.3;
             request.hypotheses.target=[-4.75;2.25;0;0;0;0;1.6;2.4;1;0;0];
             result=solvePredictiveControl("outputFeedback",request);
-            testCase.verifyFalse(result.accepted);
+            testCase.verifyTrue(result.accepted);
+            testCase.verifyEqual(result.stageDeficits,.05,AbsTol=1e-10);
             request.operation="evaluateControlSequence";request.holds=1;
             value=solvePredictiveControl("outputFeedback",request);
             testCase.verifyEqual(value.stage,.3-.25,AbsTol=1e-10);
+        end
+        function aPositiveRootDeficitCanBeCommittedAndThenSpent(testCase)
+            cfg=testCase.cfg;cfg.vehicle.width=2;cfg.outputFeedback.horizonSeconds=.1;
+            block=localBlock(cfg,8);item=block.initialHypotheses;
+            item.target=[-4.75;2.05;0;0;0;0;1.6;2.4;1;0;0];
+            block.initialHypotheses=item;
+            block.samples=solvePredictiveControl("outputFeedback",struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+            [cmd,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
+            testCase.verifyEqual(cmd.actuatorInput,state.fineControls(:,1));
+            testCase.verifyEqual(state.stageDeficits(1),.05,AbsTol=1e-10);
+            testCase.verifyEqual(prediction.metadata.pcbfValue,sum(state.stageDeficits));
+            [~,~,next]=collisionAvoidanceController(localNextBlock(state,cfg),[],[],cfg,state);
+            testCase.verifyEqual(next.metadata.inheritedDeficitCap,sum(state.stageDeficits(2:end)));
+            testCase.verifyLessThanOrEqual(next.metadata.pcbfValue,next.metadata.inheritedDeficitCap+1e-12);
+        end
+        function targetParameterCasesShareCommandsAndReachTheTerminalCheck(testCase)
+            cfg=testCase.cfg;item=testCase.block.initialHypotheses;
+            item.target=[14;5;0;6;-1;0;1.6;2.4;1;0;0];
+            item.targetObserver=struct('time',.5,'motionBounds',[-2,-.015;0,.015], ...
+                'motionHistory',struct('times',[0,.5],'positions',[11,14;5,5]));
+            request=struct('operation',"validateInputSequence",'cfg',cfg,'hypotheses',item, ...
+                'input',zeros(2,1),'inputs',zeros(2,5));
+            replay=solvePredictiveControl("outputFeedback",request);
+            testCase.verifyNumElements(replay.trajectories,5);
+            testCase.verifyTrue(replay.trajectories{1}.terminal.member);
+            testCase.verifyFalse(replay.trajectories{3}.terminal.member);
+            testCase.verifyFalse(replay.accepted);
+            expected=[-1,0;-2,-.015;0,-.015;-2,.015;0,.015];
+            for k=1:5
+                trace=replay.trajectories{k};
+                testCase.verifyEqual(trace.targets(5:6,:),repmat(expected(k,:).',1,6));
+                testCase.verifyEqual(trace.ego,replay.trajectories{1}.ego);
+                testCase.verifyEqual(trace.targetMotionParameters,expected(k,:).');
+                single=request;single.hypotheses=rmfield(item,'targetObserver');
+                single.hypotheses.target=trace.targets(:,1);
+                exact=solvePredictiveControl("outputFeedback",single);
+                testCase.verifyEqual(trace.terminal,exact.trajectories{1}.terminal);
+            end
+            request.operation="evaluateControlSequence";request.holds=ones(1,5);
+            eval=solvePredictiveControl("outputFeedback",request);
+            testCase.verifyEqual(max(0,eval.stage),replay.stageDeficits,AbsTol=1e-11);
+        end
+        function missedReturnsAdvanceEachParameterCaseFromTheLastObservedChord(testCase)
+            item=testCase.block.initialHypotheses;item.target=[20;4;0;5;-2;0;1.6;2.4;1;0;0];
+            item.targetObserver=struct('time',1,'motionBounds',[-2,-.01;-1,.01], ...
+                'motionHistory',struct('times',[0,1],'positions',[15,20;4,4]));
+            req=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
+                'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1));
+            old=solvePredictiveControl("outputFeedback",req);
+            req.hypotheses.targetObserver.time=1.25;
+            req.hypotheses.target=predictiveSafetyGeometry.predictTarget(item.target,.25);
+            next=solvePredictiveControl("outputFeedback",req);
+            for k=2:5
+                expected=predictiveSafetyGeometry.predictTarget(old.trajectories{k}.targets(:,1),.25);
+                testCase.verifyEqual(next.trajectories{k}.targets(:,1),expected,AbsTol=1e-12);
+            end
         end
         function aStoredPlanCanResumeAfterReplayWithTheCurrentMargin(testCase)
             cfg=testCase.cfg;prior=testCase.state;

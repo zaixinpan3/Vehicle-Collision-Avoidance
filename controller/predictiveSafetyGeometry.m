@@ -196,6 +196,17 @@ classdef predictiveSafetyGeometry
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
+            if isfield(model,'guideTargets')
+                for j=1:size(model.guideTargets,2)
+                    path=predictiveSafetyGeometry.predictTarget(model.guideTargets(:,j),time);
+                    data.guideTargets(:,:,j)=path;
+                    delta=path(1:2,:)-target(1:2,:);
+                    data.support.offsets(:,:,j)=delta;
+                    data.support.ballRadius=max(data.support.ballRadius,vecnorm(delta));
+                    yaw=path(3,:)-target(3,:);
+                    data.targetYawRadius=max(data.targetYawRadius,abs(atan2(sin(yaw),cos(yaw))));
+                end
+            end
             if jointTarget
                 data.family=struct('target',model.target,'error',model.uncertainty.target,'time',time);
             end
@@ -772,6 +783,9 @@ classdef predictiveSafetyGeometry
                 +abs(normal*data.curvatureDerivative(:,index))*data.curvatureRadius ...
                 +magnitude*data.remainder(index);
             support=min(support,magnitude*data.ballRadius(index));
+            if isfield(data,'offsets')
+                support=max(normal*reshape(data.offsets(:,index,:),2,[]),[],2);
+            end
         end
 
         function q = target(observation,raw,~)
@@ -1316,6 +1330,19 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
         end
         inflation=inflation+sum(abs(axes*parameters.generator(1:2,:)),2)+targetInflation;
     end
+    if isfield(parameters,'guideTargets')
+        % The seed sees the support of all sampled rectangles along the same
+        % ballistic characteristic. Their exact distances still enter the PCBF.
+        rangeOffsets=zeros(1,count);targetSupport=-Inf(size(targetSupport));
+        inflation=parameters.inflation+sum(abs(axes*parameters.generator(1:2,:)),2);
+        for j=1:size(parameters.guideTargets,2)
+            path=predictiveSafetyGeometry.predictTarget(parameters.guideTargets(:,j),time);
+            shift=path(1:2,:)-future(1:2,:);
+            rangeOffsets=max(rangeOffsets,vecnorm(shift));
+            footprint=localMovingSupport(target(8:11),repmat(path(3,:).',8,1),0,axes);
+            targetSupport=max(targetSupport,footprint+sum(axes.*repmat(shift.',8,1),2));
+        end
+    end
     faceGap=reshape(sum(axes.*repmat((positions-future(1:2,:)).',8,1),2) ...
         -egoSupport-targetSupport-inflation,count,8);
     gaps=max(faceGap,[],2).';
@@ -1334,6 +1361,9 @@ function prediction=localAnticipation(x,target,cfg,parameters,normal)
         if ~isempty(familySupport)
             rangeReserve=rangeReserve-parameters.support.ballRadius(parameters.index)+familySupport.ballRadius;
         end
+    end
+    if isfield(parameters,'guideTargets')
+        rangeReserve=rangeReserve-parameters.support.ballRadius(parameters.index)+rangeOffsets;
     end
     outside=vecnorm(positions-future(1:2,:),2,1)-rangeReserve>cfg.collision.encounterRangeMeters;
     if ~outside(1)
@@ -1369,6 +1399,7 @@ function support=localMovingSupport(shape,yaw,yawRadius,normal)
     bodyNormal=[normal(:,1).*c+normal(:,2).*s,-normal(:,1).*s+normal(:,2).*c];
     vertices=shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1];
     a=bodyNormal*vertices;nominal=max(a,[],2);
+    if isscalar(yawRadius) && yawRadius==0,support=nominal;return;end
     radius=min(pi,yawRadius);
     b=bodyNormal*[-vertices(2,:);vertices(1,:)];
     values=a.*cos(radius)+abs(b).*sin(radius);
@@ -1600,6 +1631,9 @@ function parameters=localFieldParameters(data,index,speed)
     parameters=struct('speed',speed,'inflation',0, ...
         'egoYawRadius',data.egoYawRadius,'targetYawRadius',data.targetYawRadius(index), ...
         'generator',data.generator,'support',data.support,'index',index);
+    if isfield(data,'guideTargets')
+        parameters.guideTargets=reshape(data.guideTargets(:,index,:),size(data.target,1),[]);
+    end
     if isfield(data,'family')
         parameters.family=data.family;parameters.family.time=data.family.time(index);
     end

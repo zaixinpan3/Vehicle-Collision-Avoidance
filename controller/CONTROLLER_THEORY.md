@@ -252,14 +252,46 @@ forecast while the predicted position explains the measurement and range.
 When all positions in the acquisition window lie within the radar noise
 bound of their mean, a stationary nominal forecast uses the perceived body
 heading when available and otherwise retains its last resolved heading. The moving point observer continues to
-process returns. Below the inverse speed floor, a fitted displacement
-direction and the estimated turn over the window give the body heading.
+process returns. Below the inverse speed floor, use a resolved chord between the earliest
+and latest retained returns within a quarter turn. For chord vector $c$ and
+representative curvature $\kappa=\sin\beta/l_r$, its endpoint body heading is
+$\arg c+\arcsin(\kappa\|c\|/2)-\beta$. The representative sideslip is the
+midpoint of the retained interval. An unresolved chord supplies no new angle.
 This stationary-compatible window does not identify a
 unique physical speed. Initializing the target observer, changing the
 stationary hypothesis or receiving a return inconsistent with the forecast
 refreshes the root. Its filtered center is constrained to both the detection
 disk and the current radar error ball. Footprint
 dimensions and rear axle distance are declared vehicle-class parameters.
+
+For each ego member, a radar position error of radius $r$ gives a chord
+error of at most $2r$. Let $c_1,c_2$ be consecutive measured chords and
+$c=c_1+c_2$. The underlying constant-curvature arc satisfies
+$\kappa=2\sin\theta/\|c_{\rm true}\|$, where $\theta$ is the signed angle
+between its true chords. A resolved chord $c_i$ bounds its direction error
+by $\arcsin(2r/\|c_i\|)$. Intersect the resulting angular interval with
+the declared turn-rate bound and the resulting sideslip interval with its
+persistent prior. For two successive durations $T_i$ ending before
+absorption, bound their true lengths $s_i$ using
+$$
+ (\|c_i\|-2r)_+\le s_i\le (\|c_i\|+2r)\frac{b_i}{\sin b_i},
+ \qquad b_i=\bar\omega T_i/2 .
+$$
+The upper bound also follows from $2\arcsin(\bar\kappa(\|c_i\|+2r)/2)/\bar\kappa$
+on the short arc when defined. Intersect the acceleration prior with the
+interval image of $2(s_2/T_2-s_1/T_1)/(T_1+T_2)$. A subsequent resolved
+displacement establishes that these earlier intervals preceded absorption.
+These bounds use the declared moving-target observer domain.
+
+For a moving estimate the compact controller evaluates its central parameter
+pair projected into these intervals and their four endpoint combinations.
+Each endpoint case uses a common observed chord to reconstruct its current
+course and speed for that pair, propagating from the last return across a
+dropout. The central case retains the observer pose and speed. The same
+pair determines the forecast through braking to rest and terminal handoff.
+An absorbed nominal state has one stationary footprint. The cases share all
+ego commands and supply distinct geometric witnesses. Interior parameters
+and continuous pose errors are not covered by this finite transcription.
 
 For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
 target contributes node and terminal separation constraints when $d_k^-\le R$.
@@ -469,7 +501,7 @@ reserve enters this deficit. The primary problem is
 
 $$
 \min_{v,\xi\ge0}\ \sum_{j=0}^{N-1}\xi_j,\qquad
-C_j(v)\le\xi_j,\qquad v\in\mathcal U_N,\qquad
+C_j(v)\le\xi_j\le d_{\rm safe},\qquad v\in\mathcal U_N,\qquad
 v_{x,j}^s\ge0,\qquad (x_N^s,q_N^s,u_N)\in Z_f\quad\forall s.
 $$
 
@@ -603,8 +635,9 @@ The geometric guide constructs one route-following trajectory for the
 primary search. At each integration step its tangential acceleration is
 proportional to the sum of the transport and separation gradients of the
 predicted encounter. In a reflection-symmetric head-on encounter on a
-straight reference, the lateral contributions cancel. The resulting
-trajectory supplies the initial actuator sequence. For each subsequent
+straight reference, the lateral contributions cancel. With parameter cases, the same field evaluates the directional support of
+their predicted rectangles along the characteristic. Its single rollout
+supplies the initial actuator sequence. For each subsequent
 trial, Section 5's separation problem uses that trial's node poses.
 When needed, project the initialization onto the linear actuator and terminal
 handoff rows. From this point a damped Gauss--Newton step for
@@ -619,8 +652,9 @@ linearized zero-level inequalities and actuator bounds. Nonlinear replay
 checks the trial and further linearization uses a contracting residual.
 When the projection cannot yield a witness, the full slack-variable
 SQP minimizes the sum of stage deficits under the hard domain, motion and
-terminal constraints. Its first validated zero-deficit trial supplies an
-incumbent. Within the same budget, one further Gauss--Newton proposal on
+terminal constraints. A validated trial supplies an incumbent at its replayed
+deficit. A smaller deficit takes precedence over either performance cost. Within
+the same budget, one further Gauss--Newton proposal on
 the linearized zero-deficit level may replace it after nonlinear validation
 and the two cost comparisons above.
 
@@ -638,17 +672,14 @@ Let $z_j^s=(x_j^s,q_j^s)$ be the joint state at $t_k+jh$. While the target
 is active at decision $k$, each proposed plan must satisfy
 
 $$
-d_\pm(z_j^s)>0,\qquad d_\pm(z_j^s)\ge d_{\rm safe},\qquad
-j=0,\ldots,N,\qquad s=1,\ldots,S,
+d_\pm(z_r^s)>0,\qquad d_\pm(z_r^s)\ge d_{\rm safe}-\xi_j,\qquad
+r\in\{j,j+1\},\quad j=0,\ldots,N-1,\quad s=1,\ldots,S .
 $$
 
-with the same condition at every control boundary of the terminal bridge
-through the first strict exit. These checks use the exact rectangle-distance dual value from
-Section 5. The control-boundary state nodes are retained even inside a long
-control-knot interval. The compact controller requires $d_{\rm safe}>0$,
-with a default of $0.10\,\mathrm{m}$. The primary optimization and nonlinear
-acceptance use the same clearance at the prediction nodes and throughout
-the sampled terminal continuation to range exit. The simulation counts
+Replay assigns $\xi_j=[C_j(v)]_+$ from the exact rectangle-distance dual
+at the held-command boundaries. On the terminal bridge and in the terminal
+set the full $d_{\rm safe}$ remains hard through range exit. The default
+planning margin is $0.10\,\mathrm{m}$. The simulation counts
 contact or overlap at a control node when the true signed distance is
 nonpositive. A trajectory can
 pass these collision inequalities while intersecting between nodes; the
@@ -722,6 +753,12 @@ $$
  V_{N_{k+1}}(\mathcal I_{k+1})
  \le V_{N_k}(\mathcal I_k)-\xi^*_{0|k}.
 $$
+For a stored feasible iterate, use its replayed sum $J_k=\sum_j\xi_{j|k}$.
+On a continuing encounter with unchanged margin, a replacement must satisfy
+$J_{k+1}\le J_k-\xi_{0|k}$ up to arithmetic roundoff. A zero remaining
+budget fixes every new slack to zero. When observation updates change
+the sampled roots, this check still governs execution, but existence of
+an acceptable replacement requires a separate containment argument.
 In particular, an accepted zero-deficit plan supplies a zero-deficit
 successor even if the optimizer returns no improvement. This induction gives
 continued admissible motion under the stated assumptions. It supplies

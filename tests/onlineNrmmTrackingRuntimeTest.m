@@ -45,6 +45,10 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 testCase.verifyEqual(motion,q(3:6),AbsTol=.025);
                 testCase.verifyEqual(sign(motion(4)),sign(sideslip));
                 testCase.verifyEqual(track.detections,157);
+                testCase.verifyLessThanOrEqual(track.motionBounds(1,:),target(5:6).');
+                testCase.verifyGreaterThanOrEqual(track.motionBounds(2,:),target(5:6).');
+                testCase.verifyLessThan(diff(track.motionBounds(:,1)),1);
+                testCase.verifyLessThan(diff(track.motionBounds(:,2)),.03);
             end
         end
 
@@ -92,6 +96,20 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             [~,motion]=onlineNrmmTrackingRuntime("targetPoint",track,time+.0125,q(1:2),.3,cfg,.48);
             testCase.verifyEqual(motion,[.78;0;0;0],AbsTol=1e-12);
         end
+        function noisyBrakingPositionsKeepTheResolvedHeadingThroughTheStop(testCase)
+            cfg=collisionAvoidanceControllerConfig();track=[];target=[20;4;0;5;-2;0;1.6;2.4;.95;0;0];
+            for i=0:200
+                t=i*cfg.outputFeedback.sensorPeriod;q=predictiveSafetyGeometry.predictTarget(target,t);
+                noise=.49*cfg.outputFeedback.noiseBounds(4)*[cos(2*i);sin(3*i)];
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,q(1:2)+noise,0,cfg);
+            end
+            testCase.verifyLessThan(abs(motion(1)),deg2rad(1));
+            testCase.verifyLessThanOrEqual(track.motionBounds(1,:),[-2,0]);
+            testCase.verifyGreaterThanOrEqual(track.motionBounds(2,:),[-2,0]);
+            [~,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t+.0125,q(1:2),.3,cfg,-.3);
+            testCase.verifyLessThan(abs(motion(1)),deg2rad(1));
+        end
+
         function sharedMeasurementPreservesCurrentPublicationAndEveryNextState(testCase)
             runtime = localRuntime();
             for detected = [true,false,true]

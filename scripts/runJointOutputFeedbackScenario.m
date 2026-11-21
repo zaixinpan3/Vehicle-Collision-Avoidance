@@ -259,6 +259,10 @@ function estimate=localTargetEstimate(state)
     estimate=struct('state',item.target,'member',1,'lastReturn',item.targetObserver.lastReturn, ...
         'detections',item.targetObserver.detections,'motionInitialized',item.targetObserver.initialized, ...
         'restCompatible',item.targetObserver.restCompatible);
+    if isfield(item.targetObserver,'motionBounds')
+        estimate.accelerationIntervalMetersPerSecondSquared=item.targetObserver.motionBounds(:,1);
+        estimate.sideslipIntervalRadians=item.targetObserver.motionBounds(:,2);
+    end
 end
 
 function y=localSensor(truth,input,cfg,time,stream,dropout)
