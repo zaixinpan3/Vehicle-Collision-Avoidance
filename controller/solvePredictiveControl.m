@@ -4094,13 +4094,14 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 'Current node clearance %.9g m requires deficit %.9g m with remaining budget %.9g m.',rootGap,lossFloor,priorCap);
         end
     end
+    seedReplay=Inf;pollEvaluations=0;pollAccepted=false;
     reentered=inherit && firstEncounter;
     if reentered
         % The target-free suffix carries no collision witness for this
         % encounter. Form one guide on the shooting knots; check every hold.
         [controls,guideInputs]=localCompactSeed(item,previous,holds,lane,cfg,true);seedCount=1;
         initializationSource="singleCirculationRollout";
-        validatePlan(controls*model.map.'+model.offset,[]);
+        [~,~,seedReplay]=validatePlan(controls*model.map.'+model.offset,[]);
         if bestLoss>lossFloor+slackRoundoff,validatePlan(guideInputs,[]);end
     end
     if inherit && (isempty(best) || bestLoss>lossFloor+slackRoundoff)
@@ -4147,6 +4148,19 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 controls=localCompactSeed(item,previous,holds,lane,cfg);seedCount=1;
                 candidate=controls*model.map.'+model.offset;
                 [~,~,seedReplay]=validatePlan(candidate,[],@checkClock);
+            end
+            if bestLoss>lossFloor+slackRoundoff && size(item.guideTargets,2)>1
+                [coarse,pollEvaluations]=localCompactControlSearch(item,previous,kernel,cfg,@checkClock);
+                for trialIndex=1:numel(coarse)
+                    [selected,~,residual]=validatePlan(coarse{trialIndex},[],@checkClock);
+                    pollAccepted=pollAccepted || selected;
+                    if bestLoss<=lossFloor+slackRoundoff,break;end
+                    if residual<seedReplay
+                        warm=coarse{trialIndex}(:,boundaries(2:end));
+                        [~,~,projectedResidual]=validatePlan(warm*model.map.'+model.offset,[],@checkClock);
+                        if projectedResidual<seedReplay,controls=warm;seedReplay=projectedResidual;end
+                    end
+                end
             end
             if bestLoss>lossFloor+slackRoundoff
                 if inherit && ~reentered && inheritedResidual<seedReplay
@@ -4257,6 +4271,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'inheritedReusedHolds',sum(inheritedReusedHolds), ...
         'elapsedSeconds',toc(timer),'deadlineSeconds',h,'predictionWindow',window, ...
         'controlNodes',nodes,'horizonSteps',count,'initializationTrajectoryCount',seedCount,'initializationSource',initializationSource, ...
+        'reducedSearchEvaluations',pollEvaluations,'reducedSearchAccepted',pollAccepted, ...
         'fallbackUsed',retained && stabilitySteps==0,'retainedFinePlanUsed',retained && ~initial,'rootTerminalPlanUsed',false, ...
         'retainedTailRepaired',false, ...
         'restorationAttempted',restoration,'initialRestorationSlack',initialDeficit, ...
@@ -4917,6 +4932,82 @@ function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg,
     end
     controls=inputs(:,cumsum(holds));
     controls=localCompactRateLimit(controls,previous,holds,cfg);
+end
+
+function [candidates,evaluations]=localCompactControlSearch(item,previous,kernel,cfg,checkClock)
+    % Poll two actuator knots and their durations before the full SQP.
+    % A nominal-ego screen orders trials. Only the caller's replay over
+    % all physical members can admit a driving plan or spend PCBF slack.
+    h=cfg.controller.sampleTime;count=sum(kernel.holds);time=(0:count)*h;
+    cases=item.guideTargets;
+    targets=zeros(size(cases,1),count+1,size(cases,2));
+    for j=1:size(cases,2)
+        targets(:,:,j)=localCompactTargetNodes(cases(:,j),time);
+    end
+    x=item.ego;speed=hypot(x(4),x(5));course=x(3)+atan2(x(5),x(4));
+    drift=x(1:2)+[cos(course);sin(course)]*speed*time;
+    [~,closest]=min(vecnorm(drift-targets(1:2,:,1)));
+    span=max(cfg.outputFeedback.minimumPreviewSeconds/4,time(closest));
+    t=time(2:end)/span;
+    grip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
+    turn=min(cfg.outputFeedback.steeringMaximum,2*atan2(cfg.vehicle.wheelbase*grip,max(speed^2,1)));
+    lower=[-turn;max(-1,cfg.actuation.brakingRatioMinimum)];
+    upper=[turn;min(1,cfg.actuation.brakingRatioMaximum)];
+    boxLow=[lower;lower;.25;.25];boxHigh=[upper;upper;1.25;1.5];
+    persistent mesh
+    if isempty(mesh)
+        % Radical inverses in six coprime bases, without a toolbox or RNG.
+        bases=[2,3,5,7,11,13];mesh=zeros(6,72);
+        for k=1:numel(bases)
+            indices=32:103;factor=1;
+            while any(indices)
+                factor=factor/bases(k);
+                mesh(k,:)=mesh(k,:)+factor*mod(indices,bases(k));
+                indices=floor(indices/bases(k));
+            end
+        end
+    end
+    trim=terminalSafeSet.movingControl(cfg);
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    q=reshape(targets,11,[]);
+    radius=norm(shape(1:2))+norm(shape(3:4))+vecnorm(q(8:9,:))+vecnorm(q(10:11,:));
+    capacity=kernel.capacity;pad=zeros(2,capacity-count);enabled=double((1:capacity)<=count);
+    rateLimited=isfinite(cfg.outputFeedback.steeringRateMaximum) || isfinite(cfg.model.brakingRatioRateMaximum);
+    width=boxHigh-boxLow;points=boxLow+width.*mesh;
+    candidates={};rank=zeros(0,3);locations=zeros(6,0);evaluations=0;
+    for level=1:4
+        fresh=cell(1,size(points,2));scores=Inf(size(points,2),3);
+        for j=1:size(points,2)
+            if mod(j-1,8)==0,checkClock();end
+            z=points(:,j);
+            next=min(1,max(0,(t-z(5))/max(h/span,.25*z(5))));
+            tail=min(1,max(0,(t-z(5)-z(6))/max(h/span,.25*z(6))));
+            inputs=z(1:2)*(1-next)+z(3:4)*(next-tail)+trim*tail;
+            if rateLimited,inputs=localCompactRateLimit(inputs,previous,ones(1,count),cfg);end
+            [~,ends]=kernel.refinedRollout(x,[inputs,pad],item.parameters,enabled);
+            ego=[x,full(ends(:,1:count))];evaluations=evaluations+1;
+            if any(ego(4,:)<=0) || any(~isfinite(ego),'all'),continue;end
+            poses=repmat(ego(1:3,:),1,size(cases,2));
+            % Exact clearance clipped at one body width for ranking. A
+            % radius bound culls only pairs already beyond that clip.
+            near=vecnorm(poses(1:2,:)-q(1:2,:))-radius<cfg.vehicle.width;
+            gap=cfg.vehicle.width*ones(size(near));
+            gap(near)=min(cfg.vehicle.width,predictiveSafetyGeometry.rectangleClearance(poses(:,near),q(:,near),shape));
+            worst=min(reshape(gap,count+1,[]),[],2);
+            slip=atan2(ego(5,:)-cfg.vehicle.lr*ego(6,:),ego(4,:));
+            deficit=max(0,cfg.outputFeedback.clearanceMeters-worst);
+            scores(j,:)=[max(deficit),sum(deficit),max(abs(slip))+.1*mean(inputs(2,:).^2)-min(worst)];
+            fresh{j}=inputs;
+        end
+        [allScores,order]=sortrows([rank;scores]);
+        order=order(isfinite(allScores(:,1)));keep=1:min(4,numel(order));
+        if isempty(keep),return;end
+        candidates=[candidates,fresh];candidates=candidates(order(keep));
+        locations=[locations,points];locations=locations(:,order(keep));
+        rank=allScores(keep,:);
+        if rank(1,1)==0,return;end
+        width=width/2;points=max(boxLow,min(boxHigh,locations(:,1)+width.*(mesh-.5)));
+    end
 end
 
 function offset=localCompactCruiseOffset(cfg,curvature)

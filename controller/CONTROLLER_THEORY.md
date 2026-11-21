@@ -645,14 +645,40 @@ design assumption. Numerically the controller replays the candidate for
 each surviving member. Once the encounter ends, nominal guidance owns
 path and speed recovery.
 
-The geometric guide constructs one route-following trajectory for the
-primary search. At each integration step its tangential acceleration is
-proportional to the sum of the transport and separation gradients of the
-predicted encounter. In a reflection-symmetric head-on encounter on a
-straight reference, the lateral contributions cancel. With parameter cases, the same field evaluates the directional support of
-their predicted rectangles along the characteristic. Its single rollout
-supplies the initial actuator sequence. For each subsequent
-trial, Section 5's separation problem uses that trial's node poses.
+The geometric guide integrates one route-following field. Its
+preferred acceleration includes the transport and separation
+gradients of the predicted encounter. For a sampled motion family, use
+path coordinates to compute the longitudinal overlap times for each target
+rectangle. At such a time \(t\), let \(y^s(t)\) denote its signed lateral
+displacement from the ego footprint center extrapolated with its current
+lateral velocity. Let \(r^s(t)\) be the sum of the projected lateral
+half-widths and the planning clearance. Under a first-order yaw response
+with time constant \(T\), the lateral displacement response to one unit
+of corrective acceleration is approximated by
+\[
+D(t)=\max\{h^2/2,\ t^2/2-Tt+T^2(1-e^{-t/T})\}.
+\]
+The guide takes the interval hull of
+\([(y^s-r^s)/D,(y^s+r^s)/D]\) over these times and cases.
+When the preferred transverse acceleration, relative to the path curvature
+feedforward, is inside the hull, project it onto the nearest endpoint.
+An equal-distance tie gives zero correction. This projection preserves the
+longitudinal component of the circulation field and the fixed cruise reference.
+Every trial uses its own poses in the distance dual of Section 5.
+
+When the initial and shifted plans leave an unresolved primary deficit
+for a target family, a reduced shooting search can propose held inputs
+before full SQP. Two actuator values and two durations parameterize a
+piecewise linear transition from the first value to the second and then
+to the terminal input. Sample and refine these six coordinates around the
+best nominal-ego trial. Rank by maximum and total positive deficit over
+the sampled target family, then by rear slip, longitudinal effort and
+clearance. Screening caps clearance at one vehicle width. Admission
+replays the full sequence with every retained physical member and the
+original terminal conditions and inherited deficit budget. This search
+changes numerical proposals and leaves the stored fine-input suffix
+available for the horizon shift.
+
 When needed, project the initialization onto the linear actuator and terminal
 handoff rows. From this point a damped Gauss--Newton step for
 $J_{\rm tire}$ can advance the iterate when nonlinear replay reduces the

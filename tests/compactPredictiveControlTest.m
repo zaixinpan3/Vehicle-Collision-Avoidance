@@ -14,6 +14,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         integrationMesh={4,64}
         movingTarget={false,true}
         leadEncounter={"stoppedLead","hardBrakingLead"}
+        uncertainEncounter={"brakingLead","trafficBrakingLead","curvedCrossing"}
         cacheSpeed={.04,3}
         cacheMesh={8,24,64}
     end
@@ -320,6 +321,30 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
         end
+        function uncertainEncounterReturnsToTheGivenCruise(testCase,uncertainEncounter)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            campaign=runJointOutputFeedbackScenario(Scenarios=uncertainEncounter,Speeds=15, ...
+                Frames=400,RandomSeed=20261107,OutputDirectory=string(folder.Folder));
+            record=campaign.results;
+            testCase.assertEqual(record.outcome,"completed",record.failure);
+            data=jsondecode(fileread(record.source));
+            testCase.verifyGreaterThan(data.minimumNodeClearanceMeters,0);
+            testCase.verifyGreaterThan(data.minimumReplayClearanceMeters,0);
+            meta=[data.trace.metadata];
+            testCase.verifyTrue(all([meta.terminalSetEnforced] & [meta.deficitDescentMet]));
+            testCase.verifyLessThanOrEqual(max([meta.initializationTrajectoryCount]),1);
+            cfg=collisionAvoidanceControllerConfig();[x,~,road,cfg]=collisionThreatScenario(uncertainEncounter,cfg);
+            stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
+            [~,lane]=readControllerInputs(stub,[],road,cfg);
+            frame=predictiveSafetyGeometry.roadFrame(lane,struct);
+            trim=nonlinearBicycleModel.operatingPoint(cfg,frame(4));
+            samples=round(1/cfg.controller.sampleTime);
+            for k=numel(data.trace)-samples:numel(data.trace)
+                err=nonlinearBicycleModel.error(data.trace(k).stateAfterHold,lane,trim);
+                testCase.verifyLessThanOrEqual(abs(err),[.1;pi/180;.1;.05;.01]);
+            end
+        end
+
         function clearRoadSteadyTurnIsAPublicControllerEquilibrium(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=30;cfg.tire.frictionCoefficient=[.65;.65];
             [x,~,road,cfg]=collisionThreatScenario("curvedHeadOn",cfg);

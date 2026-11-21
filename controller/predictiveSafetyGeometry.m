@@ -1551,6 +1551,17 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
         'maximumDeviation',0,'completion',"requestedHorizon");
     candidate.states(:,1)=model.initialState;
+    if isfield(model,'guideTargets')
+        preview=max(cfg.outputFeedback.minimumPreviewSeconds, ...
+            cfg.referenceSpeed/cfg.outputFeedback.previewDecelerationMetersPerSecondSquared);
+        ticks=round([0,cumsum(durations)]/h);
+        future=(0:ceil(preview/h))*h;
+        pathTime=(0:ticks(end)+numel(future)-1)*h;
+        paths=zeros(size(model.guideTargets,1),numel(pathTime),size(model.guideTargets,2));
+        for j=1:size(model.guideTargets,2)
+            paths(:,:,j)=predictiveSafetyGeometry.predictTarget(model.guideTargets(:,j),pathTime);
+        end
+    end
     prior=model.previousInput;encounterEnded=false;
     for index=1:count+1
         if mod(index,8)==1,localPlannerDeadline(model);end
@@ -1581,8 +1592,14 @@ function candidate=localCirculationRollout(model,data,speed,durations)
                 parameters=localFieldParameters(data,index,speed);
                 parameters.preferredAcceleration=acceleration;
                 [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
-                candidate.fieldActive=candidate.fieldActive || field.activation>0;
-                if field.activation==0 && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
+                active=field.activation>0;
+                if isfield(model,'guideTargets')
+                    targets=paths(:,ticks(index)+(1:numel(future)),:);
+                    [acceleration,corrected]=localEncounterAcceleration(x,projection,acceleration,targets,future,model);
+                    active=active || corrected;
+                end
+                candidate.fieldActive=candidate.fieldActive || active;
+                if ~active && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
             end
             acceleration=predictiveSafetyGeometry.wallGuidance(x,acceleration,model);
             u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true,physicalOnly);
@@ -1595,6 +1612,51 @@ function candidate=localCirculationRollout(model,data,speed,durations)
 end
 
 
+
+function [acceleration,active]=localEncounterAcceleration(x,projection,preferred,targets,time,model)
+    % Project the route field outside the lateral accelerations that cross
+    % a predicted footprint during longitudinal overlap. The projection
+    % uses a common correction across the observed target motion family.
+    cfg=model.cfg;
+    course=x(3)+atan2(x(5),x(4));speed=hypot(x(4),x(5));
+    courseError=course-projection.heading;
+    along=speed*cos(courseError);across=speed*sin(courseError);
+    curve=struct('origin',projection.point,'heading',projection.heading,'curvature',model.frame(4));
+    [path,heading]=predictiveSafetyGeometry.referencePose(along*time,0,curve);
+    c=cos(heading);s=sin(heading);
+    dx=targets(1,:,:)-path(1,:);dy=targets(2,:,:)-path(2,:);
+    angle=targets(3,:,:)-heading;
+    longitudinal=c.*dx+s.*dy+targets(10,:,:).*cos(angle)-targets(11,:,:).*sin(angle);
+    lateral=-s.*dx+c.*dy+targets(10,:,:).*sin(angle)+targets(11,:,:).*cos(angle);
+    extent=abs(cos(angle)).*targets(8,:,:)+abs(sin(angle)).*targets(9,:,:);
+    width=abs(sin(angle)).*targets(8,:,:)+abs(cos(angle)).*targets(9,:,:);
+    ego=cfg.vehicle;
+    yaw=x(3)-projection.heading;
+    longRadius=abs(cos(yaw))*ego.length/2+abs(sin(yaw))*ego.width/2;
+    sideRadius=abs(sin(yaw))*ego.length/2+abs(cos(yaw))*ego.width/2;
+    offset=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)]*ego.rectangleOffset;
+    overlap=abs(longitudinal-offset(1))<=extent+longRadius;
+    acceleration=preferred;active=any(overlap,'all');
+    if ~active,return;end
+    % Include the lateral response lag of the yaw-rate loop in the seed.
+    lag=1/cfg.nominalClf.yawRateGain;
+    response=max(cfg.controller.sampleTime^2/2,time.^2/2-lag*time+lag^2*(-expm1(-time/lag)));
+    relative=lateral-projection.lateralPosition-offset(2)-across*time;
+    radius=width+sideRadius+cfg.outputFeedback.clearanceMeters;
+    lower=(relative-radius)./response;upper=(relative+radius)./response;
+    lo=min(lower(overlap));hi=max(upper(overlap));
+    normal=[-sin(projection.heading);cos(projection.heading)];
+    curvature=curve.curvature*along^2/max(.1,1-curve.curvature*projection.lateralPosition);
+    request=normal.'*preferred-curvature;
+    active=request>lo && request<hi && abs((request-lo)-(hi-request))>64*eps(max(abs([request,lo,hi,1])));
+    if ~active,return;end
+    if request-lo<hi-request
+        correction=lo-request;
+    else
+        correction=hi-request;
+    end
+    acceleration=preferred+normal*correction;
+end
 
 function violation=localPlannerStateViolation(x,model)
     cfg=model.cfg;
