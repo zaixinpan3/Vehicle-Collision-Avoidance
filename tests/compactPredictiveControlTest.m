@@ -522,37 +522,73 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 prior=next;
             end
         end
-        function theMovingCoreChecksTheEntireFutureTargetTrack(testCase)
-            x=[0;0;0;3;0;0];
-            target=[100;0;pi;1;0;0;1.6;2.4;.95;0;0];
-            testCase.verifyGreaterThan(terminalSafeSet.movingValue(x,target,testCase.cfg),0);
+        function targetMustClearTheSensorBoundaryWithoutAnEarlierCollision(testCase)
+            cfg=testCase.cfg;x=[0;0;0;3;0;0];
+            target=[40;0;pi;1;0;0;1.6;2.4;.95;0;0];
+            testCase.verifyGreaterThan(terminalSafeSet.movingValue(x,target,cfg),0);
             target(2)=10;
-            [value,n]=terminalSafeSet.movingValue(x,target,testCase.cfg);
+            [value,n,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
             testCase.verifyLessThan(value,0);
-            next=x;next(1)=x(1)+3;
-            target=predictiveSafetyGeometry.predictTarget(target,1);
-            testCase.verifyLessThanOrEqual(terminalSafeSet.movingValue(next,target,testCase.cfg,n),value+1e-9);
+            h=cfg.controller.sampleTime;x(1)=h*x(4);
+            target=predictiveSafetyGeometry.predictTarget(target,h);
+            [next,~,~,remaining]=terminalSafeSet.movingValue(x,target,cfg,n);
+            testCase.verifyLessThanOrEqual(next,value+1e-9);
+            testCase.verifyEqual(remaining,steps-1);
         end
-        function aBrakeOnlyActuatorCannotCertifyPerpetualCruiseAgainstDrag(testCase)
+        function coMovingInRangeTargetCannotClaimExit(testCase)
+            cfg=testCase.cfg;x=[0;0;0;3;0;0];
+            target=[cfg.collision.encounterRangeMeters;0;0;3;0;0;1.6;2.4;.95;0;0];
+            [v,~,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
+            testCase.verifyGreaterThan(v,cfg.outputFeedback.nlpTolerance);
+            testCase.verifyEqual(steps,Inf);
+            rotated=x;rotated(3)=pi/7;
+            wrapped=target;wrapped(3)=rotated(3)+2*pi;
+            [~,~,~,steps]=terminalSafeSet.movingValue(rotated,wrapped,cfg);
+            testCase.verifyEqual(steps,Inf);
+            target(1)=target(1)+.01;
+            [v,~,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
+            testCase.verifyLessThanOrEqual(v,0);testCase.verifyEqual(steps,0);
+            target(1)=10;target(4)=3.0001;
+            [v,~,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
+            testCase.verifyLessThan(v,0);testCase.verifyGreaterThan(steps,1e6);
+        end
+        function aReleasedEncounterDoesNotRequirePerpetualCruise(testCase)
             cfg=testCase.cfg;cfg.actuation.brakingRatioMaximum=0;
             item=testCase.block.initialHypotheses;item.target=[];
             checked=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
                 'cfg',cfg,'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1)));
-            testCase.verifyFalse(checked.accepted);
-            testCase.verifyFalse(checked.trajectories{1}.terminal.member);
+            testCase.verifyTrue(checked.accepted);
+            testCase.verifyEqual(checked.trajectories{1}.terminal.exitSteps,0);
         end
-        function turningTargetSupportIncludesLaterRevolutions(testCase)
-            x=[0;0;0;2;0;0];
-            target=[20;0;0;2;0;.2;1.6;2.4;.95;.3;-.2];
-            testCase.verifyGreaterThan(terminalSafeSet.movingValue(x,target,testCase.cfg),0);
-            x(2)=-20;
-            [value,normal]=terminalSafeSet.movingValue(x,target,testCase.cfg);
-            testCase.verifyLessThan(value,0);
-            testCase.verifyGreaterThanOrEqual(normal(1),-eps);
-            % The analytic stationary circular support also covers the target
-            % when it accelerates and traverses the circle repeatedly.
-            target(5)=1;
-            testCase.verifyEqual(terminalSafeSet.movingValue(x,target,testCase.cfg),value,AbsTol=1e-10);
+        function curvedTargetChecksStopAtFirstExitEvenIfItReturns(testCase)
+            cfg=testCase.cfg;h=cfg.controller.sampleTime;x=[0;0;0;.5;0;0];
+            target=[49;0;-.2;10;.2;.2;1.6;2.4;.95;.3;-.2];
+            times=(0:130)*h;q=predictiveSafetyGeometry.predictTarget(target,times);
+            positions=x(1:2)+[x(4);0]*times;outside=vecnorm(q(1:2,:)-positions)>cfg.collision.encounterRangeMeters;
+            first=find(outside,1);testCase.assertNotEmpty(first);
+            testCase.assertTrue(any(~outside(first+1:end)));
+            [v,~,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
+            testCase.verifyEqual(steps,first-1);
+            gaps=zeros(1,first);shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            for j=1:first
+                gaps(j)=predictiveSafetyGeometry.rectangle([positions(:,j);x(3)],shape,q(1:3,j),q(8:11,j));
+            end
+            testCase.verifyEqual(v,cfg.outputFeedback.clearanceMeters-min(gaps),AbsTol=1e-9);
+        end
+        function nonlinearBridgeEndsAtTheFirstOutOfRangeNode(testCase)
+            cfg=testCase.cfg;item=testCase.block.initialHypotheses;
+            item.ego=[0;0;0;.5;0;0];
+            item.target=[49;0;-.2;10;0;.2;1.6;2.4;.95;0;0];
+            request=struct('operation',"validateInputSequence",'cfg',cfg,'hypotheses',item, ...
+                'input',zeros(2,1),'inputs',zeros(2,1));
+            result=solvePredictiveControl("outputFeedback",request);
+            testCase.assertTrue(result.accepted);
+            term=result.trajectories{1}.terminal;
+            testCase.verifyEqual(term.exitSteps,2);
+            testCase.verifyEqual(term.bridgeHolds,term.exitSteps);
+            request.operation="evaluateControlSequence";request.holds=1;
+            evaluated=solvePredictiveControl("outputFeedback",request);
+            testCase.verifyLessThanOrEqual(evaluated.terminal,cfg.outputFeedback.nlpTolerance);
         end
         function expiredContinuationCannotStartASecondSearchBudget(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=1e-12;
@@ -723,8 +759,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             end
         end
         function endpointClearanceCannotReplaceTerminalMembership(testCase)
-            item=testCase.block.initialHypotheses;item.ego(:)=0;
-            item.target=[100;0;pi;5;0;0;1.6;2.4;.95;0;0];
+            item=testCase.block.initialHypotheses;item.ego=[0;0;0;3;0;0];
+            item.target=[30;0;pi;5;0;0;1.6;2.4;.95;0;0];
             result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
                 'cfg',testCase.cfg,'hypotheses',item,'input',zeros(2,1),'inputs',[0;0]));
             testCase.verifyFalse(result.accepted);
@@ -738,7 +774,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 terminalSafeSet.movingControl(testCase.cfg));
         end
         function theTerminalContinuationStraightensAndKeepsDriving(testCase)
-            item=testCase.block.initialHypotheses;item.ego=[0;0;.1;3;.4;.2];
+            item=testCase.block.initialHypotheses;item.ego=[0;0;.1;3;.4;.2];item.target=[0;20;pi/2;10;0;0;1.6;2.4;.95;0;0];
             request=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
                 'hypotheses',item,'input',[.2;0],'inputs',[.2;0]);
             value=solvePredictiveControl('outputFeedback',request);
@@ -746,12 +782,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             terminal=value.trajectories{1}.terminal;
             testCase.verifyEqual(terminal.input(1),0);
             testCase.verifyGreaterThan(terminal.bridgeHolds,0);
-            testCase.verifyEqual(terminal.model,"straightCruiseEscape");
+            testCase.verifyEqual(terminal.model,"safeRangeExit");
             testCase.verifyGreaterThan(terminal.input(2),0);
         end
         function terminalEntryHonorsAnExplicitSteeringSlewContract(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.steeringRateMaximum=.1;
-            item=testCase.block.initialHypotheses;item.ego(4:6)=0;
+            item=testCase.block.initialHypotheses;item.ego(4:6)=[3;0;0];item.target=[0;20;pi/2;10;0;0;1.6;2.4;.95;0;0];
             request=struct('operation',"validateInputSequence",'cfg',cfg, ...
                 'hypotheses',item,'input',[.4;0],'inputs',[.4;0]);
             value=solvePredictiveControl('outputFeedback',request);
@@ -1079,8 +1115,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             request=struct('operation',"validateInputSequence",'cfg',cfg, ...
                 'hypotheses',testCase.block.initialHypotheses,'input',zeros(2,1),'inputs',zeros(2,1));
             % Each stationary target is alongside only at the root, on the
-            % cruise bridge, or on the infinite terminal ray, respectively.
-            for station=[-4.75,10,120]
+            % terminal bridge, or later in range under the handoff model.
+            for station=[-4.75,10,42]
                 for gap=[.2,margin+.01,margin,margin-.01,.014,0,-1e-9]
                     request.hypotheses.target=[station;2+gap;0;0;0;0;1.6;2.4;1;0;0];
                     result=solvePredictiveControl("outputFeedback",request);

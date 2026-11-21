@@ -899,6 +899,63 @@ classdef predictiveSafetyGeometry
             end
         end
 
+        function [clearance,gradient] = rectangleClearance(states,targets,shape)
+            % Batched closest-feature evaluation of the rectangle distance dual.
+            ce=cos(states(3,:));se=sin(states(3,:));ct=cos(targets(3,:));st=sin(targets(3,:));
+            signs=[-1,1,1,-1;-1,-1,1,1];ego=cell(1,4);target=cell(1,4);
+            for j=1:4
+                e=shape(3:4)+shape(1:2).*signs(:,j);
+                t=targets(10:11,:)+targets(8:9,:).*signs(:,j);
+                ego{j}=states(1:2,:)+[ce*e(1)-se*e(2);se*e(1)+ce*e(2)];
+                target{j}=targets(1:2,:)+[ct.*t(1,:)-st.*t(2,:);st.*t(1,:)+ct.*t(2,:)];
+            end
+            square=Inf(1,size(states,2));closest=zeros(2,size(states,2));difference=closest;
+            for j=1:4
+                for k=1:4
+                    next=mod(k,4)+1;
+                    edge=target{next}-target{k};offset=ego{j}-target{k};
+                    t=max(0,min(1,sum(offset.*edge,1)./sum(edge.^2,1)));
+                    delta=offset-edge.*t;distance=sum(delta.^2,1);selected=distance<square;
+                    square(selected)=distance(selected);
+                    if nargout>1,closest(:,selected)=ego{j}(:,selected);difference(:,selected)=delta(:,selected);end
+                    edge=ego{next}-ego{k};offset=target{j}-ego{k};
+                    t=max(0,min(1,sum(offset.*edge,1)./sum(edge.^2,1)));
+                    delta=edge.*t-offset;distance=sum(delta.^2,1);selected=distance<square;
+                    square(selected)=distance(selected);
+                    if nargout>1
+                        point=ego{k}+edge.*t;closest(:,selected)=point(:,selected);difference(:,selected)=delta(:,selected);
+                    end
+                end
+            end
+            clearance=sqrt(square);
+            if nargout>1
+                [gaps,facetGradient,projection]=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
+            else
+                gaps=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
+            end
+            gap=max(gaps,[],1);
+            overlap=gap<=0;clearance(overlap)=gap(overlap);
+            if nargout>1
+                normal=difference./max(sqrt(square),eps);arm=closest-states(1:2,:);
+                gradient=[normal;normal(2,:).*arm(1,:)-normal(1,:).*arm(2,:)];
+                % A centered difference across |projection| can cancel the two
+                % separating normals. Differentiate one attaining facet in that stencil.
+                step=1e-5;
+                crossesZero=overlap & abs(projection)<=step;
+                gradient(:,crossesZero)=facetGradient(:,crossesZero);
+                regular=overlap & ~crossesZero;
+                if any(regular)
+                    x=states(1:3,regular);q=targets(:,regular);
+                    for j=1:3
+                        plus=x;minus=x;plus(j,:)=plus(j,:)+step;minus(j,:)=minus(j,:)-step;
+                        a=max(predictiveSafetyGeometry.rectangleAxisGaps(plus,shape,q(1:3,:),q(8:11,:)),[],1);
+                        b=max(predictiveSafetyGeometry.rectangleAxisGaps(minus,shape,q(1:3,:),q(8:11,:)),[],1);
+                        gradient(j,regular)=(a-b)/(2*step);
+                    end
+                end
+            end
+        end
+
         function [distance,certificate] = rectangle(poseE,shapeE,poseT,shapeT)
             kernel=localKernel();
             if isempty(kernel),[distance,normal]=predictiveSafetyGeometry.rectangleNumeric(poseE,shapeE,poseT,shapeT);

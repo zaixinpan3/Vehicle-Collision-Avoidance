@@ -1,6 +1,6 @@
 classdef terminalSafeSet
-% The compact runtime uses movingControl and movingValue for recurring
-% forward cruise. The braking continuations below are research comparators.
+% The compact runtime uses movingControl and movingValue until range exit.
+% The braking continuations below are research comparators.
 %terminalSafeSet Terminal set of the braking continuation, and the anchor's holds.
 % The legacy state-input comparator below uses the shared observer operating domain, and inside it the ego is a
 % kinematic vehicle under the simplest law: the steering held and a constant
@@ -76,109 +76,122 @@ classdef terminalSafeSet
             input=[0;min(cfg.actuation.brakingRatioMaximum,max(cfg.actuation.brakingRatioMinimum,trim))];
         end
 
-        function [value,normal,gradient]=movingValue(x,q,cfg,priorNormal)
-            % Dual separation of the straight forward sweep from the convex
-            % hull of every remaining target footprint. Each angle is a
-            % continuous unit-normal witness, including tangent separators.
-            if nargin<4,priorNormal=[];end
-            gradient=zeros(1,6);normal=zeros(2,1);
-            value=-x(4);
-            if isempty(q),gradient(4)=-1;return;end
-            t=q(3);rot=[cos(t),-sin(t);sin(t),cos(t)];
-            signs=[1,1,-1,-1;1,-1,1,-1];
-            corners=rot*(q(10:11)+q(8:9).*signs);
-            direction=predictiveSafetyGeometry.direction(t+q(6));
+        function [value,normal,gradient,exitSteps]=movingValue(x,q,cfg,priorNormal,checkClock)
+            % Terminal handoff: fixed heading and positive forward speed under
+            % the common terminal input. End this encounter at its first
+            % control node strictly outside the sensor disk.
+            if nargin<5,checkClock=[];end
+            R=cfg.collision.encounterRangeMeters;h=cfg.controller.sampleTime;
+            value=-R;normal=zeros(2,1);gradient=zeros(1,6);exitSteps=0;
+            if isempty(q) || norm(q(1:2)-x(1:2))>R,return;end
+            exitSteps=Inf;
+            e=predictiveSafetyGeometry.direction(x(3));lateral=[-e(2);e(1)];
+            speed=x(4);offset=q(1:2)-x(1:2);
+            if speed<=0
+                value=max(2*cfg.outputFeedback.nlpTolerance,-speed);gradient(4)=-1;return;
+            end
             curvature=sin(q(6))/q(7);
-            arc=Inf;
-            if q(4)==0,arc=0;elseif q(5)<0,arc=-q(4)^2/(2*q(5));end
-            corners=corners+q(1:2)-x(1:2);
-            origin=corners;
-            circle=curvature~=0 && arc>0;
-            if circle
-                arms=rot*(q(10:11)+q(8:9).*signs)-[-direction(2);direction(1)]/curvature;
-                radii=hypot(arms(1,:),arms(2,:));angles=atan2(arms(2,:),arms(1,:));
-                sweep=curvature*arc;
-                if abs(sweep)<2*pi
-                    last=predictiveSafetyGeometry.predictTarget(q,-q(4)/q(5));
-                    rotEnd=[cos(last(3)),-sin(last(3));sin(last(3)),cos(last(3))];
-                    finish=last(1:2)-x(1:2)+rotEnd*(q(10:11)+q(8:9).*signs);
+            linear=q(4)==0 || (curvature==0 && q(5)==0);
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset(:)];
+            best=Inf;worst=0;
+            if linear
+                % Equivalent wrapped headings must give zero relative drift.
+                heading=rem((q(3)-x(3))+q(6),2*pi);
+                bodyDirection=predictiveSafetyGeometry.direction(heading);
+                relativeVelocity=[e,lateral]*(q(4)*bodyDirection-[speed;0]);
+                drift=norm(relativeVelocity);
+                if drift==0
+                    value=max(2*cfg.outputFeedback.nlpTolerance,R-norm(offset));
+                    if norm(offset)>0,gradient(1:2)=offset.'/norm(offset);end
+                    return;
                 end
-            elseif isfinite(arc)
-                origin=[corners,corners+direction*arc];
-            end
-            % In body coordinates the moving rectangle sweeps a half strip.
-            % Include both strip boundaries and optimize an interior witness.
-            forward=predictiveSafetyGeometry.direction(x(3));
-            side=[-forward(2);forward(1)];
-            unboundedLine=~circle && isinf(arc);
-            lo=-pi/2;hi=pi/2;parallel=false;
-            if unboundedLine
-                angle=atan2(side.'*direction,forward.'*direction);
-                parallel=angle==0;
-                if angle>=0,hi=angle-pi/2;else,lo=angle+pi/2;end
-            end
-            grid=linspace(lo,hi,9);
-            if parallel,grid=[-pi/2,pi/2];end
-            vals=margin(grid);[gap,k]=max(vals);alpha=grid(k);
-            if ~parallel && hi>lo
-                left=grid(max(1,k-1));right=grid(min(9,k+1));
-                for j=1:14
-                    pair=[(2*left+right)/3,(left+2*right)/3];v=margin(pair);
-                    if v(1)>v(2),right=pair(2);else,left=pair(1);end
+                % Exit from a disk under affine relative motion. On this
+                % line the signed rectangle dual is convex in time.
+                along=offset.'*(relativeVelocity/drift);
+                residual=(R-norm(offset))*(R+norm(offset));
+                root=sqrt(along^2+residual);
+                travel=root-along;
+                if along>0,travel=residual/(root+along);end
+                last=floor(travel/(drift*h))+1;
+                if last>=flintmax,value=R;return;end
+                if norm(offset+relativeVelocity*(last*h))<=R,last=last+1;end
+                if last>1 && norm(offset+relativeVelocity*((last-1)*h))>R,last=last-1;end
+                exitSteps=last;
+                first=0;
+                while last-first>64
+                    splitNode=floor((first+last)/2);
+                    pair=clearances(splitNode:splitNode+1);
+                    if pair(1)<=pair(2),last=splitNode;else,first=splitNode+1;end
                 end
-                a=(left+right)/2;v=margin(a);
-                if v>gap,gap=v;alpha=a;end
+                measure(first:last);
+            else
+                % Process intervals chronologically, including an exit and
+                % re-entry lying between two in-range interval endpoints.
+                first=0;last=31;
+                while ~isfinite(exitSteps)
+                    visit(first,last);
+                    first=last+1;last=2*first-1;
+                    if first>=flintmax/2 && ~isfinite(exitSteps),value=R;return;end
+                end
             end
-            normal=axisAt(alpha).';
-            if ~isempty(priorNormal) && all(isfinite(priorNormal)) && abs(norm(priorNormal)-1)<1e-12 ...
-                    && priorNormal.'*forward>=0 && (~unboundedLine || priorNormal.'*direction<=0)
-                priorGap=supportGap(priorNormal.');
-                if priorGap>gap,gap=priorGap;normal=priorNormal;end
-            end
-            clearance=cfg.outputFeedback.clearanceMeters-gap;
-            if clearance<=value,gradient(4)=-1;return;end
-            value=clearance;
-            if nargout>=3
-                gradient(1:2)=-normal.';
-                % Reselect the constrained polar maximum for yaw, including
-                % optima on the moving half strip's rotating boundaries.
-                step=1e-5;plus=x;minus=x;plus(3)=x(3)+step;minus(3)=x(3)-step;
-                gradient(3)=(terminalSafeSet.movingValue(plus,q,cfg)-terminalSafeSet.movingValue(minus,q,cfg))/(2*step);
+            value=cfg.outputFeedback.clearanceMeters-best;
+            if nargout>=2
+                [~,g]=clearances(worst);
+                normal=g(1:2);time=h*worst;
+                gradient=-[g(1:2).',g(3)+speed*time*(g(1:2).'*lateral),time*(g(1:2).'*e),0,0];
+                if nargin>=4 && ~isempty(priorNormal) && abs(norm(priorNormal)-1)<1e-12
+                    % Keep a shifted dual witness when its support gap
+                    % also attains the worst node's exact distance.
+                    n=priorNormal(:).'/norm(priorNormal);atWorst=relativeTarget(worst);
+                    gap=-predictiveSafetyGeometry.rotationSupport(shape,x(3),0,-n) ...
+                        -n*atWorst(1:2)-predictiveSafetyGeometry.rotationSupport(q(8:11),atWorst(3),0,n);
+                    if gap>=best,normal=n.';end
+                end
             end
 
-            function gap=margin(a)
-                gap=supportGap(axisAt(a));
-            end
-            function n=axisAt(a)
-                a=a(:);n=cos(a)*forward.'+sin(a)*side.';
-                n(a==-pi/2,:)=repmat(-side.',nnz(a==-pi/2),1);
-                n(a==pi/2,:)=repmat(side.',nnz(a==pi/2),1);
-                if unboundedLine && ~parallel
-                    if angle>=0
-                        n(a==hi,:)=repmat([direction(2),-direction(1)],nnz(a==hi),1);
-                    else
-                        n(a==lo,:)=repmat([-direction(2),direction(1)],nnz(a==lo),1);
-                    end
-                end
-            end
-            function gap=supportGap(n)
-                along=n*forward;across=n*side;
-                ego=cfg.vehicle.rectangleOffset(:);
-                lower=along*ego(1)+across*ego(2)-abs(along)*cfg.vehicle.length/2-abs(across)*cfg.vehicle.width/2;
-                if circle
-                    phase=atan2(n(:,2),n(:,1))-angles;
-                    peak=n*corners+2*radii.*sin(phase/2).^2;
-                    if abs(sweep)<2*pi
-                        included=mod(sign(curvature)*phase,2*pi)<=abs(sweep);
-                        peak(~included)=-Inf;
-                        upper=max([n*corners,n*finish,peak],[],2);
-                    else
-                        upper=max(peak,[],2);
-                    end
+            function target=relativeTarget(indices)
+                times=indices*h;
+                if linear
+                    target=repmat(q,1,numel(times));
+                    target(1:2,:)=offset+relativeVelocity*times;
                 else
-                    upper=max(n*origin,[],2);
+                    target=predictiveSafetyGeometry.predictTarget(q,times);
+                    target(1:2,:)=target(1:2,:)-x(1:2)-e*(speed*times);
                 end
-                gap=lower-upper;
+            end
+            function [gaps,g]=clearances(indices)
+                target=relativeTarget(indices);
+                poses=[zeros(2,numel(indices));repmat(x(3),1,numel(indices))];
+                if nargout>1
+                    [gaps,g]=predictiveSafetyGeometry.rectangleClearance(poses,target,shape);
+                else
+                    gaps=predictiveSafetyGeometry.rectangleClearance(poses,target,shape);
+                end
+            end
+            function measure(indices)
+                [minimum,j]=min(clearances(indices));
+                if minimum<best,best=minimum;worst=indices(j);end
+            end
+            function visit(lo,hi)
+                if ~isempty(checkClock),checkClock();end
+                if hi-lo<64
+                    indices=lo:hi;target=relativeTarget(indices);
+                    out=find(vecnorm(target(1:2,:))>R,1);
+                    if ~isempty(out),exitSteps=indices(out);indices=indices(1:out);end
+                    measure(indices);return;
+                end
+                mid=floor((lo+hi)/2);target=relativeTarget(mid);
+                dt=h*max(mid-lo,hi-mid);
+                peak=max(0,target(4)+abs(q(5))*dt);
+                rel=target(4)*predictiveSafetyGeometry.direction(target(3)+q(6))-speed*e;
+                travelBound=norm(rel)*dt+.5*(abs(q(5))+abs(curvature)*peak^2)*dt^2;
+                if norm(target(1:2))+travelBound<R
+                    arm=norm(abs(q(10:11))+q(8:9));
+                    variation=travelBound+arm*min(2,abs(curvature)*peak*dt);
+                    if clearances(mid)-variation>best,return;end
+                end
+                visit(lo,mid);
+                if ~isfinite(exitSteps),visit(mid+1,hi);end
             end
         end
 

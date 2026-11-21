@@ -3991,7 +3991,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         suffix=prior.fineControls(:,2:end);
         extra=count-size(suffix,2);
         cruise=terminalSafeSet.movingControl(cfg);
-        inherited=[suffix,repmat(cruise,1,extra)];
+        last=prior.fineControls(:,end);
+        extension=localCompactRateLimit(repmat(cruise,1,extra),last,ones(1,extra),cfg);
+        inherited=[suffix,extension];
         initializationSource="shiftedMovingTerminalLaw";
         if ~reentered && toc(timer)<budget
             guide=localCompactSeed(item,previous,1,lane,cfg);
@@ -4037,7 +4039,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                     % node clearance can rule out every zero-deficit solution.
                     roots=[hypotheses.ego];targets=[hypotheses.target];
                     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-                    clearance=min(localCompactExactClearance(roots,targets,shape));
+                    clearance=min(predictiveSafetyGeometry.rectangleClearance(roots,targets,shape));
                     if ~(clearance>0)
                         error('collisionAvoidanceController:compactNoFeasiblePlan', ...
                             'Current node has no positive footprint separation (%.9g m).',clearance);
@@ -4147,7 +4149,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'maximumConstraintViolation',violation,'scenarioCount',numel(hypotheses), ...
         'activeScenarioCount',numel(hypotheses),'hypothesisCount',numel(hypotheses),'memoryDimension',0, ...
         'conditioning',conditioning,'terminalSetEnforced',true,'terminalSafetyAssumed',true, ...
-        'terminalModel',"straightCruiseEscape",'terminalValue',max(cellfun(@(t)t.terminal.value,traces)), ...
+        'terminalModel',"safeRangeExit",'terminalValue',max(cellfun(@(t)t.terminal.value,traces)), ...
         'terminalInput',traces{nominal}.terminal.input,'robustNonlinearSafetyCertified',false, ...
         'recursiveFeasibilityCertified',false,'safetyScope',"finiteHypothesesControlBoundaryCollisionChecks", ...
         'collisionCheckPeriodSeconds',h,'collisionNodeCount',count+1, ...
@@ -4316,12 +4318,6 @@ function [a,b]=localCondensedInputRows(previous,holds,cfg)
             a=[a;row;-row];b=[b;rates(k)*cfg.controller.sampleTime*holds(i)+origin;rates(k)*cfg.controller.sampleTime*holds(i)-origin];
         end
     end
-    terminal=terminalSafeSet.movingControl(cfg);
-    for k=1:2
-        if ~isfinite(rates(k)),continue;end
-        row=zeros(1,2*n);row(2*n-2+k)=1;
-        a=[a;row;-row];b=[b;terminal(k)+rates(k)*cfg.controller.sampleTime;-terminal(k)+rates(k)*cfg.controller.sampleTime];
-    end
 
 end
 
@@ -4473,7 +4469,11 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 [dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,enabled);
                 ends=full(ends);dense=full(dense);ends=ends(:,1:N);dense=[item.ego,dense(:,1:K*N)];
             end
-            [backupDense,backupEnds,backupInputs]=localCompactCruiseRollout(kernel,ends(:,end),item.parameters,cfg,checkBudget);
+            endpointTarget=[];
+            if ~isempty(item.target)
+                endpointTarget=localCompactTargetNodes(item.target,N*h);
+            end
+            [backupDense,backupEnds,backupInputs]=localCompactCruiseRollout(kernel,ends(:,end),endpointTarget,item.parameters,cfg,checkBudget);
             rollouts.trajectories{s}=struct('dense',dense,'states',ends(:,cumsum(kernel.holds)), ...
                     'collisionStates',[item.ego,ends], ...
                     'backup',struct('dense',backupDense,'states',backupEnds,'inputs',backupInputs));
@@ -4482,7 +4482,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             nodes=[item.ego,ends];q=[];gap=[];localStage=-ones(1,total);nodeIndices=1:total;
             if ~isempty(item.target)
                 if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);else,q=repmat(item.target,1,total+1);end
-                gap=localCompactExactClearance(nodes,q,shape);
+                gap=predictiveSafetyGeometry.rectangleClearance(nodes,q,shape);
                 % Each stage covers its two control-boundary nodes. No
                 % collision condition is imposed on the integration mesh.
                 [localStage,side]=max(cfg.outputFeedback.clearanceMeters-[gap(1:end-1);gap(2:end)],[],1);
@@ -4503,11 +4503,16 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         e.stabilityCost=e.stabilityCost+weight/2*sum(residual.^2);
         nodes=[item.ego,ends];roots=nodes(:,1:end-1);derivativeModel=model;
         derivativeModel.controlMap=[model.controlMap;zeros(2*(total-N),nu)];
+        slew=-Inf;channel=1;trim=terminalSafeSet.movingControl(cfg);
+        if total>N
+            rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+            [slew,channel]=max(abs(inputs(:,end)-trim)-h*rates);
+        end
         if ~derivatives
             e.stage=max(e.stage,localStage(1:N).');e.forward=max(e.forward,forward(1:N).');
             target=[];if ~isempty(q),target=q(:,end);end
-            terminal=terminalSafeSet.movingValue(ends(:,end),target,cfg);
-            e.terminal(s)=max([terminal,localStage(N+1:end),forward(N+1:end)]);
+            terminal=terminalSafeSet.movingValue(ends(:,end),target,cfg,[],checkBudget);
+            e.terminal(s)=max([terminal,slew,localStage(N+1:end),forward(N+1:end)]);
             if s==model.nominal,e.cost=localCompactPerformance(ends(:,cumsum(kernel.holds)),inputs,model);end
             continue;
         end
@@ -4543,7 +4548,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             end
         end
         target=[];if ~isempty(q),target=q(:,end);end
-        [terminal,~,g]=terminalSafeSet.movingValue(ends(:,end),target,cfg);
+        [terminal,~,g]=terminalSafeSet.movingValue(ends(:,end),target,cfg,[],checkBudget);
         e.terminal(s)=terminal;e.terminalGradient(:,s)=(g*SE{end}).';
         if total>N
             [backupValue,index]=max(localStage(N+1:end));
@@ -4553,6 +4558,11 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 j=N+index;e.terminal(s)=backupForward;
                 e.terminalGradient(:,s)=(domainState(:,j).'*SF{j}+domainInput(:,j).'*derivativeModel.controlMap(2*j-1:2*j,:)).';
             end
+        end
+        if slew>e.terminal(s)
+            e.terminal(s)=slew;
+            e.terminalGradient(:,s)=0;
+            e.terminalGradient(nu-2+channel,s)=sign(inputs(channel,end)-trim(channel));
         end
         jacobian=zeros(N,nu);
         for j=1:N
@@ -4678,7 +4688,7 @@ function kernel=localCompactSensitivityKernel()
 end
 
 function gradient=localCompactDistanceGradient(states,targets,shape)
-    [~,gradient]=localCompactExactClearance(states,targets,shape);
+    [~,gradient]=predictiveSafetyGeometry.rectangleClearance(states,targets,shape);
 end
 
 function value=localCompactPerformance(states,inputs,model)
@@ -4851,7 +4861,7 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
                 if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);
                 else,q=repmat(item.target,1,numel(times));end
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-                separation=localCompactExactClearance(collisionStates,q,shape);
+                separation=predictiveSafetyGeometry.rectangleClearance(collisionStates,q,shape);
             end
             separated=separated && all(separation>0);
             violation=max(violation,max(cfg.outputFeedback.clearanceMeters-separation));
@@ -4872,8 +4882,8 @@ function [valid,traces,violation,nodeStates] = localCompactValidate(controls,hyp
             valid=valid && terminal.member;
         end
     end
-    % A stationary initial measurement may start moving. Rest belongs only
-    % to the hypothetical terminal witness after the driving horizon.
+    % A stationary initial measurement may start moving. Both velocity
+    % components may vanish together only at the initial sample.
     for s=1:numel(traces)
         if ~valid,break;end
         trace=traces{s};
@@ -4899,47 +4909,55 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,target,previous,pa
     h=cfg.controller.sampleTime;
     if nargin<8,checkBudget=[];end
     if nargin<7 || isempty(backup)
-        [tail,tailEnds,tailInputs]=localCompactCruiseRollout(kernel,x,parameters,cfg,checkBudget);
+        [tail,tailEnds,tailInputs]=localCompactCruiseRollout(kernel,x,target,parameters,cfg,checkBudget);
     else
         tail=backup.dense;tailEnds=backup.states;tailInputs=backup.inputs;
     end
-    [domain,~,~,~,defined]=localCompactModelDomain(tail,tailInputs,cfg,kernel.validationSubsteps);
-    value=max([0,domain]);terminalTarget=target;separated=true;
-    if ~isempty(target)
-        times=(0:size(tailInputs,2))*h;
-        if target(4)==0,q=repmat(target,1,numel(times));else,q=predictiveSafetyGeometry.predictTarget(target,times);end
+    command=terminalSafeSet.movingControl(cfg);nBridge=size(tailInputs,2);
+    normalWitness=zeros(2,1);exitSteps=0;terminalValue=0;member=true;
+    if nBridge>0
+        [domain,~,~,~,defined]=localCompactModelDomain(tail,tailInputs,cfg,kernel.validationSubsteps);
+        q=localCompactTargetNodes(target,(0:nBridge)*h);
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        gaps=localCompactExactClearance([x,tailEnds],q,shape);
-        separated=all(gaps>0);
-        value=max(value,max(cfg.outputFeedback.clearanceMeters-gaps));
-        terminalTarget=q(:,end);
+        gaps=predictiveSafetyGeometry.rectangleClearance([x,tailEnds],q,shape);
+        [core,normalWitness,~,coreSteps]=terminalSafeSet.movingValue(tailEnds(:,end),q(:,end),cfg,normal,checkBudget);
+        exitSteps=nBridge+coreSteps;
+        rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+        slew=abs(command-previous)-h*rates;
+        terminalValue=max([0,max(domain),cfg.outputFeedback.clearanceMeters-min(gaps),core,slew.']);
+        member=defined && all(gaps>0) && isfinite(exitSteps) && ...
+            terminalValue<=cfg.outputFeedback.nlpTolerance && ...
+            (coreSteps==0 || core<cfg.outputFeedback.clearanceMeters);
+    else
+        % No encounter action is required. The next nominal input must
+        % still be reachable from the preceding actuator command.
+        command=localCompactRateLimit(command,previous,1,cfg);
     end
-    [core,normal]=terminalSafeSet.movingValue(tailEnds(:,end),terminalTarget,cfg,normal);
-    % At positive forward speed, core = max(-vx, requiredGap - supportGap).
-    % Strict separation of the terminal sweeps therefore requires core < requiredGap.
-    separated=separated && (isempty(target) || core<cfg.outputFeedback.clearanceMeters);
-    command=tailInputs(:,1);
-    slew=abs(command-previous)-h*[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
-    terminalValue=max([value;core;slew]);
-    unsustainableCoast=command(2)==0 && (nonlinearBicycleModel.roadLoad(cfg.referenceSpeed,cfg)>0 ...
-        || tailEnds(4,end)<.2*cfg.model.brakeHoldSpeed);
-    if command(2)<0 || unsustainableCoast || ~defined || x(4)<=0 || any(tailEnds(4,:)<=0) || any(tail(4,:)<=0)
-        terminalValue=Inf;
-    end
-    terminal=struct('value',terminalValue,'member',separated && terminalValue<=cfg.outputFeedback.nlpTolerance, ...
-        'input',command,'bridgeHolds',size(tailInputs,2),'normal',normal, ...
-        'model',"straightCruiseEscape",'safetyAssumed',true,'safetyProved',false);
+    terminal=struct('value',terminalValue,'member',member, ...
+        'input',command,'bridgeHolds',nBridge,'exitSteps',exitSteps,'normal',normalWitness, ...
+        'model',"safeRangeExit",'safetyAssumed',true,'safetyProved',false);
 end
 
-function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,parameters,cfg,checkBudget)
+function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,target,parameters,cfg,checkBudget)
     if ~isempty(checkBudget),checkBudget();end
-    count=max(1,ceil(cfg.outputFeedback.minimumPreviewSeconds/cfg.controller.sampleTime));
+    if isempty(target) || norm(target(1:2)-x(1:2))>cfg.collision.encounterRangeMeters
+        dense=x;ends=zeros(6,0);inputs=zeros(2,0);return;
+    end
+    h=cfg.controller.sampleTime;
+    count=max(1,ceil(cfg.outputFeedback.minimumPreviewSeconds/h));
     capacity=kernel.capacity;
-    command=terminalSafeSet.movingControl(cfg);
-    inputs=repmat(command,1,count);
+    inputs=repmat(terminalSafeSet.movingControl(cfg),1,count);
     [points,states]=kernel.refinedRollout(x,[inputs,zeros(2,capacity-count)],parameters,double((1:capacity)<=count));
-    states=full(states);points=full(points);
-    ends=states(:,1:count);dense=[x,points(:,1:count*kernel.validationSubsteps)];
+    ends=full(states(:,1:count));
+    q=localCompactTargetNodes(target,(1:count)*h);
+    out=find(vecnorm(ends(1:2,:)-q(1:2,:))>cfg.collision.encounterRangeMeters,1);
+    if ~isempty(out),count=out;ends=ends(:,1:count);inputs=inputs(:,1:count);end
+    dense=[x,full(points(:,1:count*kernel.validationSubsteps))];
+end
+
+function q=localCompactTargetNodes(target,times)
+    if target(4)==0,q=repmat(target,1,numel(times));
+    else,q=predictiveSafetyGeometry.predictTarget(target,times);end
 end
 
 function [value,index,stateGradient,inputGradient,defined]=localCompactModelDomain(states,inputs,cfg,K,drivingHolds)
@@ -4975,61 +4993,4 @@ function [value,index,stateGradient,inputGradient,defined]=localCompactModelDoma
     stateGradient(:,active)=0;inputGradient(:,active)=0;
     speedActive=speedGap(active)<=driveGap(active);
     stateGradient(4,active(speedActive))=-1;inputGradient(2,active(~speedActive))=-1;
-end
-
-function [clearance,gradient] = localCompactExactClearance(states,targets,shape)
-    % Batched closest-feature evaluation of the rectangle distance dual.
-    ce=cos(states(3,:));se=sin(states(3,:));ct=cos(targets(3,:));st=sin(targets(3,:));
-    signs=[-1,1,1,-1;-1,-1,1,1];ego=cell(1,4);target=cell(1,4);
-    for j=1:4
-        e=shape(3:4)+shape(1:2).*signs(:,j);
-        t=targets(10:11,:)+targets(8:9,:).*signs(:,j);
-        ego{j}=states(1:2,:)+[ce*e(1)-se*e(2);se*e(1)+ce*e(2)];
-        target{j}=targets(1:2,:)+[ct.*t(1,:)-st.*t(2,:);st.*t(1,:)+ct.*t(2,:)];
-    end
-    square=Inf(1,size(states,2));closest=zeros(2,size(states,2));difference=closest;
-    for j=1:4
-        for k=1:4
-            next=mod(k,4)+1;
-            edge=target{next}-target{k};offset=ego{j}-target{k};
-            t=max(0,min(1,sum(offset.*edge,1)./sum(edge.^2,1)));
-            delta=offset-edge.*t;distance=sum(delta.^2,1);selected=distance<square;
-            square(selected)=distance(selected);
-            if nargout>1,closest(:,selected)=ego{j}(:,selected);difference(:,selected)=delta(:,selected);end
-            edge=ego{next}-ego{k};offset=target{j}-ego{k};
-            t=max(0,min(1,sum(offset.*edge,1)./sum(edge.^2,1)));
-            delta=edge.*t-offset;distance=sum(delta.^2,1);selected=distance<square;
-            square(selected)=distance(selected);
-            if nargout>1
-                point=ego{k}+edge.*t;closest(:,selected)=point(:,selected);difference(:,selected)=delta(:,selected);
-            end
-        end
-    end
-    clearance=sqrt(square);
-    if nargout>1
-        [gaps,facetGradient,projection]=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
-    else
-        gaps=predictiveSafetyGeometry.rectangleAxisGaps(states(1:3,:),shape,targets(1:3,:),targets(8:11,:));
-    end
-    gap=max(gaps,[],1);
-    overlap=gap<=0;clearance(overlap)=gap(overlap);
-    if nargout>1
-        normal=difference./max(sqrt(square),eps);arm=closest-states(1:2,:);
-        gradient=[normal;normal(2,:).*arm(1,:)-normal(1,:).*arm(2,:)];
-        % A centered difference across |projection| can cancel the two
-        % separating normals. Differentiate one attaining facet in that stencil.
-        step=1e-5;
-        crossesZero=overlap & abs(projection)<=step;
-        gradient(:,crossesZero)=facetGradient(:,crossesZero);
-        regular=overlap & ~crossesZero;
-        if any(regular)
-            x=states(1:3,regular);q=targets(:,regular);
-            for j=1:3
-                plus=x;minus=x;plus(j,:)=plus(j,:)+step;minus(j,:)=minus(j,:)-step;
-                a=max(predictiveSafetyGeometry.rectangleAxisGaps(plus,shape,q(1:3,:),q(8:11,:)),[],1);
-                b=max(predictiveSafetyGeometry.rectangleAxisGaps(minus,shape,q(1:3,:),q(8:11,:)),[],1);
-                gradient(j,regular)=(a-b)/(2*step);
-            end
-        end
-    end
 end

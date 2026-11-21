@@ -531,78 +531,73 @@ numerical tolerance. This comparison preserves a feasible incumbent when
 stability and reference tracking favor different plans. It supplies a local
 preference and makes no claim of global secondary optimality or yaw stability.
 
-### A moving terminal set and its continuation
+### A terminal set for safe exit from sensing range
 
-Let the common terminal command be zero steering and the nominal force ratio
-for straight travel at the fixed cruise speed,
-$$
- u_f=(0,b_f),\qquad
- b_f=\operatorname{clip}_{[b_{\min},b_{\max}]}
-        \frac{F_{\rm load}(v_{\rm ref})}{\sum_i\mu_iF_{zi}}.
-$$
-All hypotheses receive the same command. When the trim is within the actuator
-bounds it balances the nominal road load at the reference speed. The resulting
-speeds may differ across physical members.
-The cruise certificate requires sustainable forward motion under this input.
+Let \(R\) be the radar range for the two reference points, \(h\) the control
+hold, and \(d_\pm\) the signed rectangle distance from the separation dual.
+A detected encounter ends at the first control node with
+\(\|p_T-p_E\|>R\). Equality is in range. Predicted exit can complete a
+terminal witness. Actual release still uses the received block and every
+surviving member. An isolated missed return inside range preserves the
+obligation. Re-entry is a new encounter.
 
-Write $E(x)$ for the oriented ego rectangle, $e=(\cos\psi,\sin\psi)$ and
-$T(q(t))$ for the target rectangle. In the simplified terminal model the ego
-continues along the forward ray with fixed orientation and strictly positive
-speed. Its speed need not have a specified time profile. Define
+While terminal continuation is needed, every member receives the same
+realizable command
 $$
- L_E(n,x)=\min_{z\in E(x)} n^\top z,\qquad
- U_T(n,q)=\sup_{t\ge0}\max_{z\in T(q(t))}n^\top z .
+ u_f=(0,b_f),\qquad b_f=\operatorname{clip}_{[b_{\min},b_{\max}]}
+ \frac{F_{\rm load}(v_{\rm ref})}{\sum_i\mu_i F_{zi}} .
 $$
-A sufficient moving core $C$ requires $v_x>0$ and a witness satisfying
+A member already outside at the planning endpoint has zero remaining
+encounter steps. Otherwise check compatibility with the previous actuator
+input and advance the nonlinear dynamics under \(u_f\) for up to
+\(B=\max(1,\lceil T_{\rm preview,min}/h\rceil)\) holds. Include each
+node through the first exit in the clearance checks and apply the vehicle
+domain checks on these holds. If exit occurs, the encounter witness is
+complete at that node.
+
+For a member still in range after the bridge, the simplified continuation
+under the same command starts with the handoff pose, fixed heading
+\(\psi\), and positive handoff longitudinal speed \(v\). Its sampled model
+and exit index are
 $$
- \|n\|=1,\qquad n^\top e\ge0,\qquad
- L_E(n,x)-U_T(n,q)>0,\qquad L_E(n,x)-U_T(n,q)\ge d_{\rm safe}.
+ p_{E,j}=p_{E,0}+jh\,v(\cos\psi,\sin\psi)^\top,\qquad
+ q_j=\Phi_T(q_0,jh),\qquad
+ J=\min\{j\ge 0:\|p_{T,j}-p_{E,j}\|>R\}.
 $$
-In the absence of a target the separation condition is vacuous. The witness
-may differ across hypotheses. One common separating plane over the remaining
-sweeps is a sufficient terminal condition. Stage constraints still use the
-configuration-specific rectangle distance dual. Some encounters that are
-safe solely because the vehicles reach a crossing at different times need
-a longer maneuver before they enter this core.
+Here \(\Phi_T\) uses the same constant target parameters and absorbing stop
+as the main forecast. The core requires finite \(J\) and
+$$
+ d_\pm(E_j,T_j)>0,\qquad d_\pm(E_j,T_j)\ge d_{\rm safe},
+ \qquad 0\le j\le J .
+$$
+Each dual compares the two oriented footprints at the **same** node. The
+core residual is \(d_{\rm safe}-\min_{0\le j\le J}d_\pm(E_j,T_j)\).
+On a fixed exit and closest-feature branch, its derivative follows from
+the active node's rectangle dual and the derivative of the straight
+translation with respect to handoff position, heading and speed.
 
-For straight target motion each corner sweeps a segment up to the absorbing
-stop, or a ray if the target continues indefinitely. Its upper support is the
-larger endpoint projection for a segment. For a ray it is finite for
-$n^\top e_T\le0$ and equals the initial projection. At rest use the current
-rectangle. For nonzero curvature each corner moves on a circular arc about
-the target turn center. Its maximum projection occurs at an endpoint or at
-the point whose outward radius is parallel to $n$, if that angle belongs to
-the remaining directed arc. A full revolution includes that extremum for
-every direction. Maximizing over the four corners gives $U_T$. The angle
-search in the admissible semicircle returns a unit-normal witness. Acceptance
-uses that witness's support gap, so it needs no globally optimal angle.
-A retained normal remains available for its surviving hypothesis on shift.
+For affine relative motion the range exit follows from a line–disk
+intersection. Signed clearance is convex along a translational line with
+fixed orientations, so its discrete minimum can be located by bisection.
+Equal velocities inside the disk give no exit. For turning or accelerating
+targets, process node intervals chronologically. An interval can be skipped
+when bounds on relative translation and target rotation show that every
+node is in range and its clearance cannot improve the current minimum.
+For a half-duration \(\Delta\), the reference-point displacement from the
+midpoint is bounded by
+\(\|v_{\rm rel}\|\Delta+(|A_T|+|\kappa_T|V_{\max}^2)\Delta^2/2\);
+the additional corner displacement is bounded by
+\(a_T\min(2,|\kappa_T|V_{\max}\Delta)\). Otherwise subdivide or evaluate
+the original node duals. This preserves the first exit even when both
+endpoints of a larger interval are in range.
 
-Under the simplified model the core is positively invariant. After a forward
-translation by $\Delta s>0$, $L_E$ increases by $\Delta s\, n^\top e\ge0$.
-The remaining target sweep is a subset of its previous sweep, so $U_T$
-cannot increase. The same normal certifies the successor.
-
-Let $F_f$ be one full nonlinear prediction hold under $u_f$ and set
-$B=\max(1,\lceil T_{\rm preview,min}/h\rceil)$. The accepted terminal set is
-the constrained $B$-step predecessor of $C$. Entry requires compatibility of
-$u_f$ with the preceding input, forward motion, and admissible nonlinear
-states and node clearance along the entire $B$-hold bridge. Its last state
-must belong to $C$. SQP differentiates the bridge and the active terminal
-support gap. Acceptance recomputes the original nonlinear inequalities.
-The bridge allows steering and lateral transients to evolve before the
-straight-cruise handoff.
-
-**Physical handoff assumption.** For the full vehicle, the terminal argument
-assumes that under $u_f$ a core state remains forward-moving and in the
-physical domain, with $n^\top e^+\ge0$ and $L_E(n,x^+)\ge L_E(n,x)$ for
-the retained witness. These are conditions on ego motion. Together with
-nesting of the target sweep they imply successor separation. The ray model
-establishes these conditions for fixed heading and forward translation. A nonlinear vehicle can still
-have residual sideslip and yaw rate after $B$ holds. The finite bridge does
-not prove the handoff assumption for that vehicle. Each online acceptance
-rechecks nonlinear motion and core membership. A violation invalidates
-the shift and must be reported if no other plan passes.
+Under the simplified continuation, advancing one hold before exit
+decrements \(J\) and retains the previously checked suffix. Exit is the
+completed state for this encounter. For the full nonlinear vehicle,
+preservation of this safe-to-exit continuation at the bridge handoff is a
+design assumption. Numerically the controller replays the candidate for
+each surviving member. Once the encounter ends, nominal guidance owns
+path and speed recovery.
 
 The geometric guide constructs one route-following trajectory for the
 primary search. At each integration step its tangential acceleration is
@@ -647,8 +642,8 @@ d_\pm(z_j^s)>0,\qquad d_\pm(z_j^s)\ge d_{\rm safe},\qquad
 j=0,\ldots,N,\qquad s=1,\ldots,S,
 $$
 
-with the same condition at every control boundary of the nonlinear cruise
-bridge. These checks use the exact rectangle-distance dual value from
+with the same condition at every control boundary of the terminal bridge
+through the first strict exit. These checks use the exact rectangle-distance dual value from
 Section 5. The control-boundary state nodes are retained even inside a long
 control-knot interval. The compact controller requires $d_{\rm safe}>0$,
 with a default of $0.10\,\mathrm{m}$. The primary optimization and nonlinear
@@ -687,11 +682,14 @@ measurements can also move it outside the previously predicted successor
 set. The numerical controller rechecks the suffix from the updated root.
 The observer point alone supplies no successor-containment guarantee.
 
-After applying the first input, let $r=N_{k+1}-(N_k-1)\ge0$. Form the
-executable candidate
+After applying the first input, let $r=N_{k+1}-(N_k-1)\ge0$. Starting
+from $w_0=u_{N_k-1|k}$, let $w_j$ move toward $u_f$ within one hold's
+actuator increment bounds. Active terminal entry requires $u_f$ to be
+reachable in that hold, in which case every appended $w_j=u_f$. The
+executable candidate is
 $$
  U_{k+1}^{\rm shift}
-   =(u_{1|k},\ldots,u_{N_k-1|k},\underbrace{u_f,\ldots,u_f}_{r}).
+   =(u_{1|k},\ldots,u_{N_k-1|k},w_1,\ldots,w_r).
 $$
 The fine held-input suffix remains directly representable even when it no
 longer interpolates the new control knots. Generated candidates and this
@@ -707,10 +705,13 @@ Suppose an initial plan is feasible, the posterior contains the true member
 and is contained in the predicted successors, the flow and timing agree,
 the required clearance stays fixed, requested horizons fit the numerical
 allocation, and the core handoff assumption holds. Let $z\in Z_f$.
-One step of $F_f$ consumes the first of
-the $B$ checked bridge holds. The remaining $B-1$ holds reach $C$. Core
-invariance supplies one more admissible moving hold ending in $C$. Thus
-$F_f(z)\in Z_f$. Induction gives any $r$ required extension holds under a
+If a bridge hold reaches exit, the encounter is complete. Otherwise one
+step consumes a checked bridge hold. At the far end of a full bridge, the
+handoff assumption preserves the core witness for one more hold or
+establishes exit. This gives closure in the encounter state augmented with
+its completion flag. Admissibility of the subsequent nominal handoff and
+admission on a new detection are separate assumptions for continuing
+operation. Induction gives any $r$ required extension holds under a
 single common input. Conditioning can discard physical members, and all
 surviving members inherit their own witnesses. When $r=0$ the old endpoint
 is already in $Z_f$.
