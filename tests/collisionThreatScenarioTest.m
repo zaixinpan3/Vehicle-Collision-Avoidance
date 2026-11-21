@@ -33,7 +33,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             for frames=[2,4]
                 campaign=runJointOutputFeedbackScenario(Frames=frames,Speeds=1.5,Scenarios="stoppedLead", ...
                     ControllerConfiguration=struct('outputFeedback',struct('method',"sqpRti")), ...
-                    TargetPositionOffsetMeters=offset,Warmup=false,OutputDirectory=string(folder.Folder));
+                    TargetPositionOffsetMeters=offset,Warmup=false,RequirePhysicalWitness=false,OutputDirectory=string(folder.Folder));
                 result=campaign.results;
                 testCase.verifyFalse(result.nodeClearanceSatisfied);
                 if frames==2
@@ -58,8 +58,45 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             result=campaign.results;
             testCase.verifyTrue(result.initialContactOrOverlap);
             testCase.verifyTrue(result.nodeCollisionDetected);
-            testCase.verifyEqual(result.failurePhase,"replaySafety");
+            testCase.verifyEqual(result.outcome,"unqualifiedScenario");
+            testCase.verifyEqual(result.failurePhase,"scenarioQualification");
+            testCase.verifyFalse(result.bypassQualified);
             testCase.verifyEqual(result.timing.calls,0);
+        end
+
+        function sensorSeedsShareAPhysicallyVerifiedScene(testCase)
+            root=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            seeds=[20261107,20261108];data=cell(1,2);
+            for k=1:2
+                campaign=runJointOutputFeedbackScenario(Frames=1,Speeds=15,Scenarios="trafficHeadOn", ...
+                    RandomSeed=seeds(k),Warmup=false,OutputDirectory=fullfile(string(root.Folder),string(seeds(k))));
+                testCase.assertTrue(campaign.results.bypassQualified);
+                data{k}=jsondecode(fileread(campaign.results.source));
+            end
+            testCase.verifyEqual(data{1}.initialPlantState,data{2}.initialPlantState);
+            testCase.verifyEqual(data{1}.physicalWitness.inputs,data{2}.physicalWitness.inputs);
+            testCase.verifyGreaterThan(data{1}.physicalWitness.minimumClearanceMeters,0);
+            testCase.verifyNotEqual(data{1}.initialSensorSample.position,data{2}.initialSensorSample.position);
+        end
+
+        function aControllerRefusalIsCheckedFromTheReachedState(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.WorkingFolderFixture());
+            writelines(["function [command,info,prediction,state]=collisionAvoidanceController(block,varargin)"
+                "if block.time>0,error('collisionAvoidanceController:compactNoFeasiblePlan','Test refusal');end"
+                "command=struct('actuatorInput',[.01;0]);info=[];prediction=struct('metadata',struct());"
+                "state=struct('memory',[],'hypotheses',[]);"
+                "end"],fullfile(folder.Folder,'collisionAvoidanceController.m'));
+            rehash;
+            campaign=runJointOutputFeedbackScenario(Frames=2,Speeds=15,Scenarios="stoppedLead", ...
+                Warmup=false,OutputDirectory=string(folder.Folder));
+            result=campaign.results;
+            testCase.assertEqual(result.failurePhase,"controller");
+            testCase.verifyEqual(result.executedFrames,1);
+            testCase.verifyTrue(result.bypassQualified && result.refusalBypassQualified);
+            run=jsondecode(fileread(result.source));w=run.physicalWitnessAtRefusal;
+            testCase.verifyEqual(w.initialState,run.trace.stateAfterHold);
+            testCase.verifyEqual(w.previousInput,run.trace.input);
+            testCase.verifyGreaterThan(w.minimumClearanceMeters,0);
         end
 
         function trafficTargetsReachTheUnmodifiedCruiseAtRoadSpeeds(testCase)
@@ -197,6 +234,18 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(witness.recoverySeconds,witness.encounterExitSeconds);
             testCase.verifyEqual(witness.states(:,1),x,AbsTol=0);
             testCase.verifyEqual(size(witness.states,2),size(witness.inputs,2)+1);
+        end
+        function qualifiedCommandsRespectTheStoredActuatorAndRequestedClearance(testCase)
+            cfg=struct('referenceSpeed',15,'outputFeedback',struct('steeringRateMaximum',.8));
+            [x,q,road,cfg]=collisionThreatScenario("stoppedLead",cfg);
+            previous=[.03;0];
+            w=bypassFeasibilityBaseline(x,q,road,cfg,PreviousInput=previous, ...
+                MinimumClearanceMeters=cfg.outputFeedback.clearanceMeters);
+            testCase.assertTrue(w.qualified,w.reason);
+            testCase.verifyGreaterThanOrEqual(w.minimumClearanceMeters,cfg.outputFeedback.clearanceMeters);
+            delta=diff([previous,w.inputs],1,2);
+            testCase.verifyLessThanOrEqual(max(abs(delta(1,:))),cfg.outputFeedback.steeringRateMaximum*cfg.controller.sampleTime+1e-12);
+            testCase.verifyLessThanOrEqual(max(abs(w.inputs(1,:))),cfg.outputFeedback.steeringMaximum);
         end
         function targetFootprintsOutsideTheRoadAreNotQualified(testCase)
             [x,q,road,cfg]=collisionThreatScenario("stoppedLead");q(2)=8.5;

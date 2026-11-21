@@ -285,8 +285,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function aMovingBrakingLeadSuppliesPerceptionYawOnlyOnDetections(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            % This sensor fixture places the target outside the benchmark road.
             run=runJointOutputFeedbackScenario(Scenarios="hardBrakingLead",Speeds=15,Frames=49, ...
-                Warmup=false,DropoutHolds=48,EgoYawOffsetRadians=.02,TargetPositionOffsetMeters=[0;15], ...
+                Warmup=false,RequirePhysicalWitness=false,DropoutHolds=48,EgoYawOffsetRadians=.02,TargetPositionOffsetMeters=[0;15], ...
                 RandomSeed=20261107,OutputDirectory=string(folder.Folder));
             testCase.assertEqual(run.results.outcome,"completed");
             data=jsondecode(fileread(run.results.source));

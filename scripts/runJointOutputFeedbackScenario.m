@@ -3,6 +3,9 @@ function campaign = runJointOutputFeedbackScenario(options)
 % Radar supplies relative position. Detected low-speed targets also supply
 % perceived relative body heading. The NRMM observer estimates target motion.
 % An independent ode45 plant generates position GNSS, body IMU, gyro and radar.
+% Physical qualification replays a separate truth-based maneuver before the
+% benchmark. RandomSeed governs sensor noise. Only diagnostic fixtures that
+% intentionally exercise invalid scenes should disable RequirePhysicalWitness.
 % The finite initial contract and future noise cases do not cover all bounded
 % uncertainty. Reported checks are empirical, with no deterministic guarantee.
     arguments
@@ -12,6 +15,7 @@ function campaign = runJointOutputFeedbackScenario(options)
         options.ControllerConfiguration (1,1) struct = struct()
         options.OutputDirectory (1,1) string = string(tempname)
         options.RandomSeed (1,1) double {mustBeInteger,mustBeNonnegative} = 20261104
+        options.RequirePhysicalWitness (1,1) logical = true
         options.Warmup (1,1) logical = true
         options.DropoutHolds (1,:) double {mustBeInteger,mustBeNonnegative} = []
         options.HypothesisOffsets (1,:) double {mustBeFinite,mustBeNonempty} = [-.005,0,.005]
@@ -39,7 +43,12 @@ function campaign = runJointOutputFeedbackScenario(options)
                 [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset],q(1:3),q(8:11));
             truth=struct('ego',x,'target',q,'parameters',ones(4,1),'sensorBias',zeros(7,1));
             initial=localInitialContract(x,options.HypothesisOffsets);
-            startup=localWarmup(cfg,options,truth,reference,initial,initialClearance,compactSolversReady);
+            qualification=[];refusalWitness=[];
+            if options.RequirePhysicalWitness
+                qualification=bypassFeasibilityBaseline(x,q,road,cfg,HalfWidthMeters=road.scenarioHalfWidthMeters);
+            end
+            admitted=isempty(qualification) || qualification.qualified;
+            startup=localWarmup(cfg,options,truth,reference,initial,admitted && initialClearance>0,compactSolversReady);
             compactSolversReady=startup.solversReady;
 
             stream=RandStream('mt19937ar','Seed',options.RandomSeed);
@@ -47,7 +56,12 @@ function campaign = runJointOutputFeedbackScenario(options)
             block=localSensorBlock(time,input,sample);block.initialHypotheses=initial;
             trace=struct([]);failure="";failurePhase="";minimumClearance=Inf;minimumNodeClearance=Inf;failureCallSeconds=0;
             callSeconds=zeros(1,options.Frames);callCount=0;
+            if ~admitted
+                failurePhase="scenarioQualification";failure=qualification.reason;
+                minimumNodeClearance=initialClearance;
+            end
             for frame=1:options.Frames
+                if ~admitted,break;end
                 if frame==1 && initialClearance<=0
                     minimumNodeClearance=initialClearance;
                     failurePhase="replaySafety";
@@ -62,7 +76,18 @@ function campaign = runJointOutputFeedbackScenario(options)
                     failurePhase="controller";
                     save(fullfile(options.OutputDirectory,sprintf('%g-%s-failure.mat',speed,name)), ...
                         'block','state','reference','cfg');
-                    failure=string(exception.identifier)+": "+string(exception.message);break;
+                    failure=string(exception.identifier)+": "+string(exception.message);
+                    if options.RequirePhysicalWitness && strcmp(exception.identifier,'collisionAvoidanceController:compactNoFeasiblePlan')
+                        % Use the true state reached by the executed prefix, including
+                        % acquisition delay. This diagnostic never supplies a command.
+                        if frame==1
+                            refusalWitness=qualification;
+                        else
+                            refusalWitness=bypassFeasibilityBaseline(truth.ego,truth.target,road,cfg, ...
+                                PreviousInput=block.heldInput,HalfWidthMeters=road.scenarioHalfWidthMeters);
+                        end
+                    end
+                    break;
                 end
                 elapsed=toc(callTimer);callCount=callCount+1;callSeconds(callCount)=elapsed;
                 input=command.actuatorInput;
@@ -92,6 +117,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                 block=nextBlock;
             end
             outcome="completed";if strlength(failure)>0,outcome="failed";end
+            if ~admitted,outcome="unqualifiedScenario";end
             file=fullfile(options.OutputDirectory,sprintf('%g-%s.json',speed,name));
             result=struct('scenario',name,'referenceSpeedMetersPerSecond',speed, ...
                 'observationModel',"rawSensorEgoConsistencyAndNrmmTargetObserver",'controllerMethod',string(cfg.outputFeedback.method), ...
@@ -117,6 +143,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'failureCallSeconds',failureCallSeconds, ...
                 'initialSensorSample',sample,'initialInformationContract',initial, ...
                 'initialPlantState',struct('ego',x,'target',q), ...
+                'physicalWitness',qualification,'physicalWitnessAtRefusal',refusalWitness, ...
                 'initialContractScope',"finiteEgoPrior;radarAcquisition;nrmmPointMotion", ...
                 'actualInitialEgoMemberIncluded',any(options.HypothesisOffsets==0), ...
                 'actualInitialMemberIncluded',false, ...
@@ -125,7 +152,11 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'trace',trace);
             result.solverTiming=localSolverTiming(trace);
             localWriteJson(file,result);
-            entry=rmfield(result,{'configuration','trace','initialInformationContract','initialPlantState','initialSensorSample'});entry.source=file;
+            entry=rmfield(result,{'configuration','trace','initialInformationContract','initialPlantState', ...
+                'initialSensorSample','physicalWitness','physicalWitnessAtRefusal'});entry.source=file;
+            entry.bypassQualified=[];entry.refusalBypassQualified=[];
+            if ~isempty(qualification),entry.bypassQualified=qualification.qualified;end
+            if ~isempty(refusalWitness),entry.refusalBypassQualified=refusalWitness.qualified;end
             if isempty(summaries),summaries=entry;else,summaries(end+1)=entry;end %#ok<AGROW>
             fprintf('%s at %g m/s: %s, %d/%d holds, mean/max call %.1f/%.1f ms, %d deadline misses\n', ...
                 name,speed,outcome,numel(trace),options.Frames,1000*result.timing.meanSeconds, ...
@@ -137,9 +168,9 @@ function campaign = runJointOutputFeedbackScenario(options)
     localWriteJson(fullfile(options.OutputDirectory,'campaign.json'),campaign);
 end
 
-function startup=localWarmup(cfg,options,truth,reference,initial,initialClearance,solversReady)
+function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversReady)
     startup=struct('seconds',0,'holds',0,'failure',"",'solversReady',solversReady,'avoidanceContinuation',false);
-    if ~options.Warmup || initialClearance<=0,return;end
+    if ~options.Warmup || ~canRun,return;end
     timer=tic;input=zeros(2,1);state=[];compact=string(cfg.outputFeedback.method)=="compactNlp";
     if compact && ~solversReady
         try

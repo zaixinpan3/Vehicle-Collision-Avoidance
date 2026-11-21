@@ -4,7 +4,7 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
 % maneuvers. No avoidance field, RTI solution, or terminal-set test is called.
 % A retained held-input sequence is independently replayed with ode45. Its
 % complete ego and target rectangles must stay inside the scenario road and
-% separated at sample nodes until the first perception-range exit. The ego
+% separated at sample nodes through range exit and recovery. The ego
 % subsequently returns to nominal cruise. This nominal-model witness makes
 % no claim about robustness to every observer/model uncertainty realization.
 % Failure of this finite maneuver family means unqualified, not impossible.
@@ -14,6 +14,8 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
         road (1,1) struct
         cfg (1,1) struct
         options.HalfWidthMeters (1,1) double {mustBePositive,mustBeFinite} = 9
+        options.PreviousInput (2,1) double {mustBeReal,mustBeFinite} = zeros(2,1)
+        options.MinimumClearanceMeters (1,1) double {mustBeNonnegative,mustBeFinite} = 0
     end
     curve=struct('origin',[0;0],'heading',0,'curvature',0,'length',200);
     if isfield(road,'referenceCurve'),curve=road.referenceCurve;
@@ -29,7 +31,8 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
         'minimumClearanceMeters',NaN,'minimumEgoRoadMarginMeters',NaN, ...
         'minimumTargetRoadMarginMeters',NaN,'maximumLateralDeviationMeters',NaN, ...
         'encounterEntrySeconds',NaN,'encounterExitSeconds',NaN,'recoverySeconds',NaN,'attempts',0, ...
-        'initialState',initialState,'targetInitialState',target,'inputs',zeros(2,0), ...
+        'initialState',initialState,'targetInitialState',target,'previousInput',options.PreviousInput, ...
+        'requiredClearanceMeters',options.MinimumClearanceMeters,'inputs',zeros(2,0), ...
         'states',zeros(6,0),'times',zeros(1,0),'offsetMeters',NaN,'riseSeconds',NaN);
     if scenarioRoadFootprintMargin(target(1:3),target(8:11),auditRoad,options.HalfWidthMeters)<0
         baseline.reason="targetOutsideRoad";return;
@@ -40,18 +43,18 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
     if predictiveSafetyGeometry.rectangle(initialState(1:3),shape,target(1:3),target(8:11))<=0
         baseline.reason="initialCollision";return;
     end
-    reference=nonlinearBicycleModel.cruise(cfg,curve.curvature);
+    reference=nonlinearBicycleModel.operatingPoint(cfg,curve.curvature);
     % A fixed offline family supplies existence evidence, not an online
     % candidate selector. Retain the first successful independent replay.
     for offset=[3,4.5,6]
-        for rise=[1.2,1.6,2,2.5,3]
+        for rise=[1.2:.2:2,2.5,3]
             for side=[1,-1]
                 baseline.attempts=baseline.attempts+1;
                 candidate=localRollout(initialState,target,curve,shape,cfg,reference, ...
-                    side*offset,rise,options.HalfWidthMeters,[],auditRoad);
+                    side*offset,rise,options,[],auditRoad);
                 if ~candidate.qualified,continue;end
                 verified=localRollout(initialState,target,curve,shape,cfg,reference, ...
-                    side*offset,rise,options.HalfWidthMeters,candidate.inputs,auditRoad);
+                    side*offset,rise,options,candidate.inputs,auditRoad);
                 if ~verified.qualified,continue;end
                 fields=fieldnames(verified);
                 for k=1:numel(fields),baseline.(fields{k})=verified.(fields{k});end
@@ -61,8 +64,9 @@ function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,optio
     end
 end
 
-function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,width,replayInputs,auditRoad)
+function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,options,replayInputs,auditRoad)
     h=cfg.controller.sampleTime;
+    width=options.HalfWidthMeters;
     % Explicit finite witness-search coverage, not a controller horizon or
     % an assumption that an unresolved encounter becomes safe at this time.
     duration=2*max(cfg.collision.encounterRangeMeters,norm(x(1:2)-target(1:2)))/max(cfg.referenceSpeed,1)+4*rise+8;
@@ -70,9 +74,11 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
     if replay,count=size(replayInputs,2);end
     inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=x;
     q=predictiveSafetyGeometry.predictTarget(target,(0:count)*h);
-    previous=zeros(2,1);entryTime=NaN;exitTime=NaN;minimum=Inf;egoMargin=Inf;targetMargin=Inf;maximum=0;
+    previous=options.PreviousInput;entryTime=NaN;exitTime=NaN;minimum=Inf;egoMargin=Inf;targetMargin=Inf;maximum=0;
     qualified=false;reason="searchCoverageExhausted";
     [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,false);
+    lower(1)=-cfg.outputFeedback.steeringMaximum;upper(1)=cfg.outputFeedback.steeringMaximum;
+    increment=h*[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     for node=1:count+1
         time=(node-1)*h;x=states(:,node);
         egoMargin=min(egoMargin,scenarioRoadFootprintMargin(x(1:3),shape,auditRoad,width));
@@ -81,10 +87,11 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
         maximum=max(maximum,abs(projection.lateralPosition));
         if min(egoMargin,targetMargin)<0,reason="footprintOutsideRoad";break;end
         if localStateViolation(x,cfg)>1e-9,reason="stateLimit";break;end
+        gap=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3,node),q(8:11,node));
+        minimum=min(minimum,gap);
+        if gap<=0,reason="collision";break;end
+        if gap<options.MinimumClearanceMeters,reason="insufficientClearance";break;end
         if isnan(exitTime)
-            gap=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3,node),q(8:11,node));
-            minimum=min(minimum,gap);
-            if gap<=0,reason="collision";break;end
             inside=norm(x(1:2)-q(1:2,node))<=cfg.collision.encounterRangeMeters;
             if inside && isnan(entryTime),entryTime=time;end
             if ~inside && ~isnan(entryTime),exitTime=time;end
@@ -114,9 +121,10 @@ function result=localRollout(x,target,curve,shape,cfg,reference,offset,rise,widt
             acceleration=(.8*(cfg.referenceSpeed-along)-kappa*stationRate*across)*tangent ...
                 +(kappa*stationRate*along+transverse)*normal;
             u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,previous,cfg);
+            u=min(max(u,max(lower,previous-increment)),min(upper,previous+increment));
         end
         if any(u<lower-1e-10 | u>upper+1e-10) ...
-                || abs(u(2)-previous(2))>cfg.model.brakingRatioRateMaximum*h+1e-10
+                || any(abs(u-previous)>increment+1e-10)
             reason="inputLimit";break;
         end
         if replay
