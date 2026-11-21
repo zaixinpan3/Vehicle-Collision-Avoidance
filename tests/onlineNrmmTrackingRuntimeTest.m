@@ -110,6 +110,25 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyLessThan(abs(motion(1)),deg2rad(1));
         end
 
+        function measuredBodyRotationConstrainsSideslipOnASlowBrakingTurn(testCase)
+            cfg=collisionAvoidanceControllerConfig();track=[];positionsOnly=[];
+            initial=[14;5;pi-.02;2.8;-.4;.035;1.6;2.4;.95;0;0];
+            for j=0:120
+                t=j*cfg.outputFeedback.sensorPeriod;
+                q=predictiveSafetyGeometry.predictTarget(initial,t);
+                point=q(1:2)+.4*cfg.outputFeedback.noiseBounds(4)*[sin(j);cos(j)];
+                egoYaw=.3*sin(t);angle=q(3)-egoYaw;
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,point,egoYaw,cfg,atan2(sin(angle),cos(angle)));
+                [positionsOnly,comparison]=onlineNrmmTrackingRuntime("targetPoint",positionsOnly,t,point,egoYaw,cfg);
+            end
+            testCase.verifyGreaterThan(q(3),pi);
+            testCase.verifyEqual(motion(1),atan2(sin(q(3)),cos(q(3))),AbsTol=1e-12);
+            testCase.verifyEqual(motion(2:4),comparison(2:4));
+            testCase.verifyLessThanOrEqual(track.motionBounds(1,2),q(6));
+            testCase.verifyGreaterThanOrEqual(track.motionBounds(2,2),q(6));
+            testCase.verifyLessThan(diff(track.motionBounds(:,2)),diff(positionsOnly.motionBounds(:,2)));
+        end
+
         function sharedMeasurementPreservesCurrentPublicationAndEveryNextState(testCase)
             runtime = localRuntime();
             for detected = [true,false,true]

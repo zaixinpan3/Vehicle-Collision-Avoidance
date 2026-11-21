@@ -1,7 +1,7 @@
 function campaign = runJointOutputFeedbackScenario(options)
 %runJointOutputFeedbackScenario Raw-sensor predictive-control experiments.
-% Radar supplies relative position. The controller estimates target motion
-% from its received samples with the NRMM point observer.
+% Radar supplies relative position. Detected low-speed targets also supply
+% perceived relative body heading. The NRMM observer estimates target motion.
 % An independent ode45 plant generates position GNSS, body IMU, gyro and radar.
 % The finite initial contract and future noise cases do not cover all bounded
 % uncertainty. Reported checks are empirical, with no deterministic guarantee.
@@ -266,6 +266,8 @@ function estimate=localTargetEstimate(state)
 end
 
 function y=localSensor(truth,input,cfg,time,stream,dropout)
+    persistent sensorSettings
+    if isempty(sensorSettings),sensorSettings=estimatorControllerIntegrationConfig();end
     y=solvePredictiveControl('outputFeedback',struct('operation',"sensor",'cfg',cfg, ...
         'hypothesis',truth,'input',input,'time',time));
     bounds=cfg.outputFeedback.noiseBounds;
@@ -275,8 +277,10 @@ function y=localSensor(truth,input,cfg,time,stream,dropout)
     y.relativePosition=y.relativePosition+localNoise(stream,bounds(4));
     if dropout,y.radarAvailable=false;y.relativePosition=[NaN;NaN];end
     y.relativeHeading=NaN;
-    if y.radarAvailable && truth.target(4)==0
-        % Ideal perception yaw for the stationary target, in the sensor frame.
+    historySpan=(sensorSettings.initialization.minimumRadarSamples-1)*cfg.outputFeedback.sensorPeriod;
+    if y.radarAvailable && abs(truth.target(4))*historySpan<=2*sensorSettings.sensor.radar.positionNoiseMaximum
+        % Supply ideal yaw before rest when motion at the current speed
+        % over the acquisition window is within its two-return error bound.
         angle=truth.target(3)-truth.ego(3);
         y.relativeHeading=atan2(sin(angle),cos(angle));
     end

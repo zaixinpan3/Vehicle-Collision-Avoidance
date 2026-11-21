@@ -3168,10 +3168,15 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                         item.target=[center;motion;cfg.target.rearAxleDistance; ...
                             cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
                     end
-                    if item.targetObserver.restCompatible && isfinite(relativeHeading) && item.target(4)==0
-                        % A position-consistent stationary forecast can still
-                        % have an incorrect body orientation after braking.
+                    if isfinite(relativeHeading)
+                        % Position consistency does not constrain body heading.
                         item.target(3)=motion(1);
+                        if item.target(4)>0
+                            % Propagate the same admissible central parameters
+                            % between returns as in the planner's central case.
+                            motionBounds=item.targetObserver.motionBounds;
+                            item.target(5:6)=min(motionBounds(2,:).',max(motionBounds(1,:).',item.target(5:6)));
+                        end
                     end
                 end
             end
@@ -3184,6 +3189,10 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                     excess=Inf;
                 else
                     excess=max(excess,norm(measured.relativePosition-expected.relativePosition)-bounds(4));
+                    if isfield(measured,'relativeHeading') && ~isempty(measured.relativeHeading) && isfinite(measured.relativeHeading)
+                        angle=item.target(3)-item.ego(3)-measured.relativeHeading;
+                        excess=max(excess,abs(atan2(sin(angle),cos(angle))));
+                    end
                 end
             end
             % A missed return alone cannot establish target departure.
@@ -3992,7 +4001,11 @@ function [cases,parents,centers]=localCompactTargetCases(members)
             % chord for this curvature and tangential acceleration.
             curvature=sin(pair(2))/q(7);half=asin(max(-1,min(1,curvature*lengthChord/2)));
             arc=lengthChord;if curvature~=0,arc=2*half/curvature;end
-            block(k).target(3)=atan2(chord(2),chord(1))+half-pair(2);
+            if isfield(track,'lastReturnHeading') && isfinite(track.lastReturnHeading)
+                block(k).target(3)=track.lastReturnHeading;
+            else
+                block(k).target(3)=atan2(chord(2),chord(1))+half-pair(2);
+            end
             block(k).target(4)=max(0,arc/span+pair(1)*span/2);
             if track.time>history.times(end)
                 % The chord ends at the last return. Advance this case over

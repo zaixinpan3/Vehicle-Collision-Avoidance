@@ -22,6 +22,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             root=fileparts(fileparts(mfilename('fullpath')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'estimator')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             setupJointNlpSolver;
             testCase.cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
@@ -188,6 +189,49 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(posterior.target(4:6),zeros(3,1));
         end
 
+        function perceivedHeadingAnchorsEveryMovingCaseBeforeTheStop(testCase)
+            cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
+            item.ego(3)=2.95;
+            target=[12;4;-3.05;2;-.6;.035;1.6;2.4;.95;0;0];
+            settings=estimatorControllerIntegrationConfig();track=[];
+            for j=0:settings.initialization.minimumRadarSamples-1
+                t=j*cfg.outputFeedback.sensorPeriod;
+                q=predictiveSafetyGeometry.predictTarget(target,t);
+                [track,~]=onlineNrmmTrackingRuntime("targetPoint",track,t,q(1:2),item.ego(3),cfg);
+            end
+            item.targetObserver=track;block.time=t+cfg.outputFeedback.sensorPeriod;
+            q=predictiveSafetyGeometry.predictTarget(target,block.time);
+            item.target=q;item.target(3)=q(3)+.2;
+            block.samples=solvePredictiveControl("outputFeedback",struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',block.time));
+            angle=q(3)-item.ego(3);
+            block.samples.relativeHeading=atan2(sin(angle),cos(angle));
+            posterior=solvePredictiveControl("outputFeedback",struct('operation',"condition", ...
+                'cfg',cfg,'initial',true,'block',block,'hypotheses',item));
+            testCase.verifyFalse(posterior.targetObserver.restCompatible);
+            testCase.verifyEqual(posterior.targetObserver.heading,q(3),AbsTol=1e-12);
+            testCase.verifyEqual(posterior.target,q,AbsTol=1e-12);
+            replay=solvePredictiveControl("outputFeedback",struct('operation',"validateInputSequence", ...
+                'cfg',cfg,'hypotheses',posterior,'input',block.heldInput,'inputs',zeros(2,1)));
+            testCase.assertGreaterThan(numel(replay.trajectories),1);
+            for j=1:numel(replay.trajectories)
+                trace=replay.trajectories{j};
+                testCase.verifyEqual(trace.targets(3,1),q(3),AbsTol=1e-12);
+            end
+        end
+
+        function anExactRelativeHeadingConditionsKnownTargetHypotheses(testCase)
+            cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
+            item.ego(3)=2.95;item.target=[12;4;-3.05;2;-.6;.035;1.6;2.4;.95;0;0];
+            block.samples=solvePredictiveControl("outputFeedback",struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+            block.samples.relativeHeading=item.target(3)-item.ego(3)+2*pi;
+            other=item;other.target(3)=other.target(3)+.2;
+            posterior=solvePredictiveControl("outputFeedback",struct('operation',"condition", ...
+                'cfg',cfg,'initial',true,'block',block,'hypotheses',[item,other]));
+            testCase.verifyEqual(posterior,item);
+        end
+
         function campaignSuppliesOnlyEgoInformationBeforeFirstContact(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             run=runJointOutputFeedbackScenario(Frames=4,Speeds=25,Scenarios="headOn", ...
@@ -216,6 +260,24 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 end
             end
             testCase.verifyNotEmpty(first);
+        end
+        function aMovingBrakingLeadSuppliesPerceptionYawOnlyOnDetections(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            run=runJointOutputFeedbackScenario(Scenarios="hardBrakingLead",Speeds=15,Frames=49, ...
+                Warmup=false,DropoutHolds=48,EgoYawOffsetRadians=.02,TargetPositionOffsetMeters=[0;15], ...
+                RandomSeed=20261107,OutputDirectory=string(folder.Folder));
+            testCase.assertEqual(run.results.outcome,"completed");
+            data=jsondecode(fileread(run.results.source));
+            seen=data.trace(47).rawSensorBlock(end);
+            speed=data.initialPlantState.target(4)+data.initialPlantState.target(5)*seen.time;
+            testCase.verifyGreaterThan(speed,0);
+            testCase.verifyTrue(seen.radarAvailable);
+            testCase.verifyEqual(seen.relativeHeading,-data.trace(47).stateAfterHold(3),AbsTol=1e-10);
+            missed=data.trace(48).rawSensorBlock;
+            testCase.verifyFalse(any([missed.radarAvailable]));
+            testCase.verifyTrue(all(arrayfun(@(y) isempty(y.relativeHeading) || isnan(y.relativeHeading),missed)));
+            seen=data.trace(49).rawSensorBlock(end);
+            testCase.verifyEqual(seen.relativeHeading,-data.trace(49).stateAfterHold(3),AbsTol=1e-10);
         end
         function startupExercisesAvoidanceWithoutSeedingTheExperiment(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
@@ -1199,7 +1261,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function missedReturnsAdvanceEachParameterCaseFromTheLastObservedChord(testCase)
             item=testCase.block.initialHypotheses;item.target=[20;4;0;5;-2;0;1.6;2.4;1;0;0];
-            item.targetObserver=struct('time',1,'motionBounds',[-2,-.01;-1,.01], ...
+            item.targetObserver=struct('time',1,'lastReturnHeading',item.target(3),'motionBounds',[-2,-.01;-1,.01], ...
                 'motionHistory',struct('times',[0,1],'positions',[15,20;4,4]));
             req=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
                 'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1));
@@ -1208,6 +1270,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             req.hypotheses.target=predictiveSafetyGeometry.predictTarget(item.target,.25);
             next=solvePredictiveControl("outputFeedback",req);
             for k=2:5
+                testCase.verifyEqual(old.trajectories{k}.targets(3,1),item.targetObserver.lastReturnHeading);
                 expected=predictiveSafetyGeometry.predictTarget(old.trajectories{k}.targets(:,1),.25);
                 testCase.verifyEqual(next.trajectories{k}.targets(:,1),expected,AbsTol=1e-12);
             end

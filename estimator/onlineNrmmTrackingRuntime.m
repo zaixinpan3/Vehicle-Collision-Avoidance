@@ -61,7 +61,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
 % each relative radar position using this member's synchronized ego pose.
 % In these axes the ego transport terms vanish and the absolute Cartesian
 % target derivatives and inverse NRMM map are unchanged.
-    if nargin<6,relativeHeading=NaN;end
+    if nargin<6 || isempty(relativeHeading),relativeHeading=NaN;end
     persistent design kernelDesign settings
     if isempty(design)
         localAddProjectPaths();
@@ -110,6 +110,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     if ~isempty(position)
         track.detections=track.detections+1;
         track.lastReturn=time;
+        track.lastReturnHeading=atan2(sin(egoHeading+relativeHeading),cos(egoHeading+relativeHeading));
         if ~isempty(track.times) && time==track.times(end)
             track.positions(:,end)=position;
         else
@@ -122,7 +123,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         noise=cfg.outputFeedback.noiseBounds(4);
         track.restCompatible=numel(keep)==count && max(vecnorm(track.positions-center))<=noise;
         resolved=norm(position-track.positions(:,1))>2*noise;
-        [track,arcHeading]=localMotionBounds(track,time,position,noise,design.domain,cfg.target.rearAxleDistance);
+        [track,arcHeading]=localMotionBounds(track,time,position,cfg.outputFeedback.noiseBounds,design.domain,cfg.target.rearAxleDistance);
 
         if ~track.initialized
             % Bootstrap on measured displacement. The first position alone
@@ -160,20 +161,18 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     domain=design.domain;domain.rearAxleDistance=cfg.target.rearAxleDistance;
     ego=struct('bodyVelocity',zeros(2,1),'yawRate',0);
     [~,estimate]=nrmmObserverVectorField("targetDerivative",track.state,ego,domain);
-    if resolved && estimate.targetSpeed>0
-        track.heading=estimate.targetRelativeHeading;
-    end
-    if estimate.regularizationActive && isfinite(arcHeading)
+    if ~isempty(position) && isfinite(track.lastReturnHeading)
+        track.heading=track.lastReturnHeading;
+    elseif estimate.regularizationActive && isfinite(arcHeading)
         track.heading=arcHeading;
-    end
-    if track.restCompatible && ~isempty(position) && isfinite(relativeHeading)
-        track.heading=atan2(sin(egoHeading+relativeHeading),cos(egoHeading+relativeHeading));
+    elseif resolved && estimate.targetSpeed>0
+        track.heading=estimate.targetRelativeHeading;
     end
     motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;estimate.targetSideslip];
     if track.restCompatible,motion(2:4)=0;end
 end
 
-function [track,heading]=localMotionBounds(track,time,position,noise,domain,lr)
+function [track,heading]=localMotionBounds(track,time,position,noiseBounds,domain,lr)
 % Each displacement uses the radar error radius twice. The retained arc
 % spans at most a quarter revolution under the declared yaw-rate bound.
     prior=[-domain.scalarAccelerationMaximum,-domain.sideslipMaximum; ...
@@ -183,14 +182,30 @@ function [track,heading]=localMotionBounds(track,time,position,noise,domain,lr)
         track.motionBounds=prior;
     end
     history=track.motionHistory;
+    if ~isfield(history,'headings'),history.headings=NaN(size(history.times));end
     keep=history.times<time & (time-history.times)*domain.yawRateMaximum<=pi/2;
     times=[history.times(keep),time];points=[history.positions(:,keep),position];
-    track.motionHistory=struct('times',times,'positions',points);
+    headings=[history.headings(keep),track.lastReturnHeading];
+    track.motionHistory=struct('times',times,'positions',points,'headings',headings);
     bounds=track.motionBounds;heading=NaN;
-    count=numel(times);rad=2*noise+64*eps(max(1,max(abs(points),[],'all')));
+    count=numel(times);rad=2*noiseBounds(4)+64*eps(max(1,max(abs(points),[],'all')));
     if count<3,return;end
     mid=ceil(count/2);
     chord=points(:,end)-points(:,1);lengthTotal=norm(chord);
+    if isfinite(headings(end))
+        first=find(isfinite(headings) & vecnorm(position-points)>rad,1);
+        if ~isempty(first)
+            % Short-arc curvature from two body headings and the chord.
+            % Two ego rates compatible with the same gyro sample can differ
+            % by twice its noise radius under the member's bias hypothesis.
+            turn=headings(end)-headings(first);
+            halfTurn=atan2(sin(turn),cos(turn))/2;
+            padding=noiseBounds(3)*(time-times(first))+64*eps(pi);
+            angle=max(-pi/2,min(pi/2,halfTurn+[-padding;padding]));
+            lengthMeasured=norm(position-points(:,first));
+            bounds(:,2)=localIntersectArcSideslip(bounds(:,2),angle,lengthMeasured,rad,lr);
+        end
+    end
     chords=diff(points(:,[1,mid,end]),1,2);lengths=vecnorm(chords);
     if all(lengths>rad) && lengthTotal>rad
         % For a circular arc kappa = 2 sin(turn between chords)/total chord.
@@ -201,9 +216,7 @@ function [track,heading]=localMotionBounds(track,time,position,noise,domain,lr)
         allowed=lower<=upper;
         if any(allowed)
             angles=[min(lower(allowed));max(upper(allowed))];
-            ratios=2*sin(angles)./[lengthTotal-rad,lengthTotal+rad];
-            beta=asin(max(-1,min(1,lr*[min(ratios,[],'all');max(ratios,[],'all')])));
-            bounds(:,2)=[max(bounds(1,2),beta(1));min(bounds(2,2),beta(2))];
+            bounds(:,2)=localIntersectArcSideslip(bounds(:,2),angles,lengthTotal,rad,lr);
         end
     end
     % A later resolvable displacement proves the target had not yet
@@ -231,13 +244,19 @@ function [track,heading]=localMotionBounds(track,time,position,noise,domain,lr)
             'Radar history does not admit the declared constant target parameters.');
     end
     track.motionBounds=bounds;
-    if lengthTotal>rad
+    if lengthTotal>rad && ~isfinite(track.lastReturnHeading)
         beta=mean(bounds(:,2));k=sin(beta)/lr;
         % Endpoint body heading from the long chord, including the arc turn
         % and the course-to-body rotation. It remains defined at rest.
         heading=atan2(chord(2),chord(1))+asin(max(-1,min(1,k*lengthTotal/2)))-beta;
         heading=atan2(sin(heading),cos(heading));
     end
+end
+
+function interval=localIntersectArcSideslip(prior,halfTurn,chordLength,chordError,lr)
+    curvature=2*sin(halfTurn)./[chordLength-chordError,chordLength+chordError];
+    beta=asin(max(-1,min(1,lr*[min(curvature,[],'all');max(curvature,[],'all')])));
+    interval=[max(prior(1),beta(1));min(prior(2),beta(2))];
 end
 
 function runtime = localResetTarget(runtime,physicalState,history)

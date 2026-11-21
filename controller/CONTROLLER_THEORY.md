@@ -169,7 +169,9 @@ $$
 
 The acceleration at a decision boundary uses the preceding applied input
 $u^-$, not the command about to be optimized. A derived velocity is not an
-independent GNSS observation. Joint bounded noise needs no statistical
+independent GNSS observation. A detection can also supply the relative
+body heading $y_\psi=\operatorname{wrap}(\psi_T-\psi_E)$.
+Joint bounded noise needs no statistical
 independence. Detection flags and their admissibility contract belong to the
 measurement relation. No return may represent a dropout.
 
@@ -242,17 +244,22 @@ $\tau_j=(t_j-t_n)/T$. The least-squares fit
 $p_j\simeq c_0+\tau_j c_1+\tau_j^2 c_2/2$ supplies the current Cartesian
 state $(c_0,c_1/T,c_2/T^2)$ to the high-gain observer and inverse above.
 A stationary-compatible window can instead initialize $(\bar p,0,0)$
-with a measured relative body heading added to ego yaw. The simulation
-supplies this heading on a detected, stopped target. With position alone,
+with a measured relative body heading added to ego yaw. In the simulation,
+a detected target supplies ideal relative body heading near rest, defined by
+$V_T T_{\rm acq}\le 2r_{\rm sensor}$ for the acquisition window span and
+the nominal radar position error radius. Each ego member converts a received heading to inertial heading
+using its own yaw at the measurement time. With position alone,
 stationary acquisition remains pending. Avoidance starts at the first
 control boundary with a complete target estimate for every retained member.
 During acquisition the target-free plan carries no encounter certificate.
 At a positive return the planning root retains its previous observer-based constant-motion
 forecast while the predicted position explains the measurement and range.
+A received body heading updates the forecast orientation even when its position is retained.
 When all positions in the acquisition window lie within the radar noise
 bound of their mean, a stationary nominal forecast uses the perceived body
 heading when available and otherwise retains its last resolved heading. The moving point observer continues to
-process returns. Below the inverse speed floor, use a resolved chord between the earliest
+process returns. Below the inverse speed floor, when no body heading is received,
+use a resolved chord between the earliest
 and latest retained returns within a quarter turn. For chord vector $c$ and
 representative curvature $\kappa=\sin\beta/l_r$, its endpoint body heading is
 $\arg c+\arcsin(\kappa\|c\|/2)-\beta$. The representative sideslip is the
@@ -271,7 +278,12 @@ $\kappa=2\sin\theta/\|c_{\rm true}\|$, where $\theta$ is the signed angle
 between its true chords. A resolved chord $c_i$ bounds its direction error
 by $\arcsin(2r/\|c_i\|)$. Intersect the resulting angular interval with
 the declared turn-rate bound and the resulting sideslip interval with its
-persistent prior. For two successive durations $T_i$ ending before
+persistent prior. Two observed body headings separated by a resolved chord
+also give $\kappa=2\sin(\Delta\psi_T/2)/\|c_{\rm true}\|$ on this short
+arc. For each ego member the numerical update allows $2r_\omega\Delta t$
+of angular variation in the measured turn, where $r_\omega$ is the gyro
+rate error radius. Intersect the resulting sideslip interval with the
+position-based interval. For two successive durations $T_i$ ending before
 absorption, bound their true lengths $s_i$ using
 $$
  (\|c_i\|-2r)_+\le s_i\le (\|c_i\|+2r)\frac{b_i}{\sin b_i},
@@ -285,9 +297,11 @@ These bounds use the declared moving-target observer domain.
 
 For a moving estimate the compact controller evaluates its central parameter
 pair projected into these intervals and their four endpoint combinations.
-Each endpoint case uses a common observed chord to reconstruct its current
-course and speed for that pair, propagating from the last return across a
-dropout. The central case retains the observer pose and speed. The same
+Each endpoint case uses a common observed chord to reconstruct speed for
+that pair. Its body heading at the last return comes from perception when
+available and from the chord otherwise. Across a dropout each case advances
+from that return under its own parameters. The central case retains the
+observer pose and speed. The same
 pair determines the forecast through braking to rest and terminal handoff.
 An absorbed nominal state has one stationary footprint. The cases share all
 ego commands and supply distinct geometric witnesses. Interior parameters
