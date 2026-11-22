@@ -2856,6 +2856,12 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
 end
 
 function [result,diagnostics,problem] = localOfStep(request,cfg)
+    if isfield(request.previousState,'configuration') && ...
+            ~isfield(request.previousState.configuration.outputFeedback,'movingTargetObservationSeconds')
+        % Older checkpoints can resume an accepted encounter or finish
+        % observing a newly detected target under the acquisition window.
+        request.previousState.configuration.outputFeedback.movingTargetObservationSeconds=cfg.outputFeedback.movingTargetObservationSeconds;
+    end
     if string(cfg.outputFeedback.method)=="compactNlp" && string(request.operation)=="step"
         [result,diagnostics]=localCompactStep(request,cfg);problem=[];return;
     end
@@ -3953,6 +3959,13 @@ function [result,info] = localCompactStep(request,cfg)
     end
     targetReady=all(arrayfun(@(s)~isempty(s.target),hypotheses));
     active=targetReady && ~isempty(firstRadarTime) && (block.samples(end).radarAvailable || inRange);
+    if active && ~initial && ~(isfield(prior,'collisionTargetActive') && prior.collisionTargetActive) ...
+            && isfield(hypotheses,'targetObserver') && ...
+            all(arrayfun(@(s)~isempty(s.targetObserver) && s.target(4)>0,hypotheses))
+        % Count received radar history. A dropout alone adds no observation.
+        observedUntil=min(arrayfun(@(s)s.targetObserver.lastReturn,hypotheses));
+        active=observedUntil-firstRadarTime >= cfg.outputFeedback.movingTargetObservationSeconds-1e-9;
+    end
     if ~active,[planning.target]=deal([]);end
     window=localOfWindow(planning,inherited,cfg);
     holds=diff(localCompactBoundaries(window.horizonSteps,cfg));

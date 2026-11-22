@@ -13,6 +13,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         requestedSpeed={4,12}
         integrationMesh={4,64}
         movingTarget={false,true}
+        admissionMeasurements={"boundedRadar","exactRadar","exactRadarWithDropout"}
         leadEncounter={"stoppedLead","hardBrakingLead"}
         uncertainEncounter={"brakingLead","trafficBrakingLead","curvedCrossing", ...
             "headOn","trafficHeadOn","curvedHeadOn","acceleratingHeadOn"}
@@ -36,6 +37,15 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aSavedPlanPredatingTheAcquisitionWindowResumes(testCase)
+            prior=testCase.state;
+            prior.configuration.outputFeedback=rmfield(prior.configuration.outputFeedback,'movingTargetObservationSeconds');
+            block=localNextBlock(prior,testCase.cfg);
+            [~,controls,~,state]=collisionAvoidanceController(block,[],[],testCase.cfg,prior);
+            [~,current]=collisionAvoidanceController(block,[],[],testCase.cfg,testCase.state);
+            testCase.verifyEqual(controls,current);
+            testCase.verifyEqual(state.configuration.outputFeedback.movingTargetObservationSeconds,.40);
+        end
         function aLongerSearchBudgetCanResumeAnExistingDrivingPlan(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=2;
             [~,~,p,state]=collisionAvoidanceController(localNextBlock(testCase.state,cfg),[],[],cfg,testCase.state);
@@ -148,24 +158,39 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()solvePredictiveControl('outputFeedback',request), ...
                 'collisionAvoidanceController:emptyJointInformation');
         end
-        function avoidanceStartsOnTheFirstBoundaryWithACompleteMovingTargetEstimate(testCase)
+        function movingTargetAdmissionUsesTheReceivedObservationWindow(testCase,admissionMeasurements)
             cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
             item.target=[10;22;.3;9;-.4;.01;1.6;2.4;.95;0;0];
+            exactRadar=admissionMeasurements~="boundedRadar";
+            dropoutAtAdmission=admissionMeasurements=="exactRadarWithDropout";
+            block.time=3;
             block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
-                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',block.time));
+            % Without a reported radius the original bounded sensor contract applies.
+            if exactRadar,block.samples.radarPositionErrorMeters=0;end
             [~,~,p,state]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyEqual(p.metadata.initializationSource,"nominalCruiseRollout");
-            settings=estimatorControllerIntegrationConfig();
-            while ~p.metadata.targetEstimateReady
-                testCase.verifyFalse(p.metadata.collisionTargetActive);
-                testCase.verifyEmpty(p.scenarios{1}.targets);
-                testCase.assertLessThan(state.hypotheses.targetObserver.detections,settings.initialization.minimumRadarSamples);
+            first=block.time;admission=first+cfg.outputFeedback.movingTargetObservationSeconds;
+            expected=admission+double(dropoutAtAdmission)*cfg.controller.sampleTime;
+            while state.time<expected-1e-9
                 plant=state;plant.hypotheses=item;
                 block=localNextBlock(plant,cfg);
+                if exactRadar,[block.samples.radarPositionErrorMeters]=deal(0);end
+                if dropoutAtAdmission && abs(block.time-admission)<1e-9
+                    [block.samples.radarAvailable]=deal(false);
+                end
                 item=localAdvanceHold(item,state.appliedInput,cfg);
                 [~,~,p,state]=collisionAvoidanceController(block,[],[],cfg,state);
+                if abs(state.time-first-.25)<1e-9
+                    testCase.verifyTrue(p.metadata.targetEstimateReady);
+                    testCase.verifyNotEmpty(p.information.target);
+                end
+                if state.time<expected-1e-9
+                    testCase.verifyFalse(p.metadata.collisionTargetActive);
+                    testCase.verifyEmpty(p.scenarios{1}.targets);
+                end
             end
-            testCase.verifyEqual(state.time,.25,AbsTol=1e-12);
+            testCase.verifyEqual(state.time,expected,AbsTol=1e-12);
             testCase.verifyTrue(p.metadata.collisionTargetActive);
             testCase.verifyEqual(p.metadata.budgetPhase,"initialization");
             testCase.verifyNotEmpty(p.scenarios{1}.targets);
@@ -268,7 +293,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             first=[];
             for k=1:numel(data.trace)
                 current=data.trace(k);
-                testCase.verifyEqual(current.metadata.collisionTargetActive,current.metadata.targetEstimateReady);
+                testCase.verifyFalse(current.metadata.collisionTargetActive && ~current.metadata.targetEstimateReady);
                 testCase.verifyEqual(current.metadata.firstRadarTime,first);
                 hits=[current.rawSensorBlock.radarAvailable];
                 if isempty(first) && any(hits)
@@ -335,6 +360,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             active=find(arrayfun(@(frame) frame.metadata.collisionTargetActive,data.trace),1);
             testCase.assertNotEmpty(active);
             info=data.trace(active).metadata;
+            testCase.verifyEqual(data.trace(active).time-info.firstRadarTime,.25,AbsTol=1e-12);
             testCase.verifyEqual(info.callBudgetSeconds,data.configuration.outputFeedback.initializationSolveSeconds);
             testCase.verifyGreaterThan(info.zeroDeficitQpSteps,0);
             testCase.verifyEqual(info.nlpAttempts,0);
@@ -345,8 +371,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function uncertainEncounterReturnsToTheGivenCruise(testCase,uncertainEncounter)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            frames=400;
+            if uncertainEncounter=="brakingLead"
+                % The gently braking lead can remain in range past 20 s.
+                frames=800;
+            end
             campaign=runJointOutputFeedbackScenario(Scenarios=uncertainEncounter,Speeds=15, ...
-                Frames=400,RandomSeed=20261107,OutputDirectory=string(folder.Folder));
+                Frames=frames,RandomSeed=20261107,OutputDirectory=string(folder.Folder));
             record=campaign.results;
             testCase.assertEqual(record.outcome,"completed",record.failure);
             data=jsondecode(fileread(record.source));

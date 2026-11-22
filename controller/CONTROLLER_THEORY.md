@@ -252,9 +252,15 @@ a detected target supplies ideal relative body heading near rest, defined by
 $V_T T_{\rm acq}\le 2r_{\rm sensor}$ for the acquisition window span and
 the nominal radar position error radius. Each ego member converts a received heading to inertial heading
 using its own yaw at the measurement time. With position alone,
-stationary acquisition remains pending. Avoidance starts at the first
-control boundary with a complete target estimate for every retained member.
-During acquisition the target-free plan carries no encounter certificate.
+stationary acquisition remains pending. Avoidance requires a complete target
+estimate for every retained member. For a newly observed moving target, the
+compact controller also requires $\min_s t_{\mathrm{last},s}-t_{\mathrm{first}}
+\ge T_{\mathrm{obs}}$, where the times refer to received radar measurements
+and $T_{\mathrm{obs}}=0.40\,\mathrm{s}$ by default. The observer continues
+updating during this interval. A complete estimate compatible with rest, or
+a target already known under the initial contract, can enter planning directly.
+The acquisition window is a timing condition. Safety during nominal cruise
+before the first feasible encounter plan is an initial-condition assumption.
 At a positive return the planning root retains its previous observer-based constant-motion
 forecast while the predicted position explains the measurement and range.
 A received body heading updates the forecast orientation even when its position is retained.
@@ -816,7 +822,7 @@ correction. This equilibrium identity alone supplies no CLF decay inequality.
 ### Recursive feasibility on the admitted information domain
 
 Releasing target constraints enlarges the feasible set for the same
-horizon. On the first complete observation or re-entry the collision obligations increase. The shift proof
+horizon. On initial admission after observation, or on re-entry, the collision obligations increase. The shift proof
 below applies through that boundary only if the incoming state and
 continuation are feasible for the reactivated encounter. The controller
 constructs one guide sampled at the control knots and their discrete
