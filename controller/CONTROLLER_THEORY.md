@@ -451,26 +451,23 @@ intervals by rounded equally spaced boundaries. The knot count is the smaller
 of the configured count and the accepted horizon, so each interval contains
 at least one hold. Independent physical decisions are endpoint commands $v_i\in\mathbb R^2$. Physical states are eliminated by forward
 substitution of the dynamics, separately for every retained hypothesis.
-With $v_0=u^-$, the commands within interval $i$ are
+Let $L(v)$ interpolate the endpoint commands linearly between adjacent
+knots, starting at $v_0=u^-$. For the single field rollout let $\bar u$
+be its $N$ held commands and $\bar v_i=\bar u_{c_i}$. The encounter solve
+interpolates corrections about that rollout,
 
 $$
-u_{c_{i-1}+j}=v_{i-1}+\frac{j}{b_i}(v_i-v_{i-1}),
-\qquad j=1,\ldots,b_i.
+u_{c_{i-1}+j}=\bar u_{c_{i-1}+j}
+ +(1-j/b_i)(v_{i-1}-\bar v_{i-1})+(j/b_i)(v_i-\bar v_i),
+\qquad \bar v_0=u^-,\quad j=1,\ldots,b_i .
 $$
 
-Each $u_j$ is held for the actual control period $h$. This interpolation does
-not assume a continuously varying actuator within a hold. Since $b_1=1$,
-the next applied command is $v_1$. Input bounds on endpoint commands imply
-the same convex bounds on every interpolated command. If a finite steering-rate
-bound is explicitly supplied as part of the actuator contract, it is imposed by
-
-$$
-|v_{i,\delta}-v_{i-1,\delta}|\le b_i h\dot\delta_{\max};
-$$
-
-hence every physical command increment is at most $h\dot\delta_{\max}$.
-Without a specified finite bound this inequality is omitted. The analogous
-force-ratio increment is imposed when its bound is finite.
+At $v=\bar v$ this reproduces every held field command. The target-free
+knot model uses $u=L(v)$. Both representations are affine in $v$, so
+physical bounds on $u_j$ and any configured increment bounds on
+$u_j-u_{j-1}$ are linear constraints. For a corrected interpolation,
+the off-knot rows must account for $\bar u-L(\bar v)$.
+Each command is held for the complete period $h$.
 
 Let $\widetilde F_h$ denote the numerical held-input flow, including the
 rest reset only at the control boundary. Define the condensed trajectories
@@ -570,7 +567,7 @@ reported tracking cost is
 
 $$
 J=\frac12\sum_{i=1}^M h b_i e_i^\top W e_i
- +\frac{w_u}{2}\sum_{i=1}^M\frac{\|v_i-v_{i-1}\|^2}{b_i}.
+ +\frac{w_u}{2}\sum_{j=1}^N\|u_j-u_{j-1}\|^2,\qquad u_0=u^- .
 $$
 
 The compact default is $W=\operatorname{diag}(0.02,0.2,2,0.1,0.1)$ and
@@ -578,8 +575,10 @@ $w_u=0.1$. The lower transverse weight permits a passing excursion while
 retaining the fixed cruise path and speed as the zero-error reference. This
 performance choice does not supply a general convergence or liveness theorem.
 
-The second term equals the sum of squared increments over all interpolated
-held commands. For the node-only collision contract, define
+The guide offset $\bar u-L(\bar v)$ vanishes at both ends of each knot
+interval. Its increments sum to zero there, so it adds a constant to the
+knot increment cost $\tfrac{w_u}{2}\sum_i\|v_i-v_{i-1}\|^2/b_i$.
+For the node-only collision contract, define
 
 $$
 C_j(v)=\max_s\max_{r\in\{j,j+1\}}
@@ -743,21 +742,16 @@ An equal-distance tie gives zero correction. This projection preserves the
 longitudinal component of the circulation field and the fixed cruise reference.
 Every trial uses its own poses in the distance dual of Section 5.
 
-When the initial and shifted plans leave an unresolved primary deficit
-during an encounter, a reduced shooting search can propose held inputs
-before full SQP. Two actuator values and two durations parameterize a
-piecewise linear transition from the first value to the second and then
-to the terminal input. Sample and refine these six coordinates around the
-best nominal-ego trial while retaining proposals across the actuator domain.
-Rank by maximum and total positive deficit over the active parameter cells,
-including terminal feasibility for promising strictly separated trials, then
-by rear slip, longitudinal effort and clearance. A local simplex can refine
-the actuator values and switch times. Screening caps clearance at one vehicle
-width. Admission
-replays the full sequence with every retained physical member and the
-original terminal conditions and inherited deficit budget. This search
-changes numerical proposals and leaves the stored fine-input suffix
-available for the horizon shift.
+The field commands $\bar u$ define the initial shooting point for a new
+encounter. Propagating them from each member gives the footprint poses
+for the signed dual in Section 5. Its value and an attaining feature
+supply the first stage deficit rows and their control Jacobians. These
+rows are defined at penetration as well as at separation. A positive
+$C_j(\bar v)$ is a residual for SQP. Initial feasibility of $\bar v$
+is unnecessary. At a subsequent iterate the inner distance dual is
+evaluated at its new poses. If an iterate attains the primary lower
+bound and passes the nonlinear hard and terminal checks, it can be
+committed immediately.
 
 When needed, project the initialization onto the linear actuator and terminal
 handoff rows. From this point a damped Gauss--Newton step for
@@ -825,10 +819,9 @@ Releasing target constraints enlarges the feasible set for the same
 horizon. On initial admission after observation, or on re-entry, the collision obligations increase. The shift proof
 below applies through that boundary only if the incoming state and
 continuation are feasible for the reactivated encounter. The controller
-constructs one guide sampled at the control knots and their discrete
-midpoints. Its interpolated knot commands and, if needed, its original
-held commands undergo the full nonlinear checks. The retained suffix must
-pass those same checks to supply an action. Re-entry feasibility thus
+constructs its new optimization problem from one field rollout at the
+physical hold period. A plan returned by that solve must pass the complete
+nonlinear checks before supplying a command. Re-entry feasibility thus
 requires a separate admission assumption. Refreshing a target point from new
 measurements can also move it outside the previously predicted successor
 set. The numerical controller rechecks the suffix from the updated root.

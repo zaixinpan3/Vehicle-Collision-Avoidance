@@ -365,9 +365,25 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(info.zeroDeficitQpSteps,0);
             testCase.verifyEqual(info.nlpAttempts,0);
             testCase.verifyTrue(info.nonlinearValidationPerformed && info.terminalSetEnforced);
-            testCase.verifyEqual(info.pcbfValue,0);
+            testCase.verifyEqual(info.pcbfValue,0,AbsTol=128*eps(1)*info.horizonSteps);
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
+        end
+        function aPenetratingFieldRolloutInitializesTheDualSolve(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            campaign=runJointOutputFeedbackScenario(Frames=12,Speeds=15,Scenarios="intersectionCrossing", ...
+                RandomSeed=20261107,OutputDirectory=string(folder.Folder));
+            testCase.assertEqual(campaign.results.outcome,"completed");
+            data=jsondecode(fileread(campaign.results.source));
+            active=find(arrayfun(@(step)step.metadata.collisionTargetActive,data.trace),1);
+            testCase.assertNotEmpty(active);
+            info=data.trace(active).metadata;
+            testCase.verifyGreaterThan(info.initialPeakClearanceDeficitMeters,data.configuration.outputFeedback.clearanceMeters);
+            testCase.verifyEqual(info.initializationTrajectoryCount,1);
+            testCase.verifyEqual(info.reducedSearchEvaluations,0);
+            testCase.verifyTrue(info.nonlinearValidationPerformed && info.terminalSetEnforced);
+            testCase.verifyLessThanOrEqual(info.pcbfValue,data.configuration.outputFeedback.nlpTolerance);
+            testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
         end
         function uncertainEncounterReturnsToTheGivenCruise(testCase,uncertainEncounter)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
