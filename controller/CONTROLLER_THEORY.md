@@ -1,7 +1,8 @@
 # Compact nonlinear output-feedback predictive control
 
 The adopted controller combines ego measurement consistency and NRMM target observation with
-a condensed nonlinear predictive-CBF optimization of actuator commands.
+a condensed nonlinear predictive-CBF optimization of actuator commands on an
+avoidance leg and its connection to the terminal set.
 It enforces a terminal continuation set and retains a complete held-input
 moving plan for validation at the next measurement. On the zero-deficit
 level, predicted tire loading and rear slip guide the choice of driving sequence. Collision constraints apply
@@ -411,9 +412,15 @@ For speed bound $v_k^+=\max_s\sqrt{(v_{x,k}^s)^2+(v_{y,k}^s)^2}$ choose
 
 $$
 T_k^{\rm req}=\max\{T_{\min},2h,v_k^+/a_p+T_s,T_{\rm space}\},\qquad
-N_k=\max\left\{N_{k-1}-1,\left\lceil
- \frac{\Delta T\lceil T_k^{\rm req}/\Delta T\rceil}{h}
-\right\rceil\right\}.
+A_k^{\rm req}=\left\lceil\frac{\Delta T\lceil T_k^{\rm req}/\Delta T\rceil}{h}\right\rceil .
+$$
+
+During an active encounter let $B_k=\lceil T_{\min}/h\rceil$ be the duration
+in holds of the optimized connection to the terminal set. In target-free
+cruise take $B_k=0$. The avoidance and total lengths satisfy
+
+$$
+N_k=\max\{N_{k-1}-1,A_k^{\rm req}+B_k\},\qquad A_k=N_k-B_k .
 $$
 
 For a target and positive cruise reference $v_{\rm ref}$, let
@@ -444,16 +451,19 @@ preview requests a longer horizon, the driving extension must itself satisfy
 the executable constraints and end in the terminal set. The accepted plan always spans the
 selected preview. The construction below supplies all missing holds.
 
-Use $M\le N$ control intervals, with integer boundaries
-$0=c_0<c_1<\cdots<c_M=N$ and $b_i=c_i-c_{i-1}$. The first few intervals
-have one hold each; the remaining holds are distributed over the remaining
-intervals by rounded equally spaced boundaries. The knot count is the smaller
-of the configured count and the accepted horizon, so each interval contains
-at least one hold. Independent physical decisions are endpoint commands $v_i\in\mathbb R^2$. Physical states are eliminated by forward
+Use integer boundaries $0=c_0<c_1<\cdots<c_M=N$ with
+$b_i=c_i-c_{i-1}$ and a knot at $A_k$. On the avoidance leg the first few
+intervals have one hold each. Distribute the remaining holds to rounded
+equally spaced boundaries, up to the configured knot count $M_{\max}$. On the
+connection use $\min(M_{\max},\lceil B_k/\max_{c_i\le A_k} b_i\rceil)$
+additional, equally spaced knots rounded to holds.
+Each endpoint command $v_i\in\mathbb R^2$ is an independent decision.
+Physical states are eliminated by forward
 substitution of the dynamics, separately for every retained hypothesis.
 Let $L(v)$ interpolate the endpoint commands linearly between adjacent
-knots, starting at $v_0=u^-$. For the single field rollout let $\bar u$
-be its $N$ held commands and $\bar v_i=\bar u_{c_i}$. The encounter solve
+knots, starting at $v_0=u^-$. Initialize $\bar u_{1:A_k}$ from one field
+rollout. Initialize $\bar u_{A_k+1:N_k}$ by moving toward terminal trim
+within the physical actuator limits. Let $\bar v_i=\bar u_{c_i}$. The encounter solve
 interpolates corrections about that rollout,
 
 $$
@@ -475,6 +485,12 @@ rest reset only at the control boundary. Define the condensed trajectories
 $$
 x_0^s=x_k^s,\qquad x_{j+1}^s=\widetilde F_h(x_j^s,u_{j+1},\vartheta^s).
 $$
+
+The same recursion carries $x_{A_k}^s$ directly into the connection.
+One optimization chooses both sets of commands. The dual clearance,
+input, physical-domain and PCBF deficit constraints cover both legs.
+Membership in $Z_f$ is imposed at $x_{N_k}^s$. The fixed continuation
+used to test that membership starts at $N_k$.
 
 The initial integration mesh resolves the sensor period and configured
 integration step. Dense poses inside each RK4 step of duration $\Delta$ use
@@ -742,7 +758,7 @@ An equal-distance tie gives zero correction. This projection preserves the
 longitudinal component of the circulation field and the fixed cruise reference.
 Every trial uses its own poses in the distance dual of Section 5.
 
-The field commands $\bar u$ define the initial shooting point for a new
+The combined initial commands $\bar u$ define the initial shooting point for a new
 encounter. Propagating them from each member gives the footprint poses
 for the signed dual in Section 5. Its value and an attaining feature
 supply the first stage deficit rows and their control Jacobians. These
@@ -819,8 +835,8 @@ Releasing target constraints enlarges the feasible set for the same
 horizon. On initial admission after observation, or on re-entry, the collision obligations increase. The shift proof
 below applies through that boundary only if the incoming state and
 continuation are feasible for the reactivated encounter. The controller
-constructs its new optimization problem from one field rollout at the
-physical hold period. A plan returned by that solve must pass the complete
+constructs the avoidance initialization from one field rollout at the
+physical hold period and jointly optimizes the connection. A plan returned by that solve must pass the complete
 nonlinear checks before supplying a command. Re-entry feasibility thus
 requires a separate admission assumption. Refreshing a target point from new
 measurements can also move it outside the previously predicted successor
@@ -836,7 +852,9 @@ $$
  U_{k+1}^{\rm shift}
    =(u_{1|k},\ldots,u_{N_k-1|k},w_1,\ldots,w_r).
 $$
-The fine held-input suffix remains directly representable even when it no
+The shift retains the optimized inputs on both sides of $A_k$, including the
+complete unexecuted connection. It appends terminal-law inputs only beyond
+the old terminal endpoint. The fine held-input suffix remains directly representable even when it no
 longer interpolates the new control knots. Generated candidates and this
 shift must each pass the same checks over the complete selected horizon.
 An optional new guide input is accepted only with a feasible continuation.

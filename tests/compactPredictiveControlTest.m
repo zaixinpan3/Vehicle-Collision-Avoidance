@@ -385,6 +385,37 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(info.pcbfValue,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
         end
+        function theConnectionCanSteerAfterTheSameAvoidancePrefixAndShift(testCase)
+            cfg=testCase.cfg;
+            cfg.outputFeedback.horizonSeconds=.30;
+            cfg.outputFeedback.initializationSolveSeconds=8;
+            block=localBlock(cfg,8);
+            block.initialHypotheses.target=[12;.4;0;0;0;0;1.6;2.4;.95;0;0];
+            block.samples=solvePredictiveControl("outputFeedback",struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
+            [~,inputs,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
+            window=prediction.metadata.predictionWindow;
+            testCase.assertEqual(window.avoidanceSteps,6);
+            testCase.assertGreaterThan(window.connectionSteps,0);
+            testCase.verifyEqual(size(inputs,2),window.avoidanceSteps+window.connectionSteps);
+            testCase.verifyTrue(ismember(window.avoidanceSteps,state.boundaries));
+            testCase.verifyTrue(state.terminal.member);
+            testCase.verifyEqual(state.pcbfDeficit,0,AbsTol=cfg.outputFeedback.nlpTolerance);
+            law=terminalSafeSet.movingControl(cfg);
+            fixed=[inputs(:,1:window.avoidanceSteps),repmat(law,1,window.connectionSteps)];
+            replay=struct('operation',"validateInputSequence",'cfg',cfg,'hypotheses',prediction.information, ...
+                'input',block.heldInput,'inputs',inputs);
+            valid=solvePredictiveControl("outputFeedback",replay);
+            testCase.verifyTrue(valid.accepted);
+            replay.inputs=fixed;
+            fixedResult=solvePredictiveControl("outputFeedback",replay);
+            testCase.verifyFalse(fixedResult.accepted);
+            cfg.outputFeedback.maximumSolveSeconds=1e-12;
+            [~,shifted,next]=collisionAvoidanceController(localNextBlock(state,cfg),[],[],cfg,state);
+            testCase.verifyEqual(shifted(:,1:end-1),inputs(:,2:end));
+            testCase.verifyEqual(shifted(:,end),law);
+            testCase.verifyTrue(next.scenarios{1}.terminal.member);
+        end
         function uncertainEncounterReturnsToTheGivenCruise(testCase,uncertainEncounter)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             frames=400;

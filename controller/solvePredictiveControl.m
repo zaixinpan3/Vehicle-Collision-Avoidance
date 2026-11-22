@@ -1,9 +1,9 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl Predictive safety and research comparison solvers.
 % The compact output-feedback path conditions the finite physical hypotheses,
-% optimizes shared actuator commands with a condensed nonlinear PCBF program,
-% and retains a separately checked executable plan. Its fixed backup law is
-% propagated to rest and followed by a complete parked-target track check.
+% jointly optimizes shared avoidance and terminal-connection commands, and
+% retains both legs of the validated plan. The range-exit check at the
+% endpoint uses the declared terminal handoff assumption.
 % Primary safety deficit precedes performance; an unsafe optimization iterate
 % can warm-start further search but cannot supply an executed command.
 % State-input, dynamic-memory and retained-tube paths are research comparators.
@@ -2818,7 +2818,15 @@ function [result,diagnostics,problem] = localOutputFeedback(request)
         case "validateInputSequence"
             hypotheses=localOfValidateHypotheses(request.hypotheses,cfg);
             validateattributes(request.inputs,{'double'},{'2d','nrows',2,'nonempty','finite','real'});
-            boundaries=localCompactBoundaries(size(request.inputs,2),cfg);
+            count=size(request.inputs,2);
+            connection=localConnectionSteps(hypotheses,cfg);
+            avoidance=count;
+            if count>connection,avoidance=count-connection;end
+            if isfield(request,'avoidanceSteps')
+                avoidance=request.avoidanceSteps;
+                validateattributes(avoidance,{'numeric'},{'scalar','integer','positive','<=',count});
+            end
+            boundaries=localCompactBoundaries(count,cfg,avoidance);
             kernel=localCompactKernel(cfg,diff(boundaries),~isempty(hypotheses(1).target));
             hypotheses=localCompactPlanningMembers(hypotheses,cfg,size(request.inputs,2));
             [valid,traces,violation,~,slacks]=localCompactValidate(request.inputs,hypotheses,request.input,kernel,cfg,true);
@@ -3278,14 +3286,23 @@ function window = localOfWindow(hypotheses,inheritedCount,cfg)
     end
     % Retain only the unexecuted suffix, which still reaches the old
     % terminal endpoint. The executed hold is no longer a horizon floor.
-    count=max(inheritedCount,ceil(allocated/h));
+    connection=localConnectionSteps(hypotheses,cfg);
+    count=max(inheritedCount,ceil(allocated/h)+connection);
     assert(count<=cfg.controller.maximumHorizonSteps, ...
         'collisionAvoidanceController:predictionWindowCapacity', ...
         'The selected %.3g s preview needs %d stages, exceeding the configured capacity %g. It was not truncated.', ...
         count*h,count,cfg.controller.maximumHorizonSteps);
     window=struct('source',source,'requestedSeconds',requested,'allocatedSeconds',count*h, ...
-        'horizonSteps',count,'speedUpperMetersPerSecond',speed, ...
+        'horizonSteps',count,'avoidanceSteps',count-connection,'connectionSteps',connection, ...
+        'speedUpperMetersPerSecond',speed, ...
         'inheritedHorizonSteps',inheritedCount,'feasibilityCertified',false);
+end
+
+function count=localConnectionSteps(hypotheses,cfg)
+    count=0;
+    if string(cfg.outputFeedback.method)=="compactNlp" && any(arrayfun(@(item)~isempty(item.target),hypotheses))
+        count=ceil(cfg.outputFeedback.minimumPreviewSeconds/cfg.controller.sampleTime);
+    end
 end
 
 function policies = localOfInitialPolicies(cfg,hypotheses,reference,previousInput,count)
@@ -3968,7 +3985,7 @@ function [result,info] = localCompactStep(request,cfg)
     end
     if ~active,[planning.target]=deal([]);end
     window=localOfWindow(planning,inherited,cfg);
-    holds=diff(localCompactBoundaries(window.horizonSteps,cfg));
+    holds=diff(localCompactBoundaries(window.horizonSteps,cfg,window.avoidanceSteps));
     % A representative retained member supplies the nominal dynamics. All
     % retained members are replayed before accepting a control sequence.
     values=[hypotheses.ego];[~,nominal]=min(sum((values-mean(values,2)).^2,1));item=hypotheses(nominal);
@@ -4032,10 +4049,19 @@ function contained=localCompactShiftContained(prior,members,indices,h)
     end
 end
 
-function boundaries=localCompactBoundaries(count,cfg)
-    nodes=min(count,cfg.outputFeedback.controlNodes);
+function boundaries=localCompactBoundaries(count,cfg,avoidance)
+    if nargin<3,avoidance=count;end
+    nodes=min(avoidance,cfg.outputFeedback.controlNodes);
     near=min(nodes-1,cfg.outputFeedback.nearControlNodes);
-    boundaries=[0:near,near+round((1:nodes-near)*(count-near)/(nodes-near))];
+    boundaries=[0:near,near+round((1:nodes-near)*(avoidance-near)/(nodes-near))];
+    connection=count-avoidance;
+    if connection>0
+        % Keep the avoidance coordinates. The connection has independent
+        % endpoint inputs at the same coarse temporal resolution.
+        spacing=max(diff(boundaries));
+        knots=min(cfg.outputFeedback.controlNodes,ceil(connection/spacing));
+        boundaries=[boundaries,avoidance+round((1:knots)*connection/knots)];
+    end
 end
 
 function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning,window,holds,lane,nominal,timer,inferenceSeconds)
@@ -4123,7 +4149,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         else,initializationSource="singleCirculationRollout";end
         try
             checkClock();
-            [controls,guideInputs]=localCompactSeed(item,previous,holds,lane,cfg);
+            [controls,guideInputs]=localCompactSeed(item,previous,holds,lane,cfg,window.avoidanceSteps);
             seedCount=1;
             if isempty(item.target)
                 validatePlan(controls*model.map.'+model.offset,[],@checkClock);
@@ -4452,9 +4478,10 @@ function [a,b]=localGuideInputRows(model,offset,a,b)
     cfg=model.cfg;map=model.controlMap;bias=model.offset(:);previous=model.previous;
     lower=[-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)];
     upper=[cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)];
-    active=find(offset(:)~=0);channel=1+mod(active-1,2);
-    a=[a;map(active,:);-map(active,:)];
-    b=[b;upper(channel)-bias(active);bias(active)-lower(channel)];
+    up=find(offset(:)>0);
+    down=find(offset(:)<0);
+    a=[a;map(up,:);-map(down,:)];
+    b=[b;upper(1+mod(up-1,2))-bias(up);bias(down)-lower(1+mod(down-1,2))];
     rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     if any(isfinite(rates))
         delta=diff([zeros(2,1),offset],1,2);
@@ -4480,7 +4507,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     maximumSpeed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum);
     previewTime=max(of.minimumPreviewSeconds,maximumSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
     allocatedTime=of.horizonResolutionSeconds*ceil(previewTime/of.horizonResolutionSeconds);
-    maximumCount=ceil(allocatedTime/h);
+    maximumCount=ceil(allocatedTime/h)+ceil(of.minimumPreviewSeconds/h);
     capacity=max(sum(holds),maximumCount);K=of.validationSubsteps;
     M=K;D=1;dt=h/M;
     x=SX.sym('x',6);u=SX.sym('u',2);p=SX.sym('p',4);fraction=SX.sym('fraction',5);
@@ -4877,9 +4904,10 @@ function controls = localCompactRateLimit(controls,previous,holds,cfg)
     end
 end
 
-function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg)
+function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg,avoidance)
     % One held-input field rollout supplies the initial geometry and controls.
     count=sum(holds);x=item.ego;
+    if nargin<6,avoidance=count;end
     frame=predictiveSafetyGeometry.roadFrame(lane,struct('lateralClearance',[]));
     nominal=struct('state',[0;0;0;cfg.referenceSpeed;0;0],'curvature',frame(4));
     model=struct('cfg',cfg,'initialState',x,'previousInput',previous,'target',item.target, ...
@@ -4897,7 +4925,10 @@ function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg)
             if i<count,x=nonlinearBicycleModel.sample(x,prior,cfg);end
         end
     else
-        guide=predictiveSafetyGeometry.avoidanceGuide(model,count);inputs=guide.inputs;
+        guide=predictiveSafetyGeometry.avoidanceGuide(model,avoidance);
+        % Only the first leg comes from the planner. Trim initializes the
+        % remaining actuator variables, which are free in the same NLP.
+        inputs=[guide.inputs,repmat(terminalSafeSet.movingControl(cfg),1,count-avoidance)];
     end
     guideInputs=localCompactRateLimit(inputs,previous,ones(1,count),cfg);
     controls=guideInputs(:,cumsum(holds));
