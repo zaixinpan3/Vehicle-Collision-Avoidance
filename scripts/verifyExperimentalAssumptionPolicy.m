@@ -66,7 +66,7 @@ function probe=localRuntimeProbe()
     wall=tic;
     probe=struct('solvedControl',zeros(2,0),'optimizationReturned',false,'failure',"",'runtimeSeconds',NaN);
     try
-        [command,~,prediction]=collisionAvoidanceController(publication,publication.targetEstimate,road,controllerCfg,[]);
+        [command,~,prediction]=stateEstimateControllerComparator(publication,publication.targetEstimate,road,controllerCfg,[]);
         probe.solvedControl=command.actuatorInput;
         probe.optimizationReturned=prediction.metadata.optimizationReturned;
     catch exception

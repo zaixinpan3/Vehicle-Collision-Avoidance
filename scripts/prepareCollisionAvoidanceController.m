@@ -1,17 +1,20 @@
-function preparation = prepareCollisionAvoidanceController(ego, road, cfg, target)
-%prepareCollisionAvoidanceController Warm the MATLAB model and optimizer.
-% Probe commands are discarded; this does not change a running controller.
+function preparation = prepareCollisionAvoidanceController(block,road,cfg)
+%prepareCollisionAvoidanceController Warm the raw-sensor controller on a discarded initial block.
     arguments
-        ego (1,1) struct
+        block (1,1) struct
         road
         cfg
-        target = []
     end
-    timer=tic;cfg=collisionAvoidanceControllerConfig(cfg);
-    [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+    assert(isfield(block,'kind') && isequal(string(block.kind),"jointSensorBlock-v1"), ...
+        'collisionAvoidanceController:invalidSensorBlock','Warm-up requires a jointSensorBlock-v1 initial block.');
+    timer=tic;
+    setupJointNlpSolver;
+    request=struct('operation',"step",'block',block,'cfg',cfg,'reference',road,'previousState',[]);
+    result=solvePredictiveControl("outputFeedback",request);
+    info=result.prediction.metadata;
     preparation=struct('performed',true,'elapsedSeconds',toc(timer), ...
-        'optimizationReturned',problem.metadata.optimizationReturned, ...
-        'predictiveBarrierValue',problem.metadata.predictiveBarrierValue, ...
+        'optimizationReturned',info.optimizationReturned,'solver',info.solver, ...
         'discardedCommandCount',1,'nativeBuildRequired',false, ...
-        'scope',"Nominal MATLAB MPC warm-up; no command applied");
+        'scope',"Raw-sensor controller warm-up with a discarded command");
+    if isfield(info,'pcbfValue'),preparation.predictiveBarrierValue=info.pcbfValue;end
 end

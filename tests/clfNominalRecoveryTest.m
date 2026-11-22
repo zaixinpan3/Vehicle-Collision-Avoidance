@@ -9,6 +9,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
         end
@@ -17,14 +18,14 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
         function targetFreeFrameMeetsTheNominalClfWithZeroSlack(testCase,referenceSpeed,curvature,lateralError)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
                 'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
-                'solver',struct('method',"rti",'timeLimitSeconds',5)));
+                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
             [position,heading]=predictiveSafetyGeometry.referencePose(0,lateralError,road.referenceCurve);
             x=[position;heading+reference.state(3)+.2*(lateralError<0);reference.state(4:6)];
             ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5), ...
                 'yawRate',x(6),'heldActuatorInput',reference.input);
-            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [command,~,problem]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             metadata=problem.metadata;lane=problem.model.lane;
             value=sum((reference.factor*nonlinearBicycleModel.error(x,lane,reference)).^2);
             next=nonlinearBicycleModel.sample(x,command.actuatorInput,cfg);
@@ -45,7 +46,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
         function moderatelyDisplacedStatesReturnToCruiseWithOneStepPerFrame(testCase,referenceSpeed,curvature)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
                 'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
-                'solver',struct('method',"rti",'timeLimitSeconds',5)));
+                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
             % RTI recovery fixtures remain near an admissible local reference.
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);tolerance=[.1;pi/180;.1;.05;.01];
@@ -55,7 +56,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
                 for frame=1:1500
                     ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5), ...
                         'yawRate',x(6),'heldActuatorInput',input,'stateTime',(frame-1)*cfg.controller.sampleTime);
-                    [command,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,prior);
+                    [command,~,problem,prior]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
                     testCase.assertTrue(problem.metadata.search.clfStageCompleted);
                     input=command.actuatorInput;x=nonlinearBicycleModel.sample(x,input,cfg);
                     if all(abs(nonlinearBicycleModel.error(x,road,reference))<=tolerance),inside=inside+1;else,inside=0;end
@@ -70,13 +71,13 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             % requested length; terminal rows still constrain its endpoint.
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',8), ...
-                'solver',struct('method',"rti",'timeLimitSeconds',5)));
+                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
             ego=struct('position',[0;0],'yaw',0,'speed',8, ...
                 'lateralVelocity',0,'yawRate',0,'heldActuatorInput',[0;0]);
-            [~,~,problem]=collisionAvoidanceController(ego,[],[-100,0;1000,0],cfg,[]);
+            [~,~,problem]=stateEstimateControllerComparator(ego,[],[-100,0;1000,0],cfg,[]);
             model=problem.model;model.initialState=[0;-40;2.5;6;.3;.1];
             model.cfg.rti.trustRegion.enabled=false;
-            [solution,search,model]=solvePredictiveControl(model,[],tic);
+            [solution,search,model]=solveStateEstimateComparison(model,[],tic);
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(search.horizonExtensions,0);
             testCase.verifyNumElements(search.attempts,1);
@@ -92,7 +93,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             % between samples (they did at 15 m/s while the tie vanished).
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
                 'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2)), ...
-                'solver',struct('method',"rti",'timeLimitSeconds',5)));
+                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',600));
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
             [position,heading]=predictiveSafetyGeometry.referencePose(0,0,road.referenceCurve);
@@ -101,7 +102,7 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             for frame=1:300
                 ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5), ...
                     'yawRate',x(6),'heldActuatorInput',input,'stateTime',(frame-1)*cfg.controller.sampleTime);
-                [command,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,prior);
+                [command,~,problem,prior]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
                 input=command.actuatorInput;x=nonlinearBicycleModel.sample(x,input,cfg);
                 if frame>100
                     worst=max(worst,abs(nonlinearBicycleModel.error(x,road,reference)));

@@ -25,10 +25,10 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             % The nominal 0.15 m lateral gap exceeds the small enclosure,
             % but not the large one. Put the pass inside the minimum horizon.
             [ego,target,road,cfg]=localFixture(.01,8);
-            [~,smallInputs,small]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [~,smallInputs,small]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             target.predictionErrorSet.positionRadius=.25;
             target.controllerErrorBound.bounds(1:2)=.25;
-            [~,largeInputs,large]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [~,largeInputs,large]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             testCase.verifyGreaterThan(large.metadata.maximumCollisionTighteningMeters, ...
                 small.metadata.maximumCollisionTighteningMeters+.20);
             count=min(size(smallInputs,2),size(largeInputs,2));
@@ -41,8 +41,8 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             [ego,target,road,cfg]=localFixture(0);
             exactEgo=rmfield(ego,'controllerErrorBound');
             exactTarget=rmfield(target,{'controllerErrorBound','predictionErrorSet'});
-            [~,exactInputs]=collisionAvoidanceController(exactEgo,exactTarget,road,cfg,[]);
-            [~,boundedInputs,bounded]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [~,exactInputs]=stateEstimateControllerComparator(exactEgo,exactTarget,road,cfg,[]);
+            [~,boundedInputs,bounded]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             % Equivalent problems can take different solver paths on an
             % almost-flat steering optimum; compare below solver accuracy.
             testCase.verifyEqual(boundedInputs,exactInputs,AbsTol=1e-8);
@@ -63,7 +63,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             [ego,target,road,cfg]=localFixture(.001);
             target.predictionErrorSet.accelerationInterval=[-.002;.002];
             target.controllerErrorBound.bounds(5:6)=.002;
-            [command,~,first,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [command,~,first,prior]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             next=nonlinearBicycleModel.sample(first.model.initialState,command.actuatorInput,cfg);
             q=predictiveSafetyGeometry.predictTarget(first.model.target,cfg.controller.sampleTime);
             q(1)=q(1)+.001;q(5)=q(5)+.001;
@@ -72,7 +72,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             target.predictionErrorSet.accelerationInterval=q(5)+[-.002;.002];
             target.controllerErrorBound.bounds(5:6)=.002;
             ego.heldActuatorInput=command.actuatorInput;
-            [~,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            [~,~,second]=stateEstimateControllerComparator(ego,target,road,cfg,prior);
             testCase.verifyEqual(second.model.targetPredictionUpdate.observed,q,AbsTol=1e-12);
             testCase.verifyEqual(second.model.target(5),q(5),AbsTol=1e-12);
             testCase.verifyTrue(second.model.targetPredictionUpdate.parameterIntersection);
@@ -90,8 +90,8 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             ego.position(2)=.1;
             exactEgo=rmfield(ego,'controllerErrorBound');
             ego.controllerErrorBound.bounds=[.001;.001;1e-4;1e-6;1e-6;1e-6];
-            [~,~,prediction]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            [~,~,exact]=collisionAvoidanceController(exactEgo,[],road,cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
+            [~,~,exact]=stateEstimateControllerComparator(exactEgo,[],road,cfg,[]);
             testCase.verifyTrue(prediction.metadata.uncertaintyIncluded);
             testCase.verifyEqual(prediction.metadata.clfDerivativeLimit, ...
                 -prediction.metadata.clfDecayRate*prediction.metadata.clfInitialValue,RelTol=1e-12);
@@ -105,7 +105,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             [ego,target,road,cfg]=localFixture(.01);
             ego.controllerErrorBound.available=false;
             ego.controllerErrorBound.bounds(:)=Inf;
-            [command,~,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [command,~,prediction]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyFalse(prediction.metadata.uncertaintyIncluded);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
@@ -113,19 +113,19 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
         function feedbackErrorIsCarriedToTheEndpoint(testCase)
             [ego,~,road,cfg]=localFixture(0);
             ego.controllerErrorBound.bounds(4)=.001;
-            [command,~,prediction]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [command,~,prediction]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyGreaterThan(prediction.model.uncertaintyPrediction.egoStateRadius(4,end),0);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
         end
         function aStoppedReferenceDoesNotRequireNegativeSpeedUncertainty(testCase)
             [ego,~,road,cfg]=localFixture(0);
-            [~,~,prediction]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             model=prediction.model;anchor=model.linearization;
             model.initialState=zeros(6,1);anchor.states(:)=0;
             anchor.inputs=repmat([0;-.48],1,size(anchor.inputs,2));
             model.uncertainty.egoGenerator=diag([0;0;0;.064;0;0]);
-            [p,~,updated]=solvePredictiveControl('probe',struct('operation','formulate', ...
+            [p,~,updated]=solveStateEstimateComparison('probe',struct('operation','formulate', ...
                 'model',model,'anchor',anchor,'inherited',false));
             point=zeros(size(p.lower));point(p.clfIndex)=1e6;
             testCase.verifyEqual(p.equal*point,p.rhs,AbsTol=1e-12);
@@ -179,27 +179,27 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
         function staleBoundsCannotBeUsedAtTheCurrentStateTime(testCase)
             [ego,target,road,cfg]=localFixture(.01);
             target.controllerErrorBound.time=-cfg.controller.sampleTime;
-            [command,~,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [command,~,prediction]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEmpty(prediction.model.uncertainty.target);
         end
         function aRelativeSetCannotBeAttachedToADifferentEgoPose(testCase)
             [ego,target,road,cfg]=localFixture(.01);
             target.predictionErrorSet.referenceEgoPose(1)=1;
-            [command,~,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [command,~,prediction]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyFalse(prediction.metadata.commonPoseCancelled);
             testCase.verifyEmpty(prediction.model.uncertainty.target);
         end
         function lossOfAnEnclosureDoesNotDiscardTheShiftedOptimization(testCase)
             [ego,target,road,cfg]=localFixture(.001);
-            [command,~,first,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [command,~,first,prior]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             next=nonlinearBicycleModel.sample(first.model.initialState,command.actuatorInput,cfg);
             q=predictiveSafetyGeometry.predictTarget(first.model.target,cfg.controller.sampleTime);
             [ego,target]=localPublication(next,q,cfg.controller.sampleTime,.001,zeros(6,1));
             ego.controllerErrorBound.available=false;target.predictionErrorSet.available=false;
             ego.heldActuatorInput=command.actuatorInput;
-            [command,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            [command,~,second]=stateEstimateControllerComparator(ego,target,road,cfg,prior);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEqual(second.metadata.search.initialization,"shiftedPrimalIterate");
             testCase.verifyFalse(second.metadata.robustNonlinearSafetyCertified);
@@ -207,7 +207,7 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
         function aMissingTargetPredictionSetDoesNotStopTheController(testCase)
             [ego,target,road,cfg]=localFixture(.01);
             target=rmfield(target,'predictionErrorSet');
-            [command,~,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [command,~,prediction]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEmpty(prediction.model.uncertainty.target);
         end
@@ -218,7 +218,7 @@ function [ego,target,road,cfg]=localFixture(radius,gap)
     [x,q,road,cfg]=collisionThreatScenario("headOn",struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
     % A near-grazing opposing pass admits a single RTI step. Full cold
     % head-on restoration is separately expected to fail in the RTI tests.
-    q(2)=2.05;cfg.solver.method="rti";cfg.solver.timeLimitSeconds=5;
+    q(2)=2.05;cfg.solver.stateEstimateMethod="rti";cfg.solver.timeLimitSeconds=5;
     if nargin>1,q(1)=x(1)+gap;end
     [ego,target]=localPublication(x,q,0,radius,zeros(6,1));
 end

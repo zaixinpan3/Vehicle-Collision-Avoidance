@@ -5,7 +5,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
-            for name=["controller","config","estimator"]
+            for name=["controller","config","estimator","scripts"]
                 testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,name)));
             end
             testCase.fixture=localFixture();
@@ -18,11 +18,11 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             model.target(1)=anchor.states(1,18);model.targetEpoch=model.target;
             model.uncertainty.egoGenerator=zeros(6);
             model.uncertainty.collisionGenerator=zeros(6);model.uncertainty.target=[];
-            [problem,~,model]=solvePredictiveControl('probe',struct( ...
+            [problem,~,model]=solveStateEstimateComparison('probe',struct( ...
                 'operation','formulate','model',model,'anchor',anchor,'inherited',false));
             fixed=[problem.stateIndices(:);problem.inputIndices(:)];
             problem.lower(fixed)=0;problem.upper(fixed)=0;
-            [proposal,~]=solvePredictiveControl('probe',struct( ...
+            [proposal,~]=solveStateEstimateComparison('probe',struct( ...
                 'operation','solve','model',model,'anchor',anchor,'problem',problem));
             testCase.assertNotEmpty(proposal);
             testCase.verifyGreaterThan(proposal.safety,0);
@@ -37,13 +37,13 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             model.uncertainty.egoGenerator=zeros(6);
             model.uncertainty.collisionGenerator=zeros(6);
             model.uncertainty.target=[];
-            [problem,~,model]=solvePredictiveControl('probe',struct( ...
+            [problem,~,model]=solveStateEstimateComparison('probe',struct( ...
                 'operation','formulate','model',model,'anchor',anchor,'inherited',false));
             % Hold the nominal trajectory fixed: only PCBF slack can repair
             % its overlap at the end, beyond the old two-node soft prefix.
             fixed=[problem.stateIndices(:);problem.inputIndices(:)];
             problem.lower(fixed)=0;problem.upper(fixed)=0;
-            [proposal,~]=solvePredictiveControl('probe',struct( ...
+            [proposal,~]=solveStateEstimateComparison('probe',struct( ...
                 'operation','solve','model',model,'anchor',anchor,'problem',problem));
             testCase.assertNotEmpty(proposal);
             testCase.verifyGreaterThan(proposal.safety,0);
@@ -194,7 +194,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         end
         function firstAdmissionCreatesAFeasibleNonlinearCertificate(testCase)
             f=testCase.fixture;
-            [solution,search]=solvePredictiveControl('probe',struct('operation','retained', ...
+            [solution,search]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',f.model,'previousState',[],'anchor',f.anchor));
             testCase.verifyTrue(solution.retainedCertificate.valid);
             testCase.verifyTrue(search.retainedCandidateFeasible);
@@ -205,7 +205,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         end
         function performanceFreedomRetainsTheFutureFeedbackPolicy(testCase)
             f=testCase.fixture;
-            [solution,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+            [solution,~]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',f.model,'previousState',[],'anchor',f.anchor));
             policies=solution.retainedCertificate.policies;
             testCase.verifyGreaterThan(max(policies(1).upper-policies(1).lower),0);
@@ -229,7 +229,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         end
         function aRealObserverUpdateRetainsZeroSlackInTheNextConvexProblem(testCase)
             f=testCase.fixture;
-            [first,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+            [first,~]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',f.model,'previousState',[],'anchor',f.anchor));
             [runtime,x,output]=localAdvance(f.runtime,f.x,f.u,first.inputs(:,1),f.cfg,0);
             cfg=f.cfg;cfg.controller.retainedTube=true;
@@ -239,7 +239,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             model.uncertainty=predictiveSafetyGeometry.observerUncertainty(ego,observation,model.target);
             model.uncertainty.target=f.model.uncertainty.target;
             previous=struct('retainedCertificate',first.retainedCertificate);
-            [second,search]=solvePredictiveControl('probe',struct('operation','retained', ...
+            [second,search]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',model,'previousState',previous,'anchor',f.anchor));
             testCase.verifyTrue(search.retainedCandidateFeasible);
             testCase.verifyTrue(search.posterior.subsetByConstruction);
@@ -254,7 +254,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             terminal=terminalSafeSet.context(model);
             count=ceil(norm(f.x(4:5))/(terminal.deceleration*f.cfg.controller.sampleTime))+10;
             anchor=localLongAnchor(f,count);
-            [first,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+            [first,~]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',model,'previousState',[],'anchor',anchor));
             [~,~,output]=localAdvance(f.runtime,f.x,f.u,first.inputs(:,1),f.cfg,0);
             [ego,~,~,observation]=readControllerInputs(output,[],[],f.cfg);
@@ -263,7 +263,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             model.uncertainty=predictiveSafetyGeometry.observerUncertainty(ego,observation,model.target);
             model.uncertainty.target=f.model.uncertainty.target;
             previous=struct('retainedCertificate',first.retainedCertificate);
-            [next,search]=solvePredictiveControl('probe',struct('operation','retained', ...
+            [next,search]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',model,'previousState',previous,'anchor',anchor));
             testCase.verifyTrue(search.certificateReused);
             testCase.verifyTrue(search.retainedCandidateFeasible);
@@ -276,7 +276,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         function repeatedUpdatesRetainZeroSlackOrAnExplicitTerminalContinuation(testCase)
             f=testCase.fixture;model=f.model;previous=[];runtime=f.runtime;x=f.x;held=f.u;
             for k=0:7
-                [solution,search]=solvePredictiveControl('probe',struct('operation','retained', ...
+                [solution,search]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                     'model',model,'previousState',previous,'anchor',f.anchor));
                 testCase.verifyTrue(search.retainedCandidateFeasible);
                 testCase.verifyEqual(solution.safety,0,AbsTol=0);
@@ -291,7 +291,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
                     testCase.verifyNotEmpty(search.refinementFailure);
                     model.sampleIndex=k+1;
                     saved=struct('retainedCertificate',solution.retainedCertificate);
-                    [tail,nextSearch]=solvePredictiveControl('probe',struct('operation','retained', ...
+                    [tail,nextSearch]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                         'model',model,'previousState',saved,'anchor',f.anchor));
                     testCase.verifyTrue(nextSearch.retainedCandidateFeasible);
                     testCase.verifyTrue(tail.terminalControlRequired);
@@ -317,7 +317,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             f=testCase.fixture;cfg=f.cfg;
             target=localObservedTarget(f.output,cfg);
             lane=[-100,0;1000,0];
-            [command,~,prediction,memory]=collisionAvoidanceController(f.output,target,lane,cfg,[]);
+            [command,~,prediction,memory]=stateEstimateControllerComparator(f.output,target,lane,cfg,[]);
             testCase.verifyTrue(prediction.metadata.zeroSlack);
             testCase.verifyTrue(prediction.metadata.retainedCandidateFeasible);
             testCase.verifyEqual(prediction.metadata.solverAlgorithm,"retainedJointPolicyTube");
@@ -326,7 +326,7 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
             testCase.verifyFalse(prediction.metadata.search.nominalRestarted);
             [~,~,output]=localAdvance(f.runtime,f.x,f.u,command.actuatorInput,cfg,0);
             target=localObservedTarget(output,cfg);
-            [~,~,next,~]=collisionAvoidanceController(output,target,lane,cfg,memory);
+            [~,~,next,~]=stateEstimateControllerComparator(output,target,lane,cfg,memory);
             testCase.verifyTrue(next.metadata.zeroSlack);
             testCase.verifyEqual(next.metadata.horizonSteps,prediction.metadata.horizonSteps);
             testCase.verifyTrue(next.metadata.search.nominalProposal.available);
@@ -347,12 +347,12 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         function aBroadPublicationDoesNotUndoTheProposalsMeasurementConditioning(testCase)
             f=testCase.fixture;lane=[-100,0;1000,0];
             target=localObservedTarget(f.output,f.cfg);
-            [command,~,~,memory]=collisionAvoidanceController(f.output,target,lane,f.cfg,[]);
+            [command,~,~,memory]=stateEstimateControllerComparator(f.output,target,lane,f.cfg,[]);
             [~,~,output]=localAdvance(f.runtime,f.x,f.u,command.actuatorInput,f.cfg,0);
             output.controllerErrorBound.generator=[output.controllerErrorBound.generator,[0;0;0;0;4;0]];
             output.controllerErrorBound.bounds=sum(abs(output.controllerErrorBound.generator),2);
             target=localObservedTarget(output,f.cfg);
-            [~,~,next]=collisionAvoidanceController(output,target,lane,f.cfg,memory);
+            [~,~,next]=stateEstimateControllerComparator(output,target,lane,f.cfg,memory);
             testCase.verifyTrue(next.metadata.search.nominalProposal.available);
             testCase.verifyTrue(next.metadata.retainedCertificateValid);
             testCase.verifyTrue(next.metadata.zeroSlack);
@@ -405,13 +405,13 @@ classdef retainedTubeControllerTest < matlab.unittest.TestCase
         end
         function missingTargetBoundsAreNotTreatedAsPerfectObservation(testCase)
             f=testCase.fixture;model=f.model;model.uncertainty.target=[];
-            testCase.verifyError(@()solvePredictiveControl('probe',struct('operation','retained', ...
+            testCase.verifyError(@()solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',model,'previousState',[],'anchor',f.anchor)), ...
                 'collisionAvoidanceController:missingTargetCertificate');
         end
         function anUnfinishedPerformanceSolveKeepsTheFeasiblePolicy(testCase)
             f=testCase.fixture;model=f.model;model.cfg.solver.maxIterations=1;
-            [solution,search]=solvePredictiveControl('probe',struct('operation','retained', ...
+            [solution,search]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',model,'previousState',[],'anchor',f.anchor));
             testCase.verifyFalse(search.secondaryStageCompleted);
             testCase.verifyTrue(search.retainedCandidateFeasible);
@@ -475,7 +475,7 @@ function [coarse,covered]=localCurvedTargetCover(overlap)
 end
 
 function [first,next]=localWiderTargetContinuation(f)
-    [first,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+    [first,~]=solveStateEstimateComparison('probe',struct('operation','retained', ...
         'model',f.model,'previousState',[],'anchor',f.anchor));
     [~,~,output]=localAdvance(f.runtime,f.x,f.u,first.inputs(:,1),f.cfg,0);
     [ego,~,~,observation]=readControllerInputs(output,[],[],f.cfg);
@@ -485,7 +485,7 @@ function [first,next]=localWiderTargetContinuation(f)
     model.uncertainty.target=f.model.uncertainty.target;
     model.uncertainty.target.positionRadius=40;
     previous=struct('retainedCertificate',first.retainedCertificate);
-    [next,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+    [next,~]=solveStateEstimateComparison('probe',struct('operation','retained', ...
         'model',model,'previousState',previous,'anchor',f.anchor));
 end
 
@@ -512,7 +512,7 @@ function result=localRepeatedConditionedDriving(f,count)
     model=f.model;previous=[];runtime=f.runtime;x=f.x;held=f.u;
     result=struct('drivingFrames',0,'maximumSlack',0,'maximumContainmentExcess',-Inf,'maximumLateralRadius',0);
     for k=0:count-1
-        [solution,~]=solvePredictiveControl('probe',struct('operation','retained', ...
+        [solution,~]=solveStateEstimateComparison('probe',struct('operation','retained', ...
             'model',model,'previousState',previous,'anchor',f.anchor));
         if solution.terminalControlRequired,return;end
         root=solution.retainedCertificate.tube.sets{1};[lo,hi]=bounds(root(1:6));
@@ -532,7 +532,7 @@ end
 function result=localCruiseInformationContinuation(f)
     cfg=f.cfg;cfg.controller.retainedTube=true;
     lane=[0,0;500,0];
-    [command,~,~,previous]=collisionAvoidanceController(f.output,localObservedTarget(f.output,cfg),lane,cfg,[]);
+    [command,~,~,previous]=stateEstimateControllerComparator(f.output,localObservedTarget(f.output,cfg),lane,cfg,[]);
     runtime=f.runtime;x=f.x;held=f.u;
     result=struct('clfEnabled',false(1,2),'informationRetained',false(1,2), ...
         'lateralRadius',zeros(1,2),'containmentExcess',-Inf);
@@ -544,7 +544,7 @@ function result=localCruiseInformationContinuation(f)
         output.perception=struct('time',output.stateTime,'completeWithinRange',true);
         output.controllerErrorBound.generator(:,end+1)=[0;0;0;0;4;0];
         output.controllerErrorBound.bounds=sum(abs(output.controllerErrorBound.generator),2);
-        [command,~,prediction,previous]=collisionAvoidanceController(output,[],lane,cfg,previous);
+        [command,~,prediction,previous]=stateEstimateControllerComparator(output,[],lane,cfg,previous);
         result.clfEnabled(k)=prediction.metadata.clfEnabled;
         result.informationRetained(k)=prediction.metadata.egoInformationRetainedAcrossModeSwitch;
         result.lateralRadius(k)=sum(abs(prediction.model.uncertainty.egoGenerator(5,:)));
@@ -564,7 +564,7 @@ end
 function f=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
         'controller',struct('horizonSteps',2,'retainedTube',true,'jointAffinePrediction',false), ...
-        'solver',struct('method',"rti",'timeLimitSeconds',120)));
+        'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',120)));
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
     design=synthesizeNrmmObserverGains(estimator.observer);
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;
@@ -576,7 +576,7 @@ function f=localFixture()
         'lateralAcceleration',0,'yawRateMeasured',0,'radarDetectionAvailable',false, ...
         'radarRelativePosition',[NaN;NaN],'heldSteeringAngle',u(1),'heldBrakingRatio',u(2));
     output=onlineNrmmTrackingRuntime('output',runtime,frame);output.targetEstimate=[];
-    [~,~,prediction]=collisionAvoidanceController(output,[],[],cfg,[]);
+    [~,~,prediction]=stateEstimateControllerComparator(output,[],[],cfg,[]);
     model=prediction.model;model.target=[25;0;0;0;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
     model.targetEpoch=model.target;model.targetOnset=true;model.cfg.controller.retainedTube=true;
     model.uncertainty.jointPrediction=output.controllerErrorBound.jointPrediction;
@@ -629,9 +629,9 @@ end
 
 function [first,second,lateralRadius]=localInitialCruiseInformation(f)
     road=struct('centerline',[-100,0;1000,0]);
-    [command,~,~,first]=collisionAvoidanceController(f.output,[],road,f.cfg,[]);
+    [command,~,~,first]=stateEstimateControllerComparator(f.output,[],road,f.cfg,[]);
     [~,~,output]=localAdvance(f.runtime,f.x,f.u,command.actuatorInput,f.cfg,0);
     output.targetEstimate=[];
-    [~,~,prediction,second]=collisionAvoidanceController(output,[],road,f.cfg,first);
+    [~,~,prediction,second]=stateEstimateControllerComparator(output,[],road,f.cfg,first);
     lateralRadius=sum(abs(prediction.model.uncertainty.egoGenerator(5,:)));
 end

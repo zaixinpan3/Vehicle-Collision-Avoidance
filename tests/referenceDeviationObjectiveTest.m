@@ -11,20 +11,20 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',32),'solver',struct('method',"rti",'timeLimitSeconds',10)));
+                'controller',struct('horizonSteps',32),'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
-            [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
             model=prediction.model;
             [~,target]=collisionThreatScenario("headOn",cfg);
             model.target=target;model.targetEpoch=target;model.targetOnset=true;
-            [testCase.anchor,~,testCase.model]=solvePredictiveControl("probe", ...
+            [testCase.anchor,~,testCase.model]=solveStateEstimateComparison("probe", ...
                 struct('operation',"reference",'model',model,'previousState',[]));
         end
     end
     methods (Test)
         function aLargeProximityWeightCannotBuyAdditionalSafetySlack(testCase)
             request=localPriorityProblem(testCase.model,testCase.anchor,1,1e8);
-            [solution,search]=solvePredictiveControl("probe",request);
+            [solution,search]=solveStateEstimateComparison("probe",request);
             testCase.assertNotEmpty(solution);
             testCase.verifyTrue(search.secondaryStageCompleted);
             testCase.verifyEqual(search.primaryOptimum,.5,AbsTol=1e-5);
@@ -34,7 +34,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
         end
         function trackingAndSmoothnessCannotBuyAdditionalSafetySlack(testCase)
             request=localPriorityProblem(testCase.model,testCase.anchor,1,10,[1e6,1e6]);
-            [solution,search]=solvePredictiveControl("probe",request);
+            [solution,search]=solveStateEstimateComparison("probe",request);
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(solution.safety,.5,AbsTol=1e-5);
             testCase.verifyEqual(search.slackCap,search.primaryOptimum,AbsTol=0);
@@ -42,7 +42,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
         end
         function equalZeroSlackSolutionsPreferTheSmallerReferenceCorrection(testCase)
             request=localPriorityProblem(testCase.model,testCase.anchor,.1,10);
-            [solution,search]=solvePredictiveControl("probe",request);
+            [solution,search]=solveStateEstimateComparison("probe",request);
             testCase.assertNotEmpty(solution);
             testCase.verifyTrue(search.secondaryStageCompleted);
             testCase.verifyEqual(solution.safety,0,AbsTol=1e-5);
@@ -51,7 +51,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
         end
         function anAffineZeroSlackWitnessAvoidsThePrimaryNumericalSolve(testCase)
             request=localWitnessProblem(testCase.model,testCase.anchor);
-            [solution,search]=solvePredictiveControl("probe",request);
+            [solution,search]=solveStateEstimateComparison("probe",request);
             testCase.assertNotEmpty(solution);
             testCase.verifyFalse(search.stages(1).numericalSolve);
             testCase.verifyTrue(search.stages(2).numericalSolve);
@@ -62,7 +62,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
         function unfinishedRefinementRetainsTheCompletedPrioritySolution(testCase)
             request=localWitnessProblem(testCase.model,testCase.anchor);
             request.model.cfg.solver.maxIterations=1;
-            [solution,search]=solvePredictiveControl("probe",request);
+            [solution,search]=solveStateEstimateComparison("probe",request);
             testCase.assertNotEmpty(solution);
             testCase.verifyTrue(search.pcbfStageCompleted);
             testCase.verifyFalse(search.secondaryStageCompleted);
@@ -75,9 +75,9 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
         function cruiseDecayCannotAlterAnAvoidanceUpdate(testCase)
             % Use a known-feasible priority problem. Feasibility of a
             % particular planner seed is separate from this objective test.
-            original=solvePredictiveControl("probe",localPriorityProblem(testCase.model,testCase.anchor,1,10));
+            original=solveStateEstimateComparison("probe",localPriorityProblem(testCase.model,testCase.anchor,1,10));
             changed=testCase.model;changed.nominalReference.decayRate=100*changed.nominalReference.decayRate;
-            alternative=solvePredictiveControl("probe",localPriorityProblem(changed,testCase.anchor,1,10));
+            alternative=solveStateEstimateComparison("probe",localPriorityProblem(changed,testCase.anchor,1,10));
             testCase.assertNotEmpty(original);testCase.assertNotEmpty(alternative);
             testCase.verifyFalse(original.clfEnabled);
             testCase.verifyTrue(isnan(original.clfSlack));
@@ -85,8 +85,8 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(alternative.states,original.states,AbsTol=1e-10);
         end
         function avoidanceUsesProximityOnlyAfterMinimizingSafetySlack(testCase)
-            [original,search]=solvePredictiveControl("probe",localPriorityProblem(testCase.model,testCase.anchor,1,10));
-            alternative=solvePredictiveControl("probe",localPriorityProblem(testCase.model,testCase.anchor,1,1000));
+            [original,search]=solveStateEstimateComparison("probe",localPriorityProblem(testCase.model,testCase.anchor,1,10));
+            alternative=solveStateEstimateComparison("probe",localPriorityProblem(testCase.model,testCase.anchor,1,1000));
             testCase.assertNotEmpty(original);testCase.assertNotEmpty(alternative);
             testCase.verifyEqual(original.inputs,alternative.inputs,AbsTol=1e-6);
             testCase.verifyEqual(original.states,alternative.states,AbsTol=1e-6);
@@ -114,7 +114,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             testCase.verifyEqual(solution.referenceDeviationCost,.5*(stateCost+inputCost),RelTol=1e-10);
         end
         function zeroWeightDoesNotReenableClfDuringAvoidance(testCase)
-            solution=solvePredictiveControl("probe",localPriorityProblem(testCase.model,testCase.anchor,1,0));
+            solution=solveStateEstimateComparison("probe",localPriorityProblem(testCase.model,testCase.anchor,1,0));
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(solution.referenceDeviationCost,0,AbsTol=0);
             testCase.verifyTrue(isnan(solution.secondaryObjectiveValue));
@@ -152,7 +152,7 @@ classdef referenceDeviationObjectiveTest < matlab.unittest.TestCase
             cfg=testCase.model.cfg;
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
             reference=nonlinearBicycleModel.cruise(cfg,0);ego.heldActuatorInput=reference.input;
-            [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
             testCase.verifyLessThan(prediction.metadata.referenceDeviationCost,1e-4);
             testCase.verifyLessThan(prediction.metadata.clfSlack,1e-4);
             testCase.verifyEqual(prediction.metadata.referenceDeviationWeight,0);
@@ -164,7 +164,7 @@ function request=localPriorityProblem(model,anchor,demand,weight,performanceWeig
     if nargin<5,performanceWeights=[0,0];end
     model.cfg.rti.referenceDeviationWeight=weight;
     model.cfg.rti.nominalTrackingWeight=performanceWeights(1);model.cfg.rti.inputVariationWeight=performanceWeights(2);
-    [p,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+    [p,~,model]=solveStateEstimateComparison("probe",struct('operation',"formulate", ...
         'model',model,'anchor',anchor,'inherited',true));
     % A small constrained choice: correction + slack >= demand. The
     % correction is at most 0.5, so safety and proximity can conflict.
@@ -186,9 +186,9 @@ end
 function [solution,search]=localSolve(model,anchor,weight)
     model.cfg.rti.referenceDeviationWeight=weight;
     model.cfg.rti.nominalTrackingWeight=0;model.cfg.rti.inputVariationWeight=0;
-    [problem,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+    [problem,~,model]=solveStateEstimateComparison("probe",struct('operation',"formulate", ...
         'model',model,'anchor',anchor,'inherited',false));
-    [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
+    [solution,search]=solveStateEstimateComparison("probe",struct('operation',"solve", ...
         'model',model,'anchor',anchor,'problem',problem));
 end
 
@@ -204,8 +204,8 @@ function [model,anchor]=localDisplacedReference(model)
 end
 
 function [solution,search]=localConfiguredSolve(model,anchor)
-    [problem,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+    [problem,~,model]=solveStateEstimateComparison("probe",struct('operation',"formulate", ...
         'model',model,'anchor',anchor,'inherited',false));
-    [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
+    [solution,search]=solveStateEstimateComparison("probe",struct('operation',"solve", ...
         'model',model,'anchor',anchor,'problem',problem));
 end

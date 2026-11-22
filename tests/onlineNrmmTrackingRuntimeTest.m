@@ -21,7 +21,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
 
     methods (TestMethodSetup)
         function resetControllerState(~)
-            collisionAvoidanceController("resetNominalTrajectory");
+            stateEstimateControllerComparator("resetNominalTrajectory");
         end
     end
 

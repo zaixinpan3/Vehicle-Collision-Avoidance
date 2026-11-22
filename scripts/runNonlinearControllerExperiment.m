@@ -15,7 +15,6 @@ function summaries = runNonlinearControllerExperiment(outputDirectory,options)
     assert(numel(options.Scenarios)==numel(options.Speeds));
     root=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(root,'config'));
     cfg=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
-    cfg.outputFeedback.qpMaximumIterations=options.MaximumIterations;
     cfg.outputFeedback.nlpMaximumIterations=options.MaximumIterations;
     if isfield(options,'FrameBudgetSeconds')
         cfg.outputFeedback.maximumSolveSeconds=options.FrameBudgetSeconds;

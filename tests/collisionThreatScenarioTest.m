@@ -32,7 +32,6 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             offset=[ego(1)+cfg.vehicle.length/2+target(8)+gap-target(1);0];
             for frames=[2,4]
                 campaign=runJointOutputFeedbackScenario(Frames=frames,Speeds=1.5,Scenarios="stoppedLead", ...
-                    ControllerConfiguration=struct('outputFeedback',struct('method',"sqpRti")), ...
                     TargetPositionOffsetMeters=offset,Warmup=false,RequirePhysicalWitness=false,OutputDirectory=string(folder.Folder));
                 result=campaign.results;
                 testCase.verifyFalse(result.nodeClearanceSatisfied);
@@ -53,7 +52,6 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             [ego,target]=collisionThreatScenario("stoppedLead");
             campaign=runJointOutputFeedbackScenario(Frames=1,Speeds=1.5,Scenarios="stoppedLead", ...
-                ControllerConfiguration=struct('outputFeedback',struct('method',"sqpRti")), ...
                 TargetPositionOffsetMeters=ego(1:2)-target(1:2),OutputDirectory=string(folder.Folder));
             result=campaign.results;
             testCase.verifyTrue(result.initialContactOrOverlap);
@@ -187,7 +185,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             % This checks noisy joint execution, independently of machine
             % load and the separate real-time deadline experiment.
             campaign = runCollisionThreatValidation(Pipeline="nrmmComparator",Frames=40,OutputDirectory=string(fixture.Folder), ...
-                ControllerConfiguration=struct('solver',struct('method',"rti",'timeLimitSeconds',5)));
+                ControllerConfiguration=struct('solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
             testCase.assertNumElements(campaign.results,2);
             testCase.verifyEqual([campaign.results.scenario],["stoppedLead","hardBrakingLead"]);
             testCase.verifyTrue(all([campaign.results.bypassQualified]));

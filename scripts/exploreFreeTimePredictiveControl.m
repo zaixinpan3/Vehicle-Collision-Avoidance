@@ -82,7 +82,7 @@ function result=localReferenceAttempt(model,previousState,options,timer,minimumC
     cfg=model.cfg;wall=tic;
     request=struct('operation',"reference",'model',model,'previousState',previousState, ...
         'minimumHorizonSteps',minimumCount,'timer',timer);
-    [anchor,initialization,model]=solvePredictiveControl("probe",request);
+    [anchor,initialization,model]=solveStateEstimateComparison("probe",request);
     model.probeTimer=timer;
     % Obtain guidance with its existing CLF table key. Use a finer, fixed
     % integration mesh for both comparison problems and reroll the same
@@ -194,7 +194,7 @@ end
 function [problem,model]=localProblem(anchor,model,inherited)
     request=struct('operation',"formulate",'model',model,'anchor',anchor,'inherited',inherited);
     if isfield(model,'probeTimer'),request.timer=model.probeTimer;end
-    [problem,~,model]=solvePredictiveControl("probe",request);
+    [problem,~,model]=solveStateEstimateComparison("probe",request);
 end
 
 function same=localSameRows(a,b)
@@ -265,7 +265,7 @@ function trial=localSolve(problem,anchor,model,inherited,weights,change)
     wall=tic;
     request=struct('operation',"solve",'model',model,'anchor',anchor,'problem',problem);
     if isfield(model,'probeTimer'),request.timer=model.probeTimer;end
-    [solution,search,~]=solvePredictiveControl("probe",request);
+    [solution,search,~]=solveStateEstimateComparison("probe",request);
     seconds=toc(wall);
     trial=struct('returned',~isempty(solution),'solveSeconds',seconds,'search',search, ...
         'durationSeconds',NaN,'durationChangeSeconds',NaN,'durations',[], ...

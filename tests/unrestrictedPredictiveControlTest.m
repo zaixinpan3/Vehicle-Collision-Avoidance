@@ -7,12 +7,13 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',32),'solver',struct('method',"rti",'timeLimitSeconds',10)));
+                'controller',struct('horizonSteps',32),'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;.1],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
-            [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
             testCase.model=prediction.model;testCase.anchor=prediction.model.linearization;
         end
     end
@@ -49,7 +50,7 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
             model.terminalContext=terminalSafeSet.context(model);
             anchor=testCase.anchor;anchor.states(1,2:end)=anchor.states(1,2:end)+100;
             request=struct('operation',"formulate",'model',model,'anchor',anchor,'inherited',false);
-            [problem,~,formed]=solvePredictiveControl("probe",request);
+            [problem,~,formed]=solveStateEstimateComparison("probe",request);
             % The reference leaves the perception disk; optimized positions
             % need not. Keep target geometry until actual observed exit.
             testCase.verifyEqual(problem.encounterExit,size(anchor.states,2));
@@ -63,7 +64,7 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(isnan(formed.encounterExitRecord));
         end
         function theLocalUpdateReturnsWithoutANonlinearRemainderGate(testCase)
-            [solution,search,model]=solvePredictiveControl(testCase.model,[],tic);
+            [solution,search,model]=solveStateEstimateComparison(testCase.model,[],tic);
             testCase.assertNotEmpty(solution);
             testCase.verifyTrue(isnan(solution.linearizationGap));
             testCase.verifyFalse(search.rollout.available);
@@ -76,13 +77,13 @@ classdef unrestrictedPredictiveControlTest < matlab.unittest.TestCase
 end
 
 function [solution,search]=localSolve(anchor,model,first)
-    [problem,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+    [problem,~,model]=solveStateEstimateComparison("probe",struct('operation',"formulate", ...
         'model',model,'anchor',anchor,'inherited',false));
     if ~isempty(first)
         idx=problem.inputIndices(:,1);
         rows=sparse(2,numel(problem.lower));rows(:,idx)=eye(2);
         problem.equal=[problem.equal;rows];problem.rhs=[problem.rhs;first-anchor.inputs(:,1)];
     end
-    [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
+    [solution,search]=solveStateEstimateComparison("probe",struct('operation',"solve", ...
         'model',model,'anchor',anchor,'problem',problem));
 end

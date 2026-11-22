@@ -12,7 +12,7 @@ classdef nonlinearSimulationContinuationTest < matlab.unittest.TestCase
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             file=string(fullfile(folder.Folder,'continuation.mat'));
             cfg=struct('referenceSpeed',8,'controller',struct('horizonSteps',8), ...
-                'solver',struct('method',"nonlinear",'timeLimitSeconds',120));
+                'solver',struct('stateEstimateMethod',"nonlinear",'timeLimitSeconds',120));
             options={'Scenarios',"brakingTarget",'ControllerConfiguration',cfg, ...
                 'EstimatorConfiguration',estimatorControllerIntegrationConfig()};
             continuous=runNonlinearPredictiveSafetyValidation(options{:},Frames=2);

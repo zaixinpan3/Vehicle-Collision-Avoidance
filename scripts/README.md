@@ -20,8 +20,10 @@ for fallback. No memory-update map is optimized.
 
 Load external CasADi with `setupJointNlpSolver` before execution. See the
 [setup, scenario campaign, interface and timing definitions](../README.md).
-`outputFeedback.method="sqpRti"` and `"ipopt"` explicitly select the previous
-dynamic-memory comparison formulations. Experiment outputs are written to the
+`outputFeedback.method="ipopt"` selects the adopted PCBF and
+`"dynamicMemoryIpopt"` selects its dynamic-memory IPOPT comparison.
+The separate state-estimate experiments call `stateEstimateControllerComparator`.
+Experiment outputs are written to the
 chosen output directory, not retained as routine research reports.
 
 ## Finite-input information-state reference
@@ -218,10 +220,9 @@ In particular, a uniform tail grid generally does not remain uniform after
 executing one fixed prefix hold and shifting the remaining policy. A variable
 duration alone therefore establishes neither recursive feasibility nor safety.
 
-`prepareCollisionAvoidanceController` warms MATLAB and the optimizer using a
-discarded call. It does not build native controller libraries:
-`buildPredictiveConicSolver` links the required Clarabel adapter, and
-`buildControllerKernels` builds the optional MATLAB Coder kernels.
+`prepareCollisionAvoidanceController(block, road, cfg)` warms the raw-sensor
+controller with a discarded initial block. The state-estimate conic comparison
+uses the Clarabel adapter built by `buildPredictiveConicSolver`.
 
 ## Estimator and perception research
 

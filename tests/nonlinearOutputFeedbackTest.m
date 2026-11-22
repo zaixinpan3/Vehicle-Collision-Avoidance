@@ -126,16 +126,13 @@ classdef nonlinearOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(abs(command.brakingRatio),1);
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
         end
-        function nonlinearIterationsEscapeTheRtiCoefficientStepBox(testCase)
+        function anInconsistentSteeringSeedRespectsTheActuatorRateAfterOptimization(testCase)
             [cfg,block]=localFixture();block.heldInput=[-.4;0];
             cfg.outputFeedback.steeringRateMaximum=1;
             policy=struct('v',[.4;0],'K',zeros(2,1),'A',0,'B',zeros(1,8),'c',0);
             block.initialPolicies=repmat(policy,1,ceil(cfg.outputFeedback.horizonSeconds/cfg.controller.sampleTime));
             block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
                 'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
-            rti=cfg;rti.outputFeedback.method="sqpRti";
-            testCase.verifyError(@()collisionAvoidanceController(block,[],[],rti,[]), ...
-                'collisionAvoidanceController:noOutputFeedbackPlan');
             [command,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyLessThan(command.steeringAngle,-.35+cfg.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);

@@ -11,7 +11,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
     methods (Test)
         function cruiseUsesOneClfSolveAndTheUnmodifiedCommand(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [command,inputs,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [command,inputs,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             search=problem.metadata.search;
             testCase.verifyEqual(search.algorithm,"realTimeIteration");
             testCase.verifyEqual(search.rtiIterations,1);
@@ -43,9 +43,9 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function shiftedReferenceUsesTheNewMeasurementInOneIteration(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);ego.position(2)=ego.position(2)+.01;
-            [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [command,inputs,problem]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPrimalIterate");
             testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
             testCase.verifyEqual(size(inputs,2),size(prior.inputTrajectory,2));
@@ -61,10 +61,10 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function aChangedTargetForecastCannotLengthenTheEncounter(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,problem,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,problem,prior]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             [~,target]=collisionThreatScenario("headOn",cfg);
             model=problem.model;model.target=target;model.targetEpoch=target;model.targetOnset=false;
-            [anchor,search]=solvePredictiveControl("probe",struct('operation',"reference", ...
+            [anchor,search]=solveStateEstimateComparison("probe",struct('operation',"reference", ...
                 'model',model,'previousState',prior));
             testCase.verifyEqual(search.initialization,"shiftedPrimalIterate");
             testCase.verifyEqual(search.plannerCalls,0);
@@ -75,10 +75,10 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         function aLongEncounterHorizonDoesNotShrinkAfterExecutingAHold(testCase)
             [ego,road,cfg]=localFixture();
             [~,q]=collisionThreatScenario("brakingLead",cfg);
-            [~,~,first,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,first,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             testCase.assertGreaterThan(first.metadata.horizonSteps,cfg.controller.horizonSteps);
             ego=localSuccessor(ego,prior,cfg);
-            [~,inputs,second,next]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [~,inputs,second,next]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             testCase.verifyEqual(size(inputs,2),first.metadata.horizonSteps);
             testCase.verifyEqual(second.metadata.horizonPolicy,"fixedWithinEncounter");
             testCase.verifyEqual(next.encounterHorizonSteps,prior.encounterHorizonSteps);
@@ -90,15 +90,15 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         function aNewEncounterCanChooseADifferentHorizon(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=0;
             [~,q]=collisionThreatScenario("brakingLead",cfg);
-            [~,~,first,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,first,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);ego.stateTime=cfg.controller.sampleTime;
             ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
-            [~,~,cleared,idle]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [~,~,cleared,idle]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             testCase.verifyEqual(cleared.metadata.encounterHorizonSteps,0);
             testCase.verifyEqual(idle.encounterHorizonSteps,0);
             ego=localSuccessor(ego,idle,cfg);ego.stateTime=2*cfg.controller.sampleTime;
             ego.perception.time=ego.stateTime;
-            [~,~,new,next]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,idle);
+            [~,~,new,next]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,idle);
             testCase.verifyTrue(new.model.targetOnset);
             testCase.verifyEqual(new.metadata.search.plannerCalls,1);
             testCase.verifyEqual(next.encounterId,prior.encounterId+1);
@@ -107,11 +107,11 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function aNewEncounterReplacesThePreviouslyUnobstructedCruiseSeed(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,problem,prior]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             [~,target]=collisionThreatScenario("headOn",cfg);
             model=problem.model;model.target=target;model.targetEpoch=target;model.targetOnset=true;
             request=struct('operation',"reference",'model',model,'previousState',prior);
-            [anchor,search]=solvePredictiveControl("probe",request);
+            [anchor,search]=solveStateEstimateComparison("probe",request);
             testCase.verifyEqual(search.initialization,"plannedAvoidanceRollout");
             testCase.verifyTrue(anchor.planner.used);
             testCase.verifyEqual(anchor.states(:,1),model.initialState,AbsTol=0);
@@ -119,13 +119,13 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function clearingAnEncounterRebuildsCruiseBeforeOneLinearization(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=0;
-            [~,~,~,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);ego.stateTime=cfg.controller.sampleTime;
             ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
             % A stale avoidance input sequence must not be the linearization
             % point once the complete scan releases its encounter.
             prior.inputTrajectory(:,:)=repmat([.25;-.7],1,size(prior.inputTrajectory,2));
-            [command,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [command,~,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             reference=problem.model.linearization;
             testCase.verifyEqual(problem.metadata.search.initialization,"cruiseFeedbackRollout");
             testCase.verifyEqual(problem.metadata.optimizationMode,"clf");
@@ -141,7 +141,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,problem.solution.inputs(:,1),AbsTol=0);
             ego=localSuccessor(ego,state,cfg);ego.stateTime=2*cfg.controller.sampleTime;
             ego.perception.time=ego.stateTime;
-            [~,~,next]=collisionAvoidanceController(ego,[],road,cfg,state);
+            [~,~,next]=stateEstimateControllerComparator(ego,[],road,cfg,state);
             testCase.verifyEqual(next.metadata.search.initialization,"cruiseFeedbackRollout");
             testCase.verifyEqual(next.metadata.search.linearizationCount,1);
             testCase.verifyEqual(next.metadata.search.plannerCalls,0);
@@ -149,7 +149,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         function coldCrossingSelectsACirculationReferenceBeforeTheRtiSolve(testCase)
             [ego,~,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=15;
             [~,q,road]=collisionThreatScenario("crossing",cfg);
-            [command,inputs,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [command,inputs,problem]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
             testCase.verifyTrue(problem.model.targetOnset);
             testCase.verifyEqual(problem.metadata.encounterId,1);
@@ -170,7 +170,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         function aNewLeadThreatBeyondTwoSecondsPlansBeforeItBecomesUrgent(testCase)
             [ego,road,cfg]=localFixture();
             [~,q]=collisionThreatScenario("brakingLead",cfg);
-            [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,problem,state]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             search=problem.metadata.search;
             testCase.verifyTrue(search.planner.used);
             testCase.verifyTrue(state.avoidanceInitialized);
@@ -189,12 +189,12 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(anchor.appendedBrakingSteps,0);
             testCase.verifyEqual(search.rtiIterations,1);
             ego=localSuccessor(ego,state,cfg);q=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
-            [~,~,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
+            [~,~,next]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,state);
             testCase.verifyEqual(next.metadata.search.attempts(1).initialization,"shiftedPrimalIterate");
         end
         function seedsStayDifferentiableWhilePhysicalInputsIncludeSaturation(testCase)
             [ego,road,cfg]=localFixture();cfg.referenceSpeed=15;ego.speed=1.8;
-            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,problem]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             [physicalLower,physicalUpper]=nonlinearBicycleModel.inputBounds(cfg);
             testCase.verifyEqual([physicalLower(2);physicalUpper(2)],[-1;1]);
             [lower,upper]=nonlinearBicycleModel.inputBounds(cfg,true);
@@ -206,19 +206,19 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function shiftingASaturatedInputRebuildsAnInteriorTangentSeed(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,problem,prior]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             prior.inputTrajectory(2,2:end)=1;
-            [~,search,model]=solvePredictiveControl(problem.model,prior,tic);
+            [~,search,model]=solveStateEstimateComparison(problem.model,prior,tic);
             testCase.verifyEqual(search.linearizationCount,1);
             testCase.verifyLessThan(max(model.linearization.inputs(2,:)),1);
             testCase.verifyTrue(all(isfinite(model.linearization.states),'all'));
         end
         function eachReferenceUsesAtMostOneRtiModel(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,nominal]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             [~,q]=collisionThreatScenario("headOn",cfg);
             model=nominal.model;model.target=q;model.targetEpoch=q;model.targetOnset=true;
-            [solution,search]=solvePredictiveControl(model,[],tic);
+            [solution,search]=solveStateEstimateComparison(model,[],tic);
             testCase.verifyEqual(search.rtiIterations,1);
             testCase.verifyEqual(search.restartCount,0);
             testCase.verifyEqual(search.horizonExtensions,0);
@@ -229,14 +229,14 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function plannedInputsRespectBrakingSlewOnTheSingleAttempt(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,nominal]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             % Test the planner's slew handling without requiring an unrelated
             % short-horizon cruise solve to admit a slow actuator from rest.
             cfg.model.brakingRatioRateMaximum=1;
             [~,q]=collisionThreatScenario("crossing",cfg);
             model=nominal.model;model.cfg=cfg;model.previousInput=[0;0];
             model.target=q;model.targetEpoch=q;model.targetOnset=true;
-            [~,search,model]=solvePredictiveControl(model,[],tic);
+            [~,search,model]=solveStateEstimateComparison(model,[],tic);
             testCase.verifyEqual(search.rtiIterations,1);
             testCase.verifyEqual(search.planner.candidateCount,1);
             inputs=model.linearization.inputs;
@@ -253,7 +253,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
                 [~,~,cfg]=localFixture();cfg.referenceSpeed=speed;
                 [x,q,road]=collisionThreatScenario("curvedHeadOn",cfg);
                 ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
-                [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+                [~,~,problem]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
                 projection=predictiveSafetyGeometry.project(x(1:2),problem.model.lane);
                 lateral=[-sin(projection.heading);cos(projection.heading)];
                 chosen=sign(problem.model.linearization.guide.direction.'*lateral);
@@ -263,7 +263,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function preparingTheReferenceRoadDoesNotIssueACommand(testCase)
             [~,~,cfg]=localFixture();[~,~,road]=collisionThreatScenario("curvedHeadOn",cfg);
-            [command,inputs,prediction,state]=collisionAvoidanceController("warmUp",cfg,road);
+            [command,inputs,prediction,state]=stateEstimateControllerComparator("warmUp",cfg,road);
             testCase.verifyEmpty(command);testCase.verifyEmpty(inputs);
             testCase.verifyEmpty(prediction);testCase.verifyEmpty(state);
         end
@@ -272,9 +272,9 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             % This fixture tests side continuity, independently of corridor admission.
             [x,q,road]=collisionThreatScenario("curvedCrossing",cfg);
             ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
-            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);q=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
-            [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,prior);
+            [~,~,problem]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,prior);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPrimalIterate");
             testCase.verifyEqual(problem.model.collisionSide,prior.collisionSide);
             testCase.verifyEqual(problem.model.linearization.terminalContext.collisionSide,prior.collisionSide);
@@ -283,11 +283,11 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             [ego,road,cfg]=localFixture();road.lateralClearance=[3;3];
             cfg.controller.enforceRoadBoundaries=true;
             cfg.controller.horizonSteps=32;cfg.controller.maximumHorizonSteps=32;
-            [~,~,first,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,first,prior]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             prior.inputTrajectory=repmat([.35;0],1,33);
             model=first.model;model.targetOnset=false;
             prior.stateTrajectory=localTrajectory(model.initialState,prior.inputTrajectory,cfg);
-            [solution,search,model]=solvePredictiveControl(model,prior,tic);
+            [solution,search,model]=solveStateEstimateComparison(model,prior,tic);
             testCase.verifyEmpty(solution);
             testCase.verifyEqual(search.plannerCalls,0);
             testCase.verifyFalse(search.nominalRestarted);
@@ -301,10 +301,10 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function anInvalidContinuationCannotSilentlyRequestPlanning(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,first,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,first,prior]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             model=first.model;model.targetOnset=false;
             prior.inputTrajectory(:)=NaN;
-            [solution,search]=solvePredictiveControl(model,prior,tic);
+            [solution,search]=solveStateEstimateComparison(model,prior,tic);
             testCase.verifyEmpty(solution);
             testCase.verifyEqual(search.plannerCalls,0);
             testCase.verifyEqual(search.initializationFailure,"collisionAvoidanceController:missingWarmStart");
@@ -312,11 +312,11 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function extendingTheInitialReferenceDoesNotInvokeThePlannerAgain(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,first]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,first]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             original=first.model.linearization;
             request=struct('operation',"reference",'model',first.model,'previousState',[], ...
                 'reference',original,'minimumHorizonSteps',size(original.inputs,2)+4);
-            [extended,search]=solvePredictiveControl("probe",request);
+            [extended,search]=solveStateEstimateComparison("probe",request);
             testCase.verifyEqual(search.plannerCalls,0);
             testCase.verifyEqual(search.initialization,"extendedInputRollout");
             testCase.verifyEqual(extended.inputs(:,1:size(original.inputs,2)),original.inputs,AbsTol=0);
@@ -325,9 +325,9 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function anInfeasibleOnsetDoesNotExtendItsHorizon(testCase)
             [ego,road,cfg]=localFixture();cfg.controller.maximumHorizonSteps=32;
-            [~,~,first]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,first]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             model=first.model;model.road.lateralClearance=[.5;.5];
-            [solution,search]=solvePredictiveControl(model,[],tic);
+            [solution,search]=solveStateEstimateComparison(model,[],tic);
             testCase.verifyEmpty(solution);
             testCase.verifyEqual(search.horizonExtensions,0);
             testCase.verifyEqual(search.plannerCalls,1);
@@ -339,10 +339,10 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function newMeasurementsWithinAnEncounterDoNotRestartPlanning(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,first,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,first,prior]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);
             target=localNearTarget();target.targetPositionInertial(2)=6.1;
-            [~,~,second,next]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            [~,~,second,next]=stateEstimateControllerComparator(ego,target,road,cfg,prior);
             testCase.verifyEqual(first.metadata.search.plannerCalls,1);
             testCase.verifyEqual(second.metadata.search.plannerCalls,0);
             testCase.verifyFalse(second.model.targetOnset);
@@ -353,9 +353,9 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function targetOnsetUsesTheSameSingleIteration(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);
-            [~,~,problem]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,prior);
+            [~,~,problem]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,prior);
             testCase.verifyTrue(problem.model.targetOnset);
             testCase.verifyEqual(problem.metadata.search.plannerCalls,1);
             testCase.verifyEqual(problem.metadata.search.initialization,"plannedAvoidanceRollout");
@@ -365,7 +365,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         function anUncertifiedStoppedTailDoesNotRestartTheSeed(testCase)
             [ego,road,cfg]=localFixture();
             cfg.controller.maximumHorizonSteps=16;
-            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,nominal]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             model=nominal.model;model.initialState=zeros(6,1);model.previousInput=zeros(2,1);
             % An overlapping stationary target makes membership false. The
             % diagnostic solves may fail; extending the tail must not restart motion.
@@ -373,7 +373,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             model.target=q;model.targetEpoch=q;model.targetOnset=false;
             prior=struct('inputTrajectory',zeros(2,cfg.controller.horizonSteps), ...
                 'stateTrajectory',zeros(6,cfg.controller.horizonSteps+1));
-            [~,search,model]=solvePredictiveControl(model,prior,tic);
+            [~,search,model]=solveStateEstimateComparison(model,prior,tic);
             testCase.verifyEqual(search.rtiIterations,1);
             testCase.verifyEqual(search.plannerCalls,0);
             testCase.verifyEqual(search.stopReason,"pcbfNoNumericalResult");
@@ -382,7 +382,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function aRemoteTailDoesNotExtrapolateTheLocalCruiseGain(testCase)
             [ego,road,cfg]=localFixture();cfg.referenceSpeed=8;ego.speed=8;
-            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,nominal]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             model=nominal.model;
             model.target=[24;0;pi;8;0;0;1.6;2.4;.95;0;0];
             model.targetEpoch=model.target;model.targetOnset=false;
@@ -394,7 +394,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             model.initialState=x;model.previousInput=u;
             prior=struct('inputTrajectory',repmat(u,1,n), ...
                 'stateTrajectory',repmat(x,1,n+1));
-            [anchor,search]=solvePredictiveControl('probe',struct( ...
+            [anchor,search]=solveStateEstimateComparison('probe',struct( ...
                 'operation',"reference",'model',model,'previousState',prior));
             testCase.verifyEqual(search.plannerCalls,0);
             testCase.verifySize(anchor.inputs,[2,n]);
@@ -407,14 +407,14 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function saturatedWarmStartKeepsLateralForceOnTheSmallSlipBranch(testCase)
             [ego,road,cfg]=localFixture();cfg.referenceSpeed=8;ego.speed=8;
-            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,nominal]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             model=nominal.model;
             model.target=[4;0;pi;8;0;0;1.6;2.4;.95;0;0];
             model.targetEpoch=model.target;model.targetOnset=false;
             x=[8;-4;-.9;7;.8;-.4];u=[-.74;-.55];
             model.initialState=x;model.previousInput=u;
             prior=struct('inputTrajectory',repmat(u,1,2),'stateTrajectory',repmat(x,1,3),'safetyBudget',0);
-            anchor=solvePredictiveControl('probe',struct('operation',"reference", ...
+            anchor=solveStateEstimateComparison('probe',struct('operation',"reference", ...
                 'model',model,'previousState',prior));
             seed=anchor.inputs(:,1);course=atan2(x(5)+cfg.vehicle.lf*x(6),x(4));
             rear=atan2(x(5)-cfg.vehicle.lr*x(6),x(4));
@@ -432,7 +432,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             % While a positive safety deficit remains, retain the old
             % controls' encounter timing instead of changing frontX.
             prior.safetyBudget=1;
-            unresolved=solvePredictiveControl('probe',struct('operation',"reference", ...
+            unresolved=solveStateEstimateComparison('probe',struct('operation',"reference", ...
                 'model',model,'previousState',prior));
             testCase.verifyEqual(unresolved.inputs(:,1),u,AbsTol=0);
         end
@@ -440,7 +440,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             [ego,road,cfg]=localFixture();cfg.controller.horizonSteps=40;
             beta=asin(1.6/20);
             q=[40;-20;-beta;60;0;beta;1.6;2.4;.95;0;0];
-            [~,~,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,problem]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             testCase.verifyTrue(isnan(problem.model.encounterExitRecord));
             testCase.verifyFalse(problem.model.terminalContext.encounterEnded);
             forecast=predictiveSafetyGeometry.predictTarget(q,(0:80)*cfg.controller.sampleTime/2);
@@ -452,9 +452,9 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         function onlyAnActiveTargetDisablesTheCruiseClf(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             target=localNearTarget();far=target;far.targetPositionInertial(1)=-60;
-            [~,~,absent]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            [~,~,near]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            [~,~,distant]=collisionAvoidanceController(ego,far,road,cfg,[]);
+            [~,~,absent]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
+            [~,~,near]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
+            [~,~,distant]=stateEstimateControllerComparator(ego,far,road,cfg,[]);
             testCase.verifyEqual([absent.metadata.clfInitialValue,near.metadata.clfInitialValue,distant.metadata.clfInitialValue], ...
                 repmat(absent.metadata.clfInitialValue,1,3),AbsTol=1e-12);
             testCase.verifyEqual([absent.metadata.clfFunction,near.metadata.clfFunction,distant.metadata.clfFunction], ...
@@ -473,15 +473,15 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function cruiseClfResumesAfterTheEncounterClears(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=0;
-            [~,~,first,prior]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,first,prior]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);ego.stateTime=cfg.controller.sampleTime;
-            [~,~,coasting,prior]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [~,~,coasting,prior]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             testCase.verifyTrue(coasting.metadata.hasTarget);
             testCase.verifyFalse(coasting.metadata.clfEnabled);
             testCase.verifyFalse(first.metadata.clfEnabled);
             ego=localSuccessor(ego,prior,cfg);ego.stateTime=2*cfg.controller.sampleTime;
             ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
-            [~,~,cleared]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [~,~,cleared]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             testCase.verifyFalse(cleared.metadata.hasTarget);
             testCase.verifyTrue(cleared.metadata.clfEnabled);
             testCase.verifyTrue(cleared.metadata.search.clfStageCompleted);
@@ -493,10 +493,10 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function consecutiveMeasuredSuccessorsRemainSingleIterations(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [~,~,~,state]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
+            [~,~,~,state]=stateEstimateControllerComparator(ego,localNearTarget(),road,cfg,[]);
             for frame=1:3
                 ego=localSuccessor(ego,state,cfg);
-                [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,state);
+                [~,~,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,state);
                 testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPrimalIterate");
                 testCase.verifyEqual(problem.metadata.search.linearizationCount,1);
                 localVerifyRtiPrediction(testCase,problem,cfg);
@@ -505,14 +505,14 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         function impossibleRoadHasNoRelaxedCommand(testCase)
             [ego,road,cfg]=localFixture();road.lateralClearance=[.5;.5];
             cfg.controller.enforceRoadBoundaries=true;cfg.controller.maximumHorizonSteps=16;
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
+            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
         function anImpossibleProblemStopsEvenWithoutAHorizonLimit(testCase)
             [ego,road,cfg]=localFixture();cfg.controller.maximumHorizonSteps=Inf;
-            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,nominal]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             model=nominal.model;model.road.lateralClearance=[.5;.5];timer=tic;
-            [solution,search,model]=solvePredictiveControl(model,[],timer);
+            [solution,search,model]=solveStateEstimateComparison(model,[],timer);
             testCase.verifyEmpty(solution);
             testCase.verifyEqual(search.horizonExtensions,0);
             testCase.verifyEqual(search.selectedAttempt,0);
@@ -528,9 +528,9 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function roadEdgesAreDeferredWithoutChangingTheCruisePath(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [~,inputs,withoutEdges]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,inputs,withoutEdges]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             road.lateralClearance=[.5;.5];
-            [~,withEdges,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,withEdges,problem]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             testCase.verifyEmpty(problem.model.road.lateralClearance);
             testCase.verifyEqual(problem.model.terminalContext.clearance,[Inf;Inf]);
             testCase.verifyEqual(problem.model.lane,withoutEdges.model.lane);
@@ -539,13 +539,13 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function anInfeasibleLocalDomainDoesNotTriggerHorizonGrowth(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,problem]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             model=problem.model;model.initialState=[21.52;7.33;.017;6.21;-.153;-.14];
             % The measured state lies outside this intentionally narrow
             % shared observer domain; extra horizon nodes cannot repair it.
             model.cfg.model.sideslipMaximum=.0001;
             model.cfg.rti.trustRegion.errorBudget=1e-4*ones(6,1);
-            [solution,search]=solvePredictiveControl(model,[],tic);
+            [solution,search]=solveStateEstimateComparison(model,[],tic);
             testCase.verifyEmpty(solution);
             testCase.verifyEqual(search.horizonExtensions,0);
             testCase.verifyEqual(search.linearizationCount,1);
@@ -556,7 +556,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
             ego.position=[84.567;-.623471];ego.yaw=-.0654507;ego.speed=.0799722;
             ego.lateralVelocity=.00427434;ego.yawRate=.00259123;
             target=[84.4527;-14.699;1.04376;16.45;1;.05;1.6;2.4;.95;0;0];
-            [~,~,problem]=collisionAvoidanceController(ego,localTarget(target),road,cfg,[]);
+            [~,~,problem]=stateEstimateControllerComparator(ego,localTarget(target),road,cfg,[]);
             testCase.verifyTrue(problem.metadata.search.planner.used);
             guide=problem.model.linearization.guide;
             testCase.verifyEqual(norm(guide.velocity(:,1)),hypot(ego.speed,ego.lateralVelocity),AbsTol=1e-12);
@@ -566,14 +566,14 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function exhaustedBudgetDoesNotExecuteThePreviousTrajectory(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);cfg.solver.timeLimitSeconds=1e-12;
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
+            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],road,cfg,prior), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
         function expiredBudgetStartsNoLinearizationOrNumericalSolve(testCase)
-            cfg=collisionAvoidanceControllerConfig(struct('solver',struct('method',"rti",'timeLimitSeconds',1e-12)));
-            [solution,search]=solvePredictiveControl(struct('cfg',cfg),[],tic);
+            cfg=collisionAvoidanceControllerConfig(struct('solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',1e-12)));
+            [solution,search]=solveStateEstimateComparison(struct('cfg',cfg),[],tic);
             testCase.verifyEmpty(solution);
             testCase.verifyEqual(search.solverCalls,0);
             testCase.verifyEqual(search.linearizationCount,0);
@@ -582,14 +582,14 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function anUnfinishedConicIterationDoesNotSupplyACommand(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;cfg.solver.maxIterations=1;
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
+            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
         function numericalIterationExhaustionDoesNotTriggerReplanning(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,nominal]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             model=nominal.model;model.cfg.solver.maxIterations=1;
-            [solution,search]=solvePredictiveControl(model,[],tic);
+            [solution,search]=solveStateEstimateComparison(model,[],tic);
             testCase.verifyEmpty(solution);
             testCase.verifyFalse(search.nominalRestarted);
             testCase.verifyEqual(numel(search.attempts),1);
@@ -597,15 +597,15 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         end
         function initialOverlapIsExposedAsPositivePcbfSlack(testCase)
             [ego,road,cfg]=localFixture();
-            [~,~,nominal]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,nominal]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             model=nominal.model;
             model.target=[0;0;0;40;0;0;1.6;2.4;.95;0;0];
             model.targetEpoch=model.target;model.targetOnset=true;
-            [anchor,~,model]=solvePredictiveControl("probe",struct('operation',"reference", ...
+            [anchor,~,model]=solveStateEstimateComparison("probe",struct('operation',"reference", ...
                 'model',model,'previousState',[]));
-            [problem,~,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+            [problem,~,model]=solveStateEstimateComparison("probe",struct('operation',"formulate", ...
                 'model',model,'anchor',anchor,'inherited',false));
-            [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
+            [solution,search]=solveStateEstimateComparison("probe",struct('operation',"solve", ...
                 'model',model,'anchor',anchor,'problem',problem));
             % This is already a colliding initial state. Check the PCBF
             % formulation, without requiring a valid nonlinear command.
@@ -616,7 +616,7 @@ classdef switchedPredictiveControlTest < matlab.unittest.TestCase
         function returnedInputsRespectBrakingMagnitudeAndSlew(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.05;
             cfg.model.brakingRatioRateMaximum=2;ego.heldActuatorInput=[0;0];
-            [~,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,inputs,problem]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             tolerance=cfg.solver.reducedTolerance;
             testCase.verifyLessThanOrEqual(max(abs(diff([ego.heldActuatorInput(2),inputs(2,:)]))), ...
                 cfg.controller.sampleTime*2+tolerance);
@@ -629,7 +629,7 @@ end
 
 function [ego,road,cfg]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8), ...
-        'solver',struct('method',"rti",'timeLimitSeconds',5)));
+        'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
     ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
     road=struct('centerline',[-100,0;1000,0]);
 end

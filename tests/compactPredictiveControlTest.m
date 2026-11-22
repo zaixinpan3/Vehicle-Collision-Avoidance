@@ -38,9 +38,40 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function theMainEntryRejectsStateEstimatesAndRetiredSolverRequests(testCase)
+            block=testCase.block;cfg=testCase.cfg;
+            testCase.verifyError(@()collisionAvoidanceController(struct('speed',8),[],[],cfg,[]), ...
+                'collisionAvoidanceController:invalidSensorBlock');
+            testCase.verifyError(@()collisionAvoidanceController(block,[],[],struct('solver',struct('method',"rti")),[]), ...
+                'collisionAvoidanceController:invalidConfiguration');
+            old=cfg;old.outputFeedback.method="sqpRti";
+            testCase.verifyError(@()collisionAvoidanceController(block,[],[],old,[]), ...
+                'collisionAvoidanceController:invalidConfiguration');
+            prior=testCase.state;prior.configuration=old;
+            testCase.verifyError(@()collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior), ...
+                'collisionAvoidanceController:invalidConfiguration');
+            for operation=["linearize","linearizeStep"]
+                request=struct('operation',operation,'cfg',cfg);
+                testCase.verifyError(@()solvePredictiveControl("outputFeedback",request), ...
+                    'collisionAvoidanceController:invalidOutputFeedbackOperation');
+            end
+            testCase.verifyError(@()solvePredictiveControl("probe",struct()), ...
+                'collisionAvoidanceController:invalidSolverInterface');
+        end
+        function discardedPreparationUsesTheRawSensorSolver(testCase)
+            step=prepareCollisionAvoidanceController(testCase.block,[],testCase.cfg);
+            testCase.verifyEqual(step.solver,"casadiIpoptCompactPcbf");
+            testCase.verifyEqual(step.predictiveBarrierValue,testCase.prediction.metadata.pcbfValue);
+            testCase.verifyError(@()prepareCollisionAvoidanceController(struct('speed',8),[],testCase.cfg), ...
+                'collisionAvoidanceController:invalidSensorBlock');
+        end
         function aSavedPlanPredatingTheAcquisitionWindowResumes(testCase)
             prior=testCase.state;
             prior.configuration.outputFeedback=rmfield(prior.configuration.outputFeedback,'movingTargetObservationSeconds');
+            prior.configuration.outputFeedback.method="compactNlp";
+            prior.configuration.outputFeedback.qpMaximumIterations=60;
+            prior.configuration.solver.method=prior.configuration.solver.stateEstimateMethod;
+            prior.configuration.solver=rmfield(prior.configuration.solver,'stateEstimateMethod');
             block=localNextBlock(prior,testCase.cfg);
             [~,controls,~,state]=collisionAvoidanceController(block,[],[],testCase.cfg,prior);
             [~,current]=collisionAvoidanceController(block,[],[],testCase.cfg,testCase.state);

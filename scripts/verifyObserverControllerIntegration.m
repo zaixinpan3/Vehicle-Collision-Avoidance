@@ -11,7 +11,7 @@ function result = verifyObserverControllerIntegration(outputFile)
     probes=struct([]);inputPlans=cell(1,2);radii=[.01,.10];
     for index=1:numel(radii)
         [ego,target]=localPublication(x,q,0,radii(index));
-        [command,inputs,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+        [command,inputs,prediction]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
         inputPlans{index}=inputs;
         entry=struct('targetPositionRadiusMeters',radii(index),'input',command.actuatorInput, ...
             'maximumCollisionTighteningMeters',prediction.metadata.maximumCollisionTighteningMeters, ...
@@ -22,7 +22,7 @@ function result = verifyObserverControllerIntegration(outputFile)
     [ego,target]=localPublication(x,q,0,.001);
     target.predictionErrorSet.accelerationInterval=q(5)+[-.002;.002];
     target.controllerErrorBound.bounds(5:6)=.002;
-    [command,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
+    [command,~,~,prior]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
     next=nonlinearBicycleModel.sample(x,command.actuatorInput,cfg);
     updated=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
     updated(1)=updated(1)+.001;updated(5)=updated(5)+.001;
@@ -30,7 +30,7 @@ function result = verifyObserverControllerIntegration(outputFile)
     target.predictionErrorSet.accelerationInterval=updated(5)+[-.002;.002];
     target.controllerErrorBound.bounds(5:6)=.002;
     ego.heldActuatorInput=command.actuatorInput;
-    [~,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
+    [~,~,second]=stateEstimateControllerComparator(ego,target,road,cfg,prior);
 
     % A genuine runtime publication with a declared, valid initial error prior.
     % Truth equals the initialized point; the bounds are deliberately nonzero.
@@ -49,9 +49,9 @@ function result = verifyObserverControllerIntegration(outputFile)
     uncertainty=predictiveSafetyGeometry.observerUncertainty(parsed,observation,targetCenter);
     exact=publication;exact=rmfield(exact,{'controllerErrorBound','controllerStateErrorBound'});
     exact.targetEstimate=rmfield(exact.targetEstimate,{'controllerErrorBound','predictionErrorSet'});
-    [~,~,baseline]=collisionAvoidanceController(exact,exact.targetEstimate,line,observerControllerCfg,[]);
+    [~,~,baseline]=stateEstimateControllerComparator(exact,exact.targetEstimate,line,observerControllerCfg,[]);
     model=baseline.model;model.uncertainty=uncertainty;
-    [solution,search,model]=solvePredictiveControl(model,[]);
+    [solution,search,model]=solveStateEstimateComparison(model,[]);
     prediction=model.uncertaintyPrediction;
     runtimeProbe=struct('egoBounds',publication.controllerErrorBound.bounds, ...
         'parameterSet',publication.targetEstimate.predictionErrorSet, ...

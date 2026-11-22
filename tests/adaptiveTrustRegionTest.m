@@ -8,11 +8,12 @@ classdef adaptiveTrustRegionTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
-            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('method',"rti",'timeLimitSeconds',10)));
+            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
-            [~,~,p]=collisionAvoidanceController(ego,[],[],cfg,[]);
+            [~,~,p]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
             testCase.cfg=cfg;testCase.model=p.model;testCase.anchor=p.model.linearization;
         end
     end
@@ -63,7 +64,7 @@ classdef adaptiveTrustRegionTest < matlab.unittest.TestCase
         function primarySlackOptimizationAlreadyRespectsTrust(testCase)
             request=localPriorityRequest(testCase.model,testCase.anchor);
             limit=request.problem.upper(request.problem.inputIndices(1,1));
-            [solution,search]=solvePredictiveControl('probe',request);
+            [solution,search]=solveStateEstimateComparison('probe',request);
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(solution.inputCorrection(1,1),limit,AbsTol=1e-5);
             testCase.verifyEqual(search.primaryOptimum,limit,AbsTol=1e-5);
@@ -120,7 +121,7 @@ classdef adaptiveTrustRegionTest < matlab.unittest.TestCase
                 [~,anchor.states(:,k+1)]=terminalSafeSet.holdStates(anchor.states(:,k),anchor.inputs(:,k),cfg);
             end
             anchor.states(5:6,2)=anchor.states(5:6,2)+[-cfg.vehicle.lf*.2;.2];
-            p=solvePredictiveControl('probe',struct('operation','formulate', ...
+            p=solveStateEstimateComparison('probe',struct('operation','formulate', ...
                 'model',model,'anchor',anchor,'inherited',true));
             testCase.verifyTrue(p.trustWarmStartAdjusted);
             correction=reshape(p.rhs,6,[]);
@@ -151,7 +152,7 @@ classdef adaptiveTrustRegionTest < matlab.unittest.TestCase
             end
             model.initialState=anchor.states(:,1)+[0;0;.002;.05;.03;.005];
             anchor.states(:,1)=model.initialState;
-            p=solvePredictiveControl('probe',struct('operation','formulate', ...
+            p=solveStateEstimateComparison('probe',struct('operation','formulate', ...
                 'model',model,'anchor',anchor,'inherited',true));
             actual=anchor.states;
             for k=1:2
@@ -180,7 +181,7 @@ function request=localPriorityRequest(model,anchor)
     model.target=[30;0;pi;8;0;0;model.cfg.vehicle.lr;2.4;.95;0;0];model.targetEpoch=model.target;
     model.cfg.rti.nominalTrackingWeight=0;model.cfg.rti.referenceDeviationWeight=0;
     model.cfg.rti.inputVariationWeight=20;
-    [p,~,model]=solvePredictiveControl('probe',struct('operation','formulate','model',model,'anchor',anchor,'inherited',false));
+    [p,~,model]=solveStateEstimateComparison('probe',struct('operation','formulate','model',model,'anchor',anchor,'inherited',false));
     column=p.inputIndices(1,1);slack=p.slackIndices(1);limit=p.upper(column);n=numel(p.lower);
     p.equal=sparse(0,n);p.rhs=zeros(0,1);p.cones=[];p.lower(:)=0;p.upper(:)=0;
     p.upper(column)=limit;p.upper(slack)=Inf;

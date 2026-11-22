@@ -11,13 +11,14 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function solveNontrivialCruise(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',8), ...
-                'solver',struct('method',"nonlinear",'maxIterations',150,'timeLimitSeconds',120)));
+                'solver',struct('stateEstimateMethod',"nonlinear",'maxIterations',150,'timeLimitSeconds',120)));
             ego=struct('position',[0;.4],'yaw',.03,'speed',8,'lateralVelocity',0,'yawRate',0);
-            [~,~,testCase.prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
+            [~,~,testCase.prediction]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
             testCase.config=cfg;
         end
     end
@@ -28,7 +29,7 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
             model.target=[center;0;0;0;0;1.6;2.4;.95;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
             model.terminalContext=terminalSafeSet.context(model);
-            problem=solvePredictiveControl('probe',struct('operation','nonlinearProblem', ...
+            problem=solveStateEstimateComparison('probe',struct('operation','nonlinearProblem', ...
                 'model',model,'anchor',anchor));
             % Evaluate the SAME first-node collision constraint after large
             % pose changes. No new corridor or barrier definition is built.
@@ -64,11 +65,11 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
         end
         function nonlinearAndRetainedModesCannotBeConfused(testCase)
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
-                'solver',struct('method',"nonlinear"),'controller',struct('retainedTube',true))), ...
+                'solver',struct('stateEstimateMethod',"nonlinear"),'controller',struct('retainedTube',true))), ...
                 'collisionAvoidanceController:invalidConfiguration');
             cfg=collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.solver.method,"rti");
-            diagnostic=collisionAvoidanceControllerConfig(struct('solver',struct('method',"nonlinear")));
+            testCase.verifyEqual(cfg.solver.stateEstimateMethod,"rti");
+            diagnostic=collisionAvoidanceControllerConfig(struct('solver',struct('stateEstimateMethod',"nonlinear")));
             testCase.verifyEqual(diagnostic.solver.timeLimitSeconds,1000);
         end
         function constraintDerivativesMatchNonlinearPerturbations(testCase)
@@ -77,7 +78,7 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
             model.target=[10;2;pi;8;0;0;1.6;2.4;.95;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
             model.terminalContext=terminalSafeSet.context(model);
-            problem=solvePredictiveControl('probe',struct('operation','nonlinearProblem', ...
+            problem=solveStateEstimateComparison('probe',struct('operation','nonlinearProblem', ...
                 'model',model,'anchor',anchor));
             point=problem.point;point(problem.stateIndices(5,end))=.02;
             [~,~,gc,ge]=problem.constraint(point);[~,g]=problem.performance(point);
@@ -97,7 +98,7 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
             model.target=[10;2;.37;8;0;0;1.6;2.4;.95;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
             model.terminalContext=terminalSafeSet.context(model);
-            problem=solvePredictiveControl('probe',struct('operation','nonlinearProblem', ...
+            problem=solveStateEstimateComparison('probe',struct('operation','nonlinearProblem', ...
                 'model',model,'anchor',anchor));
             [c,~,g]=problem.constraint(problem.point);affine=problem.affineProblem;
             testCase.verifyEqual(full(affine.a(1:16,:)),full(g(:,1:16).'),AbsTol=2e-9);
@@ -111,7 +112,7 @@ classdef nonlinearOptimizationBackendTest < matlab.unittest.TestCase
             model.target=[anchor.states(1:2,1)+[1.37;.41];0;40;0;0;1.6;2.4;.95;0;0];
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
             model.terminalContext=terminalSafeSet.context(model);
-            problem=solvePredictiveControl('probe',struct('operation','nonlinearProblem', ...
+            problem=solveStateEstimateComparison('probe',struct('operation','nonlinearProblem', ...
                 'model',model,'anchor',anchor));
             point=problem.point;[unrelaxed,~]=problem.constraint(point);
             testCase.verifyGreaterThan(max(unrelaxed),0);

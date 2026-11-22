@@ -23,7 +23,7 @@ function output(b)
         ego.heldActuatorInput=e.held;
         road=perceiveRoadBoundaries(e.road,x(1:2),e.cfg.collision.encounterRangeMeters,t);
         e.lastEgo=ego;e.lastEstimate=estimate;e.lastRoad=road;
-        [command,~,prediction,e.previous]=collisionAvoidanceController(ego,estimate,road,e.cfg,e.previous);
+        [command,~,prediction,e.previous]=stateEstimateControllerComparator(ego,estimate,road,e.cfg,e.previous);
         u=command.actuatorInput;e.held=u;
         % Controller is FLU, the VDB template is SAE FRD.
         delta=-u(1);L=e.cfg.vehicle.wheelbase;track=1.922;

@@ -11,10 +11,10 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
-            cfg=collisionAvoidanceControllerConfig(struct('solver',struct('method',"rti")));cfg.referenceSpeed=8;
+            cfg=collisionAvoidanceControllerConfig(struct('solver',struct('stateEstimateMethod',"rti")));cfg.referenceSpeed=8;
             cfg.controller.horizonSteps=8;cfg.solver.timeLimitSeconds=30;
             ego=struct('position',[0;.1],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
-            [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
             testCase.model=prediction.model;
             testCase.previous=localPrevious(repmat(prediction.model.nominalReference.input,1,33),testCase.model);
             testCase.result=exploreFreeTimePredictiveControl(testCase.model,testCase.previous);
@@ -68,7 +68,7 @@ classdef freeTimePredictiveControlTest < matlab.unittest.TestCase
             model.uncertainty.relativeFrame=false;model.uncertainty.specified=true;
             model.predictionDurations(end)=.08;
             request=struct('operation',"formulate",'model',model,'anchor',anchor,'inherited',true);
-            [~,~,checked]=solvePredictiveControl("probe",request);
+            [~,~,checked]=solveStateEstimateComparison("probe",request);
             cfg=model.cfg;cfg.controller.sampleTime=.08;
             [~,~,~,~,jacobian]=nonlinearBicycleModel.hold(anchor.states(:,end-1),anchor.inputs(:,end),cfg);
             testCase.verifyEqual(checked.uncertaintyPrediction.time(end),r.initialDurationSeconds+.03,AbsTol=1e-10);

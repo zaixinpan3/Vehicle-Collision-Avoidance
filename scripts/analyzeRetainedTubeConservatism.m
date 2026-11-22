@@ -16,7 +16,7 @@ function result = analyzeRetainedTubeConservatism(options)
     for k=0:options.Frames-1
         timer=tic;
         try
-            [solution,search]=solvePredictiveControl('probe',struct('operation','retained', ...
+            [solution,search]=solveStateEstimateComparison('probe',struct('operation','retained', ...
                 'model',model,'previousState',previous,'anchor',f.anchor));
             if solution.terminalControlRequired
                 failure="terminalControlRequired: "+search.refinementFailure;
@@ -72,7 +72,7 @@ function f=localFixture()
         'lateralAcceleration',0,'yawRateMeasured',0,'radarDetectionAvailable',false, ...
         'radarRelativePosition',[NaN;NaN],'heldSteeringAngle',u(1),'heldBrakingRatio',u(2));
     output=onlineNrmmTrackingRuntime('output',runtime,frame);output.targetEstimate=[];
-    [~,~,prediction]=collisionAvoidanceController(output,[],[],cfg,[]);
+    [~,~,prediction]=stateEstimateControllerComparator(output,[],[],cfg,[]);
     model=prediction.model;model.target=[25;0;0;0;0;0;cfg.vehicle.lr;cfg.vehicle.length/2;cfg.vehicle.width/2;0;0];
     model.targetEpoch=model.target;model.targetOnset=true;model.cfg.controller.retainedTube=true;
     model.uncertainty.jointPrediction=output.controllerErrorBound.jointPrediction;

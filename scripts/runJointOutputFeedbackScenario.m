@@ -30,7 +30,7 @@ function campaign = runJointOutputFeedbackScenario(options)
     for speed=options.Speeds
         for name=options.Scenarios
             cfg=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
-            if any(string(cfg.outputFeedback.method)==["ipopt","dynamicMemoryIpopt"]) && exist('casadi.SX','class')~=8
+            if exist('casadi.SX','class')~=8
                 setupJointNlpSolver;
             end
             cfg.referenceSpeed=speed;cfg.model.speedMaximum=max(cfg.model.speedMaximum,1.2*speed);
@@ -174,7 +174,12 @@ function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversR
     timer=tic;input=zeros(2,1);state=[];compact=string(cfg.outputFeedback.method)=="ipopt";
     if compact && ~solversReady
         try
-            startup.solversReady=localWarmCompactSolvers(cfg);
+            warmCfg=collisionAvoidanceControllerConfig();
+            warmCfg.outputFeedback.nlpJit=cfg.outputFeedback.nlpJit;
+            warmCfg.outputFeedback.nlpCompiler=cfg.outputFeedback.nlpCompiler;
+            warmCfg.outputFeedback.nlpCompilerOptimization=cfg.outputFeedback.nlpCompilerOptimization;
+            startup.solversReady=solvePredictiveControl("outputFeedback",struct('operation',"warmUp", ...
+                'cfg',warmCfg,'reference',[-100,0;1000,0]));
             if ~startup.solversReady
                 startup.failure="The startup probe did not invoke CasADi/IPOPT.";
             end
@@ -219,31 +224,6 @@ function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversR
         end
     end
     startup.seconds=toc(timer);
-end
-
-function ready=localWarmCompactSolvers(runCfg)
-    % A fixed synthetic encounter exercises the CasADi/IPOPT backend
-    % and trajectory derivatives before the experiment clock starts.
-    cfg=collisionAvoidanceControllerConfig();
-    % This discarded offline solve uses the solver iteration limits. An
-    % online wall-clock deadline can interrupt first-time toolbox loading.
-    cfg.outputFeedback.initializationSolveSeconds=realmax;
-    cfg.outputFeedback.nlpJit=runCfg.outputFeedback.nlpJit;
-    cfg.outputFeedback.nlpCompiler=runCfg.outputFeedback.nlpCompiler;
-    cfg.outputFeedback.nlpCompilerOptimization=runCfg.outputFeedback.nlpCompilerOptimization;
-    item=localInitialContract([0;0;0;15;0;0],0);
-    item.target=[25;0;0;0;0;0;cfg.target.rearAxleDistance; ...
-        cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
-    input=zeros(2,1);
-    sample=solvePredictiveControl("outputFeedback",struct('operation',"sensor", ...
-        'cfg',cfg,'hypothesis',item,'input',input,'time',0));
-    block=localSensorBlock(0,input,sample);block.initialHypotheses=item;
-    % The probe has no access to the experiment state or controller memory.
-    request=struct('operation',"step",'cfg',cfg,'reference',[-100,0;1000,0], ...
-        'block',block,'previousState',[]);
-    result=solvePredictiveControl("outputFeedback",request);
-    info=result.prediction.metadata;
-    ready=info.solver=="casadiIpoptCompactPcbf" && info.nlpAttempts>0;
 end
 
 function timing=localTiming(seconds,deadline)

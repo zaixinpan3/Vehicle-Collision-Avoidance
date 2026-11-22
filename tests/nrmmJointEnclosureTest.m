@@ -7,7 +7,7 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function addProjectPaths(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
-            for name=["controller","config","estimator"]
+            for name=["controller","config","estimator","scripts"]
                 testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,name)));
             end
         end
@@ -255,10 +255,10 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
         function nonlinearModeRequiresAnObserverSnapshot(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',2,'jointNonlinearPrediction',true), ...
-                'solver',struct('method',"rti",'timeLimitSeconds',30)));
+                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',30)));
             x=nonlinearBicycleModel.cruise(cfg,0).state;
             ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],[],cfg,[]), ...
+            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],[],cfg,[]), ...
                 'collisionAvoidanceController:missingJointPrediction');
         end
         function controllerEnclosesTheSameDecisionDomainItAdmits(testCase)
@@ -269,7 +269,7 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
             output.controllerErrorBound.bounds(:)=0;
             output.controllerErrorBound.jointPrediction.parameterRadius(:)=0;
             output.controllerErrorBound.jointPrediction.noiseRadius(:)=0;
-            [~,~,prediction]=collisionAvoidanceController(output,[],[],cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(output,[],[],cfg,[]);
             testCase.verifyTrue(prediction.model.jointPredictionTube.realArithmeticEnclosure);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
             testCase.verifyGreaterThan(max(prediction.model.jointPredictionTube.physicalRadius,[],'all'),0);
@@ -315,7 +315,7 @@ function excess=localUnaryDependenceExcess(kind)
 end
 
 function [certificate,maximum]=localAccelerationHoldSamples()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('method',"rti")));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('stateEstimateMethod',"rti")));
     trim=nonlinearBicycleModel.cruise(cfg,0);input=trim.input;
     lower=[0;0;0;7.75;-.0045;-.0015];upper=[0;0;0;8.25;.0045;.0015];
     state=nrmmSet.range(lower,upper);parameters=nrmmSet(zeros(4,1),.05*eye(4));
@@ -334,7 +334,7 @@ function [certificate,maximum]=localAccelerationHoldSamples()
 end
 
 function [center,context,output]=localFixture()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('method',"rti")));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('stateEstimateMethod',"rti")));
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
     design=synthesizeNrmmObserverGains(estimator.observer);
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;

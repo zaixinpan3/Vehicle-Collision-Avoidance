@@ -943,7 +943,7 @@ nonlinear optimization, few decision nodes over substantial preview, and warm
 initialization. Its spatial-coordinate vehicle/actuator transcription is not
 identical to this held-input time-coordinate model, which includes rest.
 
-The optional `sqpRti` and `dynamicMemoryIpopt` dynamic-memory implementations and the
+The optional `dynamicMemoryIpopt` formulation and the
 full independent ego/target observer integration are research comparators. The adopted compact
 controller does not optimize their memory maps or observer gains. The NRMM
 observer's own conditional derivation is in

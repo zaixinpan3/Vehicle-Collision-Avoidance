@@ -63,6 +63,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         saved=[];
         if strlength(options.ResumeFrom)>0
             saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;
+            saved.result.configuration=collisionAvoidanceControllerConfig(saved.result.configuration);
             assert(isequaln(saved.result.configuration,cfg) && saved.result.scenario==name ...
                 && isequaln(saved.result.targetInitialState,initialTarget), ...
                 'Continuation scenario and configuration must match before reusing qualification.');
@@ -125,9 +126,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         % or RNG (initialFramePending is true); its command/state are discarded.
         roadScan=perceiveRoadBoundaries(road,ego.position,cfg.collision.encounterRangeMeters,ego.stateTime);
         warmUpTimer=tic;
-        if isempty(saved),collisionAvoidanceController("warmUp",cfg,roadScan);end
+        if isempty(saved),stateEstimateControllerComparator("warmUp",cfg,roadScan);end
         if useEstimator && strlength(options.ResumeFrom)==0 && ~cfg.controller.retainedTube ...
-                && string(cfg.solver.method)=="rti"
+                && string(cfg.solver.stateEstimateMethod)=="rti"
             % Do not compute and discard a complete nonlinear certificate
             % before repeating the same admission in the recorded frame.
             [~,probeEgo,probeTarget]=nrmmEstimatorControllerAdapter( ...
@@ -135,7 +136,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             probeEgo.heldActuatorInput=ego.heldActuatorInput;
             probeCfg=cfg;probeCfg.solver.timeLimitSeconds=max(1,cfg.solver.timeLimitSeconds);
             try
-                collisionAvoidanceController(probeEgo,probeTarget,roadScan,probeCfg,[]);
+                stateEstimateControllerComparator(probeEgo,probeTarget,roadScan,probeCfg,[]);
             catch exception
                 expected=any(string(exception.identifier)==["collisionAvoidanceController:noOptimizationSolution", ...
                     "collisionAvoidanceController:noRetainedCertificate"]) ...
@@ -292,7 +293,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 end
                 roadScan=perceiveRoadBoundaries(road,ego.position,cfg.collision.encounterRangeMeters,ego.stateTime);
                 phase="controller";controllerTimer=tic;
-                [command,~,problem,prior]=collisionAvoidanceController(egoInput,estimate,roadScan,cfg,prior);
+                [command,~,problem,prior]=stateEstimateControllerComparator(egoInput,estimate,roadScan,cfg,prior);
                 assert(problem.metadata.optimizationReturned && numel(command.actuatorInput)==2 ...
                     && all(isfinite(command.actuatorInput),'all'), ...
                     'runNonlinearPredictiveSafetyValidation:noControlOutput','No finite solved control was returned.');
@@ -473,7 +474,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                         recovery.confirmationTimeSeconds=ego.stateTime;break;
                     end
                 end
-                if string(cfg.solver.method)=="nonlinear" || mod(frame,4)==0
+                if string(cfg.solver.stateEstimateMethod)=="nonlinear" || mod(frame,4)==0
                     fprintf('%s: %d/%d holds, last %.3f s, J %.6g, source %s\n', ...
                         name,frame,options.Frames,frameSeconds,problem.metadata.predictiveBarrierValue,search.source);
                 end
@@ -576,7 +577,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     end
     report=struct('model',"nonlinear combined-slip Fiala; one constant-acceleration/constant-sideslip target", ...
         'targetStateOrder',["X","Y","psi","V","A","beta","lr","halfLength","halfWidth","offsetX","offsetY"], ...
-        'scope',string(cfg.solver.method)+" PCBF/CLF with independent offline replay", ...
+        'scope',string(cfg.solver.stateEstimateMethod)+" PCBF/CLF with independent offline replay", ...
         'observationLimitEnabled',isfinite(options.Frames), ...
         'stateObservation',options.StateTransition+" ego successor with sample-end rest reset; target observation: "+observationModel, ...
         'targetTruth',"fixed initial constant-A/constant-beta trajectory, independent of estimated forecasts", ...

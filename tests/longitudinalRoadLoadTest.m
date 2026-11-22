@@ -9,6 +9,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function addControllerPaths(testCase)
             root = fileparts(fileparts(mfilename("fullpath")));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "config")));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "controller")));
         end
@@ -100,7 +101,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.8);
             ego.stateTime = 0;
 
-            [~, ~, second] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
+            [~, ~, second] = stateEstimateControllerComparator(ego, [], [0, 0; 2000, 0], cfg, []);
 
             testCase.verifyGreaterThan(abs(first.metadata.clfInitialValue-second.metadata.clfInitialValue), 1.0e-10);
             testCase.verifyGreaterThan(second.metadata.clfOperatingInput(2), ...
@@ -124,9 +125,9 @@ end
 
 function [command, problem, cfg] = localProblem(speed)
     cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps",16,"sampleTime",0.05), ...
-        "solver",struct("method","rti","timeLimitSeconds",5)));
+        "solver",struct("stateEstimateMethod","rti","timeLimitSeconds",5)));
     ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
     ego.stateTime = 0;
 
-    [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
+    [command, ~, problem] = stateEstimateControllerComparator(ego, [], [0, 0; 2000, 0], cfg, []);
 end

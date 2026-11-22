@@ -234,7 +234,7 @@ function result=localConditionMeasurements(set,contract,cfg)
     point=contract.point;point(3)=set.center(9)+atan2(sin(point(3)-set.center(9)),cos(point(3)-set.center(9)));
     lo(7:11)=point;hi(7:11)=point;
     lo(16:17)=measurement.heldInput;hi(16:17)=measurement.heldInput;
-    if cfg.controller.reducedJointInformation && string(cfg.solver.method)=="rti" ...
+    if cfg.controller.reducedJointInformation && string(cfg.solver.stateEstimateMethod)=="rti" ...
             && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction
         result=localAffineMeasurementConditioning(nrmmSet.range(lo,hi),contract,cfg,before);
         return
@@ -1047,7 +1047,7 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
         root=localCoupledRoot(anchor.states(:,1),initialGenerator,contract,target,errorSet);
     end
     count=size(anchor.inputs,2);center=root.center;generator=root.generator;
-    moment=cfg.controller.jointMomentPrediction && string(cfg.solver.method)=="rti" ...
+    moment=cfg.controller.jointMomentPrediction && string(cfg.solver.stateEstimateMethod)=="rti" ...
         && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction;
     if moment,generator=localMomentFactor(generator);end
     inputRoom=inf(2,count);
@@ -1178,7 +1178,7 @@ end
 
 function reuse=localReuseJointModel(cache,center,context,k)
     cfg=context.cfg;
-    reuse=~isempty(cache) && k>2 && string(cfg.solver.method)=="rti" ...
+    reuse=~isempty(cache) && k>2 && string(cfg.solver.stateEstimateMethod)=="rti" ...
         && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction;
     if ~reuse,return;end
     old=cache.center;
@@ -1229,7 +1229,7 @@ function prediction=localPredictionContract(contract,cfg,duration,first)
     % the stable internal observer integration step and all noise amplitudes.
     prediction=contract;
     requested=cfg.controller.jointPredictionSamplesPerHold;
-    if first || requested==0 || string(cfg.solver.method)~="rti" ...
+    if first || requested==0 || string(cfg.solver.stateEstimateMethod)~="rti" ...
             || cfg.controller.retainedTube || cfg.controller.jointNonlinearPrediction
         return
     end

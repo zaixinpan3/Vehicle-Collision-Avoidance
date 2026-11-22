@@ -12,7 +12,7 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
-            for folder=["controller","config","estimator"]
+            for folder=["controller","config","estimator","scripts"]
                 testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,folder)));
             end
             testCase.fixture=localFixture();
@@ -99,7 +99,7 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
             testCase.verifyFalse(coarse.nonlinearCertificate);
         end
         function nonlinearModeIgnoresTheCoarseFutureClock(testCase)
-            f=testCase.fixture;f.cfg.solver.method="nonlinear";
+            f=testCase.fixture;f.cfg.solver.stateEstimateMethod="nonlinear";
             f.cfg.controller.jointPredictionSamplesPerHold=2;
             tube=nrmmJointPrediction('coupledPropagate',localAnchor(f,3),f.cfg,f.generator, ...
                 f.contract,repmat(.05,1,3),f.target,f.error);
@@ -235,7 +235,7 @@ classdef coupledObserverPredictionTest < matlab.unittest.TestCase
         function controllerRetainsItsIssuedCommandForTheJointSuccessor(testCase)
             f=testCase.fixture;cfg=f.cfg;cfg.controller.horizonSteps=6;cfg.solver.timeLimitSeconds=60;
             output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);
-            [command,~,prediction,state]=collisionAvoidanceController(output,[],[],cfg,[]);
+            [command,~,prediction,state]=stateEstimateControllerComparator(output,[],[],cfg,[]);
             testCase.verifyTrue(prediction.metadata.futureTargetObserverDynamicsIncluded);
             testCase.verifyTrue(prediction.metadata.targetFeedbackIncluded);
             testCase.verifyEqual(state.coupledJointPrediction.appliedInput,command.actuatorInput);

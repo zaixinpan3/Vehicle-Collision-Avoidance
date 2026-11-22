@@ -35,13 +35,13 @@ classdef lateralDeviationLimitTest < matlab.unittest.TestCase
             model=localModel([0;side*10.5;0;8;0;0]);
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',operatingCurvature,'length',200));
             ego=struct('position',[0;side*10.5],'yaw',0,'speed',8);
-            [command,~,problem]=collisionAvoidanceController(ego,[],road,model.cfg,[]);
+            [command,~,problem]=stateEstimateControllerComparator(ego,[],road,model.cfg,[]);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEqual(problem.solution.affineStates(2,1),side*10.5,AbsTol=1e-10);
         end
         function simulationStopsAndReportsTheActualDeviation(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=5, ...
-                LateralDeviationLimitMeters=.005,ControllerConfiguration=struct('solver',struct('method',"rti",'timeLimitSeconds',5)));
+                LateralDeviationLimitMeters=.005,ControllerConfiguration=struct('solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
             r=report.results;
             testCase.verifyEqual(r.outcome,"lateralLimitExceeded");
             testCase.verifyTrue(r.lateralLimitExceeded);
@@ -52,14 +52,14 @@ classdef lateralDeviationLimitTest < matlab.unittest.TestCase
         end
         function defaultSimulationThresholdIsTenMeters(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=1, ...
-                ControllerConfiguration=struct('solver',struct('method',"rti",'timeLimitSeconds',5)));
+                ControllerConfiguration=struct('solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
             testCase.verifyEqual(report.results.lateralDeviationLimitMeters,10);
         end
     end
 end
 
 function model=localModel(x)
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('method',"rti",'timeLimitSeconds',5)));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
     ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
     [~,lane,road]=readControllerInputs(ego,[],struct('centerline',[-100,0;1000,0]),cfg);
     model=struct('cfg',cfg,'initialState',x,'lane',lane,'road',road,'target',[],'targetEpoch',[], ...

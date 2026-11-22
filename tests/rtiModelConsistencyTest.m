@@ -10,13 +10,13 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
-            for directory=["controller","config"]
+            for directory=["controller","config","scripts"]
                 testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,directory)));
             end
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',8),'solver',struct('method',"rti",'timeLimitSeconds',10)));
+                'controller',struct('horizonSteps',8),'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
-            [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
             testCase.model=prediction.model;testCase.anchor=prediction.model.linearization;
         end
     end
@@ -24,7 +24,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         function numericalInputExcessReturnsTheExactPhysicalBound(testCase,inputBound)
             excess=sign(inputBound)*testCase.model.cfg.solver.feasibilityTolerance/2;
             [request,raw]=localFixedInputResult(testCase.model,testCase.anchor,inputBound,excess);
-            [solution,search]=solvePredictiveControl("probe",request);
+            [solution,search]=solveStateEstimateComparison("probe",request);
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(solution.inputs(2,:),repmat(inputBound,1,size(raw,2)),AbsTol=0);
             testCase.verifyEqual(solution.inputs(1,:),raw(1,:),AbsTol=1e-12);
@@ -39,7 +39,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         function materialInputExcessCannotBecomeAnActuatorCommand(testCase,inputBound)
             excess=sign(inputBound)*10*testCase.model.cfg.solver.feasibilityTolerance;
             request=localFixedInputResult(testCase.model,testCase.anchor,inputBound,excess);
-            [solution,search]=solvePredictiveControl("probe",request);
+            [solution,search]=solveStateEstimateComparison("probe",request);
             testCase.verifyEmpty(solution);
             testCase.verifyEqual(search.terminationReason,"clfInputBoundsViolation");
             testCase.verifyGreaterThan(search.stages.exitFlag,0);
@@ -48,7 +48,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
         function inBoundsSolverInputsAreNotMovedToTheBoundary(testCase,inputBound)
             excess=-sign(inputBound)*testCase.model.cfg.solver.feasibilityTolerance/2;
             [request,raw]=localFixedInputResult(testCase.model,testCase.anchor,inputBound,excess);
-            solution=solvePredictiveControl("probe",request);
+            solution=solveStateEstimateComparison("probe",request);
             testCase.assertNotEmpty(solution);
             testCase.verifyEqual(solution.inputs,raw,AbsTol=1e-12);
             testCase.verifyEqual(solution.inputBoundCorrection,0,AbsTol=0);
@@ -60,7 +60,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             % the cruise problem without any affine correction.
             model.probeReference=testCase.anchor;
             previous=struct('inputTrajectory',testCase.anchor.inputs,'stateTrajectory',testCase.anchor.states);
-            [solution,search,formed]=solvePredictiveControl(model,previous,tic);
+            [solution,search,formed]=solveStateEstimateComparison(model,previous,tic);
             testCase.assertNotEmpty(solution);
             reference=formed.linearization;
             [next,a,b]=nonlinearBicycleModel.sample(reference.states(:,1),reference.inputs(:,1),model.cfg);
@@ -82,7 +82,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             model.targetEpoch=model.target;model.targetEpochIndex=model.sampleIndex;
             model.terminalContext=terminalSafeSet.context(model);
             [p,~,model]=localFormulate(anchor,model);
-            check=solvePredictiveControl("probe",struct('operation',"check", ...
+            check=solveStateEstimateComparison("probe",struct('operation',"check", ...
                 'model',model,'anchor',anchor,'problem',p));
             testCase.verifyTrue(all(isfinite(anchor.states),'all'));
             testCase.verifyGreaterThan(check.hard,.1);
@@ -101,7 +101,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             anchor.inputs=repmat([.25;0],1,8);
             anchor.states=localRollout(model.initialState,anchor.inputs,model.cfg);
             [p,~,model]=localFormulate(anchor,model);
-            check=solvePredictiveControl("probe",struct('operation',"check", ...
+            check=solveStateEstimateComparison("probe",struct('operation',"check", ...
                 'model',model,'anchor',anchor,'problem',p));
             testCase.verifyGreaterThan(check.terminalViolation,model.cfg.solver.feasibilityTolerance);
             testCase.verifyGreaterThan(check.hard,model.cfg.solver.feasibilityTolerance);
@@ -121,7 +121,7 @@ classdef rtiModelConsistencyTest < matlab.unittest.TestCase
             testCase.verifyEqual(p.upper(p.clfIndex),0);
             testCase.verifyEqual(p.performanceObjective(p.clfIndex),0);
             testCase.verifyFalse(isfield(p,'clfRowIndex'));
-            [solution,search]=solvePredictiveControl("probe",struct('operation',"solve", ...
+            [solution,search]=solveStateEstimateComparison("probe",struct('operation',"solve", ...
                 'model',model,'anchor',anchor,'problem',p));
             testCase.assertNotEmpty(solution);
             testCase.verifyTrue(search.pcbfStageCompleted);
@@ -197,7 +197,7 @@ function [request,inputs]=localFixedInputResult(model,anchor,bound,excess)
 end
 
 function [problem,search,model]=localFormulate(anchor,model)
-    [problem,search,model]=solvePredictiveControl("probe",struct('operation',"formulate", ...
+    [problem,search,model]=solveStateEstimateComparison("probe",struct('operation',"formulate", ...
         'model',model,'anchor',anchor,'inherited',false));
 end
 

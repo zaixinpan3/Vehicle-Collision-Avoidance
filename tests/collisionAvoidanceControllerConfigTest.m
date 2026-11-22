@@ -108,16 +108,15 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
                 struct('outputFeedback',struct('nlpCompilerOptimization',4))), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
-        function restorationIterationsHaveAnIndependentPositiveLimit(testCase)
-            cfg=collisionAvoidanceControllerConfig(struct('outputFeedback', ...
-                struct('nlpMaximumIterations',5,'restorationMaximumIterations',200)));
-            testCase.verifyEqual(cfg.outputFeedback.nlpMaximumIterations,5);
-            testCase.verifyEqual(cfg.outputFeedback.restorationMaximumIterations,200);
-            for invalid=[0,-1,1.5,Inf,NaN]
-                testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('outputFeedback', ...
-                    struct('restorationMaximumIterations',invalid))), ...
+        function oldNumericalSettingsDoNotOverrideTheIpoptIterationLimit(testCase)
+            expected=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('nlpMaximumIterations',5)));
+            saved=expected;
+            for name=["restorationMaximumIterations","qpMaximumIterations","finiteDifferenceStep"]
+                saved.outputFeedback.(name)=3;
+                testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('outputFeedback',struct(name,3))), ...
                     'collisionAvoidanceController:invalidConfiguration');
             end
+            testCase.verifyEqual(collisionAvoidanceControllerConfig(saved),expected);
         end
         function theJointHorizonHasNoFixedStageDefault(testCase)
             cfg=collisionAvoidanceControllerConfig();
@@ -152,9 +151,9 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
                     'collisionAvoidanceController:invalidConfiguration');
             end
             cfg=collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.solver.method,"rti");
+            testCase.verifyEqual(cfg.solver.stateEstimateMethod,"rti");
             testCase.verifyEqual(cfg.solver.timeLimitSeconds,.1);
-            diagnostic=collisionAvoidanceControllerConfig(struct('solver',struct('method',"nonlinear")));
+            diagnostic=collisionAvoidanceControllerConfig(struct('solver',struct('stateEstimateMethod',"nonlinear")));
             testCase.verifyEqual(diagnostic.solver.timeLimitSeconds,1000);
             testCase.verifyEqual(cfg.controller.sampleTime,.05);
             testCase.verifyLessThan(cfg.solver.completionReserveSeconds,cfg.solver.timeLimitSeconds);

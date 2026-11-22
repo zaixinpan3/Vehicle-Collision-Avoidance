@@ -3,6 +3,7 @@ classdef predictiveVelocityGeometryTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
         end
@@ -50,9 +51,9 @@ classdef predictiveVelocityGeometryTest < matlab.unittest.TestCase
         function predictionRetainsTheCurrentHoldAndSchedulesTheSlowerTail(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'controller',struct('horizonSteps',40,'sampleTime',.05), ...
-                'solver',struct('method',"rti",'timeLimitSeconds',10)));
+                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',10)));
             ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
-            [~,~,prediction]=collisionAvoidanceController(ego,[],[],cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
             model=prediction.model;anchor=model.linearization;
             anchor.inputs=repmat([0;-.4],1,size(anchor.inputs,2));
             for k=1:size(anchor.inputs,2)
@@ -62,10 +63,10 @@ classdef predictiveVelocityGeometryTest < matlab.unittest.TestCase
             model.uncertainty.egoGenerator=predictiveSafetyGeometry.egoErrorGenerator(model.initialState,factors);
             model.uncertainty.collisionGenerator=model.uncertainty.egoGenerator;
             model.uncertainty.velocityGeometry=factors.velocityGeometry;
-            [~,~,scheduled]=solvePredictiveControl('probe',struct('operation','formulate', ...
+            [~,~,scheduled]=solveStateEstimateComparison('probe',struct('operation','formulate', ...
                 'model',model,'anchor',anchor,'inherited',false));
             model.uncertainty=rmfield(model.uncertainty,'velocityGeometry');
-            [~,~,fixed]=solvePredictiveControl('probe',struct('operation','formulate', ...
+            [~,~,fixed]=solveStateEstimateComparison('probe',struct('operation','formulate', ...
                 'model',model,'anchor',anchor,'inherited',false));
             testCase.verifyEqual(scheduled.uncertaintyPrediction.egoStateRadius(:,1:3), ...
                 fixed.uncertaintyPrediction.egoStateRadius(:,1:3),AbsTol=1e-12);

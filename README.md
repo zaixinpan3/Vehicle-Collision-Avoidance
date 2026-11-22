@@ -191,9 +191,8 @@ results = runtests({'tests/compactPredictiveControlTest.m', ...
 assertSuccess(results)
 ```
 
-The optional `sqpRti` and `dynamicMemoryIpopt` methods retain the earlier dynamic-memory
-formulation as numerical comparators. The separate NRMM observer integration
-remains available through `Pipeline="nrmmComparator"`; it is not part of the
-compact optimizer. Source files stay in their existing controller,
+The raw-sensor controller uses CasADi/IPOPT. The optional `dynamicMemoryIpopt`
+comparison also uses IPOPT. The independent observer experiment runs through
+`Pipeline="nrmmComparator"` and calls `stateEstimateControllerComparator` explicitly. Source files stay in their existing controller,
 configuration, estimator and experiment directories. Experiment output goes
 to the requested directory; routine runs do not create repository reports.

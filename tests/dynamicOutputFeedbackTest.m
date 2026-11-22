@@ -17,6 +17,7 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
+            setupJointNlpSolver;
             [cfg,hypothesis,block]=localFixture();
             [~,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.cfg=cfg;testCase.hypothesis=hypothesis;testCase.block=block;
@@ -43,7 +44,7 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             [command,~,prediction,state]=collisionAvoidanceController(block,[],[],testCase.cfg,testCase.state);
             testCase.verifyEqual(state.memory,expected,AbsTol=1e-14);
             testCase.verifyEqual(command.actuatorInput,state.committedPolicy.v+state.committedPolicy.K*expected,AbsTol=1e-14);
-            testCase.verifyFalse(prediction.metadata.nonlinearValidationPerformed);
+            testCase.verifyTrue(prediction.metadata.nonlinearValidationPerformed);
             testCase.verifyLessThanOrEqual(abs(state.memory),ones(2,1));
         end
         function everyRawReadingConstrainsThePosteriorEvenWithIdenticalFeatures(testCase)
@@ -99,7 +100,7 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
                 'duration',.05,'endOfHold',true));
             testCase.verifyEqual(next.target,hypothesis.target,AbsTol=0);
         end
-        function constantAccelerationAndSideslipTargetsReachTheQp(testCase,targetAcceleration,targetSideslip)
+        function constantAccelerationAndSideslipPersistThroughIpoptContinuation(testCase,targetAcceleration,targetSideslip)
             [cfg,hypothesis,block]=localFixture();
             hypothesis.target(4:6)=[1;targetAcceleration;targetSideslip];
             block.initialHypotheses=hypothesis;
@@ -108,7 +109,7 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             nextBlock=localNextBlock(state,cfg);
             [nextCommand,~,nextPrediction,nextState]=collisionAvoidanceController(nextBlock,[],[],cfg,state);
             testCase.verifyTrue(all(isfinite([command.actuatorInput;nextCommand.actuatorInput])));
-            testCase.verifyEqual([prediction.metadata.sqpIterations,nextPrediction.metadata.sqpIterations],[1,1]);
+            testCase.verifyEqual([prediction.metadata.solver,nextPrediction.metadata.solver],["casadiIpopt","casadiIpopt"]);
             testCase.verifyEqual(nextState.hypotheses.target(5:6),[targetAcceleration;targetSideslip],AbsTol=0);
             expected=predictiveSafetyGeometry.predictTarget(hypothesis.target, ...
                 prediction.metadata.predictionWindow.allocatedSeconds);
@@ -124,15 +125,12 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(block,[],[],testCase.cfg,testCase.state), ...
                 'collisionAvoidanceController:informationReset');
         end
-        function oneLinearizedQpDoesNotClaimNonlinearSafety(testCase)
+        function replayChecksTheFinitePrediction(testCase)
             metadata=testCase.prediction.metadata;
-            testCase.verifyFalse(metadata.nonlinearValidationPerformed);
-            testCase.verifyTrue(metadata.sparseQp);
+            testCase.verifyTrue(metadata.nonlinearValidationPerformed);
             testCase.verifyFalse(metadata.robustNonlinearSafetyCertified);
             testCase.verifyFalse(metadata.recursiveFeasibilityCertified);
-            testCase.verifyLessThanOrEqual(metadata.maximumLinearizedConstraintViolation,testCase.cfg.solver.constraintTolerance);
-            testCase.verifyEqual(metadata.sqpIterations,1);
-            testCase.verifyEqual(metadata.acceptedSteps,1);
+            testCase.verifyLessThanOrEqual(metadata.maximumConstraintViolation,testCase.cfg.outputFeedback.nlpTolerance);
         end
         function theBackupReserveBoundsTheActualLowSpeedTravel(testCase)
             [minimumReserve,travel,bound,minimumSpeed]=localBackupAudit(testCase.cfg);
@@ -160,7 +158,7 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             block=localNextBlock(prior,cfg);
             [~,~,prediction,next]=collisionAvoidanceController(block,[],[],cfg,prior);
             testCase.verifyTrue(prediction.metadata.deadlineMissed);
-            testCase.verifyEqual(prediction.metadata.sqpIterations,1);
+            testCase.verifyEqual(prediction.metadata.solver,"casadiIpopt");
             testCase.verifyEqual(next.appliedInput,next.committedPolicy.v+next.committedPolicy.K*next.memory,AbsTol=1e-12);
         end
         function overlappingHypothesesCannotExecuteAnUncheckedPlan(testCase)
@@ -171,15 +169,10 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,[]), ...
                 'collisionAvoidanceController:noOutputFeedbackPlan');
         end
-        function localShootingTangentsMatchIndependentPolicyPerturbations(testCase)
-            [stateError,memoryError]=localTangentAudit();
-            testCase.verifyLessThan(stateError,2e-7);
-            testCase.verifyLessThan(memoryError,2e-7);
-        end
         function anExplicitDurationControlsThePredictionCoverage(testCase)
             testCase.verifyGreaterThanOrEqual(numel(testCase.state.policies)*testCase.cfg.controller.sampleTime, ...
                 testCase.cfg.outputFeedback.horizonSeconds);
-            testCase.verifyTrue(testCase.prediction.metadata.predictionIsLinearized);
+            testCase.verifyFalse(testCase.prediction.metadata.predictionIsLinearized);
             testCase.verifyLessThan(testCase.prediction.metadata.maximumShootingEqualityResidual,1e-8);
         end
         function automaticCoverageGrowsWithTheCurrentSpeed(testCase)
@@ -217,23 +210,6 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(testCase.block,[],[],cfg,[]), ...
                 'collisionAvoidanceController:predictionWindowCapacity');
         end
-        function brakingFeedforwardCanMoveBeyondTheNumericalBoxButNotActuatorLimits(testCase)
-            policies=testCase.state.policies;
-            for i=1:numel(policies)
-                policies(i).v=[0;-.6];policies(i).K(:)=0;
-            end
-            request=struct('operation',"linearize",'cfg',testCase.cfg, ...
-                'hypotheses',testCase.hypothesis,'memory',zeros(2,1), ...
-                'input',testCase.block.heldInput,'policies',policies,'reference',[]);
-            qp=solvePredictiveControl('outputFeedback',request);
-            [flag,step]=localBrakeStep(qp,-.35);
-            testCase.verifyGreaterThan(flag,0);
-            testCase.verifyEqual(step(qp.policyIndices(2,1)),-.35,AbsTol=1e-9);
-            testCase.verifyEqual(localBrakeStep(qp,-.5),-2);
-            request.cfg.model.brakingRatioRateMaximum=1;
-            limited=solvePredictiveControl('outputFeedback',request);
-            testCase.verifyEqual(localBrakeStep(limited,-.35),-2);
-        end
         function theFinalPolicyIsOptimizedInsteadOfFixedToBraking(testCase)
             testCase.verifyGreaterThan(testCase.state.policies(end).v(2),-.5);
             testCase.verifyLessThanOrEqual(abs(testCase.prediction.scenarios{1}.inputs(2,end)),1+1e-8);
@@ -246,13 +222,13 @@ classdef dynamicOutputFeedbackTest < matlab.unittest.TestCase
             [command,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyGreaterThan(prediction.scenarios{1}.ego(4,end),20);
-            testCase.verifyLessThan(prediction.metadata.maximumLinearizedConstraintViolation,cfg.solver.constraintTolerance);
+            testCase.verifyLessThan(prediction.metadata.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
         end
-        function theSelectedRtiCampaignUsesRawSensorsWithoutTheNrmmPipeline(testCase)
+        function theDynamicMemoryComparisonRunsTheRawSensorCampaign(testCase)
             fixture=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             campaign=runCollisionThreatValidation(Frames=1,Speeds=1.5,Scenarios="stoppedLead", ...
                 ControllerConfiguration=testCase.cfg,OutputDirectory=string(fixture.Folder));
-            testCase.verifyEqual(campaign.pipeline,"sqpRti");
+            testCase.verifyEqual(campaign.pipeline,"dynamicMemoryIpopt");
             testCase.verifyEqual(campaign.results.observationModel,"rawSensorEgoConsistencyAndNrmmTargetObserver");
             testCase.verifyEqual(campaign.results.executedFrames,1);
             testCase.verifyEqual(campaign.results.outcome,"completed");
@@ -284,8 +260,8 @@ end
 function [cfg,hypothesis,block]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',1.5, ...
         'controller',struct('horizonSteps',3), ...
-        'outputFeedback',struct('method',"sqpRti",'horizonSeconds',.15,'memoryDimension',2, ...
-        'noiseDirections',zeros(7,1),'maximumSolveSeconds',120)));
+        'outputFeedback',struct('method',"dynamicMemoryIpopt",'horizonSeconds',.15,'memoryDimension',2, ...
+        'noiseDirections',zeros(7,1),'nlpJit',false,'maximumSolveSeconds',120)));
     hypothesis=struct('ego',[0;0;0;1.5;0;0],'target',[15;0;0;0;0;0;1.6;2.4;.95;0;0], ...
         'parameters',ones(4,1),'sensorBias',zeros(7,1));
     input=[0;-.6];
@@ -319,30 +295,4 @@ function [reserve,travel,bound,minimumSpeed]=localBackupAudit(cfg)
         values(j)=info.separationReserveMeters-initial.separationReserveMeters;
     end
     reserve=min(values);travel=trapz(times,vecnorm(states(4:5,:)));minimumSpeed=min(states(4,:));
-end
-
-function [stateError,memoryError]=localTangentAudit()
-    [cfg,hypothesis,block]=localFixture();
-    [~,~,~,state]=collisionAvoidanceController(block,[],[],cfg,[]);
-    request=struct('hypotheses',hypothesis,'memory',state.memory,'input',block.heldInput, ...
-        'policies',state.policies,'reference',[]);
-    qp=localOperation('linearize',cfg,request);indices=qp.stateIndices(:);
-    delta=zeros(size(qp.equality,2),1);delta(qp.policyIndices(1,1))=1e-5;
-    delta(qp.policyIndices(11,1))=2e-5;
-    delta(indices)=qp.equality(:,indices)\(-qp.equality*delta);
-    request.policies(1).v(1)=request.policies(1).v(1)+1e-5;
-    request.policies(1).B(1,1)=request.policies(1).B(1,1)+2e-5;
-    trace=localOperation('predict',cfg,request);
-    changes=reshape(delta(indices),10,[]);
-    stateError=max(abs(trace{1}.ego(:,2:end)-qp.nominal{1}.ego(:,2:end)-changes(1:6,:)),[],'all');
-    memoryError=max(abs(trace{1}.memory(:,2:end)-qp.nominal{1}.memory(:,2:end)-changes(7:8,:)),[],'all');
-end
-
-function [flag,step]=localBrakeStep(qp,brakeIncrement)
-    lower=qp.lower;upper=qp.upper;index=qp.policyIndices(2,1);
-    lower(index)=max(lower(index),brakeIncrement);
-    upper(index)=min(upper(index),brakeIncrement);
-    options=optimoptions('linprog','Display','none','ConstraintTolerance',1e-9);
-    [step,~,flag]=linprog(zeros(size(lower)),qp.inequality,qp.bounds, ...
-        qp.equality,zeros(size(qp.equality,1),1),lower,upper,options);
 end

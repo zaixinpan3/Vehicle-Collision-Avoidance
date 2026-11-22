@@ -10,6 +10,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
         end
@@ -217,7 +218,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
         function laneFollowingRunsWithNoNativeVerifier(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [command,~,problem]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             testCase.verifyTrue(problem.metadata.optimizationReturned);
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
@@ -227,10 +228,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
         function changedTargetForecastRetainsTheInputWarmStart(testCase)
             [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;0;1.6;2.4;.95;0;0]);
-            [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);
             updated=[30.4;5.01;0;6;1.02;.0005;1.6;2.4;.95;0;0];target=localTarget(updated);
-            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            [command,~,problem]=stateEstimateControllerComparator(ego,target,road,cfg,prior);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEqual(problem.model.target,updated,AbsTol=1e-12);
             testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPrimalIterate");
@@ -241,9 +242,9 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             % Keep the curved track away from the parked terminal continuation;
             % this case tests angle wrapping, not maneuver feasibility.
             [ego,road,cfg]=localFixture();q=[30;-25;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
-            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
-            [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
+            [~,~,problem,state]=stateEstimateControllerComparator(ego,localTarget(next),road,cfg,prior);
             testCase.verifyGreaterThan(next(3),pi);
             % The new estimate equals the forecast (its heading unwrapped
             % next to it), so the re-anchored epoch continues the forecast.
@@ -252,14 +253,14 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.model.target,next,AbsTol=1e-12);
             testCase.verifyTrue(problem.metadata.optimizationReturned);
             next(3)=next(3)+.01;
-            [~,~,updated]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
+            [~,~,updated]=stateEstimateControllerComparator(ego,localTarget(next),road,cfg,prior);
             testCase.verifyEqual(updated.model.target,next,AbsTol=1e-12);
         end
         function targetDropoutUsesOneFixedAbsoluteEpoch(testCase)
             [ego,road,cfg]=localFixture();q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];ego.stateTime=10;
-            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);ego.stateTime=10+cfg.controller.sampleTime;
-            [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [~,~,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             expected=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
             testCase.verifyEqual(state.targetEpoch,q,AbsTol=1e-12);
@@ -275,18 +276,18 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
         function nonconsecutiveSampleTimesCannotReuseTheTrajectory(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=10;
-            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);ego.stateTime=10.17;
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
+            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],road,cfg,prior), ...
                 'collisionAvoidanceController:invalidSampleTime');
         end
         function aCompleteEmptyScanClearsTheForecastAndRebuildsCruise(testCase)
             [ego,road,cfg]=localFixture();ego.stateTime=0;
             q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];
-            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,~,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             ego=localSuccessor(ego,prior,cfg);ego.stateTime=cfg.controller.sampleTime;
             ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
-            [command,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [command,~,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEmpty(state.targetEpoch);
@@ -295,7 +296,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
             ego=localSuccessor(ego,state,cfg);ego.stateTime=2*cfg.controller.sampleTime;
             ego.perception.time=ego.stateTime;
-            [~,~,returned,next]=collisionAvoidanceController(ego,localTarget(q),road,cfg,state);
+            [~,~,returned,next]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,state);
             testCase.verifyTrue(returned.model.targetOnset);
             testCase.verifyEqual(returned.metadata.search.plannerCalls,1);
             testCase.verifyEqual(next.encounterId,prior.encounterId+1);
@@ -306,22 +307,22 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [ego,road,cfg]=localFixture();
             outside=[0;50.1;0;8;0;0;1.6;2.4;.95;0;0];
             inside=outside;inside(2)=49.9;
-            [~,~,far]=collisionAvoidanceController(ego,localTarget(outside),road,cfg,[]);
-            [~,~,near]=collisionAvoidanceController(ego,localTarget(inside),road,cfg,[]);
+            [~,~,far]=stateEstimateControllerComparator(ego,localTarget(outside),road,cfg,[]);
+            [~,~,near]=stateEstimateControllerComparator(ego,localTarget(inside),road,cfg,[]);
             testCase.verifyEqual(far.metadata.encounterExitStep,0);
             testCase.verifyGreaterThan(near.metadata.encounterExitStep,0);
         end
         function aDistantObservationCannotForecastANewEncounter(testCase)
             [ego,road,cfg]=localFixture();
             q=[52;10;pi;8;0;0;1.6;2.4;.95;0;0];
-            [~,~,prediction]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
             testCase.verifyGreaterThan(norm(q(1:2)-ego.position),50);
             testCase.verifyEqual(prediction.metadata.encounterExitStep,0);
             testCase.verifyEmpty(prediction.model.target);
         end
         function retiredStateCannotRestoreTheOldTargetMotion(testCase)
             [ego,road,cfg]=localFixture();prior=struct('version',56,'target',ones(10,1));
-            [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            [~,~,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"nominalFeedbackRollout");
             testCase.verifyGreaterThan(state.version,prior.version);
@@ -339,11 +340,11 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             % Start near terminal braking so both locality and actuator slew
             % permit its terminal-entry input; this test isolates input memory.
             cfg.model.brakingRatioRateMaximum=.5;ego.heldActuatorInput=[0;-.48];
-            [~,plan]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,plan]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
             rate=.5*cfg.controller.sampleTime;
             testCase.verifyLessThanOrEqual(abs(diff([ego.heldActuatorInput(2),plan(2,:)])),rate+cfg.solver.feasibilityTolerance);
             ego=rmfield(ego,'heldActuatorInput');
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
+            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:missingInputMemory');
         end
     end
@@ -351,7 +352,7 @@ end
 
 function [ego,road,cfg]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8), ...
-        'solver',struct('method',"rti",'timeLimitSeconds',5)));
+        'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
     ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
 end

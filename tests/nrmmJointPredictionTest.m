@@ -9,6 +9,7 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function prepare(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'estimator')));
@@ -87,7 +88,7 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             f.frame=localHeldInput(f.frame,f.input,true);
             output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);
             output.targetEstimate=[];
-            [~,~,prediction,state]=collisionAvoidanceController(output,[],[],f.cfg,[]);
+            [~,~,prediction,state]=stateEstimateControllerComparator(output,[],[],f.cfg,[]);
             tube=prediction.model.jointPredictionTube;
             testCase.verifyTrue(prediction.model.uncertaintyPrediction.futureObserverDynamicsIncluded);
             testCase.verifyFalse(prediction.model.uncertaintyPrediction.futurePrimitiveBudgetsAssumed);
@@ -104,7 +105,7 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             f.cfg.controller.reducedJointInformation=reducedInformation;
             f.frame=localHeldInput(f.frame,f.input,true);
             output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);output.targetEstimate=[];
-            [~,~,prediction,state]=collisionAvoidanceController(output,[],[],f.cfg,[]);
+            [~,~,prediction,state]=stateEstimateControllerComparator(output,[],[],f.cfg,[]);
             testCase.verifyEqual(prediction.metadata.reducedJointInformation,reducedInformation);
             testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
             testCase.verifyEqual(isfield(state,'egoJointPrediction'),~reducedInformation);
@@ -112,10 +113,10 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
         end
         function nonlinearSolveRefreshesMarginsOnItsReturnedVehicleTrajectory(testCase)
             f=testCase.fixture;f.cfg.controller.horizonSteps=6;
-            f.cfg.solver.method="nonlinear";f.cfg.solver.timeLimitSeconds=120;
+            f.cfg.solver.stateEstimateMethod="nonlinear";f.cfg.solver.timeLimitSeconds=120;
             f.frame=localHeldInput(f.frame,f.input,true);
             output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);output.targetEstimate=[];
-            [~,~,prediction]=collisionAvoidanceController(output,[],[],f.cfg,[]);
+            [~,~,prediction]=stateEstimateControllerComparator(output,[],[],f.cfg,[]);
             testCase.verifyFalse(prediction.metadata.reducedJointInformation);
             testCase.verifyTrue(prediction.metadata.marginRefreshPerformed);
             testCase.verifyFalse(prediction.metadata.uncertaintyFrozenWithinSolve);
