@@ -93,7 +93,8 @@ function cfg = estimatorControllerIntegrationConfig()
     % Fixed point-observer design shared by the raw-block traffic experiments.
     % The gains are synthesizeNrmmObserverGains(observer).target.innovationGains
     % with these target-domain overrides and the above nominal sensor settings.
-    % Keeping the offline gains avoids solving an SDP at first radar contact.
+    % speedMaximum specifies the domain of this offline gain certificate.
+    % Radar acquisition sets the initial velocity error independently.
     trafficDomain=observer.target.domain;
     trafficDomain.speedMaximum=35;trafficDomain.scalarAccelerationMaximum=6;
     trafficDomain.sideslipMaximum=.12;trafficDomain.yawRateMaximum=.5;

@@ -274,7 +274,40 @@ in each member's inertial frame, with zero ego transport and gyro terms.
 It propagates the position, velocity, acceleration and radar predictor
 error bounds through the same integration steps as the point estimate.
 A received position resets the predictor error radius to its sensor bound.
-At acquisition the derivative errors start from the declared motion domain.
+At acquisition let $T=t_n-t_1$, $c=(y_n-y_1)/T$, $r_i$ be the
+position error radii for this ego member, and $a_*$ the Cartesian
+acceleration bound of the observer design. Integration of the true
+velocity over the window gives the initial velocity error radius
+$$
+r_v=\|\hat v_n-c\|+(r_1+r_n)/T+a_*T/2 .
+$$
+This also covers a target stopping inside the window. If
+$\|\hat v_n\|-r_v>a_*T$, the speed was positive throughout.
+On that moving branch the constant-motion law gives a Cartesian jerk
+bound $J=\sqrt{V_u^2\bar\omega^4+9\bar A^2\bar\omega^2}$ with
+$V_u=\|\hat v_n\|+r_v+a_*T$. Let $w_i$ be the dimensionless acceleration
+weights of the existing quadratic fit, and $t_m=(t_1+t_n)/2$.
+Expanding position about $t_m$, the fit reproduces the quadratic terms
+exactly and each cubic remainder is bounded by $J|t_i-t_m|^3/6$.
+Thus $r_a$ is bounded by
+$T^{-2}\sum_i |w_i|(r_i+J|t_i-t_m|^3/6)+JT/2$ and independently by
+$\|\hat a_n\|+a_*$. When motion throughout the window is unresolved,
+only the latter acceleration bound is used.
+
+For a smooth integration substep of length $h$, let
+$\Delta\hat p,\Delta\hat v,\Delta\hat a$ denote the accepted observer
+increments. Direct integration also gives the componentwise upper bounds
+$$
+\begin{aligned}
+r_p^+ &\le r_p+\|\Delta\hat p-h\hat v\|+h r_v+a_* h^2/2,\\
+r_v^+ &\le r_v+\|\Delta\hat v-h\hat a\|+h r_a+J h^2/2,\\
+r_a^+ &\le r_a+\|\Delta\hat a\|+Jh .
+\end{aligned}
+$$
+Here $J$ uses $V_u=\|\hat v\|+r_v+a_*h$. Taking the smaller of these
+bounds and the ISS comparison bounds preserves both enclosures.
+If absorption can occur within a substep, the zero-derivative branch
+is included separately before continuing.
 
 Write $r_v,r_a$ for the propagated Cartesian velocity and acceleration
 error radii. The NRMM parameter error map bounds the tangential acceleration

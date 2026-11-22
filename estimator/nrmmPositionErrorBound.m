@@ -329,13 +329,18 @@ function [bound,next,comparison]=localTargetComparison(bound,input,before,after,
     comparison = record;
 end
 
-function bound=localInertialTarget(bound,states,first,detected,radius,step,design)
+function bound=localInertialTarget(bound,states,first,detected,radius,step,design,initialRadii)
     % Same sampled comparison in inertial axes. Each retained ego member
     % supplies its synchronized frame, so the ego and gyro terms vanish.
     x=states(7:12,1); domain=design.target.domain;
     if isempty(bound)
-        bound.targetComponents=[norm(x(1:2)-states(13:14,1))+radius; ...
-            norm(x(3:4))+domain.speedMaximum;norm(x(5:6))+domain.accelerationNormBound];
+        if nargin>=8 && ~isempty(initialRadii)
+            bound.targetComponents=localGuard(initialRadii);
+        else
+            % A resumed track can predate the recorded acquisition radii.
+            bound.targetComponents=[norm(x(1:2)-states(13:14,1))+radius; ...
+                norm(x(3:4))+domain.speedMaximum;norm(x(5:6))+domain.accelerationNormBound];
+        end
         bound.targetLyapunov=localMetricBound(bound.targetComponents,design);
         bound.trueRangeMaximum=norm(x(1:2))+bound.targetComponents(1);
         bound.radarPredictor=bound.targetComponents(1);
@@ -356,17 +361,28 @@ function bound=localInertialTarget(bound,states,first,detected,radius,step,desig
         range=bound.trueRangeMaximum+domain.speedMaximum*step;
         stopSpeed=domain.scalarAccelerationMaximum*step;
         canStop=norm(before.targetState(3:4))<=bound.targetComponents(2)+stopSpeed;
-        startPositionRadius=bound.targetComponents(1);
+        priorRadii=bound.targetComponents;
+        speedUpper=norm(before.targetState(3:4))+priorRadii(2)+step*domain.accelerationNormBound;
+        jerk=hypot(speedUpper*domain.yawRateMaximum^2,3*domain.scalarAccelerationMaximum*domain.yawRateMaximum);
+        % Integrate the same error about the accepted observer states. This
+        % retains component information lost by a scalar Lyapunov projection.
+        delta=after.targetState-before.targetState;
+        transport=[priorRadii(1)+norm(delta(1:2)-step*before.targetState(3:4))+ ...
+            step*priorRadii(2)+step^2*domain.accelerationNormBound/2; ...
+            priorRadii(2)+norm(delta(3:4)-step*before.targetState(5:6))+step*priorRadii(3)+step^2*jerk/2; ...
+            priorRadii(3)+norm(delta(5:6))+step*jerk];
         bound=localTargetComparison(bound,input,before,after,step,design,defect,range,0,0,0,0,0,0);
+        bound.targetComponents=min(bound.targetComponents,localGuard(transport));
         if canStop
             % A stop inside this substep resets true derivatives to zero.
             % Include that branch alongside the smooth NRMM comparison.
-            stopped=[startPositionRadius+stopSpeed*step+norm(after.targetState(1:2)-before.targetState(1:2)); ...
+            stopped=[priorRadii(1)+stopSpeed*step+norm(after.targetState(1:2)-before.targetState(1:2)); ...
                 norm(after.targetState(3:4));norm(after.targetState(5:6))];
             bound.targetComponents=max(bound.targetComponents,localGuard(stopped));
             bound.targetLyapunov=max(bound.targetLyapunov,localMetricBound(stopped,design));
             bound.radarPredictor=max(bound.radarPredictor,localGuard(stopped(1)+norm(after.radarPredictor-after.targetState(1:2))));
         end
+        bound.targetLyapunov=min(bound.targetLyapunov,localMetricBound(bound.targetComponents,design));
         before=after;
     end
 end

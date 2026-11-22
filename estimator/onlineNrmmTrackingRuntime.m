@@ -115,18 +115,22 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     elseif dt>0
         track.state(1:2)=track.state(1:2)+dt*track.state(3:4);
     end
+    initialRadii=[];
     if ~isempty(position)
         track.detections=track.detections+1;
         track.lastReturn=time;
         track.lastReturnHeading=atan2(sin(egoHeading+relativeHeading),cos(egoHeading+relativeHeading));
+        if ~isfield(track,'positionRadii') || isempty(track.times)
+            track.positionRadii=repmat(cfg.outputFeedback.noiseBounds(4),size(track.times));
+        end
         if ~isempty(track.times) && time==track.times(end)
-            track.positions(:,end)=position;
+            track.positions(:,end)=position;track.positionRadii(end)=positionErrorRadius;
         else
-            track.times(end+1)=time;track.positions(:,end+1)=position;
+            track.times(end+1)=time;track.positions(:,end+1)=position;track.positionRadii(end+1)=positionErrorRadius;
         end
         count=settings.initialization.minimumRadarSamples;
         keep=max(1,numel(track.times)-count+1):numel(track.times);
-        track.times=track.times(keep);track.positions=track.positions(:,keep);
+        track.times=track.times(keep);track.positions=track.positions(:,keep);track.positionRadii=track.positionRadii(keep);
         center=mean(track.positions,2);
         noise=cfg.outputFeedback.noiseBounds(4);
         track.restCompatible=numel(keep)==count && max(vecnorm(track.positions-center))<=noise;
@@ -146,7 +150,8 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
                 span=track.times(end)-track.times(1);
                 tau=(track.times(:)-track.times(end))/span;
                 basis=[ones(size(tau)),tau,tau.^2/2];
-                coefficients=basis\(track.positions-center).';
+                weights=basis\eye(count);
+                coefficients=weights*(track.positions-center).';
                 track.state=[center+coefficients(1,:).';coefficients(2,:).'/span;coefficients(3,:).'/span^2];
                 chord=position-track.positions(:,1);
                 track.heading=atan2(chord(2),chord(1));
@@ -155,6 +160,26 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
                 % A stationary position window cannot identify body heading.
                 track.state=[center;zeros(4,1)];
                 track.initialized=true;
+            end
+            if track.initialized
+                span=track.times(end)-track.times(1);
+                chord=(track.positions(:,end)-track.positions(:,1))/span;
+                accelerationMax=design.domain.accelerationNormBound;
+                velocityRadius=norm(track.state(3:4)-chord) ...
+                    +(track.positionRadii(1)+track.positionRadii(end))/span+accelerationMax*span/2;
+                accelerationRadius=norm(track.state(5:6))+accelerationMax;
+                % The Taylor acceleration bound applies only if the whole
+                % window preceded absorption; the velocity bound includes rest.
+                if resolved && norm(track.state(3:4))-velocityRadius>accelerationMax*span
+                    speedUpper=norm(track.state(3:4))+velocityRadius+accelerationMax*span;
+                    yawRate=design.domain.yawRateMaximum;
+                    jerk=hypot(speedUpper*yawRate^2,3*design.domain.scalarAccelerationMaximum*yawRate);
+                    midpointTime=track.times-(track.times(1)+span/2);
+                    remainder=track.positionRadii+jerk*abs(midpointTime).^3/6;
+                    accelerationRadius=min(accelerationRadius, ...
+                        abs(weights(3,:))*remainder.'/span^2+jerk*span/2);
+                end
+                initialRadii=[norm(track.state(1:2)-position)+positionErrorRadius;velocityRadius;accelerationRadius];
             end
         end
     else
@@ -175,7 +200,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     end
     if isempty(track.errorBound)
         packed=[zeros(6,1);track.state;position;0];
-        track.errorBound=nrmmPositionErrorBound("inertialTarget",[],packed,[],true,positionErrorRadius,0,boundDesign);
+        track.errorBound=nrmmPositionErrorBound("inertialTarget",[],packed,[],true,positionErrorRadius,0,boundDesign,initialRadii);
     end
     components=track.errorBound.targetComponents;
     limits=nrmmControllerErrorBounds("targetParameters",track.state(3:4),track.state(5:6),components(2),components(3),0);

@@ -58,6 +58,30 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(track.motionBounds(:,2),max(-maxSlip,min(maxSlip,expected)));
         end
 
+        function radarAcquisitionBoundsVelocityAcrossBrakingAndAbsorption(testCase)
+            cfg=collisionAvoidanceControllerConfig();dt=cfg.outputFeedback.sensorPeriod;
+            for initialSpeed=[12,.4]
+                q=[1;2;.4;initialSpeed;-4;.01;1.6;2.4;.95;0;0];track=[];
+                for i=0:32
+                    t=i*dt;
+                    state=predictiveSafetyGeometry.predictTarget(q,t);
+                    radius=.005+.001*mod(i,4);
+                    y=state(1:2)+radius*[cos(1.2*i);sin(1.2*i)];
+                    [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,y,0,cfg,state(3),radius);
+                    if isempty(motion),continue;end
+                    course=state(3)+state(6);direction=[cos(course);sin(course)];
+                    velocity=state(4)*direction;acceleration=zeros(2,1);
+                    if state(4)>0
+                        acceleration=state(5)*direction+state(4)^2*sin(state(6))/state(7)*[-direction(2);direction(1)];
+                    end
+                    error=[norm(velocity-track.state(3:4));norm(acceleration-track.state(5:6))];
+                    testCase.verifyLessThanOrEqual(error,track.errorBound.targetComponents(2:3)+1e-10);
+                    if i==19,testCase.verifyLessThan(track.errorBound.targetComponents(2),2);end
+                end
+                testCase.verifyTrue(track.initialized);
+            end
+        end
+
         function aKnownInitialStateAccumulatesNrmmErrorAcrossAMissedReturn(testCase)
             cfg=collisionAvoidanceControllerConfig();dt=cfg.outputFeedback.sensorPeriod;
             track=[];
