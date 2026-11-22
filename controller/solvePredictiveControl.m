@@ -4314,6 +4314,64 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         selected=true;bestCost=tracking;incumbentStability=score;
         best=inputs;traces=checked;violation=maximum;bestLoss=loss;bestSlacks=slacks;
     end
+
+    function [u,e]=reduceInitialViolations(u,e)
+        % The gradient of each positive residual contributes, even if a
+        % different node is currently the worst. This merit guides proposals
+        % only. considerSolution enforces the original nonlinear PCBF.
+        options=optimoptions('quadprog','Algorithm','active-set','Display','off', ...
+            'MaxIterations',cfg.outputFeedback.qpMaximumIterations);
+        scaledInputs=a.*controlScale.';
+        previousStep=[];previousGradient=[];
+        for k=1:cfg.outputFeedback.restorationMaximumIterations
+            checkClock();
+            if ~e.derivatives,e=evaluate(u,true);end
+            r=[e.stage;e.forward;e.terminal];active=r>0;
+            if ~any(active) || ~isempty(bestU),return;end
+            rows=[e.stageGradient,e.forwardGradient,e.terminalGradient].';
+            J=rows(active,:).*controlScale.';
+            residual=r(active);loss=residual.'*residual;
+            gradient=J.'*residual;
+            if isempty(previousStep)
+                H=J.'*J;
+                H=H+.01*max(1,mean(diag(H)))*eye(nu);
+            else
+                % Powell's damped BFGS update retains positive curvature
+                % as the attaining rectangle feature or tire force changes.
+                Hs=H*previousStep;
+                change=gradient-previousGradient;
+                curvature=previousStep.'*Hs;
+                product=previousStep.'*change;
+                if curvature>eps
+                    if product<.2*curvature
+                        weight=.8*curvature/(curvature-product);
+                        change=weight*change+(1-weight)*Hs;
+                        product=previousStep.'*change;
+                    end
+                    H=H+change*change.'/product-Hs*Hs.'/curvature;
+                end
+            end
+            [step,~,flag]=quadprog((H+H.')/2+1e-9*eye(nu),gradient,scaledInputs,b-a*u,[],[], ...
+                (lower-u)./controlScale,(upper-u)./controlScale,zeros(nu,1),options);
+            iterationCount=iterationCount+1;
+            if flag<=0 || norm(step,Inf)<=eps,return;end
+            accepted=false;
+            for backtrack=0:8
+                delta=2^(-backtrack)*step;
+                trial=u+controlScale.*delta;
+                candidate=evaluate(trial,false);
+                if ~isempty(bestU),return;end
+                next=max(0,[candidate.stage;candidate.forward;candidate.terminal]);
+                if next.'*next < loss+2e-4*(gradient.'*delta)
+                    u=trial;e=candidate;accepted=true;
+                    previousStep=delta;previousGradient=gradient;
+                    break
+                end
+            end
+            if ~accepted,return;end
+        end
+    end
+
     function [u,e]=projectToZeroDeficit(u,e)
         options=optimoptions('quadprog','Algorithm','active-set','Display','off', ...
             'MaxIterations',cfg.outputFeedback.qpMaximumIterations);
@@ -4341,6 +4399,12 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             end
             candidate=evaluate(proposal,false);
             residual=max([candidate.stage;candidate.forward;candidate.terminal]);
+            if projectionSteps==1 && isinf(priorCap) && initialTerminal<=tolerance && ...
+                    isempty(bestU) && residual>=worstMargin/2
+                [corrected,values]=reduceInitialViolations(u,e);
+                if ~isempty(bestU),u=bestU;e=bestValues;continue;end
+                if ~isequal(corrected,u),u=corrected;e=values;continue;end
+            end
             if residual>=worstMargin/2
                 % A bound-constrained tangent step can overshoot the nonlinear
                 % flow. Backtrack on the actual worst inequality.
@@ -4559,7 +4623,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     persistent keys kernels
     key=cfg;hit=false;
     for k=1:numel(keys)
-        if isequaln(key,keys{k})&&sum(holds)<=sum(kernels{k}.capacity)
+        if isequaln(key,keys{k})
             kernel=kernels{k};kernel.holds=holds;hit=true;return;
         end
     end
@@ -4569,9 +4633,9 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     previewTime=max(of.minimumPreviewSeconds,maximumSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
     allocatedTime=of.horizonResolutionSeconds*ceil(previewTime/of.horizonResolutionSeconds);
     maximumCount=ceil(allocatedTime/h)+ceil(of.minimumPreviewSeconds/h);
-    capacity=max(sum(holds),maximumCount);K=of.validationSubsteps;
+    capacity=maximumCount;K=of.validationSubsteps;
     M=K;D=1;dt=h/M;
-    x=SX.sym('x',6);u=SX.sym('u',2);p=SX.sym('p',4);fraction=SX.sym('fraction',5);
+    x=SX.sym('x',6);u=SX.sym('u',2);p=SX.sym('p',4);
     k1=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);
     k2=nonlinearBicycleModel.symbolicDerivative(x+dt*k1/2,u,p,cfg);
     k3=nonlinearBicycleModel.symbolicDerivative(x+dt*k2/2,u,p,cfg);
@@ -4606,39 +4670,35 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     next=x+dt*(k1+2*k2+2*k3+k4)/6;
     sensitivity=SX.sym('sensitivity',6,8);
     updated=jacobian(next,x)*sensitivity+[SX.zeros(6,6),jacobian(next,u)];
-    index=MX.sym('index',5);initialSensitivity=DM([eye(6),zeros(6,2)]);
-    if D==1
-        % On the fine mesh, dense samples are RK4 endpoints. Propagate one
-        % sensitivity and select the requested samples before the hold reset.
-        augmented=[x;sensitivity(:)];
-        variation=Function('pcbf_variation',{augmented,u,p},{[next;updated(:)]},options);
-        initialVariation=[root;initialSensitivity(:)];
-        variationMap=variation.mapaccum(M);
-        varying=variationMap(initialVariation,repmat(command,1,M),repmat(parameters,1,M));
-        history=densify([initialVariation,varying]);selected=cell(1,5);
-        for j=1:5,selected{j}=reshape(history(7:54,index(j)+1),6,8);end
-        E=reshape(varying(7:54,end),6,8);D=horzcat(selected{:});
-    else
-        chosen=SX.sym('chosen',6,40);augmented=[x;sensitivity(:);chosen(:)];selected=cell(1,5);
-        for j=1:5
-            t=fmin(1,fmax(0,fraction(j)));
-            point=x+dt*((t-1.5*t^2+2/3*t^3)*k1+(t^2-2/3*t^3)*(k2+k3)+(-.5*t^2+2/3*t^3)*k4);
-            variation=jacobian(point,x)*sensitivity+[SX.zeros(6,6),jacobian(point,u)];
-            selected{j}=if_else((fraction(j)>0)&(fraction(j)<=1),variation,chosen(:,8*(j-1)+(1:8)));
-        end
-        selected=horzcat(selected{:});update=[next;updated(:);selected(:)];
-        variation=Function('pcbf_variation',{augmented,u,p,fraction},{update},options);
-        variationMap=variation.mapaccum(M);
-        varying=variationMap([root;initialSensitivity(:);repmat(initialSensitivity(:),5,1)], ...
-            repmat(command,1,M),repmat(parameters,1,M),repmat(index/D,1,M)-repmat(0:M-1,5,1));
-        E=reshape(varying(7:54,end),6,8);D=reshape(varying(55:294,end),6,40);
+    % Only the binding physical-domain sample needs a within-hold Jacobian.
+    % Geometry and the terminal law use the post-reset boundary Jacobians.
+    index=MX.sym('index');initialSensitivity=DM([eye(6),zeros(6,2)]);
+    augmented=[x;sensitivity(:)];
+    variation=Function('pcbf_variation',{augmented,u,p},{[next;updated(:)]},options);
+    initialVariation=[root;initialSensitivity(:)];
+    variationMap=variation.mapaccum(M);
+    varying=variationMap(initialVariation,repmat(command,1,M),repmat(parameters,1,M));
+    history=densify([initialVariation,varying]);
+    position=index*M/K;left=floor(position);
+    base=history(:,left+1);
+    sample=reshape(base(7:54),6,8);
+    if D~=1
+        % A fine-grid sample between coarse RK4 endpoints uses the continuous
+        % extension of that single substep, evaluated at its own initial state.
+        t=SX.sym('fraction');
+        point=x+dt*((t-1.5*t^2+2/3*t^3)*k1+(t^2-2/3*t^3)*(k2+k3)+(-.5*t^2+2/3*t^3)*k4);
+        tangent=jacobian(point,x)*sensitivity+[SX.zeros(6,6),jacobian(point,u)];
+        interpolate=Function('pcbf_dense_tangent',{augmented,u,p,t},{tangent},options);
+        fraction=position-left;
+        sample=if_else(fraction>0,interpolate(base,command,parameters,fraction),sample,true);
     end
+    E=reshape(varying(7:54,end),6,8);
     % At exact rest and neutral force, select the outgoing acceleration
     % branch. The reset value is unchanged; nonlinear replay accepts steps.
     starting=(command(2)==0)&(dot(root(4:6),root(4:6))==0);
     stopped=(command(2)<=0)&(varying(4,end)<.2*cfg.model.brakeHoldSpeed)&~starting;
     E=[E(1:3,:);if_else(stopped,MX.zeros(3,8),E(4:6,:))];
-    derivative=Function('pcbf_sensitivity',{root,command,parameters,index},{E,D},options);
+    derivative=Function('pcbf_sensitivity',{root,command,parameters,index},{E,sample},options);
     identity=Function('pcbf_identity',{x,u,p},{x,repmat(x,1,K)});
     switchFlow=Function.if_else('pcbf_active',hold,identity);
     root=MX.sym('root',6);input=MX.sym('input',2);scale=MX.sym('scale',4);active=MX.sym('active');
@@ -4648,6 +4708,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     [ends,points]=mapped(root,inputs,repmat(scale,1,capacity),enabled);
     rollout=Function('pcbf_rollout',{root,inputs,scale,enabled},{points,ends},options);
     kernel=struct('refinedRollout',rollout,'sensitivity',derivative,'capacity',capacity, ...
+        'mappedSensitivity',containers.Map('KeyType','double','ValueType','any'), ...
         'holds',holds,'validationSubsteps',K,'integrationSubsteps',K,'sensitivitySubsteps',M,'hasTarget',hasTarget);
     keys{end+1}=key;kernels{end+1}=kernel;
 end
@@ -4657,14 +4718,13 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
     if nargin<3,derivatives=true;end
     if nargin<5,checkBudget=[];end
     cfg=model.cfg;kernel=model.kernel;N=sum(kernel.holds);n=numel(kernel.holds);nu=numel(u);K=kernel.validationSubsteps;h=cfg.controller.sampleTime;
-    controls=reshape(u,2,n);inputs=controls*model.map.'+model.offset;capacity=sum(kernel.capacity);
+    controls=reshape(u,2,n);inputs=controls*model.map.'+model.offset;
     if nargin<4,rollouts=[];end
     if ~localCompactCacheMatches(rollouts,inputs,model.hypotheses,model.previous,kernel,cfg)
         rollouts=struct('hypotheses',model.hypotheses,'inputs',inputs,'previous',model.previous, ...
             'cfg',cfg,'holds',kernel.holds,'integrationSubsteps',kernel.integrationSubsteps, ...
             'trajectories',{cell(1,numel(model.hypotheses))});
     end
-    values=[inputs,zeros(2,capacity-N)];enabled=double((1:capacity)<=N);
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     e=struct('stage',-Inf(N,1),'forward',-Inf(N,1),'terminal',zeros(numel(model.hypotheses),1), ...
         'cost',0,'derivatives',derivatives);
@@ -4701,8 +4761,8 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             if ~isempty(rollouts.trajectories{s}) && isfield(rollouts.trajectories{s},'ends')
                 dense=rollouts.trajectories{s}.dense;ends=rollouts.trajectories{s}.ends;
             else
-                [dense,ends]=kernel.refinedRollout(item.ego,values,item.parameters,enabled);
-                ends=full(ends);dense=full(dense);ends=ends(:,1:N);dense=[item.ego,dense(:,1:K*N)];
+                [dense,ends]=localCompactHeldFlow(kernel,item.ego,inputs,item.parameters,checkBudget);
+                dense=[item.ego,dense];
             end
             remaining=[];
             if ~isempty(item.cover)
@@ -4781,12 +4841,10 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             [~,backupDomain]=max(forward(N+1:end));
             stageNeeded(N+backupStage)=activeStages(N+backupStage);domainNeeded(N+backupDomain)=true;
         end
-        required=[false(2,total);domainNeeded;false(2,total)];
         if ~isempty(checkBudget),checkBudget();end
-        [SC,SE]=localCondensedSensitivities(roots,allInputs,item.parameters, ...
-            [zeros(2,total);fi;zeros(2,total)],required,derivativeModel);
+        [SF,SE]=localCondensedSensitivities(roots,allInputs,item.parameters,fi,domainNeeded,derivativeModel);
         if ~isempty(checkBudget),checkBudget();end
-        SF=SC(3,:);gradient=zeros(3,total);
+        gradient=zeros(3,total);
         if any(stageNeeded)
             selected=nodeIndices(stageNeeded);
             gradient(:,stageNeeded)=localCompactDistanceGradient(nodes(:,selected),boxes(:,selected),shape);
@@ -4794,23 +4852,23 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         stageGradient=zeros(nu,total);
         for i=1:total
             if stageNeeded(i)
-                S=SE{nodeIndices(i)};
+                S=SE(:,:,nodeIndices(i));
                 stageGradient(:,i)=-(gradient(:,i).'*S(1:3,:)).';
             end
             if i<=N
-                domainGradient=(domainState(:,i).'*SF{i}+domainInput(:,i).'*derivativeModel.controlMap(2*i-1:2*i,:)).';
+                domainGradient=(domainState(:,i).'*SF(:,:,i)+domainInput(:,i).'*derivativeModel.controlMap(2*i-1:2*i,:)).';
                 if localStage(i)>e.stage(i),e.stage(i)=localStage(i);e.stageGradient(:,i)=stageGradient(:,i);end
                 if forward(i)>e.forward(i),e.forward(i)=forward(i);e.forwardGradient(:,i)=domainGradient;end
             end
         end
-        e.terminal(s)=terminal;e.terminalGradient(:,s)=(g*SE{end}).';
+        e.terminal(s)=terminal;e.terminalGradient(:,s)=(g*SE(:,:,end)).';
         if total>N
             [backupValue,index]=max(localStage(N+1:end));
             if backupValue>e.terminal(s),e.terminal(s)=backupValue;e.terminalGradient(:,s)=stageGradient(:,N+index);end
             [backupForward,index]=max(forward(N+1:end));
             if backupForward>e.terminal(s)
                 j=N+index;e.terminal(s)=backupForward;
-                e.terminalGradient(:,s)=(domainState(:,j).'*SF{j}+domainInput(:,j).'*derivativeModel.controlMap(2*j-1:2*j,:)).';
+                e.terminalGradient(:,s)=(domainState(:,j).'*SF(:,:,j)+domainInput(:,j).'*derivativeModel.controlMap(2*j-1:2*j,:)).';
             end
         end
         if slew>e.terminal(s)
@@ -4820,14 +4878,14 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         end
         jacobian=zeros(N,nu);
         for j=1:N
-            sensitivity=SE{j+1};
+            sensitivity=SE(:,:,j+1);
             jacobian(j,:)=slipDerivative(:,j).'*sensitivity(4:6,:);
         end
         e.stabilityGradient=e.stabilityGradient+weight*jacobian.'*residual.';
         e.stabilityHessian=e.stabilityHessian+weight*(jacobian.'*jacobian);
         if performance && s==model.nominal
             for i=1:n
-                state=ends(:,sum(kernel.holds(1:i)));S=SE{sum(kernel.holds(1:i))+1};ref=model.reference(:,i);
+                state=ends(:,sum(kernel.holds(1:i)));S=SE(:,:,sum(kernel.holds(1:i))+1);ref=model.reference(:,i);
                 normal=[-sin(ref(3));cos(ref(3))];error=[normal.'*(state(1:2)-ref(1:2));atan2(sin(state(3)-ref(3)),cos(state(3)-ref(3)));state(4)-cfg.referenceSpeed;state(5:6)];
                 derivative=[normal.'*S(1:2,:);S(3:6,:)];
                 e.cost=e.cost+.5*h*kernel.holds(i)*sum(cfg.outputFeedback.trackingWeights.*error.^2);
@@ -4861,71 +4919,59 @@ function [residual,derivative]=localRearSlipResidual(states,model,index)
 end
 
 function [selected,ends]=localCondensedSensitivities(roots,inputs,parameters,index,required,model)
-    N=size(inputs,2);nu=size(model.controlMap,2);selected=cell(5,N);ends=cell(1,N+1);ends{1}=zeros(6,nu);
-    mapped=model.kernel.sensitivity.map(N);
+    N=size(inputs,2);nu=size(model.controlMap,2);
+    maps=model.kernel.mappedSensitivity;
+    if isKey(maps,N)
+        mapped=maps(N);
+    else
+        mapped=model.kernel.sensitivity.map(N);
+        % Horizons can vary with the terminal continuation. Bound the cache
+        % per compiled model while reusing maps across hypotheses and iterates.
+        if maps.Count>=16,remove(maps,keys(maps));end
+        maps(N)=mapped;
+    end
     [allEnd,allSelected]=mapped(roots,inputs,repmat(parameters,1,N),index);
     allEnd=full(allEnd);allSelected=full(allSelected);
     native=[];
     if model.cfg.outputFeedback.nlpJit,native=localCompactSensitivityKernel();end
     if ~isempty(native)
         [points,endpoints]=native(allEnd,allSelected,model.controlMap,index,required,model.kernel.validationSubsteps);
-        ends=mat2cell(endpoints,6,repmat(nu,1,N+1));
-        selected=reshape(mat2cell(points,6,repmat(nu,1,5*N)),5,N);
-        selected(~required)={[]};return;
+        selected=reshape(points,6,nu,N);
+        ends=reshape(endpoints,6,nu,N+1);
+        return
     end
-    % Establish aliases once for the entire horizon. Equal dense sample
-    % indices have the same local map; an endpoint may have a different
-    % post-stop reset, so its map must match exactly before it is reused.
-    aliases=zeros(5,N);
-    for j=2:5
-        for earlier=1:j-1
-            same=required(j,:) & required(earlier,:) & index(j,:)==index(earlier,:) & aliases(j,:)==0;
-            aliases(j,same)=earlier+5*(find(same)-1);
-        end
-    end
-    atRoot=required & index==0;atEnd=false(5,N);
-    candidates=find(required & index==model.kernel.validationSubsteps);
-    blocks=reshape(allSelected,48,[]);endpointBlocks=reshape(allEnd,48,[]);
-    atEnd(candidates)=all(blocks(:,candidates)==endpointBlocks(:,ceil(candidates/5)),1);
-    assemble=find(required & ~atRoot & ~atEnd & aliases==0);
-    active=0;widths=zeros(1,N);columns=cell(1,N);weights=cell(1,N);
+    selected=zeros(6,nu,N);ends=zeros(6,nu,N+1);
     for i=1:N
-        E=allEnd(:,8*(i-1)+(1:8));U=model.controlMap(2*i-1:2*i,:);
-        columns{i}=find(any(U,1));weights{i}=U(:,columns{i});widths(i)=active;
-        previous=ends{i};next=zeros(6,nu);
-        if active>0,next(:,1:active)=E(:,1:6)*previous(:,1:active);end
-        if ~isempty(columns{i})
-            next(:,columns{i})=next(:,columns{i})+E(:,7:8)*weights{i};
-            active=max(active,columns{i}(end));
+        columns=8*(i-1)+(1:8);
+        E=allEnd(:,columns);U=model.controlMap(2*i-1:2*i,:);
+        before=ends(:,:,i);
+        ends(:,:,i+1)=E(:,1:6)*before+E(:,7:8)*U;
+        if required(i)
+            D=allSelected(:,columns);
+            if index(i)==0
+                selected(:,:,i)=before;
+            elseif index(i)==model.kernel.validationSubsteps && isequal(D,E)
+                selected(:,:,i)=ends(:,:,i+1);
+            else
+                selected(:,:,i)=D(:,1:6)*before+D(:,7:8)*U;
+            end
         end
-        ends{i+1}=next;
     end
-    selected(atRoot)=ends(ceil(find(atRoot)/5));
-    selected(atEnd)=ends(ceil(find(atEnd)/5)+1);
-    for slot=assemble.'
-        i=ceil(slot/5);D=allSelected(:,8*(slot-1)+(1:8));
-        previous=ends{i};active=widths(i);point=zeros(6,nu);
-        if active>0,point(:,1:active)=D(:,1:6)*previous(:,1:active);end
-        if ~isempty(columns{i}),point(:,columns{i})=point(:,columns{i})+D(:,7:8)*weights{i};end
-        selected{slot}=point;
-    end
-    duplicate=required & aliases~=0 & ~atRoot & ~atEnd;
-    selected(duplicate)=selected(aliases(duplicate));
 end
 
 function kernel=localCompactSensitivityKernel()
     % Optional native copy of the numerical chain rule. A deterministic
-    % probe covers aliases, a pre-reset sample and causal control columns.
+    % probe covers a pre-reset sample and causal control columns.
     persistent handle checked
     if isempty(checked)
         checked=true;handle=[];
         folder=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
-        if isfile(fullfile(folder,['condensedSensitivityKernelMex.',mexext]))
-            previous=addpath(folder);cleanup=onCleanup(@()path(previous));candidate=@condensedSensitivityKernelMex;
+        if isfile(fullfile(folder,['domainSensitivityKernelMex.',mexext]))
+            previous=addpath(folder);cleanup=onCleanup(@()path(previous));candidate=@domainSensitivityKernelMex;
             E=[eye(6),ones(6,2)/8];E=[E,E];E(4:6,9:16)=0;
-            D=repmat([eye(6),ones(6,2)/8],1,10);
+            D=repmat([eye(6),ones(6,2)/8],1,2);
             U=[eye(2),zeros(2);eye(2)/2,eye(2)/2];
-            index=[0,0;64,64;32,32;32,32;16,16];required=true(5,2);required(5,1)=false;
+            index=[0,64];required=true(1,2);
             [points,ends]=nonlinearBicycleModel.condenseSensitivities(E,D,U,index,required,64);
             same=false;
             try
@@ -5063,11 +5109,8 @@ function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,condition
             dense=item.ego;ends=zeros(6,0);root=item.ego;
         end
         if prefix<count
-            remaining=count-prefix;capacity=kernel.capacity;
-            [points,states]=kernel.refinedRollout(root,[inputs(:,prefix+1:end),zeros(2,capacity-remaining)], ...
-                item.parameters,double((1:capacity)<=remaining));
-            points=full(points);states=full(states);
-            dense=[dense,points(:,1:substeps*remaining)];ends=[ends,states(:,1:remaining)];
+            [points,states]=localCompactHeldFlow(kernel,root,inputs(:,prefix+1:end),item.parameters,checkBudget);
+            dense=[dense,points];ends=[ends,states];
         end
         reusedHolds(s)=prefix;
         % Geometry, physical-domain constraints and terminal continuation are rechecked.
@@ -5153,12 +5196,27 @@ function [dense,states,inputs,collisionStates] = localCompactRollout(kernel,x,pr
             previous=controls(:,i);
         end
     end
-    capacity=sum(kernel.capacity);
-    [dense,ends]=kernel.refinedRollout(x,[inputs,zeros(2,capacity-N)],parameters,double((1:capacity)<=N));
-    dense=full(dense);ends=full(ends);
-    dense=[x,dense(:,1:kernel.validationSubsteps*N)];states=ends(:,cumsum(kernel.holds));
-    if nargout>3,collisionStates=[x,ends(:,1:N)];end
+    [points,ends]=localCompactHeldFlow(kernel,x,inputs,parameters,[]);
+    dense=[x,points];states=ends(:,cumsum(kernel.holds));
+    if nargout>3,collisionStates=[x,ends];end
 end
+
+function [points,ends]=localCompactHeldFlow(kernel,x,inputs,parameters,checkBudget)
+    % The compiled integrator owns a block of holds. A longer online horizon
+    % continues at its post-reset endpoint with the same parameters and inputs.
+    count=size(inputs,2);capacity=kernel.capacity;substeps=kernel.validationSubsteps;
+    points=zeros(6,substeps*count);ends=zeros(6,count);
+    for first=1:capacity:count
+        if first>1 && ~isempty(checkBudget),checkBudget();end
+        last=min(first+capacity-1,count);blockCount=last-first+1;
+        commands=[inputs(:,first:last),zeros(2,capacity-blockCount)];
+        [dense,nodes]=kernel.refinedRollout(x,commands,parameters,double((1:capacity)<=blockCount));
+        dense=full(dense);nodes=full(nodes);
+        points(:,substeps*(first-1)+1:substeps*last)=dense(:,1:substeps*blockCount);
+        ends(:,first:last)=nodes(:,1:blockCount);x=nodes(:,blockCount);
+    end
+end
+
 function [terminalValue,terminal]=localCompactTerminalCheck(x,item,start,previous,kernel,cfg,backup,checkBudget,remaining)
     h=cfg.controller.sampleTime;
     if nargin<8,checkBudget=[];end
@@ -5204,13 +5262,11 @@ function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,item,start,cfg,c
     end
     h=cfg.controller.sampleTime;
     count=max(1,ceil(cfg.outputFeedback.minimumPreviewSeconds/h));
-    capacity=kernel.capacity;
     inputs=repmat(terminalSafeSet.movingControl(cfg),1,count);
-    [points,states]=kernel.refinedRollout(x,[inputs,zeros(2,capacity-count)],item.parameters,double((1:capacity)<=count));
-    ends=full(states(:,1:count));
+    [points,ends]=localCompactHeldFlow(kernel,x,inputs,item.parameters,checkBudget);
     out=find(localCompactRange(item,ends,start+(1:count)*h)>cfg.collision.encounterRangeMeters,1);
     if ~isempty(out),count=out;ends=ends(:,1:count);inputs=inputs(:,1:count);end
-    dense=[x,full(points(:,1:count*kernel.validationSubsteps))];
+    dense=[x,points(:,1:count*kernel.validationSubsteps)];
 end
 
 function cover=localCompactCover(item,h,count)

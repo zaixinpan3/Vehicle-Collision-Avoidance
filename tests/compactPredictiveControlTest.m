@@ -15,6 +15,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         movingTarget={false,true}
         admissionMeasurements={"boundedRadar","exactRadar","exactRadarWithDropout"}
         leadEncounter={"stoppedLead","hardBrakingLead"}
+        acquisitionEncounter={"brakingLead","acceleratingHeadOn"}
         uncertainEncounter={"brakingLead","trafficBrakingLead","curvedCrossing", ...
             "headOn","trafficHeadOn","curvedHeadOn","acceleratingHeadOn"}
         cacheSpeed={.04,3}
@@ -370,24 +371,23 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
         end
-        function blockedAdmissionAndWarmupUseTheCompactSolver(testCase)
+        function difficultAcquisitionAndWarmupReturnAValidatedCommand(testCase,acquisitionEncounter)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             writelines(["function varargout=fmincon(varargin)"
                 "error('compactPredictiveControlTest:forbiddenSolver','Unexpected fmincon call');"
                 "end"],fullfile(folder.Folder,'fmincon.m'));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(folder.Folder));
-            campaign=runJointOutputFeedbackScenario(Frames=9,Speeds=15,Scenarios="brakingLead", ...
+            campaign=runJointOutputFeedbackScenario(Frames=9,Speeds=15,Scenarios=acquisitionEncounter, ...
                 RandomSeed=20261108,OutputDirectory=string(folder.Folder));
             data=jsondecode(fileread(campaign.results.source));
             testCase.verifyTrue(data.compactSolversReadyBeforeFirstFrame);
             testCase.verifyEmpty(data.warmupFailure);
-            if strcmp(data.outcome,'completed')
-                testCase.verifyTrue(data.trace(end).metadata.deficitDescentMet);
-                testCase.verifyTrue(data.trace(end).metadata.terminalSetEnforced);
-            else
-                testCase.verifyEqual(data.executedFrames,8);
-                testCase.verifyTrue(startsWith(data.failure,'collisionAvoidanceController:compactNoFeasiblePlan'));
-            end
+            testCase.assertEqual(string(data.outcome),"completed",string(data.failure));
+            info=data.trace(end).metadata;
+            testCase.verifyTrue(info.collisionTargetActive && info.deficitDescentMet && info.terminalSetEnforced);
+            testCase.verifyEqual(info.initializationTrajectoryCount,1);
+            testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
+            testCase.verifyGreaterThan(data.minimumNodeClearanceMeters,0);
         end
         function aPenetratingFieldRolloutInitializesTheDualSolve(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
@@ -868,14 +868,32 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 2*testCase.prediction.metadata.controlNodes+testCase.prediction.metadata.horizonSteps);
         end
         function previewGrowthReusesTheCompiledProblem(testCase)
-            cfg=testCase.cfg;cfg.outputFeedback.horizonResolutionSeconds=.9;
+            cfg=testCase.cfg;cfg.outputFeedback.horizonResolutionSeconds=.5;
+            cfg.outputFeedback.minimumPreviewSeconds=1;
+            cfg.model.speedMaximum=8;
             [~,~,baseline]=collisionAvoidanceController(localBlock(cfg,8),[],[],cfg,[]);
-            speed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum);
-            [~,~,prediction]=collisionAvoidanceController(localBlock(cfg,speed),[],[],cfg,[]);
+            % The driving model permits speeds above the build-time sizing
+            % speed. The longer horizon must span more than one compiled block.
+            block=localBlock(cfg,24);
+            [~,inputs,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyGreaterThan(prediction.metadata.predictionWindow.allocatedSeconds, ...
                 baseline.metadata.predictionWindow.allocatedSeconds);
             testCase.verifyEqual(prediction.metadata.controlNodes,baseline.metadata.controlNodes);
             testCase.verifyTrue(prediction.metadata.nlpCacheHit);
+            % Compare every boundary and integration sample with a sequence
+            % of short rollouts started at their actual preceding endpoints.
+            item=block.initialHypotheses;previous=block.heldInput;trace=prediction.scenarios{1};
+            substeps=cfg.outputFeedback.validationSubsteps;
+            for first=1:20:size(inputs,2)
+                last=min(first+19,size(inputs,2));
+                replay=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
+                    'cfg',cfg,'hypotheses',item,'input',previous,'inputs',inputs(:,first:last)));
+                part=replay.trajectories{1};
+                testCase.verifyEqual(trace.collisionEgo(:,first+1:last+1),part.collisionEgo(:,2:end),AbsTol=1e-12);
+                samples=substeps*(first-1)+2:substeps*last+1;
+                testCase.verifyEqual(trace.denseEgo(:,samples),part.denseEgo(:,2:end),AbsTol=1e-12);
+                item.ego=part.collisionEgo(:,end);previous=inputs(:,last);
+            end
         end
         function everyAppliedHoldUsesThePredictedCommand(testCase)
             u=testCase.prediction.scenarios{1}.inputs;
@@ -1237,7 +1255,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function nativeDerivativesAgreeAcrossChangingHorizons(testCase,integrationMesh,movingTarget)
             root=fileparts(fileparts(mfilename('fullpath')));
-            testCase.assumeTrue(isfile(fullfile(root,'solver','controller',['condensedSensitivityKernelMex.',mexext])), ...
+            testCase.assumeTrue(isfile(fullfile(root,'solver','controller',['domainSensitivityKernelMex.',mexext])), ...
                 'Run buildControllerKernels to test the optional native sensitivity implementation.');
             cfg=testCase.cfg;cfg.outputFeedback.validationSubsteps=integrationMesh;
             item=testCase.block.initialHypotheses;item.ego=[0;0;.12;3.3;.08;.03];item.target=[];

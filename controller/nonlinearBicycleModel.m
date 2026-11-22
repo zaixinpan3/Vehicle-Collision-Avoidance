@@ -6,11 +6,11 @@ classdef nonlinearBicycleModel
             % Chain local flow Jacobians over the actual, variable horizon.
             % Generated native code calls this same numerical implementation.
             % Sample maps precede the stop reset; end maps follow it.
-            count=size(index,2);width=size(controlMap,2);
-            assert(size(index,1)==5 && isequal(size(required),size(index)));
-            assert(isequal(size(endMaps),[6,8*count]) && isequal(size(sampleMaps),[6,40*count]));
+            count=size(index,2);slots=size(index,1);width=size(controlMap,2);
+            assert(slots>=1 && isequal(size(required),size(index)));
+            assert(isequal(size(endMaps),[6,8*count]) && isequal(size(sampleMaps),[6,8*slots*count]));
             assert(size(controlMap,1)==2*count);
-            selected=zeros(6,5*width*count);ends=zeros(6,width*(count+1));active=0;
+            selected=zeros(6,slots*width*count);ends=zeros(6,width*(count+1));active=0;
             value=zeros(6,width);columns=zeros(1,width);
             for i=1:count
                 before=ends(:,width*(i-1)+(1:width));
@@ -22,9 +22,9 @@ classdef nonlinearBicycleModel
                 end
                 % Reuse one workspace. Scalar fixed-size products avoid
                 % allocating variable-size slices and BLAS work per sample.
-                for j=0:5
+                for j=0:slots
                     if j>0 && ~required(j,i),continue;end
-                    slot=5*(i-1)+j;point=endpoint;alias=0;
+                    slot=slots*(i-1)+j;point=endpoint;alias=0;
                     if j>0
                         point=sampleMaps(:,8*(slot-1)+(1:8));
                         for earlier=1:j-1
@@ -36,7 +36,7 @@ classdef nonlinearBicycleModel
                     elseif j>0 && index(j,i)==substeps && isequal(point,endpoint)
                         value(:,:)=ends(:,width*i+(1:width));
                     elseif alias>0
-                        value(:,:)=selected(:,width*(5*(i-1)+alias-1)+(1:width));
+                        value(:,:)=selected(:,width*(slots*(i-1)+alias-1)+(1:width));
                     else
                         value(:)=0;
                         for c=1:active

@@ -1658,15 +1658,20 @@ function candidate=localCirculationRollout(model,data,speed,durations)
             % acceleration with a cruise-speed request afterwards.
             acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
             if ~encounterEnded
-                parameters=localFieldParameters(data,index,speed);
-                parameters.preferredAcceleration=acceleration;
-                [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
-                active=field.activation>0;
+                corrected=false;
                 if uncertainMotion
+                    % The enclosure includes the nominal target. Apply its
+                    % lateral correction directly to the route acceleration.
                     nodes=ticks(index)+(1:numel(future));
                     targets=path(:,nodes,:);referenceBoxes=centers(:,nodes,:);
                     [acceleration,corrected]=localEncounterAcceleration(x,projection,acceleration,targets,future,model,referenceBoxes);
-                    active=active || corrected;
+                end
+                active=corrected;
+                if ~corrected
+                    parameters=localFieldParameters(data,index,speed);
+                    parameters.preferredAcceleration=acceleration;
+                    [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
+                    active=field.activation>0;
                 end
                 candidate.fieldActive=candidate.fieldActive || active;
                 if ~active && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end

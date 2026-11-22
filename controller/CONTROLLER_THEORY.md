@@ -752,10 +752,12 @@ D(t)=\max\{h^2/2,\ t^2/2-Tt+T^2(1-e^{-t/T})\}.
 The guide takes the interval hull of
 \([(y^s-r^s)/D,(y^s+r^s)/D]\) over the overlap times of the retained
 parameter cells, up to each cell's range exit on the extrapolated ego path.
-When the preferred transverse acceleration, relative to the path curvature
-feedforward, is inside the hull, project it onto the nearest endpoint.
-An equal-distance tie gives zero correction. This projection preserves the
-longitudinal component of the circulation field and the fixed cruise reference.
+Let $a_r$ be the route acceleration before the nominal target correction.
+When its transverse component relative to path curvature feedforward lies
+inside the hull and has a unique nearest endpoint, project that component
+onto the endpoint and retain the longitudinal component of $a_r$. The
+nominal target is already included in the enclosure. Otherwise the guide
+uses its nominal circulation field. Both use the same cruise reference.
 Every trial uses its own poses in the distance dual of Section 5.
 
 The combined initial commands $\bar u$ define the initial shooting point for a new
@@ -780,6 +782,16 @@ Since the primary value is nonnegative, the solver first seeks a zero-deficit
 witness by minimizing the squared scaled actuator correction subject to all
 linearized zero-level inequalities and actuator bounds. Nonlinear replay
 checks the trial and further linearization uses a contracting residual.
+
+At admission with a feasible terminal handoff, if the first projection
+leaves at least half the maximum residual and yields no executable
+incumbent, use the local merit
+$\tfrac12\|[C,H]_+\|_2^2$, where $H$ collects the domain and terminal
+residuals. In scaled actuator coordinates, initialize a regularized
+Gauss--Newton matrix from the violated rows, update it with damped BFGS
+secants, and backtrack on the nonlinear merit. The first admissible
+iterate returns to the primary PCBF solve. The merit has no role in
+the stored deficit or the nonlinear dispatch conditions.
 A step-length trial needs only the nonlinear values. At a retained
 linearization point the state and geometry from that evaluation supply
 the derivatives without another integration.
