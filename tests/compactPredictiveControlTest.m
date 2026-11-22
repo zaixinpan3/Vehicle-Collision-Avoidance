@@ -269,7 +269,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 'cfg',cfg,'initial',true,'block',block,'hypotheses',item));
             testCase.verifyFalse(posterior.targetObserver.restCompatible);
             testCase.verifyEqual(posterior.targetObserver.heading,q(3),AbsTol=1e-12);
-            testCase.verifyEqual(posterior.target,q,AbsTol=1e-12);
+            testCase.verifyEqual(posterior.target(3),q(3),AbsTol=1e-12);
             replay=solvePredictiveControl("outputFeedback",struct('operation',"validateInputSequence", ...
                 'cfg',cfg,'hypotheses',posterior,'input',block.heldInput,'inputs',zeros(2,1)));
             testCase.assertNumElements(replay.trajectories,1);
@@ -290,8 +290,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',t));
             posterior=solvePredictiveControl('outputFeedback',struct('operation',"condition", ...
                 'cfg',cfg,'initial',true,'block',block,'hypotheses',item));
-            bounds=posterior.targetObserver.motionBounds;
-            testCase.verifyEqual(posterior.target(5:6),[bounds(2,1);bounds(1,2)],AbsTol=1e-12);
+            [~,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,item.target(1:2),item.ego(3),cfg);
+            testCase.verifyEqual(posterior.target(3:6),motion,AbsTol=1e-10);
             replay=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
                 'cfg',cfg,'hypotheses',posterior,'input',block.heldInput,'inputs',zeros(2,1)));
             testCase.verifyEqual(replay.trajectories{1}.targets(:,1),posterior.target,AbsTol=1e-12);
@@ -1485,9 +1485,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             r.hypotheses.targetObserver=struct('motionBounds',[-1,-.13;1,.13]);
             broad=solvePredictiveControl("outputFeedback",r);
             testCase.assertGreaterThan(broad.pcbfDeficit,straight.pcbfDeficit);
-            % Opposite oblique supports imply A=kappa=0. Neither marginal
-            % alone encodes these simultaneous restrictions.
-            r.hypotheses.targetObserver.motionStrips=[1,20,0;-1,-20,0;1,-20,0;-1,20,0];
+            r.hypotheses.targetObserver.motionBounds=zeros(2,2);
             restricted=solvePredictiveControl("outputFeedback",r);
             testCase.verifyLessThan(restricted.pcbfDeficit,broad.pcbfDeficit);
             testCase.verifyEqual(restricted.trajectories{1}.targets,straight.trajectories{1}.targets);

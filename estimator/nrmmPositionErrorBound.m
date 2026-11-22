@@ -2,6 +2,8 @@ function bound = nrmmPositionErrorBound(action, varargin)
 % nrmmPositionErrorBound Maintain a deterministic sampled position enclosure.
 % initialize(design,cfg,state,time,prior), measure(bound,input,state),
 % advance(bound,input,before,after,firstDerivative,h), reset(bound,state).
+% inertialTarget(bound,states,firstDerivatives,detected,radarRadius,h,design)
+% applies the same target comparison to the compact inertial-frame observer.
 % State fields: yaw, bodyVelocity, targetState (6-by-1), radarPredictor (2-by-1).
 % Yaw centers the optional initial prior. Subsequent yaw bounds enclose the
 % propagated/intersected orientation set about the actual numerical yaw estimate.
@@ -17,6 +19,8 @@ function bound = nrmmPositionErrorBound(action, varargin)
             bound = localInitialize(varargin{:});
         case "measure"
             bound = localMeasure(varargin{:});
+        case "inertialTarget"
+            bound=localInertialTarget(varargin{:});
         case "advance"
             bound = localAdvance(varargin{:});
         case "reset"
@@ -254,6 +258,20 @@ function bound = localAdvance(bound,input,before,after,first,step)
     gyroCertificate = nrmmObserverCertificate("targetGyro", ...
         target.lyapunovMatrix,target.bandwidth,target.domain,range);
     gyroCoefficient = gyroCertificate.coefficient;
+    [bound,next,comparison]=localTargetComparison(bound,input,before,after,step,design,defect, ...
+        range,gyroCoefficient,gyroError,egoMatrix,egoInitial,egoInput,velocityPathMaximum);
+    bound.yaw = nrmmSet.yaw("radiusAbout",bound.orientationSet,after.yaw);
+    bound.bodyVelocity = min(next(1),localGuard(domain.egoSpeedMaximum+norm(after.bodyVelocity)));
+    bound.time = bound.time+step;
+    bound.lastDefect = defect;
+    bound.lastComparison = comparison;
+    bound.lastGyroscopeHoldError = gyroError;
+    bound.usesAccelerationEnvelope = isfinite(accelerationEnvelope);
+end
+
+function [bound,next,comparison]=localTargetComparison(bound,input,before,after,step,design,defect, ...
+        range,gyroCoefficient,gyroError,egoMatrix,egoInitial,egoInput,velocityPathMaximum)
+    target=design.target;
     if input.radarDetectionAvailable
         matrix = zeros(3);
         matrix(1,1) = egoMatrix;
@@ -309,13 +327,52 @@ function bound = localAdvance(bound,input,before,after,first,step)
     record = struct("matrix",matrix,"input",forcing,"initial",initial, ...
         "final",next,"step",step,"mode",mode);
     comparison = record;
-    bound.yaw = nrmmSet.yaw("radiusAbout",bound.orientationSet,after.yaw);
-    bound.bodyVelocity = min(next(1),localGuard(domain.egoSpeedMaximum+norm(after.bodyVelocity)));
-    bound.time = bound.time+step;
-    bound.lastDefect = defect;
-    bound.lastComparison = comparison;
-    bound.lastGyroscopeHoldError = gyroError;
-    bound.usesAccelerationEnvelope = isfinite(accelerationEnvelope);
+end
+
+function bound=localInertialTarget(bound,states,first,detected,radius,step,design)
+    % Same sampled comparison in inertial axes. Each retained ego member
+    % supplies its synchronized frame, so the ego and gyro terms vanish.
+    x=states(7:12,1); domain=design.target.domain;
+    if isempty(bound)
+        bound.targetComponents=[norm(x(1:2)-states(13:14,1))+radius; ...
+            norm(x(3:4))+domain.speedMaximum;norm(x(5:6))+domain.accelerationNormBound];
+        bound.targetLyapunov=localMetricBound(bound.targetComponents,design);
+        bound.trueRangeMaximum=norm(x(1:2))+bound.targetComponents(1);
+        bound.radarPredictor=bound.targetComponents(1);
+    end
+    if detected
+        bound.radarPredictor=radius;
+        bound.targetComponents(1)=min(bound.targetComponents(1),norm(states(13:14,1)-x(1:2))+radius);
+        bound.targetLyapunov=min(bound.targetLyapunov,localMetricBound(bound.targetComponents,design));
+    else
+        % The coast predictor starts at the estimated position.
+        bound.radarPredictor=bound.targetComponents(1);
+    end
+    input=struct('radarDetectionAvailable',detected,'yawRate',0);
+    before=localInertialState(states(:,1));
+    for i=1:size(first,2)
+        after=localInertialState(states(:,i+1));
+        defect=localDefect(before,after,localInertialState(first(:,i)),input,design,step);
+        range=bound.trueRangeMaximum+domain.speedMaximum*step;
+        stopSpeed=domain.scalarAccelerationMaximum*step;
+        canStop=norm(before.targetState(3:4))<=bound.targetComponents(2)+stopSpeed;
+        startPositionRadius=bound.targetComponents(1);
+        bound=localTargetComparison(bound,input,before,after,step,design,defect,range,0,0,0,0,0,0);
+        if canStop
+            % A stop inside this substep resets true derivatives to zero.
+            % Include that branch alongside the smooth NRMM comparison.
+            stopped=[startPositionRadius+stopSpeed*step+norm(after.targetState(1:2)-before.targetState(1:2)); ...
+                norm(after.targetState(3:4));norm(after.targetState(5:6))];
+            bound.targetComponents=max(bound.targetComponents,localGuard(stopped));
+            bound.targetLyapunov=max(bound.targetLyapunov,localMetricBound(stopped,design));
+            bound.radarPredictor=max(bound.radarPredictor,localGuard(stopped(1)+norm(after.radarPredictor-after.targetState(1:2))));
+        end
+        before=after;
+    end
+end
+
+function state=localInertialState(packed)
+    state=struct('bodyVelocity',[0;0],'targetState',packed(7:12),'radarPredictor',packed(13:14));
 end
 
 function defect = localDefect(before,after,first,input,design,step)

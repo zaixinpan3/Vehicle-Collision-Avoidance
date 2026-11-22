@@ -255,46 +255,21 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                 if isfield(measured,'radarPositionErrorMeters') && ~isempty(measured.radarPositionErrorMeters)
                     positionError=min(positionError,measured.radarPositionErrorMeters);
                 end
-                previousTrack=item.targetObserver;
-                try
-                    [item.targetObserver,motion]=onlineNrmmTrackingRuntime("targetPoint", ...
-                        item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading,positionError,j==numel(block.samples));
-                catch exception
-                    if ~strcmp(exception.identifier,'onlineNrmmTrackingRuntime:inconsistentTargetMotion'),rethrow(exception);end
-                    excess=Inf;break
-                end
+                [item.targetObserver,motion]=onlineNrmmTrackingRuntime("targetPoint", ...
+                    item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading,positionError);
                 if measured.radarAvailable && ~isempty(motion)
-                    % Keep the previous observer forecast while this return
-                    % explains it. Replacing it with each noisy position
-                    % would discard a consistent shifted collision witness.
-                    refresh=isempty(item.target) || (~isempty(previousTrack) && ...
-                        (isempty(previousTrack.times) || previousTrack.restCompatible~=item.targetObserver.restCompatible || ...
-                        ~previousTrack.initialized && item.targetObserver.initialized));
-                    if ~refresh
-                        refresh=norm(item.target(1:2)-item.ego(1:2))>radius || ...
-                            norm(rotation.'*(item.target(1:2)-item.ego(1:2))-corrected)>bounds(4)+tolerance;
-                    end
-                    if refresh
-                        % Use the filtered position inside both the detection
-                        % disk and the current bounded position observation.
-                        filtered=rotation.'*(item.targetObserver.state(1:2)-item.ego(1:2));
-                        filtered=filtered*min(1,radius/max(norm(filtered),realmin));
-                        delta=filtered-rho;
-                        room=max(0,bounds(4)-norm(corrected-rho));
-                        center=measuredPosition+rotation*(min(1,room/max(norm(delta),realmin))*delta);
-                        item.target=[center;motion;cfg.target.rearAxleDistance; ...
-                            cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
-                    end
-                    if isfinite(relativeHeading)
-                        % Position consistency does not constrain body heading.
-                        item.target(3)=motion(1);
-                    end
-                    if item.target(4)>0
-                        % A position-only return can also tighten these intervals.
-                        % Retain the same forecast that the controller propagates.
-                        motionBounds=item.targetObserver.motionBounds;
-                        item.target(5:6)=min(motionBounds(2,:).',max(motionBounds(1,:).',item.target(5:6)));
-                    end
+                    % Use the filtered position inside both the detection
+                    % disk and the current bounded position observation.
+                    filtered=rotation.'*(item.targetObserver.state(1:2)-item.ego(1:2));
+                    filtered=filtered*min(1,radius/max(norm(filtered),realmin));
+                    delta=filtered-rho;
+                    room=max(0,bounds(4)-norm(corrected-rho));
+                    center=measuredPosition+rotation*(min(1,room/max(norm(delta),realmin))*delta);
+                    item.target=[center;motion;cfg.target.rearAxleDistance; ...
+                        cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
+                elseif ~isempty(motion)
+                    item.target=[item.targetObserver.state(1:2);motion;cfg.target.rearAxleDistance; ...
+                        cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
                 end
             end
             expected=localOfSensor(item,block.heldInput,cfg,measured.time);
@@ -419,6 +394,15 @@ function [result,info] = localCompactStep(request,cfg)
         assert(norm(block.heldInput-prior.appliedInput,Inf)<1e-12, ...
             'collisionAvoidanceController:actuationMismatch','Measurements must use the committed input.');
         hypotheses=prior.hypotheses;inherited=size(prior.fineControls,2)-1;
+        if isfield(hypotheses,'targetObserver')
+            for j=1:numel(hypotheses)
+                track=hypotheses(j).targetObserver;
+                if isstruct(track) && isfield(track,'motionHistory')
+                    obsolete=intersect(fieldnames(track),{'motionBounds','motionHistory','motionStrips'});
+                    hypotheses(j).targetObserver=rmfield(track,obsolete);
+                end
+            end
+        end
         if ~isfield(prior,'targetEstimateReady') && isfield(hypotheses,'targetObserver') && ...
                 any(arrayfun(@(s)~isempty(s.targetObserver) && ~s.targetObserver.initialized,hypotheses))
             [hypotheses.target]=deal([]);
@@ -1597,30 +1581,6 @@ function cover=localCompactCover(item,cfg,count)
     times=(0:count)*h;nominal=predictiveSafetyGeometry.predictTarget(item.target,times);
     lower=[reshape(acceleration(i),1,[]);reshape(slip(j),1,[])];
     upper=[reshape(acceleration(min(i+1,end)),1,[]);reshape(slip(min(j+1,end)),1,[])];
-    track=item.targetObserver;
-    if isfield(track,'motionStrips') && ~isempty(track.motionStrips)
-        strips=track.motionStrips;lr=item.target(7);
-        lower(2,:)=sin(lower(2,:))/lr;upper(2,:)=sin(upper(2,:))/lr;
-        % Keep the published NRMM center as well as every data-compatible
-        % constant motion. Each inequality only excludes impossible cells.
-        center=[item.target(5);sin(item.target(6))/lr];
-        strips(:,3)=max(strips(:,3),strips(:,1:2)*center);
-        for row=1:size(strips,1)
-            n=strips(row,1:2);rhs=strips(row,3);
-            for d=1:2
-                if abs(n(d))<=eps,continue;end
-                other=3-d;
-                bound=(rhs-min(n(other)*lower(other,:),n(other)*upper(other,:)))/n(d);
-                tol=64*eps(max(1,abs(bound)));
-                if n(d)>0,upper(d,:)=min(upper(d,:),bound+tol);
-                else,lower(d,:)=max(lower(d,:),bound-tol);end
-            end
-        end
-        keep=all(lower<=upper,1);lower=lower(:,keep);upper=upper(:,keep);
-        lower(2,:)=asin(max(-1,min(1,lr*lower(2,:))));upper(2,:)=asin(max(-1,min(1,lr*upper(2,:))));
-        cover.cells=cover.cells(:,:,1:nnz(keep));cover.boxes=cover.boxes(:,:,1:nnz(keep));
-        cover.centers=cover.centers(:,:,1:nnz(keep));
-    end
     for k=1:size(lower,2)
         limits=[lower(:,k).';upper(:,k).'];cover.cells(:,:,k)=limits;
         [cover.boxes(:,:,k),cover.centers(:,:,k)]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,limits,times,nominal);
