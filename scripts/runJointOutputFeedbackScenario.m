@@ -243,7 +243,31 @@ function ready=localWarmCompactSolvers(runCfg)
         'block',block,'previousState',[]);
     result=solvePredictiveControl("outputFeedback",request);
     info=result.prediction.metadata;
-    ready=info.zeroDeficitQpSteps>0 && info.nlpAttempts>0;
+    sqpReady=info.nlpAttempts>0;
+    if ~sqpReady
+        % If the projection already found a plan, load SQP separately on
+        % an isolated one-hold instance of the same nonlinear constraints.
+        item.target(2)=2*(cfg.vehicle.width+cfg.target.defaultWidth);
+        probe=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
+            'hypotheses',item,'input',input,'holds',1);
+        opts=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
+            'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true);
+        [~,~,flag]=fmincon(@effort,[0;.01],[],[],[],[], ...
+            [-cfg.outputFeedback.steeringMaximum;cfg.actuation.brakingRatioMinimum], ...
+            [cfg.outputFeedback.steeringMaximum;cfg.actuation.brakingRatioMaximum],@constraints,opts);
+        sqpReady=flag>0;
+    end
+    ready=info.zeroDeficitQpSteps>0 && sqpReady;
+
+    function [value,gradient]=effort(u)
+        value=u.'*u/2;gradient=u;
+    end
+    function [c,ceq,gc,gceq]=constraints(u)
+        probe.inputs=u;
+        e=solvePredictiveControl("outputFeedback",probe);
+        c=[e.stage;e.forward;e.terminal];gc=[e.stageGradient,e.forwardGradient,e.terminalGradient];
+        ceq=[];gceq=[];
+    end
 end
 
 function timing=localTiming(seconds,deadline)

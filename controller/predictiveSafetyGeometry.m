@@ -1615,7 +1615,21 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         ticks=round([0,cumsum(durations)]/h);
         future=(0:ceil(preview/h))*h;
         pathTime=(0:ticks(end)+numel(future)-1)*h;
-        path=predictiveSafetyGeometry.targetMotionEnvelope(model.target,model.motionLimits,pathTime);
+        if isfield(model,'motionCover') && ~isempty(model.motionCover)
+            % The same continuous parameter cells guide one initialization.
+            % Reuse the precomputed target images across all its ego nodes.
+            cover=model.motionCover;cached=min(numel(pathTime),size(cover.boxes,2));
+            path=cover.boxes(:,1:cached,:);centers=cover.centers(:,1:cached,:);
+            if cached<numel(pathTime)
+                extra=pathTime(cached+1:end);nominal=predictiveSafetyGeometry.predictTarget(model.target,extra);
+                for cellIndex=1:size(cover.cells,3)
+                    [path(:,cached+1:numel(pathTime),cellIndex),centers(:,cached+1:numel(pathTime),cellIndex)]= ...
+                        predictiveSafetyGeometry.targetMotionEnvelope(model.target,cover.cells(:,:,cellIndex),extra,nominal);
+                end
+            end
+        else
+            [path,centers]=predictiveSafetyGeometry.targetMotionEnvelope(model.target,model.motionLimits,pathTime);
+        end
     end
     prior=model.previousInput;encounterEnded=false;
     for index=1:count+1
@@ -1649,8 +1663,9 @@ function candidate=localCirculationRollout(model,data,speed,durations)
                 [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
                 active=field.activation>0;
                 if uncertainMotion
-                    targets=path(:,ticks(index)+(1:numel(future)));
-                    [acceleration,corrected]=localEncounterAcceleration(x,projection,acceleration,targets,future,model);
+                    nodes=ticks(index)+(1:numel(future));
+                    targets=path(:,nodes,:);referenceBoxes=centers(:,nodes,:);
+                    [acceleration,corrected]=localEncounterAcceleration(x,projection,acceleration,targets,future,model,referenceBoxes);
                     active=active || corrected;
                 end
                 candidate.fieldActive=candidate.fieldActive || active;
@@ -1668,7 +1683,7 @@ end
 
 
 
-function [acceleration,active]=localEncounterAcceleration(x,projection,preferred,targets,time,model)
+function [acceleration,active]=localEncounterAcceleration(x,projection,preferred,targets,time,model,centers)
     % Project the route field outside the lateral accelerations that cross
     % a predicted footprint during longitudinal overlap. The projection
     % uses the observed target forecast.
@@ -1678,6 +1693,12 @@ function [acceleration,active]=localEncounterAcceleration(x,projection,preferred
     along=speed*cos(courseError);across=speed*sin(courseError);
     curve=struct('origin',projection.point,'heading',projection.heading,'curvature',model.frame(4));
     [path,heading]=predictiveSafetyGeometry.referencePose(along*time,0,curve);
+    count=numel(time);cells=size(targets,3);
+    targets=reshape(targets,11,[]);centers=reshape(centers,4,[]);
+    path=repmat(path,1,cells);heading=repmat(heading,1,cells);time=repmat(time,1,cells);
+    outside=reshape(predictiveSafetyGeometry.targetEnvelopeRange(path,targets,centers),count,cells)>cfg.collision.encounterRangeMeters;
+    activeNodes=reshape(cumsum(outside,1)==0,1,[]);
+    targets=targets(:,activeNodes);path=path(:,activeNodes);heading=heading(activeNodes);time=time(activeNodes);
     c=cos(heading);s=sin(heading);
     dx=targets(1,:)-path(1,:);dy=targets(2,:)-path(2,:);
     angle=targets(3,:)-heading;

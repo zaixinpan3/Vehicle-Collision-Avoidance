@@ -274,38 +274,71 @@ refreshes the root. Its filtered center is constrained to both the detection
 disk and the current radar error ball. Footprint
 dimensions and rear axle distance are declared vehicle-class parameters.
 
-For each ego member, a radar position error of radius $r$ gives a chord
-error of at most $2r$. Here $r$ is the largest declared return radius
-in the retained chord history, with the configured bound for an unlabeled
-return. Let $c_1,c_2$ be consecutive measured chords and
-$c=c_1+c_2$. The underlying constant-curvature arc satisfies
-$\kappa=2\sin\theta/\|c_{\rm true}\|$, where $\theta$ is the signed angle
-between its true chords. A resolved chord $c_i$ bounds its direction error
-by $\arcsin(2r/\|c_i\|)$. Intersect the resulting angular interval with
-the declared turn-rate bound and the resulting sideslip interval with its
-persistent prior. Two observed body headings separated by a resolved chord
-also give $\kappa=2\sin(\Delta\psi_T/2)/\|c_{\rm true}\|$ on this short
-arc. For each ego member the numerical update allows $2r_\omega\Delta t$
-of angular variation in the measured turn, where $r_\omega$ is the gyro
-rate error radius. Intersect the resulting sideslip interval with the
-position-based interval. For two successive durations $T_i$ ending before
-absorption, bound their true lengths $s_i$ using
+On a retained short arc, let $t_i,y_i,r_i$ denote the time, position and
+declared error radius of return $i$. A chord $c_{ij}=y_j-y_i$ has error at
+most $e_{ij}=r_i+r_j$. For $T_{ij}=t_j-t_i$ and
+$b_{ij}=\bar\omega T_{ij}/2$, the traveled arc length satisfies
 $$
- (\|c_i\|-2r)_+\le s_i\le (\|c_i\|+2r)\frac{b_i}{\sin b_i},
- \qquad b_i=\bar\omega T_i/2 .
+ (\|c_{ij}\|-e_{ij})_+\le s_{ij}\le
+ (\|c_{ij}\|+e_{ij}) b_{ij}/\sin b_{ij}.
 $$
-The upper bound also follows from $2\arcsin(\bar\kappa(\|c_i\|+2r)/2)/\bar\kappa$
-on the short arc when defined. Intersect the acceleration prior with the
-interval image of $2(s_2/T_2-s_1/T_1)/(T_1+T_2)$. A subsequent resolved
-displacement establishes that these earlier intervals preceded absorption.
-These bounds use the declared moving-target observer domain.
+A current curvature bound $K$ also gives the short-arc upper bound
+$2\arcsin(K(\|c_{ij}\|+e_{ij})/2)/K$ when its argument is below one.
+A later resolved displacement proves that the target was still moving
+at the start of that displacement. For all pairs ending by that time,
+$s_{ij}/T_{ij}=V_0+A((t_i+t_j)/2-t_0)$. These strips share one unknown
+$V_0$. For the angular update, let $s_i$ denote travel from the first
+return. The true chord course equals $\theta_0+\kappa(s_i+s_j)/2$.
+A resolved chord observes that course within $\arcsin(e_{ij}/\|c_{ij}\|)$.
+Bounds on $s_i,s_j$, the quarter-turn observation window and the two
+curvature signs give affine strips sharing one unknown initial course.
+Only unambiguous angular lifts are used. For either update, at a proposed
+slope the largest lower intercept cannot exceed the smallest upper
+intercept. Each violation yields a necessary slope bound. Incomplete
+elimination retains an outer interval. Measured body headings can also
+constrain curvature through $2\sin(\Delta\psi_T/2)/\|c_{\rm true}\|$,
+with turn uncertainty $2r_\omega\Delta t$ under the gyro contract.
 
-For each retained physical member, let the observer supply the closed
-intervals $I_A$ and $I_\beta$. The compact predictor uses one NRMM forecast
-per member. Its central $A,\beta$ are clipped to the intervals. The PCBF
-quantifies over their Cartesian product from that member's estimated root
-position, heading and speed. Errors in those root quantities are covered
-only to the extent represented by the physical members.
+At acquisition, a joint constraint follows from the same returns. Use the
+first-to-last chord as the longitudinal axis and the observation time
+midpoint as origin. The midpoint speed is $s_{1n}/T\in[V_l,V_u]$ when
+$V_l>\max|A|T/2$ establishes forward motion throughout the window.
+The midpoint course differs from the measured chord course by at most
+$\delta=\arcsin(e_{1n}/\|c_{1n}\|)+K\max|A|T^2/8$. Under constant
+$A,\kappa$, the tangential and normal jerk components are
+$-\kappa^2 V^3$ and $3\kappa V A$. Let $J$ bound their resultant using
+$V\le V_u+\max|A|T/2$. The mean Cartesian velocity over $[a,b]$,
+in midpoint-relative time, differs from $v_m+\dot v_m(a+b)/2$ by at
+most $J(a^2+ab+b^2)/6$. Projecting all measured chords onto a direction
+therefore bounds the corresponding component of $\dot v_m$.
+
+The position constraints can tighten this bound. All returns share the
+six Cartesian coefficients of $p_m+v_m t+\dot v_m t^2/2$. Each measured
+position bounds its projection on every chosen unit normal with radius
+$r_i+J|t_i|^3/6$. In scaled coordinates these rows have the form
+$Hz\le b$. For any nonnegative dual vector $\lambda$ and known
+$|z|\le Z$, the valid directional upper bound is
+$\lambda^\top b+|c-H^\top\lambda|^\top Z$ for $c^\top z$. The chord
+bounds remain available when this optional linear calculation is unavailable.
+Let $S=(V_l^2+V_u^2)/2$. In the true midpoint course frame the
+acceleration vector is $(A,V_m^2\kappa)$. Rotating through the bounded
+angle $\delta$ and allowing $|V_m^2-S|\le(V_u^2-V_l^2)/2$ gives linear
+support inequalities for $(A,S\kappa)$. These inequalities persist for the
+same associated target across missing returns under its constant-parameter
+contract. The moving-parameter evidence survives absorption while the
+stopped branch separately propagates the stationary pose. A new target
+starts a new track. At low speed, a sideslip inverse clipped to its domain
+limit uses the midpoint of its measured sideslip interval as the point
+output, minimizing worst absolute error over that interval.
+
+For each retained physical member, the compact predictor uses one NRMM
+forecast and the closed intervals $I_A,I_\beta$. The center is clipped to
+those intervals. Each acquired support is relaxed, if necessary, to also
+include that center. The continuous parameter cells cover the intersection
+of $I_A\times I_\beta$ with these supports evaluated at
+$\kappa=\sin\beta/l_r$. All surviving combinations are propagated from
+the member's estimated root position, heading and speed. Errors in those
+root quantities are covered only to the extent represented by the members.
 
 To enclose the target footprint at elapsed time $t$, write
 $s(A,t)=\int_0^t\max(0,V_0+A\tau)\,d\tau$ on the moving branch.
@@ -696,7 +729,8 @@ of corrective acceleration is approximated by
 D(t)=\max\{h^2/2,\ t^2/2-Tt+T^2(1-e^{-t/T})\}.
 \]
 The guide takes the interval hull of
-\([(y^s-r^s)/D,(y^s+r^s)/D]\) over these times.
+\([(y^s-r^s)/D,(y^s+r^s)/D]\) over the overlap times of the retained
+parameter cells, up to each cell's range exit on the extrapolated ego path.
 When the preferred transverse acceleration, relative to the path curvature
 feedforward, is inside the hull, project it onto the nearest endpoint.
 An equal-distance tie gives zero correction. This projection preserves the
@@ -710,8 +744,10 @@ piecewise linear transition from the first value to the second and then
 to the terminal input. Sample and refine these six coordinates around the
 best nominal-ego trial while retaining proposals across the actuator domain.
 Rank by maximum and total positive deficit over the active parameter cells,
-including terminal feasibility at zero stage deficit, then by rear slip, longitudinal effort and
-clearance. Screening caps clearance at one vehicle width. Admission
+including terminal feasibility for promising strictly separated trials, then
+by rear slip, longitudinal effort and clearance. A local simplex can refine
+the actuator values and switch times. Screening caps clearance at one vehicle
+width. Admission
 replays the full sequence with every retained physical member and the
 original terminal conditions and inherited deficit budget. This search
 changes numerical proposals and leaves the stored fine-input suffix

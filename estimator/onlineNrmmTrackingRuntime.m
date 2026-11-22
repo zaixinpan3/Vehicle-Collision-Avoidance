@@ -56,13 +56,14 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
     end
 end
 
-function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,relativeHeading,positionErrorRadius)
+function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,relativeHeading,positionErrorRadius,endOfBlock)
 % The existing sampled high-gain target chain in inertial axes. Transform
 % each relative radar position using this member's synchronized ego pose.
 % In these axes the ego transport terms vanish and the absolute Cartesian
 % target derivatives and inverse NRMM map are unchanged.
     if nargin<6 || isempty(relativeHeading),relativeHeading=NaN;end
     if nargin<7 || isempty(positionErrorRadius),positionErrorRadius=cfg.outputFeedback.noiseBounds(4);end
+    if nargin<8,endOfBlock=true;end
     persistent design kernelDesign settings
     if isempty(design)
         localAddProjectPaths();
@@ -89,7 +90,9 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     assert(dt>=0,'onlineNrmmTrackingRuntime:nonmonotonicTime','Target samples must be time ordered.');
     if time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
         track.initialized=false;track.restCompatible=false;track.times=[];track.positions=zeros(2,0);
-        if isfield(track,'motionHistory'),track=rmfield(track,{'motionHistory','motionBounds'});end
+        % The caller retains one associated target. A gap invalidates the
+        % Cartesian bootstrap, but its fixed motion parameters persist.
+        if isfield(track,'motionHistory'),track=rmfield(track,'motionHistory');end
     end
     if dt>0 && track.initialized
         reference=track.previousPosition;detected=~isempty(reference);
@@ -159,6 +162,11 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         motion=[];
         return
     end
+    if endOfBlock && ~isempty(position) && ~isfield(track,'motionStrips') && ~track.restCompatible
+        [track.motionStrips,track.motionBounds]=localAccelerationStrips(track.motionHistory,track.motionBounds, ...
+            cfg.target.rearAxleDistance,design.domain.yawRateMaximum);
+        if isempty(track.motionStrips),track=rmfield(track,'motionStrips');end
+    end
     domain=design.domain;domain.rearAxleDistance=cfg.target.rearAxleDistance;
     ego=struct('bodyVelocity',zeros(2,1),'yawRate',0);
     [~,estimate]=nrmmObserverVectorField("targetDerivative",track.state,ego,domain);
@@ -169,7 +177,13 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     elseif resolved && estimate.targetSpeed>0
         track.heading=estimate.targetRelativeHeading;
     end
-    motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;estimate.targetSideslip];
+    beta=estimate.targetSideslip;
+    if estimate.regularizationActive && abs(beta)>=domain.sideslipMaximum
+        % A saturated inverse at low speed supplies only the domain limit.
+        % The interval midpoint minimizes worst absolute sideslip error.
+        beta=mean(track.motionBounds(:,2));
+    end
+    motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;beta];
     if track.restCompatible,motion(2:4)=0;end
 end
 
@@ -180,7 +194,7 @@ function [track,heading]=localMotionBounds(track,time,position,noiseBounds,domai
             domain.scalarAccelerationMaximum,domain.sideslipMaximum];
     if ~isfield(track,'motionHistory')
         track.motionHistory=struct('times',track.times,'positions',track.positions);
-        track.motionBounds=prior;
+        if ~isfield(track,'motionBounds'),track.motionBounds=prior;end
     end
     history=track.motionHistory;
     if ~isfield(history,'headings'),history.headings=NaN(size(history.times));end
@@ -195,7 +209,6 @@ function [track,heading]=localMotionBounds(track,time,position,noiseBounds,domai
     bounds=track.motionBounds;heading=NaN;
     count=numel(times);rad=2*max(track.motionHistory.positionErrorRadii)+64*eps(max(1,max(abs(points),[],'all')));
     if count<3,return;end
-    mid=ceil(count/2);
     chord=points(:,end)-points(:,1);lengthTotal=norm(chord);
     if isfinite(headings(end))
         first=find(isfinite(headings) & vecnorm(position-points)>rad,1);
@@ -211,39 +224,8 @@ function [track,heading]=localMotionBounds(track,time,position,noiseBounds,domai
             bounds(:,2)=localIntersectArcSideslip(bounds(:,2),angle,lengthMeasured,rad,lr);
         end
     end
-    chords=diff(points(:,[1,mid,end]),1,2);lengths=vecnorm(chords);
-    if all(lengths>rad) && lengthTotal>rad
-        % For a circular arc kappa = 2 sin(turn between chords)/total chord.
-        angle=atan2(det(chords),dot(chords(:,1),chords(:,2)));
-        error=sum(asin(rad./lengths));limit=domain.yawRateMaximum*(time-times(1))/2;
-        branches=angle+[-2*pi,0,2*pi];
-        lower=max(-limit,branches-error);upper=min(limit,branches+error);
-        allowed=lower<=upper;
-        if any(allowed)
-            angles=[min(lower(allowed));max(upper(allowed))];
-            bounds(:,2)=localIntersectArcSideslip(bounds(:,2),angles,lengthTotal,rad,lr);
-        end
-    end
-    % A later resolvable displacement proves the target had not yet
-    % reached its absorbing stop at the end of these two earlier chords.
-    last=find(vecnorm(position-points)>rad,1,'last');
-    if ~isempty(last) && last>=3
-        idx=[1,ceil(last/2),last];dt=diff(times(idx));
-        lengths=vecnorm(diff(points(:,idx),1,2));
-        low=max(0,lengths-rad);high=lengths+rad;
-        halfTurn=domain.yawRateMaximum*dt/2;
-        scale=ones(size(dt));nz=halfTurn>0;scale(nz)=halfTurn(nz)./sin(halfTurn(nz));
-        upper=high.*scale;
-        k=max(abs(sin(bounds(:,2))))/lr;
-        if k>0
-            small=k*high<2;
-            upper(small)=min(upper(small),2*asin(k*high(small)/2)/k);
-        else
-            upper=high;
-        end
-        accel=2*[low(2)/dt(2)-upper(1)/dt(1);upper(2)/dt(2)-low(1)/dt(1)]/sum(dt);
-        bounds(:,1)=[max(bounds(1,1),accel(1));min(bounds(2,1),accel(2))];
-    end
+    radii=track.motionHistory.positionErrorRadii+32*eps(max(1,max(abs(points),[],'all')));
+    bounds=localChordMotionBounds(bounds,points,times,radii,domain.yawRateMaximum,lr);
     if any(bounds(1,:)>bounds(2,:))
         error('onlineNrmmTrackingRuntime:inconsistentTargetMotion', ...
             'Radar history does not admit the declared constant target parameters.');
@@ -255,6 +237,172 @@ function [track,heading]=localMotionBounds(track,time,position,noiseBounds,domai
         % and the course-to-body rotation. It remains defined at rest.
         heading=atan2(chord(2),chord(1))+asin(max(-1,min(1,k*lengthTotal/2)))-beta;
         heading=atan2(sin(heading),cos(heading));
+    end
+end
+
+function bounds=localChordMotionBounds(bounds,points,times,radii,rate,lr)
+% A chord measures the speed at its time midpoint (before absorption)
+% and the course at its arc-length midpoint. Both are affine functions
+% with unknown intercepts. Intersect the strips over all return pairs.
+    count=numel(times);
+    persistent left right capacity
+    if isempty(capacity) || capacity<count
+        capacity=max(count,2^nextpow2(count));
+        [left,right]=find(triu(true(capacity),1));
+        left=left.';right=right.';
+    end
+    pairs=count*(count-1)/2;
+    i=left(1:pairs);j=right(1:pairs);
+    diffX=points(1,j)-points(1,i);diffY=points(2,j)-points(2,i);
+    chordLength=hypot(diffX,diffY);chordError=radii(i)+radii(j);duration=times(j)-times(i);
+    arcLow=max(0,chordLength-chordError);arcHigh=chordLength+chordError;
+    halfTurn=rate*duration/2;
+    arcHigh=arcHigh.*(halfTurn./sin(halfTurn));
+    resolved=chordLength>chordError;
+    if ~any(resolved),return;end
+
+    % Bound cumulative travel from the first return. Each prefix spans at
+    % most a quarter turn, including a possible stationary suffix.
+    first=i==1;
+    lowerTravel=[0,arcLow(first)];upperTravel=[0,arcHigh(first)];
+    arcMidLow=(lowerTravel(i)+lowerTravel(j))/2;
+    arcMidHigh=(upperTravel(i)+upperTravel(j))/2;
+    [~,best]=max(chordLength./chordError);reference=atan2(diffY(best),diffX(best));
+    direction=atan2(diffY(resolved),diffX(resolved))-reference;
+    direction=atan2(sin(direction),cos(direction));
+    angleError=asin(chordError(resolved)./chordLength(resolved))+64*eps(pi);
+    span=rate*(times(end)-times(1))+asin(chordError(best)/chordLength(best))+64*eps(pi);
+    % Discard an angle strip if its other 2*pi lift could intersect the
+    % same physical arc. Such a chord cannot safely select one lift.
+    unambiguous=abs(direction)+angleError+span<2*pi;
+    midLow=arcMidLow(resolved);midLow=midLow(unambiguous);
+    midHigh=arcMidHigh(resolved);midHigh=midHigh(unambiguous);
+    low=direction(unambiguous)-angleError(unambiguous);
+    high=direction(unambiguous)+angleError(unambiguous);
+    curvature=sin(bounds(:,2))/lr;
+    negative=localProjectSlope([curvature(1);min(0,curvature(2))],low,high,midLow,midHigh);
+    positive=localProjectSlope([max(0,curvature(1));curvature(2)],low,high,midHigh,midLow);
+    intervals=[negative,positive];
+    intervals=intervals(:,intervals(1,:)<=intervals(2,:));
+    if isempty(intervals)
+        bounds(:,2)=[Inf;-Inf];return
+    end
+    curvature=[min(intervals(1,:));max(intervals(2,:))];
+    bounds(:,2)=asin(max(-1,min(1,lr*curvature)));
+
+    % A subsequent resolved displacement proves that every earlier
+    % endpoint through its start preceded the absorbing stop.
+    last=max(i(resolved));moving=j<=last;
+    if ~any(moving),return;end
+    k=max(abs(curvature));upper=arcHigh(moving);highChord=chordLength(moving)+chordError(moving);
+    if k>0
+        small=k*highChord<2;
+        upper(small)=min(upper(small),2*asin(k*highChord(small)/2)/k);
+    else
+        upper=highChord;
+    end
+    dt=duration(moving);mid=(times(i(moving))+times(j(moving)))/2-times(1);
+    bounds(:,1)=localProjectSlope(bounds(:,1),arcLow(moving)./dt,upper./dt,mid,mid);
+end
+
+function [strips,bounds]=localAccelerationStrips(history,bounds,lr,rate)
+% A short moving arc also observes a joint acceleration vector. All chord
+% averages share the same midpoint velocity and Cartesian acceleration.
+    strips=[];
+    times=history.times;T=times(end)-times(1);
+    if T<=0,return;end
+    points=history.positions;d=points(:,end)-points(:,1);L=norm(d);
+    radii=history.positionErrorRadii+64*eps(max(1,max(abs(points),[],'all')));
+    endpointError=radii(1)+radii(end);
+    accel=max(abs(bounds(:,1)));curvature=sin(bounds(:,2))/lr;k=max(abs(curvature));
+    vLow=(L-endpointError)/T;
+    % The speed is Lipschitz even across absorption. This inequality proves
+    % positive speed throughout the window before using the moving equations.
+    if vLow<=accel*T/2,return;end
+    halfTurn=rate*T/2;
+    vHigh=(L+endpointError)*halfTurn/(sin(halfTurn)*T);
+    vmax=vHigh+accel*T/2;
+    jerk=hypot(k^2*vmax^3,3*k*vmax*accel);
+    % Difference between chord course and course at the time midpoint.
+    angleError=asin(endpointError/L)+k*accel*T^2/8;
+    if angleError>=pi/2,return;end
+    c=d/L;basis=[c,[-c(2);c(1)]];
+    [i,j]=find(triu(true(numel(times)),1));i=i.';j=j.';
+    dt=times(j)-times(i);centered=(times-times(1))-T/2;
+    mid=(centered(i)+centered(j))/2;
+    chord=basis.'*(points(:,j)-points(:,i))./dt;
+    error=(radii(i)+radii(j))./dt+jerk/6*(centered(i).^2+centered(i).*centered(j)+centered(j).^2);
+    scale=(vLow^2+vHigh^2)/2;
+    centrifugal=k*vHigh^2;
+    anglePad=(1-cos(angleError))*[accel;centrifugal]+sin(angleError)*[centrifugal;accel];
+    anglePad(2)=anglePad(2)+k*(vHigh^2-vLow^2)/2;
+    angles=(0:7)'*pi/8;axes=[cos(angles),sin(angles)];
+    diskSupport=localDiskSupport(axes,basis,points,times,radii,jerk,vmax,hypot(accel,centrifugal));
+    projected=axes*chord;strips=zeros(16,3);
+    magnitude=hypot(accel,centrifugal);
+    for j=1:size(axes,1)
+        interval=localProjectSlope([-magnitude;magnitude],projected(j,:)-error,projected(j,:)+error,mid,mid);
+        interval=[max(interval(1),-diskSupport(j+size(axes,1)));min(interval(2),diskSupport(j))];
+        n=axes(j,:);pad=abs(n)*anglePad+128*eps(max(1,magnitude));
+        row=[n(1),scale*n(2)];
+        strips(2*j-1:2*j,:)=[row,interval(2)+pad;-row,-interval(1)+pad];
+    end
+    bounds(:,1)=[max(bounds(1,1),-strips(2,3));min(bounds(2,1),strips(1,3))];
+    curvature=[max(curvature(1),-strips(10,3)/scale);min(curvature(2),strips(9,3)/scale)];
+    bounds(:,2)=asin(max(-1,min(1,lr*curvature)));
+    if any(bounds(1,:)>bounds(2,:))
+        error('onlineNrmmTrackingRuntime:inconsistentTargetMotion','Radar history excludes the declared motion bounds.');
+    end
+end
+
+function support=localDiskSupport(axes,basis,points,times,radii,jerk,vmax,magnitude)
+% The six Cartesian Taylor coefficients are shared by all return disks.
+% A dual multiplier bounds a support direction even for an inexact LP;
+% its stationarity residual is charged against the coefficient bounds.
+    directions=[axes;-axes];support=Inf(size(directions,1),1);
+    if exist('linprog','file')~=2 || ~license('test','Optimization_Toolbox'),return;end
+    half=(times(end)-times(1))/2;tau=(times-times(1))/half-1;
+    chord=norm(points(:,end)-points(:,1));
+    data=basis.'*(points-points(:,1))-[chord*(1+tau)/2;zeros(size(tau))];
+    padding=radii+jerk/6*abs(half*tau).^3+128*eps(max(1,max(abs(points),[],'all')));
+    normal=repmat(directions,numel(times),1);
+    u=repelem(tau.',size(directions,1));
+    H=[normal,normal.*u,normal.*u.^2];
+    rhs=reshape(directions*data+padding,[],1);
+    positionBound=chord/2+vmax*half+max(radii);
+    velocityBound=chord/2+vmax*half;
+    coeffBound=repelem([positionBound;velocityBound;magnitude*half^2/2],2);
+    persistent opts
+    if isempty(opts),opts=optimoptions('linprog','Display','none');end
+    for j=1:size(directions,1)
+        objective=[zeros(4,1);directions(j,:).'];
+        [~,~,flag,~,dual]=linprog(-objective,H,rhs,[],[],[],[],opts);
+        if flag<=0,continue;end
+        lambda=max(0,dual.ineqlin);
+        upper=lambda.'*rhs+abs(objective-H.'*lambda).'*coeffBound;
+        support(j)=(upper+128*eps(max(1,sum(abs(lambda.*rhs)))))*2/half^2;
+    end
+end
+
+function interval=localProjectSlope(interval,low,high,lowerSlope,upperSlope)
+% Eliminate the shared intercept in low-z*lowerSlope <= c <= high-z*upperSlope.
+% Each violated pair supplies a necessary half-line for z. Stopping early
+% retains an outer interval. Numeric padding only relaxes the strips.
+    if isempty(low) || interval(1)>interval(2),return;end
+    padding=64*eps(max([1,max(abs(low)),max(abs(high)),max(abs(interval))*max(abs([lowerSlope,upperSlope]))]));
+    low=low-padding;high=high+padding;
+    for side=1:2
+        for iter=1:12
+            z=interval(side);
+            [lower,i]=max(low-z*lowerSlope);[upper,j]=min(high-z*upperSlope);
+            if lower<=upper+padding,break;end
+            delta=lowerSlope(i)-upperSlope(j);
+            if (side==1 && delta<=0) || (side==2 && delta>=0)
+                interval=[Inf;-Inf];return
+            end
+            interval(side)=(low(i)-high(j))/delta;
+            if interval(1)>interval(2),return;end
+        end
     end
 end
 

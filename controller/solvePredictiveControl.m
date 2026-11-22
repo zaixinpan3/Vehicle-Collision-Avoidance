@@ -3148,7 +3148,7 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                 previousTrack=item.targetObserver;
                 try
                     [item.targetObserver,motion]=onlineNrmmTrackingRuntime("targetPoint", ...
-                        item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading,positionError);
+                        item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading,positionError,j==numel(block.samples));
                 catch exception
                     if ~strcmp(exception.identifier,'onlineNrmmTrackingRuntime:inconsistentTargetMotion'),rethrow(exception);end
                     excess=Inf;break
@@ -4290,7 +4290,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     prediction=struct('metadata',info,'scenarios',{traces},'memory',zeros(0,1),'information',hypotheses);
     result=struct('command',command,'inputs',best,'prediction',prediction,'state',state);
 
-    function admitted=admitScreenedPlan(inputs)
+    function [admitted,selected]=admitScreenedPlan(inputs)
         selected=validatePlan(inputs,[],@checkClock);
         pollAccepted=pollAccepted || selected;
         admitted=bestLoss<=lossFloor+slackRoundoff;
@@ -4874,7 +4874,7 @@ function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg,
     frame=predictiveSafetyGeometry.roadFrame(lane,struct('lateralClearance',[]));
     nominal=struct('state',[0;0;0;cfg.referenceSpeed;0;0],'curvature',frame(4));
     model=struct('cfg',cfg,'initialState',x,'previousInput',previous,'target',item.target, ...
-        'lane',lane,'road',struct('lateralClearance',[]),'frame',frame,'nominalReference',nominal,'compactInitialization',true,'motionLimits',item.motionLimits, ...
+        'lane',lane,'road',struct('lateralClearance',[]),'frame',frame,'nominalReference',nominal,'compactInitialization',true,'motionLimits',item.motionLimits,'motionCover',item.cover, ...
         'uncertainty',struct('collisionGenerator',zeros(6,0),'target',[]));
     if nargin>=6 && reentered
         % Sample the same guide at knot boundaries and their midpoints.
@@ -4943,48 +4943,88 @@ function [candidates,evaluations]=localCompactControlSearch(item,previous,kernel
     firstBatch=72;if ~isempty(item.cover),firstBatch=256;end
     points=boxLow+width.*mesh(:,1:firstBatch);
     candidates={};rank=zeros(0,3);locations=zeros(6,0);evaluations=0;
-    for level=1:4
+    bestScreenedLoss=Inf;done=false;
+    levels=4;
+    if ~isempty(item.cover)
+        % First poll sustained commands, then resolve shorter events down to
+        % a single physical hold. The same replay accepts either proposal.
+        for j=1:firstBatch/2
+            screen(points(:,j));
+            if done,return;end
+        end
+        t=time(1:end-1)/span;boxLow(5:6)=h/span;
+        width=boxHigh-boxLow;points=boxLow+width.*mesh(:,1:firstBatch);
+        levels=2;
+    end
+    searchWidth=width;
+    for level=1:levels
         fresh=cell(1,size(points,2));scores=Inf(size(points,2),3);
         for j=1:size(points,2)
-            if mod(j-1,8)==0,checkClock();end
-            z=points(:,j);
-            next=min(1,max(0,(t-z(5))/max(h/span,.25*z(5))));
-            tail=min(1,max(0,(t-z(5)-z(6))/max(h/span,.25*z(6))));
-            inputs=z(1:2)*(1-next)+z(3:4)*(next-tail)+trim*tail;
-            if rateLimited,inputs=localCompactRateLimit(inputs,previous,ones(1,count),cfg);end
-            [~,ends]=kernel.refinedRollout(x,[inputs,pad],item.parameters,enabled);
-            ego=[x,full(ends(:,1:count))];evaluations=evaluations+1;
-            if any(ego(4,:)<=0) || any(~isfinite(ego),'all'),continue;end
-            if ~isempty(item.cover)
-                [gap,~,remaining]=localCompactOccupied(item,ego,time,shape,cfg,[],cfg.vehicle.width);
-            else
-                poses=ego(1:3,:);
-                % Exact clearance clipped at one body width for ranking. A
-                % radius bound culls only pairs already beyond that clip.
-                near=vecnorm(poses(1:2,:)-q(1:2,:))-radius<cfg.vehicle.width;
-                gap=cfg.vehicle.width*ones(size(near));
-                gap(near)=min(cfg.vehicle.width,predictiveSafetyGeometry.rectangleClearance(poses(:,near),q(:,near),shape));
-            end
-            slip=atan2(ego(5,:)-cfg.vehicle.lr*ego(6,:),ego(4,:));
-            deficit=max(0,cfg.outputFeedback.clearanceMeters-gap);
-            hard=0;
-            if ~isempty(item.cover) && all(deficit==0)
-                hard=localCompactTerminalCheck(ego(:,end),item,time(end),inputs(:,end),kernel,cfg,[],checkClock,remaining);
-            end
-            scores(j,:)=[max(max(deficit),hard),sum(deficit)+hard,max(abs(slip))+.1*mean(inputs(2,:).^2)-min(gap)];
-            if all(deficit==0) && hard==0 && admit(inputs),return;end
-            fresh{j}=inputs;
+            [scores(j,:),fresh{j}]=screen(points(:,j));
+            if done,return;end
         end
-        [allScores,order]=sortrows([rank;scores]);
-        order=order(isfinite(allScores(:,1)));keep=1:min(4,numel(order));
+        [allScores,order]=sortrows([rank;scores]);keep=find(isfinite(allScores(:,1)),4);
         if isempty(keep),return;end
         candidates=[candidates,fresh];candidates=candidates(order(keep));
         locations=[locations,points];locations=locations(:,order(keep));
         rank=allScores(keep,:);
-        if level==4,break;end
-        width=width/2;nextMesh=mesh(:,firstBatch+72*(level-1)+(1:72));
-        refined=max(boxLow,min(boxHigh,locations(:,1)+width.*(nextMesh(:,1:36)-.5)));
-        points=[refined,boxLow+(boxHigh-boxLow).*nextMesh(:,37:72)];
+        if level<levels
+            searchWidth=searchWidth/2;
+            nextMesh=mesh(:,firstBatch+72*(level-1)+(1:72));
+            refined=max(boxLow,min(boxHigh,locations(:,1)+searchWidth.*(nextMesh(:,1:36)-.5)));
+            points=[refined,boxLow+width.*nextMesh(:,37:72)];
+        end
+    end
+    % Refine the best actuator coordinates continuously. The screen can
+    % suggest an iterate; admission uses the complete nonlinear replay.
+    boxLow(5:6)=h/span;width=boxHigh-boxLow;
+    opts=optimset('Display','off','MaxFunEvals',160,'MaxIter',120,'TolX',1e-4);
+    for j=1:min(3,size(locations,2))
+        origin=locations(:,j);
+        fminsearch(@merit,ones(6,1),opts);
+        if done,return;end
+    end
+    function value=merit(z)
+        if done,value=0;return;end
+        point=origin+(z-1).*width;
+        projection=min(boxHigh,max(boxLow,point));
+        [score,trial]=screen(projection);
+        value=score(1)+.01*score(2)+sum(abs(point-projection));
+        if value<rank(1,1)+.01*rank(1,2)
+            rank(1,:)=score;candidates{1}=trial;
+        end
+    end
+    function [score,inputs]=screen(z)
+        if mod(evaluations,8)==0,checkClock();end
+        score=[Inf,Inf,Inf];
+        next=min(1,max(0,(t-z(5))/max(h/span,.25*z(5))));
+        tail=min(1,max(0,(t-z(5)-z(6))/max(h/span,.25*z(6))));
+        inputs=z(1:2)*(1-next)+z(3:4)*(next-tail)+trim*tail;
+        if rateLimited,inputs=localCompactRateLimit(inputs,previous,ones(1,count),cfg);end
+        [~,ends]=kernel.refinedRollout(x,[inputs,pad],item.parameters,enabled);
+        ego=[x,full(ends(:,1:count))];evaluations=evaluations+1;
+        if any(ego(4,:)<=0) || any(~isfinite(ego),'all'),return;end
+        if ~isempty(item.cover)
+            [gap,~,remaining]=localCompactOccupied(item,ego,time,shape,cfg,[],cfg.vehicle.width);
+        else
+            poses=ego(1:3,:);
+            % Exact clearance clipped at one body width for ranking. A
+            % radius bound culls only pairs already beyond that clip.
+            near=vecnorm(poses(1:2,:)-q(1:2,:))-radius<cfg.vehicle.width;
+            gap=cfg.vehicle.width*ones(size(near));
+            gap(near)=min(cfg.vehicle.width,predictiveSafetyGeometry.rectangleClearance(poses(:,near),q(:,near),shape));
+        end
+        slip=atan2(ego(5,:)-cfg.vehicle.lr*ego(6,:),ego(4,:));
+        deficit=max(0,cfg.outputFeedback.clearanceMeters-gap);
+        hard=0;
+        if ~isempty(item.cover) && all(gap>0) && sum(deficit)<bestScreenedLoss
+            hard=localCompactTerminalCheck(ego(:,end),item,time(end),inputs(:,end),kernel,cfg,[],checkClock,remaining);
+        end
+        score=[max(max(deficit),hard),sum(deficit)+hard,max(abs(slip))+.1*mean(inputs(2,:).^2)-min(gap)];
+        if all(gap>0) && hard==0 && sum(deficit)<bestScreenedLoss
+            [done,selected]=admit(inputs);
+            if selected,bestScreenedLoss=sum(deficit);end
+        end
     end
 end
 
@@ -5213,9 +5253,34 @@ function cover=localCompactCover(item,h,count)
     cover=struct('h',h,'cells',zeros(2,2,numel(i)),'boxes',zeros(11,count+1,numel(i)), ...
         'centers',zeros(4,count+1,numel(i)));
     times=(0:count)*h;nominal=predictiveSafetyGeometry.predictTarget(item.target,times);
-    for k=1:numel(i)
-        limits=[acceleration(i(k)),slip(j(k));acceleration(min(i(k)+1,end)),slip(min(j(k)+1,end))];
-        cover.cells(:,:,k)=limits;
+    lower=[reshape(acceleration(i),1,[]);reshape(slip(j),1,[])];
+    upper=[reshape(acceleration(min(i+1,end)),1,[]);reshape(slip(min(j+1,end)),1,[])];
+    track=item.targetObserver;
+    if isfield(track,'motionStrips') && ~isempty(track.motionStrips)
+        strips=track.motionStrips;lr=item.target(7);
+        lower(2,:)=sin(lower(2,:))/lr;upper(2,:)=sin(upper(2,:))/lr;
+        % Keep the published NRMM center as well as every data-compatible
+        % constant motion. Each inequality only excludes impossible cells.
+        center=[item.target(5);sin(item.target(6))/lr];
+        strips(:,3)=max(strips(:,3),strips(:,1:2)*center);
+        for row=1:size(strips,1)
+            n=strips(row,1:2);rhs=strips(row,3);
+            for d=1:2
+                if abs(n(d))<=eps,continue;end
+                other=3-d;
+                bound=(rhs-min(n(other)*lower(other,:),n(other)*upper(other,:)))/n(d);
+                tol=64*eps(max(1,abs(bound)));
+                if n(d)>0,upper(d,:)=min(upper(d,:),bound+tol);
+                else,lower(d,:)=max(lower(d,:),bound-tol);end
+            end
+        end
+        keep=all(lower<=upper,1);lower=lower(:,keep);upper=upper(:,keep);
+        lower(2,:)=asin(max(-1,min(1,lr*lower(2,:))));upper(2,:)=asin(max(-1,min(1,lr*upper(2,:))));
+        cover.cells=cover.cells(:,:,1:nnz(keep));cover.boxes=cover.boxes(:,:,1:nnz(keep));
+        cover.centers=cover.centers(:,:,1:nnz(keep));
+    end
+    for k=1:size(lower,2)
+        limits=[lower(:,k).';upper(:,k).'];cover.cells(:,:,k)=limits;
         [cover.boxes(:,:,k),cover.centers(:,:,k)]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,limits,times,nominal);
     end
 end

@@ -40,6 +40,61 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(track.motionBounds(1,:),target(5:6).');
             testCase.verifyGreaterThanOrEqual(track.motionBounds(2,:),target(5:6).');
             testCase.verifyLessThan(diff(track.motionBounds),diff(coarse.motionBounds));
+            parameters=[target(5);sin(target(6))/target(7)];
+            testCase.verifyGreaterThanOrEqual(track.motionStrips(:,3),track.motionStrips(:,1:2)*parameters);
+        end
+
+        function allReturnPairsExcludeAFalseBrakingForecast(testCase)
+            cfg=collisionAvoidanceControllerConfig();dt=cfg.outputFeedback.sensorPeriod;
+            % A few near-extremal returns resolve acceleration even though
+            % the first, middle and last returns alone admit strong braking.
+            times=0:dt:.25;track=[];radius=.02;
+            for j=1:numel(times)
+                offset=0;
+                if any(j==[2,19]),offset=.019;elseif j==12,offset=-.019;end
+                p=[8*times(j)+offset;0];
+                track=onlineNrmmTrackingRuntime("targetPoint",track,times(j),p,0,cfg,[],radius);
+            end
+            testCase.verifyLessThanOrEqual(track.motionBounds(1,:),[0,0]);
+            testCase.verifyGreaterThanOrEqual(track.motionBounds(2,:),[0,0]);
+            testCase.verifyGreaterThan(track.motionBounds(1,1),-1);
+            testCase.verifyGreaterThanOrEqual(track.motionStrips(:,3),zeros(size(track.motionStrips,1),1));
+        end
+
+        function sameTargetRetainsMotionEvidenceAcrossARadarGap(testCase)
+            cfg=collisionAvoidanceControllerConfig();track=[];dt=cfg.outputFeedback.sensorPeriod;
+            q=[5;2;pi-.1;8;.4;.015;1.6;2.4;.95;0;0];
+            for t=0:dt:.5
+                p=predictiveSafetyGeometry.predictTarget(q,t);
+                track=onlineNrmmTrackingRuntime("targetPoint",track,t,p(1:2),0,cfg);
+            end
+            old=track.motionBounds;
+            for t=.5+dt:dt:2
+                track=onlineNrmmTrackingRuntime("targetPoint",track,t,[],0,cfg);
+            end
+            testCase.verifyFalse(track.initialized);
+            t=2+dt;p=predictiveSafetyGeometry.predictTarget(q,t);
+            [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,p(1:2),0,cfg);
+            testCase.verifyEmpty(motion);
+            testCase.verifyEqual(track.motionBounds,old);
+            testCase.verifyGreaterThanOrEqual(track.motionStrips(:,3), ...
+                track.motionStrips(:,1:2)*[q(5);sin(q(6))/q(7)]);
+        end
+
+        function poorlyResolvedSlowTurnUsesAConsistentSideslipAtAcquisition(testCase)
+            cfg=collisionAvoidanceControllerConfig();domain=estimatorControllerIntegrationConfig();
+            q=[12;0;0;1.36;-.17;.05;1.6;2.4;.95;0;0];track=[];
+            times=(0:19)*cfg.outputFeedback.sensorPeriod;
+            for t=times
+                p=predictiveSafetyGeometry.predictTarget(q,t);
+                point=p(1:2)-[0;.017*(2*t/times(end)-1)^2];
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,point,0,cfg,[],.02);
+            end
+            [~,raw]=nrmmObserverVectorField("targetDerivative",track.state, ...
+                struct('bodyVelocity',zeros(2,1),'yawRate',0),domain.trafficTargetObserver.domain);
+            testCase.verifyEqual(abs(raw.targetSideslip),domain.trafficTargetObserver.domain.sideslipMaximum,AbsTol=1e-12);
+            testCase.verifyEqual(motion(4),mean(track.motionBounds(:,2)),AbsTol=1e-12);
+            testCase.verifyLessThan(abs(motion(4)-q(6)),abs(raw.targetSideslip-q(6)));
         end
 
         function trafficPointReconstructsTurningAndBrakingFromPositionSamples(testCase)

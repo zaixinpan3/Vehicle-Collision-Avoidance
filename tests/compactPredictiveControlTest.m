@@ -1321,6 +1321,26 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             oracle=solvePredictiveControl("outputFeedback",request);
             testCase.verifyEqual(max(0,oracle.stage),replay.stageDeficits,AbsTol=1e-11);
         end
+        function measuredJointMotionBoundsEnterTheSameStageAndTerminalReplay(testCase)
+            item=testCase.block.initialHypotheses;
+            item.target=[10;5;pi;8;0;0;1.6;2.4;1;0;0];
+            r=struct('operation',"validateInputSequence",'cfg',testCase.cfg,'hypotheses',item, ...
+                'input',zeros(2,1),'inputs',zeros(2,28));
+            straight=solvePredictiveControl("outputFeedback",r);
+            r.hypotheses.targetObserver=struct('motionBounds',[-1,-.13;1,.13]);
+            broad=solvePredictiveControl("outputFeedback",r);
+            testCase.assertGreaterThan(broad.pcbfDeficit,straight.pcbfDeficit);
+            % Opposite oblique supports imply A=kappa=0. Neither marginal
+            % alone encodes these simultaneous restrictions.
+            r.hypotheses.targetObserver.motionStrips=[1,20,0;-1,-20,0;1,-20,0;-1,20,0];
+            restricted=solvePredictiveControl("outputFeedback",r);
+            testCase.verifyLessThan(restricted.pcbfDeficit,broad.pcbfDeficit);
+            testCase.verifyEqual(restricted.trajectories{1}.targets,straight.trajectories{1}.targets);
+            testCase.verifyTrue(restricted.accepted && restricted.trajectories{1}.terminal.member);
+            r.operation="evaluateControlSequence";r.holds=ones(1,28);
+            oracle=solvePredictiveControl("outputFeedback",r);
+            testCase.verifyEqual(max(0,oracle.stage),restricted.stageDeficits,AbsTol=1e-11);
+        end
         function aStoredPlanCanResumeAfterReplayWithTheCurrentMargin(testCase)
             cfg=testCase.cfg;prior=testCase.state;
             for previousMargin=[0,.2]
