@@ -780,10 +780,37 @@ Since the primary value is nonnegative, the solver first seeks a zero-deficit
 witness by minimizing the squared scaled actuator correction subject to all
 linearized zero-level inequalities and actuator bounds. Nonlinear replay
 checks the trial and further linearization uses a contracting residual.
-When the projection cannot yield a witness, the full slack-variable
-SQP minimizes the sum of stage deficits under the hard domain, motion and
-terminal constraints. A validated trial supplies an incumbent at its replayed
-deficit. A smaller deficit takes precedence over either performance cost. Within
+A step-length trial needs only the nonlinear values. At a retained
+linearization point the state and geometry from that evaluation supply
+the derivatives without another integration.
+
+If the projection stalls, or both its full and damped steps fail to
+improve the maximum residual once a verified incumbent exists, take
+sequential linear programming steps in
+scaled actuator coordinates $d$, subject to the actuator rows and an
+adaptive box $\|d\|_\infty\le r$. Let $H$ collect the model-domain and
+terminal residuals and let $L$ denote the inherited deficit cap, with
+$L=+\infty$ on admission. For $L>0$ the linearized inequalities are
+
+$$
+H + H' d \le t,\qquad C+C'd\le\xi,\qquad
+0\le\xi_j\le d_{\rm safe}+t,\qquad \sum_j\xi_j\le L+t .
+$$
+
+At a hard-infeasible search point minimize $t\ge0$ to obtain a search
+direction. At a hard-feasible point fix $t=0$ and minimize
+$\sum_j\xi_j$. For $L=0$ eliminate the slacks and use $C+C'd\le t$.
+The trial must reduce the corresponding nonlinear violation or reduce
+the primary deficit while satisfying the hard constraints. A rejected
+trial contracts the step box. The auxiliary $t$ never enters execution
+or the stored PCBF value. Only a validated trial supplies an incumbent
+at its measured deficit. If the projection already supplied an executable
+incumbent, one primary linear step and its nonlinear acceptance check
+suffice for dispatch. When the linear search starts without an incumbent,
+it proceeds from hard feasibility to the primary deficit objective. The incumbent
+remains available if that trial fails. A positive stored cost then uses
+the decrease condition for $J_k$ below and carries no claim of optimality.
+A smaller deficit takes precedence over either performance cost. Within
 the same budget, one further Gauss--Newton proposal on
 the linearized zero-deficit level may replace it after nonlinear validation
 and the two cost comparisons above.

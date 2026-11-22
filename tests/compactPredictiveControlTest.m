@@ -364,10 +364,30 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(info.callBudgetSeconds,data.configuration.outputFeedback.initializationSolveSeconds);
             testCase.verifyGreaterThan(info.zeroDeficitQpSteps,0);
             testCase.verifyEqual(info.nlpAttempts,0);
+            testCase.verifyLessThan(info.nonlinearDerivativeEvaluations,info.nonlinearOracleEvaluations);
             testCase.verifyTrue(info.nonlinearValidationPerformed && info.terminalSetEnforced);
             testCase.verifyEqual(info.pcbfValue,0,AbsTol=128*eps(1)*info.horizonSteps);
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
+        end
+        function blockedAdmissionAndWarmupUseTheCompactSolver(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            writelines(["function varargout=fmincon(varargin)"
+                "error('compactPredictiveControlTest:forbiddenSolver','Unexpected fmincon call');"
+                "end"],fullfile(folder.Folder,'fmincon.m'));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(folder.Folder));
+            campaign=runJointOutputFeedbackScenario(Frames=9,Speeds=15,Scenarios="brakingLead", ...
+                RandomSeed=20261108,OutputDirectory=string(folder.Folder));
+            data=jsondecode(fileread(campaign.results.source));
+            testCase.verifyTrue(data.compactSolversReadyBeforeFirstFrame);
+            testCase.verifyEmpty(data.warmupFailure);
+            if strcmp(data.outcome,'completed')
+                testCase.verifyTrue(data.trace(end).metadata.deficitDescentMet);
+                testCase.verifyTrue(data.trace(end).metadata.terminalSetEnforced);
+            else
+                testCase.verifyEqual(data.executedFrames,8);
+                testCase.verifyTrue(startsWith(data.failure,'collisionAvoidanceController:compactNoFeasiblePlan'));
+            end
         end
         function aPenetratingFieldRolloutInitializesTheDualSolve(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());

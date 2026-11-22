@@ -176,7 +176,7 @@ function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversR
         try
             startup.solversReady=localWarmCompactSolvers(cfg);
             if ~startup.solversReady
-                startup.failure="The startup probe did not exercise both the active-set QP and nonlinear SQP.";
+                startup.failure="The startup probe did not exercise both the active-set QP and sparse linear solver.";
             end
         catch exception
             startup.failure=string(exception.identifier)+": "+string(exception.message);
@@ -222,8 +222,8 @@ function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversR
 end
 
 function ready=localWarmCompactSolvers(runCfg)
-    % A fixed synthetic encounter exercises the actual projection QP, SQP
-    % callbacks and trajectory derivatives before the experiment clock starts.
+    % A fixed synthetic encounter exercises the projection QP, sparse LP
+    % and trajectory derivatives before the experiment clock starts.
     cfg=collisionAvoidanceControllerConfig();
     % This discarded offline solve uses the solver iteration limits. An
     % online wall-clock deadline can interrupt first-time toolbox loading.
@@ -243,31 +243,15 @@ function ready=localWarmCompactSolvers(runCfg)
         'block',block,'previousState',[]);
     result=solvePredictiveControl("outputFeedback",request);
     info=result.prediction.metadata;
-    sqpReady=info.nlpAttempts>0;
-    if ~sqpReady
-        % If the projection already found a plan, load SQP separately on
-        % an isolated one-hold instance of the same nonlinear constraints.
-        item.target(2)=2*(cfg.vehicle.width+cfg.target.defaultWidth);
-        probe=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
-            'hypotheses',item,'input',input,'holds',1);
-        opts=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
-            'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true);
-        [~,~,flag]=fmincon(@effort,[0;.01],[],[],[],[], ...
-            [-cfg.outputFeedback.steeringMaximum;cfg.actuation.brakingRatioMinimum], ...
-            [cfg.outputFeedback.steeringMaximum;cfg.actuation.brakingRatioMaximum],@constraints,opts);
-        sqpReady=flag>0;
+    lpReady=info.nlpAttempts>0;
+    if ~lpReady
+        % Load the same bounded stage-deficit LP backend when the projection
+        % already reached zero on the offline fixture.
+        opts=optimoptions('linprog','Algorithm','dual-simplex-highs','Display','none');
+        [~,~,flag]=linprog([0;1],sparse([1,-1]),-.01,[],[],[-1;0],[1;.1],opts);
+        lpReady=flag>0;
     end
-    ready=info.zeroDeficitQpSteps>0 && sqpReady;
-
-    function [value,gradient]=effort(u)
-        value=u.'*u/2;gradient=u;
-    end
-    function [c,ceq,gc,gceq]=constraints(u)
-        probe.inputs=u;
-        e=solvePredictiveControl("outputFeedback",probe);
-        c=[e.stage;e.forward;e.terminal];gc=[e.stageGradient,e.forwardGradient,e.terminalGradient];
-        ceq=[];gceq=[];
-    end
+    ready=info.zeroDeficitQpSteps>0 && lpReady;
 end
 
 function timing=localTiming(seconds,deadline)

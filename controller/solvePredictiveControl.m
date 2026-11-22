@@ -4083,7 +4083,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     % A previous implementation could store a parking sequence. Preserve the
     % posterior when resuming such states and construct a fresh driving plan.
     inherit=~initial && isfield(prior,'movingTerminalPlan') && prior.movingTerminalPlan;
-    attempts=0;iterationCount=0;projectionSteps=0;calls=0;reuseCount=0;restoration=false;seedCount=0;
+    attempts=0;iterationCount=0;projectionSteps=0;calls=0;reuseCount=0;restoration=false;seedCount=0;gradientCalls=0;
+    bestU=[];bestValues=[];bestFlows=[];
     cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;initialPeakDeficit=NaN;
     stabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
     bestCost=Inf;inheritedCost=NaN;deadline=budget+startupBuildSeconds;
@@ -4181,47 +4182,28 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 end
                 % Signed rectangle duals at the field trajectory define the
                 % first SQP model even for a penetrating initial iterate.
-                [cache,rollouts]=localCondensedOracle(start,model,true,[],@checkClock,false);
-                cacheU=start;calls=calls+1;
-                initialPeakDeficit=max(0,max(cache.stage));
-                initialDeficit=sum(max(0,cache.stage));initialTerminal=max(cache.terminal);
+                e=evaluate(start,false);
+                initialPeakDeficit=max(0,max(e.stage));
+                initialDeficit=sum(max(0,e.stage));initialTerminal=max(e.terminal);
                 considerSolution(start);
-                e=cache;restoration=true;
+                restoration=true;
                 % Zero is the lower bound of the PCBF objective. Seek a
                 % witness on that level in actuator coordinates alone.
                 [start,e]=projectToZeroDeficit(start,e);
-                trial=stabilityStep(start,e,false);
-                if ~isempty(trial)
-                    candidate=evaluate(trial);
-                    if candidate.stabilityCost<e.stabilityCost && ...
-                            sum(max(0,candidate.stage))<=initialDeficit+tolerance && ...
-                            max([0;candidate.forward;candidate.terminal])<=max([0;e.forward;e.terminal])+tolerance
-                        start=trial;
-                        e=candidate;
+                if isempty(best)
+                    if ~e.derivatives,e=evaluate(start,true);end
+                    trial=stabilityStep(start,e,false);
+                    if ~isempty(trial)
+                        candidate=evaluate(trial,false);
+                        if candidate.stabilityCost<e.stabilityCost && ...
+                                sum(max(0,candidate.stage))<=initialDeficit+tolerance && ...
+                                max([0;candidate.forward;candidate.terminal])<=max([0;e.forward;e.terminal])+tolerance
+                            start=trial;e=candidate;
+                        end
                     end
                 end
-                % At zero inherited budget every nonnegative slack is fixed
-                % to zero. Eliminate those variables exactly in this case.
-                z=start./controlScale;
-                linearRows=a.*controlScale.';linearBounds=b;
-                low=lower./controlScale;high=upper./controlScale;
-                if priorCap>0
-                    margin=cfg.outputFeedback.clearanceMeters;
-                    z=[z;min(margin,max(0,e.stage))];
-                    linearRows=[linearRows,zeros(size(a,1),count)];
-                    low=[low;zeros(count,1)];high=[high;margin*ones(count,1)];
-                    if isfinite(priorCap)
-                        linearRows=[linearRows;zeros(1,nu),ones(1,count)];
-                        linearBounds=[linearBounds;priorCap];
-                    end
-                end
-                opts=optimoptions('fmincon','Algorithm','sqp','Display','off', ...
-                    'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true, ...
-                    'ConstraintTolerance',max(1e-7,tolerance),'OptimalityTolerance',1e-5, ...
-                    'StepTolerance',1e-9,'MaxIterations',cfg.outputFeedback.restorationMaximumIterations, ...
-                    'MaxFunctionEvaluations',10000,'OutputFcn',@progress);
-                attempts=1;
-                fmincon(@objective,z,linearRows,linearBounds,[],[],low,high,@constraints,opts);
+                if ~isempty(bestU),start=bestU;e=bestValues;end
+                minimizeDeficit(start,e);
             end
         catch exception
             if ~any(strcmp(exception.identifier,{'collisionAvoidanceController:condensedFeasible', ...
@@ -4236,6 +4218,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         % The primary optimum is zero. A secondary step must satisfy that
         % same level and the terminal handoff on nonlinear replay.
         try
+            cache=evaluate(cacheU,true);
             trial=stabilityStep(cacheU,cache,true);
             if ~isempty(trial)
                 [candidate,flows]=localCondensedOracle(trial,model,false,[],@checkClock,false);
@@ -4296,7 +4279,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'searchRestartedAtRest',false, ...
         'deferredTrialAccepted',false,'deferredTrialStored',false, ...
         'safetyObjective',"sumOfHorizonSafetySlacks",'nonlinearOracleEvaluations',calls, ...
-        'oraclePropagationReuses',reuseCount,'callBudgetSeconds',budget, ...
+        'oraclePropagationReuses',reuseCount,'nonlinearDerivativeEvaluations',gradientCalls,'callBudgetSeconds',budget, ...
         'startupBuildSeconds',startupBuildSeconds,'budgetPhase',budgetPhase, ...
         'budgetScope',"completeWarmControllerCall",'budgetStopped',budgetStopped,'budgetStopPhase',budgetStopPhase);
     info.callBudgetOverrunSeconds=max(0,info.elapsedSeconds-budget-startupBuildSeconds);
@@ -4336,6 +4319,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             'MaxIterations',cfg.outputFeedback.qpMaximumIterations);
         while projectionSteps<cfg.outputFeedback.restorationMaximumIterations
             checkClock();
+            if ~e.derivatives,e=evaluate(u,true);end
             margins=[e.stage;e.forward;e.terminal];
             worstMargin=max(margins);
             stepUnit=1;
@@ -4355,15 +4339,20 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             if isequal(proposal,u) || any(~isfinite(proposal)) || max([a*proposal-b;lower-proposal;proposal-upper])>tolerance
                 return;
             end
-            candidate=evaluate(proposal);
+            candidate=evaluate(proposal,false);
             residual=max([candidate.stage;candidate.forward;candidate.terminal]);
             if residual>=worstMargin/2
                 % A bound-constrained tangent step can overshoot the nonlinear
                 % flow. Backtrack on the actual worst inequality.
                 while residual>=worstMargin && norm(proposal-u,Inf)>tolerance
                     proposal=(proposal+u)/2;
-                    candidate=evaluate(proposal);
+                    candidate=evaluate(proposal,false);
                     residual=max([candidate.stage;candidate.forward;candidate.terminal]);
+                    if ~isempty(bestU) && residual>=worstMargin
+                        % Both the full and damped steps stalled. Resume at
+                        % the verified incumbent with the primary objective.
+                        return
+                    end
                 end
                 if worstMargin-residual<=tolerance,return;end
             end
@@ -4398,14 +4387,22 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             error('collisionAvoidanceController:condensedDeadline','The feasibility search budget elapsed.');
         end
     end
-    function e=evaluate(u)
-        if isempty(cacheU) || ~isequal(cacheU,u)
-            checkClock();
-            [cache,rollouts]=localCondensedOracle(u,model,true,[],@checkClock,false);
-            cacheU=u;calls=calls+1;
-            considerSolution(u);
+    function result=evaluate(u,derivatives)
+        if ~isequal(cacheU,u) && isequal(bestU,u)
+            cacheU=bestU;cache=bestValues;rollouts=bestFlows;
         end
-        e=cache;
+        if ~isequal(cacheU,u)
+            checkClock();
+            [cache,rollouts]=localCondensedOracle(u,model,derivatives,[],@checkClock,false);
+            cacheU=u;calls=calls+1;gradientCalls=gradientCalls+derivatives;
+            if restoration,considerSolution(u);end
+        elseif derivatives && ~cache.derivatives
+            checkClock();
+            [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,@checkClock,false);
+            gradientCalls=gradientCalls+1;
+            if isequal(u,bestU),bestValues=cache;bestFlows=rollouts;end
+        end
+        result=cache;
     end
     function considerSolution(u)
         if sum(max(0,cache.stage))>bestLoss+tolerance || max(cache.stage)>=cfg.outputFeedback.clearanceMeters || ...
@@ -4413,27 +4410,91 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             return
         end
         inputs=reshape(u,2,nodes)*model.map.'+model.offset;
-        validatePlan(inputs,rollouts,@checkClock);reuseCount=reuseCount+1;
+        [selected,~]=validatePlan(inputs,rollouts,@checkClock);reuseCount=reuseCount+1;
+        if selected,bestU=u;bestValues=cache;bestFlows=rollouts;end
         if bestLoss<=lossFloor+slackRoundoff
             error('collisionAvoidanceController:condensedFeasible','The nonlinear PCBF attained its primary lower bound.');
         end
     end
-    function [f,g]=objective(z)
-        f=sum(z(nu+1:end));g=[zeros(nu,1);ones(numel(z)-nu,1)];
-    end
-    function [c,ceq,gc,gceq]=constraints(z)
-        e=evaluate(controlScale.*z(1:nu));ceq=[];gceq=[];
-        c=[e.stage;e.forward;e.terminal];
-        gc=controlScale.*[e.stageGradient,e.forwardGradient,e.terminalGradient];
-        if numel(z)>nu
-            c(1:count)=c(1:count)-z(nu+1:end);
-            gc=[gc;-eye(count),zeros(count,count+numel(hypotheses))];
+    function hard=hardViolation(e,loss)
+        if priorCap==0
+            stage=max(e.stage);
+        else
+            stage=max(max(e.stage)-cfg.outputFeedback.clearanceMeters,loss-priorCap);
         end
+        hard=max([0;e.forward;e.terminal;stage]);
     end
-    function stop=progress(~,values,status)
-        if strcmp(status,'iter') || strcmp(status,'init'),iterationCount=values.iteration;end
-        stop=toc(timer)>=deadline;
-        if stop,budgetStopped=true;budgetStopPhase=budgetPhase;end
+    function minimizeDeficit(u,e)
+        % Each linear step uses the same stage slacks as the nonlinear PCBF.
+        % A temporary epigraph measures hard infeasibility at search points.
+        margin=cfg.outputFeedback.clearanceMeters;
+        cap=priorCap;
+        useSlacks=cap>0;
+        slackCount=count*double(useSlacks);
+        nz=nu+slackCount;
+        radius=1;
+        hadIncumbent=~isempty(bestU);
+        opts=optimoptions('linprog','Algorithm','dual-simplex-highs','Display','none');
+        attempts=1;
+        while iterationCount<cfg.outputFeedback.restorationMaximumIterations
+            checkClock();
+            if ~e.derivatives,e=evaluate(u,true);end
+            loss=sum(max(0,e.stage));
+            hard=hardViolation(e,loss);
+            phaseOne=hard>tolerance;
+            % Variables are scaled input corrections, stage deficits and
+            % the epigraph. Its upper bound is zero in the primary solve.
+            stage=sparse(e.stageGradient.'.*controlScale.');
+            domain=sparse([e.forwardGradient,e.terminalGradient].'.*controlScale.');
+            if useSlacks
+                slackRows=-speye(count);
+            else
+                slackRows=sparse(count,0);
+            end
+            rows=[sparse(a.*controlScale.'),sparse(size(a,1),slackCount+1); ...
+                  domain,sparse(size(domain,1),slackCount),-ones(size(domain,1),1); ...
+                  stage,slackRows,-ones(count,1)*double(~useSlacks)];
+            rhs=[b-a*u;-e.forward;-e.terminal;-e.stage];
+            if useSlacks
+                rows=[rows;sparse(count,nu),speye(count),-ones(count,1)];
+                rhs=[rhs;repmat(margin,count,1)];
+                if isfinite(cap)
+                    rows=[rows;sparse(1,nu),ones(1,count),-1];
+                    rhs=[rhs;cap];
+                end
+            end
+            lowerStep=[max((lower-u)./controlScale,-radius);zeros(slackCount+1,1)];
+            upperStep=[min((upper-u)./controlScale,radius);inf(slackCount,1);0];
+            objective=zeros(nz+1,1);
+            if phaseOne
+                objective(end)=1;upperStep(end)=Inf;
+            else
+                objective(nu+1:nz)=1;
+            end
+            opts.MaxTime=max(eps,deadline-toc(timer));
+            [step,~,flag]=linprog(objective,rows,rhs,[],[],lowerStep,upperStep,opts);
+            iterationCount=iterationCount+1;
+            checkClock();
+            if flag<=0 || norm(step(1:nu),Inf)<=tolerance,return;end
+            if (phaseOne && step(end)>=hard-tolerance) || ...
+                    (~phaseOne && sum(step(nu+1:nz))>=loss-tolerance)
+                return
+            end
+            trial=u+controlScale.*step(1:nu);
+            candidate=evaluate(trial,false);
+            % With an executable incumbent, this primary step has had its
+            % nonlinear acceptance check. Retain the better admissible plan.
+            if hadIncumbent,return;end
+            nextLoss=sum(max(0,candidate.stage));
+            nextHard=hardViolation(candidate,nextLoss);
+            if (phaseOne && nextHard<hard-tolerance) || ...
+                    (nextHard<=tolerance && nextLoss<loss-tolerance)
+                u=trial;e=candidate;radius=radius*2;
+            else
+                radius=min(radius,norm(step(1:nu),Inf))/2;
+                if radius<=tolerance,return;end
+            end
+        end
     end
 end
 
@@ -4605,13 +4666,14 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
     end
     values=[inputs,zeros(2,capacity-N)];enabled=double((1:capacity)<=N);
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    e=struct('stage',-Inf(N,1),'stageGradient',zeros(nu,N),'forward',-Inf(N,1), ...
-        'forwardGradient',zeros(nu,N),'terminal',zeros(numel(model.hypotheses),1), ...
-        'terminalGradient',zeros(nu,numel(model.hypotheses)),'cost',0,'costGradient',zeros(nu,1), ...
-        'costHessian',zeros(nu),'derivatives',derivatives);
+    e=struct('stage',-Inf(N,1),'forward',-Inf(N,1),'terminal',zeros(numel(model.hypotheses),1), ...
+        'cost',0,'derivatives',derivatives);
     ratio=inputs(2,:).';
     e.stabilityCost=h/2*sum(ratio.^2+ratio.^4);
     if derivatives
+        e.stageGradient=zeros(nu,N);e.forwardGradient=zeros(nu,N);
+        e.terminalGradient=zeros(nu,numel(model.hypotheses));
+        e.costGradient=zeros(nu,1);e.costHessian=zeros(nu);
         ratioJacobian=model.map;
         squaredRatioJacobian=2*ratio.*ratioJacobian;
         e.stabilityGradient=zeros(nu,1);
@@ -4634,7 +4696,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             forward=flow.forward;
             fi=flow.fi;
             domainState=flow.domainState;
-            domainInput=flow.domainInput;remaining=flow.remaining;
+            domainInput=flow.domainInput;terminal=flow.terminal;g=flow.terminalGradient;
         else
             if ~isempty(rollouts.trajectories{s}) && isfield(rollouts.trajectories{s},'ends')
                 dense=rollouts.trajectories{s}.dense;ends=rollouts.trajectories{s}.ends;
@@ -4676,8 +4738,10 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 nodeIndices=(0:total-1)+side;
             end
             [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K,N);
+            target=[];if ~isempty(q),target=q(:,end);end
+            [terminal,~,g]=localCompactMovingValue(ends(:,end),target,item,total*h,cfg,checkBudget,remaining);
             rollouts.trajectories{s}.oracle=struct('dense',dense,'ends',ends,'allInputs',allInputs,'total',total, ...
-                'q',q,'boxes',boxes,'remaining',remaining,'activeStages',activeStages,'localStage',localStage,'nodeIndices',nodeIndices, ...
+                'q',q,'boxes',boxes,'terminal',terminal,'terminalGradient',g,'activeStages',activeStages,'localStage',localStage,'nodeIndices',nodeIndices, ...
                 'forward',forward,'fi',fi,'domainState',domainState, ...
                 'domainInput',domainInput);
             if ~isempty(q)
@@ -4688,11 +4752,13 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 end
             end
         end
-        [residual,slipDerivative]=localRearSlipResidual(ends(:,1:N),model,s);
+        if derivatives
+            [residual,slipDerivative]=localRearSlipResidual(ends(:,1:N),model,s);
+        else
+            residual=localRearSlipResidual(ends(:,1:N),model,s);
+        end
         weight=h/numel(model.hypotheses);
         e.stabilityCost=e.stabilityCost+weight/2*sum(residual.^2);
-        nodes=[item.ego,ends];roots=nodes(:,1:end-1);derivativeModel=model;
-        derivativeModel.controlMap=[model.controlMap;zeros(2*(total-N),nu)];
         slew=-Inf;channel=1;trim=terminalSafeSet.movingControl(cfg);
         if total>N
             rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
@@ -4700,12 +4766,12 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         end
         if ~derivatives
             e.stage=max(e.stage,localStage(1:N).');e.forward=max(e.forward,forward(1:N).');
-            target=[];if ~isempty(q),target=q(:,end);end
-            terminal=localCompactMovingValue(ends(:,end),target,item,total*h,cfg,checkBudget,remaining);
             e.terminal(s)=max([terminal,slew,localStage(N+1:end),forward(N+1:end)]);
-            if s==model.nominal,e.cost=localCompactPerformance(ends(:,cumsum(kernel.holds)),inputs,model);end
+            if performance && s==model.nominal,e.cost=localCompactPerformance(ends(:,cumsum(kernel.holds)),inputs,model);end
             continue;
         end
+        nodes=[item.ego,ends];roots=nodes(:,1:end-1);derivativeModel=model;
+        derivativeModel.controlMap=[model.controlMap;zeros(2*(total-N),nu)];
         % Geometry uses boundary sensitivities. Only the active physical
         % domain sample inside each hold needs a dense-sample sensitivity.
         stageNeeded=false(1,total);domainNeeded=false(1,total);
@@ -4737,8 +4803,6 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 if forward(i)>e.forward(i),e.forward(i)=forward(i);e.forwardGradient(:,i)=domainGradient;end
             end
         end
-        target=[];if ~isempty(q),target=q(:,end);end
-        [terminal,~,g]=localCompactMovingValue(ends(:,end),target,item,total*h,cfg,checkBudget,remaining);
         e.terminal(s)=terminal;e.terminalGradient(:,s)=(g*SE{end}).';
         if total>N
             [backupValue,index]=max(localStage(N+1:end));
