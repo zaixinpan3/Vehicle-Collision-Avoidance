@@ -30,7 +30,7 @@ function campaign = runJointOutputFeedbackScenario(options)
     for speed=options.Speeds
         for name=options.Scenarios
             cfg=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
-            if any(string(cfg.outputFeedback.method)==["compactNlp","ipopt"]) && exist('casadi.SX','class')~=8
+            if any(string(cfg.outputFeedback.method)==["ipopt","dynamicMemoryIpopt"]) && exist('casadi.SX','class')~=8
                 setupJointNlpSolver;
             end
             cfg.referenceSpeed=speed;cfg.model.speedMaximum=max(cfg.model.speedMaximum,1.2*speed);
@@ -171,12 +171,12 @@ end
 function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversReady)
     startup=struct('seconds',0,'holds',0,'failure',"",'solversReady',solversReady,'avoidanceContinuation',false);
     if ~options.Warmup || ~canRun,return;end
-    timer=tic;input=zeros(2,1);state=[];compact=string(cfg.outputFeedback.method)=="compactNlp";
+    timer=tic;input=zeros(2,1);state=[];compact=string(cfg.outputFeedback.method)=="ipopt";
     if compact && ~solversReady
         try
             startup.solversReady=localWarmCompactSolvers(cfg);
             if ~startup.solversReady
-                startup.failure="The startup probe did not exercise both the active-set QP and sparse linear solver.";
+                startup.failure="The startup probe did not invoke CasADi/IPOPT.";
             end
         catch exception
             startup.failure=string(exception.identifier)+": "+string(exception.message);
@@ -222,7 +222,7 @@ function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversR
 end
 
 function ready=localWarmCompactSolvers(runCfg)
-    % A fixed synthetic encounter exercises the projection QP, sparse LP
+    % A fixed synthetic encounter exercises the CasADi/IPOPT backend
     % and trajectory derivatives before the experiment clock starts.
     cfg=collisionAvoidanceControllerConfig();
     % This discarded offline solve uses the solver iteration limits. An
@@ -243,15 +243,7 @@ function ready=localWarmCompactSolvers(runCfg)
         'block',block,'previousState',[]);
     result=solvePredictiveControl("outputFeedback",request);
     info=result.prediction.metadata;
-    lpReady=info.nlpAttempts>0;
-    if ~lpReady
-        % Load the same bounded stage-deficit LP backend when the projection
-        % already reached zero on the offline fixture.
-        opts=optimoptions('linprog','Algorithm','dual-simplex-highs','Display','none');
-        [~,~,flag]=linprog([0;1],sparse([1,-1]),-.01,[],[],[-1;0],[1;.1],opts);
-        lpReady=flag>0;
-    end
-    ready=info.zeroDeficitQpSteps>0 && lpReady;
+    ready=info.solver=="casadiIpoptCompactPcbf" && info.nlpAttempts>0;
 end
 
 function timing=localTiming(seconds,deadline)

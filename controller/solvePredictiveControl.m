@@ -2870,7 +2870,16 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
         % observing a newly detected target under the acquisition window.
         request.previousState.configuration.outputFeedback.movingTargetObservationSeconds=cfg.outputFeedback.movingTargetObservationSeconds;
     end
-    if string(cfg.outputFeedback.method)=="compactNlp" && string(request.operation)=="step"
+    if isfield(request.previousState,'configuration') && isfield(request.previousState,'kind')
+        saved=request.previousState.configuration.outputFeedback.method;
+        if request.previousState.kind=="compactOutputFeedback-v1" && string(saved)=="compactNlp"
+            request.previousState.configuration.outputFeedback.method="ipopt";
+        elseif request.previousState.kind=="jointOutputFeedback-v1" && string(saved)=="ipopt" && ...
+                cfg.outputFeedback.method=="dynamicMemoryIpopt"
+            request.previousState.configuration.outputFeedback.method="dynamicMemoryIpopt";
+        end
+    end
+    if string(cfg.outputFeedback.method)=="ipopt" && string(request.operation)=="step"
         [result,diagnostics]=localCompactStep(request,cfg);problem=[];return;
     end
     timer=tic;block=request.block;prior=request.previousState;
@@ -2941,7 +2950,7 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
             isequal(conditioning.retainedIndices(:),(1:numel(prior.hypotheses))')
         warm=prior.nlpWarmStart;
     end
-    if string(cfg.outputFeedback.method)=="ipopt"
+    if string(cfg.outputFeedback.method)=="dynamicMemoryIpopt"
         [point,diagnostics,trajectory,warm]=localOfNonlinearOptimize(problem,initial,timer,warm);
     else
         [point,diagnostics,trajectory]=localOfOptimize(problem,initial,timer);
@@ -2955,7 +2964,7 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
         'memory',memory,'hypotheses',hypotheses,'appliedInput',input, ...
         'committedPolicy',accepted(1),'policies',accepted,'configuration',cfg, ...
         'reference',request.reference,'conditioning',conditioning);
-    if string(cfg.outputFeedback.method)=="ipopt"
+    if string(cfg.outputFeedback.method)=="dynamicMemoryIpopt"
         state.nlpWarmStart=warm;state.nlpHypothesisCapacity=capacity;
     end
     diagnostics.conditioning=conditioning;diagnostics.elapsedSeconds=toc(timer);
@@ -2964,7 +2973,7 @@ function [result,diagnostics,problem] = localOfStep(request,cfg)
     diagnostics.scenarioCount=numel(problem.scenarios);
     diagnostics.activeScenarioCount=numel(hypotheses)*size(cfg.outputFeedback.noiseDirections,2);
     diagnostics.safetyScope="finiteJointScenariosLinearizedRti";
-    if string(cfg.outputFeedback.method)=="ipopt"
+    if string(cfg.outputFeedback.method)=="dynamicMemoryIpopt"
         diagnostics.safetyScope="finiteJointScenariosNonlinearRolloutValidated";
     end
     diagnostics.robustNonlinearSafetyCertified=false;
@@ -3074,7 +3083,7 @@ function flow=localOfInferenceKernel(cfg,duration)
     % Match the fixed prediction/replay mesh so conditioned successor roots
     % agree with the previously accepted held-input trajectory.
     persistent keys flows
-    if string(cfg.outputFeedback.method)~="compactNlp",flow=[];return;end
+    if string(cfg.outputFeedback.method)~="ipopt",flow=[];return;end
     key={cfg,duration};index=[];
     for j=1:numel(keys),if isequaln(keys{j},key),index=j;break;end,end
     if isempty(index)
@@ -3263,7 +3272,7 @@ function window = localOfWindow(hypotheses,inheritedCount,cfg)
     speed=max(arrayfun(@(s)hypot(s.ego(4),s.ego(5)),hypotheses));
     if isempty(of.horizonSeconds)
         minimum=2*h;
-        if string(of.method)=="compactNlp"
+        if string(of.method)=="ipopt"
             minimum=max(minimum,of.minimumPreviewSeconds);
             % A low-speed preview must span the encounter's spatial scale,
             % not only braking time. This is a performance lookahead, not a
@@ -3300,7 +3309,7 @@ end
 
 function count=localConnectionSteps(hypotheses,cfg)
     count=0;
-    if string(cfg.outputFeedback.method)=="compactNlp" && any(arrayfun(@(item)~isempty(item.target),hypotheses))
+    if string(cfg.outputFeedback.method)=="ipopt" && any(arrayfun(@(item)~isempty(item.target),hypotheses))
         count=ceil(cfg.outputFeedback.minimumPreviewSeconds/cfg.controller.sampleTime);
     end
 end
@@ -3372,7 +3381,7 @@ function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg
         end
     end
     activeCount=numel(scenarios);
-    if string(cfg.outputFeedback.method)=="ipopt"
+    if string(cfg.outputFeedback.method)=="dynamicMemoryIpopt"
         % Keep the compiled NLP shape through posterior pruning. Duplicate
         % the last surviving trajectory with zero objective weight; its hard
         % rows are redundant and do not add a new uncertainty realization.
@@ -3403,7 +3412,7 @@ function problem = localOfProblem(hypotheses,memory,input,policies,reference,cfg
     try
         trajectories=localOfRollout(point,problem);
     catch exception
-        if string(cfg.outputFeedback.method)~="ipopt" || ...
+        if string(cfg.outputFeedback.method)~="dynamicMemoryIpopt" || ...
                 ~any(string(exception.identifier)==["collisionAvoidanceController:jointTrialDomain", ...
                 "collisionAvoidanceController:nonlinearDomain"]),rethrow(exception);end
         % A changed measured memory can invalidate a shifted numerical seed.
@@ -4083,10 +4092,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     % A previous implementation could store a parking sequence. Preserve the
     % posterior when resuming such states and construct a fresh driving plan.
     inherit=~initial && isfield(prior,'movingTerminalPlan') && prior.movingTerminalPlan;
-    attempts=0;iterationCount=0;projectionSteps=0;calls=0;reuseCount=0;restoration=false;seedCount=0;gradientCalls=0;
-    bestU=[];bestValues=[];bestFlows=[];
-    cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;initialPeakDeficit=NaN;
-    stabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
+    attempts=0;iterationCount=0;calls=0;reuseCount=0;restoration=false;seedCount=0;gradientCalls=0;
+    solverStatus="notCalled";converged=false;ipoptSeconds=0;constraintCount=0;bestU=[];
+    cacheU=[];cache=[];rollouts=[];includeTracking=false;initialDeficit=NaN;initialTerminal=NaN;initialPeakDeficit=NaN;
+    stabilitySteps=0;initialStabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
     bestCost=Inf;inheritedCost=NaN;deadline=budget+startupBuildSeconds;
     budgetStopped=false;budgetStopPhase="";
     bestLoss=Inf;bestSlacks=[];priorCap=Inf;slackRoundoff=128*eps(max(1,cfg.outputFeedback.clearanceMeters))*count;
@@ -4175,63 +4184,25 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 lateralGrip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
                 steerScale=atan2(cfg.vehicle.wheelbase*lateralGrip,speedSquared);
                 controlScale(1:2:end)=min(cfg.outputFeedback.steeringMaximum,steerScale);
-                if any(a*start-b>tolerance)
-                    opts=optimoptions('quadprog','Algorithm','active-set','Display','off','MaxIterations',200);
-                    [projected,~,flag]=quadprog(eye(nu),-start,a,b,[],[],lower,upper,start,opts);
-                    if flag>0,start=projected;else,start=controls(:);end
-                end
-                % Signed rectangle duals at the field trajectory define the
-                % first SQP model even for a penetrating initial iterate.
                 e=evaluate(start,false);
                 initialPeakDeficit=max(0,max(e.stage));
                 initialDeficit=sum(max(0,e.stage));initialTerminal=max(e.terminal);
                 considerSolution(start);
                 restoration=true;
-                % Zero is the lower bound of the PCBF objective. Seek a
-                % witness on that level in actuator coordinates alone.
-                [start,e]=projectToZeroDeficit(start,e);
-                if isempty(best)
-                    if ~e.derivatives,e=evaluate(start,true);end
-                    trial=stabilityStep(start,e,false);
-                    if ~isempty(trial)
-                        candidate=evaluate(trial,false);
-                        if candidate.stabilityCost<e.stabilityCost && ...
-                                sum(max(0,candidate.stage))<=initialDeficit+tolerance && ...
-                                max([0;candidate.forward;candidate.terminal])<=max([0;e.forward;e.terminal])+tolerance
-                            start=trial;e=candidate;
-                        end
-                    end
+                if bestLoss>lossFloor+slackRoundoff
+                    solveIpopt(start,false);
                 end
-                if ~isempty(bestU),start=bestU;e=bestValues;end
-                minimizeDeficit(start,e);
-            end
-        catch exception
-            if ~any(strcmp(exception.identifier,{'collisionAvoidanceController:condensedFeasible', ...
-                    'collisionAvoidanceController:condensedDeadline'})),rethrow(exception);end
-        end
-    end
-    if isempty(best)
-        error('collisionAvoidanceController:compactNoFeasiblePlan', ...
-            'No validated moving PCBF plan within the %s search. No command was committed.',budgetPhase);
-    end
-    if restoration && ~isempty(cache) && bestLoss<=tolerance && toc(timer)<deadline
-        % The primary optimum is zero. A secondary step must satisfy that
-        % same level and the terminal handoff on nonlinear replay.
-        try
-            cache=evaluate(cacheU,true);
-            trial=stabilityStep(cacheU,cache,true);
-            if ~isempty(trial)
-                [candidate,flows]=localCondensedOracle(trial,model,false,[],@checkClock,false);
-                calls=calls+1;
-                if candidate.stabilityCost<incumbentStability && ...
-                        max([candidate.stage;candidate.forward;candidate.terminal])<=tolerance
-                    inputs=localCompactRateLimit(reshape(trial,2,nodes)*model.map.'+model.offset,previous,ones(1,count),cfg);
-                    validatePlan(inputs,flows,@checkClock);
+                if ~isempty(bestU) && bestLoss<=lossFloor+slackRoundoff && toc(timer)<deadline
+                    solveIpopt(bestU,true);
                 end
             end
         catch exception
             if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
         end
+    end
+    if isempty(best)
+        error('collisionAvoidanceController:compactNoFeasiblePlan', ...
+            'No validated moving PCBF plan within the %s search. No command was committed.',budgetPhase);
     end
     solveSeconds=toc(solveClock);
     retainedTrajectories=cell(1,numel(hypotheses));
@@ -4247,10 +4218,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
         'pcbfDeficit',bestLoss,'stageDeficits',bestSlacks, ...
         'retainedTrajectories',{retainedTrajectories});
-    info=struct('solver',"condensedNonlinearPcbfSqp",'nlpStatus',"feasible", ...
-        'nlpConverged',false,'nlpIterations',iterationCount+projectionSteps,'nlpSeconds',solveSeconds, ...
+    info=struct('solver',"casadiIpoptCompactPcbf",'ipoptStatus',solverStatus,'ipoptSeconds',ipoptSeconds,'nlpStatus',"feasible", ...
+        'nlpConverged',converged,'nlpIterations',iterationCount,'nlpSeconds',solveSeconds, ...
         'nlpAttempts',attempts,'nlpBuildSeconds',buildSeconds,'nlpCacheHit',cacheHit, ...
-        'nlpVariables',nu+count*double(priorCap>0),'nlpConstraints',2*count+numel(hypotheses), ...
+        'nlpVariables',nu,'nlpConstraints',constraintCount, ...
         'informationUpdateSeconds',inferenceSeconds,'nonlinearValidationSeconds',validationSeconds, ...
         'inheritedReusedHolds',sum(inheritedReusedHolds), ...
         'elapsedSeconds',toc(timer),'deadlineSeconds',h,'predictionWindow',window, ...
@@ -4275,7 +4246,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'shiftContained',contained,'inheritedDeficitCap',priorCap,'deficitDescentMet',bestLoss<=priorCap+slackRoundoff, ...
         'inheritedPerformanceCost',inheritedCost,'acceptedPerformanceCost',bestCost, ...
         'firstFeasibleStabilityCost',firstFeasibleStability,'acceptedStabilityCost',incumbentStability, ...
-        'performanceAcceptedSteps',stabilitySteps,'partialQpSteps',0,'zeroDeficitQpSteps',projectionSteps, ...
+        'performanceAcceptedSteps',stabilitySteps,'partialQpSteps',0,'zeroDeficitQpSteps',0, ...
         'searchRestartedAtRest',false, ...
         'deferredTrialAccepted',false,'deferredTrialStored',false, ...
         'safetyObjective',"sumOfHorizonSafetySlacks",'nonlinearOracleEvaluations',calls, ...
@@ -4315,136 +4286,100 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         best=inputs;traces=checked;violation=maximum;bestLoss=loss;bestSlacks=slacks;
     end
 
-    function [u,e]=reduceInitialViolations(u,e)
-        % The gradient of each positive residual contributes, even if a
-        % different node is currently the worst. This merit guides proposals
-        % only. considerSolution enforces the original nonlinear PCBF.
-        options=optimoptions('quadprog','Algorithm','active-set','Display','off', ...
-            'MaxIterations',cfg.outputFeedback.qpMaximumIterations);
-        scaledInputs=a.*controlScale.';
-        previousStep=[];previousGradient=[];
-        for k=1:cfg.outputFeedback.restorationMaximumIterations
-            checkClock();
-            if ~e.derivatives,e=evaluate(u,true);end
-            r=[e.stage;e.forward;e.terminal];active=r>0;
-            if ~any(active) || ~isempty(bestU),return;end
-            rows=[e.stageGradient,e.forwardGradient,e.terminalGradient].';
-            J=rows(active,:).*controlScale.';
-            residual=r(active);loss=residual.'*residual;
-            gradient=J.'*residual;
-            if isempty(previousStep)
-                H=J.'*J;
-                H=H+.01*max(1,mean(diag(H)))*eye(nu);
-            else
-                % Powell's damped BFGS update retains positive curvature
-                % as the attaining rectangle feature or tire force changes.
-                Hs=H*previousStep;
-                change=gradient-previousGradient;
-                curvature=previousStep.'*Hs;
-                product=previousStep.'*change;
-                if curvature>eps
-                    if product<.2*curvature
-                        weight=.8*curvature/(curvature-product);
-                        change=weight*change+(1-weight)*Hs;
-                        product=previousStep.'*change;
-                    end
-                    H=H+change*change.'/product-Hs*Hs.'/curvature;
-                end
-            end
-            [step,~,flag]=quadprog((H+H.')/2+1e-9*eye(nu),gradient,scaledInputs,b-a*u,[],[], ...
-                (lower-u)./controlScale,(upper-u)./controlScale,zeros(nu,1),options);
-            iterationCount=iterationCount+1;
-            if flag<=0 || norm(step,Inf)<=eps,return;end
-            accepted=false;
-            for backtrack=0:8
-                delta=2^(-backtrack)*step;
-                trial=u+controlScale.*delta;
-                candidate=evaluate(trial,false);
-                if ~isempty(bestU),return;end
-                next=max(0,[candidate.stage;candidate.forward;candidate.terminal]);
-                if next.'*next < loss+2e-4*(gradient.'*delta)
-                    u=trial;e=candidate;accepted=true;
-                    previousStep=delta;previousGradient=gradient;
-                    break
-                end
-            end
-            if ~accepted,return;end
-        end
-    end
-
-    function [u,e]=projectToZeroDeficit(u,e)
-        options=optimoptions('quadprog','Algorithm','active-set','Display','off', ...
-            'MaxIterations',cfg.outputFeedback.qpMaximumIterations);
-        while projectionSteps<cfg.outputFeedback.restorationMaximumIterations
-            checkClock();
-            if ~e.derivatives,e=evaluate(u,true);end
-            margins=[e.stage;e.forward;e.terminal];
-            worstMargin=max(margins);
-            stepUnit=1;
-            if worstMargin>0 && worstMargin<1e-4
-                % Express tiny corrections in units of the remaining deficit
-                % so the active-set solver can resolve them near feasibility.
-                stepUnit=max(worstMargin,eps);
-            end
-            rows=[a;[e.stageGradient,e.forwardGradient,e.terminalGradient].'];
-            rhs=[b-a*u;-margins];
-            lo=((lower-u)./controlScale)/stepUnit;hi=((upper-u)./controlScale)/stepUnit;
-            scaled=rows.*controlScale.';rhs=rhs/stepUnit;
-            [step,~,flag]=quadprog(eye(nu),zeros(nu,1),scaled,rhs,[],[],lo,hi,zeros(nu,1),options);
-            projectionSteps=projectionSteps+1;
-            if flag<=0,return;end
-            proposal=u+controlScale.*(stepUnit*step);
-            if isequal(proposal,u) || any(~isfinite(proposal)) || max([a*proposal-b;lower-proposal;proposal-upper])>tolerance
-                return;
-            end
-            candidate=evaluate(proposal,false);
-            residual=max([candidate.stage;candidate.forward;candidate.terminal]);
-            if projectionSteps==1 && isinf(priorCap) && initialTerminal<=tolerance && ...
-                    isempty(bestU) && residual>=worstMargin/2
-                [corrected,values]=reduceInitialViolations(u,e);
-                if ~isempty(bestU),u=bestU;e=bestValues;continue;end
-                if ~isequal(corrected,u),u=corrected;e=values;continue;end
-            end
-            if residual>=worstMargin/2
-                % A bound-constrained tangent step can overshoot the nonlinear
-                % flow. Backtrack on the actual worst inequality.
-                while residual>=worstMargin && norm(proposal-u,Inf)>tolerance
-                    proposal=(proposal+u)/2;
-                    candidate=evaluate(proposal,false);
-                    residual=max([candidate.stage;candidate.forward;candidate.terminal]);
-                    if ~isempty(bestU) && residual>=worstMargin
-                        % Both the full and damped steps stalled. Resume at
-                        % the verified incumbent with the primary objective.
-                        return
-                    end
-                end
-                if worstMargin-residual<=tolerance,return;end
-            end
-            u=proposal;e=candidate;
-        end
-    end
-
-    function trial=stabilityStep(u,e,zeroLevel)
+    function solveIpopt(start,secondary)
+        import casadi.*
+        % IPOPT owns all search directions, restoration and step lengths.
+        % Scale knots before exposing the exact nonlinear values to CasADi.
         checkClock();
-        rows=a;
-        rhs=b-a*u;
-        if zeroLevel
-            rows=[rows;[e.stageGradient,e.forwardGradient,e.terminalGradient].'];
-            rhs=[rhs;-e.stage;-e.forward;-e.terminal];
+        if exist('casadiFunctionCallback','class')~=8
+            addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'scripts'));
         end
-        hessian=(controlScale*controlScale.').*e.stabilityHessian+cfg.outputFeedback.regularization*eye(nu);
-        gradient=controlScale.*e.stabilityGradient;
-        options=optimoptions('quadprog','Algorithm','active-set','Display','off','MaxIterations',200);
-        [step,~,flag]=quadprog(hessian,gradient,rows.*controlScale.',rhs,[],[], ...
-            (lower-u)./controlScale,(upper-u)./controlScale,zeros(nu,1),options);
-        trial=[];
-        if flag>0
-            proposal=u+controlScale.*step;
-            if ~isequal(proposal,u) && max([a*proposal-b;lower-proposal;proposal-upper])<=tolerance
-                trial=proposal;
-            end
+        includeTracking=secondary;
+        if secondary,cacheU=[];end
+        outputCount=2*count+numel(hypotheses)+1+double(secondary);
+        oracle=casadiFunctionCallback('pcbf_rollout',[nu,1],[outputCount,1], ...
+            @ipoptValues,@ipoptJacobian);
+        oracleLifetime=onCleanup(@()oracle.release());
+        v=MX.sym('knots',nu);value=oracle.call({v});value=value{1};
+        inputRows=sparse(a.*controlScale.');
+        terminalEnd=2*count+numel(hypotheses);
+        hard=[value(count+1:terminalEnd);inputRows*v-b];
+        z=v;lo=lower./controlScale;hi=upper./controlScale;z0=start./controlScale;
+        % For fixed controls, xi_j=max(C_j,0) minimizes the original
+        % epigraph. Its sum and the maximum stage deficit retain every cap.
+        stage=value(1:count);
+        deficit=sum(fmax(stage,0));
+        cap=priorCap;
+        maxIterations=cfg.outputFeedback.nlpMaximumIterations;
+        if secondary
+            % The performance pass proposes one step from the feasible
+            % incumbent; primary iterations retain the configured limit.
+            maxIterations=1;
+            cap=bestLoss;
+            hard=[hard;value(end)-bestCost-tolerance];
+        end
+        if cap==0
+            constraints=[stage;hard];
+        else
+            constraints=[mmax(stage)-cfg.outputFeedback.clearanceMeters;hard];
+            if isfinite(cap),constraints=[constraints;deficit-cap];end
+        end
+        objective=deficit;
+        if secondary,objective=value(terminalEnd+1);end
+        ng=size(constraints,1);nz=size(z,1);constraintCount=ng;
+        % nlpsol outputs x, f, g, lam_x, lam_g, lam_p.
+        initialStabilitySteps=stabilitySteps;
+        stop=casadiFunctionCallback('pcbf_stop',[[nz;1;ng;nz;ng;0],ones(6,1)],[1,1], ...
+            @stopIpopt);
+        stopLifetime=onCleanup(@()stop.release());
+        options=struct('print_time',false,'error_on_fail',false,'calc_lam_p',false, ...
+            'iteration_callback',stop,'show_eval_warnings',false, ...
+            'ipopt',struct('print_level',0,'sb','yes','max_iter',maxIterations, ...
+            'hessian_approximation','limited-memory','bound_relax_factor',0, ...
+            'mu_strategy','monotone','mu_init',1e-6,'bound_push',1e-6,'bound_frac',1e-6, ...
+            'tol',tolerance,'constr_viol_tol',tolerance));
+        % The offline prewarm uses realmax. Passing it through the CasADi
+        % options converter can overflow; omit a wall limit for that case.
+        if deadline<flintmax,options.ipopt.max_wall_time=max(.001,deadline-toc(timer));end
+        nlp=nlpsol('compact_pcbf','ipopt',struct('x',z,'f',objective,'g',constraints),options);
+        solverLifetime=onCleanup(@()delete(nlp));
+        attempts=attempts+1;
+        ipoptClock=tic;
+        answer=nlp('x0',z0,'lbx',lo,'ubx',hi,'lbg',-inf(ng,1),'ubg',zeros(ng,1));
+        ipoptSeconds=ipoptSeconds+toc(ipoptClock);
+        stats=nlp.stats();solverStatus=string(stats.return_status);
+        iterationCount=iterationCount+stats.iter_count;
+        converged=stats.success;
+        if toc(timer)>=deadline,budgetStopped=true;budgetStopPhase=budgetPhase;end
+        % A solver status alone never authorizes an actuator command.
+        point=full(answer.x);
+        clear solverLifetime options objective constraints hard deficit stage value
+        clear stopLifetime oracleLifetime
+        if all(isfinite(point)) && toc(timer)<deadline
+            evaluate(point(1:nu).*controlScale,false);
         end
     end
+
+    % Keep callback state in the controller frame. A callback must not retain
+    % the solver workspace that owns it across an encounter or MATLAB exit.
+    function stop=stopIpopt(~)
+        stop=double(toc(timer)>=deadline || (~includeTracking && bestLoss<=lossFloor+slackRoundoff) || ...
+            (includeTracking && stabilitySteps>initialStabilitySteps));
+    end
+
+    function output=ipoptValues(args)
+        e=evaluate(full(args{1}).*controlScale,false);
+        output=[e.stage;e.forward;e.terminal;e.stabilityCost];
+        if includeTracking,output=[output;e.cost];end
+    end
+
+    function output=ipoptJacobian(args)
+        e=evaluate(full(args{1}).*controlScale,true);
+        gradients=[e.stageGradient,e.forwardGradient,e.terminalGradient,e.stabilityGradient];
+        if includeTracking,gradients=[gradients,e.costGradient];end
+        output=(gradients.*controlScale).';
+    end
+
     function checkClock()
         if toc(timer)>=deadline
             budgetStopped=true;budgetStopPhase=budgetPhase;
@@ -4452,19 +4387,13 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         end
     end
     function result=evaluate(u,derivatives)
-        if ~isequal(cacheU,u) && isequal(bestU,u)
-            cacheU=bestU;cache=bestValues;rollouts=bestFlows;
-        end
         if ~isequal(cacheU,u)
-            checkClock();
-            [cache,rollouts]=localCondensedOracle(u,model,derivatives,[],@checkClock,false);
+            [cache,rollouts]=localCondensedOracle(u,model,derivatives,[],[],includeTracking);
             cacheU=u;calls=calls+1;gradientCalls=gradientCalls+derivatives;
             if restoration,considerSolution(u);end
         elseif derivatives && ~cache.derivatives
-            checkClock();
-            [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,@checkClock,false);
+            [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,[],includeTracking);
             gradientCalls=gradientCalls+1;
-            if isequal(u,bestU),bestValues=cache;bestFlows=rollouts;end
         end
         result=cache;
     end
@@ -4474,91 +4403,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             return
         end
         inputs=reshape(u,2,nodes)*model.map.'+model.offset;
-        [selected,~]=validatePlan(inputs,rollouts,@checkClock);reuseCount=reuseCount+1;
-        if selected,bestU=u;bestValues=cache;bestFlows=rollouts;end
-        if bestLoss<=lossFloor+slackRoundoff
-            error('collisionAvoidanceController:condensedFeasible','The nonlinear PCBF attained its primary lower bound.');
-        end
-    end
-    function hard=hardViolation(e,loss)
-        if priorCap==0
-            stage=max(e.stage);
-        else
-            stage=max(max(e.stage)-cfg.outputFeedback.clearanceMeters,loss-priorCap);
-        end
-        hard=max([0;e.forward;e.terminal;stage]);
-    end
-    function minimizeDeficit(u,e)
-        % Each linear step uses the same stage slacks as the nonlinear PCBF.
-        % A temporary epigraph measures hard infeasibility at search points.
-        margin=cfg.outputFeedback.clearanceMeters;
-        cap=priorCap;
-        useSlacks=cap>0;
-        slackCount=count*double(useSlacks);
-        nz=nu+slackCount;
-        radius=1;
-        hadIncumbent=~isempty(bestU);
-        opts=optimoptions('linprog','Algorithm','dual-simplex-highs','Display','none');
-        attempts=1;
-        while iterationCount<cfg.outputFeedback.restorationMaximumIterations
-            checkClock();
-            if ~e.derivatives,e=evaluate(u,true);end
-            loss=sum(max(0,e.stage));
-            hard=hardViolation(e,loss);
-            phaseOne=hard>tolerance;
-            % Variables are scaled input corrections, stage deficits and
-            % the epigraph. Its upper bound is zero in the primary solve.
-            stage=sparse(e.stageGradient.'.*controlScale.');
-            domain=sparse([e.forwardGradient,e.terminalGradient].'.*controlScale.');
-            if useSlacks
-                slackRows=-speye(count);
-            else
-                slackRows=sparse(count,0);
-            end
-            rows=[sparse(a.*controlScale.'),sparse(size(a,1),slackCount+1); ...
-                  domain,sparse(size(domain,1),slackCount),-ones(size(domain,1),1); ...
-                  stage,slackRows,-ones(count,1)*double(~useSlacks)];
-            rhs=[b-a*u;-e.forward;-e.terminal;-e.stage];
-            if useSlacks
-                rows=[rows;sparse(count,nu),speye(count),-ones(count,1)];
-                rhs=[rhs;repmat(margin,count,1)];
-                if isfinite(cap)
-                    rows=[rows;sparse(1,nu),ones(1,count),-1];
-                    rhs=[rhs;cap];
-                end
-            end
-            lowerStep=[max((lower-u)./controlScale,-radius);zeros(slackCount+1,1)];
-            upperStep=[min((upper-u)./controlScale,radius);inf(slackCount,1);0];
-            objective=zeros(nz+1,1);
-            if phaseOne
-                objective(end)=1;upperStep(end)=Inf;
-            else
-                objective(nu+1:nz)=1;
-            end
-            opts.MaxTime=max(eps,deadline-toc(timer));
-            [step,~,flag]=linprog(objective,rows,rhs,[],[],lowerStep,upperStep,opts);
-            iterationCount=iterationCount+1;
-            checkClock();
-            if flag<=0 || norm(step(1:nu),Inf)<=tolerance,return;end
-            if (phaseOne && step(end)>=hard-tolerance) || ...
-                    (~phaseOne && sum(step(nu+1:nz))>=loss-tolerance)
-                return
-            end
-            trial=u+controlScale.*step(1:nu);
-            candidate=evaluate(trial,false);
-            % With an executable incumbent, this primary step has had its
-            % nonlinear acceptance check. Retain the better admissible plan.
-            if hadIncumbent,return;end
-            nextLoss=sum(max(0,candidate.stage));
-            nextHard=hardViolation(candidate,nextLoss);
-            if (phaseOne && nextHard<hard-tolerance) || ...
-                    (nextHard<=tolerance && nextLoss<loss-tolerance)
-                u=trial;e=candidate;radius=radius*2;
-            else
-                radius=min(radius,norm(step(1:nu),Inf))/2;
-                if radius<=tolerance,return;end
-            end
-        end
+        [selected,~]=validatePlan(inputs,rollouts);reuseCount=reuseCount+1;
+        if selected,bestU=u;end
     end
 end
 

@@ -1,5 +1,5 @@
 classdef compactPredictiveControlTest < matlab.unittest.TestCase
-    % Direct-input planning with one fixed flow and checked SQP proposals.
+    % Direct-input planning with one fixed flow and checked CasADi/IPOPT proposals.
     properties (Access=private)
         cfg
         block
@@ -352,7 +352,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 end
             end
         end
-        function firstStoppedLeadEncounterReachesZeroDeficitWithQpProjection(testCase)
+        function firstStoppedLeadEncounterReachesZeroDeficitWithIpopt(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             campaign=runJointOutputFeedbackScenario(Frames=8,Speeds=15,Scenarios="stoppedLead", ...
                 RandomSeed=20261107,OutputDirectory=string(folder.Folder));
@@ -363,9 +363,10 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             info=data.trace(active).metadata;
             testCase.verifyEqual(data.trace(active).time-info.firstRadarTime,.25,AbsTol=1e-12);
             testCase.verifyEqual(info.callBudgetSeconds,data.configuration.outputFeedback.initializationSolveSeconds);
-            testCase.verifyGreaterThan(info.zeroDeficitQpSteps,0);
-            testCase.verifyEqual(info.nlpAttempts,0);
-            testCase.verifyLessThan(info.nonlinearDerivativeEvaluations,info.nonlinearOracleEvaluations);
+            testCase.verifyEqual(string(info.solver),"casadiIpoptCompactPcbf");
+            testCase.verifyGreaterThan(info.nlpAttempts,0);
+            testCase.verifyGreaterThan(info.nlpIterations,0);
+            testCase.verifyNotEqual(string(info.ipoptStatus),"notCalled");
             testCase.verifyTrue(info.nonlinearValidationPerformed && info.terminalSetEnforced);
             testCase.verifyEqual(info.pcbfValue,0,AbsTol=128*eps(1)*info.horizonSteps);
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
@@ -859,13 +860,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function theDefaultOptimizesDirectInputsWithoutMemoryMaps(testCase)
             cfg=collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.outputFeedback.method,"compactNlp");
+            testCase.verifyEqual(cfg.outputFeedback.method,"ipopt");
             testCase.verifyEmpty(testCase.state.memory);
             testCase.verifyFalse(isfield(testCase.state,'committedPolicy'));
             testCase.verifyTrue(testCase.prediction.metadata.nonlinearValidationPerformed);
             testCase.verifyFalse(testCase.prediction.metadata.robustNonlinearSafetyCertified);
             testCase.verifyEqual(testCase.prediction.metadata.nlpVariables, ...
-                2*testCase.prediction.metadata.controlNodes+testCase.prediction.metadata.horizonSteps);
+                2*testCase.prediction.metadata.controlNodes);
         end
         function previewGrowthReusesTheCompiledProblem(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.horizonResolutionSeconds=.5;
@@ -1115,7 +1116,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             info=prediction.metadata;
             testCase.verifyTrue(info.restorationAttempted);
             testCase.verifyGreaterThan(info.initialRestorationSlack,0);
-            testCase.verifyGreaterThan(info.zeroDeficitQpSteps,0);
+            testCase.verifyEqual(string(info.solver),"casadiIpoptCompactPcbf");
+            testCase.verifyGreaterThan(info.nlpAttempts,0);
+            testCase.verifyGreaterThan(info.nlpIterations,0);
             testCase.verifyLessThanOrEqual(info.acceptedStabilityCost,info.firstFeasibleStabilityCost);
             testCase.verifyEqual(info.pcbfValue,0);
             testCase.verifyTrue(info.terminalSetEnforced);

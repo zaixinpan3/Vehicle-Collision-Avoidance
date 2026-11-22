@@ -41,13 +41,13 @@ result = runJointOutputFeedbackScenario(Scenarios=names, Speeds=[8,15,25], ...
     Frames=160, RandomSeed=20261107, OutputDirectory=string(tempname));
 ```
 
-The default `outputFeedback.method="compactNlp"` uses 24 control knots where
+The default `outputFeedback.method="ipopt"` uses 24 control knots where
 preview length permits. Preview duration follows the current retained speed,
 a configured minimum duration, and inherited coverage. Physical commands
 still update every 50 ms, with dynamics and collision checks between knots.
 The allocated graph supports preview growth without online recompilation.
-With 24 knots, the zero-deficit projection uses 48 actuator variables.
-The full SQP adds one nonnegative clearance slack per predicted hold.
+With 24 knots, CasADi/IPOPT optimizes 48 actuator variables. Each stage
+slack equals its positive clearance deficit after algebraic elimination.
 
 `outputFeedback.nlpCompiler` selects `"clang"`, `"gcc"`, or `"cc"`;
 `nlpCompilerOptimization` selects levels 0--3. `nlpJit=false` permits execution
@@ -178,9 +178,8 @@ Endpoint control variables interpolate into a complete sequence of held
 commands. Constraints apply to those actual inputs and their increments.
 Collision checks use the rectangle distance dual at the control boundaries.
 A candidate must pass nonlinear replay for every retained member, including
-terminal membership and its continuation. The shared actuator projection
-seeks zero PCBF deficit first. The full slack SQP continues the search when
-needed. A shifted plan must pass the same checks on the updated information.
+terminal membership and its continuation. CasADi/IPOPT minimizes the
+sum of stage deficits under the inherited cap. A shifted plan must pass the same checks on the updated information.
 
 ## Tests and comparisons
 
@@ -192,7 +191,7 @@ results = runtests({'tests/compactPredictiveControlTest.m', ...
 assertSuccess(results)
 ```
 
-The optional `sqpRti` and `ipopt` methods retain the earlier dynamic-memory
+The optional `sqpRti` and `dynamicMemoryIpopt` methods retain the earlier dynamic-memory
 formulation as numerical comparators. The separate NRMM observer integration
 remains available through `Pipeline="nrmmComparator"`; it is not part of the
 compact optimizer. Source files stay in their existing controller,

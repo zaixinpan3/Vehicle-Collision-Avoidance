@@ -44,6 +44,8 @@ The user requires the following algorithmic structure. Performance work must
 preserve it; a faster implementation that drops it is a different algorithm,
 not an implementation of the adopted controller.
 
+- Use CasADi with IPOPT for online optimization in the adopted raw-sensor
+  controller. Verify backend changes through the normal scenario entry point.
 - Preserve the predictive control barrier function (PCBF) formulation, its
   primary safety objective and the conditions used to establish its decrease.
   A weighted feasibility-restoration penalty or ordinary collision-constrained

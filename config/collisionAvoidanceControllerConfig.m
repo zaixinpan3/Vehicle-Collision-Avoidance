@@ -22,18 +22,21 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
         end
         cfg=localMerge(cfg,userCfg);
     end
+    if isequal(string(cfg.outputFeedback.method),"compactNlp")
+        cfg.outputFeedback.method="ipopt";
+    end
     try
         localValidate(cfg);
     catch exception
         error('collisionAvoidanceController:invalidConfiguration','%s',exception.message);
     end
-    if string(cfg.outputFeedback.method)~="compactNlp" ...
+    if string(cfg.outputFeedback.method)~="ipopt" ...
             && ~(isstruct(userCfg) && isfield(userCfg,'outputFeedback') ...
             && isfield(userCfg.outputFeedback,'trackingWeights'))
         % Preserve the objective of the dynamic-memory research comparators.
         cfg.outputFeedback.trackingWeights=[1;1;.2;.1;.1];
     end
-    if string(cfg.outputFeedback.method)~="compactNlp" ...
+    if string(cfg.outputFeedback.method)~="ipopt" ...
             && ~(isstruct(userCfg) && isfield(userCfg,'outputFeedback') ...
             && isfield(userCfg.outputFeedback,'maximumSolveSeconds'))
         cfg.outputFeedback.maximumSolveSeconds=.06;
@@ -50,7 +53,9 @@ function cfg=localDefaults()
     % Nominal simulation road-wheel limit: 2021 Pacifica Hybrid OEM data
     % give 3.13 lock-to-lock turns / 16.2 ratio, about 34.8 deg each side.
     % This is an equivalent-angle estimate, not an actuator calibration.
-    cfg.outputFeedback=struct('method',"compactNlp",'nlpMaximumIterations',50,'restorationMaximumIterations',1000, ...
+    % restorationMaximumIterations is retained for saved configurations.
+    % The online IPOPT iteration limit is nlpMaximumIterations.
+    cfg.outputFeedback=struct('method',"ipopt",'nlpMaximumIterations',50,'restorationMaximumIterations',1000, ...
         'nlpTolerance',1e-7,'nlpJit',true,'nlpCompilerOptimization',2,'nlpCompiler',"clang", ...
         'sensorPeriod',.0125,'movingTargetObservationSeconds',.40,'memoryDimension',1, ...
         'noiseBounds',[.04;.03;.0015;.04], ...
@@ -234,8 +239,8 @@ end
 
 function localValidate(cfg)
     of=cfg.outputFeedback;
-    assert(isscalar(string(of.method)) && any(string(of.method)==["compactNlp","sqpRti","ipopt"]), ...
-        'outputFeedback.method must be compactNlp, sqpRti or ipopt.');
+    assert(isscalar(string(of.method)) && any(string(of.method)==["ipopt","sqpRti","dynamicMemoryIpopt"]), ...
+        'outputFeedback.method must be ipopt, sqpRti or dynamicMemoryIpopt.');
     validateattributes(of.controlNodes,{'double'},{'scalar','integer','finite','>=',6});
     validateattributes(of.nearControlNodes,{'double'},{'scalar','integer','finite','positive','<',of.controlNodes});
     validateattributes(of.nlpMaximumIterations,{'double'},{'scalar','integer','finite','positive'});
@@ -272,7 +277,7 @@ function localValidate(cfg)
     validateattributes(of.validationSubsteps,{'double'},{'scalar','integer','finite','>=',4});
     validateattributes(of.intersampleMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(of.clearanceMeters,{'double'},{'scalar','real','finite','nonnegative'});
-    if string(of.method)=="compactNlp" && of.clearanceMeters==0
+    if string(of.method)=="ipopt" && of.clearanceMeters==0
         localInvalid('Compact PCBF planning requires a positive clearanceMeters.');
     end
     validateattributes(of.inputWeight,{'double'},{'scalar','real','finite','nonnegative'});

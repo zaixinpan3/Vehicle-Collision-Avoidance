@@ -77,7 +77,10 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
         function compactTimingUsesTheWholeCallBudget(testCase)
             cfg=collisionAvoidanceControllerConfig();
             testCase.verifyEqual(cfg.outputFeedback.maximumSolveSeconds,1);
-            comparator=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('method',"ipopt")));
+            testCase.verifyEqual(cfg.outputFeedback.method,"ipopt");
+            legacy=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('method',"compactNlp")));
+            testCase.verifyEqual(legacy,cfg);
+            comparator=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('method',"dynamicMemoryIpopt")));
             testCase.verifyEqual(comparator.outputFeedback.maximumSolveSeconds,.06);
             explicit=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('maximumSolveSeconds',.25)));
             testCase.verifyEqual(explicit.outputFeedback.maximumSolveSeconds,.25);

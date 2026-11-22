@@ -508,7 +508,7 @@ b_4=-\tfrac12\theta^2+\tfrac23\theta^3.
 $$
 
 The nonlinear validation flow uses a fixed RK4 mesh, with physical-domain
-checks inside each hold and collision checks at its boundaries. Local SQP
+checks inside each hold and collision checks at its boundaries. Local flow
 sensitivities propagate $S_{j+1}=F_x S_j+F_uD_v u_j$ on a cheaper mesh. The
 held inputs reconstructed from a trial must pass the original nonlinear
 validation. Neither mesh supplies a certified integration-error bound.
@@ -765,67 +765,41 @@ encounter. Propagating them from each member gives the footprint poses
 for the signed dual in Section 5. Its value and an attaining feature
 supply the first stage deficit rows and their control Jacobians. These
 rows are defined at penetration as well as at separation. A positive
-$C_j(\bar v)$ is a residual for SQP. Initial feasibility of $\bar v$
-is unnecessary. At a subsequent iterate the inner distance dual is
-evaluated at its new poses. If an iterate attains the primary lower
-bound and passes the nonlinear hard and terminal checks, it can be
-committed immediately.
+$C_j(\bar v)$ is a residual at the initialization point. The initial
+trajectory may penetrate the target. Subsequent evaluations use the
+attaining dual at the new vehicle poses.
 
-When needed, project the initialization onto the linear actuator and terminal
-handoff rows. From this point a damped Gauss--Newton step for
-$J_{\rm tire}$ can advance the iterate when nonlinear replay reduces the
-cost without increasing either the total positive collision deficit or the
-maximum positive model-domain and terminal violation beyond numerical
-tolerance. The step uses the residuals $(b_j,b_j^2,a_{j+1}^s/\sqrt S)$ and
-the same input interpolation and physical bounds as the primary problem.
-Since the primary value is nonnegative, the solver first seeks a zero-deficit
-witness by minimizing the squared scaled actuator correction subject to all
-linearized zero-level inequalities and actuator bounds. Nonlinear replay
-checks the trial and further linearization uses a contracting residual.
+Let $H(v)\le0$ collect the nonlinear model-domain and terminal constraints,
+and let $L$ be the remaining inherited deficit, infinite on admission.
+CasADi transcribes the actuator interpolation and bounds. IPOPT obtains
+the condensed trajectory values and their active-branch Jacobians from
+the shared nonlinear prediction. A diagonal change of variables scales
+steering by its friction-limited turn angle and leaves the feasible set
+unchanged. IPOPT selects search directions and step lengths.
 
-At admission with a feasible terminal handoff, if the first projection
-leaves at least half the maximum residual and yields no executable
-incumbent, use the local merit
-$\tfrac12\|[C,H]_+\|_2^2$, where $H$ collects the domain and terminal
-residuals. In scaled actuator coordinates, initialize a regularized
-Gauss--Newton matrix from the violated rows, update it with damped BFGS
-secants, and backtrack on the nonlinear merit. The first admissible
-iterate returns to the primary PCBF solve. The merit has no role in
-the stored deficit or the nonlinear dispatch conditions.
-A step-length trial needs only the nonlinear values. At a retained
-linearization point the state and geometry from that evaluation supply
-the derivatives without another integration.
-
-If the projection stalls, or both its full and damped steps fail to
-improve the maximum residual once a verified incumbent exists, take
-sequential linear programming steps in
-scaled actuator coordinates $d$, subject to the actuator rows and an
-adaptive box $\|d\|_\infty\le r$. Let $H$ collect the model-domain and
-terminal residuals and let $L$ denote the inherited deficit cap, with
-$L=+\infty$ on admission. For $L>0$ the linearized inequalities are
-
+For fixed controls the smallest feasible individual slack is
+$\xi_j^*(v)=[C_j(v)]_+$. Eliminating these variables gives the same primary
+optimization over actuator knots:
 $$
-H + H' d \le t,\qquad C+C'd\le\xi,\qquad
-0\le\xi_j\le d_{\rm safe}+t,\qquad \sum_j\xi_j\le L+t .
+\min_v D(v)=\sum_j[C_j(v)]_+,\qquad
+\max_j C_j(v)\le d_{\rm safe},\quad D(v)\le L,\quad
+H(v)\le0,\quad v\in\mathcal U_N .
 $$
+On admission the infinite cap is omitted. With $L=0$ the stage inequalities
+reduce to $C_j(v)\le0$ for every $j$. The boundary of the feasible set
+includes contact when a stage slack equals $d_{\rm safe}$; dispatch still
+requires strictly positive measured node clearance. At a feature or active
+stage change the reduced functions can be nonsmooth. The local solver uses
+the supplied branch sensitivities; convergence to a global minimum is not
+assumed.
 
-At a hard-infeasible search point minimize $t\ge0$ to obtain a search
-direction. At a hard-feasible point fix $t=0$ and minimize
-$\sum_j\xi_j$. For $L=0$ eliminate the slacks and use $C+C'd\le t$.
-The trial must reduce the corresponding nonlinear violation or reduce
-the primary deficit while satisfying the hard constraints. A rejected
-trial contracts the step box. The auxiliary $t$ never enters execution
-or the stored PCBF value. Only a validated trial supplies an incumbent
-at its measured deficit. If the projection already supplied an executable
-incumbent, one primary linear step and its nonlinear acceptance check
-suffice for dispatch. When the linear search starts without an incumbent,
-it proceeds from hard feasibility to the primary deficit objective. The incumbent
-remains available if that trial fails. A positive stored cost then uses
-the decrease condition for $J_k$ below and carries no claim of optimality.
-A smaller deficit takes precedence over either performance cost. Within
-the same budget, one further Gauss--Newton proposal on
-the linearized zero-deficit level may replace it after nonlinear validation
-and the two cost comparisons above.
+The numerical primary lower bound is zero or the unavoidable current-node
+deficit. An admissible iterate attaining this bound may end the primary
+solve. The secondary problem minimizes $J_{\rm tire}$ on the attained
+level with $J(v)\le J_{\rm incumbent}+\varepsilon$ for the tracking cost.
+A local or interrupted solve can retain a verified incumbent at its actual
+stage deficits. Section 7 specifies the nonlinear dispatch and decrease
+conditions.
 
 ## 7. Node acceptance and retention of executable plans
 
@@ -969,7 +943,7 @@ nonlinear optimization, few decision nodes over substantial preview, and warm
 initialization. Its spatial-coordinate vehicle/actuator transcription is not
 identical to this held-input time-coordinate model, which includes rest.
 
-The optional `sqpRti` and `ipopt` dynamic-memory implementations and the
+The optional `sqpRti` and `dynamicMemoryIpopt` dynamic-memory implementations and the
 full independent ego/target observer integration are research comparators. The adopted compact
 controller does not optimize their memory maps or observer gains. The NRMM
 observer's own conditional derivation is in
