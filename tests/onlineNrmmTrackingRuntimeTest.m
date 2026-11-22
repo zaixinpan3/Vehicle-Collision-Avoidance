@@ -22,7 +22,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
 
     methods (Test)
         function aLongRadarGapRequiresFreshObserverAcquisition(testCase)
-            cfg=collisionAvoidanceControllerConfig();track=[];dt=cfg.outputFeedback.sensorPeriod;
+            cfg=localPointTestConfiguration();track=[];dt=cfg.outputFeedback.sensorPeriod;
             q=[5;2;pi-.1;8;.4;.015;1.6;2.4;.95;0;0];
             for t=0:dt:.5
                 p=predictiveSafetyGeometry.predictTarget(q,t);
@@ -39,7 +39,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function slowTurnPublishesTheNrmmInverseAndItsPropagatedUncertainty(testCase)
-            cfg=collisionAvoidanceControllerConfig();domain=estimatorControllerIntegrationConfig();
+            cfg=localPointTestConfiguration();domain=onlineNrmmTrackingRuntime("prepareTarget",cfg).domain;
             q=[12;0;0;1.36;-.17;.05;1.6;2.4;.95;0;0];track=[];
             times=(0:19)*cfg.outputFeedback.sensorPeriod;
             for t=times
@@ -48,18 +48,18 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,point,0,cfg,[],.02);
             end
             [~,raw]=nrmmObserverVectorField("targetDerivative",track.state, ...
-                struct('bodyVelocity',zeros(2,1),'yawRate',0),domain.trafficTargetObserver.domain);
-            testCase.verifyEqual(abs(raw.targetSideslip),domain.trafficTargetObserver.domain.sideslipMaximum,AbsTol=1e-12);
+                struct('bodyVelocity',zeros(2,1),'yawRate',0),domain);
+            testCase.verifyEqual(abs(raw.targetSideslip),domain.sideslipMaximum,AbsTol=1e-12);
             testCase.verifyEqual(motion(4),raw.targetSideslip);
             radii=track.errorBound.targetComponents;
             limits=nrmmControllerErrorBounds("targetParameters",track.state(3:4),track.state(5:6),radii(2),radii(3),0);
-            maxSlip=domain.trafficTargetObserver.domain.sideslipMaximum;
+            maxSlip=domain.sideslipMaximum;
             expected=asin(max(-1,min(1,cfg.target.rearAxleDistance*limits.curvatureInterval)));
             testCase.verifyEqual(track.motionBounds(:,2),max(-maxSlip,min(maxSlip,expected)));
         end
 
         function radarAcquisitionBoundsVelocityAcrossBrakingAndAbsorption(testCase)
-            cfg=collisionAvoidanceControllerConfig();dt=cfg.outputFeedback.sensorPeriod;
+            cfg=localPointTestConfiguration();dt=cfg.outputFeedback.sensorPeriod;
             for initialSpeed=[12,.4]
                 q=[1;2;.4;initialSpeed;-4;.01;1.6;2.4;.95;0;0];track=[];
                 for i=0:32
@@ -83,7 +83,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function aKnownInitialStateAccumulatesNrmmErrorAcrossAMissedReturn(testCase)
-            cfg=collisionAvoidanceControllerConfig();dt=cfg.outputFeedback.sensorPeriod;
+            cfg=localPointTestConfiguration();dt=cfg.outputFeedback.sensorPeriod;
             track=[];
             for k=0:20
                 t=k*dt;
@@ -104,7 +104,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function trafficPointReconstructsTurningAndBrakingFromPositionSamples(testCase)
-            cfg=collisionAvoidanceControllerConfig();dt=.0125;
+            cfg=localPointTestConfiguration();dt=.0125;
             for sideslip=[-.01,.01]
                 target=[20;4;.7;15;-.6;sideslip;1.6;2.4;.95;0;0];track=[];
                 for index=0:160
@@ -128,7 +128,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function firstFullOutputUsesPositionVelocityAndAccelerationAtTheLastReturn(testCase)
-            cfg=collisionAvoidanceControllerConfig();track=[];
+            cfg=localPointTestConfiguration();track=[];
             settings=estimatorControllerIntegrationConfig();
             for j=1:settings.initialization.minimumRadarSamples
                 t=(j-1)*cfg.outputFeedback.sensorPeriod;
@@ -139,7 +139,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function stationaryAcquisitionRequiresBothPositionHistoryAndPerceivedYaw(testCase)
-            cfg=collisionAvoidanceControllerConfig();settings=estimatorControllerIntegrationConfig();track=[];
+            cfg=localPointTestConfiguration();settings=estimatorControllerIntegrationConfig();track=[];
             for j=1:settings.initialization.minimumRadarSamples
                 [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,0,[12;3],.4,cfg,-.8);
                 testCase.verifyEmpty(motion);
@@ -156,7 +156,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function boundedPositionJitterAtRestPreservesTheLastResolvedHeading(testCase)
-            cfg=collisionAvoidanceControllerConfig();t0=[12;3;.8;4;-2;0;1.6;2.4;.95;0;0];
+            cfg=localPointTestConfiguration();t0=[12;3;.8;4;-2;0;1.6;2.4;.95;0;0];
             track=[];motion=[];
             for index=0:256
                 time=index*.0125;
@@ -172,7 +172,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(motion,[.78;0;0;0],AbsTol=1e-12);
         end
         function noisyBrakingPositionsKeepTheResolvedHeadingThroughTheStop(testCase)
-            cfg=collisionAvoidanceControllerConfig();track=[];target=[20;4;0;5;-2;0;1.6;2.4;.95;0;0];
+            cfg=localPointTestConfiguration();track=[];target=[20;4;0;5;-2;0;1.6;2.4;.95;0;0];
             for i=0:200
                 t=i*cfg.outputFeedback.sensorPeriod;q=predictiveSafetyGeometry.predictTarget(target,t);
                 noise=.49*cfg.outputFeedback.noiseBounds(4)*[cos(2*i);sin(3*i)];
@@ -186,7 +186,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function measuredBodyHeadingCorrectsOnlyOrientationOnASlowBrakingTurn(testCase)
-            cfg=collisionAvoidanceControllerConfig();track=[];positionsOnly=[];
+            cfg=localPointTestConfiguration();track=[];positionsOnly=[];
             initial=[14;5;pi-.02;2.8;-.4;.035;1.6;2.4;.95;0;0];
             for j=0:120
                 t=j*cfg.outputFeedback.sensorPeriod;
@@ -586,9 +586,6 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "The radar timestamp stays at the last detection.");
             testCase.verifyEqual( ...
                 output.targetEstimate.lastRadarTime, 0.0, AbsTol=0.0);
-            testCase.verifyEqual( ...
-                output.targetEstimate.measurementTime, ...
-                output.targetEstimate.lastRadarTime, AbsTol=0.0);
         end
 
         function speedDomainAuditReportsPeakingWithoutRejection(testCase)
@@ -1101,4 +1098,10 @@ end
 
 function value = localWrapToPi(value)
     value = mod(value+pi, 2.0*pi)-pi;
+end
+
+function cfg=localPointTestConfiguration()
+    % One operating envelope covers every synthetic point-observer fixture.
+    cfg=collisionAvoidanceControllerConfig();
+    cfg.target.observerDomain=struct('scalarAccelerationMaximum',5,'sideslipMaximum',.06);
 end

@@ -79,75 +79,6 @@ classdef predictiveSafetyGeometry
             pose=[position;q(3)+2*half-q(5)];
         end
 
-        function gap = targetFamilySeparation(ego,shape,target,errorSet,time,parts)
-            % Cover the complete persistent parameter family, rather than
-            % filling the space BETWEEN its distinct curved trajectories.
-            % Every cell must separate from the entire ego set. A different
-            % support normal per uncertainty cell does not choose a different
-            % ego maneuver: the ego policy and its complete image are fixed.
-            if nargin<6,parts=8;end
-            validateattributes(parts,{'double'},{'scalar','integer','positive','finite'});
-            if isempty(errorSet) || ~isfield(errorSet,'curvatureInterval')
-                pose=predictiveSafetyGeometry.targetPoseSet(target,errorSet,time);
-                gap=predictiveSafetyGeometry.setSeparation(ego,shape,pose,target(8:11));return;
-            end
-            arc=predictiveSafetyGeometry.targetArcInterval(target,errorSet,time);
-            arcs=linspace(arc(1),arc(2),parts+1);
-            curves=linspace(errorSet.curvatureInterval(1),errorSet.curvatureInterval(2),parts+1);
-            gap=Inf;queue=[1,parts+1,1,parts+1,-Inf];
-            while ~isempty(queue)
-                cell=queue(end,:);queue(end,:)=[];
-                family=errorSet;family.curvatureInterval=curves(cell(1:2)).';
-                family.curvatureRadius=diff(family.curvatureInterval)/2;
-                pose=predictiveSafetyGeometry.targetArcSet(target,family,arcs(cell(3:4)));
-                lower=max(cell(5),predictiveSafetyGeometry.setSeparation(ego,shape,pose,target(8:11)));
-                width=[cell(2)-cell(1),cell(4)-cell(3)];
-                if lower>=0 || lower>=gap || all(width==1)
-                    % A whole parent cell is still in the cover. A valid
-                    % positive support needs no finer split, and a cell
-                    % above an already retained lower gap cannot lower it.
-                    gap=min(gap,lower);continue;
-                end
-                [~,axis]=max(width);indices=2*axis+[-1,0];middle=floor(mean(cell(indices)));
-                first=cell;second=cell;first(indices(2))=middle;second(indices(1))=middle;
-                first(5)=lower;second(5)=lower;
-                queue=[queue;second;first]; %#ok<AGROW>
-            end
-        end
-
-        function [gap,normal] = setSeparation(ego,shapeE,target,shapeT,normal)
-            % Verified fixed-world-normal supports of uncertain rectangles.
-            if nargin<5 || isempty(normal)
-                point=predictiveSafetyGeometry.supportLinearization(ego.center,shapeE,target.center,shapeT);
-                normal=point.normal;
-            end
-            assert(abs(norm(normal)-1)<1e-8,'predictiveSafetyGeometry:invalidNormal','A unit normal is required.');
-            normal=normal(:);angle=atan2(normal(2),normal(1));
-            signs=[-1,1,1,-1;-1,-1,1,1];
-            vertices=shapeE(3:4)+shapeE(1:2).*signs;
-            % Project each rotated vertex BEFORE enclosing its angle. One
-            % cosine retains the shared yaw/position dependence and avoids
-            % separately bounding two components of the same rotation.
-            offsets=atan2(vertices(2,:),vertices(1,:)).'-angle;
-            values=normal.'*ego(1:2)+vecnorm(vertices).'.*cos(ego(3)+offsets);
-            [lo,~]=bounds(values);
-            vertices=shapeT(3:4)+shapeT(1:2).*signs;
-            offsets=atan2(vertices(2,:),vertices(1,:)).'-angle;
-            values=normal.'*target(1:2)+vecnorm(vertices).'.*cos(target(3)+offsets);
-            [~,hi]=bounds(values);
-            gap=min(lo)-max(hi);
-        end
-
-        function valid = stateSetAdmissible(state,cfg)
-            [lo,hi]=bounds(state);
-            valid=lo(4)>=cfg.model.speedMinimum && hi(4)<=cfg.model.speedMaximum ...
-                && max(abs([lo(5),hi(5)]))<=cfg.model.lateralVelocityMaximum ...
-                && max(abs([lo(6),hi(6)]))<=cfg.model.yawRateMaximum;
-            tangent=tan(cfg.model.sideslipMaximum);
-            [~,one]=bounds(state(5)-tangent*state(4));[~,two]=bounds(-state(5)-tangent*state(4));
-            valid=valid && max(one,two)<=0;
-        end
-
         function acceleration=routeAcceleration(x,projection,model)
             % A course field converges to the path without prescribing waypoints or
             % an avoidance/return schedule. The existing initialization gains set its
@@ -181,8 +112,7 @@ classdef predictiveSafetyGeometry
             generator=model.uncertainty.collisionGenerator;
             reserve=sum(vecnorm(generator(1:2,:),2,1));
             % Guide and optimizer must use the same persistent target family
-            % whenever joint prediction is selected. Only legacy per-hold
-            % prediction uses its distinct conditional approximation.
+            % whenever joint prediction is selected.
             holdTime=[0,durations];
             jointTarget=isfield(model.uncertainty,'jointPrediction') ...
                 && (cfg.controller.jointAffinePrediction || cfg.controller.jointNonlinearPrediction);
@@ -412,101 +342,6 @@ classdef predictiveSafetyGeometry
             inflation=max(0,support-nominal);
         end
 
-        function uncertainty = observerUncertainty(ego,observation,q)
-            % A common uncertain rigid pose cancels from pairwise distance.
-            % Relative target balls are therefore used in the frame frozen at
-            % this sample; path and CLF rows still use the full ego error box.
-            uncertainty=struct('specified',ego.uncertaintySpecified, ...
-                'egoGenerator',ego.errorGenerator,'collisionGenerator',ego.errorGenerator, ...
-                'target',[],'relativeFrame',false);
-            if isfield(ego,'velocityErrorGeometry') && ~isempty(ego.velocityErrorGeometry)
-                uncertainty.velocityGeometry=ego.velocityErrorGeometry;
-            end
-            if isfield(ego,'jointPrediction') && ~isempty(ego.jointPrediction)
-                uncertainty.jointPrediction=ego.jointPrediction;
-            end
-            if isempty(observation),return;end
-            set=observation.predictionErrorSet;
-            if isempty(set),return;end
-            required={'kind','time','available','referenceEgoPose','relativePosition', ...
-                'positionRadius','courseCenter','courseRadius','speedInterval', ...
-                'accelerationInterval','curvatureInterval','rearAxleDistance'};
-            if ~isstruct(set) || ~isscalar(set) || ~all(isfield(set,required)) ...
-                    || ~(isequal(set.kind,"nrmm-constant-parameter-set-v1") ...
-                    || isequal(set.kind,'nrmm-constant-parameter-set-v1'))
-                return;
-            end
-            if ~isequal(set.available,true)
-                return;
-            end
-            if ~ego.uncertaintySpecified || ~observation.uncertaintySpecified
-                return;
-            end
-            fields={'time','referenceEgoPose','relativePosition','positionRadius','courseCenter', ...
-                'courseRadius','speedInterval','accelerationInterval','curvatureInterval','rearAxleDistance'};
-            sizes=[1,3,2,1,1,1,2,2,2,1];
-            for index=1:numel(fields)
-                value=set.(fields{index});
-                if ~isnumeric(value) || ~isreal(value) || numel(value)~=sizes(index) || any(~isfinite(value),'all')
-                    return;
-                end
-                set.(fields{index})=value(:);
-            end
-            intervals=[set.speedInterval,set.accelerationInterval,set.curvatureInterval];
-            if any(intervals(1,:)>intervals(2,:)) || min([set.positionRadius,set.courseRadius])<0 ...
-                    || set.rearAxleDistance<=0 || any(abs(set.curvatureInterval*set.rearAxleDistance)>1)
-                return;
-            end
-            rotation=[cos(ego.yaw),-sin(ego.yaw);sin(ego.yaw),cos(ego.yaw)];
-            residual=[set.referenceEgoPose-ego.modelState(1:3); ...
-                ego.position+rotation*set.relativePosition-q(1:2); ...
-                atan2(sin(ego.yaw+set.courseCenter-q(3)-q(6)),cos(ego.yaw+set.courseCenter-q(3)-q(6))); ...
-                set.rearAxleDistance-q(7)];
-            residual(3)=atan2(sin(residual(3)),cos(residual(3)));
-            if abs(set.time-ego.stateTime)>1e-9*max(1,abs(ego.stateTime)) || norm(residual,inf)>1e-8
-                return;
-            end
-            curvature=sin(q(6))/q(7);
-            uncertainty.target=struct('positionRadius',set.positionRadius,'courseRadius',min(pi,set.courseRadius), ...
-                'speedRadius',max(abs(set.speedInterval-q(4))), ...
-                'accelerationRadius',max(abs(set.accelerationInterval-q(5))), ...
-                'curvatureRadius',max(abs(set.curvatureInterval-curvature)), ...
-                'sideslipRadius',max(abs(asin(set.curvatureInterval*q(7))-q(6))), ...
-                'speedInterval',set.speedInterval,'accelerationInterval',set.accelerationInterval, ...
-                'curvatureInterval',set.curvatureInterval);
-            uncertainty.predictionSet=set;
-            uncertainty.collisionGenerator(1:3,:)=0;
-            uncertainty.relativeFrame=true;uncertainty.specified=true;
-        end
-
-        function uncertainty = conditionTargetHistory(uncertainty,physical,time,target)
-            % Reuse the SAME radar/gyro observations with the current joint
-            % ego heading enclosure. No future measurement or known target
-            % heading is presumed, and the original parameter family is kept
-            % by intersection. A stale record is left unchanged.
-            if isempty(uncertainty.target) || ~isfield(uncertainty,'predictionSet') ...
-                    || ~isfield(uncertainty.predictionSet,'measurementHistory'),return;end
-            history=uncertainty.predictionSet.measurementHistory;
-            if isempty(history.time) || abs(history.time(end)-time)>128*eps(max(1,abs(time))),return;end
-            prior=uncertainty.target.speedInterval;
-            maximum=max(abs(uncertainty.target.accelerationInterval));
-            heading=[physical.center(3);radius(physical(3))];
-            interval=nrmmTargetHistory('speed',history,time,maximum,heading);
-            interval=localIntervalIntersection(prior,interval);
-            uncertainty.target.speedInterval=interval;
-            uncertainty.target.speedRadius=max(abs(interval-target(4)));
-            uncertainty.targetHistoryConditioning=struct('priorSpeedInterval',prior, ...
-                'speedInterval',interval,'egoHeading',heading,'time',time);
-            if isfield(uncertainty.target,'family')
-                family=uncertainty.target.family;
-                intervals=[interval,uncertainty.target.accelerationInterval, ...
-                    uncertainty.target.curvatureInterval, ...
-                    sum(target([3,6]))+[-1;1]*(uncertainty.target.courseRadius+heading(2))];
-                uncertainty.target.family=nrmmTargetHistory('constantFamily',history,time,intervals,family,heading);
-                uncertainty.target.familyYawRadius=heading(2);
-            end
-        end
-
         function [q,uncertainty,memory,info] = reconcileTarget(q,prior,uncertainty,memory,time)
             % The observer point and a nominal predictor need not coincide.
             % Intersect the declared constant-A/constant-curvature intervals
@@ -654,14 +489,6 @@ classdef predictiveSafetyGeometry
                 radius=reshape(max(sqrt(sum(extent.^2,1)),[],2),1,[]);
                 tube.positionRadius=min(tube.positionRadius,errorSet.positionRadius+radius);
             end
-        end
-
-        function support = targetPositionSupport(q,errorSet,time,normal)
-            % Directional enclosure of the same constant-parameter family.
-            % A speed error moves principally along the target path; a ball
-            % would incorrectly charge its full size in every normal.
-            data=predictiveSafetyGeometry.targetSupportData(q,errorSet,time);
-            support=predictiveSafetyGeometry.targetSupportFromData(data,1,normal);
         end
 
         function support = targetDirectionalSupport(q,errorSet,time,normal)
@@ -1121,24 +948,6 @@ classdef predictiveSafetyGeometry
                 'lambda',certificate.lambda,'distance',min(values),'exitFlag',1,'dualityGap',gap);
         end
 
-        function reserve = jointPoseSupport(normal,poseE,shapeE,poseT,shapeT,generator)
-            % Shared affine pose primitives, with exact-rotation remainder
-            % bounds. Common translation cancels before taking any support.
-            normal=normal(:).';signs=[-1,1,1,-1;-1,-1,1,1];cross=[0,-1;1,0];
-            re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
-            rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
-            ve=shapeE(3:4)+shapeE(1:2).*signs;vt=shapeT(3:4)+shapeT(1:2).*signs;
-            g=generator;position=normal*(g(1:2,:)-g(4:5,:));
-            ego=(normal*re*cross*ve)'*g(3,:);target=(normal*rt*cross*vt)'*g(6,:);
-            pairs=reshape(position,1,1,[])+reshape(ego,4,1,[])-reshape(target,1,4,[]);
-            support=max(sum(abs(pairs),3),[],'all');
-            ye=sum(abs(g(3,:)));yt=sum(abs(g(6,:)));
-            coupled=support+.5*max(vecnorm(ve))*ye^2+.5*max(vecnorm(vt))*yt^2;
-            separate=sum(abs(position))+2*max(vecnorm(ve))*sin(min(pi,ye)/2) ...
-                +2*max(vecnorm(vt))*sin(min(pi,yt)/2);
-            reserve=min(coupled,separate);
-        end
-
         function [value,jacobian] = separationWitnessRows(poseE,shapeE,poseT,shapeT,witness,reserve,reserveDerivative)
             % A continuous unit normal and a relative plane offset describe
             % ONE nonlinear separating-plane constraint, without angle bins.
@@ -1269,14 +1078,6 @@ classdef predictiveSafetyGeometry
             end
             % Only the given path enters control; optional road widths are metadata.
             frame=[origin;heading;k];
-        end
-
-        function straight = isStraight(lane)
-            if isfield(lane,'referenceCurve')
-                straight=lane.referenceCurve.curvature==0;
-            else
-                straight=all(abs(lane.tangent-lane.tangent(1,:))<1e-12,'all');
-            end
         end
 
         function curve = validateReferenceCurve(curve)
@@ -1579,8 +1380,7 @@ function [best,compatible]=localAccelerationProjection(preferred,normal,lower)
 end
 
 function kernel=localKernel()
-    % Use only the distance kernel. Collision duals are optimization
-    % problems and never call the retired signed-direction MEX kernel.
+    % Load the distance kernel for geometric evaluations.
     persistent handles checked
     if isempty(checked)
         checked=true;handles=[];

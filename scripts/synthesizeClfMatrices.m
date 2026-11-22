@@ -101,20 +101,20 @@ function entries = synthesizeClfMatrices(operatingPoints,options)
         if iscell(decoded),existing=decoded(:).';else,existing=num2cell(decoded(:).');end
     end
     entries=existing;
-    jobs=struct('cfg',{},'curvature',{},'key',{});stale=strings(1,0);
+    jobs=struct('cfg',{},'curvature',{},'key',{});
     for index=1:numel(operatingPoints)
         cfg=collisionAvoidanceControllerConfig(operatingPoints(index).configuration);
         curvature=operatingPoints(index).curvature;
         jobs(end+1)=struct('cfg',cfg,'curvature',curvature,'key',nonlinearBicycleModel.clfKey(cfg,curvature)); %#ok<AGROW>
     end
     if options.RefreshExisting
-        % Every stored entry is synthesized again from its key; a key whose
-        % settings have been retired maps to the current key and is dropped.
+        % Rebuild each stored operating point using its declared configuration.
         for index=1:numel(existing)
             old=string(existing{index}.key);
             [cfg,curvature]=localConfigurationFromKey(old);
             key=nonlinearBicycleModel.clfKey(cfg,curvature);
-            if key~=old,stale(end+1)=old;end %#ok<AGROW>
+            assert(key==old,'synthesizeClfMatrices:invalidKey', ...
+                'The stored operating point does not match the current CLF key.');
             if any(arrayfun(@(j)j.key==key,jobs)),continue;end
             jobs(end+1)=struct('cfg',cfg,'curvature',curvature,'key',key); %#ok<AGROW>
         end
@@ -129,7 +129,6 @@ function entries = synthesizeClfMatrices(operatingPoints,options)
             cfg.referenceSpeed,curvature,entry.extents,entry.regionFill,entry.certifiedTimeConstantSeconds, ...
             entry.requiredTimeConstantSeconds,entry.holdFactor,entry.certificate.sampledWorstContraction);
     end
-    entries(cellfun(@(e)any(string(e.key)==stale) || ~isfield(e,'gain'),entries))=[];
     [~,order]=sortrows([cellfun(@(e)e.referenceSpeed,entries).',cellfun(@(e)e.curvature,entries).']);entries=entries(order);
     fid=fopen(file,'w');assert(fid>=0,'Cannot write %s.',file);cleanup=onCleanup(@()fclose(fid));
     fprintf(fid,'%s\n',jsonencode(entries,'PrettyPrint',true));
@@ -363,8 +362,7 @@ function localReport(options,varargin)
 end
 
 function [cfg,curvature]=localConfigurationFromKey(key)
-    % The configuration a stored key records (nonlinearBicycleModel.clfKey);
-    % settings that no longer exist are dropped.
+    % Reconstruct the configuration recorded by nonlinearBicycleModel.clfKey.
     data=jsondecode(char(key));defaults=collisionAvoidanceControllerConfig();
     override=struct('vehicle',localShaped(data.vehicle,defaults.vehicle),'tire',localShaped(data.tire,defaults.tire), ...
         'roadLoad',localShaped(data.roadLoad,defaults.roadLoad),'referenceSpeed',data.referenceSpeed, ...
@@ -374,12 +372,9 @@ function [cfg,curvature]=localConfigurationFromKey(key)
 end
 
 function group=localShaped(group,defaults)
-    % jsondecode returns column vectors; restore the configuration's shapes and
-    % drop settings the configuration no longer has.
+    % Restore vector orientation after JSON decoding.
     for name=string(fieldnames(group)).'
-        if ~isfield(defaults,name)
-            group=rmfield(group,name);
-        elseif isnumeric(group.(name)) && numel(group.(name))==numel(defaults.(name))
+        if isfield(defaults,name) && isnumeric(group.(name)) && numel(group.(name))==numel(defaults.(name))
             group.(name)=reshape(group.(name),size(defaults.(name)));
         end
     end

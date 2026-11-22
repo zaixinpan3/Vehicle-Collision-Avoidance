@@ -28,21 +28,12 @@ function cfg = estimatorControllerIntegrationConfig()
 
     cfg.initialization.historyDuration = 0.50;        % s
     % One radar position cannot observe target velocity. A target is
-    % acquired after this many consecutive detections (0.25 s at 80 Hz),
-    % whose least-squares line initializes its velocity. A single detection
-    % with the oncoming line-of-sight speed prior (15 m/s) started a
-    % re-acquired 8-m/s target 7 m/s off; the tracker's transient then moved
-    % the published forecast across the whole target contract and left the
-    % controller without a solution.
+    % acquired from a sequence of positions at the actual radar times.
     cfg.initialization.minimumRadarSamples = 20;
     % A detection window spanning at least this duration also initializes
     % the target acceleration (constant-acceleration least squares); a
     % shorter window initializes it to zero.
     cfg.initialization.accelerationFitMinimumDuration = 0.50; % s
-    % This default supplies only the provisional speed magnitude; scenario
-    % drivers replace it with their declared target speed. It is not
-    % presented as a radar velocity measurement.
-    cfg.initialization.targetSpeedPrior = 15.0;       % m/s
     observer = nrmmTrackingConfig();
     % The scalar gain SDPs use sample time to bound the one-sample
     % correction, and the predictor-reset realization also depends on it.
@@ -72,11 +63,6 @@ function cfg = estimatorControllerIntegrationConfig()
     % The physical domain includes rest. The Cartesian jerk extension uses
     % a positive speed floor in its Lipschitz certificate.
     observer.target.domain.speedMinimum = 0.0;        % m/s
-    observer.target.domain.regularizationSpeedMinimum = 5.0; % m/s, Cartesian jerk extension
-    observer.target.domain.speedMaximum = 20.0;       % m/s
-    observer.target.domain.scalarAccelerationMaximum = 2.0; % m/s^2
-    observer.target.domain.sideslipMaximum = 0.005;   % rad
-    observer.target.domain.relativePositionMaximum = 50.0; % m
     % The normalized target direction is recovered from an observer LMI;
     % its physical bandwidth is then solved by the normalized certified-
     % state minimax problem. The resulting omega_T*T_s is reported for the
@@ -90,29 +76,6 @@ function cfg = estimatorControllerIntegrationConfig()
         cfg.sensor.gyroscope.yawRateNoiseMaximum;
     observer.measurement.radar.noiseMaximum = ...
         cfg.sensor.radar.positionNoiseMaximum;
-    % Fixed point-observer design shared by the raw-block traffic experiments.
-    % The gains are synthesizeNrmmObserverGains(observer).target.innovationGains
-    % with these target-domain overrides and the above nominal sensor settings.
-    % speedMaximum specifies the domain of this offline gain certificate.
-    % Radar acquisition sets the initial velocity error independently.
-    trafficDomain=observer.target.domain;
-    trafficDomain.speedMaximum=35;trafficDomain.scalarAccelerationMaximum=6;
-    trafficDomain.sideslipMaximum=.12;trafficDomain.yawRateMaximum=.5;
-    trafficDomain.accelerationNormBound=8;
-    cfg.trafficTargetObserver=struct('domain',trafficDomain,'innovationGains', ...
-        [22.35910170441581;249.63879191633592;1256.7133478449043]);
-
-    % Certificate from the same offline synthesis as the traffic gains above.
-    cert=struct('bandwidth',6.1979719024604236,'lambda',1.2, ...
-        'lyapunovMatrix',[26.358995102907144,-10.034144180065086,-0.14134276435085597; ...
-        -10.034144180065086,13.907207721277199,-7.4843643616147961; ...
-        -0.14134276435085597,-7.4843643616147961,7.3627538330567441], ...
-        'componentConversion',[0.31763308207639263;4.026928048466111;29.215756767111884], ...
-        'observerModelJerkMaximum',6.7700722739388119, ...
-        'disturbanceCoefficients',struct('radar',74.937287292017871,'modelJerk',0.070635160128664706), ...
-        'lipschitzCertificate',struct('phiVelocity',8.2877642009333581,'phiAcceleration',4.0087388846197376));
-    cfg.trafficTargetObserver.certificate=cert;
-
     cfg.observer = observer;
 
     % Controller errors come from the online timestamped observer enclosure.
@@ -120,10 +83,4 @@ function cfg = estimatorControllerIntegrationConfig()
     % substitutes for the evolving estimation errors. No fixed state-error
     % override is applied by the adapter.
 
-    % Vehicle parameters come from the controller configuration
-    % (estimatorConfigurationFromController); this configuration holds no
-    % duplicate vehicle geometry. Only the scenario target speed lives
-    % here, as the default prior magnitude for the adapter's provisional
-    % first-detection target state.
-    cfg.vehicle.targetSpeed = 15.0;                  % m/s
 end

@@ -19,6 +19,20 @@ classdef nrmmStationaryTargetTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function populationEnvelopeCoversDistinctLawsAndAbsorbingStops(testCase)
+            domain=collisionThreatContract();
+            for name=["acceleratingHeadOn","trafficBrakingLead","turningCrossing","stoppedLead"]
+                [~,initial]=collisionThreatScenario(name);
+                for time=[0,1,20]
+                    target=predictiveSafetyGeometry.predictTarget(initial,time);
+                    rate=target(4)*abs(sin(target(6)))/target(7);
+                    bounds=[domain.speedMaximum;domain.scalarAccelerationMaximum; ...
+                        domain.sideslipMaximum;domain.yawRateMaximum;domain.accelerationNormBound];
+                    testCase.verifyLessThanOrEqual([target(4);abs(target(5));abs(target(6)); ...
+                        rate;hypot(target(5),target(4)*rate)],bounds+1e-12);
+                end
+            end
+        end
         function aBrakingTargetRetainsRestOutsideTheSampledWindow(testCase)
             contract=collisionThreatContract("hardBrakingLead",25,WindowSeconds=.05);
             testCase.verifyEqual(contract.speedMinimum,0);

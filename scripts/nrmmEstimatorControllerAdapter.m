@@ -242,8 +242,7 @@ function [context, egoEstimate, targetEstimate, frame, audit] = ...
     audit.truthEnclosure = auditNrmmTruthEnclosure( ...
         egoEstimate,truthState,targetTruth,context.configuration.observer);
     if ~context.targetAcquired
-        context = localAnchorDormantTarget( ...
-            context, egoEstimate);
+        context = localAnchorDormantTarget(context);
     end
     observerFrame = frame;
     if ~context.targetAcquired || targetJustAcquired
@@ -544,7 +543,7 @@ function [targetState, acquired, acquisition] = ...
                 detectionTime(end)-detectionTime(1), cfg);
         acquired = true;
     else
-        targetState = localDormantTargetState(cfg);
+        targetState = zeros(6,1);
         acquired = false;
     end
 end
@@ -584,20 +583,6 @@ function targetPosition = localInitialTargetPositionRows( ...
             (egoPosition ...
                 + rotation*radarPosition(positionIdx, :).').';
     end
-end
-
-function targetState = localDormantTargetState(cfg)
-% localDormantTargetState Park a constant-velocity phantom ahead of range.
-%
-% In the transformed coordinates the target velocity q is the absolute
-% target velocity in the ego frame, so a dormant oncoming phantom is
-% simply q = [-targetSpeed; 0] with zero absolute acceleration; no ego
-% state enters the prior.
-    relativePosition = [ ...
-        cfg.sensor.radar.rangeMaximum+10.0; 0.0];
-    targetVelocityEgoFrame = [-cfg.vehicle.targetSpeed; 0.0];
-    targetState = [ ...
-        relativePosition; targetVelocityEgoFrame; zeros(2, 1)];
 end
 
 function [context, justAcquired] = ...
@@ -654,9 +639,8 @@ function [context, justAcquired] = ...
             context.configuration);
     context.targetAcquisition = acquisition;
     context.runtime = onlineNrmmTrackingRuntime("resetTarget", context.runtime, targetState,acquisition.errorHistory);
-    context.runtime.targetCertifiedSpeedDomainValid = true;
+    context.runtime.targetCertifiedSpeedDomainValid = context.runtime.lastIntervalTargetCertifiedSpeedDomainValid;
     context.runtime.minimumReconstructedTargetSpeed = targetSpeed;
-    context.runtime.lastIntervalTargetCertifiedSpeedDomainValid = true;
     context.targetAcquired = true;
     context.targetAcquisitionTime = frame.time;
     justAcquired = true;
@@ -695,16 +679,12 @@ function context = localUpdateTargetLifecycle( ...
     context.targetLastDetectionTime = NaN;
     context.targetAcquisition = localEmptyTargetAcquisition( ...
         context.targetAcquisition.minimumSampleCount);
-    context = localAnchorDormantTarget(context, egoEstimate);
+    context = localAnchorDormantTarget(context);
 end
 
-function context = localAnchorDormantTarget(context, ~)
-    targetState = localDormantTargetState(context.configuration);
+function context = localAnchorDormantTarget(context)
+    targetState = zeros(6,1);
     context.runtime = onlineNrmmTrackingRuntime("resetTarget", context.runtime, targetState);
-    context.runtime.lastIntervalTargetCertifiedSpeedDomainValid = true;
-    context.runtime.minimumReconstructedTargetSpeed = min( ...
-        context.runtime.minimumReconstructedTargetSpeed, ...
-        context.configuration.vehicle.targetSpeed);
 end
 
 function acquisition = localEmptyTargetAcquisition(minimumSampleCount)
@@ -770,7 +750,7 @@ function [targetState, reconstructedTargetSpeed] = ...
 % The transformed target state is [rho; q; s]: radar relative position,
 % absolute target velocity in the ego frame, and absolute target
 % acceleration in the ego frame. A multi-sample window supplies the fitted
-% velocity; only a single detection uses the provisional velocity prior.
+% velocity once the radar acquisition window is populated.
 % A window spanning at least initialization.accelerationFitMinimumDuration
 % is fitted with a constant acceleration as well (an NRMM target has
 % constant A and beta, so its acceleration turns only slowly over the
@@ -786,55 +766,39 @@ function [targetState, reconstructedTargetSpeed] = ...
             "Target initialization requires consecutive radar samples.");
     end
     targetPosition = targetPositionInertial(end, :).';
-    if isscalar(detectionTime)
-        lineOfSight = targetPosition - egoPosition;
-        lineOfSightNorm = norm(lineOfSight);
-        if lineOfSightNorm ...
-                <= 100.0*eps(max(1.0, lineOfSightNorm))
-            error("nrmmEstimatorControllerAdapter:" ...
-                    + "invalidTargetInitialization", ...
-                "The radial oncoming velocity prior requires a " ...
-                + "nonzero radar line of sight.");
-        end
-        targetVelocity = ...
-            -cfg.initialization.targetSpeedPrior ...
-                * lineOfSight/lineOfSightNorm;
-        targetAcceleration = zeros(2, 1);
-    else
-        relativeTime = detectionTime-detectionTime(end);
-        fitAcceleration = numel(detectionTime) >= 3 ...
-            && -relativeTime(1) >= cfg.initialization.accelerationFitMinimumDuration ...
-                - 100.0*eps(max(1.0, max(abs(detectionTime))));
-        basis = [ones(size(relativeTime)), relativeTime];
-        if fitAcceleration
-            basis = [basis, relativeTime.^2/2];
-        end
-        targetModel = basis \ targetPositionInertial;
-        targetAcceleration = zeros(2, 1);
-        if fitAcceleration
-            residual = targetPositionInertial-basis*targetModel;
-            deviation = sqrt(sum(residual(:).^2)/(2*(numel(relativeTime)-3)));
-            covariance = inv(basis.'*basis);
-            standardError = deviation*sqrt(covariance(3, 3));
-            tangent = targetModel(2, :).'/max(norm(targetModel(2, :)), eps);
-            frame = [tangent, [-tangent(2); tangent(1)]];
-            components = frame.'*targetModel(3, :).';
-            components(abs(components) <= 3.0*standardError) = 0.0;
-            targetAcceleration = frame*components;
-            targetAcceleration = targetAcceleration ...
-                *min(1.0, accelerationBound/max(norm(targetAcceleration), eps));
-        end
-        rawTargetVelocity = targetModel(2, :).';
-        rawTargetSpeed = norm(rawTargetVelocity);
-        if rawTargetSpeed ...
-                < cfg.observer.target.domain.speedMinimum
-            error("nrmmEstimatorControllerAdapter:" ...
-                    + "invalidTargetInitialization", ...
-                "Radar/GNSS samples reconstructed a target below the " ...
-                + "configured NRMM speed domain.");
-        end
-        targetVelocity = rawTargetVelocity;
+    relativeTime = detectionTime-detectionTime(end);
+    fitAcceleration = numel(detectionTime) >= 3 ...
+        && -relativeTime(1) >= cfg.initialization.accelerationFitMinimumDuration ...
+            - 100.0*eps(max(1.0, max(abs(detectionTime))));
+    basis = [ones(size(relativeTime)), relativeTime];
+    if fitAcceleration
+        basis = [basis, relativeTime.^2/2];
     end
+    targetModel = basis \ targetPositionInertial;
+    targetAcceleration = zeros(2, 1);
+    if fitAcceleration
+        residual = targetPositionInertial-basis*targetModel;
+        deviation = sqrt(sum(residual(:).^2)/(2*(numel(relativeTime)-3)));
+        covariance = inv(basis.'*basis);
+        standardError = deviation*sqrt(covariance(3, 3));
+        tangent = targetModel(2, :).'/max(norm(targetModel(2, :)), eps);
+        frame = [tangent, [-tangent(2); tangent(1)]];
+        components = frame.'*targetModel(3, :).';
+        components(abs(components) <= 3.0*standardError) = 0.0;
+        targetAcceleration = frame*components;
+        targetAcceleration = targetAcceleration ...
+            *min(1.0, accelerationBound/max(norm(targetAcceleration), eps));
+    end
+    rawTargetVelocity = targetModel(2, :).';
+    rawTargetSpeed = norm(rawTargetVelocity);
+    if rawTargetSpeed ...
+            < cfg.observer.target.domain.speedMinimum
+        error("nrmmEstimatorControllerAdapter:" ...
+                + "invalidTargetInitialization", ...
+            "Radar/GNSS samples reconstructed a target below the " ...
+            + "configured NRMM speed domain.");
+    end
+    targetVelocity = rawTargetVelocity;
     reconstructedTargetSpeed = norm(targetVelocity);
     rotationTranspose = localRotation(egoYaw).';
     relativePosition = rotationTranspose ...
@@ -1047,7 +1011,7 @@ end
 
 function localValidateConfiguration(cfg)
     required = ["randomSeed", "noiseModel", "sensor", ...
-        "initialization", "observer", "vehicle"];
+        "initialization", "observer"];
     if ~isstruct(cfg) || ~isscalar(cfg) || ~all(isfield(cfg, required))
         error("nrmmEstimatorControllerAdapter:invalidConfiguration", ...
             "cfg must come from estimatorControllerIntegrationConfig.");
@@ -1072,16 +1036,9 @@ function localValidateConfiguration(cfg)
             || cfg.sensor.radar.rangeMaximum <= 0.0 ...
             || ~publicationPolicyValid ...
             || ~trackCoastDurationValid ...
-            || cfg.initialization.minimumRadarSamples < 1 ...
+            || cfg.initialization.minimumRadarSamples < 2 ...
             || ~isfield(cfg.initialization, "accelerationFitMinimumDuration") ...
-            || ~(cfg.initialization.accelerationFitMinimumDuration > 0.0) ...
-            || ~isfield(cfg.initialization, "targetSpeedPrior") ...
-            || ~isfinite(cfg.initialization.targetSpeedPrior) ...
-            || cfg.initialization.targetSpeedPrior ...
-                < cfg.observer.target.domain.speedMinimum ...
-            || ~isfield(cfg.vehicle, "targetSpeed") ...
-            || ~isfinite(cfg.vehicle.targetSpeed) ...
-            || cfg.vehicle.targetSpeed <= 0.0
+            || ~(cfg.initialization.accelerationFitMinimumDuration > 0.0)
         error("nrmmEstimatorControllerAdapter:invalidConfiguration", ...
             "Sample time, radar range/publication/coast policy, and " ...
             + "initialization count are invalid.");

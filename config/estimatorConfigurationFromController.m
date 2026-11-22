@@ -42,6 +42,9 @@ function estimator = estimatorConfigurationFromController(estimator, controller,
     observer.ego.model = struct("mass",vehicle.m,"lf",vehicle.lf,"lr",vehicle.lr, ...
         "gravity",vehicle.gravity,"corneringStiffness",tire.corneringStiffness(:), ...
         "frictionCoefficient",tire.frictionCoefficient(:),"parameterUncertainty",uncertainty);
+    if isempty(targetContract),targetContract=controller.target.observerDomain;end
+    observer.target.domain.rearAxleDistance=controller.target.rearAxleDistance;
+    observer.target.domain.relativePositionMaximum=controller.collision.encounterRangeMeters;
     if ~isempty(targetContract)
         for field = string(fieldnames(targetContract)).'
             observer.target.domain.(field) = targetContract.(field);

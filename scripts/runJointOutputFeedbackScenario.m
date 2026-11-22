@@ -24,12 +24,19 @@ function campaign = runJointOutputFeedbackScenario(options)
         options.TargetPositionOffsetMeters (2,1) double {mustBeFinite} = [0;0]
     end
     root=fileparts(fileparts(mfilename('fullpath')));
-    addpath(fullfile(root,'controller'),fullfile(root,'config'));
+    addpath(fullfile(root,'controller'),fullfile(root,'config'),fullfile(root,'estimator'));
     if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
     summaries=struct([]);compactSolversReady=false;
+    base=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
+    if isempty(base.target.observerDomain)
+        % Use the complete benchmark population before selecting or observing a target.
+        base.target.observerDomain=collisionThreatContract(strings(1,0),options.Speeds, ...
+            WindowSeconds=max(20,options.Frames*base.controller.sampleTime),ControllerConfiguration=base);
+    end
+    onlineNrmmTrackingRuntime("prepareTarget",base);
     for speed=options.Speeds
         for name=options.Scenarios
-            cfg=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
+            cfg=base;
             if exist('casadi.SX','class')~=8
                 setupJointNlpSolver;
             end

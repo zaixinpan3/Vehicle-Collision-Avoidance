@@ -8,27 +8,7 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
         if ~isstruct(userCfg) || ~isscalar(userCfg)
             localInvalid('The override must be a scalar structure.');
         end
-        if all(isfield(userCfg,{'controller','solver','outputFeedback','vehicle','clf'})) && isstruct(userCfg.outputFeedback)
-            % Only complete saved configurations may contain retired numerical fields.
-            if isfield(userCfg,'terminal'),userCfg=rmfield(userCfg,'terminal');end
-            obsolete=intersect(fieldnames(userCfg.controller),{'retainedTube','horizonSteps'});
-            userCfg.controller=rmfield(userCfg.controller,obsolete);
-            if isfield(userCfg,'rti'),userCfg=rmfield(userCfg,'rti');end
-            legacy=intersect(fieldnames(userCfg.solver),{'method','stateEstimateMethod','maxIterations', ...
-                'timeLimitSeconds','completionReserveSeconds','feasibilityTolerance','optimalityTolerance', ...
-                'lexicographicTieTolerance','reducedTolerance'});
-            userCfg.solver=rmfield(userCfg.solver,legacy);
-            retired={'recoverySolveSeconds','qpMaximumIterations','restorationMaximumIterations','finiteDifferenceStep', ...
-                'memoryDimension','featureScale','noiseDirections','intersampleMarginMeters','backupBrakingRatio', ...
-                'minimumTargetDeceleration','coefficientMaximum','gainMaximum','regularization', ...
-                'predictionSubsteps','smoothAbsoluteValue','planningBufferMeters'};
-            obsolete=isfield(userCfg.outputFeedback,retired);
-            if any(obsolete),userCfg.outputFeedback=rmfield(userCfg.outputFeedback,retired(obsolete));end
-        end
         cfg=localMerge(cfg,userCfg);
-    end
-    if isequal(string(cfg.outputFeedback.method),"compactNlp")
-        cfg.outputFeedback.method="ipopt";
     end
     try
         localValidate(cfg);
@@ -145,7 +125,7 @@ function cfg=localDefaults()
         'speedGain',.5,'brakingRatioLimit',.35);
     % Tolerance used for actuator-bound interior points in shared model routines.
     cfg.solver=struct('constraintTolerance',1e-5);
-    cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6);
+    cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6,'observerDomain',[]);
 end
 
 function base=localMerge(base,overrides)
@@ -273,6 +253,20 @@ function localValidate(cfg)
         if cfg.nominalClf.(name)>=1,localInvalid('nominalClf.%s must lie in (0,1).',name);end
     end
     validateattributes(cfg.solver.constraintTolerance,{'double'},{'scalar','real','finite','positive'});
+    domain=cfg.target.observerDomain;
+    if ~isempty(domain)
+        allowed=["speedMinimum","speedMaximum","scalarAccelerationMaximum","sideslipMaximum", ...
+            "yawRateMaximum","accelerationNormBound"];
+        if ~isstruct(domain) || ~isscalar(domain) || ~all(ismember(fieldnames(domain),allowed))
+            localInvalid('target.observerDomain accepts only NRMM physical operating bounds.');
+        end
+        if isfield(domain,'sideslipMaximum')
+            validateattributes(domain.sideslipMaximum,{'double'},{'scalar','positive','<=',pi/2});
+        end
+        for name=string(fieldnames(domain)).'
+            validateattributes(domain.(name),{'double'},{'scalar','real','finite','nonnegative'});
+        end
+    end
     for name=["defaultLength","defaultWidth","rearAxleDistance"]
         validateattributes(cfg.target.(name),{'double'},{'scalar','real','finite','positive'});
     end

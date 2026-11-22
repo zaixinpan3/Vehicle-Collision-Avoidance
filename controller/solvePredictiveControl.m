@@ -49,33 +49,10 @@ function [result,diagnostics,problem] = solvePredictiveControl(interface,request
             [~,rollouts]=localCondensedOracle(controls(:),model,false);
             result=localCondensedOracle(controls(:),model,true,rollouts);
         case "step"
-            [result,diagnostics,problem]=localOfStep(request,cfg);
+            [result,diagnostics]=localCompactStep(request,cfg);
         otherwise
             error('collisionAvoidanceController:invalidOutputFeedbackOperation','Unknown joint operation.');
     end
-end
-
-function [result,diagnostics,problem] = localOfStep(request,cfg)
-    if isfield(request.previousState,'configuration')
-        prior=request.previousState;
-        stored=prior.configuration.outputFeedback;
-        if ~isfield(stored,'movingTargetObservationSeconds')
-            stored.movingTargetObservationSeconds=cfg.outputFeedback.movingTargetObservationSeconds;
-        end
-        if isfield(prior,'kind') && prior.kind=="compactOutputFeedback-v1" && string(stored.method)=="compactNlp"
-            stored.method="ipopt";
-        end
-        assert(string(stored.method)=="ipopt", ...
-            'collisionAvoidanceController:invalidConfiguration','The checkpoint requires an unsupported solver.');
-        prior.configuration.outputFeedback=stored;
-        if isfield(prior.configuration,'rti') || isfield(prior.configuration.solver,'method') || ...
-                isfield(prior.configuration.controller,'horizonSteps') || isfield(stored,'memoryDimension') || ...
-                any(isfield(stored,{'qpMaximumIterations','restorationMaximumIterations','finiteDifferenceStep','recoverySolveSeconds'}))
-            prior.configuration=collisionAvoidanceControllerConfig(prior.configuration);
-        end
-        request.previousState=prior;
-    end
-    [result,diagnostics]=localCompactStep(request,cfg);problem=[];
 end
 
 function localOfValidateBlock(block,cfg)
@@ -373,7 +350,7 @@ function [result,info] = localCompactStep(request,cfg)
             'collisionAvoidanceController:invalidInitialBlock','Initialization uses the current reading.');
         inherited=0;
     else
-        assert(isfield(prior,'kind') && prior.kind=="compactOutputFeedback-v1", ...
+        assert(isfield(prior,'kind') && prior.kind=="compactOutputFeedback-v2", ...
             'collisionAvoidanceController:incompatibleContinuation','Expected a compact controller continuation.');
         previousCfg=prior.configuration;
         % A search deadline does not enter the dynamics or plan certificate.
@@ -394,29 +371,6 @@ function [result,info] = localCompactStep(request,cfg)
         assert(norm(block.heldInput-prior.appliedInput,Inf)<1e-12, ...
             'collisionAvoidanceController:actuationMismatch','Measurements must use the committed input.');
         hypotheses=prior.hypotheses;inherited=size(prior.fineControls,2)-1;
-        if isfield(hypotheses,'targetObserver')
-            for j=1:numel(hypotheses)
-                track=hypotheses(j).targetObserver;
-                if isstruct(track) && isfield(track,'motionHistory')
-                    obsolete=intersect(fieldnames(track),{'motionBounds','motionHistory','motionStrips'});
-                    hypotheses(j).targetObserver=rmfield(track,obsolete);
-                end
-            end
-        end
-        if ~isfield(prior,'targetEstimateReady') && isfield(hypotheses,'targetObserver') && ...
-                any(arrayfun(@(s)~isempty(s.targetObserver) && ~s.targetObserver.initialized,hypotheses))
-            [hypotheses.target]=deal([]);
-            prior.collisionTargetActive=false;
-            request.previousState=prior;
-        end
-        if ~isfield(prior,'firstRadarTime') && ~isempty(hypotheses(1).target) && ~any([block.samples.radarAvailable])
-            % Older checkpoints could carry a target and an avoidance plan
-            % without ever receiving radar. Preserve only their ego history.
-            [hypotheses.target]=deal([]);
-            prior.movingTerminalPlan=false;
-            request.previousState=prior;
-            inherited=0;
-        end
     end
     clock=tic;[hypotheses,conditioning]=localOfCondition(hypotheses,block,cfg,initial);
     inferenceSeconds=toc(clock);
@@ -426,14 +380,14 @@ function [result,info] = localCompactStep(request,cfg)
     inRange=any(arrayfun(@(s)~isempty(s.target) && ...
         norm(s.target(1:2)-s.ego(1:2))<=cfg.collision.encounterRangeMeters,hypotheses));
     firstRadarTime=[];
-    if ~initial && isfield(prior,'firstRadarTime'),firstRadarTime=prior.firstRadarTime;end
+    if ~initial,firstRadarTime=prior.firstRadarTime;end
     if isempty(firstRadarTime)
         hit=find([block.samples.radarAvailable],1);
         if ~isempty(hit),firstRadarTime=block.samples(hit).time;end
     end
     targetReady=all(arrayfun(@(s)~isempty(s.target),hypotheses));
     active=targetReady && ~isempty(firstRadarTime) && (block.samples(end).radarAvailable || inRange);
-    if active && ~initial && ~(isfield(prior,'collisionTargetActive') && prior.collisionTargetActive) ...
+    if active && ~initial && ~prior.collisionTargetActive ...
             && isfield(hypotheses,'targetObserver') && ...
             all(arrayfun(@(s)~isempty(s.targetObserver) && s.target(4)>0,hypotheses))
         % Count received radar history. A dropout alone adds no observation.
@@ -471,13 +425,7 @@ function members=localCompactPlanningMembers(members,cfg,count)
         q=members(j).target;track=[];
         if isfield(members,'targetObserver'),track=members(j).targetObserver;end
         if isempty(q) || q(4)==0 || isempty(track),continue;end
-        if isfield(track,'motionBounds') && ~isempty(track.motionBounds)
-            b=track.motionBounds;
-        else
-            settings=estimatorControllerIntegrationConfig();domain=settings.trafficTargetObserver.domain;
-            limit=[domain.scalarAccelerationMaximum,domain.sideslipMaximum];
-            b=[-limit;limit];
-        end
+        b=track.motionBounds;
         members(j).target(5:6)=min(b(2,:).',max(b(1,:).',q(5:6)));
         if any(b(1,:)~=b(2,:))
             members(j).motionLimits=b;
@@ -531,15 +479,13 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     best=[];traces={};violation=Inf;validationSeconds=0;retained=false;
     inheritedReusedHolds=zeros(1,numel(hypotheses));solveClock=tic;
     startupBuildSeconds=0;
-    firstEncounter=~initial && isfield(prior,'collisionTargetActive') && ~prior.collisionTargetActive && ~isempty(item.target);
+    firstEncounter=~initial && ~prior.collisionTargetActive && ~isempty(item.target);
     budget=cfg.outputFeedback.maximumSolveSeconds;budgetPhase="continuation";
     if initial || firstEncounter
         budget=cfg.outputFeedback.initializationSolveSeconds;budgetPhase="initialization";
         if ~cacheHit,startupBuildSeconds=buildSeconds;end
     end
-    % A previous implementation could store a parking sequence. Preserve the
-    % posterior when resuming such states and construct a fresh driving plan.
-    inherit=~initial && isfield(prior,'movingTerminalPlan') && prior.movingTerminalPlan;
+    inherit=~initial;
     attempts=0;iterationCount=0;calls=0;reuseCount=0;restoration=false;seedCount=0;gradientCalls=0;
     solverStatus="notCalled";converged=false;ipoptSeconds=0;constraintCount=0;bestU=[];
     cacheU=[];cache=[];rollouts=[];includeTracking=false;initialDeficit=NaN;initialTerminal=NaN;initialPeakDeficit=NaN;
@@ -551,10 +497,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         && localCompactShiftContained(prior,hypotheses,conditioning.retainedIndices,h);
     sameEncounter=inherit && ~firstEncounter && cfg.outputFeedback.clearanceMeters==prior.configuration.outputFeedback.clearanceMeters;
     if sameEncounter
-        % Old checkpoints admitted zero-deficit plans only. A new posterior
-        % needs fresh replay even when it falls outside the sampled shift.
-        priorCap=0;
-        if isfield(prior,'stageDeficits'),priorCap=sum(prior.stageDeficits(2:end));end
+        priorCap=sum(prior.stageDeficits(2:end));
     end
     lossFloor=0;
     if ~isempty(item.target)
@@ -660,9 +603,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             'collisionEgo',trace.collisionEgo,'validationSubsteps',kernel.validationSubsteps, ...
             'parameters',hypotheses(s).parameters,'target',hypotheses(s).target);
     end
-    input=best(:,1);state=struct('kind',"compactOutputFeedback-v1",'time',request.block.time,'memory',zeros(0,1), ...
+    input=best(:,1);state=struct('kind',"compactOutputFeedback-v2",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
-        'fineControls',best,'movingTerminalPlan',true,'firstFeasibleDrivingPlan',stabilitySteps==0,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
+        'fineControls',best,'firstFeasibleDrivingPlan',stabilitySteps==0,'boundaries',boundaries,'horizonSteps',count,'configuration',cfg, ...
         'reference',request.reference,'conditioning',conditioning,'terminal',traces{nominal}.terminal, ...
         'pcbfDeficit',bestLoss,'stageDeficits',bestSlacks, ...
         'retainedTrajectories',{retainedTrajectories});

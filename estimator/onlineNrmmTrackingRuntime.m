@@ -17,6 +17,7 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % states use held-input RK4. Numerical defects, sampling and model uncertainty
 % enter separate conditional enclosures; no floating-point interval proof is
 % claimed. See OBSERVER_ISS_THEORY.md for the position-only sensor amendment.
+% prepareTarget synthesizes and caches the target design from the operating bounds.
 % targetPoint returns empty motion until the acquisition history resolves the
 % state. An optional relative perception heading can initialize a target at rest.
 % It advances the target point channel from timestamped radar
@@ -27,9 +28,11 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
     action = lower(string(action));
     if ~isscalar(action)
         error("onlineNrmmTrackingRuntime:invalidAction", ...
-            "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', or 'targetPoint'.");
+            "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', 'prepareTarget', or 'targetPoint'.");
     end
     switch action
+        case "preparetarget"
+            varargout{1}=localPointDesign(varargin{:});
         case "targetpoint"
             [varargout{1},varargout{2}]=localTargetPoint(varargin{:});
         case "initialize"
@@ -53,47 +56,69 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
             varargout{1} = localResetTarget(varargin{:});
         otherwise
             error("onlineNrmmTrackingRuntime:invalidAction", ...
-                "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', or 'targetPoint'.");
+                "action must be 'initialize', 'step', 'sample', 'output', 'measurement', 'resetTarget', 'prepareTarget', or 'targetPoint'.");
     end
 end
 
-function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,relativeHeading,positionErrorRadius,~)
+function [design,kernelDesign,settings,boundDesign]=localPointDesign(cfg)
+% Both the point observer and its comparison system use the same synthesis.
+    persistent previousKey target kernel integration bound
+    key={cfg.target.observerDomain,cfg.target.rearAxleDistance,cfg.collision.encounterRangeMeters, ...
+        cfg.outputFeedback.noiseBounds,cfg.outputFeedback.sensorPeriod};
+    if ~isequal(previousKey,key)
+        localAddProjectPaths();
+        integration=estimatorControllerIntegrationConfig();
+        observer=integration.observer;
+        if ~isempty(cfg.target.observerDomain)
+            for name=string(fieldnames(cfg.target.observerDomain)).'
+                observer.target.domain.(name)=cfg.target.observerDomain.(name);
+            end
+        end
+        observer.target.domain.rearAxleDistance=cfg.target.rearAxleDistance;
+        observer.target.domain.relativePositionMaximum=cfg.collision.encounterRangeMeters;
+        observer.runtime.samplePeriod=cfg.outputFeedback.sensorPeriod;
+        noise=cfg.outputFeedback.noiseBounds;
+        observer.measurement.gps.positionNoiseMaximum=noise(1);
+        observer.measurement.imu.noiseMaximum=noise(2);
+        observer.measurement.gyroscope.noiseMaximum=noise(3);
+        observer.measurement.radar.noiseMaximum=noise(4);
+        synthesis=synthesizeNrmmObserverGains(observer);
+        target=synthesis.target;
+        bound=struct('target',target,'velocity',struct('gain',0),'coupling',struct('targetVelocityCoupling',0));
+        domain=target.domain;
+        if isfield(domain,'regularizationSpeedMinimum')
+            domain.speedMinimum=domain.regularizationSpeedMinimum;
+            domain=rmfield(domain,'regularizationSpeedMinimum');
+        end
+        kernel=struct('velocity',struct('gain',1),'position',struct('gain',1), ...
+            'target',struct('innovationGains',target.innovationGains,'domain',domain), ...
+            'yaw',struct('correctionBandwidth',1,'courseModel',struct( ...
+            'rearAxleDistance',1,'sideslipDomainMaximum',0)));
+        previousKey=key;
+    end
+    design=target;kernelDesign=kernel;settings=integration;boundDesign=bound;
+end
+
+function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,relativeHeading,positionErrorRadius)
 % The existing sampled high-gain target chain in inertial axes. Transform
 % each relative radar position using this member's synchronized ego pose.
 % In these axes the ego transport terms vanish and the absolute Cartesian
 % target derivatives and inverse NRMM map are unchanged.
     if nargin<6 || isempty(relativeHeading),relativeHeading=NaN;end
     if nargin<7 || isempty(positionErrorRadius),positionErrorRadius=cfg.outputFeedback.noiseBounds(4);end
-    persistent design kernelDesign settings boundDesign
-    if isempty(design)
-        localAddProjectPaths();
-        settings=estimatorControllerIntegrationConfig();
-        design=settings.trafficTargetObserver;
-        target=design.certificate;target.domain=design.domain;target.innovationGains=design.innovationGains;
-        boundDesign=struct('target',target,'velocity',struct('gain',0),'coupling',struct('targetVelocityCoupling',0));
-        domain=design.domain;
-        domain.speedMinimum=domain.regularizationSpeedMinimum;
-        domain=orderfields(rmfield(domain,'regularizationSpeedMinimum'), ...
-            {'speedMinimum','speedMaximum','scalarAccelerationMaximum','yawRateMaximum', ...
-            'accelerationNormBound','sideslipMaximum','rearAxleDistance','relativePositionMaximum'});
-        % The unused ego channels stay at zero in this fixed inertial frame.
-        kernelDesign=struct('velocity',struct('gain',1),'position',struct('gain',1), ...
-            'target',struct('innovationGains',design.innovationGains,'domain',domain), ...
-            'yaw',struct('correctionBandwidth',1,'courseModel',struct( ...
-            'rearAxleDistance',1,'sideslipDomainMaximum',0)));
-    end
+    [design,kernelDesign,settings,boundDesign]=localPointDesign(cfg);
     if isempty(track)
         assert(~isempty(position),'onlineNrmmTrackingRuntime:missingFirstReturn','Radar must initialize a track.');
         track=struct('state',[position;zeros(4,1)],'time',time,'lastReturn',time, ...
-            'previousPosition',[],'times',[],'positions',zeros(2,0),'initialized',false, ...
+            'previousPosition',[],'previousRadius',positionErrorRadius,'positionRadii',[],'errorBound',[],'times',[],'positions',zeros(2,0),'initialized',false, ...
             'heading',egoHeading,'detections',0,'restCompatible',false);
     end
     dt=time-track.time;
     assert(dt>=0,'onlineNrmmTrackingRuntime:nonmonotonicTime','Target samples must be time ordered.');
     if time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
-        track.initialized=false;track.restCompatible=false;track.times=[];track.positions=zeros(2,0);
+        track.initialized=false;track.restCompatible=false;track.times=[];track.positions=zeros(2,0);track.positionRadii=[];
     end
-    if ~isfield(track,'errorBound') || ~track.initialized,track.errorBound=[];end
+    if ~track.initialized,track.errorBound=[];end
     if dt>0 && track.initialized
         reference=track.previousPosition;detected=~isempty(reference);
         if ~detected,reference=track.state(1:2);end
@@ -107,10 +132,8 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         else
             [states,first]=nrmmObserverVectorField("integrate",packed,measurement,kernelDesign,dt/count,count);
         end
-        previousRadius=cfg.outputFeedback.noiseBounds(4);
-        if isfield(track,'previousRadius'),previousRadius=track.previousRadius;end
         track.errorBound=nrmmPositionErrorBound("inertialTarget",track.errorBound,states,first, ...
-            detected,previousRadius,dt/count,boundDesign);
+            detected,track.previousRadius,dt/count,boundDesign);
         track.state=states(7:12,end);
     elseif dt>0
         track.state(1:2)=track.state(1:2)+dt*track.state(3:4);
@@ -120,9 +143,6 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         track.detections=track.detections+1;
         track.lastReturn=time;
         track.lastReturnHeading=atan2(sin(egoHeading+relativeHeading),cos(egoHeading+relativeHeading));
-        if ~isfield(track,'positionRadii') || isempty(track.times)
-            track.positionRadii=repmat(cfg.outputFeedback.noiseBounds(4),size(track.times));
-        end
         if ~isempty(track.times) && time==track.times(end)
             track.positions(:,end)=position;track.positionRadii(end)=positionErrorRadius;
         else
@@ -165,14 +185,18 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
                 span=track.times(end)-track.times(1);
                 chord=(track.positions(:,end)-track.positions(:,1))/span;
                 accelerationMax=design.domain.accelerationNormBound;
-                velocityRadius=norm(track.state(3:4)-chord) ...
-                    +(track.positionRadii(1)+track.positionRadii(end))/span+accelerationMax*span/2;
+                chordNoise=(track.positionRadii(1)+track.positionRadii(end))/span;
+                % At any time in this window, velocity differs from the true
+                % secant by at most accelerationMax*span/2 (integrate |t-s|).
+                speedUpper=min(design.domain.speedMaximum,norm(chord)+chordNoise+accelerationMax*span/2);
+                yawRate=min(design.domain.yawRateMaximum, ...
+                    speedUpper*sin(design.domain.sideslipMaximum)/design.domain.rearAxleDistance);
+                accelerationMax=min(accelerationMax,hypot(design.domain.scalarAccelerationMaximum,speedUpper*yawRate));
+                velocityRadius=norm(track.state(3:4)-chord)+chordNoise+accelerationMax*span/2;
                 accelerationRadius=norm(track.state(5:6))+accelerationMax;
                 % The Taylor acceleration bound applies only if the whole
                 % window preceded absorption; the velocity bound includes rest.
                 if resolved && norm(track.state(3:4))-velocityRadius>accelerationMax*span
-                    speedUpper=norm(track.state(3:4))+velocityRadius+accelerationMax*span;
-                    yawRate=design.domain.yawRateMaximum;
                     jerk=hypot(speedUpper*yawRate^2,3*design.domain.scalarAccelerationMaximum*yawRate);
                     midpointTime=track.times-(track.times(1)+span/2);
                     remainder=track.positionRadii+jerk*abs(midpointTime).^3/6;
@@ -864,8 +888,6 @@ function estimate = localTargetEstimate(runtime, observerInput)
         "integrationErrorIncluded",true,"floatingPointVerified",false, ...
         "scope",runtime.positionErrorBound.scope, ...
         "futurePredictionIncluded",false);
-    % Retained as a compatibility alias with corrected semantics.
-    estimate.measurementTime = estimate.lastRadarTime;
     if strlength(runtime.targetIdentifier)>0
         estimate.trackId=runtime.targetIdentifier;
     end

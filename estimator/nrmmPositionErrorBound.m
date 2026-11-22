@@ -334,13 +334,7 @@ function bound=localInertialTarget(bound,states,first,detected,radius,step,desig
     % supplies its synchronized frame, so the ego and gyro terms vanish.
     x=states(7:12,1); domain=design.target.domain;
     if isempty(bound)
-        if nargin>=8 && ~isempty(initialRadii)
-            bound.targetComponents=localGuard(initialRadii);
-        else
-            % A resumed track can predate the recorded acquisition radii.
-            bound.targetComponents=[norm(x(1:2)-states(13:14,1))+radius; ...
-                norm(x(3:4))+domain.speedMaximum;norm(x(5:6))+domain.accelerationNormBound];
-        end
+        bound.targetComponents=localGuard(initialRadii);
         bound.targetLyapunov=localMetricBound(bound.targetComponents,design);
         bound.trueRangeMaximum=norm(x(1:2))+bound.targetComponents(1);
         bound.radarPredictor=bound.targetComponents(1);

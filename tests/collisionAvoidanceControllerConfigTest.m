@@ -78,8 +78,6 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             cfg=collisionAvoidanceControllerConfig();
             testCase.verifyEqual(cfg.outputFeedback.maximumSolveSeconds,1);
             testCase.verifyEqual(cfg.outputFeedback.method,"ipopt");
-            legacy=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('method',"compactNlp")));
-            testCase.verifyEqual(legacy,cfg);
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
                 'outputFeedback',struct('method',"dynamicMemoryIpopt"))), ...
                 'collisionAvoidanceController:invalidConfiguration');
@@ -117,7 +115,8 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
                 testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('outputFeedback',struct(name,3))), ...
                     'collisionAvoidanceController:invalidConfiguration');
             end
-            testCase.verifyEqual(collisionAvoidanceControllerConfig(saved),expected);
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(saved), ...
+                'collisionAvoidanceController:invalidConfiguration');
         end
         function theJointHorizonHasNoFixedStageDefault(testCase)
             cfg=collisionAvoidanceControllerConfig();

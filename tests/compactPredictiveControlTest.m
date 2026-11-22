@@ -49,7 +49,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidConfiguration');
             prior=testCase.state;prior.configuration=old;
             testCase.verifyError(@()collisionAvoidanceController(localNextBlock(prior,cfg),[],[],cfg,prior), ...
-                'collisionAvoidanceController:invalidConfiguration');
+                'collisionAvoidanceController:changedContinuationProblem');
             for operation=["linearize","linearizeStep"]
                 request=struct('operation',operation,'cfg',cfg);
                 testCase.verifyError(@()solvePredictiveControl("outputFeedback",request), ...
@@ -65,18 +65,10 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()prepareCollisionAvoidanceController(struct('speed',8),[],testCase.cfg), ...
                 'collisionAvoidanceController:invalidSensorBlock');
         end
-        function aSavedPlanPredatingTheAcquisitionWindowResumes(testCase)
-            prior=testCase.state;
-            prior.configuration.outputFeedback=rmfield(prior.configuration.outputFeedback,'movingTargetObservationSeconds');
-            prior.configuration.outputFeedback.method="compactNlp";
-            prior.configuration.outputFeedback.qpMaximumIterations=60;
-            prior.configuration.solver.method="rti";
-            prior.configuration.controller.horizonSteps=16;
-            block=localNextBlock(prior,testCase.cfg);
-            [~,controls,~,state]=collisionAvoidanceController(block,[],[],testCase.cfg,prior);
-            [~,current]=collisionAvoidanceController(block,[],[],testCase.cfg,testCase.state);
-            testCase.verifyEqual(controls,current);
-            testCase.verifyEqual(state.configuration.outputFeedback.movingTargetObservationSeconds,.40);
+        function anUnsupportedCheckpointRequiresNewInitialization(testCase)
+            prior=testCase.state;prior.kind="unsupported";
+            testCase.verifyError(@()collisionAvoidanceController(localNextBlock(prior,testCase.cfg), ...
+                [],[],testCase.cfg,prior),'collisionAvoidanceController:incompatibleContinuation');
         end
         function aLongerSearchBudgetCanResumeAnExistingDrivingPlan(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=2;
@@ -625,23 +617,6 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(sum(value.costGradient(2:2:end)), ...
                 (moved.cost-value.cost)/step,AbsTol=1e-5);
         end
-        function legacyIntegrationHistoryCannotChangeTheContinuation(testCase)
-            cfg=testCase.cfg;cfg.referenceSpeed=3;cfg.outputFeedback.nlpJit=true;
-            cfg.outputFeedback.maximumSolveSeconds=2;cfg.outputFeedback.nlpMaximumIterations=1;
-            block=localBlock(cfg,2);
-            [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
-            block=localNextBlock(prior,cfg);
-            prior.requiresFineIntegration=false;
-            [~,first,firstPrediction]=collisionAvoidanceController(block,[],[],cfg,prior);
-            prior.requiresFineIntegration=true;
-            [~,second,secondPrediction,state]=collisionAvoidanceController(block,[],[],cfg,prior);
-            testCase.verifyEqual(second,first,AbsTol=1e-12);
-            testCase.verifyEqual(secondPrediction.scenarios{1}.collisionEgo, ...
-                firstPrediction.scenarios{1}.collisionEgo,AbsTol=1e-12);
-            testCase.verifyTrue(secondPrediction.scenarios{1}.terminal.member);
-            testCase.verifyEqual(secondPrediction.metadata.pcbfValue,0);
-            testCase.verifyFalse(isfield(state,'requiresFineIntegration'));
-        end
         function aValidatedDrivingPlanEndsTheSearch(testCase)
             for prediction={testCase.prediction,localNextPrediction(testCase.state,testCase.cfg)}
                 info=prediction{1}.metadata;
@@ -850,35 +825,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             evaluated=solvePredictiveControl("outputFeedback",request);
             testCase.verifyLessThanOrEqual(evaluated.terminal,cfg.outputFeedback.nlpTolerance);
         end
-        function expiredContinuationCannotStartASecondSearchBudget(testCase)
-            cfg=testCase.cfg;cfg.outputFeedback.maximumSolveSeconds=1e-12;
-            [~,~,~,prior]=collisionAvoidanceController(localBlock(cfg,3),[],[],cfg,[]);
-            block=localNextBlock(prior,cfg);
-            prior=rmfield(prior,'movingTerminalPlan');
-            cfg.outputFeedback.recoverySolveSeconds=100;
-            prior.configuration.outputFeedback.recoverySolveSeconds=100;
-            testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,prior), ...
-                'collisionAvoidanceController:compactNoFeasiblePlan');
-        end
         function anExpiredAdmissionCannotDispatchTheTerminalBrake(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.initializationSolveSeconds=1e-12;
             block=localBlock(cfg,0);
             testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,[]), ...
                 'collisionAvoidanceController:compactNoFeasiblePlan');
-        end
-        function aLegacyParkedPlanIsReplannedFromTheConditionedState(testCase)
-            cfg=testCase.cfg;cfg.referenceSpeed=1.5;
-            [~,~,~,old]=collisionAvoidanceController(localBlock(cfg,0),[],[],cfg,[]);
-            old=rmfield(old,'movingTerminalPlan');
-            brake=[0;-.5];
-            old.fineControls=repmat(brake,1,old.horizonSteps);old.appliedInput=brake;
-            block=localNextBlock(old,cfg);
-            [command,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,old);
-            testCase.verifyGreaterThan(command.actuatorInput(2),0);
-            testCase.verifyTrue(state.firstFeasibleDrivingPlan);
-            testCase.verifyFalse(prediction.metadata.rootTerminalPlanUsed);
-            testCase.verifyFalse(prediction.metadata.retainedFinePlanUsed);
-            testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
         end
         function anExpiredAdmissionCannotAuthorizeAnUncheckedSeed(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.initializationSolveSeconds=1e-12;

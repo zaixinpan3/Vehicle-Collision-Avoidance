@@ -10,13 +10,6 @@ function information = buildNrmmObserverKernel()
     output = fullfile(root,"solver","nrmm");
     if ~isfolder(output),mkdir(output);end
     addpath(output);
-    % The integration kernel was compiled directly from the former
-    % nrmmObserverRk4Interval.m; remove that binary so it cannot shadow the
-    % current one.
-    legacy = dir(fullfile(output,"nrmmObserverRk4IntervalMex.*"));
-    for item = legacy.'
-        delete(fullfile(item.folder,item.name));
-    end
     domain = struct("speedMinimum",5,"speedMaximum",20,"scalarAccelerationMaximum",2, ...
         "yawRateMaximum",0.1,"accelerationNormBound",3,"sideslipMaximum",0.1, ...
         "rearAxleDistance",1.6,"relativePositionMaximum",50);

@@ -9,6 +9,8 @@ function preparation = prepareCollisionAvoidanceController(block,road,cfg)
         'collisionAvoidanceController:invalidSensorBlock','Warm-up requires a jointSensorBlock-v1 initial block.');
     timer=tic;
     setupJointNlpSolver;
+    addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'estimator'));
+    onlineNrmmTrackingRuntime("prepareTarget",collisionAvoidanceControllerConfig(cfg));
     request=struct('operation',"step",'block',block,'cfg',cfg,'reference',road,'previousState',[]);
     result=solvePredictiveControl("outputFeedback",request);
     info=result.prediction.metadata;
