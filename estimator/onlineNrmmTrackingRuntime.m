@@ -121,6 +121,9 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     if ~track.initialized
         track.errorBound=[];track.motionBounds=[];
     end
+    if ~track.initialized || ~isfield(track,'speedAnchor')
+        track.speedAnchor=[];
+    end
     if dt>0 && track.initialized
         reference=track.previousPosition;detected=~isempty(reference);
         if ~detected,reference=track.state(1:2);end
@@ -244,6 +247,9 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     end
     domainLimits=[domain.scalarAccelerationMaximum,slipMaximum];
     bounds=[-domainLimits;domainLimits];
+    if ~isempty(position)
+        [track.speedAnchor,bounds(:,1)]=localChordAcceleration(track,domain,bounds(:,1));
+    end
     % While motion is certain the Cartesian inverse bounds the persistent
     % parameters. At possible absorption zero derivatives give no new
     % information about their values before the stop.
@@ -266,6 +272,29 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     end
     motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;estimate.targetSideslip];
     if track.restCompatible,motion(2:4)=0;end
+end
+
+function [anchor,interval]=localChordAcceleration(track,domain,interval)
+    % On a moving constant-A track, mean speed is speed at the midpoint.
+    anchor=track.speedAnchor;
+    duration=track.times(end)-track.times(1);
+    halfTurn=domain.yawRateMaximum*duration/2;
+    if duration<=0 || halfTurn>=pi/2,return;end
+    chord=norm(track.positions(:,end)-track.positions(:,1));
+    allowance=sum(track.positionRadii([1,end]))+16*eps(max(1,max(abs(track.positions(:,[1,end])),[],'all')));
+    lower=(chord-allowance)/duration;
+    % If the target could have stopped, mean speed need not equal midpoint
+    % speed. The end speed is at least the mean minus max|A|*duration/2.
+    if lower<=domain.scalarAccelerationMaximum*duration/2,return;end
+    upper=(chord+allowance)/(duration*cos(halfTurn));
+    midpoint=track.times(1)+duration/2;
+    if isempty(anchor)
+        anchor=struct('time',midpoint,'lower',lower,'upper',upper);
+    elseif midpoint>anchor.time
+        elapsed=midpoint-anchor.time;
+        interval=[max(interval(1),(lower-anchor.upper)/elapsed); ...
+                  min(interval(2),(upper-anchor.lower)/elapsed)];
+    end
 end
 
 function runtime = localResetTarget(runtime,physicalState,history)

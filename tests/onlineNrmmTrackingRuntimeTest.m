@@ -21,6 +21,33 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
 
 
     methods (Test)
+        function noisyTurningReturnsResolveBrakingBeforeHalfASecond(testCase)
+            cfg=localPointTestConfiguration();
+            target=[7;3;.35;12;-4;.005;1.6;2.4;.95;0;0];
+            times=(0:32)*cfg.outputFeedback.sensorPeriod;
+            times([8,25])=[]; % Uneven return spacing in both speed windows.
+            track=localRunMotionTrack([],cfg,target,times,0);
+            testCase.assertNotEmpty(track.motionBounds);
+            testCase.verifyLessThanOrEqual(track.motionBounds(1,1),target(5));
+            testCase.verifyGreaterThanOrEqual(track.motionBounds(2,1),target(5));
+            testCase.verifyLessThan(track.motionBounds(2,1),0);
+        end
+
+        function reacquiredAcceleratingTargetUsesItsOwnRadarReturns(testCase)
+            cfg=localPointTestConfiguration();
+            first=[7;3;.35;3;-4;0;1.6;2.4;.95;0;0];
+            times=(0:90)*cfg.outputFeedback.sensorPeriod;
+            stopped=localRunMotionTrack([],cfg,first,times,0);
+            testCase.verifyLessThanOrEqual(stopped.motionBounds(1,1),first(5));
+            testCase.verifyGreaterThanOrEqual(stopped.motionBounds(2,1),first(5));
+            testCase.verifyLessThan(stopped.motionBounds(2,1),0);
+            next=[2;-3;-.2;8;2;.01;1.6;2.4;.95;0;0];
+            acquired=localRunMotionTrack(stopped,cfg,next,times,4);
+            testCase.verifyGreaterThan(acquired.motionBounds(1,1),0);
+            testCase.verifyLessThanOrEqual(acquired.motionBounds(1,1),next(5));
+            testCase.verifyGreaterThanOrEqual(acquired.motionBounds(2,1),next(5));
+        end
+
         function aLongRadarGapRequiresFreshObserverAcquisition(testCase)
             cfg=localPointTestConfiguration();track=[];dt=cfg.outputFeedback.sensorPeriod;
             q=[5;2;pi-.1;8;.4;.015;1.6;2.4;.95;0;0];
@@ -1135,6 +1162,15 @@ end
 
 function value = localWrapToPi(value)
     value = mod(value+pi, 2.0*pi)-pi;
+end
+
+function track=localRunMotionTrack(track,cfg,target,times,start)
+    for j=1:numel(times)
+        state=predictiveSafetyGeometry.predictTarget(target,times(j));
+        radius=.015+.005*mod(j,2);
+        reading=state(1:2)+radius*[cos(j);sin(j)];
+        track=onlineNrmmTrackingRuntime("targetPoint",track,start+times(j),reading,0,cfg,state(3),radius);
+    end
 end
 
 function cfg=localPointTestConfiguration()

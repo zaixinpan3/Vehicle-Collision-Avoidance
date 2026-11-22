@@ -321,7 +321,30 @@ $r_i,r_j$ their error radii. The latter follows from the triangle inequality
 and integration of speed. For $s_*>0$, the yaw-rate premise and constant
 sideslip imply $|\sin\beta|\le l_r\bar\omega/s_*$. Intersect this bound
 with the physical sideslip interval. When $\|\hat v\|>r_v$, also intersect
-the Cartesian inverse intervals for $A,\beta$. Retain the intersections
+the Cartesian inverse intervals for $A,\beta$.
+
+For two returns separated by $T>0$, let $c$ be the measured chord length,
+$r$ the sum of their position error radii, and $m$ their midpoint time.
+With $\bar\omega T/2<\pi/2$, the mean speed lies in
+$$
+  [L,U]=\left[\frac{(c-r)_+}{T},
+                \frac{c+r}{T\cos(\bar\omega T/2)}\right].
+$$
+The lower bound follows from arc length. For the upper bound, project the
+true path onto the course at $m$. Constant sideslip and bounded yaw rate
+keep the course within $\bar\omega T/2$ of that direction. If
+$L>\bar A T/2$, the end speed is positive by the speed Lipschitz bound;
+absorption therefore cannot have occurred. Speed is affine throughout the
+window, so this interval also encloses $V(m)$. Save the first such interval
+$[L_0,U_0]$ and its midpoint $m_0$ for the track. Each later eligible radar
+window with $m>m_0$ supplies the further intersection
+$$
+  I_A\leftarrow I_A\cap
+  \left[\frac{L-U_0}{m-m_0},\frac{U-L_0}{m-m_0}\right].
+$$
+The result holds for overlapping windows and irregular return times since
+both intervals enclose speeds on the same constant-acceleration trajectory.
+Discard the saved interval upon reacquisition. Retain the intersections
 on the same track, including the latent parameters through an absorbing
 stop. Start new intervals at reacquisition. An empty intersection excludes
 that member. The PCBF uses the resulting intervals $I_A,I_\beta$ at the stage
