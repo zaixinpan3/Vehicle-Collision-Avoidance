@@ -234,6 +234,10 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                 end
                 [item.targetObserver,motion]=onlineNrmmTrackingRuntime("targetPoint", ...
                     item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading,positionError);
+                if item.targetObserver.initialized && isempty(motion)
+                    % Disjoint certified intervals exclude this track history.
+                    excess=Inf;break
+                end
                 if measured.radarAvailable && ~isempty(motion)
                     % Use the filtered position inside both the detection
                     % disk and the current bounded position observation.
@@ -1555,10 +1559,19 @@ function [gap,worst,remaining,last]=localCompactOccupied(item,states,times,shape
     active=reshape((1:count).'<=stop,1,[]);
     c=cos(boxes(3,:));sn=sin(boxes(3,:));
     center=boxes(1:2,:)+[c.*boxes(10,:)-sn.*boxes(11,:);sn.*boxes(10,:)+c.*boxes(11,:)];
-    radius=vecnorm(boxes(8:9,:))+norm(shape(1:2))+norm(shape(3:4));
-    distance=vecnorm(ego(1:2,:)-center);
-    lower=reshape(distance-radius,count,[]);
-    upper=reshape(distance+radius,count,[]);upper(~reshape(active,count,[]))=Inf;
+    % Signed distance from the ego footprint center to each target box.
+    % Concentric disks inside and outside the ego rectangle bound the same
+    % separation dual, also in overlap. Only possible minimizers need its
+    % exact rectangular evaluation.
+    ce=cos(states(3,:));se=sin(states(3,:));
+    egoCenter=states(1:2,:)+[ce*shape(3)-se*shape(4);se*shape(3)+ce*shape(4)];
+    delta=repmat(egoCenter,1,number)-center;
+    dx=abs(c.*delta(1,:)+sn.*delta(2,:))-boxes(8,:);
+    dy=abs(-sn.*delta(1,:)+c.*delta(2,:))-boxes(9,:);
+    pointGap=hypot(max(0,dx),max(0,dy))+min(0,max(dx,dy));
+    lower=reshape(pointGap-norm(shape(1:2)),count,[]);
+    upper=reshape(pointGap-min(shape(1:2)),count,[]);
+    upper(~reshape(active,count,[]))=Inf;
     bound=min(clip,min(upper,[],2));
     check=active & reshape(lower<=bound,1,[]);
     values=repmat(clip,1,count*number);

@@ -58,6 +58,43 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(track.motionBounds(:,2),max(-maxSlip,min(maxSlip,expected)));
         end
 
+        function yawRateBoundsPersistentSlipThroughBrakingAndReset(testCase)
+            cfg=localPointTestConfiguration();
+            cfg.target.observerDomain.yawRateMaximum=.065;
+            dt=cfg.outputFeedback.sensorPeriod;
+            target=[10;2;.1;12;-4;.006;1.6;2.4;.95;0;0];
+            track=[];prior=[];firstMaximum=Inf;
+            for t=0:dt:3.1
+                q=predictiveSafetyGeometry.predictTarget(target,t);
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,q(1:2),0,cfg,q(3));
+                if isempty(motion)
+                    testCase.verifyFalse(track.initialized);
+                    continue
+                end
+                bounds=track.motionBounds;
+                if isempty(prior)
+                    firstMaximum=max(abs(bounds(:,2)));
+                    testCase.verifyLessThan(firstMaximum,.01);
+                else
+                    testCase.verifyGreaterThanOrEqual(bounds(1,:),prior(1,:));
+                    testCase.verifyLessThanOrEqual(bounds(2,:),prior(2,:));
+                end
+                testCase.verifyLessThanOrEqual(bounds(1,:),target(5:6).');
+                testCase.verifyGreaterThanOrEqual(bounds(2,:),target(5:6).');
+                prior=bounds;
+            end
+            testCase.verifyNotEmpty(prior);
+            testCase.verifyLessThanOrEqual(max(abs(track.motionBounds(:,2))),firstMaximum);
+            % A new, slow track can turn more sharply at the same yaw-rate limit.
+            other=[4;2;0;1.5;0;.04;1.6;2.4;.95;0;0];
+            for t=0:dt:.30
+                q=predictiveSafetyGeometry.predictTarget(other,t);
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,4+t,q(1:2),0,cfg,q(3));
+            end
+            testCase.verifyNotEmpty(motion);
+            testCase.verifyGreaterThanOrEqual(track.motionBounds(2,2),other(6));
+        end
+
         function radarAcquisitionBoundsVelocityAcrossBrakingAndAbsorption(testCase)
             cfg=localPointTestConfiguration();dt=cfg.outputFeedback.sensorPeriod;
             for initialSpeed=[12,.4]

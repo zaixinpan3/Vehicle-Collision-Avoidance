@@ -313,7 +313,18 @@ Write $r_v,r_a$ for the propagated Cartesian velocity and acceleration
 error radii. The NRMM parameter error map bounds the tangential acceleration
 and curvature using the velocity and acceleration balls. The curvature
 interval maps to sideslip through $\arcsin(l_r\kappa)$ on the physical
-domain. The PCBF uses the resulting intervals $I_A,I_\beta$ at the stage
+domain. Let $s_*$ be a lower bound on the largest target speed attained on
+the current track. Both $(\|\hat v\|-r_v)_+$ and
+$(\|y_j-y_i\|-r_i-r_j)_+/(t_j-t_i)$ are valid lower bounds, where
+$y_i,y_j$ are the inertial radar positions for the same ego member and
+$r_i,r_j$ their error radii. The latter follows from the triangle inequality
+and integration of speed. For $s_*>0$, the yaw-rate premise and constant
+sideslip imply $|\sin\beta|\le l_r\bar\omega/s_*$. Intersect this bound
+with the physical sideslip interval. When $\|\hat v\|>r_v$, also intersect
+the Cartesian inverse intervals for $A,\beta$. Retain the intersections
+on the same track, including the latent parameters through an absorbing
+stop. Start new intervals at reacquisition. An empty intersection excludes
+that member. The PCBF uses the resulting intervals $I_A,I_\beta$ at the stage
 nodes and terminal continuation. Relative position and initial body heading
 are conditioned on the retained ego member.
 

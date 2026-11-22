@@ -118,7 +118,9 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     if time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
         track.initialized=false;track.restCompatible=false;track.times=[];track.positions=zeros(2,0);track.positionRadii=[];
     end
-    if ~track.initialized,track.errorBound=[];end
+    if ~track.initialized
+        track.errorBound=[];track.motionBounds=[];
+    end
     if dt>0 && track.initialized
         reference=track.previousPosition;detected=~isempty(reference);
         if ~detected,reference=track.state(1:2);end
@@ -227,13 +229,41 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         track.errorBound=nrmmPositionErrorBound("inertialTarget",[],packed,[],true,positionErrorRadius,0,boundDesign,initialRadii);
     end
     components=track.errorBound.targetComponents;
-    limits=nrmmControllerErrorBounds("targetParameters",track.state(3:4),track.state(5:6),components(2),components(3),0);
-    acceleration=sum(track.state(3:4).*track.state(5:6))/max(norm(track.state(3:4)),realmin);
-    signBounds=[-1;1];
-    a=acceleration+signBounds*limits.speedRateErrorBound;
-    beta=asin(max(-1,min(1,cfg.target.rearAxleDistance*limits.curvatureInterval)));
-    domainLimits=[domain.scalarAccelerationMaximum,domain.sideslipMaximum];
-    track.motionBounds=min(domainLimits,max(-domainLimits,[a,beta]));
+    speed=norm(track.state(3:4));
+    % For constant sideslip, the yaw-rate premise applies at every speed
+    % attained on this track. The measured chord also lower-bounds the
+    % peak speed during its window, including windows ending at rest.
+    speedLower=max(0,speed-components(2));
+    if numel(track.times)>1
+        travelLower=norm(track.positions(:,end)-track.positions(:,1))-sum(track.positionRadii([1,end]));
+        speedLower=max(speedLower,travelLower/(track.times(end)-track.times(1)));
+    end
+    slipMaximum=domain.sideslipMaximum;
+    if speedLower>0
+        slipMaximum=min(slipMaximum,asin(min(1,domain.rearAxleDistance*domain.yawRateMaximum/speedLower)));
+    end
+    domainLimits=[domain.scalarAccelerationMaximum,slipMaximum];
+    bounds=[-domainLimits;domainLimits];
+    % While motion is certain the Cartesian inverse bounds the persistent
+    % parameters. At possible absorption zero derivatives give no new
+    % information about their values before the stop.
+    if speed>components(2)
+        limits=nrmmControllerErrorBounds("targetParameters",track.state(3:4),track.state(5:6),components(2),components(3),0);
+        acceleration=sum(track.state(3:4).*track.state(5:6))/speed;
+        a=acceleration+[-1;1]*limits.speedRateErrorBound;
+        beta=asin(max(-1,min(1,domain.rearAxleDistance*limits.curvatureInterval)));
+        bounds(1,:)=max(bounds(1,:),[a(1),beta(1)]);
+        bounds(2,:)=min(bounds(2,:),[a(2),beta(2)]);
+    end
+    if ~isempty(track.motionBounds)
+        bounds(1,:)=max(bounds(1,:),track.motionBounds(1,:));
+        bounds(2,:)=min(bounds(2,:),track.motionBounds(2,:));
+    end
+    track.motionBounds=bounds;
+    if any(track.motionBounds(1,:)>track.motionBounds(2,:))
+        motion=[];
+        return
+    end
     motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;estimate.targetSideslip];
     if track.restCompatible,motion(2:4)=0;end
 end
