@@ -35,7 +35,7 @@ function certificate = nrmmObserverCertificate(action, varargin)
 %   certificate = nrmmObserverCertificate("sampled", design, period, filterGain)
 %       Exact small reset/flow matrices, a position-filter Lyapunov metric,
 %       and signed target innovation kernel. Contraction of these homogeneous
-%       maps alone does not certify the physical forcing or the RTI solve.
+%       maps alone does not certify the physical forcing.
 
     switch string(action)
         case "core"

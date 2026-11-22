@@ -3,7 +3,7 @@ function summary = validateNominalClf(options)
 % Signed coordinate perturbations use the precomputed local feedback as a
 % continuous derivative decrease witness. This diagnostic does not issue vehicle commands, certify an entire
 % neighborhood, or establish a global CLF. Closed-loop recovery is tested by
-% clfNominalRecoveryTest and the obstacle scenario campaign.
+% the raw-sensor controller in the obstacle scenario campaign.
     arguments
         options.OutputDirectory (1,1) string = ""
         options.Speeds (1,:) double = [8,15]

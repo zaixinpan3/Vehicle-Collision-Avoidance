@@ -177,78 +177,6 @@ classdef nonlinearBicycleModel
             if variational,a=reshape(y(7:42),6,6);b=reshape(y(43:54),6,2);end
         end
 
-        function [radius,info] = trustRegion(x,u,cfg,next,a,b,requiredState)
-            % Numerical, state-dependent locality estimate for the hold map.
-            % Translation is exactly affine and receives no trust bound.
-            % Finite differences seed the radii from mixed curvature; this
-            % is not a certified Hessian bound across model transitions.
-            % An optional affine consistency correction reserves state room.
-            % Reallocate the SAME error budget by shrinking the other axes;
-            % the required correction is not a relaxation of model accuracy.
-            if nargin<7,requiredState=zeros(6,1);end
-            minimum=[abs(requiredState(3:6));zeros(2,1)];
-            q=[x;u];active=3:8;
-            units=[.3;max(2,.25*abs(x(4)));1;.4;.25;.5];
-            steps=1e-3*units;
-            steps(6)=min(steps(6),max(1e-8,(1-abs(u(2)))/2));
-            jac=[a,b];curvature=zeros(6,6,6);
-            for j=1:6
-                plus=q;minus=q;plus(active(j))=plus(active(j))+steps(j);
-                minus(active(j))=minus(active(j))-steps(j);
-                [~,ap,bp]=nonlinearBicycleModel.sample(plus(1:6),plus(7:8),cfg);
-                [~,am,bm]=nonlinearBicycleModel.sample(minus(1:6),minus(7:8),cfg);
-                difference=([ap,bp]-[am,bm])/(2*steps(j));
-                curvature(:,:,j)=difference(:,active).*units.'*units(j);
-            end
-            budget=cfg.rti.trustRegion.errorBudget;
-            % For |d_i| <= r_i, sum |H_ij| r_i r_j bounds the
-            % quadratic surrogate, including mixed state/input terms.
-            curvature=(curvature+permute(curvature,[1,3,2]))/2;
-            envelope=abs(curvature)./reshape(budget,6,1,1);
-            weights=squeeze(max(sum(envelope,3),[],1));
-            scaled=min(1,sqrt(2./max(6*weights,1e-12)));
-            radii=max(minimum,units.*scaled(:));
-            % Probe finite displacements too: a zero local curvature can
-            % otherwise miss a nearby saturation or model transition.
-            signs=[eye(6),-eye(6),ones(6,1),-ones(6,1), ...
-                [1;-1;1;-1;1;-1],[-1;1;-1;1;-1;1]];
-            if any(minimum)
-                % A required correction can cross a saturation transition.
-                % Test all mixed corners instead of treating the reference
-                % Hessian's absolute envelope as a finite-region bound.
-                corners=2*(dec2bin(0:63,6)-'0')-1;
-                signs=[eye(6),-eye(6),corners.'];
-            end
-            ratio=0;
-            for attempt=1:6
-                ratio=0;
-                for j=1:size(signs,2)
-                    change=zeros(8,1);change(active)=radii.*signs(:,j);
-                    trial=q+change;trial(8)=min(1,max(-1,trial(8)));
-                    change=trial-q;
-                    try
-                        actual=nonlinearBicycleModel.sample(trial(1:6),trial(7:8),cfg);
-                        ratio=max(ratio,max(abs(actual-next-jac*change)./budget));
-                    catch exception
-                        if ~ismember(string(exception.identifier),[ ...
-                                "collisionAvoidanceController:nonlinearDomain", ...
-                                "collisionAvoidanceController:invalidTireOperatingPoint"])
-                            rethrow(exception);
-                        end
-                        ratio=Inf;break;
-                    end
-                end
-                if ratio<=1,break;end
-                if attempt==6
-                    error('collisionAvoidanceController:trustRegionUnavailable', ...
-                        'No local box passed the finite-displacement model probes.');
-                end
-                radii=minimum+(radii-minimum)*max(.1,min(.8,.8/sqrt(ratio)));
-            end
-            radius=[Inf;Inf;radii];
-            info=struct('sampledErrorRatio',ratio,'probePasses',attempt);
-        end
-
         function next = sensorFlow(x,u,cfg,duration,endOfHold)
             % Sensor-only boundaries do not trigger the sampled rest reset.
             % This uses the same RK4 body model; no validated error bound is
@@ -319,7 +247,7 @@ classdef nonlinearBicycleModel
         function [rate,inputGradient,value] = nominalDerivative(x,u,lane,reference,cfg)
             % Exact continuous-time derivative of V=e'Pe at the current
             % state. Only its dependence on the actual Fiala inputs is
-            % linearized by RTI; the error chart is differentiated exactly.
+            % used for local prediction; the error chart is differentiated exactly.
             [e,jacobian]=nonlinearBicycleModel.errorLinearization(x,lane,reference);
             gradient=2*e.'*reference.matrix*jacobian;
             rate=gradient*nonlinearBicycleModel.derivative(x,u,cfg);
@@ -527,7 +455,7 @@ classdef nonlinearBicycleModel
             desiredYaw=(lateral.'*acceleration)/max(speed,1);
             limit=cfg.planner.lateralAccelerationFraction*min(tire.frictionCoefficient)*cfg.vehicle.gravity/max(speed,1);
             % Slow turns must remain reachable in the same sideslip domain as
-            % the RTI model; a friction-only yaw demand grows as speed falls.
+            % the bicycle model; a friction-only yaw demand grows as speed falls.
             kinematicLimit=.8*tan(cfg.model.sideslipMaximum)*max(x(4),0)/cfg.vehicle.lr;
             if physicalBoundsOnly
                 betaLimit=atan(cfg.vehicle.lr/(cfg.vehicle.lf+cfg.vehicle.lr)*tan(cfg.outputFeedback.steeringMaximum));

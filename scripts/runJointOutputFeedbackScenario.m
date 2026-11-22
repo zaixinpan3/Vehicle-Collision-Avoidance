@@ -48,7 +48,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                 qualification=bypassFeasibilityBaseline(x,q,road,cfg,HalfWidthMeters=road.scenarioHalfWidthMeters);
             end
             admitted=isempty(qualification) || qualification.qualified;
-            startup=localWarmup(cfg,options,truth,reference,initial,admitted && initialClearance>0,compactSolversReady);
+            startup=localWarmup(cfg,options,admitted && initialClearance>0,compactSolversReady);
             compactSolversReady=startup.solversReady;
 
             stream=RandStream('mt19937ar','Seed',options.RandomSeed);
@@ -168,11 +168,11 @@ function campaign = runJointOutputFeedbackScenario(options)
     localWriteJson(fullfile(options.OutputDirectory,'campaign.json'),campaign);
 end
 
-function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversReady)
+function startup=localWarmup(cfg,options,canRun,solversReady)
     startup=struct('seconds',0,'holds',0,'failure',"",'solversReady',solversReady,'avoidanceContinuation',false);
     if ~options.Warmup || ~canRun,return;end
-    timer=tic;input=zeros(2,1);state=[];compact=string(cfg.outputFeedback.method)=="ipopt";
-    if compact && ~solversReady
+    timer=tic;input=zeros(2,1);state=[];
+    if ~solversReady
         try
             warmCfg=collisionAvoidanceControllerConfig();
             warmCfg.outputFeedback.nlpJit=cfg.outputFeedback.nlpJit;
@@ -187,34 +187,25 @@ function startup=localWarmup(cfg,options,truth,reference,initial,canRun,solversR
             startup.failure=string(exception.identifier)+": "+string(exception.message);
         end
     end
-    if compact
-        % Use a private sensor stream to exercise target acquisition and
-        % the following active continuation with the simulation's actual configuration.
-        stream=RandStream('mt19937ar','Seed',0);reference=[-100,0;1000,0];
-        initial=localInitialContract([0;0;0;cfg.referenceSpeed;0;0],0);
-        truth=initial;
-        truth.target=[cfg.collision.encounterRangeMeters/2;cfg.vehicle.width+cfg.target.defaultWidth; ...
-            0;0;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
-        sample=localSensor(truth,input,cfg,0,stream,false);
-        observerCfg=estimatorControllerIntegrationConfig();
-        samplesPerHold=round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod);
-        count=2+ceil((observerCfg.initialization.minimumRadarSamples-1)/samplesPerHold);
-    else
-        % Match the original four-hold replay of the research comparators.
-        stream=RandStream('mt19937ar','Seed',options.RandomSeed);
-        sample=localSensor(truth,input,cfg,0,stream,false);
-        reset(stream);count=4;
-    end
+    % Use a private sensor stream to exercise target acquisition and
+    % the following active continuation with the simulation's actual configuration.
+    stream=RandStream('mt19937ar','Seed',0);reference=[-100,0;1000,0];
+    initial=localInitialContract([0;0;0;cfg.referenceSpeed;0;0],0);
+    truth=initial;
+    truth.target=[cfg.collision.encounterRangeMeters/2;cfg.vehicle.width+cfg.target.defaultWidth; ...
+        0;0;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
+    sample=localSensor(truth,input,cfg,0,stream,false);
+    observerCfg=estimatorControllerIntegrationConfig();
+    samplesPerHold=round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod);
+    count=2+ceil((observerCfg.initialization.minimumRadarSamples-1)/samplesPerHold);
     block=localSensorBlock(0,input,sample);block.initialHypotheses=initial;
     for k=1:count
         try
             [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
             input=command.actuatorInput;
-            if compact
-                info=prediction.metadata;
-                startup.avoidanceContinuation=startup.avoidanceContinuation || ...
-                    (info.collisionTargetActive && info.budgetPhase=="continuation");
-            end
+            info=prediction.metadata;
+            startup.avoidanceContinuation=startup.avoidanceContinuation || ...
+                (info.collisionTargetActive && info.budgetPhase=="continuation");
             [truth,samples]=localReplay(truth,input,cfg,block.time,stream,false);
             block=localSensorBlock(block.time+cfg.controller.sampleTime,input,samples);
             startup.holds=startup.holds+1;

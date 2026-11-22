@@ -1,5 +1,5 @@
 classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
-    % Nominal PCBF/CLF/RTI behavior; no native verifier dependency.
+    % Target and vehicle dynamics, geometry and held-input integration.
     properties (TestParameter)
         targetSideslip={0,1e-12,.08,-.08};
         targetAcceleration={0,1.2,-1.2};
@@ -145,10 +145,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyFalse(stopped);testCase.verifyEqual(next,x);
         end
         function theVehicleBrakesToRestAndMovesOffFromIt(testCase)
-            % Braking at the terminal law's ratio with the steering held ends
+            % Braking at a nominal 4 m/s^2 with the steering held ends
             % at rest, never in reverse, with the handling rows met.
             [~,~,cfg]=localFixture();
-            u=[.05;-cfg.terminal.brakingDecelerationMetersPerSecondSquared/nonlinearBicycleModel.tireAccelerationGain(cfg)];
+            u=[.05;-4/nonlinearBicycleModel.tireAccelerationGain(cfg)];
             x=[0;0;0;6;0;0];
             for k=1:60
                 x=nonlinearBicycleModel.sample(x,u,cfg);
@@ -216,117 +216,6 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(am,(eye(6)+a)/2,AbsTol=0);
             testCase.verifyEqual(bm,b/2,AbsTol=0);
         end
-        function laneFollowingRunsWithNoNativeVerifier(testCase)
-            [ego,road,cfg]=localFixture();ego.position(2)=.1;
-            [command,~,problem]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
-            testCase.verifyTrue(problem.metadata.optimizationReturned);
-            testCase.verifyTrue(problem.metadata.zeroSlack);
-            testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
-            testCase.verifySize(command.actuatorInput,[2,1]);
-            testCase.verifyFalse(isfield(problem,'certificate'));
-            testCase.verifyEqual(problem.metadata.safetyScope,"affineSubproblem");
-        end
-        function changedTargetForecastRetainsTheInputWarmStart(testCase)
-            [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;0;1.6;2.4;.95;0;0]);
-            [~,~,~,prior]=stateEstimateControllerComparator(ego,target,road,cfg,[]);
-            ego=localSuccessor(ego,prior,cfg);
-            updated=[30.4;5.01;0;6;1.02;.0005;1.6;2.4;.95;0;0];target=localTarget(updated);
-            [command,~,problem]=stateEstimateControllerComparator(ego,target,road,cfg,prior);
-            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
-            testCase.verifyEqual(problem.model.target,updated,AbsTol=1e-12);
-            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPrimalIterate");
-            expected=predictiveSafetyGeometry.predictTarget(updated,(0:size(problem.inputTrajectory,2))*cfg.controller.sampleTime);
-            testCase.verifyEqual(problem.predictedJointState(7:10,:),expected(1:4,:),AbsTol=1e-11);
-        end
-        function headingWrapPreservesTheFixedTargetForecast(testCase)
-            % Keep the curved track away from the parked terminal continuation;
-            % this case tests angle wrapping, not maneuver feasibility.
-            [ego,road,cfg]=localFixture();q=[30;-25;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
-            [~,~,~,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
-            ego=localSuccessor(ego,prior,cfg);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
-            [~,~,problem,state]=stateEstimateControllerComparator(ego,localTarget(next),road,cfg,prior);
-            testCase.verifyGreaterThan(next(3),pi);
-            % The new estimate equals the forecast (its heading unwrapped
-            % next to it), so the re-anchored epoch continues the forecast.
-            testCase.verifyEqual(state.targetEpoch,next,AbsTol=1e-12);
-            testCase.verifyEqual(state.targetEpochIndex,1);
-            testCase.verifyEqual(problem.model.target,next,AbsTol=1e-12);
-            testCase.verifyTrue(problem.metadata.optimizationReturned);
-            next(3)=next(3)+.01;
-            [~,~,updated]=stateEstimateControllerComparator(ego,localTarget(next),road,cfg,prior);
-            testCase.verifyEqual(updated.model.target,next,AbsTol=1e-12);
-        end
-        function targetDropoutUsesOneFixedAbsoluteEpoch(testCase)
-            [ego,road,cfg]=localFixture();q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];ego.stateTime=10;
-            [~,~,~,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
-            ego=localSuccessor(ego,prior,cfg);ego.stateTime=10+cfg.controller.sampleTime;
-            [~,~,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
-            expected=predictiveSafetyGeometry.predictTarget(q,cfg.controller.sampleTime);
-            testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
-            testCase.verifyEqual(state.targetEpoch,q,AbsTol=1e-12);
-            testCase.verifyEqual(state.targetEpochIndex,0);
-            testCase.verifyEqual(state.encounterHorizonSteps,prior.encounterHorizonSteps);
-            testCase.verifyEqual(size(state.inputTrajectory,2),size(prior.inputTrajectory,2));
-            % Shifted target nodes keep their original absolute times; the
-            % fixed-length horizon adds one new target node at its end.
-            count=min(size(problem.predictedJointState,2),size(prior.predictedJointState,2)-1);
-            testCase.verifyEqual(problem.predictedJointState(7:10,1:count), ...
-                prior.predictedJointState(7:10,2:count+1),AbsTol=1e-12);
-            testCase.verifyEqual(state.sampleIndex,1);
-        end
-        function nonconsecutiveSampleTimesCannotReuseTheTrajectory(testCase)
-            [ego,road,cfg]=localFixture();ego.stateTime=10;
-            [~,~,~,prior]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
-            ego=localSuccessor(ego,prior,cfg);ego.stateTime=10.17;
-            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],road,cfg,prior), ...
-                'collisionAvoidanceController:invalidSampleTime');
-        end
-        function aCompleteEmptyScanClearsTheForecastAndRebuildsCruise(testCase)
-            [ego,road,cfg]=localFixture();ego.stateTime=0;
-            q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];
-            [~,~,~,prior]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
-            ego=localSuccessor(ego,prior,cfg);ego.stateTime=cfg.controller.sampleTime;
-            ego.perception=struct('time',ego.stateTime,'range',50,'completeWithinRange',true);
-            [command,~,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
-            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
-            testCase.verifyEmpty(problem.model.target);
-            testCase.verifyEmpty(state.targetEpoch);
-            testCase.verifyEqual(state.encounterHorizonSteps,0);
-            testCase.verifyEqual(problem.metadata.search.initialization,"cruiseFeedbackRollout");
-            testCase.verifyEqual(problem.metadata.search.plannerCalls,0);
-            ego=localSuccessor(ego,state,cfg);ego.stateTime=2*cfg.controller.sampleTime;
-            ego.perception.time=ego.stateTime;
-            [~,~,returned,next]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,state);
-            testCase.verifyTrue(returned.model.targetOnset);
-            testCase.verifyEqual(returned.metadata.search.plannerCalls,1);
-            testCase.verifyEqual(next.encounterId,prior.encounterId+1);
-            testCase.verifyEqual(next.encounterHorizonSteps,returned.metadata.horizonSteps);
-            testCase.verifyEqual(next.targetEpochIndex,2);
-        end
-        function encounterRadiusUsesReferencePositionsRatherThanBodyClearance(testCase)
-            [ego,road,cfg]=localFixture();
-            outside=[0;50.1;0;8;0;0;1.6;2.4;.95;0;0];
-            inside=outside;inside(2)=49.9;
-            [~,~,far]=stateEstimateControllerComparator(ego,localTarget(outside),road,cfg,[]);
-            [~,~,near]=stateEstimateControllerComparator(ego,localTarget(inside),road,cfg,[]);
-            testCase.verifyEqual(far.metadata.encounterExitStep,0);
-            testCase.verifyGreaterThan(near.metadata.encounterExitStep,0);
-        end
-        function aDistantObservationCannotForecastANewEncounter(testCase)
-            [ego,road,cfg]=localFixture();
-            q=[52;10;pi;8;0;0;1.6;2.4;.95;0;0];
-            [~,~,prediction]=stateEstimateControllerComparator(ego,localTarget(q),road,cfg,[]);
-            testCase.verifyGreaterThan(norm(q(1:2)-ego.position),50);
-            testCase.verifyEqual(prediction.metadata.encounterExitStep,0);
-            testCase.verifyEmpty(prediction.model.target);
-        end
-        function retiredStateCannotRestoreTheOldTargetMotion(testCase)
-            [ego,road,cfg]=localFixture();prior=struct('version',56,'target',ones(10,1));
-            [~,~,problem,state]=stateEstimateControllerComparator(ego,[],road,cfg,prior);
-            testCase.verifyEmpty(problem.model.target);
-            testCase.verifyEqual(problem.metadata.search.initialization,"nominalFeedbackRollout");
-            testCase.verifyGreaterThan(state.version,prior.version);
-        end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;1;0;1.6;2.4;.95;0;0];
             next=predictiveSafetyGeometry.predictTarget(q,1e8);
@@ -335,33 +224,15 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             next=predictiveSafetyGeometry.predictTarget(q,1e8);
             testCase.verifyGreaterThan(next(2),q(2)+1);
         end
-        function finiteBrakingSlewUsesAppliedInputMemory(testCase)
-            [ego,road,cfg]=localFixture();
-            % Start near terminal braking so both locality and actuator slew
-            % permit its terminal-entry input; this test isolates input memory.
-            cfg.model.brakingRatioRateMaximum=.5;ego.heldActuatorInput=[0;-.48];
-            [~,plan]=stateEstimateControllerComparator(ego,[],road,cfg,[]);
-            rate=.5*cfg.controller.sampleTime;
-            testCase.verifyLessThanOrEqual(abs(diff([ego.heldActuatorInput(2),plan(2,:)])),rate+cfg.solver.feasibilityTolerance);
-            ego=rmfield(ego,'heldActuatorInput');
-            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],road,cfg,[]), ...
-                'collisionAvoidanceController:missingInputMemory');
-        end
     end
 end
 
 function [ego,road,cfg]=localFixture()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8), ...
-        'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
     ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[8.5344;12.192]);
 end
-function target=localTarget(q)
-    velocity=q(4)*[cos(q(3)+q(6));sin(q(3)+q(6))];
-    target=struct('targetPositionInertial',q(1:2),'targetVelocityInertial',velocity, ...
-        'targetYawInertial',q(3),'targetTangentialAcceleration',q(5),'targetSideslip',q(6), ...
-        'targetRearAxleDistance',q(7),'targetLength',2*q(8),'targetWidth',2*q(9));
-end
+
 function finite=localTargetTangent(q,time)
     finite=zeros(4);h=1e-6;
     for j=1:4
@@ -369,10 +240,4 @@ function finite=localTargetTangent(q,time)
         a=predictiveSafetyGeometry.predictTarget(hi,time);b=predictiveSafetyGeometry.predictTarget(lo,time);
         finite(:,j)=(a(1:4)-b(1:4))/(2*h);
     end
-end
-function ego=localSuccessor(ego,prior,cfg)
-    x=[ego.position;ego.yaw;ego.speed;ego.lateralVelocity;ego.yawRate];
-    x=nonlinearBicycleModel.sample(x,prior.appliedInput,cfg);
-    ego.position=x(1:2);ego.yaw=x(3);ego.speed=x(4);
-    ego.lateralVelocity=x(5);ego.yawRate=x(6);ego.heldActuatorInput=prior.appliedInput;
 end

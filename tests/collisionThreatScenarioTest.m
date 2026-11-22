@@ -180,29 +180,6 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             testCase.verifyTrue(braking.collisionDetected);
             testCase.verifyTrue(braking.allLongitudinalPoliciesCertified);
         end
-        function campaignRunsStationaryAndBrakingTargetsWithTheObserver(testCase)
-            fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
-            % This checks noisy joint execution, independently of machine
-            % load and the separate real-time deadline experiment.
-            campaign = runCollisionThreatValidation(Pipeline="nrmmComparator",Frames=40,OutputDirectory=string(fixture.Folder), ...
-                ControllerConfiguration=struct('solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5)));
-            testCase.assertNumElements(campaign.results,2);
-            testCase.verifyEqual([campaign.results.scenario],["stoppedLead","hardBrakingLead"]);
-            testCase.verifyTrue(all([campaign.results.bypassQualified]));
-            testCase.verifyTrue(all([campaign.results.allLongitudinalPoliciesCertified]));
-            for ran=campaign.results
-                testCase.verifyNotEqual(ran.outcome,"setupError");
-                testCase.assertGreaterThan(ran.executedFrames,0);
-                report = jsondecode(fileread(ran.source));
-                result = report.results;
-                testCase.verifyEqual(string(result.observationModel),"nrmmSyntheticSensors");
-                defaults = estimatorControllerIntegrationConfig();
-                testCase.verifyEqual(result.randomSeed,defaults.randomSeed);
-                testCase.verifyGreaterThan(norm(result.trace(1).estimatedState-result.trace(1).state),0);
-                testCase.verifyGreaterThan(result.estimatorConfiguration.sensor.radar.positionNoiseMaximum,0);
-                testCase.verifyEqual(result.estimatorConfiguration.observer.target.domain.speedMinimum,0);
-            end
-        end
         function everyThreatStartsSeparatedAndCollidesWithoutAvoidance(testCase,scenario,referenceSpeed)
             [~,target,road,cfg] = collisionThreatScenario(scenario,struct('referenceSpeed',referenceSpeed));
             baseline = givenPathCollisionBaseline(road,target,cfg,8);
@@ -257,12 +234,6 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             witness=bypassFeasibilityBaseline(x,q,road,cfg);
             testCase.verifyFalse(witness.qualified);
         end
-        function invalidScenarioGeometryIsNotAControllerFailure(testCase)
-            cfg=struct('collision',struct('encounterRangeMeters',1));
-            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
-                Scenarios="stoppedLead",Frames=1,ControllerConfiguration=cfg), ...
-                'runNonlinearPredictiveSafetyValidation:unqualifiedScenario');
-        end
         function aVehicleEdgeCannotCutThroughTheInsideOfACurvedRoad(testCase)
             curve=struct('origin',[0;0],'heading',0,'curvature',.005,'length',200);
             shape=[2.4;.95;0;0];pose=[0;8.055;0];
@@ -282,41 +253,12 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(baseline.stoppingDistanceMeters,q(1)-cfg.vehicle.length);
             testCase.verifyEqual(baseline.finalState(4),0);
         end
-        function aSlowLeadIsExcludedFromTheSteeringChallenge(testCase)
-            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
-                Scenarios="brakingLead",RequireBrakingInsufficient=true), ...
-                'runNonlinearPredictiveSafetyValidation:brakingSuffices');
-        end
-        function aBrakingSufficientScenarioIsNotAControllerFailure(testCase)
-            fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
-            campaign = runCollisionThreatValidation(Pipeline="nrmmComparator",Scenarios="brakingLead",Speeds=8, ...
-                OutputDirectory=string(fixture.Folder));
-            testCase.verifyEqual(campaign.results.outcome,"unqualifiedScenario");
-            testCase.verifyEqual(campaign.results.executedFrames,0);
-            testCase.verifyFalse(campaign.results.allLongitudinalPoliciesCertified);
-            testCase.verifyEqual(campaign.results.source,"");
-        end
-        function oneFailedBrakingPolicyDoesNotProveSteeringIsNecessary(testCase)
-            [x,q,~,cfg] = collisionThreatScenario("curvedHeadOn",struct('referenceSpeed',8));
-            baseline = maximumBrakingCollisionBaseline(x,q,cfg);
-            testCase.assertTrue(baseline.collisionDetected);
-            testCase.verifyFalse(baseline.allLongitudinalPoliciesCertified);
-            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
-                Scenarios="curvedHeadOn",RequireBrakingInsufficient=true, ...
-                ControllerConfiguration=struct('referenceSpeed',8)), ...
-                'runNonlinearPredictiveSafetyValidation:brakingInsufficiencyUnproven');
-        end
         function stoppingDoesNotDiscardAnOncomingTarget(testCase)
             [x,q,~,cfg]=collisionThreatScenario("headOn",struct('referenceSpeed',8));
             baseline=maximumBrakingCollisionBaseline(x,q,cfg);
             testCase.verifyTrue(baseline.collisionDetected);
             testCase.verifyEqual(baseline.collisionPhase,"afterStop");
             testCase.verifyTrue(baseline.allLongitudinalPoliciesCertified);
-        end
-        function benignSideBrakingIsNotAdmitted(testCase)
-            testCase.verifyError(@()runNonlinearPredictiveSafetyValidation( ...
-                Scenarios="brakingTarget",Frames=160,RequireCollisionThreat=true), ...
-                'runNonlinearPredictiveSafetyValidation:notCollisionThreat');
         end
         function touchingWithoutOverlapDoesNotQualifyAsActualDanger(testCase)
             cfg = collisionAvoidanceControllerConfig(struct('referenceSpeed',8));

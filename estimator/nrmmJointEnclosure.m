@@ -141,8 +141,7 @@ end
 
 function result=localCompactCoupledHold(center,generator,context,options)
 % Construct the full nonlinear joint outer image using separate physical
-% slabs and small observer kernels. This is a research certificate evaluator,
-% not the ordinary affine RTI approximation or a safety claim for that solve.
+% slabs and small observer kernels for the joint research certificate.
     if nargin<4,options=struct;end
     c=context.contract;h=c.samplePeriod;count=round(context.duration/h);
     assert(count>=1 && abs(count*h-context.duration)<1e-10);

@@ -186,13 +186,7 @@ sum of stage deficits under the inherited cap. A shifted plan must pass the same
 ```matlab
 addpath('scripts'); setupJointNlpSolver;
 results = runtests({'tests/compactPredictiveControlTest.m', ...
-    'tests/dynamicOutputFeedbackTest.m','tests/nonlinearOutputFeedbackTest.m', ...
+    'tests/rawSensorContractTest.m','tests/nonlinearOutputFeedbackTest.m', ...
     'tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m'});
 assertSuccess(results)
 ```
-
-The raw-sensor controller uses CasADi/IPOPT. The optional `dynamicMemoryIpopt`
-comparison also uses IPOPT. The independent observer experiment runs through
-`Pipeline="nrmmComparator"` and calls `stateEstimateControllerComparator` explicitly. Source files stay in their existing controller,
-configuration, estimator and experiment directories. Experiment output goes
-to the requested directory; routine runs do not create repository reports.

@@ -1,4 +1,7 @@
 classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
+    properties (TestParameter)
+        slipInterval={[-.2,.17],[-.2,-.05],[.03,.17]}
+    end
     methods (TestClassSetup)
         function preparePaths(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -33,9 +36,10 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
             testCase.verifyEqual(value,withWitness,AbsTol=1e-12);
         end
 
-        function continuousArcEnvelopeContainsInteriorFootprintsThroughStopping(testCase)
+        function continuousArcEnvelopeContainsInteriorFootprintsThroughStopping(testCase,slipInterval)
             root=[12;-4;2.8;4;-.5;.03;1.6;2.4;.95;.35;-.21];
-            times=[0,.1,1,2,4,12];limits=[-3,-.2;1,.17];
+            root(6)=mean(slipInterval);
+            times=[0,.1,1,2,4,12];limits=[[-3;1],slipInterval(:)];
             [box,centers]=predictiveSafetyGeometry.targetMotionEnvelope(root,limits,times);
             ego=[7;8]+zeros(2,numel(times));
             d=predictiveSafetyGeometry.targetEnvelopeRange(ego,box,centers);

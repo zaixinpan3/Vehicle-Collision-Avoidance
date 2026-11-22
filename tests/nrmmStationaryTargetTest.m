@@ -19,6 +19,10 @@ classdef nrmmStationaryTargetTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aBrakingTargetRetainsRestOutsideTheSampledWindow(testCase)
+            contract=collisionThreatContract("hardBrakingLead",25,WindowSeconds=.05);
+            testCase.verifyEqual(contract.speedMinimum,0);
+        end
         function lowSpeedModelDiscrepancyIsCovered(testCase,speed,turnSign)
             domain=testCase.Design.target.domain;
             curvature=turnSign*sin(domain.sideslipMaximum)/domain.rearAxleDistance;

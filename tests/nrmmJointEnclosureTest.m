@@ -225,55 +225,6 @@ classdef nrmmJointEnclosureTest < matlab.unittest.TestCase
                 end
             end
         end
-        function terminalImageContainsStopAndMovingBranches(testCase)
-            context=struct('deceleration',4,'sampleTime',.05);
-            center=[2;1;.1;8;.3;.1];g=diag([.01;.01;.002;.2;.02;.01]);
-            rng(52);
-            for t=[.5,2,3]
-                image=nrmmJointEnclosure('terminalPose',nrmmSet(center,g),context,t);
-                for k=1:10
-                    x=center+g*(2*rand(6,1)-1);path=terminalSafeSet.continuation(context,x,round(2*t/.05)/2);
-                    localContains(testCase,image,path.pose(:,end));
-                end
-            end
-        end
-        function terminalResidualCoversDecisionAndPhysicalError(testCase)
-            context=struct('deceleration',4,'sampleTime',.05);
-            y=[2;1;.1;8;.3;.1];r=[.01;.01;.002;.02;.002;.001];g=diag(r/2);
-            image=terminalSafeSet.encloseContinuation(context,y,-r,r,g,4);
-            rng(71);
-            for k=1:8
-                decision=r.*(2*rand(6,1)-1);x=y+decision+g*(2*rand(6,1)-1);
-                path=terminalSafeSet.continuation(context,x,4);
-                for j=1:numel(path.time)
-                    residual=path.pose(:,j)-image.referencePose(:,j)-image.jacobian(:,:,j)*decision;
-                    localContains(testCase,image.residual{j},residual);
-                end
-            end
-            testCase.verifyFalse(image.terminalMembershipCertified);
-        end
-        function nonlinearModeRequiresAnObserverSnapshot(testCase)
-            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',2,'jointNonlinearPrediction',true), ...
-                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',30)));
-            x=nonlinearBicycleModel.cruise(cfg,0).state;
-            ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
-            testCase.verifyError(@()stateEstimateControllerComparator(ego,[],[],cfg,[]), ...
-                'collisionAvoidanceController:missingJointPrediction');
-        end
-        function controllerEnclosesTheSameDecisionDomainItAdmits(testCase)
-            [~,context,output]=localFixture();cfg=context.cfg;
-            cfg.controller.horizonSteps=2;cfg.controller.jointNonlinearPrediction=true;
-            cfg.solver.timeLimitSeconds=30;cfg.rti.trustRegion.errorBudget(:)=1e-8;
-            output.targetEstimate=[];output.controllerErrorBound.generator(:)=0;
-            output.controllerErrorBound.bounds(:)=0;
-            output.controllerErrorBound.jointPrediction.parameterRadius(:)=0;
-            output.controllerErrorBound.jointPrediction.noiseRadius(:)=0;
-            [~,~,prediction]=stateEstimateControllerComparator(output,[],[],cfg,[]);
-            testCase.verifyTrue(prediction.model.jointPredictionTube.realArithmeticEnclosure);
-            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
-            testCase.verifyGreaterThan(max(prediction.model.jointPredictionTube.physicalRadius,[],'all'),0);
-        end
     end
 end
 function localContains(testCase,image,value)
@@ -315,7 +266,7 @@ function excess=localUnaryDependenceExcess(kind)
 end
 
 function [certificate,maximum]=localAccelerationHoldSamples()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('stateEstimateMethod',"rti")));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
     trim=nonlinearBicycleModel.cruise(cfg,0);input=trim.input;
     lower=[0;0;0;7.75;-.0045;-.0015];upper=[0;0;0;8.25;.0045;.0015];
     state=nrmmSet.range(lower,upper);parameters=nrmmSet(zeros(4,1),.05*eye(4));
@@ -334,7 +285,7 @@ function [certificate,maximum]=localAccelerationHoldSamples()
 end
 
 function [center,context,output]=localFixture()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('stateEstimateMethod',"rti")));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
     design=synthesizeNrmmObserverGains(estimator.observer);
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;

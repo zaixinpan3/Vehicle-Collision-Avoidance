@@ -1,7 +1,7 @@
 function baseline = bypassFeasibilityBaseline(initialState,target,road,cfg,options)
 %bypassFeasibilityBaseline Find an independent, physically feasible bypass.
 % Offline scenario qualification only: truth is used to try prescribed offset
-% maneuvers. No avoidance field, RTI solution, or terminal-set test is called.
+% maneuvers. This baseline is independent of the predictive controller.
 % A retained held-input sequence is independently replayed with ode45. Its
 % complete ego and target rectangles must stay inside the scenario road and
 % separated at sample nodes through range exit and recovery. The ego

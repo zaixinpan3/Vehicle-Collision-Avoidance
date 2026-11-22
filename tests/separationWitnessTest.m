@@ -49,14 +49,6 @@ classdef separationWitnessTest < matlab.unittest.TestCase
                 testCase.verifyEqual((vp-vm)/2e-6,jacobian(:,k),AbsTol=2e-8);
             end
         end
-        function normalizationPreservesTheTangentPlaneForALargeWitnessStep(testCase)
-            shape=[2.4;.95;.2;-.1];ego=[6;4;.193];target=[1;-2;-.317];
-            witness=[.271;3];step=[1.7;-.4];
-            [value,jacobian]=predictiveSafetyGeometry.separationWitnessRows(ego,shape,target,shape,witness);
-            updated=predictiveSafetyGeometry.retractSeparationWitness(witness,step);
-            actual=predictiveSafetyGeometry.separationWitnessRows(ego,shape,target,shape,updated);
-            testCase.verifyEqual(actual,(value+jacobian(:,4:5)*step)/hypot(1,step(1)),AbsTol=2e-12);
-        end
     end
 end
 

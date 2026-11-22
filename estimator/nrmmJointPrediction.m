@@ -234,8 +234,8 @@ function result=localConditionMeasurements(set,contract,cfg)
     point=contract.point;point(3)=set.center(9)+atan2(sin(point(3)-set.center(9)),cos(point(3)-set.center(9)));
     lo(7:11)=point;hi(7:11)=point;
     lo(16:17)=measurement.heldInput;hi(16:17)=measurement.heldInput;
-    if cfg.controller.reducedJointInformation && string(cfg.solver.stateEstimateMethod)=="rti" ...
-            && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction
+    if cfg.controller.reducedJointInformation ...
+            && ~cfg.controller.jointNonlinearPrediction
         result=localAffineMeasurementConditioning(nrmmSet.range(lo,hi),contract,cfg,before);
         return
     end
@@ -428,7 +428,7 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
         'currentInputUncertaintyRadius',zeros(2,1),'currentMeasurementConditioned',true, ...
         'futureObserverDynamicsIncluded',true,'futurePrimitiveBudgetsAssumed',false, ...
         'persistentParameterColumns',rootColumns+(1:4),'nonlinearCertificate',false, ...
-        'scope',"joint affine maps along the RTI shooting reference; nonlinear remainders not certified", ...
+        'scope',"joint affine maps along the supplied shooting reference; nonlinear remainders not certified", ...
         'mode',"causalObserverFeedback",'time',[0,cumsum(durations)], ...
         'predictionSensorSamples',round(durations/contract.samplePeriod), ...
         'compactObserverStages',false(1,count), ...
@@ -510,9 +510,7 @@ function tube=localPropagate(anchor,cfg,initialGenerator,contract,durations,opti
             tube.generator{2*k}=[nextGenerators(22:27,:),middle-middleReference];
             tube.generator{2*k+1}=[nextGenerators(1:6,:),next(1:6)-anchor.states(:,k+1)];
         else
-            % RTI already carries F(xbar,ubar)-xbar_next in its dynamics
-            % equality. It is a known shooting defect, not an independent
-            % uncertain disturbance. Linearize every future joint hold at
+            % The shooting defect F(xbar,ubar)-xbar_next is deterministic. Linearize every future joint hold at
             % the SAME shooting reference instead of accumulating a separate
             % open-loop nominal rollout and enclosing its drift as error.
             tube.generator{2*k}=nextGenerators(22:27,:);
@@ -555,7 +553,7 @@ function middle=localReferenceMiddle(anchor,k,cfg,duration)
 end
 
 function gains=localFeedback(anchor,cfg,durations)
-    % Finite-horizon ancillary feedback, separately represented from the RTI
+    % Finite-horizon ancillary feedback, separately represented from the
     % nominal commands. Full position feedback avoids an uncontrolled drift
     % mode. These are design weights, not claimed contraction certificates.
     count=numel(durations);gains=zeros(2,6,count);p=diag([1,4,20,1,1,2]);
@@ -1047,8 +1045,8 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
         root=localCoupledRoot(anchor.states(:,1),initialGenerator,contract,target,errorSet);
     end
     count=size(anchor.inputs,2);center=root.center;generator=root.generator;
-    moment=cfg.controller.jointMomentPrediction && string(cfg.solver.stateEstimateMethod)=="rti" ...
-        && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction;
+    moment=cfg.controller.jointMomentPrediction ...
+        && ~cfg.controller.jointNonlinearPrediction;
     if moment,generator=localMomentFactor(generator);end
     inputRoom=inf(2,count);
     if nargin>=9 && isfield(options,'feedbackInputRadius'),inputRoom=options.feedbackInputRadius;end
@@ -1096,7 +1094,7 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
                 anchor.inputs(2,k)-cfg.actuation.brakingRatioMinimum))];
             % Preserve the existing stabilizing ego feedback first. The
             % additional target response uses the remaining actuator room
-            % and RTI's local correction budget. Scaling the entire ego gain
+            % and the supplied local correction budget. Scaling the entire ego gain
             % by target uncertainty would remove its stabilization.
             gain=gain.*min(1,authority./max(reserve,realmin));
             baseReserve=sum(abs(gain*egoMap*generator),2)+abs(gain(:,6))*contract.noiseRadius(7);
@@ -1159,7 +1157,7 @@ function tube=localCoupledPropagate(anchor,cfg,initialGenerator,contract,duratio
             end
         end
         % Transport the expansion point, not physical uncertainty, to the
-        % RTI shooting reference. Keep target world motion and observer bias.
+        % supplied shooting reference. Keep target world motion and observer bias.
         next=point(1:35);
         [next,transport]=localCoupledReanchor(next,anchor.states(:,k+1));
         generator=transport*propagated(1:35,:);center=next;
@@ -1178,8 +1176,8 @@ end
 
 function reuse=localReuseJointModel(cache,center,context,k)
     cfg=context.cfg;
-    reuse=~isempty(cache) && k>2 && string(cfg.solver.stateEstimateMethod)=="rti" ...
-        && ~cfg.controller.retainedTube && ~cfg.controller.jointNonlinearPrediction;
+    reuse=~isempty(cache) && k>2 ...
+        && ~cfg.controller.jointNonlinearPrediction;
     if ~reuse,return;end
     old=cache.center;
     % Refresh across changes of vehicle regime or substantial maneuver/pose
@@ -1225,12 +1223,12 @@ end
 
 function prediction=localPredictionContract(contract,cfg,duration,first)
     % The issued-command successor keeps the complete actual sensor block.
-    % Only later engineering RTI holds use fewer virtual measurements. Keep
+    % Only later prediction holds use fewer virtual measurements. Keep
     % the stable internal observer integration step and all noise amplitudes.
     prediction=contract;
     requested=cfg.controller.jointPredictionSamplesPerHold;
-    if first || requested==0 || string(cfg.solver.stateEstimateMethod)~="rti" ...
-            || cfg.controller.retainedTube || cfg.controller.jointNonlinearPrediction
+    if first || requested==0 ...
+            || cfg.controller.jointNonlinearPrediction
         return
     end
     samples=min(requested,round(duration/contract.samplePeriod));

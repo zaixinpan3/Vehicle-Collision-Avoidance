@@ -1,32 +1,27 @@
 function cfg = collisionAvoidanceControllerConfig(userCfg)
-%collisionAvoidanceControllerConfig Joint output-feedback and comparator settings.
+%collisionAvoidanceControllerConfig Raw-sensor predictive controller and shared vehicle settings.
 % Unknown fields are rejected so retired algorithm settings cannot silently
 % change the interpretation of a controller run.
     if nargin<1,userCfg=[];end
     cfg=localDefaults();
-    % Old complete configurations used solver.method for the state-estimate
-    % comparison while selecting the raw-sensor solver in outputFeedback.method.
-    if isstruct(userCfg) && isscalar(userCfg) && all(isfield(userCfg,{'outputFeedback','solver','rti'})) ...
-            && isstruct(userCfg.solver) && isscalar(userCfg.solver) && isfield(userCfg.solver,'method') ...
-            && ~isfield(userCfg.solver,'stateEstimateMethod') && isstruct(userCfg.outputFeedback) ...
-            && isfield(userCfg.outputFeedback,'method')
-        userCfg.solver.stateEstimateMethod=userCfg.solver.method;
-        userCfg.solver=rmfield(userCfg.solver,'method');
-    end
-    % These solver settings belong to the optional state-estimate comparator.
-    if isstruct(userCfg) && isscalar(userCfg) && isfield(userCfg,'solver') ...
-            && isstruct(userCfg.solver) && isscalar(userCfg.solver) && isfield(userCfg.solver,'stateEstimateMethod') ...
-            && (ischar(userCfg.solver.stateEstimateMethod) || isstring(userCfg.solver.stateEstimateMethod)) ...
-            && isequal(string(userCfg.solver.stateEstimateMethod),"nonlinear")
-        cfg.solver.timeLimitSeconds=1000;
-    end
     if ~isempty(userCfg)
         if ~isstruct(userCfg) || ~isscalar(userCfg)
             localInvalid('The override must be a scalar structure.');
         end
-        if all(isfield(userCfg,{'controller','solver','rti','outputFeedback'})) && isstruct(userCfg.outputFeedback)
+        if all(isfield(userCfg,{'controller','solver','outputFeedback','vehicle','clf'})) && isstruct(userCfg.outputFeedback)
             % Only complete saved configurations may contain retired numerical fields.
-            retired={'recoverySolveSeconds','qpMaximumIterations','restorationMaximumIterations','finiteDifferenceStep'};
+            if isfield(userCfg,'terminal'),userCfg=rmfield(userCfg,'terminal');end
+            obsolete=intersect(fieldnames(userCfg.controller),{'retainedTube','horizonSteps'});
+            userCfg.controller=rmfield(userCfg.controller,obsolete);
+            if isfield(userCfg,'rti'),userCfg=rmfield(userCfg,'rti');end
+            legacy=intersect(fieldnames(userCfg.solver),{'method','stateEstimateMethod','maxIterations', ...
+                'timeLimitSeconds','completionReserveSeconds','feasibilityTolerance','optimalityTolerance', ...
+                'lexicographicTieTolerance','reducedTolerance'});
+            userCfg.solver=rmfield(userCfg.solver,legacy);
+            retired={'recoverySolveSeconds','qpMaximumIterations','restorationMaximumIterations','finiteDifferenceStep', ...
+                'memoryDimension','featureScale','noiseDirections','intersampleMarginMeters','backupBrakingRatio', ...
+                'minimumTargetDeceleration','coefficientMaximum','gainMaximum','regularization', ...
+                'predictionSubsteps','smoothAbsoluteValue','planningBufferMeters'};
             obsolete=isfield(userCfg.outputFeedback,retired);
             if any(obsolete),userCfg.outputFeedback=rmfield(userCfg.outputFeedback,retired(obsolete));end
         end
@@ -39,17 +34,6 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
         localValidate(cfg);
     catch exception
         error('collisionAvoidanceController:invalidConfiguration','%s',exception.message);
-    end
-    if string(cfg.outputFeedback.method)~="ipopt" ...
-            && ~(isstruct(userCfg) && isfield(userCfg,'outputFeedback') ...
-            && isfield(userCfg.outputFeedback,'trackingWeights'))
-        % Preserve the objective of the dynamic-memory research comparators.
-        cfg.outputFeedback.trackingWeights=[1;1;.2;.1;.1];
-    end
-    if string(cfg.outputFeedback.method)~="ipopt" ...
-            && ~(isstruct(userCfg) && isfield(userCfg,'outputFeedback') ...
-            && isfield(userCfg.outputFeedback,'maximumSolveSeconds'))
-        cfg.outputFeedback.maximumSolveSeconds=.06;
     end
     cfg.actuation.brakingRatioMinimum=double(cfg.actuation.brakingRatioMinimum);
     cfg.actuation.brakingRatioMaximum=double(cfg.actuation.brakingRatioMaximum);
@@ -66,84 +50,37 @@ function cfg=localDefaults()
     % The online IPOPT iteration limit is nlpMaximumIterations.
     cfg.outputFeedback=struct('method',"ipopt",'nlpMaximumIterations',50, ...
         'nlpTolerance',1e-7,'nlpJit',true,'nlpCompilerOptimization',2,'nlpCompiler',"clang", ...
-        'sensorPeriod',.0125,'movingTargetObservationSeconds',.40,'memoryDimension',1, ...
+        'sensorPeriod',.0125,'movingTargetObservationSeconds',.40, ...
         'noiseBounds',[.04;.03;.0015;.04], ...
-        'featureScale',[50;50;10;10;1;50;50], ...
-        'noiseDirections',zeros(7,1), ...
         'horizonSeconds',[],'previewDecelerationMetersPerSecondSquared',4, ...
         'previewSettlingSeconds',.5,'horizonResolutionSeconds',1, ...
-        'intersampleMarginMeters',0, ...
-        'backupBrakingRatio',.6,'minimumTargetDeceleration',.2, ...
         'clearanceMeters',.1,'steeringMaximum',deg2rad(35),'steeringRateMaximum',Inf, ...
-        'coefficientMaximum',2,'gainMaximum',.25,'regularization',.01, ...
         'inputWeight',.1,'trackingWeights',[.02;.2;2;.1;.1], ...
-        'predictionSubsteps',2, ...
-        'maximumHypotheses',64,'smoothAbsoluteValue',1e-6, ...
+        'maximumHypotheses',64, ...
         'maximumSolveSeconds',1,'initializationSolveSeconds',2, ...
-        'controlNodes',24,'nearControlNodes',4,'planningBufferMeters',0,'minimumPreviewSeconds',3, ...
+        'controlNodes',24,'nearControlNodes',4,'minimumPreviewSeconds',3, ...
         'validationSubsteps',8); % Fixed integration/domain mesh; collision nodes are control boundaries.
     % Compact maximumSolveSeconds covers the whole warmed controller call.
     % Only initialization has a separate budget. Both are soft search deadlines.
     % The transverse penalty permits a passing detour while the fixed speed
     % reference continues to penalize waiting; the cruise path stays fixed.
     % A finite steering-rate bound requires an explicitly supplied actuator contract.
-    % horizonSteps is the shortest horizon. Every collision stage has slack.
-    % Encounter preview sizes the first reference; its first accepted length
-    % stays fixed throughout that encounter.
+    % The encounter preview sets the horizon. Every collision stage has slack.
     % Road edges are deferred. Lateral excursion is an experiment stop rule.
-    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',Inf, ...
+    cfg.controller=struct('sampleTime',.05,'maximumHorizonSteps',Inf, ...
         'enforceRoadBoundaries',false,'jointAffinePrediction',true,'jointNonlinearPrediction',false, ...
-        'retainedTube',false,'reducedJointInformation',true, ...
+        'reducedJointInformation',true, ...
         'jointPredictionSamplesPerHold',2,'jointPredictionInverseTolerance',.005, ...
         'jointPredictionRefreshSteps',2,'compactObserverPrediction',true, ...
         'jointGeneratorLimit',4096,'jointMomentPrediction',true);
-    % jointMomentPrediction uses a fixed-dimensional joint Gramian surrogate
-    % in engineering RTI. It preserves shared linear dependence, not bounded
-    % noise support or a probability guarantee. The observer is unchanged.
-    % With it disabled, jointGeneratorLimit caps the conditioned generator
-    % root by outer reduction, retaining all new future sensor errors.
-    % Stage reuse is capped by jointPredictionRefreshSteps; regime changes
-    % refresh sooner. This never decimates the actual runtime observer.
-    % Engineering RTI retains one joint affine sensor-block history and uses
-    % the actual observer for current ego information. Strict modes ignore this.
-    % retainedTube selects a different, enclosure-certified policy-box
-    % formulation for active encounters. It requires explicit ego/target
-    % bounds and retains a nonlinear joint/terminal certificate. This is
-    % an explicit verification mode, not the online experiment default.
-    % Full-domain nonlinear outer images on the RTI decision box. This
-    % research mode fails explicitly if the admitted set cannot be enclosed;
-    % it never substitutes the affine approximation on failure. It is not
-    % an end-to-end recursive-feasibility or floating-point certificate.
-    % Online experiments use joint affine observer/feedback supports when a
-    % synchronized observer contract is available. Persistent mismatch and
-    % future sensor updates remain in prediction. This engineering
-    % approximation does not certify nonlinear containment or recursion.
-    % Legacy inputs without that contract retain their published margins.
     cfg.nonlinear=struct('integrationStep',.05);
-    % Plan once on target acquisition; later frames shift the state/input iterate.
-    % Initial preview starts from horizonSteps and the current stopping time.
-    % Later frames shift M-1 state/input stages and append one hold to retain M.
-    % Failure is reported without horizon extension, replanning or another
-    % local model.
-    % Optional implementation refinement, separate from the theoretical PCBF
-    % control law that executes a primary minimizer's first command.
-    % Shared quadratic performance: nominal transverse/speed tracking,
-    % actual input increments, and optional reference proximity (off by default).
-    % PCBF minimizes safety slack first, then performance at that optimum.
-    % Cruise minimizes the integrated continuous-CLF slack plus performance.
-    % All three weights are soft costs; zero disables that component.
-    % Trust budgets are one-hold numerical approximation tolerances in
-    % [m;m;rad;m/s;m/s;rad/s], separate from observer uncertainty.
-    cfg.rti=struct('settlingSeconds',.5,'referenceDeviationWeight',0, ...
-        'nominalTrackingWeight',1,'inputVariationWeight',20, ...
-        'trustRegion',struct('enabled',true,'errorBudget',[.04;.04;.01;.4;.4;.2]));
     % One field rollout combines route attraction with predictive obstacle
     % gradients. Time-aligned exposure scales continuous target-transport and
     % separation gradients, without a passing-side input or sign selection.
     % There is no candidate bank or nominal/avoidance behavior switch.
     % Cruise feedback never overwrites longitudinal obstacle correction.
     % The parallel-wall acceleration guide anticipates transverse momentum;
-    % it is not a hard RTI/terminal constraint or an execution certificate.
+    % it is not a hard terminal constraint or an execution certificate.
     cfg.planner=struct('radialRate',1,'tangentialRate',2,'wallRate',2, ...
         'lateralAccelerationFraction',.9,'guideHalfWidthMeters',9);
     % encounterRangeMeters is the perception radius: the estimator receives
@@ -153,9 +90,6 @@ function cfg=localDefaults()
     % Collision rows require nonoverlap after uncertainty tightening. There
     % is no extra fixed clearance in the optimizer or geometric guide.
     cfg.collision=struct('encounterRangeMeters',50);
-    % Nominal deceleration for the braking-model comparators. The compact
-    % controller continues under straight cruise and checks a moving core.
-    cfg.terminal=struct('brakingDecelerationMetersPerSecondSquared',4);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -183,11 +117,6 @@ function cfg=localDefaults()
         'sideslipMaximum',.25);
     % One continuous-time quadratic CLF V = e' P e with the soft condition
     %   Vdot <= -2 V / convergenceTimeConstantSeconds + slack.
-    % Integrate this condition over a held-input interval h, then RTI
-    % linearizes V at the first predicted state. The resulting affine row is
-    % V_aff(x+) <= exp(-alpha*h)*V(x) + (1-exp(-alpha*h))/alpha * slack.
-    % The continuous design of P is unchanged. Zero affine slack alone is
-    % not an exact nonlinear sampled or continuous stability certificate.
     % The offline design enforces the continuous trim Lyapunov inequality.
     % A separate sampled certificate supports the cruise initializer below.
     % P and the gain K of the cruise controller u = u* + K e are synthesized offline
@@ -214,20 +143,8 @@ function cfg=localDefaults()
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
         'speedGain',.5,'brakingRatioLimit',.35);
-    % PCBF priority and reference refinement share the remaining call budget.
-    % An in-flight factorization can overrun this soft wall-clock limit.
-    % constraintTolerance and optimalityTolerance govern NLP feasibility and
-    % local optimality, or the explicit conic comparator's feasibility/gap.
-    % feasibilityTolerance is also used for
-    % diagnostic interpretation and limits numerical input-bound projection.
-    % reducedTolerance is the precision
-    % for an AlmostSolved result. Budget includes controller preprocessing;
-    % the reserve leaves time for output assembly. Native
-    % solves also count their construction time against the remaining budget.
-    cfg.solver=struct('stateEstimateMethod',"rti",'maxIterations',40,'timeLimitSeconds',.1,'completionReserveSeconds',.002, ...
-        'feasibilityTolerance',1e-4,'constraintTolerance',1e-5, ...
-        'optimalityTolerance',1e-5,'lexicographicTieTolerance',1e-3, ...
-        'reducedTolerance',1e-3);
+    % Tolerance used for actuator-bound interior points in shared model routines.
+    cfg.solver=struct('constraintTolerance',1e-5);
     cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6);
 end
 
@@ -247,8 +164,8 @@ end
 
 function localValidate(cfg)
     of=cfg.outputFeedback;
-    assert(isscalar(string(of.method)) && any(string(of.method)==["ipopt","dynamicMemoryIpopt"]), ...
-        'outputFeedback.method must be ipopt or dynamicMemoryIpopt.');
+    assert(isscalar(string(of.method)) && string(of.method)=="ipopt", ...
+        'outputFeedback.method must be ipopt.');
     validateattributes(of.controlNodes,{'double'},{'scalar','integer','finite','>=',6});
     validateattributes(of.nearControlNodes,{'double'},{'scalar','integer','finite','positive','<',of.controlNodes});
     validateattributes(of.nlpMaximumIterations,{'double'},{'scalar','integer','finite','positive'});
@@ -264,53 +181,30 @@ function localValidate(cfg)
         validateattributes(of.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(of.previewSettlingSeconds,{'double'},{'scalar','real','finite','nonnegative'});
-    for name=["sensorPeriod","backupBrakingRatio","minimumTargetDeceleration", ...
-            "steeringMaximum","coefficientMaximum", ...
-            "gainMaximum","regularization","smoothAbsoluteValue"]
+    for name=["sensorPeriod","steeringMaximum"]
         validateattributes(of.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(of.steeringRateMaximum,{'double'},{'scalar','real','nonnan','positive'});
     validateattributes(of.maximumSolveSeconds,{'double'},{'scalar','real','positive'});
     validateattributes(of.initializationSolveSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(of.movingTargetObservationSeconds,{'double'},{'scalar','real','finite','nonnegative'});
-    assert(of.backupBrakingRatio<1,'backupBrakingRatio must lie strictly between zero and one.');
     assert(of.steeringMaximum<pi/2,'steeringMaximum must be below pi/2.');
-    for name=["memoryDimension","predictionSubsteps","maximumHypotheses"]
-        validateattributes(of.(name),{'double'},{'scalar','integer','finite','positive'});
-    end
-    assert(mod(of.predictionSubsteps,2)==0,'predictionSubsteps must be even.');
-    validateattributes(of.planningBufferMeters,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(of.maximumHypotheses,{'double'},{'scalar','integer','finite','positive'});
     validateattributes(of.minimumPreviewSeconds,{'double'},{'scalar','real','finite','positive'});
     validateattributes(of.validationSubsteps,{'double'},{'scalar','integer','finite','>=',4});
-    validateattributes(of.intersampleMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(of.clearanceMeters,{'double'},{'scalar','real','finite','nonnegative'});
-    if string(of.method)=="ipopt" && of.clearanceMeters==0
+    if of.clearanceMeters==0
         localInvalid('Compact PCBF planning requires a positive clearanceMeters.');
     end
     validateattributes(of.inputWeight,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(of.noiseBounds,{'double'},{'size',[4,1],'real','finite','nonnegative'});
-    validateattributes(of.featureScale,{'double'},{'size',[7,1],'real','finite','positive'});
     validateattributes(of.trackingWeights,{'double'},{'size',[5,1],'real','finite','nonnegative'});
-    validateattributes(of.noiseDirections,{'double'},{'2d','nrows',7,'nonempty','real','finite'});
-    assert(all(vecnorm(of.noiseDirections(1:2,:))<=1+1e-12) ...
-        && all(vecnorm(of.noiseDirections(3:4,:))<=1+1e-12) ...
-        && all(abs(of.noiseDirections(5,:))<=1+1e-12) ...
-        && all(vecnorm(of.noiseDirections(6:7,:))<=1+1e-12), ...
-        'Future noise directions must respect each declared sensor norm.');
-    assert(any(string(cfg.solver.stateEstimateMethod)==["rti","nonlinear"]), ...
-        'collisionAvoidanceController:invalidConfiguration','solver.stateEstimateMethod must be rti or nonlinear.');
-    assert(~(string(cfg.solver.stateEstimateMethod)=="nonlinear" && cfg.controller.retainedTube), ...
-        'collisionAvoidanceController:invalidConfiguration','Nonlinear optimization and retainedTube are separate backends.');
     validateattributes(cfg.referenceSpeed,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(cfg.controller.horizonSteps,{'double'},{'scalar','real','finite','integer','positive'});
     validateattributes(cfg.controller.enforceRoadBoundaries,{'logical'},{'scalar'});
     validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'scalar','real','positive'});
     if isfinite(cfg.controller.maximumHorizonSteps)
         validateattributes(cfg.controller.maximumHorizonSteps,{'double'},{'integer'});
-    end
-    if cfg.controller.horizonSteps>cfg.controller.maximumHorizonSteps
-        localInvalid('horizonSteps cannot exceed maximumHorizonSteps.');
     end
     validateattributes(cfg.nonlinear.integrationStep,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.jointAffinePrediction,{'logical'},{'scalar'});
@@ -325,29 +219,18 @@ function localValidate(cfg)
     validateattributes(cfg.controller.jointMomentPrediction,{'logical'},{'scalar'});
     validateattributes(cfg.controller.jointGeneratorLimit,{'double'},{'scalar','integer','>=',70,'finite'});
     validateattributes(cfg.controller.jointNonlinearPrediction,{'logical'},{'scalar'});
-    validateattributes(cfg.controller.retainedTube,{'logical'},{'scalar'});
-    validateattributes(cfg.rti.settlingSeconds,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(cfg.rti.referenceDeviationWeight,{'double'},{'scalar','real','finite','nonnegative'});
-    validateattributes(cfg.rti.nominalTrackingWeight,{'double'},{'scalar','real','finite','nonnegative'});
-    validateattributes(cfg.rti.inputVariationWeight,{'double'},{'scalar','real','finite','nonnegative'});
-    validateattributes(cfg.rti.trustRegion.enabled,{'logical'},{'scalar'});
-    validateattributes(cfg.rti.trustRegion.errorBudget,{'double'},{'size',[6,1],'real','finite','positive'});
     for name=["radialRate","tangentialRate","wallRate"]
         validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});
     validateattributes(cfg.planner.guideHalfWidthMeters,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(cfg.terminal.brakingDecelerationMetersPerSecondSquared,{'double'},{'scalar','real','finite','positive'});
     for name=["m","Iz","lf","lr","wheelbase","length","width","gravity"]
         validateattributes(cfg.vehicle.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.vehicle.rectangleOffset,{'double'},{'size',[2,1],'real','finite'});
     for name=["corneringStiffness","frictionCoefficient"]
         validateattributes(cfg.tire.(name),{'double'},{'size',[2,1],'real','finite','positive'});
-    end
-    if cfg.terminal.brakingDecelerationMetersPerSecondSquared>=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity
-        localInvalid('The terminal braking rate must lie inside the longitudinal tire capacity.');
     end
     for name=["brakingRatioMinimum","brakingRatioMaximum"]
         validateattributes(cfg.actuation.(name),{'numeric'},{'scalar','real','finite'});
@@ -389,16 +272,7 @@ function localValidate(cfg)
     for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit"]
         if cfg.nominalClf.(name)>=1,localInvalid('nominalClf.%s must lie in (0,1).',name);end
     end
-    validateattributes(cfg.solver.maxIterations,{'double'},{'scalar','real','finite','integer','positive'});
-    validateattributes(cfg.solver.timeLimitSeconds,{'double'},{'scalar','real','finite','positive'});
-    validateattributes(cfg.solver.completionReserveSeconds,{'double'},{'scalar','real','finite','nonnegative'});
-    for name=["feasibilityTolerance","constraintTolerance","optimalityTolerance","reducedTolerance"]
-        validateattributes(cfg.solver.(name),{'double'},{'scalar','real','finite','positive'});
-    end
-    if cfg.solver.reducedTolerance<max(cfg.solver.feasibilityTolerance,cfg.solver.constraintTolerance)
-        localInvalid('solver.reducedTolerance cannot be tighter than the feasibility and constraint tolerances.');
-    end
-    validateattributes(cfg.solver.lexicographicTieTolerance,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.solver.constraintTolerance,{'double'},{'scalar','real','finite','positive'});
     for name=["defaultLength","defaultWidth","rearAxleDistance"]
         validateattributes(cfg.target.(name),{'double'},{'scalar','real','finite','positive'});
     end

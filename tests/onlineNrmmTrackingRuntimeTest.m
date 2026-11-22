@@ -19,11 +19,6 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
     end
 
-    methods (TestMethodSetup)
-        function resetControllerState(~)
-            stateEstimateControllerComparator("resetNominalTrajectory");
-        end
-    end
 
     methods (Test)
         function reportedRadarRadiiBoundThePersistentMotionIntervals(testCase)

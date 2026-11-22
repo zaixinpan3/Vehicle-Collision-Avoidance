@@ -121,24 +121,6 @@ classdef roadBoundaryGuidanceTest < matlab.unittest.TestCase
             witness=bypassFeasibilityBaseline(x,q,road,cfg);
             testCase.verifyTrue(witness.qualified,witness.reason);
         end
-        function jointControlKeepsTheInitializedJunctionHorizon(testCase,egoSpeed)
-            cfg=struct('referenceSpeed',egoSpeed, ...
-                'controller',struct('horizonSteps',8+8*(egoSpeed>=15)), ...
-                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',5,'maxIterations',200));
-            report=runNonlinearPredictiveSafetyValidation(Scenarios="intersectionCrossing",Frames=11, ...
-                ControllerConfiguration=cfg,EstimatorConfiguration=estimatorControllerIntegrationConfig());
-            result=report.results;
-            testCase.verifyEqual(result.failure,"");
-            testCase.verifyEqual(result.executedFrames,11);
-            testCase.verifyFalse(result.collisionDetected);
-            testCase.verifyFalse(result.roadConstraintsEnforced);
-            % The first encounter plan chooses a horizon longer than the
-            % slack prefix; subsequent frames retain that same node count.
-            testCase.assertNotEmpty(result.trace,'The controller must return a first plan before its horizon can be compared.');
-            testCase.verifyGreaterThan(result.trace(1).horizonSteps,cfg.controller.horizonSteps);
-            testCase.verifyEqual([result.trace.horizonSteps], ...
-                repmat(result.trace(1).horizonSteps,1,numel(result.trace)));
-        end
         function aBoundaryAdjustedSeedRetainsNonlinearDynamicConsistency(testCase)
             model=localModel(perceiveRoadBoundaries(localRoad(),[0;0],30));
             x=[0;8.9;0;8;0;0];

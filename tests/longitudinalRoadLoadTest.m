@@ -60,53 +60,9 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             testCase.verifyEqual(cruise, [0.75; 0; 0; 15; 0; 0], AbsTol=1.0e-12);
         end
 
-        function commandAndClfUseTheSameLongitudinalForceBalance(testCase)
-            [command, problem, cfg] = localProblem(14.8);
-            derivative=nonlinearBicycleModel.derivative(problem.model.initialState,command.actuatorInput,cfg);
-            forceDerivative=(command.totalLongitudinalActuatorForce ...
-                -command.aerodynamicResistanceForce-command.rollingResistanceForce)/cfg.vehicle.m;
-            testCase.verifyEqual(command.bodyLongitudinalVelocityDerivative,derivative(4),AbsTol=1e-12);
-            % A solver may return a tiny nonzero steering angle even on a
-            % straight road. Compare the full body-frame force balance.
-            delta=command.frontWheelSteeringAngle;
-            steeringCorrection=(command.axleLongitudinalForce(1)*(cos(delta)-1) ...
-                -command.axleLateralForce(1)*sin(delta))/cfg.vehicle.m;
-            coriolis=problem.model.initialState(6)*problem.model.initialState(5);
-            testCase.verifyEqual(derivative(4),forceDerivative+steeringCorrection+coriolis,AbsTol=1e-12);
-            testCase.verifyEqual(command.totalLongitudinalActuatorForce, ...
-                cfg.vehicle.m*nonlinearBicycleModel.tireAccelerationGain(cfg)*command.actuatorInput(2), AbsTol=1.0e-10);
-            testCase.verifyEqual(forceDerivative, (command.totalLongitudinalTireForce ...
-                -command.aerodynamicResistanceForce)/cfg.vehicle.m, AbsTol=1.0e-12);
-            testCase.verifyEqual(sum(command.axleNormalLoad), cfg.vehicle.m*cfg.vehicle.gravity, AbsTol=1.0e-10);
-        end
 
-        function theCruiseEquilibriumAccountsForPassiveForces(testCase)
-            [~, problem, cfg] = localProblem(15);
-            requiredInput = nonlinearBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*nonlinearBicycleModel.tireAccelerationGain(cfg));
 
-            testCase.verifyEqual(problem.metadata.clfOperatingInput, [0;requiredInput], AbsTol=1.0e-12);
-            testCase.verifyGreaterThan(requiredInput, 0.0);
-        end
 
-        function tireNormalLoadsUseTheStaticWeightDistribution(testCase)
-            [command, ~, cfg] = localProblem(14.8);
-            expected = cfg.vehicle.m*cfg.vehicle.gravity/(cfg.vehicle.lf+cfg.vehicle.lr) ...
-                * [cfg.vehicle.lr; cfg.vehicle.lf];
-            testCase.verifyEqual(command.axleNormalLoad, expected, AbsTol=1.0e-10);
-        end
-
-        function changingRoadLoadUpdatesTheNominalValue(testCase)
-            [~, first, cfg] = localProblem(14.8);
-            cfg.roadLoad.dragCoefficient = 1.2;
-            ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.8);
-            ego.stateTime = 0;
-
-            [~, ~, second] = stateEstimateControllerComparator(ego, [], [0, 0; 2000, 0], cfg, []);
-
-            testCase.verifyGreaterThan(abs(first.metadata.clfInitialValue-second.metadata.clfInitialValue), 1.0e-10);
-            testCase.verifyGreaterThan(second.metadata.clfOperatingInput(2), ...
-                first.metadata.clfOperatingInput(2));
-        end
 
         function passiveCoefficientsMustBeFiniteNonnegativeScalars(testCase, invalidCoefficient)
             override = struct("roadLoad", struct("rollingCoefficient", invalidCoefficient));
@@ -121,13 +77,4 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:invalidConfiguration");
         end
     end
-end
-
-function [command, problem, cfg] = localProblem(speed)
-    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps",16,"sampleTime",0.05), ...
-        "solver",struct("stateEstimateMethod","rti","timeLimitSeconds",5)));
-    ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
-    ego.stateTime = 0;
-
-    [command, ~, problem] = stateEstimateControllerComparator(ego, [], [0, 0; 2000, 0], cfg, []);
 end

@@ -170,9 +170,9 @@ classdef predictiveSafetyGeometry
 
         function guide = avoidanceGuide(model,count,holds)
             % Route-following initialization, corrected by an avoidance field.
-            % No candidate scores or admission gate. RTI receives the states
+            % No candidate scores or admission gate. The nonlinear solve receives the states
             % and inputs over exactly count holds. Terminal constraints
-            % belong to RTI, not this heuristic initialization.
+            % are imposed in the nonlinear solve.
             if nargin<3,holds=ones(1,count);end
             cfg=model.cfg;durations=holds*cfg.controller.sampleTime;
             time=[0,cumsum(holds)]*cfg.controller.sampleTime;
@@ -185,7 +185,7 @@ classdef predictiveSafetyGeometry
             % prediction uses its distinct conditional approximation.
             holdTime=[0,durations];
             jointTarget=isfield(model.uncertainty,'jointPrediction') ...
-                && (cfg.controller.retainedTube || cfg.controller.jointAffinePrediction || cfg.controller.jointNonlinearPrediction);
+                && (cfg.controller.jointAffinePrediction || cfg.controller.jointNonlinearPrediction);
             jointTarget=jointTarget || (~isempty(model.uncertainty.target) && isfield(model.uncertainty.target,'family'));
             if jointTarget
                 holdTime=time;
@@ -242,7 +242,7 @@ classdef predictiveSafetyGeometry
             % Perceived boundary guidance, with a parallel-wall fallback.
             % The fallback clips transverse acceleration and anticipates outward speed.
             % Exact realization would enforce second-order wall inequalities;
-            % Fiala tracking and RTI modification still need replay validation.
+            % Fiala tracking and optimized commands still need replay validation.
             if isfield(model.road,'boundaryObservation')
                 [acceleration,active]=predictiveSafetyGeometry.roadBoundaryGuidance(x,acceleration,model);return;
             end
@@ -809,6 +809,14 @@ classdef predictiveSafetyGeometry
                 observation.length/2;observation.width/2;offset];
         end
 
+        function spread=motionSpread(root,limits,time)
+            % Pairwise travel variation plus the maximum change of the
+            % integrated course over the arc. Absorption can only shorten it.
+            arc=root(4)*time+max(0,limits(2,1))*time^2/2;
+            spread=diff(limits(:,1))*time^2/2+arc*diff(limits(:,2)) ...
+                +arc^2*diff(sin(limits(:,2)))/(2*root(7));
+        end
+
         function [box,centers] = targetMotionEnvelope(root,limits,time,nominal)
             % Enclose the continuous constant-A, constant-beta footprint in
             % axes centered on the possible body headings at each node.
@@ -860,8 +868,23 @@ classdef predictiveSafetyGeometry
                 [low,high]=localCosRange(courseLow-phase,courseHigh-phase);
                 projections=[chordLow.*low;chordLow.*high;chordHigh.*low;chordHigh.*high]-sum(axes.*offset,1);
                 row=2*k-1;
-                centers(row,:)=min(projections,[],1)-padding;
-                centers(row+1,:)=max(projections,[],1)+padding;
+                lowerCenter=min(projections,[],1);
+                upperCenter=max(projections,[],1);
+                % Project the same circular arc using the difference of its
+                % endpoint sines. This keeps the signed position on a curved
+                % cell bounded even when the arc spans several revolutions.
+                if curvature(1)*curvature(2)>0
+                    alpha=midHeading+phase;
+                    [sl,sh]=localCosRange(limits(1,2)+2*halfLow-alpha-pi/2, ...
+                        limits(2,2)+2*halfHigh-alpha-pi/2);
+                    [il,ih]=localCosRange(limits(1,2)-alpha-pi/2,limits(2,2)-alpha-pi/2);
+                    q=[(sl-ih)/curvature(1);(sl-ih)/curvature(2); ...
+                        (sh-il)/curvature(1);(sh-il)/curvature(2)]-sum(axes.*offset,1);
+                    lowerCenter=max(lowerCenter,min(q,[],1));
+                    upperCenter=min(upperCenter,max(q,[],1));
+                end
+                centers(row,:)=lowerCenter-padding;
+                centers(row+1,:)=upperCenter+padding;
                 [vl,vh]=localCosRange(yawLow+vertexAngles-phase,yawHigh+vertexAngles-phase);
                 lower=centers(row,:)+min(radii.*vl,[],1);
                 upper=centers(row+1,:)+max(radii.*vh,[],1);
@@ -1096,17 +1119,6 @@ classdef predictiveSafetyGeometry
             assert(min(certificate.lambda)>=0 && norm(certificate.normal)<=1+1e-8 && abs(gap)<=1e-6);
             rows=struct('value',values,'jacobian',jacobian,'normal',certificate.normal, ...
                 'lambda',certificate.lambda,'distance',min(values),'exitFlag',1,'dualityGap',gap);
-        end
-
-        function witness = retractSeparationWitness(reference,increment)
-            % Normalize the tangent-plane update, including its offset.
-            % At a fixed pose and zero uncertainty this preserves every
-            % linearized separating halfspace exactly up to positive scale.
-            % Its derivative at zero is the angle/offset identity, so it is
-            % a retraction for the same SQP tangent, not another optimization.
-            scale=hypot(1,increment(1,:));
-            witness=[reference(1,:)+atan(increment(1,:)); ...
-                (reference(2,:)+increment(2,:))./scale];
         end
 
         function reserve = jointPoseSupport(normal,poseE,shapeE,poseT,shapeT,generator)
@@ -1600,14 +1612,13 @@ end
 
 function candidate=localCirculationRollout(model,data,speed,durations)
     cfg=model.cfg;h=cfg.controller.sampleTime;count=numel(durations);
-    physicalOnly=isfield(model,'compactInitialization') && model.compactInitialization;
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1), ...
         'speedScale',speed, ...
         'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
         'maximumDeviation',0,'completion',"requestedHorizon");
     candidate.states(:,1)=model.initialState;
-    uncertainMotion=physicalOnly && ~isempty(model.target) && model.target(4)>0 ...
+    uncertainMotion=~isempty(model.target) && model.target(4)>0 ...
         && isfield(model,'motionLimits') && ~isempty(model.motionLimits);
     if uncertainMotion
         preview=max(cfg.outputFeedback.minimumPreviewSeconds, ...
@@ -1631,12 +1642,19 @@ function candidate=localCirculationRollout(model,data,speed,durations)
             [path,centers]=predictiveSafetyGeometry.targetMotionEnvelope(model.target,model.motionLimits,pathTime);
         end
     end
+    if uncertainMotion,remaining=true(1,size(path,3));end
     prior=model.previousInput;encounterEnded=false;
     for index=1:count+1
         if mod(index,8)==1,localPlannerDeadline(model);end
         x=candidate.states(:,index);target=data.target(:,index);
         [gap,nominal]=localPlannerGap(x,target,data,index);
         outside=norm(x(1:2)-target(1:2))-data.reserve-data.support.ballRadius(index)>cfg.collision.encounterRangeMeters;
+        if uncertainMotion
+            node=ticks(index)+1;
+            ranges=predictiveSafetyGeometry.targetEnvelopeRange(x,reshape(path(:,node,:),11,[]),reshape(centers(:,node,:),4,[]));
+            remaining=remaining & ranges<=cfg.collision.encounterRangeMeters;
+            outside=~any(remaining);
+        end
         if index>1 && outside && norm(model.initialState(1:2)-model.target(1:2))<=cfg.collision.encounterRangeMeters
             encounterEnded=true;
         end
@@ -1648,38 +1666,60 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         projection=predictiveSafetyGeometry.project(x(1:2),model.lane);
         candidate.maximumDeviation=max(candidate.maximumDeviation,abs(projection.lateralPosition));
         if index>count,break;end
-        if ~physicalOnly && hypot(x(4),x(5))<=cfg.model.brakeHoldSpeed
-            b=-cfg.terminal.brakingDecelerationMetersPerSecondSquared/nonlinearBicycleModel.tireAccelerationGain(cfg);
-            change=cfg.model.brakingRatioRateMaximum*h;
-            u=[prior(1);min(prior(2)+change,max(prior(2)-change,b))];
-        else
-            % Route attraction is the preferred acceleration BEFORE obstacle
-            % and boundary correction. Never overwrite longitudinal obstacle
-            % acceleration with a cruise-speed request afterwards.
-            acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
-            if ~encounterEnded
-                corrected=false;
-                if uncertainMotion
-                    % The enclosure includes the nominal target. Apply its
-                    % lateral correction directly to the route acceleration.
-                    nodes=ticks(index)+(1:numel(future));
-                    targets=path(:,nodes,:);referenceBoxes=centers(:,nodes,:);
-                    [acceleration,corrected]=localEncounterAcceleration(x,projection,acceleration,targets,future,model,referenceBoxes);
-                end
-                active=corrected;
-                if ~corrected
-                    parameters=localFieldParameters(data,index,speed);
-                    parameters.preferredAcceleration=acceleration;
-                    [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
-                    active=field.activation>0;
-                end
-                candidate.fieldActive=candidate.fieldActive || active;
-                if ~active && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
+        % Route attraction is the preferred acceleration BEFORE obstacle
+        % and boundary correction. Never overwrite longitudinal obstacle
+        % acceleration with a cruise-speed request afterwards.
+        acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
+        if ~encounterEnded
+            corrected=false;
+            if uncertainMotion
+                % The enclosure includes the nominal target. Apply its
+                % lateral correction directly to the route acceleration.
+                nodes=ticks(index)+(1:numel(future));
+                targets=path(:,nodes,remaining);referenceBoxes=centers(:,nodes,remaining);
+                [acceleration,corrected]=localEncounterAcceleration(x,projection,acceleration,targets,future,model,referenceBoxes);
             end
-            acceleration=predictiveSafetyGeometry.wallGuidance(x,acceleration,model);
-            u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true,physicalOnly);
-            if physicalOnly,u(1)=min(cfg.outputFeedback.steeringMaximum,max(-cfg.outputFeedback.steeringMaximum,u(1)));end
+            active=corrected;
+            if ~corrected
+                parameters=localFieldParameters(data,index,speed);
+                parameters.preferredAcceleration=acceleration;
+                [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
+                active=field.activation>0;
+            end
+            candidate.fieldActive=candidate.fieldActive || active;
+            if ~active && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
         end
+        if ~isfield(model.road,'boundaryObservation')
+            acceleration=predictiveSafetyGeometry.wallGuidance(x,acceleration,model);
+        end
+        if uncertainMotion && ~encounterEnded
+            % When the possible target displacement spans the sensor range,
+            % give the single seed an outward velocity component. All knots
+            % remain free in the PCBF solve.
+            hPreview=cfg.outputFeedback.minimumPreviewSeconds;
+            spread=predictiveSafetyGeometry.motionSpread(target,model.motionLimits,hPreview);
+            range=cfg.collision.encounterRangeMeters;
+            weight=min(1,max(0,spread/range-1));
+            displacement=x(1:2)-target(1:2);distance=norm(displacement);
+            if weight>0 && distance>0
+                outward=displacement/distance;
+                speed=hypot(x(4),x(5));course=x(3)+atan2(x(5),x(4));
+                forward=[cos(course);sin(course)];normal=[-forward(2);forward(1)];
+                turn=atan2(normal.'*outward,forward.'*outward);
+                if normal.'*outward==0,turn=0;end
+                grip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
+                desiredSpeed=min(cfg.referenceSpeed+hPreview*grip, ...
+                    max(cfg.referenceSpeed,(range+spread/2-distance)/hPreview));
+                escape=(desiredSpeed-speed)*forward/cfg.nominalClf.lookaheadSeconds ...
+                    +speed*cfg.nominalClf.courseGain*turn*normal;
+                acceleration=(1-weight)*acceleration+weight*escape;
+            end
+        end
+        if isfield(model.road,'boundaryObservation')
+            acceleration=predictiveSafetyGeometry.roadBoundaryGuidance(x,acceleration,model);
+        end
+        u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true,true);
+        u(1)=min(cfg.outputFeedback.steeringMaximum,max(-cfg.outputFeedback.steeringMaximum,u(1)));
         candidate.inputs(:,index)=u;
         next=nonlinearBicycleModel.sample(x,u,cfg,[],durations(index));
         candidate.states(:,index+1)=next;prior=u;
@@ -1789,7 +1829,7 @@ end
 
 function localPlannerDeadline(model)
     if isfield(model,'solveTimer') && toc(model.solveTimer)>=model.solveTimeLimitSeconds
-        error('collisionAvoidanceController:timeBudgetExceeded','Circulation initialization exhausted the RTI budget.');
+        error('collisionAvoidanceController:timeBudgetExceeded','Circulation initialization exhausted its time budget.');
     end
 end
 

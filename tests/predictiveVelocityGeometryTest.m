@@ -48,33 +48,6 @@ classdef predictiveVelocityGeometryTest < matlab.unittest.TestCase
             u=localFixture();u=rmfield(u,'velocityGeometry');
             testCase.verifyEqual(predictiveSafetyGeometry.egoErrorGenerator(zeros(6,1),u),u.egoGenerator);
         end
-        function predictionRetainsTheCurrentHoldAndSchedulesTheSlowerTail(testCase)
-            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-                'controller',struct('horizonSteps',40,'sampleTime',.05), ...
-                'solver',struct('stateEstimateMethod',"rti",'timeLimitSeconds',10)));
-            ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
-            [~,~,prediction]=stateEstimateControllerComparator(ego,[],[],cfg,[]);
-            model=prediction.model;anchor=model.linearization;
-            anchor.inputs=repmat([0;-.4],1,size(anchor.inputs,2));
-            for k=1:size(anchor.inputs,2)
-                anchor.states(:,k+1)=nonlinearBicycleModel.sample(anchor.states(:,k),anchor.inputs(:,k),cfg);
-            end
-            factors=localFixture();
-            model.uncertainty.egoGenerator=predictiveSafetyGeometry.egoErrorGenerator(model.initialState,factors);
-            model.uncertainty.collisionGenerator=model.uncertainty.egoGenerator;
-            model.uncertainty.velocityGeometry=factors.velocityGeometry;
-            [~,~,scheduled]=solveStateEstimateComparison('probe',struct('operation','formulate', ...
-                'model',model,'anchor',anchor,'inherited',false));
-            model.uncertainty=rmfield(model.uncertainty,'velocityGeometry');
-            [~,~,fixed]=solveStateEstimateComparison('probe',struct('operation','formulate', ...
-                'model',model,'anchor',anchor,'inherited',false));
-            testCase.verifyEqual(scheduled.uncertaintyPrediction.egoStateRadius(:,1:3), ...
-                fixed.uncertaintyPrediction.egoStateRadius(:,1:3),AbsTol=1e-12);
-            testCase.verifyLessThan(scheduled.uncertaintyPrediction.egoStateRadius(5,end), ...
-                fixed.uncertaintyPrediction.egoStateRadius(5,end)/2);
-            testCase.verifyTrue(scheduled.uncertaintyPrediction.futurePrimitiveBudgetsAssumed);
-            testCase.verifyFalse(scheduled.uncertaintyPrediction.futureObserverDynamicsIncluded);
-        end
     end
 end
 function u=localFixture()

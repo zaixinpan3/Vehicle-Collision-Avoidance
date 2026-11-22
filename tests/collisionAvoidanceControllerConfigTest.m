@@ -80,8 +80,9 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             testCase.verifyEqual(cfg.outputFeedback.method,"ipopt");
             legacy=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('method',"compactNlp")));
             testCase.verifyEqual(legacy,cfg);
-            comparator=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('method',"dynamicMemoryIpopt")));
-            testCase.verifyEqual(comparator.outputFeedback.maximumSolveSeconds,.06);
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
+                'outputFeedback',struct('method',"dynamicMemoryIpopt"))), ...
+                'collisionAvoidanceController:invalidConfiguration');
             explicit=collisionAvoidanceControllerConfig(struct('outputFeedback',struct('maximumSolveSeconds',.25)));
             testCase.verifyEqual(explicit.outputFeedback.maximumSolveSeconds,.25);
         end
@@ -122,41 +123,18 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             cfg=collisionAvoidanceControllerConfig();
             testCase.verifyEmpty(cfg.outputFeedback.horizonSeconds);
             testCase.verifyFalse(isfield(cfg.outputFeedback,'horizonSteps'));
+            testCase.verifyFalse(isfield(cfg.controller,'horizonSteps'));
         end
         function retiredJointStageCountsCannotSilentlyOverrideCoverage(testCase)
             testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
                 struct('outputFeedback',struct('horizonSteps',4))), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
-        function performanceWeightsMustBeFiniteAndNonnegative(testCase,invalidReferenceWeight,performanceWeight)
-            testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
-                struct('rti',struct(performanceWeight,invalidReferenceWeight))), ...
+        function horizonCapacityIsIndependentOfAnyRetiredStageMinimum(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('controller',struct('maximumHorizonSteps',10)));
+            testCase.verifyEqual(cfg.controller.maximumHorizonSteps,10);
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('controller',struct('horizonSteps',4))), ...
                 'collisionAvoidanceController:invalidConfiguration');
-        end
-        function referenceDeviationCanBeDisabledForAnAblation(testCase)
-            cfg=collisionAvoidanceControllerConfig(struct('rti',struct('referenceDeviationWeight',0)));
-            testCase.verifyEqual(cfg.rti.referenceDeviationWeight,0);
-        end
-        function realTimeIterationCannotEnableAnOuterLoopOrRestoration(testCase)
-            for retired={struct('scp',struct('maximumIterations',1)), ...
-                    struct('rti',struct('maximumIterations',2)), ...
-                    struct('rti',struct('maximumRestorations',4)), ...
-                    struct('rti',struct('restorationWeight',1000))}
-                testCase.verifyError(@()collisionAvoidanceControllerConfig(retired{1}), ...
-                    'collisionAvoidanceController:invalidConfiguration');
-            end
-            for invalid={struct('initialSearchSeconds',2),struct('minimumPredictionSeconds',1), ...
-                    struct('settlingSeconds',Inf)}
-                testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('rti',invalid{1})), ...
-                    'collisionAvoidanceController:invalidConfiguration');
-            end
-            cfg=collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.solver.stateEstimateMethod,"rti");
-            testCase.verifyEqual(cfg.solver.timeLimitSeconds,.1);
-            diagnostic=collisionAvoidanceControllerConfig(struct('solver',struct('stateEstimateMethod',"nonlinear")));
-            testCase.verifyEqual(diagnostic.solver.timeLimitSeconds,1000);
-            testCase.verifyEqual(cfg.controller.sampleTime,.05);
-            testCase.verifyLessThan(cfg.solver.completionReserveSeconds,cfg.solver.timeLimitSeconds);
         end
         function jointModelSchedulingCanBeDisabledAndRequiresAFiniteStepCount(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('controller',struct('jointPredictionRefreshSteps',1)));

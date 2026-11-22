@@ -361,13 +361,22 @@ $$
 
 On turning cells whose curvature interval excludes zero, the chord length
 factor also equals $2\sin(z)/\kappa$. Intersecting the two interval bounds
-keeps this factor bounded after a full revolution.
+keeps this factor bounded after a full revolution. On such cells the signed
+projection onto an axis at angle $\alpha$ relative to the initial heading
+also equals $[\sin(\beta+\kappa s-\alpha)-\sin(\beta-\alpha)]/\kappa$.
+Intersecting its interval extension with the chord projection tightens the
+reference-point enclosure on long turns.
 Project these interval expressions and the four rotated footprint vertices
 onto axes centered on the cell's heading interval. Coordinate minima and
 maxima enclose the reference points in $P_C(t)$ and the complete occupied
-footprints in $B_C(t)$. The compact calculation partitions each nondegenerate
-parameter interval into four adjacent closed subintervals. Every value in
-each cell contributes to its enclosure. At each control node the clearance
+footprints in $B_C(t)$. Over the preview $T$, let
+$L=V_0T+\max(0,A_u)T^2/2$. Integrating the course variation along the
+arc bounds the pairwise position spread by
+$D=(A_u-A_l)T^2/2+L(\beta_u-\beta_l)+L^2(\kappa_u-\kappa_l)/2$.
+The predictor uses four subdivisions per parameter by default. When $D$
+exceeds the sensor radius, it uses eight acceleration and sixteen slip
+subdivisions and splits any cell that straddles zero curvature. Every
+subdivision is closed and the union covers the same motion family. At each control node the clearance
 lower bound is
 
 $$
@@ -758,7 +767,12 @@ inside the hull and has a unique nearest endpoint, project that component
 onto the endpoint and retain the longitudinal component of $a_r$. The
 nominal target is already included in the enclosure. Otherwise the guide
 uses its nominal circulation field. Both use the same cruise reference.
-Every trial uses its own poses in the distance dual of Section 5.
+For uncertain motion, each cell contributes to the field until its own
+range exit. When $D$ exceeds the sensor radius $R$, the initial guide
+blends its acceleration with a velocity correction directed away from
+the forecast target center, with weight $\min(1,\max(0,D/R-1))$.
+This affects only the initial controls. Every trial uses its own poses
+in the distance dual of Section 5.
 
 The combined initial commands $\bar u$ define the initial shooting point for a new
 encounter. Propagating them from each member gives the footprint poses
@@ -943,8 +957,5 @@ nonlinear optimization, few decision nodes over substantial preview, and warm
 initialization. Its spatial-coordinate vehicle/actuator transcription is not
 identical to this held-input time-coordinate model, which includes rest.
 
-The optional `dynamicMemoryIpopt` formulation and the
-full independent ego/target observer integration are research comparators. The adopted compact
-controller does not optimize their memory maps or observer gains. The NRMM
-observer's own conditional derivation is in
+The NRMM observer's conditional derivation is in
 [OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md).

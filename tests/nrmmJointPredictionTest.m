@@ -83,50 +83,6 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
             testCase.verifyEqual(tube.mean(1:6,:),anchor.states,AbsTol=1e-12);
             testCase.verifyFalse(tube.nonlinearCertificate);
         end
-        function controllerUsesTheJointTubeAndReservesFutureFeedbackAuthority(testCase)
-            f=testCase.fixture;f.cfg.controller.horizonSteps=6;f.cfg.controller.jointAffinePrediction=true;
-            f.frame=localHeldInput(f.frame,f.input,true);
-            output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);
-            output.targetEstimate=[];
-            [~,~,prediction,state]=stateEstimateControllerComparator(output,[],[],f.cfg,[]);
-            tube=prediction.model.jointPredictionTube;
-            testCase.verifyTrue(prediction.model.uncertaintyPrediction.futureObserverDynamicsIncluded);
-            testCase.verifyFalse(prediction.model.uncertaintyPrediction.futurePrimitiveBudgetsAssumed);
-            testCase.verifyGreaterThan(norm(tube.inputRadius(:,end)),0);
-            testCase.verifyEqual(tube.firstInputRadius,zeros(2,1),AbsTol=1e-12);
-            testCase.verifyFalse(isfield(state,'retainedCertificate'));
-            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
-            testCase.verifyFalse(prediction.metadata.egoJointRealArithmeticEnclosure);
-            testCase.verifyEqual(prediction.metadata.measurementConditioning.method, ...
-                "affineCurrentMeasurementIntersection");
-        end
-        function reducedInformationUsesTheObserverWithoutASecondEgoPrior(testCase,reducedInformation)
-            f=testCase.fixture;f.cfg.controller.horizonSteps=6;
-            f.cfg.controller.reducedJointInformation=reducedInformation;
-            f.frame=localHeldInput(f.frame,f.input,true);
-            output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);output.targetEstimate=[];
-            [~,~,prediction,state]=stateEstimateControllerComparator(output,[],[],f.cfg,[]);
-            testCase.verifyEqual(prediction.metadata.reducedJointInformation,reducedInformation);
-            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
-            testCase.verifyEqual(isfield(state,'egoJointPrediction'),~reducedInformation);
-            testCase.verifyTrue(prediction.metadata.futureObserverDynamicsIncluded);
-        end
-        function nonlinearSolveRefreshesMarginsOnItsReturnedVehicleTrajectory(testCase)
-            f=testCase.fixture;f.cfg.controller.horizonSteps=6;
-            f.cfg.solver.stateEstimateMethod="nonlinear";f.cfg.solver.timeLimitSeconds=120;
-            f.frame=localHeldInput(f.frame,f.input,true);
-            output=onlineNrmmTrackingRuntime('output',f.runtime,f.frame);output.targetEstimate=[];
-            [~,~,prediction]=stateEstimateControllerComparator(output,[],[],f.cfg,[]);
-            testCase.verifyFalse(prediction.metadata.reducedJointInformation);
-            testCase.verifyTrue(prediction.metadata.marginRefreshPerformed);
-            testCase.verifyFalse(prediction.metadata.uncertaintyFrozenWithinSolve);
-            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
-            states=prediction.solution.states;inputs=prediction.solution.inputs;
-            for k=1:size(inputs,2)
-                testCase.verifyEqual(states(:,k+1), ...
-                    nonlinearBicycleModel.sample(states(:,k),inputs(:,k),f.cfg),AbsTol=1e-10);
-            end
-        end
         function affineImuUpdateContainsAConsistentSharedFrictionRealization(testCase)
             f=testCase.fixture;frame=localHeldInput(f.frame,f.input,true);
             output=onlineNrmmTrackingRuntime('output',f.runtime,frame);
@@ -147,7 +103,6 @@ classdef nrmmJointPredictionTest < matlab.unittest.TestCase
         end
         function onlinePredictionKeepsJointFeedbackWithoutClaimingANonlinearCertificate(testCase)
             testCase.verifyTrue(testCase.fixture.cfg.controller.jointAffinePrediction);
-            testCase.verifyFalse(testCase.fixture.cfg.controller.retainedTube);
             [tube,~]=localTube(testCase.fixture,4,true);
             testCase.verifyFalse(tube.nonlinearCertificate);
         end
@@ -252,7 +207,7 @@ function frame=localHeldInput(frame,input,enabled)
 end
 
 function f=localFixture()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'solver',struct('timeLimitSeconds',30)));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
     estimator=estimatorConfigurationFromController(estimatorControllerIntegrationConfig(),cfg);
     design=synthesizeNrmmObserverGains(estimator.observer);
     reference=nonlinearBicycleModel.cruise(cfg,0);x=reference.state;u=reference.input;

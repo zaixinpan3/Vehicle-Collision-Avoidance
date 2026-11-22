@@ -31,7 +31,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             setupJointNlpSolver;
             testCase.cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
                 'model',struct('speedMaximum',16,'lateralVelocityMaximum',1), ...
-                'outputFeedback',struct('method',"compactNlp",'nlpJit',false,'maximumSolveSeconds',1)));
+                'outputFeedback',struct('method',"ipopt",'nlpJit',false,'maximumSolveSeconds',1)));
             testCase.block=localBlock(testCase.cfg,8);
             [testCase.command,~,testCase.prediction,testCase.state]= ...
                 collisionAvoidanceController(testCase.block,[],[],testCase.cfg,[]);
@@ -70,8 +70,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             prior.configuration.outputFeedback=rmfield(prior.configuration.outputFeedback,'movingTargetObservationSeconds');
             prior.configuration.outputFeedback.method="compactNlp";
             prior.configuration.outputFeedback.qpMaximumIterations=60;
-            prior.configuration.solver.method=prior.configuration.solver.stateEstimateMethod;
-            prior.configuration.solver=rmfield(prior.configuration.solver,'stateEstimateMethod');
+            prior.configuration.solver.method="rti";
+            prior.configuration.controller.horizonSteps=16;
             block=localNextBlock(prior,testCase.cfg);
             [~,controls,~,state]=collisionAvoidanceController(block,[],[],testCase.cfg,prior);
             [~,current]=collisionAvoidanceController(block,[],[],testCase.cfg,testCase.state);
@@ -870,7 +870,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;
             [~,~,~,old]=collisionAvoidanceController(localBlock(cfg,0),[],[],cfg,[]);
             old=rmfield(old,'movingTerminalPlan');
-            brake=terminalSafeSet.compactControl(old.appliedInput,cfg);
+            brake=[0;-.5];
             old.fineControls=repmat(brake,1,old.horizonSteps);old.appliedInput=brake;
             block=localNextBlock(old,cfg);
             [command,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,old);
@@ -1457,23 +1457,28 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function continuousMotionIntervalsContributeToThePrimaryDeficit(testCase)
             item=testCase.block.initialHypotheses;
-            item.target=[10;5;pi;8;0;0;1.6;2.4;1;0;0];
+            item.target=[10;3.4;pi;8;0;0;1.6;2.4;1;0;0];
             request=struct('operation',"validateInputSequence",'cfg',testCase.cfg,'hypotheses',item, ...
                 'input',zeros(2,1),'inputs',zeros(2,28));
             nominal=solvePredictiveControl("outputFeedback",request);
             testCase.verifyTrue(nominal.accepted);
             testCase.verifyEqual(max(nominal.stageDeficits),0);
+            % A permitted turn physically intersects the ego path while the
+            % straight target clears it. Compare with that concrete member.
+            turn=request;turn.hypotheses.target(6)=.13;
+            witness=solvePredictiveControl("outputFeedback",turn);
+            testCase.assertGreaterThan(max(witness.stageDeficits),.05);
             request.hypotheses.targetObserver=struct('motionBounds',[-1,-.13;1,.13]);
             replay=solvePredictiveControl("outputFeedback",request);
             testCase.assertNumElements(replay.trajectories,1);
-            testCase.verifyGreaterThan(max(replay.stageDeficits),.05);
+            testCase.verifyGreaterThanOrEqual(replay.stageDeficits+1e-10,witness.stageDeficits);
             request.operation="evaluateControlSequence";request.holds=ones(1,28);
             oracle=solvePredictiveControl("outputFeedback",request);
             testCase.verifyEqual(max(0,oracle.stage),replay.stageDeficits,AbsTol=1e-11);
         end
         function measuredJointMotionBoundsEnterTheSameStageAndTerminalReplay(testCase)
             item=testCase.block.initialHypotheses;
-            item.target=[10;5;pi;8;0;0;1.6;2.4;1;0;0];
+            item.target=[10;3.4;pi;8;0;0;1.6;2.4;1;0;0];
             r=struct('operation',"validateInputSequence",'cfg',testCase.cfg,'hypotheses',item, ...
                 'input',zeros(2,1),'inputs',zeros(2,28));
             straight=solvePredictiveControl("outputFeedback",r);

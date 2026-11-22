@@ -16,7 +16,6 @@ function contract = collisionThreatContract(names, speeds, options)
         options.WindowSeconds (1,1) double {mustBePositive} = 20
         options.Range (1,1) double {mustBePositive} = 50
         options.Margin (1,1) double {mustBeNonnegative} = 0.1
-        options.SpeedFloor (1,1) double {mustBeNonnegative} = 0
     end
     speedLow = Inf;speedHigh = 0;acceleration = 0;sideslip = 0;yawRate = 0;norm2 = 0;
     for speed = speeds
@@ -30,6 +29,10 @@ function contract = collisionThreatContract(names, speeds, options)
                 position = predictiveSafetyGeometry.referencePose(x0(4)*t,0,curve);
                 if norm(q(1:2)-position(:)) > options.Range,continue;end
                 omega = q(4)*sin(q(6))/q(7);
+                % The admitted constant braking law has an absorbing stop.
+                % Its forward-invariant speed domain includes zero even when
+                % a sampled encounter ends just before the stop.
+                if q0(5)<0,speedLow=0;end
                 speedLow = min(speedLow,q(4));speedHigh = max(speedHigh,q(4));
                 acceleration = max(acceleration,abs(q(5)));sideslip = max(sideslip,abs(q(6)));
                 yawRate = max(yawRate,abs(omega));norm2 = max(norm2,hypot(q(5),q(4)*omega));
@@ -37,7 +40,7 @@ function contract = collisionThreatContract(names, speeds, options)
         end
     end
     widen = 1+options.Margin;
-    contract = struct('speedMinimum',max(options.SpeedFloor,speedLow/widen), ...
+    contract = struct('speedMinimum',speedLow/widen, ...
         'speedMaximum',speedHigh*widen,'scalarAccelerationMaximum',max(0.1,acceleration*widen), ...
         'sideslipMaximum',max(1e-3,sideslip*widen),'yawRateMaximum',max(1e-3,yawRate*widen), ...
         'accelerationNormBound',max(0.1,norm2*widen));

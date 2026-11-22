@@ -10,7 +10,7 @@ function information = buildControllerKernels()
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
     output = fullfile(root,"solver","controller");
     if ~isfolder(output),mkdir(output);end
-    clear bicycleSampleKernelMex rectangleKernelMex domainSensitivityKernelMex solvePredictiveControl solveStateEstimateComparison;
+    clear bicycleSampleKernelMex rectangleKernelMex domainSensitivityKernelMex solvePredictiveControl;
     settings = coder.config("mex");settings.GenerateReport = false;settings.EnableOpenMP = false;
     settings.IntegrityChecks = false;settings.ResponsivenessChecks = false;
     localBuild(output,settings,"bicycleSampleKernel",{zeros(6,1),zeros(2,1),zeros(23,1),0,true},[ ...
@@ -41,10 +41,9 @@ function information = buildControllerKernels()
         "function [selected,ends] = domainSensitivityKernel(endMaps,sampleMaps,controlMap,index,required,substeps) %#codegen", ...
         "    [selected,ends] = nonlinearBicycleModel.condenseSensitivities(endMaps,sampleMaps,controlMap,index,required,substeps);", ...
         "end"]);
-    buildPredictiveConicSolver();
     clear nonlinearBicycleModel predictiveSafetyGeometry;rehash;
     information = struct("directory",output,"matlabVersion",string(version), ...
-        "binaries",["bicycleSampleKernelMex","rectangleKernelMex","domainSensitivityKernelMex","predictiveConicSolverMex"]+"."+mexext, ...
+        "binaries",["bicycleSampleKernelMex","rectangleKernelMex","domainSensitivityKernelMex"]+"."+mexext, ...
         "algorithmSources",["controller/nonlinearBicycleModel.m","controller/predictiveSafetyGeometry.m"]);
 end
 
