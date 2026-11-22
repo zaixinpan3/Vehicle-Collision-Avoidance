@@ -111,7 +111,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         assert(~isempty(position),'onlineNrmmTrackingRuntime:missingFirstReturn','Radar must initialize a track.');
         track=struct('state',[position;zeros(4,1)],'time',time,'lastReturn',time, ...
             'previousPosition',[],'previousRadius',positionErrorRadius,'positionRadii',[],'errorBound',[],'times',[],'positions',zeros(2,0),'initialized',false, ...
-            'heading',egoHeading,'detections',0,'restCompatible',false);
+            'heading',egoHeading,'detections',0,'restCompatible',false,'motionBounds',[]);
     end
     dt=time-track.time;
     assert(dt>=0,'onlineNrmmTrackingRuntime:nonmonotonicTime','Target samples must be time ordered.');
@@ -119,7 +119,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         track.initialized=false;track.restCompatible=false;track.times=[];track.positions=zeros(2,0);track.positionRadii=[];
     end
     if ~track.initialized
-        track.errorBound=[];track.motionBounds=[];
+        track.errorBound=[];
     end
     if ~track.initialized || ~isfield(track,'speedAnchor')
         track.speedAnchor=[];
@@ -153,13 +153,29 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         else
             track.times(end+1)=time;track.positions(:,end+1)=position;track.positionRadii(end+1)=positionErrorRadius;
         end
-        count=settings.initialization.minimumRadarSamples;
-        keep=max(1,numel(track.times)-count+1):numel(track.times);
+        minimum=settings.initialization.minimumRadarSamples;
+        capacity=settings.sensor.radar.motionWindowSamples;
+        keep=max(1,numel(track.times)-capacity+1):numel(track.times);
+        count=numel(keep);
         track.times=track.times(keep);track.positions=track.positions(:,keep);track.positionRadii=track.positionRadii(keep);
         center=mean(track.positions,2);
         noise=cfg.outputFeedback.noiseBounds(4);
-        track.restCompatible=numel(keep)==count && max(vecnorm(track.positions-center))<=noise;
-        resolved=norm(position-track.positions(:,1))>2*noise;
+        track.restCompatible=count>=minimum && max(vecnorm(track.positions-center))<=noise;
+        displacement=position-track.positions(:,1);
+        resolved=norm(displacement)>2*noise;
+
+        if count>=2
+            span=track.times(end)-track.times(1);
+            chord=displacement/span;
+            accelerationMax=design.domain.accelerationNormBound;
+            chordNoise=(track.positionRadii(1)+track.positionRadii(end))/span;
+            % At any time in this window, velocity differs from the true
+            % secant by at most accelerationMax*span/2 (integrate |t-s|).
+            speedUpper=min(design.domain.speedMaximum,norm(chord)+chordNoise+accelerationMax*span/2);
+            yawRate=min(design.domain.yawRateMaximum, ...
+                speedUpper*sin(design.domain.sideslipMaximum)/design.domain.rearAxleDistance);
+            accelerationMax=min(accelerationMax,hypot(design.domain.scalarAccelerationMaximum,speedUpper*yawRate));
+        end
 
         if ~track.initialized
             % Bootstrap on measured displacement. The first position alone
@@ -169,17 +185,23 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
                 velocity=track.positions*t.'/sum(t.^2);
             end
             track.state=[center+t(end)*velocity;velocity;zeros(2,1)];
-            if resolved && numel(t)==count
+            if resolved && count>=minimum
                 % Fit position, velocity and acceleration at the last return.
                 % Scaling the sample times keeps the small LS system conditioned.
-                span=track.times(end)-track.times(1);
                 tau=(track.times(:)-track.times(end))/span;
                 basis=[ones(size(tau)),tau,tau.^2/2];
                 weights=basis\eye(count);
                 coefficients=weights*(track.positions-center).';
-                track.state=[center+coefficients(1,:).';coefficients(2,:).'/span;coefficients(3,:).'/span^2];
-                chord=position-track.positions(:,1);
-                track.heading=atan2(chord(2),chord(1));
+                acceleration=coefficients(3,:).'/span^2;
+                if norm(acceleration)>design.domain.accelerationNormBound
+                    acceleration=acceleration*(design.domain.accelerationNormBound/norm(acceleration));
+                end
+                % Refit position and velocity for the projected acceleration.
+                % Centered times also cover irregular return spacing.
+                meanVelocity=velocity-.5*acceleration*sum(t.^3)/sum(t.^2);
+                endPosition=center+t(end)*meanVelocity+.5*acceleration*(t(end)^2-mean(t.^2));
+                track.state=[endPosition;meanVelocity+t(end)*acceleration;acceleration];
+                track.heading=atan2(displacement(2),displacement(1));
                 track.initialized=true;
             elseif track.restCompatible && isfinite(relativeHeading)
                 % A stationary position window cannot identify body heading.
@@ -187,16 +209,10 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
                 track.initialized=true;
             end
             if track.initialized
-                span=track.times(end)-track.times(1);
-                chord=(track.positions(:,end)-track.positions(:,1))/span;
-                accelerationMax=design.domain.accelerationNormBound;
-                chordNoise=(track.positionRadii(1)+track.positionRadii(end))/span;
-                % At any time in this window, velocity differs from the true
-                % secant by at most accelerationMax*span/2 (integrate |t-s|).
-                speedUpper=min(design.domain.speedMaximum,norm(chord)+chordNoise+accelerationMax*span/2);
-                yawRate=min(design.domain.yawRateMaximum, ...
-                    speedUpper*sin(design.domain.sideslipMaximum)/design.domain.rearAxleDistance);
-                accelerationMax=min(accelerationMax,hypot(design.domain.scalarAccelerationMaximum,speedUpper*yawRate));
+                % Until reacquisition, the controller propagates the last
+                % target with its persistent-parameter bounds. A newly
+                % initialized track starts its own parameter intersection.
+                track.motionBounds=[];
                 velocityRadius=norm(track.state(3:4)-chord)+chordNoise+accelerationMax*span/2;
                 accelerationRadius=norm(track.state(5:6))+accelerationMax;
                 % The Taylor acceleration bound applies only if the whole
@@ -231,6 +247,14 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         packed=[zeros(6,1);track.state;position;0];
         track.errorBound=nrmmPositionErrorBound("inertialTarget",[],packed,[],true,positionErrorRadius,0,boundDesign,initialRadii);
     end
+    if ~isempty(position) && numel(track.times)>1
+        spans=time-track.times(1:end-1);
+        chords=(position-track.positions(:,1:end-1))./spans;
+        noiseRadii=(positionErrorRadius+track.positionRadii(1:end-1))./spans;
+        velocityRadius=min(vecnorm(track.state(3:4)-chords)+noiseRadii+accelerationMax*spans/2);
+        track.errorBound.targetComponents(2)=min(track.errorBound.targetComponents(2), ...
+            velocityRadius+64*eps(max(1,velocityRadius)));
+    end
     components=track.errorBound.targetComponents;
     speed=norm(track.state(3:4));
     % For constant sideslip, the yaw-rate premise applies at every speed
@@ -248,7 +272,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     domainLimits=[domain.scalarAccelerationMaximum,slipMaximum];
     bounds=[-domainLimits;domainLimits];
     if ~isempty(position)
-        [track.speedAnchor,bounds(:,1)]=localChordAcceleration(track,domain,bounds(:,1));
+        [track.speedAnchor,bounds(:,1)]=localChordAcceleration(track,domain,bounds(:,1),capacity);
     end
     % While motion is certain the Cartesian inverse bounds the persistent
     % parameters. At possible absorption zero derivatives give no new
@@ -274,7 +298,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     if track.restCompatible,motion(2:4)=0;end
 end
 
-function [anchor,interval]=localChordAcceleration(track,domain,interval)
+function [anchor,interval]=localChordAcceleration(track,domain,interval,capacity)
     % On a moving constant-A track, mean speed is speed at the midpoint.
     anchor=track.speedAnchor;
     duration=track.times(end)-track.times(1);
@@ -288,12 +312,16 @@ function [anchor,interval]=localChordAcceleration(track,domain,interval)
     if lower<=domain.scalarAccelerationMaximum*duration/2,return;end
     upper=(chord+allowance)/(duration*cos(halfTurn));
     midpoint=track.times(1)+duration/2;
-    if isempty(anchor)
-        anchor=struct('time',midpoint,'lower',lower,'upper',upper);
-    elseif midpoint>anchor.time
+    if ~isempty(anchor) && midpoint>anchor.time
         elapsed=midpoint-anchor.time;
         interval=[max(interval(1),(lower-anchor.upper)/elapsed); ...
                   min(interval(2),(upper-anchor.lower)/elapsed)];
+    end
+    % A short acquisition chord can have a loose speed bound. Use the
+    % first full-window chord as the reference once it becomes available.
+    fullWindow=numel(track.times)==capacity;
+    if isempty(anchor) || (fullWindow && isfield(anchor,'fullWindow') && ~anchor.fullWindow)
+        anchor=struct('time',midpoint,'lower',lower,'upper',upper,'fullWindow',fullWindow);
     end
 end
 

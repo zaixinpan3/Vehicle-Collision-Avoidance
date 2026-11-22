@@ -59,6 +59,9 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 track=onlineNrmmTrackingRuntime("targetPoint",track,t,[],0,cfg);
             end
             testCase.verifyFalse(track.initialized);
+            testCase.assertSize(track.motionBounds,[2,2]);
+            testCase.verifyLessThanOrEqual(track.motionBounds(1,:),q(5:6).');
+            testCase.verifyGreaterThanOrEqual(track.motionBounds(2,:),q(5:6).');
             t=2+dt;p=predictiveSafetyGeometry.predictTarget(q,t);
             [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,t,p(1:2),0,cfg);
             testCase.verifyEmpty(motion);
@@ -101,13 +104,14 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 bounds=track.motionBounds;
                 if isempty(prior)
                     firstMaximum=max(abs(bounds(:,2)));
-                    testCase.verifyLessThan(firstMaximum,.01);
+                    testCase.verifyLessThan(firstMaximum,cfg.target.observerDomain.sideslipMaximum);
                 else
                     testCase.verifyGreaterThanOrEqual(bounds(1,:),prior(1,:));
                     testCase.verifyLessThanOrEqual(bounds(2,:),prior(2,:));
                 end
                 testCase.verifyLessThanOrEqual(bounds(1,:),target(5:6).');
                 testCase.verifyGreaterThanOrEqual(bounds(2,:),target(5:6).');
+                if t>=.2375,testCase.verifyLessThan(max(abs(bounds(:,2))),.01);end
                 prior=bounds;
             end
             testCase.verifyNotEmpty(prior);
@@ -189,6 +193,21 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 testCase.verifyLessThanOrEqual(track.motionBounds(1,:),target(5:6).');
                 testCase.verifyGreaterThanOrEqual(track.motionBounds(2,:),target(5:6).');
             end
+        end
+
+        function fiveNoisyReturnsInitializeWithinThePhysicalAccelerationBound(testCase)
+            cfg=localPointTestConfiguration();
+            domain=onlineNrmmTrackingRuntime("prepareTarget",cfg).domain;
+            track=[];
+            for k=0:4
+                time=k*cfg.outputFeedback.sensorPeriod;
+                position=[10+12*time;.02*(k-2)^2/4];
+                [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,time,position,0,cfg,[],.02);
+            end
+            testCase.assertNotEmpty(motion);
+            testCase.verifyLessThanOrEqual(norm(track.state(5:6)),domain.accelerationNormBound+1e-12);
+            testCase.verifyEqual(track.state(3),12,AbsTol=1e-9);
+            testCase.verifyLessThanOrEqual(norm(track.state(5:6)),track.errorBound.targetComponents(3));
         end
 
         function firstFullOutputUsesPositionVelocityAndAccelerationAtTheLastReturn(testCase)

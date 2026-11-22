@@ -289,10 +289,10 @@ function y=localSensor(truth,input,cfg,time,stream,dropout)
     y.relativePosition=y.relativePosition+localNoise(stream,y.radarPositionErrorMeters);
     if dropout,y.radarAvailable=false;y.relativePosition=[NaN;NaN];end
     y.relativeHeading=NaN;
-    historySpan=(sensorSettings.initialization.minimumRadarSamples-1)*cfg.outputFeedback.sensorPeriod;
+    historySpan=(sensorSettings.sensor.radar.motionWindowSamples-1)*cfg.outputFeedback.sensorPeriod;
     if y.radarAvailable && abs(truth.target(4))*historySpan<=2*sensorSettings.sensor.radar.positionNoiseMaximum
         % Supply ideal yaw before rest when motion at the current speed
-        % over the acquisition window is within its two-return error bound.
+        % over the motion window is within its two-return error bound.
         angle=truth.target(3)-truth.ego(3);
         y.relativeHeading=atan2(sin(angle),cos(angle));
     end

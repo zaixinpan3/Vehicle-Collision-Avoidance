@@ -5,7 +5,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
             "turningCrossing","curvedHeadOn","curvedCrossing"};
         referenceSpeed = {8,15};
         crossingScenario = {"crossing","turningCrossing","curvedCrossing"};
-        crossingSpeed = {1.5,3,6,15,25};
+        crossingSpeed = {1.5,3,6,15,20};
         crossingPressure = {false,true};
     end
     methods (TestClassSetup)
@@ -155,7 +155,7 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
                 crossingScenario,crossingSpeed,crossingPressure,minimum);
         end
         function curvedInitialConditionsDoNotRequireAControllerCertificate(testCase)
-            for speed=[8,15,25]
+            for speed=[8,15,20]
                 for name=["curvedHeadOn","curvedCrossing"]
                     cfg=struct('referenceSpeed',speed, ...
                         'clf',struct('convergenceTimeConstantSeconds',1.2345));

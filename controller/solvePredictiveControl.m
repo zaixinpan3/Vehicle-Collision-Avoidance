@@ -391,13 +391,6 @@ function [result,info] = localCompactStep(request,cfg)
     end
     targetReady=all(arrayfun(@(s)~isempty(s.target),hypotheses));
     active=targetReady && ~isempty(firstRadarTime) && (block.samples(end).radarAvailable || inRange);
-    if active && ~initial && ~prior.collisionTargetActive ...
-            && isfield(hypotheses,'targetObserver') && ...
-            all(arrayfun(@(s)~isempty(s.targetObserver) && s.target(4)>0,hypotheses))
-        % Count received radar history. A dropout alone adds no observation.
-        observedUntil=min(arrayfun(@(s)s.targetObserver.lastReturn,hypotheses));
-        active=observedUntil-firstRadarTime >= cfg.outputFeedback.movingTargetObservationSeconds-1e-9;
-    end
     if ~active,[planning.target]=deal([]);end
     window=localOfWindow(planning,inherited,cfg);
     holds=diff(localCompactBoundaries(window.horizonSteps,cfg,window.avoidanceSteps));

@@ -182,7 +182,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()solvePredictiveControl('outputFeedback',request), ...
                 'collisionAvoidanceController:emptyJointInformation');
         end
-        function movingTargetAdmissionUsesTheReceivedObservationWindow(testCase,admissionMeasurements)
+        function firstCompleteTargetEstimateActivatesPlanningAtTheSameBoundary(testCase,admissionMeasurements)
             cfg=testCase.cfg;block=localBlock(cfg,8);item=block.initialHypotheses;
             item.target=[10;22;.3;9;-.4;.01;1.6;2.4;.95;0;0];
             exactRadar=admissionMeasurements~="boundedRadar";
@@ -194,7 +194,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             if exactRadar,block.samples.radarPositionErrorMeters=0;end
             [~,~,p,state]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyEqual(p.metadata.initializationSource,"nominalCruiseRollout");
-            first=block.time;admission=first+cfg.outputFeedback.movingTargetObservationSeconds;
+            admission=block.time+cfg.controller.sampleTime;
             expected=admission+double(dropoutAtAdmission)*cfg.controller.sampleTime;
             while state.time<expected-1e-9
                 plant=state;plant.hypotheses=item;
@@ -205,10 +205,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 end
                 item=localAdvanceHold(item,state.appliedInput,cfg);
                 [~,~,p,state]=collisionAvoidanceController(block,[],[],cfg,state);
-                if abs(state.time-first-.25)<1e-9
-                    testCase.verifyTrue(p.metadata.targetEstimateReady);
-                    testCase.verifyNotEmpty(p.information.target);
-                end
+                testCase.verifyEqual(p.metadata.collisionTargetActive,p.metadata.targetEstimateReady);
                 if state.time<expected-1e-9
                     testCase.verifyFalse(p.metadata.collisionTargetActive);
                     testCase.verifyEmpty(p.scenarios{1}.targets);
@@ -384,7 +381,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             active=find(arrayfun(@(frame) frame.metadata.collisionTargetActive,data.trace),1);
             testCase.assertNotEmpty(active);
             info=data.trace(active).metadata;
-            testCase.verifyEqual(data.trace(active).time-info.firstRadarTime,.25,AbsTol=1e-12);
+            testCase.verifyEqual(active,find(arrayfun(@(frame)frame.metadata.targetEstimateReady,data.trace),1));
             testCase.verifyEqual(info.callBudgetSeconds,data.configuration.outputFeedback.initializationSolveSeconds);
             testCase.verifyEqual(string(info.solver),"casadiIpoptCompactPcbf");
             testCase.verifyGreaterThan(info.nlpAttempts,0);

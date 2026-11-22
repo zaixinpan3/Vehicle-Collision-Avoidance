@@ -38,8 +38,14 @@ classdef perceptionRangeTest < matlab.unittest.TestCase
             testCase.verifyTrue(published.predictionErrorSet.available);
             testCase.verifyEqual(published.predictionErrorSet.measurementHistory.time(end),time,AbsTol=1e-12);
             testCase.verifyEqual(published.predictionErrorSet.speedInterval(1),0);
-            testCase.verifyLessThan(published.predictionErrorSet.speedInterval(2),6);
+            testCase.verifyLessThan(published.predictionErrorSet.speedInterval(2),cfg.observer.target.domain.speedMaximum);
             testCase.verifyGreaterThanOrEqual(published.targetYawErrorBound,pi-1e-12);
+            for later=time+.05:.05:time+.25
+                ego.position=[25*later;0];
+                [context,~,published]=nrmmEstimatorControllerAdapter('sample',context,later,ego,target(later,ego));
+            end
+            testCase.verifyEqual(published.predictionErrorSet.speedInterval(1),0);
+            testCase.verifyLessThan(published.predictionErrorSet.speedInterval(2),6);
         end
         function theFirstPublicationCarriesKnownActuatorHistory(testCase)
             vehicle=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));

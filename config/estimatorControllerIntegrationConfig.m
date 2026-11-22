@@ -29,7 +29,8 @@ function cfg = estimatorControllerIntegrationConfig()
     cfg.initialization.historyDuration = 0.50;        % s
     % One radar position cannot observe target velocity. A target is
     % acquired from a sequence of positions at the actual radar times.
-    cfg.initialization.minimumRadarSamples = 20;
+    cfg.initialization.minimumRadarSamples = 5;
+    cfg.sensor.radar.motionWindowSamples = 20; % Retained returns for motion bounds.
     % A detection window spanning at least this duration also initializes
     % the target acceleration (constant-acceleration least squares); a
     % shorter window initializes it to zero.

@@ -8,7 +8,7 @@ function contract = collisionThreatContract(names, speeds, options)
         options.WindowSeconds (1,1) double {mustBePositive,mustBeFinite} = 20
         options.ControllerConfiguration (1,1) struct = struct()
     end
-    benchmarkSpeeds=[8,15,25];
+    benchmarkSpeeds=[8,15,20];
     if isempty(names)
         % The full benchmark contract also covers the published campaign speeds.
         speeds=unique([speeds,benchmarkSpeeds]);

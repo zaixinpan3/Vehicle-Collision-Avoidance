@@ -242,25 +242,26 @@ perception or prior information. The Cartesian jerk extension $\Phi_e$ has its
 own positive denominator bound for the observer gain and error analysis.
 
 A single position return identifies neither velocity nor body orientation.
-During acquisition the ego follows its nominal cruise controller. For a
+The compact observer requires at least five distinct radar returns and retains
+up to twenty to resolve motion and bound its parameters. During acquisition
+the ego follows its nominal cruise controller. For a
 populated window with resolved displacement, let $T=t_n-t_1$ and
 $\tau_j=(t_j-t_n)/T$. The least-squares fit
 $p_j\simeq c_0+\tau_j c_1+\tau_j^2 c_2/2$ supplies the current Cartesian
-state $(c_0,c_1/T,c_2/T^2)$ to the high-gain observer and inverse above.
+acceleration $c_2/T^2$, projected onto the declared Cartesian acceleration
+ball. Refit the affine terms at this acceleration to initialize position and
+velocity at the last return. Projection onto a ball containing the true
+acceleration preserves the acceleration error bound of the quadratic fit.
 A stationary-compatible window can instead initialize $(\bar p,0,0)$
 with a measured relative body heading added to ego yaw. In the simulation,
 a detected target supplies ideal relative body heading near rest, defined by
-$V_T T_{\rm acq}\le 2r_{\rm sensor}$ for the acquisition window span and
+$V_T T_{\rm window}\le 2r_{\rm sensor}$ for the retained motion window span and
 the nominal radar position error radius. Each ego member converts a received heading to inertial heading
 using its own yaw at the measurement time. With position alone,
 stationary acquisition remains pending. Avoidance requires a complete target
-estimate for every retained member. For a newly observed moving target, the
-compact controller also requires $\min_s t_{\mathrm{last},s}-t_{\mathrm{first}}
-\ge T_{\mathrm{obs}}$, where the times refer to received radar measurements
-and $T_{\mathrm{obs}}=0.40\,\mathrm{s}$ by default. The observer continues
-updating during this interval. A complete estimate compatible with rest, or
-a target already known under the initial contract, can enter planning directly.
-The acquisition window is a timing condition. Safety during nominal cruise
+estimate for every retained member. At the first control boundary with complete
+target outputs for all retained members and a detected or in-range target,
+the PCBF includes the target immediately. Safety during nominal cruise
 before the first feasible encounter plan is an initial-condition assumption.
 At a positive return the planning root uses the current NRMM velocity and
 acceleration through its inverse motion map. The observed body heading
@@ -281,7 +282,9 @@ velocity over the window gives the initial velocity error radius
 $$
 r_v=\|\hat v_n-c\|+(r_1+r_n)/T+a_*T/2 .
 $$
-This also covers a target stopping inside the window. If
+This also covers a target stopping inside the window. At each return, each
+earlier retained position yields such a secant bound for the current velocity.
+The smallest of these bounds intersects the propagated velocity error radius. If
 $\|\hat v_n\|-r_v>a_*T$, the speed was positive throughout.
 On that moving branch the constant-motion law gives a Cartesian jerk
 bound $J=\sqrt{V_u^2\bar\omega^4+9\bar A^2\bar\omega^2}$ with
@@ -344,7 +347,9 @@ $$
 $$
 The result holds for overlapping windows and irregular return times since
 both intervals enclose speeds on the same constant-acceleration trajectory.
-Discard the saved interval upon reacquisition. Retain the intersections
+After using the initial short chord, replace it once with the first eligible
+full-window chord to reduce the effect of position noise on the reference
+speed. Keep the accumulated intersections and discard the reference upon reacquisition. Retain the intersections
 on the same track, including the latent parameters through an absorbing
 stop. Start new intervals at reacquisition. An empty intersection excludes
 that member. The PCBF uses the resulting intervals $I_A,I_\beta$ at the stage
