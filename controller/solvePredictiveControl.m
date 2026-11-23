@@ -522,6 +522,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;initialPeakDeficit=NaN;
     stabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
     reducedSearch=false;reducedPoint=[];reducedCalls=0;reducedAccepted=false;
+    domainKnots=[];midpointReplays=0;
     bestPoint=[];bestResidual=Inf;
     bestCost=Inf;inheritedCost=NaN;deadline=budget+startupBuildSeconds;
     budgetStopped=false;budgetStopPhase="";
@@ -691,6 +692,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'elapsedSeconds',toc(timer),'deadlineSeconds',h,'predictionWindow',window, ...
         'controlNodes',nodes,'horizonSteps',count,'initializationTrajectoryCount',seedCount,'initializationSource',initializationSource, ...
         'reducedSearchEvaluations',reducedCalls,'reducedSearchAccepted',reducedAccepted, ...
+        'midpointReplays',midpointReplays, ...
         'fallbackUsed',retained && stabilitySteps==0,'retainedFinePlanUsed',retained && ~initial,'rootTerminalPlanUsed',false, ...
         'retainedTailRepaired',false, ...
         'restorationAttempted',restoration,'initialRestorationSlack',initialDeficit, ...
@@ -755,6 +757,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         % IPOPT owns all search directions, restoration and step lengths.
         % Scale knots before exposing the exact nonlinear values to CasADi.
         checkClock();
+        domainKnots=[];
         if exist('casadiFunctionCallback','class')~=8
             addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'scripts'));
         end
@@ -816,8 +819,35 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
 
     % Keep callback state in the controller frame. A callback must not retain
     % the solver workspace that owns it across an encounter or MATLAB exit.
-    function stop=stopIpopt(~)
+    function stop=stopIpopt(args)
         stop=double(toc(timer)>=deadline || (reducedSearch && ~isempty(reducedPoint)) || bestLoss<=lossFloor+slackRoundoff);
+        if stop || ~seekZero || reducedSearch,return;end
+        knots=full(args{1}).*controlScale;
+        if ~isequal(knots,cacheU)
+            domainKnots=[];
+            return
+        end
+        geometryPassed=all(cache.stage<=0) && all(cache.terminal<=tolerance);
+        if ~geometryPassed && all(cache.forward<=0)
+            domainKnots=knots;
+            return
+        end
+        % The accepted step can clear the obstacle but leave the tire domain.
+        % Replay one interior control sequence before requesting another step.
+        if ~isempty(domainKnots) && geometryPassed && any(cache.forward>0)
+            midpoint=domainKnots+(knots-domainKnots)/2;
+            if all(a*midpoint-b<=tolerance) && all(midpoint>=lower-tolerance & midpoint<=upper+tolerance)
+                midpointReplays=midpointReplays+1;
+                inputs=reshape(midpoint,2,nodes)*model.map.'+model.offset;
+                try
+                    validatePlan(inputs,[],@checkClock);
+                catch exception
+                    if ~strcmp(exception.identifier,'collisionAvoidanceController:condensedDeadline'),rethrow(exception);end
+                end
+                stop=double(bestLoss<=lossFloor+slackRoundoff || toc(timer)>=deadline);
+            end
+        end
+        domainKnots=[];
     end
 
     function output=ipoptValues(args)
