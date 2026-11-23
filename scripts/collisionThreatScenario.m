@@ -55,8 +55,13 @@ function [state,target,road,cfg,impactTime] = collisionThreatScenario(name,contr
             return;
         case "brakingLead"
             impactTime = 5;
-            targetSpeed = cfg.referenceSpeed-.5*impactTime;
-            targetAcceleration = -.5;beta = 0;relativeCourse = 0;
+            targetAcceleration = -.5;
+            % Integrate forward to place the initial target. It can reach
+            % its absorbing stop before ideal cruise reaches the conflict.
+            movingTime = min(impactTime,cfg.referenceSpeed/abs(targetAcceleration));
+            gap = cfg.referenceSpeed*(impactTime-movingTime)-.5*targetAcceleration*movingTime^2;
+            target = [gap;0;0;cfg.referenceSpeed;targetAcceleration;0;lr;2.4;.95;0;0];
+            return;
         case "crossing"
             targetSpeed = 2.5;targetAcceleration = -1.5;beta = 0;relativeCourse = -pi/2;
         case "intersectionCrossing"

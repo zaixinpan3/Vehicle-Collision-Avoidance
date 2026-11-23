@@ -11,7 +11,7 @@ function preparation = prepareCollisionAvoidanceController(block,road,cfg)
     setupJointNlpSolver;
     addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'estimator'));
     onlineNrmmTrackingRuntime("prepareTarget",collisionAvoidanceControllerConfig(cfg));
-    request=struct('operation',"step",'block',block,'cfg',cfg,'reference',road,'previousState',[]);
+    request=struct('operation',"prepareStep",'block',block,'cfg',cfg,'reference',road,'previousState',[]);
     result=solvePredictiveControl("outputFeedback",request);
     info=result.prediction.metadata;
     preparation=struct('performed',true,'elapsedSeconds',toc(timer), ...

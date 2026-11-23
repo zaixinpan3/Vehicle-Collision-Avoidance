@@ -25,22 +25,31 @@ function campaign = runJointOutputFeedbackScenario(options)
     root=fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'),fullfile(root,'estimator'));
     if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
-    summaries=struct([]);compactSolversReady=false;
+    summaries=struct([]);
     base=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
     if isempty(base.target.observerDomain)
         % Use the complete benchmark population before selecting or observing a target.
         base.target.observerDomain=collisionThreatContract(strings(1,0),options.Speeds, ...
             WindowSeconds=max(20,options.Frames*base.controller.sampleTime),ControllerConfiguration=base);
     end
-    onlineNrmmTrackingRuntime("prepareTarget",base);
-    for speed=options.Speeds
+    startupTimer=tic;
+    observer=onlineNrmmTrackingRuntime("prepareTarget",base);
+    if exist('casadi.SX','class')~=8,setupJointNlpSolver;end
+    % Finish all configuration-specific preparation before any measured case.
+    [speeds,~,speedIndex]=unique(options.Speeds,'stable');
+    configurations=cell(size(speeds));preparations=cell(size(speeds));
+    for i=1:numel(speeds)
+        cfg=base;cfg.referenceSpeed=speeds(i);
+        cfg.model.speedMaximum=max(base.model.speedMaximum,1.2*speeds(i));
+        configurations{i}=cfg;
+        preparations{i}=localWarmup(cfg,options.Warmup,observer.domain.speedMaximum);
+    end
+    campaignWarmupSeconds=0;
+    if options.Warmup,campaignWarmupSeconds=toc(startupTimer);end
+    for i=1:numel(options.Speeds)
+        speed=options.Speeds(i);startup=preparations{speedIndex(i)};
         for name=options.Scenarios
-            cfg=base;
-            if exist('casadi.SX','class')~=8
-                setupJointNlpSolver;
-            end
-            cfg.referenceSpeed=speed;cfg.model.speedMaximum=max(cfg.model.speedMaximum,1.2*speed);
-            [x,q,road,cfg]=collisionThreatScenario(name,cfg);
+            [x,q,road,cfg]=collisionThreatScenario(name,configurations{speedIndex(i)});
             x(1:2)=x(1:2)+options.EgoPositionOffsetMeters;
             x(3)=x(3)+options.EgoYawOffsetRadians;
             q(1:2)=q(1:2)+options.TargetPositionOffsetMeters;
@@ -54,8 +63,6 @@ function campaign = runJointOutputFeedbackScenario(options)
                 qualification=bypassFeasibilityBaseline(x,q,road,cfg,HalfWidthMeters=road.scenarioHalfWidthMeters);
             end
             admitted=isempty(qualification) || qualification.qualified;
-            startup=localWarmup(cfg,options,admitted && initialClearance>0,compactSolversReady);
-            compactSolversReady=startup.solversReady;
 
             stream=RandStream('mt19937ar','Seed',options.RandomSeed);
             sample=localSensor(truth,input,cfg,time,stream,false);
@@ -144,7 +151,8 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'finalLongitudinalProgressMeters',truth.ego(1)-x(1), ...
                 'startupWarmupSeconds',startup.seconds,'warmupEnabled',options.Warmup, ...
                 'warmupCompletedHolds',startup.holds,'warmupFailure',startup.failure, ...
-                'compactSolversReadyBeforeFirstFrame',compactSolversReady, ...
+                'compactSolversReadyBeforeFirstFrame',startup.solversReady,'warmupIpoptCalls',startup.ipoptCalls, ...
+                'warmupIpoptIterations',startup.ipoptIterations, ...
                 'warmupAvoidanceContinuation',startup.avoidanceContinuation, ...
                 'failureCallSeconds',failureCallSeconds, ...
                 'initialSensorSample',sample,'initialInformationContract',initial, ...
@@ -170,56 +178,73 @@ function campaign = runJointOutputFeedbackScenario(options)
         end
     end
     campaign=struct('scope',"raw-sensor control from one known initial ego state", ...
-        'pipeline',string(cfg.outputFeedback.method),'results',summaries);
+        'pipeline',string(cfg.outputFeedback.method),'startupWarmupSeconds',campaignWarmupSeconds,'results',summaries);
     localWriteJson(fullfile(options.OutputDirectory,'campaign.json'),campaign);
 end
 
-function startup=localWarmup(cfg,options,canRun,solversReady)
-    startup=struct('seconds',0,'holds',0,'failure',"",'solversReady',solversReady,'avoidanceContinuation',false);
-    if ~options.Warmup || ~canRun,return;end
-    timer=tic;input=zeros(2,1);state=[];
-    if ~solversReady
-        try
-            warmCfg=collisionAvoidanceControllerConfig();
-            warmCfg.outputFeedback.nlpJit=cfg.outputFeedback.nlpJit;
-            warmCfg.outputFeedback.nlpCompiler=cfg.outputFeedback.nlpCompiler;
-            warmCfg.outputFeedback.nlpCompilerOptimization=cfg.outputFeedback.nlpCompilerOptimization;
-            startup.solversReady=solvePredictiveControl("outputFeedback",struct('operation',"warmUp", ...
-                'cfg',warmCfg,'reference',[-100,0;1000,0]));
-            if ~startup.solversReady
-                startup.failure="The startup probe did not invoke CasADi/IPOPT.";
-            end
-        catch exception
-            startup.failure=string(exception.identifier)+": "+string(exception.message);
-        end
-    end
-    % Use a private sensor stream to exercise target acquisition and
-    % the following active continuation with the simulation's actual configuration.
-    stream=RandStream('mt19937ar','Seed',0);reference=[-100,0;1000,0];
+function startup=localWarmup(cfg,enabled,targetSpeedMaximum)
+    startup=struct('seconds',0,'holds',0,'failure',"",'solversReady',false, ...
+        'avoidanceContinuation',false,'ipoptCalls',0,'ipoptIterations',0);
+    if ~enabled,return;end
+    timer=tic;reference=[-100,0;1000,0];
+    discardState=onCleanup(@()collisionAvoidanceController("resetNominalTrajectory"));
     initial=localInitialContract([0;0;0;cfg.referenceSpeed;0;0]);
-    truth=initial;
-    truth.target=[cfg.collision.encounterRangeMeters/2;cfg.vehicle.width+cfg.target.defaultWidth; ...
+    privateTarget=[cfg.collision.encounterRangeMeters/2;cfg.vehicle.width+cfg.target.defaultWidth; ...
         0;0;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
-    sample=localSensor(truth,input,cfg,0,stream,false);
     observerCfg=estimatorControllerIntegrationConfig();
     samplesPerHold=round(cfg.controller.sampleTime/cfg.outputFeedback.sensorPeriod);
-    count=2+ceil((observerCfg.initialization.minimumRadarSamples-1)/samplesPerHold);
-    block=localSensorBlock(0,input,sample);block.initialHypotheses=initial;
-    for k=1:count
-        try
-            [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
-            input=command.actuatorInput;
-            info=prediction.metadata;
-            startup.avoidanceContinuation=startup.avoidanceContinuation || ...
-                (info.collisionTargetActive && info.budgetPhase=="continuation");
-            [truth,samples]=localReplay(truth,input,cfg,block.time,stream,false);
-            block=localSensorBlock(block.time+cfg.controller.sampleTime,input,samples);
-            startup.holds=startup.holds+1;
-        catch exception
-            startup.failure=strtrim(startup.failure+" "+string(exception.identifier)+": "+string(exception.message));
-            break;
-        end
+    windowSamples=observerCfg.sensor.radar.motionWindowSamples;
+    windowSeconds=(windowSamples-1)*cfg.outputFeedback.sensorPeriod;
+    probeSpeeds=0;
+    if targetSpeedMaximum*windowSeconds>3*cfg.outputFeedback.noiseBounds(4)
+        % Allow a resolvable displacement even at the two opposite noise
+        % extremes of the private radar generator (half the declared radius).
+        movingSpeed=min(targetSpeedMaximum,max(cfg.referenceSpeed, ...
+            4*cfg.outputFeedback.noiseBounds(4)/windowSeconds));
+        probeSpeeds=[0,movingSpeed];
     end
+    count=2+ceil((windowSamples-1)/samplesPerHold);
+    for targetSpeed=probeSpeeds
+        state=[];input=zeros(2,1);truth=initial;truth.target=privateTarget;
+        truth.target(4)=targetSpeed;
+        if targetSpeed>0
+            % A receding track exercises moving-target inference and prediction.
+            truth.target(1)=-truth.target(1);
+            truth.target(3)=pi;
+        end
+        stream=RandStream('mt19937ar','Seed',0);
+        sample=localSensor(truth,input,cfg,0,stream,false);
+        block=localSensorBlock(0,input,sample);block.initialHypotheses=initial;
+        prepared=false;continued=false;
+        for k=1:count
+            if ~prepared
+                request=struct('operation',"prepareStep",'cfg',cfg,'reference',reference, ...
+                    'block',block,'previousState',state);
+                result=solvePredictiveControl("outputFeedback",request);
+                command=result.command;prediction=result.prediction;state=result.state;
+            else
+                [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
+            end
+            info=prediction.metadata;
+            startup.ipoptCalls=startup.ipoptCalls+info.nlpAttempts;
+            startup.ipoptIterations=startup.ipoptIterations+info.nlpIterations;
+            continued=prepared && info.collisionTargetActive && info.budgetPhase=="continuation";
+            observedMotion=info.collisionTargetActive && ((state.hypotheses(1).target(4)>0)==(targetSpeed>0));
+            prepared=prepared || (observedMotion && info.nlpAttempts>0 && ...
+                info.nonlinearDerivativeEvaluations>0 && info.nonlinearValidationPerformed);
+            startup.holds=startup.holds+1;
+            if continued,break;end
+            if k<count
+                input=command.actuatorInput;
+                [truth,samples]=localReplay(truth,input,cfg,block.time,stream,false);
+                block=localSensorBlock(block.time+cfg.controller.sampleTime,input,samples);
+            end
+        end
+        assert(prepared && continued,'runJointOutputFeedbackScenario:incompleteWarmup', ...
+            'Private startup at ego/target speeds %g/%g m/s did not exercise IPOPT, derivatives and active continuation.', ...
+            cfg.referenceSpeed,targetSpeed);
+    end
+    startup.solversReady=true;startup.avoidanceContinuation=true;
     startup.seconds=toc(timer);
 end
 

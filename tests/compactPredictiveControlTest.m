@@ -316,6 +316,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(isfield(data,'initialAcquisitionMotionPrior'));
             testCase.verifyFalse(data.initialSensorSample.radarAvailable);
             testCase.verifyTrue(all(isnan(data.initialSensorSample.relativePosition)));
+            observer=estimatorControllerIntegrationConfig();
             first=[];
             for k=1:numel(data.trace)
                 current=data.trace(k);
@@ -328,7 +329,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 if ~current.metadata.targetEstimateReady
                     testCase.verifyEmpty(current.targetEstimateAtDecision);
                 else
-                    testCase.verifyGreaterThanOrEqual(current.targetEstimateAtDecision.detections,20);
+                    testCase.verifyGreaterThanOrEqual(current.targetEstimateAtDecision.detections, ...
+                        observer.initialization.minimumRadarSamples);
                     testCase.verifyTrue(current.targetEstimateAtDecision.motionInitialized);
                 end
             end
@@ -355,27 +357,47 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function startupExercisesAvoidanceWithoutSeedingTheExperiment(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            speeds=[8,15,20];prepared=cell(size(speeds));
             for warmup=[true,false]
-                campaign=runJointOutputFeedbackScenario(Frames=8,Speeds=15,Scenarios="stoppedLead", ...
+                campaign=runJointOutputFeedbackScenario(Frames=8,Speeds=speeds,Scenarios="stoppedLead", ...
                     Warmup=warmup,RandomSeed=20261107,OutputDirectory=string(folder.Folder));
-                result=campaign.results;
-                testCase.assertEqual(result.outcome,"completed");
-                testCase.verifyEqual(result.compactSolversReadyBeforeFirstFrame,warmup);
-                testCase.verifyEqual(result.warmupAvoidanceContinuation,warmup);
-                testCase.verifyEqual(result.warmupFailure,"");
-                testCase.verifyEqual(result.timing.calls,8);
-                data=jsondecode(fileread(result.source));
-                if warmup
-                    prepared=data;
-                    testCase.verifyGreaterThan(result.startupWarmupSeconds,0);
-                else
-                    testCase.verifyEqual(result.startupWarmupSeconds,0);
-                    testCase.verifyEqual(prepared.initialSensorSample,data.initialSensorSample);
-                    testCase.verifyEqual([prepared.trace.rawSensorBlock],[data.trace.rawSensorBlock]);
-                    testCase.verifyEqual([prepared.trace.input],[data.trace.input]);
-                    testCase.verifyEqual([prepared.trace.stateAfterHold],[data.trace.stateAfterHold]);
+                for i=1:numel(speeds)
+                    result=campaign.results(i);
+                    testCase.assertEqual(result.outcome,"completed");
+                    testCase.verifyEqual(result.compactSolversReadyBeforeFirstFrame,warmup);
+                    testCase.verifyEqual(result.warmupAvoidanceContinuation,warmup);
+                    testCase.verifyEqual(result.warmupFailure,"");
+                    testCase.verifyEqual(result.timing.calls,8);
+                    data=jsondecode(fileread(result.source));
+                    testCase.verifyEqual(data.trace(1).time,0);
+                    if warmup
+                        prepared{i}=data;
+                        calls=[data.trace.metadata];
+                        testCase.verifyTrue(all([calls.nlpCacheHit]));
+                        testCase.verifyEqual([calls.startupBuildSeconds],zeros(1,numel(calls)));
+                        testCase.verifyGreaterThanOrEqual(result.warmupIpoptCalls,2);
+                        testCase.verifyGreaterThan(result.warmupIpoptIterations,0);
+                        testCase.verifyGreaterThan(result.startupWarmupSeconds,0);
+                        testCase.verifyGreaterThanOrEqual(campaign.startupWarmupSeconds,result.startupWarmupSeconds);
+                    else
+                        testCase.verifyEqual(campaign.startupWarmupSeconds,0);
+                        testCase.verifyEqual(result.warmupIpoptCalls,0);
+                        testCase.verifyEqual(result.warmupIpoptIterations,0);
+                        testCase.verifyEqual(prepared{i}.initialSensorSample,data.initialSensorSample);
+                        testCase.verifyEqual([prepared{i}.trace.rawSensorBlock],[data.trace.rawSensorBlock]);
+                        testCase.verifyEqual([prepared{i}.trace.input],[data.trace.input]);
+                        testCase.verifyEqual([prepared{i}.trace.stateAfterHold],[data.trace.stateAfterHold]);
+                    end
                 end
             end
+        end
+        function failedPreparationProducesNoMeasuredScenario(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            cfg=struct('controller',struct('enforceRoadBoundaries',true));
+            testCase.verifyError(@()runJointOutputFeedbackScenario(Frames=2,Speeds=8,Scenarios="stoppedLead", ...
+                ControllerConfiguration=cfg,OutputDirectory=string(folder.Folder)), ...
+                'collisionAvoidanceController:unsupportedCompactRoadConstraint');
+            testCase.verifyEmpty(dir(fullfile(folder.Folder,'*.json')));
         end
         function firstStoppedLeadEncounterReachesZeroDeficitWithIpopt(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());

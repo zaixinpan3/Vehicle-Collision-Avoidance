@@ -48,7 +48,7 @@ function [result,diagnostics,problem] = solvePredictiveControl(interface,request
             model=localCondensedModel(cfg,hypotheses,request.input,holds,lane,nominal,kernel);
             [~,rollouts]=localCondensedOracle(controls(:),model,false);
             result=localCondensedOracle(controls(:),model,true,rollouts);
-        case "step"
+        case {"step","prepareStep"}
             [result,diagnostics]=localCompactStep(request,cfg);
         otherwise
             error('collisionAvoidanceController:invalidOutputFeedbackOperation','Unknown joint operation.');
@@ -519,6 +519,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         budget=cfg.outputFeedback.initializationSolveSeconds;budgetPhase="initialization";
         if ~cacheHit,startupBuildSeconds=buildSeconds;end
     end
+    preparing=strcmp(request.operation,"prepareStep");
+    if preparing,budget=realmax;end
     inherit=~initial;
     attempts=0;iterationCount=0;calls=0;reuseCount=0;restoration=false;seedCount=0;gradientCalls=0;
     solverStatus="notCalled";converged=false;ipoptSeconds=0;constraintCount=0;
@@ -656,7 +658,13 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                         evaluate(start,false);
                     end
                 end
-                if bestLoss>lossFloor+slackRoundoff
+                if preparing && seekZero && bestLoss<=lossFloor+slackRoundoff
+                    % A feasible private seed would skip the optimizer online.
+                    % Exercise its actual horizon Jacobian and IPOPT callbacks.
+                    [cache,rollouts]=localCondensedOracle(start,model,true,rollouts,[],false);
+                    gradientCalls=gradientCalls+1;
+                end
+                if bestLoss>lossFloor+slackRoundoff || (preparing && seekZero)
                     solveIpopt(start);
                 end
                 if seekZero && bestLoss>lossFloor+slackRoundoff && toc(timer)<deadline
@@ -850,6 +858,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     % the solver workspace that owns it across an encounter or MATLAB exit.
     function stop=stopIpopt(args)
         stop=double(toc(timer)>=deadline || (reducedSearch && ~isempty(reducedPoint)) || bestLoss<=lossFloor+slackRoundoff);
+        % Let IPOPT exercise its linear solver on the discarded startup call.
+        if preparing && bestLoss<=lossFloor+slackRoundoff,stop=0;return;end
         if stop || ~seekZero || reducedSearch,return;end
         knots=full(args{1}).*controlScale;
         if ~isequal(knots,cacheU)
@@ -1798,16 +1808,15 @@ function ready=localWarmIpopt(cfg,reference)
     % and trajectory derivatives before the experiment clock starts.
     % This discarded offline solve uses the solver iteration limits. An
     % online wall-clock deadline can interrupt first-time toolbox loading.
-    cfg.outputFeedback.initializationSolveSeconds=realmax;
-    item=struct('ego',[0;0;0;15;0;0],'parameters',ones(4,1),'sensorBias',zeros(7,1));
-    item.target=[25;0;0;0;0;0;cfg.target.rearAxleDistance; ...
+    item=struct('ego',[0;0;0;cfg.referenceSpeed;0;0],'parameters',ones(4,1),'sensorBias',zeros(7,1));
+    item.target=[cfg.collision.encounterRangeMeters/2;cfg.vehicle.width+cfg.target.defaultWidth;0;0;0;0;cfg.target.rearAxleDistance; ...
         cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
     input=zeros(2,1);
     sample=solvePredictiveControl("outputFeedback",struct('operation',"sensor", ...
         'cfg',cfg,'hypothesis',item,'input',input,'time',0));
     block=struct('kind',"jointSensorBlock-v1",'time',0,'heldInput',input,'samples',sample,'initialHypotheses',item);
     % The probe has no access to the experiment state or controller memory.
-    request=struct('operation',"step",'cfg',cfg,'reference',reference, ...
+    request=struct('operation',"prepareStep",'cfg',cfg,'reference',reference, ...
         'block',block,'previousState',[]);
     result=solvePredictiveControl("outputFeedback",request);
     info=result.prediction.metadata;

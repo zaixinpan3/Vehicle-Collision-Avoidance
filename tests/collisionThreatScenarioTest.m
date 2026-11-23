@@ -17,6 +17,15 @@ classdef collisionThreatScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function brakingLeadMeetsCruiseEvenIfItStopsBeforeTheConflict(testCase)
+            for speed=[1.5,2.5,8]
+                [ego,target,~,~,time]=collisionThreatScenario("brakingLead",struct('referenceSpeed',speed));
+                conflict=predictiveSafetyGeometry.predictTarget(target,time);
+                testCase.verifyEqual(conflict(1:2),ego(1:2)+[speed*time;0],'AbsTol',1e-12);
+                testCase.verifyEqual(conflict(4),max(0,speed+target(5)*time),'AbsTol',1e-12);
+            end
+        end
+
         function replayContinuesBelowPlanningClearanceUntilContact(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.WorkingFolderFixture());
             % Coast into a stationary target to isolate the replay verdict
