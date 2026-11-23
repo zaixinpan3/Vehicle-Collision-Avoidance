@@ -387,7 +387,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(active,find(arrayfun(@(frame)frame.metadata.targetEstimateReady,data.trace),1));
             testCase.verifyEqual(info.callBudgetSeconds,data.configuration.outputFeedback.initializationSolveSeconds);
             testCase.verifyEqual(string(info.solver),"casadiIpoptCompactPcbf");
-            testCase.verifyGreaterThan(info.nlpAttempts,0);
+            testCase.verifyEqual(info.nlpAttempts,1);
             testCase.verifyGreaterThan(info.nlpIterations,0);
             testCase.verifyNotEqual(string(info.ipoptStatus),"notCalled");
             testCase.verifyTrue(info.nonlinearValidationPerformed && info.terminalSetEnforced);
@@ -1148,7 +1148,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(result.accepted);
             testCase.verifyGreaterThan(result.maximumViolation,0);
         end
-        function stabilityPreferencePreservesZeroDeficitAndHardTerminalMembership(testCase)
+        function aFeasiblePrimaryOptimumCanDispatchWithHardTerminalMembership(testCase)
             % A previously tracked opposing vehicle exercises the nonzero
             % initial deficit independently of cold target acquisition.
             cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',15,'outputFeedback', ...
@@ -1165,7 +1165,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(info.solver),"casadiIpoptCompactPcbf");
             testCase.verifyGreaterThan(info.nlpAttempts,0);
             testCase.verifyGreaterThan(info.nlpIterations,0);
-            testCase.verifyLessThanOrEqual(info.acceptedStabilityCost,info.firstFeasibleStabilityCost);
+            testCase.verifyTrue(info.primaryOptimumComputed && info.deficitDescentMet);
             testCase.verifyEqual(info.pcbfValue,0);
             testCase.verifyTrue(info.terminalSetEnforced);
             testCase.verifyLessThanOrEqual(info.terminalValue,cfg.outputFeedback.nlpTolerance);
@@ -1184,7 +1184,6 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(abs(rearSlip)),pureCorneringPeak);
             metadata=[data.trace.metadata];
             compared=[metadata.performanceAcceptedSteps]>0;
-            testCase.verifyTrue(any(compared));
             testCase.verifyTrue(all([metadata(compared).acceptedStabilityCost]<[metadata(compared).firstFeasibleStabilityCost]));
             testCase.verifyTrue(all([metadata.deficitDescentMet]));
             testCase.verifyLessThanOrEqual([metadata.pcbfValue],128*eps*[metadata.horizonSteps]);

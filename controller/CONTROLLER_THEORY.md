@@ -797,9 +797,13 @@ stage change the reduced functions can be nonsmooth. The local solver uses
 the supplied branch sensitivities; convergence to a global minimum is not
 assumed.
 
-For a zero-deficit feasibility proposal, IPOPT can minimize
-$\|[C(v)]_+\|_2^2+\|[H(v)]_+\|_2^2$ subject to the actuator bounds.
-Zero attains the primary lower bound. A positive residual by itself has
+For a zero-deficit feasibility proposal, let $r=([C(v)]_+,[H(v)]_+)$
+collect the stage, physical-domain and terminal violations. Subject to the
+actuator bounds, IPOPT minimizes a scalar proposal cost
+$\sum_i (\sqrt{1+r_i^2}-1)$. Each term is nonnegative, vanishes exactly at
+zero and has slope $r_i/\sqrt{1+r_i^2}$. A large violation at one node
+therefore has bounded weight in the trajectory gradient. Zero attains the
+primary lower bound. A positive residual by itself has
 no dispatch authority. With several ego members, the proposal can start
 with the member having the largest squared violation on the current
 trajectory and add a violating member after full replay. Each member
@@ -810,8 +814,9 @@ when the zero level has not been attained.
 
 The numerical primary lower bound is zero or the unavoidable current-node
 deficit. An admissible iterate attaining this bound may end the primary
-solve. The secondary problem minimizes $J_{\rm tire}$ on the attained
-level with $J(v)\le J_{\rm incumbent}+\varepsilon$ for the tracking cost.
+solve. The online search returns the validated plan on attaining this
+bound. When comparing available validated plans at equal deficit, it uses
+$J_{\rm tire}$ with $J(v)\le J_{\rm incumbent}+\varepsilon$ for the tracking cost.
 A local or interrupted solve can retain a verified incumbent at its actual
 stage deficits. Section 7 specifies the nonlinear dispatch and decrease
 conditions.

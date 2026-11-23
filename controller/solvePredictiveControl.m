@@ -518,9 +518,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     inherit=~initial;
     attempts=0;iterationCount=0;calls=0;reuseCount=0;restoration=false;seedCount=0;gradientCalls=0;
-    solverStatus="notCalled";converged=false;ipoptSeconds=0;constraintCount=0;bestU=[];
-    cacheU=[];cache=[];rollouts=[];includeTracking=false;initialDeficit=NaN;initialTerminal=NaN;initialPeakDeficit=NaN;
-    stabilitySteps=0;initialStabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
+    solverStatus="notCalled";converged=false;ipoptSeconds=0;constraintCount=0;
+    cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;initialPeakDeficit=NaN;
+    stabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
     reducedSearch=false;reducedPoint=[];reducedCalls=0;reducedAccepted=false;
     bestPoint=[];bestResidual=Inf;
     bestCost=Inf;inheritedCost=NaN;deadline=budget+startupBuildSeconds;
@@ -645,22 +645,19 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                         model.rearSlipScale=fullModel.rearSlipScale(working);model.nominal=1;
                         reducedSearch=true;reducedPoint=[];cacheU=[];rollouts=[];
                         evaluate(start,false);
-                        if isempty(reducedPoint),solveIpopt(start,false);end
+                        if isempty(reducedPoint),solveIpopt(start);end
                         reducedSearch=false;model=fullModel;cacheU=[];rollouts=[];
                         if ~isempty(reducedPoint),start=reducedPoint;end
                         evaluate(start,false);
                     end
                 end
                 if bestLoss>lossFloor+slackRoundoff
-                    solveIpopt(start,false);
+                    solveIpopt(start);
                 end
                 if seekZero && bestLoss>lossFloor+slackRoundoff && toc(timer)<deadline
                     seekZero=false;
                     if ~isempty(bestPoint),start=bestPoint;end
-                    solveIpopt(start,false);
-                end
-                if ~isempty(bestU) && bestLoss<=lossFloor+slackRoundoff && toc(timer)<deadline
-                    solveIpopt(bestU,true);
+                    solveIpopt(start);
                 end
             end
         catch exception
@@ -753,7 +750,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         best=inputs;traces=checked;violation=maximum;bestLoss=loss;bestSlacks=slacks;
     end
 
-    function solveIpopt(start,secondary)
+    function solveIpopt(start)
         import casadi.*
         % IPOPT owns all search directions, restoration and step lengths.
         % Scale knots before exposing the exact nonlinear values to CasADi.
@@ -761,65 +758,48 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         if exist('casadiFunctionCallback','class')~=8
             addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'scripts'));
         end
-        includeTracking=secondary;
-        if secondary,cacheU=[];end
-        outputCount=2*count+numel(model.hypotheses)+1+double(secondary);
+        residualCount=2*count+numel(model.hypotheses);
+        if seekZero,outputCount=1;else,outputCount=residualCount;end
         oracle=casadiFunctionCallback('pcbf_rollout',[nu,1],[outputCount,1], ...
             @ipoptValues,@ipoptJacobian);
         oracleLifetime=onCleanup(@()oracle.release());
         v=MX.sym('knots',nu);value=oracle.call({v});value=value{1};
         inputRows=sparse(a.*controlScale.');
-        terminalEnd=2*count+numel(model.hypotheses);
-        hard=[value(count+1:terminalEnd);inputRows*v-b];
-        z=v;lo=lower./controlScale;hi=upper./controlScale;z0=start./controlScale;
-        % For fixed controls, xi_j=max(C_j,0) minimizes the original
-        % epigraph. Its sum and the maximum stage deficit retain every cap.
-        stage=value(1:count);
-        deficit=sum(fmax(stage,0));
-        cap=priorCap;
-        maxIterations=cfg.outputFeedback.nlpMaximumIterations;
-        if secondary
-            % The performance pass proposes one step from the feasible
-            % incumbent; primary iterations retain the configured limit.
-            maxIterations=1;
-            cap=bestLoss;
-            hard=[hard;value(end)-bestCost-tolerance];
-        end
-        if seekZero && ~secondary
-            % Search the primary zero level inside the actuator polytope.
-            % validatePlan enforces every dispatch condition at each trial.
-            constraints=inputRows*v-b;
-            objective=sumsqr(fmax(stage,0))+sumsqr(fmax(value(count+1:terminalEnd),0));
+        constraints=inputRows*v-b;
+        if seekZero
+            % The scalar merit proposes a zero-deficit trajectory. Only a
+            % full nonlinear replay can authorize dispatch.
+            objective=value;
         else
-            objective=deficit;
-            if cap==0
+            stage=value(1:count);
+            objective=sum(fmax(stage,0));
+            hard=[value(count+1:end);constraints];
+            if priorCap==0
                 constraints=[stage;hard];
             else
                 constraints=[mmax(stage)-cfg.outputFeedback.clearanceMeters;hard];
-                if isfinite(cap),constraints=[constraints;deficit-cap];end
+                if isfinite(priorCap),constraints=[constraints;objective-priorCap];end
             end
         end
-        if secondary,objective=value(terminalEnd+1);end
-        ng=size(constraints,1);nz=size(z,1);constraintCount=ng;
+        ng=size(constraints,1);constraintCount=ng;
         % nlpsol outputs x, f, g, lam_x, lam_g, lam_p.
-        initialStabilitySteps=stabilitySteps;
-        stop=casadiFunctionCallback('pcbf_stop',[[nz;1;ng;nz;ng;0],ones(6,1)],[1,1], ...
+        stop=casadiFunctionCallback('pcbf_stop',[[nu;1;ng;nu;ng;0],ones(6,1)],[1,1], ...
             @stopIpopt);
         stopLifetime=onCleanup(@()stop.release());
         options=struct('print_time',false,'error_on_fail',false,'calc_lam_p',false, ...
             'iteration_callback',stop,'show_eval_warnings',false, ...
-            'ipopt',struct('print_level',0,'sb','yes','max_iter',maxIterations, ...
+            'ipopt',struct('print_level',0,'sb','yes','max_iter',cfg.outputFeedback.nlpMaximumIterations, ...
             'hessian_approximation','limited-memory','bound_relax_factor',0, ...
             'mu_strategy','monotone','mu_init',1e-6,'bound_push',1e-6,'bound_frac',1e-6, ...
             'tol',tolerance,'constr_viol_tol',tolerance));
         % The offline prewarm uses realmax. Passing it through the CasADi
         % options converter can overflow; omit a wall limit for that case.
         if deadline<flintmax,options.ipopt.max_wall_time=max(.001,deadline-toc(timer));end
-        nlp=nlpsol('compact_pcbf','ipopt',struct('x',z,'f',objective,'g',constraints),options);
+        nlp=nlpsol('compact_pcbf','ipopt',struct('x',v,'f',objective,'g',constraints),options);
         solverLifetime=onCleanup(@()delete(nlp));
         attempts=attempts+1;
         ipoptClock=tic;
-        answer=nlp('x0',z0,'lbx',lo,'ubx',hi,'lbg',-inf(ng,1),'ubg',zeros(ng,1));
+        answer=nlp('x0',start./controlScale,'lbx',lower./controlScale,'ubx',upper./controlScale,'lbg',-inf(ng,1),'ubg',zeros(ng,1));
         ipoptSeconds=ipoptSeconds+toc(ipoptClock);
         stats=nlp.stats();solverStatus=string(stats.return_status);
         iterationCount=iterationCount+stats.iter_count;
@@ -827,9 +807,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         if toc(timer)>=deadline,budgetStopped=true;budgetStopPhase=budgetPhase;end
         % A solver status alone never authorizes an actuator command.
         point=full(answer.x);
-        clear solverLifetime options objective constraints hard deficit stage value
+        clear solverLifetime options objective constraints hard stage value
         clear stopLifetime oracleLifetime
-        if all(isfinite(point)) && toc(timer)<deadline
+        if bestLoss>lossFloor+slackRoundoff && all(isfinite(point)) && toc(timer)<deadline
             evaluate(point(1:nu).*controlScale,false);
         end
     end
@@ -837,20 +817,37 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     % Keep callback state in the controller frame. A callback must not retain
     % the solver workspace that owns it across an encounter or MATLAB exit.
     function stop=stopIpopt(~)
-        stop=double(toc(timer)>=deadline || (reducedSearch && ~isempty(reducedPoint)) || (~includeTracking && bestLoss<=lossFloor+slackRoundoff) || ...
-            (includeTracking && stabilitySteps>initialStabilitySteps));
+        stop=double(toc(timer)>=deadline || (reducedSearch && ~isempty(reducedPoint)) || bestLoss<=lossFloor+slackRoundoff);
     end
 
     function output=ipoptValues(args)
         e=evaluate(full(args{1}).*controlScale,false);
-        output=[e.stage;e.forward;e.terminal;e.stabilityCost];
-        if includeTracking,output=[output;e.cost];end
+        output=[e.stage;e.forward;e.terminal];
+        if seekZero
+            residual=max(output,0);
+            scale=hypot(1,residual);
+            output=sum(residual.*(residual./(1+scale)));
+        end
     end
 
     function output=ipoptJacobian(args)
-        e=evaluate(full(args{1}).*controlScale,true);
-        gradients=[e.stageGradient,e.forwardGradient,e.terminalGradient,e.stabilityGradient];
-        if includeTracking,gradients=[gradients,e.costGradient];end
+        u=full(args{1}).*controlScale;
+        if seekZero
+            e=evaluate(u,false);
+            residual=max([e.stage;e.forward;e.terminal],0);
+            % At zero every squared positive-part term has zero derivative,
+            % including a constraint exactly on its boundary.
+            if ~any(residual)
+                output=zeros(1,nu);
+                return
+            end
+        end
+        e=evaluate(u,true);
+        gradients=[e.stageGradient,e.forwardGradient,e.terminalGradient];
+        if seekZero
+            weights=residual./hypot(1,residual);
+            gradients=gradients*weights;
+        end
         output=(gradients.*controlScale).';
     end
 
@@ -862,18 +859,18 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     function result=evaluate(u,derivatives)
         if ~isequal(cacheU,u)
-            [cache,rollouts]=localCondensedOracle(u,model,derivatives,[],[],includeTracking);
+            [cache,rollouts]=localCondensedOracle(u,model,derivatives,[],[],false);
             cacheU=u;calls=calls+1;gradientCalls=gradientCalls+derivatives;
             reducedCalls=reducedCalls+reducedSearch;
             if restoration,considerSolution(u);end
         elseif derivatives && ~cache.derivatives
-            [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,[],includeTracking);
+            [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,[],false);
             gradientCalls=gradientCalls+1;
         end
         result=cache;
     end
     function considerSolution(u)
-        if ~reducedSearch && ~includeTracking
+        if ~reducedSearch
             residual=sum(max(0,[cache.stage;cache.terminal;cache.forward;a*u-b;u-upper;lower-u]).^2);
             if residual<bestResidual,bestResidual=residual;bestPoint=u;end
         end
@@ -888,9 +885,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             [selected,~]=validatePlan(inputs,[]);
             reducedAccepted=reducedAccepted || selected;
         else
-            [selected,~]=validatePlan(inputs,rollouts);reuseCount=reuseCount+1;
+            validatePlan(inputs,rollouts);reuseCount=reuseCount+1;
         end
-        if selected,bestU=u;end
     end
 end
 
@@ -1060,18 +1056,22 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     e=struct('stage',-Inf(N,1),'forward',-Inf(N,1),'terminal',zeros(numel(model.hypotheses),1), ...
         'cost',0,'derivatives',derivatives);
-    ratio=inputs(2,:).';
-    e.stabilityCost=h/2*sum(ratio.^2+ratio.^4);
     if derivatives
         e.stageGradient=zeros(nu,N);e.forwardGradient=zeros(nu,N);
         e.terminalGradient=zeros(nu,numel(model.hypotheses));
-        e.costGradient=zeros(nu,1);e.costHessian=zeros(nu);
-        ratioJacobian=model.map;
-        squaredRatioJacobian=2*ratio.*ratioJacobian;
-        e.stabilityGradient=zeros(nu,1);
-        e.stabilityHessian=zeros(nu);
-        e.stabilityGradient(2:2:end)=h*(ratioJacobian.'*ratio+squaredRatioJacobian.'*(ratio.^2));
-        e.stabilityHessian(2:2:end,2:2:end)=h*(ratioJacobian.'*ratioJacobian+squaredRatioJacobian.'*squaredRatioJacobian);
+    end
+    if performance
+        ratio=inputs(2,:).';
+        e.stabilityCost=h/2*sum(ratio.^2+ratio.^4);
+        if derivatives
+            e.costGradient=zeros(nu,1);e.costHessian=zeros(nu);
+            ratioJacobian=model.map;
+            squaredRatioJacobian=2*ratio.*ratioJacobian;
+            e.stabilityGradient=zeros(nu,1);
+            e.stabilityHessian=zeros(nu);
+            e.stabilityGradient(2:2:end)=h*(ratioJacobian.'*ratio+squaredRatioJacobian.'*(ratio.^2));
+            e.stabilityHessian(2:2:end,2:2:end)=h*(ratioJacobian.'*ratioJacobian+squaredRatioJacobian.'*squaredRatioJacobian);
+        end
     end
     for s=1:numel(model.hypotheses)
         if ~isempty(checkBudget),checkBudget();end
@@ -1144,13 +1144,15 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 end
             end
         end
-        if derivatives
-            [residual,slipDerivative]=localRearSlipResidual(ends(:,1:N),model,s);
-        else
-            residual=localRearSlipResidual(ends(:,1:N),model,s);
+        if performance
+            if derivatives
+                [residual,slipDerivative]=localRearSlipResidual(ends(:,1:N),model,s);
+            else
+                residual=localRearSlipResidual(ends(:,1:N),model,s);
+            end
+            weight=h/numel(model.hypotheses);
+            e.stabilityCost=e.stabilityCost+weight/2*sum(residual.^2);
         end
-        weight=h/numel(model.hypotheses);
-        e.stabilityCost=e.stabilityCost+weight/2*sum(residual.^2);
         slew=-Inf;channel=1;
         if total>N
             trim=allInputs(:,end);
@@ -1209,6 +1211,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             e.terminalGradient(:,s)=0;
             e.terminalGradient(nu-2+channel,s)=sign(inputs(channel,end)-trim(channel));
         end
+        if ~performance,continue;end
         jacobian=zeros(N,nu);
         for j=1:N
             sensitivity=SE(:,:,j+1);
@@ -1216,7 +1219,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         end
         e.stabilityGradient=e.stabilityGradient+weight*jacobian.'*residual.';
         e.stabilityHessian=e.stabilityHessian+weight*(jacobian.'*jacobian);
-        if performance && s==model.nominal
+        if s==model.nominal
             for i=1:n
                 state=ends(:,sum(kernel.holds(1:i)));S=SE(:,:,sum(kernel.holds(1:i))+1);ref=model.reference(:,i);
                 normal=[-sin(ref(3));cos(ref(3))];error=[normal.'*(state(1:2)-ref(1:2));atan2(sin(state(3)-ref(3)),cos(state(3)-ref(3)));state(4)-cfg.referenceSpeed;state(5:6)];
@@ -1368,10 +1371,10 @@ function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg,
             if i<count,x=nonlinearBicycleModel.sample(x,prior,cfg);end
         end
     else
-        guide=predictiveSafetyGeometry.avoidanceGuide(model,avoidance);
+        fieldInputs=predictiveSafetyGeometry.avoidanceInputs(model,avoidance);
         % Only the first leg comes from the planner. Trim initializes the
         % remaining actuator variables, which are free in the same NLP.
-        inputs=[guide.inputs,repmat(terminalSafeSet.movingControl(cfg),1,count-avoidance)];
+        inputs=[fieldInputs,repmat(terminalSafeSet.movingControl(cfg),1,count-avoidance)];
     end
     guideInputs=localCompactRateLimit(inputs,previous,ones(1,count),cfg);
     controls=guideInputs(:,cumsum(holds));

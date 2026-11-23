@@ -11,6 +11,13 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function theControllerReceivesTheSameFieldInputsAsTheDiagnosticRollout(testCase,crossingSpeed)
+            model=localModel("crossing",crossingSpeed);
+            holds=[1,2,1,3,2];
+            guide=predictiveSafetyGeometry.avoidanceGuide(model,numel(holds),holds);
+            inputs=predictiveSafetyGeometry.avoidanceInputs(model,numel(holds),holds);
+            testCase.verifyEqual(inputs,guide.inputs);
+        end
         function anAbsorbingStopPreservesTheCompactCirculationDirection(testCase)
             model=localModel("crossing",8);
             model.cfg.referenceSpeed=1.5;

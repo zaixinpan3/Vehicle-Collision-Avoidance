@@ -100,10 +100,13 @@ classdef predictiveSafetyGeometry
         end
 
         function guide = avoidanceGuide(model,count,holds)
-            % Route-following initialization, corrected by an avoidance field.
-            % No candidate scores or admission gate. The nonlinear solve receives the states
-            % and inputs over exactly count holds. Terminal constraints
-            % are imposed in the nonlinear solve.
+            if nargin<3,holds=ones(1,count);end
+            [~,guide]=predictiveSafetyGeometry.avoidanceInputs(model,count,holds);
+        end
+
+        function [inputs,guide] = avoidanceInputs(model,count,holds)
+            % The field supplies the held controls for one initialization.
+            % Request the second output to inspect the field trajectory.
             if nargin<3,holds=ones(1,count);end
             cfg=model.cfg;durations=holds*cfg.controller.sampleTime;
             time=[0,cumsum(holds)]*cfg.controller.sampleTime;
@@ -143,7 +146,9 @@ classdef predictiveSafetyGeometry
             % One autonomous field, integrated once. Route attraction,
             % obstacle circulation and road guidance act at every moving node;
             % no separate nominal rollout classifies or selects a behavior.
-            best=localCirculationRollout(model,data,speed,durations);
+            best=localCirculationRollout(model,data,speed,durations,nargout>1);
+            inputs=best.inputs;
+            if nargout<2,return;end
             total=1;diagnostics=localCandidateSummary(best);
             conflict=best.gaps<=0;first=NaN;last=NaN;
             if any(conflict),first=time(find(conflict,1));last=time(find(conflict,1,'last'));end
@@ -1414,7 +1419,7 @@ function [distance,point]=localPointSegment(vertex,first,last)
     point=first+alpha*edge;distance=norm(vertex-point);
 end
 
-function candidate=localCirculationRollout(model,data,speed,durations)
+function candidate=localCirculationRollout(model,data,speed,durations,collectDiagnostics)
     cfg=model.cfg;h=cfg.controller.sampleTime;count=numel(durations);
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1), ...
@@ -1447,24 +1452,29 @@ function candidate=localCirculationRollout(model,data,speed,durations)
     for index=1:count+1
         if mod(index,8)==1,localPlannerDeadline(model);end
         x=candidate.states(:,index);target=data.target(:,index);
-        [gap,nominal]=localPlannerGap(x,target,data,index);
-        outside=norm(x(1:2)-target(1:2))-data.reserve-data.support.ballRadius(index)>cfg.collision.encounterRangeMeters;
         if uncertainMotion
             node=ticks(index)+1;
             ranges=predictiveSafetyGeometry.targetEnvelopeRange(x,path(:,node),centers(:,node));
             remaining=remaining & ranges<=cfg.collision.encounterRangeMeters;
             outside=~remaining;
+        else
+            outside=norm(x(1:2)-target(1:2))-data.reserve-data.support.ballRadius(index)>cfg.collision.encounterRangeMeters;
         end
         if index>1 && outside && norm(model.initialState(1:2)-model.target(1:2))<=cfg.collision.encounterRangeMeters
             encounterEnded=true;
         end
-        if encounterEnded,gap=Inf;nominal=Inf;end
-        candidate.gaps(index)=gap;candidate.nominalGaps(index)=nominal;
-        violation=localPlannerStateViolation(x,model);
-        candidate.stateViolation=max(candidate.stateViolation,violation);
         % The route attracts the seed; road boundaries also shape it.
         projection=predictiveSafetyGeometry.project(x(1:2),model.lane);
-        candidate.maximumDeviation=max(candidate.maximumDeviation,abs(projection.lateralPosition));
+        if collectDiagnostics
+            if encounterEnded
+                gap=Inf;nominal=Inf;
+            else
+                [gap,nominal]=localPlannerGap(x,target,data,index);
+            end
+            candidate.gaps(index)=gap;candidate.nominalGaps(index)=nominal;
+            candidate.stateViolation=max(candidate.stateViolation,localPlannerStateViolation(x,model));
+            candidate.maximumDeviation=max(candidate.maximumDeviation,abs(projection.lateralPosition));
+        end
         if index>count,break;end
         % Route attraction is the preferred acceleration BEFORE obstacle
         % and boundary correction. Never overwrite longitudinal obstacle
@@ -1498,6 +1508,7 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         u=nonlinearBicycleModel.accelerationGuidance(x,acceleration,prior,cfg,1,true,true);
         u(1)=min(cfg.outputFeedback.steeringMaximum,max(-cfg.outputFeedback.steeringMaximum,u(1)));
         candidate.inputs(:,index)=u;
+        if index==count && ~collectDiagnostics,break;end
         next=nonlinearBicycleModel.sample(x,u,cfg,[],durations(index));
         candidate.states(:,index+1)=next;prior=u;
     end
