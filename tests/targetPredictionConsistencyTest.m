@@ -10,6 +10,18 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function declaredTurnRateEnclosesTheAdmissibleConstantCurvatureArc(testCase)
+            q=[2;-5;.7;3;1;.015;1.6;2.4;.95;0;0];times=[0,1,2,4];
+            bounds=[-2,-.05;3,.05];
+            domain=struct('speedMaximum',12,'yawRateMaximum',.07);
+            [box,centers]=predictiveSafetyGeometry.targetMotionEnvelope(q,bounds,times,[],domain);
+            truth=predictiveSafetyGeometry.predictTarget(q,times);
+            ego=[-3;12]+zeros(2,numel(times));
+            lower=predictiveSafetyGeometry.targetEnvelopeRange(ego,box,centers);
+            testCase.verifyLessThanOrEqual(lower,vecnorm(ego-truth(1:2,:))+1e-10);
+            testCase.verifyLessThanOrEqual(abs(box(3,:)-q(3)),domain.yawRateMaximum*times+1e-12);
+        end
+
         function aTurningCellRemainsBoundedAfterSeveralRevolutions(testCase)
             root=[0;0;.3;15;1;.09;1.6;2.4;.95;0;0];
             limits=[.5,.08;1.5,.10];time=[20,40];

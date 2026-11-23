@@ -312,6 +312,21 @@ bounds and the ISS comparison bounds preserves both enclosures.
 If absorption can occur within a substep, the zero-derivative branch
 is included separately before continuing.
 
+Let $P$ be the inertial axis-aligned box for the target reference point.
+Over a sensor interval $h_s$, intersect the displacement box
+$h_s\hat v+[-b,b]^2$, $b=h_s r_v+a_*h_s^2/2$, with the box obtained
+from the upper travel distance under the persistent acceleration interval
+and absorbing stop. Add this displacement to $P$ and intersect the result
+with each available position observation box and the NRMM position bound.
+On the stationary hypothesis the displacement is zero. Its conditional
+box intersects successive position observations until their intersection
+is empty. For a box with midpoint $p_c$ and half-widths $w$, use $p_c$
+as the planning origin. A stationary footprint gains $|R_T^\top|w$ in
+body half-widths. For a turning footprint each body half-width gains
+$\|w\|_2$. Range-exit checks allow the same reference-point displacement.
+This construction conditions on the observer's motion mode and root speed
+and heading.
+
 Write $r_v,r_a$ for the propagated Cartesian velocity and acceleration
 error radii. The NRMM parameter error map bounds the tangential acceleration
 and curvature using the velocity and acceleration balls. The curvature
@@ -367,6 +382,12 @@ $$
 \Delta p=s\operatorname{sinc}(z)e(\psi_0+\beta+z),\qquad
 \psi=\psi_0+2z,\qquad \operatorname{sinc}(0)=1.
 $$
+
+When the observer operating domain provides speed and yaw-rate bounds, an
+admissible arc also satisfies $s\le V_{\max}t$ and
+$|z|\le\bar\omega t/2$. If $k_*=\min_{\kappa\in C}|\kappa|>0$ then
+$s\le\bar\omega t/k_*$. These inequalities tighten each cell's image
+over the portion of its motion admitted by the operating domain.
 
 On turning cells whose curvature interval excludes zero, the chord length
 factor also equals $2\sin(z)/\kappa$. Intersecting the two interval bounds
@@ -755,33 +776,21 @@ design assumption. Numerically the controller replays the candidate for
 each surviving member. Once the encounter ends, nominal guidance owns
 path and speed recovery.
 
-The geometric guide integrates one route-following field. Its
-preferred acceleration includes the transport and separation
-gradients of the predicted encounter. For an uncertain moving target, use
-path coordinates to compute the longitudinal overlap times for its footprint enclosure. At such a time \(t\), let \(y^s(t)\) denote its signed lateral
-displacement from the ego footprint center extrapolated with its current
-lateral velocity. Let \(r^s(t)\) be the sum of the projected lateral
-half-widths and the planning clearance. Under a first-order yaw response
-with time constant \(T\), the lateral displacement response to one unit
-of corrective acceleration is approximated by
-\[
-D(t)=\max\{h^2/2,\ t^2/2-Tt+T^2(1-e^{-t/T})\}.
-\]
-The guide takes the interval hull of
-\([(y^s-r^s)/D,(y^s+r^s)/D]\) over the overlap times of the retained
-parameter cells, up to each cell's range exit on the extrapolated ego path.
-Let $a_r$ be the route acceleration before the nominal target correction.
-When its transverse component relative to path curvature feedforward lies
-inside the hull and has a unique nearest endpoint, project that component
-onto the endpoint and retain the longitudinal component of $a_r$. The
-nominal target is already included in the enclosure. Otherwise the guide
-uses its nominal circulation field. Both use the same cruise reference.
-For uncertain motion, each cell contributes to the field until its own
-range exit. When $D$ exceeds the sensor radius $R$, the initial guide
-blends its acceleration with a velocity correction directed away from
-the forecast target center, with weight $\min(1,\max(0,D/R-1))$.
-This affects only the initial controls. Every trial uses its own poses
-in the distance dual of Section 5.
+At encounter acquisition let $\bar\theta$ be the componentwise midpoint
+of the acceleration and sideslip intervals. To choose the motion used in
+the single vector-field integration, extrapolate the current ego velocity
+and heading over the avoidance leg. Evaluate the target at $\bar\theta$
+and at the closed parameter cells' centers, ordered by their Euclidean
+distance from $\bar\theta$ in coordinates normalized by the nonzero
+interval widths. Choose the first whose signed footprint clearance on
+this reference reaches the planning margin before range exit. If all
+remain separated beyond the margin, choose the one with the smallest
+clearance. The extrapolation supplies a geometric reference and requires
+no actuator rollout. Integrate the route-following circulation field once
+for this target. The solver uses all parameter cells for the PCBF.
+During an active encounter its shifted fine commands supply the origin
+for new actuator corrections, so zero correction reproduces the available
+suffix exactly.
 
 The combined initial commands $\bar u$ define the initial shooting point for a new
 encounter. Propagating them from each member gives the footprint poses
@@ -815,6 +824,17 @@ requires strictly positive measured node clearance. At a feature or active
 stage change the reduced functions can be nonsmooth. The local solver uses
 the supplied branch sensitivities; convergence to a global minimum is not
 assumed.
+
+For a zero-deficit feasibility proposal, IPOPT can minimize
+$\|[C(v)]_+\|_2^2+\|[H(v)]_+\|_2^2$ subject to the actuator bounds.
+Zero attains the primary lower bound. A positive residual by itself has
+no dispatch authority. With several ego members, the proposal can start
+with the member having the largest squared violation on the current
+trajectory and add a violating member after full replay. Each member
+retains its complete target parameter cover. A committed trial must pass
+the original node, terminal, physical-domain and deficit-decrease tests
+on every retained member. The original capped primary remains available
+when the zero level has not been attained.
 
 The numerical primary lower bound is zero or the unavoidable current-node
 deficit. An admissible iterate attaining this bound may end the primary

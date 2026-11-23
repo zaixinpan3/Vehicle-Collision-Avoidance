@@ -221,6 +221,21 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(motion,[0;12-4*t;-4;0],AbsTol=1e-9);
         end
 
+        function repeatedReturnsAtRestTightenTheSameWorldPositionBox(testCase)
+            cfg=localPointTestConfiguration();dt=cfg.outputFeedback.sensorPeriod;
+            q=[12;3;0;0;0;0;1.6;2.4;.95;0;0];
+            track=localRunMotionTrack([],cfg,q,(0:12)*dt,0);
+            [track,~]=onlineNrmmTrackingRuntime("targetPoint",track,13*dt,q(1:2),0,cfg,0,.02);
+            previous=track.restBounds;
+            [track,motion]=onlineNrmmTrackingRuntime("targetPoint",track,14*dt,q(1:2)+[.015;-.01],0,cfg,0,.02);
+            testCase.assertNotEmpty(motion);
+            testCase.verifyEqual(motion(2),0);
+            testCase.verifyGreaterThanOrEqual(track.restBounds(:,1),previous(:,1));
+            testCase.verifyLessThanOrEqual(track.restBounds(:,2),previous(:,2));
+            testCase.verifyLessThanOrEqual(track.restBounds(:,1),q(1:2));
+            testCase.verifyGreaterThanOrEqual(track.restBounds(:,2),q(1:2));
+        end
+
         function stationaryAcquisitionRequiresBothPositionHistoryAndPerceivedYaw(testCase)
             cfg=localPointTestConfiguration();settings=estimatorControllerIntegrationConfig();track=[];
             for j=1:settings.initialization.minimumRadarSamples

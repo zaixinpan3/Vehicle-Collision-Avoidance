@@ -283,8 +283,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(posterior.target(3:6),motion,AbsTol=1e-10);
             replay=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...
                 'cfg',cfg,'hypotheses',posterior,'input',block.heldInput,'inputs',zeros(2,1)));
-            testCase.verifyEqual(replay.trajectories{1}.targets(:,1),posterior.target,AbsTol=1e-12);
-            next=predictiveSafetyGeometry.predictTarget(posterior.target,cfg.controller.sampleTime);
+            root=replay.trajectories{1}.targets(:,1);
+            testCase.verifyEqual(root(3:7),posterior.target(3:7),AbsTol=1e-12);
+            testCase.verifyEqual(root(1:2),mean(posterior.targetObserver.positionBounds,2),AbsTol=1e-12);
+            testCase.verifyGreaterThanOrEqual(root(8:9),posterior.target(8:9));
+            next=predictiveSafetyGeometry.predictTarget(root,cfg.controller.sampleTime);
             testCase.verifyEqual(replay.trajectories{1}.targets(:,end),next,AbsTol=1e-12);
         end
 
@@ -404,9 +407,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(data.compactSolversReadyBeforeFirstFrame);
             testCase.verifyEmpty(data.warmupFailure);
             testCase.assertEqual(string(data.outcome),"completed",string(data.failure));
-            info=data.trace(end).metadata;
-            testCase.verifyTrue(info.collisionTargetActive && info.deficitDescentMet && info.terminalSetEnforced);
-            testCase.verifyEqual(info.initializationTrajectoryCount,1);
+            active=find(arrayfun(@(step)step.metadata.collisionTargetActive,data.trace));
+            testCase.assertNotEmpty(active);
+            info=data.trace(active(end)).metadata;
+            testCase.verifyTrue(info.deficitDescentMet && info.terminalSetEnforced);
+            testCase.verifyEqual(data.trace(active(1)).metadata.initializationTrajectoryCount,1);
+            testCase.verifyEqual(info.initializationTrajectoryCount,double(numel(active)==1));
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyGreaterThan(data.minimumNodeClearanceMeters,0);
         end
@@ -421,7 +427,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             info=data.trace(active).metadata;
             testCase.verifyGreaterThan(info.initialPeakClearanceDeficitMeters,data.configuration.outputFeedback.clearanceMeters);
             testCase.verifyEqual(info.initializationTrajectoryCount,1);
-            testCase.verifyEqual(info.reducedSearchEvaluations,0);
+            testCase.verifyTrue(info.deficitDescentMet);
             testCase.verifyTrue(info.nonlinearValidationPerformed && info.terminalSetEnforced);
             testCase.verifyLessThanOrEqual(info.pcbfValue,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);

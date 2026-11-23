@@ -644,14 +644,14 @@ classdef predictiveSafetyGeometry
                 +arc^2*diff(sin(limits(:,2)))/(2*root(7));
         end
 
-        function [box,centers] = targetMotionEnvelope(root,limits,time,nominal)
+        function [box,centers] = targetMotionEnvelope(root,limits,time,nominal,domain)
             % Enclose the continuous constant-A, constant-beta footprint in
             % axes centered on the possible body headings at each node.
             time=reshape(time,1,[]);
             if root(4)==0
                 box=repmat(root,1,numel(time));centers=zeros(4,numel(time));return
             end
-            if nargin<4,nominal=predictiveSafetyGeometry.predictTarget(root,time);end
+            if nargin<4 || isempty(nominal),nominal=predictiveSafetyGeometry.predictTarget(root,time);end
             box=nominal;
             centers=zeros(4,numel(time));
             if isempty(limits),return;end
@@ -661,8 +661,25 @@ classdef predictiveSafetyGeometry
             arcLow=predictiveSafetyGeometry.targetArc(slow,time);
             arcHigh=predictiveSafetyGeometry.targetArc(fast,time);
             curvature=sin(limits(:,2))/root(7);
+            if nargin>=5 && isstruct(domain) && isfield(domain,'yawRateMaximum')
+                % On a persistent-curvature arc, |kappa|*V is the physical
+                % yaw rate. Bound distance traveled before constructing its
+                % Cartesian image, including cells far beyond the handoff.
+                speedLimit=Inf;
+                if isfield(domain,'speedMaximum'),speedLimit=domain.speedMaximum;end
+                if prod(curvature)>0
+                    speedLimit=min(speedLimit,domain.yawRateMaximum/min(abs(curvature)));
+                end
+                if isfinite(speedLimit),arcHigh=min(arcHigh,speedLimit*time);end
+                arcLow=min(arcLow,arcHigh);
+            end
             turns=[curvature(1)*arcLow;curvature(1)*arcHigh;curvature(2)*arcLow;curvature(2)*arcHigh];
             halfLow=min(turns,[],1)/2;halfHigh=max(turns,[],1)/2;
+            if nargin>=5 && isstruct(domain) && isfield(domain,'yawRateMaximum')
+                halfTurnLimit=domain.yawRateMaximum*time/2;
+                halfLow=max(-halfTurnLimit,min(halfTurnLimit,halfLow));
+                halfHigh=max(-halfTurnLimit,min(halfTurnLimit,halfHigh));
+            end
             far=max(abs(halfLow),abs(halfHigh));near=max(0,max(halfLow,-halfHigh));
             sincLow=-ones(size(time));sincHigh=ones(size(time));
             short=far<=pi;sincLow(short)=1;
@@ -707,8 +724,9 @@ classdef predictiveSafetyGeometry
                     [il,ih]=localCosRange(limits(1,2)-alpha-pi/2,limits(2,2)-alpha-pi/2);
                     q=[(sl-ih)/curvature(1);(sl-ih)/curvature(2); ...
                         (sh-il)/curvature(1);(sh-il)/curvature(2)]-sum(axes.*offset,1);
-                    lowerCenter=max(lowerCenter,min(q,[],1));
-                    upperCenter=min(upperCenter,max(q,[],1));
+                    lo=max(lowerCenter,min(q,[],1));hi=min(upperCenter,max(q,[],1));
+                    consistent=lo<=hi;
+                    lowerCenter(consistent)=lo(consistent);upperCenter(consistent)=hi(consistent);
                 end
                 centers(row,:)=lowerCenter-padding;
                 centers(row+1,:)=upperCenter+padding;
@@ -1435,7 +1453,7 @@ function candidate=localCirculationRollout(model,data,speed,durations)
                 extra=pathTime(cached+1:end);nominal=predictiveSafetyGeometry.predictTarget(model.target,extra);
                 for cellIndex=1:size(cover.cells,3)
                     [path(:,cached+1:numel(pathTime),cellIndex),centers(:,cached+1:numel(pathTime),cellIndex)]= ...
-                        predictiveSafetyGeometry.targetMotionEnvelope(model.target,cover.cells(:,:,cellIndex),extra,nominal);
+                        predictiveSafetyGeometry.targetMotionEnvelope(model.target,cover.cells(:,:,cellIndex),extra,nominal,model.cfg.target.observerDomain);
                 end
             end
         else

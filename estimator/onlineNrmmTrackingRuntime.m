@@ -124,6 +124,40 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     if ~track.initialized || ~isfield(track,'speedAnchor')
         track.speedAnchor=[];
     end
+    if ~isfield(track,'positionBounds') || time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
+        track.positionBounds=[];
+        track.speedUpper=design.domain.speedMaximum;track.restBounds=[];
+        if track.initialized && ~isempty(track.errorBound)
+            r=track.errorBound.targetComponents(1);
+            track.positionBounds=track.state(1:2)+[-r,r];
+        end
+    end
+    if ~isfield(track,'restBounds'),track.restBounds=[];end
+    if ~isempty(track.positionBounds) && dt>0
+        accelerationUpper=design.domain.scalarAccelerationMaximum;
+        if track.initialized && ~isempty(track.motionBounds),accelerationUpper=track.motionBounds(2,1);end
+        movingTime=dt;
+        if accelerationUpper<0,movingTime=min(dt,track.speedUpper/(-accelerationUpper));end
+        travel=track.speedUpper*movingTime+.5*accelerationUpper*movingTime^2;
+        displacement=travel*[-ones(2,1),ones(2,1)];
+        if ~isempty(track.errorBound)
+            deviation=dt*track.errorBound.targetComponents(2)+.5*design.domain.accelerationNormBound*dt^2;
+            step=dt*track.state(3:4);
+            displacement(:,1)=max(displacement(:,1),step-deviation);
+            displacement(:,2)=min(displacement(:,2),step+deviation);
+        end
+        track.positionBounds=track.positionBounds+displacement;
+        track.speedUpper=min(design.domain.speedMaximum,max(0,track.speedUpper+dt*accelerationUpper));
+    end
+    if ~isempty(position)
+        measuredBox=position+[-positionErrorRadius,positionErrorRadius];
+        if isempty(track.positionBounds)
+            track.positionBounds=measuredBox;
+        else
+            track.positionBounds(:,1)=max(track.positionBounds(:,1),measuredBox(:,1));
+            track.positionBounds(:,2)=min(track.positionBounds(:,2),measuredBox(:,2));
+        end
+    end
     if dt>0 && track.initialized
         reference=track.previousPosition;detected=~isempty(reference);
         if ~detected,reference=track.state(1:2);end
@@ -257,6 +291,9 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
     end
     components=track.errorBound.targetComponents;
     speed=norm(track.state(3:4));
+    track.speedUpper=min(track.speedUpper,speed+components(2));
+    track.positionBounds(:,1)=max(track.positionBounds(:,1),track.state(1:2)-components(1));
+    track.positionBounds(:,2)=min(track.positionBounds(:,2),track.state(1:2)+components(1));
     % For constant sideslip, the yaw-rate premise applies at every speed
     % attained on this track. The measured chord also lower-bounds the
     % peak speed during its window, including windows ending at rest.
@@ -295,7 +332,23 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         return
     end
     motion=[track.heading;estimate.targetSpeed;estimate.targetScalarAcceleration;estimate.targetSideslip];
-    if track.restCompatible,motion(2:4)=0;end
+    if track.restCompatible
+        % Conditional pose enclosure of the absorbing model. Its position
+        % transition is the identity. Keep the moving enclosure separately
+        % until the measurements actually rule out motion.
+        if isempty(track.restBounds)
+            track.restBounds=track.positionBounds;
+        elseif ~isempty(position)
+            track.restBounds=[max(track.restBounds(:,1),position-positionErrorRadius), ...
+                min(track.restBounds(:,2),position+positionErrorRadius)];
+        end
+        if any(track.restBounds(:,1)>track.restBounds(:,2))
+            track.restCompatible=false;
+        else
+            motion(2:4)=0;
+        end
+    end
+    if ~track.restCompatible,track.restBounds=[];end
 end
 
 function [anchor,interval]=localChordAcceleration(track,domain,interval,capacity)
