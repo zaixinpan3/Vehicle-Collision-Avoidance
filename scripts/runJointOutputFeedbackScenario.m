@@ -18,7 +18,6 @@ function campaign = runJointOutputFeedbackScenario(options)
         options.RequirePhysicalWitness (1,1) logical = true
         options.Warmup (1,1) logical = true
         options.DropoutHolds (1,:) double {mustBeInteger,mustBeNonnegative} = []
-        options.HypothesisOffsets (1,:) double {mustBeFinite,mustBeNonempty} = [-.005,0,.005]
         options.EgoPositionOffsetMeters (2,1) double {mustBeFinite} = [0;0]
         options.EgoYawOffsetRadians (1,1) double {mustBeFinite} = 0
         options.TargetPositionOffsetMeters (2,1) double {mustBeFinite} = [0;0]
@@ -48,8 +47,8 @@ function campaign = runJointOutputFeedbackScenario(options)
             reference=road;input=zeros(2,1);time=0;state=[];
             initialClearance=predictiveSafetyGeometry.rectangle(x(1:3), ...
                 [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset],q(1:3),q(8:11));
-            truth=struct('ego',x,'target',q,'parameters',ones(4,1),'sensorBias',zeros(7,1));
-            initial=localInitialContract(x,options.HypothesisOffsets);
+            initial=localInitialContract(x);
+            truth=initial;truth.target=q;
             qualification=[];refusalWitness=[];
             if options.RequirePhysicalWitness
                 qualification=bypassFeasibilityBaseline(x,q,road,cfg,HalfWidthMeters=road.scenarioHalfWidthMeters);
@@ -151,8 +150,8 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'initialSensorSample',sample,'initialInformationContract',initial, ...
                 'initialPlantState',struct('ego',x,'target',q), ...
                 'physicalWitness',qualification,'physicalWitnessAtRefusal',refusalWitness, ...
-                'initialContractScope',"finiteEgoPrior;radarAcquisition;nrmmPointMotion", ...
-                'actualInitialEgoMemberIncluded',any(options.HypothesisOffsets==0), ...
+                'initialContractScope',"knownInitialEgo;radarAcquisition;nrmmPointMotion", ...
+                'actualInitialEgoMemberIncluded',true, ...
                 'actualInitialMemberIncluded',false, ...
                 'experimentOptions',options, ...
                 'robustSafetyCertified',false,'timing',localTiming(callSeconds(1:callCount),cfg.controller.sampleTime), ...
@@ -170,7 +169,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                 1000*result.timing.maximumSeconds,result.timing.deadlineMisses);
         end
     end
-    campaign=struct('scope',"raw-sensor control with an explicitly declared finite initial information contract", ...
+    campaign=struct('scope',"raw-sensor control from one known initial ego state", ...
         'pipeline',string(cfg.outputFeedback.method),'results',summaries);
     localWriteJson(fullfile(options.OutputDirectory,'campaign.json'),campaign);
 end
@@ -197,7 +196,7 @@ function startup=localWarmup(cfg,options,canRun,solversReady)
     % Use a private sensor stream to exercise target acquisition and
     % the following active continuation with the simulation's actual configuration.
     stream=RandStream('mt19937ar','Seed',0);reference=[-100,0;1000,0];
-    initial=localInitialContract([0;0;0;cfg.referenceSpeed;0;0],0);
+    initial=localInitialContract([0;0;0;cfg.referenceSpeed;0;0]);
     truth=initial;
     truth.target=[cfg.collision.encounterRangeMeters/2;cfg.vehicle.width+cfg.target.defaultWidth; ...
         0;0;0;0;cfg.target.rearAxleDistance;cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
@@ -243,17 +242,8 @@ function timing=localSolverTiming(trace)
     timing.meanUnder100Milliseconds=~isempty(seconds) && mean(seconds)<.1;
 end
 
-function hypotheses=localInitialContract(x,offsets)
-    % This is an experimental prior, not an estimate derived from truth at
-    % every decision. Common translation and friction remain correlated.
-    prototype=struct('ego',x,'target',[],'parameters',ones(4,1),'sensorBias',zeros(7,1));
-    hypotheses=repmat(prototype,1,numel(offsets));
-    for j=1:numel(offsets)
-        offset=offsets(j);
-        hypotheses(j).ego(1:2)=x(1:2)+[offset;offset];
-        hypotheses(j).ego(4)=x(4)+offset;
-        hypotheses(j).parameters(3:4)=1+offset;
-    end
+function initial=localInitialContract(x)
+    initial=struct('ego',x,'target',[],'parameters',ones(4,1),'sensorBias',zeros(7,1));
 end
 
 function block=localSensorBlock(time,input,samples)

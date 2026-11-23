@@ -422,6 +422,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 RandomSeed=20261107,OutputDirectory=string(folder.Folder));
             testCase.assertEqual(campaign.results.outcome,"completed");
             data=jsondecode(fileread(campaign.results.source));
+            initial=data.initialInformationContract;
+            testCase.assertNumElements(initial,1);
+            testCase.verifyEqual(initial.ego,data.initialPlantState.ego);
+            testCase.verifyEqual(initial.parameters,ones(4,1));
+            testCase.verifyEmpty(initial.target);
+            testCase.verifyEqual([data.trace.posteriorCount],ones(1,numel(data.trace)));
             active=find(arrayfun(@(step)step.metadata.collisionTargetActive,data.trace),1);
             testCase.assertNotEmpty(active);
             info=data.trace(active).metadata;
