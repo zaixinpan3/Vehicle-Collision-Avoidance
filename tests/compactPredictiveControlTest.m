@@ -12,6 +12,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         refinedHolds={24,60}
         requestedSpeed={4,12}
         crossingSpeed={15,20}
+        crossingEncounter={"intersectionCrossing","trafficCrossing"}
         integrationMesh={4,64}
         movingTarget={false,true}
         admissionMeasurements={"boundedRadar","exactRadar","exactRadarWithDropout"}
@@ -396,24 +397,30 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
         end
-        function aCrossingReachesZeroDeficitWithinFiveIpoptIterations(testCase,crossingSpeed)
+        function aCrossingReachesZeroDeficitWithinFiveIpoptIterations(testCase,crossingSpeed,crossingEncounter)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             cfg=collisionAvoidanceControllerConfig();
             cfg.target.observerDomain=collisionThreatContract(strings(1,0),[8,15,20], ...
                 WindowSeconds=20,ControllerConfiguration=cfg);
             cfg.outputFeedback.nlpMaximumIterations=5;
-            run=runJointOutputFeedbackScenario(Scenarios="intersectionCrossing",Speeds=crossingSpeed,Frames=3, ...
+            frames=3;
+            if crossingEncounter=="trafficCrossing",frames=40;end
+            run=runJointOutputFeedbackScenario(Scenarios=crossingEncounter,Speeds=crossingSpeed,Frames=frames, ...
                 RandomSeed=20261107,ControllerConfiguration=cfg,OutputDirectory=string(folder.Folder));
             testCase.assertEqual(run.results.outcome,"completed");
             data=jsondecode(fileread(run.results.source));
-            admission=data.trace(2).metadata;
+            metadata=[data.trace.metadata];
+            first=find([metadata.collisionTargetActive],1);
+            testCase.assertNotEmpty(first);
+            testCase.assertLessThan(first,numel(metadata));
+            admission=metadata(first);
             testCase.verifyGreaterThan(admission.initialPeakClearanceDeficitMeters,0);
             testCase.verifyEqual(admission.nlpAttempts,1);
             testCase.verifyEqual(admission.pcbfValue,0);
             testCase.verifyTrue(admission.primaryOptimumComputed && admission.terminalSetEnforced);
             testCase.verifyLessThanOrEqual(admission.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
-            testCase.verifyEqual(data.trace(3).metadata.inheritedDeficitCap,0);
-            testCase.verifyTrue(data.trace(3).metadata.deficitDescentMet);
+            testCase.verifyEqual(metadata(first+1).inheritedDeficitCap,0);
+            testCase.verifyTrue(metadata(first+1).deficitDescentMet);
         end
         function aTireDomainCrossingCanReachZeroDeficitInOneIpoptIteration(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());

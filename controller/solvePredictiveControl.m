@@ -661,6 +661,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 end
                 if seekZero && bestLoss>lossFloor+slackRoundoff && toc(timer)<deadline
                     seekZero=false;
+                    % The primary NLP also needs Jacobians of satisfied constraints.
+                    cache.derivatives=false;
                     if ~isempty(bestPoint),start=bestPoint;end
                     solveIpopt(start);
                 end
@@ -921,7 +923,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             reducedCalls=reducedCalls+reducedSearch;
             if restoration,considerSolution(u);end
         elseif derivatives && ~cache.derivatives
-            [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,[],false);
+            if seekZero && numel(model.hypotheses)==1 && all(cache.forward<=0) && all(cache.terminal<=0)
+                cache=localClearanceMeritDerivatives(cache,rollouts.trajectories{1}.oracle,model);
+            else
+                [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,[],false);
+            end
             gradientCalls=gradientCalls+1;
         end
         result=cache;
@@ -1296,6 +1302,33 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
     e.costGradient=e.costGradient+reshape(du-[du(:,2:end),zeros(2,1)],[],1);
     difference=eye(n)-diag(ones(n-1,1),-1);
     e.costHessian=e.costHessian+cfg.outputFeedback.inputWeight*kron(difference.'*diag(1./kernel.holds)*difference,eye(2));
+end
+
+function e=localClearanceMeritDerivatives(e,flow,model)
+    % The full rollout identifies which node determines each stage deficit.
+    % Only positive deficits contribute to the zero-deficit search gradient.
+    width=size(model.controlMap,2);
+    e.stageGradient=zeros(width,numel(e.stage));
+    e.forwardGradient=zeros(width,numel(e.forward));
+    e.terminalGradient=zeros(width,1);
+    e.derivatives=true;
+    stages=find(e.stage>0);
+    nodes=flow.nodeIndices(stages);
+    % Node 1 is fixed. Propagate through the hold ending at the last
+    % contributing node; later controls cannot affect its clearance.
+    lastHold=max([1;nodes(:)])-1;
+    if lastHold==0,return;end
+    item=model.hypotheses(1);
+    states=[item.ego,flow.ends(:,1:lastHold)];
+    model.controlMap=model.controlMap(1:2*lastHold,:);
+    [~,sensitivity]=localCondensedSensitivities(states(:,1:lastHold),flow.allInputs(:,1:lastHold), ...
+        item.parameters,flow.fi(1:lastHold),false(1,lastHold),model);
+    vehicle=model.cfg.vehicle;
+    shape=[vehicle.length/2;vehicle.width/2;vehicle.rectangleOffset];
+    gradients=localCompactDistanceGradient(states(:,nodes),flow.boxes(:,nodes),shape);
+    for j=1:numel(stages)
+        e.stageGradient(:,stages(j))=-(gradients(:,j).'*sensitivity(1:3,:,nodes(j))).';
+    end
 end
 
 function [residual,derivative]=localRearSlipResidual(states,model,index)
