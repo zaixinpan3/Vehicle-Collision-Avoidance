@@ -546,7 +546,9 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     if inherit && ~firstEncounter
         suffix=prior.fineControls(:,2:end);
         extra=count-size(suffix,2);
-        cruise=terminalSafeSet.movingControl(cfg);
+        % Extend an active encounter with the same common neutral handoff
+        % command that was checked for every physical member.
+        cruise=terminalSafeSet.continuationControl(cfg,~isempty(item.target));
         last=prior.fineControls(:,end);
         extension=localCompactRateLimit(repmat(cruise,1,extra),last,ones(1,extra),cfg);
         inherited=[suffix,extension];
@@ -701,7 +703,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         'maximumConstraintViolation',violation,'scenarioCount',numel(hypotheses), ...
         'activeScenarioCount',numel(hypotheses),'hypothesisCount',numel(hypotheses),'memoryDimension',0, ...
         'conditioning',conditioning,'terminalSetEnforced',true,'terminalSafetyAssumed',true, ...
-        'terminalModel',"safeRangeExit",'terminalValue',max(cellfun(@(t)t.terminal.value,traces)), ...
+        'terminalModel',"collisionFreeContinuation",'terminalValue',max(cellfun(@(t)t.terminal.value,traces)), ...
         'terminalInput',traces{nominal}.terminal.input,'robustNonlinearSafetyCertified',false, ...
         'recursiveFeasibilityCertified',false,'safetyScope',"finiteHypothesesControlBoundaryCollisionChecks", ...
         'collisionCheckPeriodSeconds',h,'collisionNodeCount',count+1, ...
@@ -1149,8 +1151,9 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         end
         weight=h/numel(model.hypotheses);
         e.stabilityCost=e.stabilityCost+weight/2*sum(residual.^2);
-        slew=-Inf;channel=1;trim=terminalSafeSet.movingControl(cfg);
+        slew=-Inf;channel=1;
         if total>N
+            trim=allInputs(:,end);
             rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
             [slew,channel]=max(abs(inputs(:,end)-trim)-h*rates);
         end
@@ -1548,9 +1551,10 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,item,start,previou
     else
         tail=backup.dense;tailEnds=backup.states;tailInputs=backup.inputs;
     end
-    command=terminalSafeSet.movingControl(cfg);nBridge=size(tailInputs,2);
+    nBridge=size(tailInputs,2);
     normalWitness=zeros(2,1);exitSteps=0;terminalValue=0;member=true;
     if nBridge>0
+        command=tailInputs(:,1);
         [domain,~,~,~,defined]=localCompactModelDomain(tail,tailInputs,cfg,kernel.validationSubsteps);
         times=start+(0:nBridge)*h;
         q=localCompactTargetNodes(item.target,times);
@@ -1565,18 +1569,19 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,item,start,previou
         rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
         slew=abs(command-previous)-h*rates;
         terminalValue=max([0,max(domain),cfg.outputFeedback.clearanceMeters-min(gaps),core,slew.']);
-        member=defined && all(gaps>0) && isfinite(exitSteps) && ...
+        member=defined && all(gaps>0) && ...
             terminalValue<=cfg.outputFeedback.nlpTolerance && ...
-            (coreSteps==0 || core<cfg.outputFeedback.clearanceMeters);
+            core<cfg.outputFeedback.clearanceMeters;
     else
         % No encounter action is required. The next nominal input must
         % still be reachable from the preceding actuator command.
+        command=terminalSafeSet.continuationControl(cfg,~isempty(item.target));
         command=localCompactRateLimit(command,previous,1,cfg);
     end
     terminal=struct('value',terminalValue,'member',member, ...
         'input',command,'bridgeHolds',nBridge,'exitSteps',exitSteps, ...
-        'exitStepsAreUpperBound',~isempty(item.cover) && exitSteps>nBridge,'normal',normalWitness, ...
-        'model',"safeRangeExit",'safetyAssumed',true,'safetyProved',false);
+        'exitStepsAreUpperBound',~isempty(item.cover) && isfinite(exitSteps) && exitSteps>nBridge,'normal',normalWitness, ...
+        'model',"collisionFreeContinuation",'safetyAssumed',true,'safetyProved',false);
 end
 
 function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,item,start,cfg,checkBudget,remaining)
@@ -1591,7 +1596,7 @@ function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,item,start,cfg,c
     if released
         dense=x;ends=zeros(6,0);inputs=zeros(2,0);return;
     end
-    inputs=terminalSafeSet.movingControl(cfg);
+    inputs=terminalSafeSet.continuationControl(cfg,true);
     [points,ends]=localCompactHeldFlow(kernel,x,inputs,item.parameters,checkBudget);
     dense=[x,points];
 end
@@ -1626,8 +1631,14 @@ function cover=localCompactCover(item,cfg,count)
     end
     cover.velocity=mid.*predictiveSafetyGeometry.direction(angle);
     % Law of cosines at the angular extreme and the two speed endpoints.
-    cover.velocityRadius=sqrt(max((vMin-mid).^2+4*vMin.*mid.*sin(half/2).^2, ...
-        (vMax-mid).^2+4*vMax.*mid.*sin(half/2).^2));
+    if vMin==0 && cosine>0 && mid==vMax/(2*cosine)
+        % The origin and both outer corners are co-circular. Use the same
+        % norm as the drift test to preserve exact tangency at rest.
+        cover.velocityRadius=vecnorm(cover.velocity);
+    else
+        cover.velocityRadius=sqrt(max((vMin-mid).^2+4*vMin.*mid.*sin(half/2).^2, ...
+            (vMax-mid).^2+4*vMax.*mid.*sin(half/2).^2));
+    end
 end
 
 function [gap,boxes,remaining]=localCompactOccupied(item,states,times,shape,cfg,remaining)

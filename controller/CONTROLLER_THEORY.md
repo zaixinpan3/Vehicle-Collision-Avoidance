@@ -492,7 +492,7 @@ Physical states are eliminated by forward
 substitution of the dynamics, separately for every retained hypothesis.
 Let $L(v)$ interpolate the endpoint commands linearly between adjacent
 knots, starting at $v_0=u^-$. Initialize $\bar u_{1:A_k}$ from one field
-rollout. Initialize $\bar u_{A_k+1:N_k}$ by moving toward terminal trim
+rollout. Initialize $\bar u_{A_k+1:N_k}$ by moving toward the nominal cruise trim
 within the physical actuator limits. Let $\bar v_i=\bar u_{c_i}$. The encounter solve
 interpolates corrections about that rollout,
 
@@ -686,7 +686,7 @@ numerical tolerance. This comparison preserves a feasible incumbent when
 stability and reference tracking favor different plans. It supplies a local
 preference and makes no claim of global secondary optimality or yaw stability.
 
-### A terminal set for safe exit from sensing range
+### A terminal set for sustained collision avoidance
 
 Let \(R\) be the radar range for the two reference points, \(h\) the control
 hold, and \(d_\pm\) the signed rectangle distance from the separation dual.
@@ -696,14 +696,10 @@ terminal witness. Actual release still uses the received block and every
 surviving member. An isolated missed return inside range preserves the
 obligation. Re-entry is a new encounter.
 
-While terminal continuation is needed, every member receives the same
-realizable command
-$$
- u_f=(0,b_f),\qquad b_f=\operatorname{clip}_{[b_{\min},b_{\max}]}
- \frac{F_{\rm load}(v_{\rm ref})}{\sum_i\mu_i F_{zi}} .
-$$
-A released member has no remaining encounter obligation. For an active
-member, check actuator compatibility and one physical hold under $u_f$,
+During an active encounter every member receives the same realizable terminal
+command $u_f=(0,0)$ (straight steering and neutral drive), which leaves a
+stationary ego at rest in the physical model. For an active member, check
+actuator compatibility and one physical hold under $u_f$,
 including its model domain and the clearance at both nodes. The terminal
 set is the one-step preimage, under this common command, of release or the
 following **separating-motion set**.
@@ -730,15 +726,18 @@ after the two optimized legs and the physical handoff hold.
 Write $w_C=v_E-c_C$ and $G_C(n)=\min_{a\in E}n^\top a-
 \max_{b\in T_C}n^\top b$. Membership requires, **for each active ego hypothesis**,
 $$
-\|w_C\|>r_C,\qquad
 \exists\,\|n_C\|=1:\quad
 G_C(n_C)\ge d_{\rm safe},\quad G_C(n_C)>0,\quad n_C^\top w_C\ge r_C .
 $$
 Each ego hypothesis may have its own geometric witness. All members use $u_f$.
 On this simplified model the signed projection gap can only increase
-or stay constant. The strictly positive minimum relative speed
-$\|w_C\|-r_C$ implies finite range exit. Exit time is a diagnostic.
-For an initial reference-point distance bounded by $L_C$, any time
+or stay constant indefinitely, including when both vehicles remain at rest.
+When $w_C=0$ and $r_C=0$, every normal satisfies the velocity inequality,
+so membership reduces to the current footprint clearance. When
+$\|w_C\|=r_C>0$, the only admissible normal is $w_C/\|w_C\|$.
+When $\|w_C\|<r_C$, the velocity disk admits closing motion along every
+normal. If $\|w_C\|>r_C$, a finite exit time can also be reported.
+In that last case, for an initial reference-point distance bounded by $L_C$, any time
 strictly greater than $(R+L_C)/(\|w_C\|-r_C)$ suffices.
 
 The opening condition restricts the rectangle dual normal to an arc of
@@ -752,7 +751,7 @@ $n_\pm=b e\pm\sqrt{1-b^2}Je$. Evaluate the exact footprint supports
 at both. The work per ego hypothesis is independent of the time to exit.
 
 For the nonlinear vehicles, **terminal safety and closure under $u_f$ are
-handoff assumptions**. They cover continued safe motion to exit, admissible
+handoff assumptions**. They cover continued safe motion while the encounter remains active, admissible
 actuation, and preservation of terminal membership under the next physical
 hold and compatible information update. The real target continues to obey
 its original motion contract. After release, nominal guidance owns path
@@ -838,7 +837,7 @@ $$
 Replay assigns $\xi_j=[C_j(v)]_+$ using the lower bound $\underline d_r^s$
 at the held-command boundaries for each uncertain member. A point member
 uses its exact rectangle-distance dual. On the terminal bridge and in the terminal
-set the full $d_{\rm safe}$ remains hard through range exit. The default
+set the full $d_{\rm safe}$ remains hard for the duration of the encounter. The default
 planning margin is $0.10\,\mathrm{m}$. The simulation counts
 contact or overlap at a control node when the true signed distance is
 nonpositive. A trajectory can

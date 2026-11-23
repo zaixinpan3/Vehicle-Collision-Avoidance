@@ -448,7 +448,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(ismember(window.avoidanceSteps,state.boundaries));
             testCase.verifyTrue(state.terminal.member);
             testCase.verifyEqual(state.pcbfDeficit,0,AbsTol=cfg.outputFeedback.nlpTolerance);
-            law=terminalSafeSet.movingControl(cfg);
+            law=terminalSafeSet.continuationControl(cfg,true);
             fixed=[inputs(:,1:window.avoidanceSteps),repmat(law,1,window.connectionSteps)];
             replay=struct('operation',"validateInputSequence",'cfg',cfg,'hypotheses',prediction.information, ...
                 'input',block.heldInput,'inputs',inputs);
@@ -746,7 +746,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
                 prior=next;
             end
         end
-        function targetMustClearTheSensorBoundaryWithoutAnEarlierCollision(testCase)
+        function aDepartingTargetMaintainsSeparationUntilRelease(testCase)
             cfg=testCase.cfg;x=[0;0;0;3;0;0];
             target=[40;0;pi;1;0;0;1.6;2.4;.95;0;0];
             testCase.verifyGreaterThan(terminalSafeSet.movingValue(x,target,cfg),0);
@@ -773,11 +773,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(terminalSafeSet.movingValue(ego,target,cfg), ...
                 cfg.outputFeedback.clearanceMeters);
         end
-        function coMovingInRangeTargetCannotClaimExit(testCase)
+        function coMovingVehiclesCanRemainWithinRangeIndefinitely(testCase)
             cfg=testCase.cfg;x=[0;0;0;3;0;0];
             target=[cfg.collision.encounterRangeMeters;0;0;3;0;0;1.6;2.4;.95;0;0];
             [v,~,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
-            testCase.verifyGreaterThan(v,cfg.outputFeedback.nlpTolerance);
+            testCase.verifyLessThan(v,0);
             testCase.verifyEqual(steps,Inf);
             rotated=x;rotated(3)=pi/7;
             wrapped=target;wrapped(3)=rotated(3)+2*pi;
@@ -789,6 +789,39 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             target(1)=10;target(4)=3.0001;
             [v,~,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
             testCase.verifyLessThan(v,0);testCase.verifyGreaterThan(steps,1e6);
+        end
+        function aTangentVelocityDiskRequiresANonclosingSeparatingPlane(testCase)
+            cfg=testCase.cfg;x=zeros(6,1);
+            target=[10;0;0;0;0;0;1.6;2.4;.95;0;0];
+            for y=[0,4]
+                target(2)=y;
+                [v,n,g,steps]=terminalSafeSet.separatingMotion(x,target,[1;0],1,0,cfg);
+                testCase.verifyLessThan(v,0);
+                testCase.verifyEqual(n,[-1;0],AbsTol=1e-12);
+                testCase.verifyTrue(all(isfinite(g)));
+                testCase.verifyEqual(steps,Inf);
+            end
+            target(1:2)=[0;10];
+            testCase.verifyGreaterThan(terminalSafeSet.separatingMotion(x,target,[1;0],1,0,cfg),0);
+        end
+        function parkedVehiclesCanRemainInRangeWithTheSameTerminalInput(testCase)
+            cfg=testCase.cfg;item=testCase.block.initialHypotheses;item.ego=zeros(6,1);
+            item.target=[10;0;0;0;0;0;1.6;2.4;.95;0;0];
+            request=struct('operation',"validateInputSequence",'cfg',cfg,'hypotheses',item, ...
+                'input',zeros(2,1),'inputs',zeros(2,5));
+            for j=1:2
+                checked=solvePredictiveControl("outputFeedback",request);
+                testCase.assertTrue(checked.accepted);
+                trace=checked.trajectories{1};term=trace.terminal;
+                testCase.verifyTrue(term.member);
+                testCase.verifyEqual(term.exitSteps,Inf);
+                testCase.verifyEqual(term.input,zeros(2,1));
+                testCase.verifyEqual(trace.collisionEgo,zeros(size(trace.collisionEgo)));
+                request.hypotheses.ego=trace.collisionEgo(:,end);
+                request.inputs=[request.inputs(:,2:end),term.input];
+            end
+            request.hypotheses.target(1)=0;
+            testCase.verifyFalse(solvePredictiveControl("outputFeedback",request).accepted);
         end
         function aReleasedEncounterDoesNotRequirePerpetualCruise(testCase)
             cfg=testCase.cfg;cfg.actuation.brakingRatioMaximum=0;
@@ -1027,7 +1060,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(testCase.state.terminal.input, ...
                 terminalSafeSet.movingControl(testCase.cfg));
         end
-        function theTerminalContinuationStraightensAndKeepsDriving(testCase)
+        function theActiveTerminalContinuationUsesNeutralDrive(testCase)
             item=testCase.block.initialHypotheses;item.ego=[0;0;.1;3;.4;.2];item.target=[0;20;pi/2;10;0;0;1.6;2.4;.95;0;0];
             request=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
                 'hypotheses',item,'input',[.2;0],'inputs',[.2;0]);
@@ -1036,8 +1069,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             terminal=value.trajectories{1}.terminal;
             testCase.verifyEqual(terminal.input(1),0);
             testCase.verifyGreaterThan(terminal.bridgeHolds,0);
-            testCase.verifyEqual(terminal.model,"safeRangeExit");
-            testCase.verifyGreaterThan(terminal.input(2),0);
+            testCase.verifyEqual(terminal.model,"collisionFreeContinuation");
+            testCase.verifyEqual(terminal.input(2),0);
         end
         function terminalEntryHonorsAnExplicitSteeringSlewContract(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.steeringRateMaximum=.1;
@@ -1174,15 +1207,17 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(min(prediction.scenarios{1}.collisionEgo(4,:)),0);
             testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
         end
-        function stoppingBeforeAnInRangeLeadStillRequiresTerminalMembership(testCase)
+        function stoppingBeforeAnInRangeLeadCanSatisfyTerminalMembership(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=3;
             block=localBlock(cfg,3);item=block.initialHypotheses;
             item.target=[5.6;0;0;0;0;0;1.6;2.4;.95;0;0];
             request=struct('operation',"validateInputSequence",'cfg',cfg, ...
                 'hypotheses',item,'input',block.heldInput,'inputs',repmat([0;-.8],1,60));
             parked=solvePredictiveControl('outputFeedback',request);
-            testCase.verifyFalse(parked.trajectories{1}.terminal.member);
-            testCase.verifyFalse(parked.accepted);
+            testCase.assertTrue(parked.accepted);
+            testCase.verifyTrue(parked.trajectories{1}.terminal.member);
+            testCase.verifyEqual(parked.trajectories{1}.terminal.exitSteps,Inf);
+            testCase.verifyEqual(parked.trajectories{1}.ego(4:6,end),zeros(3,1));
         end
         function brakingToRestUsesTheSameSafetyConstraints(testCase)
             cfg=testCase.cfg;item=testCase.block.initialHypotheses;

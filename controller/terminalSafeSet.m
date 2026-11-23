@@ -1,10 +1,19 @@
 classdef terminalSafeSet
-%terminalSafeSet Moving range-exit continuation and shared CLF and geometry utilities.
+%terminalSafeSet Collision-free terminal continuation and shared CLF and geometry utilities.
     methods (Static)
         function input=movingControl(cfg)
             gain=nonlinearBicycleModel.tireAccelerationGain(cfg);
             trim=nonlinearBicycleModel.roadLoad(cfg.referenceSpeed,cfg)/(cfg.vehicle.m*gain);
             input=[0;min(cfg.actuation.brakingRatioMaximum,max(cfg.actuation.brakingRatioMinimum,trim))];
+        end
+
+        function input=continuationControl(cfg,encounter)
+            if encounter
+                % Neutral steering and drive preserve a parked ego.
+                input=zeros(2,1);
+            else
+                input=terminalSafeSet.movingControl(cfg);
+            end
         end
 
         function [value,normal,gradient,exitSteps]=movingValue(x,q,cfg)
@@ -41,7 +50,7 @@ classdef terminalSafeSet
                 value=max(2*cfg.outputFeedback.nlpTolerance,-x(4));gradient(4)=-1;return
             end
             [slow,k]=min(drift);
-            if slow<=0
+            if slow<0
                 value=2*cfg.outputFeedback.nlpTolerance-h*slow;
                 if speed(k)>0
                     gradient(3:4)=-h*w(:,k).'/speed(k)*[x(4)*J*e,e];
@@ -75,8 +84,10 @@ classdef terminalSafeSet
             [least,k]=min(gap);value=cfg.outputFeedback.clearanceMeters-least;
             gradient(1:4)=-gradients(:,k).';normal=normals(:,k);
             % A finite upper bound on the exit index, without time marching.
-            offset=x(1:2)-boxes(1:2,:);
-            exitSteps=1+floor(max((R+vecnorm(offset)+positionRadius)./(h*drift)));
+            if slow>0
+                offset=x(1:2)-boxes(1:2,:);
+                exitSteps=1+floor(max((R+vecnorm(offset)+positionRadius)./(h*drift)));
+            end
 
             function [projection,derivative]=support(n,side)
                 ne=e.'*n;nl=lateral.'*n;
@@ -87,7 +98,12 @@ classdef terminalSafeSet
                 tLong=target(8,:).*sign(nt);tLat=target(9,:).*sign(nb);
                 witness=x(1:2)+egoArm-targetCenter-[c.*tLong-s.*tLat;s.*tLong+c.*tLat];
                 % Angle of n is angle(w) +/- acos(radius/|w|).
-                phi=(J*axis+side*axis.*(cosine./sine))./speed(adjust);
+                % At tangency the admissible arc is a single normal. Use
+                % its tangential derivative along the boundary |w|=radius.
+                turnDerivative=zeros(size(sine));
+                interior=sine>0;
+                turnDerivative(interior)=cosine(interior)./sine(interior);
+                phi=(J*axis+side*axis.*turnDerivative)./speed(adjust);
                 nTerm=sum((J*n).*witness,1);
                 derivative=[n;sum(n.*(J*egoArm),1)+nTerm.*(x(4)*lateral.'*phi);nTerm.*(e.'*phi)];
             end
