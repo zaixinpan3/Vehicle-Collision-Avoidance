@@ -253,28 +253,28 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyEqual(force,zeros(2,1),AbsTol=1e-12);
             testCase.verifyEqual(field.incidence,0);
         end
-        function predictedDecelerationCanCreateAThreatWithTheSamePresentPoseAndSpeed(testCase)
+        function laterOccupancyCannotChangeEarlierFieldInputs(testCase)
+            model=localModel("intersectionCrossing",8);
+            count=40;time=(0:count)*model.cfg.controller.sampleTime;
+            [boxes,centers]=predictiveSafetyGeometry.targetMotionEnvelope(model.target,[],time);
+            model.motionCover=struct('boxes',boxes,'centers',centers);
+            original=predictiveSafetyGeometry.avoidanceInputs(model,count);
+            % Preserve the first six occupied rectangles, including acquisition.
+            firstChanged=7;
+            model.motionCover.boxes(2,firstChanged:end)=model.motionCover.boxes(2,firstChanged:end)+60;
+            changed=predictiveSafetyGeometry.avoidanceInputs(model,count);
+            testCase.verifyEqual(original(:,1:firstChanged-1),changed(:,1:firstChanged-1));
+            testCase.verifyGreaterThan(norm(original(:,firstChanged:end)-changed(:,firstChanged:end),'fro'),0);
+        end
+        function incidenceDependsOnPresentMotionWhenTargetAccelerationChanges(testCase)
             model=localModel("intersectionCrossing",8);model.target(4)=16;
             p=struct('speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
-            [free,~]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            [~,steady]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
             model.target(5)=-16^2/(2*17.6);
-            [braking,field]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
-            testCase.verifyEqual(free,zeros(2,1),AbsTol=1e-12);
-            testCase.verifyGreaterThan(norm(braking),1);
-            testCase.verifyGreaterThan(field.incidence,.5);
+            [~,braking]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            testCase.verifyEqual(braking.incidence,steady.incidence);
         end
-        function predictedTurningCanClearAnInitiallyHeadOnApproach(testCase)
-            model=localModel("headOn",8);
-            p=struct('speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
-            [straight,~]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
-            % Preserve position, speed and velocity course; change NRMM curvature.
-            model.target(6)=.08;model.target(3)=pi-model.target(6);
-            [turning,field]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
-            testCase.verifyGreaterThan(norm(straight),1);
-            testCase.verifyEqual(turning,zeros(2,1),AbsTol=1e-12);
-            testCase.verifyEqual(field.incidence,0);
-        end
-        function predictionGuidanceDoesNotDependOnTheWorldCoordinateFrame(testCase)
+        function localGuidanceDoesNotDependOnTheWorldCoordinateFrame(testCase)
             model=localModel("turningCrossing",8);
             model.target(10:11)=[.3;-.2];model.cfg.vehicle.rectangleOffset=[.2;.1];
             p=struct('speed',8,'inflation',.1,'preferredAcceleration',[.2;-.1]);
@@ -286,7 +286,7 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             [transformed,other]=predictiveSafetyGeometry.circulationField(x,target,model.cfg,p);
             testCase.verifyEqual(transformed,rotation*original,AbsTol=1e-10);
             testCase.verifyEqual(other.incidence,field.incidence,AbsTol=1e-10);
-            testCase.verifyEqual(other.transportGradient,rotation*field.transportGradient,AbsTol=1e-10);
+            testCase.verifyEqual(other.tangentialAcceleration,rotation*field.tangentialAcceleration,AbsTol=1e-10);
         end
         function aLongerRolloutExtendsExactlyTheSameFieldMotion(testCase,crossingSpeed)
             model=localModel("intersectionCrossing",crossingSpeed);

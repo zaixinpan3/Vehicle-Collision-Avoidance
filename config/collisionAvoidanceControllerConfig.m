@@ -54,10 +54,8 @@ function cfg=localDefaults()
         'jointPredictionRefreshSteps',2,'compactObserverPrediction',true, ...
         'jointGeneratorLimit',4096,'jointMomentPrediction',true);
     cfg.nonlinear=struct('integrationStep',.05);
-    % One field rollout combines route attraction with predictive obstacle
-    % gradients. Time-aligned exposure scales continuous target-transport and
-    % separation gradients, without a passing-side input or sign selection.
-    % There is no candidate bank or nominal/avoidance behavior switch.
+    % Integrate one field from the current relative pose and velocity at
+    % each node. Transverse feedback varies continuously with the encounter.
     % Cruise feedback never overwrites longitudinal obstacle correction.
     % The parallel-wall acceleration guide anticipates transverse momentum;
     % it is not a hard terminal constraint or an execution certificate.

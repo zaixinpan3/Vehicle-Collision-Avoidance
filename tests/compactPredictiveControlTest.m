@@ -458,7 +458,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(admission.initialPeakClearanceDeficitMeters,0);
             testCase.verifyEqual(admission.initializationTrajectoryCount,1);
             testCase.verifyEqual(admission.nlpAttempts,1);
-            testCase.verifyEqual(admission.midpointReplays,1);
+            testCase.verifyLessThanOrEqual(admission.nlpIterations,1);
             testCase.verifyEqual(admission.pcbfValue,0);
             testCase.verifyTrue(admission.primaryOptimumComputed && admission.nonlinearValidationPerformed);
             testCase.verifyLessThanOrEqual(admission.maximumConstraintViolation,cfg.outputFeedback.nlpTolerance);
