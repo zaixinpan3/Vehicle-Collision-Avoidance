@@ -42,7 +42,10 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
             q(10:11,:)=randn(rngStream,2,n);
             shape=[2.1;.9;.37;-.13];
             value=predictiveSafetyGeometry.rectangleClearance(ego,q,shape);
-            [withWitness,~]=predictiveSafetyGeometry.rectangleClearance(ego,q,shape);
+            [withWitness,gradient]=predictiveSafetyGeometry.rectangleClearance(ego,q,shape);
+            [interpreted,referenceGradient]=predictiveSafetyGeometry.rectangleClearanceNumeric(ego,q,shape);
+            testCase.verifyEqual(withWitness,interpreted,AbsTol=1e-12);
+            testCase.verifyEqual(gradient,referenceGradient,AbsTol=1e-8);
             testCase.verifyGreaterThan(max(value),0);
             testCase.verifyLessThan(min(value),0);
             testCase.verifyEqual(value,withWitness,AbsTol=1e-12);

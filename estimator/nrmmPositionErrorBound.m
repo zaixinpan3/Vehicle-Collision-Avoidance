@@ -324,9 +324,10 @@ function [bound,next,comparison]=localTargetComparison(bound,input,before,after,
         localMetricBound(components,design));
     bound.radarPredictor = predictor;
     bound.trueRangeMaximum = localGuard(range);
-    record = struct("matrix",matrix,"input",forcing,"initial",initial, ...
-        "final",next,"step",step,"mode",mode);
-    comparison = record;
+    if nargout>2
+        comparison=struct("matrix",matrix,"input",forcing,"initial",initial, ...
+            "final",next,"step",step,"mode",mode);
+    end
 end
 
 function bound=localInertialTarget(bound,states,first,detected,radius,step,design,initialRadii)
@@ -348,10 +349,15 @@ function bound=localInertialTarget(bound,states,first,detected,radius,step,desig
         bound.radarPredictor=bound.targetComponents(1);
     end
     input=struct('radarDetectionAvailable',detected,'yawRate',0);
+    if isempty(first),return;end
+    % Substep defects depend only on the accepted RK states. Compute them
+    % together; the bound and absorbing-stop update still run in time order.
+    defects=localDefect(localInertialState(states(:,1:end-1)),localInertialState(states(:,2:end)), ...
+        localInertialState(first),input,design,step);
     before=localInertialState(states(:,1));
     for i=1:size(first,2)
         after=localInertialState(states(:,i+1));
-        defect=localDefect(before,after,localInertialState(first(:,i)),input,design,step);
+        defect=struct('target',defects.target(:,i),'radarPredictor',defects.radarPredictor(i));
         range=bound.trueRangeMaximum+domain.speedMaximum*step;
         stopSpeed=domain.scalarAccelerationMaximum*step;
         canStop=norm(before.targetState(3:4))<=bound.targetComponents(2)+stopSpeed;
@@ -382,7 +388,7 @@ function bound=localInertialTarget(bound,states,first,detected,radius,step,desig
 end
 
 function state=localInertialState(packed)
-    state=struct('bodyVelocity',[0;0],'targetState',packed(7:12),'radarPredictor',packed(13:14));
+    state=struct('bodyVelocity',zeros(2,size(packed,2)),'targetState',packed(7:12,:),'radarPredictor',packed(13:14,:));
 end
 
 function defect = localDefect(before,after,first,input,design,step)
@@ -394,30 +400,30 @@ function defect = localDefect(before,after,first,input,design,step)
     velocityDelta = -input.yawRate*cross*deltaVelocity ...
         -design.velocity.gain*deltaVelocity;
     defect = struct("bodyVelocity",localGuard( ...
-        norm(deltaVelocity/step-first.bodyVelocity-0.5*velocityDelta) ...
-        + 0.5*norm(velocityDelta)), ...
-        "target",zeros(3,1), ...
+        vecnorm(deltaVelocity/step-first.bodyVelocity-0.5*velocityDelta) ...
+        + 0.5*vecnorm(velocityDelta)), ...
+        "target",zeros(3,size(deltaVelocity,2)), ...
         "radarPredictor",0);
     delta = after.targetState-before.targetState;
     deltaPredictor = after.radarPredictor-before.radarPredictor;
     gains = double(input.radarDetectionAvailable)*design.target.innovationGains;
-    innovationDelta = deltaPredictor-delta(1:2);
-    linearDelta = [delta(3:4)-deltaVelocity-input.yawRate*cross*delta(1:2) ...
-        + gains(1)*innovationDelta;delta(5:6)-input.yawRate*cross*delta(3:4) ...
-        + gains(2)*innovationDelta;-input.yawRate*cross*delta(5:6) ...
+    innovationDelta = deltaPredictor-delta(1:2,:);
+    linearDelta = [delta(3:4,:)-deltaVelocity-input.yawRate*cross*delta(1:2,:) ...
+        + gains(1)*innovationDelta;delta(5:6,:)-input.yawRate*cross*delta(3:4,:) ...
+        + gains(2)*innovationDelta;-input.yawRate*cross*delta(5:6,:) ...
         + gains(3)*innovationDelta];
     residual = delta/step-first.targetState-0.5*linearDelta;
     for component = 1:3
         rows = (2*component-1):(2*component);
-        defect.target(component) = norm(residual(rows))+0.5*norm(linearDelta(rows));
+        defect.target(component,:) = vecnorm(residual(rows,:))+0.5*vecnorm(linearDelta(rows,:));
     end
-    defect.target(3) = defect.target(3) ...
-        + design.target.lipschitzCertificate.phiVelocity*norm(delta(3:4)) ...
-        + design.target.lipschitzCertificate.phiAcceleration*norm(delta(5:6));
-    predictorDelta = delta(3:4)-deltaVelocity-input.yawRate*cross*deltaPredictor;
+    defect.target(3,:) = defect.target(3,:) ...
+        + design.target.lipschitzCertificate.phiVelocity*vecnorm(delta(3:4,:)) ...
+        + design.target.lipschitzCertificate.phiAcceleration*vecnorm(delta(5:6,:));
+    predictorDelta = delta(3:4,:)-deltaVelocity-input.yawRate*cross*deltaPredictor;
     defect.radarPredictor = localGuard( ...
-        norm(deltaPredictor/step-first.radarPredictor-0.5*predictorDelta) ...
-        + 0.5*norm(predictorDelta));
+        vecnorm(deltaPredictor/step-first.radarPredictor-0.5*predictorDelta) ...
+        + 0.5*vecnorm(predictorDelta));
     defect.target = localGuard(defect.target);
 end
 

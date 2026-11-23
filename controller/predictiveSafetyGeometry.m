@@ -830,6 +830,23 @@ classdef predictiveSafetyGeometry
 
         function [clearance,gradient] = rectangleClearance(states,targets,shape)
             % Batched closest-feature evaluation of the rectangle distance dual.
+            if size(states,2)==size(targets,2) ...
+                    && size(targets,1)==11 && isequal(size(shape),[4,1]) ...
+                    && isa(states,'double') && isa(targets,'double') && isa(shape,'double')
+                kernel=localClearanceKernel();
+                if ~isempty(kernel)
+                    [clearance,gradient]=kernel(states(1:3,:),targets,shape,nargout>1);
+                    return
+                end
+            end
+            if nargout>1
+                [clearance,gradient]=predictiveSafetyGeometry.rectangleClearanceNumeric(states,targets,shape);
+            else
+                clearance=predictiveSafetyGeometry.rectangleClearanceNumeric(states,targets,shape);
+            end
+        end
+
+        function [clearance,gradient] = rectangleClearanceNumeric(states,targets,shape)
             ce=cos(states(3,:));se=sin(states(3,:));ct=cos(targets(3,:));st=sin(targets(3,:));
             signs=[-1,1,1,-1;-1,-1,1,1];ego=cell(1,4);target=cell(1,4);
             for j=1:4
@@ -1386,6 +1403,33 @@ function [best,compatible]=localAccelerationProjection(preferred,normal,lower)
         if individual && deficit<leastDeficit,leastDeficit=deficit;least=candidate;end
         if deficit<=1e-8 && cost<bestCost,best=candidate;bestCost=cost;end
     end
+end
+
+function kernel=localClearanceKernel()
+    % The build compiles this same dual evaluation one pose pair at a time.
+    persistent handle checked
+    if isempty(checked)
+        checked=true;handle=[];
+        folder=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
+        if isfile(fullfile(folder,['clearanceBatchKernelMex.',mexext]))
+            previous=addpath(folder);cleanup=onCleanup(@()path(previous));
+            candidate=@clearanceBatchKernelMex;
+            shape=[2.4;.95;.3;-.1];
+            x=[0,0,1;0,0,1;0,0,.3];
+            q=zeros(11,3);q(1:3,:)=[1,10,6;.1,-3,2;0,0,-.2];q(8:11,:)=repmat(shape,1,3);
+            [expected,gradient]=predictiveSafetyGeometry.rectangleClearanceNumeric(x,q,shape);
+            values=predictiveSafetyGeometry.rectangleClearanceNumeric(x,q,shape);
+            try
+                [d,g]=candidate(x,q,shape,true);
+                if isequal(d,expected) && isequal(g,gradient) && isequal(candidate(x,q,shape,false),values)
+                    handle=candidate;
+                end
+            catch
+                % An incompatible binary leaves the MATLAB implementation active.
+            end
+        end
+    end
+    kernel=handle;
 end
 
 function kernel=localKernel()

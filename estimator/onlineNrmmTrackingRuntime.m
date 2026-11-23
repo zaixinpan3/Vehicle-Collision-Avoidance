@@ -32,7 +32,7 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
     end
     switch action
         case "preparetarget"
-            varargout{1}=localPointDesign(varargin{:});
+            varargout{1}=localPointDesign(varargin{:},true);
         case "targetpoint"
             [varargout{1},varargout{2}]=localTargetPoint(varargin{:});
         case "initialize"
@@ -60,12 +60,14 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
     end
 end
 
-function [design,kernelDesign,settings,boundDesign]=localPointDesign(cfg)
+function [design,kernelDesign,settings,boundDesign,integrator]=localPointDesign(cfg,prepare)
 % Both the point observer and its comparison system use the same synthesis.
-    persistent previousKey target kernel integration bound
+    if nargin<2,prepare=false;end
+    persistent previousKey target kernel integration bound nativeIntegrator
     key={cfg.target.observerDomain,cfg.target.rearAxleDistance,cfg.collision.encounterRangeMeters, ...
         cfg.outputFeedback.noiseBounds,cfg.outputFeedback.sensorPeriod};
-    if ~isequal(previousKey,key)
+    changed=~isequal(previousKey,key);
+    if changed
         localAddProjectPaths();
         integration=estimatorControllerIntegrationConfig();
         observer=integration.observer;
@@ -96,7 +98,16 @@ function [design,kernelDesign,settings,boundDesign]=localPointDesign(cfg)
             'rearAxleDistance',1,'sideslipDomainMaximum',0)));
         previousKey=key;
     end
-    design=target;kernelDesign=kernel;settings=integration;boundDesign=bound;
+    if changed || prepare
+        % Resolve the implementation at preparation or design change, before
+        % the sensor loop. A saved handle does not search the MATLAB path.
+        if exist('nrmmObserverIntegrationKernelV2Mex','file')==3
+            nativeIntegrator=@nrmmObserverIntegrationKernelV2Mex;
+        else
+            nativeIntegrator=[];
+        end
+    end
+    design=target;kernelDesign=kernel;settings=integration;boundDesign=bound;integrator=nativeIntegrator;
 end
 
 function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,relativeHeading,positionErrorRadius)
@@ -106,7 +117,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
 % target derivatives and inverse NRMM map are unchanged.
     if nargin<6 || isempty(relativeHeading),relativeHeading=NaN;end
     if nargin<7 || isempty(positionErrorRadius),positionErrorRadius=cfg.outputFeedback.noiseBounds(4);end
-    [design,kernelDesign,settings,boundDesign]=localPointDesign(cfg);
+    [design,kernelDesign,settings,boundDesign,integrator]=localPointDesign(cfg);
     if isempty(track)
         assert(~isempty(position),'onlineNrmmTrackingRuntime:missingFirstReturn','Radar must initialize a track.');
         track=struct('state',[position;zeros(4,1)],'time',time,'lastReturn',time, ...
@@ -166,8 +177,8 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
             'lateralVelocity',0);
         packed=[zeros(6,1);track.state;reference;0];
         count=max(1,ceil(dt/settings.observer.runtime.integrationStepMaximum-1e-9));
-        if exist('nrmmObserverIntegrationKernelV2Mex','file')==3
-            [states,first]=nrmmObserverIntegrationKernelV2Mex(packed,measurement,kernelDesign,dt/count,count);
+        if ~isempty(integrator)
+            [states,first]=integrator(packed,measurement,kernelDesign,dt/count,count);
         else
             [states,first]=nrmmObserverVectorField("integrate",packed,measurement,kernelDesign,dt/count,count);
         end

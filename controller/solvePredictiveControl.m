@@ -197,9 +197,12 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
     observe=isempty(hypotheses(1).target) || ...
         (isfield(hypotheses,'targetObserver') && ~isempty(hypotheses(1).targetObserver));
     if observe && ~isfield(hypotheses,'targetObserver'),[hypotheses.targetObserver]=deal([]);end
-    if observe && (~isempty(hypotheses(1).target) || any([block.samples.radarAvailable])) && ...
-            exist('onlineNrmmTrackingRuntime','file')~=2
-        addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'estimator'));
+    persistent updateTarget
+    if isempty(updateTarget) && observe && (any([block.samples.radarAvailable]) || any(~cellfun(@isempty,{hypotheses.targetObserver})))
+        if exist('onlineNrmmTrackingRuntime','file')~=2
+            addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'estimator'));
+        end
+        updateTarget=@onlineNrmmTrackingRuntime;
     end
     keep=false(1,numel(hypotheses));residual=Inf(numel(hypotheses),1);
     next=hypotheses;bounds=cfg.outputFeedback.noiseBounds;
@@ -232,7 +235,7 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                 if isfield(measured,'radarPositionErrorMeters') && ~isempty(measured.radarPositionErrorMeters)
                     positionError=min(positionError,measured.radarPositionErrorMeters);
                 end
-                [item.targetObserver,motion]=onlineNrmmTrackingRuntime("targetPoint", ...
+                [item.targetObserver,motion]=updateTarget("targetPoint", ...
                     item.targetObserver,measured.time,measuredPosition,item.ego(3),cfg,relativeHeading,positionError);
                 positionBox=item.targetObserver.positionBounds;
                 if ~isempty(positionBox) && any(positionBox(:,1)>positionBox(:,2)+tolerance)
@@ -626,6 +629,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 lateralGrip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
                 steerScale=atan2(cfg.vehicle.wheelbase*lateralGrip,speedSquared);
                 controlScale(1:2:end)=min(cfg.outputFeedback.steeringMaximum,steerScale);
+                physicalScale=controlScale;
                 seekZero=~isempty(item.target);
                 e=evaluate(start,false);
                 initialPeakDeficit=max(0,max(e.stage));
@@ -763,6 +767,24 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         end
         residualCount=2*count+numel(model.hypotheses);
         if seekZero,outputCount=1;else,outputCount=residualCount;end
+        % In a clearance-only restoration, equilibrate each actuator knot
+        % by the diagonal of the regularized local least-squares model of
+        % the pseudo-Huber merit. A unit scaled step then accounts for its
+        % effect on every violated clearance. All bounds use the same map.
+        controlScale=physicalScale;
+        if seekZero
+            seed=evaluate(start,false);
+            active=seed.stage>0;
+            if any(active) && all(seed.forward<=0) && all(seed.terminal<=0)
+                seed=evaluate(start,true);
+                jacobian=seed.stageGradient(:,active).*physicalScale;
+                weights=1./hypot(1,seed.stage(active));
+                diagonal=1+jacobian.^2*weights;
+                if all(isfinite(diagonal))
+                    controlScale=physicalScale./sqrt(diagonal);
+                end
+            end
+        end
         oracle=casadiFunctionCallback('pcbf_rollout',[nu,1],[outputCount,1], ...
             @ipoptValues,@ipoptJacobian);
         oracleLifetime=onCleanup(@()oracle.release());

@@ -11,6 +11,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         rectangleYaw={0,.2,pi/4,pi/2}
         refinedHolds={24,60}
         requestedSpeed={4,12}
+        crossingSpeed={15,20}
         integrationMesh={4,64}
         movingTarget={false,true}
         admissionMeasurements={"boundedRadar","exactRadar","exactRadarWithDropout"}
@@ -395,13 +396,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
             testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
         end
-        function aCrossingReachesZeroDeficitWithinFiveIpoptIterations(testCase)
+        function aCrossingReachesZeroDeficitWithinFiveIpoptIterations(testCase,crossingSpeed)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             cfg=collisionAvoidanceControllerConfig();
             cfg.target.observerDomain=collisionThreatContract(strings(1,0),[8,15,20], ...
                 WindowSeconds=20,ControllerConfiguration=cfg);
             cfg.outputFeedback.nlpMaximumIterations=5;
-            run=runJointOutputFeedbackScenario(Scenarios="intersectionCrossing",Speeds=20,Frames=3, ...
+            run=runJointOutputFeedbackScenario(Scenarios="intersectionCrossing",Speeds=crossingSpeed,Frames=3, ...
                 RandomSeed=20261107,ControllerConfiguration=cfg,OutputDirectory=string(folder.Folder));
             testCase.assertEqual(run.results.outcome,"completed");
             data=jsondecode(fileread(run.results.source));
