@@ -659,23 +659,10 @@ $|\alpha_f|<\pi/2$ on the declared steering domain. This condition is inactive
 on the pure low-speed branch. Symbolic guards used to evaluate rejected trial
 points do not extend the physical model's domain. Terminal membership is hard
 and has no safety slack.
-The primary problem has $2M+N$ variables. A driving sequence must also
-satisfy $\|(v_x^s,v_y^s)\|_2>0$ after the initial node at the sampled
-physical states of each executable hold, including its post-reset endpoint.
-An initially stationary ego can depart on the first hold. The strict
-condition introduces no calibrated minimum cruise speed.
-
-Let $\tilde v_{x,j}^s$ denote the longitudinal speed just before the
-boundary reset. Its stop branch has $b_j\le0$ and
-$\tilde v_{x,j}^s<0.2v_{\rm hold}$. During feasibility restoration, the
-inequality
-$$
-\min\{0.2v_{\rm hold}-\tilde v_{x,j}^s,-b_j\}\le 0
-$$
-excludes the interior of that branch. The original nonlinear flow and the
-strict motion check resolve equality cases. These constraints apply to the
-executable horizon. The following terminal construction has its own dynamics
-and is evaluated as a membership witness.
+The primary problem has $2M+N$ variables. The nonnegative longitudinal
+speed domain includes rest. When braking enters the model's stop reset,
+the post-reset state is propagated through the remaining holds, with the
+same node clearance, PCBF deficit and terminal membership conditions.
 
 A feasible zero-deficit driving sequence attains the lower bound of the PCBF
 objective. Define a secondary cost over its $N$ held inputs. Write $b_j$ for
@@ -732,7 +719,7 @@ following **separating-motion set**.
 At handoff let $E$ be the oriented ego footprint and let $T_C$ be the
 occupied rectangle of a surviving target parameter cell. In the terminal
 model the footprints keep their orientations. The ego translates with
-$v_E=v_x e(\psi_E)$, $v_x>0$. The target translates with a constant
+$v_E=v_x e(\psi_E)$, $v_x\ge0$. The target translates with a constant
 velocity in its handoff disk $D(c_C,r_C)$. A point target has $r_C=0$.
 Obtain the cell's speed and course intervals from the constant-acceleration,
 constant-sideslip arc up to handoff, including absorption and the declared

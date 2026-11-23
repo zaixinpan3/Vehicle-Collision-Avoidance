@@ -37,7 +37,7 @@ classdef terminalSafeSet
             w=x(4)*e-velocity;speed=vecnorm(w);
             normal=zeros(2,1);gradient=zeros(1,6);exitSteps=Inf;
             drift=speed-radius;
-            if x(4)<=0
+            if x(4)<0
                 value=max(2*cfg.outputFeedback.nlpTolerance,-x(4));gradient(4)=-1;return
             end
             [slow,k]=min(drift);

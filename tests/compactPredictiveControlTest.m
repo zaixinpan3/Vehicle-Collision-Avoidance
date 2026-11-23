@@ -1174,7 +1174,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(min(prediction.scenarios{1}.collisionEgo(4,:)),0);
             testCase.verifyTrue(prediction.scenarios{1}.terminal.member);
         end
-        function aParkingWitnessCannotBeDispatchedAsADrivingPlan(testCase)
+        function stoppingBeforeAnInRangeLeadStillRequiresTerminalMembership(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=3;
             block=localBlock(cfg,3);item=block.initialHypotheses;
             item.target=[5.6;0;0;0;0;0;1.6;2.4;.95;0;0];
@@ -1184,14 +1184,38 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(parked.trajectories{1}.terminal.member);
             testCase.verifyFalse(parked.accepted);
         end
-        function restorationCanLeaveTheStopResetAlongTheDriveInput(testCase)
+        function brakingToRestUsesTheSameSafetyConstraints(testCase)
             cfg=testCase.cfg;item=testCase.block.initialHypotheses;
             item.ego(4)=.05*cfg.model.brakeHoldSpeed;
-            value=solvePredictiveControl('outputFeedback',struct('operation',"evaluateControlSequence", ...
-                'cfg',cfg,'hypotheses',item,'input',zeros(2,1),'holds',1,'inputs',[0;-.001]));
-            testCase.verifyEqual(value.forward,.001,AbsTol=1e-12);
-            testCase.verifyEqual(value.forwardGradient(:,1),[0;-1],AbsTol=1e-12);
-            testCase.verifyLessThanOrEqual(value.terminal,cfg.outputFeedback.nlpTolerance);
+            item.target=[16;0;0;3;0;0;1.6;2.4;.95;0;0];
+            inputs=repmat([0;-.2],1,4);
+            request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
+                'hypotheses',item,'input',inputs(:,1),'holds',ones(1,4),'inputs',inputs);
+            value=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyLessThanOrEqual(max([value.forward;value.stage;value.terminal]), ...
+                cfg.outputFeedback.nlpTolerance);
+            request.operation="validateInputSequence";
+            checked=solvePredictiveControl('outputFeedback',request);
+            testCase.assertTrue(checked.accepted);
+            trace=checked.trajectories{1};
+            testCase.verifyEqual(trace.collisionEgo(4:6,2:end),zeros(3,4));
+            testCase.verifyEqual(checked.pcbfDeficit,0);
+            testCase.verifyTrue(trace.terminal.member);
+
+            % The same stopped ego and input with a target approaching head-on.
+            item.target(3)=pi;request.hypotheses=item;
+            unsafe=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyFalse(unsafe.accepted);
+        end
+        function aDepartingTargetCanClearAStationaryTerminalEgo(testCase)
+            cfg=testCase.cfg;x=zeros(6,1);
+            q=[16;0;0;3;0;0;1.6;2.4;.95;0;0];
+            [value,~,~,steps]=terminalSafeSet.movingValue(x,q,cfg);
+            testCase.verifyLessThanOrEqual(value,0);
+            testCase.verifyTrue(isfinite(steps));
+            q(4)=0;
+            [~,~,~,steps]=terminalSafeSet.movingValue(x,q,cfg);
+            testCase.verifyEqual(steps,Inf);
         end
         function condensedGradientsDifferentiateTheActualConstraintValues(testCase,integrationMesh)
             cfg=testCase.cfg;cfg.outputFeedback.nlpJit=true;
@@ -1414,7 +1438,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function eachPhysicalMemberHasOnePersistentTargetForecast(testCase)
             cfg=testCase.cfg;item=testCase.block.initialHypotheses;
-            item.target=[14;5;0;6;-1;0;1.6;2.4;1;0;0];
+            % The center forecast clears the ego, but the allowed turns can close the gap.
+            item.target=[14;3;0;6;-1;0;1.6;2.4;1;0;0];
             item.targetObserver=struct('motionBounds',[-2,-.015;0,.015]);
             request=struct('operation',"validateInputSequence",'cfg',cfg,'hypotheses',item, ...
                 'input',zeros(2,1),'inputs',zeros(2,5));
@@ -1498,7 +1523,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(result.accepted);
             testCase.verifyEqual(numel(result.trajectories),2);
         end
-        function stationaryEndpointsCannotSupplyMovingContinuation(testCase)
+        function coincidentSpeedsAloneCannotEstablishRangeExit(testCase)
             item=testCase.block.initialHypotheses;item.ego(4:6)=0;
             item.target=[4.95;0;0;0;0;0;1.6;2.4;.95;0;0];
             result=solvePredictiveControl('outputFeedback',struct('operation',"validateInputSequence", ...

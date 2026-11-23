@@ -668,7 +668,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     if isempty(best)
         error('collisionAvoidanceController:compactNoFeasiblePlan', ...
-            'No validated moving PCBF plan within the %s search. No command was committed.',budgetPhase);
+            'No validated PCBF plan within the %s search. No command was committed.',budgetPhase);
     end
     solveSeconds=toc(solveClock);
     retainedTrajectories=cell(1,numel(hypotheses));
@@ -1128,7 +1128,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 localStage(~activeStages)=-1;
                 nodeIndices=(0:total-1)+side;
             end
-            [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K,N);
+            [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K);
             target=[];if ~isempty(q),target=q(:,end);end
             [terminal,~,g]=localCompactMovingValue(ends(:,end),target,item,total*h,cfg,remaining);
             rollouts.trajectories{s}.oracle=struct('dense',dense,'ends',ends,'allInputs',allInputs,'total',total, ...
@@ -1539,13 +1539,6 @@ function [valid,traces,violation,nodeStates,slacks] = localCompactValidate(contr
             valid=valid && terminal.member;
         end
     end
-    % A stationary initial measurement may start moving. Both velocity
-    % components may vanish together only at the initial sample.
-    for s=1:numel(traces)
-        if ~valid,break;end
-        trace=traces{s};
-        valid=~any(all(trace.collisionEgo(4:5,2:end)==0,1)) && ~any(all(trace.denseEgo(4:5,2:end)==0,1));
-    end
 end
 
 function [dense,states,inputs,collisionStates] = localCompactRollout(kernel,x,previous,controls,parameters,fine)
@@ -1742,7 +1735,7 @@ function q=localCompactTargetNodes(target,times)
     else,q=predictiveSafetyGeometry.predictTarget(target,times);end
 end
 
-function [value,index,stateGradient,inputGradient,defined]=localCompactModelDomain(states,inputs,cfg,K,drivingHolds)
+function [value,index,stateGradient,inputGradient,defined]=localCompactModelDomain(states,inputs,cfg,K)
     % The numerical Fiala guard must not become an accepted model extension.
     % Above the pure kinematic branch, front-wheel longitudinal velocity must
     % be positive (equivalent to |alpha_f|<pi/2 for the steering domain).
@@ -1755,7 +1748,7 @@ function [value,index,stateGradient,inputGradient,defined]=localCompactModelDoma
     defined=all(blend<=0 | front>0);
     [v,branch]=max([-x(4,:);min(blend,-front)],[],1);
     [value,j]=max(reshape(v,K+1,count),[],1);index=j-1;
-    if nargout<3 && nargin<5,return;end
+    if nargout<3,return;end
     selected=(0:count-1)*(K+1)+j;x=x(:,selected);u=u(:,selected);
     branch=branch(selected);c=c(selected);s=s(selected);lateral=lateral(selected);
     stateGradient=zeros(6,count);inputGradient=zeros(2,count);stateGradient(4,:)=-1;
@@ -1764,17 +1757,6 @@ function [value,index,stateGradient,inputGradient,defined]=localCompactModelDoma
     stateGradient(4,wheel)=-c(wheel);stateGradient(5,wheel)=-s(wheel);
     stateGradient(6,wheel)=-cfg.vehicle.lf*s(wheel);
     inputGradient(1,wheel)=x(4,wheel).*s(wheel)-lateral(wheel).*c(wheel);
-    if nargin<5 || drivingHolds==0,return;end
-    % At driving nodes exclude the interior of the model's stop-reset guard:
-    % nonpositive command AND longitudinal speed below the reset threshold.
-    % Use the pre-reset endpoint derivative. Exact replay resolves its boundary.
-    nodes=1:drivingHolds;speedGap=.2*cfg.model.brakeHoldSpeed-states(4,1+K*nodes);
-    driveGap=-inputs(2,nodes);resetGap=min(speedGap,driveGap);
-    active=nodes(resetGap>value(nodes));
-    value(active)=resetGap(active);index(active)=K;
-    stateGradient(:,active)=0;inputGradient(:,active)=0;
-    speedActive=speedGap(active)<=driveGap(active);
-    stateGradient(4,active(speedActive))=-1;inputGradient(2,active(~speedActive))=-1;
 end
 
 function ready=localWarmIpopt(cfg,reference)
