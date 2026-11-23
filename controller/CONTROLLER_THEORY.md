@@ -373,8 +373,8 @@ are conditioned on the retained ego member.
 
 To enclose the target footprint at elapsed time $t$, write
 $s(A,t)=\int_0^t\max(0,V_0+A\tau)\,d\tau$ on the moving branch.
-The absorbing stopped branch retains its pose. For any closed parameter
-cell $C=[A_l,A_u]\times[\beta_l,\beta_u]$, monotonicity gives
+The absorbing stopped branch retains its pose. For the full observer interval
+$C=I_A\times I_\beta=[A_l,A_u]\times[\beta_l,\beta_u]$, monotonicity gives
 $s\in[s(A_l,t),s(A_u,t)]$. Set $z=s\sin(\beta)/(2l_r)$. The offset of the
 reference point and the body heading are
 
@@ -386,42 +386,34 @@ $$
 When the observer operating domain provides speed and yaw-rate bounds, an
 admissible arc also satisfies $s\le V_{\max}t$ and
 $|z|\le\bar\omega t/2$. If $k_*=\min_{\kappa\in C}|\kappa|>0$ then
-$s\le\bar\omega t/k_*$. These inequalities tighten each cell's image
+$s\le\bar\omega t/k_*$. These inequalities tighten the interval image
 over the portion of its motion admitted by the operating domain.
 
-On turning cells whose curvature interval excludes zero, the chord length
+When the curvature interval excludes zero, the chord length
 factor also equals $2\sin(z)/\kappa$. Intersecting the two interval bounds
-keeps this factor bounded after a full revolution. On such cells the signed
+keeps this factor bounded after a full revolution. In this case the signed
 projection onto an axis at angle $\alpha$ relative to the initial heading
 also equals $[\sin(\beta+\kappa s-\alpha)-\sin(\beta-\alpha)]/\kappa$.
 Intersecting its interval extension with the chord projection tightens the
 reference-point enclosure on long turns.
 Project these interval expressions and the four rotated footprint vertices
-onto axes centered on the cell's heading interval. Coordinate minima and
+onto axes centered on the target heading interval. Coordinate minima and
 maxima enclose the reference points in $P_C(t)$ and the complete occupied
-footprints in $B_C(t)$. Over the preview $T$, let
-$L=V_0T+\max(0,A_u)T^2/2$. Integrating the course variation along the
-arc bounds the pairwise position spread by
-$D=(A_u-A_l)T^2/2+L(\beta_u-\beta_l)+L^2(\kappa_u-\kappa_l)/2$.
-The predictor uses four subdivisions per parameter by default. When $D$
-exceeds the sensor radius, it uses eight acceleration and sixteen slip
-subdivisions and splits any cell that straddles zero curvature. Every
-subdivision is closed and the union covers the same motion family. At each control node the clearance
-lower bound is
-
+footprints in $B_C(t)$.
+Each retained ego hypothesis $s$ uses one occupied rectangle for the entire
+observer interval at each active control node:
 $$
-\underline d_j^s=\min_{C\ \mathrm{active}} d_\pm(B_E(x_j^s),B_C^s(jh)).
+\underline d_j^s=d_\pm(B_E(x_j^s),B_C^s(jh)).
 $$
-
-A known point prediction uses its physical rectangle directly. An empty
-active set has clearance $+\infty$. The rectangle dual retains its
-continuous separating normal. Using an outer
-footprint can underestimate clearance. If the distance from the ego
-reference point to $P_C(jh)$ exceeds the sensor range, the entire cell
-has left this encounter. Check its exit node and discharge its subsequent
-obligations. The terminal handoff uses the surviving footprint and velocity enclosure
-of each such cell, including cells that admit absorption. A measured update requires a fresh replay
-when shifted containment has not been established.
+A known point prediction uses its physical rectangle directly. The rectangle
+dual retains its continuous separating normal. An outer footprint can
+underestimate clearance. When the distance from the ego reference point
+to $P_C(jh)$ exceeds the sensor range, the entire target enclosure has
+left the encounter. Check that node before releasing subsequent separation
+obligations. A released encounter has clearance $+\infty$ for this constraint.
+The terminal handoff uses the footprint and velocity enclosures for the
+same interval, including admissible absorption. A measured update requires
+a fresh replay when shifted containment has not been established.
 
 For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
 target contributes node and terminal separation constraints when $d_k^-\le R$.
@@ -717,14 +709,18 @@ set is the one-step preimage, under this common command, of release or the
 following **separating-motion set**.
 
 At handoff let $E$ be the oriented ego footprint and let $T_C$ be the
-occupied rectangle of a surviving target parameter cell. In the terminal
+occupied rectangle of the target interval for an active member. In the terminal
 model the footprints keep their orientations. The ego translates with
 $v_E=v_x e(\psi_E)$, $v_x\ge0$. The target translates with a constant
 velocity in its handoff disk $D(c_C,r_C)$. A point target has $r_C=0$.
-Obtain the cell's speed and course intervals from the constant-acceleration,
+Obtain the speed and course intervals from the constant-acceleration,
 constant-sideslip arc up to handoff, including absorption and the declared
 physical bounds. If speed lies in $[l,u]$ and course lies within $\delta$
-of $\phi$, use $m=(l+u)/2$, $c_C=m e(\phi)$ and
+of $\phi$, set $q=\cos(\min(\pi,\delta))$. The minimum enclosing disk
+has center $c_C=m e(\phi)$ by symmetry. For $m\ge0$, the maximum
+squared distance is attained at an angular extreme and one of the two
+radial endpoints. Minimizing the larger of these two quadratics gives
+$m=0$ if $q\le0$ and $m=\min(uq,(l+u)/(2q))$ otherwise. Its radius is
 $$
 r_C^2=\max_{s\in\{l,u\}}\{(s-m)^2+4sm\sin^2(\min(\pi,\delta)/2)\}.
 $$
@@ -732,13 +728,13 @@ This encloses all handoff velocities. The frozen continuation applies only
 after the two optimized legs and the physical handoff hold.
 
 Write $w_C=v_E-c_C$ and $G_C(n)=\min_{a\in E}n^\top a-
-\max_{b\in T_C}n^\top b$. Membership requires, **for every surviving cell**,
+\max_{b\in T_C}n^\top b$. Membership requires, **for each active ego hypothesis**,
 $$
 \|w_C\|>r_C,\qquad
 \exists\,\|n_C\|=1:\quad
 G_C(n_C)\ge d_{\rm safe},\quad G_C(n_C)>0,\quad n_C^\top w_C\ge r_C .
 $$
-Each cell may have its own geometric witness. All members use $u_f$.
+Each ego hypothesis may have its own geometric witness. All members use $u_f$.
 On this simplified model the signed projection gap can only increase
 or stay constant. The strictly positive minimum relative speed
 $\|w_C\|-r_C$ implies finite range exit. Exit time is a diagnostic.
@@ -753,7 +749,7 @@ positive clearance. Indeed, on the arc of normals with positive gap,
 each vertex-pair projection is concave in normal angle, as is their minimum.
 Writing $e=w_C/\|w_C\|$, $b=r_C/\|w_C\|$, the endpoints are
 $n_\pm=b e\pm\sqrt{1-b^2}Je$. Evaluate the exact footprint supports
-at both. The work per cell is independent of the time to exit.
+at both. The work per ego hypothesis is independent of the time to exit.
 
 For the nonlinear vehicles, **terminal safety and closure under $u_f$ are
 handoff assumptions**. They cover continued safe motion to exit, admissible
@@ -762,18 +758,9 @@ hold and compatible information update. The real target continues to obey
 its original motion contract. After release, nominal guidance owns path
 and speed recovery.
 
-At encounter acquisition let $\bar\theta$ be the componentwise midpoint
-of the acceleration and sideslip intervals. To choose the motion used in
-the single vector-field integration, extrapolate the current ego velocity
-and heading over the avoidance leg. Evaluate the target at $\bar\theta$
-and at the closed parameter cells' centers, ordered by their Euclidean
-distance from $\bar\theta$ in coordinates normalized by the nonzero
-interval widths. Choose the first whose signed footprint clearance on
-this reference reaches the planning margin before range exit. If all
-remain separated beyond the margin, choose the one with the smallest
-clearance. The extrapolation supplies a geometric reference and requires
-no actuator rollout. Integrate the route-following circulation field once
-for this target. The solver uses all parameter cells for the PCBF.
+At encounter acquisition, integrate the route-following circulation field
+once using the NRMM target forecast and the occupied rectangle at each
+preview node. The same full parameter interval enters the PCBF.
 During an active encounter its shifted fine commands supply the origin
 for new actuator corrections, so zero correction reproduces the available
 suffix exactly.

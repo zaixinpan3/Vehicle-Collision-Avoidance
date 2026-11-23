@@ -595,8 +595,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 controls=guideInputs(:,cumsum(holds));
                 initializationSource="shiftedMovingTerminalLaw";
             else
-                seedItem=localFieldTarget(item,window.avoidanceSteps,cfg);
-                [controls,guideInputs]=localCompactSeed(seedItem,previous,holds,lane,cfg,window.avoidanceSteps);
+                [controls,guideInputs]=localCompactSeed(item,previous,holds,lane,cfg,window.avoidanceSteps);
                 seedCount=1;
             end
             if isempty(item.target)
@@ -1345,35 +1344,6 @@ function controls = localCompactRateLimit(controls,previous,holds,cfg)
     end
 end
 
-function item=localFieldTarget(item,steps,cfg)
-    if isempty(item.motionLimits),return;end
-    center=mean(item.motionLimits,1).';
-    parameters=[center,reshape(mean(item.cover.cells,1),2,[])];
-    widths=diff(item.motionLimits,1,1).';
-    scaled=(parameters-center)./max(eps,widths);
-    [~,order]=sort(sum(scaled.^2,1));
-    x=item.ego;time=(0:steps)*cfg.controller.sampleTime;
-    rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-    reference=[x(1:2)+rotation*x(4:5)*time;repmat(x(3),1,numel(time))];
-    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    bestGap=Inf;
-    % Choose the nearest parameter perturbation that reaches the clearance
-    % margin along the extrapolated reference. No controls are integrated.
-    for j=order
-        root=item.target;root(5:6)=parameters(:,j);
-        target=predictiveSafetyGeometry.predictTarget(root,time);
-        gap=predictiveSafetyGeometry.rectangleClearance(reference,target,shape);
-        outside=find(vecnorm(reference(1:2,:)-target(1:2,:))>cfg.collision.encounterRangeMeters+item.positionRadius,1);
-        if ~isempty(outside),gap=gap(1:outside);end
-        nearest=min(gap);
-        if nearest<bestGap,bestGap=nearest;center=parameters(:,j);end
-        if bestGap<=cfg.outputFeedback.clearanceMeters,break;end
-    end
-    item.target(5:6)=center;
-    item.motionLimits=[];
-    item.cover=[];
-end
-
 function [controls,guideInputs] = localCompactSeed(item,previous,holds,lane,cfg,avoidance)
     % One held-input field rollout supplies the initial geometry and controls.
     count=sum(holds);x=item.ego;
@@ -1616,7 +1586,7 @@ function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,item,start,cfg,c
         if ~isempty(target),target=localCompactTargetNodes(target,start);end
         released=isempty(target) || norm(x(1:2)-target(1:2))>cfg.collision.encounterRangeMeters+item.positionRadius;
     else
-        released=~any(remaining);
+        released=~remaining;
     end
     if released
         dense=x;ends=zeros(6,0);inputs=zeros(2,0);return;
@@ -1628,88 +1598,48 @@ end
 
 function cover=localCompactCover(item,cfg,count)
     h=cfg.controller.sampleTime;bounds=item.motionLimits;
-    spread=predictiveSafetyGeometry.motionSpread(item.target,bounds,cfg.outputFeedback.minimumPreviewSeconds);
-    if spread>cfg.collision.encounterRangeMeters
-        acceleration=unique(linspace(bounds(1,1),bounds(2,1),9));
-        slip=unique([linspace(bounds(1,2),bounds(2,2),17),max(bounds(1,2),min(0,bounds(2,2)))]);
-    else
-        acceleration=unique(linspace(bounds(1,1),bounds(2,1),5));
-        slip=unique(linspace(bounds(1,2),bounds(2,2),5));
-    end
-    na=max(1,numel(acceleration)-1);nb=max(1,numel(slip)-1);
-    [i,j]=ndgrid(1:na,1:nb);
-    % Store closed interval cells, each with its complete footprint image.
-    cover=struct('h',h,'domain',cfg.target.observerDomain,'cells',zeros(2,2,numel(i)),'boxes',zeros(11,count+1,numel(i)), ...
-        'centers',zeros(4,count+1,numel(i)));
-    times=(0:count)*h;nominal=predictiveSafetyGeometry.predictTarget(item.target,times);
-    lower=[reshape(acceleration(i),1,[]);reshape(slip(j),1,[])];
-    upper=[reshape(acceleration(min(i+1,end)),1,[]);reshape(slip(min(j+1,end)),1,[])];
-    for k=1:size(lower,2)
-        limits=[lower(:,k).';upper(:,k).'];cover.cells(:,:,k)=limits;
-        [cover.boxes(:,:,k),cover.centers(:,:,k)]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,limits,times,nominal,cfg.target.observerDomain);
-    end
-    % Enclose every admissible handoff velocity in its parameter cell.
-    t=times(end);slow=repmat(item.target,1,size(lower,2));fast=slow;
-    slow(5,:)=lower(1,:);fast(5,:)=upper(1,:);
+    times=(0:count)*h;
+    [boxes,centers]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,bounds,times,[],cfg.target.observerDomain);
+    cover=struct('h',h,'boxes',boxes,'centers',centers);
+    % A single disk encloses the velocity over the full observer interval at handoff.
+    t=times(end);slow=item.target;fast=slow;
+    slow(5)=bounds(1,1);fast(5)=bounds(2,1);
     [sMin,vMin]=predictiveSafetyGeometry.targetArc(slow,t);
     [sMax,vMax]=predictiveSafetyGeometry.targetArc(fast,t);
-    kMin=sin(lower(2,:))/item.target(7);kMax=sin(upper(2,:))/item.target(7);
-    turns=[kMin.*sMin;kMin.*sMax;kMax.*sMin;kMax.*sMax];
-    angLo=min(turns,[],1);angHi=max(turns,[],1);
-    if isfield(cover.domain,'yawRateMaximum')
-        limit=t*cover.domain.yawRateMaximum;
+    kMin=sin(bounds(1,2))/item.target(7);kMax=sin(bounds(2,2))/item.target(7);
+    turns=[kMin*sMin,kMin*sMax,kMax*sMin,kMax*sMax];
+    angLo=min(turns);angHi=max(turns);
+    if isfield(cfg.target.observerDomain,'yawRateMaximum')
+        limit=t*cfg.target.observerDomain.yawRateMaximum;
         angLo=max(-limit,min(limit,angLo));angHi=max(-limit,min(limit,angHi));
     end
-    if isfield(cover.domain,'speedMaximum')
-        vMax=min(vMax,cover.domain.speedMaximum);vMin=min(vMin,vMax);
+    if isfield(cfg.target.observerDomain,'speedMaximum')
+        vMax=min(vMax,cfg.target.observerDomain.speedMaximum);vMin=min(vMin,vMax);
     end
-    lo=angLo+lower(2,:);hi=angHi+upper(2,:);
+    lo=angLo+bounds(1,2);hi=angHi+bounds(2,2);
     angle=item.target(3)+(lo+hi)/2;half=min(pi,(hi-lo)/2);
-    mid=(vMin+vMax)/2;
+    % Minimize the worst squared distance to the two radial endpoints
+    % of the angular sector. Its enclosing disk lies on the bisector.
+    cosine=cos(half);mid=0;
+    if cosine>0
+        mid=min(vMax*cosine,(vMin+vMax)/(2*cosine));
+    end
     cover.velocity=mid.*predictiveSafetyGeometry.direction(angle);
     % Law of cosines at the angular extreme and the two speed endpoints.
     cover.velocityRadius=sqrt(max((vMin-mid).^2+4*vMin.*mid.*sin(half/2).^2, ...
         (vMax-mid).^2+4*vMax.*mid.*sin(half/2).^2));
 end
 
-function [gap,worst,remaining,last]=localCompactOccupied(item,states,times,shape,cfg,remaining,clip)
-    cover=item.cover;nodes=round(times/cover.h)+1;count=numel(nodes);
-    if nargin<6 || isempty(remaining),remaining=true(1,size(cover.cells,3));end
-    if nargin<7,clip=Inf;end
-    gap=repmat(clip,1,count);worst=repmat(item.target,1,count);last=1;
-    which=find(remaining);number=numel(which);
-    if number==0,return;end
-    boxes=cover.boxes(:,nodes,which);centers=cover.centers(:,nodes,which);
-    boxes=reshape(boxes,11,[]);centers=reshape(centers,4,[]);
-    ego=repmat(states,1,number);
-    range=reshape(predictiveSafetyGeometry.targetEnvelopeRange(ego,boxes,centers),count,[]);
-    outside=range>cfg.collision.encounterRangeMeters+item.positionRadius;
-    [hasExit,stop]=max(outside,[],1);stop(~hasExit)=count;
-    remaining(which(hasExit))=false;last=max(stop);
-    active=reshape((1:count).'<=stop,1,[]);
-    c=cos(boxes(3,:));sn=sin(boxes(3,:));
-    center=boxes(1:2,:)+[c.*boxes(10,:)-sn.*boxes(11,:);sn.*boxes(10,:)+c.*boxes(11,:)];
-    % Signed distance from the ego footprint center to each target box.
-    % Concentric disks inside and outside the ego rectangle bound the same
-    % separation dual, also in overlap. Only possible minimizers need its
-    % exact rectangular evaluation.
-    ce=cos(states(3,:));se=sin(states(3,:));
-    egoCenter=states(1:2,:)+[ce*shape(3)-se*shape(4);se*shape(3)+ce*shape(4)];
-    delta=repmat(egoCenter,1,number)-center;
-    dx=abs(c.*delta(1,:)+sn.*delta(2,:))-boxes(8,:);
-    dy=abs(-sn.*delta(1,:)+c.*delta(2,:))-boxes(9,:);
-    pointGap=hypot(max(0,dx),max(0,dy))+min(0,max(dx,dy));
-    lower=reshape(pointGap-norm(shape(1:2)),count,[]);
-    upper=reshape(pointGap-min(shape(1:2)),count,[]);
-    upper(~reshape(active,count,[]))=Inf;
-    bound=min(clip,min(upper,[],2));
-    check=active & reshape(lower<=bound,1,[]);
-    values=repmat(clip,1,count*number);
-    if any(check)
-        values(check)=min(clip,predictiveSafetyGeometry.rectangleClearance(ego(:,check),boxes(:,check),shape));
-    end
-    [gap,index]=min(reshape(values,count,[]),[],2);
-    gap=gap.';worst=boxes(:,(index.'-1)*count+(1:count));
+function [gap,boxes,remaining]=localCompactOccupied(item,states,times,shape,cfg,remaining)
+    cover=item.cover;nodes=round(times/cover.h)+1;
+    boxes=cover.boxes(:,nodes);gap=inf(1,numel(nodes));
+    if nargin<6 || isempty(remaining),remaining=true;end
+    if ~remaining,return;end
+    ranges=predictiveSafetyGeometry.targetEnvelopeRange(states,boxes,cover.centers(:,nodes));
+    last=find(ranges>cfg.collision.encounterRangeMeters+item.positionRadius,1);
+    remaining=isempty(last);
+    if remaining,last=numel(nodes);end
+    gap(1:last)=predictiveSafetyGeometry.rectangleClearance(states(:,1:last),boxes(:,1:last),shape);
 end
 
 function [value,normal,gradient,exitSteps]=localCompactMovingValue(x,target,item,start,cfg,remaining)
@@ -1720,13 +1650,13 @@ function [value,normal,gradient,exitSteps]=localCompactMovingValue(x,target,item
     end
     R=cfg.collision.encounterRangeMeters;
     value=-R;normal=zeros(2,1);gradient=zeros(1,6);exitSteps=0;
-    if ~any(remaining),return;end
+    if ~remaining,return;end
     node=round(start/item.cover.h)+1;
-    boxes=reshape(item.cover.boxes(:,node,remaining),11,[]);
-    centers=reshape(item.cover.centers(:,node,remaining),4,[]);
+    boxes=item.cover.boxes(:,node);
+    centers=item.cover.centers(:,node);
     posRadius=item.positionRadius+vecnorm(max(abs(centers([1 3],:)),abs(centers([2 4],:))));
     [value,normal,gradient,exitSteps]=terminalSafeSet.separatingMotion(x,boxes, ...
-        item.cover.velocity(:,remaining),item.cover.velocityRadius(remaining),posRadius,cfg);
+        item.cover.velocity,item.cover.velocityRadius,posRadius,cfg);
 end
 
 

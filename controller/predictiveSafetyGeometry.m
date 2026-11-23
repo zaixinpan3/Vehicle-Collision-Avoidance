@@ -493,9 +493,6 @@ classdef predictiveSafetyGeometry
 
         function support = targetDirectionalSupport(q,errorSet,time,normal)
             % Upper support of the complete constant-NRMM target family.
-            % Small interval cells retain the dependence of position and yaw
-            % on the same arc, course and curvature. Splitting the uncertainty
-            % family does not select an ego passing side or discard a case.
             normal=normal(:);magnitude=norm(normal);angle=atan2(normal(2),normal(1));
             signs=[-1,1,1,-1;-1,-1,1,1];vertices=q(10:11)+q(8:9).*signs;
             if isempty(errorSet)
@@ -507,11 +504,8 @@ classdef predictiveSafetyGeometry
             curve=sin(q(6))/q(7)+[-1,1]*errorSet.curvatureRadius;
             if isfield(errorSet,'curvatureInterval'),curve=errorSet.curvatureInterval(:).';end
             course=q(3)+q(6)+[-1,1]*errorSet.courseRadius;
-            curves=linspace(curve(1),curve(2),5);arcs=linspace(arc(1),arc(2),5);
-            courses=linspace(course(1),course(2),5);
-            [ik,is,ic]=ndgrid(1:4,1:4,1:4);ik=ik(:);is=is(:);ic=ic(:);
-            kl=curves(ik).';kh=curves(ik+1).';sl=arcs(is).';sh=arcs(is+1).';
-            cl=courses(ic).';ch=courses(ic+1).';
+            kl=curve(1);kh=curve(2);sl=arc(1);sh=arc(2);
+            cl=course(1);ch=course(2);
             product=[kl.*sl,kl.*sh,kh.*sl,kh.*sh]/2;
             hl=min(product,[],2);hh=max(product,[],2);
             far=max(abs([hl,hh]),[],2);near=max(0,max(hl,-hh));
@@ -636,14 +630,6 @@ classdef predictiveSafetyGeometry
                 observation.length/2;observation.width/2;offset];
         end
 
-        function spread=motionSpread(root,limits,time)
-            % Pairwise travel variation plus the maximum change of the
-            % integrated course over the arc. Absorption can only shorten it.
-            arc=root(4)*time+max(0,limits(2,1))*time^2/2;
-            spread=diff(limits(:,1))*time^2/2+arc*diff(limits(:,2)) ...
-                +arc^2*diff(sin(limits(:,2)))/(2*root(7));
-        end
-
         function [box,centers] = targetMotionEnvelope(root,limits,time,nominal,domain)
             % Enclose the continuous constant-A, constant-beta footprint in
             % axes centered on the possible body headings at each node.
@@ -664,7 +650,7 @@ classdef predictiveSafetyGeometry
             if nargin>=5 && isstruct(domain) && isfield(domain,'yawRateMaximum')
                 % On a persistent-curvature arc, |kappa|*V is the physical
                 % yaw rate. Bound distance traveled before constructing its
-                % Cartesian image, including cells far beyond the handoff.
+                % Cartesian image, including times far beyond the handoff.
                 speedLimit=Inf;
                 if isfield(domain,'speedMaximum'),speedLimit=domain.speedMaximum;end
                 if prod(curvature)>0
@@ -687,7 +673,7 @@ classdef predictiveSafetyGeometry
             use=short & near>0;sincHigh(use)=sin(near(use))./near(use);
             products=[arcLow.*sincLow;arcHigh.*sincLow;arcLow.*sincHigh;arcHigh.*sincHigh];
             chordLow=min(products,[],1);chordHigh=max(products,[],1);
-            % On a turning cell the chord is also 2*sin(half turn)/curvature.
+            % On a turning interval the chord is also 2*sin(half turn)/curvature.
             % This bounds its radius through arbitrarily many revolutions.
             if any(~short) && curvature(1)*curvature(2)>0 && min(abs(curvature))>eps
                 [low,high]=localCosRange(halfLow-pi/2,halfHigh-pi/2);
@@ -715,8 +701,8 @@ classdef predictiveSafetyGeometry
                 lowerCenter=min(projections,[],1);
                 upperCenter=max(projections,[],1);
                 % Project the same circular arc using the difference of its
-                % endpoint sines. This keeps the signed position on a curved
-                % cell bounded even when the arc spans several revolutions.
+                % endpoint sines. This keeps the signed position on a turn
+                % bounded even when the arc spans several revolutions.
                 if curvature(1)*curvature(2)>0
                     alpha=midHeading+phase;
                     [sl,sh]=localCosRange(limits(1,2)+2*halfLow-alpha-pi/2, ...
@@ -1445,22 +1431,18 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         future=(0:ceil(preview/h))*h;
         pathTime=(0:ticks(end)+numel(future)-1)*h;
         if isfield(model,'motionCover') && ~isempty(model.motionCover)
-            % The same continuous parameter cells guide one initialization.
-            % Reuse the precomputed target images across all its ego nodes.
             cover=model.motionCover;cached=min(numel(pathTime),size(cover.boxes,2));
-            path=cover.boxes(:,1:cached,:);centers=cover.centers(:,1:cached,:);
+            path=cover.boxes(:,1:cached);centers=cover.centers(:,1:cached);
             if cached<numel(pathTime)
-                extra=pathTime(cached+1:end);nominal=predictiveSafetyGeometry.predictTarget(model.target,extra);
-                for cellIndex=1:size(cover.cells,3)
-                    [path(:,cached+1:numel(pathTime),cellIndex),centers(:,cached+1:numel(pathTime),cellIndex)]= ...
-                        predictiveSafetyGeometry.targetMotionEnvelope(model.target,cover.cells(:,:,cellIndex),extra,nominal,model.cfg.target.observerDomain);
-                end
+                extra=pathTime(cached+1:end);
+                [path(:,cached+1:numel(pathTime)),centers(:,cached+1:numel(pathTime))]= ...
+                    predictiveSafetyGeometry.targetMotionEnvelope(model.target,model.motionLimits,extra,[],cfg.target.observerDomain);
             end
         else
             [path,centers]=predictiveSafetyGeometry.targetMotionEnvelope(model.target,model.motionLimits,pathTime);
         end
     end
-    if uncertainMotion,remaining=true(1,size(path,3));end
+    if uncertainMotion,remaining=true;end
     prior=model.previousInput;encounterEnded=false;
     for index=1:count+1
         if mod(index,8)==1,localPlannerDeadline(model);end
@@ -1469,9 +1451,9 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         outside=norm(x(1:2)-target(1:2))-data.reserve-data.support.ballRadius(index)>cfg.collision.encounterRangeMeters;
         if uncertainMotion
             node=ticks(index)+1;
-            ranges=predictiveSafetyGeometry.targetEnvelopeRange(x,reshape(path(:,node,:),11,[]),reshape(centers(:,node,:),4,[]));
+            ranges=predictiveSafetyGeometry.targetEnvelopeRange(x,path(:,node),centers(:,node));
             remaining=remaining & ranges<=cfg.collision.encounterRangeMeters;
-            outside=~any(remaining);
+            outside=~remaining;
         end
         if index>1 && outside && norm(model.initialState(1:2)-model.target(1:2))<=cfg.collision.encounterRangeMeters
             encounterEnded=true;
@@ -1490,11 +1472,11 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
         if ~encounterEnded
             corrected=false;
-            if uncertainMotion
+            if uncertainMotion && remaining
                 % The enclosure includes the nominal target. Apply its
                 % lateral correction directly to the route acceleration.
                 nodes=ticks(index)+(1:numel(future));
-                targets=path(:,nodes,remaining);referenceBoxes=centers(:,nodes,remaining);
+                targets=path(:,nodes);referenceBoxes=centers(:,nodes);
                 [acceleration,corrected]=localEncounterAcceleration(x,projection,acceleration,targets,future,model,referenceBoxes);
             end
             active=corrected;
@@ -1509,29 +1491,6 @@ function candidate=localCirculationRollout(model,data,speed,durations)
         end
         if ~isfield(model.road,'boundaryObservation')
             acceleration=predictiveSafetyGeometry.wallGuidance(x,acceleration,model);
-        end
-        if uncertainMotion && ~encounterEnded
-            % When the possible target displacement spans the sensor range,
-            % give the single seed an outward velocity component. All knots
-            % remain free in the PCBF solve.
-            hPreview=cfg.outputFeedback.minimumPreviewSeconds;
-            spread=predictiveSafetyGeometry.motionSpread(target,model.motionLimits,hPreview);
-            range=cfg.collision.encounterRangeMeters;
-            weight=min(1,max(0,spread/range-1));
-            displacement=x(1:2)-target(1:2);distance=norm(displacement);
-            if weight>0 && distance>0
-                outward=displacement/distance;
-                speed=hypot(x(4),x(5));course=x(3)+atan2(x(5),x(4));
-                forward=[cos(course);sin(course)];normal=[-forward(2);forward(1)];
-                turn=atan2(normal.'*outward,forward.'*outward);
-                if normal.'*outward==0,turn=0;end
-                grip=min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-                desiredSpeed=min(cfg.referenceSpeed+hPreview*grip, ...
-                    max(cfg.referenceSpeed,(range+spread/2-distance)/hPreview));
-                escape=(desiredSpeed-speed)*forward/cfg.nominalClf.lookaheadSeconds ...
-                    +speed*cfg.nominalClf.courseGain*turn*normal;
-                acceleration=(1-weight)*acceleration+weight*escape;
-            end
         end
         if isfield(model.road,'boundaryObservation')
             acceleration=predictiveSafetyGeometry.roadBoundaryGuidance(x,acceleration,model);
@@ -1556,11 +1515,8 @@ function [acceleration,active]=localEncounterAcceleration(x,projection,preferred
     along=speed*cos(courseError);across=speed*sin(courseError);
     curve=struct('origin',projection.point,'heading',projection.heading,'curvature',model.frame(4));
     [path,heading]=predictiveSafetyGeometry.referencePose(along*time,0,curve);
-    count=numel(time);cells=size(targets,3);
-    targets=reshape(targets,11,[]);centers=reshape(centers,4,[]);
-    path=repmat(path,1,cells);heading=repmat(heading,1,cells);time=repmat(time,1,cells);
-    outside=reshape(predictiveSafetyGeometry.targetEnvelopeRange(path,targets,centers),count,cells)>cfg.collision.encounterRangeMeters;
-    activeNodes=reshape(cumsum(outside,1)==0,1,[]);
+    outside=predictiveSafetyGeometry.targetEnvelopeRange(path,targets,centers)>cfg.collision.encounterRangeMeters;
+    activeNodes=cumsum(outside)==0;
     targets=targets(:,activeNodes);path=path(:,activeNodes);heading=heading(activeNodes);time=time(activeNodes);
     c=cos(heading);s=sin(heading);
     dx=targets(1,:)-path(1,:);dy=targets(2,:)-path(2,:);

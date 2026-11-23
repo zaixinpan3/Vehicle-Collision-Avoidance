@@ -1456,6 +1456,23 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             oracle=solvePredictiveControl("outputFeedback",request);
             testCase.verifyEqual(max(0,oracle.stage),replay.stageDeficits,AbsTol=1e-11);
         end
+        function fullObserverIntervalEntersEachNodeClearanceDirectly(testCase)
+            cfg=testCase.cfg;item=testCase.block.initialHypotheses;
+            item.target=[10;3.4;pi;8;-1;0;1.6;2.4;1;0;0];
+            item.targetObserver=struct('motionBounds',[-4,-.05;4,.05]);
+            inputs=zeros(2,25);request=struct('operation',"validateInputSequence",'cfg',cfg, ...
+                'hypotheses',item,'input',zeros(2,1),'inputs',inputs);
+            result=solvePredictiveControl("outputFeedback",request);
+            trace=result.trajectories{1};time=trace.collisionTimes;
+            [boxes,centers]=predictiveSafetyGeometry.targetMotionEnvelope( ...
+                item.target,item.targetObserver.motionBounds,time,[],cfg.target.observerDomain);
+            testCase.assertLessThan(max(predictiveSafetyGeometry.targetEnvelopeRange( ...
+                trace.collisionEgo,boxes,centers)),cfg.collision.encounterRangeMeters);
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            gap=predictiveSafetyGeometry.rectangleClearance(trace.collisionEgo,boxes,shape);
+            expected=max(0,cfg.outputFeedback.clearanceMeters-min(gap(1:end-1),gap(2:end)));
+            testCase.verifyEqual(result.stageDeficits,expected(:),AbsTol=1e-10);
+        end
         function continuousMotionIntervalsContributeToThePrimaryDeficit(testCase)
             item=testCase.block.initialHypotheses;
             item.target=[10;3.4;pi;8;0;0;1.6;2.4;1;0;0];
