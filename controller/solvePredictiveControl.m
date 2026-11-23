@@ -795,6 +795,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             'hessian_approximation','limited-memory','bound_relax_factor',0, ...
             'mu_strategy','monotone','mu_init',1e-6,'bound_push',1e-6,'bound_frac',1e-6, ...
             'tol',tolerance,'constr_viol_tol',tolerance));
+        if seekZero
+            % A rejected trial costs a full nonlinear rollout. Backtrack by
+            % two halvings at a time when searching for a zero PCBF deficit.
+            options.ipopt.alpha_red_factor=0.25;
+        end
         % The offline prewarm uses realmax. Passing it through the CasADi
         % options converter can overflow; omit a wall limit for that case.
         if deadline<flintmax,options.ipopt.max_wall_time=max(.001,deadline-toc(timer));end
