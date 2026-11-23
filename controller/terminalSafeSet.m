@@ -7,114 +7,89 @@ classdef terminalSafeSet
             input=[0;min(cfg.actuation.brakingRatioMaximum,max(cfg.actuation.brakingRatioMinimum,trim))];
         end
 
-        function [value,normal,gradient,exitSteps]=movingValue(x,q,cfg,checkClock)
-            % Terminal handoff: fixed heading and positive forward speed under
-            % the common terminal input. End this encounter at its first
-            % control node strictly outside the sensor disk.
-            if nargin<4,checkClock=[];end
-            R=cfg.collision.encounterRangeMeters;h=cfg.controller.sampleTime;
+        function [value,normal,gradient,exitSteps]=movingValue(x,q,cfg)
+            % Constant-velocity handoff for one known target.
+            R=cfg.collision.encounterRangeMeters;
             value=-R;normal=zeros(2,1);gradient=zeros(1,6);exitSteps=0;
             if isempty(q) || norm(q(1:2)-x(1:2))>R,return;end
-            exitSteps=Inf;
-            e=predictiveSafetyGeometry.direction(x(3));lateral=[-e(2);e(1)];
-            speed=x(4);offset=q(1:2)-x(1:2);
-            if speed<=0
-                value=max(2*cfg.outputFeedback.nlpTolerance,-speed);gradient(4)=-1;return;
-            end
-            curvature=sin(q(6))/q(7);
-            linear=q(4)==0 || (curvature==0 && q(5)==0);
-            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset(:)];
-            best=Inf;worst=0;
-            if linear
-                % Equivalent wrapped headings must give zero relative drift.
-                heading=rem((q(3)-x(3))+q(6),2*pi);
-                bodyDirection=predictiveSafetyGeometry.direction(heading);
-                relativeVelocity=[e,lateral]*(q(4)*bodyDirection-[speed;0]);
-                drift=norm(relativeVelocity);
-                if drift==0
-                    value=max(2*cfg.outputFeedback.nlpTolerance,R-norm(offset));
-                    if norm(offset)>0,gradient(1:2)=offset.'/norm(offset);end
-                    return;
-                end
-                % Exit from a disk under affine relative motion. On this
-                % line the signed rectangle dual is convex in time.
-                along=offset.'*(relativeVelocity/drift);
+            % Relative angles retain equivalence under full revolutions.
+            direction=predictiveSafetyGeometry.direction(x(3));
+            basis=[direction,[-direction(2);direction(1)]];
+            targetVelocity=basis*(q(4)*predictiveSafetyGeometry.direction(rem(q(3)-x(3)+q(6),2*pi)));
+            [value,normal,gradient,exitSteps]=terminalSafeSet.separatingMotion(x,q,targetVelocity,0,0,cfg);
+            if isfinite(exitSteps)
+                % Exact first outside node on the frozen relative line.
+                offset=q(1:2)-x(1:2);relative=targetVelocity-x(4)*direction;
+                speed=norm(relative);along=offset.'*(relative/speed);
                 residual=(R-norm(offset))*(R+norm(offset));
-                root=sqrt(along^2+residual);
-                travel=root-along;
+                root=sqrt(along^2+residual);travel=root-along;
                 if along>0,travel=residual/(root+along);end
-                last=floor(travel/(drift*h))+1;
-                if last>=flintmax,value=R;return;end
-                if norm(offset+relativeVelocity*(last*h))<=R,last=last+1;end
-                if last>1 && norm(offset+relativeVelocity*((last-1)*h))>R,last=last-1;end
-                exitSteps=last;
-                first=0;
-                while last-first>64
-                    splitNode=floor((first+last)/2);
-                    pair=clearances(splitNode:splitNode+1);
-                    if pair(1)<=pair(2),last=splitNode;else,first=splitNode+1;end
-                end
-                measure(first:last);
-            else
-                % Process intervals chronologically, including an exit and
-                % re-entry lying between two in-range interval endpoints.
-                first=0;last=31;
-                while ~isfinite(exitSteps)
-                    visit(first,last);
-                    first=last+1;last=2*first-1;
-                    if first>=flintmax/2 && ~isfinite(exitSteps),value=R;return;end
-                end
+                exitSteps=floor(travel/(speed*cfg.controller.sampleTime))+1;
             end
-            value=cfg.outputFeedback.clearanceMeters-best;
-            if nargout>=2
-                [~,g]=clearances(worst);
-                normal=g(1:2);time=h*worst;
-                gradient=-[g(1:2).',g(3)+speed*time*(g(1:2).'*lateral),time*(g(1:2).'*e),0,0];
-            end
+        end
 
-            function target=relativeTarget(indices)
-                times=indices*h;
-                if linear
-                    target=repmat(q,1,numel(times));
-                    target(1:2,:)=offset+relativeVelocity*times;
+        function [value,normal,gradient,exitSteps]=separatingMotion(x,boxes,velocity,radius,positionRadius,cfg)
+            % For each occupied box choose a supporting plane whose gap can
+            % never decrease under the handoff velocity disk.
+            h=cfg.controller.sampleTime;R=cfg.collision.encounterRangeMeters;
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            e=predictiveSafetyGeometry.direction(x(3));J=[0,-1;1,0];
+            w=x(4)*e-velocity;speed=vecnorm(w);
+            normal=zeros(2,1);gradient=zeros(1,6);exitSteps=Inf;
+            drift=speed-radius;
+            if x(4)<=0
+                value=max(2*cfg.outputFeedback.nlpTolerance,-x(4));gradient(4)=-1;return
+            end
+            [slow,k]=min(drift);
+            if slow<=0
+                value=2*cfg.outputFeedback.nlpTolerance-h*slow;
+                if speed(k)>0
+                    gradient(3:4)=-h*w(:,k).'/speed(k)*[x(4)*J*e,e];
                 else
-                    target=predictiveSafetyGeometry.predictTarget(q,times);
-                    target(1:2,:)=target(1:2,:)-x(1:2)-e*(speed*times);
+                    gradient(4)=-h;
                 end
+                return
             end
-            function [gaps,g]=clearances(indices)
-                target=relativeTarget(indices);
-                poses=[zeros(2,numel(indices));repmat(x(3),1,numel(indices))];
-                if nargout>1
-                    [gaps,g]=predictiveSafetyGeometry.rectangleClearance(poses,target,shape);
-                else
-                    gaps=predictiveSafetyGeometry.rectangleClearance(poses,target,shape);
-                end
+            pose=repmat(x(1:3),1,size(boxes,2));
+            [gap,g]=predictiveSafetyGeometry.rectangleClearance(pose,boxes,shape);
+            % A penetrating handoff is infeasible for every separating plane.
+            % Its rectangle dual still supplies a local improvement direction.
+            adjust=gap>0 & sum(g(1:2,:).*w,1)<radius;
+            gradients=[g;zeros(1,size(g,2))];normals=g(1:2,:);
+            if any(adjust)
+                axis=w(:,adjust)./speed(adjust);
+                cosine=radius(adjust)./speed(adjust);
+                sine=sqrt((drift(adjust)./speed(adjust)).*(1+cosine));
+                right=axis.*cosine-J*axis.*sine;left=axis.*cosine+J*axis.*sine;
+                target=boxes(:,adjust);
+                c=cos(target(3,:));s=sin(target(3,:));
+                lateral=J*e;
+                targetCenter=target(1:2,:)+[c.*target(10,:)-s.*target(11,:);s.*target(10,:)+c.*target(11,:)];
+                delta=x(1:2)+[e,lateral]*shape(3:4)-targetCenter;
+                [first,firstGradient]=support(right,-1);
+                [second,secondGradient]=support(left,1);
+                use=second>first;first(use)=second(use);
+                firstGradient(:,use)=secondGradient(:,use);right(:,use)=left(:,use);
+                gap(adjust)=first;gradients(:,adjust)=firstGradient;normals(:,adjust)=right;
             end
-            function measure(indices)
-                [minimum,j]=min(clearances(indices));
-                if minimum<best,best=minimum;worst=indices(j);end
-            end
-            function visit(lo,hi)
-                if ~isempty(checkClock),checkClock();end
-                if hi-lo<64
-                    indices=lo:hi;target=relativeTarget(indices);
-                    out=find(vecnorm(target(1:2,:))>R,1);
-                    if ~isempty(out),exitSteps=indices(out);indices=indices(1:out);end
-                    measure(indices);return;
-                end
-                mid=floor((lo+hi)/2);target=relativeTarget(mid);
-                dt=h*max(mid-lo,hi-mid);
-                peak=max(0,target(4)+abs(q(5))*dt);
-                rel=target(4)*predictiveSafetyGeometry.direction(target(3)+q(6))-speed*e;
-                travelBound=norm(rel)*dt+.5*(abs(q(5))+abs(curvature)*peak^2)*dt^2;
-                if norm(target(1:2))+travelBound<R
-                    arm=norm(abs(q(10:11))+q(8:9));
-                    variation=travelBound+arm*min(2,abs(curvature)*peak*dt);
-                    if clearances(mid)-variation>best,return;end
-                end
-                visit(lo,mid);
-                if ~isfinite(exitSteps),visit(mid+1,hi);end
+            [least,k]=min(gap);value=cfg.outputFeedback.clearanceMeters-least;
+            gradient(1:4)=-gradients(:,k).';normal=normals(:,k);
+            % A finite upper bound on the exit index, without time marching.
+            offset=x(1:2)-boxes(1:2,:);
+            exitSteps=1+floor(max((R+vecnorm(offset)+positionRadius)./(h*drift)));
+
+            function [projection,derivative]=support(n,side)
+                ne=e.'*n;nl=lateral.'*n;
+                nt=c.*n(1,:)+s.*n(2,:);nb=-s.*n(1,:)+c.*n(2,:);
+                projection=sum(n.*delta,1)-shape(1)*abs(ne)-shape(2)*abs(nl) ...
+                    -target(8,:).*abs(nt)-target(9,:).*abs(nb);
+                egoArm=e.*(shape(3)-shape(1)*sign(ne))+lateral.*(shape(4)-shape(2)*sign(nl));
+                tLong=target(8,:).*sign(nt);tLat=target(9,:).*sign(nb);
+                witness=x(1:2)+egoArm-targetCenter-[c.*tLong-s.*tLat;s.*tLong+c.*tLat];
+                % Angle of n is angle(w) +/- acos(radius/|w|).
+                phi=(J*axis+side*axis.*(cosine./sine))./speed(adjust);
+                nTerm=sum((J*n).*witness,1);
+                derivative=[n;sum(n.*(J*egoArm),1)+nTerm.*(x(4)*lateral.'*phi);nTerm.*(e.'*phi)];
             end
         end
 

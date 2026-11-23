@@ -798,22 +798,37 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(checked.accepted);
             testCase.verifyEqual(checked.trajectories{1}.terminal.exitSteps,0);
         end
-        function curvedTargetChecksStopAtFirstExitEvenIfItReturns(testCase)
-            cfg=testCase.cfg;h=cfg.controller.sampleTime;x=[0;0;0;.5;0;0];
+        function terminalCoreUsesTheCourseAndSpeedAtHandoff(testCase)
+            cfg=testCase.cfg;x=[0;0;0;.5;0;0];
             target=[49;0;-.2;10;.2;.2;1.6;2.4;.95;.3;-.2];
-            times=(0:130)*h;q=predictiveSafetyGeometry.predictTarget(target,times);
-            positions=x(1:2)+[x(4);0]*times;outside=vecnorm(q(1:2,:)-positions)>cfg.collision.encounterRangeMeters;
-            first=find(outside,1);testCase.assertNotEmpty(first);
-            testCase.assertTrue(any(~outside(first+1:end)));
-            [v,~,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
-            testCase.verifyEqual(steps,first-1);
-            gaps=zeros(1,first);shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-            for j=1:first
-                gaps(j)=predictiveSafetyGeometry.rectangle([positions(:,j);x(3)],shape,q(1:3,j),q(8:11,j));
-            end
-            testCase.verifyEqual(v,cfg.outputFeedback.clearanceMeters-min(gaps),AbsTol=1e-9);
+            [value,normal,~,steps]=terminalSafeSet.movingValue(x,target,cfg);
+            velocity=target(4)*predictiveSafetyGeometry.direction(target(3)+target(6))-[x(4);0];
+            h=cfg.controller.sampleTime;R=cfg.collision.encounterRangeMeters;
+            testCase.verifyLessThan(value,0);
+            testCase.verifyLessThanOrEqual(normal.'*velocity,1e-12);
+            testCase.verifyGreaterThan(norm(target(1:2)+steps*h*velocity),R);
+            testCase.verifyLessThanOrEqual(norm(target(1:2)+(steps-1)*h*velocity),R);
         end
-        function nonlinearBridgeEndsAtTheFirstOutOfRangeNode(testCase)
+        function eachTerminalPlaneSeparatesTheWholeHandoffVelocityDisk(testCase)
+            cfg=testCase.cfg;x=[0;0;.1;5;0;0];
+            q=[12;8;-.12;1;0;0;1.6;2.4;.95;0;0];
+            c=[1;0];r=.35;
+            [value,n,g,steps]=terminalSafeSet.separatingMotion(x,q,c,r,0,cfg);
+            testCase.verifyLessThan(value,0);testCase.verifyTrue(isfinite(steps));
+            relative=x(4)*predictiveSafetyGeometry.direction(x(3))-c;
+            testCase.verifyEqual(norm(n),1,AbsTol=1e-12);
+            testCase.verifyEqual(n.'*relative,r,AbsTol=1e-12);
+            for k=1:4
+                dx=zeros(6,1);dx(k)=1e-6;
+                plus=terminalSafeSet.separatingMotion(x+dx,q,c,r,0,cfg);
+                minus=terminalSafeSet.separatingMotion(x-dx,q,c,r,0,cfg);
+                testCase.verifyEqual(g(k),(plus-minus)/(2e-6),AbsTol=1e-6);
+            end
+            [invalid,~,~,steps]=terminalSafeSet.separatingMotion(x,q,c,norm(relative)+.1,0,cfg);
+            testCase.verifyGreaterThan(invalid,cfg.outputFeedback.nlpTolerance);
+            testCase.verifyEqual(steps,Inf);
+        end
+        function aSinglePhysicalHandoffHoldPrecedesTheAnalyticExit(testCase)
             cfg=testCase.cfg;item=testCase.block.initialHypotheses;
             item.ego=[0;0;0;.5;0;0];
             item.target=[49;0;-.2;10;0;.2;1.6;2.4;.95;0;0];
@@ -823,7 +838,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.assertTrue(result.accepted);
             term=result.trajectories{1}.terminal;
             testCase.verifyEqual(term.exitSteps,2);
-            testCase.verifyEqual(term.bridgeHolds,term.exitSteps);
+            testCase.verifyEqual(term.bridgeHolds,1);
+            testCase.verifyGreaterThan(term.exitSteps,term.bridgeHolds);
             request.operation="evaluateControlSequence";request.holds=1;
             evaluated=solvePredictiveControl("outputFeedback",request);
             testCase.verifyLessThanOrEqual(evaluated.terminal,cfg.outputFeedback.nlpTolerance);
@@ -831,6 +847,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         function anExpiredAdmissionCannotDispatchTheTerminalBrake(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.initializationSolveSeconds=1e-12;
             block=localBlock(cfg,0);
+            % Admission of an observed, separated stopped lead vehicle.
+            item=block.initialHypotheses;
+            item.target=[15;0;0;0;0;0;1.6;2.4;.95;0;0];
+            block.initialHypotheses=item;
+            block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
+                'cfg',cfg,'hypothesis',item,'input',block.heldInput,'time',0));
             testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,[]), ...
                 'collisionAvoidanceController:compactNoFeasiblePlan');
         end

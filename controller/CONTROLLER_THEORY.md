@@ -419,9 +419,8 @@ continuous separating normal. Using an outer
 footprint can underestimate clearance. If the distance from the ego
 reference point to $P_C(jh)$ exceeds the sensor range, the entire cell
 has left this encounter. Check its exit node and discharge its subsequent
-obligations. The terminal bridge and straight continuation carry the same
-constant parameter cells forward from the planning root, including cells
-whose target can brake to rest. A measured update requires a fresh replay
+obligations. The terminal handoff uses the surviving footprint and velocity enclosure
+of each such cell, including cells that admit absorption. A measured update requires a fresh replay
 when shifted containment has not been established.
 
 For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
@@ -724,57 +723,57 @@ $$
  u_f=(0,b_f),\qquad b_f=\operatorname{clip}_{[b_{\min},b_{\max}]}
  \frac{F_{\rm load}(v_{\rm ref})}{\sum_i\mu_i F_{zi}} .
 $$
-A member already outside at the planning endpoint has zero remaining
-encounter steps. Otherwise check compatibility with the previous actuator
-input and advance the nonlinear dynamics under \(u_f\) for up to
-\(B=\max(1,\lceil T_{\rm preview,min}/h\rceil)\) holds. Include each
-node through the first exit in the clearance checks and apply the vehicle
-domain checks on these holds. If exit occurs, the encounter witness is
-complete at that node.
+A released member has no remaining encounter obligation. For an active
+member, check actuator compatibility and one physical hold under $u_f$,
+including its model domain and the clearance at both nodes. The terminal
+set is the one-step preimage, under this common command, of release or the
+following **separating-motion set**.
 
-For a member still in range after the bridge, the simplified continuation
-under the same command starts with the handoff pose, fixed heading
-\(\psi\), and positive handoff longitudinal speed \(v\). Its sampled model
-and exit index are
+At handoff let $E$ be the oriented ego footprint and let $T_C$ be the
+occupied rectangle of a surviving target parameter cell. In the terminal
+model the footprints keep their orientations. The ego translates with
+$v_E=v_x e(\psi_E)$, $v_x>0$. The target translates with a constant
+velocity in its handoff disk $D(c_C,r_C)$. A point target has $r_C=0$.
+Obtain the cell's speed and course intervals from the constant-acceleration,
+constant-sideslip arc up to handoff, including absorption and the declared
+physical bounds. If speed lies in $[l,u]$ and course lies within $\delta$
+of $\phi$, use $m=(l+u)/2$, $c_C=m e(\phi)$ and
 $$
- p_{E,j}=p_{E,0}+jh\,v(\cos\psi,\sin\psi)^\top,\qquad
- q_j=\Phi_T(q_0,jh),\qquad
- J=\min\{j\ge 0:\|p_{T,j}-p_{E,j}\|>R\}.
+r_C^2=\max_{s\in\{l,u\}}\{(s-m)^2+4sm\sin^2(\min(\pi,\delta)/2)\}.
 $$
-Here \(\Phi_T\) uses the same constant target parameters and absorbing stop
-as the main forecast. The core requires finite \(J\) and
-$$
- d_\pm(E_j,T_j)>0,\qquad d_\pm(E_j,T_j)\ge d_{\rm safe},
- \qquad 0\le j\le J .
-$$
-Each dual compares the two oriented footprints at the **same** node. The
-core residual is \(d_{\rm safe}-\min_{0\le j\le J}d_\pm(E_j,T_j)\).
-On a fixed exit and closest-feature branch, its derivative follows from
-the active node's rectangle dual and the derivative of the straight
-translation with respect to handoff position, heading and speed.
+This encloses all handoff velocities. The frozen continuation applies only
+after the two optimized legs and the physical handoff hold.
 
-For affine relative motion the range exit follows from a line–disk
-intersection. Signed clearance is convex along a translational line with
-fixed orientations, so its discrete minimum can be located by bisection.
-Equal velocities inside the disk give no exit. For turning or accelerating
-targets, process node intervals chronologically. An interval can be skipped
-when bounds on relative translation and target rotation show that every
-node is in range and its clearance cannot improve the current minimum.
-For a half-duration \(\Delta\), the reference-point displacement from the
-midpoint is bounded by
-\(\|v_{\rm rel}\|\Delta+(|A_T|+|\kappa_T|V_{\max}^2)\Delta^2/2\);
-the additional corner displacement is bounded by
-\(a_T\min(2,|\kappa_T|V_{\max}\Delta)\). Otherwise subdivide or evaluate
-the original node duals. This preserves the first exit even when both
-endpoints of a larger interval are in range.
+Write $w_C=v_E-c_C$ and $G_C(n)=\min_{a\in E}n^\top a-
+\max_{b\in T_C}n^\top b$. Membership requires, **for every surviving cell**,
+$$
+\|w_C\|>r_C,\qquad
+\exists\,\|n_C\|=1:\quad
+G_C(n_C)\ge d_{\rm safe},\quad G_C(n_C)>0,\quad n_C^\top w_C\ge r_C .
+$$
+Each cell may have its own geometric witness. All members use $u_f$.
+On this simplified model the signed projection gap can only increase
+or stay constant. The strictly positive minimum relative speed
+$\|w_C\|-r_C$ implies finite range exit. Exit time is a diagnostic.
+For an initial reference-point distance bounded by $L_C$, any time
+strictly greater than $(R+L_C)/(\|w_C\|-r_C)$ suffices.
 
-Under the simplified continuation, advancing one hold before exit
-decrements \(J\) and retains the previously checked suffix. Exit is the
-completed state for this encounter. For the full nonlinear vehicle,
-preservation of this safe-to-exit continuation at the bridge handoff is a
-design assumption. Numerically the controller replays the candidate for
-each surviving member. Once the encounter ends, nominal guidance owns
-path and speed recovery.
+The opening condition restricts the rectangle dual normal to an arc of
+the unit circle. First evaluate the unconstrained rectangle-distance dual.
+If its maximizing normal violates the opening condition and the rectangles
+are separated, the two endpoints of the opening arc suffice for testing
+positive clearance. Indeed, on the arc of normals with positive gap,
+each vertex-pair projection is concave in normal angle, as is their minimum.
+Writing $e=w_C/\|w_C\|$, $b=r_C/\|w_C\|$, the endpoints are
+$n_\pm=b e\pm\sqrt{1-b^2}Je$. Evaluate the exact footprint supports
+at both. The work per cell is independent of the time to exit.
+
+For the nonlinear vehicles, **terminal safety and closure under $u_f$ are
+handoff assumptions**. They cover continued safe motion to exit, admissible
+actuation, and preservation of terminal membership under the next physical
+hold and compatible information update. The real target continues to obey
+its original motion contract. After release, nominal guidance owns path
+and speed recovery.
 
 At encounter acquisition let $\bar\theta$ be the componentwise midpoint
 of the acceleration and sideslip intervals. To choose the motion used in
@@ -924,11 +923,11 @@ Suppose an initial plan is feasible, the posterior contains the true member
 and is contained in the predicted successors, the flow and timing agree,
 the required clearance stays fixed, requested horizons fit the numerical
 allocation, and the core handoff assumption holds. Let $z\in Z_f$.
-If a bridge hold reaches exit, the encounter is complete. Otherwise one
-step consumes a checked bridge hold. At the far end of a full bridge, the
-handoff assumption preserves the core witness for one more hold or
-establishes exit. This gives closure in the encounter state augmented with
-its completion flag. Admissibility of the subsequent nominal handoff and
+A shift consumes the checked handoff hold. A surviving member reaches
+the separating-motion core. The physical handoff assumption supplies the
+next safe hold under the same command and another core or release witness.
+This gives the required closure conditional on that assumption.
+Admissibility of the subsequent nominal handoff and
 admission on a new detection are separate assumptions for continuing
 operation. Induction gives any $r$ required extension holds under a
 single common input. Conditioning can discard physical members, and all

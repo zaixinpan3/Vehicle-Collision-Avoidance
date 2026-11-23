@@ -460,8 +460,7 @@ function members=localCompactPlanningMembers(members,cfg,count)
         members(j).target(5:6)=min(b(2,:).',max(b(1,:).',q(5:6)));
         if any(b(1,:)~=b(2,:))
             members(j).motionLimits=b;
-            h=cfg.controller.sampleTime;
-            members(j).cover=localCompactCover(members(j),cfg,count+ceil(cfg.outputFeedback.minimumPreviewSeconds/h));
+            members(j).cover=localCompactCover(members(j),cfg,count+1);
         end
     end
     if isfield(members,'targetObserver'),members=rmfield(members,'targetObserver');end
@@ -1131,7 +1130,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             end
             [forward,fi,domainState,domainInput]=localCompactModelDomain(dense,allInputs,cfg,K,N);
             target=[];if ~isempty(q),target=q(:,end);end
-            [terminal,~,g]=localCompactMovingValue(ends(:,end),target,item,total*h,cfg,checkBudget,remaining);
+            [terminal,~,g]=localCompactMovingValue(ends(:,end),target,item,total*h,cfg,remaining);
             rollouts.trajectories{s}.oracle=struct('dense',dense,'ends',ends,'allInputs',allInputs,'total',total, ...
                 'q',q,'boxes',boxes,'terminal',terminal,'terminalGradient',g,'activeStages',activeStages,'localStage',localStage,'nodeIndices',nodeIndices, ...
                 'forward',forward,'fi',fi,'domainState',domainState, ...
@@ -1598,7 +1597,7 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,item,start,previou
         else
             [gaps,~,remaining]=localCompactOccupied(item,[x,tailEnds],times,shape,cfg,remaining);
         end
-        [core,normalWitness,~,coreSteps]=localCompactMovingValue(tailEnds(:,end),q(:,end),item,times(end),cfg,checkBudget,remaining);
+        [core,normalWitness,~,coreSteps]=localCompactMovingValue(tailEnds(:,end),q(:,end),item,times(end),cfg,remaining);
         exitSteps=nBridge+coreSteps;
         rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
         slew=abs(command-previous)-h*rates;
@@ -1612,22 +1611,26 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,item,start,previou
         command=localCompactRateLimit(command,previous,1,cfg);
     end
     terminal=struct('value',terminalValue,'member',member, ...
-        'input',command,'bridgeHolds',nBridge,'exitSteps',exitSteps,'normal',normalWitness, ...
+        'input',command,'bridgeHolds',nBridge,'exitSteps',exitSteps, ...
+        'exitStepsAreUpperBound',~isempty(item.cover) && exitSteps>nBridge,'normal',normalWitness, ...
         'model',"safeRangeExit",'safetyAssumed',true,'safetyProved',false);
 end
 
 function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,item,start,cfg,checkBudget,remaining)
     if ~isempty(checkBudget),checkBudget();end
-    if isempty(item.target) || (~isempty(item.cover) && ~any(remaining)) || localCompactRange(item,x,start)>cfg.collision.encounterRangeMeters
+    if isempty(item.cover)
+        target=item.target;
+        if ~isempty(target),target=localCompactTargetNodes(target,start);end
+        released=isempty(target) || norm(x(1:2)-target(1:2))>cfg.collision.encounterRangeMeters+item.positionRadius;
+    else
+        released=~any(remaining);
+    end
+    if released
         dense=x;ends=zeros(6,0);inputs=zeros(2,0);return;
     end
-    h=cfg.controller.sampleTime;
-    count=max(1,ceil(cfg.outputFeedback.minimumPreviewSeconds/h));
-    inputs=repmat(terminalSafeSet.movingControl(cfg),1,count);
+    inputs=terminalSafeSet.movingControl(cfg);
     [points,ends]=localCompactHeldFlow(kernel,x,inputs,item.parameters,checkBudget);
-    out=find(localCompactRange(item,ends,start+(1:count)*h)>cfg.collision.encounterRangeMeters,1);
-    if ~isempty(out),count=out;ends=ends(:,1:count);inputs=inputs(:,1:count);end
-    dense=[x,points(:,1:count*kernel.validationSubsteps)];
+    dense=[x,points];
 end
 
 function cover=localCompactCover(item,cfg,count)
@@ -1652,6 +1655,28 @@ function cover=localCompactCover(item,cfg,count)
         limits=[lower(:,k).';upper(:,k).'];cover.cells(:,:,k)=limits;
         [cover.boxes(:,:,k),cover.centers(:,:,k)]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,limits,times,nominal,cfg.target.observerDomain);
     end
+    % Enclose every admissible handoff velocity in its parameter cell.
+    t=times(end);slow=repmat(item.target,1,size(lower,2));fast=slow;
+    slow(5,:)=lower(1,:);fast(5,:)=upper(1,:);
+    [sMin,vMin]=predictiveSafetyGeometry.targetArc(slow,t);
+    [sMax,vMax]=predictiveSafetyGeometry.targetArc(fast,t);
+    kMin=sin(lower(2,:))/item.target(7);kMax=sin(upper(2,:))/item.target(7);
+    turns=[kMin.*sMin;kMin.*sMax;kMax.*sMin;kMax.*sMax];
+    angLo=min(turns,[],1);angHi=max(turns,[],1);
+    if isfield(cover.domain,'yawRateMaximum')
+        limit=t*cover.domain.yawRateMaximum;
+        angLo=max(-limit,min(limit,angLo));angHi=max(-limit,min(limit,angHi));
+    end
+    if isfield(cover.domain,'speedMaximum')
+        vMax=min(vMax,cover.domain.speedMaximum);vMin=min(vMin,vMax);
+    end
+    lo=angLo+lower(2,:);hi=angHi+upper(2,:);
+    angle=item.target(3)+(lo+hi)/2;half=min(pi,(hi-lo)/2);
+    mid=(vMin+vMax)/2;
+    cover.velocity=mid.*predictiveSafetyGeometry.direction(angle);
+    % Law of cosines at the angular extreme and the two speed endpoints.
+    cover.velocityRadius=sqrt(max((vMin-mid).^2+4*vMin.*mid.*sin(half/2).^2, ...
+        (vMax-mid).^2+4*vMax.*mid.*sin(half/2).^2));
 end
 
 function [gap,worst,remaining,last]=localCompactOccupied(item,states,times,shape,cfg,remaining,clip)
@@ -1661,15 +1686,7 @@ function [gap,worst,remaining,last]=localCompactOccupied(item,states,times,shape
     gap=repmat(clip,1,count);worst=repmat(item.target,1,count);last=1;
     which=find(remaining);number=numel(which);
     if number==0,return;end
-    if nodes(end)<=size(cover.boxes,2)
-        boxes=cover.boxes(:,nodes,which);centers=cover.centers(:,nodes,which);
-    else
-        boxes=zeros(11,count,number);centers=zeros(4,count,number);
-        nominal=predictiveSafetyGeometry.predictTarget(item.target,times);
-        for k=1:number
-            [boxes(:,:,k),centers(:,:,k)]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,cover.cells(:,:,which(k)),times,nominal,cfg.target.observerDomain);
-        end
-    end
+    boxes=cover.boxes(:,nodes,which);centers=cover.centers(:,nodes,which);
     boxes=reshape(boxes,11,[]);centers=reshape(centers,4,[]);
     ego=repmat(states,1,number);
     range=reshape(predictiveSafetyGeometry.targetEnvelopeRange(ego,boxes,centers),count,[]);
@@ -1702,51 +1719,23 @@ function [gap,worst,remaining,last]=localCompactOccupied(item,states,times,shape
     gap=gap.';worst=boxes(:,(index.'-1)*count+(1:count));
 end
 
-function range=localCompactRange(item,states,time)
-    if isempty(item.motionLimits)
-        q=localCompactTargetNodes(item.target,time);
-        range=vecnorm(states(1:2,:)-q(1:2,:));
-    else
-        [q,centers]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,item.motionLimits,time,[],item.cover.domain);
-        range=predictiveSafetyGeometry.targetEnvelopeRange(states,q,centers);
-    end
-    range=range-item.positionRadius;
-end
-
-function [value,normal,gradient,exitSteps]=localCompactMovingValue(x,target,item,start,cfg,checkBudget,remaining)
+function [value,normal,gradient,exitSteps]=localCompactMovingValue(x,target,item,start,cfg,remaining)
     if isempty(item.motionLimits)
         cfg.collision.encounterRangeMeters=cfg.collision.encounterRangeMeters+item.positionRadius;
-        [value,normal,gradient,exitSteps]=terminalSafeSet.movingValue(x,target,cfg,checkBudget);
+        [value,normal,gradient,exitSteps]=terminalSafeSet.movingValue(x,target,cfg);
         return
     end
-    R=cfg.collision.encounterRangeMeters;h=cfg.controller.sampleTime;
+    R=cfg.collision.encounterRangeMeters;
     value=-R;normal=zeros(2,1);gradient=zeros(1,6);exitSteps=0;
-    if ~any(remaining) || localCompactRange(item,x,start)>R,return;end
-    exitSteps=Inf;
-    if x(4)<=0,value=max(2*cfg.outputFeedback.nlpTolerance,-x(4));gradient(4)=-1;return;end
-    e=predictiveSafetyGeometry.direction(x(3));lateral=[-e(2);e(1)];
-    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    clock=tic;first=0;best=Inf;
-    while isinf(exitSteps)
-        if isempty(checkBudget) && toc(clock)>cfg.outputFeedback.maximumSolveSeconds
-            value=R;return
-        end
-        if ~isempty(checkBudget),checkBudget();end
-        indices=first+(0:31);time=h*indices;
-        states=[x(1:2)+x(4)*e*time;repmat(x(3),size(time))];
-        [gaps,boxes,remaining,last]=localCompactOccupied(item,states,start+time,shape,cfg,remaining);
-        if ~any(remaining),exitSteps=indices(last);end
-        [minimum,j]=min(gaps);
-        if minimum<best
-            best=minimum;value=cfg.outputFeedback.clearanceMeters-best;
-            [~,g]=predictiveSafetyGeometry.rectangleClearance(states(:,j),boxes(:,j),shape);
-            normal=g(1:2);t=time(j);
-            gradient=-[normal.',g(3)+x(4)*t*(normal.'*lateral),t*(normal.'*e),0,0];
-        end
-        if best<cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance,return;end
-        first=indices(end)+1;
-    end
+    if ~any(remaining),return;end
+    node=round(start/item.cover.h)+1;
+    boxes=reshape(item.cover.boxes(:,node,remaining),11,[]);
+    centers=reshape(item.cover.centers(:,node,remaining),4,[]);
+    posRadius=item.positionRadius+vecnorm(max(abs(centers([1 3],:)),abs(centers([2 4],:))));
+    [value,normal,gradient,exitSteps]=terminalSafeSet.separatingMotion(x,boxes, ...
+        item.cover.velocity(:,remaining),item.cover.velocityRadius(remaining),posRadius,cfg);
 end
+
 
 function q=localCompactTargetNodes(target,times)
     if target(4)==0,q=repmat(target,1,numel(times));
