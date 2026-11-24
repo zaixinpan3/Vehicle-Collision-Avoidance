@@ -538,7 +538,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     cacheU=[];cache=[];rollouts=[];initialDeficit=NaN;initialTerminal=NaN;initialPeakDeficit=NaN;
     stabilitySteps=0;firstFeasibleStability=NaN;incumbentStability=NaN;
     reducedSearch=false;reducedPoint=[];reducedCalls=0;reducedAccepted=false;
-    domainKnots=[];midpointReplays=0;
+    domainKnots=[];midpointReplays=0;meritTransition=0;
     bestPoint=[];bestResidual=Inf;
     bestCost=Inf;inheritedCost=NaN;deadline=budget+startupBuildSeconds;
     budgetStopped=false;budgetStopPhase="";
@@ -793,10 +793,12 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         % the pseudo-Huber merit. A unit scaled step then accounts for its
         % effect on every violated clearance. All bounds use the same map.
         controlScale=physicalScale;
+        meritTransition=0;
         if seekZero
             seed=evaluate(start,false);
             active=seed.stage>0;
             if any(active) && all(seed.forward<=0) && all(seed.terminal<=0)
+                meritTransition=cfg.outputFeedback.clearanceMeters;
                 seed=evaluate(start,true);
                 jacobian=seed.stageGradient(:,active).*physicalScale;
                 weights=1./hypot(1,seed.stage(active));
@@ -905,8 +907,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         output=[e.stage;e.forward;e.terminal];
         if seekZero
             residual=max(output,0);
-            scale=hypot(1,residual);
-            output=sum(residual.*(residual./(1+scale)));
+            output=localFeasibilityMerit(residual,meritTransition,tolerance);
         end
     end
 
@@ -925,7 +926,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         e=evaluate(u,true);
         gradients=[e.stageGradient,e.forwardGradient,e.terminalGradient];
         if seekZero
-            weights=residual./hypot(1,residual);
+            [~,weights]=localFeasibilityMerit(residual,meritTransition,tolerance);
             gradients=gradients*weights;
         end
         output=(gradients.*controlScale).';
@@ -947,7 +948,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             if seekZero && numel(model.hypotheses)==1 && all(cache.forward<=0) && all(cache.terminal<=0)
                 cache=localClearanceMeritDerivatives(cache,rollouts.trajectories{1}.oracle,model);
             else
-                [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,[],false);
+                [cache,rollouts]=localCondensedOracle(u,model,true,rollouts,[],false,seekZero && numel(model.hypotheses)==1);
             end
             gradientCalls=gradientCalls+1;
         end
@@ -972,6 +973,24 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             validatePlan(inputs,rollouts);reuseCount=reuseCount+1;
         end
     end
+end
+
+function [value,weights]=localFeasibilityMerit(residual,transition,tolerance)
+    scale=hypot(1,residual);
+    mass=sum(residual.*(residual./(1+scale)));
+    % Keep the original search slope above the clearance scale. Below it,
+    % a regularized square root counters the flattening of the squared loss.
+    % Both branches have the same value and first derivative at the join.
+    join=sqrt(transition^2+tolerance^2);
+    if 2*mass<transition^2
+        root=sqrt(2*mass+tolerance^2);
+        value=join*(2*mass/(root+tolerance));
+        slope=join/root;
+    else
+        value=mass+transition^2/2-tolerance*transition^2/(join+tolerance);
+        slope=1;
+    end
+    if nargout>1,weights=(residual./scale)*slope;end
 end
 
 function model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel)
@@ -1123,7 +1142,8 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     keys{end+1}=key;kernels{end+1}=kernel;
 end
 
-function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBudget,performance)
+function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBudget,performance,positiveOnly)
+    if nargin<7,positiveOnly=false;end
     if nargin<6,performance=true;end
     if nargin<3,derivatives=true;end
     if nargin<5,checkBudget=[];end
@@ -1253,6 +1273,11 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         % domain sample inside each hold needs a dense-sample sensitivity.
         stageNeeded=false(1,total);domainNeeded=false(1,total);
         stageNeeded(1:N)=activeStages(1:N);domainNeeded(1:N)=true;
+        if positiveOnly
+            % Satisfied rows have exactly zero weight in the scalar merit.
+            stageNeeded(1:N)=stageNeeded(1:N) & localStage(1:N)>0;
+            domainNeeded(1:N)=forward(1:N)>0;
+        end
         if total>N
             [~,backupStage]=max(localStage(N+1:end));
             [~,backupDomain]=max(forward(N+1:end));
@@ -1267,16 +1292,17 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
             gradient(:,stageNeeded)=localCompactDistanceGradient(nodes(:,selected),boxes(:,selected),shape);
         end
         stageGradient=zeros(nu,total);
-        for i=1:total
-            if stageNeeded(i)
-                S=SE(:,:,nodeIndices(i));
-                stageGradient(:,i)=-(gradient(:,i).'*S(1:3,:)).';
-            end
-            if i<=N
-                domainGradient=(domainState(:,i).'*SF(:,:,i)+domainInput(:,i).'*derivativeModel.controlMap(2*i-1:2*i,:)).';
-                if localStage(i)>e.stage(i),e.stage(i)=localStage(i);e.stageGradient(:,i)=stageGradient(:,i);end
-                if forward(i)>e.forward(i),e.forward(i)=forward(i);e.forwardGradient(:,i)=domainGradient;end
-            end
+        for i=find(stageNeeded)
+            S=SE(:,:,nodeIndices(i));
+            stageGradient(:,i)=-(gradient(:,i).'*S(1:3,:)).';
+        end
+        updateStage=localStage(1:N).'>e.stage;
+        e.stage(updateStage)=localStage(updateStage);
+        e.stageGradient(:,updateStage)=stageGradient(:,updateStage);
+        updateDomain=forward(1:N).'>e.forward;
+        e.forward(updateDomain)=forward(updateDomain);
+        for i=find(updateDomain.' & domainNeeded(1:N))
+            e.forwardGradient(:,i)=(domainState(:,i).'*SF(:,:,i)+domainInput(:,i).'*derivativeModel.controlMap(2*i-1:2*i,:)).';
         end
         e.terminal(s)=terminal;e.terminalGradient(:,s)=(g*SE(:,:,end)).';
         if total>N
@@ -1449,12 +1475,17 @@ function value=localCompactPerformance(states,inputs,model)
 end
 
 function controls = localCompactRateLimit(controls,previous,holds,cfg)
+    rates=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    lower=[-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)];
+    upper=[cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)];
+    if all(isinf(rates))
+        controls=max(lower,min(upper,controls));
+        return
+    end
     for i=1:numel(holds)
-        span=cfg.controller.sampleTime*holds(i);
-        change=[cfg.outputFeedback.steeringRateMaximum;cfg.model.brakingRatioRateMaximum]*span;
+        change=rates*(cfg.controller.sampleTime*holds(i));
         controls(:,i)=max(previous-change,min(previous+change,controls(:,i)));
-        controls(:,i)=max([-cfg.outputFeedback.steeringMaximum;max(-1,cfg.actuation.brakingRatioMinimum)], ...
-            min([cfg.outputFeedback.steeringMaximum;min(1,cfg.actuation.brakingRatioMaximum)],controls(:,i)));
+        controls(:,i)=max(lower,min(upper,controls(:,i)));
         previous=controls(:,i);
     end
 end

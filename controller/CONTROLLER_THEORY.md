@@ -801,10 +801,24 @@ assumed.
 
 For a zero-deficit feasibility proposal, let $r=([C(v)]_+,[H(v)]_+)$
 collect the stage, physical-domain and terminal violations. Subject to the
-actuator bounds, IPOPT minimizes a scalar proposal cost
-$\sum_i (\sqrt{1+r_i^2}-1)$. Each term is nonnegative, vanishes exactly at
-zero and has slope $r_i/\sqrt{1+r_i^2}$. A large violation at one node
-therefore has bounded weight in the trajectory gradient. Zero attains the
+actuator bounds, define the nonnegative residual cost
+$P(r)=\sum_i (\sqrt{1+r_i^2}-1)$. When only clearance is deficient at the start of the proposal solve, use
+$b=d_{\rm safe}$ as the numerical transition scale. Otherwise use $b=0$
+to retain the original scaling for mixed physical and terminal violations.
+Keep $b$ fixed throughout the solve. Let $\epsilon>0$ be the NLP tolerance and
+$k=\sqrt{b^2+\epsilon^2}$. IPOPT uses the increasing transformation
+$$
+F(P)=
+\begin{cases}
+ k(\sqrt{2P+\epsilon^2}-\epsilon), & 2P < b^2,\\
+ P-b^2/2+k(k-\epsilon), & 2P\ge b^2.
+\end{cases}
+$$
+The slopes agree at the join. Above it, the trajectory gradient is the
+original gradient of $P$. Below it, the gradient is multiplied by
+$k/\sqrt{2P+\epsilon^2}$, allowing small residuals to produce a numerically
+useful search direction. $F(0)=0$, and the zero set and ordering of proposals
+are preserved, including at $b=0$. Zero attains the
 primary lower bound. A positive residual by itself has
 no dispatch authority. With several ego members, the proposal can start
 with the member having the largest squared violation on the current

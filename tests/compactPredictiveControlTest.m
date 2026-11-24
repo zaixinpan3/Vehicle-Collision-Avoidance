@@ -444,6 +444,26 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(metadata(first+1).inheritedDeficitCap,0);
             testCase.verifyTrue(metadata(first+1).deficitDescentMet);
         end
+        function aShiftedPlanCanRecoverZeroDeficitInOneSolve(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            cfg=collisionAvoidanceControllerConfig();
+            cfg.target.observerDomain=collisionThreatContract(strings(1,0),[8,15,20], ...
+                WindowSeconds=20,ControllerConfiguration=cfg);
+            run=runJointOutputFeedbackScenario(Scenarios="brakingLead",Speeds=8,Frames=50, ...
+                ControllerConfiguration=cfg,RandomSeed=20261107,OutputDirectory=string(folder.Folder));
+            testCase.assertEqual(run.results.outcome,"completed");
+            data=jsondecode(fileread(run.results.source));
+            frames=[data.trace.metadata];
+            repair=find([frames.nlpAttempts]>0 & string({frames.budgetPhase})=="continuation",1);
+            testCase.assertNotEmpty(repair);
+            step=frames(repair);
+            testCase.verifyGreaterThan(step.initialPeakClearanceDeficitMeters,0);
+            testCase.verifyEqual(step.inheritedDeficitCap,0);
+            testCase.verifyEqual(step.nlpAttempts,1);
+            testCase.verifyEqual(step.pcbfValue,0);
+            testCase.verifyTrue(step.deficitDescentMet && step.terminalSetEnforced);
+            testCase.verifyFalse(data.nodeCollisionDetected || data.sampledCollisionDetected);
+        end
         function aTireDomainCrossingCanReachZeroDeficitInOneIpoptIteration(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             cfg=collisionAvoidanceControllerConfig();
