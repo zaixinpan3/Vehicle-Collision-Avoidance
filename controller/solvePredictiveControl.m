@@ -614,6 +614,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     reducedSearch=false;reducedPoint=[];reducedCalls=0;reducedAccepted=false;
     domainKnots=[];midpointReplays=0;meritTransition=0;
     bestPoint=[];bestResidual=Inf;
+    rebalance=false;monitorProgress=false;restartPending=false;
+    previousResidual=Inf;slowSteps=0;proposalIterations=cfg.outputFeedback.nlpMaximumIterations;
     bestCost=Inf;inheritedCost=NaN;deadline=budget+startupBuildSeconds;
     budgetStopped=false;budgetStopPhase="";
     bestLoss=Inf;bestSlacks=[];priorCap=Inf;slackRoundoff=128*eps(max(1,cfg.outputFeedback.clearanceMeters))*count;
@@ -753,6 +755,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 if bestLoss>lossFloor+slackRoundoff || (preparing && seekZero)
                     solveIpopt(start);
                 end
+                if restartPending && bestLoss>lossFloor+slackRoundoff && toc(timer)<deadline
+                    rebalance=true;
+                    solveIpopt(start);
+                end
                 if seekZero && bestLoss>lossFloor+slackRoundoff && toc(timer)<deadline
                     seekZero=false;
                     % The primary NLP also needs Jacobians of satisfied constraints.
@@ -876,7 +882,21 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         if seekZero
             seed=evaluate(start,false);
             active=seed.stage>0;
-            if any(active) && all(seed.forward<=0) && all(seed.terminal<=0)
+            monitorProgress=~preparing && ~reducedSearch && ~rebalance && any(active) && any(seed.terminal>tolerance);
+            previousResidual=Inf;slowSteps=0;
+            if rebalance
+                % Equilibrate the active residual Jacobian at the original guide.
+                % The median keeps a typical knot in its original physical units.
+                seed=evaluate(start,true);
+                residual=[seed.stage;seed.forward;seed.terminal];
+                jacobian=[seed.stageGradient,seed.forwardGradient,seed.terminalGradient];
+                violated=residual>0;
+                columns=jacobian(:,violated).*physicalScale;
+                diagonal=1+columns.^2*(1./hypot(1,residual(violated)));
+                if all(isfinite(diagonal))
+                    controlScale=physicalScale./sqrt(diagonal)*sqrt(median(diagonal));
+                end
+            elseif any(active) && all(seed.forward<=0) && all(seed.terminal<=0)
                 meritTransition=cfg.outputFeedback.clearanceMeters;
                 seed=evaluate(start,true);
                 jacobian=seed.stageGradient(:,active).*physicalScale;
@@ -920,6 +940,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             'mu_strategy','monotone','mu_init',1e-6,'bound_push',1e-6,'bound_frac',1e-6, ...
             'tol',tolerance,'constr_viol_tol',tolerance));
         if seekZero
+            options.ipopt.max_iter=proposalIterations;
             if any(seed.terminal>tolerance) || any(seed.forward>tolerance)
                 % In scaled knot coordinates a log-barrier row contributes
                 % curvature mu/d^2, where d is the distance to its plane.
@@ -945,6 +966,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         ipoptSeconds=ipoptSeconds+toc(ipoptClock);
         stats=nlp.stats();solverStatus=string(stats.return_status);
         iterationCount=iterationCount+stats.iter_count;
+        if monitorProgress && restartPending
+            proposalIterations=proposalIterations-stats.iter_count;
+            restartPending=proposalIterations>0;
+        end
         converged=stats.success;
         if toc(timer)>=deadline,budgetStopped=true;budgetStopPhase=budgetPhase;end
         % A solver status alone never authorizes an actuator command.
@@ -963,6 +988,15 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         % Let IPOPT exercise its linear solver on the discarded startup call.
         if preparing && bestLoss<=lossFloor+slackRoundoff,stop=0;return;end
         if stop || ~seekZero || reducedSearch,return;end
+        if monitorProgress
+            % Two consecutive accepted steps with little reduction suggest
+            % that the current knot scaling is wasting rollout evaluations.
+            if bestResidual>=0.9*previousResidual,slowSteps=slowSteps+1;else,slowSteps=0;end
+            previousResidual=bestResidual;
+            if slowSteps>=2
+                restartPending=true;stop=1;return
+            end
+        end
         knots=full(args{1}).*controlScale;
         if ~isequal(knots,cacheU)
             domainKnots=[];

@@ -456,6 +456,25 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(metadata(first+1).inheritedDeficitCap,0);
             testCase.verifyTrue(metadata(first+1).deficitDescentMet);
         end
+        function aStalledCrossingReachesZeroDeficitAndRetainsItsPlan(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            run=runJointOutputFeedbackScenario(Scenarios="trafficCrossing",Speeds=15,Frames=400, ...
+                RandomSeed=20261104,OutputDirectory=string(folder.Folder));
+            testCase.assertEqual(run.results.outcome,"completed");
+            data=jsondecode(fileread(run.results.source));
+            metadata=[data.trace.metadata];
+            first=find([metadata.collisionTargetActive],1);
+            testCase.assertNotEmpty(first);
+            testCase.assertLessThan(first,numel(metadata));
+            admission=metadata(first);
+            testCase.verifyGreaterThan(admission.initialPeakClearanceDeficitMeters,0);
+            testCase.verifyEqual(admission.pcbfValue,0);
+            testCase.verifyTrue(admission.primaryOptimumComputed && admission.terminalSetEnforced);
+            testCase.verifyLessThanOrEqual(admission.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
+            testCase.verifyEqual(metadata(first+1).inheritedDeficitCap,0);
+            testCase.verifyTrue(all([metadata(first+1:end).deficitDescentMet]));
+            testCase.verifyFalse(data.nodeCollisionDetected || data.sampledCollisionDetected);
+        end
         function aJointClearanceAndTerminalDeficitFitsAShortIpoptSolve(testCase,jointDeficitCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             cfg=collisionAvoidanceControllerConfig();

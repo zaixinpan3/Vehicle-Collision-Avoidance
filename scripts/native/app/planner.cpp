@@ -1,4 +1,5 @@
 #include "planner.hpp"
+#include <algorithm>
 #include <numeric>
 namespace pc {
 namespace {
@@ -26,6 +27,9 @@ struct Context {
     M derivative;
     double transition = 0, bestResidual = inf;
     bool merit = true, preparing = false;
+    bool monitorProgress = false, restartPending = false;
+    double previousResidual = inf;
+    int slowSteps = 0, acceptedStep = -1;
     Plan best;
     std::string chosen;
     bool timedOut() const {
@@ -376,6 +380,15 @@ void optimize(Context &ctx, const M &seed, const std::vector<int> &ends, int &at
         if (!w.merit) {
             return 0;
         }
+        if (w.monitorProgress) {
+            ++w.acceptedStep;
+            w.slowSteps = w.bestResidual >= .9 * w.previousResidual ? w.slowSteps + 1 : 0;
+            w.previousResidual = w.bestResidual;
+            if (w.slowSteps >= 2 && w.acceptedStep < w.c.iterations) {
+                w.restartPending = true;
+                return 1;
+            }
+        }
         Vec x = Eigen::Map<const Vec>(raw, w.map.cols());
         if (w.cached.size() != x.size() || w.cached != x) {
             w.domainPoint.resize(0);
@@ -397,21 +410,15 @@ void optimize(Context &ctx, const M &seed, const std::vector<int> &ends, int &at
     Vec equil = Vec::Ones(nu);
     bool clearanceSearch =
         first.values.head(ctx.N).maxCoeff() > 0 && first.values.tail(first.values.size() - ctx.N).maxCoeff() <= 0;
-    if (clearanceSearch) {
-        ctx.transition = c.margin;
-        first = ctx.evaluate(seed, true);
-        for (int i = 0; i < ctx.N; i++) {
-            if (first.values[i] > 0) {
-                equil.array() += first.jac.row(i).transpose().array().square() / std::hypot(1., first.values[i]);
-            }
-        }
-        equil = equil.cwiseSqrt();
+    const bool jointDeficit = first.values.head(ctx.N).maxCoeff() > 0 && first.values.tail(p.members).maxCoeff() > c.tol;
+    auto applyScaling = [&]() {
         x0.array() *= equil.array();
         lo.array() *= equil.array();
         hi.array() *= equil.array();
         map.array().rowwise() /= equil.transpose().array();
         A.array().rowwise() /= equil.transpose().array();
-    } else if (first.values.tail(first.values.size() - ctx.N).maxCoeff() > c.tol) {
+    };
+    auto initBarrier = [&]() {
         double distance = std::min((x0 - lo).minCoeff(), (hi - x0).minCoeff());
         for (int j = 0; j < A.rows(); j++) {
             if (A.row(j).norm() > 0) {
@@ -419,17 +426,60 @@ void optimize(Context &ctx, const M &seed, const std::vector<int> &ends, int &at
             }
         }
         p.mu_init = std::clamp(std::pow(std::max(0., distance), 2), 1e-6, .1);
+    };
+    auto activeDiagonal = [&](int rows) {
+        Vec diagonal = Vec::Ones(nu);
+        Eval atGuide = ctx.evaluate(seed, true);
+        for (int i = 0; i < rows; ++i) {
+            if (atGuide.values[i] > 0) {
+                diagonal.array() += atGuide.jac.row(i).transpose().array().square() / std::hypot(1., atGuide.values[i]);
+            }
+        }
+        return diagonal;
+    };
+    if (clearanceSearch) {
+        ctx.transition = c.margin;
+        equil = activeDiagonal(ctx.N).cwiseSqrt();
+        applyScaling();
+    } else if (first.values.tail(first.values.size() - ctx.N).maxCoeff() > c.tol) {
+        initBarrier();
     }
     Vec trial(nu);
-    for (bool seek : {true, false}) {
+    enum class Phase { proposal, rebalancedProposal, primary };
+    for (Phase phase : {Phase::proposal, Phase::rebalancedProposal, Phase::primary}) {
+        bool seek = phase != Phase::primary;
         if (ctx.optimal() || ctx.timedOut()) {
             break;
         }
+        ctx.monitorProgress = phase == Phase::proposal && jointDeficit && !ctx.preparing;
+        if (phase == Phase::rebalancedProposal) {
+            if (!ctx.restartPending) {
+                continue;
+            }
+            // Restart the same guide in coordinates balanced by the violated rows.
+            equil = activeDiagonal(first.values.size());
+            if (equil.allFinite()) {
+                Vec sorted = equil;
+                std::sort(sorted.data(), sorted.data() + nu);
+                double median = .5 * sorted[(nu - 1) / 2] + .5 * sorted[nu / 2];
+                equil = (equil.array() / median).sqrt();
+                applyScaling();
+                if (ctx.bestPoint.size()) {
+                    ctx.bestPoint.array() *= equil.array();
+                }
+                initBarrier();
+            } else {
+                equil.setOnes();
+            }
+            p.max_iterations = c.iterations - ctx.acceptedStep;
+        }
+        ctx.domainPoint.resize(0);
         ctx.merit = seek;
         p.seek_zero = seek;
         ctx.cached.resize(0);
         ctx.derivative.resize(0, 0);
         if (!seek) {
+            p.max_iterations = c.iterations;
             if (ctx.bestPoint.size()) {
                 x0 = ctx.bestPoint;
             }
