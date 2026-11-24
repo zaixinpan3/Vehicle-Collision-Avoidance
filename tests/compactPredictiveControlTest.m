@@ -510,16 +510,24 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(info.maximumConstraintViolation,data.configuration.outputFeedback.nlpTolerance);
         end
         function theConnectionCanSteerAfterTheSameAvoidancePrefixAndShift(testCase)
-            cfg=testCase.cfg;
-            cfg.outputFeedback.horizonSeconds=.30;
-            cfg.outputFeedback.initializationSolveSeconds=8;
-            block=localBlock(cfg,8);
-            block.initialHypotheses.target=[12;.4;0;0;0;0;1.6;2.4;.95;0;0];
-            block.samples=solvePredictiveControl("outputFeedback",struct('operation',"sensor", ...
-                'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
-            [~,inputs,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            cfg=collisionAvoidanceControllerConfig();
+            cfg.target.observerDomain=collisionThreatContract(strings(1,0),[8,15,20], ...
+                WindowSeconds=20,ControllerConfiguration=cfg);
+            run=runJointOutputFeedbackScenario(Scenarios="hardBrakingLead",Speeds=20,Frames=3, ...
+                ControllerConfiguration=cfg,RandomSeed=20261107,OutputDirectory=string(folder.Folder));
+            testCase.assertEqual(run.results.outcome,"completed");
+            data=jsondecode(fileread(run.results.source));
+            cfg.referenceSpeed=20;cfg.model.speedMaximum=data.configuration.model.speedMaximum;
+            [~,~,reference,cfg]=collisionThreatScenario("hardBrakingLead",cfg);
+            block=struct('kind',"jointSensorBlock-v1",'time',0,'heldInput',[0;0], ...
+                'samples',data.initialSensorSample,'initialHypotheses',data.initialInformationContract);
+            [first,~,~,prior]=collisionAvoidanceController(block,[],reference,cfg,[]);
+            block=struct('kind',"jointSensorBlock-v1",'time',data.trace(2).time, ...
+                'heldInput',first.actuatorInput,'samples',data.trace(1).rawSensorBlock);
+            [command,inputs,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,prior);
             window=prediction.metadata.predictionWindow;
-            testCase.assertEqual(window.avoidanceSteps,6);
+            testCase.assertGreaterThan(window.avoidanceSteps,0);
             testCase.assertGreaterThan(window.connectionSteps,0);
             testCase.verifyEqual(size(inputs,2),window.avoidanceSteps+window.connectionSteps);
             testCase.verifyTrue(ismember(window.avoidanceSteps,state.boundaries));
@@ -534,10 +542,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             replay.inputs=fixed;
             fixedResult=solvePredictiveControl("outputFeedback",replay);
             testCase.verifyFalse(fixedResult.accepted);
-            cfg.outputFeedback.maximumSolveSeconds=1e-12;
-            [~,shifted,next]=collisionAvoidanceController(localNextBlock(state,cfg),[],[],cfg,state);
-            testCase.verifyEqual(shifted(:,1:end-1),inputs(:,2:end));
-            testCase.verifyEqual(shifted(:,end),law);
+            block=struct('kind',"jointSensorBlock-v1",'time',data.trace(3).time, ...
+                'heldInput',command.actuatorInput,'samples',data.trace(2).rawSensorBlock);
+            [~,shifted,next]=collisionAvoidanceController(block,[],reference,cfg,state);
+            testCase.verifyEqual(shifted(:,1),data.trace(3).input);
+            testCase.verifyTrue(next.metadata.deficitDescentMet);
+            testCase.verifyEqual(next.metadata.inheritedDeficitCap,sum(state.stageDeficits(2:end)));
             testCase.verifyTrue(next.scenarios{1}.terminal.member);
         end
         function uncertainEncounterReturnsToTheGivenCruise(testCase,uncertainEncounter)
@@ -681,8 +691,24 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             radius=hypot(cfg.vehicle.length/2,cfg.vehicle.width/2)+norm(cfg.vehicle.rectangleOffset) ...
                 +norm(item.target(8:9))+norm(item.target(10:11));
             testCase.verifyGreaterThanOrEqual(window.allocatedSeconds*cfg.referenceSpeed,2*radius);
-            testCase.verifyGreaterThan(window.allocatedSeconds,cfg.outputFeedback.minimumPreviewSeconds);
+            testCase.verifyGreaterThanOrEqual(window.avoidanceSteps*cfg.controller.sampleTime,2*radius/cfg.referenceSpeed);
             testCase.verifyFalse(window.feasibilityCertified);
+        end
+        function calculatedWindowUsesTargetMotionAndCoversEachMember(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=20;
+            member=localBlock(cfg,20);lead=member.initialHypotheses;
+            lead.target=[30;0;0;5;0;0;1.6;2.4;.95;0;0];
+            approaching=lead;approaching.target(3)=pi;
+            getWindow=@(items)solvePredictiveControl("outputFeedback", ...
+                struct('operation',"window",'cfg',cfg,'hypotheses',items));
+            passing=getWindow(lead);opposing=getWindow(approaching);
+            testCase.verifyLessThan(passing.avoidanceSteps,opposing.avoidanceSteps);
+            testCase.verifyLessThan(passing.connectionSteps,opposing.connectionSteps);
+            both=getWindow([lead,approaching]);
+            testCase.verifyEqual(both.avoidanceSteps,max(passing.avoidanceSteps,opposing.avoidanceSteps));
+            testCase.verifyEqual(both.connectionSteps,max(passing.connectionSteps,opposing.connectionSteps));
+            lead.target=[];free=getWindow(lead);
+            testCase.verifyEqual(free.connectionSteps,0);
         end
         function neutralRestExposesTheOneSidedStartingDirection(testCase,integrationMesh)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;
@@ -727,7 +753,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         function shrinkingBelowTheKnotCountKeepsPositiveControlIntervals(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.maximumSolveSeconds=1e-12;
             cfg.outputFeedback.initializationSolveSeconds=2;
-            cfg.outputFeedback.horizonSeconds=.1;
+            cfg.outputFeedback.horizonResolutionSeconds=cfg.controller.sampleTime;
+            cfg.outputFeedback.previewSettlingSeconds=0;cfg.referenceSpeed=.15;
             block=localBlock(cfg,cfg.referenceSpeed);
             [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
             % A retained fine sequence can exceed the currently requested
@@ -752,12 +779,16 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function anOpenRoadRestStateCanResumeCruise(testCase)
             cfg=testCase.cfg;cfg.referenceSpeed=1.5;cfg.outputFeedback.nlpJit=true;
-            cfg.outputFeedback.maximumSolveSeconds=2;cfg.outputFeedback.horizonSeconds=8;
+            cfg.outputFeedback.maximumSolveSeconds=2;
             block=localBlock(cfg,0);block.initialHypotheses.target=[];
             block.samples=solvePredictiveControl('outputFeedback',struct('operation',"sensor", ...
                 'cfg',cfg,'hypothesis',block.initialHypotheses,'input',block.heldInput,'time',0));
-            [command,~,prediction]=collisionAvoidanceController(block,[],[],cfg,[]);
+            [command,~,prediction,state]=collisionAvoidanceController(block,[],[],cfg,[]);
             testCase.verifyGreaterThan(command.actuatorInput(2),.01);
+            for k=1:140
+                if prediction.scenarios{1}.ego(4,end)>1.4,break;end
+                [~,~,prediction,state]=collisionAvoidanceController(localNextBlock(state,cfg),[],[],cfg,state);
+            end
             testCase.verifyGreaterThan(prediction.scenarios{1}.ego(4,end),1.4);
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,1e-6);
         end
@@ -809,11 +840,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(current.retainedFinePlanUsed || current.initializationSource=="guideWithDrivingSuffix");
         end
         function aCheckedPlanCanShiftPastItsOriginalEndWithoutAnotherSolve(testCase)
-            cfg=testCase.cfg;cfg.referenceSpeed=3;cfg.outputFeedback.horizonSeconds=.15;
+            cfg=testCase.cfg;cfg.referenceSpeed=3;
             cfg.outputFeedback.maximumSolveSeconds=1e-12;block=localBlock(cfg,3);
             [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
             terminalInput=terminalSafeSet.movingControl(cfg);
-            for k=1:12
+            for k=1:prior.horizonSteps+2
                 block=localNextBlock(prior,cfg);
                 [~,inputs,prediction,next]=collisionAvoidanceController(block,[],[],cfg,prior);
                 testCase.verifyEqual(inputs,[prior.fineControls(:,2:end),terminalInput]);
@@ -987,7 +1018,6 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         end
         function previewGrowthReusesTheCompiledProblem(testCase)
             cfg=testCase.cfg;cfg.outputFeedback.horizonResolutionSeconds=.5;
-            cfg.outputFeedback.minimumPreviewSeconds=1;
             cfg.model.speedMaximum=8;
             [~,~,baseline]=collisionAvoidanceController(localBlock(cfg,8),[],[],cfg,[]);
             % The driving model permits speeds above the build-time sizing
@@ -1271,13 +1301,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             end
             testCase.assertEqual(item.ego(4),0);count=count-1;
             testCase.assertGreaterThan(count,2);
-            cfg.outputFeedback.horizonSeconds=(count-.25)*cfg.controller.sampleTime;
             [~,~,~,prior]=collisionAvoidanceController(block,[],[],cfg,[]);
             prior.fineControls=repmat(brake,1,count);prior.appliedInput=brake;
             block=localNextBlock(prior,cfg);
             [command,inputs,prediction]=collisionAvoidanceController(block,[],[],cfg,prior);
             testCase.verifyEqual(command.actuatorInput,brake);
-            testCase.verifyEqual(inputs(:,1:end-1),prior.fineControls(:,2:end));
+            testCase.verifyEqual(inputs(:,1:count-1),prior.fineControls(:,2:end));
             testCase.verifyEqual(inputs(:,end),terminalSafeSet.movingControl(cfg));
             testCase.verifyFalse(prediction.metadata.restorationAttempted);
             testCase.verifyGreaterThan(min(prediction.scenarios{1}.collisionEgo(4,:)),0);
@@ -1533,7 +1562,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(value.stage,.3-.25,AbsTol=1e-10);
         end
         function aPositiveRootDeficitCanBeCommittedAndThenSpent(testCase)
-            cfg=testCase.cfg;cfg.vehicle.width=2;cfg.outputFeedback.horizonSeconds=.1;
+            cfg=testCase.cfg;cfg.vehicle.width=2;
             block=localBlock(cfg,8);item=block.initialHypotheses;
             item.target=[-4.75;2.05;0;0;0;0;1.6;2.4;1;0;0];
             block.initialHypotheses=item;

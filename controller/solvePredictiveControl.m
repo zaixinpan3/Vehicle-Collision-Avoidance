@@ -20,12 +20,13 @@ function [result,diagnostics,problem] = solvePredictiveControl(interface,request
             hypotheses=localOfValidateHypotheses(request.hypotheses,cfg);
             validateattributes(request.inputs,{'double'},{'2d','nrows',2,'nonempty','finite','real'});
             count=size(request.inputs,2);
-            connection=localConnectionSteps(hypotheses,cfg);
-            avoidance=count;
-            if count>connection,avoidance=count-connection;end
             if isfield(request,'avoidanceSteps')
                 avoidance=request.avoidanceSteps;
                 validateattributes(avoidance,{'numeric'},{'scalar','integer','positive','<=',count});
+            else
+                [~,connection]=localPreviewDurations(hypotheses,cfg);
+                avoidance=count;
+                if count>connection,avoidance=count-connection;end
             end
             boundaries=localCompactBoundaries(count,cfg,avoidance);
             kernel=localCompactKernel(cfg,diff(boundaries),~isempty(hypotheses(1).target));
@@ -297,47 +298,55 @@ function window = localOfWindow(hypotheses,inheritedCount,cfg)
     % Select coverage directly, before optimization; never try increasing
     % lengths until a solve succeeds. This is an engineering time scale,
     % not a certified Fiala stopping-time or feasibility upper bound.
-    of=cfg.outputFeedback;h=cfg.controller.sampleTime;
+    h=cfg.controller.sampleTime;
     speed=max(arrayfun(@(s)hypot(s.ego(4),s.ego(5)),hypotheses));
-    if isempty(of.horizonSeconds)
-        minimum=max(2*h,of.minimumPreviewSeconds);
-        % A low-speed preview must span the encounter's spatial scale,
-        % not only braking time. This is a performance lookahead, not a
-        % stopping reserve or a certificate of feasibility.
-        targetRadius=0;
-        for s=1:numel(hypotheses)
-            q=hypotheses(s).target;
-            if ~isempty(q),targetRadius=max(targetRadius,norm(q(8:9))+norm(q(10:11)));end
-        end
-        if targetRadius>0 && cfg.referenceSpeed>0
-            egoRadius=hypot(cfg.vehicle.length/2,cfg.vehicle.width/2)+norm(cfg.vehicle.rectangleOffset);
-            minimum=max(minimum,2*(egoRadius+targetRadius)/max(speed,cfg.referenceSpeed));
-        end
-        requested=max(minimum,speed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
-        allocated=of.horizonResolutionSeconds*ceil(requested/of.horizonResolutionSeconds);
-        source="speedBasedPreview";
-    else
-        requested=max(2*h,of.horizonSeconds);allocated=requested;source="configuredDuration";
-    end
-    % Retain only the unexecuted suffix, which still reaches the old
-    % terminal endpoint. The executed hold is no longer a horizon floor.
-    connection=localConnectionSteps(hypotheses,cfg);
-    count=max(inheritedCount,ceil(allocated/h)+connection);
+    [avoidance,connection,requested]=localPreviewDurations(hypotheses,cfg);
+    count=max(inheritedCount,avoidance+connection);
     assert(count<=cfg.controller.maximumHorizonSteps, ...
         'collisionAvoidanceController:predictionWindowCapacity', ...
         'The selected %.3g s preview needs %d stages, exceeding the configured capacity %g. It was not truncated.', ...
         count*h,count,cfg.controller.maximumHorizonSteps);
-    window=struct('source',source,'requestedSeconds',requested,'allocatedSeconds',count*h, ...
+    window=struct('source',"calculatedPreview",'requestedSeconds',requested,'allocatedSeconds',count*h, ...
         'horizonSteps',count,'avoidanceSteps',count-connection,'connectionSteps',connection, ...
         'speedUpperMetersPerSecond',speed, ...
         'inheritedHorizonSteps',inheritedCount,'feasibilityCertified',false);
 end
 
-function count=localConnectionSteps(hypotheses,cfg)
-    count=0;
-    if any(arrayfun(@(item)~isempty(item.target),hypotheses))
-        count=ceil(cfg.outputFeedback.minimumPreviewSeconds/cfg.controller.sampleTime);
+function [avoidance,connection,requested]=localPreviewDurations(hypotheses,cfg)
+    of=cfg.outputFeedback;h=cfg.controller.sampleTime;
+    requested=0;connectionTime=0;
+    egoRadius=hypot(cfg.vehicle.length/2,cfg.vehicle.width/2)+norm(cfg.vehicle.rectangleOffset);
+    lateralAcceleration=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
+    for member=hypotheses(:).'
+        x=member.ego;q=member.target;
+        egoSpeed=hypot(x(4),x(5));
+        brakingTime=egoSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds;
+        leg=brakingTime;
+        if ~isempty(q)
+            body=predictiveSafetyGeometry.direction(x(3));left=[-body(2);body(1)];
+            targetCourse=predictiveSafetyGeometry.direction(q(3)+q(6));
+            relativeVelocity=[body,left]*x(4:5)-q(4)*targetCourse;
+            span=2*(egoRadius+norm(q(8:9))+norm(q(10:11)));
+            % Along the target course, positive relative velocity can carry
+            % the ego past the target. Crossing traffic may have no such motion.
+            passingSpeed=relativeVelocity.'*targetCourse;
+            passTime=Inf;approachTime=Inf;
+            if passingSpeed>0
+                passTime=span/passingSpeed;
+                approachTime=max(0,(q(1:2)-x(1:2)).'*targetCourse)/passingSpeed;
+            end
+            angle=q(3)-x(3);
+            width=cfg.vehicle.width/2+abs(sin(angle))*q(8)+abs(cos(angle))*q(9)+of.clearanceMeters;
+            lateralTime=2*sqrt(width/lateralAcceleration);
+            leg=min(max(brakingTime,lateralTime),approachTime+lateralTime);
+            leg=max(leg,span/max(egoSpeed,cfg.referenceSpeed));
+            connectionTime=max(connectionTime,min(passTime,2*sqrt(span/lateralAcceleration)));
+        end
+        requested=max(requested,max(2*h,leg));
     end
+    resolution=of.horizonResolutionSeconds;
+    avoidance=ceil(resolution*ceil(requested/resolution)/h);
+    connection=ceil(resolution*ceil(connectionTime/resolution)/h);
 end
 
 function [result,info] = localCompactStep(request,cfg)
@@ -408,6 +417,8 @@ function [result,info] = localCompactStep(request,cfg)
     targetReady=all(arrayfun(@(s)~isempty(s.target),hypotheses));
     active=targetReady && ~isempty(firstRadarTime) && (block.samples(end).radarAvailable || inRange);
     if ~active,[planning.target]=deal([]);end
+    % Acquisition adds collision obligations absent from a cruise-only suffix.
+    if active && ~initial && ~prior.collisionTargetActive,inherited=0;end
     window=localOfWindow(planning,inherited,cfg);
     holds=diff(localCompactBoundaries(window.horizonSteps,cfg,window.avoidanceSteps));
     % A representative retained member supplies the nominal dynamics. All
@@ -1031,10 +1042,8 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     import casadi.*
     of=cfg.outputFeedback;h=cfg.controller.sampleTime;
     maximumSpeed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum);
-    previewTime=max(of.minimumPreviewSeconds,maximumSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds);
-    allocatedTime=of.horizonResolutionSeconds*ceil(previewTime/of.horizonResolutionSeconds);
-    maximumCount=ceil(allocatedTime/h)+ceil(of.minimumPreviewSeconds/h);
-    capacity=maximumCount;K=of.validationSubsteps;
+    blockSeconds=maximumSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds;
+    capacity=max(2,ceil(blockSeconds/h));K=of.validationSubsteps;
     M=K;D=1;dt=h/M;
     x=SX.sym('x',6);u=SX.sym('u',2);p=SX.sym('p',4);
     k1=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);

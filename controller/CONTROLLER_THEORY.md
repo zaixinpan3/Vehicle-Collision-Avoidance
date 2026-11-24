@@ -438,48 +438,50 @@ open-loop inputs are reoptimized after future measurements arrive.
 
 ## 4. Preview time, control knots, and held-input dynamics
 
-For speed bound $v_k^+=\max_s\sqrt{(v_{x,k}^s)^2+(v_{y,k}^s)^2}$ choose
+At each decision, size the two legs from the current surviving hypotheses.
+Let $h$ be the control period and $C(t)=\lceil\Delta T\lceil t/\Delta T\rceil/h\rceil$
+the allocation on the configured time grid. For a target-free hypothesis of
+ego speed $v$, the avoidance-leg request is $A_s=\max(2h,v/a_p+T_s)$ and
+the connection request is $B_s=0$. Here $a_p$ is a preview deceleration
+scale and $T_s$ is the response allowance.
 
+For an active target, let $d=p_T-p_E$, $u=\dot p_E-\dot p_T$ and
+$e_T$ be the target's unit course vector including sideslip. The relative
+speed along that course is $c=e_T^\top u$. For $c>0$, set
+$t_c=[e_T^\top d]_+/c$ and $t_P=L/c$, where $L=2(a_E+a_T)$ and each
+footprint radius is its half-diagonal plus the norm of its reference-point
+offset. These times describe catching up to the target's longitudinal
+position and gaining a combined footprint span at the current velocities.
+For $c\le0$ both are infinite, so this passing mechanism does not shorten
+the request.
+
+Let $w$ be the sum of the ego half-width, the target half-extents projected
+onto the ego lateral axis, and the requested clearance. With the guidance
+model's available lateral acceleration $a_y$, define $t_L=2\sqrt{w/a_y}$.
+Two opposite accelerations of magnitude $a_y$ cover $w$ in this time with
+zero initial and final lateral speed. The connection uses the same sizing
+model with the orientation-independent displacement $L$. The two requests
+in seconds are
 $$
-T_k^{\rm req}=\max\{T_{\min},2h,v_k^+/a_p+T_s,T_{\rm space}\},\qquad
-A_k^{\rm req}=\left\lceil\frac{\Delta T\lceil T_k^{\rm req}/\Delta T\rceil}{h}\right\rceil .
+A_s=\max\left(2h,\frac{L}{\max(v,v_{\rm ref})},
+       \min\left(\max(v/a_p+T_s,t_L),t_c+t_L\right)\right),
+\qquad B_s=\min(t_P,2\sqrt{L/a_y}).
 $$
+The spatial scale uses circumscribed radii only for duration selection.
+The optimizer uses the nonlinear vehicle model, the persistent target motion
+contract and the rectangle-distance dual for its actual predictions.
+The time requests are engineering estimates. They do not certify reachability
+of the terminal set.
 
-During an active encounter let $B_k=\lceil T_{\min}/h\rceil$ be the duration
-in holds of the optimized connection to the terminal set. In target-free
-cruise take $B_k=0$. The avoidance and total lengths satisfy
-
+For $A^*=C(\max_s A_s)$ and $B_k=C(\max_s B_s)$, set
 $$
-N_k=\max\{N_{k-1}-1,A_k^{\rm req}+B_k\},\qquad A_k=N_k-B_k .
+N_k=\max(N_{\rm suffix},A^*+B_k),\qquad A_k=N_k-B_k.
 $$
-
-For a target and positive cruise reference $v_{\rm ref}$, let
-
-$$
-T_{\rm space}=\frac{2(a_E+\max_s a_T^s)}{\max(v_k^+,v_{\rm ref})},
-\qquad a=\sqrt{\ell^2+w^2}+\|o\|,
-$$
-
-where $\ell,w$ are footprint half dimensions and $o$ is the reference-point
-offset. Otherwise set $T_{\rm space}=0$. This spatial lookahead exposes the
-scale of passing both footprints at low speed; these radii size the horizon
-only and never replace the rectangle-distance constraints.
-Here $a_p>0$ is a preview scale, not a certified braking acceleration. The
-minimum preview admits avoidance planning even when the ego is slow and a
-target is approaching. An explicitly configured duration replaces the
-speed-based rule. Neither rule proves that a feasible maneuver exists or
-that this is an upper bound on the necessary maneuver time. A uniquely
-predicted endpoint for specified inputs does not determine those inputs or
-establish reachability of a safe endpoint.
-
-At initialization the inherited-length term is zero. On continuation,
-$N_{k-1}-1$ is the length of the unexecuted feasible suffix, which ends at
-the old terminal state. The preview may therefore shrink by one hold per
-decision as its current time requirement decreases; no terminal action is
-appended solely to preserve the previous horizon length. If the current
-preview requests a longer horizon, the driving extension must itself satisfy
-the executable constraints and end in the terminal set. The accepted plan always spans the
-selected preview. The construction below supplies all missing holds.
+At startup and upon acquisition after target-free cruise, $N_{\rm suffix}=0$.
+The cruise plan has no certificate for the newly introduced target. On a
+continuing encounter, $N_{\rm suffix}=N_{k-1}-1$ retains the old terminal
+endpoint. Any required extension, including the terminal handoff, is subject
+to the ordinary feasibility and deficit-decrease checks.
 
 Use integer boundaries $0=c_0<c_1<\cdots<c_M=N$ with
 $b_i=c_i-c_{i-1}$ and a knot at $A_k$. On the avoidance leg the first few
@@ -552,8 +554,8 @@ used a coarser flow. Sensor noise bounds are unchanged; finer integration is
 still not a certified discretization-error enclosure.
 
 The compiled flow graph allocates capacity from configuration size hints and
-the preview rule. These hints are not planner velocity constraints. A larger
-preview grows the graph; unused slots are identities. Updating the active
+the preview rule. These hints are not planner velocity constraints. A longer
+preview uses consecutive blocks of the same graph; unused slots are identities. Updating the active
 preview within the allocation does not require rebuilding the flow graph.
 The allocation cannot truncate a requested preview.
 

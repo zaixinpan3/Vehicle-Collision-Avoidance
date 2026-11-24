@@ -64,7 +64,7 @@ classdef rawSensorContractTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:missingInitialInformation');
         end
         function aCapacityLimitCannotSilentlyShortenThePreview(testCase)
-            cfg=testCase.cfg;cfg.outputFeedback.horizonSeconds=[];
+            cfg=testCase.cfg;
             cfg.controller.maximumHorizonSteps=10;
             testCase.verifyError(@()collisionAvoidanceController(testCase.block,[],[],cfg,[]), ...
                 'collisionAvoidanceController:predictionWindowCapacity');
@@ -79,8 +79,7 @@ end
 
 function [cfg,hypothesis,block]=localFixture()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',1.5, ...
-        'outputFeedback',struct('horizonSeconds',.15, ...
-        'nlpJit',false,'maximumSolveSeconds',120)));
+        'outputFeedback',struct('nlpJit',false,'maximumSolveSeconds',120)));
     hypothesis=struct('ego',[0;0;0;1.5;0;0],'target',[15;8;0;0;0;0;1.6;2.4;.95;0;0], ...
         'parameters',ones(4,1),'sensorBias',zeros(7,1));
     input=[0;-.6];
