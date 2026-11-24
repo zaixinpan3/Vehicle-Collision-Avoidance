@@ -2,7 +2,11 @@
 
 ## 1. Vehicle motion and observations
 
-A control decision is made at $t_k=kh$. The command $u_k=(\delta_k,b_k)$ is held on $[t_k,t_{k+1})$. Steering $\delta$ is positive to the left and the signed longitudinal force ratio $b$ is positive in traction. A sensor block contains the readings during one hold, including its right endpoint. Denote the preceding command by $u^-$. Write $e(\theta)=(\cos\theta,\sin\theta)^\top$, $J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$, $R(\theta)=[e(\theta),Je(\theta)]$, $[a]_+=\max(a,0)$, and $\operatorname{sat}_c(a)=\max(-c,\min(c,a))$. Norms are Euclidean. Angle differences use the principal wrapped angle.
+At the control boundary $t_k=kh$, the controller conditions on the readings through $t_k$, chooses $u_k=(\delta_k,b_k)$ and holds it on $[t_k,t_{k+1})$. Steering $\delta$ is positive to the left and the signed longitudinal force ratio $b$ is positive in traction. Write $u^-$ for the command preceding a decision.
+
+Let $\sigma_\ell=\ell h_s$ be the sensor reading times, with $h=M_s h_s$ for an integer $M_s$. The block $Y_{k+1}$ consists of the time-stamped readings and detection flags at $t_k<\sigma_\ell\le t_{k+1}$. Its boundary accelerometer reading uses $u_k$. A radar return occurs only at a reading with a positive detection flag, so successive returns may be several sensor periods apart.
+
+Write $e(\theta)=(\cos\theta,\sin\theta)^\top$, $J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$, $R(\theta)=[e(\theta),Je(\theta)]$, $[a]_+=\max(a,0)$, and $\operatorname{sat}_c(a)=\max(-c,\min(c,a))$. Norms are Euclidean. Angle differences use the principal wrapped angle.
 
 ### Ego vehicle
 
@@ -41,7 +45,7 @@ f_\ell=\left((X_\ell-F_d)/m+rv_y,\quad(l_rr_\ell-v_y)/\tau_\ell,\quad
 (r_\ell-r)/\tau_\ell\right)^\top .
 $$
 
-For blending speeds $0<v_\ell<v_h$, set $s=\min(1,\max(0,(v_x-v_\ell)/(v_h-v_\ell)))$ and $w=s^2(3-2s)$. The body derivative is $(1-w)f_\ell+wf_d$, with the pure branches evaluated on their domains. At a control boundary, braking or neutral drive with $v_x< v_b/5$ sets $(v_x,v_y,r)$ to zero and preserves the integrated pose. Let $F_h^\vartheta(x,u)$ denote this held motion and boundary reset for parameters $\vartheta$. Intermediate sensor instants do not reset the vehicle. The forward-motion domain requires $v_x\ge0$ and, where the rolling law contributes, $v_x\cos\delta+(v_y+l_fr)\sin\delta>0$. Both sides of an input switch are subject to the model domain wherever the command is evaluated.
+For blending speeds $0<v_\ell<v_h$, set $s=\min(1,\max(0,(v_x-v_\ell)/(v_h-v_\ell)))$ and $w=s^2(3-2s)$. The body derivative is $(1-w)f_\ell+wf_d$, with the pure branches evaluated on their domains. At a control boundary, braking or neutral drive with $v_x< v_b/5$ sets $(v_x,v_y,r)$ to zero and preserves the integrated pose. If $\phi_h^\vartheta(x,u)$ is the time-$h$ flow of these equations under the constant input $u$ and $\mathcal S_u$ the boundary reset just defined, then $F_h^\vartheta(x,u)=\mathcal S_u(\phi_h^\vartheta(x,u))$. The forward-motion domain requires $v_x\ge0$ and, where the rolling law contributes, $v_x\cos\delta+(v_y+l_fr)\sin\delta>0$. Both sides of an input switch are subject to the model domain wherever the command is evaluated.
 
 ### Target vehicle
 
@@ -80,7 +84,7 @@ $$
 \mathcal I^+=\{\chi':\exists\,\chi\in\mathcal I,\;(\chi',Y)\in\mathcal R_h(\chi,u)\}.
 $$
 
-Initial containment implies successor containment because the realized history is a witness. The controller carries a finite collection of ego members. Each propagates its own $x,\vartheta,\eta$ under the applied command and survives only if the entire position, gyro and accelerometer block is consistent. Propagation to the last sensor reading includes the control-boundary rest reset before conditioning on that reading. Each surviving member carries its own target observation history. For a positive radar return set $\tilde\rho=y_\rho-\eta_\rho$ and $\rho_m=\Pi_{\|\,\cdot\,\|\le R_d}\tilde\rho$. Consistency requires $\|\tilde\rho-\rho_m\|\le\epsilon_\rho$. Its inertial target measurement is $y=p+R(\psi)\rho_m$; projection onto the disk containing the true relative position preserves the error bound. Below, $r_i$ is the valid position measurement radius at time $t_i$ conditional on that member.
+Initial containment implies successor containment because the realized history is a witness. The controller carries a finite collection of ego members. Each propagates its own $x,\vartheta,\eta$ under the applied command and survives only if the entire position, gyro and accelerometer block is consistent. Propagation to the last sensor reading includes the control-boundary rest reset before conditioning on that reading. Each surviving member carries its own target observation history. For a positive radar return set $\tilde\rho=y_\rho-\eta_\rho$ and $\rho_m=\Pi_{\|\,\cdot\,\|\le R_d}\tilde\rho$. Consistency requires $\|\tilde\rho-\rho_m\|\le\epsilon_\rho$. Its inertial target measurement is $y=p+R(\psi)\rho_m$; projection onto the disk containing the true relative position preserves the error bound. Below, $r_i$ is the valid position measurement radius at the $i$th retained return, at time $\tau_i$, conditional on that member.
 
 ## 2. Nonlinear relative motion model observer
 
@@ -106,7 +110,7 @@ $$
 
 It agrees with $\Phi$ on admissible moving states above $v_*$. For $0<V<v_*$ on the physical moving arc it equals $(V/v_*)^4\Phi$. Hence $\bar j_e=\sqrt{\kappa_{\max}^4 v_*^6+9\bar A^2\kappa_{\max}^2v_*^2}$, $\kappa_{\max}=\sin\bar\beta/l_T$, satisfies $\bar j_e\ge\sup\|\Phi-\Phi_e\|$ on smooth physical arcs, with the stopped branch treated separately. Ball projections and clips are nonexpansive, the denominators are bounded away from zero, and the differentiated factors involving $q$ are bounded in each radial region. Thus finite partial Lipschitz bounds $L_q,L_a$ exist for $\Phi_e$.
 
-At a detected reading reset the position predictor $z^+=y$. Over the following sensor interval the observer satisfies
+At reading time $\sigma_\ell$, let $d_\ell=1$ for a radar return and $d_\ell=0$ for a miss. A return sets $z(\sigma_\ell^+)$ to the measured inertial target position. A miss sets it to $\hat p(\sigma_\ell)$. On $[\sigma_\ell,\sigma_{\ell+1})$ the innovation is $e=d_\ell(z-\hat p)$ and the observer evolves according to
 
 $$
 \dot{\hat p}=\hat q+L_1 e,\quad
@@ -115,7 +119,7 @@ $$
 \dot z=\hat q .
 $$
 
-Here $e=z-\hat p$ following a detection and $e=0$ following a missed reading. At a missed reading the coast predictor starts at $\hat p$. Write $\hat V=\|\hat q\|$. At positive speed the published values are
+Write $\hat V=\|\hat q\|$. At positive speed the published values are
 
 $$
 \hat d=\hat q/\hat V,\quad
@@ -128,25 +132,25 @@ A resolved moving course yields body heading $\arg\hat q-\hat\beta$. A measured 
 
 ### Acquisition
 
-Let $(t_i,y_i,r_i)$ be distinct returns in the retained window, from $i=1$ to $n$, $T=t_n-t_1$. Motion initialization requires at least five returns (the window holds up to twenty) and $\|y_n-y_1\|>2\epsilon_\rho$. Put $\tau_i=(t_i-t_n)/T$ and fit $y_i=c_0+\tau_i c_1+\tfrac12\tau_i^2c_2$ in squared Euclidean distance. Set $\hat a=\Pi_{\bar a}(c_2/T^2)$ and refit the constant and linear terms with this acceleration fixed. The intercept and terminal slope give $\hat p,\hat q$ at $t_n$. If all returns lie within $\epsilon_\rho$ of their mean and body heading is observed, a rest-compatible initialization is $(\bar y,0,0)$. A single return supplies position only. Loss of the track beyond its declared coast duration initiates reacquisition.
+Let $(\tau_i,y_i,r_i)$, $1\le i\le n$, be the retained returns ordered by time. Each $\tau_i$ is a reading time $\sigma_\ell$ with $d_\ell=1$. For $n\ge2$ let $T=\tau_n-\tau_1$. Let $n_{\min}$ be the acquisition threshold and $n_{\max}$ the retained window length. The adopted acquisition rule uses $(n_{\min},n_{\max})=(5,20)$. Once $n\ge n_{\min}$ and $\|y_n-y_1\|>2\epsilon_\rho$, put $\zeta_i=(\tau_i-\tau_n)/T$ and fit $y_i=c_0+\zeta_i c_1+\tfrac12\zeta_i^2 c_2$ in squared Euclidean distance. Three distinct return times give the quadratic fit full column rank because a polynomial of degree at most two that vanishes at all three times is identically zero. Set $\hat a=\Pi_{\bar a}(c_2/T^2)$ and refit the constant and linear terms with this acceleration fixed. The intercept and terminal slope give $\hat p,\hat q$ at $\tau_n$. If $n\ge n_{\min}$, all returns lie within $\epsilon_\rho$ of their mean and body heading is observed, a rest-compatible initialization is $(\bar y,0,0)$. A single return supplies position only. Loss of the track beyond its declared coast duration initiates reacquisition.
 
-Let $c=(y_n-y_1)/T$ and $a_*$ bound the Cartesian acceleration throughout the window. Integrating $\|q(t_n)-q(t)\|\le a_*(t_n-t)$ bounds the difference between endpoint and mean velocity by $a_*T/2$. Initial radii for $(\hat p,\hat q,\hat a)$ are therefore
+Let $c=(y_n-y_1)/T$ and $a_*$ bound the Cartesian acceleration throughout the window. Integrating $\|q(\tau_n)-q(t)\|\le a_*(\tau_n-t)$ bounds the difference between endpoint and mean velocity by $a_*T/2$. Initial radii for $(\hat p,\hat q,\hat a)$ are therefore
 
 $$
 E_p=\|\hat p-y_n\|+r_n,\quad
 E_q=\|\hat q-c\|+(r_1+r_n)/T+a_*T/2,\quad E_a=\|\hat a\|+a_* .
 $$
 
-At later returns each secant ending at the current return gives the same velocity inequality. Its intersection with the propagated bound retains every compatible velocity. If $\|\hat q\|-E_q>a_*T$, the target was moving throughout. For midpoint $m=(t_n+t_1)/2$, let $w_i$ be the weights that extract $c_2$ from the quadratic fit. The fit reproduces all quadratics, so Taylor expansion around $m$ and nonexpansiveness of acceleration projection also give
+At later returns each secant ending at the current return gives the same velocity inequality. Its intersection with the propagated bound retains every compatible velocity. If $\|\hat q\|-E_q>a_*T$, the target was moving throughout. For midpoint $m=(\tau_n+\tau_1)/2$, let $w_i$ be the weights that extract $c_2$ from the quadratic fit. The fit reproduces all quadratics, so Taylor expansion around $m$ and nonexpansiveness of acceleration projection also give
 
 $$
-\|\hat a-a(t_n)\|\le
- T^{-2}\sum_i |w_i|\big(r_i+\bar j |t_i-m|^3/6\big)+\bar j T/2 .
+\|\hat a-a(\tau_n)\|\le
+ T^{-2}\sum_i |w_i|\big(r_i+\bar j |\tau_i-m|^3/6\big)+\bar j T/2 .
 $$
 
 The two upper bounds on the same error permit taking the smaller radius. A moving-arc jerk bound is $\bar j=\sqrt{V_u^2\omega_u^4+9\bar A^2\omega_u^2}$ for speed and yaw-rate upper bounds $V_u,\omega_u$ valid on the interval, since the two components of $\Phi$ are orthogonal.
 
-### ISS certificate and sampled measurement errors
+### ISS certificate and error bounds between radar readings
 
 Write $L_i=\ell_i\omega^i$, $\omega>0$. For estimate-minus-truth errors form $Z=(e_p,e_q/\omega,e_a/\omega^2)$ and the metric $W=\sqrt{Z^\top MZ}$, $M=P\otimes I_2$, $P=P^\top\succ0$. Let
 
@@ -169,7 +173,16 @@ D^+W\le-\lambda W+\omega\sqrt{\ell^\top P\ell}\,D_z+
 c_i=\omega^{i-1}\sqrt{(P^{-1})_{ii}} .
 $$
 
-The coordinate inequalities $(\|e_p\|,\|e_q\|,\|e_a\|)_i\le c_iW$ follow by duality of the metric norm. Reset $D_z$ to the measurement radius at a return. With continuous position information of error at most $\epsilon$, integration gives $W(t)\le e^{-\lambda t}W(0)+(1-e^{-\lambda t})(\omega\sqrt{\ell^\top P\ell}\,\epsilon+\sqrt{P_{33}}\,\bar j_e/\omega^2)/\lambda$. For sampled information propagate the two coupled upper inequalities as equalities between resets. On a dropout use the component comparison instead,
+The coordinate inequalities $(\|e_p\|,\|e_q\|,\|e_a\|)_i\le c_iW$ follow by duality of the metric norm. At a return time $\tau_i$, use $D_z(\tau_i^+)=r_i$ since $z(\tau_i^+)=y_i$. Until the next sensor reading, propagate upper bounds for $W$ and $D_z$ with the coupled comparison equations above, taking their right-hand sides as equalities. In particular, if $D_z\le\epsilon$ throughout a corrected interval of duration $\Delta$, integration of the first inequality gives
+
+$$
+W(\sigma_\ell+\Delta)\le e^{-\lambda\Delta}W(\sigma_\ell^+)
+ +\frac{1-e^{-\lambda\Delta}}{\lambda}
+ \left(\omega\sqrt{\ell^\top P\ell}\,\epsilon+
+       \sqrt{P_{33}}\,\bar j_e/\omega^2\right).
+$$
+
+The bound $\epsilon$ here covers the predictor error over the interval. The measurement radius $r_i$ bounds it at the reset instant. Following a missed reading the innovation vanishes, which gives the component comparison
 
 $$
 \dot E_p=E_q,\qquad \dot E_q=E_a,\qquad
@@ -186,7 +199,7 @@ E'_a&=E_a+\|\delta\hat a\|+\bar j\Delta .
 \end{aligned}
 $$
 
-Unprimed estimates in these expressions are the initial values. If $\|\hat q\|\le E_q+\bar A\Delta$, absorption inside the interval is possible. Enclose the union with the stopped endpoint, whose velocity and acceleration are zero and whose position has moved at most $\bar A\Delta^2$ from its initial position. Smooth jerk bounds apply only to the moving part. Uniform-in-time sampled bounds require sufficient recurring measurement information; the continuous dissipation inequality alone supplies no contraction during arbitrary dropout.
+Unprimed estimates in these expressions are the initial values. If $\|\hat q\|\le E_q+\bar A\Delta$, absorption inside the interval is possible. Enclose the union with the stopped endpoint, whose velocity and acceleration are zero and whose position has moved at most $\bar A\Delta^2$ from its initial position. Smooth jerk bounds apply only to the moving part. Uniform-in-time error bounds through successive readings require a bound on the growth allowed by the intervals without radar correction.
 
 ### Ego observer in the body-frame formulation
 
@@ -211,7 +224,7 @@ For $s_\psi>0$ define $(c,s)=(y_v^\top m_I,(Jy_v)^\top m_I)/(\|y_v\|\|m_I\|+s_\p
 $\dot{\hat\psi}=y_r+k_\psi(s\cos\hat\psi-c\sin\hat\psi)$.
 If $\mathcal V$ encloses the body velocity, the compatible angles are
 $\{\theta:\exists v'\in\mathcal V,\ \|m_I-R(\theta)v'\|\le\epsilon_G\}$.
-Intersect these angles with the prior angle set transported by the gyro integral and its error interval. The maximum wrapped distance to $\hat\psi$ on that intersection bounds its output error. At rest the innovation can vanish for every heading. In body axes the target error metric also receives the disturbances from $\hat v-v$ and the common gyro error. The former enters the first row only, contributing at most $\sqrt{P_{11}}\|\hat v-v\|$ to $D^+W$; the latter contributes at most $\epsilon_r\sup\|(\,J\rho,Jq_B/\omega,Ja_B/\omega^2\,)\|_M$ over the domain, where $\|z\|_M=\sqrt{z^\top Mz}$. In particular, for continuous bounded innovation disturbances write $\dot E\le-k_vE+d_E$ and $\dot W\le-\lambda W+\sqrt{P_{11}}E+d_T$, where $E$ bounds the body-velocity error and $d_E,d_T$ collect the respective disturbance terms above. Scalar comparison first gives $\limsup E\le d_E/k_v$, then $\limsup W\le(d_T+\sqrt{P_{11}}d_E/k_v)/\lambda$. Sampled predictor errors use the reset and dropout comparisons instead.
+Intersect these angles with the prior angle set transported by the gyro integral and its error interval. The maximum wrapped distance to $\hat\psi$ on that intersection bounds its output error. At rest the innovation can vanish for every heading. In body axes the target error metric also receives the disturbances from $\hat v-v$ and the common gyro error. The former enters the first row only, contributing at most $\sqrt{P_{11}}\|\hat v-v\|$ to $D^+W$; the latter contributes at most $\epsilon_r\sup\|(\,J\rho,Jq_B/\omega,Ja_B/\omega^2\,)\|_M$ over the domain, where $\|z\|_M=\sqrt{z^\top Mz}$. In particular, for continuous bounded innovation disturbances write $\dot E\le-k_vE+d_E$ and $\dot W\le-\lambda W+\sqrt{P_{11}}E+d_T$, where $E$ bounds the body-velocity error and $d_E,d_T$ collect the respective disturbance terms above. Scalar comparison first gives $\limsup E\le d_E/k_v$, then $\limsup W\le(d_T+\sqrt{P_{11}}d_E/k_v)/\lambda$. For radar at discrete reading times, the predictor error follows the return and dropout comparisons above.
 
 ### Persistent parameter and position enclosures
 
@@ -239,7 +252,7 @@ Let $P_0$ denote the current world-axis box enclosing the target reference posit
 
 ### Predicted target occupancy and encounter scope
 
-For a member let the forecast root be the midpoint of the applicable position box, with half-width vector $b_0$, selected heading and speed, and parameter rectangle $I_A\times I_\beta$. At time $t$ the entire family uses one geometric enclosure. Set
+For a member let the forecast root be the midpoint of the applicable position box, with half-width vector $b_0$, selected heading and speed, and parameter rectangle $I_A\times I_\beta$. Each admissible pair $(A,\beta)\in I_A\times I_\beta$ stays fixed along its forecast. Set
 $S=[s(\inf I_A,t),s(\sup I_A,t)]$, $K=\sin(I_\beta)/l_T$, $Z=KS/2$ using interval products. Monotonicity of speed before absorption proves the travel bounds. Intersect with $S\le\bar Vt$, $|Z|\le\bar\Omega t/2$ and, if $0\notin K$, $S\le\bar\Omega t/\min_{\kappa\in K}|\kappa|$ where those domain bounds apply. A stopped root retains its pose.
 
 Choose axes at $\theta_b=\psi_0+\inf Z+\sup Z$ and $\theta_b+\pi/2$. On either axis of angle $\alpha$, enclose the reference-point displacement by the interval product
@@ -406,7 +419,15 @@ $$
 
 ### Primary safety objective and secondary preference
 
-For each stage $0\le j<N$, define
+For member $s$, let $B_T^s(jh;A,\beta,p_0)$ be the occupied target footprint given by its motion law at elapsed time $jh$, with initial position $p_0$ in its position box $P_0^s$. The construction of $T_j^s$ gives, conditional on the member's root speed, heading and motion mode,
+
+$$
+\bigcup_{\substack{p_0\in P_0^s,\ (A,\beta)\in I_A^s\times I_\beta^s\\
+                    \text{admissible on }[0,jh]}}
+ B_T^s(jh;A,\beta,p_0)\ \subseteq\ T_j^s .
+$$
+
+Thus the gap to $T_j^s$ lower-bounds separation for the full parameter intervals at the control node $t_k+jh$. For each stage $0\le j<N$, define
 $C_j(U)=\max_s\max_{i\in\{j,j+1\}}(d_*-d_i^s)$.
 The two endpoints ensure that the root, the common leg junction and the terminal node are included. For an information state $\mathcal I$ write $\mathcal U_N(\mathcal I)$ for the common command sequences satisfying the actuator and physical-domain conditions on both legs and the hard terminal condition on every member. The predictive control barrier value on this domain is
 
@@ -436,13 +457,13 @@ $$
 
 This measures longitudinal force use and rear slip relative to the tire force scale. Among available plans of equal deficit an incumbent is replaced when $J_\mathrm{tire}$ decreases and $J_\mathrm{tr}$ does not increase, in real arithmetic. Neither preference can buy an increase in the primary deficit.
 
-For a realizable constant-curvature cruise trim, $v_c=V_\mathrm{ref}$, course is tangent to the route, $r=k_\Gamma V_\mathrm{ref}$ and the body derivatives vanish. Let $u^\star,x^\star$ satisfy these balance equations. The target-free guide adds the constant offset $u^\star-G(x^\star,u^\star)$ to the raw route command $G(x,u^-)$ before actuator projection. At admissible trim this gives $u^\star$; on a straight road the offset is zero. For transverse trim error $e=(e_y,\operatorname{wrap}(\psi-\theta-\psi^\star_\mathrm{rel}),v_x-v_x^\star,v_y-v_y^\star,r-r^\star)$ one may evaluate the nominal CLF $V_\mathrm{clf}=e^\top P_c e$, $P_c\succ0$, with $\dot V_\mathrm{clf}=2e^\top P_c\dot e$, using $\dot\theta=k_\Gamma\dot s$. Here $\psi^\star_\mathrm{rel}$ is the equilibrium body-heading offset from the tangent. For a sampled transverse linearization $e^+=A_ce+B_c\delta u$ and certified local feedback $\delta u=K_c e$, a metric with $(A_c+B_cK_c)^\top P_c(A_c+B_cK_c)\preceq\rho_cP_c$, $0<\rho_c<1$, gives $V_\mathrm{clf}(e^+)\le\rho_c V_\mathrm{clf}(e)$ on that linear model. The primary problem above imposes no global decrease condition on this CLF. The trim identity establishes equilibrium tracking; asymptotic return to the route would require a separate stability argument.
+For a realizable constant-curvature cruise trim, $v_c=V_\mathrm{ref}$, course is tangent to the route, $r=k_\Gamma V_\mathrm{ref}$ and the body derivatives vanish. Let $u^\star,x^\star$ satisfy these balance equations. The target-free guide adds the constant offset $u^\star-G(x^\star,u^\star)$ to the raw route command $G(x,u^-)$ before actuator projection. At admissible trim this gives $u^\star$; on a straight road the offset is zero. For transverse trim error $e=(e_y,\operatorname{wrap}(\psi-\theta-\psi^\star_\mathrm{rel}),v_x-v_x^\star,v_y-v_y^\star,r-r^\star)$ one may evaluate the nominal CLF $V_\mathrm{clf}=e^\top P_c e$, $P_c\succ0$, with $\dot V_\mathrm{clf}=2e^\top P_c\dot e$, using $\dot\theta=k_\Gamma\dot s$. Here $\psi^\star_\mathrm{rel}$ is the equilibrium body-heading offset from the tangent. For the one-hold transverse linearization $e^+=A_ce+B_c\delta u$ and certified local feedback $\delta u=K_c e$, a metric with $(A_c+B_cK_c)^\top P_c(A_c+B_cK_c)\preceq\rho_cP_c$, $0<\rho_c<1$, gives $V_\mathrm{clf}(e^+)\le\rho_c V_\mathrm{clf}(e)$ on that linear model. The primary problem above imposes no global decrease condition on this CLF. The trim identity establishes equilibrium tracking; asymptotic return to the route would require a separate stability argument.
 
 ### Conditional recursive feasibility
 
 **Proposition.** Suppose that an encounter starts with a feasible common plan; the margin, dynamics and timing stay fixed; each realized successor and footprint is covered; and conditioning on the new block leaves a subset of the previously predicted successors **with compatible future uncertainty and exit obligations**. Suppose the physical handoff and target-free continuation assumptions hold, and the new horizon contains the whole unexecuted suffix with all required common terminal extensions admissible and representable. Require a feasible admission separately whenever a new encounter adds collision obligations.
 
-Let $U_k$ be the committed plan and $\xi_{j|k}$ its actual stage deficits. Applying its first command and conditioning removes the first stage. Every surviving path along the old suffix was covered by the old constraints. Its worst endpoint deficit at new stage $j$ is consequently at most $\xi_{j+1|k}$. If $N_{k+1}=N_k-1$, the endpoint already belongs to $Z_f$. Otherwise append $N_{k+1}-(N_k-1)$ holds of the common continuation. Closure inductively supplies their admissibility, terminal membership and zero collision slack. Hence a feasible successor exists, and
+Let $U_k$ be the committed plan and $\xi_{j|k}$ its actual stage deficits. After the hold $[t_k,t_{k+1})$, condition on $Y_{k+1}$. The old prediction node $t_k+(j+1)h$ coincides with the new node $t_{k+1}+jh$. Every surviving path along the old suffix was covered by the old constraints. Its worst endpoint deficit at new stage $j$ is consequently at most $\xi_{j+1|k}$. If $N_{k+1}=N_k-1$, the endpoint already belongs to $Z_f$. Otherwise append $N_{k+1}-(N_k-1)$ holds of the common continuation. Closure inductively supplies their admissibility, terminal membership and zero collision slack. Hence a feasible successor exists, and
 
 $$
 D(U^\mathrm{shift}_{k+1})\le D(U_k)-\xi_{0|k},\qquad
@@ -451,4 +472,4 @@ $$
 
 For an attained primary minimizer this yields $V_{N_{k+1}}(\mathcal I_{k+1})\le V_{N_k}(\mathcal I_k)-\xi^*_{0|k}$. For any committed incumbent, accepting only successors within $L_{k+1}$ gives the corresponding decrease of committed deficits. Starting from zero, nonnegativity forces every subsequent deficit to remain zero. In particular the replacement may choose a different separating direction. The shift proof uses existence of the inherited witnesses and membership of any replacement in the same feasible set. Under coverage, the actual vehicle then has clearance at least $d_*$ at obligated control nodes. A positive feasible deficit still requires strictly positive node clearance.
 
-The containment premise concerns the joint physical and information evolution. Replacing the root speed, heading or motion mode with a newly observed point can violate it, even when $A,\beta$ are constant on the true trajectory. Checking the shifted trajectory against the new information establishes feasibility for that update when it passes. The induction applies across updates for which its premises hold. The node inequalities imply neither intersample separation nor admission feasibility for an arbitrary previously unseen target.
+The containment premise concerns the joint physical and information evolution. Replacing the root speed, heading or motion mode with a newly observed point can violate it, even when $A,\beta$ are constant on the true trajectory. Checking the shifted trajectory against the new information establishes feasibility for that update when it passes. The induction applies across updates for which its premises hold. Separation between control boundaries and feasibility on admission of a previously unseen target each require an additional argument.
