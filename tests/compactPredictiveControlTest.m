@@ -459,6 +459,8 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             step=frames(repair);
             testCase.verifyGreaterThan(step.initialPeakClearanceDeficitMeters,0);
             testCase.verifyEqual(step.inheritedDeficitCap,0);
+            testCase.verifyLessThan(step.sensitivitySubsteps,step.validationSubsteps);
+            testCase.verifyEqual(step.validationSubsteps,cfg.outputFeedback.validationSubsteps);
             testCase.verifyEqual(step.nlpAttempts,1);
             testCase.verifyEqual(step.pcbfValue,0);
             testCase.verifyTrue(step.deficitDescentMet && step.terminalSetEnforced);
@@ -534,12 +536,12 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             cfg=collisionAvoidanceControllerConfig();
             cfg.target.observerDomain=collisionThreatContract(strings(1,0),[8,15,20], ...
                 WindowSeconds=20,ControllerConfiguration=cfg);
-            run=runJointOutputFeedbackScenario(Scenarios="hardBrakingLead",Speeds=20,Frames=3, ...
+            run=runJointOutputFeedbackScenario(Scenarios="crossing",Speeds=8,Frames=3, ...
                 ControllerConfiguration=cfg,RandomSeed=20261107,OutputDirectory=string(folder.Folder));
             testCase.assertEqual(run.results.outcome,"completed");
             data=jsondecode(fileread(run.results.source));
-            cfg.referenceSpeed=20;cfg.model.speedMaximum=data.configuration.model.speedMaximum;
-            [~,~,reference,cfg]=collisionThreatScenario("hardBrakingLead",cfg);
+            cfg.referenceSpeed=8;cfg.model.speedMaximum=data.configuration.model.speedMaximum;
+            [~,~,reference,cfg]=collisionThreatScenario("crossing",cfg);
             block=struct('kind',"jointSensorBlock-v1",'time',0,'heldInput',[0;0], ...
                 'samples',data.initialSensorSample,'initialHypotheses',data.initialInformationContract);
             [first,~,~,prior]=collisionAvoidanceController(block,[],reference,cfg,[]);

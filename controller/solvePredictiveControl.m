@@ -45,7 +45,9 @@ function [result,diagnostics,problem] = solvePredictiveControl(interface,request
             stub=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6));
             reference=[-1000,0;1000,0];if isfield(request,'reference'),reference=request.reference;end
             [~,lane]=readControllerInputs(stub,[],reference,cfg);
-            kernel=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target));
+            % The sequence evaluator differentiates the reported nonlinear
+            % flow. Online IPOPT proposals use the cheaper tangent mesh.
+            kernel=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target),cfg.outputFeedback.validationSubsteps);
             model=localCondensedModel(cfg,hypotheses,request.input,holds,lane,nominal,kernel);
             [~,rollouts]=localCondensedOracle(controls(:),model,false);
             result=localCondensedOracle(controls(:),model,true,rollouts);
@@ -1050,16 +1052,19 @@ function [a,b]=localGuideInputRows(model,offset,a,b)
     end
 end
 
-function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
+function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,tangentSteps)
     persistent keys kernels
+    of=cfg.outputFeedback;h=cfg.controller.sampleTime;
+    if nargin<4
+        tangentSteps=min(of.validationSubsteps,max(2,ceil(h/(2*of.sensorPeriod))));
+    end
     key=cfg;hit=false;
     for k=1:numel(keys)
-        if isequaln(key,keys{k})
+        if kernels{k}.sensitivitySubsteps==tangentSteps && isequaln(key,keys{k})
             kernel=kernels{k};kernel.holds=holds;hit=true;return;
         end
     end
     import casadi.*
-    of=cfg.outputFeedback;h=cfg.controller.sampleTime;
     maximumSpeed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum);
     blockSeconds=maximumSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds;
     capacity=max(2,ceil(blockSeconds/h));K=of.validationSubsteps;
@@ -1091,7 +1096,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget)
     % their derivatives without an additional integration at every sample.
     % IPOPT uses this approximation to the trajectory Jacobian.
     % The nonlinear oracle and acceptance gate always use the flow above.
-    M=min(K,max(4,round(h/of.sensorPeriod)));D=K/M;dt=h/M;
+    M=tangentSteps;D=K/M;dt=h/M;
     k1=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);
     k2=nonlinearBicycleModel.symbolicDerivative(x+dt*k1/2,u,p,cfg);
     k3=nonlinearBicycleModel.symbolicDerivative(x+dt*k2/2,u,p,cfg);

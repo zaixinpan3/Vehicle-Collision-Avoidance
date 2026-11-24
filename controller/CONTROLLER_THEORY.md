@@ -541,8 +541,12 @@ $$
 
 The nonlinear validation flow uses a fixed RK4 mesh, with physical-domain
 checks inside each hold and collision checks at its boundaries. Local flow
-sensitivities propagate $S_{j+1}=F_x S_j+F_uD_v u_j$ on a cheaper mesh. The
-held inputs reconstructed from a trial must pass the original nonlinear
+sensitivities propagate $S_{j+1}=F_x S_j+F_uD_v u_j$. For an IPOPT search
+direction the tangent flow uses $\min(K_v,\max(2,\lceil h/(2h_s)\rceil))$
+RK4 substeps per hold, where $h_s$ is the sensor period. At the default
+timing this gives two tangent substeps and eight nonlinear substeps.
+Standalone evaluation of a specified input sequence differentiates its
+validation mesh. The held inputs reconstructed from a trial must pass the original nonlinear
 validation. Neither mesh supplies a certified integration-error bound.
 
 The causal measurement-consistency update uses the same fine RK4 resolution,
