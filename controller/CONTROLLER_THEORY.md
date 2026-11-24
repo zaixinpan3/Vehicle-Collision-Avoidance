@@ -544,18 +544,15 @@ checks inside each hold and collision checks at its boundaries. Local flow
 sensitivities propagate $S_{j+1}=F_x S_j+F_uD_v u_j$. For an IPOPT search
 direction the tangent flow uses $\min(K_v,\max(2,\lceil h/(2h_s)\rceil))$
 RK4 substeps per hold, where $h_s$ is the sensor period. At the default
-timing this gives two tangent substeps and eight nonlinear substeps.
+timing this gives two tangent substeps and four nonlinear substeps.
 Standalone evaluation of a specified input sequence differentiates its
 validation mesh. The held inputs reconstructed from a trial must pass the original nonlinear
 validation. Neither mesh supplies a certified integration-error bound.
 
-The causal measurement-consistency update uses the same fine RK4 resolution,
-subdividing each sensor interval without applying the absorbing reset before
-the control boundary. Its small compiled flow is cached independently of the
-optimization graph. Otherwise, an accurate raw acceleration reading near a
-model transition can reject the true physical member solely because inference
-used a coarser flow. Sensor noise bounds are unchanged; finer integration is
-still not a certified discretization-error enclosure.
+With the default timing the causal measurement-consistency update advances
+the ego state by one RK4 step per sensor interval under the held command.
+It evaluates the sensor equations and updates the target at each reading.
+The absorbing ego reset applies only at the control boundary.
 
 The compiled flow graph allocates capacity from configuration size hints and
 the preview rule. These hints are not planner velocity constraints. A longer
@@ -845,7 +842,7 @@ conditions.
 
 For each retained physical member, expand the proposed coarse commands into
 all $N$ held commands and propagate its own persistent parameters. Fine RK4
-replay uses $K_v=8$ steps per hold by default, with the held command and the
+replay uses $K_v=4$ steps per hold by default, with the held command and the
 rest reset applied at control boundaries. This is the integration and
 physical-domain mesh; it does not define additional collision constraints.
 Every new executable proposal is checked for physical input bounds,

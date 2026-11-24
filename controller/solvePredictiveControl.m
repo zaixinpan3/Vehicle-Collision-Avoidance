@@ -130,16 +130,14 @@ function cfg = localOfPhysicalConfiguration(hypothesis,cfg)
     cfg.tire.frictionCoefficient=cfg.tire.frictionCoefficient.*hypothesis.parameters(3:4);
 end
 
-function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold,flow)
-    if nargin<6,flow=localOfInferenceKernel(cfg,duration);end
-    next=hypothesis;
-    if ~isempty(flow)
-        next.ego=full(flow(hypothesis.ego,input,hypothesis.parameters));
-        if endOfHold,next.ego=nonlinearBicycleModel.sampleEndState(next.ego,input,cfg);end
-    else
-        physical=localOfPhysicalConfiguration(hypothesis,cfg);
-        next.ego=nonlinearBicycleModel.sensorFlow(hypothesis.ego,input,physical,duration,endOfHold);
+function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold,ego)
+    if nargin<6
+        flow=localOfInferenceKernel(cfg,duration,1);
+        ego=full(flow(hypothesis.ego,input,hypothesis.parameters));
     end
+    next=hypothesis;
+    next.ego=ego;
+    if endOfHold,next.ego=nonlinearBicycleModel.sampleEndState(next.ego,input,cfg);end
     if ~isempty(hypothesis.target) && hypothesis.target(4)>0
         next.target=predictiveSafetyGeometry.predictTarget(hypothesis.target,duration);
         next.target(5:6)=hypothesis.target(5:6);
@@ -147,11 +145,11 @@ function next = localOfAdvance(hypothesis,input,cfg,duration,endOfHold,flow)
     % V=0 is an absorbing mode, including when latent A was nonzero.
 end
 
-function flow=localOfInferenceKernel(cfg,duration)
+function flow=localOfInferenceKernel(cfg,duration,sampleCount)
     % Match the fixed prediction/replay mesh so conditioned successor roots
     % agree with the previously accepted held-input trajectory.
     persistent keys flows
-    key={cfg,duration};index=[];
+    key={cfg,duration,sampleCount};index=[];
     for j=1:numel(keys),if isequaln(keys{j},key),index=j;break;end,end
     if isempty(index)
         import casadi.*
@@ -171,9 +169,10 @@ function flow=localOfInferenceKernel(cfg,duration)
                 'compiler',char(cfg.outputFeedback.nlpCompiler),'directory',[directory,filesep]));
         end
         step=Function('pcbf_inference_step',{root,command,scale},{root+dt*(k1+2*k2+2*k3+k4)/6},options);
-        mapped=step.mapaccum(count);root=MX.sym('root',6);command=MX.sym('command',2);scale=MX.sym('scale',4);
-        states=mapped(root,repmat(command,1,count),repmat(scale,1,count));
-        flows{end+1}=Function('pcbf_inference',{root,command,scale},{states(:,end)});keys{end+1}=key;index=numel(keys);
+        steps=count*sampleCount;
+        mapped=step.mapaccum(steps);root=MX.sym('root',6);command=MX.sym('command',2);scale=MX.sym('scale',4);
+        states=mapped(root,repmat(command,1,steps),repmat(scale,1,steps));
+        flows{end+1}=Function('pcbf_inference',{root,command,scale},{states(:,count:count:end)});keys{end+1}=key;index=numel(keys);
     end
     flow=flows{index};
 end
@@ -212,12 +211,15 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
     tolerance=1e-9; % Numerical measurement comparison only; not extra noise.
     % The sensor mesh and model are shared; the persistent physical
     % parameters remain separate arguments for each hypothesis.
-    if ~initial,flow=localOfInferenceKernel(cfg,cfg.outputFeedback.sensorPeriod);end
+    sampleCount=numel(block.samples);
+    if ~initial,flow=localOfInferenceKernel(cfg,cfg.outputFeedback.sensorPeriod,sampleCount);end
     for s=1:numel(hypotheses)
         item=hypotheses(s);excess=-Inf;
-        for j=1:numel(block.samples)
+        % Only the target is corrected between readings of a held command.
+        if ~initial,egoSamples=full(flow(item.ego,block.heldInput,item.parameters));end
+        for j=1:sampleCount
             if ~initial
-                item=localOfAdvance(item,block.heldInput,cfg,cfg.outputFeedback.sensorPeriod,j==numel(block.samples),flow);
+                item=localOfAdvance(item,block.heldInput,cfg,cfg.outputFeedback.sensorPeriod,j==sampleCount,egoSamples(:,j));
             end
             measured=block.samples(j);
             if observe && (measured.radarAvailable || ~isempty(item.targetObserver))

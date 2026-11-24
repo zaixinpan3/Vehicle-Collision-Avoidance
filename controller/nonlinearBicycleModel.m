@@ -499,7 +499,10 @@ classdef nonlinearBicycleModel
                 value=fx*s+force(1)*c;
                 derivative=fx*c-slope(1)*c-force(1)*s;
                 if derivative<=eps,break;end
+                previousSteering=steering;
                 steering=min(frontCourse+slipLimit,max(frontCourse-slipLimit,steering+(front-value)/derivative));
+                % The guidance inverse only needs a steering seed (radians).
+                if abs(steering-previousSteering)<=1e-4,break;end
             end
             % The declared plant blends to a kinematic bicycle at low speed;
             % invert that branch too instead of applying a tire-force inverse

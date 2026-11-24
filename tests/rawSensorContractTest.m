@@ -36,6 +36,12 @@ classdef rawSensorContractTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(bad,[],[],testCase.cfg,testCase.state), ...
                 'collisionAvoidanceController:invalidSensorGrid');
         end
+        function anInconsistentIntermediateAccelerationRejectsTheHold(testCase)
+            cfg=testCase.cfg;block=localNextBlock(testCase.state,cfg);
+            block.samples(2).acceleration(1)=block.samples(2).acceleration(1)+cfg.outputFeedback.noiseBounds(2)+.01;
+            testCase.verifyError(@()collisionAvoidanceController(block,[],[],cfg,testCase.state), ...
+                'collisionAvoidanceController:emptyJointInformation');
+        end
         function parameterAndSensorBiasHypothesesPersistThroughMotion(testCase)
             hypothesis=testCase.hypothesis;hypothesis.parameters=[.9;1.1;.95;1.05];hypothesis.sensorBias=(1:7)'*.001;
             next=localOperation('advance',testCase.cfg,struct('hypothesis',hypothesis,'input',[0;-.6], ...
