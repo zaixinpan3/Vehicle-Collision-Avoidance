@@ -893,6 +893,11 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
             'mu_strategy','monotone','mu_init',1e-6,'bound_push',1e-6,'bound_frac',1e-6, ...
             'tol',tolerance,'constr_viol_tol',tolerance));
         if seekZero
+            % Start in the interior when the seed must also recover hard
+            % constraints. Clearance-only corrections already use equilibration.
+            if any(seed.terminal>tolerance) || any(seed.forward>tolerance)
+                options.ipopt.mu_init=0.1;
+            end
             % A rejected trial costs a full nonlinear rollout. Backtrack by
             % two halvings at a time when searching for a zero PCBF deficit.
             options.ipopt.alpha_red_factor=0.25;

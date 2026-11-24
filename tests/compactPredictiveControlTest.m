@@ -453,6 +453,24 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(metadata(first+1).inheritedDeficitCap,0);
             testCase.verifyTrue(metadata(first+1).deficitDescentMet);
         end
+        function aJointClearanceAndTerminalDeficitFitsAShortIpoptSolve(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            cfg=collisionAvoidanceControllerConfig();
+            cfg.target.observerDomain=collisionThreatContract(strings(1,0),[8,15,20], ...
+                WindowSeconds=20,ControllerConfiguration=cfg);
+            cfg.outputFeedback.nlpMaximumIterations=8;
+            run=runJointOutputFeedbackScenario(Scenarios="curvedCrossing",Speeds=8,Frames=3, ...
+                RandomSeed=20261108,ControllerConfiguration=cfg,OutputDirectory=string(folder.Folder));
+            testCase.assertEqual(run.results.outcome,"completed");
+            data=jsondecode(fileread(run.results.source));
+            info=data.trace(2).metadata;
+            testCase.verifyGreaterThan(info.initialPeakClearanceDeficitMeters,0);
+            testCase.verifyGreaterThan(info.initialNlpViolation,cfg.outputFeedback.nlpTolerance);
+            testCase.verifyEqual(info.nlpAttempts,1);
+            testCase.verifyEqual(info.pcbfValue,0);
+            testCase.verifyLessThanOrEqual(info.terminalValue,cfg.outputFeedback.nlpTolerance);
+            testCase.verifyTrue(data.trace(3).metadata.deficitDescentMet);
+        end
         function aShiftedPlanCanRecoverZeroDeficitInOneSolve(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             cfg=collisionAvoidanceControllerConfig();
