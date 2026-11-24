@@ -661,12 +661,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             block=localNextBlock(prior,cfg);
             [~,expectedInputs,expected]=collisionAvoidanceController(block,[],[],cfg, ...
                 rmfield(prior,'retainedTrajectories'));
-            for change=["root","parameters","mesh","input"]
+            for change=["root","parameters","mesh","integrationRule","input"]
                 changed=prior;old=changed.retainedTrajectories{1};
                 switch change
                     case "root",old.collisionEgo(1,2)=old.collisionEgo(1,2)+.01;
                     case "parameters",old.parameters(3)=old.parameters(3)+.01;
                     case "mesh",old.validationSubsteps=2*old.validationSubsteps;
+                    case "integrationRule",old=rmfield(old,'integrationRule');
                     case "input",old.inputs(1,2)=old.inputs(1,2)+.01;
                 end
                 changed.retainedTrajectories{1}=old;

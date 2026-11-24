@@ -58,6 +58,17 @@ classdef rawSensorContractTest < matlab.unittest.TestCase
             testCase.verifyEqual(boundary.ego(4:6),zeros(3,1),AbsTol=0);
             testCase.verifyEqual(middle.ego(1:3),boundary.ego(1:3),AbsTol=0);
         end
+        function aBrakingSampleEnteringTheModelBlendUsesTwoHalfSteps(testCase)
+            cfg=testCase.cfg;dt=cfg.outputFeedback.sensorPeriod;
+            item=testCase.hypothesis;item.ego(4:6)=[cfg.model.kinematicSpeedRange(2)+.02;.05;.01];
+            request=struct('hypothesis',item,'input',[.02;-.8],'duration',dt,'endOfHold',false);
+            actual=localOperation('advance',cfg,request);
+            request.duration=dt/2;
+            request.hypothesis=localOperation('advance',cfg,request);
+            expected=localOperation('advance',cfg,request);
+            testCase.verifyLessThan(actual.ego(4),cfg.model.kinematicSpeedRange(2));
+            testCase.verifyEqual(actual.ego,expected.ego,AbsTol=1e-12);
+        end
         function anAbsorbedTargetCannotRestartFromItsLatentAcceleration(testCase)
             hypothesis=testCase.hypothesis;hypothesis.target(5)=2;
             next=localOperation('advance',testCase.cfg,struct('hypothesis',hypothesis,'input',[0;-.6], ...

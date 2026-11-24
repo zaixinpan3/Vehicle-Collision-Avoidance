@@ -465,7 +465,7 @@ classdef nonlinearBicycleModel
             desiredYaw=min(limit,max(-limit,desiredYaw));
             longitudinal=longitudinalWeight*(forward.'*acceleration);
             if ~physicalBoundsOnly,longitudinal=min(longitudinal,(cfg.model.speedMaximum-x(4))/cfg.controller.sampleTime);end
-            b=(longitudinal+nonlinearBicycleModel.roadLoad(x(4),cfg)/cfg.vehicle.m)/nonlinearBicycleModel.tireAccelerationGain(cfg);
+            b=(longitudinal+nonlinearBicycleModel.roadLoad(x(4),cfg)/cfg.vehicle.m)/tire.brakingRatioAccelerationGain;
             % Allocate braking and lateral force together. The cruise seed's
             % brakingRatioLimit is not an avoidance actuator bound. Reserve
             % the lateral fraction requested by the yaw loop at BOTH axles,
@@ -486,23 +486,31 @@ classdef nonlinearBicycleModel
             front=(cfg.vehicle.Iz*p.yawRateGain*(desiredYaw-x(6))+cfg.vehicle.lr*rear(2))/cfg.vehicle.lf;
             capacity=tire.longitudinalForceScale(1)*sqrt(1-b^2);
             fraction=min(abs(front)/capacity,p.frontForceFraction);
-            slip=-sign(front)*atan(3*capacity*(1-(1-fraction)^(1/3))/tire.corneringStiffness(1));
-            steering=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor))-slip;
-            % The front braking force rotates with steering. Invert the
-            % body-frame lateral force, not Fy alone, with bounded scalar
-            % Newton steps on the same adhesion branch used above.
+            stiffness=tire.corneringStiffness(1);
+            remaining=(1-fraction)^(1/3);
+            slipTangent=-sign(front)*3*capacity*(1-remaining)/stiffness;
             frontCourse=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
-            slipLimit=atan(3*capacity*(1-(1-p.frontForceFraction)^(1/3))/tire.corneringStiffness(1));
-            for iteration=1:3*double(coupled)
-                [force,slope]=nonlinearBicycleModel.tireForces([frontCourse-steering;rearSlip],b,cfg);
-                fx=b*tire.longitudinalForceScale(1);c=cos(steering);s=sin(steering);
-                value=fx*s+force(1)*c;
-                derivative=fx*c-slope(1)*c-force(1)*s;
-                if derivative<=eps,break;end
-                previousSteering=steering;
-                steering=min(frontCourse+slipLimit,max(frontCourse-slipLimit,steering+(front-value)/derivative));
-                % The guidance inverse only needs a steering seed (radians).
-                if abs(steering-previousSteering)<=1e-4,break;end
+            steering=frontCourse-atan(slipTangent);
+            if coupled
+                % The inverse Fiala solution gives both the front force and
+                % its steering derivative at this initial steering angle.
+                force=sign(front)*fraction*capacity;
+                steerSlope=stiffness*remaining^2*(1+slipTangent^2);
+                fx=b*tire.longitudinalForceScale(1);
+                limit=atan(3*capacity*(1-(1-p.frontForceFraction)^(1/3))/stiffness);
+                for correction=1:2
+                    c=cos(steering);s=sin(steering);
+                    slope=(fx+steerSlope)*c-force*s;
+                    if slope<=eps,break;end
+                    update=(front-fx*s-force*c)/slope;
+                    corrected=min(frontCourse+limit,max(frontCourse-limit,steering+update));
+                    change=corrected-steering;
+                    steering=corrected;
+                    % Resolve larger seed corrections once more (radians).
+                    if abs(change)<=1e-3 || correction==2,break;end
+                    [fy,slipSlope]=nonlinearBicycleModel.tireForces([frontCourse-steering;rearSlip],b,cfg);
+                    force=fy(1);steerSlope=-slipSlope(1);
+                end
             end
             % The declared plant blends to a kinematic bicycle at low speed;
             % invert that branch too instead of applying a tire-force inverse

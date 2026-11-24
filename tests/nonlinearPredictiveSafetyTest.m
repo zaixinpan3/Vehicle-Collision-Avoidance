@@ -39,6 +39,22 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(next(3),q(3)+15*sin(.1)/1.6,AbsTol=1e-14);
             testCase.verifyEqual(next(4)*sin(next(6))/next(7),1.5*q(4)*sin(q(6))/q(7),AbsTol=1e-14);
         end
+        function steeringGuidanceAccountsForLongitudinalForceInBothDirections(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            speed=15;state=[0;0;0;speed;0;0];prior=[0;0];
+            for longitudinal=[-2,2]
+                for lateral=[-1.3,1.3]
+                    acceleration=[longitudinal;lateral];
+                    uncoupled=nonlinearBicycleModel.accelerationGuidance(state,acceleration,prior,cfg,1,false,true);
+                    coupled=nonlinearBicycleModel.accelerationGuidance(state,acceleration,prior,cfg,1,true,true);
+                    testCase.verifyEqual(coupled(2),uncoupled(2),AbsTol=1e-12);
+                    before=nonlinearBicycleModel.derivative(state,uncoupled,cfg);
+                    after=nonlinearBicycleModel.derivative(state,coupled,cfg);
+                    requestedYawAcceleration=cfg.nominalClf.yawRateGain*lateral/speed;
+                    testCase.verifyLessThan(abs(after(6)-requestedYawAcceleration),abs(before(6)-requestedYawAcceleration));
+                end
+            end
+        end
         function brakingEndsAtRest(testCase)
             % Braking stops the target and never turns it back; the state at
             % rest carries A = 0, so the forecast keeps the semigroup property.

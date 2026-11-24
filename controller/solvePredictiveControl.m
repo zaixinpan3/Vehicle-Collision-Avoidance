@@ -48,7 +48,8 @@ function [result,diagnostics,problem] = solvePredictiveControl(interface,request
             % The sequence evaluator differentiates the reported nonlinear
             % flow. Online IPOPT proposals use the cheaper tangent mesh.
             kernel=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target),cfg.outputFeedback.validationSubsteps);
-            model=localCondensedModel(cfg,hypotheses,request.input,holds,lane,nominal,kernel);
+            model=localPerformanceModel(cfg,hypotheses,request.input,holds,lane,nominal,kernel);
+            model=localAddControlMap(model);
             [~,rollouts]=localCondensedOracle(controls(:),model,false);
             result=localCondensedOracle(controls(:),model,true,rollouts);
         case {"step","prepareStep"}
@@ -157,10 +158,6 @@ function flow=localOfInferenceKernel(cfg,duration,sampleCount)
         requested=cfg.outputFeedback.validationSubsteps*duration/cfg.controller.sampleTime;
         count=max(1,ceil(requested-8*eps(max(1,requested))));dt=duration/count;
         root=SX.sym('inference_state',6);command=SX.sym('inference_input',2);scale=SX.sym('inference_scale',4);
-        k1=nonlinearBicycleModel.symbolicDerivative(root,command,scale,cfg);
-        k2=nonlinearBicycleModel.symbolicDerivative(root+dt*k1/2,command,scale,cfg);
-        k3=nonlinearBicycleModel.symbolicDerivative(root+dt*k2/2,command,scale,cfg);
-        k4=nonlinearBicycleModel.symbolicDerivative(root+dt*k3,command,scale,cfg);
         options=struct;
         if cfg.outputFeedback.nlpJit
             directory=tempname;mkdir(directory);
@@ -168,7 +165,7 @@ function flow=localOfInferenceKernel(cfg,duration,sampleCount)
                 'flags',sprintf('-O%d',cfg.outputFeedback.nlpCompilerOptimization), ...
                 'compiler',char(cfg.outputFeedback.nlpCompiler),'directory',[directory,filesep]));
         end
-        step=Function('pcbf_inference_step',{root,command,scale},{root+dt*(k1+2*k2+2*k3+k4)/6},options);
+        step=localIntegrationStep(root,command,scale,dt,cfg,options);
         steps=count*sampleCount;
         mapped=step.mapaccum(steps);root=MX.sym('root',6);command=MX.sym('command',2);scale=MX.sym('scale',4);
         states=mapped(root,repmat(command,1,steps),repmat(scale,1,steps));
@@ -177,21 +174,59 @@ function flow=localOfInferenceKernel(cfg,duration,sampleCount)
     flow=flows{index};
 end
 
-function y = localOfSensor(hypothesis,input,cfg,time)
-    physical=localOfPhysicalConfiguration(hypothesis,cfg);x=hypothesis.ego;
-    dx=nonlinearBicycleModel.derivative(x,input,physical);
-    a=[dx(4)-x(6)*x(5);dx(5)+x(6)*x(4)];
-    relative=zeros(2,1);detected=false;
-    if ~isempty(hypothesis.target)
-        rotation=[cos(x(3)),sin(x(3));-sin(x(3)),cos(x(3))];
-        relative=rotation*(hypothesis.target(1:2)-x(1:2));
-        detected=norm(relative)<=cfg.collision.encounterRangeMeters;
+function step=localIntegrationStep(x,u,p,dt,cfg,options)
+    import casadi.*
+    nominal=localRk4(x,u,p,dt,cfg);
+    if dt<=cfg.outputFeedback.sensorPeriod/2
+        step=Function('pcbf_rk4',{x,u,p},{nominal},options);
+        return
     end
-    if ~detected,relative=NaN(2,1);end
-    bias=hypothesis.sensorBias;
-    y=struct('time',time,'position',x(1:2)+bias(1:2), ...
-        'acceleration',a+bias(3:4),'yawRate',x(6)+bias(5), ...
-        'relativePosition',relative+bias(6:7),'radarAvailable',detected);
+    coarseStep=Function('pcbf_full_step',{x,u,p},{nominal});
+    halfStep=Function('pcbf_half_step',{x,u,p},{localRk4(x,u,p,dt/2,cfg)});
+    root=MX.sym('root',6);command=MX.sym('command',2);scale=MX.sym('scale',4);
+    fine=Function('pcbf_two_halves',{root,command,scale},{halfStep(halfStep(root,command,scale),command,scale)});
+    choose=Function.if_else('pcbf_select_step',fine,coarseStep);
+    % Extrapolate the current body coupling and road load by one substep.
+    % Allow either tire-force direction when selecting the integration mesh.
+    vx=root(4);range=cfg.model.kinematicSpeedRange;
+    drift=dt*(root(5)*root(6)-nonlinearBicycleModel.symbolicRoadLoad(vx,cfg)/cfg.vehicle.m);
+    tireSpan=dt*cfg.vehicle.gravity*mmax(cfg.tire.frictionCoefficient(:).*scale(3:4));
+    nearBlend=(fmax(vx,vx+drift+tireSpan)>=range(1)) & (fmin(vx,vx+drift-tireSpan)<=range(2));
+    next=choose(nearBlend,root,command,scale);
+    step=Function('pcbf_transition_step',{root,command,scale},{next},options);
+end
+
+function [next,k1,k2,k3,k4]=localRk4(x,u,p,dt,cfg)
+    k1=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);
+    k2=nonlinearBicycleModel.symbolicDerivative(x+dt*k1/2,u,p,cfg);
+    k3=nonlinearBicycleModel.symbolicDerivative(x+dt*k2/2,u,p,cfg);
+    k4=nonlinearBicycleModel.symbolicDerivative(x+dt*k3,u,p,cfg);
+    next=x+dt*(k1+2*k2+2*k3+k4)/6;
+end
+
+function y = localOfSensor(hypothesis,input,cfg,time)
+    physical=localOfPhysicalConfiguration(hypothesis,cfg);
+    [position,acceleration,yawRate]=localOfEgoSensor(hypothesis,input,physical);
+    [relative,detected]=localOfRadar(hypothesis,cfg);
+    y=struct('time',time,'position',position,'acceleration',acceleration,'yawRate',yawRate, ...
+        'relativePosition',relative,'radarAvailable',detected);
+end
+
+function [position,acceleration,yawRate]=localOfEgoSensor(hypothesis,input,physical)
+    x=hypothesis.ego;bias=hypothesis.sensorBias;
+    dx=nonlinearBicycleModel.derivative(x,input,physical);
+    position=x(1:2)+bias(1:2);
+    acceleration=[dx(4)-x(6)*x(5);dx(5)+x(6)*x(4)]+bias(3:4);
+    yawRate=x(6)+bias(5);
+end
+
+function [relative,detected]=localOfRadar(hypothesis,cfg)
+    relative=NaN(2,1);detected=false;
+    if isempty(hypothesis.target),return;end
+    x=hypothesis.ego;rotation=[cos(x(3)),sin(x(3));-sin(x(3)),cos(x(3))];
+    offset=rotation*(hypothesis.target(1:2)-x(1:2));
+    detected=norm(offset)<=cfg.collision.encounterRangeMeters;
+    if detected,relative=offset+hypothesis.sensorBias(6:7);end
 end
 
 function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
@@ -215,6 +250,7 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
     if ~initial,flow=localOfInferenceKernel(cfg,cfg.outputFeedback.sensorPeriod,sampleCount);end
     for s=1:numel(hypotheses)
         item=hypotheses(s);excess=-Inf;
+        physical=localOfPhysicalConfiguration(item,cfg);
         % Only the target is corrected between readings of a held command.
         if ~initial,egoSamples=full(flow(item.ego,block.heldInput,item.parameters));end
         for j=1:sampleCount
@@ -265,15 +301,16 @@ function [posterior,info] = localOfCondition(hypotheses,block,cfg,initial)
                         cfg.target.defaultLength/2;cfg.target.defaultWidth/2;0;0];
                 end
             end
-            expected=localOfSensor(item,block.heldInput,cfg,measured.time);
-            errors=[norm(measured.position-expected.position); ...
-                norm(measured.acceleration-expected.acceleration);abs(measured.yawRate-expected.yawRate)];
+            [position,acceleration,yawRate]=localOfEgoSensor(item,block.heldInput,physical);
+            errors=[norm(measured.position-position); ...
+                norm(measured.acceleration-acceleration);abs(measured.yawRate-yawRate)];
             excess=max(excess,max(errors-bounds(1:3)));
             if measured.radarAvailable && ~observe
-                if isempty(item.target) || ~expected.radarAvailable
+                [relative,detected]=localOfRadar(item,cfg);
+                if ~detected
                     excess=Inf;
                 else
-                    excess=max(excess,norm(measured.relativePosition-expected.relativePosition)-bounds(4));
+                    excess=max(excess,norm(measured.relativePosition-relative)-bounds(4));
                     if isfield(measured,'relativeHeading') && ~isempty(measured.relativeHeading) && isfinite(measured.relativeHeading)
                         angle=item.target(3)-item.ego(3)-measured.relativeHeading;
                         excess=max(excess,abs(atan2(sin(angle),cos(angle))));
@@ -521,8 +558,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     clock=tic;[kernel,cacheHit]=localCompactKernel(cfg,holds,~isempty(hypotheses(1).target));buildSeconds=toc(clock);
     count=sum(holds);nodes=numel(holds);nu=2*nodes;previous=request.block.heldInput;prior=request.previousState;
     initial=isempty(prior);h=cfg.controller.sampleTime;boundaries=[0,cumsum(holds)];
-    model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel);
-    validationModel=model;
+    validationModel=localPerformanceModel(cfg,hypotheses,previous,holds,lane,nominal,kernel);
     item=hypotheses(nominal);
     tolerance=cfg.outputFeedback.nlpTolerance;
     best=[];traces={};violation=Inf;validationSeconds=0;retained=false;
@@ -611,6 +647,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         if isempty(item.target),initializationSource="nominalCruiseRollout";
         else,initializationSource="singleCirculationRollout";end
         try
+            model=localAddControlMap(validationModel);
             coldCruise=initial && isempty(item.target);
             if ~coldCruise,checkClock();end
             if inherit && ~firstEncounter && ~isempty(item.target)
@@ -704,7 +741,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         trace=traces{s};
         retainedTrajectories{s}=struct('inputs',trace.inputs,'denseEgo',trace.denseEgo, ...
             'collisionEgo',trace.collisionEgo,'validationSubsteps',kernel.validationSubsteps, ...
-            'parameters',hypotheses(s).parameters,'target',hypotheses(s).target);
+            'parameters',hypotheses(s).parameters,'target',hypotheses(s).target,'integrationRule',"transitionRefinedRK4");
     end
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v2",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
@@ -997,26 +1034,29 @@ function [value,weights]=localFeasibilityMerit(residual,transition,tolerance)
     if nargout>1,weights=(residual./scale)*slope;end
 end
 
-function model=localCondensedModel(cfg,hypotheses,previous,holds,lane,nominal,kernel)
-    count=sum(holds);nodes=numel(holds);h=cfg.controller.sampleTime;boundaries=[0,cumsum(holds)];
-    map=zeros(count,nodes);offset=zeros(2,count);row=0;
-    for i=1:nodes
-        for j=1:holds(i)
-            row=row+1;fraction=j/holds(i);map(row,i)=fraction;
-            if i==1,offset(:,row)=(1-fraction)*previous;else,map(row,i-1)=1-fraction;end
-        end
-    end
-    controlMap=kron(map,eye(2));
-    model=struct('cfg',cfg,'hypotheses',hypotheses,'previous',previous,'kernel',kernel, ...
-        'map',map,'offset',offset,'controlMap',controlMap,'nominal',nominal,'reference',zeros(3,nodes));
+function model=localPerformanceModel(cfg,hypotheses,previous,holds,lane,nominal,kernel)
+    model=struct('cfg',cfg,'hypotheses',hypotheses,'previous',previous,'kernel',kernel,'nominal',nominal);
     tire=nonlinearBicycleModel.tireParameters(cfg);
     scales=[hypotheses.parameters];
     model.rearSlipScale=(tire.longitudinalForceScale(2)/tire.corneringStiffness(2))*scales(4,:)./scales(2,:);
     x=hypotheses(nominal).ego;
+    distances=cumsum(holds)*cfg.controller.sampleTime*cfg.referenceSpeed;
+    points=x(1:2)+[cos(x(3));sin(x(3))]*distances;
+    projection=predictiveSafetyGeometry.project(points,lane);
+    model.reference=[projection.point;projection.heading];
+end
+
+function model=localAddControlMap(model)
+    % Shifted executable commands can be evaluated directly on the hold grid.
+    holds=model.kernel.holds;count=sum(holds);nodes=numel(holds);
+    map=zeros(count,nodes);offset=zeros(2,count);row=0;
     for i=1:nodes
-        p=x(1:2)+boundaries(i+1)*h*cfg.referenceSpeed*[cos(x(3));sin(x(3))];
-        projection=predictiveSafetyGeometry.project(p,lane);model.reference(:,i)=[projection.point;projection.heading];
+        for j=1:holds(i)
+            row=row+1;fraction=j/holds(i);map(row,i)=fraction;
+            if i==1,offset(:,row)=(1-fraction)*model.previous;else,map(row,i-1)=1-fraction;end
+        end
     end
+    model.map=map;model.offset=offset;model.controlMap=kron(map,eye(2));
 end
 
 function [a,b]=localCondensedInputRows(previous,holds,cfg)
@@ -1070,27 +1110,18 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,tangentSteps)
     maximumSpeed=hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum);
     blockSeconds=maximumSpeed/of.previewDecelerationMetersPerSecondSquared+of.previewSettlingSeconds;
     capacity=max(2,ceil(blockSeconds/h));K=of.validationSubsteps;
-    M=K;D=1;dt=h/M;
+    M=K;dt=h/M;
     x=SX.sym('x',6);u=SX.sym('u',2);p=SX.sym('p',4);
-    k1=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);
-    k2=nonlinearBicycleModel.symbolicDerivative(x+dt*k1/2,u,p,cfg);
-    k3=nonlinearBicycleModel.symbolicDerivative(x+dt*k2/2,u,p,cfg);
-    k4=nonlinearBicycleModel.symbolicDerivative(x+dt*k3,u,p,cfg);
-    next=x+dt*(k1+2*k2+2*k3+k4)/6;
     options=struct;
     if of.nlpJit
         directory=tempname;mkdir(directory);options=struct('jit',true,'compiler','shell', ...
             'jit_options',struct('flags',sprintf('-O%d',of.nlpCompilerOptimization), ...
             'compiler',char(of.nlpCompiler),'directory',[directory,filesep]));
     end
-    points=cell(1,D);
-    for j=1:D
-        t=j/D;points{j}=x+dt*((t-1.5*t^2+2/3*t^3)*k1 ...
-            +(t^2-2/3*t^3)*(k2+k3)+(-.5*t^2+2/3*t^3)*k4);
-    end
-    step=Function('pcbf_step',{x,u,p},{next,horzcat(points{:})},options);
+    step=localIntegrationStep(x,u,p,dt,cfg,options);
     root=MX.sym('root',6);command=MX.sym('command',2);parameters=MX.sym('parameters',4);
-    mappedStep=step.mapaccum(M);[ends,points]=mappedStep(root,repmat(command,1,M),repmat(parameters,1,M));
+    mappedStep=step.mapaccum(M);ends=mappedStep(root,repmat(command,1,M),repmat(parameters,1,M));
+    points=ends;
     last=ends(:,end);stopped=(command(2)<=0)&(last(4)<.2*cfg.model.brakeHoldSpeed);
     finish=[last(1:3);if_else(stopped,zeros(3,1),last(4:6))];
     hold=Function('pcbf_hold',{root,command,parameters},{finish,points});
@@ -1099,18 +1130,20 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,tangentSteps)
     % IPOPT uses this approximation to the trajectory Jacobian.
     % The nonlinear oracle and acceptance gate always use the flow above.
     M=tangentSteps;D=K/M;dt=h/M;
-    k1=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);
-    k2=nonlinearBicycleModel.symbolicDerivative(x+dt*k1/2,u,p,cfg);
-    k3=nonlinearBicycleModel.symbolicDerivative(x+dt*k2/2,u,p,cfg);
-    k4=nonlinearBicycleModel.symbolicDerivative(x+dt*k3,u,p,cfg);
-    next=x+dt*(k1+2*k2+2*k3+k4)/6;
+    [next,k1,k2,k3,k4]=localRk4(x,u,p,dt,cfg);
     sensitivity=SX.sym('sensitivity',6,8);
     updated=jacobian(next,x)*sensitivity+[SX.zeros(6,6),jacobian(next,u)];
     % Only the binding physical-domain sample needs a within-hold Jacobian.
     % Geometry and the terminal law use the post-reset boundary Jacobians.
     index=MX.sym('index');initialSensitivity=DM([eye(6),zeros(6,2)]);
     augmented=[x;sensitivity(:)];
-    variation=Function('pcbf_variation',{augmented,u,p},{[next;updated(:)]},options);
+    if M==K && dt>of.sensorPeriod/2
+        exact=step(root,command,parameters);seed=MX.sym('seed',6,8);
+        change=jacobian(exact,root)*seed+[MX.zeros(6,6),jacobian(exact,command)];
+        variation=Function('pcbf_variation',{[root;seed(:)],command,parameters},{[exact;change(:)]},options);
+    else
+        variation=Function('pcbf_variation',{augmented,u,p},{[next;updated(:)]},options);
+    end
     initialVariation=[root;initialSensitivity(:)];
     variationMap=variation.mapaccum(M);
     varying=variationMap(initialVariation,repmat(command,1,M),repmat(parameters,1,M));
@@ -1570,7 +1603,8 @@ function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,condition
                 {'inputs','denseEgo','collisionEgo','validationSubsteps','parameters'}));
             if compatible
                 oldCount=size(old.inputs,2);
-                compatible=old.validationSubsteps==substeps && oldCount>=1 ...
+                compatible=isfield(old,'integrationRule') && isequal(old.integrationRule,"transitionRefinedRK4") ...
+                    && old.validationSubsteps==substeps && oldCount>=1 ...
                     && isequal(size(old.inputs),[2,oldCount]) ...
                     && isequal(size(old.collisionEgo),[6,oldCount+1]) ...
                     && isequal(size(old.denseEgo),[6,substeps*oldCount+1]) ...

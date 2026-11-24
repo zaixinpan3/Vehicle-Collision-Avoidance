@@ -539,18 +539,26 @@ b_2=\theta^2-\tfrac23\theta^3,\quad
 b_4=-\tfrac12\theta^2+\tfrac23\theta^3.
 $$
 
-The nonlinear validation flow uses a fixed RK4 mesh, with physical-domain
-checks inside each hold and collision checks at its boundaries. Local flow
+The nonlinear validation flow samples the physical domain on a fixed base
+mesh and checks collision at hold boundaries. Let $\Delta=h/K_v$ and let
+$[v_1,v_2]$ be the kinematic-to-Fiala blend interval. To select a numerical
+step, extrapolate the current longitudinal coupling and road load by
+$b=\Delta(v_y r-F_{\rm load}(v_x)/m_E)$, and let
+$a=\Delta g\max(\mu_f,\mu_r)$ use the member's axle friction coefficients.
+When $\Delta>h_s/2$ and the convex hull of
+$\{v_x,v_x+b-a,v_x+b+a\}$ intersects $[v_1,v_2]$, compose two RK4
+half steps. Otherwise take one RK4 step. This interval selects integration
+resolution and carries no reachable-set guarantee. Local flow
 sensitivities propagate $S_{j+1}=F_x S_j+F_uD_v u_j$. For an IPOPT search
 direction the tangent flow uses $\min(K_v,\max(2,\lceil h/(2h_s)\rceil))$
 RK4 substeps per hold, where $h_s$ is the sensor period. At the default
-timing this gives two tangent substeps and four nonlinear substeps.
+timing this gives two search tangent substeps and four nonlinear base intervals.
 Standalone evaluation of a specified input sequence differentiates its
 validation mesh. The held inputs reconstructed from a trial must pass the original nonlinear
 validation. Neither mesh supplies a certified integration-error bound.
 
 With the default timing the causal measurement-consistency update advances
-the ego state by one RK4 step per sensor interval under the held command.
+the ego state by the same numerical map over each sensor interval under the held command.
 It evaluates the sensor equations and updates the target at each reading.
 The absorbing ego reset applies only at the control boundary.
 
@@ -842,7 +850,7 @@ conditions.
 
 For each retained physical member, expand the proposed coarse commands into
 all $N$ held commands and propagate its own persistent parameters. Fine RK4
-replay uses $K_v=4$ steps per hold by default, with the held command and the
+replay uses $K_v=4$ base intervals per hold by default, with the held command and the
 rest reset applied at control boundaries. This is the integration and
 physical-domain mesh; it does not define additional collision constraints.
 Every new executable proposal is checked for physical input bounds,
