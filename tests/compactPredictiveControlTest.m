@@ -18,6 +18,9 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
         admissionMeasurements={"boundedRadar","exactRadar","exactRadarWithDropout"}
         leadEncounter={"stoppedLead","hardBrakingLead"}
         acquisitionEncounter={"brakingLead","acceleratingHeadOn"}
+        jointDeficitCase=struct( ...
+            'interiorCrossing',struct('name',"curvedCrossing",'speed',8,'seed',20261108,'iterations',8), ...
+            'nearFullBraking',struct('name',"hardBrakingLead",'speed',20,'seed',20261107,'iterations',3))
         uncertainEncounter={"brakingLead","trafficBrakingLead","curvedCrossing", ...
             "headOn","trafficHeadOn","curvedHeadOn","acceleratingHeadOn"}
         cacheSpeed={.04,3}
@@ -453,14 +456,14 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(metadata(first+1).inheritedDeficitCap,0);
             testCase.verifyTrue(metadata(first+1).deficitDescentMet);
         end
-        function aJointClearanceAndTerminalDeficitFitsAShortIpoptSolve(testCase)
+        function aJointClearanceAndTerminalDeficitFitsAShortIpoptSolve(testCase,jointDeficitCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
             cfg=collisionAvoidanceControllerConfig();
             cfg.target.observerDomain=collisionThreatContract(strings(1,0),[8,15,20], ...
                 WindowSeconds=20,ControllerConfiguration=cfg);
-            cfg.outputFeedback.nlpMaximumIterations=8;
-            run=runJointOutputFeedbackScenario(Scenarios="curvedCrossing",Speeds=8,Frames=3, ...
-                RandomSeed=20261108,ControllerConfiguration=cfg,OutputDirectory=string(folder.Folder));
+            cfg.outputFeedback.nlpMaximumIterations=jointDeficitCase.iterations;
+            run=runJointOutputFeedbackScenario(Scenarios=jointDeficitCase.name,Speeds=jointDeficitCase.speed,Frames=3, ...
+                RandomSeed=jointDeficitCase.seed,ControllerConfiguration=cfg,OutputDirectory=string(folder.Folder));
             testCase.assertEqual(run.results.outcome,"completed");
             data=jsondecode(fileread(run.results.source));
             info=data.trace(2).metadata;
