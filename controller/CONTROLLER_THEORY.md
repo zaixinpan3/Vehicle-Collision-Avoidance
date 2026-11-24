@@ -400,6 +400,11 @@ Project these interval expressions and the four rotated footprint vertices
 onto axes centered on the target heading interval. Coordinate minima and
 maxima enclose the reference points in $P_C(t)$ and the complete occupied
 footprints in $B_C(t)$.
+At the observed root, a world-axis position box with half widths $b$ expands
+the body's two half extents by $|R_T^\top|b$ (entrywise matrix absolute
+value). This is the exact support of the translation box on the two known
+body axes for that member. Future projections may use $\|b\|_2$ on each
+axis when the axes can rotate.
 Each retained ego hypothesis $s$ uses one occupied rectangle for the entire
 observer interval at each active control node:
 $$
@@ -545,9 +550,12 @@ $[v_1,v_2]$ be the kinematic-to-Fiala blend interval. To select a numerical
 step, extrapolate the current longitudinal coupling and road load by
 $b=\Delta(v_y r-F_{\rm load}(v_x)/m_E)$, and let
 $a=\Delta g\max(\mu_f,\mu_r)$ use the member's axle friction coefficients.
-When $\Delta>h_s/2$ and the convex hull of
-$\{v_x,v_x+b-a,v_x+b+a\}$ intersects $[v_1,v_2]$, compose two RK4
-half steps. Otherwise take one RK4 step. This interval selects integration
+Let $C_f,C_r$ denote the member's axle cornering stiffnesses. The nominal
+lateral and yaw damping rates on the rolling branch scale as $1/v_x$, with
+coefficients $k_y=(C_f+C_r)/m_E$ and $k_r=(l_f^2 C_f+l_r^2 C_r)/I_z$.
+When $\Delta>h_s/2$ and the convex hull of $\{v_x,v_x+b-a,v_x+b+a\}$
+intersects $[v_1,\max(v_2,2\Delta\max(k_y,k_r))]$, compose two RK4 half
+steps. Otherwise take one RK4 step. This interval selects integration
 resolution and carries no reachable-set guarantee. Local flow
 sensitivities propagate $S_{j+1}=F_x S_j+F_uD_v u_j$. For an IPOPT search
 direction the tangent flow uses $\min(K_v,\max(2,\lceil h/(2h_s)\rceil))$
@@ -719,47 +727,47 @@ At handoff let $E$ be the oriented ego footprint and let $T_C$ be the
 occupied rectangle of the target interval for an active member. In the terminal
 model the footprints keep their orientations. The ego translates with
 $v_E=v_x e(\psi_E)$, $v_x\ge0$. The target translates with a constant
-velocity in its handoff disk $D(c_C,r_C)$. A point target has $r_C=0$.
-Obtain the speed and course intervals from the constant-acceleration,
-constant-sideslip arc up to handoff, including absorption and the declared
-physical bounds. If speed lies in $[l,u]$ and course lies within $\delta$
-of $\phi$, set $q=\cos(\min(\pi,\delta))$. The minimum enclosing disk
-has center $c_C=m e(\phi)$ by symmetry. For $m\ge0$, the maximum
-squared distance is attained at an angular extreme and one of the two
-radial endpoints. Minimizing the larger of these two quadratics gives
-$m=0$ if $q\le0$ and $m=\min(uq,(l+u)/(2q))$ otherwise. Its radius is
-$$
-r_C^2=\max_{s\in\{l,u\}}\{(s-m)^2+4sm\sin^2(\min(\pi,\delta)/2)\}.
-$$
-This encloses all handoff velocities. The frozen continuation applies only
-after the two optimized legs and the physical handoff hold.
+velocity in the handoff sector
+$V_C=\{s e(\theta): l\le s\le u,\ |\operatorname{wrap}(\theta-\phi)|\le\delta\}$.
+The constant-acceleration, constant-sideslip arc up to handoff, absorption
+and the declared physical bounds give the speed and course intervals.
+The frozen continuation begins after the two optimized legs and the physical
+handoff hold. A known velocity gives a singleton sector.
 
-Write $w_C=v_E-c_C$ and $G_C(n)=\min_{a\in E}n^\top a-
-\max_{b\in T_C}n^\top b$. Membership requires, **for each active ego hypothesis**,
+Let $G_C(n)=\min_{a\in E}n^\top a-\max_{b\in T_C}n^\top b$. For a unit
+normal $n=e(\alpha)$ the exact velocity support is
 $$
-\exists\,\|n_C\|=1:\quad
-G_C(n_C)\ge d_{\rm safe},\quad G_C(n_C)>0,\quad n_C^\top w_C\ge r_C .
+p=\cos\!\left(\max(0,|\operatorname{wrap}(\alpha-\phi)|-\delta)\right),
+\qquad H_C(n)=\max(lp,up).
 $$
-Each ego hypothesis may have its own geometric witness. All members use $u_f$.
-On this simplified model the signed projection gap can only increase
-or stay constant indefinitely, including when both vehicles remain at rest.
-When $w_C=0$ and $r_C=0$, every normal satisfies the velocity inequality,
-so membership reduces to the current footprint clearance. When
-$\|w_C\|=r_C>0$, the only admissible normal is $w_C/\|w_C\|$.
-When $\|w_C\|<r_C$, the velocity disk admits closing motion along every
-normal. If $\|w_C\|>r_C$, a finite exit time can also be reported.
-In that last case, for an initial reference-point distance bounded by $L_C$, any time
-strictly greater than $(R+L_C)/(\|w_C\|-r_C)$ suffices.
+Here $p$ is the largest projection of any allowed unit course direction,
+and the maximizing speed is one of the two speed endpoints. Each active
+member needs a witness satisfying
+$$
+\|n_C\|=1,\qquad G_C(n_C)\ge d_{\rm safe},\qquad
+G_C(n_C)>0,\qquad n_C^\top v_E\ge H_C(n_C).
+$$
+All members use the common input $u_f$. For any allowed frozen target
+velocity $v_T$, the same witness at time $t$ has gap
+$G_C(n_C)+t\,n_C^\top(v_E-v_T)\ge G_C(n_C)$. This includes stationary
+or co-moving footprints. If $d_v=\min_{v\in V_C}\|v_E-v\|>0$, a finite
+upper bound on the exit index is $1+\lfloor (R+L_C)/(h d_v)\rfloor$ for
+an initial reference-point distance at most $L_C$. Membership also allows
+indefinite in-range separation.
 
-The opening condition restricts the rectangle dual normal to an arc of
-the unit circle. First evaluate the unconstrained rectangle-distance dual.
-If its maximizing normal violates the opening condition and the rectangles
-are separated, the two endpoints of the opening arc suffice for testing
-positive clearance. Indeed, on the arc of normals with positive gap,
-each vertex-pair projection is concave in normal angle, as is their minimum.
-Writing $e=w_C/\|w_C\|$, $b=r_C/\|w_C\|$, the endpoints are
-$n_\pm=b e\pm\sqrt{1-b^2}Je$. Evaluate the exact footprint supports
-at both. The work per ego hypothesis is independent of the time to exit.
+To evaluate membership, start with the maximizing rectangle-distance normal.
+The opening normals satisfy $n^\top(v_E-v)\ge0$ for every $v\in V_C$.
+Their cone is bounded by support lines of the convex velocity hull through
+$v_E$. On the arc with positive footprint gap, each vertex-pair projection
+is concave in angle and so is their minimum. If the unconstrained maximizer
+violates opening, testing the boundary of the opening cone therefore finds
+any attainable positive gap. A boundary line passes through a hull corner
+at a speed and course endpoint, is tangent to the outer circle, or coincides
+with a flat hull face. The circle tangents, when they exist, have normal
+angles $\psi_E\pm\arccos(u/\|v_E\|)$. Testing the analytic support $H_C$
+retains boundary directions valid for the entire sector, including its
+interior courses. Each remaining direction uses the exact rectangle supports.
+The number of support evaluations is independent of forecast duration.
 
 For the nonlinear vehicles, **terminal safety and closure under $u_f$ are
 handoff assumptions**. They cover continued safe motion while the encounter remains active, admissible

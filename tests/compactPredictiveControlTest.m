@@ -935,6 +935,70 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             target(1:2)=[0;10];
             testCase.verifyGreaterThan(terminalSafeSet.separatingMotion(x,target,[1;0],1,0,cfg),0);
         end
+        function theCompleteVelocitySectorAllowsAnOpeningHandoff(testCase)
+            cfg=testCase.cfg;
+            x=[5.842;9.531;3.3031;3.6857;0;0];
+            box=[32.443;5.063;-1.6369;0;0;0;1.6;45.033;21.673;42.165;.044];
+            sector=terminalSafeSet.velocitySector(0,26.202,-1.6369,.4204);
+            [value,n,g]=terminalSafeSet.sectorSeparation(x,box,sector,0,cfg);
+            testCase.verifyLessThan(value,-2);
+            testCase.verifyEqual(norm(n),1,AbsTol=1e-12);
+            % Independently maximize target projection on this returned normal.
+            course=atan2(n(2),n(1));offset=atan2(sin(course+1.6369),cos(course+1.6369));
+            maximum=max(0,26.202*cos(max(0,abs(offset)-.4204)));
+            v=x(4)*[cos(x(3));sin(x(3))];
+            testCase.verifyGreaterThanOrEqual(n.'*v,maximum-1e-12);
+            for j=1:4
+                dx=zeros(6,1);dx(j)=1e-6;
+                plus=terminalSafeSet.sectorSeparation(x+dx,box,sector,0,cfg);
+                minus=terminalSafeSet.sectorSeparation(x-dx,box,sector,0,cfg);
+                testCase.verifyEqual(g(j),(plus-minus)/2e-6,AbsTol=1e-6);
+            end
+            % Shift the frozen footprints by a full hold at each course extreme.
+            for speed=[0,26.202]
+                for angle=-1.6369+[-.4204,.4204]
+                    next=x;next(1:2)=x(1:2)+cfg.controller.sampleTime*v;
+                    target=box;target(1:2)=box(1:2)+cfg.controller.sampleTime*speed*[cos(angle);sin(angle)];
+                    testCase.verifyLessThanOrEqual(terminalSafeSet.sectorSeparation(next,target,sector,0,cfg),value+1e-10);
+                end
+            end
+        end
+
+        function anInteriorTargetCourseCanCloseEverySeparatingDirection(testCase)
+            cfg=testCase.cfg;x=[0;0;0;4;0;0];
+            box=[-10;0;0;0;0;0;1.6;2.4;.95;0;0];
+            sector=terminalSafeSet.velocitySector(1,5,2*pi,pi/3);
+            % Both extreme courses project only 2.5 m/s forward. The allowed
+            % interior velocities surround the ego velocity in two dimensions.
+            testCase.verifyGreaterThan(terminalSafeSet.sectorSeparation(x,box,sector,0,cfg),cfg.outputFeedback.nlpTolerance);
+            x(4)=5;
+            [value,n,~,steps]=terminalSafeSet.sectorSeparation(x,box,sector,0,cfg);
+            testCase.verifyLessThan(value,0);
+            testCase.verifyEqual(n,[1;0],AbsTol=1e-12);
+            testCase.verifyEqual(steps,Inf);
+            x(4)=0;sector=terminalSafeSet.velocitySector(0,5,pi,.3);
+            testCase.verifyLessThan(terminalSafeSet.sectorSeparation(x,box,sector,0,cfg),0);
+            sector=terminalSafeSet.velocitySector(0,5,pi,pi);
+            testCase.verifyGreaterThan(terminalSafeSet.sectorSeparation(x,box,sector,0,cfg),cfg.outputFeedback.nlpTolerance);
+        end
+
+        function theCurrentFootprintUsesTheObservedPositionBox(testCase)
+            cfg=testCase.cfg;item=testCase.block.initialHypotheses;item.ego=zeros(6,1);
+            x=cfg.vehicle.length/2+cfg.vehicle.rectangleOffset(1)+2.4+.16;
+            item.target=[x;0;0;8;0;0;1.6;2.4;.95;0;0];
+            for bounds={zeros(2),[-.5,-.02;.5,.02]}
+                item.targetObserver=struct('positionBounds',[x-.02,x+.02;-.20,.20],'motionBounds',bounds{1});
+                request=struct('cfg',cfg,'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1), ...
+                    'operation',"validateInputSequence");
+                replay=solvePredictiveControl("outputFeedback",request);
+                testCase.verifyTrue(replay.accepted);
+                testCase.verifyEqual(replay.stageDeficits,0);
+                request.operation="evaluateControlSequence";request.holds=1;
+                oracle=solvePredictiveControl("outputFeedback",request);
+                testCase.verifyEqual(oracle.stage,cfg.outputFeedback.clearanceMeters-.14,AbsTol=1e-9);
+            end
+        end
+
         function parkedVehiclesCanRemainInRangeWithTheSameTerminalInput(testCase)
             cfg=testCase.cfg;item=testCase.block.initialHypotheses;item.ego=zeros(6,1);
             item.target=[10;0;0;0;0;0;1.6;2.4;.95;0;0];

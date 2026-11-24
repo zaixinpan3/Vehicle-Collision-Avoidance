@@ -109,6 +109,89 @@ classdef terminalSafeSet
             end
         end
 
+        function sector=velocitySector(minimum,maximum,course,halfWidth)
+            % Extreme velocities and face normals of the convex hull of the
+            % continuous radial sector. Its outer circular arc is exact.
+            halfWidth=min(pi,halfWidth);
+            axis=predictiveSafetyGeometry.direction(course);
+            edges=predictiveSafetyGeometry.direction(course+[-halfWidth,halfWidth]);
+            J=[0,-1;1,0];
+            sector=struct('minimum',minimum,'maximum',maximum,'axis',axis, ...
+                'halfWidth',halfWidth,'cosine',cospi(halfWidth/pi),'edges',edges, ...
+                'corners',[minimum*edges,maximum*edges], ...
+                'faces',[-axis,-J*edges(:,1),J*edges(:,2)]);
+        end
+
+        function [value,normal,gradient,exitSteps]=sectorSeparation(x,box,sector,positionRadius,cfg)
+            % Maximize the rectangle gap over normals with nonclosing motion
+            % for every velocity in the sector. One box belongs to one member.
+            if sector.halfWidth==pi || sector.maximum==0
+                [value,normal,gradient,exitSteps]=terminalSafeSet.separatingMotion( ...
+                    x,box,zeros(2,1),sector.maximum,positionRadius,cfg);
+                return
+            end
+            J=[0,-1;1,0];e=predictiveSafetyGeometry.direction(x(3));
+            velocity=x(4)*e;
+            gradient=zeros(1,6);normal=zeros(2,1);exitSteps=Inf;
+            tol=cfg.outputFeedback.nlpTolerance;h=cfg.controller.sampleTime;
+            if x(4)<0
+                value=max(2*tol,-x(4));gradient(4)=-1;return
+            end
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            [gap,g]=predictiveSafetyGeometry.rectangleClearance(x(1:3),box,shape);
+            value=cfg.outputFeedback.clearanceMeters-gap;normal=g(1:2);gradient(1:3)=-g.';
+            if gap<=0,return;end
+
+            % Minimum relative speed bounds the exit time for frozen velocities.
+            % A finite exit time is optional for terminal membership.
+            projection=localSectorCosine(e,sector);
+            nearest=min(sector.maximum,max(sector.minimum,x(4)*projection));
+            speed=sqrt((x(4)-nearest)^2+2*x(4)*nearest*max(0,1-projection));
+            if speed>0
+                exitSteps=1+floor((cfg.collision.encounterRangeMeters+norm(x(1:2)-box(1:2))+positionRadius)/(h*speed));
+            end
+            roundoff=32*eps(max([1,x(4),sector.maximum]));
+            if localSectorOpening(normal,velocity,sector)>=-roundoff,return;end
+
+            % At an endpoint of the admissible normal arc the support line
+            % through the ego velocity touches a sector corner or the outer
+            % circle. Fixed face normals include coincident corner cases.
+            relative=velocity-sector.corners;
+            lengths=vecnorm(relative);use=lengths>0;
+            relative=relative(:,use);lengths=lengths(use);
+            perpendicular=J*(relative./lengths);
+            directions=[perpendicular,-perpendicular,sector.faces];
+            angleGradient=[perpendicular./lengths,perpendicular./lengths,zeros(2,size(sector.faces,2))];
+            if x(4)>=sector.maximum
+                cosine=sector.maximum/x(4);sine=sqrt((1-cosine)*(1+cosine));
+                directions=[directions,cosine*e+sine*(J*e),cosine*e-sine*(J*e)];
+                turn=0;
+                if sine>0,turn=cosine/sine;end
+                angleGradient=[angleGradient,(J*e+turn*e)/x(4),(J*e-turn*e)/x(4)];
+            end
+            opening=localSectorOpening(directions,velocity,sector);
+            allowed=opening>=-roundoff;
+            if ~any(allowed)
+                % Inside the convex velocity hull, nearest escape is through
+                % a straight face or the circular boundary.
+                faces=[sector.faces,e];
+                [best,j]=max(localSectorOpening(faces,velocity,sector));
+                value=2*tol-h*best;normal=zeros(2,1);gradient(:)=0;
+                gradient(3:4)=-h*faces(:,j).'*[x(4)*J*e,e];return
+            end
+
+            directions=directions(:,allowed);angleGradient=angleGradient(:,allowed);
+            egoCorners=localCorners(x(1:3),shape);targetCorners=localCorners(box(1:3),box(8:11));
+            [egoSupport,i]=min(egoCorners.'*directions,[],1);
+            [targetSupport,j]=max(targetCorners.'*directions,[],1);
+            [gap,k]=max(egoSupport-targetSupport);normal=directions(:,k);
+            egoPoint=egoCorners(:,i(k));targetPoint=targetCorners(:,j(k));
+            angleSlope=(egoPoint-targetPoint).'*(J*normal);
+            frameSlope=normal.'*J*(egoPoint-x(1:2));
+            value=cfg.outputFeedback.clearanceMeters-gap;
+            gradient(1:4)=-[normal.',[frameSlope,0]+angleSlope*angleGradient(:,k).'*[x(4)*J*e,e]];
+        end
+
         function [distance,witness,track] = parkedClearance(context,pose,q)
             % Least distance between the ego rectangle parked at 'pose' and the
             % target rectangle over the target's remaining track from its
@@ -330,6 +413,17 @@ classdef terminalSafeSet
             margin=min([clearance(2)-lateral;clearance(1)+lateral],[],1);
         end
     end
+end
+
+function projection=localSectorCosine(normals,sector)
+    projection=max(sector.edges.'*normals,[],1);
+    projection(sector.axis.'*normals>=sector.cosine)=1;
+end
+
+function opening=localSectorOpening(normals,velocity,sector)
+    projection=localSectorCosine(normals,sector);
+    support=max(sector.minimum*projection,sector.maximum*projection);
+    opening=velocity.'*normals-support;
 end
 
 function [lower,upper,full,exitSeconds] = localTrack(q,centre,range)

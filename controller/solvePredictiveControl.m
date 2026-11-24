@@ -191,8 +191,14 @@ function step=localIntegrationStep(x,u,p,dt,cfg,options)
     vx=root(4);range=cfg.model.kinematicSpeedRange;
     drift=dt*(root(5)*root(6)-nonlinearBicycleModel.symbolicRoadLoad(vx,cfg)/cfg.vehicle.m);
     tireSpan=dt*cfg.vehicle.gravity*mmax(cfg.tire.frictionCoefficient(:).*scale(3:4));
-    nearBlend=(fmax(vx,vx+drift+tireSpan)>=range(1)) & (fmin(vx,vx+drift-tireSpan)<=range(2));
-    next=choose(nearBlend,root,command,scale);
+    % Near straight rolling, the lateral and yaw damping rates scale as
+    % 1/vx. Resolve their shortest nominal time constant with two steps.
+    stiffness=cfg.tire.corneringStiffness(:).*scale(1:2);
+    lateral=sum1(stiffness)/cfg.vehicle.m;
+    yaw=[cfg.vehicle.lf^2,cfg.vehicle.lr^2]*stiffness/cfg.vehicle.Iz;
+    upper=fmax(range(2),2*dt*fmax(lateral,yaw));
+    refine=(fmax(vx,vx+drift+tireSpan)>=range(1)) & (fmin(vx,vx+drift-tireSpan)<=upper);
+    next=choose(refine,root,command,scale);
     step=Function('pcbf_transition_step',{root,command,scale},{next},options);
 end
 
@@ -489,7 +495,10 @@ function members=localCompactPlanningMembers(members,cfg,count)
         members(j).motionLimits=[];members(j).cover=[];members(j).positionRadius=0;
         q=members(j).target;track=[];
         if isfield(members,'targetObserver'),track=members(j).targetObserver;end
-        if isempty(q) || isempty(track),continue;end
+        members(j).rootHalfSize=[];
+        if isempty(q),continue;end
+        members(j).rootHalfSize=q(8:9);
+        if isempty(track),continue;end
         if isfield(track,'positionBounds') && ~isempty(track.positionBounds)
             box=track.positionBounds;
             if q(4)==0 && isfield(track,'restBounds') && ~isempty(track.restBounds)
@@ -498,13 +507,11 @@ function members=localCompactPlanningMembers(members,cfg,count)
             q(1:2)=mean(box,2);
             half=max(0,(box(:,2)-box(:,1))/2);
             members(j).positionRadius=norm(half);
-            if q(4)==0
-                % A translation box in world coordinates, projected onto
-                % the two fixed axes of the absorbing footprint.
-                c=abs(cos(q(3)));s=abs(sin(q(3)));
-                projection=[c,s;s,c]*half;
-            else
-                % The target axes can turn at later prediction nodes.
+            % At this node the body axes are known for this member.
+            c=abs(cos(q(3)));s=abs(sin(q(3)));projection=[c,s;s,c]*half;
+            members(j).rootHalfSize=q(8:9)+projection;
+            if q(4)>0
+                % Future axes of a moving target can turn.
                 projection=repmat(norm(half),2,1);
             end
             q(8:9)=q(8:9)+projection;
@@ -591,7 +598,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     end
     lossFloor=0;
     if ~isempty(item.target)
-        roots=[hypotheses.ego];targets=[hypotheses.target];
+        roots=[hypotheses.ego];targets=[hypotheses.target];targets(8:9,:)=[hypotheses.rootHalfSize];
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
         rootGap=min(predictiveSafetyGeometry.rectangleClearance(roots,targets,shape));
         lossFloor=max(0,cfg.outputFeedback.clearanceMeters-rootGap);
@@ -741,7 +748,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         trace=traces{s};
         retainedTrajectories{s}=struct('inputs',trace.inputs,'denseEgo',trace.denseEgo, ...
             'collisionEgo',trace.collisionEgo,'validationSubsteps',kernel.validationSubsteps, ...
-            'parameters',hypotheses(s).parameters,'target',hypotheses(s).target,'integrationRule',"transitionRefinedRK4");
+            'parameters',hypotheses(s).parameters,'target',hypotheses(s).target,'integrationRule',"tireDynamicsRefinedRK4");
     end
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v2",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
@@ -1255,6 +1262,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 if item.target(4)>0,q=predictiveSafetyGeometry.predictTarget(item.target,times);else,q=repmat(item.target,1,total+1);end
                 boxes=q;
                 if isempty(item.cover)
+                    boxes(8:9,1)=item.rootHalfSize;
                     gap=predictiveSafetyGeometry.rectangleClearance(nodes,boxes,shape);
                 else
                     gap=drivingGap;boxes=drivingBoxes;
@@ -1603,7 +1611,7 @@ function [cache,reusedHolds]=localCompactShiftedCache(prior,hypotheses,condition
                 {'inputs','denseEgo','collisionEgo','validationSubsteps','parameters'}));
             if compatible
                 oldCount=size(old.inputs,2);
-                compatible=isfield(old,'integrationRule') && isequal(old.integrationRule,"transitionRefinedRK4") ...
+                compatible=isfield(old,'integrationRule') && isequal(old.integrationRule,"tireDynamicsRefinedRK4") ...
                     && old.validationSubsteps==substeps && oldCount>=1 ...
                     && isequal(size(old.inputs),[2,oldCount]) ...
                     && isequal(size(old.collisionEgo),[6,oldCount+1]) ...
@@ -1672,7 +1680,8 @@ function [valid,traces,violation,nodeStates,slacks] = localCompactValidate(contr
                 else,q=repmat(item.target,1,numel(times));end
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
                 if isempty(item.cover)
-                    separation=predictiveSafetyGeometry.rectangleClearance(collisionStates,q,shape);
+                    boxes=q;boxes(8:9,1)=item.rootHalfSize;
+                    separation=predictiveSafetyGeometry.rectangleClearance(collisionStates,boxes,shape);
                 else
                     [separation,~,remaining]=localCompactOccupied(item,collisionStates,times,shape,cfg);
                 end
@@ -1790,7 +1799,7 @@ function cover=localCompactCover(item,cfg,count)
     times=(0:count)*h;
     [boxes,centers]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,bounds,times,[],cfg.target.observerDomain);
     cover=struct('h',h,'boxes',boxes,'centers',centers);
-    % A single disk encloses the velocity over the full observer interval at handoff.
+    % Keep the observer speed and course ranges through the handoff.
     t=times(end);slow=item.target;fast=slow;
     slow(5)=bounds(1,1);fast(5)=bounds(2,1);
     [sMin,vMin]=predictiveSafetyGeometry.targetArc(slow,t);
@@ -1807,27 +1816,16 @@ function cover=localCompactCover(item,cfg,count)
     end
     lo=angLo+bounds(1,2);hi=angHi+bounds(2,2);
     angle=item.target(3)+(lo+hi)/2;half=min(pi,(hi-lo)/2);
-    % Minimize the worst squared distance to the two radial endpoints
-    % of the angular sector. Its enclosing disk lies on the bisector.
-    cosine=cos(half);mid=0;
-    if cosine>0
-        mid=min(vMax*cosine,(vMin+vMax)/(2*cosine));
-    end
-    cover.velocity=mid.*predictiveSafetyGeometry.direction(angle);
-    % Law of cosines at the angular extreme and the two speed endpoints.
-    if vMin==0 && cosine>0 && mid==vMax/(2*cosine)
-        % The origin and both outer corners are co-circular. Use the same
-        % norm as the drift test to preserve exact tangency at rest.
-        cover.velocityRadius=vecnorm(cover.velocity);
-    else
-        cover.velocityRadius=sqrt(max((vMin-mid).^2+4*vMin.*mid.*sin(half/2).^2, ...
-            (vMax-mid).^2+4*vMax.*mid.*sin(half/2).^2));
-    end
+    cover.velocitySector=terminalSafeSet.velocitySector(vMin,vMax,angle,half);
 end
 
 function [gap,boxes,remaining]=localCompactOccupied(item,states,times,shape,cfg,remaining)
     cover=item.cover;nodes=round(times/cover.h)+1;
     boxes=cover.boxes(:,nodes);gap=inf(1,numel(nodes));
+    if nodes(1)==1
+        boxes(:,1)=item.target;
+        boxes(8:9,1)=item.rootHalfSize;
+    end
     if nargin<6 || isempty(remaining),remaining=true;end
     if ~remaining,return;end
     ranges=predictiveSafetyGeometry.targetEnvelopeRange(states,boxes,cover.centers(:,nodes));
@@ -1850,8 +1848,7 @@ function [value,normal,gradient,exitSteps]=localCompactMovingValue(x,target,item
     boxes=item.cover.boxes(:,node);
     centers=item.cover.centers(:,node);
     posRadius=item.positionRadius+vecnorm(max(abs(centers([1 3],:)),abs(centers([2 4],:))));
-    [value,normal,gradient,exitSteps]=terminalSafeSet.separatingMotion(x,boxes, ...
-        item.cover.velocity,item.cover.velocityRadius,posRadius,cfg);
+    [value,normal,gradient,exitSteps]=terminalSafeSet.sectorSeparation(x,boxes,item.cover.velocitySector,posRadius,cfg);
 end
 
 
