@@ -272,6 +272,8 @@ end
 function [bound,next,comparison]=localTargetComparison(bound,input,before,after,step,design,defect, ...
         range,gyroCoefficient,gyroError,egoMatrix,egoInitial,egoInput,velocityPathMaximum)
     target=design.target;
+    coder.varsize('matrix',[5,5],[true,true]);
+    coder.varsize('forcing','initial','next',[5,1],[true,false]);
     if input.radarDetectionAvailable
         matrix = zeros(3);
         matrix(1,1) = egoMatrix;
@@ -330,15 +332,19 @@ function [bound,next,comparison]=localTargetComparison(bound,input,before,after,
     end
 end
 
-function bound=localInertialTarget(bound,states,first,detected,radius,step,design,initialRadii)
+function bound=localInertialTarget(prior,states,first,detected,radius,step,design,initialRadii)
     % Same sampled comparison in inertial axes. Each retained ego member
     % supplies its synchronized frame, so the ego and gyro terms vanish.
     x=states(7:12,1); domain=design.target.domain;
-    if isempty(bound)
-        bound.targetComponents=localGuard(initialRadii);
+    if nargin>=8 && isempty(prior)
+        components=localGuard(initialRadii);
+        bound=struct('targetComponents',components,'targetLyapunov',0, ...
+            'trueRangeMaximum',0,'radarPredictor',0);
         bound.targetLyapunov=localMetricBound(bound.targetComponents,design);
         bound.trueRangeMaximum=norm(x(1:2))+bound.targetComponents(1);
         bound.radarPredictor=bound.targetComponents(1);
+    else
+        bound=prior(1);
     end
     if detected
         bound.radarPredictor=radius;
@@ -403,7 +409,7 @@ function defect = localDefect(before,after,first,input,design,step)
         vecnorm(deltaVelocity/step-first.bodyVelocity-0.5*velocityDelta) ...
         + 0.5*vecnorm(velocityDelta)), ...
         "target",zeros(3,size(deltaVelocity,2)), ...
-        "radarPredictor",0);
+        "radarPredictor",zeros(1,size(deltaVelocity,2)));
     delta = after.targetState-before.targetState;
     deltaPredictor = after.radarPredictor-before.radarPredictor;
     gains = double(input.radarDetectionAvailable)*design.target.innovationGains;
@@ -430,8 +436,13 @@ end
 function next = localComparisonStep(matrix,forcing,initial,step)
 % Cache the state/input flow, which is independent of the changing forcing.
 % The augmented identity integrates constant inputs without inverting H.
-    persistent cachedMatrices cachedSteps cachedFlows
     count = numel(initial);
+    if ~coder.target('MATLAB')
+        transition=expm(step*[matrix,eye(count);zeros(count,2*count)]);
+        next=localGuard(max(0,transition(1:count,:)*[initial;forcing]));
+        return
+    end
+    persistent cachedMatrices cachedSteps cachedFlows
     if isempty(cachedMatrices)
         cachedMatrices = cell(0,1);cachedSteps = zeros(0,1);cachedFlows = cell(0,1);
     end

@@ -6,6 +6,14 @@ function [result,diagnostics,problem] = solvePredictiveControl(interface,request
     cfg=collisionAvoidanceControllerConfig(request.cfg);
     diagnostics=[];problem=[];
     switch string(request.operation)
+        case "predictionKernels"
+            % Export the same graphs used by the planner before host JIT.
+            cfg.outputFeedback.nlpJit=false;
+            kernel=localCompactKernel(cfg,1,true);
+            period=cfg.outputFeedback.sensorPeriod;
+            samples=round(cfg.controller.sampleTime/period);
+            result=struct('hold',kernel.hold,'rollout',kernel.refinedRollout,'sensitivity',kernel.sensitivity, ...
+                'inference',localOfInferenceKernel(cfg,period,samples));
         case "warmUp"
             result=localWarmIpopt(cfg,request.reference);
         case "sensor"
@@ -1197,7 +1205,7 @@ function [kernel,hit] = localCompactKernel(cfg,holds,hasTarget,tangentSteps)
     inputs=MX.sym('inputs',2,capacity);enabled=MX.sym('enabled',1,capacity);
     [ends,points]=mapped(root,inputs,repmat(scale,1,capacity),enabled);
     rollout=Function('pcbf_rollout',{root,inputs,scale,enabled},{points,ends},options);
-    kernel=struct('refinedRollout',rollout,'sensitivity',derivative,'capacity',capacity, ...
+    kernel=struct('hold',hold,'refinedRollout',rollout,'sensitivity',derivative,'capacity',capacity, ...
         'mappedSensitivity',containers.Map('KeyType','double','ValueType','any'), ...
         'holds',holds,'validationSubsteps',K,'integrationSubsteps',K,'sensitivitySubsteps',M,'hasTarget',hasTarget);
     keys{end+1}=key;kernels{end+1}=kernel;

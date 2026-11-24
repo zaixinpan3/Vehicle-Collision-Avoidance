@@ -33,6 +33,10 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
     switch action
         case "preparetarget"
             varargout{1}=localPointDesign(varargin{:},true);
+        case "targetdesign"
+            [varargout{1},varargout{2},varargout{3},varargout{4}]=localPointDesign(varargin{1},true);
+        case "targetsample"
+            [varargout{1},varargout{2}]=localTargetSample(varargin{:},[]);
         case "targetpoint"
             [varargout{1},varargout{2}]=localTargetPoint(varargin{:});
         case "initialize"
@@ -124,22 +128,32 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
             'previousPosition',[],'previousRadius',positionErrorRadius,'positionRadii',[],'errorBound',[],'times',[],'positions',zeros(2,0),'initialized',false, ...
             'heading',egoHeading,'detections',0,'restCompatible',false,'motionBounds',[]);
     end
+    [track,motion]=localTargetSample(track,time,position,egoHeading,cfg,relativeHeading,positionErrorRadius, ...
+        design,kernelDesign,settings,boundDesign,integrator);
+end
+
+function [track,motion]=localTargetSample(track,time,position,egoHeading,cfg,relativeHeading,positionErrorRadius, ...
+        design,kernelDesign,settings,boundDesign,integrator)
     dt=time-track.time;
     assert(dt>=0,'onlineNrmmTrackingRuntime:nonmonotonicTime','Target samples must be time ordered.');
     if time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
-        track.initialized=false;track.restCompatible=false;track.times=[];track.positions=zeros(2,0);track.positionRadii=[];
+        track.initialized=false;track.restCompatible=false;track.times=zeros(1,0);track.positions=zeros(2,0);track.positionRadii=zeros(1,0);
     end
-    if ~track.initialized
+    if ~isfield(track,'errorBound')
         track.errorBound=[];
+    elseif ~track.initialized
+        track.errorBound=track.errorBound([]);
     end
-    if ~track.initialized || ~isfield(track,'speedAnchor')
+    if ~isfield(track,'speedAnchor')
         track.speedAnchor=[];
+    elseif ~track.initialized
+        track.speedAnchor=track.speedAnchor([]);
     end
     if ~isfield(track,'positionBounds') || time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
         track.positionBounds=[];
         track.speedUpper=design.domain.speedMaximum;track.restBounds=[];
         if track.initialized && ~isempty(track.errorBound)
-            r=track.errorBound.targetComponents(1);
+            r=track.errorBound(1).targetComponents(1);
             track.positionBounds=track.state(1:2)+[-r,r];
         end
     end
@@ -152,7 +166,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         travel=track.speedUpper*movingTime+.5*accelerationUpper*movingTime^2;
         displacement=travel*[-ones(2,1),ones(2,1)];
         if ~isempty(track.errorBound)
-            deviation=dt*track.errorBound.targetComponents(2)+.5*design.domain.accelerationNormBound*dt^2;
+            deviation=dt*track.errorBound(1).targetComponents(2)+.5*design.domain.accelerationNormBound*dt^2;
             step=dt*track.state(3:4);
             displacement(:,1)=max(displacement(:,1),step-deviation);
             displacement(:,2)=min(displacement(:,2),step+deviation);
@@ -169,6 +183,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
             track.positionBounds(:,2)=min(track.positionBounds(:,2),measuredBox(:,2));
         end
     end
+    capacity=settings.sensor.radar.motionWindowSamples;
     if dt>0 && track.initialized
         reference=track.previousPosition;detected=~isempty(reference);
         if ~detected,reference=track.state(1:2);end
@@ -182,13 +197,19 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         else
             [states,first]=nrmmObserverVectorField("integrate",packed,measurement,kernelDesign,dt/count,count);
         end
-        track.errorBound=nrmmPositionErrorBound("inertialTarget",track.errorBound,states,first, ...
+        track.errorBound=nrmmPositionErrorBound("inertialTarget",track.errorBound(1),states,first, ...
             detected,track.previousRadius,dt/count,boundDesign);
         track.state=states(7:12,end);
     elseif dt>0
         track.state(1:2)=track.state(1:2)+dt*track.state(3:4);
     end
     initialRadii=[];
+    if ~coder.target('MATLAB')
+        % These temporaries have numeric types even before the second return.
+        chord=zeros(2,1);chordNoise=0;accelerationMax=design.domain.accelerationNormBound;
+        span=0;speedUpper=track.speedUpper;yawRate=design.domain.yawRateMaximum;
+        weights=zeros(3,0);
+    end
     if ~isempty(position)
         track.detections=track.detections+1;
         track.lastReturn=time;
@@ -196,10 +217,10 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         if ~isempty(track.times) && time==track.times(end)
             track.positions(:,end)=position;track.positionRadii(end)=positionErrorRadius;
         else
-            track.times(end+1)=time;track.positions(:,end+1)=position;track.positionRadii(end+1)=positionErrorRadius;
+            track.times=[track.times,time];track.positions=[track.positions,reshape(position,2,1)];
+            track.positionRadii=[track.positionRadii,positionErrorRadius];
         end
         minimum=settings.initialization.minimumRadarSamples;
-        capacity=settings.sensor.radar.motionWindowSamples;
         keep=max(1,numel(track.times)-capacity+1):numel(track.times);
         count=numel(keep);
         track.times=track.times(keep);track.positions=track.positions(:,keep);track.positionRadii=track.positionRadii(keep);
@@ -245,7 +266,7 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
                 % Centered times also cover irregular return spacing.
                 meanVelocity=velocity-.5*acceleration*sum(t.^3)/sum(t.^2);
                 endPosition=center+t(end)*meanVelocity+.5*acceleration*(t(end)^2-mean(t.^2));
-                track.state=[endPosition;meanVelocity+t(end)*acceleration;acceleration];
+                track.state=reshape([endPosition;meanVelocity+t(end)*acceleration;acceleration],6,1);
                 track.heading=atan2(displacement(2),displacement(1));
                 track.initialized=true;
             elseif track.restCompatible && isfinite(relativeHeading)
@@ -289,18 +310,19 @@ function [track,motion]=localTargetPoint(track,time,position,egoHeading,cfg,rela
         track.heading=estimate.targetRelativeHeading;
     end
     if isempty(track.errorBound)
+        assert(numel(initialRadii)==3,'An initialized target needs its acquisition error radii.');
         packed=[zeros(6,1);track.state;position;0];
-        track.errorBound=nrmmPositionErrorBound("inertialTarget",[],packed,[],true,positionErrorRadius,0,boundDesign,initialRadii);
+        track.errorBound=nrmmPositionErrorBound("inertialTarget",[],packed,[],true,positionErrorRadius,0,boundDesign,reshape(initialRadii,3,1));
     end
     if ~isempty(position) && numel(track.times)>1
         spans=time-track.times(1:end-1);
         chords=(position-track.positions(:,1:end-1))./spans;
         noiseRadii=(positionErrorRadius+track.positionRadii(1:end-1))./spans;
         velocityRadius=min(vecnorm(track.state(3:4)-chords)+noiseRadii+accelerationMax*spans/2);
-        track.errorBound.targetComponents(2)=min(track.errorBound.targetComponents(2), ...
+        track.errorBound(1).targetComponents(2)=min(track.errorBound(1).targetComponents(2), ...
             velocityRadius+64*eps(max(1,velocityRadius)));
     end
-    components=track.errorBound.targetComponents;
+    components=track.errorBound(1).targetComponents;
     speed=norm(track.state(3:4));
     track.speedUpper=min(track.speedUpper,speed+components(2));
     track.positionBounds(:,1)=max(track.positionBounds(:,1),track.state(1:2)-components(1));
@@ -376,15 +398,15 @@ function [anchor,interval]=localChordAcceleration(track,domain,interval,capacity
     if lower<=domain.scalarAccelerationMaximum*duration/2,return;end
     upper=(chord+allowance)/(duration*cos(halfTurn));
     midpoint=track.times(1)+duration/2;
-    if ~isempty(anchor) && midpoint>anchor.time
-        elapsed=midpoint-anchor.time;
-        interval=[max(interval(1),(lower-anchor.upper)/elapsed); ...
-                  min(interval(2),(upper-anchor.lower)/elapsed)];
+    if ~isempty(anchor) && midpoint>anchor(1).time
+        elapsed=midpoint-anchor(1).time;
+        interval=[max(interval(1),(lower-anchor(1).upper)/elapsed); ...
+                  min(interval(2),(upper-anchor(1).lower)/elapsed)];
     end
     % A short acquisition chord can have a loose speed bound. Use the
     % first full-window chord as the reference once it becomes available.
     fullWindow=numel(track.times)==capacity;
-    if isempty(anchor) || (fullWindow && isfield(anchor,'fullWindow') && ~anchor.fullWindow)
+    if isempty(anchor) || (fullWindow && isfield(anchor,'fullWindow') && ~anchor(1).fullWindow)
         anchor=struct('time',midpoint,'lower',lower,'upper',upper,'fullWindow',fullWindow);
     end
 end

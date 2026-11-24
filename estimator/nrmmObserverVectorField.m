@@ -354,23 +354,9 @@ function [stateDerivative, estimate] = localTargetDerivative( ...
         sineLimit = sin(sideslipMaximum);
         targetSideslip = asin(min(sineLimit,max(-sineLimit,rearAxleDistance*targetYawRate/targetSpeed)));
     end
-    saturatedQuantities = strings(0, 1);
-    if targetSpeed < speedMinimum
-        saturatedQuantities(end+1, 1) = "targetSpeedBelowMinimum";
-    end
-    if speedScale < 1.0
-        saturatedQuantities(end+1, 1) = "targetSpeedAboveMaximum";
-    end
-    if accelerationScale < 1.0
-        saturatedQuantities(end+1, 1) = "targetAccelerationNorm";
-    end
-    if abs(scalarAccelerationRaw) > scalarAccelerationMaximum
-        saturatedQuantities(end+1, 1) = "targetScalarAcceleration";
-    end
-    if abs(yawRateRaw) > yawRateMaximum
-        saturatedQuantities(end+1, 1) = "targetYawRate";
-    end
-    saturationActive = ~isempty(saturatedQuantities);
+    flags=[targetSpeed<speedMinimum; speedScale<1; accelerationScale<1; ...
+        abs(scalarAccelerationRaw)>scalarAccelerationMaximum; abs(yawRateRaw)>yawRateMaximum];
+    saturationActive=any(flags);
     courseAngleEgoFrame = atan2(targetVelocity(2), targetVelocity(1));
     speedDomainValid = targetSpeed >= speedMinimum;
 
@@ -390,8 +376,12 @@ function [stateDerivative, estimate] = localTargetDerivative( ...
         "speedDomainValid", speedDomainValid, ...
         "regularizationActive", targetSpeed < inverseSpeedMinimum, ...
         "operatingDomainValid", speedDomainValid && ~saturationActive, ...
-        "saturationActive", saturationActive, ...
-        "saturatedQuantities", saturatedQuantities);
+        "saturationActive", saturationActive);
+    if coder.target('MATLAB')
+        names=["targetSpeedBelowMinimum";"targetSpeedAboveMaximum";"targetAccelerationNorm"; ...
+            "targetScalarAcceleration";"targetYawRate"];
+        estimate.saturatedQuantities=names(flags);
+    end
 end
 
 function [speedMinimum, speedMaximum, scalarAccelerationMaximum, ...

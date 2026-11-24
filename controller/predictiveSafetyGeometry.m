@@ -127,8 +127,12 @@ classdef predictiveSafetyGeometry
             if ~isempty(model.uncertainty.target)
                 starts=predictiveSafetyGeometry.predictTarget(model.target,max(0,time-holdTime));
             end
-            [support,tube]=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,holdTime);
-            if isempty(tube),tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,holdTime);end
+            [support,ball]=predictiveSafetyGeometry.targetSupportData(starts,model.uncertainty.target,holdTime);
+            if isempty(ball)
+                tube=predictiveSafetyGeometry.targetErrorTube(starts,model.uncertainty.target,holdTime);
+            else
+                tube=ball;
+            end
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
@@ -837,7 +841,7 @@ classdef predictiveSafetyGeometry
 
         function [clearance,gradient] = rectangleClearance(states,targets,shape)
             % Batched closest-feature evaluation of the rectangle distance dual.
-            if size(states,2)==size(targets,2) ...
+            if coder.target('MATLAB') && size(states,2)==size(targets,2) ...
                     && size(targets,1)==11 && isequal(size(shape),[4,1]) ...
                     && isa(states,'double') && isa(targets,'double') && isa(shape,'double')
                 kernel=localClearanceKernel();
@@ -1371,8 +1375,9 @@ function candidate=localCirculationRollout(model,data,speed,durations,collectDia
         'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
         'maximumDeviation',0,'completion',"requestedHorizon");
     candidate.states(:,1)=model.initialState;
-    hasCover=isfield(model,'motionCover') && ~isempty(model.motionCover);
+    hasCover=isfield(model,'motionCover') && ~isempty(model.motionCover) && ~isempty(model.motionCover.boxes);
     nodes=1+round([0,cumsum(durations)]/h);
+    boxes=zeros(11,0);centerVelocity=zeros(2,0);extentRate=zeros(2,0);
     if hasCover
         % Backward differences give the local motion of the occupied rectangle.
         boxes=model.motionCover.boxes(:,nodes);angles=boxes(3,:);
@@ -1415,6 +1420,9 @@ function candidate=localCirculationRollout(model,data,speed,durations,collectDia
         acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
         if ~encounterEnded
             parameters=localFieldParameters(data,index,speed);
+            if ~coder.target('MATLAB')
+                parameters.crossWeight=0;parameters.centerVelocity=zeros(2,1);parameters.extentRate=zeros(2,1);
+            end
             if hasCover && index>1 && target(4)~=0
                 % Project the target footprint across the cruise path. Its length
                 % contributes transverse drift in proportion to the width it spans.
