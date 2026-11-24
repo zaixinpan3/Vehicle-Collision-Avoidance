@@ -827,12 +827,16 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
 
     function solveIpopt(start)
         import casadi.*
+        persistent newCallback
         % IPOPT owns all search directions, restoration and step lengths.
         % Scale knots before exposing the exact nonlinear values to CasADi.
         checkClock();
         domainKnots=[];
-        if exist('casadiFunctionCallback','class')~=8
-            addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'scripts'));
+        if isempty(newCallback)
+            if exist('casadiFunctionCallback','class')~=8
+                addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'scripts'));
+            end
+            newCallback=@casadiFunctionCallback;
         end
         residualCount=2*count+numel(model.hypotheses);
         if seekZero,outputCount=1;else,outputCount=residualCount;end
@@ -856,7 +860,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
                 end
             end
         end
-        oracle=casadiFunctionCallback('pcbf_rollout',[nu,1],[outputCount,1], ...
+        oracle=newCallback('pcbf_rollout',[nu,1],[outputCount,1], ...
             @ipoptValues,@ipoptJacobian);
         oracleLifetime=onCleanup(@()oracle.release());
         v=MX.sym('knots',nu);value=oracle.call({v});value=value{1};
@@ -879,7 +883,7 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         end
         ng=size(constraints,1);constraintCount=ng;
         % nlpsol outputs x, f, g, lam_x, lam_g, lam_p.
-        stop=casadiFunctionCallback('pcbf_stop',[[nu;1;ng;nu;ng;0],ones(6,1)],[1,1], ...
+        stop=newCallback('pcbf_stop',[[nu;1;ng;nu;ng;0],ones(6,1)],[1,1], ...
             @stopIpopt);
         stopLifetime=onCleanup(@()stop.release());
         options=struct('print_time',false,'error_on_fail',false,'calc_lam_p',false, ...

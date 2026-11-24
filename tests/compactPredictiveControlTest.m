@@ -67,6 +67,15 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()prepareCollisionAvoidanceController(struct('speed',8),[],testCase.cfg), ...
                 'collisionAvoidanceController:invalidSensorBlock');
         end
+        function independentOfflineSolvesCanLoadTheCallbackFromTheController(testCase)
+            scripts=fileparts(which('setupJointNlpSolver'));
+            testCase.addTeardown(@path,path);
+            rmpath(scripts);
+            request=struct('operation',"warmUp",'cfg',testCase.cfg,'reference',[-100,0;1000,0]);
+            testCase.assertTrue(solvePredictiveControl("outputFeedback",request));
+            request.cfg.referenceSpeed=6;
+            testCase.verifyTrue(solvePredictiveControl("outputFeedback",request));
+        end
         function anUnsupportedCheckpointRequiresNewInitialization(testCase)
             prior=testCase.state;prior.kind="unsupported";
             testCase.verifyError(@()collisionAvoidanceController(localNextBlock(prior,testCase.cfg), ...

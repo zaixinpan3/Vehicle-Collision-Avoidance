@@ -221,6 +221,21 @@ function startup=localWarmup(cfg,enabled,targetSpeedMaximum)
                 request=struct('operation',"prepareStep",'cfg',cfg,'reference',reference, ...
                     'block',block,'previousState',state);
                 result=solvePredictiveControl("outputFeedback",request);
+                if result.prediction.metadata.collisionTargetActive && result.prediction.metadata.nlpAttempts>0
+                    % Exercise ordinary acquisition as well as the forced IPOPT
+                    % probe, using the same private block and its original prior.
+                    try
+                        [~,~,ordinary]=collisionAvoidanceController(block,[],reference,cfg,state);
+                        startup.ipoptCalls=startup.ipoptCalls+ordinary.metadata.nlpAttempts;
+                        startup.ipoptIterations=startup.ipoptIterations+ordinary.metadata.nlpIterations;
+                    catch exception
+                        % A short online deadline may expire in this discarded call.
+                        % The preparation above already supplied the private command.
+                        if ~strcmp(exception.identifier,'collisionAvoidanceController:compactNoFeasiblePlan')
+                            rethrow(exception);
+                        end
+                    end
+                end
                 command=result.command;prediction=result.prediction;state=result.state;
             else
                 [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
