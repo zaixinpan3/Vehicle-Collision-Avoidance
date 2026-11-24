@@ -2,6 +2,15 @@ function [result,diagnostics,problem] = solvePredictiveControl(interface,request
 %solvePredictiveControl Raw-sensor, two-stage PCBF with CasADi/IPOPT.
     assert(nargin==2 && (ischar(interface) || isstring(interface)) && isequal(string(interface),"outputFeedback"), ...
         'collisionAvoidanceController:invalidSolverInterface','Expected the outputFeedback interface.');
+    % Fixed-type build entries reuse the online numerical functions.
+    if isequal(request.operation,"memberPreview")
+        [result,diagnostics,problem]=localPreviewDurations( ...
+            struct('ego',request.ego,'target',request.target),request.cfg);
+        return
+    elseif isequal(request.operation,"holdDomain")
+        [v,i,g,b,defined]=localCompactModelDomain(request.dense,request.input,request.cfg,size(request.dense,2)-1);
+        result=[v;i;g;b;double(defined)];diagnostics=[];problem=[];return
+    end
     if ~isfield(request,'callTimer'),request.callTimer=tic;end
     cfg=collisionAvoidanceControllerConfig(request.cfg);
     diagnostics=[];problem=[];
@@ -12,7 +21,17 @@ function [result,diagnostics,problem] = solvePredictiveControl(interface,request
             kernel=localCompactKernel(cfg,1,true);
             period=cfg.outputFeedback.sensorPeriod;
             samples=round(cfg.controller.sampleTime/period);
-            result=struct('hold',kernel.hold,'rollout',kernel.refinedRollout,'sensitivity',kernel.sensitivity, ...
+            x=casadi.SX.sym('x',6);u=casadi.SX.sym('u',2);p=casadi.SX.sym('p',4);
+            dx=nonlinearBicycleModel.symbolicDerivative(x,u,p,cfg);
+            imu=casadi.Function('pcbf_imu',{x,u,p},{[dx(4)-x(5)*x(6);dx(5)+x(4)*x(6)]});
+            root=casadi.MX.sym('root',6);command=casadi.MX.sym('command',2);
+            scales=casadi.MX.sym('scales',4);index=casadi.MX.sym('index');
+            [finish,dense]=kernel.hold(root,command,scales);
+            samplesForDomain=[root,dense];sample=samplesForDomain(:,index+1);
+            variables=[root;command];
+            exact=casadi.Function('pcbf_exact_tangent',{root,command,scales,index}, ...
+                {densify(jacobian(finish,variables)),densify(jacobian(sample,variables))});
+            result=struct('imu',imu,'exactTangent',exact,'hold',kernel.hold,'rollout',kernel.refinedRollout,'sensitivity',kernel.sensitivity, ...
                 'inference',localOfInferenceKernel(cfg,period,samples));
         case "warmUp"
             result=localWarmIpopt(cfg,request.reference);

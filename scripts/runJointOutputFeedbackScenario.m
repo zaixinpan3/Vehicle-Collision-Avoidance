@@ -11,6 +11,7 @@ function campaign = runJointOutputFeedbackScenario(options)
     arguments
         options.Scenarios (1,:) string = ["stoppedLead","trafficBrakingLead","trafficHeadOn","trafficCrossing"]
         options.Speeds (1,:) double {mustBePositive,mustBeFinite} = 15
+        options.ControllerExecutable (1,1) string = ""
         options.Frames (1,1) double {mustBeInteger,mustBePositive,mustBeFinite} = 200
         options.ControllerConfiguration (1,1) struct = struct()
         options.OutputDirectory (1,1) string = string(tempname)
@@ -26,23 +27,40 @@ function campaign = runJointOutputFeedbackScenario(options)
     addpath(fullfile(root,'controller'),fullfile(root,'config'),fullfile(root,'estimator'));
     if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
     summaries=struct([]);
-    base=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
-    if isempty(base.target.observerDomain)
-        % Use the complete benchmark population before selecting or observing a target.
-        base.target.observerDomain=collisionThreatContract(strings(1,0),options.Speeds, ...
-            WindowSeconds=max(20,options.Frames*base.controller.sampleTime),ControllerConfiguration=base);
-    end
     startupTimer=tic;
-    observer=onlineNrmmTrackingRuntime("prepareTarget",base);
-    if exist('casadi.SX','class')~=8,setupJointNlpSolver;end
-    % Finish all configuration-specific preparation before any measured case.
+    native=options.ControllerExecutable~="";
     [speeds,~,speedIndex]=unique(options.Speeds,'stable');
     configurations=cell(size(speeds));preparations=cell(size(speeds));
-    for i=1:numel(speeds)
-        cfg=base;cfg.referenceSpeed=speeds(i);
-        cfg.model.speedMaximum=max(base.model.speedMaximum,1.2*speeds(i));
-        configurations{i}=cfg;
-        preparations{i}=localWarmup(cfg,options.Warmup,observer.domain.speedMaximum);
+    if native
+        client=nativeControllerProcess(options.ControllerExecutable);
+        closeClient=onCleanup(@()delete(client));
+        profile=client.exchange(struct('type',"profile"));
+        assert(isscalar(speeds) && profile.cfg.referenceSpeed==speeds, ...
+            'runJointOutputFeedbackScenario:profile','Use the cruise speed compiled into this executable.');
+        % JSON null represents unbounded configuration scalars in the build.
+        nativeCfg=load(fullfile(fileparts(fileparts(options.ControllerExecutable)),'share','configuration.mat'),'cfg');
+        cfg=nativeCfg.cfg;
+        assert(isequaln(jsondecode(jsonencode(cfg)),profile.cfg), ...
+            'runJointOutputFeedbackScenario:profile','The executable and simulation configuration must match.');
+        assert(isempty(fieldnames(options.ControllerConfiguration)), ...
+            'runJointOutputFeedbackScenario:profile','The executable already contains its controller configuration.');
+        configurations{1}=cfg;
+        preparations{1}=localNativeWarmup(client,options.Warmup);
+    else
+        base=collisionAvoidanceControllerConfig(options.ControllerConfiguration);
+        if isempty(base.target.observerDomain)
+            % Use the complete benchmark population before selecting or observing a target.
+            base.target.observerDomain=collisionThreatContract(strings(1,0),options.Speeds, ...
+                WindowSeconds=max(20,options.Frames*base.controller.sampleTime),ControllerConfiguration=base);
+        end
+        observer=onlineNrmmTrackingRuntime("prepareTarget",base);
+        if exist('casadi.SX','class')~=8,setupJointNlpSolver;end
+        for i=1:numel(speeds)
+            cfg=base;cfg.referenceSpeed=speeds(i);
+            cfg.model.speedMaximum=max(base.model.speedMaximum,1.2*speeds(i));
+            configurations{i}=cfg;
+            preparations{i}=localWarmup(cfg,options.Warmup,observer.domain.speedMaximum);
+        end
     end
     campaignWarmupSeconds=0;
     if options.Warmup,campaignWarmupSeconds=toc(startupTimer);end
@@ -82,7 +100,14 @@ function campaign = runJointOutputFeedbackScenario(options)
                 end
                 callTimer=tic;
                 try
-                    [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
+                    if native
+                        reply=localNativeCall(client,block,reference);
+                        command=struct('actuatorInput',reply.actuatorInput(:));
+                        prediction=struct('metadata',reply);
+                        state=struct('memory',[]);
+                    else
+                        [command,~,prediction,state]=collisionAvoidanceController(block,[],reference,cfg,state);
+                    end
                 catch exception
                     failureCallSeconds=toc(callTimer);
                     callCount=callCount+1;callSeconds(callCount)=failureCallSeconds;
@@ -104,6 +129,11 @@ function campaign = runJointOutputFeedbackScenario(options)
                 end
                 elapsed=toc(callTimer);callCount=callCount+1;callSeconds(callCount)=elapsed;
                 input=command.actuatorInput;
+                if native
+                    posteriorCount=reply.posteriorCount;targetEstimate=reply.targetEstimate;
+                else
+                    posteriorCount=numel(state.hypotheses);targetEstimate=localTargetEstimate(state);
+                end
                 try
                     [truth,samples,clearance,nodeClearance]=localReplay(truth,input,cfg,time,stream, ...
                         ismember(frame,options.DropoutHolds));
@@ -115,11 +145,11 @@ function campaign = runJointOutputFeedbackScenario(options)
                 minimumClearance=min(minimumClearance,clearance);
                 minimumNodeClearance=min(minimumNodeClearance,nodeClearance);
                 entry=struct('time',time,'input',input,'memory',state.memory, ...
-                    'posteriorCount',numel(state.hypotheses),'metadata',prediction.metadata, ...
+                    'posteriorCount',posteriorCount,'metadata',prediction.metadata, ...
                     'controllerCallSeconds',elapsed,'deadlineMissed',elapsed>cfg.controller.sampleTime, ...
                     'minimumReplayClearanceMeters',clearance,'minimumNodeClearanceMeters',nodeClearance, ...
                     'stateAfterHold',truth.ego, ...
-                    'rawSensorBlock',samples,'targetEstimateAtDecision',localTargetEstimate(state));
+                    'rawSensorBlock',samples,'targetEstimateAtDecision',targetEstimate);
                 if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 time=time+cfg.controller.sampleTime;
                 % Positive clearance below the planning margin is diagnostic.
@@ -180,6 +210,31 @@ function campaign = runJointOutputFeedbackScenario(options)
     campaign=struct('scope',"raw-sensor control from one known initial ego state", ...
         'pipeline',string(cfg.outputFeedback.method),'startupWarmupSeconds',campaignWarmupSeconds,'results',summaries);
     localWriteJson(fullfile(options.OutputDirectory,'campaign.json'),campaign);
+end
+
+function reply=localNativeCall(client,block,road)
+    request=struct('type',"step",'block',block);
+    if isfield(block,'initialHypotheses')
+        request.type="init";
+        if isfield(road,'referenceCurve')
+            request.reference=road.referenceCurve;
+        else
+            points=road.centerline;d=points(end,:)-points(1,:);
+            request.reference=struct('origin',points(1,:),'heading',atan2(d(2),d(1)), ...
+                'curvature',0,'length',norm(d));
+        end
+    end
+    reply=client.exchange(request);
+end
+
+function startup=localNativeWarmup(client,enabled)
+    startup=struct('seconds',0,'holds',0,'failure',"",'solversReady',false, ...
+        'avoidanceContinuation',false,'ipoptCalls',0,'ipoptIterations',NaN);
+    if ~enabled,return;end
+    clock=tic;
+    reply=client.exchange(struct('type',"warmup"));
+    startup.solversReady=reply.ipoptAttempts>0;startup.ipoptCalls=reply.ipoptAttempts;
+    startup.seconds=toc(clock);
 end
 
 function startup=localWarmup(cfg,enabled,targetSpeedMaximum)

@@ -99,7 +99,7 @@ static void geometry(FILE *file,double hold)
     pcbfTerminalKnown(x,q,0,&v,n,d,&steps);
     check(v,known[0]);check_array(n,known+1,2);check_array(d,known+3,6);check(steps,known[9]);
     double prior[2]={0,0}, times_data[13],commands[24];
-    struct6_T curve={ .origin={-100,0},.heading=0,.curvature=.001,.length=1000 };
+    struct7_T curve={ .origin={-100,0},.heading=0,.curvature=.001,.length=1000 };
     emxDestroyArray_real_T(times);
     for (int k=0;k<13;k++) times_data[k]=k*hold;
     times=emxCreateWrapper_real_T(times_data,1,13);

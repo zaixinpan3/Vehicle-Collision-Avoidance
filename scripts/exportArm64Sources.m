@@ -1,4 +1,4 @@
-function exportArm64Sources(directory,configuration)
+function exportArm64Sources(directory,configuration,device)
 %exportArm64Sources Generate standalone NRMM and PCBF numerical components.
 % The workstation needs MATLAB Coder and the project's CasADi/IPOPT package.
 % The target domain, observer gains, model and mesh are specialized together.
@@ -6,6 +6,7 @@ function exportArm64Sources(directory,configuration)
     arguments
         directory (1,1) string
         configuration (1,1) struct = struct()
+        device (1,1) string = "ARM Compatible->ARM Cortex-A (64-bit)"
     end
     root=fileparts(fileparts(mfilename('fullpath')));
     native=fullfile(root,'scripts','native');
@@ -16,7 +17,7 @@ function exportArm64Sources(directory,configuration)
     build.GenCodeOnly=true;
     build.GenerateReport=false;
     build.EnableOpenMP=false;
-    build.HardwareImplementation.ProdHWDeviceType='ARM Compatible->ARM Cortex-A (64-bit)';
+    build.HardwareImplementation.ProdHWDeviceType=char(device);
 
     localFlows(fullfile(directory,'generated'),cfg);
     codegen('-config',build,fullfile(native,'nrmmObserverInterval.m'), ...
@@ -37,6 +38,12 @@ function localFlows(outputDirectory,cfg)
     end
     generator.generate([folder.Name,filesep]);
     save(fullfile(folder.Name,'configuration.mat'),'cfg');
+    tire=nonlinearBicycleModel.tireParameters(cfg);
+    runtime=struct('cfg',cfg,'trim',terminalSafeSet.movingControl(cfg), ...
+        'rearSlipScale',tire.longitudinalForceScale(2)/tire.corneringStiffness(2));
+    f=fopen(fullfile(folder.Name,'controller.json'),'w');assert(f>=0);
+    close=onCleanup(@()fclose(f));fprintf(f,'%s',jsonencode(runtime));
+
 end
 
 function localTarget(native,outputDirectory,cfg,build)
@@ -78,5 +85,10 @@ function localGeometry(native,outputDirectory,cfg,build)
         fullfile(native,'pcbfTerminalKnown.m'),'-args',{zeros(6,1),zeros(11,1),0,coder.Constant(cfg)}, ...
         fullfile(native,'pcbfFieldInputs.m'),'-args',{zeros(6,1),zeros(2,1),zeros(11,1),curve, ...
         coder.typeof(0,[11,Inf],[false,true]),coder.typeof(0,[4,Inf],[false,true]),0,coder.Constant(fullConfiguration)}, ...
+        fullfile(native,'pcbfMemberPreview.m'),'-args',{zeros(6,1),coder.typeof(0,[11,1],[true,false]),coder.Constant(fullConfiguration)}, ...
+        fullfile(native,'pcbfHoldDomain.m'),'-args',{zeros(6,1+fullConfiguration.outputFeedback.validationSubsteps),zeros(2,1),coder.Constant(fullConfiguration)}, ...
+        fullfile(native,'pcbfCruiseInputs.m'),'-args',{zeros(6,1),zeros(2,1),curve,zeros(2,1),0,coder.Constant(fullConfiguration)}, ...
+        fullfile(native,'pcbfTrimResidual.m'),'-args',{zeros(3,1),0,coder.Constant(fullConfiguration)}, ...
+        fullfile(native,'pcbfTargetAt.m'),'-args',{zeros(11,1),0}, ...
         '-d',outputDirectory);
 end
