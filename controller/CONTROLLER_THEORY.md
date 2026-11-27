@@ -405,8 +405,8 @@ the body's two half extents by $|R_T^\top|b$ (entrywise matrix absolute
 value). This is the exact support of the translation box on the two known
 body axes for that member. Future projections may use $\|b\|_2$ on each
 axis when the axes can rotate.
-Each retained ego hypothesis $s$ uses one occupied rectangle for the entire
-observer interval at each active control node:
+The motion prior for each retained ego hypothesis $s$ provides a signed
+clearance bound for the entire observer interval at each active node:
 $$
 \underline d_j^s=d_\pm(B_E(x_j^s),B_C^s(jh)).
 $$
@@ -419,6 +419,43 @@ obligations. A released encounter has clearance $+\infty$ for this constraint.
 The terminal handoff uses the footprint and velocity enclosures for the
 same interval, including admissible absorption. A measured update requires
 a fresh replay when shifted containment has not been established.
+
+The same received positions yield an additional certificate. In the complex
+plane let $H=F_\kappa(s_-)$ be the signed past chord and
+$G_c=F_\kappa(s)+e^{i(\kappa s-\beta)}c$ the displacement to body corner
+$c$ in the initial course frame. Section 2 of [the algorithm](../ALGORITHM.md)
+derives the shared similarity from these two coefficients. Its image of
+the physical rectangle is $R_y$. With reference quantities denoted by bars,
+the chord integral has arc-length derivative of unit modulus and curvature
+derivative of modulus at most $s^2/2$. Thus outward bounds are
+$$
+ \Delta H=\sup|s_--\bar s_-|+\tfrac12\bar s_-^2\sup|\kappa-\bar\kappa|,\quad
+ \Delta G_c=\sup|s-\bar s|+\tfrac12\bar s^2\sup|\kappa-\bar\kappa|
+       +|c|\min(2,\sup|\kappa s-\bar\kappa\bar s|+\sup|\beta-\bar\beta|).
+$$
+These follow by varying the arc length at fixed curvature, then the
+curvature at the reference length. The last term bounds the rotation of
+the corner. The speed interval comes from the NRMM velocity error and the
+measured chord. Arc length is monotone in speed and acceleration up to
+absorption. An uncertain stop in the measured interval permits zero
+backward travel. Let $W_c=\bar G_c/\bar H$ and take
+$r_y=\max_c(\Delta G_c+|W_c|(\epsilon_-+\Delta H)+|1-W_c|\epsilon_0)$.
+The four true and measured corners with the same convex coefficients
+differ by at most $r_y$. A stopped member uses its current measured
+position disk and its retained body heading. A chord whose measured
+position disks overlap gives no independent course witness.
+
+The common stage and handoff-hold clearance value is therefore
+$$
+ d_j^s=\max\big\{d_\pm(E,B_C),\ d_\pm(E,R_y)-r_y\big\}.
+$$
+This is the best certificate obtained from the two separate support
+bounds and an unrestricted unit normal. The outer rectangle $B_C$
+continues to define the simpler terminal continuation set. A measurement
+certificate whose rounded rectangle contains all four corners of $B_C$
+cannot improve the signed gap at any ego pose. New or expired measurement
+witnesses require rechecking a shifted certificate unless containment is
+established.
 
 For an acquired track let $d_k^-=\min_s\|p_{T,k}^s-p_{E,k}^s\|$. The
 target contributes node and terminal separation constraints when $d_k^-\le R$.

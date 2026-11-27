@@ -522,9 +522,9 @@ function members=localCompactPlanningMembers(members,cfg,count)
         members(j).motionLimits=[];members(j).cover=[];members(j).positionRadius=0;
         q=members(j).target;track=[];
         if isfield(members,'targetObserver'),track=members(j).targetObserver;end
-        members(j).rootHalfSize=[];
+        members(j).rootHalfSize=[];members(j).observedFootprint=[];
         if isempty(q),continue;end
-        members(j).rootHalfSize=q(8:9);
+        physicalHalfSize=q(8:9);members(j).rootHalfSize=physicalHalfSize;
         if isempty(track),continue;end
         if isfield(track,'positionBounds') && ~isempty(track.positionBounds)
             box=track.positionBounds;
@@ -544,12 +544,26 @@ function members=localCompactPlanningMembers(members,cfg,count)
             q(8:9)=q(8:9)+projection;
             members(j).target=q;
         end
-        if q(4)==0,continue;end
-        b=track.motionBounds;
-        members(j).target(5:6)=min(b(2,:).',max(b(1,:).',q(5:6)));
-        if any(b(1,:)~=b(2,:))
-            members(j).motionLimits=b;
-            members(j).cover=localCompactCover(members(j),cfg,count+1);
+        bounds=repmat(q(5:6).',2,1);
+        if q(4)>0
+            bounds=track.motionBounds;
+            members(j).target(5:6)=min(bounds(2,:).',max(bounds(1,:).',q(5:6)));
+            if any(bounds(1,:)~=bounds(2,:))
+                members(j).motionLimits=bounds;
+                members(j).cover=localCompactCover(members(j),cfg,count+1);
+            end
+        end
+        physical=members(j).target;physical(8:9)=physicalHalfSize;
+        obs=nrmmControllerErrorBounds("footprintObservation",track,physical,bounds,cfg.target.observerDomain);
+        times=(0:count+1)*cfg.controller.sampleTime;
+        [measured,radius]=predictiveSafetyGeometry.observedFootprint(physical,bounds,times,obs,cfg.target.observerDomain);
+        if isempty(measured),continue;end
+        if isempty(members(j).cover),prior=localCompactTargetNodes(members(j).target,times);
+        else,prior=members(j).cover.boxes;end
+        prior(:,1)=members(j).target;prior(8:9,1)=members(j).rootHalfSize;
+        relevant=localCompactIndependentNodes(prior,measured,radius);
+        if any(relevant)
+            members(j).observedFootprint=struct('boxes',measured,'radius',radius,'relevant',relevant);
         end
     end
     if isfield(members,'targetObserver'),members=rmfield(members,'targetObserver');end
@@ -561,6 +575,9 @@ function contained=localCompactShiftContained(prior,members,indices,h)
     for j=1:numel(members)
         old=prior.retainedTrajectories{indices(j)};item=members(j);
         if ~isequal(old.collisionEgo(:,2),item.ego) || ~isequal(old.parameters,item.parameters)
+            contained=false;return
+        end
+        if ~isempty(item.observedFootprint) || (isfield(old,'observedFootprint') && old.observedFootprint)
             contained=false;return
         end
         if isempty(item.target),continue;end
@@ -629,7 +646,10 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
     if ~isempty(item.target)
         roots=[hypotheses.ego];targets=[hypotheses.target];targets(8:9,:)=[hypotheses.rootHalfSize];
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        rootGap=min(predictiveSafetyGeometry.rectangleClearance(roots,targets,shape));
+        rootGap=Inf;
+        for j=1:numel(hypotheses)
+            rootGap=min(rootGap,localCompactNodeGap(hypotheses(j),roots(:,j),targets(:,j),1,shape));
+        end
         lossFloor=max(0,cfg.outputFeedback.clearanceMeters-rootGap);
         if rootGap<=0 || lossFloor>priorCap+slackRoundoff
             error('collisionAvoidanceController:compactNoFeasiblePlan', ...
@@ -781,7 +801,8 @@ function [result,info] = localCondensedSolve(request,cfg,hypotheses,conditioning
         trace=traces{s};
         retainedTrajectories{s}=struct('inputs',trace.inputs,'denseEgo',trace.denseEgo, ...
             'collisionEgo',trace.collisionEgo,'validationSubsteps',kernel.validationSubsteps, ...
-            'parameters',hypotheses(s).parameters,'target',hypotheses(s).target,'integrationRule',"tireDynamicsRefinedRK4");
+            'parameters',hypotheses(s).parameters,'target',hypotheses(s).target, ...
+            'observedFootprint',~isempty(hypotheses(s).observedFootprint),'integrationRule',"tireDynamicsRefinedRK4");
     end
     input=best(:,1);state=struct('kind',"compactOutputFeedback-v2",'time',request.block.time,'memory',zeros(0,1), ...
         'hypotheses',hypotheses,'appliedInput',input,'controls',best(:,boundaries(2:end)), ...
@@ -1338,7 +1359,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
                 boxes=q;
                 if isempty(item.cover)
                     boxes(8:9,1)=item.rootHalfSize;
-                    gap=predictiveSafetyGeometry.rectangleClearance(nodes,boxes,shape);
+                    gap=localCompactNodeGap(item,nodes,boxes,1:size(nodes,2),shape);
                 else
                     gap=drivingGap;boxes=drivingBoxes;
                     if total>N
@@ -1412,7 +1433,7 @@ function [e,rollouts]=localCondensedOracle(u,model,derivatives,rollouts,checkBud
         gradient=zeros(3,total);
         if any(stageNeeded)
             selected=nodeIndices(stageNeeded);
-            gradient(:,stageNeeded)=localCompactDistanceGradient(nodes(:,selected),boxes(:,selected),shape);
+            [~,gradient(:,stageNeeded)]=localCompactNodeGap(item,nodes(:,selected),boxes(:,selected),selected,shape);
         end
         stageGradient=zeros(nu,total);
         for i=find(stageNeeded)
@@ -1493,7 +1514,7 @@ function e=localClearanceMeritDerivatives(e,flow,model)
         item.parameters,flow.fi(1:lastHold),false(1,lastHold),model);
     vehicle=model.cfg.vehicle;
     shape=[vehicle.length/2;vehicle.width/2;vehicle.rectangleOffset];
-    gradients=localCompactDistanceGradient(states(:,nodes),flow.boxes(:,nodes),shape);
+    [~,gradients]=localCompactNodeGap(item,states(:,nodes),flow.boxes(:,nodes),nodes,shape);
     for j=1:numel(stages)
         e.stageGradient(:,stages(j))=-(gradients(:,j).'*sensitivity(1:3,:,nodes(j))).';
     end
@@ -1583,8 +1604,36 @@ function kernel=localCompactSensitivityKernel()
     kernel=handle;
 end
 
-function gradient=localCompactDistanceGradient(states,targets,shape)
-    [~,gradient]=predictiveSafetyGeometry.rectangleClearance(states,targets,shape);
+function relevant=localCompactIndependentNodes(prior,measured,radius)
+    % A rounded rectangle contains the prior iff it contains its four corners.
+    % An enclosing measurement certificate cannot improve any signed gap.
+    rot=exp(1i*(prior(3,:)-measured(3,:)));
+    shift=complex(prior(1,:)-measured(1,:),prior(2,:)-measured(2,:)).*exp(-1i*measured(3,:));
+    x=prior(10,:)+[-1;1;1;-1].*prior(8,:);
+    y=prior(11,:)+[-1;-1;1;1].*prior(9,:);
+    corners=shift+rot.*complex(x,y)-complex(measured(10,:),measured(11,:));
+    dx=max(0,abs(real(corners))-measured(8,:));dy=max(0,abs(imag(corners))-measured(9,:));
+    relevant=any(hypot(dx,dy)>radius,1);
+end
+
+function [gap,gradient]=localCompactNodeGap(item,states,targets,nodes,shape)
+    if nargout>1,[gap,gradient]=predictiveSafetyGeometry.rectangleClearance(states,targets,shape);
+    else,gap=predictiveSafetyGeometry.rectangleClearance(states,targets,shape);end
+    data=item.observedFootprint;
+    if isempty(data),return;end
+    use=find(data.relevant(nodes));
+    if isempty(use),return;end
+    indices=nodes(use);boxes=data.boxes(:,indices);
+    if nargout>1
+        [distance,measurementGradient]=predictiveSafetyGeometry.rectangleClearance(states(:,use),boxes,shape);
+    else
+        distance=predictiveSafetyGeometry.rectangleClearance(states(:,use),boxes,shape);
+    end
+    observed=distance-data.radius(indices);
+    if nargout>1
+        active=observed>gap(use);gradient(:,use(active))=measurementGradient(:,active);
+    end
+    gap(use)=max(gap(use),observed);
 end
 
 function value=localCompactPerformance(states,inputs,model)
@@ -1756,7 +1805,7 @@ function [valid,traces,violation,nodeStates,slacks] = localCompactValidate(contr
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
                 if isempty(item.cover)
                     boxes=q;boxes(8:9,1)=item.rootHalfSize;
-                    separation=predictiveSafetyGeometry.rectangleClearance(collisionStates,boxes,shape);
+                    separation=localCompactNodeGap(item,collisionStates,boxes,1:size(boxes,2),shape);
                 else
                     [separation,~,remaining]=localCompactOccupied(item,collisionStates,times,shape,cfg);
                 end
@@ -1828,7 +1877,7 @@ function [terminalValue,terminal]=localCompactTerminalCheck(x,item,start,previou
         q=localCompactTargetNodes(item.target,times);
         shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
         if isempty(item.cover)
-            gaps=predictiveSafetyGeometry.rectangleClearance([x,tailEnds],q,shape);
+            gaps=localCompactNodeGap(item,[x,tailEnds],q,round(times/cfg.controller.sampleTime)+1,shape);
         else
             [gaps,~,remaining]=localCompactOccupied(item,[x,tailEnds],times,shape,cfg,remaining);
         end
@@ -1907,7 +1956,7 @@ function [gap,boxes,remaining]=localCompactOccupied(item,states,times,shape,cfg,
     last=find(ranges>cfg.collision.encounterRangeMeters+item.positionRadius,1);
     remaining=isempty(last);
     if remaining,last=numel(nodes);end
-    gap(1:last)=predictiveSafetyGeometry.rectangleClearance(states(:,1:last),boxes(:,1:last),shape);
+    gap(1:last)=localCompactNodeGap(item,states(:,1:last),boxes(:,1:last),nodes(1:last),shape);
 end
 
 function [value,normal,gradient,exitSteps]=localCompactMovingValue(x,target,item,start,cfg,remaining)

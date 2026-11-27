@@ -5,6 +5,9 @@ function value = nrmmControllerErrorBounds(action, varargin)
 %       The comparison state bounds yaw, body velocity and [rho; q; s]. Absolute
 %       position also uses the timestamped GNSS ball and the true speed domain.
 %       These are current estimation bounds, not a prediction-horizon certificate.
+%   observation = nrmmControllerErrorBounds("footprintObservation", track, root, limits, domain)
+%       Publish two position observations with their errors and the
+%       corresponding NRMM speed interval for the material-corner map.
 %   bounds = nrmmControllerErrorBounds("targetParameters", velocity, acceleration, ...
 %       velocityRadius, accelerationRadius, frameRotationRadius)
 %       The true target velocity and acceleration lie within velocityRadius and
@@ -27,11 +30,49 @@ function value = nrmmControllerErrorBounds(action, varargin)
     switch string(action)
         case "publish"
             value = localPublish(varargin{1}, varargin{2}, varargin{3}, varargin{4});
+        case "footprintObservation"
+            value = localFootprintObservation(varargin{:});
         case "targetParameters"
             value = localTargetParameterBounds(varargin{:});
         otherwise
             error("nrmmControllerErrorBounds:invalidAction", ...
-                "action must be 'publish' or 'targetParameters'.");
+                "Unknown NRMM controller-bound operation.");
+    end
+end
+
+function obs=localFootprintObservation(track,root,limits,domain)
+    speed=root(4);
+    obs=struct('speed',[speed;speed],'current',[],'radius',0,'previous',[],'previousRadius',0,'span',0);
+    if speed>0 && isfield(track,'errorBound') && ~isempty(track.errorBound)
+        radius=track.errorBound(1).targetComponents(2);
+        obs.speed=[max(0,speed-radius);min(track.speedUpper,speed+radius)];
+    end
+    if ~isfield(track,'times') || isempty(track.times) || track.times(end)~=track.time,return;end
+    obs.current=track.positions(:,end);obs.radius=track.positionRadii(end);
+    if numel(track.times)<2,return;end
+    obs.previous=track.positions(:,1);obs.previousRadius=track.positionRadii(1);
+    obs.span=track.time-track.times(1);
+    if obs.span<=0 || speed==0,return;end
+
+    % A chord of length S*sinc(kappa*S/2) spans S meters of arc.
+    % Before absorption V_end=S/T+A*T/2. Clipping also encloses zero
+    % when braking ends inside the measured interval.
+    t=obs.span;chordLength=norm(obs.current-obs.previous);
+    noise=obs.radius+obs.previousRadius+16*eps(max([1;abs(obs.current);abs(obs.previous)]));
+    yawRate=max(abs(sin(limits(:,2))))/root(7)*(obs.speed(2)+max(0,-limits(1,1))*t);
+    if isfield(domain,'yawRateMaximum'),yawRate=min(yawRate,domain.yawRateMaximum);end
+    turn=yawRate*t/2;
+    lower=max(0,(chordLength-noise)/t+limits(1,1)*t/2);
+    if turn<pi
+        chordRatio=1;if turn>0,chordRatio=sin(turn)/turn;end
+        upperArc=(chordLength+noise)/chordRatio;
+        upper=max(0,upperArc/t+limits(2,1)*t/2);
+        obs.speed(2)=min(obs.speed(2),upper);
+    end
+    obs.speed(1)=max(obs.speed(1),lower);
+    if obs.speed(1)>obs.speed(2)
+        % An empty auxiliary clock interval supplies no measurement witness.
+        obs.previous=[];
     end
 end
 

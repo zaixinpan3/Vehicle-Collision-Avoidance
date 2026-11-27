@@ -1031,6 +1031,47 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(terminalSafeSet.sectorSeparation(x,box,sector,0,cfg),cfg.outputFeedback.nlpTolerance);
         end
 
+        function theMeasuredPositionDiskEntersTheSamePcbfInSearchAndReplay(testCase)
+            cfg=testCase.cfg;item=testCase.block.initialHypotheses;item.ego=[0;0;0;3;0;0];
+            margin=.24;r=.2;
+            center=cfg.vehicle.rectangleOffset-[cfg.vehicle.length/2+2.4;cfg.vehicle.width/2+.95]-margin;
+            item.target=[center;0;0;0;0;1.6;2.4;.95;0;0];
+            item.targetObserver=struct('positionBounds',center+[-r,r],'motionBounds',zeros(2), ...
+                'times',0,'time',0,'positions',center,'positionRadii',r);
+            req=struct('operation',"evaluateControlSequence",'cfg',cfg,'hypotheses',item, ...
+                'input',zeros(2,1),'inputs',zeros(2,1),'holds',1);
+            oracle=solvePredictiveControl("outputFeedback",req);
+            testCase.verifyEqual(oracle.stage,cfg.outputFeedback.clearanceMeters-(sqrt(2)*margin-r),AbsTol=1e-8);
+            req.operation="validateInputSequence";
+            replay=solvePredictiveControl("outputFeedback",req);
+            testCase.verifyEqual(replay.stageDeficits,0);
+            req.hypotheses.targetObserver.times=[];req.operation="evaluateControlSequence";
+            prior=solvePredictiveControl("outputFeedback",req);
+            testCase.verifyEqual(prior.stage,cfg.outputFeedback.clearanceMeters-sqrt(2)*(margin-r),AbsTol=1e-8);
+            testCase.verifyGreaterThan(prior.stage,0);
+        end
+
+        function twoPositionsCanCertifyAMovingTargetWhenTheMotionBoxSpendsSlack(testCase)
+            cfg=testCase.cfg;item=testCase.block.initialHypotheses;item.ego=[0;0;0;15;0;0];
+            margin=.26;r=.2;speed=10;
+            center=cfg.vehicle.rectangleOffset-[cfg.vehicle.length/2+2.4;cfg.vehicle.width/2+.95]-margin;
+            item.target=[center;0;speed;0;0;1.6;2.4;.95;0;0];
+            item.targetObserver=struct('positionBounds',center+[-r,r],'motionBounds',zeros(2), ...
+                'times',[0,1],'time',1,'positions',[center-[speed;0],center],'positionRadii',[0,r]);
+            req=struct('operation',"evaluateControlSequence",'cfg',cfg,'hypotheses',item, ...
+                'input',zeros(2,1),'inputs',zeros(2,1),'holds',1);
+            observed=solvePredictiveControl("outputFeedback",req);
+            radius=r*hypot(1+2.4/speed,.95/speed);
+            testCase.verifyEqual(observed.stage,cfg.outputFeedback.clearanceMeters-(sqrt(2)*margin-radius),AbsTol=1e-9);
+            testCase.verifyLessThan(observed.stage,0);
+            req.operation="validateInputSequence";replay=solvePredictiveControl("outputFeedback",req);
+            testCase.verifyEqual(replay.stageDeficits,0);
+            req.hypotheses.targetObserver.times=[];req.operation="evaluateControlSequence";
+            prior=solvePredictiveControl("outputFeedback",req);
+            testCase.verifyEqual(prior.stage,cfg.outputFeedback.clearanceMeters-sqrt(2)*(margin-r),AbsTol=1e-9);
+            testCase.verifyGreaterThan(prior.stage,0);
+        end
+
         function theCurrentFootprintUsesTheObservedPositionBox(testCase)
             cfg=testCase.cfg;item=testCase.block.initialHypotheses;item.ego=zeros(6,1);
             x=cfg.vehicle.length/2+cfg.vehicle.rectangleOffset(1)+2.4+.16;

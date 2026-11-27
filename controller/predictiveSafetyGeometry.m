@@ -741,6 +741,61 @@ classdef predictiveSafetyGeometry
             end
         end
 
+        function [boxes,radius]=observedFootprint(root,limits,time,obs,domain)
+            % The same complex similarity maps all four labeled corners.
+            % Bound the residual of each corner, then offset their common
+            % rectangle by the largest disk. A position chord identifies
+            % its orientation without an independently observed velocity.
+            boxes=[];radius=[];
+            if isempty(obs.current),return;end
+            time=reshape(time,1,[]);origin=complex(obs.current(1),obs.current(2));
+            if root(4)==0
+                boxes=repmat(root,1,numel(time));boxes(1:2,:)=obs.current+zeros(1,numel(time));
+                radius=obs.radius+zeros(size(time));return
+            end
+            if isempty(obs.previous),return;end
+            chord=complex(obs.previous(1),obs.previous(2))-origin;
+            if abs(chord)<=obs.radius+obs.previousRadius,return;end
+
+            t=obs.span;k=sin(root(6))/root(7);K=sin(limits(:,2))/root(7);
+            back=-localPastTravel(root(4),root(5),t);
+            H=localArcChord(back,k);
+            if H==0,return;end
+            d=chord/H;scale=abs(d);
+            if ~isfinite(scale),return;end
+            betaError=max(abs(limits(:,2)-root(6)));kError=max(abs(K-k));
+            backLo=-localPastTravel(obs.speed(2),limits(1,1),t);
+            backHi=-localPastTravel(obs.speed(1),limits(2,1),t);
+            if obs.speed(1)==0,backHi=0;end
+            errorH=max(abs([backLo,backHi]-back))+.5*back^2*kError;
+
+            slow=root;fast=root;
+            slow(4:5)=[obs.speed(1);limits(1,1)];fast(4:5)=[obs.speed(2);limits(2,1)];
+            lo=predictiveSafetyGeometry.targetArc(slow,time);hi=predictiveSafetyGeometry.targetArc(fast,time);
+            if obs.speed(1)==0,lo=zeros(size(time));end
+            if isfield(domain,'speedMaximum'),hi=min(hi,domain.speedMaximum*time);end
+            turns=[K(1)*lo;K(1)*hi;K(2)*lo;K(2)*hi];
+            turnLo=min(turns,[],1);turnHi=max(turns,[],1);
+            if isfield(domain,'yawRateMaximum')
+                turnLo=max(turnLo,-domain.yawRateMaximum*time);turnHi=min(turnHi,domain.yawRateMaximum*time);
+            end
+            s=predictiveSafetyGeometry.targetArc(root,time);F=localArcChord(s,k);
+            yaw=k*s-root(6);center=origin+d*F;
+            boxes=repmat(root,1,numel(time));boxes(1:2,:)=[real(center);imag(center)];
+            boxes(3,:)=angle(d)+yaw;boxes(8:11,:)=scale*boxes(8:11,:);
+
+            vertices=root(10:11)+root(8:9).*[-1,1,1,-1;-1,-1,1,1];
+            c=complex(vertices(1,:),vertices(2,:)).';
+            G=F+c.*exp(1i*yaw);
+            turnError=max(abs(turnLo-k*s),abs(turnHi-k*s))+betaError;
+            errorG=max(abs(lo-s),abs(hi-s))+.5*s.^2*kError+abs(c).*min(2,turnError);
+            perCorner=errorG+abs(G)*((errorH+obs.previousRadius)/abs(H)) ...
+                +abs(H-G)*(obs.radius/abs(H));
+            radius=max(perCorner,[],1);
+            radius=radius+64*eps(max(1,abs(center)+scale*max(abs(c))+radius));
+            if any(~isfinite(radius)) || any(~isfinite(boxes),'all'),boxes=[];radius=[];end
+        end
+
         function range=targetEnvelopeRange(ego,target,centers)
             % Distance to the box of possible dynamics reference points.
             d=ego(1:2,:)-target(1:2,:);c=cos(target(3,:));s=sin(target(3,:));
@@ -1205,6 +1260,18 @@ classdef predictiveSafetyGeometry
 
 
     end
+end
+
+function arc=localPastTravel(v,a,t)
+    % Reverse the acceleration when integrating speed into the past.
+    if a>0,t=min(t,v/a);end
+    arc=t*(v-.5*a*t);
+end
+
+function f=localArcChord(s,k)
+    half=k*s/2;factor=ones(size(half));nz=half~=0;
+    factor(nz)=sin(half(nz))./half(nz);
+    f=s.*factor.*exp(1i*half);
 end
 
 function [lo,hi]=localCosRange(a,b)

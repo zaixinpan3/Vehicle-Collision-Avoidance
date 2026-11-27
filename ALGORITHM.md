@@ -215,17 +215,58 @@ where $\mathcal T$ comprises the observed times on that moving arc for which $\h
 
 Let $\mathbb B(c,r)$ be the closed ball of radius $r$ about $c$. Conditional on the ego member, the current target reference position belongs to $\mathbb B(y,\epsilon_\rho)\cap\mathbb B(\hat p,E_p)$. Write $P_0$ for a set enclosing all current target positions consistent with the observed history. With exact relative position and known ego pose, $P_0$ may be the singleton $\{p_T\}$.
 
-### Predicted target occupancy and encounter scope
+### Observing the future footprint from positions
 
-Fix an ego member, a target root speed and heading, and a motion mode. Let $\mathcal C=I_A\times I_\beta$ and let $B_T$ be the target body rectangle, including its reference-point offset. At elapsed time $t$ its possible occupied region is
-
+Identify an inertial plane vector with a complex number. Then $n^\top z=\operatorname{Re}(\bar n z)$ and multiplication by $e^{i\psi}$ rotates a vector by $\psi$. Work conditionally on one ego and sensor-bias history so its position observations are in a common inertial frame. Choose the current time as zero and any earlier observed time $-T$ on the same target arc. Write $y_0,y_-$ for the observed positions and $\epsilon_0,\epsilon_-$ for their error radii. The physical clock $\theta=(V_0,A,\beta)$ determines the signed arc lengths $s_-\le0$ to the earlier position and $s(t)\ge0$ to a future position. The same clock governs both. Define
 $$
-\mathcal O(t)=\bigcup_{\substack{p_0\in P_0,\ (A,\beta)\in\mathcal C\\
-                         \text{admissible on }[0,t]}}
-       \big(p_T(t;p_0,A,\beta)+R(\psi_T(t;A,\beta))B_T\big).
+ F_\kappa(s)=\int_0^s e^{i\kappa u}\,du
+ =s\,\operatorname{sinc}(\kappa s/2)e^{i\kappa s/2},\qquad
+ H_\theta=F_\kappa(s_-),\qquad
+ G_{\theta,c}(t)=F_\kappa(s(t))+e^{i(\kappa s(t)-\beta)}c .
+$$
+Here $c$ is a body corner measured from the target dynamics reference point, including its offset. With $d=e^{i(\psi_0+\beta)}$, the earlier reference position and the future corner satisfy
+$$
+ p_-=p_0+H_\theta d,\qquad z_c(t)=p_0+G_{\theta,c}(t)d .
+$$
+This follows by integrating the target velocity in arc length and rotating the body offset by its final heading. For $H_\theta\ne0$, subtraction eliminates both the unknown initial position and course:
+$$
+ z_c(t)=(1-W_c)p_0+W_c p_-,\qquad W_c=G_{\theta,c}(t)/H_\theta .
+$$
+The complex coefficient includes a rotation. With exact observed positions this identity recovers the corner for that clock; a zero chord leaves the initial course unobservable from this pair. After absorption, the terminal pose persists. An already stationary target uses its position and admitted body-heading set.
+
+For a moving member the NRMM velocity ball gives the speed interval $[\max(0,\|\hat q\|-E_q),\|\hat q\|+E_q]$, intersected with prior physical bounds. The positions further constrain this clock. Put $L=|y_0-y_-|$, $e=\epsilon_0+\epsilon_-$ and $\alpha=\bar\Omega T/2$, where $\bar\Omega$ bounds the yaw rate on the past arc. If $\alpha<\pi$, its length $S$ satisfies
+$$
+ (L-e)_+\le S\le(L+e)/\operatorname{sinc}(\alpha).
+$$
+Indeed the true chord is $S\,|\operatorname{sinc}(\kappa S/2)|$ and $|\kappa|S/2\le\alpha$. The lower bound holds for every turn. On a moving arc spanning both observations $V_0=S/T+AT/2$. For a braking target that stops within the interval $V_0=0$ and $S\le |A|T^2/2$. Thus clipping each endpoint of the interval for $S/T+AT/2$ below at zero also covers absorption. These relations restrict the clock without differentiating a measured position.
+
+For any admitted clock family $\Theta$ and any complex $W$, the two position equations give the following support bound in a unit direction $n$:
+$$
+ \operatorname{Re}(\bar n z_c)\ \le \operatorname{Re}\!\left(\bar n[(1-W)y_0+Wy_-]\right)
+ +|1-W|\epsilon_0+|W|\epsilon_-+
+ \sup_{\theta\in\Theta}|G_{\theta,c}-WH_\theta|.
+$$
+Indeed $|d|=1$ and the last residual is the coefficient of $d$. The measurement covectors are $\overline{(1-W)}n$ and $\bar W n$. They depend on the corner, the prediction time and the separation direction. No independence of the two measurement errors is required. For any reference clock with $\bar H\ne0$, taking $W=\bar G_c/\bar H$ cancels its course term. If $|G_{\theta,c}-\bar G_c|\le\Delta G_c$ and $|H_\theta-\bar H|\le\Delta H$ throughout the clock family, then $\Delta G_c+|W|\Delta H$ bounds the residual. The current position and the arc equations independently enclose every corner and remain defined at $\bar H=0$.
+
+For explicit radii let $d_s=\sup_\Theta|s-\bar s|$, $d_-=\sup_\Theta|s_--\bar s_-|$, $d_\kappa=\sup_\Theta|\kappa-\bar\kappa|$ and $d_\varphi=\sup_\Theta|\kappa s-\bar\kappa\bar s|+\sup_\Theta|\beta-\bar\beta|$. From the integral for $F$, $|\partial_sF|=1$ and $|\partial_\kappa F|\le s^2/2$. Since $|e^{iu}-e^{iv}|\le\min(2,|u-v|)$, one may take
+$$
+ \Delta H=d_-+\tfrac12\bar s_-^2d_\kappa,\qquad
+ \Delta G_c=d_s+\tfrac12\bar s^2d_\kappa+|c|\min(2,d_\varphi).
 $$
 
-The arc equations of Section 1 determine each pose using one constant pair $(A,\beta)$ throughout its motion. Let $T(t)$ be a rectangle satisfying $\mathcal O(t)\subseteq T(t)$. Thus one geometric clearance constraint covers the persistent parameter uncertainty for that member. Coverage of the physical target additionally requires coverage of its root speed, heading and mode.
+There is a single observed rectangle for all four corners. Let $d_y=(y_- - y_0)/\bar H$ and denote the reference clock by bars. The four centers of the observation bounds are
+$$
+ \bar z_c=y_0+d_y F_{\bar\kappa}(\bar s)
+             + d_y e^{i(\bar\kappa\bar s-\bar\beta)}c .
+$$
+The multiplier of $c$ is common to every corner. Consequently their convex hull $R_y(t)$ is a translated, rotated and uniformly scaled copy of the physical body rectangle. Its scale is $|d_y|$, including for a rectangle whose reference point is offset. Let
+$$
+ r_y(t)=\max_{c\in\operatorname{vert}B_T}
+ \{\Delta G_c+|W_c|(\Delta H+\epsilon_-)+|1-W_c|\epsilon_0\}.
+$$
+Every true corner lies within $r_y$ of its corresponding center. Using the same convex coefficients for a body point and its four centers proves $B_T(t)\subseteq R_y(t)\oplus\mathbb B(0,r_y(t))$. At a known absorbing pose, the latest position measurement defines $R_y=y_0+R(\psi_0)B_T$ and $r_y=\epsilon_0$. An unresolved position chord supplies no independent course witness.
+
+Independently, for a member with initial speed $V_0$, body heading $\psi_0$ and mode, let $R_p(t)$ enclose the arc image over the NRMM position set $P_0$ and its persistent $I_A\times I_\beta$. The two footprint enclosures can use different outer bounds for the same member. In particular the position pair can use the entire NRMM speed interval to cover its clock error. Physical coverage across members requires the true initial speed, heading, mode and ego motion to be represented.
 
 The target contributes a collision obligation while it is in perception range. In prediction, exit is established when every admissible reference position lies farther than $R_d$ from the ego reference point. The first exit node is checked before releasing subsequent nodes of that encounter. An observed re-entry starts a new encounter.
 
@@ -314,30 +355,32 @@ The initial trajectory for the first leg comes from the field in Section 3. The 
 
 ### Collision-distance dual
 
-Let the ego body $B_E=o_E+[-b_E,b_E]$ have vertices $e_a$ and let $E=p+R(\psi)B_E$. At an active node let $T$ be the target rectangle, including its occupancy uncertainty. In axes $R_T$ about a reference point $p_T$, with half-extents $b_T$ and offset $o_T$, it is given by
-$H(y-p_T)\le f$, where $H=[I;-I]R_T^\top$ (vertical stacking) and $f=(b_T+o_T,b_T-o_T)$ stacked. For any $n$, its support relative to $p_T$ is
-
+Let $E=p+R(\psi)B_E$ have geometric center $c_E=p+R(\psi)o_E$, unit body axis $u_E=e(\psi)$ and half-extents $a,b$. For a target rectangle $R$, define
 $$
-\max_{H z\le f}n^\top z=\min_{\lambda\ge0,\ H^\top\lambda=n} f^\top\lambda .
+ d_\pm(E,R)=\max_{\|n\|=1}
+ \left[n^\top c_E-a|n^\top u_E|-b|n^\top Ju_E|-h_R(n)\right],
+ \qquad h_R(n)=\max_{z\in R}n^\top z .
 $$
-
-The rectangle is nonempty and bounded, so linear-program duality attains this value. The minimum of a linear projection on $E$ is attained at a vertex. Eliminating the support for each direction gives the signed separation
-
+For $R=\{z:H z\le f\}$, linear-program duality gives $h_R(n)=\min_{\lambda\ge0,\ H^\top\lambda=n}f^\top\lambda$. One normal serves every ego and target point at a node. For congruent rectangles the expression being maximized becomes
 $$
-d_\pm(E,T)=
-\max_{\lambda\ge0,\ \|H^\top\lambda\|=1}
-\min_a\big\{\lambda^\top H(p+R(\psi)e_a-p_T)-f^\top\lambda\big\}.
+ n^\top(c_E-c_T)-a\big(|n^\top u_E|+|n^\top u_T|\big)
+                  -b\big(|n^\top Ju_E|+|n^\top Ju_T|\big).
 $$
+The centered difference body is the sum of four line segments along the two body frames. More generally the dual maximizes the least projection of $E-R$. Outside the difference body the origin's closest point supplies an attaining unit normal. Inside it the largest lower projection equals minus the distance to the boundary, with zero at contact.
 
-Indeed this is the largest lower projection of $E-T$ over all unit directions. When the origin is outside that difference polygon, its closest point supplies a unit normal attaining its distance. When the origin lies inside, the largest lower projection equals minus the least translation distance to the boundary; at contact it is zero. Thus overlap has negative value. One multiplier is shared across the ego vertices at a node. Different members and nodes may have different witnesses. A change of witness leaves the signed-distance function and the admissible physical constraint unchanged. The enclosing rectangle makes the gap a lower bound for the true footprint gap whenever the true footprint is covered.
+Since $h_{R_y\oplus\mathbb B(0,r_y)}(n)=h_{R_y}(n)+r_y$ for $\|n\|=1$, the two available upper bounds on target support give the node certificate
+$$
+ \boxed{\quad d_j^s=\max\{d_\pm(E,R_p),\ d_\pm(E,R_y)-r_y\}.\quad}
+$$
+Indeed subtracting the smaller upper support bound from the least ego projection and maximizing over $n$ commutes with choosing the better of the two bounds. Each term lower-bounds physical signed clearance for the member. The signed distance to the intersection of the enclosures can be larger. With only the prior available $d_j^s=d_\pm(E,R_p)$. Different nodes and members can use different witnesses.
 
 ## 5. Terminal continuation and the predictive barrier
 
 ### Terminal set
 
-Let $d_*>0$ be the prescribed clearance margin. Write $d_j^s$ for the signed gap to the occupied rectangle for member $s$ at node $j$, with $d_j^s=+\infty$ after release. For an active encounter the common terminal input is $u_f=(0,0)$. Membership in $Z_f$ at the endpoint means that a released member has completed its collision obligation, and each still-active member admits one physical hold under $u_f$ with admissible input transition, model domain, positive separation and full clearance $d_*$ at both obligated nodes. After that hold it must be released or lie in the following core. A target-free continuation uses an admissible input toward cruise trim. The collision terminal condition imposes no cruise-speed or lane-error equality.
+Let $d_*>0$ be the prescribed clearance margin. Write $d_j^s$ for the signed gap certified by the available footprint enclosures for member $s$ at node $j$, with $d_j^s=+\infty$ after release. For an active encounter the common terminal input is $u_f=(0,0)$. Membership in $Z_f$ at the endpoint means that a released member has completed its collision obligation, and each still-active member admits one physical hold under $u_f$ with admissible input transition, model domain, positive separation and full clearance $d_*$ at both obligated nodes. After that hold it must be released or lie in the following core. A target-free continuation uses an admissible input toward cruise trim. The collision terminal condition imposes no cruise-speed or lane-error equality.
 
-At handoff freeze the footprint shapes and orientations. The ego translates with $v_f=v_xe(\psi)$ and the target translates at a fixed velocity in the sector
+At handoff take the prior target rectangle $T=R_p$ and freeze the footprint shapes and orientations. The ego translates with $v_f=v_xe(\psi)$ and the target translates at a fixed velocity in the sector
 $\mathcal V=\{s e(\theta):l\le s\le u,\ |\operatorname{wrap}(\theta-\phi)|\le\delta_v\}$.
 At elapsed handoff time $t$ the speed endpoints follow from $[V_0+tI_A]_+$ with the physical speed bound and absorption. The course interval encloses $\psi_0+\beta+\kappa s(A,t)$ for all admissible $(A,\beta)$, with turn restricted to $[-\bar\Omega t,\bar\Omega t]$. Its midpoint and half-width, capped at $\pi$ for the latter, define $\phi,\delta_v$. A known velocity gives a singleton. A stopped track gives zero velocity.
 
@@ -353,7 +396,7 @@ $$
 
 ### Primary safety objective and secondary preference
 
-For member $s$, the signed gap $d_i^s$ uses $T^s(ih)\supseteq\mathcal O^s(ih)$ from Section 2. This makes $d_i^s$ a lower bound on clearance for that member's admissible target motions.
+For member $s$, the signed gap $d_i^s$ is the observation and motion certificate of Section 4.
 
 For each stage $0\le j<N$, define
 $C_j(U)=\sup_s\max_{i\in\{j,j+1\}}(d_*-d_i^s)$.
@@ -389,9 +432,9 @@ For a realizable constant-curvature cruise trim, $v_c=V_\mathrm{ref}$, course is
 
 ### Conditional recursive feasibility
 
-**Proposition.** Suppose an encounter begins with a feasible common plan. Assume the dynamics, margin and control period stay fixed and the physical state and footprint satisfy the stated enclosures. Along the unexecuted suffix, every history consistent with the new observations must extend an old admissible history. At each overlapping prediction time its target enclosure must lie inside the corresponding old enclosure, and each continuing collision obligation must have been present in that prediction. Assume terminal closure under the common continuation law and that the new horizon and admissible command family contain the resulting shift and any required extension. A newly encountered target requires feasible admission.
+**Proposition.** Suppose an encounter begins with a feasible common plan. Assume the dynamics, margin and control period stay fixed and the physical state and footprint satisfy the stated enclosures. Along the unexecuted suffix, every history consistent with the new observations must extend an old admissible history. At each overlapping prediction time the new information must preserve the inherited directional support certificate, and every continuing collision obligation must already have been present in the prediction. Assume terminal closure under the common continuation law and that the new horizon and admissible command family contain the resulting shift and any required extension. A newly encountered target requires feasible admission.
 
-Let $U_k$ be the committed plan and $\xi_{j|k}$ its actual stage deficits. After the hold $[t_k,t_{k+1})$, use the updated information set $\mathcal I(t_{k+1})$. The old prediction node $t_k+(j+1)h$ coincides with the new node $t_{k+1}+jh$. On each surviving path the inherited input produces the same ego footprint at that time. Containment of the target enclosure can only decrease its support in the old separating direction, so the old dual separation bound still holds. The worst endpoint deficit at new stage $j$ is consequently at most $\xi_{j+1|k}$. If $N_{k+1}=N_k-1$, the endpoint already belongs to $Z_f$. Otherwise append $N_{k+1}-(N_k-1)$ holds of the common continuation. Closure inductively supplies their admissibility, terminal membership and zero collision slack. Hence a feasible successor exists, and
+Let $U_k$ be the committed plan and $\xi_{j|k}$ its actual stage deficits. After the hold $[t_k,t_{k+1})$, use the updated information set $\mathcal I(t_{k+1})$. The old prediction node $t_k+(j+1)h$ coincides with the new node $t_{k+1}+jh$. On each surviving path the inherited input produces the same ego footprint at that time. For the two-certificate model, the minimum of the available support upper bounds at the new node must be no larger in the inherited witness direction. It suffices that one new valid enclosure be contained in the enclosure attaining the old certificate. The signed separation bound then persists. The worst endpoint deficit at new stage $j$ is consequently at most $\xi_{j+1|k}$. If $N_{k+1}=N_k-1$, the endpoint already belongs to $Z_f$. Otherwise append $N_{k+1}-(N_k-1)$ holds of the common continuation. Closure inductively supplies their admissibility, terminal membership and zero collision slack. Hence a feasible successor exists, and
 
 $$
 D(U^\mathrm{shift}_{k+1})\le D(U_k)-\xi_{0|k},\qquad

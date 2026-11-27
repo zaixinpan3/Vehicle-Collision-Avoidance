@@ -35,6 +35,63 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
             testCase.verifyEqual(box,nominal,AbsTol=1e-8);
         end
 
+        function theArcChordRestrictsSpeedWithoutAssumingAnUnobservedHeading(testCase)
+            q=[0;0;.8;5.8;2;0;1.6;2.2;.9;0;0];limits=[2,0;2,0];
+            track=struct('times',[1,2],'time',2,'positions',[0,3;0,4], ...
+                'positionRadii',[0,0],'speedUpper',10,'errorBound',struct('targetComponents',[0;2;1]));
+            obs=nrmmControllerErrorBounds("footprintObservation",track,q,limits,struct);
+            testCase.verifyEqual(obs.speed,[6;6],AbsTol=1e-12);
+            track.time=2.1;
+            obs=nrmmControllerErrorBounds("footprintObservation",track,q,limits,struct);
+            testCase.verifyEmpty(obs.current);
+            testCase.verifyEqual(obs.speed,[3.8;7.8],AbsTol=1e-12);
+            % The same formula permits absorption before the last position.
+            track.time=2;track.positions=[0,.1;0,0];q(4)=.4;limits(:,1)=-4;
+            obs=nrmmControllerErrorBounds("footprintObservation",track,q,limits,struct);
+            testCase.verifyEqual(obs.speed,[0;0],AbsTol=1e-12);
+        end
+
+        function aNoiselessChordReconstructsAllFourFutureCornersThroughAStop(testCase)
+            truth=[3;-2;2.8;4;-1.5;.12;1.6;2.3;.88;.35;-.13];times=[0,.4,2,4];
+            past=predictiveSafetyGeometry.predictTarget(truth,-.3);
+            obs=struct('speed',[4;4],'current',truth(1:2),'radius',0, ...
+                'previous',past(1:2),'previousRadius',0,'span',.3);
+            root=truth;root(1:3)=[-18;14;-.9];limits=repmat(root(5:6).',2,1);
+            [box,r]=predictiveSafetyGeometry.observedFootprint(root,limits,times,obs,struct);
+            target=predictiveSafetyGeometry.predictTarget(truth,times);
+            testCase.verifyEqual(localCorners(box),localCorners(target),AbsTol=2e-12);
+            testCase.verifyLessThan(max(r),2e-12);
+            obs.previous=obs.current;
+            [box,r]=predictiveSafetyGeometry.observedFootprint(root,limits,times,obs,struct);
+            testCase.verifyEmpty(box);testCase.verifyEmpty(r);
+        end
+
+        function oneRoundedRectangleCoversInteriorClocksAndNoisyPositionPairs(testCase)
+            root=[3;-2;.7;4;-1;.04;1.6;2.2;.9;.3;-.2];times=[0,.12,1,3,7];
+            limits=[-3,-.09;.5,.13];span=.25;shape=[2.1;.8;.25;-.1];
+            ego=[1,-1,5,3,22;2,1,-3,4,3;.7,-1,.05,.3,.8];
+            for speed=[2.8,4.9]
+                for a=[-2.6,.2]
+                    for beta=[-.075,.09]
+                        truth=root;truth(3:6)=[1.1;speed;a;beta];
+                        past=predictiveSafetyGeometry.predictTarget(truth,-span);
+                        obs=struct('speed',[2.6;5],'current',truth(1:2)+[.03;-.01],'radius',.04, ...
+                            'previous',past(1:2)+[-.02;.01],'previousRadius',.03,'span',span);
+                        [box,r]=predictiveSafetyGeometry.observedFootprint(root,limits,times,obs,struct);
+                        target=predictiveSafetyGeometry.predictTarget(truth,times);
+                        testCase.verifyLessThanOrEqual(max(abs(localCorners(target)-localCorners(box)),[],1),r+1e-11);
+                        gap=predictiveSafetyGeometry.rectangleClearance(ego,box,shape)-r;
+                        actual=predictiveSafetyGeometry.rectangleClearance(ego,target,shape);
+                        testCase.verifyLessThanOrEqual(gap,actual+1e-10);
+                    end
+                end
+            end
+            root(4)=0;obs.previous=[];obs.current=[-.5;.8];obs.radius=.04;
+            [box,r]=predictiveSafetyGeometry.observedFootprint(root,limits,times,obs,struct);
+            testCase.verifyEqual(box(1:2,:),repmat(obs.current,1,numel(times)));
+            testCase.verifyEqual(r,repmat(obs.radius,1,numel(times)));
+        end
+
         function valueOnlyDistanceAgreesWithTheDualWitnessEvaluation(testCase)
             rngStream=RandStream('mt19937ar',Seed=1523);
             n=300;ego=randn(rngStream,3,n);q=zeros(11,n);
@@ -268,4 +325,9 @@ function [image,samples]=localSpatialArcSamples()
             end
         end
     end
+end
+
+function corners=localCorners(q)
+    x=q(8,:).*[-1;1;1;-1]+q(10,:);y=q(9,:).*[-1;-1;1;1]+q(11,:);
+    corners=complex(q(1,:),q(2,:))+exp(1i*q(3,:)).*complex(x,y);
 end
