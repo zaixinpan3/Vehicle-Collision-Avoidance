@@ -26,7 +26,7 @@ function certificate = nrmmObserverCertificate(action, varargin)
 %       satisfies |Phi_e(q1,s1)-Phi_e(q2,s2)| <= Lq*|q1-q2|+Ls*|s1-s2|.
 %       The bounds are analytic over all radial and scalar saturation
 %       regions, not a sampled Jacobian maximum; the acceleration Jacobian
-%       retains its 2-by-2 directional structure. See OBSERVER_ISS_THEORY.md.
+%       retains its 2-by-2 directional structure. See ALGORITHM.md.
 %   certificate = nrmmObserverCertificate("targetGyro", metric, bandwidth, domain, range)
 %       Norm of the single gyro column in the target metric. The true NRMM
 %       relation q'*s = V*A is retained before maximizing over the domain.

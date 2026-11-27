@@ -4,7 +4,7 @@ function cfg = nrmmTrackingConfig()
 % The observer retains the Sharma NRMM ego-to-target cascade and covariant
 % third-order high-gain chain. Gains follow a normalized observer LMI and a
 % structured Lyapunov/Lipschitz ISS design. Sensor biases are compensated
-% upstream. See estimator/OBSERVER_ISS_THEORY.md.
+% upstream. See ALGORITHM.md.
 
     % Realization settings are consumed only after continuous gain synthesis.
     cfg.runtime.samplePeriod = 0.02;                 % s

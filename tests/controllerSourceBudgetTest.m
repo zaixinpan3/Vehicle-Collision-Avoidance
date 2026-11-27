@@ -20,12 +20,13 @@ classdef controllerSourceBudgetTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(numel(sources),12);
         end
 
-        function eachAlgorithmHasOneTheoryDocument(testCase)
+        function bothAlgorithmsShareTheRootTheoryDocument(testCase)
             root = fileparts(fileparts(mfilename('fullpath')));
-            controller = dir(fullfile(root,'controller','**','*.md'));
-            observer = dir(fullfile(root,'estimator','**','*.md'));
-            testCase.verifyEqual(string({controller.name}),"CONTROLLER_THEORY.md");
-            testCase.verifyEqual(string({observer.name}),"OBSERVER_ISS_THEORY.md");
+            testCase.verifyTrue(isfile(fullfile(root,'ALGORITHM.md')));
+            for directory = ["controller","estimator"]
+                theory = dir(fullfile(root,directory,'**','*THEORY*.md'));
+                testCase.verifyEmpty(theory);
+            end
         end
     end
 end

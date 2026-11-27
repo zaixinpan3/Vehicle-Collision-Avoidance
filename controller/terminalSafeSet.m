@@ -228,7 +228,7 @@ classdef terminalSafeSet
 
         function [input,next,ok,value,middle] = cruiseInput(x,model)
             % One hold of the CLF's certified cruise controller u = u* + K e(x),
-            % the gain certified offline together with P (CONTROLLER_THEORY.md, Section 4). On
+            % the gain certified offline together with P. On
             % the certified level set the hold satisfies V(next) <= rho V(x)
             % and the input bound. ok evaluates the decrease and the hard rows
             % on this hold. The anchor appends it while its endpoint stays in
@@ -278,7 +278,7 @@ classdef terminalSafeSet
             % the RK4 variational equations and the error chart, and plus =
             % g(e, du) itself (5xn); NaN where the model's domain is left.
             % scripts/synthesizeClfMatrices encloses their ray averages
-            % (rayJacobians) over the certified set (CONTROLLER_THEORY.md, Section 4).
+            % (rayJacobians) over the certified set.
             if nargin<5,duration=cfg.controller.sampleTime;end
             curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);
             lane=struct('referenceCurve',curve);
@@ -309,7 +309,7 @@ classdef terminalSafeSet
             % is a fixed point of the map) that the quadrature leaves. For
             % the saturating tire the ray averages spread like the secants of
             % its curve, not like its tangents, which is why the certificate
-            % encloses them (CONTROLLER_THEORY.md, Section 4). NaN where the model's domain is
+            % encloses them. NaN where the model's domain is
             % left.
             if nargin<5 || isempty(duration),duration=cfg.controller.sampleTime;end
             if nargin<6,nodes=8;end
@@ -339,7 +339,7 @@ classdef terminalSafeSet
             %                endpoint;
             % NaN where the model's domain is left. The certificate itself is
             % the robust LMI of scripts/synthesizeClfMatrices over the enclosure
-            % of the Jacobians (CONTROLLER_THEORY.md, Section 4); these samples test it
+            % of the Jacobians; these samples test it
             % independently.
             if nargin<4,subdivisions=10;end
             curve=struct('origin',[0;0],'heading',0,'curvature',reference.curvature,'length',200);

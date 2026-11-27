@@ -16,63 +16,11 @@ latexmk -pdf -interaction=nonstopmode -halt-on-error manuscript.tex
 The derived `manuscript.pdf` is the readable draft. Remove build
 intermediates with `latexmk -c manuscript.tex`.
 
-## Unified mathematical design
+## Algorithm specification
 
-The observer supplies a valid current enclosure, including the initial
-transient and applicable sensor and model uncertainty. Prediction carries
-both physical vehicles, both observers, held sensor records, persistent tire
-parameters and observable histories under causal control policies. Future
-target observations can therefore change future ego inputs. Each physical
-parameter and sensor realization is shared by all affected equations.
-
-Exact sensor-period flows and resets define the nonlinear successor. At the
-next decision, conditioning on the entire received sensor block retains a
-subset of the old first successor. Raw observer balls need not be nested.
-The predictor-innovation decay identity does not claim contraction of the
-full estimation error. Neither constant tube width nor a uniformly small
-tube is assumed.
-
-The theoretical encounter controller minimizes PCBF slack and executes the
-first common command of an attained primary minimizer. Restricting the old
-tail to surviving histories and appending a compatible terminal rule proves
-recursive feasibility and nonincreasing optimal slack sum. Zero remains zero
-and excludes interior collision at decision instants. Contact is allowed at
-equality; positive slack is relaxation, and finite-time arrival at zero is
-not proved. Road boundaries and intersample collision are outside this theorem.
-
-Initial feasibility, truth containment, well-posed joint flows, primary
-attainment, policy/certificate closure and a nonempty downward-closed terminal
-family remain explicit premises. The terminal family must admit a common
-causal zero-slack continuation under the same model and uncertainty contract.
-The theorem assumes this family exists. The compact controller uses a
-simplified continuation to the first control node outside sensing range.
-
-No performance optimization is required by the theoretical control law.
-A feasible secondary refinement under the exact attained primary cap is
-still a primary minimizer. An affine RTI cap alone does not establish this
-nonlinear property. An unbounded soft CLF slack preserves feasibility for
-finite residuals but does not prove recovery.
-
-The detailed compact nonlinear controller derivation is maintained in
-[controller theory](../controller/CONTROLLER_THEORY.md).
-Section II-B of `manuscript.tex` now presents the adopted
-compact nonlinear controller (fixed measurement-consistency ensemble
-inference, condensed nonlinear PCBF SQP over coarse control knots, exact
-dual rectangle separation at control-boundary nodes, terminal continuation
-to sensing-range exit under an explicit physical handoff assumption, and zero-deficit tire-loading/rear-slip preference $J_{\rm tire}$
-with damped Gauss--Newton refinement) alongside the idealized joint
-output-feedback safety theory.
-
-Tezuka and Nakamura (2020) and Quan et al. (2025) motivate error compensation
-and containing-set interfaces. Their hypotheses are distinguished from this
-vehicle construction; an energy-gain inequality alone is not treated as a
-pointwise Euclidean error bound.
-
-The longitudinal reference
-[verifyUnifiedObserverSafety.m](../scripts/verifyUnifiedObserverSafety.m)
-checks selected containment and shift mechanisms of the simpler held-input
-specialization. It does not implement the full joint observer/policy
-construction.
+The current continuous-time derivation for the observer and controller is
+maintained in [ALGORITHM.md](../ALGORITHM.md). The manuscript records the
+formulation and experiments from its own revision.
 
 ## Numerical evidence and implementation scope
 

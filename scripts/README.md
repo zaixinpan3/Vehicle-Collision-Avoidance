@@ -1,11 +1,9 @@
 # Research entry points
 
-The controller has six MATLAB sources and one current derivation:
-[CONTROLLER_THEORY.md](../controller/CONTROLLER_THEORY.md).
-Fiala forces belong to `nonlinearBicycleModel`; lane charts belong to
-`predictiveSafetyGeometry`. The observer has twelve MATLAB sources and one
-current derivation: [OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md).
-Its target equations, Jacobian enclosure and position/IMU filter are actions
+The controller and observer share one continuous-time derivation in
+[ALGORITHM.md](../ALGORITHM.md). Fiala forces belong to
+`nonlinearBicycleModel` and lane charts to `predictiveSafetyGeometry`.
+The observer’s target equations, Jacobian enclosure and position/IMU filter are actions
 of `nrmmObserverVectorField`; orientation sets use `nrmmSet.yaw`, and retained
 motion-parameter covers use `nrmmTargetHistory("constantMotion",...)`.
 

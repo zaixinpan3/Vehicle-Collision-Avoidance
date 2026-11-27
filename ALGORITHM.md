@@ -10,7 +10,7 @@ Write $e(\theta)=(\cos\theta,\sin\theta)^\top$, $J=\left[\begin{smallmatrix}0&-1
 
 ### Ego vehicle
 
-The state is $x=(p,\psi,v_x,v_y,r)$, with inertial reference position $p$, body heading $\psi$, body velocity $v=(v_x,v_y)^\top$ and yaw rate $r$. Thus $\dot p=R(\psi)v$ and $\dot\psi=r$. Let $m,I_z$ be mass and yaw inertia, $g$ gravity, $l_f,l_r$ the axle distances, and $L=l_f+l_r$. For front and rear axles $i=f,r$, define
+The input is $u=(\delta,b)$ with $|b|\le1$. The state is $x=(p,\psi,v_x,v_y,r)$, with inertial reference position $p$, body heading $\psi$, body velocity $v=(v_x,v_y)^\top$ and yaw rate $r$. Thus $\dot p=R(\psi)v$ and $\dot\psi=r$. Let $m,I_z$ be mass and yaw inertia, $g$ gravity, $l_f,l_r$ the axle distances, and $L=l_f+l_r$. For front and rear axles $i=f,r$, define
 
 $$
 (F_{zf},F_{zr})=mg(l_r,l_f)/L,\qquad
@@ -45,7 +45,7 @@ f_\ell=\left((X_\ell-F_d)/m+rv_y,\quad(l_rr_\ell-v_y)/\tau_\ell,\quad
 (r_\ell-r)/\tau_\ell\right)^\top .
 $$
 
-For blending speeds $0<v_\ell<v_h$, set $s=\min(1,\max(0,(v_x-v_\ell)/(v_h-v_\ell)))$ and $w=s^2(3-2s)$. The body derivative is $(1-w)f_\ell+wf_d$, with the pure branches evaluated on their domains. Let $F_h^\vartheta(x,u)$ denote the transition over time $h$ under constant command $u=(\delta,b)$ and physical parameters $\vartheta$, including the vehicle's rest transition. At rest the body velocity and yaw rate are zero, and neutral drive preserves the pose. The forward-motion domain requires $v_x\ge0$ and, where the rolling law contributes, $v_x\cos\delta+(v_y+l_fr)\sin\delta>0$.
+For blending speeds $0<v_\ell<v_h$, set $s=\min(1,\max(0,(v_x-v_\ell)/(v_h-v_\ell)))$ and $w=s^2(3-2s)$. The body derivative is $(1-w)f_\ell+wf_d$, with the pure branches evaluated on their domains. Write $f^\vartheta(x,u)$ for the resulting vehicle vector field with command $u=(\delta,b)$ and persistent physical parameters $\vartheta$. At rest the body velocity and yaw rate are zero, and neutral drive preserves the pose. The forward-motion domain requires $v_x\ge0$ and, where the rolling law contributes, $v_x\cos\delta+(v_y+l_fr)\sin\delta>0$.
 
 ### Target vehicle
 
@@ -80,7 +80,7 @@ $$
 
 The accelerometer measures inertial acceleration in body axes. Denote the four error bounds by $\epsilon_p,\epsilon_r,\epsilon_a,\epsilon_\rho$. Conditional on an ego pose and bias, the inertial target position output is $y=p+R(\psi)(y_\rho-\eta_\rho)$, hence $\|y-p_T\|\le\epsilon_\rho$ by orthogonality.
 
-Let $\chi$ contain the vehicle states, modes, persistent parameters and biases. The information set $\mathcal I(t)$ consists of all $\chi(t)$ reached from the initial set by admissible histories consistent with the applied input and the observed outputs up to $t$. The same history must satisfy the motion and observation equations. If the true initial condition, parameters and errors satisfy the assumptions, the true history witnesses $\chi(t)\in\mathcal I(t)$. Each member is the endpoint of at least one consistent physical history. All members receive the same control.
+Let $\chi$ contain the vehicle states, modes, persistent parameters and biases. Denote by $\mathscr H_t$ all histories that start in the initial set and satisfy the motion and observation equations with the applied input and the outputs received through $t$. The information $\mathcal I(t)$ comprises this consistent family, the known observer state, the position history used by the footprint bound, and the current encounter and actuator information. Write $s\in\mathcal I(t)$ to index a consistent history and its endpoint $\chi^s(t)$. The true history belongs to $\mathscr H_t$ when the initial, motion and measurement assumptions hold. Two histories with the same estimated current pose can provide different observed chords. All members receive the same control. The controller retains the committed plan to determine the inherited horizon and remaining deficit.
 
 ## 2. Nonlinear relative motion model observer
 
@@ -95,6 +95,8 @@ A=d^\top a,\quad \Omega=(Jd)^\top a/V .
 $$
 
 In ego axes define $(\rho,q_B,a_B)=(R^\top(p_T-p),R^\top q,R^\top a)$ and $\nabla_r z=\dot z+rJz$. Then $\nabla_r\rho=q_B-v$, $\nabla_rq_B=a_B$, $\nabla_ra_B=\Phi(q_B,a_B)$. The inertial observation $y$ allows each retained ego member to use the inertial chain directly.
+
+The Cartesian target chain follows the multistage NRMM observer construction. [Sharma, Alai and Rajamani](https://doi.org/10.1016/j.trc.2025.105411)
 
 Let the declared physical domain bound $V,\|a\|,|A|,|\Omega|,|\beta|$ by $\bar V,\bar a,\bar A,\bar\Omega,\bar\beta$ with $\bar\beta<\pi/2$. These are domain assumptions shared by tracks. Define $d_v=\max(\|q\|,v_*)$, $0<v_*<\bar V$, $Q=\Pi_{\bar V}q$ and $S=\Pi_{\bar a}a$, where $\Pi_c$ projects onto the centered radius-$c$ ball. The globally defined propagation field is
 
@@ -114,7 +116,13 @@ $$
 \dot{\hat a}=\Phi_e(\hat q,\hat a)+L_3 e .
 $$
 
-A discrepancy in the observed position therefore corrects all three Cartesian states. The moving target's velocity and acceleration follow from the chain without differentiating the measured position.
+In ego axes the same observer design uses the bias-corrected signals $y_r,y_\rho$, the innovation $e_B=y_\rho-\hat\rho$, and the covariant derivatives
+$$
+ \nabla_{y_r}\hat\rho=\hat q_B-\hat v+L_1 e_B,\qquad
+ \nabla_{y_r}\hat q_B=\hat a_B+L_2 e_B,\qquad
+ \nabla_{y_r}\hat a_B=\Phi_e(\hat q_B,\hat a_B)+L_3 e_B .
+$$
+The body-frame error comparison below includes errors in the measured rotation and estimated translation. The inertial form uses positions conditional on the ego history. A discrepancy in the observed position corrects all three Cartesian states. The moving target's velocity and acceleration follow from the chain without differentiating the measured position.
 
 Write $\hat V=\|\hat q\|$. At positive estimated speed the inverse motion map gives
 
@@ -140,6 +148,27 @@ Here $e_i$ in matrix expressions denotes a Cartesian basis vector of $\mathbb R^
 $F^\top M+MF\preceq-2\lambda M$ for every $(B,C)$ in a convex enclosure of the joint Jacobian $(D_q\Phi_e,D_a\Phi_e)$, including limiting branches. Integration along the segment between estimate and truth puts their finite field difference in this family. The certificate therefore bounds the actual nonlinear error. A common rotation of the three planar coordinates adds a skew transport term with zero metric derivative.
 
 Let $T_d=R_d/(\bar V_E+\bar V)$, where $\bar V_E$ is the ego speed bound on the observer design domain. The gain design requires a certified decay rate $\lambda\ge 1/T_d$. The symbol $\otimes$ denotes the Kronecker product.
+
+The gain condition uses a joint vector-Jacobian bound for the nonlinear increment. [Sharma, Zemouche and Rajamani](https://doi.org/10.1002/rnc.70732)
+
+The Jacobian family can be obtained directly from the extension. For perturbations $(z,w)$ of $(q,a)$ write $\delta Q=D\Pi_{\bar V}(q)z$, $\delta S=D\Pi_{\bar a}(a)w$. Inside a projection ball its derivative is the identity. Outside, $D\Pi_c(y)=c(I-\hat y\hat y^\top)/\|y\|$, $\hat y=y/\|y\|$. Let $h=d_v$, $h'=0$ below the speed floor and $h'=q^\top z/\|q\|$ above. Let $\chi_A,\chi_\Omega$ be the slopes of the two clips on the smooth branch and set $a_1=Q^\top S/h$, $a_2=(JQ)^\top S/h^2$. Differentiation gives
+$$
+\begin{aligned}
+ A'_e&=\chi_A\big[(\delta Q^\top S+Q^\top\delta S)/h-a_1h'/h\big],\\
+ \Omega'_e&=\chi_\Omega\big[((J\delta Q)^\top S+(JQ)^\top\delta S)/h^2-2a_2h'/h\big],\\
+ Bz+Cw&=-2\Omega_e\Omega'_e Q-\Omega_e^2\delta Q+
+ 3(A'_e\Omega_e+A_e\Omega'_e)Jq/h+
+ 3A_e\Omega_e(Jz/h-Jq\,h'/h^2).
+\end{aligned}
+$$
+All factors in one derivative are evaluated at the same $(q,a)$. The closed convex hull of these paired matrices and their limiting values is a valid family. Along any segment the Lipschitz field is absolutely continuous and its increment is the integral of its directional derivative. At a switching surface a generalized Jacobian gives the tangential derivative. This proves the finite-error inclusion used above. Equivariance under a planar rotation $R$ conjugates $B,C$ by $R$. Also $M$ commutes with $I_3\otimes J$, so $M(I_3\otimes J)+(I_3\otimes J)^\top M=0$. This is why rotating the coordinate frame costs no homogeneous decay rate.
+
+The mathematical criterion for selecting a gain also accounts for position noise entering the velocity estimate. In unscaled coordinates put $A_0=e_1e_2^\top+e_2e_3^\top$, $L=(L_1,L_2,L_3)^\top$, $A_L=A_0-Le_1^\top$. Among dissipative gains at the specified decay rate, minimize an upper bound $\gamma$ subject to
+$$
+ A_L^\top P_g+P_g A_L+e_2e_2^\top\preceq0,\qquad
+ L^\top P_gL\le\gamma,\qquad P_g\succ0 ,
+$$
+with the same metric $P_g\otimes I_2$ in the unscaled dissipation condition. Indeed integration along $\dot z=A_Lz$ shows that $P_g$ dominates $\int_0^\infty e^{A_L^\top v} e_2e_2^\top e^{A_Lv}\,dv$. Multiplication on both sides by $L$ bounds the squared energy of the linear velocity response to a position impulse. This preference ranks gains. The nonlinear deterministic bound follows from dissipation.
 
 Let $t_0$ begin an in-range observation interval with a bounded initial error set, and write $\nu=y-p_T$. For some admissible mean Jacobian $(B,C)$, subtracting the plant chain from the observer on a smooth motion branch gives
 
@@ -177,9 +206,11 @@ On the forward cone $v_x\ge\|v\|\cos b_E$, $0\le b_E<\pi/2$, write $M_v=\|m_I\|$
 $y_v=(\sqrt{\max\{M_v^2-w_m^2,M_v^2\cos^2 b_E\}},w_m)^\top$.
 Under $|r-v_y/l_r|\le d_\mathrm{kin}$ the kinematic choice $w_m=l_r y_r$ has radius $\rho_w=l_r(\epsilon_r+d_\mathrm{kin})$. On a valid rolling branch the shared force model also supplies an inverse observation. For each possible lateral velocity $w$, the longitudinal velocity is $v_x=\sqrt{V_E^2-w^2}$. The force balance restricts $w$ to those values for which $|Y_f+F_{yr}-m y_{a,y}|\le m\epsilon_a$ for some admissible speed, yaw rate and tire parameters under the applied input. Here $|V_E-M_v|\le\epsilon_G$ and the forward-cone constraint applies. For the chosen nominal inverse $w_m$, the supremum of $|w-w_m|$ on this set gives a valid $\rho_w$.
 
+On an admitted monotone branch take the nominal lateral force $G_0(w)$ from the front and rear force balance with the observed yaw rate, reconstructed speed and known input. For a positive inverse regularization $\lambda_w(M_v)$, choose $w_m$ from $G_0(w_m)-\lambda_w(M_v)w_m=m y_{a,y}$, with endpoint saturation on $[-M_v\sin b_E,M_v\sin b_E]$. If $[w_-,w_+]$ contains all physically compatible lateral speeds, $\rho_w=\max(|w_m-w_-|,|w_m-w_+|)$ accounts for ambiguous inversion, including tire saturation. At rest an uninformative course leaves the full admitted direction set available.
+
 With the transit-time gain choice $k_v=k_p=k_\psi=\ln(20)/T_d$, the scalar homogeneous error factor after one transit time is $1/20$ for the velocity and position corrections. The body and position observers obey
 $\dot{\hat v}=y_a-y_rJ\hat v+k_v(y_v-\hat v)$ and
-$\dot{\hat p}_E=m_I+k_p(y_p-\hat p_E)$. The longitudinal inverse has derivative bounds $\sec b_E,\tan b_E$ with respect to speed and lateral velocity. Consequently $\|y_v-v\|\le\sec b_E(\epsilon_G+\rho_w)$. Skew symmetry of $J$ gives
+$\dot{\hat p}_E=m_I+k_p(y_p-\hat p_E)$. For the body-velocity error $e_v=\hat v-v$, subtraction gives $\dot e_v=(-k_v I-y_rJ)e_v+n_a-n_rJv+k_v(y_v-v)$. The longitudinal inverse has derivative bounds $\sec b_E,\tan b_E$ with respect to speed and lateral velocity. Consequently $\|y_v-v\|\le\sec b_E(\epsilon_G+\rho_w)$. Skew symmetry of $J$ gives
 
 $$
 D^+\|\hat v-v\|\le-k_v\|\hat v-v\|+
@@ -191,6 +222,17 @@ $\dot{\hat\psi}=y_r+k_\psi(s\cos\hat\psi-c\sin\hat\psi)$.
 If $\mathcal V$ encloses the body velocity, the compatible angles are
 $\{\theta:\exists v'\in\mathcal V,\ \|m_I-R(\theta)v'\|\le\epsilon_G\}$.
 Intersect these angles with the prior angle set transported by the gyro integral and its error interval. The maximum wrapped distance to $\hat\psi$ on that intersection bounds its output error. At rest the innovation can vanish for every heading. In body axes the target error metric also receives the disturbances from $\hat v-v$ and the common gyro error. The former enters the first row only, contributing at most $\sqrt{P_{11}}\|\hat v-v\|$ to $D^+W$; the latter contributes at most $\epsilon_r\sup\|(\,J\rho,Jq_B/\omega,Ja_B/\omega^2\,)\|_M$ over the domain, where $\|z\|_M=\sqrt{z^\top Mz}$. In particular, for continuous bounded innovation disturbances write $\dot E\le-k_vE+d_E$ and $\dot W\le-\lambda W+\sqrt{P_{11}}E+d_T$, where $E$ bounds the body-velocity error and $d_E,d_T$ collect the respective disturbance terms above. Scalar comparison first gives $\limsup E\le d_E/k_v$, then $\limsup W\le(d_T+\sqrt{P_{11}}d_E/k_v)/\lambda$.
+
+For an explicit transient bound let $\zeta=(E,W)^\top$, $H=\left[\begin{smallmatrix}-k_v&0\\\sqrt{P_{11}}&-\lambda\end{smallmatrix}\right]$ and $b=(d_E,d_T)^\top$, with the gyro forcing included in $d_T$ for body coordinates. Since $H$ has nonnegative off-diagonal entries, $e^{H v}$ is nonnegative for $v\ge0$. Variation of constants yields
+$$
+ \zeta(t)\le e^{H(t-t_0)}\zeta_0+\int_{t_0}^t e^{H(t-v)}b(v)\,dv .
+$$
+An initial error set containing the true errors supplies $\zeta_0$. For the ego position error, subtraction gives $\dot e_{p,E}=-k_p e_{p,E}+(m_I-Rv)+k_p n_p$, so its ultimate norm is bounded by $\epsilon_G/k_p+\epsilon_p$. For yaw, with $e_\psi=\operatorname{wrap}(\hat\psi-\psi)$, ideal velocity correspondences give $(c,s)=a_\psi(\cos\psi,\sin\psi)$, $a_\psi=\|v\|^2/(\|v\|^2+s_\psi^2)$. Writing the actual pair as this ideal pair plus $\Delta$, one obtains
+$$
+ \dot e_\psi=-k_\psi a_\psi\sin e_\psi+n_r+
+ k_\psi(-\sin\hat\psi,\cos\hat\psi)\Delta .
+$$
+Thus in an invariant chart $|e_\psi|\le b<\pi$, the local contraction rate is at least $k_\psi\inf a_\psi\,\operatorname{sinc}(b)$ when $\inf a_\psi>0$. The compatible orientation set supplies a bound even at rest. For a body vector with estimate error at most $E_z$ and heading error $B_\psi$, adding and subtracting the commonly rotated vector gives the inertial error bound $E_z+2\min(\|\hat z\|,\bar z)\sin(B_\psi/2)$ when $\|z\|\le\bar z$. Adding the ego position error then encloses the absolute target position. All bounds are conditional on a valid sensor and motion domain. The filter's acceleration input also depends on yaw, so the triangular comparison for body velocity and target motion alone cannot establish global yaw convergence.
 
 ### Persistent parameter and position enclosures
 
@@ -212,6 +254,16 @@ $$
 $$
 
 where $\mathcal T$ comprises the observed times on that moving arc for which $\hat V>E_q$. When $s_*>0$ lower-bounds a speed already attained, $|\sin\beta|\le l_T\bar\Omega/s_*$ also follows from $\Omega=V\sin\beta/l_T$. At an absorbing stop the motion derivatives vanish while the pre-stop parameter restrictions persist.
+
+There is also a constraint on $A$ from displacement alone. For an observed interval $[a,b]$ of duration $T=b-a$, let $C=(y(b)-y(a))/T$ and $\epsilon=\epsilon_a^p+\epsilon_b^p$ be the sum of the two position error radii. Integrating the velocity under $\|\dot q\|\le\bar a$ gives $\|q(b)-C\|\le\epsilon/T+\bar a T/2$, including arcs ending in absorption. Let $\alpha=\bar\Omega T/2<\pi/2$. Projection of the whole velocity history onto the course at the interval midpoint and the chord triangle inequality enclose the mean speed in
+$$
+ [L,U]=\left[(\|C\|-\epsilon/T)_+,\,(\|C\|+\epsilon/T)/\cos\alpha\right].
+$$
+If $L>\bar A T/2$, absorption cannot have occurred on that interval because a speed ending at zero is bounded by $\bar A(b-v)$ there. On a moving interval the mean speed equals the midpoint speed by affinity of $V$. Therefore two such intervals on the same moving arc with midpoint times $m_1<m_2$ imply
+$$
+ A\in[(L_2-U_1)/(m_2-m_1),(U_2-L_1)/(m_2-m_1)] .
+$$
+Intersecting these bounds with $I_A$ uses the persistence of the *same* acceleration through both observations.
 
 Let $\mathbb B(c,r)$ be the closed ball of radius $r$ about $c$. Conditional on the ego member, the current target reference position belongs to $\mathbb B(y,\epsilon_\rho)\cap\mathbb B(\hat p,E_p)$. Write $P_0$ for a set enclosing all current target positions consistent with the observed history. With exact relative position and known ego pose, $P_0$ may be the singleton $\{p_T\}$.
 
@@ -268,7 +320,16 @@ Every true corner lies within $r_y$ of its corresponding center. Using the same 
 
 Independently, for a member with initial speed $V_0$, body heading $\psi_0$ and mode, let $R_p(t)$ enclose the arc image over the NRMM position set $P_0$ and its persistent $I_A\times I_\beta$. The two footprint enclosures can use different outer bounds for the same member. In particular the position pair can use the entire NRMM speed interval to cover its clock error. Physical coverage across members requires the true initial speed, heading, mode and ego motion to be represented.
 
-The target contributes a collision obligation while it is in perception range. In prediction, exit is established when every admissible reference position lies farther than $R_d$ from the ego reference point. The first exit node is checked before releasing subsequent nodes of that encounter. An observed re-entry starts a new encounter.
+To construct $R_p$ explicitly, choose orthonormal enclosure axes $n_1,n_2$ aligned with the center of the predicted body-heading interval. For either axis $n$, a support bound is
+$$
+ h_p(n)=h_{P_0}(n)+\sup_{(A,\beta)\in I_A\times I_\beta}
+ \left[n^\top s\,\operatorname{sinc}(\kappa s/2)e(\psi_0+\beta+\kappa s/2)
+ +h_{B_T}(R(\psi_0+\kappa s)^\top n)\right],
+ \quad h_S(n)=\sup_{z\in S}n^\top z .
+$$
+Include the stationary pose on an admitted absorbed branch. The rectangle $-h_p(-n_i)\le n_i^\top z\le h_p(n_i)$, $i=1,2$, contains every possible body point by the arc equations. Any outward upper bound for these four extrema gives the same inclusion property. The ego-to-target distance dual in Section 4 ranges over every unit normal. The two axes here specify an outer footprint for uncertain motion. Root position, heading, mode and sensor errors refer to the same history in both enclosures.
+
+The target contributes a collision obligation while it is in perception range. In prediction, exit is established when every admissible reference position lies farther than $R_d$ from the ego reference point. The clearance obligation includes the boundary of the encounter. After certified exit it is released until the next encounter. An observed re-entry starts a new encounter.
 
 ## 3. One initial trajectory from a local acceleration field
 
@@ -328,7 +389,7 @@ The radial expression comes from $\ddot d_g=n^\top\ddot q_g+k_g\tau^2$ outside t
 
 After predicted exit use $a_g=a_0$. For a finite route-guide half-width $W_g$, limit the component $n_\Gamma^\top a_g$ to $a_\mathrm{mid}\pm k_w^2W_g$, leaving its tangential component unchanged. Here $a_\mathrm{mid}=k_\Gamma(v_c\cos\epsilon)^2/(1-k_\Gamma e_y)-2k_w v_c\sin\epsilon-k_w^2e_y$, $k_w>0$. These strip inequalities result from applying a second-order response to $W_g\pm e_y$. Their role is confined to the guiding field.
 
-### From acceleration to the initial held inputs
+### From the acceleration field to one avoidance trajectory
 
 Resolve $a_g$ along the instantaneous course. The desired yaw rate is $r_g=(Je(\chi))^\top a_g/\max(v_c,v_g)$, clipped in magnitude to the smaller of $a_y/\max(v_c,v_g)$ and $v_c\sin(\arctan(l_r\tan\delta_{\max}/L))/l_r$. Let $v_s>0$ regularize the guide's tire angles and put $\alpha_{r,g}=\operatorname{atan2}(v_y-l_rr,\max(v_x,v_s))$. For longitudinal ratio $b'$ the rear tire force is $F_r(b')=F_{yr}(\alpha_{r,g},b')$; the requested body-frame front lateral force follows from yaw moment balance,
 
@@ -338,20 +399,29 @@ $$
 
 With yaw response $k_r>0$ and front force fraction $0<f_*<1$, reserve
 $\eta=\min(f_*,\max(|F^*(0)|/K_f,|F_r(0)|/K_r))$.
-The guide requests $b'=(m e(\chi)^\top a_g+F_d)/(K_f+K_r)$, clipped to $\pm\sqrt{1-\eta^2}$ and to the admissible longitudinal input and increment. The rolling steering demand is the front-tire inverse for the body-frame lateral force $F^*(b')$. Its defining balance is $b'K_f\sin\delta+F_{yf}(\alpha_f,b')\cos\delta=F^*(b')$ on the admissible slip branch, with demand limited to the available force. At zero lateral capacity the tire slip demand is zero. Blend this rolling demand with the low-speed inverse $\delta_\ell=\arctan(L\tan\beta_g/l_r)$, $\beta_g=\arcsin(\operatorname{sat}_1(l_rr_g/v_c))$ with zero demand at rest, using weight $w$ of Section 1. Admissible actuator projection gives the held guide command. Recursively applying $F_h^\vartheta$ to these commands gives **one** initial avoidance trajectory. Its clearance may be negative.
+The guide requests $b'=(m e(\chi)^\top a_g+F_d)/(K_f+K_r)$, clipped to $\pm\sqrt{1-\eta^2}$ and to the physical longitudinal input bounds. The rolling steering demand is the front-tire inverse for the body-frame lateral force $F^*(b')$. Its defining balance is $b'K_f\sin\delta+F_{yf}(\alpha_f,b')\cos\delta=F^*(b')$ on the admissible slip branch, with demand limited to the available force. At zero lateral capacity the tire slip demand is zero. Blend this rolling demand with the low-speed inverse $\delta_\ell=\arctan(L\tan\beta_g/l_r)$, $\beta_g=\arcsin(\operatorname{sat}_1(l_rr_g/v_c))$ with zero demand at rest, using weight $w$ of Section 1. Let $u_g$ be the resulting admissible actuator command. The integral curve $\dot x_g=f^\vartheta(x_g,u_g)$ starting at the nominal ego state supplies one initial avoidance trajectory. Its signed clearance may be negative.
 
 ## 4. Two-leg prediction and signed separation
 
-### Duration and admissible command sequences
+### Duration, common input and the two connected trajectories
 
-Let $h>0$ be the control period, $t_k=kh$, and write $\mathcal I_k=\mathcal I(t_k)$. At $t_k$ let $A_h$ and $B$ denote the avoidance and connection lengths in control stages, with $N_k=A_h+B$. The horizon may depend on the encounter. For recursive feasibility on continuation it must accommodate the unexecuted suffix, $N_{k+1}\ge N_k-1$. Initial reachability of the terminal set is a separate premise.
+At observation time $t$, let $a_t>0$ be the avoidance duration, $b_t\ge0$ the connection duration and $T_t=a_t+b_t$. For each physical history $s$ in $\mathcal I(t)$ let $x_t^s$ be its ego state. A plan is one common input function $u:[0,T_t]\to\mathcal U$, where $\mathcal U$ contains the admissible steering angles and longitudinal force ratios. Require each resulting trajectory to stay in the physical model domain. Include the initial actuator state and any prescribed actuator dynamics or physical rate limits in admissibility. For every history the two legs satisfy
 
-For each admitted initial state and persistent parameter hypothesis $s$, the two legs obey a single dynamics constraint
 $$
-x_0^s=x_k^s,\qquad x_{j+1}^s=F_h^{\vartheta_s}(x_j^s,u_j),
-\qquad j=0,\ldots,N_k-1 .
+x^s(\tau)=x_t^s+\int_0^\tau f^{\vartheta_s}(x^s(v),u(v))\,dv,
+\qquad 0\le\tau\le T_t,\qquad
+x^s(a_t^-)=x^s(a_t^+).
 $$
-The initial trajectory for the first leg comes from the field in Section 3. The second leg starts at $x_{A_h}^s$ and ends in $Z_f$. Its starting state is determined by the first leg. The control inputs on **both** legs are decision variables. Each input $u_j$ is common to all hypotheses. Each satisfies the physical actuator bounds and any specified input-increment bounds relative to $u_{j-1}$, with $u_{-1}=u^-$ the preceding applied command. The admissible command family must contain the shifted plan and its terminal continuation for the shift argument in Section 5. Below write $N=N_k$ and $U_i=u_{i-1}$ for hold numbers $1\le i\le N$, with $U_0=u^-$.
+
+The field in Section 3 supplies the initial trajectory for the first leg. The first leg determines the entry state of the connection. Both input functions are free subject to the same constraints and terminal membership. The planner sees only information available at $t$. Every predicted member follows the common input until the plan is revised using later observations.
+
+To specify the encounter time scales, let $v$ be the ego speed, $a_p>0$ a preview deceleration, $T_r\ge0$ a response allowance, and $a_y>0$ the available lateral acceleration used in the guide. Let $D=2(r_E+r_T)$, where each $r$ bounds the body's radius about its dynamics reference point. Let $w$ be the ego lateral half-width plus the target half-width projected on the ego lateral axis, plus the desired clearance. Opposite constant lateral accelerations of magnitude $a_y$ over two equal durations cover $w$ with zero net lateral velocity, giving $t_L=2\sqrt{w/a_y}$. With target course $d$, let $c=d^\top(\dot p-\dot p_T)$. For $c>0$ the relative motion along $d$ gives $t_c=[d^\top(p_T-p)]_+/c$ and $t_P=D/c$. Take both times as infinite for $c\le0$. Use the admitted target direction on a stationary member. The physical duration requests of a member are
+$$
+ a_s=\max\!\left\{D/\max(v,V_{\rm ref}),
+     \min\big(\max(v/a_p+T_r,t_L),t_c+t_L\big)\right\},\qquad
+ b_s=\min(t_P,2\sqrt{D/a_y}).
+$$
+In target-free motion the respective requests are $v/a_p+T_r$ and zero. The two durations cover the respective suprema of these requests. During a continuing encounter the total horizon also covers the remaining duration of the inherited plan. Any extension can be assigned to the first leg while retaining the requested connection duration. These time scales select a preview. Existence of a trajectory to the terminal set is a separate condition.
 
 ### Collision-distance dual
 
@@ -361,24 +431,29 @@ $$
  \left[n^\top c_E-a|n^\top u_E|-b|n^\top Ju_E|-h_R(n)\right],
  \qquad h_R(n)=\max_{z\in R}n^\top z .
 $$
-For $R=\{z:H z\le f\}$, linear-program duality gives $h_R(n)=\min_{\lambda\ge0,\ H^\top\lambda=n}f^\top\lambda$. One normal serves every ego and target point at a node. For congruent rectangles the expression being maximized becomes
+For $R=\{z:H z\le f\}$, linear-program duality gives $h_R(n)=\min_{\lambda\ge0,\ H^\top\lambda=n}f^\top\lambda$. At any given time one normal serves every point of both footprints. For congruent rectangles the expression being maximized becomes
 $$
  n^\top(c_E-c_T)-a\big(|n^\top u_E|+|n^\top u_T|\big)
                   -b\big(|n^\top Ju_E|+|n^\top Ju_T|\big).
 $$
-The centered difference body is the sum of four line segments along the two body frames. More generally the dual maximizes the least projection of $E-R$. Outside the difference body the origin's closest point supplies an attaining unit normal. Inside it the largest lower projection equals minus the distance to the boundary, with zero at contact.
+The centered difference body is the sum of four line segments along the two body frames. In general write $D=E-R=\{x-y:x\in E,y\in R\}$. If $0\notin D$, let $z=\Pi_D(0)$. The projection inequality $z^\top(x-z)\ge0$ for all $x\in D$ makes $z/\|z\|$ an attaining normal. No unit normal can give a larger lower projection since $z\in D$. If $0\in D$, the result is $-\min_{\|n\|=1}h_D(n)$, the negative radius of the largest origin-centered disk in $D$, hence minus the distance to the boundary. At contact it is zero. For ego vertices $x_a$ and $R=\{z:Hz\le f\}$ this gives the multiplier form
+$$
+ d_\pm(E,R)=\max_{\lambda\ge0,\;\|H^\top\lambda\|=1}
+                 \min_a\big[\lambda^\top Hx_a-f^\top\lambda\big].
+$$
+The substitution $H^\top\lambda=n$ and strong support duality give equality for each normal. Unit length retains the penetration sign.
 
-Since $h_{R_y\oplus\mathbb B(0,r_y)}(n)=h_{R_y}(n)+r_y$ for $\|n\|=1$, the two available upper bounds on target support give the node certificate
+Since $h_{R_y\oplus\mathbb B(0,r_y)}(n)=h_{R_y}(n)+r_y$ for $\|n\|=1$, the two available upper bounds on target support give the clearance certificate at elapsed time $\tau$
 $$
- \boxed{\quad d_j^s=\max\{d_\pm(E,R_p),\ d_\pm(E,R_y)-r_y\}.\quad}
+ \boxed{\quad g_s(\tau;u)=\max\{d_\pm(E,R_p),\ d_\pm(E,R_y)-r_y\}.\quad}
 $$
-Indeed subtracting the smaller upper support bound from the least ego projection and maximizing over $n$ commutes with choosing the better of the two bounds. Each term lower-bounds physical signed clearance for the member. The signed distance to the intersection of the enclosures can be larger. With only the prior available $d_j^s=d_\pm(E,R_p)$. Different nodes and members can use different witnesses.
+Indeed subtracting the smaller upper support bound from the least ego projection and maximizing over $n$ commutes with choosing the better of the two bounds. Each term lower-bounds physical signed clearance for the member. The signed distance to the intersection of the enclosures can be larger. With only the prior available $g_s(\tau;u)=d_\pm(E,R_p)$. The normal may depend on time and the physical member. It certifies a geometric statement and never enters the actuator command as hidden information.
 
 ## 5. Terminal continuation and the predictive barrier
 
 ### Terminal set
 
-Let $d_*>0$ be the prescribed clearance margin. Write $d_j^s$ for the signed gap certified by the available footprint enclosures for member $s$ at node $j$, with $d_j^s=+\infty$ after release. For an active encounter the common terminal input is $u_f=(0,0)$. Membership in $Z_f$ at the endpoint means that a released member has completed its collision obligation, and each still-active member admits one physical hold under $u_f$ with admissible input transition, model domain, positive separation and full clearance $d_*$ at both obligated nodes. After that hold it must be released or lie in the following core. A target-free continuation uses an admissible input toward cruise trim. The collision terminal condition imposes no cruise-speed or lane-error equality.
+Let $d_*>0$ be the planning margin. Set $g_s=+\infty$ during a released encounter. For an active encounter the common terminal command is $u_f=(0,0)$. Define terminal membership on the joint physical and information state, including the actuator state when applicable. Starting there, each still-active member must admit the common neutral command over a physical handoff duration $T_f>0$, respecting actuation and model domain, with $g_s(\tau;u_f)\ge d_*$ throughout its obligation. At the end it must be released or belong to the separation core below. When all members are released the common law may continue admissibly toward cruise trim. A release on one hidden member alone cannot change the command. The handoff is a continuation used to define membership. The two preceding legs remain free to maneuver.
 
 At handoff take the prior target rectangle $T=R_p$ and freeze the footprint shapes and orientations. The ego translates with $v_f=v_xe(\psi)$ and the target translates at a fixed velocity in the sector
 $\mathcal V=\{s e(\theta):l\le s\le u,\ |\operatorname{wrap}(\theta-\phi)|\le\delta_v\}$.
@@ -392,55 +467,94 @@ $$
 
 **Separation in the terminal model.** For every fixed $v_T\in\mathcal V$ the same normal has gap $G(n)+t' n^\top(v_f-v_T)\ge G(n)$ for all $t'\ge0$. This proves clearance for that member throughout the frozen continuation. Each member may have its own normal under the common command. Two stationary separated bodies satisfy the motion inequality with equality. Neither finite-time exit nor positive ego speed is required.
 
-**Physical handoff assumption.** For the nonlinear physical and observation model, suppose the common terminal law admits a safe next hold and the resulting conditioned state retains terminal membership or an admissible release continuation. This is the closure assumption used below. The frozen-translation calculation proves the displayed result for its own model; future tire, target-turn and measurement dynamics enter the physical statement through the handoff assumption.
-
-### Primary safety objective and secondary preference
-
-For member $s$, the signed gap $d_i^s$ is the observation and motion certificate of Section 4.
-
-For each stage $0\le j<N$, define
-$C_j(U)=\sup_s\max_{i\in\{j,j+1\}}(d_*-d_i^s)$.
-The two endpoints ensure that the root, the common leg junction and the terminal node are included. For an information state $\mathcal I$ write $\mathcal U_N(\mathcal I)$ for the common command sequences satisfying the actuator and physical-domain conditions on both legs and the hard terminal condition on every member. The predictive control barrier value on this domain is
-
+Formally, let $\mathcal K$ denote the released states and the members satisfying the core inequalities. Let $\mathcal R_{u_f}(v,\mathcal I)$ contain all histories reached after elapsed time $v$ under the common handoff law, with their conditional enclosures. The terminal information family is
 $$
-V_N(\mathcal I)=\inf_{U\in\mathcal U_N(\mathcal I),\,\xi\ge0}
-\left\{\sum_{j=0}^{N-1}\xi_j:\ C_j(U)\le\xi_j\le d_*,\
-d_i^s>0\ \text{at every obligated node}\right\}.
+ Z_f=\left\{\mathcal I\ne\varnothing:
+ \begin{array}{l}
+ u_f\text{ is jointly admissible on }[0,T_f],\\
+ g_s(v;u_f)\ge d_*\text{ for all obligated histories and }0\le v\le T_f,\\
+ \mathcal R_{u_f}(T_f,\mathcal I)\subseteq\mathcal K
+ \end{array}\right\}.
 $$
+Here the handoff law uses the released continuation only upon observable release. Feasibility at the end of the connection requires $Z_f$ membership for the possible terminal information states, with a common admissible extension of the plan. Removing histories preserves a terminal witness whenever the retained histories can use its original support bounds and common input.
 
-An empty feasible set has value $+\infty$. For fixed feasible $U$, the least compatible slack is $\xi_j(U)=[C_j(U)]_+$. This follows separately for every stage since the objective increases with each slack. Write $D(U)=\sum_j\xi_j(U)$. A positive slack consumes part of the planning margin. The condition $d_i^s>0$ excludes contact even at $\xi_j=d_*$. The immutable root lower-bounds $D(U)$ by $[d_*-\inf_s d_0^s]_+$. An admissible plan attaining that bound is primary optimal.
+**Physical handoff assumption.** On the nonlinear physical and observation system, assume the terminal continuation law is realizable from the available information. From any admitted terminal information state it maintains clearance $d_*$, actuator admissibility and terminal membership (or admissible release) for every elapsed duration and surviving history. Safe concatenation includes the actuator transition at the join. The opening-normal argument proves separation under frozen translation. Closure under tire dynamics, changing target heading and subsequent observations is the physical handoff assumption.
 
-On continuation the committed sequence must also satisfy $D(U)\le L_k$, where $L_k$ is the preceding plan's remaining deficit after its executed stage. Admission starts with $L_k=+\infty$. Only the first hold of a feasible plan is applied; the complete remaining sequence is retained. Thus the actual control is causal even though predictions from different members are compared in defining $C_j$. The domain of the control law consists of nonempty information sets admitting such a plan.
+### Continuous predictive deficit and causal control
 
-For the nominal member let $\varepsilon_j$ stack lateral displacement from the reference frame, wrapped body-heading error, $v_x-V_\mathrm{ref}$, $v_y$ and $r$. The reference frame at stage $j$ is the route frame at the projection of $p_k+jhV_\mathrm{ref}e(\psi_k)$. With nonnegative tracking weights $w_j$, $W\succeq0$ and $w_u\ge0$, the tracking preference is
+The predictive barrier uses the accumulated relaxation of a clearance constraint, following the PCBF construction of Huang, Wang, Margellos and Goulart. The functional and shift inequality below use elapsed physical time. [Predictive Control Barrier Functions](https://arxiv.org/abs/2502.08400)
 
+Fix the information at $t$ and a common input $u$. On $0\le\tau\le T_t$ set
 $$
-J_\mathrm{tr}=\tfrac h2\sum_{j=1}^N w_j\varepsilon_j^\top W\varepsilon_j
-+\tfrac{w_u}2\sum_{j=1}^N\|U_j-U_{j-1}\|^2 .
+ c_t(\tau;u)=\sup_{s\in\mathcal I(t)}[d_*-g_s(\tau;u)]_+,\qquad
+ D_t(u)=\int_0^{T_t}c_t(\tau;u)\,d\tau ,
 $$
-
-Let $\langle\cdot\rangle$ denote the normalized mean over the physical members used in the secondary preference. Define $\gamma_j^s=(C_r^s/K_r^s)\operatorname{atan2}(v_{y,j}^s-l_r r_j^s,\sqrt{(v_{x,j}^s)^2+v_s^2})$ at the end of hold $j$. With longitudinal ratio $b_j$ on that hold, set
-
+where a released member contributes zero. The supremum ranges over every admissible continuation of each history, using the same persistent parameters as in the observations. Assume these bounded deficit functions are measurable. Write $\mathcal U_t$ for common inputs satisfying the dynamics, actuator and physical-domain conditions, strict $g_s>0$ for every obligated member and instant, and membership of the terminal information family for all possible continuations. The terminal continuation must use a common admissible input for indistinguishable histories. The separating normals may differ among them. The primary problem is
 $$
-J_\mathrm{tire}=\tfrac h2\sum_{j=1}^N
-  \left(b_j^2+b_j^4+\big\langle(\gamma_j^s)^2\big\rangle\right).
+ \mathcal V(t,\mathcal I(t))=
+ \inf_{\substack{u\in\mathcal U_t,\;\xi:[0,T_t]\to[0,d_*]\\
+                 \xi(\tau)\ge c_t(\tau;u)\ \forall\tau}}
+                \int_0^{T_t}\xi(\tau)\,d\tau
+ =\inf_{u\in\mathcal U_t}D_t(u).
 $$
+The equality follows by taking the pointwise smallest slack for each feasible input. The infimum of an empty set is $+\infty$. A positive slack spends part of the planning margin while the strict separation constraint still applies. The integral has units of distance times time. A deficit at one instant alone supplies no positive lower bound on this integral.
 
-This measures longitudinal force use and rear slip relative to the tire force scale. For equal primary deficit, the secondary ordering favors a strict decrease in $J_\mathrm{tire}$ with no increase in $J_\mathrm{tr}$.
-
-For a realizable constant-curvature cruise trim, $v_c=V_\mathrm{ref}$, course is tangent to the route, $r=k_\Gamma V_\mathrm{ref}$ and the body derivatives vanish. Let $u^\star,x^\star$ satisfy these balance equations. The target-free guide adds the constant offset $u^\star-G(x^\star,u^\star)$ to the raw route command $G(x,u^-)$ before actuator projection. At admissible trim this gives $u^\star$; on a straight road the offset is zero. For transverse trim error $e=(e_y,\operatorname{wrap}(\psi-\theta-\psi^\star_\mathrm{rel}),v_x-v_x^\star,v_y-v_y^\star,r-r^\star)$ one may evaluate the nominal CLF $V_\mathrm{clf}=e^\top P_c e$, $P_c\succ0$, with $\dot V_\mathrm{clf}=2e^\top P_c\dot e$, using $\dot\theta=k_\Gamma\dot s$. Here $\psi^\star_\mathrm{rel}$ is the equilibrium body-heading offset from the tangent. For the one-hold transverse linearization $e^+=A_ce+B_c\delta u$ and certified local feedback $\delta u=K_c e$, a metric with $(A_c+B_cK_c)^\top P_c(A_c+B_cK_c)\preceq\rho_cP_c$, $0<\rho_c<1$, gives $V_\mathrm{clf}(e^+)\le\rho_c V_\mathrm{clf}(e)$ on that linear model. The primary problem above imposes no global decrease condition on this CLF. The trim identity establishes equilibrium tracking; asymptotic return to the route would require a separate stability argument.
-
-### Conditional recursive feasibility
-
-**Proposition.** Suppose an encounter begins with a feasible common plan. Assume the dynamics, margin and control period stay fixed and the physical state and footprint satisfy the stated enclosures. Along the unexecuted suffix, every history consistent with the new observations must extend an old admissible history. At each overlapping prediction time the new information must preserve the inherited directional support certificate, and every continuing collision obligation must already have been present in the prediction. Assume terminal closure under the common continuation law and that the new horizon and admissible command family contain the resulting shift and any required extension. A newly encountered target requires feasible admission.
-
-Let $U_k$ be the committed plan and $\xi_{j|k}$ its actual stage deficits. After the hold $[t_k,t_{k+1})$, use the updated information set $\mathcal I(t_{k+1})$. The old prediction node $t_k+(j+1)h$ coincides with the new node $t_{k+1}+jh$. On each surviving path the inherited input produces the same ego footprint at that time. For the two-certificate model, the minimum of the available support upper bounds at the new node must be no larger in the inherited witness direction. It suffices that one new valid enclosure be contained in the enclosure attaining the old certificate. The signed separation bound then persists. The worst endpoint deficit at new stage $j$ is consequently at most $\xi_{j+1|k}$. If $N_{k+1}=N_k-1$, the endpoint already belongs to $Z_f$. Otherwise append $N_{k+1}-(N_k-1)$ holds of the common continuation. Closure inductively supplies their admissibility, terminal membership and zero collision slack. Hence a feasible successor exists, and
-
+At admission the controller may choose any feasible primary minimizer when it exists. More generally it can carry the deficit of a feasible committed plan as its certificate. If it follows a prefix of duration $\delta$, the budget for a replacement is
 $$
-D(U^\mathrm{shift}_{k+1})\le D(U_k)-\xi_{0|k},\qquad
-L_{k+1}=D(U_k)-\xi_{0|k}.
+ L(t+\delta)=D_t(u)-\int_0^\delta c_t(v;u)\,dv .
 $$
+A replacement must be feasible with deficit at most $L(t+\delta)$. Its actual input depends on the information received and the retained plan. During the executed prefix every indistinguishable history receives the same actuator input. Section 6 derives the budget and proves existence of a continuation under the stated hypotheses.
 
-For an attained primary minimizer this yields $V_{N_{k+1}}(\mathcal I_{k+1})\le V_{N_k}(\mathcal I_k)-\xi^*_{0|k}$. For any feasible committed plan, the budget $L_{k+1}$ gives the same decrease inequality for the committed deficits. Starting from zero, nonnegativity forces every subsequent deficit to remain zero. In particular the replacement may choose a different separating direction. The shift proof uses existence of the inherited witnesses and membership of any replacement in the same feasible set. Under coverage, the actual vehicle then has clearance at least $d_*$ at obligated control nodes. A positive feasible deficit still requires strictly positive node clearance.
+### Nominal cruise and secondary preferences
 
-The containment premise concerns the joint physical and information evolution. Replacing the root speed, heading or motion mode with a new point estimate can violate it, even when $A,\beta$ are constant on the true trajectory. Thus persistence of the physical parameters alone does not imply consistency of successive prediction sets. Separation between control boundaries and feasibility on admission of a previously unseen target each require an additional argument.
+For a nominal member let $\varepsilon(\tau)$ contain lateral displacement from the route frame, wrapped body-heading error, $v_x-V_{\rm ref}$, $v_y$ and $r$. For the tracking preference the route frame at $\tau$ is the frame at the projection of $p(t)+\tau V_{\rm ref}e(\psi(t))$ onto the given path. For a nonnegative emphasis $w$, $W\succeq0$ and an actuator smoothness weight $w_u\ge0$, the continuous tracking and tire-use preferences are
+$$
+ J_{\rm tr}=\tfrac12\int_0^{T_t}
+ \big[w(\tau)\varepsilon^\top W\varepsilon+w_u\|\dot u\|^2\big]\,d\tau ,
+ \qquad
+ J_{\rm tire}=\tfrac12\int_0^{T_t}
+ \left[b^2+b^4+\langle(\gamma^s)^2\rangle\right]\,d\tau ,
+$$
+$$
+ \gamma^s=(C_r^s/K_r^s)\operatorname{atan2}
+ (v_y^s-l_r r^s,\sqrt{(v_x^s)^2+v_s^2}).
+$$
+The derivative term describes a preference on absolutely continuous commands with square-integrable rate when used. The brackets denote a normalized design average over physical members for secondary performance. The safety constraints use every member. At equal primary deficit the secondary ordering favors lower tire use with no increase in tracking cost. Neither preference is a premise of the safety argument.
+
+For a realizable constant-curvature cruise trim the course is tangent to the route, $\|v^\star\|=V_{\rm ref}$, $r^\star=k_\Gamma V_{\rm ref}$, and $\dot v^\star=\dot r^\star=0$ under $u^\star$. These equations determine the body heading offset $\psi^\star_{\rm rel}=-\operatorname{atan2}(v_y^\star,v_x^\star)$. Use the route command $G$ from Section 3 with the trim correction $u^\star-G(x^\star,u^\star)$ before actuator projection. At an admissible trim this restores exactly $u^\star$. Define the transverse error and nominal control Lyapunov function by
+$$
+ e_c=(e_y,\operatorname{wrap}(\psi-\theta-\psi^\star_{\rm rel}),
+          v_x-v_x^\star,v_y-v_y^\star,r-r^\star)^\top,\qquad
+ V_c=e_c^\top P_c e_c,\quad P_c=P_c^\top\succ0 .
+$$
+The first two derivatives are $v_c\sin(\chi-\theta)$ and $r-k_\Gamma\dot s$, and the last three follow from the body vector field in Section 1. Write their joint field as $f_c(e_c,u)$ and let $A_c=D_e f_c(0,u^\star)$, $B_c=D_u f_c(0,u^\star)$ on a smooth trim branch. Under a realizable local cruise feedback $u=u^\star+K_c e_c$, let $A_K=A_c+B_cK_c$. If $A_K^\top P_c+P_c A_K\preceq-2\alpha_c P_c$, $\alpha_c>0$, differentiation gives
+$$
+ \dot V_c=2e_c^\top P_c f_c(e_c,u^\star+K_c e_c)
+ \le-2\alpha_c V_c+o(\|e_c\|^2).
+$$
+In a sufficiently small admissible neighborhood the remainder is bounded by $\alpha_c V_c$, yielding local exponential convergence there under this feedback. Equilibrium reproduction by the target-free guide and local CLF decrease under the certified feedback are distinct properties. Global return to cruise after every feasible avoidance maneuver requires additional attraction and reachability hypotheses.
+
+## 6. Conditional recursive feasibility and physical clearance
+
+**Information consistency.** Let $\mathscr H_t$ be the admissible physical histories consistent with all outputs up to $t$. After using $u$ for $\delta>0$, the new histories are exactly the extensions of histories in $\mathscr H_t$ satisfying the plant under that prefix and the outputs on $(t,t+\delta]$. The true history survives by the measurement and motion assumptions. Any continuation from a surviving history on the inherited input suffix was a possible continuation at $t$. For an outer information representation require this same containment on the suffix. Updating a point estimate of the root speed or heading alone does not establish it.
+
+Physical containment and preservation of a *computed clearance bound* are separate conditions. In the old separating direction $n$ the upper bound on target support is
+$$
+ H_t(n,\tau)=\min\{h_{R_p}(n),\,h_{R_y}(n)+r_y\},
+$$
+using available witnesses for that member and time. Assume physical flows are well posed on the admitted domain. At the same physical instant on the shifted plan require that an inherited normal can still certify at least its old gap. A sufficient condition is $H_{t+\delta}(n,v)\le H_t(n,v+\delta)$ in an old maximizing direction with the same physical ego trajectory. Retaining a valid old footprint bound for the surviving histories suffices. Two fresh enclosures can each contain the true target without satisfying this directional inequality.
+
+**Proposition.** Suppose a feasible plan is committed at admission, all physical and observation histories are covered, and the above consistency and witness conditions hold. During a continuing encounter require that every new obligation on the overlapping interval previously existed, that $T_{t+\delta}\ge T_t-\delta$, and that the admissible trajectory family contains the retained suffix and the required terminal extension, including any change of leg junction. Assume physical terminal closure as in Section 5. A new encounter requires feasible admission.
+
+For any $0<\delta\le T_t$ during which the chosen input is followed, write $T=T_t$, $T'=T_{t+\delta}$. On $0\le v\le T-\delta$ choose $u'(v)=u(v+\delta)$. Uniqueness of the physical evolution for a fixed history gives the same ego footprint at the same absolute time. The inherited normal and the smaller family of possible histories give
+$$
+ c_{t+\delta}(v;u')\le c_t(v+\delta;u)
+$$
+and preserve strict separation even when the margin was relaxed. The old endpoint is still in the terminal family. Append the admissible common terminal continuation for $T'-(T-\delta)$, which may be zero. Terminal closure supplies zero deficit throughout the extension and membership at its endpoint. Integration proves
+$$
+ D_{t+\delta}(u')\le\int_\delta^{T}c_t(v;u)\,dv
+   =D_t(u)-\int_0^\delta c_t(v;u)\,dv .
+$$
+This provides a feasible successor and proves that the replacement budget is attainable. For a primary minimizer $u^*$ at $t$, taking the infimum at $t+\delta$ gives the same inequality with $\mathcal V(t+\delta,\mathcal I(t+\delta))$ on the left and $\mathcal V(t,\mathcal I(t))$ in place of $D_t(u^*)$ on the right. Existence of a feasible committed plan suffices for the stored-deficit inequality. A zero infimum by itself does not exhibit a zero-deficit plan.
+
+On a closed-loop continuation whose executed prefixes cover the encounter, the inequalities telescope. Starting from an attained zero deficit, every executed prefix has zero integrated deficit. For each covered physical history, $[d_*-d_\pm(E_{\rm true},B_{T,\rm true})]_+$ is bounded by $c_t$ on its active interval. Both physical poses are continuous, including at absorption, so the physical distance is continuous. A strict loss of margin at any time in an encounter of positive duration would persist on a one-sided interval of positive length, contradicting the zero integral. The endpoints follow by continuity. An isolated instantaneous obligation must meet the desired margin directly for that same conclusion. This proves physical clearance $d_*$ on the stated domain. A feasible positive-deficit plan guarantees the separately imposed strict separation. Neither statement guarantees feasibility when a previously unseen target first enters range.

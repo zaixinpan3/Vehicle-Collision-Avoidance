@@ -430,7 +430,7 @@ function [result,field] = localTargetJacobian(action,varargin)
 % Its optional second output is Phi at the same point, reusing the clipped
 % velocity, acceleration, and inverse-speed factors of the Jacobian.
 % At a switching surface it selects a neighboring branch for diagnostics.
-% See OBSERVER_ISS_THEORY.md for the global incremental matrix-LMI proof.
+% See ALGORITHM.md for the global incremental matrix-LMI proof.
 
     field = zeros(2,1);
     switch string(action)

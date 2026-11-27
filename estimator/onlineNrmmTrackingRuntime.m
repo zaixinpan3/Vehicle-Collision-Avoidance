@@ -16,7 +16,7 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % GNSS/radar predictors reset on sample arrivals. The remaining continuous
 % states use held-input RK4. Numerical defects, sampling and model uncertainty
 % enter separate conditional enclosures; no floating-point interval proof is
-% claimed. See OBSERVER_ISS_THEORY.md for the position-only sensor amendment.
+% claimed. See ALGORITHM.md for the position-only observation model.
 % prepareTarget synthesizes and caches the target design from the operating bounds.
 % targetPoint returns empty motion until the acquisition history resolves the
 % state. An optional relative perception heading can initialize a target at rest.

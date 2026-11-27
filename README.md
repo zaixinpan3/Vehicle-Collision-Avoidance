@@ -11,7 +11,7 @@ sideslip, and absorbing target-stop convention are retained. Moving, turning,
 and accelerating targets are admitted; targets need not brake or stop.
 
 The mathematical derivation is in
-[CONTROLLER_THEORY.md](controller/CONTROLLER_THEORY.md). Finite hypotheses,
+[ALGORITHM.md](ALGORITHM.md). Finite hypotheses,
 numerical integration and sampled checks are deployment approximations. The
 implementation does not claim universal uncertainty coverage, continuous-time
 certification, a complete physical-feasibility test, or guaranteed deadlines.

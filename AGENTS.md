@@ -4,26 +4,17 @@
 
 This repository is a research-only codebase. Each directory owns one domain:
 
-- `controller/` — the predictive controller as one entry
-  (`collisionAvoidanceController.m`) over a small fixed set of modules: input
-  parsing (`readControllerInputs.m`), the two-stage PCBF/CLF solve with its
-  anchor rollout, constraints and trust estimate (`solvePredictiveControl.m`),
-  the Fiala bicycle model, trim and CLF value (`nonlinearBicycleModel.m`,
-  `modifiedFialaTire.m`), target prediction, uncertainty tubes, potential
-  guidance and rectangle geometry (`predictiveSafetyGeometry.m`), and path
-  coordinates (`laneGeometry.m`). `CONTROLLER_FILES.md` is the module map and a
-  test limits the number of source files. Controller theory documents live
-  beside the code.
+- `controller/` — the predictive controller entry point
+  (`collisionAvoidanceController.m`), input parsing, two-leg PCBF planning,
+  bicycle dynamics, path and safety geometry, and terminal continuation.
+  A test limits the number of source files.
 - `config/` — all MATLAB configuration entry points and the precomputed CLF
   matrix table. Controller configuration merging and validation live with the
   defaults in `collisionAvoidanceControllerConfig.m`.
 - `estimator/` — flat: the runtime (`onlineNrmmTrackingRuntime.m`), vector
-  fields, certificates, gain synthesis, error bounds, the reproduced Sharma
-  comparator (`sharma*.m`), and the theory documents
-  (`OBSERVER_ISS_THEORY.md`, `MODEL_AIDED_ESTIMATION.md`). Only executable
-  estimator and gain-design algorithms plus their theory documents belong
-  here — no scenario drivers, benchmarks, adapters, reports, or generated
-  artifacts.
+  fields, certificates, gain synthesis, error bounds, and the reproduced Sharma
+  comparator. Keep scenario drivers, benchmarks, adapters and generated artifacts
+  in their respective project directories.
 - `perception/` — the Python YOLO+LiDAR target-position pipeline (the
   offline curb-detection experiment was removed on 2026-10-06).
 - `scripts/` — closed-loop scenario drivers and campaigns, the
@@ -87,6 +78,23 @@ mathematical theory to legitimize an implementation that has lost a required
 algorithm component. Report implementation gaps and unverified guarantees
 truthfully. Changing these protected requirements needs an explicit user
 instruction; a request for faster execution is not such authorization.
+
+## Canonical Algorithm Theory
+
+The root `ALGORITHM.md` is the sole maintained specification of the adopted
+algorithm. Update its English, self-contained derivation in the same change
+as any change to the mathematical algorithm, including the observer, its
+uncertainty bounds, the initialization field, the controller, or the conditions
+of a guarantee. Explain the assumptions and derive the affected conclusions.
+
+Formulate the theory in continuous physical time. The variational problem,
+admissible signals and mathematical optimality conditions belong there.
+Keep discretization, observation schedules, transcription, solvers, tolerances,
+runtime decisions and experimental results in their implementation or research
+locations. Implementation-only changes do not require a theory edit. Point
+readers to this file from module documentation and manuscript guidance.
+Distinguish an ideal continuous-time theorem from guarantees established for
+the executable controller.
 
 ## Literature Sources
 
@@ -159,9 +167,8 @@ An unsuccessful attempt warrants a report only if its finding meets the same
 importance threshold. When in doubt, do not create a standalone report.
 
 Consolidate related important findings into an existing relevant report rather
-than creating a new report for each turn or small subtask. Theory documents
-contain the complete mathematical derivation of the adopted algorithm; they
-are not logs of implementation work, exploratory proposals, or discussions.
+than creating a new report for each turn or small subtask. Maintain the derivation of the adopted algorithm in `ALGORITHM.md`. Keep
+implementation logs and exploratory proposals outside that document.
 
 Report retention and activity-ledger eligibility are separate decisions.
 Qualifying work may need a concise ledger entry and a Git reference without
