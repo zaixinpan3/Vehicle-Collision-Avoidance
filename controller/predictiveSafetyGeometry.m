@@ -736,33 +736,62 @@ classdef predictiveSafetyGeometry
             end
         end
 
-        function [boxes,radius]=observedFootprint(root,limits,time,obs,domain)
+        function chart=observedPoseChart(root,limits,obs)
+            % Each observation bounds p+H*v, in one common position/course chart.
+            chart=[];
+            if root(4)==0 || isempty(obs.previous),return;end
+            chord=complex(obs.previous(1)-obs.current(1),obs.previous(2)-obs.current(2));
+            if abs(chord)<=obs.radius+obs.previousRadius,return;end
+            k=sin(root(6))/root(7);kError=max(abs(sin(limits(:,2))/root(7)-k));
+            samples=[obs.span;real(chord);imag(chord);obs.previousRadius];
+            if isfield(obs,'chords'),samples=[samples,obs.chords];end
+            ages=samples(1,:);
+            back=-localPastTravel(root(4),root(5),ages);
+            H=localArcChord(back,k);
+            if abs(H(1))<=eps(max(1,abs(back(1)))),return;end
+            d=chord/H(1);
+            if ~isfinite(abs(d)),return;end
+            far=localPastTravel(obs.speed(2),limits(1,1),ages);
+            near=localPastTravel(obs.speed(1),limits(2,1),ages);
+            if obs.speed(1)==0,near=zeros(size(ages));end
+            errors=max(abs(back+near),abs(back+far))+.5*back.^2*kError;
+            offsets=complex(samples(2,:),samples(3,:))-H*d;
+            radii=samples(4,:)+errors;
+            chart=struct('direction',d,'H',H,'offsets',offsets,'radii',radii, ...
+                'courseRadius',(radii(1)+obs.radius)/abs(H(1)));
+        end
+
+        function radius=translationRadius(origin,priorRadius,obs,chart)
+            % For every normal, p=(p+H*v)-H*v. Enclose each aggregate
+            % about the same root used by the motion and terminal covers.
+            radius=priorRadius;
+            if isempty(chart) || radius==0,return;end
+            shift=complex(obs.current(1)-origin(1),obs.current(2)-origin(2));
+            centers=shift+chart.offsets;
+            bounds=abs(centers)+chart.radii+abs(chart.H)*chart.courseRadius;
+            pad=64*eps(max([1;abs(origin);abs(chart.H(:)*chart.direction);bounds(:)]));
+            radius=min(radius,min(bounds)+pad);
+        end
+
+        function [boxes,radius,relevant]=observedFootprint(root,limits,time,obs,domain,prior,chart)
             % The same complex similarity maps all four labeled corners.
             % Bound the residual of each corner, then offset their common
             % rectangle by the largest disk. A position chord identifies
             % its orientation without an independently observed velocity.
-            boxes=[];radius=[];
+            boxes=[];radius=[];relevant=false(1,0);
+            if nargin<6,prior=[];end
             if isempty(obs.current),return;end
             time=reshape(time,1,[]);origin=complex(obs.current(1),obs.current(2));
             if root(4)==0
                 boxes=repmat(root,1,numel(time));boxes(1:2,:)=obs.current+zeros(1,numel(time));
-                radius=obs.radius+zeros(size(time));return
+                radius=obs.radius+zeros(size(time));
+                relevant=localCoverRadius(prior,boxes)>radius;return
             end
-            if isempty(obs.previous),return;end
-            chord=complex(obs.previous(1),obs.previous(2))-origin;
-            if abs(chord)<=obs.radius+obs.previousRadius,return;end
-
-            t=obs.span;k=sin(root(6))/root(7);K=sin(limits(:,2))/root(7);
-            back=-localPastTravel(root(4),root(5),t);
-            H=localArcChord(back,k);
-            if H==0,return;end
-            d=chord/H;scale=abs(d);
-            if ~isfinite(scale),return;end
+            if nargin<7,chart=predictiveSafetyGeometry.observedPoseChart(root,limits,obs);end
+            if isempty(chart),return;end
+            k=sin(root(6))/root(7);K=sin(limits(:,2))/root(7);
+            d=chart.direction;H=chart.H(1);scale=abs(d);
             betaError=max(abs(limits(:,2)-root(6)));kError=max(abs(K-k));
-            backLo=-localPastTravel(obs.speed(2),limits(1,1),t);
-            backHi=-localPastTravel(obs.speed(1),limits(2,1),t);
-            if obs.speed(1)==0,backHi=0;end
-            errorH=max(abs([backLo,backHi]-back))+.5*back^2*kError;
 
             slow=root;fast=root;
             slow(4:5)=[obs.speed(1);limits(1,1)];fast(4:5)=[obs.speed(2);limits(2,1)];
@@ -784,11 +813,22 @@ classdef predictiveSafetyGeometry
             G=F+c.*exp(1i*yaw);
             turnError=max(abs(turnLo-k*s),abs(turnHi-k*s))+betaError;
             errorG=max(abs(lo-s),abs(hi-s))+.5*s.^2*kError+abs(c).*min(2,turnError);
-            perCorner=errorG+abs(G)*((errorH+obs.previousRadius)/abs(H)) ...
+            perCorner=errorG+abs(G)*(chart.radii(1)/abs(H)) ...
                 +abs(H-G)*(obs.radius/abs(H));
+            coverRadius=localCoverRadius(prior,boxes);
+            possible=coverRadius>max(errorG,[],1);
+            % A swept certificate can use both neighbours of a relevant node.
+            use=possible | [false,possible(1:end-1)] | [possible(2:end),false];
+            if isfield(obs,'chords') && any(use)
+                % All commands tested in this frame share this target chart.
+                % Reduce its joint support to a rounded rectangle once.
+                distance=localCornerSupport(G(:,use),c,scale,boxes(3,use),root,obs,chart);
+                perCorner(:,use)=min(perCorner(:,use),errorG(:,use)+distance);
+            end
             radius=max(perCorner,[],1);
             radius=radius+64*eps(max(1,abs(center)+scale*max(abs(c))+radius));
-            if any(~isfinite(radius)) || any(~isfinite(boxes),'all'),boxes=[];radius=[];end
+            if any(~isfinite(radius)) || any(~isfinite(boxes),'all'),boxes=[];radius=[];return;end
+            relevant=coverRadius>radius;
         end
 
         function range=targetEnvelopeRange(ego,target,centers)
@@ -1295,10 +1335,73 @@ classdef predictiveSafetyGeometry
     end
 end
 
+function coverRadius=localCoverRadius(prior,measured)
+    % Minimum disk padding needed for the measured rectangle to contain
+    % all four corners of the prior. Distance to a rectangle is convex.
+    if isempty(prior),coverRadius=inf(1,size(measured,2));return;end
+    rot=exp(1i*(prior(3,:)-measured(3,:)));
+    shift=complex(prior(1,:)-measured(1,:),prior(2,:)-measured(2,:)).*exp(-1i*measured(3,:));
+    x=prior(10,:)+[-1;1;1;-1].*prior(8,:);
+    y=prior(11,:)+[-1;-1;1;1].*prior(9,:);
+    corners=shift+rot.*complex(x,y)-complex(measured(10,:),measured(11,:));
+    dx=max(0,abs(real(corners))-measured(8,:));dy=max(0,abs(imag(corners))-measured(9,:));
+    coverRadius=max(hypot(dx,dy),[],1);
+end
+
+function distance=localCornerSupport(G,c,scale,heading,root,obs,chart)
+    % In complex inertial axes let p be the current position error and v
+    % the error in the current unit course. A corner error is p+G*v plus
+    % the orbit remainder. Each radar chord supplies rows on p+Hj*v.
+    pLo=-obs.radius*ones(2,1);pHi=-pLo;
+    if ~isempty(obs.positionBounds)
+        pLo=max(pLo,obs.positionBounds(:,1)-obs.current);
+        pHi=min(pHi,obs.positionBounds(:,2)-obs.current);
+    end
+    courseRadius=chart.courseRadius;d=chart.direction;
+    course=[real(d);imag(d)];
+    vLo=max(-1-course,-courseRadius);vHi=min(1-course,courseRadius);
+    if any(pLo>pHi) || any(vLo>vHi)
+        distance=inf(size(G));return
+    end
+    pCenter=(pLo+pHi)/2;pMid=complex(pCenter(1),pCenter(2));
+    vCenter=(vLo+vHi)/2;vMid=complex(vCenter(1),vCenter(2));
+    pHalf=(pHi-pLo)/2;vHalf=(vHi-vLo)/2;
+    axis=exp(-1i*heading);map=axis.*G;
+    middle=axis*pMid+map*vMid;
+    hx=abs(real(axis))*pHalf(1)+abs(imag(axis))*pHalf(2)+abs(real(map))*vHalf(1)+abs(imag(map))*vHalf(2);
+    hy=abs(imag(axis))*pHalf(1)+abs(real(axis))*pHalf(2)+abs(imag(map))*vHalf(1)+abs(real(map))*vHalf(2);
+    lx=real(middle)-hx;ux=real(middle)+hx;
+    ly=imag(middle)-hy;uy=imag(middle)+hy;
+    for j=1:numel(chart.H)
+        chord=chart.H(j);z=chart.offsets(j);rowRadius=chart.radii(j);
+        if abs(chord)<=eps(max(1,abs(chord))),continue;end
+        % Signed row multipliers are the positive/negative parts of
+        % G/chord in these axes. They eliminate the course coefficient
+        % exactly in real arithmetic, leaving the box support of p.
+        weight=map/chord;residual=axis-weight;
+        middle=residual*pMid+weight*z;
+        strip=(abs(real(weight))+abs(imag(weight)))*rowRadius;
+        % Account for scale in the two potentially cancelling products.
+        rounding=64*eps(max(1,abs(residual)*(abs(pMid)+sum(pHalf))+ ...
+            abs(weight)*(abs(z)+abs(chord*d)+rowRadius+norm(obs.current))+abs(map)*(1+abs(d))));
+        hx=abs(real(residual))*pHalf(1)+abs(imag(residual))*pHalf(2)+strip+rounding;
+        hy=abs(imag(residual))*pHalf(1)+abs(real(residual))*pHalf(2)+strip+rounding;
+        lx=max(lx,real(middle)-hx);ux=min(ux,real(middle)+hx);
+        ly=max(ly,imag(middle)-hy);uy=min(uy,imag(middle)+hy);
+    end
+    % Distance to the nominal rectangle is convex. Bounding each corner
+    % bounds the entire footprint. Inward corner errors need no padding.
+    x=scale*(real(c)-root(10));y=scale*(imag(c)-root(11));
+    dx=max(0,max(x+ux,-x-lx)-scale*root(8));
+    dy=max(0,max(y+uy,-y-ly)-scale*root(9));
+    distance=hypot(dx,dy);
+    distance(lx>ux | ly>uy)=Inf;
+end
+
 function arc=localPastTravel(v,a,t)
     % Reverse the acceleration when integrating speed into the past.
     if a>0,t=min(t,v/a);end
-    arc=t*(v-.5*a*t);
+    arc=t.*(v-.5*a*t);
 end
 
 function f=localArcChord(s,k)

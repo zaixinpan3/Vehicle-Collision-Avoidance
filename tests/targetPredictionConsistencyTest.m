@@ -66,6 +66,63 @@ classdef targetPredictionConsistencyTest < matlab.unittest.TestCase
             testCase.verifyEmpty(box);testCase.verifyEmpty(r);
         end
 
+        function aRetainedRadarStripTightensFutureClearanceForTheSameMotion(testCase)
+            q=[70;-12;.61;6;0;0;1.6;2.4;.9;.32;-.18];
+            limits=[0,0;0,0];times=[0,.1,1,2,3];span=.12;
+            past=predictiveSafetyGeometry.predictTarget(q,[-1,-span]);
+            current=q(1:2)+[.02;-.01];previous=past(1:2,2)+[-.01;.02];
+            older=past(1:2,1)+[.005;.005];
+            track=struct('times',[2-span,2],'time',2,'positions',[previous,current], ...
+                'positionRadii',[.05,.05],'arcAnchors',[1,2-span,2;older,previous,current;.01,.05,.05]);
+            obs=nrmmControllerErrorBounds("footprintObservation",track,q,limits,struct);
+            testCase.verifyEqual(obs.chords,[1;older-current;.01],AbsTol=1e-14);
+            [box,r]=predictiveSafetyGeometry.observedFootprint(q,limits,times,obs,struct);
+            without=obs;without.chords=zeros(4,0);
+            [~,base]=predictiveSafetyGeometry.observedFootprint(q,limits,times,without,struct);
+            testCase.verifyLessThan(r(end),base(end)/2);
+            target=predictiveSafetyGeometry.predictTarget(q,times);
+            localVerifyCornerContainment(testCase,target,box,r);
+            % Only the middle prior protrudes. Swept checks on both sides
+            % must still get the full joint bound at their other endpoint.
+            prior=box;prior(8:9,:)=prior(8:9,:)/2;prior(8,3)=box(8,3)+10;
+            [~,screened,relevant]=predictiveSafetyGeometry.observedFootprint(q,limits,times,obs,struct,prior);
+            testCase.verifyEqual(relevant,[false,false,true,false,false]);
+            testCase.verifyEqual(screened(2:4),r(2:4),AbsTol=1e-12);
+        end
+
+        function correlatedNoisyChordsEncloseRotatingCornersAndAbsorption(testCase)
+            root=[3;-2;.7;4;-1.4;.04;1.6;2.2;.9;.3;-.2];
+            times=[0,.1,1,4,8];limits=[-2.1,-.035;-1.1,.12];
+            for beta=[-.035,.12]
+                for acceleration=limits(:,1).'
+                    q=root;q(3:6)=[-2.1;4.2;acceleration;beta];
+                    past=predictiveSafetyGeometry.predictTarget(q,[-.8,-.3,-.1]);
+                    current=q(1:2)+[.015;-.01];older=past(1:2,1:2)+[-.01;.01];
+                    obs=struct('speed',[3.8;4.3],'current',current,'radius',.02, ...
+                        'previous',past(1:2,3)+[.02;-.015],'previousRadius',.03,'span',.1, ...
+                        'positionBounds',current+[-.02,.02], ...
+                        'chords',[.8,.3;older-current;.02,.02]);
+                    [box,r]=predictiveSafetyGeometry.observedFootprint(root,limits,times,obs,struct);
+                    localVerifyCornerContainment(testCase,predictiveSafetyGeometry.predictTarget(q,times),box,r);
+                    [~,prior]=predictiveSafetyGeometry.observedFootprint(root,limits,times, ...
+                        rmfield(obs,{'positionBounds','chords'}),struct);
+                    testCase.verifyLessThanOrEqual(r,prior+1e-11);
+                end
+            end
+        end
+
+        function aJointChordReducesTheMainMotionEnvelopeTranslationRadius(testCase)
+            origin=[73;-8];prior=.5;obs=struct('current',origin+[.02;-.01]);
+            chart=struct('H',-2+1i,'offsets',.19-.11i,'radii',.025,'courseRadius',.005,'direction',1i);
+            radius=predictiveSafetyGeometry.translationRadius(origin,prior,obs,chart);
+            d=chart.radii+abs(chart.H)*chart.courseRadius;center=.21-.12i;
+            testCase.verifyEqual(radius,abs(center)+d,AbsTol=2e-12);
+            testCase.verifyLessThan(radius,prior);
+            testCase.verifyGreaterThanOrEqual(radius+1e-12,max(abs(center+d*exp(1i*linspace(-pi,pi,51)))));
+            chart.radii=2;
+            testCase.verifyEqual(predictiveSafetyGeometry.translationRadius(origin,prior,obs,chart),prior);
+        end
+
         function oneRoundedRectangleCoversInteriorClocksAndNoisyPositionPairs(testCase)
             root=[3;-2;.7;4;-1;.04;1.6;2.2;.9;.3;-.2];times=[0,.12,1,3,7];
             limits=[-3,-.09;.5,.13];span=.25;shape=[2.1;.8;.25;-.1];
@@ -330,4 +387,11 @@ end
 function corners=localCorners(q)
     x=q(8,:).*[-1;1;1;-1]+q(10,:);y=q(9,:).*[-1;-1;1;1]+q(11,:);
     corners=complex(q(1,:),q(2,:))+exp(1i*q(3,:)).*complex(x,y);
+end
+
+function localVerifyCornerContainment(testCase,target,box,radius)
+    w=(localCorners(target)-complex(box(1,:),box(2,:))).*exp(-1i*box(3,:));
+    dx=max(0,abs(real(w)-box(10,:))-box(8,:));
+    dy=max(0,abs(imag(w)-box(11,:))-box(9,:));
+    testCase.verifyLessThanOrEqual(max(hypot(dx,dy),[],1),radius+1e-10);
 end

@@ -92,7 +92,8 @@ end
 
 function obs=localFootprintObservation(track,root,limits,domain)
     speed=root(4);
-    obs=struct('speed',[speed;speed],'current',[],'radius',0,'previous',[],'previousRadius',0,'span',0);
+    obs=struct('speed',[speed;speed],'current',[],'radius',0,'previous',[],'previousRadius',0,'span',0, ...
+        'positionBounds',zeros(2,0),'chords',zeros(4,0));
     if speed>0 && isfield(track,'errorBound') && ~isempty(track.errorBound)
         radius=track.errorBound(1).targetComponents(2);
         obs.speed=[max(0,speed-radius);min(track.speedUpper,speed+radius)];
@@ -129,6 +130,16 @@ function obs=localFootprintObservation(track,root,limits,domain)
     if obs.speed(1)>obs.speed(2)
         % An empty auxiliary clock interval supplies no measurement witness.
         obs.previous=[];
+        return
+    end
+    if isfield(track,'positionBounds'),obs.positionBounds=track.positionBounds;end
+    if isfield(track,'arcAnchors') && ~isempty(track.arcAnchors)
+        % Each column describes the same current position and unit course.
+        % Preserve the displacement and disk radius in this member's axes.
+        anchors=track.arcAnchors;
+        age=track.time-anchors(1,:);
+        use=isfinite(age) & age>0 & age~=obs.span & [true,diff(age)~=0];
+        obs.chords=[age(use);anchors(2:3,use)-obs.current;anchors(4,use)];
     end
 end
 

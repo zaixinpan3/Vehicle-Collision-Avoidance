@@ -550,18 +550,23 @@ function members=localCompactPlanningMembers(members,cfg,count)
             members(j).target(5:6)=min(bounds(2,:).',max(bounds(1,:).',q(5:6)));
             if any(bounds(1,:)~=bounds(2,:))
                 members(j).motionLimits=bounds;
-                members(j).cover=localCompactCover(members(j),cfg,count+1);
             end
         end
         physical=members(j).target;physical(8:9)=physicalHalfSize;
         obs=nrmmControllerErrorBounds("footprintObservation",track,physical,bounds,cfg.target.observerDomain);
+        chart=predictiveSafetyGeometry.observedPoseChart(physical,bounds,obs);
+        if ~isempty(members(j).motionLimits)
+            radius=predictiveSafetyGeometry.translationRadius(physical(1:2),members(j).positionRadius,obs,chart);
+            coverRoot=physical;coverRoot(8:9)=physicalHalfSize+radius;
+            members(j).cover=localCompactCover(coverRoot,bounds,cfg,count+1);
+        end
+        if isempty(obs.current) || (physical(4)>0 && isempty(obs.previous)),continue;end
         times=(0:count+1)*cfg.controller.sampleTime;
-        [measured,radius]=predictiveSafetyGeometry.observedFootprint(physical,bounds,times,obs,cfg.target.observerDomain);
-        if isempty(measured),continue;end
         if isempty(members(j).cover),prior=localCompactTargetNodes(members(j).target,times);
         else,prior=members(j).cover.boxes;end
         prior(:,1)=members(j).target;prior(8:9,1)=members(j).rootHalfSize;
-        relevant=localCompactIndependentNodes(prior,measured,radius);
+        [measured,radius,relevant]=predictiveSafetyGeometry.observedFootprint( ...
+            physical,bounds,times,obs,cfg.target.observerDomain,prior,chart);
         if any(relevant)
             members(j).observedFootprint=struct('boxes',measured,'radius',radius,'relevant',relevant);
         end
@@ -1585,18 +1590,6 @@ function kernel=localCompactSensitivityKernel()
     kernel=handle;
 end
 
-function relevant=localCompactIndependentNodes(prior,measured,radius)
-    % A rounded rectangle contains the prior iff it contains its four corners.
-    % An enclosing measurement certificate cannot improve any signed gap.
-    rot=exp(1i*(prior(3,:)-measured(3,:)));
-    shift=complex(prior(1,:)-measured(1,:),prior(2,:)-measured(2,:)).*exp(-1i*measured(3,:));
-    x=prior(10,:)+[-1;1;1;-1].*prior(8,:);
-    y=prior(11,:)+[-1;-1;1;1].*prior(9,:);
-    corners=shift+rot.*complex(x,y)-complex(measured(10,:),measured(11,:));
-    dx=max(0,abs(real(corners))-measured(8,:));dy=max(0,abs(imag(corners))-measured(9,:));
-    relevant=any(hypot(dx,dy)>radius,1);
-end
-
 function data=localSweepBounds(item,cfg)
     % A bound for every material point, in m/s^2, on one held interval.
     h=cfg.controller.sampleTime;car=cfg.vehicle;
@@ -2003,17 +1996,17 @@ function [dense,ends,inputs]=localCompactCruiseRollout(kernel,x,item,start,cfg,c
     dense=[x,points];
 end
 
-function cover=localCompactCover(item,cfg,count)
-    h=cfg.controller.sampleTime;bounds=item.motionLimits;
+function cover=localCompactCover(target,bounds,cfg,count)
+    h=cfg.controller.sampleTime;
     times=(0:count)*h;
-    [boxes,centers]=predictiveSafetyGeometry.targetMotionEnvelope(item.target,bounds,times,[],cfg.target.observerDomain);
+    [boxes,centers]=predictiveSafetyGeometry.targetMotionEnvelope(target,bounds,times,[],cfg.target.observerDomain);
     cover=struct('h',h,'boxes',boxes,'centers',centers);
     % Keep the observer speed and course ranges through the handoff.
-    t=times(end);slow=item.target;fast=slow;
+    t=times(end);slow=target;fast=slow;
     slow(5)=bounds(1,1);fast(5)=bounds(2,1);
     [sMin,vMin]=predictiveSafetyGeometry.targetArc(slow,t);
     [sMax,vMax]=predictiveSafetyGeometry.targetArc(fast,t);
-    kMin=sin(bounds(1,2))/item.target(7);kMax=sin(bounds(2,2))/item.target(7);
+    kMin=sin(bounds(1,2))/target(7);kMax=sin(bounds(2,2))/target(7);
     turns=[kMin*sMin,kMin*sMax,kMax*sMin,kMax*sMax];
     angLo=min(turns);angHi=max(turns);
     if isfield(cfg.target.observerDomain,'yawRateMaximum')
@@ -2024,8 +2017,8 @@ function cover=localCompactCover(item,cfg,count)
         vMax=min(vMax,cfg.target.observerDomain.speedMaximum);vMin=min(vMin,vMax);
     end
     lo=angLo+bounds(1,2);hi=angHi+bounds(2,2);
-    angle=item.target(3)+(lo+hi)/2;half=min(pi,(hi-lo)/2);
-    cover.velocitySector=terminalSafeSet.velocitySector(vMin,vMax,angle,half);
+    angle=target(3)+(lo+hi)/2;halfAngle=min(pi,(hi-lo)/2);
+    cover.velocitySector=terminalSafeSet.velocitySector(vMin,vMax,angle,halfAngle);
 end
 
 function [gap,boxes,remaining]=localCompactOccupied(item,states,times,shape,cfg,remaining)

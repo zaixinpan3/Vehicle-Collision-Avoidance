@@ -258,6 +258,20 @@ Each multiplier certifies a support bound. The normal serves all sixteen pairs, 
 
 For a fresh query it suffices to exhibit any witnesses meeting (12). In particular $U(c;0)=h_B(c)$. Taking the least $U$ over zero and any retained nonnegative multipliers always gives a valid bound at least as tight as the box support. When the input or $n$ changes, evaluate $U$ at the **new** $c$ and use a valid trial remainder. The same multipliers remain admissible for this calculation on the same polytope. A feasible primal point alone supplies a lower bound on the support, which has the wrong direction for certifying clearance.
 
+**Explicit witnesses from a radar chord.** Condition on a joint ego member and use complex inertial coordinates. At the present epoch let $Y$ be the observed target position, $d_0$ a reference course vector, $p=p_T-Y$ and $v=d-d_0$ the errors in position and unit course. For a past observation $Y_j$ with disk radius $\epsilon_j$, let $H_j$ be its signed nominal arc chord and $\eta_j$ bound its chord error. The observation gives the four real strip inequalities
+$$
+ \|p+H_j v-z_j\|_\infty\le r_j,\qquad
+ z_j=Y_j-Y-H_jd_0,\qquad r_j=\epsilon_j+\eta_j .
+$$
+Here the infinity norm acts on real and imaginary parts. The enclosure follows by writing the true displacement as $d H_j^{\rm true}$ and using $|d|=1$. In particular, for a signed nominal arc length $s$ one may use $\eta_j=\sup|s'-s|+\tfrac12s^2\sup|\kappa'-\kappa|$, since $F_\kappa(s)=\int_0^s e^{i\kappa l}\,dl$. The same estimate applies to a future corner coefficient $G=F_\kappa(s)+e^{i(\kappa s-\beta)}q$ after adding the bounded rotation error of $q$.
+
+The affine part of that corner's error is $p+Gv$. For $H_j\ne0$ put $w=G/H_j$, and write $C_w$ for the real matrix of complex multiplication by $w$. The identity $p+Gv=(1-w)p+w(p+H_jv)$ gives, for every unit direction $n$ and position box $B_p$,
+$$
+ n^\top(p+Gv)\le h_{B_p}(C_{1-w}^\top n)
+       +(C_w^\top n)^\top z_j+r_j\|C_w^\top n\|_1 .
+$$
+These are witnesses of (12). The positive and negative parts of $C_w^\top n$ are multipliers for the two sides of the measurement rows, and their residual course coefficient vanishes. All rows refer to the same $(p,v)$. Taking the tightest bound for each signed projection, including the box witness, preserves containment. For any nominal rectangle, two orthogonal projection intervals enclose each affine corner in a box. Its farthest distance from the nominal rectangle in the rectangle's axes is the norm of the two maximum coordinate excesses. Adding the nonlinear corner remainder and maximizing over the four corners gives an enclosing rounded rectangle by convexity. Its separation from the ego footprint can use any normal in (8). For the translation alone the identity $p=(p+H_jv)-H_jv$ gives another explicit witness. If the original observation residual lies in a disk of radius $r_j$ and $|v|le r_v$, then $pinmathbb B(z_j,r_j+|H_j|r_v)$. The support of that disk in either signed direction can be intersected with the corresponding box support. Translation is common to all four corners. About an existing root $o$, the uniform support upper bound contributed by this witness is $|Y+z_j-o|+r_j+|H_j|r_v$. Its minimum with a prior ball radius bounds the translation of the entire body in every direction. This conditional certificate concerns target pose uncertainty within a joint member. Other uncertain ego variables still enter (10).
+
 **One ego variation for all corners.** For body $b\in\{E,T\}$ write $P_b=D_\lambda p_b$, $a_b=D_\lambda\psi_b$ (a row vector) at the reference. Then
 $$
  M_{ij}=P_T-P_E+(R_TJq_j)a_T-(R_EJe_i)a_E .
