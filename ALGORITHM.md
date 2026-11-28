@@ -38,10 +38,10 @@ Use $\dot v_x,\dot v_y,\dot r$ from $f_d$ on the rolling domain where $v_x>0$ an
 
 ### The target's orbit and its clock
 
-The target reference point $p_T$ has speed $V$, body yaw $\psi_T$, constant tangential acceleration $A$, constant sideslip $\beta\in(-\pi/2,\pi/2)$ and known rear reference distance $l_T>0$. Its moving dynamics are
+Let $x_C=(p_T,V,\gamma,A,\kappa)$ be the six-dimensional target state. The course $\gamma$ is the direction of motion. With known rear reference distance $l_T>0$ and constant sideslip $\beta\in(-\pi/2,\pi/2)$, curvature satisfies $\kappa=\sin\beta/l_T$ and the rectangle has body yaw $\psi_T=\gamma-\beta$. During forward motion the state evolves under one autonomous law,
 $$
- \dot p_T=V e(\psi_T+\beta),\qquad \dot\psi_T=\kappa V,\qquad
- \dot V=A,\qquad \kappa=\sin\beta/l_T .
+ \dot p_T=V e(\gamma),\qquad \dot V=A,\qquad
+ \dot\gamma=\kappa V,\qquad \dot A=0,\qquad\dot\kappa=0 .
 $$
 Since traveled distance satisfies $ds=V\,dt$, the course turns through $\kappa\,ds$. Identify planar vectors with complex numbers and rotations with multiplication by a unit complex number. At a common encounter epoch $a$, put $b_T=p_T(a)$, $d=e^{i(\psi_T(a)+\beta)}$, $V_a=V(a)$. At elapsed time $\tau$ the distance and the unit-speed orbit are
 $$
@@ -64,16 +64,18 @@ A common rigid displacement of both vehicles leaves $(\rho,Q)$ and every clearan
 
 ### Equivalence to the nonlinear relative motion model (NRMM)
 
-The target law in the observer and in every forecast is the constant-tangential-acceleration, constant-sideslip kinematic single track used by the NRMM. The following coordinate identity fixes its meaning independently of the estimator. [Sharma, Alai and Rajamani](https://doi.org/10.1016/j.trc.2025.105411)
+The target law in the observer and in every forecast is the constant-tangential-acceleration, constant-sideslip kinematic single track used by the NRMM. Equations (1) and (2) express this law in arc and Cartesian coordinates, respectively. [Sharma, Alai and Rajamani](https://doi.org/10.1016/j.trc.2025.105411)
 
 Put $q=R(\psi)^\top\dot p_T$, $s_B=R(\psi)^\top\ddot p_T$, $d_B=q/V$, $\Omega=\kappa V$, and write $\nabla_r z=\dot z+rJz$ for differentiation of a world vector expressed in rotating ego axes. Then $s_B=A d_B+V\Omega Jd_B$ and $\nabla_r d_B=\Omega Jd_B$. Since $\dot\Omega=\kappa A$, differentiation gives the following Cartesian NRMM.
 $$
  \nabla_r\rho=q-v,\qquad \nabla_r q=s_B,\qquad
  \nabla_r s_B=-\Omega^2q+3A\Omega Jd_B. \tag{2}
 $$
-Conversely, for $V=\|q\|>0$ recover $A=d_B^\top s_B$, $N=(Jd_B)^\top s_B$, $\Omega=N/V$ and $\kappa=N/V^2$. Along (2), $\dot V=A$, $\dot A=\Omega N-\Omega^2 V=0$ and $\dot N=-A\Omega+3A\Omega=2A\Omega$, hence $\dot\kappa=0$. The physical body yaw is $\psi_T=\psi+\arg q-\arcsin(l_T\kappa)$ modulo $2\pi$. Substitution recovers (1), the same relative-position output and the same four body corners for every admissible ego input. These maps give a bijection of moving trajectories on $|l_T\kappa|<1$. At an absorbing stop (1) carries the last orientation. The inverse map at $q=0$ is outside the identification domain. The equivalence concerns the physical model. A change of observer does not transfer an ISS bound proved for a particular innovation law.
+Conversely, for $V=\|q\|>0$ recover $A=d_B^\top s_B$, $N=(Jd_B)^\top s_B$, $\Omega=N/V$ and $\kappa=N/V^2$. Along (2), $\dot V=A$, $\dot A=\Omega N-\Omega^2 V=0$ and $\dot N=-A\Omega+3A\Omega=2A\Omega$, hence $\dot\kappa=0$. The physical body yaw is $\psi_T=\psi+\arg q-\arcsin(l_T\kappa)$ modulo $2\pi$. Substitution recovers (1), the same relative-position output and the same four body corners for every admissible ego input. These maps give a bijection of moving trajectories on $|l_T\kappa|<1$. At an absorbing stop (1) carries the last orientation. The inverse map at $q=0$ is outside the identification domain. The estimation guarantee in Section 2 follows from containment under the measurement update.
 
 ## 2. One joint observer, from positions to occupied footprints
+
+The joint observer estimates a family of target motions from the positions observed so far. Its current state estimate and its forecast are evaluations of this family at different times. Equation (3) specifies how observations constrain the family, and (7) updates its fixed-size enclosure.
 
 At the epoch $a$, let $z=(x(a),\vartheta,\eta,b_T,d,V_a,A,\kappa)$ belong to a declared compact joint prior $\Theta_a^-$, with $|d|=1$, $|l_T\kappa|<1$ and $\beta=\arcsin(l_T\kappa)$. The constant vector $\eta$ contains declared sensor biases. Any actuator initial state is included in $x(a)$. Denote the ego flow under the **actually applied** input by $x_z$. Relative position, ego position, yaw rate and body-frame inertial acceleration obey
 $$
@@ -92,7 +94,22 @@ $$
  \{z:\text{the additional outputs on }(t,t+h]\text{ agree with }z\}.
  \tag{3}
 $$
-For a history contract the intersection is on histories with a common prefix, followed by projection if desired. The image of the surviving histories under the joint flow is the current state estimate. The true member survives if the prior and model contain it. Every predicted ego pose, target corner and future clearance for a member uses that same member. This is a nonlinear set-membership observer. The controller below acts on its information and its applied input determines the ego motion in the next observation constraint. Recursive set-membership estimation provides the general conditioning principle. [Bertsekas and Rhodes](https://doi.org/10.1109/TAC.1971.1099674)
+For a history contract the intersection is on histories with a common prefix, followed by projection if desired. The image of the surviving histories under the joint flow is the current state estimate. The true member survives if the prior and model contain it. Every predicted ego pose, target corner and future clearance for a member uses that same member. The applied control determines the ego motion in the next observation constraint. Recursive set-membership estimation provides the general conditioning principle. [Bertsekas and Rhodes](https://doi.org/10.1109/TAC.1971.1099674)
+
+**One flow for estimation and prediction.** Let $\Phi_h$ denote the target flow above for elapsed time $h$, including the stipulated stop. For a joint member $z$, write $x_{C,z}(t)=\Phi_{t-a}(x_{C,z}(a))$. Use fixed-epoch labels throughout, indexing full admissible histories when errors have memory. Conditional on the observations through $t$, the observer defines the family of continuations and its time sections by
+$$
+ \mathcal P_t=\{\,(z,\,h\mapsto\Phi_h(x_{C,z}(t))):z\in\Theta_t\,\},\qquad
+ \mathcal C_{t+h\mid t}=\{\,\omega(h):(z,\omega)\in\mathcal P_t\,\},
+ \qquad h\ge0 .
+$$
+At $h=0$ this is the current target state set. At $h>0$ it gives the future states consistent with precisely the same observations. Each curve carries its original joint member $z$ into the rectangle constraint (9). In particular $A$ and $\kappa$ stay constant along each curve, even though later observations can narrow their estimated ranges.
+
+For a continuing encounter and $\delta>0$, (3) and the flow identity $\Phi_h\circ\Phi_\delta=\Phi_{h+\delta}$ give
+$$
+ \mathcal P_{t+\delta}\ \subseteq\
+ \{\,(z,\,h\mapsto\omega(\delta+h)):(z,\omega)\in\mathcal P_t\,\}.
+$$
+Indeed, each member consistent through $t+\delta$ was already consistent through $t$ and follows the same target dynamics. A forecast at $t$ uses just the observations available at $t$. When the next observation arrives, it restricts the continuations themselves. For finite enclosures the inherited certificate in Section 6 preserves this reasoning on the retained plan.
 
 **Eliminating the target pose.** Conditional on one ego trajectory, let $Y(t)=p_z(t)+R(\psi_z(t))(y_\rho(t)-\eta_\rho)$. For an isotropic radar residual bound $\epsilon(t)$ the radar constraint is precisely
 $$
