@@ -6,6 +6,10 @@
 
 \newtheorem{lemma}{Lemma}
 \newtheorem{theorem}{Theorem}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newcommand{\vct}[1]{\boldsymbol{#1}}
+\newcommand{\mtx}[1]{\mathbf{#1}}
 \interdisplaylinepenalty=2500
 
 \title{Output-Feedback Collision Avoidance for Two Rectangular Vehicles}
@@ -211,426 +215,537 @@ numerical evaluation, and Sections~\ref{sec:discussion}
 and~\ref{sec:conclusion} discuss implementation limitations and conclude
 the paper.
 
-\section{Two Vehicles in Relative Motion}\label{sec:systemDesign}
-
-Let the two vehicles occupy congruent rectangles in the plane. The ego
-vehicle follows a prescribed path at speed $V_{\rm ref}>0$ and observes
-the target's relative position while it is within sensing range. During
-this encounter the target has constant tangential acceleration and
-constant sideslip. The control is one steering and longitudinal input,
-chosen from the observations received so far. We seek to preserve
-separation and to follow the nominal cruise command whenever safety permits.
-
-Write $e(\theta)=(\cos\theta,\sin\theta)^\top$, let $J$ rotate a vector
-through $\pi/2$, and let $R(\theta)=[e(\theta),Je(\theta)]$.
-The ego state comprises its inertial position $p$, body heading $\psi$,
-body velocity $v=(v_x,v_y)^\top$, and yaw rate $r$. Write $R_E=R(\psi)$.
-Under steering angle $\delta$ and normalized longitudinal demand $b$, the
-single-track force balances are
+\section{Vehicle Dynamics}\label{sec:systemDesign}
+We seek a steering and longitudinal input that separates two rectangular
+vehicles while tracking a prescribed path at speed $V_{\rm ref}>0$.
+The ego vehicle measures the target's relative position within sensing range.
+\subsection{Ego-Vehicle Model}
+Let $\vct x_E=[\vct p_E^\top,\psi_E,\vct v^\top,r]^\top$ and
+$\vct u=[\delta,b]^\top$, where $\vct p_E\in\mathbb R^2$ is the inertial
+position, $\psi_E$ is the body heading, $\vct v=[v_x,v_y]^\top$ is the
+body velocity, $r$ is the yaw rate, $\delta$ is the front steering angle,
+and $b\in[-1,1]$ is the longitudinal force demand. With
+$\vct e(\theta)=[\cos\theta,\sin\theta]^\top$,
+$\mtx J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$ and
+$\mtx R(\theta)=[\vct e(\theta),\mtx J\vct e(\theta)]$, the planar
+single-track model gives
 \begin{equation}\label{eq:ego}
 \begin{aligned}
- \dot p &=R_Ev, & \dot\psi&=r,\\
- m(\dot v+rJv)&=R(\delta)F_f+F_r-F_d(v_x)e(0),\\
- I_z\dot r&=l_f[R(\delta)F_f]_2-l_r[F_r]_2 .
+ \dot{\vct p}_E&=\mtx R_E\vct v,\qquad \dot\psi_E=r,\\
+ m(\dot{\vct v}+r\mtx J\vct v)
+   &=\mtx R(\delta)\vct F_f+\vct F_r-F_d(v_x)\vct e(0),\\
+ I_z\dot r&=l_f[\mtx R(\delta)\vct F_f]_2-l_r[\vct F_r]_2 ,
 \end{aligned}
 \end{equation}
-Here $F_f,F_r$ are axle forces in wheel axes, $l_f,l_r$ are axle
-distances, $m,I_z$ are mass and yaw inertia, and $F_d$ is longitudinal
-road load. For axle $i$, put $K_i=\mu_iF_{zi}$, with friction coefficient
-$\mu_i$ and static normal load $F_{zi}$. The longitudinal force $bK_i$
-leaves lateral capacity $D_i=K_i\sqrt{1-b^2}$. For $D_i>0$, set
-$z_i=C_i|\tan\alpha_i|/(3D_i)$, where $C_i$ is the cornering
-stiffness. The modified Fiala law gives
-\[
- [F_i]_2=-D_i\,\operatorname{sgn}(\alpha_i)
-       \bigl[1-(1-z_i)_+^3\bigr],
-\]
-with zero lateral force at $D_i=0$ and $x_+=\max(x,0)$. The front and
-rear slip angles are $\operatorname{atan2}(v_y+l_fr,v_x)-\delta$ and
-$\operatorname{atan2}(v_y-l_rr,v_x)$. We work on the forward rolling
-domain with positive wheel-longitudinal velocities. Physical parameters
-$\vartheta$ are fixed along each motion. Admissible inputs respect tire
-and actuator limits and give unique flows. An actuator with memory is
-included in the physical state.
+where $\mtx R_E=\mtx R(\psi_E)$, $m$ and $I_z$ are mass and yaw
+inertia, $l_f,l_r$ are the axle distances, $F_d$ is the longitudinal
+road load, and $\vct F_f,\vct F_r$ are forces in wheel axes. For axle
+$i\in\{f,r\}$ let $K_i=\mu_i F_{zi}$ and $D_i=K_i\sqrt{1-b^2}$, where
+$\mu_i$ is the friction coefficient and $F_{zi}$ is the static normal
+load. The modified Fiala law gives $F_{xi}=bK_i$ and, for $D_i>0$,
+\begin{equation*}
+ F_{yi}=-D_i\,\operatorname{sgn}(\alpha_i)
+       [1-(1-z_i)_+^3],\qquad z_i=\frac{C_i|\tan\alpha_i|}{3D_i},
+\end{equation*}
+where $x_+=\max(x,0)$, $C_i$ is the cornering stiffness, and
+\begin{equation*}
+ \alpha_f=\operatorname{atan2}(v_y+l_fr,v_x)-\delta,\quad
+ \alpha_r=\operatorname{atan2}(v_y-l_rr,v_x).
+\end{equation*}
+For $D_i=0$ we set $F_{yi}=0$. We consider forward rolling motion with
+positive wheel-longitudinal velocities. The physical parameters
+$\vct\vartheta$ are constant along each trajectory. Admissible inputs
+respect the actuator limits and yield unique flows. Any actuator state
+is included in $\vct x_E$.
 
-\subsection{The target orbit and its clock}
-
-Let $\gamma$ denote the target's course, $V$ its speed, $A$ its
-tangential acceleration, and $\beta$ its sideslip. With known rear axle
-distance $l_T$ and $|\beta|<\pi/2$, its curvature is
-$\kappa=\sin(\beta)/l_T$ and its body heading is $\psi_T=\gamma-\beta$.
-The moving-target equations are
+\subsection{Target Motion Model}
+Let $\vct x_T=[\vct p_T^\top,V,\gamma,A,\kappa]^\top$, where
+$\vct p_T$ is the target position, $V$ is speed, $\gamma$ is course,
+$A$ is tangential acceleration, and $\kappa$ is curvature. During the
+encounter, $A$ and the sideslip $\beta\in(-\pi/2,\pi/2)$ are constant.
+With rear axle distance $l_T$, the body heading is $\psi_T=\gamma-\beta$
+and $\kappa=\sin\beta/l_T$. For $V>0$ the dynamics are
 \begin{equation}\label{eq:target}
- \dot p_T=Ve(\gamma),\quad \dot V=A,\quad
- \dot\gamma=\kappa V,\quad \dot A=\dot\kappa=0 .
+ \dot{\vct p}_T=V\vct e(\gamma),\quad
+ \dot V=A,\quad \dot\gamma=\kappa V,\quad \dot A=\dot\kappa=0.
 \end{equation}
-Identify the plane with $\mathbb C$. Choose an epoch $a$ on a moving
-arc and put $b_T=p_T(a)$, $d=e^{i\gamma(a)}$. At elapsed time $\tau$
-the traveled length is $s(\tau)=V(a)\tau+A\tau^2/2$. Since
-$d\gamma=\kappa\,ds$, the position $T_q$ of any body point $q$ follows
-by integrating the course direction and rotating its body offset. Thus
-\begin{align}
- F_\kappa(s)&=\int_0^s e^{i\kappa l}\,dl,\qquad F_0(s)=s,\nonumber\\
- T_q(a+\tau)&=b_T+d\bigl[F_\kappa(s)+e^{i(\kappa s-\beta)}q\bigr].
- \label{eq:orbit}
-\end{align}
-Thus three scalar quantities, $V(a),A,\kappa$, fix the entire motion
-up to a planar rigid displacement. When braking brings $V$ to zero, the
-stipulated absorbing stop holds $s$ at $-V(a)^2/(2A)$ and preserves all
-four corners.
 
-Equation~\eqref{eq:orbit} is also a representation of the nonlinear
-relative motion model (NRMM) \cite{SharmaAlaiRajamani2026}. To see the
-equivalence, put $\rho=R_E^\top(p_T-p)$, $w=R_E^\top\dot p_T$,
-$f=R_E^\top\ddot p_T$ and $\nabla_r=\frac{d}{dt}+rJ$ in ego axes.
-With $d_B=w/V$ and $\Omega=\kappa V$, differentiation gives
+\subsubsection{Target Flow}
+At a moving epoch $a$, let $V_a=V(a)$, $b_T=p_T(a)$ and
+$d=e^{\mathrm i\gamma(a)}$, identifying planar vectors with complex
+numbers in the orbit equations. Integrating $\dot V=A$ and
+$d\gamma=\kappa\,ds$ gives the traveled distance and reference-point
+displacement in initial course axes,
+\begin{equation}\label{eq:clock}
+ s(\tau)=V_a\tau+\tfrac12 A\tau^2,\qquad
+ F_\kappa(s)=\int_0^s e^{\mathrm i\kappa l}\,dl .
+\end{equation}
+For a material point $q$ in body coordinates, rotation through the body
+heading at $a+\tau$ gives
+\begin{equation}\label{eq:orbit}
+ T_q(a+\tau)=b_T+d\,G_q(s),\quad
+ G_q(s)=F_\kappa(s)+e^{\mathrm i(\kappa s-\beta)}q .
+\end{equation}
+For straight motion $F_0(s)=s$. If $A<0$ and $\tau\ge -V_a/A$, the
+absorbing stop holds $s=-V_a^2/(2A)$ in \eqref{eq:orbit}, fixing both
+position and heading.
+
+\subsubsection{Relative Dynamics}
+Define $\vct\rho=\mtx R_E^\top(\vct p_T-\vct p_E)$,
+$\vct w=\mtx R_E^\top\dot{\vct p}_T$ and
+$\vct f=\mtx R_E^\top\ddot{\vct p}_T$. For a vector in ego axes
+write $\nabla_r\vct w=\dot{\vct w}+r\mtx J\vct w$. With
+$\vct d_B=\vct w/V$ and $\Omega=\kappa V$, \eqref{eq:target} gives
+$\vct f=A\vct d_B+V\Omega\mtx J\vct d_B$.
+Differentiating with $\nabla_r\vct d_B=\Omega\mtx J\vct d_B$ yields
+the nonlinear relative motion model (NRMM) \cite{SharmaAlaiRajamani2026},
 \begin{equation}\label{eq:nrmm}
- \nabla_r\rho=w-v,\quad \nabla_r w=f,\quad
- \nabla_r f=-\Omega^2w+3A\Omega Jd_B .
-\end{equation}
-Indeed $f=A d_B+V\Omega Jd_B$ and $\nabla_r d_B=\Omega Jd_B$.
-Conversely, on $V>0$, one recovers $V=\|w\|$, $A=d_B^\top f$ and
-$\kappa=(Jd_B)^\top f/V^2$. Equation~\eqref{eq:nrmm} gives
-$\dot A=0$ and $\frac{d}{dt}((Jd_B)^\top f)=2A\Omega$, hence
-$\dot\kappa=0$. Both representations therefore give the same relative
-position and body orientation. For each fixed physical hypothesis, the
-inertial target orbit is independent of the future ego input. Its
-relative position $\rho$ depends on that input through $p$ and $R_E$.
-
-\section{Observation as a Family of Target Orbits}\label{sec:estimator}
-
-Index the possible motions at epoch $a$ by $z$. A label specifies the
-ego state and parameters, the target tuple $(b_T,d,V(a),A,\kappa)$,
-and any persistent sensor bias or disturbance memory. Take a compact
-prior containing the true label. For each member, propagate the ego
-under the input actually applied. The measured relative position has
-the form $y_\rho=\rho+\eta_\rho+n_\rho$, with bias $\eta_\rho$ and
-bounded residual $n_\rho$. The ego measurements of position, yaw rate
-and inertial acceleration in body axes have noise-free parts $p$, $r$
-and $\dot v+rJv$, respectively. Impose their joint error bounds on the
-same label. The resulting set-membership estimate
-\cite{BertsekasRhodes1971} is the family $\Theta_t$ of surviving
-labels. In fixed epoch coordinates, receiving further observations gives
-\begin{equation}\label{eq:conditioning}
- \Theta_{t+h}=\{z\in\Theta_t:\text{the new observations agree with }z\}.
-\end{equation}
-For errors with temporal memory the label includes the compatible
-history, or its sufficient memory, when taking this restriction. The
-current estimate is the image of $\Theta_t$ at time $t$. Its forecast at
-$t+h$ is the image of the same set at $t+h$ under \eqref{eq:orbit}.
-In particular, each forecast retains the ego history that made that
-target motion compatible with the radar.
-
-\subsection{What a position chord determines}
-
-Condition on an ego history and the radar bias. Let
-$Y=p+R_E(y_\rho-\eta_\rho)$ be the observed inertial target position.
-For a position error disk of radius $\epsilon_j$ at $t_j$, put
-$F_j=F_\kappa(s(t_j-a))$. The admissible translations satisfy
-\begin{equation}\label{eq:disks}
- b_T\in\bigcap_j \mathbb B(Y_j-dF_j,\epsilon_j),
-\end{equation}
-where $\mathbb B$ denotes a closed Euclidean disk. With two exact fixes
-and $F_1\ne F_0$, subtraction gives $d=(Y_1-Y_0)/(F_1-F_0)$.
-Substituting into \eqref{eq:orbit} eliminates both pose variables. At
-future time $w$, write $s_w=s(w-a)$ and
-$G_q(w)=F_\kappa(s_w)+e^{i(\kappa s_w-\beta)}q$. Then
-\begin{equation}\label{eq:chord}
- T_q(w)=Y_0+(Y_1-Y_0)\frac{G_q(w)-F_0}{F_1-F_0}.
-\end{equation}
-The same measured chord locates every future corner. A candidate clock
-and curvature must still give $|d|=1$ and agree with the other fixes.
-
-Three distinct, exact fixes in forward order identify the curvature on an
-arc of less than one revolution. With $D_{ij}=Y_j-Y_i$, the signed
-triangle area and circumradius give
-\[
- \kappa=\frac{2\det(D_{01},D_{02})}
-              {\|D_{01}\|\,\|D_{02}\|\,\|D_{12}\|}.
-\]
-The straight limit gives zero. The locations determine curvature
-independently of the times at which the target passed through them.
-The observation times then constrain its speed. On a moving minor arc,
-a chord of length $l$ subtends the arc length
-$L_\kappa(l)=2\arcsin(|\kappa|l/2)/|\kappa|$, with $L_0(l)=l$.
-This follows by taking the modulus of $F_\kappa(s)$. If $l^-,l^+$
-are the ends of the feasible chord-length interval, put
-$\Delta=t_j-t_i$ and $\bar t=(t_j+t_i)/2$. The quadratic clock gives
-\begin{equation}\label{eq:clockstrip}
- L_\kappa(l^-)\le\Delta\bigl[V(a)+(\bar t-a)A\bigr]\le L_\kappa(l^+).
-\end{equation}
-The position disks give the chord bounds by the triangle inequality,
-intersected with $[0,2/|\kappa|]$ when $\kappa\ne0$.
-For fixed $\kappa$, each observation pair thus cuts a strip in the
-$(V(a),A)$ plane. Distinct pairs constrain the same two unknowns. For
-example, on a straight arc an exact displacement at elapsed time
-$\tau>0$ fixes $V(a)+\tau A/2$. Even when the allowable ranges of
-$V(a)$ and $A$ individually stay wide, their contribution to displacement
-at time $\tau$ is known exactly.
-
-\subsection{Retaining the measured correlations}
-
-In a local chart let $\lambda$ denote displacement from a fixed
-reference label. A scalar observation of the form
-$y=\bar y+a^\top\lambda+e$, $|e|\le r$, contributes the two inequalities
-$|y-\bar y-a^\top\lambda|\le r$. Here $r$ includes measurement error
-and a bound on the nonlinear residual over the chart. Write the retained
-joint enclosure as
-\begin{equation}\label{eq:polytope}
- P_t=\{\lambda\in B:H\lambda\le b\},
-\end{equation}
-with coordinate box $B$. The raw observations and the conditional clock
-strips enter in the same coordinates. Each row must hold for every
-compatible member in its chart. Appending such rows preserves the truth
-and narrows the same family on which future clearance is evaluated.
-
-\section{Clearance of Two Uncertain Rectangles}\label{sec:control}
-
-Let $B_0=[-L,L]\times[-W,W]$ and let $B_i=o_i+B_0$, $i=E,T$,
-where $o_i$ locates the geometric center in its body frame. In ego axes
-put $Q=R_E^\top R(\psi_T)$ and $c=\rho+Qo_T-o_E$. The two rectangles
-intersect exactly when $c\in Z(Q)=B_0\oplus QB_0$. This configuration
-obstacle is the sum of four line segments. For a compact set $S$ write
-$h_S(n)=\sup_{s\in S}n^\top s$. The signed clearance reduces to
-\begin{align}
- g(c,Q)&=\max_{\|n\|=1}\{n^\top c-h_0(n)-h_0(Q^\top n)\},
- \label{eq:distance}\\
- h_0(n)&=L|n_1|+W|n_2|.\nonumber
-\end{align}
-Outside $Z(Q)$ the closest point supplies an attaining normal. Inside,
-the least supporting-plane slack is the radius of the largest disk
-centered at $c$ inside $Z(Q)$, giving negative signed clearance.
-At contact $g=0$. In half-space coordinates $B_0=\{x:Dx\le k\}$,
-each support has the equivalent dual
-$h_0(n)=\min_{\ell\ge0,\ D^\top\ell=n}k^\top\ell$
-\cite{ZhangLinigerBorrelli2021}.
-
-For one common candidate input $u$, let $g_z(h;u)$ be
-\eqref{eq:distance} at time $t+h$ along member $z$. The observable
-robust gap is
-\begin{equation}\label{eq:gap}
- G_t(h;u)=\inf_{z\in\Theta_t}g_z(h;u).
-\end{equation}
-The infimum follows the choice of input and precedes the choice of
-normal for each member. Only the input must be realizable from the
-observations. If all variables except target translation are fixed and
-the possible center displacements form a compact convex set $C$
-disjoint from $Z(Q)$, a closest pair supports both sets. In this case
-one normal is exact for the whole family, and
-$G=\operatorname{dist}(C,Z(Q))=\max_{\|n\|=1}
-[-h_C(-n)-h_{Z(Q)}(n)]$.
-
-\subsection{A joint bound in the separating direction}\label{subsec:robust}
-
-Let $E_i,T_j$ denote the four corners of the respective bodies in
-common inertial axes. For fixed $u,h$, enclose their differences on
-$P_t$ by
-\[
- T_j-E_i=\bar D_{ij}+M_{ij}\lambda+e_{ij},\qquad
- \|e_{ij}\|\le r_{ij}.
-\]
-The columns of $M_{ij}$ describe variation with respect to the same
-physical label. A shared translation has a zero column in the
-difference. For any unit $n$, the least projected affine difference is
-$n^\top\bar D_{ij}-h_{P_t}(-M_{ij}^\top n)$. Taking all vertex pairs
-and then the best common normal gives
-\begin{equation}\label{eq:certificate}
- \sup_{\|n\|=1}\min_{i,j}
- \{n^\top\bar D_{ij}-h_{P_t}(-M_{ij}^\top n)-r_{ij}\}
- \ \le\ G_t(h;u).
-\end{equation}
-Indeed every projected pair exceeds its stated lower bound for every
-member. A common normal gives a sufficient certificate even when
-members would select different maximizers in \eqref{eq:distance}.
-
-For nonempty $P_t$ and any support direction $c'$, one has
-\begin{equation}\label{eq:dual}
- h_{P_t}(c')=\min_{\mu\ge0}\{b^\top\mu+h_B(c'-H^\top\mu)\}.
-\end{equation}
-To obtain this identity, dualize the observation rows and the upper
-and lower box faces. For fixed observation multipliers $\mu$, the box
-multipliers have difference $c'-H^\top\mu$ and their least contribution
-is the box support at that residual. Linear programming duality gives
-equality, including for a lower-dimensional nonempty polytope. Each
-nonnegative $\mu$ already gives an upper support bound with the correct
-sign for \eqref{eq:certificate}.
-
-The orbit provides an explicit choice of multipliers. At the current
-epoch let $Y$ be the measured position, $d_0$ a reference course vector,
-and write $p'=p_T-Y$, $v'=d-d_0$ in complex axes. For a past fix $Y_j$,
-let $H_j$ be its signed reference chord from the current epoch and
-$\eta_j$ a bound on its chord error. With $z_j=Y_j-Y-H_jd_0$ and
-$r_j=\epsilon_j+\eta_j$, the observation implies
-$\|p'+H_jv'-z_j\|_\infty\le r_j$ in real coordinates.
-For example, if the true arc parameters are $(s',\kappa')$, then
-\[
- |F_{\kappa'}(s')-F_\kappa(s)|
- \le |s'-s|+\tfrac12s^2|\kappa'-\kappa|,
-\]
-by the integral defining $F_\kappa$. A future corner with reference
-coefficient $G$ has affine error $p'+Gv'$. The change in $G$ under the
-uncertain clock and curvature bounds the remaining corner error since
-the true course vector has unit length.
-Whenever $H_j\ne0$, set $\omega=G/H_j$. The identity
-\[
- p'+Gv'=(1-\omega)p'+\omega(p'+H_jv')
-\]
-eliminates the course error from the residual. Let $C_\omega$ denote
-the real matrix of complex multiplication by $\omega$. For position
-box $B_p$ and any unit $n$, set $\nu=C_\omega^\top n$. Then
-\begin{equation}\label{eq:chorddual}
- n^\top(p'+Gv')\le h_{B_p}(C_{1-\omega}^\top n)
-                       +\nu^\top z_j+r_j\|\nu\|_1 .
-\end{equation}
-The positive and negative parts of $\nu$ are the multipliers for the two
-sides of the radar strips. Thus a position chord that helped identify
-the orbit also supplies a witness for its clearance.
-
-\section{A Predictive Barrier on the Information Set}
-
-\subsection{Terminal continuation in relative position}
-
-Fix one physically realizable continuation $u_f=(0,b_f)$ with
-$|b_f|<1$. At handoff, set $r_0=p_T-p$ and let $\zeta$ collect the
-orientations, velocities, persistent parameters and actuator state.
-By translation invariance, the reference-point displacements $w_E(h)$,
-$w_T(h)$ and the future rotations depend only on $\zeta$ under $u_f$.
-Define
-\begin{equation}\label{eq:forbidden}
 \begin{aligned}
- K_h(\zeta)&=w_E(h)-w_T(h)+R_E(h)B_E\oplus(-R_T(h)B_T),\\
- \mathcal F(\zeta)&=\bigcup_{h\ge0}\bigl(K_h(\zeta)\oplus
-                                      \mathbb B_{d_*}^{\circ}\bigr).
+ \nabla_r\vct\rho&=\vct w-\vct v,\qquad \nabla_r\vct w=\vct f,\\
+ \nabla_r\vct f&=-\Omega^2\vct w+3A\Omega\mtx J\vct d_B .
 \end{aligned}
 \end{equation}
-Here $d_*>0$ is the design clearance and $\mathbb B_{d_*}^{\circ}$ is
-the open disk about zero. At time $h$, ego and target occupy points
-closer than $d_*$ precisely when $r_0$ belongs to the corresponding
-open offset in \eqref{eq:forbidden}. Both footprints in each summand are
-evaluated at the same time. The terminal set $\mathcal K_f$ consists
-of the states with an admissible handoff and forward flow under $u_f$
-for which $r_0\notin\mathcal F(\zeta)$.
+Conversely, set $V=\|\vct w\|$, $A=\vct d_B^\top\vct f$, and
+$N=(\mtx J\vct d_B)^\top\vct f$. Substitution in \eqref{eq:nrmm}
+gives $\dot V=A$, $\dot A=0$ and $\dot N=2A\Omega$, with
+$\Omega=N/V$. Hence $\kappa=N/V^2$ is constant on $V>0$.
+Equations~\eqref{eq:orbit} and~\eqref{eq:nrmm} determine the same
+relative position and body orientation. For a fixed initial joint state,
+the future ego input enters $\vct\rho$ through \eqref{eq:ego} alone.
 
-For example, consider straight motion along one line. Let the ego
-travel ahead at trim speed $V_*$, and let the target approach from
-behind at initial speed $V_0$ with $A<0$. The gap closes only while the
-target is faster. Integrating its excess speed gives the minimum
-bumper gap $g_0-(V_0-V_*)_+^2/(2|A|)$ for initial gap $g_0$.
-If this quantity is at least $d_*$, the
-terminal condition holds even though the two spatial paths overlap.
+\section{Observer Design}\label{sec:estimator}
+\subsection{Set-Membership Observer}
+Let $z$ denote the joint state at epoch $a$, including the initial
+ego state, $\vct\vartheta$, the target coordinates $(b_T,d,V_a,A,\kappa)$
+and the sensor biases. If errors have temporal memory, include the
+corresponding latent state or compatible error history in $z$. Let
+$\Theta_a^-$ be a compact prior containing the true member. During an
+in-range encounter the measured outputs satisfy
+\begin{equation}\label{eq:outputs}
+\begin{aligned}
+ \vct y_p&=\vct p_E+\vct\eta_p+\vct n_p,&
+ y_r&=r+\eta_r+n_r,\\
+ \vct y_a&=\dot{\vct v}+r\mtx J\vct v+\vct\eta_a+\vct n_a,&
+ \vct y_\rho&=\vct\rho+\vct\eta_\rho+\vct n_\rho ,
+\end{aligned}
+\end{equation}
+where $\eta$ denotes persistent bias and $n$ belongs to the prescribed
+joint error family. The acceleration in \eqref{eq:outputs} is evaluated
+under the applied input.
 
-\begin{lemma}\label{lem:terminal}
-$\mathcal K_f$ is positively invariant under $u_f$. Every nonempty
-family contained in $\mathcal K_f$ admits the same safe continuation.
+\begin{definition}[Joint set-membership observer]\label{def:observer}
+Let $\mathcal Y_{[a,t]}(z)$ be the output histories admitted by
+\eqref{eq:ego}, \eqref{eq:target} and \eqref{eq:outputs} under the
+applied input. For the received history $y_{[a,t]}$, define the
+observer state and its target-position prediction by
+\begin{equation}\label{eq:observer}
+\begin{aligned}
+ \Theta_t&=\{z\in\Theta_a^-:y_{[a,t]}\in\mathcal Y_{[a,t]}(z)\},\\
+ \mathcal T_{q,t}(h)&=\{T_{q,z}(t+h):z\in\Theta_t\},\qquad h\ge0 ,
+\end{aligned}
+\end{equation}
+where $T_{q,z}$ is the material-point flow \eqref{eq:orbit}.
+\end{definition}
+At $h=0$, \eqref{eq:observer} gives the current estimate of each point.
+For $h>0$ the same labeled flow gives its forecast. Restricting any
+admissible history on $[a,t+\Delta]$ to $[a,t]$ gives the
+set-membership update \cite{BertsekasRhodes1971} and its consequence
+\begin{equation}\label{eq:conditioning}
+ \Theta_{t+\Delta}\subseteq\Theta_t,\qquad
+ \mathcal T_{q,t+\Delta}(h)\subseteq\mathcal T_{q,t}(h+\Delta).
+\end{equation}
+The joint label in \eqref{eq:observer} retains the ego trajectory used
+to interpret the relative-position measurement.
+
+\subsection{Geometric Measurement Constraints}
+\subsubsection{Translation and Curvature}
+Condition on one ego trajectory and radar bias. In inertial coordinates
+write $\vct Y_j=\vct p_E(t_j)+\mtx R_E(t_j)(\vct y_\rho(t_j)-\vct\eta_\rho)$.
+Let $\epsilon_j$ bound the radar error norm and set
+$F_j=F_\kappa(s(t_j-a))$. Evaluating \eqref{eq:orbit} at $q=0$ gives
+\begin{equation}\label{eq:disks}
+ b_T\in\bigcap_j\mathbb B(Y_j-dF_j,\epsilon_j),
+\end{equation}
+where $\mathbb B$ is a closed disk. For two exact positions with
+$F_1\ne F_0$, subtracting the two measurement equations gives
+$d=(Y_1-Y_0)/(F_1-F_0)$. Eliminating $b_T$ in \eqref{eq:orbit} then gives
+\begin{equation}\label{eq:chord}
+ T_q(a+\tau)=Y_0+(Y_1-Y_0)\frac{G_q(s(\tau))-F_0}{F_1-F_0}.
+\end{equation}
+The same $d$ must have unit modulus and satisfy all remaining measurements.
+For three distinct exact positions in forward order over less than one
+revolution, set $\vct D_{ij}=\vct Y_j-\vct Y_i$. The signed triangle
+area and circumradius give
+\begin{equation*}
+ \kappa=\frac{2\det(\vct D_{01},\vct D_{02})}
+              {\|\vct D_{01}\|\,\|\vct D_{02}\|\,\|\vct D_{12}\|}.
+\end{equation*}
+Distinct collinear positions give $\kappa=0$.
+
+\subsubsection{Speed and Acceleration}
+For a forward arc of length $\Delta s$ and total turn at most $\pi$ in
+magnitude, the chord modulus in \eqref{eq:clock} gives
+$L_\kappa(l)=2\arcsin(|\kappa|l/2)/|\kappa|$, where $l$ is chord
+length, $\Delta s=L_\kappa(l)$ and $L_0(l)=l$. Let $[l^-,l^+]$
+be the measured chord interval obtained from \eqref{eq:disks} with
+error radius $\epsilon_i+\epsilon_j$, intersected with the physical
+range $[0,2/|\kappa|]$ for $\kappa\ne0$ or $[0,\infty)$ otherwise.
+For a nonempty interval on a moving arc, substitution of
+$\Delta s=s(t_j-a)-s(t_i-a)$ gives
+\begin{equation}\label{eq:clockstrip}
+ L_\kappa(l^-)\le\Delta[V_a+(\bar t-a)A]\le L_\kappa(l^+),
+\end{equation}
+where $\Delta=t_j-t_i>0$ and $\bar t=(t_j+t_i)/2$.
+For fixed $\kappa$, \eqref{eq:clockstrip} is a linear strip in $(V_a,A)$.
+On a straight arc an exact displacement at elapsed time $\tau>0$ fixes
+$V_a+\tau A/2$ even when both coordinate intervals have positive width.
+
+\subsubsection{Joint Polytope}
+Let $\vct\lambda\in B$ be the displacement from a fixed reference in
+a joint parameter chart, with $B$ a bounded box. For a scalar output
+$y=\bar y+\vct a^\top\vct\lambda+e$, let $r_y$ bound the sum of
+measurement and expansion errors on the chart. The resulting strip is
+\begin{equation*}
+ y-\bar y-r_y\le \vct a^\top\vct\lambda\le y-\bar y+r_y .
+\end{equation*}
+Collecting such rows, including valid clock strips in the same
+coordinates, gives the outer enclosure
+\begin{equation}\label{eq:polytope}
+ P_t=\{\vct\lambda\in B:\mtx H\vct\lambda\le\vct b\}.
+\end{equation}
+Each row holds for every compatible member of its chart. Appending
+observation rows thus preserves containment of the true member and
+restricts the same joint variables used in prediction.
+
+\section{Controller Design}\label{sec:control}
+\subsection{Rectangle Separation}
+Let $B_0=[-L,L]\times[-W,W]$ and $B_i=\vct o_i+B_0$, $i\in\{E,T\}$,
+where $\vct o_i$ is the offset of the geometric center in body axes.
+Let $\mtx R_T=\mtx R(\psi_T)$, $\mtx Q=\mtx R_E^\top\mtx R_T$ and
+$\vct c=\vct\rho+\mtx Q\vct o_T-\vct o_E$. The rectangles intersect
+if and only if $\vct c\in Z(\mtx Q)=B_0\oplus\mtx Q B_0$. For a
+compact set $S$, denote its support by
+$h_S(\vct n)=\sup_{\vct x\in S}\vct n^\top\vct x$. Since $Z(\mtx Q)$
+is a sum of four segments, its support gives the signed clearance
+\begin{equation}\label{eq:distance}
+\begin{aligned}
+ g(\vct c,\mtx Q)
+ &=\max_{\|\vct n\|=1}
+   \{\vct n^\top\vct c-h_0(\vct n)-h_0(\mtx Q^\top\vct n)\},\\
+ h_0(\vct n)&=L|n_1|+W|n_2| .
+\end{aligned}
+\end{equation}
+For $\vct c$ outside $Z$, the normal from its projection onto $Z$ to
+$\vct c$ attains the distance. In the interior, the least supporting-plane
+slack is the radius of the largest disk about $\vct c$ contained in $Z$,
+so $g$ is negative. At contact $g=0$. For $B_0=\{\vct x:\mtx D\vct x
+\le\vct k\}$ each support in \eqref{eq:distance} has the equivalent
+dual form \cite{ZhangLinigerBorrelli2021}
+\begin{equation*}
+ h_0(\vct n)=\min_{\vct\ell\ge0,\ \mtx D^\top\vct\ell=\vct n}
+                  \vct k^\top\vct\ell .
+\end{equation*}
+
+For a common input $\vct u$ on $[t,t+T]$, denote the clearance of
+member $z$ at $t+h$ by $g_z(h;\vct u)$. We define the robust clearance
+by
+\begin{equation}\label{eq:gap}
+ G_t(h;\vct u)=\inf_{z\in\Theta_t}g_z(h;\vct u).
+\end{equation}
+Each member in \eqref{eq:gap} admits its own normal in \eqref{eq:distance}.
+For fixed orientation and a compact convex family $C$ of possible
+center displacements disjoint from $Z$, a closest pair of $C$ and $Z$
+has a common supporting normal. In this case \eqref{eq:gap} reduces to
+\begin{equation*}
+ \operatorname{dist}(C,Z)=
+ \max_{\|\vct n\|=1}\{-h_C(-\vct n)-h_Z(\vct n)\}.
+\end{equation*}
+
+\subsection{Directional Clearance Bound}\label{subsec:robust}
+Let $\vct E_i$ and $\vct T_j$ be the ego and target corners at a common
+prediction time under $\vct u$. On the chart \eqref{eq:polytope},
+write the relative corner displacement as
+\begin{equation}\label{eq:cornererror}
+ \vct T_j-\vct E_i=\bar{\vct D}_{ij}
+       +\mtx M_{ij}\vct\lambda+\vct e_{ij},\qquad
+       \|\vct e_{ij}\|\le r_{ij}.
+\end{equation}
+The two corner variations use the same columns of $\vct\lambda$.
+In particular, a common translation cancels in $\mtx M_{ij}$.
+
+\begin{lemma}[Directional clearance]\label{lem:directional}
+Suppose $P_t$ is nonempty and \eqref{eq:cornererror} encloses all
+compatible members. The robust clearance \eqref{eq:gap} satisfies
+\begin{equation}\label{eq:certificate}
+\begin{aligned}
+ G_t(h;\vct u)&\ge\max_{\|\vct n\|=1}\min_{i,j} L_{ij}(\vct n),\\
+ L_{ij}(\vct n)&=\vct n^\top\bar{\vct D}_{ij}
+              -h_{P_t}(-\mtx M_{ij}^\top\vct n)-r_{ij}.
+\end{aligned}
+\end{equation}
+For each support direction $\vct c'$,
+\begin{equation}\label{eq:dual}
+ h_{P_t}(\vct c')=
+ \min_{\vct\mu\ge0}\{\vct b^\top\vct\mu+
+                         h_B(\vct c'-\mtx H^\top\vct\mu)\}.
+\end{equation}
 \end{lemma}
 \begin{proof}
-At elapsed time $s$ the remaining motion is the suffix of the same forward
-flow. Its relative displacement is $r_s=r_0+w_T(s)-w_E(s)$, and
-$K_{s+h}(\zeta)=w_E(s)-w_T(s)+K_h(\zeta_s)$. Hence exclusion from every
-open offset at the initial time implies exclusion at time $s$ for every
-$h\ge0$. Forward admissibility passes to the suffix. The command $u_f$
-is common to all members.
+Taking the projection of \eqref{eq:cornererror} on $\vct n$ gives
+$\vct n^\top(\vct T_j-\vct E_i)\ge L_{ij}(\vct n)$. Taking the
+minimum over corner pairs bounds the separation along that normal for
+every member. Maximizing the bound and applying \eqref{eq:gap} yields
+\eqref{eq:certificate}. For \eqref{eq:dual}, dualize the observation
+and box rows in \eqref{eq:polytope}. For fixed observation multiplier
+$\vct\mu\ge0$, the upper and lower box multipliers have difference
+$\vct c'-\mtx H^\top\vct\mu$. Their least contribution is $h_B$ at
+that difference. Strong linear programming duality gives equality for
+every nonempty bounded $P_t$, including a lower-dimensional one.
 \end{proof}
 
-A turning target provides a second consequence of \eqref{eq:forbidden}.
-For $\kappa\ne0$, \eqref{eq:orbit} places its reference point on a circle
-with center $C=b_T+i d/\kappa$ and radius $1/|\kappa|$. In any unit
-direction $n$ every future target corner has projection at most
-$H=n^\top C+1/|\kappa|+\max_{q\in B_T}\|q\|$, also after absorption.
-Suppose the terminal ego flow satisfies
-$\min_i n^\top E_i(h)\ge m+\alpha h-B$ with $\alpha>0$ and $B\ge0$.
-A straight forward trim along $n$ has this property with $B=0$.
-For $h\ge(H+d_*-m+B)_+/\alpha$ the projected gap alone guarantees
-$d_*$. Under these hypotheses, terminal membership reduces to forward
-admissibility and the same-time clearance on the finite interval up to
-that cutoff.
+\subsubsection{Multipliers from a Radar Chord}
+At the prediction epoch let $Y$ be the observed target position and
+$d_0$ a reference course vector in complex coordinates. Set $p'=p_T-Y$
+and $v'=e^{\mathrm i\gamma}-d_0$. For a past observation $Y_j$, let
+$H_j$ be its signed reference chord from the current epoch and $\eta_j$
+a bound on the chord error. For true arc parameters $(s',\kappa')$ and
+reference parameters $(s,\kappa)$, \eqref{eq:clock} gives
+\begin{equation*}
+ |F_{\kappa'}(s')-F_\kappa(s)|
+ \le |s'-s|+\tfrac12 s^2|\kappa'-\kappa|.
+\end{equation*}
+With $z_j=Y_j-Y-H_jd_0$ and $r_j=\epsilon_j+\eta_j$, the unit modulus
+of the true course and \eqref{eq:disks} give the four real strip rows
+$\|p'+H_jv'-z_j\|_\infty\le r_j$. For a future corner with reference
+coefficient $G$ in \eqref{eq:orbit}, its affine error is $p'+Gv'$.
+The remainder norm is bounded by the variation in $G$ over the chart.
 
-\subsection{Safety deficit and nominal cruise}
+For $H_j\ne0$, set $\omega=G/H_j$ and let $\mtx C_\omega$ be the real
+$2\times2$ matrix representing multiplication by $\omega$. Substituting
+$p'+Gv'=(1-\omega)p'+\omega(p'+H_jv')$ and taking the support
+of the strip rows gives, in real coordinates,
+\begin{equation}\label{eq:chorddual}
+\begin{aligned}
+ \vct n^\top(p'+Gv')&\le h_{B_p}(\mtx C_{1-\omega}^\top\vct n)
+                    +\vct\nu^\top z_j+r_j\|\vct\nu\|_1,\\
+ \vct\nu&=\mtx C_\omega^\top\vct n ,
+\end{aligned}
+\end{equation}
+where $p'\in B_p$. The positive and negative parts of $\vct\nu$ are
+nonnegative multipliers in \eqref{eq:dual}. For a fixed ego trajectory,
+evaluating \eqref{eq:chorddual} at $-\vct n$ bounds the target
+contribution subtracted in \eqref{eq:certificate}. When the ego pose
+varies on the chart, \eqref{eq:cornererror} includes its variation
+in the same $\vct\lambda$.
 
-Fix a horizon $T>0$. Let $\mathcal U_t(T)$ consist of admissible common
-inputs giving $G_t(h;u)>0$ for all $h\in[0,T]$ and placing every
-terminal member in $\mathcal K_f$. In the predictive-barrier construction
-\cite{HuangWangMargellosGoulart2025}, a nonnegative slack spends design
-clearance. For a given input its least value at time $h$ is
-$c_t(h;u)=(d_*-G_t(h;u))_+$. The barrier value is therefore
+\subsection{Terminal Set}
+Choose the constant terminal input $\vct u_f=[0,b_f]^\top$ with
+$|b_f|<1$. At handoff let $\vct r_0=\vct p_T-\vct p_E$ and let
+$\zeta$ collect the remaining physical state, parameters and actuator
+state, omitting the common translation. Under $\vct u_f$ denote the
+inertial reference-point displacements by $\vct w_E(h),\vct w_T(h)$.
+These displacements and the rotations $\mtx R_E(h),\mtx R_T(h)$ depend
+only on $\zeta$. For a prescribed design clearance $d_*>0$, define
+\begin{equation}\label{eq:forbidden}
+\begin{aligned}
+ Z_h&=\mtx R_E(h)B_E\oplus[-\mtx R_T(h)B_T],\\
+ K_h(\zeta)&=\vct w_E(h)-\vct w_T(h)+Z_h,\\
+ \mathcal F(\zeta)&=\bigcup_{h\ge0}
+                  \bigl(K_h(\zeta)\oplus\mathbb B^\circ_{d_*}\bigr),
+\end{aligned}
+\end{equation}
+where $\mathbb B^\circ_{d_*}$ is the open disk of radius $d_*$ about
+zero. Both terms in $Z_h$ use the same elapsed time.
+
+\begin{definition}[Terminal set]\label{def:terminal}
+Let $\mathcal A_f$ be the states admitting the handoff to $\vct u_f$ and
+an admissible forward flow under $\vct u_f$. We define
+\begin{equation}\label{eq:terminalset}
+ \mathcal K_f=\{(\vct r_0,\zeta)\in\mathcal A_f:
+                         \vct r_0\notin\mathcal F(\zeta)\}.
+\end{equation}
+A terminal information set is admissible if it is nonempty and
+contained in $\mathcal K_f$.
+\end{definition}
+
+\begin{lemma}[Terminal invariance]\label{lem:terminal}
+Every state in $\mathcal K_f$ has clearance at least $d_*$ for all
+future times under $\vct u_f$, and $\mathcal K_f$ is positively
+invariant under that input.
+\end{lemma}
+\begin{proof}
+At time $h$ the set of differences between ego and target material
+points is $K_h(\zeta)-\vct r_0$. By \eqref{eq:forbidden}, exclusion
+from $\mathcal F(\zeta)$ is equivalent to
+$\operatorname{dist}(\vct r_0,K_h(\zeta))\ge d_*$ for every $h\ge0$.
+After elapsed time $s$ the relative position and displacement sets satisfy
+\begin{equation*}
+\begin{aligned}
+ \vct r_s&=\vct r_0+\vct w_T(s)-\vct w_E(s),\\
+ K_{s+h}(\zeta)&=\vct w_E(s)-\vct w_T(s)+K_h(\zeta_s).
+\end{aligned}
+\end{equation*}
+Thus $\operatorname{dist}(\vct r_s,K_h(\zeta_s))
+=\operatorname{dist}(\vct r_0,K_{s+h}(\zeta))\ge d_*$.
+Forward admissibility passes to the remaining flow, proving
+$(\vct r_s,\zeta_s)\in\mathcal K_f$.
+\end{proof}
+
+For collinear straight motion, let the ego travel ahead at trim speed
+$V_*>0$ and let the target have initial speed $V_0$ and $A<0$. For
+initial bumper gap $g_0$, integrating the positive closing speed gives
+\begin{equation*}
+ g_{\min}=g_0-\int_0^\infty(V_0+Ah-V_*)_+\,dh
+         =g_0-\frac{(V_0-V_*)_+^2}{2|A|}.
+\end{equation*}
+Hence $g_{\min}\ge d_*$ certifies \eqref{eq:terminalset} for these
+admissible motions, including when their spatial paths overlap.
+
+For $\kappa\ne0$, \eqref{eq:orbit} bounds the future target footprint
+by the disk of center $C=b_T+\mathrm i d/\kappa$ and radius
+$R_{\rm orb}=1/|\kappa|+\max_{q\in B_T}|q|$. Fix a unit direction
+$\vct n$ and put $H_n=\vct n^\top C+R_{\rm orb}$, using real
+coordinates for the projection. Suppose each ego corner under $\vct u_f$
+satisfies $\vct n^\top\vct E_i(h)\ge m_0+\alpha h-B_f$ for all
+$h\ge0$, with $\alpha>0$, $B_f\ge0$. Straight trim along $\vct n$
+satisfies this inequality with $\alpha=V_*$ and $B_f=0$. Setting
+$H_*=(H_n+d_*-m_0+B_f)_+/\alpha$ gives
+\begin{equation}\label{eq:cutoff}
+ \min_{i,j}\vct n^\top(\vct E_i(h)-\vct T_j(h))\ge d_*,
+ \qquad h\ge H_* .
+\end{equation}
+Under these hypotheses, \eqref{eq:terminalset} therefore requires
+clearance verification only on $[0,H_*]$ in addition to forward
+admissibility.
+
+\subsection{Predictive Barrier Synthesis}
+\subsubsection{Nominal Cruise Control}
+Let $s_\Gamma$ be the arc coordinate on the prescribed path, $\theta$
+the tangent angle, $k_\Gamma$ the path curvature, and $e_y$ the lateral
+error. For course $\chi=\psi_E+\operatorname{atan2}(v_y,v_x)$ the
+transverse kinematics on a regular path chart are
+\begin{equation*}
+ \dot s_\Gamma=\frac{\|\vct v\|\cos(\chi-\theta)}
+                       {1-k_\Gamma e_y},\qquad
+ \dot e_y=\|\vct v\|\sin(\chi-\theta).
+\end{equation*}
+At a realizable constant-curvature trim, $\|\vct v^\star\|=V_{\rm ref}>0$,
+$r^\star=k_\Gamma V_{\rm ref}$ and
+$\psi^\star_{\rm rel}=-\operatorname{atan2}(v_y^\star,v_x^\star)$.
+Let $\vct e_c$ collect $e_y$, $\psi_E-\theta-\psi^\star_{\rm rel}$,
+$\vct v-\vct v^\star$ and $r-r^\star$ in a local heading chart, and let
+$(\mtx A_c,\mtx B_c)$ be the linearized transverse dynamics.
+For an admissible local gain $\mtx K$ choose $\mtx P\succ0$ and
+$\alpha_c>0$ satisfying
+\begin{equation*}
+ (\mtx A_c+\mtx B_c\mtx K)^\top\mtx P+
+ \mtx P(\mtx A_c+\mtx B_c\mtx K)\preceq-2\alpha_c\mtx P .
+\end{equation*}
+Differentiating $V_c=\vct e_c^\top\mtx P\vct e_c$ under
+$\vct u^\star+\mtx K\vct e_c$ gives
+$\dot V_c\le-2\alpha_c V_c+o(\|\vct e_c\|^2)$. For varying curvature
+the corresponding inequality along a realizable reference includes
+$\dot{\mtx P}$ when the metric is time varying. Denote the nominal
+command forecast from the available ego information by $\bar{\vct u}_t$.
+
+\subsubsection{Safety and Cruise Objectives}
+For horizon $T>0$, let $\mathcal U_t(T)$ consist of common inputs
+admissible for every member of $\Theta_t$, satisfying
+$G_t(h;\vct u)>0$ throughout $[0,T]$ and placing every terminal state
+in $\mathcal K_f$. Following the predictive barrier formulation
+\cite{HuangWangMargellosGoulart2025}, we define the primary value by
 \begin{equation}\label{eq:barrier}
- \mathcal V_t(T)=\inf_{u\in\mathcal U_t(T)}D_t(u),\qquad
- D_t(u)=\int_0^T c_t(h;u)\,dh .
+\begin{aligned}
+ \mathcal V_t(T)=
+ \inf_{\vct u\in\mathcal U_t(T),\,\xi}\quad
+       &\int_0^T\xi(h)\,dh\\
+ \text{subject to}\quad
+       &G_t(h;\vct u)+\xi(h)\ge d_*,\\
+       &\xi(h)\ge0,\qquad 0\le h\le T .
+\end{aligned}
 \end{equation}
-The empty feasible family has value $+\infty$. For a certified lower
-gap $\ell_t\le G_t$, imposing $\ell_t>0$ and using
-$(d_*-\ell_t)_+$ gives the corresponding sufficient formulation.
-An early arrival in $\mathcal K_f$ extends under $u_f$ at zero further
-deficit, so the entire maneuver fits one prediction interval.
+For a fixed admissible input the least slack and its integral are
+\begin{equation}\label{eq:deficit}
+ c_t(h;\vct u)=(d_*-G_t(h;\vct u))_+,\quad
+ D_t(\vct u)=\int_0^T c_t(h;\vct u)\,dh .
+\end{equation}
+Thus $\mathcal V_t(T)=\inf_{\vct u\in\mathcal U_t(T)}D_t(\vct u)$,
+with value $+\infty$ for an empty feasible family. For a certified
+lower bound $\ell_t\le G_t$ from \eqref{eq:certificate}, requiring
+$\ell_t>0$ and using $(d_*-\ell_t)_+$ gives a sufficient clearance
+condition and an upper bound on the deficit. By Lemma~\ref{lem:terminal},
+a common input reaching $\mathcal K_f$ early can be extended to $T$ at
+zero additional deficit.
 
-The prescribed path enters through the nominal command $\bar u_t$.
-For a path of curvature $k_\Gamma$ and tangent angle $\theta$, write
-$e_y$ for lateral error and $\chi=\psi+\operatorname{atan2}(v_y,v_x)$
-for course. In a regular arc-length chart,
-$\dot e_y=\|v\|\sin(\chi-\theta)$ and
-$\dot s_\Gamma=\|v\|\cos(\chi-\theta)/(1-k_\Gamma e_y)$.
-At a realizable constant-curvature trim of speed $V_{\rm ref}$ and yaw
-rate $k_\Gamma V_{\rm ref}$, let $e$ collect the errors in lateral position,
-relative body heading, body velocity and yaw rate. For a stabilizable
-transverse linearization $(A_c,B_c)$ choose a feasible local gain $K$
-and $P\succ0$ with
-$(A_c+B_cK)^\top P+P(A_c+B_cK)\preceq-2\alpha P$, $\alpha>0$.
-Then $V_c=e^\top P e$ satisfies
-$\dot V_c\le-2\alpha V_c+o(\|e\|^2)$ locally. A varying-curvature path
-requires the corresponding inequality along its realizable reference
-motion. The nominal forecast must be causal in the available ego
-information. Among inputs attaining the minimum in \eqref{eq:barrier},
-minimize $\int_0^T (u-\bar u_t)^\top W(u-\bar u_t)\,dh$, $W\succ0$.
-Whenever nominal cruise attains the minimum deficit, its deviation cost
-is zero.
+When the primary minimum is attained, we choose the control by
+\begin{equation}\label{eq:secondary}
+\begin{aligned}
+ \min_{\vct u\in\mathcal U_t(T)}\quad&
+ \int_0^T (\vct u-\bar{\vct u}_t)^\top\mtx W
+                     (\vct u-\bar{\vct u}_t)\,dh\\
+ \text{subject to}\quad&D_t(\vct u)=\mathcal V_t(T),
+\end{aligned}
+\end{equation}
+where $\mtx W\succ0$. If $\bar{\vct u}_t$ attains the primary minimum,
+its cost in \eqref{eq:secondary} is zero. We apply the selected input
+until the next control decision.
 
-\subsection{Recursive feasibility}
-
-\begin{theorem}\label{thm:shift}
-Suppose the initial information contains the truth and admits a
-feasible plan. Assume the encounter model and measurement bounds hold,
-the admissible input class is closed under restriction and terminal
-concatenation, and each new posterior satisfies \eqref{eq:conditioning}.
-Execute a prefix of length $0<\Delta\le T$ of a feasible plan $u$.
-For every new horizon $T'\ge T-\Delta$ of positive length there exists
-a feasible continuation $u'$ satisfying
+\subsection{Recursive Feasibility}
+\begin{theorem}[Feasibility and deficit decrease]\label{thm:shift}
+Suppose the prior contains the true member, the encounter and measurement
+models hold, and a feasible input exists at admission. Let the observer
+satisfy \eqref{eq:observer} and the admissible input class be closed
+under restriction and terminal concatenation. If a prefix of length
+$0<\Delta\le T$ of $\vct u\in\mathcal U_t(T)$ is executed, then for
+every $T'>0$ with $T'\ge T-\Delta$ there exists
+$\vct u'\in\mathcal U_{t+\Delta}(T')$ such that
 \begin{equation}\label{eq:descent}
- D_{t+\Delta}(u')\le D_t(u)-\int_0^\Delta c_t(h;u)\,dh .
+ D_{t+\Delta}(\vct u')\le D_t(\vct u)
+                  -\int_0^\Delta c_t(h;\vct u)\,dh .
 \end{equation}
-Executing feasible replacements that respect this remaining budget
-preserves physical separation throughout a continuing encounter. A plan
-with zero initial deficit preserves the design clearance $d_*$.
+Feasible replacements satisfying \eqref{eq:descent} preserve strict
+separation on successive executed prefixes covering the encounter. If
+the initial plan has zero deficit, their physical clearance is at least
+$d_*$.
 \end{theorem}
 \begin{proof}
-On $[0,T-\Delta]$, take $u'(h)=u(h+\Delta)$. Each label in
-$\Theta_{t+\Delta}$ belonged to $\Theta_t$ and experienced the executed
-prefix. Uniqueness reproduces its former two footprints at the same
-physical time. Taking the infimum over the surviving labels gives
-\[
- G_{t+\Delta}(h;u')\ge G_t(h+\Delta;u).
-\]
-Thus the remaining deficit cannot increase. All surviving terminal
-members inherit the former handoff. Append $u_f$ up to $T'$ and apply
-Lemma~\ref{lem:terminal}. The appended interval has zero deficit.
-Integration gives \eqref{eq:descent}. For an attained old minimum the
-same bound holds for the new optimal value. Induction preserves
-feasibility and strict separation on successive prefixes whose decision
-times cover the encounter. If the budget is zero, any strict shortfall
-below $d_*$ along the true continuous footprint motion would persist
-on a time interval of positive length. Its integral would contradict
-the zero budget.
+Set $S=T-\Delta$. Define $\vct u'(h)=\vct u(h+\Delta)$ on $0\le h<S$
+and $\vct u'(h)=\vct u_f$ on $S\le h\le T'$. By
+\eqref{eq:conditioning}, each member of $\Theta_{t+\Delta}$ belonged
+to $\Theta_t$ and experienced the same applied prefix. Uniqueness of
+the flows gives identical footprints at matching physical times on the
+remaining plan. Taking the infimum in \eqref{eq:gap} over the smaller
+set yields
+\begin{equation*}
+ G_{t+\Delta}(h;\vct u')\ge G_t(h+\Delta;\vct u),
+ \qquad 0\le h\le S .
+\end{equation*}
+At $h=S$ every surviving member satisfies the original terminal
+handoff. Lemma~\ref{lem:terminal} gives clearance at least $d_*$ and
+preserves membership in $\mathcal K_f$ on $[S,T']$. Hence $\vct u'$ is
+feasible. Substitution into \eqref{eq:deficit} gives
+\begin{equation*}
+ D_{t+\Delta}(\vct u')\le\int_0^S c_t(h+\Delta;\vct u)\,dh
+                         =\int_\Delta^T c_t(h;\vct u)\,dh ,
+\end{equation*}
+which proves \eqref{eq:descent}. For an attained old optimum the same
+inequality holds for the new optimal value. Induction gives strict
+separation along the true member. With zero initial budget the deficit
+remains zero. A strict shortfall below $d_*$ on the true continuous
+footprint motion would give a positive integral in \eqref{eq:deficit}.
 \end{proof}
 
-The same proof applies to \eqref{eq:certificate} on a retained chart.
-At a common physical time keep its former normal, corner differences
-and residual bounds. A newly appended strip extends every old
-multiplier by zero in \eqref{eq:dual}, while a nested box can only decrease
-the remaining box support. The old lower gap and its remaining deficit
-budget are therefore still certified. A change of chart requires
-establishing this bound on the new enclosure. The theorem concerns
-encounters admitting a common safe input at entry. Once every compatible
-position has left sensing range, nominal driving resumes. A subsequent
-encounter requires feasible entry for its own information set.
+For the finite enclosure \eqref{eq:polytope}, retain the chart, normal
+and corner enclosures of the former plan at matching physical times.
+Appending observation rows extends the old multiplier in \eqref{eq:dual}
+by zeros. Its two terms $\mtx H^\top\vct\mu$ and $\vct b^\top\vct\mu$
+are preserved, and box support can only decrease under nested
+tightening. The former lower gap therefore remains valid on the suffix,
+yielding \eqref{eq:descent} for the certified deficit. A replacement
+chart must re-establish the remaining budget and terminal membership.
+Nominal control resumes once all compatible positions have left sensing
+range. Admission to a subsequent encounter requires feasibility for the
+new information set.
 
 \section{Results}\label{sec:results}
 
