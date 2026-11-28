@@ -139,6 +139,15 @@ function [track,motion]=localTargetSample(track,time,position,egoHeading,cfg,rel
     if time-track.lastReturn>settings.sensor.radar.maximumTrackCoastDuration
         track.initialized=false;track.restCompatible=false;track.times=zeros(1,0);track.positions=zeros(2,0);track.positionRadii=zeros(1,0);
     end
+    if ~isfield(track,'arcAnchors') || isempty(track.times)
+        track.arcAnchors=nan(4,3);
+    end
+    if ~isfield(track,'arcClock') || isempty(track.times),track.arcClock=nan(3,1);end
+    triple=zeros(4,0);
+    if ~isempty(position)
+        sample=[time;position(:);positionErrorRadius];
+        [track.arcAnchors,triple]=localArcAnchors(track.arcAnchors,sample,design.domain.yawRateMaximum);
+    end
     if ~isfield(track,'errorBound')
         track.errorBound=[];
     elseif ~track.initialized
@@ -355,6 +364,9 @@ function [track,motion]=localTargetSample(track,time,position,egoHeading,cfg,rel
         bounds(1,:)=max(bounds(1,:),[a(1),beta(1)]);
         bounds(2,:)=min(bounds(2,:),[a(2),beta(2)]);
     end
+    if ~isempty(triple)
+        [bounds,track.arcClock]=nrmmControllerErrorBounds("circleParameters",triple,domain,bounds,track.arcClock);
+    end
     if ~isempty(track.motionBounds)
         bounds(1,:)=max(bounds(1,:),track.motionBounds(1,:));
         bounds(2,:)=min(bounds(2,:),track.motionBounds(2,:));
@@ -382,6 +394,27 @@ function [track,motion]=localTargetSample(track,time,position,egoHeading,cfg,rel
         end
     end
     if ~track.restCompatible,track.restBounds=[];end
+end
+
+function [anchors,triple]=localArcAnchors(anchors,sample,yawRate)
+    % Keep the first position and two successively longer baselines. The
+    % middle return stays separated from both endpoints without a history fit.
+    triple=zeros(4,0);t=sample(1);
+    if any(~isfinite(anchors(1,:)))
+        anchors=repmat(sample,1,3);return
+    end
+    if yawRate*(t-anchors(1,1))>=pi
+        anchors=[anchors(:,2:3),sample];
+    end
+    if anchors(1,1)==anchors(1,2)
+        anchors(:,2:3)=[sample,sample];return
+    end
+    if t>anchors(1,2) && yawRate*(t-anchors(1,1))<pi
+        triple=[anchors(:,1:2),sample];
+    end
+    if t-anchors(1,1)>=2*(anchors(1,3)-anchors(1,1))
+        anchors(:,2:3)=[anchors(:,3),sample];
+    end
 end
 
 function [anchor,interval]=localChordAcceleration(track,domain,interval,capacity)

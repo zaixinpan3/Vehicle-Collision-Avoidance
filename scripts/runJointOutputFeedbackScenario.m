@@ -153,9 +153,9 @@ function campaign = runJointOutputFeedbackScenario(options)
                 if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 time=time+cfg.controller.sampleTime;
                 % Positive clearance below the planning margin is diagnostic.
-                if nodeClearance<=0
+                if clearance<=0
                     failurePhase="replaySafety";
-                    failure="The vehicle footprints touched or overlapped at a control-boundary node.";break;
+                    failure="The independent plant replay detected footprint contact during the hold.";break;
                 end
                 block=nextBlock;
             end
@@ -168,7 +168,7 @@ function campaign = runJointOutputFeedbackScenario(options)
                 'outcome',outcome,'requestedFrames',options.Frames,'executedFrames',numel(trace), ...
                 'simulatedSeconds',time,'failure',failure,'failurePhase',failurePhase, ...
                 'minimumReplayClearanceMeters',minimumClearance,'configuration',cfg, ...
-                'collisionCheckScope',"controlBoundaryNodes", ...
+                'collisionCheckScope',"independentPlantReplay", ...
                 'minimumNodeClearanceMeters',minimumNodeClearance, ...
                 'nodeClearanceSatisfied',~isempty(trace)&&minimumNodeClearance>0&&minimumNodeClearance>=cfg.outputFeedback.clearanceMeters-cfg.outputFeedback.nlpTolerance, ...
                 'nodeCollisionDetected',minimumNodeClearance<=0, ...
@@ -402,16 +402,13 @@ function [truth,samples,clearance,nodeClearance]=localReplay(truth,input,cfg,tim
         y=localSensor(truth,input,cfg,time+j*dt,stream,dropout);
         if isempty(samples),samples=y;else,samples(end+1)=y;end %#ok<AGROW>
     end
-    % Dense clearance remains an independent diagnostic. Only the actual
-    % control-boundary nodes determine the node-safety campaign outcome.
-    clearance=Inf;nodeClearance=Inf;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    for t=linspace(0,h,41)
-        x=deval(ode,t);q=start.target;
-        if q(4)>0,q=predictiveSafetyGeometry.predictTarget(q,t);end
-        gap=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3),q(8:11));
-        clearance=min(clearance,gap);
-        if t==0 || t==h,nodeClearance=min(nodeClearance,gap);end
-    end
+    % Integrate the physical plant independently and use the general signed
+    % rectangle dual, including for the congruent nominal vehicle bodies.
+    times=linspace(0,h,41);states=deval(ode,times);
+    q=predictiveSafetyGeometry.predictTarget(start.target,times);
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+    gaps=predictiveSafetyGeometry.rectangleClearance(states,q,shape);
+    clearance=min(gaps);nodeClearance=min(gaps([1,end]));
 end
 
 function localWriteJson(path,value)

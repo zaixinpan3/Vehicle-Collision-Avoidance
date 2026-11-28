@@ -21,6 +21,54 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function threePositionDisksContainThePersistentArcParameters(testCase)
+            domain=struct('rearAxleDistance',1.6,'scalarAccelerationMaximum',4,'yawRateMaximum',1);
+            t=[0,.37,.91];acc=-.7;v0=8;beta=-.07;curvature=sin(beta)/domain.rearAxleDistance;
+            arc=v0*t+acc*t.^2/2;
+            truth=[sin(curvature*arc);2*sin(curvature*arc/2).^2]/curvature;
+            prior=[-4,-.3;4,.3];radius=[.002,.003,.004];
+            directions=[cos([.8,-1.6,.3]);sin([.8,-1.6,.3])];
+            exact=nrmmControllerErrorBounds("circleParameters",[t;truth;zeros(1,3)],domain,prior);
+            testCase.verifyEqual(exact,repmat([acc,beta],2,1),AbsTol=1e-10);
+            for scale=[-1,0,1]
+                observed=[t;truth+scale*radius.*directions;radius];
+                bounds=nrmmControllerErrorBounds("circleParameters",observed,domain,prior);
+                testCase.verifyLessThanOrEqual(bounds(1,:),[acc,beta]);
+                testCase.verifyGreaterThanOrEqual(bounds(2,:),[acc,beta]);
+                testCase.verifyLessThan(diff(bounds),diff(prior));
+            end
+        end
+        function laterPositionChordsCutTheSameSpeedAndAccelerationClock(testCase)
+            domain=struct('rearAxleDistance',1.6,'scalarAccelerationMaximum',4,'yawRateMaximum',1);
+            a=.7;v0=6;prior=[-4,-.3;4,.3];clock=nan(3,1);bounds=prior;
+            for t0=[0,.7,1.5]
+                t=t0+[0,.3,.8];observed=[t;v0*t+a*t.^2/2;zeros(1,3);.01*ones(1,3)];
+                [bounds,clock]=nrmmControllerErrorBounds("circleParameters",observed,domain,bounds,clock);
+                testCase.verifyEqual(clock(1),.55,AbsTol=1e-12);
+                testCase.verifyLessThanOrEqual(clock(2),v0+a*clock(1));
+                testCase.verifyGreaterThanOrEqual(clock(3),v0+a*clock(1));
+            end
+            testCase.verifyLessThanOrEqual(bounds(1,1),a);
+            testCase.verifyGreaterThanOrEqual(bounds(2,1),a);
+            testCase.verifyLessThan(diff(bounds(:,1)),.15);
+            root=[0;0;0;9;a;0;1.6;2.4;.95;0;0];
+            track=struct('arcClock',clock,'time',2.5,'speedUpper',20, ...
+                'errorBound',struct('targetComponents',[0;5;0]));
+            obs=nrmmControllerErrorBounds("footprintObservation",track,root,bounds,domain);
+            testCase.verifyLessThanOrEqual(obs.speed(1),v0+a*track.time);
+            testCase.verifyGreaterThanOrEqual(obs.speed(2),v0+a*track.time);
+            testCase.verifyLessThan(diff(obs.speed),.5);
+        end
+        function unresolvedChordsPreserveThePrior(testCase)
+            domain=struct('rearAxleDistance',1.6,'scalarAccelerationMaximum',4,'yawRateMaximum',1);
+            prior=[-4,-.3;4,.3];t=[0,.4,.9];
+            samples=[t;0,1,1;0,0,0;.01,.01,.01];
+            testCase.verifyEqual(nrmmControllerErrorBounds("circleParameters",samples,domain,prior),prior);
+            samples=[t;5*t;zeros(2,3)];
+            exact=nrmmControllerErrorBounds("circleParameters",samples,domain,prior);
+            testCase.verifyEqual(exact,zeros(2),AbsTol=1e-10);
+            samples(1,:)=[0,2,4];testCase.verifyEqual(nrmmControllerErrorBounds("circleParameters",samples,domain,prior),prior);
+        end
         function reconstructedWorldStateIsContainedAcrossRotationsAndPeaking(testCase, geometry)
             [published, actualError] = localReconstruction(testCase.Design, geometry);
             testCase.verifyTrue(published.controllerErrorBound.available);

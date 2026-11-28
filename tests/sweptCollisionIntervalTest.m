@@ -7,6 +7,21 @@ classdef sweptCollisionIntervalTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function sweptDualFindsOverlapAndGivesAnEndpointGradient(testCase)
+            shape=[.2;.1;.025;-.01];target=repmat([0;0;.17;0;0;0;1.6;.15;.09;.02;-.01],1,2);
+            x=[-1,1;.03,-.02;-.2,.4];d=predictiveSafetyGeometry.sweptRectangleDual(x,target,shape);
+            testCase.verifyLessThan(d,0);
+            for k=1:2
+                testCase.verifyGreaterThan(predictiveSafetyGeometry.rectangle(x(:,k),shape,target(1:3,k),target(8:11,k)),0);
+            end
+            x(2,:)=x(2,:)+.8;
+            [d,left,right]=predictiveSafetyGeometry.sweptRectangleDual(x,target,shape);
+            step=1e-6;direction=[.3,-.2;-.2,.4;.4,.11];
+            plus=predictiveSafetyGeometry.sweptRectangleDual(x+step*direction,target,shape);
+            minus=predictiveSafetyGeometry.sweptRectangleDual(x-step*direction,target,shape);
+            testCase.verifyGreaterThan(d,0);
+            testCase.verifyEqual(sum([left,right].*direction,'all'),(plus-minus)/(2*step),AbsTol=1e-7);
+        end
         function separatedEndpointsDoNotAuthorizeAnIntersampleCollision(testCase)
             shape=[.1;.1;0;0];target=[0;0;0;0;0;0;1.6;shape];
             result=predictiveSafetyGeometry.intervalClearance([-1;0;0],[1;0;0],shape,target,0,.05,.006);

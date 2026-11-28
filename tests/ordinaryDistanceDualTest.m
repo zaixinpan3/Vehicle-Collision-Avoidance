@@ -14,6 +14,20 @@ classdef ordinaryDistanceDualTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function foldedCongruentRectanglesAgreeWithTheGeneralSignedDual(testCase)
+            half=[2.4;.95];shape=[half;0;0];positions=[-7,-2.5,.25,0,3,5.8;3,2,-.3,0,-2,-4];
+            for angle=[-pi/2,-.3,0,.41,pi/2,pi]
+                q=repmat([0;0;.23;0;0;0;1.6;shape],1,size(positions,2));
+                x=[positions;repmat(.23+angle,1,size(positions,2))];
+                expected=predictiveSafetyGeometry.rectangleClearanceNumeric(x,q,shape);
+                for k=1:size(x,2)
+                    [d,n]=predictiveSafetyGeometry.congruentClearance(x(1:2,k),x(3,k),q(3,k),half);
+                    testCase.verifyEqual(d,expected(k),AbsTol=1e-12);
+                    testCase.verifyEqual(norm(n),1,AbsTol=1e-12);
+                end
+            end
+        end
+
         function optimizedDualEqualsIndependentRectangleDistance(testCase,targetPose,shapeOffset)
             pose=[0;0;0];shape=[2.4;.95;shapeOffset];
             rows=predictiveSafetyGeometry.dualLinearization(pose,shape,targetPose,shape);

@@ -1,4 +1,4 @@
-function value = nrmmControllerErrorBounds(action, varargin)
+function [value,clock] = nrmmControllerErrorBounds(action, varargin)
 %nrmmControllerErrorBounds Publish state-time enclosures for control.
 %
 %   output = nrmmControllerErrorBounds("publish", output, bound, input, design)
@@ -27,9 +27,12 @@ function value = nrmmControllerErrorBounds(action, varargin)
 %       For vector error boxes, supply the Euclidean norms of their half-widths as
 %       velocityRadius and accelerationRadius; a component radius alone is insufficient.
 
+    clock=nan(3,1);
     switch string(action)
         case "publish"
             value = localPublish(varargin{1}, varargin{2}, varargin{3}, varargin{4});
+        case "circleParameters"
+            [value,clock] = localCircleParameters(varargin{:});
         case "footprintObservation"
             value = localFootprintObservation(varargin{:});
         case "targetParameters"
@@ -40,12 +43,65 @@ function value = nrmmControllerErrorBounds(action, varargin)
     end
 end
 
+function [bounds,clock]=localCircleParameters(samples,domain,bounds,clock)
+    % Columns contain time, measured inertial x/y and Euclidean disk radius.
+    if nargin<4,clock=nan(3,1);end
+    dt=diff(samples(1,:));
+    if any(dt<=0) || sum(dt)*domain.yawRateMaximum>=pi,return;end
+    y=samples(2:3,:);r=samples(4,:)+32*eps(max(1,max(abs(y),[],'all')));
+    a=y(:,2)-y(:,1);b=y(:,3)-y(:,2);
+    lengths=[norm(a),norm(b),norm(a+b)];
+    noise=[r(1)+r(2),r(2)+r(3),r(1)+r(3)];
+    lower=lengths-noise;upper=lengths+noise;
+    if any(lower<=0),return;end
+    twiceArea=a(1)*b(2)-a(2)*b(1);
+    areaError=r*lengths([2,3,1]).'+r(1)*r(2)+r(2)*r(3)+r(3)*r(1);
+    inverse=2./[prod(lower),prod(upper)];
+    range=(twiceArea+[-areaError;areaError])*inverse;
+    axle=domain.rearAxleDistance;
+    beta=asin(max(-1,min(1,axle*[min(range,[],'all');max(range,[],'all')])));
+    bounds(:,2)=[max(bounds(1,2),beta(1));min(bounds(2,2),beta(2))];
+    if bounds(1,2)>bounds(2,2) || lower(2)/dt(2)<=domain.scalarAccelerationMaximum*dt(2)/2,return;end
+    % The final chord rules out absorption. Both mean arc speeds are
+    % therefore the speeds at the midpoints of their respective intervals.
+    k=sin(bounds(:,2))/axle;
+    lowK=max([0;k(1);-k(2)]);highK=max(abs(k));
+    arcLo=lower(1:2).*localArcRatio(lowK*lower(1:2)/2);
+    arcHi=upper(1:2).*localArcRatio(highK*upper(1:2)/2);
+    meanLo=arcLo./dt;meanHi=arcHi./dt;
+    acc=2*[meanLo(2)-meanHi(1);meanHi(2)-meanLo(1)]/sum(dt);
+    bounds(:,1)=[max(bounds(1,1),acc(1));min(bounds(2,1),acc(2))];
+    % The speed at a fixed observed midpoint and A specify one affine
+    % clock throughout the moving arc. A later chord cuts that same strip.
+    midpoint=(samples(1,2)+samples(1,3))/2;
+    if ~isfinite(clock(1))
+        clock=[midpoint;meanLo(2);meanHi(2)];
+    elseif midpoint>clock(1)
+        elapsed=midpoint-clock(1);
+        a=([meanLo(2);meanHi(2)]-clock([3;2]))/elapsed;
+        bounds(:,1)=[max(bounds(1,1),a(1));min(bounds(2,1),a(2))];
+        v=[meanLo(2);meanHi(2)]-elapsed*bounds([2,1],1);
+        clock(2:3)=[max(clock(2),v(1));min(clock(3),v(2))];
+    end
+end
+
+function ratio=localArcRatio(x)
+    x=min(1,x);ratio=ones(size(x));moving=x>0;
+    ratio(moving)=asin(x(moving))./x(moving);
+end
+
 function obs=localFootprintObservation(track,root,limits,domain)
     speed=root(4);
     obs=struct('speed',[speed;speed],'current',[],'radius',0,'previous',[],'previousRadius',0,'span',0);
     if speed>0 && isfield(track,'errorBound') && ~isempty(track.errorBound)
         radius=track.errorBound(1).targetComponents(2);
         obs.speed=[max(0,speed-radius);min(track.speedUpper,speed+radius)];
+    end
+    if speed>0 && isfield(track,'arcClock') && all(isfinite(track.arcClock)) && track.time>=track.arcClock(1)
+        % Absorption clips the affine clock at zero. The epoch stays fixed.
+        elapsed=track.time-track.arcClock(1);
+        interval=max(0,track.arcClock(2:3)+elapsed*limits(:,1));
+        obs.speed=[max(obs.speed(1),interval(1));min(obs.speed(2),interval(2))];
     end
     if ~isfield(track,'times') || isempty(track.times) || track.times(end)~=track.time,return;end
     obs.current=track.positions(:,end);obs.radius=track.positionRadii(end);

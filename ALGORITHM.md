@@ -265,6 +265,28 @@ $$
 $$
 Intersecting these bounds with $I_A$ uses the persistence of the *same* acceleration through both observations.
 
+**Identifying the arc independently of its clock.** On a moving branch write $d=e(\psi_T+\beta)$ and $\kappa=\sin\beta/l_T$. Then $\dot d=\kappa J\dot p_T$. The normal $N=Jd$ obeys $N(t)=N(a)-\kappa(p_T(t)-p_T(a))$. Integrating $N(t)^\top dp_T(t)=0$ with $z=p_T(t)-p_T(a)$ gives $N(a)^\top z=\kappa\|z\|^2/2$. This is the equation of a circle, with the straight line obtained at $\kappa=0$. Acceleration changes the time at which a position is reached.
+
+For any three ordered positions $p_0,p_1,p_2$ on this arc, write $a=p_1-p_0$, $b=p_2-p_1$, $L_1=\|a\|$, $L_2=\|b\|$, $L_3=\|a+b\|$, and $u\times v=u_xv_y-u_yv_x$. For distinct positions with total turn below $\pi$, the angle between the chords equals half the turn between the first and last position. Applying the chord formula to $a+b$ gives
+$$
+ \kappa=\frac{2(a\times b)}{L_1L_2L_3},\qquad \beta=\arcsin(l_T\kappa).
+$$
+The signed area vanishes on a straight segment. For position disks of radii $r_0,r_1,r_2$, use tildes for quantities formed from their centers. Each length differs from its measured value by at most the sum of its two endpoint radii. Expanding the cross product gives linear coefficients with norms $\tilde L_2,\tilde L_3,\tilde L_1$ at the first, middle and last position. The three products of errors give
+$$
+ |a\times b-\tilde a\times\tilde b|
+ \le r_0\tilde L_2+r_1\tilde L_3+r_2\tilde L_1+r_0r_1+r_1r_2+r_2r_0 .
+$$
+Dividing the resulting signed numerator interval by the positive product interval bounds curvature. A zero lower chord length supplies no such witness. On each shorter-than-semicircular segment the arc length is $S_i=L_i\,\arcsin(z_i)/z_i$, $z_i=|\kappa|L_i/2$, with ratio one at zero. The ratio increases from one to $\pi/2$, giving interval bounds from the length and curvature bounds. Write $T_i$ for each duration, $m_i$ for its midpoint and $U_i=S_i/T_i$. If the last chord lower-bounds $U_2$ by more than $\bar A T_2/2$, both intervals precede absorption. Then
+$$
+ A=(U_2-U_1)/(m_2-m_1),\quad V(t_2)=U_2+AT_2/2,\quad
+ \psi_T(t_2)=\arg b+\kappa S_2/2-\beta\pmod{2\pi}.
+$$
+These identities give information whenever the observed arc resolves it. At an absorbing stop the position persists and a body heading requires the compatible incoming pose or a heading observation.
+
+In particular, choose a resolved midpoint $a$ and retain its speed interval $I_a$. Any later resolved chord centered at $m$ supplies a strip $V(a)+(m-a)A\in[L_m,U_m]$. Intersecting the strips at the same epoch bounds both $A$ and $V(a)$. Each compatible pair gives the future speed $[V(a)+(t-a)A]_+$, including absorption from this moving arc. The geometry of a chord and its affine clock therefore constrain the same footprint forecast.
+
+Fix an encounter epoch $a$. Let $\Theta_t$ consist of joint tuples $(p_T(a),d(a),V(a),A,\beta,\sigma)$ whose *same* arc and clock satisfy the motion contract and all available position and derivative enclosures through $t$, conditional on the same ego history. Intersecting with the preceding geometrical witnesses preserves the true tuple and $\Theta_{t'}\subseteq\Theta_t$ for $t'\ge t$. In particular, at a common future world time the exact support of its occupied set can only decrease. Coordinate interval bounds on this set can lose correlations. Section 6 specifies the directional containment needed when an outer bound replaces the exact image.
+
 Let $\mathbb B(c,r)$ be the closed ball of radius $r$ about $c$. Conditional on the ego member, the current target reference position belongs to $\mathbb B(y,\epsilon_\rho)\cap\mathbb B(\hat p,E_p)$. Write $P_0$ for a set enclosing all current target positions consistent with the observed history. With exact relative position and known ego pose, $P_0$ may be the singleton $\{p_T\}$.
 
 ### Observing the future footprint from positions
@@ -350,48 +372,23 @@ $$
 
 The first component restores speed; the second rotates the course toward the route. $D_{\min},T_D,k_\chi,k_v^{g}$ are positive guidance parameters.
 
-### Obstacle field
+### Projection onto the complement of a velocity obstacle
 
-The field uses one nominal ego state and one predicted target rectangle. Work in the axes $R_T$ of that rectangle at the corresponding prediction time. Let $b=(b_1,b_2)>0$ be its half-extents, $o_T$ its body offset, $c=p_T+R_To_T$ its center, $\Omega=\kappa V$, and $\dot\Omega=\kappa A$. The point motion gives
+Let $r=c_E-c_T$ be the center displacement, $Z=R_TB_T^0\oplus(-R_EB_E^0)$ the centered configuration obstacle, and $K=Z\oplus d_g\mathbb B$ with $d_g\ge d_*$. Here $B_j^0$ is the centered rectangle, $\mathbb B$ the unit disk, and $d_g$ may include a position error bound. Use the predicted occupied rectangle when forming a guide from an outer target footprint. For frozen orientations and translating bodies, contact with $K$ is equivalent to $r+t w\in K$ for some $t\ge0$, where $w$ is ego velocity relative to the target center. Outside $K$ the closed cone $C=\operatorname{cone}(K-r)$ consists of collision directions, including its two tangent rays and its apex. Excluding its interior permits a grazing guide. Each ray of $K-r$ is tangent to the convex hull of the disks around the corner differences, since disk dilation commutes with taking their convex hull.
 
+Let $\tau_g>0$ be the velocity response time of the guide. Write $v_E,v_T$ for the velocities of the geometric centers, including $\dot R_j o_j$, and $w_d=v_E-v_T+\tau_g a_0$. For a moving footprint with corner velocities $v_j$ set $U=\operatorname{conv}\{v_j-v_T\}$ in the relative velocity plane. A rigid translation has $U=\{0\}$. The local translation model treats these velocities as frozen. The possible collision velocities then form $C\oplus U$. Its support is finite precisely on the polar cone $C^\circ=\{n:n^\top c\le0\ \forall c\in C\}$, and equals $h_U(n)$ there. Outside the interior, at least one unit outward normal satisfies $n^\top w\ge h_U(n)$. For a polygonal $U$ all boundary lines come from its edges with normals in $C^\circ$ or from the two bounding rays of $C$. If $w_d$ is inside, projection onto each exterior half-plane costs $h_U(n)-n^\top w_d$. Hence, for a unique nearest face,
 $$
-v_c^T=Vd+\Omega JR_To_T,\qquad a_c^T=Ad+V\Omega Jd+\dot\Omega JR_To_T-\Omega^2R_To_T,\quad d=e(\psi_T+\beta).
+ w_g=w_d+[h_U(n_*)-n_*^\top w_d]_+n_*,
+ \qquad n_*\in\arg\min_{n\text{ outward face normal}}(h_U(n)-n^\top w_d),
+ \qquad a_g=a_0+(w_g-w_d)/\tau_g .
 $$
-
-For a moving occupancy enclosure let $c_B(t)$ and $b_B(t)$ be its center and half-extents. Its transverse growth contributes to the field through their rates of change on smooth arcs. Let $\gamma=\psi_T+\beta-\theta$ and let $h_1,h_2$ be the nominal target half-extents. With $[z]_{01}=\min(1,\max(0,z))$ and radial gain $k>0$ set
-$\zeta=[(h_1|\sin\gamma|-h_2|\cos\gamma|)/h_2]_{01}[1+A/(k^2h_2)]_{01}$.
-For a moving enclosure the effective center velocity is $(1-\zeta)v_c^T+\zeta\dot c_B$ and the effective extent rate is $\dot b_g=\zeta\dot b_B$. Use the former as $v_c^T$ below. For a known rigid target the point center velocity applies and $\dot b_g=0$.
-
-Set $q_g=R_T^\top(p-c)$, $w_g=R_T^\top(R(\psi)v-v_c^T)-\Omega Jq_g$, and let $q_*=\Pi_{[-b,b]}q_g$. Outside the rectangle let $d_g=\|q_g-q_*\|$, $n=(q_g-q_*)/d_g$, and $k_g=1/d_g$ in a corner region and zero on a face. Inside or on the rectangle use $d_g=-\min_i(b_i-|q_{g,i}|)$ and $k_g=0$. To continue the field there, assign weights proportional to $\exp(f_i/\min_i b_i)$ to the four faces, with $f=(q_g-b,-q_g-b)$; $n$ is the weighted mean of their outward unit normals. This also defines a finite field at the center.
-
-Let $t=Jn$, $n_W=R_Tn$, $t_W=R_Tt$, $\nu=n^\top w_g-|n|^\top\dot b_g$, $\tau=t^\top w_g$. For the ego body rectangle $B_E$, its support is $\sigma_{B_E}(z)=\max_{y\in B_E}z^\top y$. The field clearance is $g=d_g-\sigma_{B_E}(-R(\psi)^\top n_W)$. Let $\Delta_c=p+R(\psi)o_E-c$, $v_\Delta=R(\psi)v+rJR(\psi)o_E-v_c^T$, $u_\perp=Jv_\Delta/\|v_\Delta\|$ (zero at zero relative speed), and $y_\perp=u_\perp^\top\Delta_c$. With ego half-extents $b_E$, the combined transverse half-width is
-$H=|R(\psi)^\top u_\perp|^\top b_E+|R_T^\top u_\perp|^\top b$.
-The incidence coefficient is
-
-$$
-i=\max\{\mathbf 1_{g<0},\ \mathbf 1_{\Delta_c^\top v_\Delta<0}[1-(y_\perp/H)^2]_+\},
-$$
-
-where the closing term is zero at zero relative speed. With tangential gain $k_t>0$, lateral acceleration scale $a_y>0$ and positive field speed $s_g$, define
-
-$$
-\begin{aligned}
-a_t&=k_t t_W t_W^\top
- \left(s_g u_\perp y_\perp/\sqrt{y_\perp^2+\min(b_{E,2},b_2)^2}-v_c^T\right),\\
-a_\mathrm{rel}&=(-k_g\tau^2-2k\nu-k^2g)n+k_g\nu\tau\,t,\\
-a_\mathrm{obs}&=R_T(a_\mathrm{rel}+2\Omega Jw_g+\dot\Omega Jq_g-\Omega^2q_g)+a_c^T+a_t,\\
-c_n&=i[\,n_W^\top(a_\mathrm{obs}-a_0)\,]_+,\qquad
-a_g=a_0+c_n n_W+\min(1,c_n/a_y)a_t .
-\end{aligned}
-$$
-
-The radial expression comes from $\ddot d_g=n^\top\ddot q_g+k_g\tau^2$ outside the rectangle and the desired radial response $\ddot g+2k\dot g+k^2g=0$. Changes in ego support and envelope shape make this a guidance law. The transport terms follow by differentiating rotating coordinates twice. Choose $a_y$ as a prescribed fraction of $\min_i\mu_i g_\mathrm{grav}$, where $g_\mathrm{grav}$ denotes gravitational acceleration. Let $v_g>0$ be the guide speed scale. At the initial nominal target pose set $s_g=\min(\max(\|w_g\|,v_g),\sqrt{a_y\max(r_E,\|q_g\|)})$, with $r_E=\max_{y\in B_E}\|y\|$. The sign of the transverse contribution follows from the evolving $y_\perp$.
+If $w_d$ is outside the interior, take $w_g=w_d$. For a tie between distinct faces, bisect the two extreme tied normals in the polar cone and project onto the exterior half-plane supported by this bisector. Reflection of the configuration then reflects the command, including an exactly centered encounter. Such a convention is a seed and carries no feasibility certificate. If $r\in K$, let $g$ and $n$ be a signed footprint gap and one of its maximizing normals. Project $w_d$ onto $n^\top w_g\ge(d_g-g)/\tau_g$ to extend the field through an intersecting initial trajectory. The PCBF retains the full motion model and signed distance dual. The cone describes a frozen local guidance problem.
 
 After predicted exit use $a_g=a_0$. For a finite route-guide half-width $W_g$, limit the component $n_\Gamma^\top a_g$ to $a_\mathrm{mid}\pm k_w^2W_g$, leaving its tangential component unchanged. Here $a_\mathrm{mid}=k_\Gamma(v_c\cos\epsilon)^2/(1-k_\Gamma e_y)-2k_w v_c\sin\epsilon-k_w^2e_y$, $k_w>0$. These strip inequalities result from applying a second-order response to $W_g\pm e_y$. Their role is confined to the guiding field.
 
 ### From the acceleration field to one avoidance trajectory
 
-Resolve $a_g$ along the instantaneous course. The desired yaw rate is $r_g=(Je(\chi))^\top a_g/\max(v_c,v_g)$, clipped in magnitude to the smaller of $a_y/\max(v_c,v_g)$ and $v_c\sin(\arctan(l_r\tan\delta_{\max}/L))/l_r$. Let $v_s>0$ regularize the guide's tire angles and put $\alpha_{r,g}=\operatorname{atan2}(v_y-l_rr,\max(v_x,v_s))$. For longitudinal ratio $b'$ the rear tire force is $F_r(b')=F_{yr}(\alpha_{r,g},b')$; the requested body-frame front lateral force follows from yaw moment balance,
+Resolve $a_g$ along the instantaneous course. The desired yaw rate is $r_g=(Je(\chi))^\top a_g/\max(v_c,v_g)$, clipped in magnitude to the smaller of $a_y/\max(v_c,v_g)$ and $v_c\sin(\arctan(l_r\tan\delta_{\max}/L))/l_r$. Here $a_y>0$ denotes the lateral acceleration available to the guide and $v_g>0$ regularizes the course rate at rest. Let $v_s>0$ regularize the guide's tire angles and put $\alpha_{r,g}=\operatorname{atan2}(v_y-l_rr,\max(v_x,v_s))$. For longitudinal ratio $b'$ the rear tire force is $F_r(b')=F_{yr}(\alpha_{r,g},b')$; the requested body-frame front lateral force follows from yaw moment balance,
 
 $$
 F^*(b')=(I_z k_r(r_g-r)+l_rF_r(b'))/l_f .
@@ -413,15 +410,14 @@ x^s(\tau)=x_t^s+\int_0^\tau f^{\vartheta_s}(x^s(v),u(v))\,dv,
 x^s(a_t^-)=x^s(a_t^+).
 $$
 
-The field in Section 3 supplies the initial trajectory for the first leg. The first leg determines the entry state of the connection. Both input functions are free subject to the same constraints and terminal membership. The planner sees only information available at $t$. Every predicted member follows the common input until the plan is revised using later observations.
+The field in Section 3 supplies the initial trajectory for the first leg. The first leg determines the entry state of the connection. Both input functions are free subject to the same constraints and terminal membership. For fixed $T_t$, restriction at any interior time and concatenation at that time are inverse maps on admissible common inputs up to equality almost everywhere. The junction gives the seed its two roles without limiting how the optimized trajectory can pass. The planner sees only information available at $t$. Every predicted member follows the common input until the plan is revised using later observations.
 
-To specify the encounter time scales, let $v$ be the ego speed, $a_p>0$ a preview deceleration, $T_r\ge0$ a response allowance, and $a_y>0$ the available lateral acceleration used in the guide. Let $D=2(r_E+r_T)$, where each $r$ bounds the body's radius about its dynamics reference point. Let $w$ be the ego lateral half-width plus the target half-width projected on the ego lateral axis, plus the desired clearance. Opposite constant lateral accelerations of magnitude $a_y$ over two equal durations cover $w$ with zero net lateral velocity, giving $t_L=2\sqrt{w/a_y}$. With target course $d$, let $c=d^\top(\dot p-\dot p_T)$. For $c>0$ the relative motion along $d$ gives $t_c=[d^\top(p_T-p)]_+/c$ and $t_P=D/c$. Take both times as infinite for $c\le0$. Use the admitted target direction on a stationary member. The physical duration requests of a member are
+Define the feasible arrival times for the current information by
 $$
- a_s=\max\!\left\{D/\max(v,V_{\rm ref}),
-     \min\big(\max(v/a_p+T_r,t_L),t_c+t_L\big)\right\},\qquad
- b_s=\min(t_P,2\sqrt{D/a_y}).
+ \Sigma_t=\{s\ge0:\ \text{one admissible common input strictly separates all obligated histories on }[0,s]
+ \text{ and reaches the terminal family of Section 5 at }s\}.
 $$
-In target-free motion the respective requests are $v/a_p+T_r$ and zero. The two durations cover the respective suprema of these requests. During a continuing encounter the total horizon also covers the remaining duration of the inherited plan. Any extension can be assigned to the first leg while retaining the requested connection duration. These time scales select a preview. Existence of a trajectory to the terminal set is a separate condition.
+Under the common terminal continuation assumption, $s\in\Sigma_t$ implies $[s,\infty)\subseteq\Sigma_t$. Concatenating the initial command with that continuation proves this inclusion. Thus a committed feasible plan supplies an upper bound on the earliest feasible arrival $\inf\Sigma_t$. At admission a requested preview must contain an actual feasible arrival. During a continuing encounter a stored suffix supplies such an arrival after the elapsed time, subject to the information consistency in Section 6. This construction permits the preview to shrink with the remaining certified maneuver.
 
 ### Collision-distance dual
 
@@ -442,6 +438,19 @@ $$
                  \min_a\big[\lambda^\top Hx_a-f^\top\lambda\big].
 $$
 The substitution $H^\top\lambda=n$ and strong support duality give equality for each normal. Unit length retains the penetration sign.
+
+For congruent rectangles let $a,b$ be the common half-length and half-width. Their unsigned body axes have a principal relative angle $2\delta\in[-\pi/2,\pi/2]$. In their bisecting frame the longitudinal generators are $a(c,\pm s)$ and the transverse generators are $b(\pm s,c)$, where $c=\cos\delta$, $s=|\sin\delta|$. The sum of the two longitudinal segments is the diamond with tips $(\pm2ac,0),(0,\pm2as)$. The transverse pair gives the diamond with tips $(\pm2bs,0),(0,\pm2bc)$. Ordering their edges gives the first-quadrant boundary of $Z$ as the two segments joining
+$$
+ P=(2ac+2bs,0),\qquad Q=(2ac,2bc),\qquad S=(0,2as+2bc).
+$$
+Reflecting a point into that quadrant preserves its distance to the boundary. For the folded center displacement $q$, take the least distance to $[P,Q]$ and $[Q,S]$. Its sign is the sign of the largest of $\langle (c,s),q-Q\rangle$ and $\langle (s,c),q-Q\rangle$. The formula includes aligned axes, penetration and diagonal exterior separation. For unequal or enlarged rectangles the general support dual above still applies.
+
+**A separating witness over a time interval.** For $[a,b]$ write $D_j=E(j)-T(j)$, $j=a,b$, and $D=\operatorname{conv}(D_a\cup D_b)$. For fixed orientations and relative translation tracing the segment between its endpoints, the swept difference is exactly $D$. The speed along the segment can vary. In particular, an absorbed target and a forward straight-rolling ego have this property for every admissible longitudinal input that preserves straight motion. Its signed clearance is $\max_{\|n\|=1}\min\{\min_{z\in D_a}n^\top z,\min_{z\in D_b}n^\top z\}$. The same plane supports both ends of this interval. Its normal is free to vary on other intervals. More generally, if every material-point difference $z$ has absolutely continuous velocity and $\|\ddot z\|\le M$ almost everywhere, integration against the zero-endpoint Green function bounds the deviation from its endpoint chord by $M(t-a)(b-t)/2$. Therefore
+$$
+ \inf_{t\in[a,b]} d_\pm(E(t),T(t))
+ \ \ge\ d_\pm(\{0\},D)-M(b-a)^2/8 .
+$$
+The bound also holds with endpoint outer enclosures of all compatible material points. For a rectangle with reference acceleration $a_c$, yaw rate $r$, yaw acceleration $\dot r$ and maximum material radius $L$, $\|a_c\|+L(|\dot r|+r^2)$ bounds every material acceleration by differentiating $p+Ro$. Bounds for the two bodies add. Continuous velocity through a change of acceleration suffices. An interior velocity jump requires splitting at the event or bounding its chord error separately.
 
 Since $h_{R_y\oplus\mathbb B(0,r_y)}(n)=h_{R_y}(n)+r_y$ for $\|n\|=1$, the two available upper bounds on target support give the clearance certificate at elapsed time $\tau$
 $$
@@ -478,7 +487,7 @@ $$
 $$
 Here the handoff law uses the released continuation only upon observable release. Feasibility at the end of the connection requires $Z_f$ membership for the possible terminal information states, with a common admissible extension of the plan. Removing histories preserves a terminal witness whenever the retained histories can use its original support bounds and common input.
 
-**Physical handoff assumption.** On the nonlinear physical and observation system, assume the terminal continuation law is realizable from the available information. From any admitted terminal information state it maintains clearance $d_*$, actuator admissibility and terminal membership (or admissible release) for every elapsed duration and surviving history. Safe concatenation includes the actuator transition at the join. The opening-normal argument proves separation under frozen translation. Closure under tire dynamics, changing target heading and subsequent observations is the physical handoff assumption.
+**Physical handoff assumption.** On the nonlinear physical and observation system, assume the terminal continuation law is realizable from the available information. From any admitted terminal information state it maintains clearance $d_*$, actuator admissibility and terminal membership (or admissible release) for every elapsed duration and surviving history. For the common-input plan family in Section 4 the extension over any required interval must be representable by one command function across all terminal histories. A common neutral command applies also to already released histories whenever admissible. Safe concatenation includes the actuator transition at the join. The opening-normal argument proves separation under frozen translation. Closure under tire dynamics, changing target heading and subsequent observations is the physical handoff assumption.
 
 ### Continuous predictive deficit and causal control
 
@@ -505,21 +514,16 @@ $$
 $$
 A replacement must be feasible with deficit at most $L(t+\delta)$. Its actual input depends on the information received and the retained plan. During the executed prefix every indistinguishable history receives the same actuator input. Section 6 derives the budget and proves existence of a continuation under the stated hypotheses.
 
+**Free arrival at the terminal family.** Fix a physical preview $T$. A feasible prefix reaching the terminal family at any $\sigma\in[0,T]$ can be extended by its common continuation with zero deficit to $T$, under the terminal closure and information assumptions. Conversely a feasible plan on $[0,T]$ is a free-arrival candidate with $\sigma=T$. Consequently the infimal primary deficit over feasible arrival times equals the fixed-preview value. If a stored certificate uses an earlier arrival, it includes its continuation. The secondary cost compares the complete extensions over the same interval. This argument neither supplies an admission witness nor permits shortening a continuing obligation by dropping its suffix.
+
 ### Nominal cruise and secondary preferences
 
-For a nominal member let $\varepsilon(\tau)$ contain lateral displacement from the route frame, wrapped body-heading error, $v_x-V_{\rm ref}$, $v_y$ and $r$. For the tracking preference the route frame at $\tau$ is the frame at the projection of $p(t)+\tau V_{\rm ref}e(\psi(t))$ onto the given path. For a nonnegative emphasis $w$, $W\succeq0$ and an actuator smoothness weight $w_u\ge0$, the continuous tracking and tire-use preferences are
+Let $\bar u_t$ be the causal target-free cruise command forecast obtained by evolving the route feedback from the same nominal initial member and preceding actuator state. At equal primary deficit order feasible plans by
 $$
- J_{\rm tr}=\tfrac12\int_0^{T_t}
- \big[w(\tau)\varepsilon^\top W\varepsilon+w_u\|\dot u\|^2\big]\,d\tau ,
- \qquad
- J_{\rm tire}=\tfrac12\int_0^{T_t}
- \left[b^2+b^4+\langle(\gamma^s)^2\rangle\right]\,d\tau ,
+ J_\Gamma(u)=\tfrac12\int_0^{T_t}(u(v)-\bar u_t(v))^\top W_u(u(v)-\bar u_t(v))\,dv,
+ \qquad W_u=\operatorname{diag}(\delta_{\max}^{-2},1).
 $$
-$$
- \gamma^s=(C_r^s/K_r^s)\operatorname{atan2}
- (v_y^s-l_r r^s,\sqrt{(v_x^s)^2+v_s^2}).
-$$
-The derivative term describes a preference on absolutely continuous commands with square-integrable rate when used. The brackets denote a normalized design average over physical members for secondary performance. The safety constraints use every member. At equal primary deficit the secondary ordering favors lower tire use with no increase in tracking cost. Neither preference is a premise of the safety argument.
+Steering is expressed as a fraction of its physical limit and longitudinal actuation as a force ratio. A feasible, equally safe nominal forecast achieves the absolute lower bound zero, including at a curved cruise trim. Two plans that agree on a portion of their horizon contribute exactly the same integral there.
 
 For a realizable constant-curvature cruise trim the course is tangent to the route, $\|v^\star\|=V_{\rm ref}$, $r^\star=k_\Gamma V_{\rm ref}$, and $\dot v^\star=\dot r^\star=0$ under $u^\star$. These equations determine the body heading offset $\psi^\star_{\rm rel}=-\operatorname{atan2}(v_y^\star,v_x^\star)$. Use the route command $G$ from Section 3 with the trim correction $u^\star-G(x^\star,u^\star)$ before actuator projection. At an admissible trim this restores exactly $u^\star$. Define the transverse error and nominal control Lyapunov function by
 $$

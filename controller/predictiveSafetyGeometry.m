@@ -136,15 +136,7 @@ classdef predictiveSafetyGeometry
             data=struct('target',target,'shape',shape,'reserve',reserve, ...
                 'generator',generator,'egoYawRadius',sum(abs(generator(3,:))), ...
                 'support',support,'targetYawRadius',tube.yawRadius);
-            parameters=localFieldParameters(data,1,0);
-            [~,field]=predictiveSafetyGeometry.circulationField(model.initialState,target(:,1),cfg,parameters);
-            budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-            % Bound the tangential speed scale by the available turning acceleration.
-            % This positive scale sets neither a side nor a target velocity.
-            contourRadius=max(field.egoRadius,norm(field.position));
-            speed=min(max(norm(field.velocity),1),sqrt(budget*contourRadius));
-            % Integrate route, obstacle and road guidance together on one trajectory.
-            best=localCirculationRollout(model,data,speed,durations,nargout>1);
+            best=localVelocityObstacleRollout(model,data,durations,nargout>1);
             inputs=best.inputs;
             if nargout<2,return;end
             total=1;diagnostics=localCandidateSummary(best);
@@ -252,91 +244,94 @@ classdef predictiveSafetyGeometry
             if nargout>1,next=nonlinearBicycleModel.sample(x,input,cfg);end
         end
 
-        function [acceleration,field] = circulationField(x,target,cfg,parameters)
-            % Local guide for a single initialization. The PCBF evaluates safety.
-            j=[0,-1;1,0];angle=target(3);r=[cos(angle),-sin(angle);sin(angle),cos(angle)];
-            course=predictiveSafetyGeometry.direction(angle+target(6));
-            curvature=sin(target(6))/target(7);omega=curvature*target(4);omegaDot=curvature*target(5);
-            center=target(1:2)+r*target(10:11);
-            centerVelocity=target(4)*course+omega*r*j*target(10:11);
-            centerAcceleration=target(5)*course+curvature*target(4)^2*j*course ...
-                +omegaDot*r*j*target(10:11)-omega^2*r*target(10:11);
-            if isfield(parameters,'centerVelocity')
-                centerVelocity=centerVelocity ...
-                    +parameters.crossWeight*(parameters.centerVelocity-centerVelocity);
+        function [acceleration,field] = velocityObstacleField(x,target,cfg,preferred,inflation,velocityOffsets)
+            % Nearest relative velocity outside the frozen footprint cone.
+            tau=cfg.planner.velocityResponseSeconds;
+            E=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+            T=[cos(target(3)),-sin(target(3));sin(target(3)),cos(target(3))];
+            J=[0,-1;1,0];
+            armE=E*cfg.vehicle.rectangleOffset;armT=T*target(10:11);
+            w=E*x(4:5)+x(6)*J*armE-target(4)*predictiveSafetyGeometry.direction(target(3)+target(6)) ...
+                -target(4)*sin(target(6))/target(7)*J*armT;
+            desired=w+tau*preferred;
+            center=x(1:2)+armE-target(1:2)-armT;
+            half=[cfg.vehicle.length;cfg.vehicle.width]/2;
+            margin=cfg.outputFeedback.clearanceMeters+inflation;
+            signs=[1,1,-1,-1;1,-1,1,-1];
+            e=E*(half.*signs);t=T*(target(8:9).*signs);
+            if isempty(velocityOffsets) && target(4)*sin(target(6))~=0
+                velocityOffsets=(target(4)*sin(target(6))/target(7))*J*t;
             end
-            re=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-            q=r.'*(x(1:2)-center);w=r.'*(re*x(4:5)-centerVelocity)-omega*j*q;
-            closest=min(target(8:9),max(-target(8:9),q));difference=q-closest;distance=norm(difference);
-            corner=all(abs(q)>target(8:9));
-            if distance>1e-10
-                normal=difference/distance;kappa=double(corner)/distance;
-            else
-                % A colliding seed still needs finite guidance. This extension
-                % has no clearance theorem and is never labelled certified.
-                depth=min(target(8:9)-abs(q));
-                faceGap=[q-target(8:9);-q-target(8:9)];
-                weight=exp((faceGap-max(faceGap))/min(target(8:9)));
-                weight=weight/sum(weight);normal=weight(1:2)-weight(3:4);
-                distance=-depth;kappa=0;
+            chosen=desired;interior=false;
+            axes=[E,T];
+            support=half.'*abs(E.'*axes)+target(8:9).'*abs(T.'*axes);
+            if max(abs(center.'*axes)-support)<=margin
+                [gap,n]=localSignedNormal(center,half,target(8:9),x(3),target(3));
+                if gap<=margin
+                    interior=true;
+                    chosen=desired+max(0,(margin-gap)/tau-n.'*desired)*n;
+                end
             end
-            tangent=j*normal;nu=normal.'*w;tau=tangent.'*w;
-            if isfield(parameters,'extentRate')
-                nu=nu-parameters.crossWeight*abs(normal).'*parameters.extentRate;
+            if ~interior && (any(desired) || ~isempty(velocityOffsets))
+                rays=reshape(reshape(t,2,4,1)-reshape(e,2,1,4),2,16)-center;
+                axis=atan2(-center(2),-center(1));
+                angles=atan2(rays(2,:),rays(1,:))-axis;
+                angles=atan2(sin(angles),cos(angles));
+                spread=asin(min(1,margin./max(realmin,vecnorm(rays))));
+                lo=axis+min(angles-spread);hi=axis+max(angles+spread);
+                normals=[sin(lo),-sin(hi);-cos(lo),cos(hi)];
+                if ~isempty(velocityOffsets)
+                    edges=velocityOffsets(:,[2,3])-velocityOffsets(:,1);
+                    caps=[-edges(2,:);edges(1,:)];
+                    caps=[caps,-caps];lengths=vecnorm(caps);
+                    caps=caps(:,lengths>eps)./lengths(lengths>eps);
+                    tangent=[cos([lo,hi]);sin([lo,hi])];
+                    normals=[normals,caps(:,all(tangent.'*caps<=16*eps,1))];
+                    bounds=max(normals.'*velocityOffsets,[],2);
+                else
+                    bounds=zeros(size(normals,2),1);
+                end
+                correction=bounds-normals.'*desired;
+                [smallest,k]=min(correction);
+                if smallest>0
+                    chosen=desired+smallest*normals(:,k);
+                    tied=abs(correction-smallest)<=16*eps(max(1,norm(desired)));
+                    if any(normals(:,k).'*normals(:,tied)<1-32*eps)
+                        % The bisector of the two extreme tied normals also
+                        % belongs to the polar cone. Its opening half-plane
+                        % gives a reflection-equivariant command at a tie.
+                        tiedNormals=normals(:,tied);
+                        angle=atan2(tiedNormals(2,:),tiedNormals(1,:))-axis-pi;
+                        angle=atan2(sin(angle),cos(angle));
+                        middle=axis+pi+(min(angle)+max(angle))/2;
+                        n=[cos(middle);sin(middle)];bound=0;
+                        if ~isempty(velocityOffsets),bound=max(n.'*velocityOffsets);end
+                        chosen=desired+max(0,bound-n.'*desired)*n;
+                    end
+                end
             end
-            corners=cfg.vehicle.rectangleOffset+[1,1,-1,-1;1,-1,1,-1].*[cfg.vehicle.length/2;cfg.vehicle.width/2];
-            egoRadius=max(vecnorm(corners,2,1));
-            normalWorld=r*normal;targetYawRadius=0;
-            if isfield(parameters,'targetYawRadius'),targetYawRadius=parameters.targetYawRadius;end
-            [~,targetReserve]=predictiveSafetyGeometry.rotationSupport(target(8:11),target(3),targetYawRadius,normalWorld.');
-            inflation=parameters.inflation+targetReserve;
-            if isfield(parameters,'generator')
-                inflation=inflation+sum(abs(normalWorld.'*parameters.generator(1:2,:))) ...
-                    +predictiveSafetyGeometry.targetSupportFromData(parameters.support,parameters.index,normalWorld.');
+            acceleration=preferred+(chosen-desired)/tau;
+            if nargout>1
+                field=struct('active',any(chosen~=desired),'relativeVelocity',w,'desired',desired, ...
+                    'projected',chosen,'relativeCenter',center);
             end
-            % Directional ego support avoids an artificial disk-width buffer
-            % beside the target. The derivative terms remain guidance only:
-            % body yaw and directional uncertainty change during the rollout.
-            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-            yawRadius=0;if isfield(parameters,'egoYawRadius'),yawRadius=parameters.egoYawRadius;end
-            egoSupport=predictiveSafetyGeometry.rotationSupport(shape,x(3),yawRadius,-normalWorld.');
-            h=distance-egoSupport-inflation;
-            % Transverse offset and closing velocity are evaluated at this node.
-            egoOffset=re*cfg.vehicle.rectangleOffset;
-            delta=x(1:2)+egoOffset-center;
-            velocity=re*x(4:5)+x(6)*j*egoOffset-centerVelocity;
-            transverse=j*velocity/max(norm(velocity),eps);
-            offset=transverse.'*delta;
-            halfWidth=abs(transverse.'*re)*shape(1:2)+abs(transverse.'*r)*target(8:9)+inflation;
-            incidence=double(h<0);
-            if delta.'*velocity<0
-                incidence=max(incidence,max(0,1-(offset/max(halfWidth,eps))^2));
+        end
+
+        function [gap,normal]=congruentClearance(delta,angleE,angleT,half)
+            % Fold the centered Minkowski difference into its first quadrant.
+            angle=mod(angleE-angleT+pi/2,pi)-pi/2;
+            theta=angleT+angle/2;R=[cos(theta),-sin(theta);sin(theta),cos(theta)];
+            local=R.'*delta;point=abs(local);c=cos(angle/2);s=abs(sin(angle/2));
+            Q=2*c*half;P=[Q(1)+2*half(2)*s;0];S=[0;Q(2)+2*half(1)*s];
+            [d1,z1]=localPointSegment(point,P,Q);[d2,z2]=localPointSegment(point,Q,S);
+            if d1<=d2,dist=d1;z=z1;face=[c;s];else,dist=d2;z=z2;face=[s;c];end
+            side=1;if max([c,s;s,c]*(point-Q))<0,side=-1;end
+            gap=side*dist;
+            if nargout>1
+                if dist>0,face=side*(point-z)/dist;end
+                parity=sign(local);parity(parity==0)=1;
+                normal=R*(parity.*face);
             end
-            tangentWorld=r*tangent;
-            rate=cfg.planner.radialRate;
-            lateral=parameters.speed*transverse*(offset/hypot(offset,min(shape(2),target(9))));
-            tangentialAcceleration=cfg.planner.tangentialRate*tangentWorld*(tangentWorld.'*(lateral-centerVelocity));
-            desired=0;
-            relative=(-kappa*tau^2-2*rate*nu-rate^2*(h-desired))*normal ...
-                +(kappa*nu*tau)*tangent;
-            transport=r.'*centerAcceleration+2*omega*j*w+omegaDot*j*q-omega^2*q;
-            acceleration=r*(relative+transport)+tangentialAcceleration;
-            correction=0;activation=1;
-            if isfield(parameters,'preferredAcceleration')
-                % Apply the outward correction and the local tangential field.
-                preferred=parameters.preferredAcceleration;normalWorld=r*normal;
-                correction=incidence*max(0,normalWorld.'*(acceleration-preferred));
-                budget=cfg.planner.lateralAccelerationFraction*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity;
-                activation=min(1,correction/budget);
-                acceleration=preferred+correction*normalWorld ...
-                    +activation*tangentialAcceleration;
-            end
-            field=struct('clearance',h,'normalSpeed',nu,'tangentSpeed',tau,'curvature',kappa, ...
-                'normal',normal,'tangent',tangent,'position',q,'velocity',w,'rotation',r, ...
-                'transport',transport,'egoRadius',egoRadius, ...
-                'inflation',inflation,'desiredClearance',desired,'initialBarrier',nu+rate*h, ...
-                'normalCorrection',correction,'activation',activation,'incidence',incidence, ...
-                'tangentialAcceleration',tangentialAcceleration);
         end
 
         function [support,inflation] = rotationSupport(shape,yaw,yawRadius,normal)
@@ -985,9 +980,16 @@ classdef predictiveSafetyGeometry
         end
 
         function [distance,certificate] = rectangle(poseE,shapeE,poseT,shapeT)
-            kernel=localKernel();
-            if isempty(kernel),[distance,normal]=predictiveSafetyGeometry.rectangleNumeric(poseE,shapeE,poseT,shapeT);
-            else,[distance,normal]=kernel.rectangle(poseE(1:3),shapeE(:),poseT(1:3),shapeT(:));
+            if isequal(shapeE(1:2),shapeT(1:2))
+                E=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
+                T=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
+                delta=poseE(1:2)+E*shapeE(3:4)-poseT(1:2)-T*shapeT(3:4);
+                [distance,normal]=predictiveSafetyGeometry.congruentClearance(delta,poseE(3),poseT(3),shapeE(1:2));
+                if distance<=0,distance=0;normal=zeros(2,1);end
+            else
+                kernel=localKernel();
+                if isempty(kernel),[distance,normal]=predictiveSafetyGeometry.rectangleNumeric(poseE,shapeE,poseT,shapeT);
+                else,[distance,normal]=kernel.rectangle(poseE(1:3),shapeE(:),poseT(1:3),shapeT(:));end
             end
             if nargout>1
                 re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
@@ -1116,6 +1118,37 @@ classdef predictiveSafetyGeometry
             slope=vertexReach(:)*min(yawRadius/2,2);
             correction=slope*yawMap(:).';
             rows=[rows+correction;rows-correction];bounds=[bounds;bounds];
+        end
+
+        function [gap,left,right]=sweptRectangleDual(x,q,shape)
+            % Signed distance from zero to the convex hull of the two relative
+            % footprint sets. Each of its vertices is a material corner pair.
+            signs=[-1,1,1,-1;-1,-1,1,1];
+            body=shape(3:4)+shape(1:2).*signs;
+            vertices=zeros(2,32);arms=zeros(2,32);
+            for k=1:2
+                e=[cos(x(3,k)),-sin(x(3,k));sin(x(3,k)),cos(x(3,k))]*body;
+                T=[cos(q(3,k)),-sin(q(3,k));sin(q(3,k)),cos(q(3,k))];
+                t=T*(q(10:11,k)+q(8:9,k).*signs);
+                cols=(k-1)*16+(1:16);
+                vertices(:,cols)=x(1:2,k)-q(1:2,k)+reshape(reshape(e,2,4,1)-reshape(t,2,1,4),2,16);
+                arms(:,cols)=repmat(e,1,4);
+            end
+            hull=convhull(vertices(1,:),vertices(2,:));
+            i=hull(1:end-1);j=hull(2:end);
+            edge=vertices(:,j)-vertices(:,i);base=vertices(:,i);
+            fraction=min(1,max(0,-sum(base.*edge,1)./sum(edge.^2,1)));
+            delta=base+edge.*fraction;
+            [gap,k]=min(vecnorm(delta,2,1));
+            inside=all(edge(1,:).*base(2,:)-edge(2,:).*base(1,:)<=0);
+            if inside,gap=-gap;end
+            if nargout>1
+                if abs(gap)>eps,normal=delta(:,k)/gap;
+                else,normal=[-edge(2,k);edge(1,k)]/norm(edge(:,k));end
+                nodes=[i(k),j(k)];weights=[1-fraction(k),fraction(k)];
+                derivative=[repmat(normal,1,2);normal(2)*arms(1,nodes)-normal(1)*arms(2,nodes)].*weights;
+                left=sum(derivative(:,nodes<=16),2);right=sum(derivative(:,nodes>16),2);
+            end
         end
 
         function check = intervalClearance(first,last,shape,targetEpoch,time,duration,margin)
@@ -1434,24 +1467,25 @@ function [distance,point]=localPointSegment(vertex,first,last)
     point=first+alpha*edge;distance=norm(vertex-point);
 end
 
-function candidate=localCirculationRollout(model,data,speed,durations,collectDiagnostics)
+function candidate=localVelocityObstacleRollout(model,data,durations,collectDiagnostics)
     cfg=model.cfg;h=cfg.controller.sampleTime;count=numel(durations);
     candidate=struct('states',zeros(6,count+1),'inputs',zeros(2,count), ...
         'gaps',zeros(1,count+1),'nominalGaps',zeros(1,count+1), ...
-        'speedScale',speed, ...
         'releaseNode',NaN,'stateViolation',0,'fieldActive',false, ...
         'maximumDeviation',0,'completion',"requestedHorizon");
     candidate.states(:,1)=model.initialState;
     hasCover=isfield(model,'motionCover') && ~isempty(model.motionCover) && ~isempty(model.motionCover.boxes);
     nodes=1+round([0,cumsum(durations)]/h);
-    boxes=zeros(11,0);centerVelocity=zeros(2,0);extentRate=zeros(2,0);
+    boxes=zeros(11,0);velocities=zeros(2,4,0);
     if hasCover
-        % Backward differences give the local motion of the occupied rectangle.
-        boxes=model.motionCover.boxes(:,nodes);angles=boxes(3,:);
-        centers=boxes(1:2,:)+[cos(angles).*boxes(10,:)-sin(angles).*boxes(11,:); ...
-            sin(angles).*boxes(10,:)+cos(angles).*boxes(11,:)];
-        centerVelocity=diff(centers,1,2)./durations;
-        extentRate=diff(boxes(8:9,:),1,2)./durations;
+        boxes=model.motionCover.boxes(:,nodes);co=cos(boxes(3,:));si=sin(boxes(3,:));
+        sign=[1,-1,1,-1;1,1,-1,-1];
+        velocities=zeros(2,4,count);
+        for k=1:4
+            body=boxes(10:11,:)+sign(:,k).*boxes(8:9,:);
+            points=boxes(1:2,:)+[co.*body(1,:)-si.*body(2,:);si.*body(1,:)+co.*body(2,:)];
+            velocities(:,k,:)=reshape(diff(points,1,2)./durations,2,1,count);
+        end
     end
     prior=model.previousInput;encounterEnded=false;
     for index=1:count+1
@@ -1486,29 +1520,15 @@ function candidate=localCirculationRollout(model,data,speed,durations,collectDia
         % acceleration with a cruise-speed request afterwards.
         acceleration=predictiveSafetyGeometry.routeAcceleration(x,projection,model);
         if ~encounterEnded
-            parameters=localFieldParameters(data,index,speed);
-            if ~coder.target('MATLAB')
-                parameters.crossWeight=0;parameters.centerVelocity=zeros(2,1);parameters.extentRate=zeros(2,1);
+            margin=data.reserve+data.support.ballRadius(index);offsets=zeros(2,0);
+            if hasCover && index>1
+                vt=target(4)*predictiveSafetyGeometry.direction(target(3)+target(6));
+                arm=[cos(target(3)),-sin(target(3));sin(target(3)),cos(target(3))]*target(10:11);
+                vt=vt+target(4)*sin(target(6))/target(7)*[-arm(2);arm(1)];
+                offsets=velocities(:,:,index-1)-vt;
             end
-            if hasCover && index>1 && target(4)~=0
-                % Project the target footprint across the cruise path. Its length
-                % contributes transverse drift in proportion to the width it spans.
-                heading=target(3)+target(6)-projection.heading;
-                lengthAcross=data.target(8,index)*abs(sin(heading));
-                widthAcross=data.target(9,index)*abs(cos(heading));
-                crossWidth=min(1,max(0,(lengthAcross-widthAcross)/data.target(9,index)));
-                % Scale the drift by the local field response over one target
-                % half-width. A braking body can slow as its occupied box grows.
-                responseAcceleration=cfg.planner.radialRate^2*data.target(9,index);
-                speedRate=sign(target(4))*target(5);
-                transportFraction=min(1,max(0,1+speedRate/responseAcceleration));
-                parameters.crossWeight=crossWidth*transportFraction;
-                parameters.centerVelocity=centerVelocity(:,index-1);
-                parameters.extentRate=extentRate(:,index-1);
-            end
-            parameters.preferredAcceleration=acceleration;
-            [acceleration,field]=predictiveSafetyGeometry.circulationField(x,target,cfg,parameters);
-            active=field.activation>0;
+            [acceleration,field]=predictiveSafetyGeometry.velocityObstacleField(x,target,cfg,acceleration,margin,offsets);
+            active=field.active;
             candidate.fieldActive=candidate.fieldActive || active;
             if ~active && candidate.fieldActive && isnan(candidate.releaseNode),candidate.releaseNode=index-1;end
         end
@@ -1545,27 +1565,29 @@ end
 
 function [gap,nominal]=localPlannerGap(x,target,data,index)
     re=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-    rt=[cos(target(3)),-sin(target(3));sin(target(3)),cos(target(3))];axes=[re,rt];
+    rt=[cos(target(3)),-sin(target(3));sin(target(3)),cos(target(3))];
     center=x(1:2)+re*data.shape(3:4)-target(1:2)-rt*target(10:11);
-    supports=data.shape(1:2).'*abs(re.'*axes)+target(8:9).'*abs(rt.'*axes);
-    rows=abs(center.'*axes)-supports;nominal=max(rows);
-    orientation=sign(center.'*axes);orientation(orientation==0)=1;
-    normal=(axes.*orientation).';
+    [nominal,n]=localSignedNormal(center,data.shape(1:2),target(8:9),x(3),target(3));
+    normal=n.';
     targetReserve=predictiveSafetyGeometry.targetSupportFromData(data.support,index,normal);
     egoSupport=predictiveSafetyGeometry.rotationSupport(data.shape,x(3),data.egoYawRadius,-normal);
     targetSupport=predictiveSafetyGeometry.rotationSupport(target(8:11),target(3),data.targetYawRadius(index),normal);
-    gap=max(normal*(x(1:2)-target(1:2))-egoSupport-targetSupport ...
-        -sum(abs(normal*data.generator(1:2,:)),2)-targetReserve);
+    gap=normal*(x(1:2)-target(1:2))-egoSupport-targetSupport ...
+        -sum(abs(normal*data.generator(1:2,:)),2)-targetReserve;
 end
 
-function parameters=localFieldParameters(data,index,speed)
-    parameters=struct('speed',speed,'inflation',0, ...
-        'egoYawRadius',data.egoYawRadius,'targetYawRadius',data.targetYawRadius(index), ...
-        'generator',data.generator,'support',data.support,'index',index);
+function [gap,n]=localSignedNormal(delta,half,other,angleE,angleT)
+    if isequal(half,other)
+        [gap,n]=predictiveSafetyGeometry.congruentClearance(delta,angleE,angleT,half);
+    else
+        q=zeros(11,1);q(3)=angleT;q(8:9)=other;
+        [gap,g]=predictiveSafetyGeometry.rectangleClearance([delta;angleE],q,[half;0;0]);
+        n=g(1:2);
+    end
 end
 
 function summary=localCandidateSummary(candidate)
-    summary=struct('speedScale',candidate.speedScale, ...
+    summary=struct( ...
         'minimumGap',min(candidate.gaps),'nominalMinimumGap',min(candidate.nominalGaps), ...
         'stateViolation',candidate.stateViolation, ...
         'releaseNode',candidate.releaseNode,'maximumDeviation',candidate.maximumDeviation, ...
@@ -1574,7 +1596,7 @@ end
 
 function localPlannerDeadline(model)
     if isfield(model,'solveTimer') && toc(model.solveTimer)>=model.solveTimeLimitSeconds
-        error('collisionAvoidanceController:timeBudgetExceeded','Circulation initialization exhausted its time budget.');
+        error('collisionAvoidanceController:timeBudgetExceeded','The velocity-obstacle guide exhausted its time budget.');
     end
 end
 

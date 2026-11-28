@@ -35,7 +35,6 @@ function cfg=localDefaults()
         'previewDecelerationMetersPerSecondSquared',4, ...
         'previewSettlingSeconds',.5,'horizonResolutionSeconds',1, ...
         'clearanceMeters',.1,'steeringMaximum',deg2rad(35),'steeringRateMaximum',Inf, ...
-        'inputWeight',.1,'trackingWeights',[.02;.2;2;.1;.1], ...
         'maximumHypotheses',64, ...
         'maximumSolveSeconds',1,'initializationSolveSeconds',2, ...
         'controlNodes',24,'nearControlNodes',4, ...
@@ -59,7 +58,7 @@ function cfg=localDefaults()
     % Cruise feedback never overwrites longitudinal obstacle correction.
     % The parallel-wall acceleration guide anticipates transverse momentum;
     % it is not a hard terminal constraint or an execution certificate.
-    cfg.planner=struct('radialRate',1,'tangentialRate',2,'wallRate',2, ...
+    cfg.planner=struct('velocityResponseSeconds',8/15,'wallRate',2, ...
         'lateralAccelerationFraction',.9,'guideHalfWidthMeters',9);
     % encounterRangeMeters is the perception radius: the estimator receives
     % the target only inside it, and outside it there is no collision risk.
@@ -169,9 +168,7 @@ function localValidate(cfg)
     if of.clearanceMeters==0
         localInvalid('Compact PCBF planning requires a positive clearanceMeters.');
     end
-    validateattributes(of.inputWeight,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(of.noiseBounds,{'double'},{'size',[4,1],'real','finite','nonnegative'});
-    validateattributes(of.trackingWeights,{'double'},{'size',[5,1],'real','finite','nonnegative'});
     validateattributes(cfg.referenceSpeed,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.enforceRoadBoundaries,{'logical'},{'scalar'});
@@ -192,9 +189,8 @@ function localValidate(cfg)
     validateattributes(cfg.controller.jointMomentPrediction,{'logical'},{'scalar'});
     validateattributes(cfg.controller.jointGeneratorLimit,{'double'},{'scalar','integer','>=',70,'finite'});
     validateattributes(cfg.controller.jointNonlinearPrediction,{'logical'},{'scalar'});
-    for name=["radialRate","tangentialRate","wallRate"]
-        validateattributes(cfg.planner.(name),{'double'},{'scalar','real','finite','positive'});
-    end
+    validateattributes(cfg.planner.velocityResponseSeconds,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.planner.wallRate,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.planner.lateralAccelerationFraction,{'double'},{'scalar','real','>',0,'<',1});
     validateattributes(cfg.planner.guideHalfWidthMeters,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','finite','positive'});

@@ -2,6 +2,8 @@
 
 The Linux executable reads JSON Lines on standard input and flushes one JSON reply per request. Keep one process running across holds. The controller contains its configuration, NRMM observer, vehicle model, constraint and derivative evaluation, CasADi/IPOPT search, terminal membership check and plan-shift logic. The adjacent shared libraries are part of the executable package.
 
+The current MATLAB controller checks the swept relative footprints between control boundaries. The native planner in this directory checks the boundary nodes. Its port and validation against the current MATLAB controller are pending.
+
 ## Run on the PC
 
 From the delivered PC archive or its installed directory:

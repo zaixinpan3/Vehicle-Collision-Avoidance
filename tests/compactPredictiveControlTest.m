@@ -612,7 +612,11 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyTrue(valid.accepted);
             replay.inputs=fixed;
             fixedResult=solvePredictiveControl("outputFeedback",replay);
-            testCase.verifyFalse(fixedResult.accepted);
+            firstLeg=1:window.avoidanceSteps+1;
+            testCase.verifyEqual(valid.trajectories{1}.collisionEgo(:,firstLeg), ...
+                fixedResult.trajectories{1}.collisionEgo(:,firstLeg),AbsTol=1e-12);
+            testCase.verifyGreaterThan(norm(valid.trajectories{1}.collisionEgo(:,end)- ...
+                fixedResult.trajectories{1}.collisionEgo(:,end)),1e-5);
             block=struct('kind',"jointSensorBlock-v1",'time',data.trace(3).time, ...
                 'heldInput',command.actuatorInput,'samples',data.trace(2).rawSensorBlock);
             [~,shifted,next]=collisionAvoidanceController(block,[],reference,cfg,state);
@@ -864,36 +868,43 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(prediction.scenarios{1}.ego(4,end),1.4);
             testCase.verifyLessThanOrEqual(prediction.metadata.maximumConstraintViolation,1e-6);
         end
-        function stabilityCostIsSymmetricAndRespondsToTireLoading(testCase)
-            cfg=testCase.cfg;
-            item=testCase.block.initialHypotheses;item.target=[];item.ego=[0;0;0;14;0;0];
-            request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
-                'hypotheses',item,'input',zeros(2,1),'holds',[1,2,3],'inputs',zeros(2,3));
-            straight=solvePredictiveControl('outputFeedback',request);
-            request.inputs(2,:)=-.8;
-            braking=solvePredictiveControl('outputFeedback',request);
-            request.inputs(2,:)=.8;
-            traction=solvePredictiveControl('outputFeedback',request);
-            testCase.verifyEqual(straight.stabilityCost,0,AbsTol=1e-12);
-            testCase.verifyGreaterThan(braking.stabilityCost,straight.stabilityCost);
-            testCase.verifyEqual(traction.stabilityCost,braking.stabilityCost,AbsTol=1e-12);
-            request.inputs(1,:)=[.08,.05,-.01];
-            left=solvePredictiveControl('outputFeedback',request);
-            request.inputs(1,:)=-request.inputs(1,:);
-            right=solvePredictiveControl('outputFeedback',request);
-            testCase.verifyGreaterThan(left.stabilityCost,traction.stabilityCost);
-            testCase.verifyEqual(right.stabilityCost,left.stabilityCost,AbsTol=1e-12);
+        function aLoneTerminalDeficitCanBeClearedInTwoNonlinearEvaluations(testCase)
+            folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
+            domain=collisionThreatContract(strings(1,0),[8,15,20],WindowSeconds=20,ControllerConfiguration=collisionAvoidanceControllerConfig());
+            campaign=runJointOutputFeedbackScenario(Frames=2,Speeds=8,Scenarios="trafficBrakingLead", ...
+                RandomSeed=20261107,OutputDirectory=string(folder.Folder), ...
+                ControllerConfiguration=struct('target',struct('observerDomain',domain)));
+            testCase.assertEqual(campaign.results.outcome,"completed");
+            data=jsondecode(fileread(campaign.results.source));info=data.trace(2).metadata;
+            testCase.verifyEqual(info.initialPeakClearanceDeficitMeters,0);
+            testCase.verifyGreaterThan(info.initialNlpViolation,data.configuration.outputFeedback.nlpTolerance);
+            testCase.verifyEqual(info.pcbfValue,0);
+            testCase.verifyLessThanOrEqual(info.terminalValue,data.configuration.outputFeedback.nlpTolerance);
+            testCase.verifyLessThanOrEqual(info.nonlinearOracleEvaluations,2);
         end
-        function aPassingDetourCostsLessThanRemainingParked(testCase)
-            cfg=testCase.cfg;cfg.referenceSpeed=1.5;
-            item=testCase.block.initialHypotheses;item.target=[];
-            item.ego=[0;6;0;cfg.referenceSpeed;0;0];
+        function interventionCostMeasuresDistanceFromTheSameCruiseCommand(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=8;
+            item=testCase.block.initialHypotheses;item.target=[];item.ego=[0;0;0;8;0;0];
+            trim=nonlinearBicycleModel.cruise(cfg,0);u=trim.input;
             request=struct('operation',"evaluateControlSequence",'cfg',cfg, ...
-                'hypotheses',item,'input',zeros(2,1),'holds',[1,1,1],'inputs',zeros(2,3));
-            passing=solvePredictiveControl('outputFeedback',request);
-            request.hypotheses.ego=zeros(6,1);
-            parked=solvePredictiveControl('outputFeedback',request);
-            testCase.verifyLessThan(passing.cost,parked.cost);
+                'hypotheses',item,'input',u,'holds',[1,2,3],'inputs',repmat(u,1,3));
+            nominal=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyEqual(nominal.cost,0,AbsTol=1e-9);
+            du=[.05;-.2];request.inputs=u+repmat(du,1,3);
+            left=solvePredictiveControl('outputFeedback',request);
+            request.inputs=u-repmat(du,1,3);right=solvePredictiveControl('outputFeedback',request);
+            expected=cfg.controller.sampleTime*sum(request.holds)/2*((du(1)/cfg.outputFeedback.steeringMaximum)^2+du(2)^2);
+            testCase.verifyEqual((left.cost+right.cost)/2-nominal.cost,expected,AbsTol=1e-11);
+        end
+        function parkingRequiresMoreInterventionThanFollowingTheCruiseCommandAtTheSameState(testCase)
+            cfg=testCase.cfg;cfg.referenceSpeed=8;trim=nonlinearBicycleModel.cruise(cfg,0);
+            item=testCase.block.initialHypotheses;item.target=[];item.ego=trim.state;
+            request=struct('operation',"evaluateControlSequence",'cfg',cfg,'hypotheses',item, ...
+                'input',trim.input,'holds',[1,1,1],'inputs',repmat(trim.input,1,3));
+            cruising=solvePredictiveControl('outputFeedback',request);
+            request.inputs(2,:)=-1;
+            braking=solvePredictiveControl('outputFeedback',request);
+            testCase.verifyLessThan(cruising.cost,braking.cost);
         end
         function theTerminalCruiseInputRenewsTheRequestedHorizon(testCase)
             folder=testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture());
@@ -1462,7 +1473,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(abs(rearSlip)),pureCorneringPeak);
             metadata=[data.trace.metadata];
             compared=[metadata.performanceAcceptedSteps]>0;
-            testCase.verifyTrue(all([metadata(compared).acceptedStabilityCost]<[metadata(compared).firstFeasibleStabilityCost]));
+            testCase.verifyTrue(all([metadata(compared).interventionCostChange]<0));
             testCase.verifyTrue(all([metadata.deficitDescentMet]));
             testCase.verifyLessThanOrEqual([metadata.pcbfValue],128*eps*[metadata.horizonSteps]);
             testCase.verifyFalse(data.nodeCollisionDetected);
@@ -1599,8 +1610,6 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             expected=([p.stage;p.forward;p.terminal]-[m.stage;m.forward;m.terminal])/(2*step);
             testCase.verifyEqual(actual,expected,AbsTol=3e-4);
             testCase.verifyEqual(value.costGradient.'*direction,(p.cost-m.cost)/(2*step),AbsTol=3e-4);
-            testCase.verifyEqual(value.stabilityGradient.'*direction, ...
-                (p.stabilityCost-m.stabilityCost)/(2*step),AbsTol=3e-4);
             testCase.verifyEqual(value.forwardGradient(3:end,1),zeros(8,1));
             testCase.verifyGreaterThan(abs(value.forwardGradient(2,1)),1e-3);
         end
@@ -1882,7 +1891,7 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(expected(1,end),item.ego(1));
             testCase.verifyEqual(result.trajectories{1}.ego(4:6,end),zeros(3,1),AbsTol=1e-14);
         end
-        function collisionBetweenControlNodesDoesNotRejectThePlan(testCase)
+        function sweptOverlapRejectsSeparatedControlNodes(testCase)
             item=testCase.block.initialHypotheses;item.ego(4:6)=[.1;0;0];
             % The target crosses the slowly moving ego between two control
             % boundaries, then leaves sensing range.
@@ -1890,13 +1899,13 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             request=struct('operation',"validateInputSequence",'cfg',testCase.cfg, ...
                 'hypotheses',item,'input',zeros(2,1),'inputs',zeros(2,1));
             result=solvePredictiveControl('outputFeedback',request);
-            testCase.verifyTrue(result.accepted);
+            testCase.verifyFalse(result.accepted);
             testCase.verifySize(result.trajectories{1}.collisionEgo,[6,2]);
             testCase.verifyEqual(result.trajectories{1}.collisionTimes,[0,testCase.cfg.controller.sampleTime]);
             testCase.verifyEqual(result.trajectories{1}.validationSubsteps,testCase.cfg.outputFeedback.validationSubsteps);
             request.operation="evaluateControlSequence";request.holds=1;
             value=solvePredictiveControl('outputFeedback',request);
-            testCase.verifyLessThanOrEqual(max(value.stage),0);
+            testCase.verifyGreaterThan(max(value.stage),testCase.cfg.outputFeedback.clearanceMeters);
             crossing=predictiveSafetyGeometry.predictTarget(item.target,.0125);
             shape=[testCase.cfg.vehicle.length/2;testCase.cfg.vehicle.width/2;testCase.cfg.vehicle.rectangleOffset];
             testCase.verifyLessThanOrEqual(predictiveSafetyGeometry.rectangle(item.ego(1:3),shape,crossing(1:3),crossing(8:11)),0);
@@ -1914,10 +1923,10 @@ classdef compactPredictiveControlTest < matlab.unittest.TestCase
             value=solvePredictiveControl('outputFeedback',request);
             testCase.verifyGreaterThan(min(value.stage),testCase.cfg.outputFeedback.clearanceMeters);
         end
-        function nodeSafetyScopeDoesNotClaimIntersampleProtection(testCase)
+        function sweptSafetyScopeIdentifiesThePropagatedHypotheses(testCase)
             info=testCase.prediction.metadata;
-            testCase.verifyEqual(info.safetyScope,"finiteHypothesesControlBoundaryCollisionChecks");
-            testCase.verifyEqual(info.wholeHoldReserveScope,"notAppliedNodeCollisionContract");
+            testCase.verifyEqual(info.safetyScope,"finiteHypothesesSweptRectangleHulls");
+            testCase.verifyEqual(info.wholeHoldReserveScope,"materialPointChordRemainder");
             testCase.verifyEqual(info.collisionNodeCount,info.horizonSteps+1);
             testCase.verifyEqual(info.collisionCheckPeriodSeconds,testCase.cfg.controller.sampleTime);
         end

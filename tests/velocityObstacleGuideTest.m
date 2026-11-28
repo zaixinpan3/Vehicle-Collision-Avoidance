@@ -1,4 +1,4 @@
-classdef circulationPlannerTest < matlab.unittest.TestCase
+classdef velocityObstacleGuideTest < matlab.unittest.TestCase
     properties (TestParameter)
         crossingSpeed={8,15};
     end
@@ -18,7 +18,7 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             inputs=predictiveSafetyGeometry.avoidanceInputs(model,numel(holds),holds);
             testCase.verifyEqual(inputs,guide.inputs);
         end
-        function anAbsorbingStopPreservesTheCompactCirculationDirection(testCase)
+        function anAbsorbingStopPreservesTheGuide(testCase)
             model=localModel("crossing",8);
             model.cfg.referenceSpeed=1.5;
             model.nominalReference=struct('state',[0;0;0;1.5;0;0],'curvature',0);
@@ -76,21 +76,21 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         end
         function relativeMotionChangesTheFieldWithoutATrajectoryDecision(testCase)
             model=localModel("headOn",8);target=model.target;target(1:6)=[15;5;0;0;0;0];
-            p=struct('speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
-            straight=predictiveSafetyGeometry.circulationField(model.initialState,target,model.cfg,p);
+            preferred=zeros(2,1);inflation=0;
+            straight=predictiveSafetyGeometry.velocityObstacleField(model.initialState,target,model.cfg,preferred,inflation,[]);
             toward=model.initialState;toward(3)=atan2(5,15);
-            approaching=predictiveSafetyGeometry.circulationField(toward,target,model.cfg,p);
+            approaching=predictiveSafetyGeometry.velocityObstacleField(toward,target,model.cfg,preferred,inflation,[]);
             testCase.verifyEqual(straight,zeros(2,1),AbsTol=1e-12);
             testCase.verifyGreaterThan(norm(approaching),1);
         end
         function fieldInfluenceVanishesContinuouslyAtAGrazingPass(testCase)
             model=localModel("headOn",8);target=model.target;
-            p=struct('speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
-            width=model.cfg.vehicle.width/2+target(9);
+            preferred=zeros(2,1);inflation=0;
+            width=model.cfg.vehicle.width/2+target(9)+model.cfg.outputFeedback.clearanceMeters;
             target(1:6)=[15;width-1e-4;0;0;0;0];
-            inside=predictiveSafetyGeometry.circulationField(model.initialState,target,model.cfg,p);
+            inside=predictiveSafetyGeometry.velocityObstacleField(model.initialState,target,model.cfg,preferred,inflation,[]);
             target(2)=width+1e-4;
-            outside=predictiveSafetyGeometry.circulationField(model.initialState,target,model.cfg,p);
+            outside=predictiveSafetyGeometry.velocityObstacleField(model.initialState,target,model.cfg,preferred,inflation,[]);
             testCase.verifyEqual(outside,zeros(2,1),AbsTol=1e-12);
             testCase.verifyGreaterThan(norm(inside),0);
             testCase.verifyLessThan(norm(inside-outside),1e-2);
@@ -102,19 +102,19 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyLessThan(guide.minimumGap,0);
             testCase.verifyTrue(guide.fieldActive);
         end
-        function anApproachingObstacleCanBrakeAtTheCruiseSpeed(testCase)
+        function anApproachingObstacleReducesForwardVelocity(testCase)
             model=localModel("headOn",8);model.target(1:6)=[12;.2;0;0;0;0];
             guide=predictiveSafetyGeometry.avoidanceGuide(model,32);
-            testCase.verifyLessThan(guide.inputs(2,1),-.1);
-            testCase.verifyLessThan(guide.states(4,end),model.initialState(4)-.5);
+            testCase.verifyLessThan(guide.inputs(2,1),0);
+            testCase.verifyLessThan(min(guide.states(4,:)),model.initialState(4));
             testCase.verifyGreaterThan(abs(guide.inputs(1,1)),1e-3);
         end
         function aRecedingTargetDoesNotPullTheVehicleIntoAnOrbit(testCase)
             model=localModel("headOn",8);target=model.target;target(1:6)=[-30;0;0;2;0;0];
-            p=struct('speed',4,'inflation',0,'preferredAcceleration',[.2;0]);
-            [a,f]=predictiveSafetyGeometry.circulationField(model.initialState,target,model.cfg,p);
-            testCase.verifyEqual(a,p.preferredAcceleration,AbsTol=1e-12);
-            testCase.verifyEqual(f.activation,0);
+            preferred=[.2;0];inflation=0;
+            [a,f]=predictiveSafetyGeometry.velocityObstacleField(model.initialState,target,model.cfg,preferred,inflation,[]);
+            testCase.verifyEqual(a,preferred,AbsTol=1e-12);
+            testCase.verifyFalse(f.active);
         end
         function parallelWallSlowsOutwardMotionBeforeReachingTheWall(testCase)
             model=localModel("headOn",8);width=model.cfg.planner.guideHalfWidthMeters;
@@ -134,31 +134,40 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             [a,active]=predictiveSafetyGeometry.wallGuidance(x,[1;-1],model);
             testCase.verifyFalse(active);testCase.verifyEqual(a,[1;-1],AbsTol=0);
         end
-        function rotatingFrameTransportRetainsTheRequestedFrozenGeometryAcceleration(testCase)
-            model=localModel("turningCrossing",8);x=model.initialState;
-            target=model.target;target(10:11)=[.4;-.2];x(2)=3;x(5)=.3;
-            parameters=struct('speed',4,'inflation',.15);
-            [a,f]=predictiveSafetyGeometry.circulationField(x,target,model.cfg,parameters);
-            relative=f.rotation.'*a-f.transport;
-            radial=f.normal.'*relative+f.curvature*f.tangentSpeed^2;
-            tangential=f.tangent.'*relative-f.curvature*f.normalSpeed*f.tangentSpeed;
-            rate=model.cfg.planner.radialRate;
-            expected=-2*rate*f.normalSpeed-rate^2*(f.clearance-f.desiredClearance);
-            testCase.verifyEqual(radial,expected,AbsTol=1e-10);
-            testCase.verifyEqual(tangential,(f.rotation*f.tangent).'*f.tangentialAcceleration,AbsTol=1e-10);
+        function projectedVelocityGrazesTheBufferedFrozenFootprints(testCase)
+            model=localModel("headOn",8);x=model.initialState;
+            target=model.target;target(1:6)=[12;.4;0;0;0;0];
+            [~,field]=predictiveSafetyGeometry.velocityObstacleField(x,target,model.cfg,zeros(2,1),0,[]);
+            testCase.assertTrue(field.active);
+            shape=[model.cfg.vehicle.length/2;model.cfg.vehicle.width/2;model.cfg.vehicle.rectangleOffset];
+            minGap=Inf;
+            for t=linspace(0,3,301)
+                pose=x(1:3)+[t*field.projected;0];
+                minGap=min(minGap,predictiveSafetyGeometry.rectangle(pose,shape,target(1:3),target(8:11)));
+            end
+            testCase.verifyGreaterThanOrEqual(minGap,model.cfg.outputFeedback.clearanceMeters-1e-10);
+            testCase.verifyLessThan(minGap,model.cfg.outputFeedback.clearanceMeters+.002);
+        end
+        function anExpandingOccupiedRectangleCanThreatenZeroRelativeSpeed(testCase)
+            model=localModel("headOn",8);target=model.target;target(1:6)=[12;0;0;8;0;0];
+            offsets=[1,1,-1,-1;1,-1,1,-1];
+            [~,f]=predictiveSafetyGeometry.velocityObstacleField(model.initialState,target,model.cfg,zeros(2,1),0,offsets);
+            testCase.verifyEqual(f.desired,[0;0],AbsTol=1e-12);
+            testCase.verifyTrue(f.active);
+            testCase.verifyLessThan(f.projected(1),0);
+            testCase.verifyEqual(f.projected(2),0,AbsTol=1e-12);
         end
         function exactSymmetryDoesNotInventAPassingSide(testCase)
             model=localModel("headOn",8);model.target(1:6)=[12;0;0;0;0;0];
-            p=struct('speed',4,'inflation',0,'preferredAcceleration',zeros(2,1));
-            [a,f]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            preferred=zeros(2,1);inflation=0;
+            [a,f]=predictiveSafetyGeometry.velocityObstacleField(model.initialState,model.target,model.cfg,preferred,inflation,[]);
             testCase.verifyEqual(a(2),0,AbsTol=1e-10);
-            testCase.verifyEqual(f.tangentialAcceleration,zeros(2,1),AbsTol=1e-10);
+            testCase.verifyEqual(f.projected,zeros(2,1),AbsTol=1e-10);
             guide=predictiveSafetyGeometry.avoidanceGuide(model,16);
             testCase.verifyEqual(guide.states(:,1),model.initialState,AbsTol=0);
             testCase.verifyEqual(guide.states(2,:),zeros(1,17),AbsTol=1e-10);
             testCase.verifyFalse(guide.robustCertificate);
             testCase.verifyEqual(guide.inputs(1,:),zeros(1,16),AbsTol=1e-10);
-            testCase.verifyEqual(guide.states(2,:),zeros(1,17),AbsTol=1e-10);
         end
         function returnedStatesComeFromTheActualHeldInputModel(testCase)
             model=localModel("crossing",8);model.cfg.model.brakingRatioRateMaximum=1;
@@ -195,9 +204,9 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyTrue(all(isfinite(guide.inputs),'all'));
         end
         function aSmallPositiveRectangleGapDoesNotTriggerDiskAvoidance(testCase)
-            model=localModel("headOn",8);model.target(1:6)=[0;2;0;8;0;0];
+            model=localModel("headOn",8);model.target(1:6)=[0;2.01;0;8;0;0];
             guide=predictiveSafetyGeometry.avoidanceGuide(model,16);
-            testCase.verifyEqual(guide.nominalMinimumGap,.1,AbsTol=1e-6);
+            testCase.verifyEqual(guide.nominalMinimumGap,.11,AbsTol=1e-6);
             testCase.verifyFalse(guide.fieldActive);
             testCase.verifyTrue(isnan(guide.conflictStartSeconds));
         end
@@ -214,7 +223,7 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
         function crossingMotionGeneratesATransverseTrajectoryWithoutASideInput(testCase)
             model=localModel("intersectionCrossing",8);
             guide=predictiveSafetyGeometry.avoidanceGuide(model,40);
-            testCase.verifyGreaterThan(guide.inputs(1,1),0);
+            testCase.verifyGreaterThan(abs(guide.inputs(1,1)),1e-6);
             testCase.verifyEqual(guide.candidateCount,1);
         end
         function compactGuideReflectsWithTheCrossingTarget(testCase)
@@ -226,32 +235,31 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyEqual(mirrored.states,[1;-1;-1;1;-1;-1].*original.states,AbsTol=1e-8);
             testCase.verifyEqual(mirrored.inputs,[-1;1].*original.inputs,AbsTol=1e-8);
         end
-        function smallOppositeOffsetsProduceSmallOppositeFieldCorrections(testCase)
+        function oppositeOffsetsProduceReflectedCorrections(testCase)
             model=localModel("headOn",8);model.target(1:6)=[12;1e-6;0;0;0;0];
-            p=struct('speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
-            a=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            preferred=zeros(2,1);inflation=0;
+            a=predictiveSafetyGeometry.velocityObstacleField(model.initialState,model.target,model.cfg,preferred,inflation,[]);
             model.target(2)=-model.target(2);
-            b=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            b=predictiveSafetyGeometry.velocityObstacleField(model.initialState,model.target,model.cfg,preferred,inflation,[]);
             testCase.verifyEqual(a(2),-b(2),AbsTol=1e-10);
-            testCase.verifyLessThan(abs(a(2)),1e-3);
             testCase.verifyGreaterThan(abs(a(2)),0);
         end
         function mirroredTargetMotionMirrorsTheAvoidanceForce(testCase)
             model=localModel("intersectionCrossing",8);
-            p=struct('speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
-            left=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            preferred=zeros(2,1);inflation=0;
+            left=predictiveSafetyGeometry.velocityObstacleField(model.initialState,model.target,model.cfg,preferred,inflation,[]);
             mirrored=model.target;mirrored([2,3,6,11])=-mirrored([2,3,6,11]);
-            right=predictiveSafetyGeometry.circulationField(model.initialState,mirrored,model.cfg,p);
-            testCase.verifyGreaterThan(left(2),0);
+            right=predictiveSafetyGeometry.velocityObstacleField(model.initialState,mirrored,model.cfg,preferred,inflation,[]);
+            testCase.verifyGreaterThan(abs(left(2)),1e-6);
             testCase.verifyEqual(right,[left(1);-left(2)],AbsTol=1e-10);
         end
         function aTargetThatClearsBeforeArrivalDoesNotLeaveAVirtualWall(testCase)
             model=localModel("intersectionCrossing",8);
             model.target(4)=30;
-            p=struct('speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
-            [force,field]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            preferred=zeros(2,1);inflation=0;
+            [force,field]=predictiveSafetyGeometry.velocityObstacleField(model.initialState,model.target,model.cfg,preferred,inflation,[]);
             testCase.verifyEqual(force,zeros(2,1),AbsTol=1e-12);
-            testCase.verifyEqual(field.incidence,0);
+            testCase.verifyFalse(field.active);
         end
         function laterOccupancyCannotChangeEarlierFieldInputs(testCase)
             model=localModel("intersectionCrossing",8);
@@ -266,27 +274,27 @@ classdef circulationPlannerTest < matlab.unittest.TestCase
             testCase.verifyEqual(original(:,1:firstChanged-1),changed(:,1:firstChanged-1));
             testCase.verifyGreaterThan(norm(original(:,firstChanged:end)-changed(:,firstChanged:end),'fro'),0);
         end
-        function incidenceDependsOnPresentMotionWhenTargetAccelerationChanges(testCase)
+        function frozenGuideUsesOnlyPresentVelocity(testCase)
             model=localModel("intersectionCrossing",8);model.target(4)=16;
-            p=struct('speed',8,'inflation',0,'preferredAcceleration',zeros(2,1));
-            [~,steady]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            preferred=zeros(2,1);inflation=0;
+            [~,steady]=predictiveSafetyGeometry.velocityObstacleField(model.initialState,model.target,model.cfg,preferred,inflation,[]);
             model.target(5)=-16^2/(2*17.6);
-            [~,braking]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
-            testCase.verifyEqual(braking.incidence,steady.incidence);
+            [~,braking]=predictiveSafetyGeometry.velocityObstacleField(model.initialState,model.target,model.cfg,preferred,inflation,[]);
+            testCase.verifyEqual(braking.projected,steady.projected);
         end
         function localGuidanceDoesNotDependOnTheWorldCoordinateFrame(testCase)
             model=localModel("turningCrossing",8);
             model.target(10:11)=[.3;-.2];model.cfg.vehicle.rectangleOffset=[.2;.1];
-            p=struct('speed',8,'inflation',.1,'preferredAcceleration',[.2;-.1]);
-            [original,field]=predictiveSafetyGeometry.circulationField(model.initialState,model.target,model.cfg,p);
+            preferred=[.2;-.1];inflation=.1;
+            [original,field]=predictiveSafetyGeometry.velocityObstacleField(model.initialState,model.target,model.cfg,preferred,inflation,[]);
             angle=.7;rotation=[cos(angle),-sin(angle);sin(angle),cos(angle)];shift=[30;-20];
             x=model.initialState;x(1:2)=rotation*x(1:2)+shift;x(3)=x(3)+angle;
             target=model.target;target(1:2)=rotation*target(1:2)+shift;target(3)=target(3)+angle;
-            p.preferredAcceleration=rotation*p.preferredAcceleration;
-            [transformed,other]=predictiveSafetyGeometry.circulationField(x,target,model.cfg,p);
+            preferred=rotation*preferred;
+            [transformed,other]=predictiveSafetyGeometry.velocityObstacleField(x,target,model.cfg,preferred,inflation,[]);
             testCase.verifyEqual(transformed,rotation*original,AbsTol=1e-10);
-            testCase.verifyEqual(other.incidence,field.incidence,AbsTol=1e-10);
-            testCase.verifyEqual(other.tangentialAcceleration,rotation*field.tangentialAcceleration,AbsTol=1e-10);
+            testCase.verifyEqual(other.active,field.active);
+            testCase.verifyEqual(other.projected,rotation*field.projected,AbsTol=1e-10);
         end
         function aLongerRolloutExtendsExactlyTheSameFieldMotion(testCase,crossingSpeed)
             model=localModel("intersectionCrossing",crossingSpeed);
